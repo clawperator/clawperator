@@ -20,7 +20,7 @@ class AgentCommandExecutorDefault(
     private val commandExecutionMutex = Mutex()
 
     companion object {
-        private const val TAG = "[Operator-AgentEvent]"
+        private const val TAG = "[Clawperator-Command]"
         /** Message prefix for canonical-envelope build errors (not a Log tag override). */
         private const val CLAWPERATOR_RESULT_TAG = "ClawperatorResult"
     }
@@ -28,7 +28,7 @@ class AgentCommandExecutorDefault(
     override suspend fun execute(command: AgentCommand): TaskResult<UiActionExecutionResult> {
         if (commandExecutionMutex.isLocked) {
             Log.i(
-                "$TAG command_queued commandId=${command.commandId} taskId=${command.taskId} waiting_for_active_command=true",
+                "$TAG queued commandId=${command.commandId} taskId=${command.taskId} waiting_for_active_command=true",
             )
         }
 
@@ -40,7 +40,7 @@ class AgentCommandExecutorDefault(
                     val statusSink = LoggingTaskStatusSink(command.commandId, command.taskId)
 
                     Log.i(
-                        "$TAG command_start commandId=${command.commandId} taskId=${command.taskId} source=${command.source} timeoutMs=${command.timeoutMs} actionCount=${command.actions.size}",
+                        "$TAG start commandId=${command.commandId} taskId=${command.taskId} source=${command.source} timeoutMs=${command.timeoutMs} actionCount=${command.actions.size}",
                     )
 
                     val result =
@@ -54,7 +54,7 @@ class AgentCommandExecutorDefault(
                     when (result) {
                         is TaskResult.Success -> {
                             Log.i(
-                                "$TAG command_success commandId=${command.commandId} taskId=${command.taskId} stepCount=${result.value.stepResults.size}",
+                                "$TAG success commandId=${command.commandId} taskId=${command.taskId} stepCount=${result.value.stepResults.size}",
                             )
                             try {
                                 val canonicalLine = buildCanonicalSuccessLine(
@@ -71,7 +71,7 @@ class AgentCommandExecutorDefault(
                         is TaskResult.Failed -> {
                             Log.e(
                                 result.cause,
-                                "$TAG command_failure commandId=${command.commandId} taskId=${command.taskId} reason=${result.reason}",
+                                "$TAG failure commandId=${command.commandId} taskId=${command.taskId} reason=${result.reason}",
                             )
                             try {
                                 val canonicalLine = buildCanonicalFailureLine(
@@ -111,27 +111,27 @@ private class LoggingTaskStatusSink(
     private val taskId: String,
 ) : TaskStatusSink {
     companion object {
-        private const val TAG = "[Operator-AgentEvent]"
+        private const val TAG = "[Clawperator-Command]"
     }
 
     override fun emit(event: TaskEvent) {
         when (event) {
             is TaskEvent.StageStart -> {
-                Log.d("$TAG stage_start commandId=$commandId taskId=$taskId id=${event.id} label=${event.label}")
+                Log.d("$TAG stage-start commandId=$commandId taskId=$taskId id=${event.id} label=${event.label}")
             }
             is TaskEvent.StageSuccess -> {
-                Log.d("$TAG stage_success commandId=$commandId taskId=$taskId id=${event.id} data=${event.data}")
+                Log.d("$TAG stage-success commandId=$commandId taskId=$taskId id=${event.id} data=${event.data}")
             }
             is TaskEvent.StageFailure -> {
-                Log.e(event.throwable, "$TAG stage_failure commandId=$commandId taskId=$taskId id=${event.id} reason=${event.reason}")
+                Log.e(event.throwable, "$TAG stage-failure commandId=$commandId taskId=$taskId id=${event.id} reason=${event.reason}")
             }
             is TaskEvent.RetryScheduled -> {
                 Log.d(
-                    "$TAG stage_retry commandId=$commandId taskId=$taskId id=${event.stageId} attempt=${event.attempt}/${event.maxAttempts} delayMs=${event.nextDelayMs}",
+                    "$TAG stage-retry commandId=$commandId taskId=$taskId id=${event.stageId} attempt=${event.attempt}/${event.maxAttempts} delayMs=${event.nextDelayMs}",
                 )
             }
             is TaskEvent.Log -> {
-                Log.d("$TAG stage_log commandId=$commandId taskId=$taskId message=${event.message}")
+                Log.d("$TAG stage-log commandId=$commandId taskId=$taskId message=${event.message}")
             }
         }
     }
