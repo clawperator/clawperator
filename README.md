@@ -3,15 +3,11 @@
 Clawperator is an Android operator runtime app for LLM-controlled device automation.
 
 ## Current State
-This repository is in active migration from ActionTask to Clawperator.
-
-Target end state:
+This repository is the post-migration Clawperator runtime:
 - Android-first runtime shell app
 - Single activity
 - Controlled by OpenClaw/agent command ingress
-- Legacy ActionTask systems removed unless required for operator execution
-
-Migration plan: `docs/migrate-to-clawperator.md`
+- Legacy ActionTask migration plans removed from active docs
 
 ## Run Locally
 From repo root:
@@ -24,11 +20,8 @@ adb shell am start -n com.clawperator.operator.dev/clawperator.activity.MainActi
 ```
 
 ## Notes
-- `testDebug` currently has inherited baseline failures from pre-migration ActionTask code; tracked in `docs/migrate-to-clawperator.md` and `docs/migration-tracker.md`.
 - Firebase/FCM backend and ingestion paths were removed in migration Slice 3.1.
 
 ## Key Docs
-- `docs/migrate-to-clawperator.md`
-- `docs/migration-tracker.md`
-- `docs/migrate-to-agent-controlled.md`
 - `docs/operator-llm-playbook.md`
+- `docs/project-overview.md`
