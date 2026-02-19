@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string name="grant_system_alert_window_permission_toast">Grant \"Allow display over other apps\"</string>
+    <string name="system_alert_window_security_exception_toast">Try and find \"Display over other apps\" in system settings.</string>
+
+</resources>

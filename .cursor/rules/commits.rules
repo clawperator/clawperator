@@ -1,0 +1,47 @@
+# Commit Message Conventions
+
+Clawperator follows the [Conventional Commits](https://www.conventionalcommits.org/) specification with some project-specific adaptations.
+
+## Format
+```
+<type>: <description>
+
+[optional body]
+
+[optional footer(s)]
+```
+
+## Types
+- `feat`: New feature or enhancement (correlates with MINOR in semver)
+- `fix`: Bug fix (correlates with PATCH in semver)
+- `refactor`: Code changes that neither fix bugs nor add features
+- `doc`: Documentation changes only
+- `test`: Adding or updating tests
+- `chore`: Maintenance tasks, dependency updates, etc. (not refactoring)
+- `style`: Code style/formatting changes
+- `perf`: Performance improvements
+
+## Breaking Changes
+- Indicate breaking changes with a `!` before the colon
+  - Example: `feat!: change folder creation API`
+- Or use a `BREAKING CHANGE:` footer
+
+## Guidelines
+- Use present tense ("add feature" not "added feature")
+- Try and keep first line under 50 characters
+- Description should complete the sentence "This commit will..."
+- No period at the end of the description
+- Leave one blank line between title and body
+- Use body to explain what and why vs. how
+- Wrap body text at 64 characters for readability
+
+## Examples
+```
+feat: add Polish language support
+fix: prevent racing of requests
+refactor: simplify drag state management
+doc: update cursor rules
+test: add folder creation tests
+chore: update Kotlin to 1.9.0
+feat!: change folder creation API
+```

@@ -1,0 +1,55 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+indent_size = 4
+insert_final_newline = true
+trim_trailing_whitespace = true
+max_line_length = off
+
+[*.{kt,kts}]
+# Kotlin-specific rules
+indent_size = 4
+max_line_length = off
+insert_final_newline = true
+trim_trailing_whitespace = true
+# Enable trailing commas
+ij_kotlin_allow_trailing_comma = true
+ij_kotlin_allow_trailing_comma_on_call_site = true
+# Allow wildcard imports
+ktlint_standard_no-wildcard-imports = disabled
+# Disable filename matching class name rule
+ktlint_standard_filename = disabled
+# Disable comment wrapping rule
+ktlint_standard_comment-wrapping = disabled
+# Disable KDoc wrapping rule
+ktlint_standard_kdoc-wrapping = disabled
+# Disable consecutive comments rule
+ktlint_standard_no-consecutive-comments = disabled
+# Disable value parameter comment rule
+ktlint_standard_value-parameter-comment = disabled
+# Disable backing property naming rule
+ktlint_standard_backing-property-naming = disabled
+# Disable if-else wrapping rule
+ktlint_standard_if-else-wrapping = disabled
+# Disable property naming rule
+ktlint_standard_property-naming = disabled
+# Disable function naming rule
+ktlint_standard_function-naming = disabled
+
+[*.{xml,json}]
+indent_size = 2
+
+[*.{yml,yaml}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+
+[*.gradle.kts]
+indent_size = 4
+
+[{*.gradle,gradlew,gradlew.bat}]
+indent_size = 4 

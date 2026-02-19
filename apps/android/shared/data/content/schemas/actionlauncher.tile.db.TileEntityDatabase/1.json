@@ -1,0 +1,77 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "882aad20aacd5be1eeb969bb20600241",
+    "entities": [
+      {
+        "tableName": "tile_entities",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`tileId` TEXT NOT NULL, `placement` TEXT NOT NULL, `indexInParent` INTEGER, `defaultTitle` TEXT, `currentTitle` TEXT, `tileEvents` TEXT, `imageResourceHandle` TEXT, `panelType` TEXT, `systemWidgetHandle` TEXT, `flags` TEXT, PRIMARY KEY(`tileId`))",
+        "fields": [
+          {
+            "fieldPath": "tileId",
+            "columnName": "tileId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "placement",
+            "columnName": "placement",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "indexInParent",
+            "columnName": "indexInParent",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "defaultTitle",
+            "columnName": "defaultTitle",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "currentTitle",
+            "columnName": "currentTitle",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "tileEvents",
+            "columnName": "tileEvents",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "imageResourceHandle",
+            "columnName": "imageResourceHandle",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "panelType",
+            "columnName": "panelType",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "systemWidgetHandle",
+            "columnName": "systemWidgetHandle",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "flags",
+            "columnName": "flags",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "tileId"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '882aad20aacd5be1eeb969bb20600241')"
+    ]
+  }
+}

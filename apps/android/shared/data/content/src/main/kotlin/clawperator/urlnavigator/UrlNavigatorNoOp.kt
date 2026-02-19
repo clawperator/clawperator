@@ -1,0 +1,10 @@
+package clawperator.urlnavigator
+
+import clawperator.data.urlnavigator.UrlNavigatorDestinations
+
+class UrlNavigatorNoOp : UrlNavigator {
+    override suspend fun toUrl(
+        url: String,
+        destinations: UrlNavigatorDestinations,
+    ): Boolean = false
+}

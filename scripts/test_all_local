@@ -1,0 +1,10 @@
+#!/bin/bash
+# Run unit tests in every module that has them (app + shared:core:common, shared:core:toolkit,
+# shared:data:*, shared:app:di, shared:app:app-adapter, shared:test, etc.).
+# For on-device instrumentation tests use: ./gradlew connectedDebugAndroidTest
+set -x
+
+./gradlew --no-configuration-cache testDebugUnitTest
+
+echo -en '\a'
+

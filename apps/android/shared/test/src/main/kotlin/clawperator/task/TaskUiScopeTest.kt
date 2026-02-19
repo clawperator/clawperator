@@ -1,0 +1,234 @@
+package clawperator.task
+
+import action.log.Log
+import clawperator.task.runner.NodeMatcher
+import clawperator.task.runner.TaskRetry
+import clawperator.task.runner.TaskScrollDirection
+import clawperator.task.runner.TaskScrollResult
+import clawperator.task.runner.TaskUiNode
+import clawperator.task.runner.TaskUiScope
+import clawperator.uitree.ToggleState
+import clawperator.uitree.UiNode
+import clawperator.uitree.UiTree
+import clawperator.uitree.UiTreeAsciiParser
+import clawperator.uitree.UiTreeClickTypes
+import clawperator.uitree.UiTreeTraversal
+import clawperator.uitree.inferOnOffState
+import kotlin.time.Duration
+
+/**
+ * Test implementation of TaskUiScope that works with pre-populated UI trees
+ * instead of live accessibility services. This enables testing of UI workflows
+ * using ASCII UI tree snapshots.
+ */
+class TaskUiScopeTest(
+    private var currentUiTree: UiTree,
+) : TaskUiScope {
+    /**
+     * Updates the current UI tree state for testing scenario progression.
+     */
+    fun setUiTree(uiTree: UiTree) {
+        currentUiTree = uiTree
+    }
+
+    /**
+     * Parses ASCII UI tree output and sets it as the current state.
+     */
+    fun setUiTreeFromAscii(
+        ascii: String,
+        windowId: Int = -1,
+    ) {
+        currentUiTree = UiTreeAsciiParser.parse(ascii, windowId)
+    }
+
+    override suspend fun getValidatedText(
+        matcher: NodeMatcher,
+        retry: TaskRetry,
+        validator: (String) -> Boolean,
+    ): String {
+        val node =
+            findNodeByMatcher(matcher)
+                ?: throw IllegalStateException("No node found matching criteria")
+
+        if (!validator(node.label)) {
+            throw IllegalStateException("Text validation failed for: ${node.label}")
+        }
+
+        return node.label
+    }
+
+    override suspend fun waitForNode(
+        matcher: NodeMatcher,
+        retry: TaskRetry,
+    ): TaskUiNode {
+        val node =
+            findNodeByMatcher(matcher)
+                ?: throw IllegalStateException("No node found matching criteria")
+
+        return TaskUiNode(
+            resourceId = node.resourceId,
+            label = node.label,
+            clickable = node.isClickable,
+            role = node.role.name.lowercase(),
+            bounds = node.bounds,
+            debugPath = node.id.value,
+        )
+    }
+
+    override suspend fun getText(
+        matcher: NodeMatcher,
+        retry: TaskRetry,
+    ): String {
+        val node =
+            findNodeByMatcher(matcher)
+                ?: throw IllegalStateException("No node found matching criteria")
+
+        return node.label
+    }
+
+    override suspend fun click(
+        matcher: NodeMatcher,
+        clickTypes: UiTreeClickTypes,
+        retry: TaskRetry,
+    ) {
+        val node =
+            findNodeByMatcher(matcher)
+                ?: throw IllegalStateException("No node found matching criteria")
+
+        if (!node.isClickable) {
+            throw IllegalStateException("Node is not clickable: ${node.label}")
+        }
+
+        // In a real test, you might update the UI tree state here to simulate the click result
+        println("[TaskUiScopeTest] Clicked node: ${node.label}")
+    }
+
+    override suspend fun scrollUntil(
+        target: NodeMatcher,
+        container: NodeMatcher?,
+        direction: TaskScrollDirection,
+        maxSwipes: Int,
+        distanceRatio: Float,
+        settleDelay: Duration,
+        retry: TaskRetry,
+        findFirstScrollableChild: Boolean,
+    ): TaskScrollResult {
+        // In test implementation, just check if the target is already there
+        val targetNode = findNodeByMatcher(target)
+        return if (targetNode != null) {
+            TaskScrollResult.Found(
+                TaskUiNode(
+                    resourceId = targetNode.resourceId,
+                    label = targetNode.label,
+                    clickable = targetNode.isClickable,
+                    role = targetNode.role.name.lowercase(),
+                    bounds = targetNode.bounds,
+                    debugPath = targetNode.id.value,
+                ),
+            )
+        } else {
+            TaskScrollResult.NotFoundExhausted
+        }
+    }
+
+    override suspend fun scrollIntoView(
+        target: NodeMatcher,
+        container: NodeMatcher?,
+        direction: TaskScrollDirection,
+        maxSwipes: Int,
+        distanceRatio: Float,
+        settleDelay: Duration,
+        retry: TaskRetry,
+        findFirstScrollableChild: Boolean,
+    ): TaskUiNode {
+        val result = scrollUntil(target, container, direction, maxSwipes, distanceRatio, settleDelay, retry, findFirstScrollableChild)
+        return when (result) {
+            is TaskScrollResult.Found -> result.node
+            is TaskScrollResult.NotFoundExhausted -> throw IllegalStateException("Target not found after scrolling")
+        }
+    }
+
+    private fun findNodeByMatcher(matcher: NodeMatcher): UiNode? {
+        // Convert NodeMatcher criteria to UiTreeTraversal search
+        return UiTreeTraversal.findFirst(currentUiTree) { uiNode ->
+            // Create a TaskUiNode to test the matcher against
+            val taskUiNode =
+                TaskUiNode(
+                    resourceId = uiNode.resourceId,
+                    label = uiNode.label,
+                    clickable = uiNode.isClickable,
+                    role = uiNode.role.name.lowercase(),
+                    bounds = uiNode.bounds,
+                    debugPath = uiNode.id.value,
+                )
+            matcher.matches(taskUiNode)
+        }
+    }
+
+    /**
+     * Helper method to get the current toggle state within a specific container using NodeMatcher.
+     */
+    override suspend fun getCurrentToggleState(
+        target: NodeMatcher,
+        retry: TaskRetry,
+    ): ToggleState {
+        // For test implementation, we don't need retry logic since we have static UI trees
+
+        // Find the container using the NodeMatcher
+        val container =
+            clawperator.uitree.UiTreeTraversal.findFirst(currentUiTree) { uiNode ->
+                val taskUiNode =
+                    TaskUiNode(
+                        resourceId = uiNode.resourceId,
+                        label = uiNode.label,
+                        clickable = uiNode.isClickable,
+                        role = uiNode.role.name.lowercase(),
+                        bounds = uiNode.bounds,
+                        debugPath = uiNode.id.value,
+                    )
+                target.matches(taskUiNode)
+            } ?: return ToggleState.Unknown
+
+        // Create a temporary sub-tree rooted at the container to search within
+        val subTree = clawperator.uitree.UiTree(root = container, windowId = currentUiTree.windowId)
+        return subTree.inferOnOffState()
+    }
+
+    /**
+     * Helper method to set the toggle state within a specific container using NodeMatcher.
+     */
+    override suspend fun setCurrentToggleState(
+        target: NodeMatcher,
+        desiredState: ToggleState,
+        retry: TaskRetry,
+    ): ToggleState {
+        // For test implementation, we simulate setting the toggle state
+        // In a real implementation, this would click the appropriate button
+        // For testing, we'll just return the desired state
+        Log.d("TaskUiScopeTest", "Simulating setting toggle state to: $desiredState")
+        return desiredState
+    }
+
+    /**
+     * Helper method to find a specific button within a toggle container (test implementation).
+     */
+    private suspend fun findButtonInContainer(
+        containerMatcher: NodeMatcher,
+        buttonLabel: String,
+    ): clawperator.uitree.UiNode? {
+        // For test implementation, we don't need to actually find UI nodes
+        // This method is primarily used in the production implementation
+        return null
+    }
+
+    /**
+     * Click a specific UiNode directly (test implementation).
+     */
+    private suspend fun clickExact(
+        node: clawperator.uitree.UiNode,
+        clickTypes: clawperator.uitree.UiTreeClickTypes,
+    ) {
+        // For test implementation, we simulate clicking
+        Log.d("TaskUiScopeTest", "Simulating click on node: ${node.label}")
+    }
+}
