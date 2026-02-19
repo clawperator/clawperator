@@ -1,0 +1,49 @@
+# Repository Guidelines
+
+## Mission
+Clawperator is an Android operator runtime for LLM-driven device control.
+
+Current product target:
+- Dumb single-activity Android shell app
+- Controlled externally by OpenClaw-driven commands
+- Local operator execution and observability on device
+
+Out of scope for this migration:
+- Firebase/FCM remote control path
+- User/account management
+- Broad launcher UI/pixel rendering surfaces
+- `/apps/node` implementation
+
+## Source of Truth
+- Operator recipes/guides: `docs/operator-llm-playbook.md`, `ui-trees/`
+- Project context: `docs/project-overview.md`
+
+## Required Iteration Loop
+Every non-trivial change should do all steps before commit:
+1. Make focused changes.
+2. Compile: `./gradlew :app:assembleDebug`
+3. Run unit tests: `./gradlew testDebugUnitTest` (or `./gradlew unitTest` for all modules)
+4. Install on device: `./gradlew :app:installDebug`
+5. Launch smoke: `adb shell am start -n <applicationId>/<mainActivity>`
+6. Run slice-specific operator smoke checks.
+7. Commit and continue.
+
+If compile, unit tests, install, or smoke fails, fix or explicitly document baseline/inherited failure before moving on.
+
+## Build & Test Commands
+- `./scripts/clawperator_grant_android_permissions.sh --package <pkg>`
+- `./gradlew :app:assembleDebug` - Build debug APK
+- `./gradlew unitTest` - Run unit tests for all modules
+- `./gradlew :app:installDebug` - Install debug APK on device
+- `./scripts/clawperator_validate_receiver.sh`
+
+## Coding & Commit Conventions
+- Use Conventional Commits (`feat:`, `fix:`, `refactor:`, `chore:`, `docs:`).
+- Keep commits small and migration-slice scoped.
+- Prefer deleting full unused modules/dependency edges instead of leaving dead code.
+- Run formatting/quality checks for touched code when needed:
+  - `./scripts/apply_coding_standards.sh -f`
+
+## Migration-Specific Constraints
+- Preserve operator control path reliability while evolving features.
+- Keep package/application identifier consistent with current repo defaults (`com.clawperator.operator*` variants).
