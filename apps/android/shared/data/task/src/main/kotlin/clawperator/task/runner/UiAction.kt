@@ -72,6 +72,14 @@ enum class UiSnapshotFormat {
     Json,
 }
 
+enum class UiSnapshotActualFormat(
+    val wireValue: String,
+) {
+    Ascii("ascii"),
+    Json("json"),
+    HierarchyXml("hierarchy_xml"),
+}
+
 enum class UiTextValidator {
     Temperature,
 }

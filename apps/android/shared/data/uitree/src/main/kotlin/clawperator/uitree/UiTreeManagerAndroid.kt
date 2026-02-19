@@ -11,7 +11,9 @@ import clawperator.accessibilityservice.dispatchLongPress
 import clawperator.accessibilityservice.dispatchSingleTap
 import clawperator.accessibilityservice.dispatchSwipe
 import clawperator.accessibilityservice.firstClickableAncestorOrSelf
+import clawperator.accessibilityservice.firstEditableAncestorOrSelf
 import clawperator.accessibilityservice.firstFocusableAncestorOrSelf
+import android.os.Bundle
 
 class UiTreeManagerAndroid(
     private val accessibilityServiceManager: AccessibilityServiceManager,
@@ -41,6 +43,40 @@ class UiTreeManagerAndroid(
 
         Log.d("[UiTreeManager] All click types failed for id=${uiNode.id}")
         return false
+    }
+
+    override suspend fun setText(
+        uiNode: UiNode,
+        text: String,
+        submit: Boolean,
+    ): Boolean {
+        val accessibilityNodeInfo = uiNode.accessibilityNodeInfo as? AccessibilityNodeInfo ?: return false
+        val target = accessibilityNodeInfo.firstEditableAncestorOrSelf() ?: accessibilityNodeInfo
+
+        // Best-effort focus before setting text.
+        if (!target.isFocused) {
+            target.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
+            target.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+        }
+
+        val args =
+            Bundle().apply {
+                putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text)
+            }
+
+        val setTextSucceeded = target.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
+        if (!setTextSucceeded) {
+            Log.d("[UiTreeManager] ACTION_SET_TEXT failed for id=${uiNode.id} on ${target.debugNode()}")
+            return false
+        }
+
+        if (submit) {
+            // Not all API levels/vendors expose a reliable IME submit action here.
+            // Best-effort: click target after text set to trigger app-side listeners.
+            target.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+        }
+
+        return true
     }
 
     override suspend fun swipeWithinVertical(

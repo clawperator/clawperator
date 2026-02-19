@@ -5,6 +5,7 @@ import android.accessibilityservice.AccessibilityService
 import clawperator.accessibilityservice.AccessibilityServiceManager
 import clawperator.accessibilityservice.buildUiTree
 import clawperator.accessibilityservice.currentAccessibilityService
+import clawperator.accessibilityservice.toUiAutomatorHierarchyDump
 
 class UiTreeInspectorAndroid(
     private val accessibilityServiceManager: AccessibilityServiceManager,
@@ -40,6 +41,33 @@ class UiTreeInspectorAndroid(
 //            logTreeSummary(tree)
             }
     }
+
+    override suspend fun getCurrentUiHierarchyDump(): String? {
+        val service = accessibilityServiceManager.currentAccessibilityService
+        if (service == null) {
+            Log.d("[Operator-UxInspector] Accessibility service is not available")
+            return null
+        }
+        val rootNode = service.rootInActiveWindow
+        if (rootNode == null) {
+            Log.d("[Operator-UxInspector] Root node is null")
+            return null
+        }
+        val rotation = getDisplayRotation(service)
+
+        return try {
+            rootNode.toUiAutomatorHierarchyDump(rotation = rotation)
+        } finally {
+            rootNode.recycle()
+        }
+    }
+
+    private fun getDisplayRotation(service: AccessibilityService): Int =
+        try {
+            service.display?.rotation ?: 0
+        } catch (e: Exception) {
+            0
+        }
 
     private fun getScreenDimensions(service: AccessibilityService): Pair<Int, Int> =
         try {

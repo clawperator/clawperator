@@ -184,4 +184,20 @@ interface TaskUiScope {
         desiredState: ToggleState,
         retry: TaskRetry = TaskRetryPresets.UiReadiness,
     ): ToggleState
+
+    /**
+     * Enters text into a UI element that matches [matcher].
+     *
+     * @param matcher NodeMatcher containing the criteria to match
+     * @param text Text to set on the target field
+     * @param submit If true, also dispatches an IME enter action after setting text
+     * @param retry Retry configuration (defaults to no retry)
+     * @throws Exception if no matching element is found or text entry fails
+     */
+    suspend fun enterText(
+        matcher: NodeMatcher,
+        text: String,
+        submit: Boolean = false,
+        retry: TaskRetry = TaskRetry.None,
+    )
 }

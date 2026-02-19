@@ -14,6 +14,20 @@ interface UiTreeManager {
     ): Boolean
 
     /**
+     * Sets text on the given [uiNode].
+     *
+     * @param uiNode The node to set text on
+     * @param text Text to set
+     * @param submit If true, dispatches IME enter after setting text
+     * @return true if text was entered successfully
+     */
+    suspend fun setText(
+        uiNode: UiNode,
+        text: String,
+        submit: Boolean = false,
+    ): Boolean
+
+    /**
      * Performs a vertical swipe gesture within the bounds of the given [uiNode].
      * Used for scrolling or other directional gestures.
      *

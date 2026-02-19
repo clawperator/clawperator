@@ -1,0 +1,472 @@
+# Clawperator Node Runtime and API Design
+
+Product naming:
+
+- Product: `Clawperator`
+- Legacy Android module/package naming in current codebase: `ActionTask` (temporary during migration)
+- Repository rename planned: TBD
+
+## Purpose
+
+Define how agents execute Android automations through Clawperator with deterministic inputs/outputs and no direct recipe-specific shell scripting.
+
+Execution model:
+
+1. Agents call Clawperator CLI/API.
+2. Clawperator performs `adb` and Android tooling interactions.
+3. Clawperator sends validated runtime commands to Android (`ACTION_AGENT_COMMAND`).
+4. Clawperator returns structured execution results.
+
+Critical requirement:
+
+- Skill artifacts are optional.
+- If no artifact exists, or an artifact is wrong/stale due to UI drift, feature flags, staged rollouts, or account-level variants, agents must still execute using generic runtime actions and live UI observation.
+
+Agent-customer policy:
+
+- The **Clawperator Node runtime interface** (CLI + HTTP API) is the primary/default interface for agents.
+- The Android APK/runtime service is an execution target, not the agent-facing integration surface.
+- Agents should not need direct `adb` for common tasks.
+- Raw `adb` remains available as an explicit fallback for edge cases and debugging.
+
+Design implication:
+
+- If a workflow is common (for example package listing, screenshots, device discovery, app open/close, execution, snapshot, logs), provide a first-class Clawperator command/API for it.
+
+## v1 Delivery Shape: CLI-first
+
+Primary interface is CLI with JSON input/output.
+
+Commands:
+
+- `clawperator doctor`
+- `clawperator doctor --fix`
+- `clawperator devices`
+- `clawperator packages list [--device-id <id>]`
+- `clawperator skills list`
+- `clawperator skills get <skill_id>`
+- `clawperator skills compile-artifact <skill_id> --artifact <name> --vars <json>`
+- `clawperator skills sync --ref <git-ref>`
+- `clawperator execute --execution <json-or-file>`
+- `clawperator execute best-effort --goal <text> [--device-id <id>]`
+- `clawperator observe snapshot [--device-id <id>]`
+- `clawperator inspect ui [--device-id <id>]`
+- `clawperator act click --selector <json> [--device-id <id>]`
+- `clawperator act read --selector <json> [--device-id <id>]`
+- `clawperator act wait --selector <json> [--device-id <id>]`
+
+Optional HTTP mode:
+
+- `clawperator --serve`
+- HTTP routes are a thin wrapper around the same CLI/application service layer.
+
+## API-First, ADB-Capable
+
+This runtime is intentionally **API-first**:
+
+1. Agents should use Clawperator commands/APIs by default.
+2. Clawperator should wrap common Android/adb operations behind stable, typed contracts.
+3. Direct adb usage is a fallback path, not the baseline integration model.
+
+Direct adb is still supported for:
+
+- unsupported/emerging edge cases,
+- low-level diagnostics,
+- temporary gaps before a stable Clawperator primitive exists.
+
+When fallback adb is used, Clawperator should still encourage convergence back to first-class APIs by:
+
+- exposing equivalent primitives as they become common,
+- keeping result/error formats structured and machine-readable,
+- documenting fallback-to-API migration paths.
+
+## Skill Artifact Optionality and Failure Handling
+
+Skill artifacts are optional, but fallback behavior is explicit:
+
+1. If artifact compile succeeds, execute compiled execution.
+2. If artifact compile fails, Clawperator returns a structured compile error and does not auto-fallback.
+3. If runtime verification fails, Clawperator returns a structured execution failure and does not auto-retry with alternate strategy.
+4. Agent chooses next step (retry, inspect UI, switch to direct actions, or abort).
+
+Runtime must expose a `mode` on each execution:
+
+- `artifact_compiled`
+- `direct`
+
+This keeps behavior deterministic and avoids hidden control-flow in the runtime.
+
+## Execution Unit Contract
+
+Use one term everywhere: `execution`.
+
+- `compile` produces an `execution`.
+- `execute` runs an `execution`.
+
+Execution schema aligns with Android `AgentCommand` constraints.
+
+Execution input may come from:
+
+1. skill artifact compile output, or
+2. direct action list authored by agent/tooling.
+
+Example execution:
+
+```json
+{
+  "commandId": "cmd-123",
+  "taskId": "task-123",
+  "source": "openclaw",
+  "timeoutMs": 90000,
+  "actions": [
+    { "id": "close", "type": "close_app", "params": { "applicationId": "com.example.app" } },
+    { "id": "open", "type": "open_app", "params": { "applicationId": "com.example.app" } },
+    { "id": "wait", "type": "sleep", "params": { "durationMs": 3000 } }
+  ]
+}
+```
+
+## Device Selection Policy (v1)
+
+`deviceId?: string` is supported on execute/observe.
+
+Selection behavior:
+
+1. If exactly one connected device exists and `deviceId` is omitted, use that device.
+2. If more than one connected device exists, `deviceId` is required.
+3. If provided `deviceId` is not connected in `device` state, fail preflight.
+
+## Agentic Best-Effort Mode
+
+Best-effort mode is a first-class execution path for unknown or drifting UIs.
+
+Behavior goals:
+
+1. Observe current UI (`snapshot_ui`).
+2. Identify likely anchors (toolbar/tab/menu/button/search patterns).
+3. Attempt constrained navigation/action.
+4. Re-observe and verify progress.
+5. Retry within safety bounds.
+
+Best-effort does not imply unsafe freeform behavior; all attempts remain within validated runtime action limits and capability policy.
+
+Important ownership split:
+
+- Clawperator provides primitives and structured observations.
+- The agent owns exploration policy/strategy.
+- Clawperator should not silently invent fallback control flow.
+
+Cardinality drift handling:
+
+- Execution should tolerate mismatches between recipe assumptions and live UI (for example expected second device tile but only one exists).
+- Runtime returns structured ambiguity/partial outcomes rather than hard-failing every mismatch.
+- Agent decides whether to proceed with alternate target selection or stop.
+
+## Result Transport Channel (v1 choice)
+
+Chosen v1 mechanism:
+
+- logcat JSON envelope with strict prefix.
+
+Required Android emission format (single line):
+
+- `[Clawperator-Result] {"commandId":"...","taskId":"...","status":"success|failed","stepResults":[...],"error":null}`
+
+Current implementation note:
+- Android currently emits stage/command lifecycle logs with tag prefix `[Operator-AgentEvent]`.
+- The canonical `[Clawperator-Result]` / `[Clawperator-Event]` envelope format is the target transport contract for dedicated result envelopes.
+
+Rules:
+
+1. Exactly one terminal result envelope per `commandId`.
+2. Envelope payload must be valid single-line JSON.
+3. Clawperator parser filters by `commandId` and prefix.
+4. Non-envelope logs are ignored for result semantics.
+
+This removes ad-hoc scraping patterns and provides deterministic parsing until a stronger transport is added.
+
+Additionally, intermediate observation envelopes may be emitted with prefix:
+
+- `[Clawperator-Event] {json...}`
+
+This supports agent feedback loops during best-effort execution.
+
+## Safety Bounds (hard constants)
+
+Public limits (v1):
+
+- `MAX_EXECUTION_ACTIONS = 50`
+- `MAX_EXECUTION_TIMEOUT_MS = 120000`
+- `MIN_EXECUTION_TIMEOUT_MS = 1000`
+- `MAX_PAYLOAD_BYTES = 64000`
+- `MAX_RETRY_ATTEMPTS_PER_STEP = 10`
+- `MAX_SNAPSHOT_LINES = 2000`
+- `MAX_SNAPSHOT_BYTES = 262144`
+
+Action policy:
+
+- denylist by default for unsupported/unsafe action types
+- allow only runtime-supported actions in v1
+
+Best-effort specific bounds:
+
+- `MAX_BEST_EFFORT_STEPS = 30`
+- `MAX_BEST_EFFORT_RUNTIME_MS = 180000`
+- `MAX_CONSECUTIVE_FAILED_ATTEMPTS = 5`
+
+Supported action types (v1):
+
+- `open_app`
+- `close_app`
+- `wait_for_node`
+- `click`
+- `scroll_and_click`
+- `read_text`
+- `snapshot_ui`
+- `sleep`
+
+## Doctor and Dependency Management
+
+`clawperator doctor` checks:
+
+1. `adb` installed and executable
+2. adb server reachable
+3. connected devices and states
+4. target package presence (optional input)
+5. accessibility service status (advisory)
+6. `scrcpy` installed (recommended for read-only device observation during automation)
+
+`clawperator doctor --fix` capabilities (best effort):
+
+1. install/update Android platform-tools (`adb`)
+2. install cmdline-tools if missing (optional)
+3. restart adb server
+4. install `scrcpy` when supported by host package manager (for example Homebrew on macOS)
+5. print exact remediation when automatic fix is unavailable
+
+Docker is optional and not required for v1.
+
+## Skill Integration Mechanism
+
+Canonical source of skills:
+
+- `clawperator-skills` repository
+
+Distribution model:
+
+1. `clawperator-skills` CI generates `skills-index.json` on `main`.
+2. `clawperator skills sync --ref <ref>` pulls skills + index at a pinned ref.
+3. Local cache stores synced artifacts for deterministic offline execution.
+
+Runtime should execute against cached/pinned skill content, not live network fetches during execution.
+
+Skill compilation requirements are defined in:
+
+- `docs/skill-design.md`
+
+When skill artifacts are missing/stale, runtime can still execute direct executions supplied by the agent.
+
+## Skill Implementation Language Strategy
+
+To set a maintainable baseline for future skills:
+
+1. Preferred language for new non-trivial skills: Node.js with TypeScript.
+2. Bash is allowed only for thin wrappers and simple glue.
+3. Python is a planned secondary path after Node contracts and tooling are stable.
+
+Rationale:
+
+- Better testability, typing, and reuse for parsing-heavy and multimodal workflows.
+- Safer payload construction and lower shell-quoting risk than large Bash scripts.
+- Cleaner evolution toward SDK-backed skill execution.
+
+Migration policy:
+
+- Do not mass-rewrite all existing Bash skills immediately.
+- For new high-value or high-complexity skills, prefer Node.js/TypeScript implementations.
+- Temporary Bash implementations (including the current Life360 flow) are acceptable only as stopgaps and must be queued for early migration once minimal Node skill SDK/runtime helpers are in place.
+
+## Agent Handoff Notes (2026-02)
+
+These notes are implementation-critical for upcoming Node skill/runtime work:
+
+1. ADB target selection must be explicit when multiple devices are connected.
+   - Current real-world setup often includes both a physical phone and an emulator.
+   - Execution should fail fast with a clear error if multiple devices exist and no `deviceId`/serial is provided.
+   - Every adb/logcat/broadcast/screencap call must consistently route through the selected device.
+
+2. Broadcast payload transport must avoid shell interpolation risks.
+   - Do not construct `adb shell ...` commands by embedding untrusted JSON into one double-quoted shell string.
+   - Use argument-safe invocation patterns, or robust escaping when forced through a shell boundary.
+   - Treat user-provided query text as untrusted input for command transport.
+
+3. Multimodal skill outputs should return file references, not binary blobs.
+   - Current practical contract: return `SCREENSHOT|path=<absolute_path>`.
+   - Keep text output as primary; image output should be optional and additive.
+   - Prefer deterministic local output directories and explicit file naming.
+
+4. UI overlays/dialogs are a first-class runtime concern.
+   - App flows (for example Life360) can surface blocking dialogs after navigation, not only on app launch.
+   - Overlay detection/dismissal must be reusable and stage-aware (pre-navigation, detail, pre-capture).
+   - Screenshot capture should happen only after overlay checks; if impossible, emit a clear fallback note.
+
+5. Runtime output should distinguish data quality from capture context.
+   - Example pattern: structured detail lines plus `SCREENSHOT_NOTE|...` when fallback capture strategy is used.
+   - This helps downstream agents/users interpret whether visual context reflects the same UI state as extracted text.
+
+## Fallback Guidance Artifact
+
+Clawperator should ship a static guidance document for agent recovery loops:
+
+- `docs/fallback-instructions.md`
+
+Failure responses should include:
+
+1. machine-readable error code
+2. short remediation hint
+3. reference path to fallback guidance doc
+
+Example fields:
+
+- `error.code` (for example `RECIPE_COMPILE_FAILED`, `VERIFY_FAILED`)
+- `error.hint`
+- `error.fallback_instructions_path`
+
+## Agent-Friendly Command and Alias Layer
+
+Because agents are primary customers, Clawperator should accept intuitive aliases that normalize to canonical actions.
+
+Examples:
+
+- `tap` -> `click`
+- `press` -> `click`
+- `long_press` -> `click` with long-click params
+- `wait_for` -> `wait_for_node`
+- `find` -> `wait_for_node`
+- `read` -> `read_text`
+- `snapshot` -> `snapshot_ui`
+- `sleep` -> `sleep`
+
+Rules:
+
+1. Canonical form is stored and logged.
+2. Aliases are input-only conveniences.
+3. Alias table is explicit/versioned (no fuzzy guessing in parser).
+
+## Future Input Primitive: Region-Based Tap
+
+To reduce brittle coordinate magic numbers in skills, add a first-class region tap primitive.
+
+Goal:
+
+- Let callers specify relative screen regions (for example `top_left`, `top_right`, `center`) instead of raw `x,y`.
+- Runtime computes final coordinates using current device metrics and safe-area policy.
+
+Suggested contract:
+
+- `act.tap_region` with:
+  - `region`: enum (`top_left`, `top_right`, `center`, `bottom_left`, `bottom_right`, etc.)
+  - `insetPolicy`: enum (`exclude_system_bars`, `include_full_screen`)
+  - `offsetPx` (optional): fine adjustment after anchor selection
+
+Runtime responsibilities:
+
+1. Resolve display size/orientation.
+2. Apply status/navigation bar insets based on `insetPolicy`.
+3. Emit resolved coordinates in execution results for observability.
+4. Reject out-of-bounds taps with structured validation errors.
+
+## Optional HTTP Wrapper (when `--serve` is enabled)
+
+Suggested endpoints:
+
+- `GET /v1/doctor`
+- `POST /v1/doctor/fix`
+- `GET /v1/devices`
+- `GET /v1/skills`
+- `GET /v1/skills/:skillId`
+- `POST /v1/skills/:skillId/compile-artifact`
+- `POST /v1/executions/execute`
+- `POST /v1/executions/best-effort`
+- `GET /v1/executions/:executionId`
+- `GET /v1/executions/:executionId/events`
+- `POST /v1/observe/snapshot`
+- `POST /v1/inspect/ui`
+- `POST /v1/act/click`
+- `POST /v1/act/read`
+- `POST /v1/act/wait`
+
+HTTP contract mirrors CLI behavior exactly.
+
+## Architecture Modules
+
+- `src/cli/*`
+  - command handlers and argument parsing
+- `src/domain/doctor/*`
+  - prerequisites and auto-fix logic
+- `src/domain/devices/*`
+  - adb discovery and selection
+- `src/domain/skills/*`
+  - sync/list/get/compile-artifact
+- `src/domain/executions/*`
+  - validation, run, state transitions
+- `src/adapters/android-bridge/*`
+  - adb broadcast + logcat result envelope parsing
+- `src/contracts/*`
+  - schema constants, JSON types
+
+## Determinism and Validation Requirements
+
+1. Skill artifact compile must be pure and deterministic.
+2. Execution validation must occur before any adb call.
+3. Every run must emit correlated IDs: `executionId`, `commandId`, `taskId`, `deviceId`.
+4. Side-effecting executions must include verification signals in step results.
+5. Direct/fallback executions must include explicit mode/status metadata.
+6. Artifact compile must fail if required input variables are missing (no implicit PII/user-literal substitution).
+
+## Testing Strategy
+
+Clawperator should define layered tests, with real-device execution as a first-class requirement.
+
+1. Unit tests (Node/CLI)
+   - execution schema validation and hard bounds
+   - device selection policy
+   - alias normalization to canonical actions
+   - result envelope parser correctness
+2. Integration tests (mock adb/logcat)
+   - doctor/device discovery behavior
+   - compile -> execute orchestration
+   - failure contracts and fallback instruction pointers
+3. Android instrumentation tests
+   - `ACTION_AGENT_COMMAND` execution path
+   - `[Clawperator-Result]` envelope emission
+   - step result mapping and verification semantics
+4. Real-device tests
+   - run a baseline skill/execution on a known installed app (current baseline can be Google Home)
+   - verify end-to-end reliability across close/open/session policy behavior
+5. Future dedicated test APK
+   - create a controlled Android app exposing stable test UI elements/states
+   - migrate core conformance tests to this APK to reduce third-party app drift risk
+
+## Security and Policy
+
+1. Capability-based execution gating (from skill/artifact metadata).
+2. Per-profile allowlist/denylist for capabilities and packages.
+3. Disable dangerous capabilities by default (`purchase_risk` off unless explicit policy).
+4. Audit trail for compile, execute, and result envelopes.
+5. Best-effort mode still obeys capability policy and hard limits.
+
+## Phased Plan
+
+1. Phase 1
+   - CLI foundation (`doctor`, `devices`, `execute`, `observe snapshot`, basic `act` commands)
+   - result envelope parsing with strict prefix
+   - hard limits and validation constants
+2. Phase 2
+   - skills sync/list/get/compile-artifact
+   - cached pinned-ref execution + explicit fallback/direct modes
+3. Phase 3
+   - `--serve` HTTP wrapper
+   - SSE event streaming + alias normalization layer
+4. Phase 4
+   - migrate from logcat envelope to stronger transport if needed

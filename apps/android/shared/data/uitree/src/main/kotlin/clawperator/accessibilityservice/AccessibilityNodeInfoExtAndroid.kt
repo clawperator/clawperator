@@ -599,3 +599,125 @@ suspend fun AccessibilityService.dispatchSwipe(
         if (!accepted) cont.resume(false)
     }
 }
+
+// Track 1 Migration Additions
+
+/**
+ * Finds the first editable ancestor of this node (or itself) by walking up the parent hierarchy.
+ * Checks for direct editability or support for ACTION_SET_TEXT.
+ */
+fun AccessibilityNodeInfo.firstEditableAncestorOrSelf(): AccessibilityNodeInfo? {
+    var current: AccessibilityNodeInfo? = this
+    var depth = 0
+    while (current != null && depth < 8) {
+        val supportsSetText = current.actionList?.any { it.id == AccessibilityNodeInfo.ACTION_SET_TEXT } ?: false
+        if (current.isEditable || supportsSetText) return current
+        val parent =
+            try {
+                current.parent
+            } catch (_: Exception) {
+                null
+            }
+        if (parent == null) break
+        if (current !== this) current.recycleSafe()
+        current = parent
+        depth++
+    }
+    if (current !== this) current?.recycleSafe()
+    return null
+}
+
+/**
+ * Generates a raw Android hierarchy dump in a `uiautomator dump`-compatible shape.
+ * The structure intentionally preserves raw class names and node hierarchy.
+ */
+fun AccessibilityNodeInfo.toUiAutomatorHierarchyDump(rotation: Int = 0): String {
+    val builder = StringBuilder()
+    builder.appendLine("<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>")
+    builder.appendLine("<hierarchy rotation=\"$rotation\">")
+    appendUiAutomatorNodeXml(
+        node = this,
+        indexInParent = 0,
+        indent = "  ",
+        out = builder,
+    )
+    builder.appendLine("</hierarchy>")
+    return builder.toString()
+}
+
+private fun appendUiAutomatorNodeXml(
+    node: AccessibilityNodeInfo,
+    indexInParent: Int,
+    indent: String,
+    out: StringBuilder,
+) {
+    val bounds = android.graphics.Rect()
+    node.getBoundsInScreen(bounds)
+    val boundsText = "[${bounds.left},${bounds.top}][${bounds.right},${bounds.bottom}]"
+
+    val attrs =
+        linkedMapOf(
+            "index" to indexInParent.toString(),
+            "text" to (node.text?.toString() ?: ""),
+            "resource-id" to (node.viewIdResourceName ?: ""),
+            "class" to (node.className?.toString() ?: ""),
+            "package" to (node.packageName?.toString() ?: ""),
+            "content-desc" to (node.contentDescription?.toString() ?: ""),
+            "checkable" to node.isCheckable.toString(),
+            "checked" to node.isChecked.toString(),
+            "clickable" to node.isClickable.toString(),
+            "enabled" to node.isEnabled.toString(),
+            "focusable" to node.isFocusable.toString(),
+            "focused" to node.isFocused.toString(),
+            "scrollable" to node.isScrollable.toString(),
+            "long-clickable" to node.isLongClickable.toString(),
+            "password" to node.isPassword.toString(),
+            "selected" to node.isSelected.toString(),
+            "bounds" to boundsText,
+        )
+
+    out.append(indent).append("<node")
+    attrs.forEach { (key, value) ->
+        out.append(' ')
+        out.append(key)
+        out.append("=\"")
+        out.append(escapeXmlAttr(value))
+        out.append('"')
+    }
+
+    if (node.childCount == 0) {
+        out.appendLine(" />")
+        return
+    }
+
+    out.appendLine(">")
+    for (i in 0 until node.childCount) {
+        node.getChild(i)?.let { child ->
+            try {
+                appendUiAutomatorNodeXml(
+                    node = child,
+                    indexInParent = i,
+                    indent = "$indent  ",
+                    out = out,
+                )
+            } finally {
+                child.recycleSafe()
+            }
+        }
+    }
+    out.append(indent).appendLine("</node>")
+}
+
+private fun escapeXmlAttr(value: String): String =
+    buildString(value.length) {
+        value.forEach { ch ->
+            when (ch) {
+                '&' -> append("&amp;")
+                '"' -> append("&quot;")
+                '\'' -> append("&apos;")
+                '<' -> append("&lt;")
+                '>' -> append("&gt;")
+                else -> append(ch)
+            }
+        }
+    }

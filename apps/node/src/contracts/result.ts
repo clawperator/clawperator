@@ -1,0 +1,26 @@
+/**
+ * How the terminal result was obtained. Canonical-only: Node accepts only [Clawperator-Result].
+ */
+export type TerminalSource = "clawperator_result";
+
+/**
+ * Result envelope contract: [Clawperator-Result] terminal envelope.
+ */
+export interface StepResult {
+  id: string;
+  actionType: string;
+  success: boolean;
+  data?: Record<string, unknown>;
+  error?: string;
+}
+
+export interface ResultEnvelope {
+  commandId: string;
+  taskId: string;
+  status: "success" | "failed";
+  stepResults: StepResult[];
+  error?: string | null;
+}
+
+export const RESULT_ENVELOPE_PREFIX = "[Clawperator-Result]";
+export const EVENT_ENVELOPE_PREFIX = "[Clawperator-Event]";

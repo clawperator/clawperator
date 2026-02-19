@@ -14,7 +14,10 @@ interface TaskScope {
         retry: TaskRetry = TaskRetry.None,
     )
 
-    suspend fun logUiTree(retry: TaskRetry = TaskRetry.None)
+    suspend fun logUiTree(
+        format: UiSnapshotFormat = UiSnapshotFormat.Ascii,
+        retry: TaskRetry = TaskRetry.None,
+    ): UiSnapshotActualFormat
 
     /**
      * Closes (backgrounds) the specified app by simulating a swipe-up gesture.

@@ -231,4 +231,24 @@ class TaskUiScopeTest(
         // For test implementation, we simulate clicking
         Log.d("TaskUiScopeTest", "Simulating click on node: ${node.label}")
     }
+
+    /**
+     * Enters text into a UI element that matches [matcher].
+     */
+    override suspend fun enterText(
+        matcher: NodeMatcher,
+        text: String,
+        submit: Boolean,
+        retry: TaskRetry,
+    ) {
+        val node =
+            findNodeByMatcher(matcher)
+                ?: throw IllegalStateException("No node found matching criteria")
+
+        if (!node.isClickable) {
+            throw IllegalStateException("Node is not editable: ${node.label}")
+        }
+
+        println("[TaskUiScopeTest] Entered text into node: ${node.label} (len=${text.length}, submit=$submit)")
+    }
 }

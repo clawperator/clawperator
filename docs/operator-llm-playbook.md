@@ -4,15 +4,15 @@ This is the canonical reference for LLM-driven automation in ActionTask.
 
 Use this doc for:
 - running the app through `ACTION_AGENT_COMMAND`
-- authoring new app navigation recipes
-- integrating recipes with OpenClaw skills
+- authoring/maintaining skill packages
+- integrating skill scripts with OpenClaw
 - understanding runtime components and naming
 
 ---
 
 ## 1) Runtime components (production)
 
-These are **runtime** components (not debug-only):
+These are runtime components (not debug-only):
 
 - `actiontask.operator.runtime.OperatorCommandService`
 - `actiontask.operator.runtime.OperatorCommandReceiver`
@@ -33,8 +33,6 @@ For app automation commands, default to:
 3. wait for stabilization
 4. add small post-navigation settle delays (~500–1500ms) before critical reads/clicks
 
-This avoids writing recipes against transient resumed UI states and intermediate screens where controls are visible but not fully hydrated yet.
-
 Send commands via Android broadcast with `payload` JSON:
 
 ```bash
@@ -51,9 +49,6 @@ adb shell am broadcast \
 - `source: string`
 - `actions: []`
 
-### Recommended fields
-- `timeoutMs: long` (bounded)
-
 ### Supported action types (current)
 - `open_app`
 - `close_app`
@@ -65,108 +60,59 @@ adb shell am broadcast \
 - `snapshot_ui`
 
 ### Visual verification with ADB screenshots (recommended)
-Use screenshots alongside UI-tree logs when building or debugging recipes.
+Use screenshots alongside UI-tree logs when building/debugging skills.
 
 ```bash
-# Capture current device screen to local file
 adb exec-out screencap -p > ./tmp/ui-check.png
 ```
 
-Why this matters:
-- UI trees can be noisy/abstract in Compose/React Native/Expo apps.
-- Screenshots help confirm what is actually visible vs merely present in the tree.
-- Best practice is to pair every selector change with at least one screenshot check.
+---
+
+## 3) Skills-first packaging (PII-safe)
+
+Canonical unit is a skill package, not a standalone recipe file.
+
+### Required structure
+- `skills/<applicationId>.<intent>/SKILL.md`
+- `skills/<applicationId>.<intent>/scripts/*.sh`
+
+### Optional structure
+- `skills/<applicationId>.<intent>/artifacts/*.recipe.json`
+
+### Rules
+1. No PII in committed skill artifacts.
+2. Use variables/placeholders for user-specific labels (for example `{{AC_TILE_NAME}}`).
+3. Prefer stable selectors first (`resourceId`), text matching second.
+4. Keep fallback matching strategy documented in `SKILL.md`.
+5. Keep skill-specific scripts/artifacts inside the skill folder (not top-level `scripts/`).
 
 ---
 
-## 3) Recipe system (PII-safe)
+## 4) Current skill set
 
-Store recipes under:
-
-- `ui-trees/<applicationId>/recipe.md`
-- optional executable templates like `ui-trees/<applicationId>/*-plan.template.json`
-
-### Recipe rules
-1. **No PII** (no personal names, addresses, account emails).
-2. Use variables for user-specific labels:
-   - `{{AC_TILE_NAME}}`
-   - `{{ROOM_LABEL}}`
-3. Include stable selectors first (`resourceId`), text matching second.
-4. Include fallback matching strategy.
-5. Document known fragile points and waits.
-
-### Existing examples
-- `ui-trees/com.google.android.apps.chromecast.app/recipe.md`
-- `ui-trees/com.google.android.apps.chromecast.app/ac-status-plan.template.json`
-- `ui-trees/com.theswitchbot.switchbot/recipe.md`
+- `com.google.android.apps.chromecast.app.get-aircon-status`
+- `com.google.android.apps.chromecast.app.set-aircon`
+- `com.globird.energy.get-usage`
+- `com.solaxcloud.starter.get-battery`
+- `com.theswitchbot.switchbot.get-bedroom-temperature`
 
 ---
 
-## 4) Skill integration pattern (OpenClaw)
+## 5) New skill authoring checklist
 
-Skills should be thin orchestration wrappers around operator commands/plans.
-
-### Suggested structure
-- `skills/<skill-name>/SKILL.md`
-- call ActionTask script/broadcast
-- parse result
-- report concise structured output
-
-### Current skill set
-- `home-get-bedroom-temperature`
-- `home-get-aircon-status`
-- `home-set-aircon`
-
-### Usage guidance
-- Prefer recipe/template-backed execution (not giant inline JSON in SKILL text).
-- Prefer command-level operations (`ac:status`, `ac:on`, `ac:off`) for stability.
-- Validate by reading post-action state whenever changing device state.
+1. Start from a fresh app session (`close_app` then `open_app`).
+2. Capture `snapshot_ui` and an ADB screenshot.
+3. Identify robust selectors (`resource-id` first).
+4. Create `skills/<appId>.<intent>/SKILL.md`.
+5. Add `scripts/*.sh` deterministic wrapper(s).
+6. Add optional `artifacts/*.recipe.json` template(s) if helpful.
+7. Validate on device end-to-end.
+8. Update this playbook if conventions changed.
 
 ---
 
-## 5) New recipe authoring checklist
+## 6) Where to update docs
 
-When adding a new app flow:
-
-1. **Always start from a fresh app session**: close app, then open app (do not rely on resumed state).
-2. Capture UI state (`ACTION_LOG_UI` or `snapshot_ui`).
-3. Capture an ADB screenshot to verify the visible UI matches the tree snapshot.
-4. Identify robust selectors (resource IDs first).
-5. Create `ui-trees/<appId>/recipe.md` with variable placeholders.
-6. Add a `*-plan.template.json` for repeatable execution.
-7. Add/adjust script wrapper if needed.
-8. Wire command parser/executor only if introducing a new semantic command.
-9. Add/extend tests for parsing and fallback logic.
-10. Verify on device end-to-end (including at least one close→open run).
-11. Update this playbook if conventions changed.
-
----
-
-## 6) AC commands + device name behavior
-
-`ac:status`, `ac:on`, and `ac:off` support device label selection via `device_name`.
-
-Matching strategy:
-1. preferred: provided `device_name` (or default `AirTouch AC 1`)
-2. fallback: `Master, Thermostat`
-
-For state changes (`ac:on`/`ac:off`):
-- run precheck status
-- toggle only if needed
-- verify final power state
-
----
-
-## 7) Backward compatibility policy
-
-- Keep action names and payload shape stable.
-- Keep command aliases stable unless formally deprecated.
-- If changing selector strategy, keep fallback behavior and document migration here.
-
----
-
-## 8) Where to update docs
-
-- Architecture/migration detail: `docs/migrate-to-agent-controlled.md`
+- Skill model/design: `docs/skill-design.md`
 - Canonical LLM/operator usage: `docs/operator-llm-playbook.md` (this file)
-- App-specific navigation knowledge: `ui-trees/<appId>/...`
+- App-specific skill packages: `skills/<applicationId>.<intent>/...`
