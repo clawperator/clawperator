@@ -1,0 +1,118 @@
+[versions]
+# Define the dependency versions
+kotlin = "2.1.10"
+kotlinCoroutines = "1.10.2"
+kotlinDateTime = "0.6.1"
+kotlinSerializationJson = "1.8.1"
+
+androidGradlePlugin = "8.10.1"
+buildTools = "35.0.0"   # Note: Ensure  matches "build-tools-NNN" in travis.yml
+# Code quality tools
+ktlint = "1.5.0"
+ktlintGradlePlugin = "12.1.2"
+detekt = "1.23.8"
+spotless = "6.25.0"
+
+androidxTestCore = "1.5.0"
+annotation = "1.7.0"
+appCompat = "1.6.1"
+archTestCore = "2.2.0"
+browserExtension = "1.6.0"
+core = "1.12.0"
+composeCompiler = "1.5.3"
+compose = "1.7.5"
+composeUi = "1.7.5"
+composeActivity = "1.9.3"
+espresso = "3.5.1"
+firebaseBom = "32.3.1"
+firebaseCrashlyticsGradle = "2.9.9"
+googleServices = "4.4.0"
+koin = "3.5.6"
+ksp = "2.1.10-1.0.31"
+ktor = "2.3.12"
+lifecycle = "2.6.2"
+lifecycleExtensions = "2.2.0"
+material3Compose = "1.3.1"
+okhttp = "4.12.0"
+okio = "3.9.1"
+processPhoenix = "2.1.2"
+robolectric="4.10"
+testRunner = "1.5.2"
+testRules = "1.5.0"
+timber = "5.0.1"
+turbine = "1.1.0"
+
+[libraries]
+android-gradlePlugin = { group = "com.android.tools.build", name = "gradle", version.ref = "androidGradlePlugin" }
+compose_compiler_gradlePlugin = { module = "org.jetbrains.kotlin:compose-compiler-gradle-plugin", version.ref = "kotlin" }
+firebase-crashlytics-gradlePlugin = { group = "com.google.firebase", name = "firebase-crashlytics-gradle", version.ref = "firebaseCrashlyticsGradle" }
+gms-google-services-gradlePlugin = { group = "com.google.gms", name = "google-services", version.ref = "googleServices" }
+kotlin-gradlePlugin = { group = "org.jetbrains.kotlin", name = "kotlin-gradle-plugin", version.ref = "kotlin" }
+# Code quality tools
+ktlint-gradlePlugin = { group = "org.jlleitschuh.gradle", name = "ktlint-gradle", version.ref = "ktlintGradlePlugin" }
+detekt-gradlePlugin = { group = "io.gitlab.arturbosch.detekt", name = "detekt-gradle-plugin", version.ref = "detekt" }
+spotless-gradlePlugin = { group = "com.diffplug.spotless", name = "spotless-plugin-gradle", version.ref = "spotless" }
+
+
+androidx_activity_compose = { module = "androidx.activity:activity-compose", version.ref = "composeActivity" }
+androidx_annotation = { module = "androidx.annotation:annotation", version.ref = "annotation" }
+androidx_appcompat = { module = "androidx.appcompat:appcompat", version.ref = "appCompat" }
+androidx_arch_core_testing = { module = "androidx.arch.core:core-testing", version.ref = "archTestCore" }
+androidx_browser = { module = "androidx.browser:browser", version.ref = "browserExtension" }
+androidx_core = { module = "androidx.core:core", version.ref = "core" }
+androidx_lifecycle_common_java8 = { module = "androidx.lifecycle:lifecycle-common-java8", version.ref = "lifecycle" }
+androidx_lifecycle_extensions = { module = "androidx.lifecycle:lifecycle-extensions", version.ref = "lifecycleExtensions" }
+androidx_lifecycle_livedata = { module = "androidx.lifecycle:lifecycle-livedata", version.ref = "lifecycle" }
+androidx_lifecycle_runtime = { module = "androidx.lifecycle:lifecycle-runtime", version.ref = "lifecycle" }
+androidx_lifecycle_runtime_compose = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycle" }
+androidx_lifecycle_service = { module = "androidx.lifecycle:lifecycle-service", version.ref = "lifecycle" }
+androidx_lifecycle_viewmodel = { module = "androidx.lifecycle:lifecycle-viewmodel", version.ref = "lifecycle" }
+androidx_test_core = { module = "androidx.test:core", version.ref = "androidxTestCore" }
+androidx_test_espresso_contrib = { module = "androidx.test.espresso:espresso-contrib", version.ref = "espresso" }
+androidx_test_espresso_core = { module = "androidx.test.espresso:espresso-core", version.ref = "espresso" }
+androidx_test_espresso_intents = { module = "androidx.test.espresso:espresso-intents", version.ref = "espresso" }
+androidx_test_rules = { module = "androidx.test:rules", version.ref = "testRules" }
+androidx_test_runner = { module = "androidx.test:runner", version.ref = "testRunner" }
+compose_icons = { module = "androidx.compose.material:material-icons-extended", version.ref = "compose" }
+compose_material = { module = "androidx.compose.material:material", version.ref = "compose" }
+compose_material3 = { module = "androidx.compose.material3:material3", version.ref = "material3Compose" }
+compose_runtime = { module = "androidx.compose.runtime:runtime", version.ref = "compose" }
+compose_ui = { module = "androidx.compose.ui:ui", version.ref = "composeUi" }
+compose_ui_graphics = { module = "androidx.compose.ui:ui-graphics", version.ref = "composeUi" }
+koin_android = { module = "io.insert-koin:koin-android", version.ref = "koin" }
+koin_core = { module = "io.insert-koin:koin-core", version.ref = "koin" }
+koin_test = { module = "io.insert-koin:koin-test", version.ref = "koin" }
+kotlin_reflect = { module = "org.jetbrains.kotlin:kotlin-reflect", version.ref = "kotlin" }
+kotlin_stdlib_jdk8 = { module = "org.jetbrains.kotlin:kotlin-stdlib-jdk8", version.ref = "kotlin" }
+kotlin_test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
+kotlin_test_junit = { module = "org.jetbrains.kotlin:kotlin-test-junit", version.ref = "kotlin" }
+kotlinx_coroutines_android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "kotlinCoroutines" }
+kotlinx_coroutines_core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinCoroutines" }
+kotlinx_coroutines_play_services = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-play-services", version.ref = "kotlinCoroutines" }
+kotlinx_coroutines_test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinCoroutines" }
+kotlinx_datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinDateTime" }
+kotlinx_serialization_json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinSerializationJson" }
+ktor_client_content_negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor" }
+ktor_client_core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
+ktor_client_logging = { module = "io.ktor:ktor-client-logging", version.ref = "ktor" }
+ktor_client_okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "ktor" }
+ktor_serialization_kotlinx_json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
+okhttp3_logging_interceptor = { module = "com.squareup.okhttp3:logging-interceptor", version.ref = "okhttp" }
+okhttp3_okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
+okio = { module = "com.squareup.okio:okio", version.ref = "okio" }
+process_phoenix = { module = "com.jakewharton:process-phoenix", version.ref = "processPhoenix" }
+robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
+timber = { module = "com.jakewharton.timber:timber", version.ref = "timber" }
+turbine = { module = "app.cash.turbine:turbine", version.ref = "turbine" }
+
+[bundles]
+
+[plugins]
+kotlin_compose_compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+kotlin_serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+
+# Code quality plugins
+ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlintGradlePlugin" }
+detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
+spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }

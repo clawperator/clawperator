@@ -1,0 +1,13 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues></ManuallySuppressedIssues>
+  <CurrentIssues>
+    <!-- 
+    This baseline file will be populated when you run:
+    ./gradlew detektBaseline
+    
+    It allows you to start enforcing detekt rules on new code
+    while ignoring existing violations in the codebase.
+    -->
+  </CurrentIssues>
+</SmellBaseline> 

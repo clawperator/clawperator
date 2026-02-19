@@ -1,0 +1,172 @@
+This file contains high level coding standards to apply when writing new code.
+
+This document is not exhaustive.
+
+---
+
+High level goals:
+* Match the style of related code
+
+
+---
+
+## Flow Usage
+- Avoid blocking operators on `Flow`
+  - Check before using `first()`, `single()`, or other terminal operators that block
+  - Instead, maintain reactive chains using `collect`, `collectLatest`, etc.
+- Use appropriate Flow operators for state updates
+  - Use `flatMapLatest` for dependent Flow chains
+  - Use `combine` for multiple Flow inputs
+  - Use `map` for simple transformations
+- Keep Flow chains cold until collection
+  - Avoid `SharedFlow` unless specifically needed
+  - Prefer `StateFlow` for UI state
+
+--
+
+** Container Usage**
+
+- See `action.util.FlowMap` for a Flow-backed container and alternative to Kotlin's `Map`
+- See `action.util.FlowList` for a Flow-backed container and alternative to Kotlin's `List`
+
+---
+
+This pattern is fine:
+```
+ private val _foo = MutableStateFlow<Foo>
+ val foo: StateFlow<Foo>
+    get() = _foo
+```
+
+But only do this if `foo` has to be exposed publicly.
+
+A private variable should generally only have the `_` prefix if there is a corresponding public field that hides mutability.
+
+---
+
+APIs/interfaces should favor properties over functions where appropriate
+
+Prefer this:
+
+`val isTrackingEnabled: Boolean`
+
+Over this:
+
+`fun isTrackingEnabled(): Boolean`
+
+---
+
+APIs/interfaces should favor properties over functions where appropriate with Flows.
+
+Prefer this:
+
+`val activeNotifications: Flow<List<NotificationData>>`
+
+Over this:
+
+`fun activeNotificationsFlow(): Flow<List<NotificationData>>`
+
+
+---
+
+Where appropiate, logically sort items alphabetically:
+
+```
+val AppModule: Module = module {
+    single<AdRepository> { get<AdRepositoryDefault>() }
+    single<AppViewModel> { AppViewModel(get(), get()) }
+    single<BottomPageManager> { get<BottomPageManagerDefault>() }
+    single<CoroutineScope>(NamedScope.CoroutineScopeIo) { Factory.coroutineScopeIo(this) }
+    single<CoroutineScope>(NamedScope.CoroutineScopeMain) { Factory.coroutineScopeMain(this) }
+    single<DateRepository> { DateRepositoryDefault(get(), get()) }
+    single<DateTimeFormatter> { DateTimeFormatterDefault(get()) }
+    single<FlavorConfig> { FlavorConfigStub() }
+    single<ImageMapper> { ImageMapper }
+    single<KnownAppsRepository> { get<KnownAppsRepositoryDefault>() }
+    ...
+}
+```
+---
+
+Sealed Interfaces and Classes:
+* Use sealed interfaces for type hierarchies that represent different states or results
+* Follow a consistent naming pattern for success/failure states
+* Example pattern for operation results:
+```kotlin
+sealed interface OperationResult {
+    sealed interface Success : OperationResult {
+        // Success subtypes
+    }
+    sealed interface Failure : OperationResult {
+        val message: String
+        // Failure subtypes
+    }
+}
+```
+
+---
+
+Data Classes and Objects:
+* Use data classes for immutable state containers
+* Use data objects for singleton states in sealed hierarchies
+* Keep data classes focused and small
+* Example:
+```kotlin
+data class Desktop(
+    val viewSpec: DesktopViewSpec,
+    val homeScreensState: HomeScreensState,
+    val dockState: DockState?,
+)
+```
+
+---
+
+Interface Design:
+* Keep interfaces focused and small
+* Use Flow for observable state
+* Prefer val properties over functions for read-only values
+* Document complex interfaces with KDoc comments
+* Example:
+```kotlin
+interface Repository {
+    val isReady: StateFlow<Boolean>
+    val items: Flow<List<Item>>
+    suspend fun getById(id: Id): Item?
+}
+```
+
+---
+
+Stability Annotations:
+* Use @Stable annotation for interfaces and data classes that are used in Compose UI
+* Example:
+```kotlin
+@Stable
+sealed interface PageOccupancyCell {
+    val cell: Cell.Defined
+    // ...
+}
+```
+
+---
+
+Extension Properties and Functions:
+* Place extension functions/properties at the bottom of the file
+* Keep extensions focused and well-scoped
+* Example:
+```kotlin
+val OperationResult.successData: Data?
+    get() = (this as? OperationResult.Success)?.data
+```
+
+---
+
+Empty States and Defaults:
+* Provide companion objects with Empty/Default states where appropriate
+* Example:
+```kotlin
+companion object {
+    val Empty = Effects(emptyList())
+}
+```
+

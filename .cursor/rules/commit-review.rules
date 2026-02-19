@@ -1,0 +1,97 @@
+# Commit Review Rules
+
+This file describes the process for reviewing commits using Cursor's Composer window (Cmd/Ctrl + L).
+
+## Quick Review
+Ask the Composer to "Review my last commit and run tests" and it will:
+1. Show the changes in your last commit
+2. Check for:
+   - [ ] Commit message follows standards (see commits.rules)
+   - [ ] Obvious errors or copy/paste mistakes
+   - [ ] Test coverage adequacy
+   - [ ] Documentation updates
+   - [ ] Potential issues or bugs
+3. Run tests by executing:
+   ```bash
+   ./gradlew :shared:test:testDebugUnitTest
+   ```
+4. If changes affect Firebase Functions, test deployment:
+   ```bash
+   ./scripts/firebase_deploy.sh --preview
+   ```
+
+## Full Review
+Ask the Composer to "Review my unpushed commits and run tests" and it will:
+1. Show all unpushed commits
+2. Review each commit individually
+3. Review all commits collectively
+4. Run tests by executing:
+   ```bash
+   ./gradlew :shared:test:testDebugUnitTest
+   ```
+5. If changes affect Firebase Functions, test deployment:
+   ```bash
+   ./scripts/firebase_deploy.sh --preview
+   ```
+6. Provide a final recommendation
+
+### Review Format
+The AI will use these emoji in its review:
+- ✅ Pass: Requirement met
+- ❌ Fail: Issue found
+- ⚠️ Warning: Needs attention
+- 🔍 Investigating: Needs more information
+
+### Individual Commit Review Checklist
+For each commit, the AI will verify and mark with emoji:
+- [ ] Commit message follows standards defined in commits.rules
+- [ ] No obvious copy/paste errors
+- [ ] Code style is consistent
+- [ ] No potential bugs or issues
+- [ ] Tests are included where needed
+- [ ] Documentation is complete
+- [ ] No performance concerns
+- [ ] No security issues
+
+### Collective Review Checklist
+The AI will review all commits together for:
+- [ ] Overall coherence and progression
+- [ ] Any breaking changes (marked with ! or footer)
+- [ ] Migration requirements
+- [ ] API consistency
+- [ ] Dependency updates
+- [ ] Database schema changes
+- [ ] Consistent commit message style across all commits
+
+### Final Review Summary
+The AI will provide:
+1. Overview of all changes
+2. Test results (from running `./gradlew testAll`)
+3. Commit message quality assessment
+4. Suggested improvements
+5. Push/don't push recommendation with emoji (✅/❌/⚠️)
+6. Any follow-up tasks
+
+## Settings
+- Maximum files per review: 50
+- Maximum lines per file: 500
+- Ignored patterns:
+  * *.lock
+  * *.log
+  * build/*
+  * .gradle/*
+
+## Example Composer Prompts
+- "Review my last commit and run tests"
+- "Review all my unpushed commits and run tests"
+- "Check if my commits are ready to push to main"
+- "Review my recent changes for any issues"
+- "Check if my commit messages follow our standards"
+
+## Best Practices
+- Review commits one at a time first, then as a whole
+- Pay special attention to files with many changes
+- Look for patterns across multiple commits
+- Always ensure tests pass before pushing
+- Document any concerns or follow-up tasks
+- Fix commit messages before pushing if they don't meet standards 

@@ -1,0 +1,38 @@
+name: Pull Request Checks
+
+on:
+  pull_request:
+    branches:
+      - main  # Adjust this if your default branch has a different name
+      - master
+
+jobs:
+  unit-tests:
+    name: Run Unit Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'  # Adjust this version if needed
+          distribution: 'temurin'
+          cache: 'gradle'
+          
+      - name: Make Gradle wrapper executable
+        run: chmod +x ./gradlew
+        
+      - name: Run unit tests
+        run: ./gradlew unitTest
+        
+      - name: Upload test results on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            **/build/reports/tests/
+            **/build/test-results/ 

@@ -1,0 +1,19 @@
+#!/bin/bash
+#set -x #echo on
+
+echo "Starting unit tests..."
+pushd apps/android > /dev/null
+./gradlew testDebug
+popd > /dev/null
+echo "Unit tests finished."
+echo ""
+echo ""
+
+echo "Starting debug instrumentation tests..."
+pushd apps/android > /dev/null
+./gradlew connectedDebugAndroidTest -Dorg.gradle.parallel=false
+popd > /dev/null
+echo "Instrumentation tests finished."
+
+echo -en '\a'
+

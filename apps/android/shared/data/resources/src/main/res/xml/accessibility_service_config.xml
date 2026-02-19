@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Accessibility Service Configuration for App Closing Functionality
+
+Key attributes for app closing operations:
+- canPerformGestures="true": REQUIRED for dispatching swipe gestures to close apps
+- canRetrieveWindowContent="true": Allows reading UI tree to verify app states
+- accessibilityEventTypes: Minimal events needed for basic functionality
+- accessibilityFlags: Basic flags for view inspection and interaction
+
+This configuration provides the minimum permissions needed while maintaining
+user privacy by not requesting unnecessary event types or feedback.
+-->
+<accessibility-service
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/accessibility_service_summary"
+    android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged"
+    android:accessibilityFlags="flagReportViewIds|flagRetrieveInteractiveWindows"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:notificationTimeout="5000"
+    android:canRetrieveWindowContent="true"
+    android:canPerformGestures="true"
+    android:settingsActivity="clawperator.activity.MainActivity"
+  />
+
