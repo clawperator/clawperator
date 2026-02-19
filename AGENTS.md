@@ -23,7 +23,7 @@ Out of scope for this migration:
 Every migration slice must do all steps before commit:
 1. Make focused changes.
 2. Compile: `./gradlew :app:assembleDebug`
-3. Run unit tests: `./gradlew testDebug` (or equivalent module task after moves)
+3. Run unit tests: `./gradlew testDebugUnitTest` (or `./gradlew unitTest` for all modules)
 4. Install on device: `./gradlew :app:installDebug`
 5. Launch smoke: `adb shell am start -n <applicationId>/<mainActivity>`
 6. Run slice-specific operator smoke checks.
@@ -32,11 +32,11 @@ Every migration slice must do all steps before commit:
 If compile, unit tests, install, or smoke fails, fix or explicitly document baseline/inherited failure before moving on.
 
 ## Build & Test Commands
-- `./gradlew :app:assembleDebug`
-- `./gradlew testDebug`
-- `./gradlew :app:installDebug`
 - `./scripts/clawperator_grant_android_permissions.sh --package <pkg>`
-- `./scripts/operator_event_log_ui.sh`
+- `./gradlew :app:assembleDebug` - Build debug APK
+- `./gradlew unitTest` - Run unit tests for all modules
+- `./gradlew :app:installDebug` - Install debug APK on device
+- `./scripts/clawperator_validate_receiver.sh`
 
 ## Coding & Commit Conventions
 - Use Conventional Commits (`feat:`, `fix:`, `refactor:`, `chore:`, `docs:`).

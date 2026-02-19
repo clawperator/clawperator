@@ -316,8 +316,8 @@ adb logcat | grep -F "[Operator-AccessibilityService]"
 ```
 3. Trigger debug actions:
 ```bash
-./scripts/operator_event_log_ui.sh
-./scripts/operator_event_run_task.sh
+node apps/node/dist/cli/index.js observe snapshot --output pretty
+node apps/node/dist/cli/index.js execute --execution '<json>' --output pretty
 ```
 4. Trigger new agent command (phase 1):
 ```bash
@@ -325,8 +325,6 @@ adb shell am broadcast -a app.clawperator.operator.ACTION_AGENT_COMMAND --es pay
 ```
 5. Trigger direct on-demand snapshot anytime (existing mechanism):
 ```bash
-./scripts/operator_event_log_ui.sh
-# or
 adb shell am broadcast -a app.clawperator.operator.ACTION_AGENT_COMMAND --es payload '<snapshot_ui_command_json>' --receiver-foreground
 ```
 
