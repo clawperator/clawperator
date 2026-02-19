@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../clawperator-skills"
+		},
+		{
+			"path": "../.clawcave"
+		}
+	],
+	"settings": {}
+}
