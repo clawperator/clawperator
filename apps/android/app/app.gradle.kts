@@ -137,7 +137,7 @@ project.afterEvaluate {
 
                     println("🔧 Granting permissions for $pkg...")
                     exec {
-                        commandLine("${project.rootDir}/../../scripts/grant_operator_permissions.sh", "--package", pkg)
+                        commandLine("${project.rootDir}/../../scripts/clawperator_grant_android_permissions.sh", "--package", pkg)
                     }
                 }
             }

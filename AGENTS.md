@@ -35,7 +35,7 @@ If compile, unit tests, install, or smoke fails, fix or explicitly document base
 - `./gradlew :app:assembleDebug`
 - `./gradlew testDebug`
 - `./gradlew :app:installDebug`
-- `./scripts/grant_operator_permissions.sh --package <pkg>`
+- `./scripts/clawperator_grant_android_permissions.sh --package <pkg>`
 - `./scripts/operator_event_log_ui.sh`
 
 ## Coding & Commit Conventions

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# grant_operator_permissions.sh
+# clawperator_grant_android_permissions.sh
 # Script to grant all necessary permissions for Clawperator Operator functionality
 # This script handles manual permission granting when automatic setup isn't sufficient
 

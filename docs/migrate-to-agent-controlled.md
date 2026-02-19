@@ -43,7 +43,7 @@ You are working in ~/src/ActionTask.
    - shared/data/workflow/src/commonMain/kotlin/actiontask/workflow/WorkflowFactoryDefault.kt
    - shared/data/task/src/commonMain/kotlin/actiontask/task/runner/*
 3) Prepare and validate local operator control:
-   - Run scripts/grant_operator_permissions.sh
+   - Run scripts/clawperator_grant_android_permissions.sh
    - Use adb logcat and monitor logs prefixed with [Operator-AccessibilityService]
    - Use a `snapshot_ui` action to force an immediate on-demand UI snapshot whenever needed
    - Open several real apps on the connected Android device and observe how the UI appears in logs/tree output
@@ -89,7 +89,7 @@ This logic works, but it makes scaling to arbitrary tasks expensive and brittle.
 - `OperatorAccessibilityService` currently logs all accessibility events with `[Operator-AccessibilityService]` prefix.
 - UI trees are already printable in ASCII (`TaskScopeDefault.logUiTree` + `UiTreeFormatterDefault`).
 - UI snapshots are obtained via `snapshot_ui` actions sent through `ACTION_AGENT_COMMAND`.
-- Permission script name in this repo is `scripts/grant_operator_permissions.sh` (plural), not `grant_operator_permission.sh`.
+- Permission script name in this repo is `scripts/clawperator_grant_android_permissions.sh` (plural), not `grant_operator_permission.sh`.
 
 ## Target architecture
 
@@ -308,7 +308,7 @@ Likely edited files:
 ### Device/integration tests
 1. Grant permissions:
 ```bash
-./scripts/grant_operator_permissions.sh
+./scripts/clawperator_grant_android_permissions.sh
 ```
 2. Watch accessibility logs:
 ```bash
