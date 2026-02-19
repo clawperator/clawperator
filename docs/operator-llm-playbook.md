@@ -1,6 +1,6 @@
 # Operator LLM Playbook (Definitive)
 
-This is the canonical reference for LLM-driven automation in ActionTask.
+This is the canonical reference for LLM-driven automation in Clawperator.
 
 Use this doc for:
 - running the app through `ACTION_AGENT_COMMAND`
@@ -14,13 +14,11 @@ Use this doc for:
 
 These are runtime components (not debug-only):
 
-- `actiontask.operator.runtime.OperatorCommandService`
-- `actiontask.operator.runtime.OperatorCommandReceiver`
+- `clawperator.operator.runtime.OperatorCommandService`
+- `clawperator.operator.runtime.OperatorCommandReceiver`
 
 They own broadcast ingress for:
-- `app.actiontask.operator.ACTION_AGENT_COMMAND`
-- `app.actiontask.operator.ACTION_LOG_UI`
-- `app.actiontask.operator.ACTION_RUN_TASK` (legacy/manual)
+- `app.clawperator.operator.ACTION_AGENT_COMMAND`
 
 ---
 
@@ -37,8 +35,8 @@ Send commands via Android broadcast with `payload` JSON:
 
 ```bash
 adb shell am broadcast \
-  -a app.actiontask.operator.ACTION_AGENT_COMMAND \
-  -p app.actiontask.operator.development \
+  -a app.clawperator.operator.ACTION_AGENT_COMMAND \
+  -p com.clawperator.operator.dev \
   --es payload '{"commandId":"cmd-1","taskId":"task-1","source":"operator","timeoutMs":90000,"actions":[{"id":"s1","type":"snapshot_ui","params":{"format":"ascii"}}]}' \
   --receiver-foreground
 ```

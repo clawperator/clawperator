@@ -53,7 +53,7 @@ describe("parseTerminalEnvelope", () => {
   });
 
   it("returns null for line without [Clawperator-Result]", () => {
-    const line = `02-19 12:00:00.000 I SomeTag: [Operator-AgentEvent] command_success commandId=${CMD_ID} stepCount=0`;
+    const line = `02-19 12:00:00.000 I SomeTag: [Some-Other-Event] status=ok commandId=${CMD_ID}`;
     assert.strictEqual(parseTerminalEnvelope(line, CMD_ID), null);
   });
 

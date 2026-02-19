@@ -22,7 +22,7 @@ Date: 2026-02-17
 - `./gradlew :app:assembleDebug` -> PASS
 - `./gradlew testDebug` -> FAIL (inherited from source ActionTask baseline)
 - `./gradlew :app:installDebug` -> PASS
-- `adb shell am start -n app.actiontask.operator.development/actionlauncher.activity.MainActivity` -> PASS
+- `adb shell am start -n com.clawperator.operator.dev/clawperator.activity.MainActivity` -> PASS
 
 Known inherited unit-test failures include:
 - `:shared:core:common:compileDebugUnitTestKotlinAndroid`
@@ -39,7 +39,7 @@ Date: 2026-02-17
 - `./gradlew :app:assembleDebug` -> PASS
 - `./gradlew testDebug` -> FAIL (same inherited failures; no new Firebase-related test failures introduced)
 - `./gradlew :app:installDebug` -> PASS
-- `adb shell am start -n app.actiontask.operator.development/actionlauncher.activity.MainActivity` -> PASS
+- `adb shell am start -n com.clawperator.operator.dev/clawperator.activity.MainActivity` -> PASS
 
 ## Slice 3.1b Validation Snapshot (Crashlytics Restoration)
 Date: 2026-02-17
@@ -47,7 +47,7 @@ Date: 2026-02-17
 - `./gradlew :app:assembleDebug` -> PASS
 - `./gradlew testDebug` -> FAIL (same inherited failures; no new failures introduced)
 - `./gradlew :app:installDebug` -> PASS
-- `adb shell am start -n app.actiontask.operator.development/actionlauncher.activity.MainActivity` -> PASS
+- `adb shell am start -n com.clawperator.operator.dev/clawperator.activity.MainActivity` -> PASS
 
 ## Slice 3.2 Validation Snapshot (Prune Unused Presentation Graph)
 Date: 2026-02-17
@@ -59,7 +59,7 @@ Date: 2026-02-17
 - `./gradlew :app:assembleDebug` -> PASS
 - `./gradlew testDebug` -> FAIL (same inherited multi-module unit-test failures)
 - `./gradlew :app:installDebug` -> PASS
-- `adb shell am start -n app.actiontask.operator.development/actionlauncher.activity.MainActivity` -> PASS
+- `adb shell am start -n com.clawperator.operator.dev/clawperator.activity.MainActivity` -> PASS
 
 ## Slice 3.3 Validation Snapshot (Remove Unused Google Auth Dependency)
 Date: 2026-02-17
@@ -72,7 +72,7 @@ Date: 2026-02-17
 - `./gradlew :app:assembleDebug` -> PASS
 - `./gradlew testDebug` -> FAIL (same inherited multi-module unit-test failures)
 - `./gradlew :app:installDebug` -> PASS
-- `adb shell am start -n app.actiontask.operator.development/actionlauncher.activity.MainActivity` -> PASS
+- `adb shell am start -n com.clawperator.operator.dev/clawperator.activity.MainActivity` -> PASS
 
 ## Slice 3.4 Validation Snapshot (Trim Redundant app Module Edges)
 Date: 2026-02-17
@@ -85,7 +85,7 @@ Date: 2026-02-17
 - `./gradlew :app:assembleDebug` -> PASS
 - `./gradlew testDebug` -> FAIL (same inherited multi-module unit-test failures)
 - `./gradlew :app:installDebug` -> PASS
-- `adb shell am start -n app.actiontask.operator.development/actionlauncher.activity.MainActivity` -> PASS
+- `adb shell am start -n com.clawperator.operator.dev/clawperator.activity.MainActivity` -> PASS
 
 ## Slice 3.5 Validation Snapshot (Remove Legacy Ad/Backup Metadata)
 Date: 2026-02-17
@@ -96,7 +96,7 @@ Date: 2026-02-17
 - `./gradlew :app:assembleDebug` -> PASS
 - `./gradlew testDebug` -> FAIL (same inherited multi-module unit-test failures)
 - `./gradlew :app:installDebug` -> PASS
-- `adb shell am start -n app.actiontask.operator.development/actionlauncher.activity.MainActivity` -> PASS
+- `adb shell am start -n com.clawperator.operator.dev/clawperator.activity.MainActivity` -> PASS
 
 ## Slice 3.6 Validation Snapshot (Remove `shared/presentation` Tree)
 Date: 2026-02-17
@@ -105,7 +105,7 @@ Date: 2026-02-17
 - `./gradlew :app:assembleDebug` -> PASS
 - `./gradlew testDebug` -> FAIL (same inherited multi-module unit-test failures)
 - `./gradlew :app:installDebug` -> PASS
-- `adb shell am start -n app.actiontask.operator.development/actionlauncher.activity.MainActivity` -> PASS
+- `adb shell am start -n com.clawperator.operator.dev/clawperator.activity.MainActivity` -> PASS
 
 ## Slice 3.7 Validation Snapshot (Remove `desktop*` and `ios*` Directories)
 Date: 2026-02-17
@@ -114,7 +114,7 @@ Date: 2026-02-17
 - `./gradlew :app:assembleDebug` -> PASS
 - `./gradlew testDebug` -> FAIL (same inherited multi-module unit-test failures)
 - `./gradlew :app:installDebug` -> PASS
-- `adb shell am start -n app.actiontask.operator.development/actionlauncher.activity.MainActivity` -> PASS
+- `adb shell am start -n com.clawperator.operator.dev/clawperator.activity.MainActivity` -> PASS
 
 ## Slice 3.8 Validation Snapshot (Remove KMP desktop/iOS Gradle Wiring)
 Date: 2026-02-17
@@ -126,7 +126,7 @@ Date: 2026-02-17
 - `./gradlew :app:assembleDebug` -> PASS
 - `./gradlew testDebug` -> FAIL (same inherited multi-module unit-test failures)
 - `./gradlew :app:installDebug` -> PASS
-- `adb shell am start -n app.actiontask.operator.development/actionlauncher.activity.MainActivity` -> PASS
+- `adb shell am start -n com.clawperator.operator.dev/clawperator.activity.MainActivity` -> PASS
 
 ## Slice 3.9 Validation Snapshot (Strip Pixel Rendering Surface)
 Date: 2026-02-17
@@ -141,4 +141,4 @@ Date: 2026-02-17
 - `./gradlew :app:assembleDebug` -> PASS
 - `./gradlew testDebug` -> FAIL (inherited unit-test failures remain; no new pixel-related test task failures introduced)
 - `./gradlew :app:installDebug` -> PASS
-- `adb shell am start -n app.actiontask.operator.development/actionlauncher.activity.MainActivity` -> PASS
+- `adb shell am start -n com.clawperator.operator.dev/clawperator.activity.MainActivity` -> PASS

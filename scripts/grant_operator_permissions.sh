@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # grant_operator_permissions.sh
-# Script to grant all necessary permissions for ActionTask Operator functionality
+# Script to grant all necessary permissions for Clawperator Operator functionality
 # This script handles manual permission granting when automatic setup isn't sufficient
 
 set -euo pipefail
@@ -14,13 +14,13 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Default package names
-DEFAULT_DEBUG_PKG="app.actiontask.operator.development"
-DEFAULT_RELEASE_PKG="app.actiontask.operator.playstore"
+DEFAULT_DEBUG_PKG="com.clawperator.operator.dev"
+DEFAULT_RELEASE_PKG="com.clawperator.operator"
 
 print_usage() {
     echo "Usage: $0 [OPTIONS]"
     echo ""
-    echo "Grant necessary permissions for ActionTask Operator functionality"
+    echo "Grant necessary permissions for Clawperator Operator functionality"
     echo ""
     echo "Options:"
     echo "  -p, --package PACKAGE    Specify package name (default: auto-detect from installed apps)"
@@ -40,7 +40,7 @@ print_usage() {
 
 print_header() {
     echo -e "${BLUE}════════════════════════════════════════════════════════════════${NC}"
-    echo -e "${BLUE}  ActionTask Operator Permission Granter${NC}"
+    echo -e "${BLUE}  Clawperator Operator Permission Granter${NC}"
     echo -e "${BLUE}════════════════════════════════════════════════════════════════${NC}"
     echo ""
 }
@@ -86,17 +86,17 @@ detect_package() {
     local adb_cmd
     adb_cmd=$(get_adb_prefix)
 
-    # Try to find ActionTask packages
+    # Try to find Clawperator packages
     local packages
-    packages=$($adb_cmd shell pm list packages | sed 's/package://' | grep -E "^app\.actiontask\.operator" || echo "")
+    packages=$($adb_cmd shell pm list packages | sed 's/package://' | grep -E "^com\.clawperator\.operator" || echo "")
 
     if echo "$packages" | grep -q "$DEFAULT_DEBUG_PKG"; then
         echo "$DEFAULT_DEBUG_PKG"
     elif echo "$packages" | grep -q "$DEFAULT_RELEASE_PKG"; then
         echo "$DEFAULT_RELEASE_PKG"
     else
-        echo -e "${RED}❌ Error: No ActionTask packages found on device${NC}"
-        echo "Available packages starting with 'app.actiontask.operator':"
+        echo -e "${RED}❌ Error: No Clawperator packages found on device${NC}"
+        echo "Available packages starting with 'com.clawperator.operator':"
         echo "$packages"
         exit 1
     fi
@@ -106,7 +106,7 @@ grant_accessibility_permission() {
     local package=$1
     local adb_cmd
     adb_cmd=$(get_adb_prefix)
-    local svc="$package/actiontask.operator.accessibilityservice.OperatorAccessibilityService"
+    local svc="$package/clawperator.operator.accessibilityservice.OperatorAccessibilityService"
 
     echo -e "${BLUE}🔧 Configuring Accessibility Service...${NC}"
 
@@ -162,11 +162,11 @@ show_verification_steps() {
     echo ""
     echo -e "${BLUE}🔍 Verification Steps:${NC}"
     echo "1. Open Android Settings > Accessibility"
-    echo "2. Look for 'ActionTask Operator' service"
+    echo "2. Look for 'Clawperator Operator' service"
     echo "3. Ensure it's enabled and running"
     echo "4. Launch the app - services will start automatically"
     echo "5. Check app notification shows 'Service is running'"
-    echo "6. Run: adb logcat | grep -E '(Operator|ActionTask)' to see logs"
+    echo "6. Run: adb logcat | grep -E '(Operator|Clawperator)' to see logs"
     echo ""
     echo -e "${GREEN}🎉 Setup complete for package: $package${NC}"
 }
@@ -228,7 +228,7 @@ main() {
     elif [ "$USE_RELEASE" = true ]; then
         TARGET_PACKAGE="$DEFAULT_RELEASE_PKG"
     else
-        echo -e "${BLUE}🔍 Auto-detecting ActionTask package...${NC}"
+        echo -e "${BLUE}🔍 Auto-detecting Clawperator package...${NC}"
         TARGET_PACKAGE=$(detect_package)
     fi
 

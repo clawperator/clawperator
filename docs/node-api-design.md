@@ -3,8 +3,7 @@
 Product naming:
 
 - Product: `Clawperator`
-- Legacy Android module/package naming in current codebase: `ActionTask` (temporary during migration)
-- Repository rename planned: TBD
+- Android package/application namespace: `com.clawperator.operator`
 
 ## Purpose
 
@@ -173,8 +172,7 @@ Required Android emission format (single line):
 - `[Clawperator-Result] {"commandId":"...","taskId":"...","status":"success|failed","stepResults":[...],"error":null}`
 
 Current implementation note:
-- Android currently emits stage/command lifecycle logs with tag prefix `[Operator-AgentEvent]`.
-- The canonical `[Clawperator-Result]` / `[Clawperator-Event]` envelope format is the target transport contract for dedicated result envelopes.
+- Android emits canonical `[Clawperator-Result]` terminal envelopes for command completion.
 
 Rules:
 
