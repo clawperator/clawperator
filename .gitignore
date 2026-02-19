@@ -75,6 +75,8 @@ main/release/output.json
 # Firebase
 .firebase/
 firebase/functions/node_modules/
+/apps/node/node_modules/
+/apps/node/dist/
 
 # Environment variables
 .env

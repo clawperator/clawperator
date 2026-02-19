@@ -1,0 +1,29 @@
+{
+  "name": "clawperator",
+  "version": "0.1.0",
+  "description": "Clawperator Node API - reliable Android execution for LLM agents",
+  "type": "module",
+  "main": "dist/cli/index.js",
+  "bin": {
+    "clawperator": "./dist/cli/index.js"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/cli/index.js",
+    "test": "node --test dist/test/**/*.test.js",
+    "test:unit": "node --test dist/test/unit/**/*.test.js",
+    "lint": "eslint src --ext .ts"
+  },
+  "keywords": ["clawperator", "android", "automation", "agent"],
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0"
+  },
+  "dependencies": {
+    "zod": "^3.24.0"
+  }
+}

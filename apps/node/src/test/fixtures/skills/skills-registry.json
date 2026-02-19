@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "1.0",
+  "generatedAt": "2026-02-19T00:00:00Z",
+  "skills": [
+    {
+      "id": "com.google.android.apps.chromecast.app.get-aircon-status",
+      "applicationId": "com.google.android.apps.chromecast.app",
+      "intent": "get-aircon-status",
+      "summary": "Read Google Home air conditioner status (power, mode, indoor temperature).",
+      "path": "skills/com.google.android.apps.chromecast.app.get-aircon-status",
+      "skillFile": "skills/com.google.android.apps.chromecast.app.get-aircon-status/SKILL.md",
+      "scripts": [
+        "skills/com.google.android.apps.chromecast.app.get-aircon-status/scripts/get_aircon_status.sh"
+      ],
+      "artifacts": [
+        "skills/com.google.android.apps.chromecast.app.get-aircon-status/artifacts/ac-status.recipe.json"
+      ]
+    }
+  ]
+}

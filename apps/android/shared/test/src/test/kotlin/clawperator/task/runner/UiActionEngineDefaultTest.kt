@@ -103,8 +103,12 @@ private class RecordingTaskScope(
     ) {
     }
 
-    override suspend fun logUiTree(retry: TaskRetry) {
+    override suspend fun logUiTree(
+        format: UiSnapshotFormat,
+        retry: TaskRetry,
+    ): UiSnapshotActualFormat {
         logUiTreeCount++
+        return UiSnapshotActualFormat.Ascii
     }
 
     override suspend fun closeApp(
@@ -212,4 +216,13 @@ private class RecordingTaskUiScope : TaskUiScope {
         desiredState: ToggleState,
         retry: TaskRetry,
     ): ToggleState = desiredState
+
+    override suspend fun enterText(
+        matcher: NodeMatcher,
+        text: String,
+        submit: Boolean,
+        retry: TaskRetry,
+    ) {
+        // Test implementation - no-op
+    }
 }

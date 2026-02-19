@@ -191,7 +191,10 @@ class TaskScopeDefault(
         Unit
     }
 
-    override suspend fun logUiTree(retry: TaskRetry) {
+    override suspend fun logUiTree(
+        format: UiSnapshotFormat,
+        retry: TaskRetry,
+    ): UiSnapshotActualFormat {
         val sink = currentTaskStatus()
         sink.emit(TaskEvent.StageStart("logUiTree", "Logging UI tree"))
 
@@ -203,41 +206,52 @@ class TaskScopeDefault(
         while (true) {
             try {
                 Log.d("$TAG Logging UI tree")
-                val uiTreeRaw =
-                    uiTreeInspector.getCurrentUiTree()
-                        ?: throw IllegalStateException("UI tree not available")
+                val hierarchyDump = uiTreeInspector.getCurrentUiHierarchyDump()
+                val nodeCount: Int
+                val maxDepth: Int
+                val actualFormat: UiSnapshotActualFormat
 
-                val uiTree = uiTreeFilterer.filterOnScreenOnly(uiTreeRaw)
+                if (hierarchyDump != null) {
+                    Log.d("$TAG UI Hierarchy:\n$hierarchyDump")
+                    nodeCount = countNodesInHierarchyDump(hierarchyDump)
+                    maxDepth = maxDepthInHierarchyDump(hierarchyDump)
+                    actualFormat = UiSnapshotActualFormat.HierarchyXml
+                } else {
+                    val uiTreeRaw =
+                        uiTreeInspector.getCurrentUiTree()
+                            ?: throw IllegalStateException("UI tree not available")
+                    val uiTree = uiTreeFilterer.filterOnScreenOnly(uiTreeRaw)
+                    val treeLog =
+                        withContext(coroutineScopeIo.coroutineContext) {
+                            val indexMap = UiTreeTraversal.buildIndexMap(uiTree.root)
+                            uiTreeFormatter.toAsciiTree(
+                                uiTree,
+                                showTreeIndex = true,
+                                showId = false,
+                                indexMap = indexMap,
+                            )
+                        }
+                    Log.d("$TAG UI Tree (fallback):\n$treeLog")
+                    nodeCount = countNodes(uiTree.root)
+                    maxDepth = calculateMaxDepth(uiTree.root)
+                    actualFormat = UiSnapshotActualFormat.Ascii
+                }
 
-                // Offload heavy computation to background
-                val treeLog =
-                    withContext(coroutineScopeIo.coroutineContext) {
-                        val indexMap = UiTreeTraversal.buildIndexMap(uiTree.root)
-                        uiTreeFormatter.toAsciiTree(
-                            uiTree,
-                            showTreeIndex = true,
-                            showId = false,
-                            indexMap = indexMap,
-                        )
-                    }
-                Log.d("$TAG UI Tree:\n$treeLog")
-
-                // Compute tree stats and include in payload
-                val nodeCount = countNodes(uiTree.root)
-                val maxDepth = calculateMaxDepth(uiTree.root)
                 val totalElapsedMs = getCurrentTimeMillis() - stageStartTime
 
                 val successPayload =
                     payload(
                         "stage_id" to "logUiTree",
+                        "requested_format" to format.name.lowercase(),
                         "node_count" to nodeCount,
                         "max_depth" to maxDepth,
+                        "actual_format" to actualFormat.wireValue,
                         "truncated" to "false", // TODO: Implement truncation detection
                         "elapsed_ms" to totalElapsedMs,
                         "attempt" to attempt,
                     )
                 sink.emit(TaskEvent.StageSuccess("logUiTree", successPayload))
-                return
+                return actualFormat
             } catch (t: Throwable) {
                 if (t is kotlinx.coroutines.CancellationException) throw t
                 if (attempt >= retry.maxAttempts) {
@@ -271,50 +285,6 @@ class TaskScopeDefault(
         }
     }
 
-    /**
-     * Helper function to count total nodes in a UI tree recursively.
-     */
-    private fun countNodes(node: UiNode): Int = 1 + node.children.sumOf { countNodes(it) }
-
-    /**
-     * Helper function to calculate maximum depth of UI tree recursively.
-     */
-    private fun calculateMaxDepth(
-        node: UiNode,
-        currentDepth: Int = 0,
-    ): Int =
-        if (node.children.isEmpty()) {
-            currentDepth
-        } else {
-            node.children.maxOf { calculateMaxDepth(it, currentDepth + 1) }
-        }
-
-    override suspend fun <T> ui(block: suspend TaskUiScope.() -> T): T {
-        Log.d("$TAG Executing UI operations")
-        val result = taskUiScope.block()
-        Log.d("$TAG UI operations completed, result: $result")
-        return result
-    }
-
-    /**
-     * Closes (backgrounds) the specified app by simulating a swipe gesture in Recents.
-     *
-     * This function implements a reliable app closing strategy:
-     * 1. First ensures the target app is in the foreground by opening it
-     * 2. Delegates to AppCloseManager to perform the actual closing gesture
-     *
-     * **Why open the app first?**
-     * Opening the app first ensures it appears as the most recent app in Recents,
-     * making it the first (topmost) app card that gets swiped away.
-     *
-     * **Retry Behavior:**
-     * Uses the provided retry configuration, with TaskRetryPresets.AppClose
-     * providing sensible defaults for app closing operations.
-     *
-     * @param applicationId The package name of the app to close
-     * @param retry Retry configuration for handling failures
-     * @throws Exception if the app cannot be closed after all retry attempts
-     */
     override suspend fun closeApp(
         applicationId: ApplicationId,
         retry: TaskRetry,
@@ -326,38 +296,62 @@ class TaskScopeDefault(
             payload(
                 "stage_id" to "closeApp:$applicationId",
                 "application_id" to applicationId,
-                "strategy" to "recents_swipe", // Default strategy used
                 "elapsed_ms" to elapsedMs,
                 "attempt" to attempt,
             )
         },
-        failurePayload = { throwable, attempt ->
-            // TODO: Replace string-based detection with typed exceptions
-            val reasonCode =
-                when {
-                    // Conservative: only check specific known error messages
-                    throwable.message?.contains("not in recents") == true -> "not_in_recents"
-                    else -> "unknown"
-                }
+        failurePayload = { _, attempt ->
             payload(
                 "application_id" to applicationId,
-                "reason_code" to reasonCode,
                 "attempt" to attempt,
             )
         },
     ) {
-        Log.d("$TAG ⚡ Starting closeApp for: $applicationId")
-
-        // Step 1: Ensure target app is in foreground (makes it first in Recents)
-        Log.d("$TAG 🚀 Step 1: Opening app to bring to foreground")
-        openApp(applicationId, retry = TaskRetryPresets.AppLaunch)
-        pause(1.seconds)
-        Log.d("$TAG ✅ App opened and should be in foreground")
-
-        // Step 2: Perform the closing gesture via AppCloseManager
+        Log.d("$TAG Closing app: $applicationId")
         appCloseManager.closeFirstAppInRecents(applicationId)
+        Unit
+    }
 
-        // Add a pause to ensure the app is closed
-        pause(1.seconds)
+    private fun countNodes(node: UiNode): Int =
+        1 + node.children.sumOf { countNodes(it) }
+
+    private fun calculateMaxDepth(node: UiNode, currentDepth: Int = 0): Int {
+        if (node.children.isEmpty()) return currentDepth
+        return node.children.maxOf { calculateMaxDepth(it, currentDepth + 1) }
+    }
+
+    private fun countNodesInHierarchyDump(hierarchyDump: String): Int = "<node ".toRegex().findAll(hierarchyDump).count()
+
+    private fun maxDepthInHierarchyDump(hierarchyDump: String): Int {
+        val tokenRegex = Regex("</?node\b[^>]*?/?>")
+        var depth = 0
+        var maxDepth = 0
+        tokenRegex.findAll(hierarchyDump).forEach { match ->
+            val token = match.value
+            when {
+                token.startsWith("</node") -> {
+                    if (depth > 0) depth--
+                }
+                token.endsWith("/>") -> {
+                    // Self-closing node contributes at the current open-parent depth.
+                    val nodeDepth = depth
+                    if (nodeDepth > maxDepth) maxDepth = nodeDepth
+                }
+                else -> {
+                    // Opening tag contributes at current depth, then increases nesting for children.
+                    val nodeDepth = depth
+                    if (nodeDepth > maxDepth) maxDepth = nodeDepth
+                    depth++
+                }
+            }
+        }
+        return maxDepth
+    }
+
+    override suspend fun <T> ui(block: suspend TaskUiScope.() -> T): T {
+        Log.d("$TAG Executing UI operations")
+        val result = taskUiScope.block()
+        Log.d("$TAG UI operations completed")
+        return result
     }
 }

@@ -324,6 +324,61 @@ class TaskUiScopeDefault(
         Unit
     }
 
+    override suspend fun enterText(
+        matcher: NodeMatcher,
+        text: String,
+        submit: Boolean,
+        retry: TaskRetry,
+    ) = withRetry(
+        retry = retry,
+        operation = "enterText($matcher)",
+        successPayload = { _, elapsedMs, attempt ->
+            payload(
+                "matcher" to matcher.toString(),
+                "submit" to submit,
+                "text_length" to text.length,
+                "elapsed_ms" to elapsedMs,
+                "attempt" to attempt,
+            )
+        },
+        failurePayload = { throwable, attempt ->
+            val failurePoint =
+                when {
+                    throwable.message?.contains("not found") == true -> "not_found"
+                    throwable.message?.contains("set text") == true -> "set_text_failed"
+                    throwable.message?.contains("UI tree not available") == true -> "stale_node"
+                    else -> "timeout"
+                }
+            payload(
+                "matcher" to matcher.toString(),
+                "submit" to submit,
+                "text_length" to text.length,
+                "failure_point" to failurePoint,
+                "attempt" to attempt,
+            )
+        },
+    ) {
+        Log.d("$TAG Entering text into node matching: $matcher (len=${text.length}, submit=$submit)")
+
+        val uiTreeRaw =
+            uiTreeInspector.getCurrentUiTree()
+                ?: throw IllegalStateException("UI tree not available")
+
+        val uiTree = uiTreeFilterer.filterOnScreenOnly(uiTreeRaw)
+
+        val uiNode =
+            findNodeByMatcher(matcher, uiTree)
+                ?: throw IllegalStateException("No UI node found matching criteria: $matcher")
+
+        val setTextSuccessful = uiTreeManager.setText(uiNode, text, submit)
+        if (!setTextSuccessful) {
+            throw IllegalStateException("Failed to set text on matching UI node")
+        }
+
+        Log.d("$TAG Successfully entered text into matching node")
+        Unit
+    }
+
     override suspend fun scrollUntil(
         target: NodeMatcher,
         container: NodeMatcher?,

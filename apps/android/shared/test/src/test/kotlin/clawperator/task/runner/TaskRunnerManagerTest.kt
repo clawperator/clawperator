@@ -87,8 +87,12 @@ class TaskRunnerManagerTest : ActionTest {
             delay(duration)
         }
 
-        override suspend fun logUiTree(retry: TaskRetry) {
+        override suspend fun logUiTree(
+            format: UiSnapshotFormat,
+            retry: TaskRetry,
+        ): UiSnapshotActualFormat {
             // No-op for testing
+            return UiSnapshotActualFormat.Ascii
         }
 
         override suspend fun closeApp(
