@@ -62,9 +62,7 @@
         android:enabled="true"
         android:exported="true">
         <intent-filter>
-          <action android:name="com.clawperator.operator.ACTION_RUN_TASK" />
-          <action android:name="com.clawperator.operator.ACTION_LOG_UI" />
-          <action android:name="com.clawperator.operator.ACTION_AGENT_COMMAND" />
+          <action android:name="app.clawperator.operator.ACTION_AGENT_COMMAND" />
         </intent-filter>
       </receiver>
 

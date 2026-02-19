@@ -6,7 +6,6 @@ import android.app.ForegroundServiceStartNotAllowedException
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
-import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.content.IntentFilter
@@ -16,8 +15,6 @@ import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import clawperator.operator.runtime.OperatorCommandReceiver.Companion.ACTION_AGENT_COMMAND
-import clawperator.operator.runtime.OperatorCommandReceiver.Companion.ACTION_LOG_UI
-import clawperator.operator.runtime.OperatorCommandReceiver.Companion.ACTION_RUN_TASK
 
 class OperatorCommandService : Service() {
     companion object {
@@ -34,8 +31,6 @@ class OperatorCommandService : Service() {
         // Register the debug broadcast receiver
         val filter =
             IntentFilter().apply {
-                addAction(ACTION_RUN_TASK)
-                addAction(ACTION_LOG_UI)
                 addAction(ACTION_AGENT_COMMAND)
             }
         ContextCompat.registerReceiver(
@@ -108,48 +103,11 @@ class OperatorCommandService : Service() {
     }
 
     private fun createNotification(): Notification {
-        // Default action (Log UI) - triggered when tapping the notification
-        val logUiIntent =
-            Intent(this, OperatorCommandReceiver::class.java).apply {
-                action = ACTION_LOG_UI
-            }
-
-        val logUiPendingIntent =
-            PendingIntent.getBroadcast(
-                this,
-                0,
-                logUiIntent,
-                PendingIntent.FLAG_IMMUTABLE,
-            )
-
-        // Run Task action button
-        val runTaskIntent =
-            Intent(this, OperatorCommandReceiver::class.java).apply {
-                action = ACTION_RUN_TASK
-            }
-
-        val runTaskPendingIntent =
-            PendingIntent.getBroadcast(
-                this,
-                1,
-                runTaskIntent,
-                PendingIntent.FLAG_IMMUTABLE,
-            )
-
         return NotificationCompat
             .Builder(this, NOTIFICATION_CHANNEL_ID)
             .setContentTitle("[Clawperator] Operator Service")
-            .setContentText("Tap to log UI elements")
+            .setContentText("Listening for agent command broadcasts")
             .setSmallIcon(clawperator.resources.R.drawable.ic_notification)
-            .setContentIntent(logUiPendingIntent) // Default action is Log UI
-            .addAction(
-                clawperator.resources.R.drawable.ic_notification,
-                "Run Task",
-                runTaskPendingIntent,
-            ).addAction(
-                clawperator.resources.R.drawable.ic_notification,
-                "Log UI",
-                logUiPendingIntent,
-            ).build()
+            .build()
     }
 }
