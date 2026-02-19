@@ -15,12 +15,11 @@ Out of scope for this migration:
 - `/apps/node` implementation
 
 ## Source of Truth
-- Migration plan: `docs/migrate-to-clawperator.md`
-- Pivot context: `docs/migrate-to-agent-controlled.md`
 - Operator recipes/guides: `docs/operator-llm-playbook.md`, `ui-trees/`
+- Project context: `docs/project-overview.md`
 
 ## Required Iteration Loop
-Every migration slice must do all steps before commit:
+Every non-trivial change should do all steps before commit:
 1. Make focused changes.
 2. Compile: `./gradlew :app:assembleDebug`
 3. Run unit tests: `./gradlew testDebugUnitTest` (or `./gradlew unitTest` for all modules)
@@ -46,7 +45,5 @@ If compile, unit tests, install, or smoke fails, fix or explicitly document base
   - `./scripts/apply_coding_standards.sh -f`
 
 ## Migration-Specific Constraints
-- Remove Firebase/FCM early (first pruning slice).
-- Final package/application identifier target: `com.clawperator.operator`.
-- Defer Android-only flattening decision; do not force it now.
-- Preserve operator control path while pruning legacy systems.
+- Preserve operator control path reliability while evolving features.
+- Keep package/application identifier consistent with current repo defaults (`com.clawperator.operator*` variants).
