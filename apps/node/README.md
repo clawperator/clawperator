@@ -6,7 +6,7 @@ Node runtime for Clawperator: deterministic Android execution for LLM agents. Se
 
 - Node.js 22+
 - `adb` on PATH (or set `ADB_PATH`)
-- Optional: `CLAWPERATOR_RECEIVER_PACKAGE` (default: `app.actiontask.operator.development`)
+- Optional: `CLAWPERATOR_RECEIVER_PACKAGE` (default: `com.clawperator.operator.dev`)
 
 ## Observability: `terminalSource`
 

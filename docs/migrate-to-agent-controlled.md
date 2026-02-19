@@ -1,9 +1,11 @@
 # Pivot Plan: ActionTask -> Agent-Controlled UI Automation
 
+> Historical migration plan. For current operational guidance use `<local_user>/src/clawperator/docs/operator-llm-playbook.md`.
+
 ## Why this document
 This plan describes how to move ActionTask from hardcoded workflows (especially in `WorkflowFactoryDefault`) to a generic, agent-controlled system that can be driven by OpenClaw.
 
-> Canonical usage/authoring guide for LLMs: `doc/operator-llm-playbook.md`.
+> Canonical usage/authoring guide for LLMs: `docs/operator-llm-playbook.md`.
 
 It includes:
 - a reusable prompt for a Codex-style implementation agent
@@ -15,14 +17,14 @@ It includes:
 - Reliability convention for agent recipes: prefer `close_app` then `open_app` before navigation/reads, so plans run from a deterministic fresh state (not resumed UI).
 - Generic `UiActionEngine` is implemented in `shared/data/task/.../UiActionEngine.kt`.
 - `temperature:get` now executes a typed generic plan (close/open/snapshot/read_text) via `UiActionEngine`, instead of direct hardcoded TaskUi calls in `WorkflowFactoryDefault`.
-- Broadcast agent ingress is available via `app.actiontask.operator.ACTION_AGENT_COMMAND` with bounded payload validation, typed parsing, and correlation IDs (`commandId`, `taskId`). For safety, this ingress is accepted only on debuggable builds.
-- `ACTION_LOG_UI` now routes through the same internal `snapshot_ui` typed action execution path for compatibility.
+- Broadcast agent ingress is available via `app.clawperator.operator.ACTION_AGENT_COMMAND` with bounded payload validation, typed parsing, and correlation IDs (`commandId`, `taskId`). For safety, this ingress is accepted only on debuggable builds.
+- Immediate UI observation is performed via the typed `snapshot_ui` action.
 - Added `ac:status` operator command that uses the generic agent-action path to open Google Home, navigate to the Climate tile, long-press the controller card, and extract a status summary (`power`, `mode`, `indoor_temp`).
 
 ### Agent command broadcast (MVP)
 ```bash
 adb shell am broadcast \
-  -a app.actiontask.operator.ACTION_AGENT_COMMAND \
+  -a app.clawperator.operator.ACTION_AGENT_COMMAND \
   --es payload '{"commandId":"cmd-1","taskId":"task-1","source":"debug","actions":[{"id":"s1","type":"snapshot_ui","params":{"format":"ascii"}}]}' \
   --receiver-foreground
 ```
@@ -43,7 +45,7 @@ You are working in ~/src/ActionTask.
 3) Prepare and validate local operator control:
    - Run scripts/grant_operator_permissions.sh
    - Use adb logcat and monitor logs prefixed with [Operator-AccessibilityService]
-   - Use ACTION_LOG_UI to force an immediate on-demand UI snapshot whenever needed
+   - Use a `snapshot_ui` action to force an immediate on-demand UI snapshot whenever needed
    - Open several real apps on the connected Android device and observe how the UI appears in logs/tree output
 4) Refactor away hardcoded workflow logic by introducing a generic action execution layer (app launch, wait, find, click, scroll, read text, assert, snapshot).
 5) Implement a command ingress path that supports machine-generated actions (broadcast first, network-backed queue optional), with strict validation and correlation IDs.
@@ -81,12 +83,12 @@ This logic works, but it makes scaling to arbitrary tasks expensive and brittle.
   - `openApp`, `closeApp`, `pause`, `logUiTree`
   - `waitForNode`, `getText`, `click`, `scrollUntil`, `clickAfterScroll`, `getCurrentToggleState`, `setCurrentToggleState`
 - `TaskEvent` already provides structured step telemetry (`StageStart`, `StageSuccess`, `StageFailure`, `RetryScheduled`, `Log`).
-- Broadcast operator entry points already exist (`OperatorCommandReceiver`, `scripts/operator_event.sh`).
+- Broadcast operator entry points already exist (`OperatorCommandReceiver`, `ACTION_AGENT_COMMAND`).
 
 ### Accessibility/logging reality
 - `OperatorAccessibilityService` currently logs all accessibility events with `[Operator-AccessibilityService]` prefix.
 - UI trees are already printable in ASCII (`TaskScopeDefault.logUiTree` + `UiTreeFormatterDefault`).
-- `OperatorCommandReceiver.ACTION_LOG_UI` (`app.actiontask.operator.ACTION_LOG_UI`) can be invoked at any time to dump the current UI tree, independent of normal workflow execution.
+- UI snapshots are obtained via `snapshot_ui` actions sent through `ACTION_AGENT_COMMAND`.
 - Permission script name in this repo is `scripts/grant_operator_permissions.sh` (plural), not `grant_operator_permission.sh`.
 
 ## Target architecture
@@ -128,11 +130,8 @@ Keep logcat output for humans, but also emit machine-parseable events:
 - optional bounded snapshot payload (ascii/json)
 
 Implementation decision:
-- Keep `ACTION_LOG_UI` as the low-level immediate observation trigger.
-- Add a first-class action type `snapshot_ui` in `UiActionEngine` and route it through the same internal code path used by `ACTION_LOG_UI`.
-- This gives us both:
-  - backwards-compatible manual control (`adb`/broadcast/scripts), and
-  - agent-safe typed observation in plans/tool calls.
+- Use `snapshot_ui` as the low-level immediate observation trigger.
+- Keep observation agent-safe and typed in plans/tool calls.
 
 #### 4) Compatibility adapter
 Refactor old workflow methods to compile into generic action plans instead of doing direct app-specific calls.
@@ -168,7 +167,7 @@ Recommended first skill pattern:
    - before starting a plan
    - after each navigation/click step
    - immediately on any failure/retry
-2. The skill should prefer structured snapshot output when available, and fall back to `ACTION_LOG_UI` log parsing for compatibility.
+2. The skill should prefer structured snapshot output when available.
 3. Keep the skill small and procedural (observe -> decide -> act -> observe) so it is reusable across apps.
 4. When appropriate, configure the skill as direct tool dispatch (slash command -> tool) so observation actions can bypass extra model hops.
 
@@ -236,8 +235,8 @@ command-arg-mode: raw
 ## Phase 0: Observability hardening
 - Add stable correlation IDs from ingress to action execution logs.
 - Add structured event logging bridge from `TaskEvent` to operator task status progress (currently TODO in `OperatorCommandExecutorDefault`).
-- Add a dedicated log prefix for machine events (for example `[Operator-AgentEvent]`).
-- Define `snapshot_ui` telemetry schema and ensure `ACTION_LOG_UI` emits the same metadata envelope.
+- Add a dedicated log prefix for machine events (for example `[Clawperator-Result]`).
+- Define `snapshot_ui` telemetry schema and ensure canonical envelopes remain stable.
 
 Acceptance:
 - One command shows consistent `taskId/commandId` in all key logs.
@@ -322,13 +321,13 @@ adb logcat | grep -F "[Operator-AccessibilityService]"
 ```
 4. Trigger new agent command (phase 1):
 ```bash
-adb shell am broadcast -a app.actiontask.operator.ACTION_AGENT_COMMAND --es payload '<json>'
+adb shell am broadcast -a app.clawperator.operator.ACTION_AGENT_COMMAND --es payload '<json>'
 ```
 5. Trigger direct on-demand snapshot anytime (existing mechanism):
 ```bash
 ./scripts/operator_event_log_ui.sh
 # or
-adb shell am broadcast -a app.actiontask.operator.ACTION_LOG_UI --receiver-foreground
+adb shell am broadcast -a app.clawperator.operator.ACTION_AGENT_COMMAND --es payload '<snapshot_ui_command_json>' --receiver-foreground
 ```
 
 ## Key risks and mitigations

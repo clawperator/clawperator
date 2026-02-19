@@ -115,14 +115,14 @@ Exit criteria:
 Record the most recent real-device validation used for this release decision:
 
 - Device: `<device_serial>`
-- Receiver package: `app.actiontask.operator.development` (or release equivalent)
+- Receiver package: `com.clawperator.operator.dev` (or release equivalent)
 - Terminal contract: canonical-only (`[Clawperator-Result]`)
 
 Baseline command set:
 
 ```bash
 ./scripts/apply_coding_standards.sh -f
-./gradlew :shared:data:operator:testDebugUnitTest --tests "actiontask.operator.agent.ClawperatorResultEnvelopeTest"
+./gradlew :shared:data:operator:testDebugUnitTest --tests "clawperator.operator.agent.ClawperatorResultEnvelopeTest"
 npm --prefix apps/node run build
 npm --prefix apps/node run test
 CLAWPERATOR_SMOKE_SUMMARY=/tmp/clawperator-smoke-summary.json ./scripts/clawperator_smoke_core.sh

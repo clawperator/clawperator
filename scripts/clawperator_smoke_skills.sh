@@ -13,7 +13,7 @@ npm --prefix apps/node run build
 # Device selection follows the same policy as Stage 1 smoke.
 # NOTE: Do not commit personal device serials to this repository.
 export DEVICE_ID="${DEVICE_ID:-}"
-export CLAWPERATOR_RECEIVER_PACKAGE="${CLAWPERATOR_RECEIVER_PACKAGE:-app.actiontask.operator.development}"
+export CLAWPERATOR_RECEIVER_PACKAGE="${CLAWPERATOR_RECEIVER_PACKAGE:-com.clawperator.operator.dev}"
 export SKILL_ID="${SKILL_ID:-com.google.android.apps.chromecast.app.get-aircon-status}"
 export ARTIFACT_NAME="${ARTIFACT_NAME:-ac-status}"
 export AC_TILE_NAME="${AC_TILE_NAME:-Master}"

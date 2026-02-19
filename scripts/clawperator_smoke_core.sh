@@ -17,7 +17,7 @@ npm --prefix apps/node run build
 export DEVICE_ID="${DEVICE_ID:-}"
 
 # 2) Set receiver package (edit if needed)
-export CLAWPERATOR_RECEIVER_PACKAGE="${CLAWPERATOR_RECEIVER_PACKAGE:-app.actiontask.operator.development}"
+export CLAWPERATOR_RECEIVER_PACKAGE="${CLAWPERATOR_RECEIVER_PACKAGE:-com.clawperator.operator.dev}"
 # 3) Baseline app package should be broadly available on Android devices.
 export BASELINE_APP_PACKAGE="${BASELINE_APP_PACKAGE:-com.android.settings}"
 

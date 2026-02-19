@@ -20,7 +20,7 @@ From repo root:
 ./gradlew :app:assembleDebug
 ./gradlew testDebug
 ./gradlew :app:installDebug
-adb shell am start -n app.actiontask.operator.development/actionlauncher.activity.MainActivity
+adb shell am start -n com.clawperator.operator.dev/clawperator.activity.MainActivity
 ```
 
 ## Notes

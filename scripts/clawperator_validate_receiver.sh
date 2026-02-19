@@ -13,7 +13,7 @@ cd "$(dirname "$0")/.."
 # - If unset and multiple devices are connected, fail and require explicit DEVICE_ID.
 # NOTE: Do not commit personal device serials to this repository.
 export DEVICE_ID="${DEVICE_ID:-}"
-export CLAWPERATOR_RECEIVER_PACKAGE="${CLAWPERATOR_RECEIVER_PACKAGE:-app.actiontask.operator.development}"
+export CLAWPERATOR_RECEIVER_PACKAGE="${CLAWPERATOR_RECEIVER_PACKAGE:-com.clawperator.operator.dev}"
 
 # Unique commandId for this run (so logcat grep is correlatable)
 VALIDATE_CMD_ID="validate-$(date +%s)"
@@ -77,7 +77,7 @@ set -e
 
 # Capture logcat lines that correlate to this command or receiver tags.
 adb -s "$DEVICE_ID" logcat -d -t 800 \
-  | awk -v cmd="$VALIDATE_CMD_ID" 'index($0, cmd) || $0 ~ /Clawperator-Result|Operator-AgentEvent|command_success|command_failure|ACTION_AGENT_COMMAND/' \
+  | awk -v cmd="$VALIDATE_CMD_ID" 'index($0, cmd) || $0 ~ /Clawperator-Result|ACTION_AGENT_COMMAND/' \
   > "$GREP_OUTPUT_FILE" || true
 
 echo "=== logcat grep result (saved to $GREP_OUTPUT_FILE) ==="

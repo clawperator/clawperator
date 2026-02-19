@@ -1,8 +1,8 @@
 /**
  * Centralized Android bridge config. Keeps action/receiver constants in one place
- * (migration-aligned: ActionTask vs Clawperator naming).
+ * for Clawperator Android runtime dispatch.
  */
-export const DEFAULT_ACTION_AGENT_COMMAND = "app.actiontask.operator.ACTION_AGENT_COMMAND";
+export const DEFAULT_ACTION_AGENT_COMMAND = "app.clawperator.operator.ACTION_AGENT_COMMAND";
 export const EXTRA_AGENT_PAYLOAD = "payload";
 
 export interface RuntimeConfig {
@@ -25,7 +25,7 @@ export function getDefaultRuntimeConfig(overrides?: Partial<RuntimeConfig>): Run
 
   return {
     adbPath: "adb",
-    receiverPackage: "app.actiontask.operator.development",
+    receiverPackage: "com.clawperator.operator.dev",
     actionAgentCommand: DEFAULT_ACTION_AGENT_COMMAND,
     payloadExtraKey: EXTRA_AGENT_PAYLOAD,
     ...definedOverrides,

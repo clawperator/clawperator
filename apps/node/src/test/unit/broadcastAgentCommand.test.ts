@@ -6,8 +6,8 @@ import type { RuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.
 const CONFIG: RuntimeConfig = {
   adbPath: "adb",
   deviceId: "test-device-serial",
-  receiverPackage: "app.actiontask.operator.development",
-  actionAgentCommand: "app.actiontask.operator.ACTION_AGENT_COMMAND",
+  receiverPackage: "com.clawperator.operator.dev",
+  actionAgentCommand: "app.clawperator.operator.ACTION_AGENT_COMMAND",
   payloadExtraKey: "payload",
 };
 
