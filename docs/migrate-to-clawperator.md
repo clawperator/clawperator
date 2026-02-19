@@ -479,11 +479,11 @@ Goal: Complete naming migration after structural churn settles.
 - Keep `action.*` prefix (it's generic enough)
 
 **Application identifier:**
-- Current: `app.actiontask.operator` (or similar)
+- Current: `app.clawperator.operator` (or similar)
 - Target: `com.clawperator.operator`
 
 **Manifest actions and authorities:**
-- `app.actiontask.operator.*` → `app.clawperator.operator.*`
+- `app.clawperator.operator.*` → `app.clawperator.operator.*`
 - Update all `AndroidManifest.xml` entries
 
 **Code strings and constants:**
@@ -499,9 +499,9 @@ Rename core operator packages that are stable:
 
 ```kotlin
 // BEFORE
-package actiontask.operator.command
-package actiontask.operator.runtime
-package actiontask.operator.accessibilityservice
+package clawperator.operator.command
+package clawperator.operator.runtime
+package clawperator.operator.accessibilityservice
 
 // AFTER  
 package clawperator.operator.command
@@ -539,24 +539,14 @@ android {
 
 Update `AndroidManifest.xml`:
 ```xml
-<!-- BEFORE -->
-<manifest package="com.actiontask.operator">
-    <action android:name="app.actiontask.operator.ACTION_RUN_TASK" />
-
-<!-- AFTER -->
 <manifest package="com.clawperator.operator">
-    <action android:name="app.clawperator.operator.ACTION_RUN_TASK" />
+    <action android:name="app.clawperator.operator.ACTION_AGENT_COMMAND" />
 ```
 
 #### Pass 6.4: String Constants and Log Tags
 ```kotlin
-// BEFORE
-const val TAG = "[ActionTask-Operator]"
-val ACTION = "app.actiontask.operator.ACTION"
-
-// AFTER
 const val TAG = "[Clawperator]"
-val ACTION = "app.clawperator.operator.ACTION"
+val ACTION = "app.clawperator.operator.ACTION_AGENT_COMMAND"
 ```
 
 ### Renaming Strategy Per File Type
@@ -615,7 +605,7 @@ Examples:
 - `refactor(migration): prune non-operator shared modules`
 - `refactor(android): move android app to apps/android`
 - `refactor(android): convert shared:core:common to Android-only`
-- `chore(rename): rename actiontask.operator packages to clawperator.operator`
+- `chore(rename): rename clawperator.operator packages to clawperator.operator`
 
 ## Risks and Mitigations
 
