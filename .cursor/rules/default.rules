@@ -2,14 +2,16 @@
 
 ## Overview
 - Android operator runtime for LLM-driven device control.
-- Product target: single-activity Android shell app, controlled externally by OpenClaw-driven commands; local operator execution and observability on device.
+- Clawperator follows a **Brain and Hand Model**: 
+  - **The Brain (Agent):** An external LLM (e.g. OpenClaw) that owns reasoning, planning, and decision-making.
+  - **The Hand (Clawperator):** A deterministic execution layer that provides the "fingers" for observation (`snapshot_ui`) and interaction (taps, scrolls).
 - Uses Android Accessibility APIs to interact with third-party apps: inspect UI, map screens to a human-readable form, programmatically trigger actions (taps, scrolls).
 - Core idea: **the app is the API**—automation for apps without official APIs by driving the device and apps directly.
 
 ## Out of scope (for this codebase)
-- Firebase / FCM remote control path
-- User or account management
-- Broad launcher UI or pixel-rendering surfaces
+- Legacy "ActionTask" or "Conductor" cloud-orchestration paths.
+- Autonomous multi-step planning (this belongs in the Agent).
+- Broad launcher UI or pixel-rendering surfaces.
 
 ---
 
@@ -80,7 +82,7 @@ The codebase uses Kotlin `Flow` for state management and reactive data flow.
 > For test-driven development workflow and best practices, see [development.rules](.cursor/rules/development.rules)
 
 ## Test Execution
-- Run unit tests with: `./gradlew :shared:test:testDebugUnitTest`
+- Run unit tests with: `./gradlew testDebugUnitTest`
 - Tests should be fast and independent
 - Avoid filesystem/network access in unit tests
 - Use fakes/mocks for external dependencies

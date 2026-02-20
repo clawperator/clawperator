@@ -7,7 +7,7 @@ Product naming:
 
 ## Purpose
 
-Define how agents execute Android automations through Clawperator with deterministic inputs/outputs and no direct recipe-specific shell scripting.
+Clawperator is a deterministic actuator tool that allows agents to execute Android automations on behalf of a user. It provides a stable layer for LLM-driven device control with deterministic inputs/outputs, eliminating the need for brittle, direct recipe-specific shell scripting.
 
 Execution model:
 
@@ -32,32 +32,80 @@ Design implication:
 
 - If a workflow is common (for example package listing, screenshots, device discovery, app open/close, execution, snapshot, logs), provide a first-class Clawperator command/API for it.
 
-## v1 Delivery Shape: CLI-first
+## v1 Delivery Shape (Shipping)
 
-Primary interface is CLI with JSON input/output.
+The v1 release focuses on stable, CLI-driven execution for single-device setups.
 
 Commands:
+- `clawperator doctor`: Validate prerequisites and environment.
+- `clawperator devices`: Discover connected device IDs.
+- `clawperator packages list`: Confirm presence of receiver and target apps.
+- `clawperator execute`: Run an execution JSON payload.
+- `clawperator observe snapshot`: Get current UI tree as JSON/ASCII.
+- `clawperator action [click|read|wait]`: Quick wrappers for single-step interactions.
 
-- `clawperator doctor`
-- `clawperator doctor --fix`
-- `clawperator devices`
-- `clawperator packages list [--device-id <id>]`
-- `clawperator skills list`
-- `clawperator skills get <skill_id>`
-- `clawperator skills compile-artifact <skill_id> --artifact <name> --vars <json>`
-- `clawperator skills sync --ref <git-ref>`
-- `clawperator execute --execution <json-or-file>`
-- `clawperator execute best-effort --goal <text> [--device-id <id>]`
-- `clawperator observe snapshot [--device-id <id>]`
-- `clawperator inspect ui [--device-id <id>]`
-- `clawperator act click --selector <json> [--device-id <id>]`
-- `clawperator act read --selector <json> [--device-id <id>]`
-- `clawperator act wait --selector <json> [--device-id <id>]`
+Contracts:
+- **Canonical Envelope:** `[Clawperator-Result] {JSON}` is the ONLY way success/failure is reported.
+- **`expectedFormat` Required:** Every observation/execution must include `expectedFormat: "android-ui-automator"`.
+- **Single-Flight Lock:** Only one execution per `deviceId` / `receiverPackage` at a time. Overlaps return `EXECUTION_CONFLICT_IN_FLIGHT`.
 
-Optional HTTP mode:
+## Post-v1 Roadmap (Planned)
 
-- `clawperator --serve`
-- HTTP routes are a thin wrapper around the same CLI/application service layer.
+Features that are not required for initial launch but are high priority:
+
+- `clawperator --serve`: HTTP/SSE server for remote agents (e.g., OpenClaw).
+- `clawperator doctor prescribe`: Detailed diagnostics via Android runtime endpoints.
+- `clawperator doctor --fix`: Automated remediation for common ADB/permission issues.
+- `clawperator skills sync`: Canonical skills repo integration.
+- `clawperator observe screenshot`: First-class visual observation primitives.
+- `clawperator action [back|home|recents]`: System-level navigation hard-keys.
+
+## Optional HTTP Wrapper (when `--serve` is enabled)
+
+- **Purpose:** Enables remote agent callers (e.g., OpenClaw in a Docker container or separate box) to interact with Clawperator via a stable REST API.
+- **Key Features:**
+    - **REST API:** Mapping of CLI commands to HTTP endpoints for device/execution management.
+    - **SSE (Server-Sent Events):** Real-time streaming of `[Clawperator-Result]` and intermediate `[Clawperator-Event]` envelopes back to the client.
+    - **Device Locking:** Basic concurrency control to prevent multiple agents from overlapping executions on the same physical device.
+
+## Determinism Doctrine
+
+1. **No Hidden Logic:** Clawperator never retries a failed action or auto-falls back to a different strategy (e.g., from `artifact` to `direct`).
+2. **Pre-Flight Validation:** Every execution is validated against the target device and receiver capabilities before any ADB call is made.
+3. **Canonical Result:** Exactly one terminal envelope per `commandId`. If a timeout occurs, the CLI emits a `RESULT_ENVELOPE_TIMEOUT` error.
+
+## Error Taxonomy
+
+LLM agents must use these codes to decide their next step.
+
+### Setup & Connectivity
+- `ADB_NOT_FOUND`: ADB is missing from PATH.
+- `NO_DEVICES`: No Android devices are connected via USB/Network.
+- `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED`: More than one device exists; specify `--device-id`.
+- `RECEIVER_NOT_INSTALLED`: The target receiver package is not on the device.
+
+### Execution & State
+- `EXECUTION_VALIDATION_FAILED`: The execution JSON is malformed or invalid.
+- `EXECUTION_ACTION_UNSUPPORTED`: The requested action type is not supported by the runtime.
+- `EXECUTION_CONFLICT_IN_FLIGHT`: A command is already running on the target device.
+- `RESULT_ENVELOPE_TIMEOUT`: The command ran but no terminal envelope was received within the timeout.
+- `RESULT_ENVELOPE_MALFORMED`: Logcat emitted an invalid JSON envelope.
+
+### UI & Nodes
+- `NODE_NOT_FOUND`: The selector (matcher) failed to find the target UI element.
+- `NODE_NOT_CLICKABLE`: The target element was found but is not enabled/clickable.
+- `SECURITY_BLOCK_DETECTED`: A system-level security overlay (e.g., "Package Installer" or "Permission Dialog") is blocking interaction.
+
+## Safety & Concurrency
+
+### In-Flight Semantics
+A command is considered "in-flight" from the moment the ADB broadcast is sent until the `[Clawperator-Result]` is received or the `timeoutMs` is reached. If a command times out, the lock is held for an additional 2000ms "settle" window before allowing the next execution.
+
+### PII Redaction Policy
+By default, Clawperator returns **full-fidelity** UI text to the agent for maximum reasoning accuracy. 
+- **User Warning:** Results *will* contain sensitive data (names, account digits, OTPs) if they are visible on the screen.
+- **Agent Mitigation:** Do not ship raw Clawperator results to long-term storage without user consent.
+- **Upcoming:** A `--safe-logs` flag is planned for regex-based redaction of common PII patterns.
 
 ## API-First, ADB-Capable
 
@@ -344,6 +392,7 @@ Examples:
 - `read` -> `read_text`
 - `snapshot` -> `snapshot_ui`
 - `sleep` -> `sleep`
+- `act` -> `action` (alias for the primary `action` subcommand)
 
 Rules:
 
@@ -362,7 +411,7 @@ Goal:
 
 Suggested contract:
 
-- `act.tap_region` with:
+- `action.tap_region` with:
   - `region`: enum (`top_left`, `top_right`, `center`, `bottom_left`, `bottom_right`, etc.)
   - `insetPolicy`: enum (`exclude_system_bars`, `include_full_screen`)
   - `offsetPx` (optional): fine adjustment after anchor selection
@@ -390,9 +439,9 @@ Suggested endpoints:
 - `GET /v1/executions/:executionId/events`
 - `POST /v1/observe/snapshot`
 - `POST /v1/inspect/ui`
-- `POST /v1/act/click`
-- `POST /v1/act/read`
-- `POST /v1/act/wait`
+- `POST /v1/action/click`
+- `POST /v1/action/read`
+- `POST /v1/action/wait`
 
 HTTP contract mirrors CLI behavior exactly.
 
@@ -457,7 +506,7 @@ Clawperator should define layered tests, with real-device execution as a first-c
 ## Phased Plan
 
 1. Phase 1
-   - CLI foundation (`doctor`, `devices`, `execute`, `observe snapshot`, basic `act` commands)
+   - CLI foundation (`doctor`, `devices`, `execute`, `observe snapshot`, basic `action` commands)
    - result envelope parsing with strict prefix
    - hard limits and validation constants
 2. Phase 2
@@ -468,3 +517,16 @@ Clawperator should define layered tests, with real-device execution as a first-c
    - SSE event streaming + alias normalization layer
 4. Phase 4
    - migrate from logcat envelope to stronger transport if needed
+
+## Stability & Versioning
+
+Clawperator follows Semantic Versioning (SemVer) for the Node SDK/CLI and its API contracts.
+
+### Versioning Rules
+- **Major Bump (`1.x.x`):** Breaking changes to the result envelope JSON schema, CLI command removal, or incompatible `ACTION_AGENT_COMMAND` protocol changes.
+- **Minor Bump (`x.1.x`):** New supported actions, new CLI commands, or backward-compatible schema additions.
+- **Patch Bump (`x.x.1`):** Bug fixes, internal refactoring, or documentation updates.
+
+### Stability Boundary
+- **Stable (v1):** `execute`, `observe snapshot`, `devices`, and the `[Clawperator-Result]` envelope structure.
+- **Alpha/Unstable:** `execute best-effort`, `--serve` (HTTP), and any feature marked as `(Upcoming)` in these docs. These may break without a major version bump until they are promoted to stable.

@@ -14,11 +14,12 @@ Use this doc for:
 
 These are runtime components (not debug-only):
 
-- `clawperator.operator.runtime.OperatorCommandService`
-- `clawperator.operator.runtime.OperatorCommandReceiver`
+- `com.clawperator.operator.runtime.OperatorCommandService`
+- `com.clawperator.operator.runtime.OperatorCommandReceiver`
 
 They own broadcast ingress for:
-- `app.clawperator.operator.ACTION_AGENT_COMMAND`
+- **Action Namespace:** `com.clawperator.operator.ACTION_AGENT_COMMAND` (stable)
+- **Package Target:** Varies by build (e.g., `com.clawperator.operator` or `com.clawperator.operator.dev`)
 
 ---
 
@@ -31,21 +32,20 @@ For app automation commands, default to:
 3. wait for stabilization
 4. add small post-navigation settle delays (~500–1500ms) before critical reads/clicks
 
-Send commands via Android broadcast with `payload` JSON:
-
-```bash
-adb shell am broadcast \
-  -a app.clawperator.operator.ACTION_AGENT_COMMAND \
-  -p com.clawperator.operator.dev \
-  --es payload '{"commandId":"cmd-1","taskId":"task-1","source":"operator","timeoutMs":90000,"actions":[{"id":"s1","type":"snapshot_ui","params":{"format":"ascii"}}]}' \
-  --receiver-foreground
-```
-
 ### Required fields
 - `commandId: string`
 - `taskId: string`
 - `source: string`
+- **`expectedFormat: "android-ui-automator"`** (Required for v1 compatibility)
 - `actions: []`
+
+### Determinism Doctrine
+1. **Validation First:** No side effects if the payload is malformed.
+2. **Exactly One Envelope:** Every command must emit a `[Clawperator-Result]`.
+3. **No Retries:** The runtime never retries a failed step; it reports the failure immediately to the Brain.
+4. **Stable IDs:** Correlate `commandId` and `taskId` end-to-end.
+
+---
 
 ### Supported action types (current)
 - `open_app`
@@ -71,18 +71,21 @@ adb exec-out screencap -p > ./tmp/ui-check.png
 Canonical unit is a skill package, not a standalone recipe file.
 
 ### Required structure
+Skills are maintained in a dedicated sibling repository: `../clawperator-skills`.
+Each skill follows this structure:
 - `skills/<applicationId>.<intent>/SKILL.md`
 - `skills/<applicationId>.<intent>/scripts/*.sh`
 
-### Optional structure
-- `skills/<applicationId>.<intent>/artifacts/*.recipe.json`
+### Nature of Skills
+Due to the dynamic nature of mobile apps (A/B tests, server-side flags, unexpected popups), skills are treated as **highly informed context** for the Agent rather than purely deterministic scripts.
+- **Agent Responsibility:** The Agent uses skill templates as a baseline, modifying them at runtime to handle personal configurations (variable substitution) or UI drift.
 
 ### Rules
 1. No PII in committed skill artifacts.
 2. Use variables/placeholders for user-specific labels (for example `{{AC_TILE_NAME}}`).
 3. Prefer stable selectors first (`resourceId`), text matching second.
 4. Keep fallback matching strategy documented in `SKILL.md`.
-5. Keep skill-specific scripts/artifacts inside the skill folder (not top-level `scripts/`).
+5. Keep skill-specific scripts/artifacts inside the skill folder.
 
 ---
 
