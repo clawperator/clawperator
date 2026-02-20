@@ -130,6 +130,14 @@ class AgentCommandParserDefault : AgentCommandParser {
                     retry = params.parseRetryOrDefault(defaultRetry = TaskRetryPresets.UiReadiness),
                     validator = params.parseValidator(),
                 )
+            "enter_text", "type_text" ->
+                UiAction.EnterText(
+                    id = id,
+                    matcher = params.parseMatcherRequired("matcher"),
+                    text = params.stringRequired("text", MAX_MATCHER_VALUE_LENGTH),
+                    submit = params.booleanOrDefault("submit", false),
+                    retry = params.parseRetryOrDefault(defaultRetry = TaskRetryPresets.UiReadiness),
+                )
             "snapshot_ui" ->
                 UiAction.SnapshotUi(
                     id = id,

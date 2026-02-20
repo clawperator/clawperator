@@ -50,6 +50,7 @@ class UiActionEngineDefault : UiActionEngine {
                 is UiAction.ScrollAndClick -> executeScrollAndClick(taskScope, action)
                 is UiAction.ReadText -> executeReadText(taskScope, action)
                 is UiAction.SnapshotUi -> executeSnapshotUi(taskScope, action)
+                is UiAction.EnterText -> executeEnterText(taskScope, action)
                 is UiAction.Sleep -> executeSleep(taskScope, action)
             }
 
@@ -199,6 +200,29 @@ class UiActionEngineDefault : UiActionEngine {
                 mapOf(
                     "requested_format" to action.format.name.lowercase(),
                     "actual_format" to actualFormat.wireValue,
+                ),
+        )
+    }
+
+    private suspend fun executeEnterText(
+        taskScope: TaskScope,
+        action: UiAction.EnterText,
+    ): UiActionStepResult {
+        taskScope.ui {
+            enterText(
+                matcher = action.matcher,
+                text = action.text,
+                submit = action.submit,
+                retry = action.retry,
+            )
+        }
+        return UiActionStepResult(
+            id = action.id,
+            actionType = "enter_text",
+            data =
+                mapOf(
+                    "text" to action.text,
+                    "submit" to action.submit.toString(),
                 ),
         )
     }

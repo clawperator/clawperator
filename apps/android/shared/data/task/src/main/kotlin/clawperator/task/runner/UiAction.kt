@@ -60,6 +60,14 @@ sealed interface UiAction {
         val retry: TaskRetry = TaskRetry.None,
     ) : UiAction
 
+    data class EnterText(
+        override val id: String,
+        val matcher: NodeMatcher,
+        val text: String,
+        val submit: Boolean = false,
+        val retry: TaskRetry = TaskRetryPresets.UiReadiness,
+    ) : UiAction
+
     data class Sleep(
         override val id: String,
         val durationMs: Long,
