@@ -60,11 +60,80 @@ These are human-first workflows. Clawperator provides reliable app control and d
 
 ## How to Get Started
 
-1. Run `clawperator devices` to resolve the target device.
-2. Run `clawperator packages list --device-id <id>` to confirm app/receiver availability.
-3. Execute a payload via `clawperator execute --execution <json-or-file> --device-id <id> --receiver-package <pkg>`.
-4. Use `clawperator observe snapshot` and `clawperator action ...` wrappers for iterative loops.
-5. For reusable flows, compile skill artifacts with `clawperator skills compile-artifact ...` and run the resulting execution.
+1. **Install**: `npm install -g clawperator` (or use the local `dist/cli/index.js`).
+2. **Discover**: Run `clawperator devices` to resolve the target device.
+3. **Verify**: Run `clawperator packages list` to confirm app/receiver availability.
+4. **Execute**: Dispatch a payload via `clawperator execute --execution payload.json`.
+5. **Observe**: Use `clawperator observe snapshot` or `clawperator observe screenshot`.
+
+For a complete, runnable integration sample (SSE + REST), see: **`apps/node/examples/basic-api-usage.js`**.
+
+---
+
+## Technical Integration Guide
+
+### 1. The CLI Interface
+
+The CLI is the canonical entry point for local development and shell-based agents.
+
+| Command | Description |
+| :--- | :--- |
+| `devices` | List connected Android serials and states. |
+| `execute` | Run a full execution JSON payload. |
+| `observe snapshot` | Capture UI tree as JSON/ASCII. |
+| `observe screenshot` | Capture device screen as PNG. |
+| `action <type>` | Fast wrappers for `click`, `read`, `type`, `wait`. |
+| `serve` | Start the local HTTP/SSE API server (default port 3000). |
+
+### 2. The HTTP API (`serve`)
+
+Enable the server with `clawperator serve`. This is the preferred interface for remote agents (e.g., OpenClaw).
+
+> ⚠️ **Security Note**: The API is currently unauthenticated. By default, it binds to `127.0.0.1`. Use `--host 0.0.0.0` only on trusted networks.
+
+#### REST Endpoints
+- **`GET /devices`**: Returns `{ ok: true, devices: [...] }`.
+- **`POST /execute`**: Dispatches an execution. 
+  - Body: `{"execution": <JSON>, "deviceId": "...", "receiverPackage": "..."}`
+  - Returns `RunExecutionResult` (200 OK or 4xx/5xx).
+- **`POST /observe/snapshot`**: Quick UI capture helper.
+- **`POST /observe/screenshot`**: Quick visual capture helper.
+
+#### Real-time Events (SSE)
+Subscribe to **`GET /events`** for a live stream.
+
+- **Event: `clawperator:result`**: Terminal outcome (success/failure).
+- **Event: `clawperator:execution`**: Full trace of all attempts.
+- **Event: `heartbeat`**: Initial connection signal.
+
+### 3. The Execution Contract
+
+Every execution must include `expectedFormat: "android-ui-automator"`.
+
+```json
+{
+  "commandId": "unique-id-123",
+  "taskId": "task-456",
+  "source": "my-agent",
+  "expectedFormat": "android-ui-automator",
+  "timeoutMs": 60000,
+  "actions": [
+    { "id": "step1", "type": "open_app", "params": { "applicationId": "com.example" } },
+    { "id": "step2", "type": "click", "params": { "matcher": { "textEquals": "Login" } } }
+  ]
+}
+```
+
+### 4. Machine-Readable Error Codes
+
+Agents should branch logic based on these codes in the `envelope.error` or `stepResults[].data.error`:
+
+- `EXECUTION_CONFLICT_IN_FLIGHT`: Device is busy.
+- `NODE_NOT_FOUND`: Selector failed to match.
+- `UNSUPPORTED_RUNTIME_CLOSE`: `close_app` was sent to Android; use Node-side ADB instead.
+- `RESULT_ENVELOPE_TIMEOUT`: Command finished but result never reached Node.
+
+---
 
 ## Agent Customer Quote
 

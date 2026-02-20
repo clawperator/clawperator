@@ -12,6 +12,7 @@ import { runAdb } from "../../adapters/android-bridge/adbClient.js";
 import { tryAcquire, release, getConflictError } from "./executionStore.js";
 import type { ResultEnvelope, TerminalSource } from "../../contracts/result.js";
 import { extractSnapshotFromLogs } from "./snapshotHelper.js";
+import { emitResult, emitExecution } from "../observe/events.js";
 
 export interface RunExecutionOptions {
   deviceId?: string;
@@ -21,12 +22,12 @@ export interface RunExecutionOptions {
 
 export type RunExecutionResult =
   | { ok: true; envelope: ResultEnvelope; deviceId: string; terminalSource: TerminalSource }
-  | { ok: false; error: { code: string; message: string; [k: string]: unknown } };
+  | { ok: false; error: { code: string; message: string; [k: string]: unknown }; deviceId?: string };
 
 /**
- * Validate, resolve device, enforce single-flight, dispatch broadcast, wait for terminal envelope.
+ * Internal helper to validate, resolve device, and perform actual execution.
  */
-export async function runExecution(
+async function performExecution(
   executionInput: unknown,
   options: RunExecutionOptions = {}
 ): Promise<RunExecutionResult> {
@@ -59,13 +60,11 @@ export async function runExecution(
   }
 
   if (!tryAcquire(deviceId, execution.commandId)) {
-    return { ok: false, error: getConflictError(deviceId, execution.commandId) };
+    return { ok: false, error: getConflictError(deviceId, execution.commandId), deviceId };
   }
 
   try {
     // 1. Handle pre-flight side effects (e.g., force-close apps via adb)
-    // The Android runtime cannot reliably force-stop other apps due to sandbox restrictions.
-    // Performing this via adb before dispatch ensures a predictable starting state.
     for (const action of execution.actions) {
       if (action.type === "close_app" && action.params?.applicationId) {
         await runAdb(config, ["shell", "am", "force-stop", action.params.applicationId]);
@@ -90,8 +89,7 @@ export async function runExecution(
     );
 
     if (result.ok) {
-      // Post-process to retrieve snapshot text from logcat if any snapshot_ui actions were run.
-      // We do this by dumping the buffer and filtering for TaskScopeDefault tags.
+      // Post-process to retrieve snapshot text from logcat
       const hasSnapshot = result.envelope.stepResults.some(s => s.actionType === "snapshot_ui");
       if (hasSnapshot) {
         const dump = await runAdb(config, ["logcat", "-d", "-v", "tag"]);
@@ -142,16 +140,54 @@ export async function runExecution(
         }
       }
 
+      emitResult(deviceId, result.envelope);
       return { ok: true, envelope: result.envelope, deviceId, terminalSource: result.terminalSource };
     }
+
+    // Handle failure emission for SSE subscribers relying on the terminal envelope signal.
+    const failureEnvelope: ResultEnvelope = {
+      commandId: execution.commandId,
+      taskId: execution.taskId,
+      status: "failed",
+      stepResults: [],
+      error: "Execution failed during runtime"
+    };
+
     if ("broadcastFailed" in result && result.broadcastFailed && "diagnostics" in result) {
-      return { ok: false, error: { ...result.diagnostics } };
+      failureEnvelope.error = result.diagnostics.code;
+      emitResult(deviceId, failureEnvelope);
+      return { ok: false, error: { ...result.diagnostics }, deviceId };
     }
     if ("timeout" in result && result.timeout && "diagnostics" in result) {
-      return { ok: false, error: { ...result.diagnostics } };
+      failureEnvelope.error = result.diagnostics.code;
+      emitResult(deviceId, failureEnvelope);
+      return { ok: false, error: { ...result.diagnostics }, deviceId };
     }
-    return { ok: false, error: { code: "UNKNOWN", message: ("error" in result ? result.error : undefined) ?? "Unknown error" } };
+    
+    const errCode = ("error" in result && typeof result.error === "string") ? result.error : "UNKNOWN_RUNTIME_ERROR";
+    failureEnvelope.error = errCode;
+    emitResult(deviceId, failureEnvelope);
+    return { ok: false, error: { code: errCode, message: ("error" in result && typeof result.error === "string") ? result.error : "Unknown error" }, deviceId };
   } finally {
     release(deviceId, execution.commandId);
   }
+}
+
+/**
+ * Validate, resolve device, enforce single-flight, dispatch broadcast, wait for terminal envelope.
+ * Always emits outcome to SSE subscribers via emitExecution.
+ */
+export async function runExecution(
+  executionInput: unknown,
+  options: RunExecutionOptions = {}
+): Promise<RunExecutionResult> {
+  const result = await performExecution(executionInput, options);
+  
+  // We emit the execution outcome even if resolution failed, as long as we have SOME deviceId 
+  // (either from options or resolved during the process).
+  const resolvedDeviceId: string | null = result.deviceId || options.deviceId || null;
+  if (resolvedDeviceId !== null) {
+    emitExecution(resolvedDeviceId, executionInput, result);
+  }
+  return result;
 }
