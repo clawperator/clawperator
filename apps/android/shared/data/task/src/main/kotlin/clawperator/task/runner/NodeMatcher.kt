@@ -9,6 +9,8 @@ data class NodeMatcher(
     val role: String? = null,
     val textEquals: String? = null,
     val textContains: String? = null,
+    val contentDescEquals: String? = null,
+    val contentDescContains: String? = null,
 ) {
     /**
      * Checks if this matcher matches the given TaskUiNode.
@@ -19,6 +21,8 @@ data class NodeMatcher(
         if (role != null && node.role?.equals(role, ignoreCase = true) != true) return false
         if (textEquals != null && node.label != textEquals) return false
         if (textContains != null && !node.label.contains(textContains, ignoreCase = true)) return false
+        if (contentDescEquals != null && node.contentDescription != contentDescEquals) return false
+        if (contentDescContains != null && node.contentDescription?.contains(contentDescContains, ignoreCase = true) != true) return false
         return true
     }
 }
@@ -32,6 +36,8 @@ class NodeMatcherBuilder {
     private var role: String? = null
     private var textEquals: String? = null
     private var textContains: String? = null
+    private var contentDescEquals: String? = null
+    private var contentDescContains: String? = null
 
     fun resourceId(id: String) {
         resourceId = id
@@ -49,12 +55,22 @@ class NodeMatcherBuilder {
         textContains = text
     }
 
+    fun contentDescEquals(text: String) {
+        contentDescEquals = text
+    }
+
+    fun contentDescContains(text: String) {
+        contentDescContains = text
+    }
+
     fun build(): NodeMatcher =
         NodeMatcher(
             resourceId = resourceId,
             role = role,
             textEquals = textEquals,
             textContains = textContains,
+            contentDescEquals = contentDescEquals,
+            contentDescContains = contentDescContains,
         )
 }
 

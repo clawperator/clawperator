@@ -13,6 +13,8 @@ data class TaskUiNode(
     val resourceId: String?,
     /** Human-readable label (text or content description) */
     val label: String,
+    /** Specific content description if available */
+    val contentDescription: String? = null,
     /** Whether the element is clickable/interactable */
     val clickable: Boolean,
     /** Semantic role of this element (e.g., "button", "text", "image") */

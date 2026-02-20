@@ -232,9 +232,12 @@ class AgentCommandParserDefault : AgentCommandParser {
         val role = matcherObject.stringOrNull("role")
         val textEquals = matcherObject.stringOrNull("textEquals")
         val textContains = matcherObject.stringOrNull("textContains")
+        val contentDescEquals = matcherObject.stringOrNull("contentDescEquals")
+        val contentDescContains = matcherObject.stringOrNull("contentDescContains")
 
         require(
-            resourceId != null || role != null || textEquals != null || textContains != null,
+            resourceId != null || role != null || textEquals != null || textContains != null ||
+                contentDescEquals != null || contentDescContains != null,
         ) { "$key must include at least one matcher field" }
 
         return NodeMatcher(
@@ -242,6 +245,8 @@ class AgentCommandParserDefault : AgentCommandParser {
             role = role,
             textEquals = textEquals,
             textContains = textContains,
+            contentDescEquals = contentDescEquals,
+            contentDescContains = contentDescContains,
         )
     }
 

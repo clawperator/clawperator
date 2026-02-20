@@ -10,6 +10,8 @@ const nodeMatcherSchema = z
     role: z.string().max(LIMITS.MAX_MATCHER_VALUE_LENGTH).optional(),
     textEquals: z.string().max(LIMITS.MAX_MATCHER_VALUE_LENGTH).optional(),
     textContains: z.string().max(LIMITS.MAX_MATCHER_VALUE_LENGTH).optional(),
+    contentDescEquals: z.string().max(LIMITS.MAX_MATCHER_VALUE_LENGTH).optional(),
+    contentDescContains: z.string().max(LIMITS.MAX_MATCHER_VALUE_LENGTH).optional(),
   })
   .strict()
   .refine(
@@ -17,7 +19,9 @@ const nodeMatcherSchema = z
       (m.resourceId ?? "") !== "" ||
       (m.role ?? "") !== "" ||
       (m.textEquals ?? "") !== "" ||
-      (m.textContains ?? "") !== "",
+      (m.textContains ?? "") !== "" ||
+      (m.contentDescEquals ?? "") !== "" ||
+      (m.contentDescContains ?? "") !== "",
     { message: "Matcher must have at least one field" }
   );
 
