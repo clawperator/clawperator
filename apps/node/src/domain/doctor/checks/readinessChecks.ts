@@ -86,6 +86,8 @@ export async function runHandshake(config: RuntimeConfig): Promise<DoctorCheckRe
   const payload = JSON.stringify({
     commandId,
     taskId: "doctor-handshake",
+    source: "clawperator-doctor",
+    expectedFormat: "android-ui-automator",
     actions: [{ id: "h1", type: "snapshot_ui" }],
     timeoutMs: 5000,
   });
@@ -149,6 +151,8 @@ export async function runSmokeTest(config: RuntimeConfig): Promise<DoctorCheckRe
   const payload = JSON.stringify({
     commandId,
     taskId: "doctor-smoke",
+    source: "clawperator-doctor",
+    expectedFormat: "android-ui-automator",
     actions: [
       { id: "s1", type: "close_app", params: { applicationId: "com.android.settings" } },
       { id: "s2", type: "open_app", params: { applicationId: "com.android.settings" } },

@@ -128,3 +128,4 @@ interface DoctorReport {
 3. **Phase 3: Handshake**: Integration with `AndroidBridge` and `LogcatResultReader`.
 4. **Phase 4: CLI & Fix**: Wiring flags and human-friendly output.
 5. **Phase 5: Build/Full**: Gradle integration.
+\n---\n\n*Note: v0.1 Verified on local emulator-5554 (API 34) including full build, install, handshake, and smoke test.*
