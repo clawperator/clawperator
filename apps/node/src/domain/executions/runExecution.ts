@@ -106,9 +106,10 @@ export async function runExecution(
       }
 
       // Post-process take_screenshot via adb exec-out
+      const screenAction = execution.actions.find(a => a.type === "take_screenshot");
       const hasScreenshot = result.envelope.stepResults.some(s => s.actionType === "take_screenshot");
       if (hasScreenshot) {
-        const screenshotPath = join(tmpdir(), `clawperator-screenshot-${execution.commandId}-${Date.now()}.png`);
+        const screenshotPath = screenAction?.params?.path || join(tmpdir(), `clawperator-screenshot-${execution.commandId}-${Date.now()}.png`);
         try {
           const deviceArgs = config.deviceId ? ["-s", config.deviceId] : [];
           const proc = spawn(config.adbPath, [...deviceArgs, "exec-out", "screencap", "-p"], {
