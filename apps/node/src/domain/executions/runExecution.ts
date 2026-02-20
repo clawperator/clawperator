@@ -84,7 +84,7 @@ async function performExecution(
       },
       async () => {
         const broadcast = await broadcastAgentCommand(config, payload);
-        return { success: broadcast.success, stderr: broadcast.stderr };
+        return { success: broadcast.success, stdout: broadcast.stdout, stderr: broadcast.stderr };
       }
     );
 
@@ -164,7 +164,7 @@ async function performExecution(
       return { ok: false, error: { ...result.diagnostics }, deviceId };
     }
     
-    const errCode = ("error" in result && typeof result.error === "string") ? result.error : "UNKNOWN_RUNTIME_ERROR";
+    const errCode = ("code" in result && result.code) ? (result.code as string) : (("error" in result && typeof result.error === "string") ? result.error : "UNKNOWN_RUNTIME_ERROR");
     failureEnvelope.error = errCode;
     emitResult(deviceId, failureEnvelope);
     return { ok: false, error: { code: errCode, message: ("error" in result && typeof result.error === "string") ? result.error : "Unknown error" }, deviceId };

@@ -59,8 +59,9 @@ export async function startServer(options: ServeOptions): Promise<Server> {
     switch (code) {
       case ERROR_CODES.EXECUTION_CONFLICT_IN_FLIGHT: return 423;
       case ERROR_CODES.DEVICE_NOT_FOUND: return 404;
-      case ERROR_CODES.DEVICE_AMBIGUOUS: return 400;
-      case ERROR_CODES.VALIDATION_FAILED: return 400;
+      case ERROR_CODES.NO_DEVICES: return 404;
+      case ERROR_CODES.MULTIPLE_DEVICES_DEVICE_ID_REQUIRED: return 400;
+      case ERROR_CODES.EXECUTION_VALIDATION_FAILED: return 400;
       case ERROR_CODES.PAYLOAD_TOO_LARGE: return 413;
       case ERROR_CODES.RESULT_ENVELOPE_TIMEOUT: return 504;
       default: return 400;

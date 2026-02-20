@@ -7,10 +7,10 @@ export interface ParsedTerminal {
 }
 
 /**
- * Parse a single line for [Clawperator-Result] JSON envelope.
- * Supports full line starting with prefix or logcat format (tag: [Clawperator-Result] {...}).
+ * Parse result envelope: [Clawperator-Result] only (canonical envelope).
+ * Returns envelope, null if not an envelope, or 'malformed' if prefix exists but JSON is invalid.
  */
-export function parseResultEnvelope(line: string, commandId: string): ResultEnvelope | null {
+export function parseResultEnvelope(line: string, commandId: string): ResultEnvelope | 'malformed' | null {
   const trimmed = line.trim();
   const prefixIndex = trimmed.indexOf(RESULT_ENVELOPE_PREFIX);
   if (prefixIndex === -1) return null;
@@ -18,20 +18,20 @@ export function parseResultEnvelope(line: string, commandId: string): ResultEnve
   try {
     const data = JSON.parse(json) as ResultEnvelope;
     if (data.commandId === commandId) return data;
+    return null; // different commandId
   } catch {
-    return null;
+    return 'malformed';
   }
-  return null;
 }
 
 /**
  * Parse terminal result: [Clawperator-Result] only (canonical envelope).
  * Returns envelope plus terminalSource for observability.
  */
-export function parseTerminalEnvelope(line: string, commandId: string): ParsedTerminal | null {
+export function parseTerminalEnvelope(line: string, commandId: string): ParsedTerminal | 'malformed' | null {
   const envelope = parseResultEnvelope(line, commandId);
-  if (envelope !== null) {
+  if (typeof envelope === 'object' && envelope !== null) {
     return { envelope, terminalSource: "clawperator_result" };
   }
-  return null;
+  return envelope;
 }
