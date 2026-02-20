@@ -1,0 +1,163 @@
+# Clawperator
+
+## Overview
+- Android operator runtime for LLM-driven device control.
+- Clawperator follows a **Brain and Hand Model**: 
+  - **The Brain (Agent):** An external LLM (e.g. OpenClaw) that owns reasoning, planning, and decision-making.
+  - **The Hand (Clawperator):** A deterministic execution layer that provides the "fingers" for observation (`snapshot_ui`) and interaction (taps, scrolls).
+- Uses Android Accessibility APIs to interact with third-party apps: inspect UI, map screens to a human-readable form, programmatically trigger actions (taps, scrolls).
+- Core idea: **the app is the API**—automation for apps without official APIs by driving the device and apps directly.
+
+## Out of scope (for this codebase)
+- Legacy "ActionTask" or "Conductor" cloud-orchestration paths.
+- Autonomous multi-step planning (this belongs in the Agent).
+- Broad launcher UI or pixel-rendering surfaces.
+
+---
+
+## Operator app (this codebase)
+- Android client app running continuously on a dedicated device.
+- Device characteristics:
+  - Permanently powered on.
+  - Connected to Wi-Fi / Bluetooth.
+  - Logged into user accounts.
+- Accessibility API usage:
+  - Interact with and control installed apps.
+  - Inspect and gather information about visible UI elements.
+  - Map visible screens into a human-readable form.
+  - Programmatically interact with UI elements (simulate user actions).
+- Functions as the **execution engine** that manipulates the device and apps directly.
+
+---
+
+# Technical Stack
+The codebase uses Kotlin `Flow` for state management and reactive data flow.
+
+> For commit message conventions, see [commits.rules](.cursor/rules/commits.rules)
+> For development workflow, see [development.rules](.cursor/rules/development.rules)
+
+- Language: Kotlin (Android)
+- UI Framework: Jetpack Compose
+- State Management: Kotlin `Flow` (preferred over callbacks/`LiveData`)
+- Architecture: Multi-module with clear separation of concerns
+- Testing: JUnit with coroutines support
+- Package target: `com.clawperator.operator.dev` (development), `com.clawperator.operator` (Release)
+
+## Android code organization
+- When platform APIs are required: define an interface for the required surface, then add an Android implementation (e.g. `PackageManagerAndroid`).
+
+## Android-Specific Code
+- Android-specific implementations must have `Android` suffix
+  - Example: `DeviceDefaultAppsRepositoryAndroid`
+- Android-specific files must use `.android.kt` suffix
+  - Example: `DeviceDefaultAppsRepository.android.kt`
+- Android APIs can only be accessed in `androidMain` source sets
+- Common interfaces should be platform-agnostic in `commonMain`
+- Keep Android dependencies isolated to Android-specific implementations
+
+# Project Structure
+- All Kotlin files should be in appropriate module based on responsibility:
+  - `/shared/core/`: Core utilities and base functionality
+  - `/shared/data/`: Data layer, repositories, and models
+  - `/shared/domain/`: Business logic and state management
+  - `/shared/presentation/`: UI components and view models
+  - `/shared/test/`: Test files
+
+# Naming Conventions
+- Use `Default` suffix for concrete implementations of interfaces
+  - Example: `DraggingDrawManagerDefault` implements `DraggingDrawManager`
+- Test files should mirror implementation files with `Test` suffix
+  - Example: `DraggingDrawManagerDefaultTest` tests `DraggingDrawManagerDefault`
+- `ViewState` suffix for UI state classes
+  - Example: `TileViewState`
+
+# Testing
+## Organization
+- All tests should be in the `/shared/test` module
+- Unit tests should be in `commonTest` whenever possible
+- Test files should mirror the package structure of the code they test
+- Integration tests should be clearly marked as such
+- UI tests should be in `androidTest`
+
+> For test-driven development workflow and best practices, see [development.rules](.cursor/rules/development.rules)
+
+## Test Execution
+- Run unit tests with: `./gradlew testDebugUnitTest`
+- Tests should be fast and independent
+- Avoid filesystem/network access in unit tests
+- Use fakes/mocks for external dependencies
+
+## Test Structure
+- Test method naming conventions differ by source set:
+  - In `commonTest`: Every test method name should be a descriptive sentence in backticks
+    - Example: `manager should enforce single active drag at a time`
+  - In `android*Test`: Test method names must use camelCase without spaces (due to DEX limitations)
+    - Example: `verifyManagerEnforcesSingleActiveDrag`
+- Use `assertFailsWith` instead of try-catch for testing exceptions
+- Tests should use `actionTest {}` coroutine scope
+- Tests should have clear arrange/act/assert sections
+- Use clear test data setup with descriptive variable names
+
+## Test Coverage
+- All business logic should have unit tests
+- Test edge cases and error conditions
+- Test state transitions thoroughly
+- Test public APIs and interfaces
+- Aim for high coverage in core functionality
+
+# Code Style
+- Use Kotlin `data class` for models
+- Use sealed classes/interfaces for state management
+- Prefer `Flow` over `StateFlow` or `MutableStateFlow` in public APIs
+- Always document public constants with clear purpose
+- Keep functions focused and small
+- Use `require()` for enforcing preconditions
+- Log important state transitions and events
+
+## Function Structure
+- Functions should follow Single Responsibility Principle
+  - Each function should do exactly one thing
+  - If a function needs to do multiple things, break it into smaller functions
+  - Example: Instead of `processAndSaveData()`, use `processData()` and `saveData()`
+- Functions should be small and focused
+  - Typically no more than 25 lines of code
+  - If a function grows larger, consider if it can be split
+- Function names should clearly describe their single purpose
+  - Use verb-noun naming: `validateInput()`, `saveState()`, `updateUI()`
+  - Avoid generic names like `process()` or `handle()`
+
+# Error Handling
+- Use `require()` for precondition validation
+- Use `error()` for impossible states
+- Handle nullable values explicitly
+- Prefer early returns for error conditions
+
+# Compose UI
+- Use `remember` for values that should survive recomposition
+- Use `LaunchedEffect` for side effects
+- Keep composables focused on UI, delegate logic to managers
+- Use proper layout hierarchy (`Box`, `Column`, `Row`)
+
+# State Management
+- Use `StateFlow` for observable state
+- Clear separation between UI state and business logic
+- State transitions should be explicit and logged
+- Validate state invariants with `require()`
+
+## Flow Usage
+- Avoid blocking operators on `Flow`
+  - Check before using `first()`, `single()`, or other terminal operators that block
+  - Instead, maintain reactive chains using `collect`, `collectLatest`, etc.
+- Use appropriate Flow operators for state updates
+  - Use `flatMapLatest` for dependent Flow chains
+  - Use `combine` for multiple Flow inputs
+  - Use `map` for simple transformations
+- Keep Flow chains cold until collection
+  - Avoid `SharedFlow` unless specifically needed
+  - Prefer `StateFlow` for UI state
+
+# Documentation
+- Document public APIs
+- Document complex state machines
+- Document magic numbers and constants
+- Include rationale in comments for non-obvious decisions

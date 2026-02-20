@@ -1,0 +1,100 @@
+# Development Process Rules
+
+This file describes the development workflow. For general project guidelines, code organization, and testing standards, see [default.rules](.cursor/rules/default.rules).
+
+## Problem-Solving Approach
+When tackling complex problems:
+
+1. Evaluate Complexity
+   - For changes affecting multiple files or core architecture, create a plan first
+   - For localized changes, proceed carefully with step-by-step implementation
+   - When unsure, err on the side of planning
+
+2. Solution Planning
+   - Consider 4-6 different possible approaches
+   - Evaluate tradeoffs of each approach
+   - Distill down to 1-2 most promising solutions
+   - Document rationale for chosen approach
+
+3. Code Organization
+   - Split large files into focused, smaller files
+   - Break down complex functions into smaller, single-purpose functions
+   - Follow existing patterns in the codebase
+   - Consider impact on test coverage
+
+## Debugging Methodology
+When investigating issues:
+
+1. Information Gathering
+   - Add logging strategically to understand the full problem context
+   - Verify assumptions with concrete data
+   - Document observed behavior vs expected behavior
+
+2. Analysis Process
+   - If logs clearly indicate the problem:
+     * Implement solution directly
+     * Add tests to prevent regression
+   - If cause is unclear:
+     * Hypothesize 4-6 possible causes
+     * Narrow down to 1-2 most likely sources
+     * Add targeted logging to validate theory
+     * Implement fix only when confident about root cause
+
+3. Implementation
+   - Make small, incremental changes
+   - Verify each change resolves part of the issue
+   - Add tests to cover the fix
+   - Document any edge cases discovered
+
+## Test-Driven Development Workflow
+When implementing new features or fixing bugs, follow this iterative process:
+
+1. Write code carefully and thoughtfully
+   - Consider edge cases
+   - Follow existing patterns in the codebase
+   - Add necessary documentation
+
+2. Address all linter errors before proceeding
+   - Fix compilation errors
+   - Resolve warnings
+   - Ensure code style consistency
+
+3. Verify code compiles successfully
+   ```bash
+   ./gradlew :app:compileDebugSources
+   ```
+
+4. Run unit tests
+   ```bash
+   ./gradlew testDebugUnitTest
+   ```
+
+5. Analyze test output:
+   - If tests pass: commit changes following commit.rules
+   - If tests fail:
+     * Read error messages carefully
+     * Identify failing test cases
+     * Debug the implementation
+     * Return to step 1
+
+6. Repeat until all tests pass successfully
+
+## AI Agent Comments
+When writing comments specifically for AI agents:
+1. Use the format `// [AI Agent]: <instruction>`
+2. Place on its own line before the code block it refers to
+3. Be explicit and clear about what should or should not be done
+4. Common use cases:
+   ```kotlin
+   // [AI Agent]: Do not modify this sorting logic
+   // [AI Agent]: Maintain null check order
+   // [AI Agent]: Keep these parameters in this exact order
+   // [AI Agent]: This function must remain synchronized
+   ```
+
+## Best Practices
+- Write tests before implementing features when possible
+- Keep the test output visible while making changes
+- Make small, incremental changes
+- Commit working states, even if incomplete
+- Document any assumptions or edge cases in the tests 
