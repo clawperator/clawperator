@@ -39,6 +39,8 @@ Commands:
                                             Compile from a skill artifact (skill: positional or --skill-id; artifact: ac-status or ac-status.recipe.json)
   skills sync --ref <git-ref>
                                             Sync and pin skills index/cache to a git ref
+  serve [--port <number>] [--host <string>]
+                                            Start local HTTP/SSE server for remote control (default host: 127.0.0.1)
   doctor
                                             Run environment and runtime checks (Stage 3)
   doctor --fix
@@ -245,6 +247,23 @@ async function main(): Promise<void> {
         result = JSON.stringify({ code: "USAGE", message: "skills list|get|compile-artifact|sync ..." });
       }
       break;
+    case "serve":
+      {
+        const portStr = getOpt(rest, "--port");
+        const port = portStr ? parseInt(portStr, 10) : 3000;
+        const host = getOpt(rest, "--host") || "127.0.0.1";
+        if (isNaN(port) || port <= 0 || port > 65535) {
+          result = JSON.stringify({ code: "USAGE", message: "Invalid port number. Must be 1-65535." });
+          break;
+        }
+        await (await import("./commands/serve.js")).cmdServe({
+          port,
+          host,
+          verbose: global.verbose,
+        });
+        // Long running, we don't return.
+        return;
+      }
     case "doctor":
       result = await (await import("./commands/doctor.js")).cmdDoctor({
         ...out,
