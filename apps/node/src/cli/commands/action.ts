@@ -3,6 +3,10 @@ import { buildClickExecution } from "../../domain/actions/click.js";
 import { buildReadExecution } from "../../domain/actions/read.js";
 import { buildWaitExecution } from "../../domain/actions/wait.js";
 import { buildTypeTextExecution } from "../../domain/actions/typeText.js";
+import { buildGetBedroomTemperatureExecution } from "../../domain/skills/implementations/switchbot.js";
+import { buildSettingsCaptureOverviewExecution } from "../../domain/skills/implementations/settings.js";
+import { buildSolaxGetBatteryExecution } from "../../domain/skills/implementations/solax.js";
+import { buildGlobirdGetUsageExecution } from "../../domain/skills/implementations/globird.js";
 import type { NodeMatcher } from "../../contracts/selectors.js";
 import type { OutputOptions } from "../output.js";
 import { formatSuccess, formatError } from "../output.js";
@@ -117,6 +121,114 @@ export async function cmdActionType(options: {
       submit: options.submit ?? false,
       clear: options.clear ?? false,
     });
+    const result = await runExecution(execution, {
+      deviceId: options.deviceId,
+      receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_RECEIVER_PACKAGE,
+    });
+    if (result.ok)
+      return formatSuccess(
+        {
+          envelope: result.envelope,
+          deviceId: result.deviceId,
+          terminalSource: result.terminalSource,
+          isCanonicalTerminal: result.terminalSource === "clawperator_result",
+        },
+        options
+      );
+    return formatError(result.error, options);
+  } catch (e) {
+    return formatError(e, options);
+  }
+}
+
+export async function cmdActionDemoSwitchbotTemp(options: {
+  format: OutputOptions["format"];
+  deviceId?: string;
+  receiverPackage?: string;
+}): Promise<string> {
+  try {
+    const execution = buildGetBedroomTemperatureExecution();
+    const result = await runExecution(execution, {
+      deviceId: options.deviceId,
+      receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_RECEIVER_PACKAGE,
+    });
+    if (result.ok)
+      return formatSuccess(
+        {
+          envelope: result.envelope,
+          deviceId: result.deviceId,
+          terminalSource: result.terminalSource,
+          isCanonicalTerminal: result.terminalSource === "clawperator_result",
+        },
+        options
+      );
+    return formatError(result.error, options);
+  } catch (e) {
+    return formatError(e, options);
+  }
+}
+
+export async function cmdActionSettingsCaptureOverview(options: {
+  format: OutputOptions["format"];
+  deviceId?: string;
+  receiverPackage?: string;
+}): Promise<string> {
+  try {
+    const execution = buildSettingsCaptureOverviewExecution();
+    const result = await runExecution(execution, {
+      deviceId: options.deviceId,
+      receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_RECEIVER_PACKAGE,
+    });
+    if (result.ok)
+      return formatSuccess(
+        {
+          envelope: result.envelope,
+          deviceId: result.deviceId,
+          terminalSource: result.terminalSource,
+          isCanonicalTerminal: result.terminalSource === "clawperator_result",
+        },
+        options
+      );
+    return formatError(result.error, options);
+  } catch (e) {
+    return formatError(e, options);
+  }
+}
+
+export async function cmdActionSolaxGetBattery(options: {
+  format: OutputOptions["format"];
+  deviceId?: string;
+  receiverPackage?: string;
+}): Promise<string> {
+  try {
+    const execution = buildSolaxGetBatteryExecution();
+    const result = await runExecution(execution, {
+      deviceId: options.deviceId,
+      receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_RECEIVER_PACKAGE,
+    });
+    if (result.ok)
+      return formatSuccess(
+        {
+          envelope: result.envelope,
+          deviceId: result.deviceId,
+          terminalSource: result.terminalSource,
+          isCanonicalTerminal: result.terminalSource === "clawperator_result",
+        },
+        options
+      );
+    return formatError(result.error, options);
+  } catch (e) {
+    return formatError(e, options);
+  }
+}
+
+export async function cmdActionGlobirdGetUsage(options: {
+  format: OutputOptions["format"];
+  deviceId?: string;
+  receiverPackage?: string;
+}): Promise<string> {
+  try {
+    const execution = buildGlobirdGetUsageExecution();
     const result = await runExecution(execution, {
       deviceId: options.deviceId,
       receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_RECEIVER_PACKAGE,

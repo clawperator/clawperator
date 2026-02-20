@@ -164,6 +164,7 @@ Example execution:
   "commandId": "cmd-123",
   "taskId": "task-123",
   "source": "openclaw",
+  "expectedFormat": "android-ui-automator",
   "timeoutMs": 90000,
   "actions": [
     { "id": "close", "type": "close_app", "params": { "applicationId": "com.example.app" } },
@@ -392,7 +393,7 @@ Examples:
 - `read` -> `read_text`
 - `snapshot` -> `snapshot_ui`
 - `sleep` -> `sleep`
-- `act` -> `action` (alias for the primary `action` subcommand)
+- `action`: Primary entry point for single-step interactions.
 
 Rules:
 

@@ -78,11 +78,36 @@ export async function waitForResultEnvelope(
       const lines = pending.split("\n");
       pending = lines.pop() ?? "";
       for (const line of lines) {
+        if (line.includes("TaskScopeDefault:")) {
+          correlatedLines.push(line);
+        }
         if (!line.includes(RESULT_ENVELOPE_PREFIX)) continue;
+        
         const parsed = parseTerminalEnvelope(line, commandId);
         if (parsed) {
-          correlatedLines.push(line);
           flush();
+          
+          // Re-scan correlatedLines for snapshot content specifically for this command
+          const snapshotLines = correlatedLines
+            .filter(l => l.includes("TaskScopeDefault:"))
+            .map(l => {
+              // Extract everything after the tag
+              const tagIndex = l.indexOf("TaskScopeDefault:");
+              return tagIndex !== -1 ? l.slice(tagIndex + "TaskScopeDefault:".length).trim() : "";
+            })
+            // Filter out the [TaskScope] prefix common in logs
+            .map(s => s.startsWith("[TaskScope]") ? s.slice("[TaskScope]".length).trim() : s)
+            // Only keep lines that look like hierarchy content or tree
+            .filter(s => s.startsWith("<") || s.startsWith("?") || s.includes("text=") || s.includes("res="));
+          
+          if (snapshotLines.length > 0) {
+            const fullSnapshot = snapshotLines.join("\n");
+            const snapStep = parsed.envelope.stepResults.find(s => s.actionType === "snapshot_ui");
+            if (snapStep) {
+              snapStep.data = { ...snapStep.data, text: fullSnapshot };
+            }
+          }
+
           finalize({ ok: true, envelope: parsed.envelope, terminalSource: parsed.terminalSource });
         }
       }

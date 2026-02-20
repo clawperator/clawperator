@@ -37,6 +37,7 @@ export interface Execution {
   commandId: string;
   taskId: string;
   source: string;
+  expectedFormat: "android-ui-automator";
   timeoutMs: number;
   actions: ExecutionAction[];
   /** Set by runtime: artifact_compiled | direct */

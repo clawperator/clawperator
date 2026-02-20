@@ -2,6 +2,7 @@
   "commandId": "{{COMMAND_ID}}",
   "taskId": "{{TASK_ID}}",
   "source": "debug",
+  "expectedFormat": "android-ui-automator",
   "timeoutMs": 90000,
   "actions": [
     { "id": "close", "type": "close_app", "params": { "applicationId": "com.google.android.apps.chromecast.app" } },

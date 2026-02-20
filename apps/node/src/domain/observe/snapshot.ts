@@ -12,6 +12,7 @@ export function buildSnapshotExecution(options?: { format?: "ascii" | "json" }):
     commandId,
     taskId: commandId,
     source: "clawperator-observe",
+    expectedFormat: "android-ui-automator",
     timeoutMs: 30_000,
     actions: [
       {

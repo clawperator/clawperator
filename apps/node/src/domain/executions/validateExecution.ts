@@ -65,6 +65,7 @@ const executionSchema = z.object({
   commandId: z.string().min(1).max(LIMITS.MAX_ID_LENGTH),
   taskId: z.string().min(1).max(LIMITS.MAX_ID_LENGTH),
   source: z.string().min(1).max(LIMITS.MAX_SOURCE_LENGTH),
+  expectedFormat: z.literal("android-ui-automator"),
   timeoutMs: z
     .number()
     .min(LIMITS.MIN_EXECUTION_TIMEOUT_MS)

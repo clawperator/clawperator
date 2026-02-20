@@ -67,6 +67,7 @@ androidx_lifecycle_runtime = { module = "androidx.lifecycle:lifecycle-runtime", 
 androidx_lifecycle_runtime_compose = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycle" }
 androidx_lifecycle_service = { module = "androidx.lifecycle:lifecycle-service", version.ref = "lifecycle" }
 androidx_lifecycle_viewmodel = { module = "androidx.lifecycle:lifecycle-viewmodel", version.ref = "lifecycle" }
+androidx_navigation_compose = { module = "androidx.navigation:navigation-compose", version = "2.8.5" }
 androidx_test_core = { module = "androidx.test:core", version.ref = "androidxTestCore" }
 androidx_test_espresso_contrib = { module = "androidx.test.espresso:espresso-contrib", version.ref = "espresso" }
 androidx_test_espresso_core = { module = "androidx.test.espresso:espresso-core", version.ref = "espresso" }

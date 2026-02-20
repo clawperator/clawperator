@@ -7,6 +7,7 @@ export function buildWaitExecution(selector: NodeMatcher): Execution {
     commandId,
     taskId: commandId,
     source: "clawperator-action",
+    expectedFormat: "android-ui-automator",
     timeoutMs: 30_000,
     actions: [
       {

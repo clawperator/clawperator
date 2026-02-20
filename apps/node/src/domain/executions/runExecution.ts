@@ -76,6 +76,27 @@ export async function runExecution(
     );
 
     if (result.ok) {
+      // Post-process to retrieve snapshot text from logcat if any snapshot_ui actions were run.
+      // We do this by dumping the buffer and filtering for TaskScopeDefault tags.
+      const hasSnapshot = result.envelope.stepResults.some(s => s.actionType === "snapshot_ui");
+      if (hasSnapshot) {
+        const dump = await runAdb(config, ["logcat", "-d", "-v", "tag"]);
+        const snapshotLines = dump.stdout.split("\n")
+          .filter(l => l.startsWith("D/TaskScopeDefault:"))
+          .map(l => l.slice("D/TaskScopeDefault:".length).trim())
+          .map(s => s.startsWith("[TaskScope]") ? s.slice("[TaskScope]".length).trim() : s)
+          // Filter for hierarchy start/content
+          .filter(s => s.startsWith("<") || s.startsWith("?") || s.includes("text=") || s.includes("res="));
+        
+        if (snapshotLines.length > 0) {
+          const fullSnapshot = snapshotLines.join("\n");
+          const snapStep = result.envelope.stepResults.find(s => s.actionType === "snapshot_ui");
+          if (snapStep) {
+            snapStep.data = { ...snapStep.data, text: fullSnapshot };
+          }
+        }
+      }
+
       return { ok: true, envelope: result.envelope, deviceId, terminalSource: result.terminalSource };
     }
     if ("broadcastFailed" in result && result.broadcastFailed && "diagnostics" in result) {
