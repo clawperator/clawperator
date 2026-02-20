@@ -39,6 +39,8 @@ Commands:
                                             Compile from a skill artifact (skill: positional or --skill-id; artifact: ac-status or ac-status.recipe.json)
   skills sync --ref <git-ref>
                                             Sync and pin skills index/cache to a git ref
+  serve [--port <number>]
+                                            Start local HTTP/SSE server for remote control
   doctor
                                             Run environment and runtime checks (Stage 3)
   doctor --fix
@@ -245,6 +247,17 @@ async function main(): Promise<void> {
         result = JSON.stringify({ code: "USAGE", message: "skills list|get|compile-artifact|sync ..." });
       }
       break;
+    case "serve":
+      {
+        const portStr = getOpt(rest, "--port");
+        const port = portStr ? parseInt(portStr, 10) : 3000;
+        await (await import("./commands/serve.js")).cmdServe({
+          port,
+          verbose: global.verbose,
+        });
+        // Long running, we don't return.
+        return;
+      }
     case "doctor":
       result = await (await import("./commands/doctor.js")).cmdDoctor({
         ...out,

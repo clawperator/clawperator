@@ -1,0 +1,17 @@
+import { EventEmitter } from "node:events";
+import type { ResultEnvelope } from "../../contracts/result.js";
+
+/**
+ * Global event emitter for Clawperator envelopes.
+ * Used by the 'serve' command to stream SSE events.
+ */
+export const clawperatorEvents = new EventEmitter();
+
+export const CLAW_EVENT_TYPES = {
+  RESULT: "clawperator:result",
+  EVENT: "clawperator:event", // placeholder for future real-time events
+} as const;
+
+export function emitResult(deviceId: string, envelope: ResultEnvelope): void {
+  clawperatorEvents.emit(CLAW_EVENT_TYPES.RESULT, { deviceId, envelope });
+}

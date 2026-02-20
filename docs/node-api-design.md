@@ -60,13 +60,33 @@ Features that are not required for initial launch but are high priority:
 - `clawperator observe screenshot`: First-class visual observation primitives.
 - `clawperator action [back|home|recents]`: System-level navigation hard-keys.
 
-## Optional HTTP Wrapper (when `--serve` is enabled)
+## HTTP API Server (`--serve`)
 
-- **Purpose:** Enables remote agent callers (e.g., OpenClaw in a Docker container or separate box) to interact with Clawperator via a stable REST API.
-- **Key Features:**
-    - **REST API:** Mapping of CLI commands to HTTP endpoints for device/execution management.
-    - **SSE (Server-Sent Events):** Real-time streaming of `[Clawperator-Result]` and intermediate `[Clawperator-Event]` envelopes back to the client.
-    - **Device Locking:** Basic concurrency control to prevent multiple agents from overlapping executions on the same physical device.
+When running `clawperator serve --port <number>`, a local HTTP server is started to allow remote agents to interact with Clawperator without direct CLI access.
+
+### REST Endpoints (v0.1)
+
+- **`GET /devices`**: List all connected Android devices and their states.
+- **`POST /execute`**: Execute a full JSON execution payload.
+    - Body: `{"execution": {...}, "deviceId": "...", "receiverPackage": "..."}`
+    - Returns: `RunExecutionResult` (200 OK or 4xx/5xx on failure).
+    - Status **423 Locked**: Returned if another execution is in flight for the target device.
+- **`POST /observe/snapshot`**: Quick helper for UI capture.
+    - Body: `{"deviceId": "...", "receiverPackage": "..."}`
+- **`POST /observe/screenshot`**: Quick helper for visual capture.
+    - Body: `{"deviceId": "...", "receiverPackage": "..."}`
+
+### Event Streaming (SSE)
+
+The server provides a real-time event stream at **`GET /events`**. Callers should use a standard SSE client to subscribe.
+
+- **Event: `clawperator:result`**: Emitted whenever any execution (triggered via REST or CLI) completes on any device.
+    - Data: `{"deviceId": "...", "envelope": {...}}`
+- **Initial Heartbeat**: Upon connection, a `{"code": "CONNECTED", ...}` message is sent to verify the stream is active.
+
+### Concurrency and Locking
+
+The server utilizes an in-memory single-flight lock per `deviceId`. If a second request arrives for the same device while an execution is in progress, the server returns **HTTP 423 (Locked)** immediately.
 
 ## Determinism Doctrine
 
@@ -452,29 +472,6 @@ Runtime responsibilities:
 3. Emit resolved coordinates in execution results for observability.
 4. Reject out-of-bounds taps with structured validation errors.
 
-## Optional HTTP Wrapper (when `--serve` is enabled)
-
-Suggested endpoints:
-
-- `GET /v1/doctor`
-- `POST /v1/doctor/fix`
-- `GET /v1/devices`
-- `GET /v1/skills`
-- `GET /v1/skills/:skillId`
-- `POST /v1/skills/:skillId/compile-artifact`
-- `POST /v1/executions/execute`
-- `POST /v1/executions/best-effort`
-- `GET /v1/executions/:executionId`
-- `GET /v1/executions/:executionId/events`
-- `POST /v1/observe/snapshot`
-- `POST /v1/inspect/ui`
-- `POST /v1/action/click`
-- `POST /v1/action/read`
-- `POST /v1/action/wait`
-
-HTTP contract mirrors CLI behavior exactly.
-
-## Architecture Modules
 
 - `src/cli/*`
   - command handlers and argument parsing

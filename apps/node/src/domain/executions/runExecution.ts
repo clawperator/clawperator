@@ -12,6 +12,7 @@ import { runAdb } from "../../adapters/android-bridge/adbClient.js";
 import { tryAcquire, release, getConflictError } from "./executionStore.js";
 import type { ResultEnvelope, TerminalSource } from "../../contracts/result.js";
 import { extractSnapshotFromLogs } from "./snapshotHelper.js";
+import { emitResult } from "../observe/events.js";
 
 export interface RunExecutionOptions {
   deviceId?: string;
@@ -142,6 +143,7 @@ export async function runExecution(
         }
       }
 
+      emitResult(deviceId, result.envelope);
       return { ok: true, envelope: result.envelope, deviceId, terminalSource: result.terminalSource };
     }
     if ("broadcastFailed" in result && result.broadcastFailed && "diagnostics" in result) {
