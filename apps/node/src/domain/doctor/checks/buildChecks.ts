@@ -1,12 +1,13 @@
-import { execSync } from "node:child_process";
+
 import { type RuntimeConfig } from "../../../adapters/android-bridge/runtimeConfig.js";
 import { type DoctorCheckResult } from "../../../contracts/doctor.js";
 import { ERROR_CODES } from "../../../contracts/errors.js";
 import { runAdb } from "../../../adapters/android-bridge/adbClient.js";
 
-export async function checkJavaVersion(): Promise<DoctorCheckResult> {
+export async function checkJavaVersion(config: RuntimeConfig): Promise<DoctorCheckResult> {
   try {
-    const versionOutput = execSync("java -version 2>&1").toString();
+    const { stdout, stderr } = await config.runner.run("java", ["-version"]);
+    const versionOutput = (stdout + stderr).toLowerCase();
     if (versionOutput.includes('version "17') || versionOutput.includes('version "21') || versionOutput.includes('openjdk 17') || versionOutput.includes('openjdk 21')) {
       return {
         id: "host.java.version",
@@ -30,11 +31,14 @@ export async function checkJavaVersion(): Promise<DoctorCheckResult> {
   }
 }
 
-export async function runAndroidBuild(): Promise<DoctorCheckResult> {
+export async function runAndroidBuild(config: RuntimeConfig): Promise<DoctorCheckResult> {
   try {
     // Run from project root. Assuming we are in apps/node/src/domain/doctor/checks/
     // Project root is ../../../../../../
-    execSync("./gradlew :apps:android:app:assembleDebug", { stdio: "pipe" });
+    const { code, error } = await config.runner.run("./gradlew", [":apps:android:app:assembleDebug"]);
+    if (code !== 0) {
+      throw error || new Error(`Gradle exited with code ${code}`);
+    }
     return {
       id: "build.android.assemble",
       status: "pass",
@@ -51,9 +55,12 @@ export async function runAndroidBuild(): Promise<DoctorCheckResult> {
   }
 }
 
-export async function runAndroidInstall(_config: RuntimeConfig): Promise<DoctorCheckResult> {
+export async function runAndroidInstall(config: RuntimeConfig): Promise<DoctorCheckResult> {
   try {
-    execSync("./gradlew :apps:android:app:installDebug", { stdio: "pipe" });
+    const { code, error } = await config.runner.run("./gradlew", [":apps:android:app:installDebug"]);
+    if (code !== 0) {
+      throw error || new Error(`Gradle exited with code ${code}`);
+    }
     return {
       id: "build.android.install",
       status: "pass",
@@ -73,7 +80,7 @@ export async function runAndroidInstall(_config: RuntimeConfig): Promise<DoctorC
 export async function runAndroidLaunch(config: RuntimeConfig): Promise<DoctorCheckResult> {
   const mainActivity = `${config.receiverPackage}/clawperator.activity.MainActivity`;
   const { code, stderr } = await runAdb(config, ["shell", "am", "start", "-n", mainActivity]);
-  
+
   if (code !== 0) {
     return {
       id: "build.android.launch",

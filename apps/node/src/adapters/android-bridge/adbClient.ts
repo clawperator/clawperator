@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+
 import { type RuntimeConfig } from "./runtimeConfig.js";
 
 export interface AdbResult {
@@ -16,32 +16,13 @@ export async function runAdb(
   options?: { timeoutMs?: number }
 ): Promise<AdbResult> {
   const deviceArgs = config.deviceId ? ["-s", config.deviceId, ...args] : args;
-  return new Promise((resolve) => {
-    const proc = spawn(config.adbPath, deviceArgs, {
-      stdio: ["ignore", "pipe", "pipe"],
-      shell: false,
-    });
-    let stdout = "";
-    let stderr = "";
-    proc.stdout?.on("data", (d) => (stdout += d.toString()));
-    proc.stderr?.on("data", (d) => (stderr += d.toString()));
-    const timeoutMs = options?.timeoutMs ?? 30_000;
-    const t = setTimeout(() => {
-      proc.kill("SIGTERM");
-    }, timeoutMs);
-    proc.on("error", (err) => {
-      clearTimeout(t);
-      if ((err as any).code === "ENOENT") {
-        resolve({ stdout, stderr: `ADB command not found at path: ${config.adbPath}`, code: 127 });
-      } else {
-        resolve({ stdout, stderr: `ADB spawn error: ${err.message}`, code: 1 });
-      }
-    });
-    proc.on("close", (code) => {
-      clearTimeout(t);
-      resolve({ stdout, stderr, code: code ?? null });
-    });
-  });
+  const result = await config.runner.run(config.adbPath, deviceArgs, options);
+
+  if (result.error && (result.error as any).code === "ENOENT") {
+    return { stdout: result.stdout, stderr: `ADB command not found at path: ${config.adbPath}`, code: 127 };
+  }
+
+  return result;
 }
 
 /**

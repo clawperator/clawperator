@@ -1,7 +1,5 @@
-/**
- * Centralized Android bridge config. Keeps action/receiver constants in one place
- * for Clawperator Android runtime dispatch.
- */
+import { type ProcessRunner, NodeProcessRunner } from "./processRunner.js";
+
 export const DEFAULT_ACTION_AGENT_COMMAND = "app.clawperator.operator.ACTION_AGENT_COMMAND";
 export const EXTRA_AGENT_PAYLOAD = "payload";
 
@@ -16,6 +14,8 @@ export interface RuntimeConfig {
   actionAgentCommand: string;
   /** Intent extra key for JSON payload */
   payloadExtraKey: string;
+  /** Process runner for executing commands (optional, defaults to NodeProcessRunner) */
+  runner: ProcessRunner;
 }
 
 export function getDefaultRuntimeConfig(overrides?: Partial<RuntimeConfig>): RuntimeConfig {
@@ -28,6 +28,7 @@ export function getDefaultRuntimeConfig(overrides?: Partial<RuntimeConfig>): Run
     receiverPackage: "com.clawperator.operator.dev",
     actionAgentCommand: DEFAULT_ACTION_AGENT_COMMAND,
     payloadExtraKey: EXTRA_AGENT_PAYLOAD,
+    runner: new NodeProcessRunner(),
     ...definedOverrides,
   };
 }

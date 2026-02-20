@@ -1,18 +1,18 @@
 import { type RuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 import { type DoctorReport, type DoctorCheckResult } from "../../contracts/doctor.js";
 import { resolveDevice } from "../devices/resolveDevice.js";
-import { 
-  checkNodeVersion, 
-  checkAdbPresence, 
-  checkAdbServer 
+import {
+  checkNodeVersion,
+  checkAdbPresence,
+  checkAdbServer
 } from "./checks/hostChecks.js";
-import { 
-  checkDeviceDiscovery, 
-  checkDeviceCapabilities 
+import {
+  checkDeviceDiscovery,
+  checkDeviceCapabilities
 } from "./checks/deviceChecks.js";
-import { 
-  checkApkPresence, 
-  checkSettings, 
+import {
+  checkApkPresence,
+  checkSettings,
   runHandshake,
   runSmokeTest
 } from "./checks/readinessChecks.js";
@@ -35,7 +35,7 @@ export class DoctorService {
 
     // 1. Host Checks
     checks.push(await checkNodeVersion());
-    
+
     const adbPresence = await checkAdbPresence(config);
     checks.push(adbPresence);
     if (adbPresence.status === "fail") return this.finalize(checks, config);
@@ -45,9 +45,9 @@ export class DoctorService {
     if (adbServer.status === "fail") return this.finalize(checks, config);
 
     if (full) {
-      checks.push(await checkJavaVersion());
-      
-      const build = await runAndroidBuild();
+      checks.push(await checkJavaVersion(config));
+
+      const build = await runAndroidBuild(config);
       checks.push(build);
       if (build.status === "fail") return this.finalize(checks, config);
     }
@@ -108,15 +108,15 @@ export class DoctorService {
 
   private finalize(checks: DoctorCheckResult[], config: RuntimeConfig): DoctorReport {
     const ok = checks.every(c => c.status !== "fail");
-    
+
     let nextCommand = "";
     if (ok) {
-       nextCommand = "clawperator action open-app --app com.android.settings";
+      nextCommand = "clawperator action open-app --app com.android.settings";
     } else {
-       const failing = checks.find(c => c.status === "fail");
-       if (failing?.fix?.commands?.[0]) {
-         nextCommand = failing.fix.commands[0];
-       }
+      const failing = checks.find(c => c.status === "fail");
+      if (failing?.fix?.commands?.[0]) {
+        nextCommand = failing.fix.commands[0];
+      }
     }
 
     return {
