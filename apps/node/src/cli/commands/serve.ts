@@ -72,24 +72,24 @@ export async function startServer(options: ServeOptions): Promise<Server> {
   // REST: Execute command
   app.post("/execute", async (req, res) => {
     if (!req.body || typeof req.body !== "object") {
-      res.status(400).json({ ok: false, error: "Invalid or missing JSON body" });
+      res.status(400).json({ ok: false, error: { code: "INVALID_BODY", message: "Invalid or missing JSON body" } });
       return;
     }
 
     const { execution, deviceId, receiverPackage } = req.body;
     
     if (!execution) {
-      res.status(400).json({ ok: false, error: "Missing 'execution' in body" });
+      res.status(400).json({ ok: false, error: { code: "MISSING_EXECUTION", message: "Missing 'execution' in body" } });
       return;
     }
 
     if (deviceId !== undefined && typeof deviceId !== "string") {
-      res.status(400).json({ ok: false, error: "'deviceId' must be a string" });
+      res.status(400).json({ ok: false, error: { code: "INVALID_DEVICE_ID", message: "'deviceId' must be a string" } });
       return;
     }
 
     if (receiverPackage !== undefined && typeof receiverPackage !== "string") {
-      res.status(400).json({ ok: false, error: "'receiverPackage' must be a string" });
+      res.status(400).json({ ok: false, error: { code: "INVALID_RECEIVER_PACKAGE", message: "'receiverPackage' must be a string" } });
       return;
     }
 
@@ -112,19 +112,19 @@ export async function startServer(options: ServeOptions): Promise<Server> {
   // REST: Observe Snapshot
   app.post("/observe/snapshot", async (req, res) => {
     if (!req.body || typeof req.body !== "object") {
-      res.status(400).json({ ok: false, error: "Invalid or missing JSON body" });
+      res.status(400).json({ ok: false, error: { code: "INVALID_BODY", message: "Invalid or missing JSON body" } });
       return;
     }
 
     const { deviceId, receiverPackage } = req.body;
     
     if (deviceId !== undefined && typeof deviceId !== "string") {
-      res.status(400).json({ ok: false, error: "'deviceId' must be a string" });
+      res.status(400).json({ ok: false, error: { code: "INVALID_DEVICE_ID", message: "'deviceId' must be a string" } });
       return;
     }
 
     if (receiverPackage !== undefined && typeof receiverPackage !== "string") {
-      res.status(400).json({ ok: false, error: "'receiverPackage' must be a string" });
+      res.status(400).json({ ok: false, error: { code: "INVALID_RECEIVER_PACKAGE", message: "'receiverPackage' must be a string" } });
       return;
     }
 
@@ -156,19 +156,19 @@ export async function startServer(options: ServeOptions): Promise<Server> {
   // REST: Observe Screenshot
   app.post("/observe/screenshot", async (req, res) => {
     if (!req.body || typeof req.body !== "object") {
-      res.status(400).json({ ok: false, error: "Invalid or missing JSON body" });
+      res.status(400).json({ ok: false, error: { code: "INVALID_BODY", message: "Invalid or missing JSON body" } });
       return;
     }
 
     const { deviceId, receiverPackage } = req.body;
 
     if (deviceId !== undefined && typeof deviceId !== "string") {
-      res.status(400).json({ ok: false, error: "'deviceId' must be a string" });
+      res.status(400).json({ ok: false, error: { code: "INVALID_DEVICE_ID", message: "'deviceId' must be a string" } });
       return;
     }
 
     if (receiverPackage !== undefined && typeof receiverPackage !== "string") {
-      res.status(400).json({ ok: false, error: "'receiverPackage' must be a string" });
+      res.status(400).json({ ok: false, error: { code: "INVALID_RECEIVER_PACKAGE", message: "'receiverPackage' must be a string" } });
       return;
     }
 
@@ -204,6 +204,11 @@ export async function startServer(options: ServeOptions): Promise<Server> {
     res.setHeader("Connection", "keep-alive");
     res.flushHeaders();
 
+    const cleanup = () => {
+      clawperatorEvents.off(CLAW_EVENT_TYPES.RESULT, onResult);
+      clawperatorEvents.off(CLAW_EVENT_TYPES.EXECUTION, onExecution);
+    };
+
     const onResult = (data: any) => {
       try {
         if (!res.writableEnded) {
@@ -212,7 +217,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
         }
       } catch (err) {
         console.error(`⚠️ SSE write failed: ${String(err)}`);
-        clawperatorEvents.off(CLAW_EVENT_TYPES.RESULT, onResult);
+        cleanup();
       }
     };
 
@@ -224,17 +229,12 @@ export async function startServer(options: ServeOptions): Promise<Server> {
         }
       } catch (err) {
         console.error(`⚠️ SSE execution write failed: ${String(err)}`);
-        clawperatorEvents.off(CLAW_EVENT_TYPES.EXECUTION, onExecution);
+        cleanup();
       }
     };
 
     clawperatorEvents.on(CLAW_EVENT_TYPES.RESULT, onResult);
     clawperatorEvents.on(CLAW_EVENT_TYPES.EXECUTION, onExecution);
-
-    const cleanup = () => {
-      clawperatorEvents.off(CLAW_EVENT_TYPES.RESULT, onResult);
-      clawperatorEvents.off(CLAW_EVENT_TYPES.EXECUTION, onExecution);
-    };
 
     req.on("close", cleanup);
     req.on("error", (err) => {
@@ -248,6 +248,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
 
     // Send initial heartbeat
     try {
+      res.write(`event: heartbeat\n`);
       res.write(`data: ${JSON.stringify({ code: "CONNECTED", message: "Clawperator SSE stream active" })}\n\n`);
     } catch (err) {
       console.error(`⚠️ SSE heartbeat failed: ${String(err)}`);

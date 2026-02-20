@@ -150,7 +150,7 @@ async function performExecution(
       taskId: execution.taskId,
       status: "failed",
       stepResults: [],
-      error: "Execution failed before completion"
+      error: "Execution failed during runtime"
     };
 
     if ("broadcastFailed" in result && result.broadcastFailed && "diagnostics" in result) {
@@ -163,8 +163,11 @@ async function performExecution(
       emitResult(deviceId, failureEnvelope);
       return { ok: false, error: { ...result.diagnostics }, deviceId };
     }
+    
+    const errCode = ("error" in result && typeof result.error === "string") ? result.error : "UNKNOWN_RUNTIME_ERROR";
+    failureEnvelope.error = errCode;
     emitResult(deviceId, failureEnvelope);
-    return { ok: false, error: { code: "UNKNOWN", message: failureEnvelope.error ?? "Unknown error" }, deviceId };
+    return { ok: false, error: { code: errCode, message: ("error" in result && typeof result.error === "string") ? result.error : "Unknown error" }, deviceId };
   } finally {
     release(deviceId, execution.commandId);
   }
@@ -179,6 +182,9 @@ export async function runExecution(
   options: RunExecutionOptions = {}
 ): Promise<RunExecutionResult> {
   const result = await performExecution(executionInput, options);
+  
+  // We emit the execution outcome even if resolution failed, as long as we have SOME deviceId 
+  // (either from options or resolved during the process).
   const resolvedDeviceId: string | null = result.deviceId || options.deviceId || null;
   if (resolvedDeviceId !== null) {
     emitExecution(resolvedDeviceId, executionInput, result);

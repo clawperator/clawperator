@@ -19,6 +19,9 @@ async function runSample() {
   const decoder = new TextDecoder();
 
   // 2. Dispatch the execution
+  // NOTE: In a production agent, you should wait for the SSE 'CONNECTED' heartbeat
+  // or a small delay to ensure the stream is established before dispatching,
+  // otherwise you might miss the result event if it finishes extremely fast.
   const payload = {
     deviceId: '<device_serial>', // Replace with your device serial
     execution: {
@@ -49,10 +52,15 @@ async function runSample() {
     process.exit(1);
   }
 
-  // 3. Process the stream until we find our result
+  // 3. Process the stream until we find our result (with a safety timeout)
   console.log('⏳ Waiting for result in SSE stream...');
+  const timeout = setTimeout(async () => {
+    console.error('❌ Script timed out waiting for result.');
+    await reader.cancel();
+    process.exit(1);
+  }, 60000);
+
   let buffer = '';
-  
   while (true) {
     const { value, done } = await reader.read();
     if (done) break;
@@ -63,14 +71,19 @@ async function runSample() {
 
     for (const line of lines) {
       if (line.startsWith('data: ')) {
-        const data = JSON.parse(line.slice(6));
-        
-        // Match our specific commandId
-        if (data.envelope && data.envelope.commandId === commandId) {
-          console.log('✅ Received Result for', commandId);
-          console.log(JSON.stringify(data.envelope, null, 2));
-          await reader.cancel();
-          process.exit(0);
+        try {
+          const data = JSON.parse(line.slice(6));
+          
+          // Match our specific commandId
+          if (data.envelope && data.envelope.commandId === commandId) {
+            clearTimeout(timeout);
+            console.log('✅ Received Result for', commandId);
+            console.log(JSON.stringify(data.envelope, null, 2));
+            await reader.cancel();
+            process.exit(0);
+          }
+        } catch (e) {
+          console.warn('⚠️ Failed to parse SSE data line:', line);
         }
       }
     }
