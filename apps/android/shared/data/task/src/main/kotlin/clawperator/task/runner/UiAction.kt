@@ -102,6 +102,7 @@ data class UiActionPlan(
 data class UiActionStepResult(
     val id: String,
     val actionType: String,
+    val success: Boolean = true,
     val data: Map<String, String> = emptyMap(),
 )
 

@@ -78,12 +78,17 @@ class UiActionEngineDefault : UiActionEngine {
         taskScope: TaskScope,
         action: UiAction.CloseApp,
     ): UiActionStepResult {
-        // NOTE: Reliable force-stop is now handled pre-flight by the Node CLI via ADB.
-        // This remains as a success placeholder to satisfy the action contract.
+        // The Android runtime cannot reliably force-stop other apps due to sandbox restrictions.
+        // We return an error here to signal that the 'Hand' (Node CLI) should have handled this via ADB.
         return UiActionStepResult(
             id = action.id,
             actionType = "close_app",
-            data = mapOf("application_id" to action.applicationId),
+            success = false,
+            data = mapOf(
+                "application_id" to action.applicationId,
+                "error" to "UNSUPPORTED_RUNTIME_CLOSE",
+                "message" to "Android runtime cannot reliably close apps. Use the Clawperator Node API or 'adb shell am force-stop' directly for this action."
+            ),
         )
     }
 
