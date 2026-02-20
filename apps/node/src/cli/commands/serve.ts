@@ -82,7 +82,8 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       if (result.ok) {
         res.json(result);
       } else {
-        res.status(400).json(result);
+        const status = result.error.code === ERROR_CODES.EXECUTION_CONFLICT_IN_FLIGHT ? 423 : 400;
+        res.status(status).json(result);
       }
     } catch (e) {
       res.status(500).json({ ok: false, error: String(e) });
@@ -106,7 +107,8 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       if (result.ok) {
         res.json(result);
       } else {
-        res.status(400).json(result);
+        const status = result.error.code === ERROR_CODES.EXECUTION_CONFLICT_IN_FLIGHT ? 423 : 400;
+        res.status(status).json(result);
       }
     } catch (e) {
       res.status(500).json({ ok: false, error: String(e) });
@@ -121,18 +123,40 @@ export async function startServer(options: ServeOptions): Promise<Server> {
     res.flushHeaders();
 
     const onResult = (data: any) => {
-      res.write(`event: ${CLAW_EVENT_TYPES.RESULT}\n`);
-      res.write(`data: ${JSON.stringify(data)}\n\n`);
+      try {
+        if (!res.writableEnded) {
+          res.write(`event: ${CLAW_EVENT_TYPES.RESULT}\n`);
+          res.write(`data: ${JSON.stringify(data)}\n\n`);
+        }
+      } catch (err) {
+        console.error(`⚠️ SSE write failed: ${String(err)}`);
+        clawperatorEvents.off(CLAW_EVENT_TYPES.RESULT, onResult);
+      }
     };
 
     clawperatorEvents.on(CLAW_EVENT_TYPES.RESULT, onResult);
 
-    req.on("close", () => {
+    const cleanup = () => {
       clawperatorEvents.off(CLAW_EVENT_TYPES.RESULT, onResult);
+    };
+
+    req.on("close", cleanup);
+    req.on("error", (err) => {
+      if (options.verbose) console.warn(`[HTTP] SSE req error: ${String(err)}`);
+      cleanup();
+    });
+    res.on("error", (err) => {
+      if (options.verbose) console.warn(`[HTTP] SSE res error: ${String(err)}`);
+      cleanup();
     });
 
     // Send initial heartbeat
-    res.write(`data: ${JSON.stringify({ code: "CONNECTED", message: "Clawperator SSE stream active" })}\n\n`);
+    try {
+      res.write(`data: ${JSON.stringify({ code: "CONNECTED", message: "Clawperator SSE stream active" })}\n\n`);
+    } catch (err) {
+      console.error(`⚠️ SSE heartbeat failed: ${String(err)}`);
+      cleanup();
+    }
   });
 
   return new Promise((resolve) => {
