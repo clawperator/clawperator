@@ -18,6 +18,8 @@ Commands:
                                             Produce deterministic next-action suggestion from current UI
   observe snapshot [--device-id <id>] [--receiver-package <package>]
                                             Capture current UI snapshot output
+  observe screenshot [--device-id <id>] [--receiver-package <package>]
+                                            Capture current device screenshot (png)
   inspect ui [--device-id <id>] [--receiver-package <package>]
                                             Alias of observe snapshot with formatted output
   action click --selector <json> [--device-id <id>] [--receiver-package <package>]
@@ -28,7 +30,6 @@ Commands:
                                             Build and run single wait_for_node action via execute path
   action type --selector <json> --text <value> [--submit] [--clear] [--device-id <id>] [--receiver-package <package>]
                                             Build and run single enter_text action via execute path
-  act <subcommand> ...                       Alias of action for compatibility
   skills list
                                             List available skills from local indexes/cache
   skills get <skill_id>
@@ -55,7 +56,6 @@ Global options:
 Notes:
   - inspect ui is a wrapper alias over observe snapshot.
   - action commands are thin wrappers that compile to execution and call execute.
-  - act is a compatibility alias for action.
   - Terminal result semantics are driven by [Clawperator-Result].
 `;
 
@@ -158,8 +158,14 @@ async function main(): Promise<void> {
           deviceId: global.deviceId ?? getOpt(rest, "--device-id"),
           receiverPackage: global.receiverPackage ?? getOpt(rest, "--receiver-package"),
         });
+      } else if (rest[0] === "screenshot") {
+        result = await (await import("./commands/observe.js")).cmdObserveScreenshot({
+          ...out,
+          deviceId: global.deviceId ?? getOpt(rest, "--device-id"),
+          receiverPackage: global.receiverPackage ?? getOpt(rest, "--receiver-package"),
+        });
       } else {
-        result = JSON.stringify({ code: "USAGE", message: "observe snapshot [options]" });
+        result = JSON.stringify({ code: "USAGE", message: "observe snapshot|screenshot [options]" });
       }
       break;
     case "inspect":
@@ -173,8 +179,7 @@ async function main(): Promise<void> {
         result = JSON.stringify({ code: "USAGE", message: "inspect ui [options]" });
       }
       break;
-    case "action":
-    case "act": {
+    case "action": {
       const sub = rest[0];
       const selector = getOpt(rest, "--selector");
       const runOpts = {

@@ -10,6 +10,7 @@ describe("validateExecution", () => {
       commandId: "cmd-1",
       taskId: "task-1",
       source: "test",
+      expectedFormat: "android-ui-automator",
       timeoutMs: 10000,
       actions: [{ id: "a1", type: "sleep", params: { durationMs: 1000 } }],
     });
@@ -22,12 +23,42 @@ describe("validateExecution", () => {
       commandId: "c",
       taskId: "t",
       source: "s",
+      expectedFormat: "android-ui-automator",
       timeoutMs: 5000,
       actions: [
         { id: "x", type: "type_text", params: { matcher: { resourceId: "id" }, text: "hi" } },
       ],
     });
     assert.strictEqual(ex.actions[0].type, "enter_text");
+  });
+
+  it("rejects missing expectedFormat", () => {
+    assert.throws(
+      () =>
+        validateExecution({
+          commandId: "c",
+          taskId: "t",
+          source: "s",
+          timeoutMs: 5000,
+          actions: [{ id: "x", type: "sleep", params: { durationMs: 0 } }],
+        }),
+      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.VALIDATION_FAILED
+    );
+  });
+
+  it("rejects invalid expectedFormat", () => {
+    assert.throws(
+      () =>
+        validateExecution({
+          commandId: "c",
+          taskId: "t",
+          source: "s",
+          expectedFormat: "wrong-format",
+          timeoutMs: 5000,
+          actions: [{ id: "x", type: "sleep", params: { durationMs: 0 } }],
+        }),
+      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.VALIDATION_FAILED
+    );
   });
 
   it("rejects empty actions", () => {
@@ -37,6 +68,7 @@ describe("validateExecution", () => {
           commandId: "c",
           taskId: "t",
           source: "s",
+          expectedFormat: "android-ui-automator",
           timeoutMs: 5000,
           actions: [],
         }),
@@ -51,6 +83,7 @@ describe("validateExecution", () => {
           commandId: "c",
           taskId: "t",
           source: "s",
+          expectedFormat: "android-ui-automator",
           timeoutMs: 5000,
           actions: [{ id: "x", type: "unsupported_action" }],
         }),
@@ -65,6 +98,7 @@ describe("validateExecution", () => {
           commandId: "c",
           taskId: "t",
           source: "s",
+          expectedFormat: "android-ui-automator",
           timeoutMs: LIMITS.MAX_EXECUTION_TIMEOUT_MS + 1,
           actions: [{ id: "x", type: "sleep", params: { durationMs: 0 } }],
         }),
@@ -79,6 +113,7 @@ describe("validateExecution", () => {
           commandId: "c",
           taskId: "t",
           source: "s",
+          expectedFormat: "android-ui-automator",
           timeoutMs: 5000,
           actions: [{ id: "x", type: "open_app", params: {} }],
         }),
@@ -93,6 +128,7 @@ describe("validateExecution", () => {
           commandId: "c",
           taskId: "t",
           source: "s",
+          expectedFormat: "android-ui-automator",
           timeoutMs: 5000,
           actions: [{ id: "x", type: "sleep", params: { durationMs: -1 } }],
         }),
@@ -107,6 +143,7 @@ describe("validateExecution", () => {
           commandId: "c",
           taskId: "t",
           source: "s",
+          expectedFormat: "android-ui-automator",
           timeoutMs: 5000,
           actions: [{ id: "x", type: "enter_text", params: { text: "hello" } }],
         }),
@@ -121,6 +158,7 @@ describe("validateExecution", () => {
           commandId: "c",
           taskId: "t",
           source: "s",
+          expectedFormat: "android-ui-automator",
           timeoutMs: 5000,
           actions: [{ id: "x", type: "sleep", params: { durationMs: 1 } }],
           unexpectedField: "nope",

@@ -10,6 +10,8 @@ const nodeMatcherSchema = z
     role: z.string().max(LIMITS.MAX_MATCHER_VALUE_LENGTH).optional(),
     textEquals: z.string().max(LIMITS.MAX_MATCHER_VALUE_LENGTH).optional(),
     textContains: z.string().max(LIMITS.MAX_MATCHER_VALUE_LENGTH).optional(),
+    contentDescEquals: z.string().max(LIMITS.MAX_MATCHER_VALUE_LENGTH).optional(),
+    contentDescContains: z.string().max(LIMITS.MAX_MATCHER_VALUE_LENGTH).optional(),
   })
   .strict()
   .refine(
@@ -17,7 +19,9 @@ const nodeMatcherSchema = z
       (m.resourceId ?? "") !== "" ||
       (m.role ?? "") !== "" ||
       (m.textEquals ?? "") !== "" ||
-      (m.textContains ?? "") !== "",
+      (m.textContains ?? "") !== "" ||
+      (m.contentDescEquals ?? "") !== "" ||
+      (m.contentDescContains ?? "") !== "",
     { message: "Matcher must have at least one field" }
   );
 
@@ -25,6 +29,7 @@ const actionParamsSchema = z.object({
   applicationId: z.string().optional(),
   durationMs: z.number().optional(),
   format: z.enum(["ascii", "json"]).optional(),
+  path: z.string().optional(),
   matcher: nodeMatcherSchema.optional(),
   text: z.string().max(LIMITS.MAX_MATCHER_VALUE_LENGTH).optional(),
   submit: z.boolean().optional(),
@@ -52,6 +57,7 @@ const supportedTypes = [
   "read_text",
   "enter_text",
   "snapshot_ui",
+  "take_screenshot",
   "sleep",
 ] as const;
 
@@ -65,6 +71,7 @@ const executionSchema = z.object({
   commandId: z.string().min(1).max(LIMITS.MAX_ID_LENGTH),
   taskId: z.string().min(1).max(LIMITS.MAX_ID_LENGTH),
   source: z.string().min(1).max(LIMITS.MAX_SOURCE_LENGTH),
+  expectedFormat: z.literal("android-ui-automator"),
   timeoutMs: z
     .number()
     .min(LIMITS.MIN_EXECUTION_TIMEOUT_MS)

@@ -7,6 +7,7 @@ export interface ActionParams {
   applicationId?: string;
   durationMs?: number;
   format?: "ascii" | "json";
+  path?: string;
   matcher?: NodeMatcher;
   text?: string;
   submit?: boolean;
@@ -37,6 +38,7 @@ export interface Execution {
   commandId: string;
   taskId: string;
   source: string;
+  expectedFormat: "android-ui-automator";
   timeoutMs: number;
   actions: ExecutionAction[];
   /** Set by runtime: artifact_compiled | direct */
