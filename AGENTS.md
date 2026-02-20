@@ -1,29 +1,35 @@
 # Repository Guidelines
 
 ## Mission
-Clawperator is a deterministic Android operator runtime for LLM agents.
+Clawperator is a deterministic actuator tool for device automation, primarily targeting Android. It acts as the "hand" for an LLM "brain," allowing it to automate device control and perform actions on behalf of a user using a dedicated **"burner" device**.
+
+This setup ensures that any cheap or old Android device can be used as a reliable actuator, regardless of the user's primary phone choice (e.g., iOS).
 
 Core intent:
-- execute validated UI actions reliably on Android
-- expose strong observability for agents (`snapshot_ui`, structured terminal results)
-- remain simple and predictable as an execution substrate
+- provide a stable Node-based interface for LLM agents
+- execute validated UI actions reliably on a device target (Android)
+- remain a simple and predictable execution substrate for user-on-behalf tasks
 
 Clawperator is not an autonomous planner. Agent reasoning stays outside this runtime.
 
-## Operating Model (Two-Handed)
-Use Clawperator as one half of a system:
-1. Clawperator executes Android actions and emits structured outcomes.
-2. The agent interprets outcomes and decides what to do next.
+## Operating Model: Brain and Hand
+Clawperator is the "hand" for an LLM "brain":
+1.  **The Brain (Agent):** Interacts with the **Clawperator Node API** to reason about state and decide what to do next.
+2.  **The Hand (Clawperator):** Translates Node API commands into precise device actions (currently Android) and returns structured sensory data (UI snapshots and terminal results).
 
 Design consequence:
 - prioritize deterministic command execution and diagnostics over hidden heuristics
 - avoid embedding app-specific strategy in core runtime paths
 
 ## Runtime Contracts
+- The **Clawperator Node API/CLI** is the canonical interface for all agent-driven interactions.
 - Canonical terminal envelope is required: `[Clawperator-Result]`.
 - Node API should remain strict and contract-driven.
 - Per-command correlation IDs (`commandId`, `taskId`) must remain stable end-to-end.
-- Keep receiver package and action identifiers consistent with current defaults (`com.clawperator.operator*` / `app.clawperator.operator*`).
+- Keep receiver package and action identifiers consistent with current defaults:
+  - `com.clawperator.operator` (Release)
+  - `com.clawperator.operator.dev` (Local/Debug)
+- **Clawperator is an actuator:** It does not own strategy, planning, or autonomous reasoning. These live in the Agent.
 
 ## Source of Truth Docs
 - `docs/project-overview.md`
@@ -73,6 +79,10 @@ For non-trivial changes, do all steps before commit:
 - Keep commits narrow and reviewable.
 - Prefer explicit contracts and deterministic behavior over convenience shortcuts.
 - When making breaking contract changes, include migration notes in commit message and docs.
+
+## Documentation Style
+- **No em dashes:** Never use em dashes (`—`). Use a regular dash or hyphen (`-`) instead for clarity and consistency.
+- Use clean,Monospaced-friendly formatting for all markdown files.
 
 ## Near-Term Engineering Priorities
 - Keep Android and Node contracts aligned and minimal.

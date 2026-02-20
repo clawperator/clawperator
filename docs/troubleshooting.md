@@ -4,9 +4,9 @@ The Clawperator operator app on Android must satisfy **three requirements** befo
 
 ## The three requirements
 
-1. **Developer settings enabled** – The device’s Developer options menu is unlocked.
-2. **USB debugging enabled** – USB debugging is turned on in Developer options.
-3. **Permissions granted** – The Clawperator accessibility (operator) service is enabled and running.
+1. **Developer settings enabled** - The device’s Developer options menu is unlocked.
+2. **USB debugging enabled** - USB debugging is turned on in Developer options.
+3. **Permissions granted** - The Clawperator accessibility (operator) service is enabled and running.
 
 If any requirement is not met, the app shows an orange background and a dedicated screen explaining what to do.
 
@@ -62,9 +62,49 @@ If any requirement is not met, the app shows an orange background and a dedicate
 
 3. After enabling, the operator app’s doctor screen should move to **Ready** (green) once the service is connected. If you see "Permissions not granted" or an accessibility-related message, run the grant script again or re-enable the service in Accessibility settings.
 
-**Note:** Android revokes the accessibility permission if the Clawperator app crashes. If the doctor screen shows "Permissions not granted" after the app had been ready, the service may have been disabled by a crash—re-run the grant script or re-enable the Clawperator service in Settings → Accessibility.
+**Note:** Android revokes the accessibility permission if the Clawperator app crashes. If the doctor screen shows "Permissions not granted" after the app had been ready, the service may have been disabled by a crash - re-run the grant script or re-enable the Clawperator service in Settings → Accessibility.
 
 **In the app:** If requirements 1 and 2 are met but the accessibility service is not running, the doctor screen shows a message like "Accessibility permissions are not configured" and instructs you to run `clawperator_grant_android_permissions.sh`.
+
+---
+
+## Wireless Debugging (YMMV)
+
+Clawperator is designed to work with a dedicated, **always-on, permanently powered** Android device. For maximum reliability, a physical USB connection is strongly recommended. 
+
+If you must use **Wireless Debugging**, be aware that your mileage may vary (YMMV) as connection stability can drop unexpectedly.
+
+1. Ensure both the Android device and your host computer are on the same Wi-Fi network.
+2. Go to **Settings** → **Developer options**.
+3. Turn on **Wireless debugging**.
+4. Tap **Wireless debugging** to see the IP address and port (e.g., `192.168.1.100:5555`).
+5. On your computer, run:
+   ```bash
+   adb connect <ip_address>:<port>
+   ```
+
+**Warning:** Wireless debugging sessions are prone to disconnection. If the device drops off the network, the Node CLI will return `NO_DEVICES`. For production use, always prefer a wired connection.
+
+---
+
+## Version Compatibility Matrix
+
+To ensure deterministic results, the Node CLI and the Android APK must be compatible.
+
+| Node CLI Version | Android APK Version | Protocol Support |
+| :--- | :--- | :--- |
+| `0.1.x` | `0.1.0`+ | `[Clawperator-Result]` v1 |
+| `0.2.x` | `0.2.0`+ | `[Clawperator-Result]` v2 |
+
+### Detecting a Mismatch
+If the versions are incompatible, you may see:
+1. **`RESULT_ENVELOPE_MALFORMED`**: The APK sent a JSON structure the CLI doesn't understand.
+2. **`EXECUTION_ACTION_UNSUPPORTED`**: The CLI sent a new action type (e.g., `back`) that the older APK hasn't implemented.
+3. **Hang/Timeout**: The APK crashed or failed to emit the envelope because of a protocol error.
+
+**How to fix:**
+- Upgrade the Node CLI: `npm install -g @clawperator/cli@latest`
+- Update the Android APK: Download the latest release from [GitHub Releases](https://github.com/Clawcave/clawperator/releases) and run `./gradlew installDebug` or install the provided APK.
 
 ---
 

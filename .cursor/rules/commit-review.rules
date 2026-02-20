@@ -13,27 +13,9 @@ Ask the Composer to "Review my last commit and run tests" and it will:
    - [ ] Potential issues or bugs
 3. Run tests by executing:
    ```bash
-   ./gradlew :shared:test:testDebugUnitTest
+   ./gradlew testDebugUnitTest
    ```
-4. If changes affect Firebase Functions, test deployment:
-   ```bash
-   ./scripts/firebase_deploy.sh --preview
-   ```
-
-## Full Review
-Ask the Composer to "Review my unpushed commits and run tests" and it will:
-1. Show all unpushed commits
-2. Review each commit individually
-3. Review all commits collectively
-4. Run tests by executing:
-   ```bash
-   ./gradlew :shared:test:testDebugUnitTest
-   ```
-5. If changes affect Firebase Functions, test deployment:
-   ```bash
-   ./scripts/firebase_deploy.sh --preview
-   ```
-6. Provide a final recommendation
+4. Provide a final recommendation
 
 ### Review Format
 The AI will use these emoji in its review:

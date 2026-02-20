@@ -1,33 +1,36 @@
 # Project Overview
 
-## Service Overview
-- Automation system leveraging a permanently powered Android device in the home.
-- Uses Android Accessibility APIs to interact with third-party apps.
-- Core principle: **"the app is the API."**
-- Expands automation of apps and services to apps without official APIs.
+## Mission
+Clawperator is a deterministic actuator tool for LLM-driven Android automation. It provides a stable execution layer that allows agents to perform actions on a dedicated, permanently-connected Android device (affectionately called a **"burner"**) on behalf of a user.
 
-## Mission and Product Shape
-ActionTask controls third‑party apps by treating the UI as the API. A permanently powered Android device (the “Operator”) uses Android Accessibility APIs to inspect visible UI, map screens into a readable structure, and perform actions such as taps or toggles. A Kotlin backend (the “Conductor”) orchestrates commands and returns results to clients (initially an MCP server).
+This approach ensures that the user's primary phone (e.g., an iPhone) remains undisturbed while the burner device handles automation tasks. There are virtually no hardware requirements; any cheap or old Android device can serve as a reliable actuator.
 
-## High‑Level Architecture
-- **Operator app (Android):** long‑running client on a dedicated device. Executes tasks via Accessibility and reports results.
-- **Conductor server (Kotlin):** Cloud Run service that accepts requests, enforces policies, orchestrates tasks, and handles error/timeout management.
-- **Client layer:** currently an MCP server; later targets include native apps and workflow integrations.
+## Core Philosophy: The Brain and the Hand
+Clawperator is designed as the execution "hand" for an LLM "brain":
 
-## Kotlin Multiplatform Design
-The codebase is Kotlin Multiplatform (KMP). Platform‑agnostic interfaces live in `commonMain`; Android‑specific implementations live in `androidMain` and are suffixed with `Android` and `.android.kt` filenames. Use platform interfaces + platform implementations when touching Android APIs (e.g., `PackageManager` + `PackageManagerAndroid`). Java SDK usage is discouraged in shared code.
+1.  **The Agent (The Brain):** An external LLM (e.g., OpenClaw) that owns reasoning, planning, and decision-making. It supervises the automation and decides which actions to take based on the user's intent.
+2.  **Clawperator (The Hand):** A deterministic actuator tool. It provides the reliable "fingers" to observe UI state (`snapshot_ui`), perform precise interactions (taps, scrolls), and report structured results back to the brain.
 
-## Module Layout (Quick Map)
-- `app/`: Android application module.
-- `shared/`: KMP modules, organized by core/data/di/domain/presentation/system/test.
-- `tooling/`: Gradle/build tooling.
-- `scripts/`: common workflows (quality checks, tests, operator debug events).
+**Clawperator is intentionally not intelligent.** It does not perform autonomous multi-step reasoning or agentic planning. It follows instructions and provides high-fidelity feedback so the Agent can drive the process.
 
-## Development Notes for AI Agents
-- Prefer `Flow` for state and data pipelines; avoid blocking operators (`first`, `single`) unless necessary.
-- Tests live in the `shared/test` module; `commonTest` is preferred when possible.
-- Commit messages follow Conventional Commits (e.g., `feat:`, `fix:`, `refactor:`).
-- The `.cursor/rules/prd-N*.mdc` files are legacy planning artifacts and can be ignored.
+## Architecture
+The system consists of two primary layers:
 
-## Documentation Home
-Project docs should live in `docs/`. Use this folder for onboarding guides, architecture notes, and workflows that help new contributors or AI agents understand context quickly.
+-   **Android Runtime (`apps/android`):** An Android application that leverages Accessibility APIs to inspect the UI tree and perform actions (taps, scrolls, text entry, and system hard-keys like `back`/`home`). It listens for commands via a broadcast receiver.
+-   **Node Runtime/CLI (`apps/node`):** The primary interface for agents. It wraps `adb` interactions, validates execution payloads, dispatches commands to the Android device, and parses canonical result envelopes from logs.
+
+## The Role of Skills
+Skills are reusable templates for app-specific workflows (e.g., "get thermostat temperature" or "check grocery prices").
+
+-   **Canonical Home:** `../clawperator-skills` (a dedicated sibling repository).
+-   **Nature of Skills:** Due to the dynamic nature of mobile apps (A/B tests, server-side flags, unexpected popups), skills are treated as **highly informed context** for the Agent rather than purely deterministic scripts.
+-   **Agent Responsibility:** The Agent uses skill templates as a baseline, modifying them at runtime to handle personal configurations (variable substitution) or UI drift.
+
+## Package Identifiers
+-   **`com.clawperator.operator`**: The production/release package name.
+-   **`com.clawperator.operator.dev`**: The local development package name (used when building from source).
+
+## Safety & Privacy
+- **Redaction (Upcoming):** Future versions will include regex-based redaction of PII (names, addresses, digits) from result envelopes to ensure sensitive data is not leaked into agent memory.
+- **Control:** The "Two-Handed" model ensures that agents can only execute within the safety bounds defined by the Clawperator runtime.
+-   **Observability:** Agents use `snapshot_ui` (ASCII or JSON) and screenshots to "see" the device state.

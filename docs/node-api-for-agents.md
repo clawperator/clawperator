@@ -14,15 +14,15 @@ How to use this document:
 
 ## Heading
 
-Clawperator Node API: Reliable Android Control for LLM Agents
+Clawperator: Deterministic Actuator Tool for LLM-Driven Android Automation
 
 ## Sub-Heading
 
-For LLM agents, Clawperator provides deterministic Android execution so they can reliably interact with apps and extract information that is often unavailable via public web APIs or websites.
+Clawperator provides a stable execution layer that allows LLM agents to automate device control and perform actions on an Android device on behalf of a user.
 
 ## Summary
 
-Today we are introducing the Clawperator Node API, an execution service built for LLM/agent callers. Clawperator lets agents reliably operate Android apps, read structured results, and return clear answers or screenshots when requested. The agent remains responsible for reasoning and decisions; Clawperator is the dependable execution layer for interacting with consumer apps where the needed data may only exist inside the mobile experience.
+Today we are introducing Clawperator, a deterministic actuator tool built for LLM/agent callers. Clawperator serves as the "hand" for an LLM "brain," enabling it to reliably operate Android apps, read structured results, and perform actions on behalf of a user. The agent remains responsible for reasoning, decisions, and supervision; Clawperator is the dependable execution layer for interacting with consumer apps where the user's data may only exist inside the mobile experience.
 
 ## Problem
 
@@ -33,7 +33,10 @@ Humans ask agents to complete real-world tasks that often span multiple mobile a
 Clawperator Node API standardizes Android execution into a stable contract so agents can focus on user outcomes:
 
 1. One canonical execution path with strict validation before dispatch.
-2. Deterministic result envelope semantics (`[Clawperator-Result]` terminal).
+2. Explicit `expectedFormat` (e.g., `android-ui-automator`) to future-proof for non-Android platforms.
+3. Standardized, machine-readable Error Codes for agent logic branching.
+4. Deterministic result envelope semantics (`[Clawperator-Result]` terminal).
+5. Multimodal support via first-class Screenshots correlated to execution steps.
 3. Consistent device targeting, receiver package targeting, and conflict handling.
 4. First-class command wrappers (`devices`, `packages list`, `execute`, `observe snapshot`, `action ...`).
 5. Skill artifact compile support that produces normal execution payloads (no hidden runtime magic).
@@ -115,4 +118,4 @@ Single-flight per device by default. A second overlapping execution on the same 
 
 ### How should agents handle sensitive text in results?
 
-Default behavior is full-fidelity logs/results for agent reasoning. Optional privacy-mode controls are planned for environments requiring stricter policy.
+Default behavior is full-fidelity logs/results for agent reasoning. Regex-based redaction is a planned feature for environments requiring strict PII protection.

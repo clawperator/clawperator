@@ -66,7 +66,7 @@ When implementing new features or fixing bugs, follow this iterative process:
 
 4. Run unit tests
    ```bash
-   ./gradlew :shared:test:testDebugUnitTest
+   ./gradlew testDebugUnitTest
    ```
 
 5. Analyze test output:
@@ -78,50 +78,6 @@ When implementing new features or fixing bugs, follow this iterative process:
      * Return to step 1
 
 6. Repeat until all tests pass successfully
-
-## Firebase Deployment Workflow
-
-For Firebase Functions, Hosting, Firestore, and Storage deployment:
-
-### Quick Deploy
-```bash
-./scripts/firebase_deploy.sh
-```
-
-### Clean and Deploy (force fresh rebuild)
-```bash
-./scripts/firebase_deploy.sh --clean
-```
-
-### Selective Deployment
-```bash
-./scripts/firebase_deploy.sh --functions-only    # Deploy only Cloud Functions
-./scripts/firebase_deploy.sh --hosting-only      # Deploy only Hosting
-./scripts/firebase_deploy.sh --firestore-only    # Deploy only Firestore rules
-./scripts/firebase_deploy.sh --storage-only      # Deploy only Storage rules
-```
-
-### Preview Deployment (dry run)
-```bash
-./scripts/firebase_deploy.sh --preview
-```
-
-### Clean Firebase Cache and Dependencies
-```bash
-./scripts/firebase_clean.sh              # Clean without confirmation
-./scripts/firebase_clean.sh --interactive  # Clean with confirmation prompt
-```
-
-### Development Flow
-1. Make code changes to Firebase functions or configuration
-2. Test locally with `./scripts/firebase_emulator_start.sh`
-3. Clean and deploy: `./scripts/firebase_deploy.sh --clean`
-4. Verify deployment in Firebase Console
-
-### Troubleshooting
-- If deployment fails due to missing dependencies, the deploy script automatically installs them
-- Use `--clean` to force a fresh rebuild when experiencing caching issues
-- Check Firebase Console for deployment status and logs
 
 ## AI Agent Comments
 When writing comments specifically for AI agents:
