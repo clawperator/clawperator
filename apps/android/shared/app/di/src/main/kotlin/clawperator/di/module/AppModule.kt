@@ -95,6 +95,8 @@ import androidx.core.app.NotificationManagerCompat
 import clawperator.accessibilityservice.AccessibilityServiceManager
 import clawperator.accessibilityservice.AccessibilityServiceManagerAndroid
 import clawperator.app.AppStateManager
+import clawperator.developeroptions.DeveloperOptionsManager
+import clawperator.developeroptions.DeveloperOptionsManagerAndroid
 import clawperator.app.AppStateManagerWrapper
 import clawperator.app.AppViewModel
 import clawperator.app.close.AppCloseManager
@@ -192,7 +194,7 @@ val AppModule: Module = module {
     single<AppState> { Factory.appState(this) }
     single<AppStateMainProcess> { AppStateMainProcess(get(), get()) }
     single<AppStateManager> { AppStateManagerWrapper(get()) }
-    single<OperatorViewModel> { OperatorViewModel(get(), get(), get(), get(NamedScope.CoroutineScopeMain)) }
+    single<OperatorViewModel> { OperatorViewModel(get(), get(), get(), get(), get(NamedScope.CoroutineScopeMain)) }
     single<AppViewModel> { AppViewModel(get(), get(), get(NamedScope.CoroutineScopeMain)) }
     single<AppVisibilityDefaultProcess> { AppVisibilityDefaultProcess() }
     single<AppsRepository> { AppsRepositoryDefault(get(), get(), get()) }
@@ -304,6 +306,8 @@ val AppModule: Module = module {
     single<android.content.res.AssetManager> { PlatformInjectionFactory.assetManager(get()) }
     single<AccessibilityServiceManager> { get<AccessibilityServiceManagerAndroid>() }
     single<AccessibilityServiceManagerAndroid> { AccessibilityServiceManagerAndroid() }
+    single<DeveloperOptionsManager> { get<DeveloperOptionsManagerAndroid>() }
+    single<DeveloperOptionsManagerAndroid> { DeveloperOptionsManagerAndroid(get()) }
     single<BatteryManager> { get<BatteryManagerSystem>() }
     single<BatteryManagerSystem> { BatteryManagerSystem(get()) }
     single<android.net.ConnectivityManager> { PlatformInjectionFactory.connectivityManager(get()) }

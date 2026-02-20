@@ -4,6 +4,8 @@ import action.coroutine.flow.combineDistinct
 import action.resources.string.StringRepository
 import androidx.lifecycle.ViewModel
 import clawperator.accessibilityservice.AccessibilityServiceManager
+import clawperator.developeroptions.DeveloperOptionsManager
+import clawperator.state.operator.AppDoctorState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
@@ -13,6 +15,7 @@ import kotlinx.coroutines.flow.stateIn
 class OperatorViewModel(
     private val operatorRepository: OperatorRepository,
     private val accessibilityServiceManager: AccessibilityServiceManager,
+    private val developerOptionsManager: DeveloperOptionsManager,
     private val stringRepository: StringRepository,
     private val coroutineScope: CoroutineScope,
 ) : ViewModel() {
@@ -20,8 +23,16 @@ class OperatorViewModel(
         get() = operatorRepository.isReady
 
     private fun mapViewState(
+        developerOptionsEnabled: Boolean,
+        usbDebuggingEnabled: Boolean,
         accessibilityIsRunning: Boolean,
     ): OperatorViewState.Data {
+        val appDoctorState = when {
+            !developerOptionsEnabled -> AppDoctorState.DeveloperOptionsDisabled
+            !usbDebuggingEnabled -> AppDoctorState.UsbDebuggingDisabled
+            !accessibilityIsRunning -> AppDoctorState.PermissionsNotGranted
+            else -> AppDoctorState.Ready
+        }
         val label =
             if (accessibilityIsRunning) {
                 stringRepository.accessibilityPermissionStatusGranted
@@ -30,6 +41,7 @@ class OperatorViewModel(
             }
 
         return OperatorViewState.Data(
+            appDoctorState = appDoctorState,
             accessibilityPermissionLabel = label,
         )
     }
@@ -37,10 +49,16 @@ class OperatorViewModel(
     val viewState: StateFlow<OperatorViewState> =
         combineDistinct(
             isReady,
+            developerOptionsManager.isEnabled,
+            developerOptionsManager.isUsbDebuggingEnabled,
             accessibilityServiceManager.isRunning,
-        ) { isReady, accessibilityIsRunning ->
+        ) { isReady, developerOptionsEnabled, usbDebuggingEnabled, accessibilityIsRunning ->
             if (isReady) {
-                mapViewState(accessibilityIsRunning = accessibilityIsRunning)
+                mapViewState(
+                    developerOptionsEnabled = developerOptionsEnabled,
+                    usbDebuggingEnabled = usbDebuggingEnabled,
+                    accessibilityIsRunning = accessibilityIsRunning,
+                )
             } else {
                 OperatorViewState.Loading
             }
