@@ -8,7 +8,7 @@ describe("serve API integration", () => {
   let port: number;
 
   before(async () => {
-    server = await startServer({ port: 0, verbose: false });
+    server = await startServer({ port: 0, host: "localhost", verbose: false });
     const addr = server.address();
     if (addr && typeof addr === "object") {
       port = addr.port;

@@ -8,22 +8,35 @@ import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeCo
 
 interface ServeOptions {
   port: number;
+  host: string;
   verbose: boolean;
 }
 
 export async function cmdServe(options: ServeOptions): Promise<void> {
-  await startServer(options);
-  return new Promise(() => {});
+  try {
+    await startServer(options);
+    // Long running
+    return new Promise(() => {});
+  } catch (e) {
+    console.error(`❌ Failed to start server: ${String(e)}`);
+    process.exit(1);
+  }
 }
 
 export async function startServer(options: ServeOptions): Promise<Server> {
   const app = express();
   app.use(express.json({ limit: "100kb" }));
 
-  // JSON parse error handler
+  // Error handler middleware
   app.use((err: any, _req: express.Request, res: express.Response, next: express.NextFunction) => {
+    // JSON parse error
     if (err instanceof SyntaxError && "status" in err && err.status === 400 && "body" in err) {
       res.status(400).json({ ok: false, error: { code: "INVALID_JSON", message: "Malformed JSON body" } });
+      return;
+    }
+    // Payload too large
+    if (err && (err.status === 413 || err.type === "entity.too.large")) {
+      res.status(413).json({ ok: false, error: { code: ERROR_CODES.PAYLOAD_TOO_LARGE, message: "Payload exceeds 100kb limit" } });
       return;
     }
     next();
@@ -256,9 +269,11 @@ export async function startServer(options: ServeOptions): Promise<Server> {
     }
   });
 
-  return new Promise((resolve) => {
-    const server = app.listen(options.port, "0.0.0.0", () => {
-      console.log(`🚀 Clawperator API server listening on http://0.0.0.0:${options.port}`);
+  return new Promise((resolve, reject) => {
+    const server = app.listen(options.port, options.host, () => {
+      const addr = server.address();
+      const actualPort = addr && typeof addr === "object" ? addr.port : options.port;
+      console.log(`🚀 Clawperator API server listening on http://${options.host}:${actualPort}`);
       if (options.verbose) {
         console.log(`- GET  /devices`);
         console.log(`- POST /execute`);
@@ -267,6 +282,10 @@ export async function startServer(options: ServeOptions): Promise<Server> {
         console.log(`- GET  /events (SSE)`);
       }
       resolve(server);
+    });
+
+    server.on("error", (err) => {
+      reject(err);
     });
   });
 }

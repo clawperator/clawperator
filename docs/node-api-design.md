@@ -62,7 +62,9 @@ Features that are not required for initial launch but are high priority:
 
 ## HTTP API Server (`serve`)
 
-When running `clawperator serve --port <number>`, a local HTTP server is started to allow remote agents to interact with Clawperator without direct CLI access.
+When running `clawperator serve [--port <number>] [--host <string>]`, a local HTTP server is started to allow remote agents to interact with Clawperator without direct CLI access.
+
+> ⚠️ **Security Warning**: The HTTP API currently provides **no authentication or authorization**. By default, it binds to `127.0.0.1` (localhost) for safety. If you bind to `0.0.0.0` or a public IP via `--host`, any client on your network can remotely control your connected Android devices. Only expose this API on trusted networks or behind an authenticated gateway.
 
 ### REST Endpoints (v0.1)
 
@@ -80,9 +82,11 @@ When running `clawperator serve --port <number>`, a local HTTP server is started
 
 The server provides a real-time event stream at **`GET /events`**. Callers should use a standard SSE client to subscribe.
 
-- **Event: `clawperator:result`**: Emitted whenever any execution (triggered via REST or CLI) completes on any device.
+- **Event: `clawperator:result`**: Emitted when an execution reaches a terminal state (success or failure) and a deviceId is known.
     - Data: `{"deviceId": "...", "envelope": {...}}`
-- **Initial Heartbeat**: Upon connection, a `{"code": "CONNECTED", ...}` message is sent to verify the stream is active.
+- **Event: `clawperator:execution`**: Emitted for *every* attempt to run an execution, including pre-resolution failures.
+    - Data: `{"deviceId": "...", "input": {...}, "result": {...}}`
+- **Event: `heartbeat`**: Upon connection, a `{"code": "CONNECTED", ...}` message is sent to verify the stream is active.
 
 ### Concurrency and Locking
 

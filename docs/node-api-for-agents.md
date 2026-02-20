@@ -89,19 +89,22 @@ The CLI is the canonical entry point for local development and shell-based agent
 
 Enable the server with `clawperator serve`. This is the preferred interface for remote agents (e.g., OpenClaw).
 
+> ⚠️ **Security Note**: The API is currently unauthenticated. By default, it binds to `127.0.0.1`. Use `--host 0.0.0.0` only on trusted networks.
+
 #### REST Endpoints
 - **`GET /devices`**: Returns `{ ok: true, devices: [...] }`.
 - **`POST /execute`**: Dispatches an execution. 
   - Body: `{"execution": <JSON>, "deviceId": "...", "receiverPackage": "..."}`
-  - Returns `RunExecutionResult` (200 OK or 423 Locked).
+  - Returns `RunExecutionResult` (200 OK or 4xx/5xx).
 - **`POST /observe/snapshot`**: Quick UI capture helper.
 - **`POST /observe/screenshot`**: Quick visual capture helper.
 
 #### Real-time Events (SSE)
-Subscribe to **`GET /events`** for a live stream of execution results.
+Subscribe to **`GET /events`** for a live stream.
 
-- **Event: `clawperator:result`**
-- **Data**: `{"deviceId": "R5C...", "envelope": {"status": "success", "stepResults": [...]}}`
+- **Event: `clawperator:result`**: Terminal outcome (success/failure).
+- **Event: `clawperator:execution`**: Full trace of all attempts.
+- **Event: `heartbeat`**: Initial connection signal.
 
 ### 3. The Execution Contract
 
