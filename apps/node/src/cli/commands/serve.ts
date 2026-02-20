@@ -207,7 +207,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       clawperatorEvents.off(CLAW_EVENT_TYPES.EXECUTION, onExecution);
     };
 
-    const onResult = (data: any) => {
+    const onResult = (data: { deviceId: string; envelope: any }) => {
       try {
         if (!res.writableEnded) {
           res.write(`event: ${CLAW_EVENT_TYPES.RESULT}\n`);
@@ -219,7 +219,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       }
     };
 
-    const onExecution = (data: any) => {
+    const onExecution = (data: { deviceId: string; input: unknown; result: any }) => {
       try {
         if (!res.writableEnded) {
           res.write(`event: ${CLAW_EVENT_TYPES.EXECUTION}\n`);
@@ -255,7 +255,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
   });
 
   // Error handler middleware (must be registered after all routes)
-  app.use((err: any, _req: express.Request, res: express.Response, next: express.NextFunction) => {
+  app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     // JSON parse error
     if (err instanceof SyntaxError && "status" in err && err.status === 400 && "body" in err) {
       res.status(400).json({ ok: false, error: { code: "INVALID_JSON", message: "Malformed JSON body" } });
@@ -266,7 +266,10 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       res.status(413).json({ ok: false, error: { code: ERROR_CODES.PAYLOAD_TOO_LARGE, message: "Payload exceeds 100kb limit" } });
       return;
     }
-    next();
+    
+    // Catch-all 500
+    if (options.verbose) console.error(`[HTTP] Unhandled error: ${String(err)}`);
+    res.status(500).json({ ok: false, error: { code: "INTERNAL_SERVER_ERROR", message: "An unexpected error occurred" } });
   });
 
   return new Promise((resolve, reject) => {
