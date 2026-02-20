@@ -143,13 +143,28 @@ async function performExecution(
       emitResult(deviceId, result.envelope);
       return { ok: true, envelope: result.envelope, deviceId, terminalSource: result.terminalSource };
     }
+
+    // Handle failure emission for SSE subscribers relying on the terminal envelope signal.
+    const failureEnvelope: ResultEnvelope = {
+      commandId: execution.commandId,
+      taskId: execution.taskId,
+      status: "failed",
+      stepResults: [],
+      error: "Execution failed before completion"
+    };
+
     if ("broadcastFailed" in result && result.broadcastFailed && "diagnostics" in result) {
+      failureEnvelope.error = result.diagnostics.code;
+      emitResult(deviceId, failureEnvelope);
       return { ok: false, error: { ...result.diagnostics }, deviceId };
     }
     if ("timeout" in result && result.timeout && "diagnostics" in result) {
+      failureEnvelope.error = result.diagnostics.code;
+      emitResult(deviceId, failureEnvelope);
       return { ok: false, error: { ...result.diagnostics }, deviceId };
     }
-    return { ok: false, error: { code: "UNKNOWN", message: ("error" in result ? result.error : undefined) ?? "Unknown error" }, deviceId };
+    emitResult(deviceId, failureEnvelope);
+    return { ok: false, error: { code: "UNKNOWN", message: failureEnvelope.error ?? "Unknown error" }, deviceId };
   } finally {
     release(deviceId, execution.commandId);
   }

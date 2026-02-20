@@ -20,6 +20,15 @@ export async function startServer(options: ServeOptions): Promise<Server> {
   const app = express();
   app.use(express.json({ limit: "100kb" }));
 
+  // JSON parse error handler
+  app.use((err: any, _req: express.Request, res: express.Response, next: express.NextFunction) => {
+    if (err instanceof SyntaxError && "status" in err && err.status === 400 && "body" in err) {
+      res.status(400).json({ ok: false, error: { code: "INVALID_JSON", message: "Malformed JSON body" } });
+      return;
+    }
+    next();
+  });
+
   // Logging middleware
   app.use((req, _res, next) => {
     if (options.verbose) {
@@ -38,9 +47,27 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       const devices = await listDevices(config);
       res.json({ ok: true, devices });
     } catch (e) {
-      res.status(500).json({ ok: false, error: String(e) });
+      res.status(500).json({ 
+        ok: false, 
+        error: { 
+          code: "INTERNAL_ERROR", 
+          message: options.verbose ? String(e) : "Failed to list devices" 
+        } 
+      });
     }
   });
+
+  function mapErrorToStatus(code: string): number {
+    switch (code) {
+      case ERROR_CODES.EXECUTION_CONFLICT_IN_FLIGHT: return 423;
+      case ERROR_CODES.DEVICE_NOT_FOUND: return 404;
+      case ERROR_CODES.DEVICE_AMBIGUOUS: return 400;
+      case ERROR_CODES.VALIDATION_FAILED: return 400;
+      case ERROR_CODES.PAYLOAD_TOO_LARGE: return 413;
+      case ERROR_CODES.RESULT_ENVELOPE_TIMEOUT: return 504;
+      default: return 400;
+    }
+  }
 
   // REST: Execute command
   app.post("/execute", async (req, res) => {
@@ -75,11 +102,10 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       if (result.ok) {
         res.json(result);
       } else {
-        const status = result.error.code === ERROR_CODES.EXECUTION_CONFLICT_IN_FLIGHT ? 423 : 400;
-        res.status(status).json(result);
+        res.status(mapErrorToStatus(result.error.code)).json(result);
       }
     } catch (e) {
-      res.status(500).json({ ok: false, error: String(e) });
+      res.status(500).json({ ok: false, error: { code: "INTERNAL_ERROR", message: String(e) } });
     }
   });
 
@@ -120,11 +146,10 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       if (result.ok) {
         res.json(result);
       } else {
-        const status = result.error.code === ERROR_CODES.EXECUTION_CONFLICT_IN_FLIGHT ? 423 : 400;
-        res.status(status).json(result);
+        res.status(mapErrorToStatus(result.error.code)).json(result);
       }
     } catch (e) {
-      res.status(500).json({ ok: false, error: String(e) });
+      res.status(500).json({ ok: false, error: { code: "INTERNAL_ERROR", message: String(e) } });
     }
   });
 
@@ -165,11 +190,10 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       if (result.ok) {
         res.json(result);
       } else {
-        const status = result.error.code === ERROR_CODES.EXECUTION_CONFLICT_IN_FLIGHT ? 423 : 400;
-        res.status(status).json(result);
+        res.status(mapErrorToStatus(result.error.code)).json(result);
       }
     } catch (e) {
-      res.status(500).json({ ok: false, error: String(e) });
+      res.status(500).json({ ok: false, error: { code: "INTERNAL_ERROR", message: String(e) } });
     }
   });
 
@@ -232,8 +256,8 @@ export async function startServer(options: ServeOptions): Promise<Server> {
   });
 
   return new Promise((resolve) => {
-    const server = app.listen(options.port, "localhost", () => {
-      console.log(`🚀 Clawperator API server listening on http://localhost:${options.port}`);
+    const server = app.listen(options.port, "0.0.0.0", () => {
+      console.log(`🚀 Clawperator API server listening on http://0.0.0.0:${options.port}`);
       if (options.verbose) {
         console.log(`- GET  /devices`);
         console.log(`- POST /execute`);

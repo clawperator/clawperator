@@ -5,10 +5,16 @@ import { Server } from "node:http";
 
 describe("serve API integration", () => {
   let server: Server;
-  const port = 3002;
+  let port: number;
 
   before(async () => {
-    server = await startServer({ port, verbose: false });
+    server = await startServer({ port: 0, verbose: false });
+    const addr = server.address();
+    if (addr && typeof addr === "object") {
+      port = addr.port;
+    } else {
+      throw new Error("Failed to get ephemeral port");
+    }
   });
 
   after(async () => {
