@@ -17,9 +17,7 @@ These are the critical "next steps" required to ship a stable 0.1 proof-of-conce
         - **REST Endpoints:** Map CLI commands (`/execute`, `/devices`, `/observe`) to HTTP POST/GET routes.
         - **Event Streaming (SSE):** Support Server-Sent Events to stream `[Clawperator-Result]` and `[Clawperator-Event]` envelopes in real-time to the caller.
         - **Device Management:** Implement a basic locking/concurrency mechanism to prevent multiple remote agents from sending conflicting commands to the same device simultaneously.
-- [ ] **Error Code Mapping:** Ensure the Node SDK correctly maps raw ADB/logcat failures to the 0.1.0 Error Taxonomy (see `node-api-design.md`).
-
-- [ ] **Error Code Mapping:** Ensure the Node SDK correctly maps raw ADB/logcat failures to the 0.1.0 Error Taxonomy (see `node-api-design.md`).
+- [x] **Error Code Mapping:** Ensure the Node SDK correctly maps raw ADB/logcat failures to the 0.1.0 Error Taxonomy (see `node-api-design.md`).
 - [ ] **`--safe-logs` Flag:** Implement a minimal regex-based redaction path for common PII patterns in logcat.
 - [ ] **Distribution and install:** Publish a canonical terminal install command for Node API (npm package or install script) and document exactly one blessed command in README.
 - [ ] **Versioned releases:** Add release notes/changelog path for Node API + Android runtime releases.

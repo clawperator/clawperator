@@ -29,6 +29,14 @@ export async function runAdb(
     const t = setTimeout(() => {
       proc.kill("SIGTERM");
     }, timeoutMs);
+    proc.on("error", (err) => {
+      clearTimeout(t);
+      if ((err as any).code === "ENOENT") {
+        resolve({ stdout, stderr: `ADB command not found at path: ${config.adbPath}`, code: 127 });
+      } else {
+        resolve({ stdout, stderr: `ADB spawn error: ${err.message}`, code: 1 });
+      }
+    });
     proc.on("close", (code) => {
       clearTimeout(t);
       resolve({ stdout, stderr, code: code ?? null });

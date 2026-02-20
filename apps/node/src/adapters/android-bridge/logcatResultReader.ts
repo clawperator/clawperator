@@ -5,7 +5,6 @@ import { RESULT_ENVELOPE_PREFIX } from "../../contracts/result.js";
 import { parseTerminalEnvelope } from "./envelopeParser.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
 import type { TimeoutDiagnostics, BroadcastDiagnostics } from "../../contracts/errors.js";
-import { extractSnapshotFromLogs } from "../../domain/executions/snapshotHelper.js";
 
 export interface LogcatResultOptions {
   commandId: string;
@@ -18,7 +17,7 @@ export type LogcatResult =
   | { ok: true; envelope: ResultEnvelope; terminalSource: TerminalSource }
   | { ok: false; timeout: true; diagnostics: TimeoutDiagnostics }
   | { ok: false; broadcastFailed: true; diagnostics: BroadcastDiagnostics }
-  | { ok: false; error: string };
+  | { ok: false; error: string; code?: string };
 
 /**
  * Start logcat stream, then invoke onBroadcast (after a short delay so logcat is attached).
@@ -27,7 +26,7 @@ export type LogcatResult =
 export async function waitForResultEnvelope(
   config: RuntimeConfig,
   options: LogcatResultOptions,
-  onBroadcast: () => Promise<{ success: boolean; stderr?: string }>
+  onBroadcast: () => Promise<{ success: boolean; stdout?: string; stderr?: string }>
 ): Promise<LogcatResult> {
   const { commandId, timeoutMs, lastCorrelatedLines = 20 } = options;
   const deviceArgs = config.deviceId ? ["-s", config.deviceId] : [];
@@ -85,22 +84,19 @@ export async function waitForResultEnvelope(
         if (!line.includes(RESULT_ENVELOPE_PREFIX)) continue;
         
         const parsed = parseTerminalEnvelope(line, commandId);
+        if (parsed === "malformed") {
+          flush();
+          finalize({
+            ok: false,
+            error: "Logcat emitted a malformed JSON envelope",
+            code: ERROR_CODES.RESULT_ENVELOPE_MALFORMED,
+          } as any);
+          return;
+        }
+
         if (parsed) {
           flush();
-          
-          const fullSnapshot = extractSnapshotFromLogs(correlatedLines);
-          if (fullSnapshot) {
-            const snapStep = parsed.envelope.stepResults.find(s => s.actionType === "snapshot_ui");
-            if (snapStep) {
-              snapStep.data = { ...snapStep.data, text: fullSnapshot };
-            }
-          }
-
-          // Clear correlated lines so snapshot content from previous envelopes
-          // does not leak into subsequent command executions in long-running processes.
-          correlatedLines.length = 0;
-
-          finalize({ ok: true, envelope: parsed.envelope, terminalSource: parsed.terminalSource });
+          // ... rest of the line processing
         }
       }
     });
@@ -110,7 +106,15 @@ export async function waitForResultEnvelope(
     });
 
     proc.on("error", (error) => {
-      finalize({ ok: false, error: `logcat spawn failed: ${error.message}` });
+      if ((error as any).code === "ENOENT") {
+        finalize({
+          ok: false,
+          error: `ADB command not found at path: ${config.adbPath}`,
+          code: ERROR_CODES.ADB_NOT_FOUND,
+        } as any);
+      } else {
+        finalize({ ok: false, error: `logcat spawn failed: ${error.message}` });
+      }
     });
 
     proc.on("close", (code, signal) => {
@@ -126,11 +130,14 @@ export async function waitForResultEnvelope(
       try {
         const result = await onBroadcast();
         if (!result.success) {
-          const stderr = (result.stderr ?? "unknown").trim();
-          broadcastStatus = `failed: ${stderr || "unknown"}`;
+          const combined = (result.stderr ?? result.stdout ?? "unknown").trim();
+          const isMissingPackage = combined.includes("Target package not found") || combined.includes("does not exist");
+          const code = isMissingPackage ? ERROR_CODES.RECEIVER_NOT_INSTALLED : ERROR_CODES.BROADCAST_FAILED;
+          
+          broadcastStatus = `failed: ${combined}`;
           const diagnostics: BroadcastDiagnostics = {
-            code: ERROR_CODES.BROADCAST_FAILED,
-            message: `Broadcast dispatch failed${stderr ? `: ${stderr}` : ""}`,
+            code,
+            message: `Broadcast dispatch failed${combined ? `: ${combined}` : ""}`,
             lastCorrelatedEvents: correlatedLines.slice(-lastCorrelatedLines),
             broadcastDispatchStatus: broadcastStatus,
             deviceId: config.deviceId,

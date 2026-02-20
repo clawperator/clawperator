@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { runExecution } from "../../domain/executions/runExecution.js";
 import type { OutputOptions } from "../output.js";
 import { formatSuccess, formatError } from "../output.js";
+import { ERROR_CODES } from "../../contracts/errors.js";
 
 export async function cmdExecute(options: {
   format: OutputOptions["format"];
@@ -15,7 +16,7 @@ export async function cmdExecute(options: {
     try {
       payload = JSON.parse(raw);
     } catch {
-      return formatError({ code: "VALIDATION_FAILED", message: "Invalid JSON for --execution" }, options);
+      return formatError({ code: ERROR_CODES.EXECUTION_VALIDATION_FAILED, message: "Invalid JSON for --execution" }, options);
     }
   } else {
     try {
@@ -23,7 +24,7 @@ export async function cmdExecute(options: {
       payload = JSON.parse(content);
     } catch (e) {
       return formatError(
-        { code: "VALIDATION_FAILED", message: `Failed to read or parse execution file: ${(e as Error).message}` },
+        { code: ERROR_CODES.EXECUTION_VALIDATION_FAILED, message: `Failed to read or parse execution file: ${(e as Error).message}` },
         options
       );
     }

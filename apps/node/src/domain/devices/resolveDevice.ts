@@ -29,13 +29,13 @@ export async function resolveDevice(config: RuntimeConfig): Promise<ResolveDevic
 
   if (connected.length === 0) {
     throw {
-      code: ERROR_CODES.DEVICE_NOT_FOUND,
+      code: ERROR_CODES.NO_DEVICES,
       message: "No connected devices",
     };
   }
   if (connected.length > 1) {
     throw {
-      code: ERROR_CODES.DEVICE_AMBIGUOUS,
+      code: ERROR_CODES.MULTIPLE_DEVICES_DEVICE_ID_REQUIRED,
       message: "Multiple devices connected; set --device-id",
       details: { devices: connected.map((d) => d.serial) },
     };
