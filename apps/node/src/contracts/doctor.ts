@@ -10,8 +10,12 @@ export interface DoctorCheckResult {
   detail?: string;
   fix?: {
     title: string;
-    commands: string[];
-    notes?: string[];
+    platform: "mac" | "linux" | "win" | "any";
+    steps: Array<{ kind: "shell" | "manual"; value: string }>;
+  };
+  deviceGuidance?: {
+    screen: string;
+    steps: string[];
   };
   evidence?: Record<string, unknown>;
 }
@@ -21,5 +25,5 @@ export interface DoctorReport {
   deviceId?: string;
   receiverPackage?: string;
   checks: DoctorCheckResult[];
-  nextCommand?: string;
+  nextActions?: string[];
 }

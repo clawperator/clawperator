@@ -1,9 +1,13 @@
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 import { type ProcessRunner, NodeProcessRunner } from "./processRunner.js";
 
 export const DEFAULT_ACTION_AGENT_COMMAND = "app.clawperator.operator.ACTION_AGENT_COMMAND";
 export const EXTRA_AGENT_PAYLOAD = "payload";
 
 export interface RuntimeConfig {
+  /** Root directory of the clawperator project */
+  projectRoot: string;
   /** adb binary path */
   adbPath: string;
   /** Target device serial (optional; resolved by domain if not set) */
@@ -23,7 +27,11 @@ export function getDefaultRuntimeConfig(overrides?: Partial<RuntimeConfig>): Run
     Object.entries(overrides ?? {}).filter(([, value]) => value !== undefined)
   ) as Partial<RuntimeConfig>;
 
+  const __dirname = dirname(fileURLToPath(import.meta.url));
+  const defaultProjectRoot = join(__dirname, "../../../../..");
+
   return {
+    projectRoot: defaultProjectRoot,
     adbPath: "adb",
     receiverPackage: "com.clawperator.operator.dev",
     actionAgentCommand: DEFAULT_ACTION_AGENT_COMMAND,

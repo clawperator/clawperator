@@ -60,6 +60,11 @@ sealed interface UiAction {
         val retry: TaskRetry = TaskRetry.None,
     ) : UiAction
 
+    data class DoctorPing(
+        override val id: String,
+        val retry: TaskRetry = TaskRetry.None,
+    ) : UiAction
+
     data class TakeScreenshot(
         override val id: String,
         val retry: TaskRetry = TaskRetry.None,

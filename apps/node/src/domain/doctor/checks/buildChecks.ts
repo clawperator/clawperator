@@ -33,9 +33,8 @@ export async function checkJavaVersion(config: RuntimeConfig): Promise<DoctorChe
 
 export async function runAndroidBuild(config: RuntimeConfig): Promise<DoctorCheckResult> {
   try {
-    // Run from project root. Assuming we are in apps/node/src/domain/doctor/checks/
-    // Project root is ../../../../../../
-    const { code, error } = await config.runner.run("./gradlew", [":apps:android:app:assembleDebug"]);
+    // Run from project root.
+    const { code, error } = await config.runner.run("./gradlew", [":apps:android:app:assembleDebug"], { cwd: config.projectRoot });
     if (code !== 0) {
       throw error || new Error(`Gradle exited with code ${code}`);
     }
@@ -57,7 +56,7 @@ export async function runAndroidBuild(config: RuntimeConfig): Promise<DoctorChec
 
 export async function runAndroidInstall(config: RuntimeConfig): Promise<DoctorCheckResult> {
   try {
-    const { code, error } = await config.runner.run("./gradlew", [":apps:android:app:installDebug"]);
+    const { code, error } = await config.runner.run("./gradlew", [":apps:android:app:installDebug"], { cwd: config.projectRoot });
     if (code !== 0) {
       throw error || new Error(`Gradle exited with code ${code}`);
     }

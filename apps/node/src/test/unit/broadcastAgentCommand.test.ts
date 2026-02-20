@@ -4,6 +4,7 @@ import { buildBroadcastShellCommand } from "../../adapters/android-bridge/broadc
 import type { RuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 
 const CONFIG: RuntimeConfig = {
+  projectRoot: ".",
   adbPath: "adb",
   deviceId: "test-device-serial",
   receiverPackage: "com.clawperator.operator.dev",

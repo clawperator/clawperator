@@ -8,15 +8,16 @@ export interface ProcessResult {
 }
 
 export interface ProcessRunner {
-  run(command: string, args: string[], options?: { timeoutMs?: number }): Promise<ProcessResult>;
+  run(command: string, args: string[], options?: { timeoutMs?: number; cwd?: string }): Promise<ProcessResult>;
   // For logcat/streaming
-  spawn(command: string, args: string[]): any; 
+  spawn(command: string, args: string[]): any;
 }
 
 export class NodeProcessRunner implements ProcessRunner {
-  async run(command: string, args: string[], options?: { timeoutMs?: number }): Promise<ProcessResult> {
+  async run(command: string, args: string[], options?: { timeoutMs?: number; cwd?: string }): Promise<ProcessResult> {
     return new Promise((resolve) => {
       const proc = spawn(command, args, {
+        cwd: options?.cwd,
         stdio: ["ignore", "pipe", "pipe"],
         shell: false,
       });
@@ -24,7 +25,7 @@ export class NodeProcessRunner implements ProcessRunner {
       let stderr = "";
       proc.stdout?.on("data", (d) => (stdout += d.toString()));
       proc.stderr?.on("data", (d) => (stderr += d.toString()));
-      
+
       const timeoutMs = options?.timeoutMs ?? 30_000;
       const t = setTimeout(() => {
         proc.kill("SIGTERM");

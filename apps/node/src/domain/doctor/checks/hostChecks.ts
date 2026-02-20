@@ -17,8 +17,12 @@ export async function checkNodeVersion(): Promise<DoctorCheckResult> {
       detail: `Clawperator requires Node.js v${MIN_NODE_VERSION} or newer.`,
       fix: {
         title: "Upgrade Node.js",
-        commands: ["nvm install 22", "nvm use 22"],
-        notes: ["Alternatively, download from nodejs.org"],
+        platform: "any",
+        steps: [
+          { kind: "shell", value: "nvm install 22" },
+          { kind: "shell", value: "nvm use 22" },
+          { kind: "manual", value: "Alternatively, download from nodejs.org" }
+        ],
       },
     };
   }
@@ -41,7 +45,11 @@ export async function checkAdbPresence(config: RuntimeConfig): Promise<DoctorChe
       detail: "The Android Debug Bridge (adb) is required to communicate with devices.",
       fix: {
         title: "Install Android Platform Tools",
-        commands: ["# macOS: brew install --cask android-platform-tools", "# Linux: sudo apt update && sudo apt install android-tools-adb"],
+        platform: "any",
+        steps: [
+          { kind: "manual", value: "macOS: brew install --cask android-platform-tools" },
+          { kind: "manual", value: "Linux: sudo apt update && sudo apt install android-tools-adb" }
+        ],
       },
     };
   }
@@ -66,7 +74,11 @@ export async function checkAdbServer(config: RuntimeConfig): Promise<DoctorCheck
       detail: stderr,
       fix: {
         title: "Restart adb server",
-        commands: ["adb kill-server", "adb start-server"],
+        platform: "any",
+        steps: [
+          { kind: "shell", value: "adb kill-server" },
+          { kind: "shell", value: "adb start-server" }
+        ],
       },
     };
   }

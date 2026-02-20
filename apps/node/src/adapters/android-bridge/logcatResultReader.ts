@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+
 import type { RuntimeConfig } from "./runtimeConfig.js";
 import type { ResultEnvelope, TerminalSource } from "../../contracts/result.js";
 import { RESULT_ENVELOPE_PREFIX } from "../../contracts/result.js";
@@ -40,10 +40,7 @@ export async function waitForResultEnvelope(
     let stderrBuffer = "";
     let timeoutId: NodeJS.Timeout;
 
-    const proc = spawn(config.adbPath, args, {
-      stdio: ["ignore", "pipe", "pipe"],
-      shell: false,
-    });
+    const proc = config.runner.spawn(config.adbPath, args);
 
     const finalize = (result: LogcatResult) => {
       if (settled) return;
@@ -82,7 +79,7 @@ export async function waitForResultEnvelope(
           correlatedLines.push(line);
         }
         if (!line.includes(RESULT_ENVELOPE_PREFIX)) continue;
-        
+
         const parsed = parseTerminalEnvelope(line, commandId);
         if (parsed === "malformed") {
           flush();
@@ -110,7 +107,7 @@ export async function waitForResultEnvelope(
       stderrBuffer += chunk.toString();
     });
 
-    proc.on("error", (error) => {
+    proc.on("error", (error: Error) => {
       if ((error as any).code === "ENOENT") {
         finalize({
           ok: false,
@@ -122,7 +119,7 @@ export async function waitForResultEnvelope(
       }
     });
 
-    proc.on("close", (code, signal) => {
+    proc.on("close", (code: number | null, signal: string | null) => {
       if (settled) return;
       const base = `logcat exited before terminal envelope (code=${code ?? "null"}, signal=${signal ?? "null"})`;
       const stderr = stderrBuffer.trim();
@@ -138,7 +135,7 @@ export async function waitForResultEnvelope(
           const combined = (result.stderr ?? result.stdout ?? "unknown").trim();
           const isMissingPackage = combined.includes("Target package not found") || combined.includes("does not exist");
           const code = isMissingPackage ? ERROR_CODES.RECEIVER_NOT_INSTALLED : ERROR_CODES.BROADCAST_FAILED;
-          
+
           broadcastStatus = `failed: ${combined}`;
           const diagnostics: BroadcastDiagnostics = {
             code,

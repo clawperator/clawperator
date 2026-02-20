@@ -26,6 +26,7 @@ import {
 export interface RunDoctorOptions {
   config: RuntimeConfig;
   full?: boolean;
+  fix?: boolean;
 }
 
 export class DoctorService {
@@ -38,24 +39,24 @@ export class DoctorService {
 
     const adbPresence = await checkAdbPresence(config);
     checks.push(adbPresence);
-    if (adbPresence.status === "fail") return this.finalize(checks, config);
+    if (adbPresence.status === "fail") return this.finalize(checks, config, options.fix);
 
     const adbServer = await checkAdbServer(config);
     checks.push(adbServer);
-    if (adbServer.status === "fail") return this.finalize(checks, config);
+    if (adbServer.status === "fail") return this.finalize(checks, config, options.fix);
 
     if (full) {
       checks.push(await checkJavaVersion(config));
 
       const build = await runAndroidBuild(config);
       checks.push(build);
-      if (build.status === "fail") return this.finalize(checks, config);
+      if (build.status === "fail") return this.finalize(checks, config, options.fix);
     }
 
     // 2. Device Discovery
     const discovery = await checkDeviceDiscovery(config);
     checks.push(discovery);
-    if (discovery.status === "fail") return this.finalize(checks, config);
+    if (discovery.status === "fail") return this.finalize(checks, config, options.fix);
 
     // After discovery, ensure we have a deviceId in config for subsequent checks
     if (!config.deviceId) {
@@ -70,32 +71,32 @@ export class DoctorService {
     if (full) {
       const install = await runAndroidInstall(config);
       checks.push(install);
-      if (install.status === "fail") return this.finalize(checks, config);
+      if (install.status === "fail") return this.finalize(checks, config, options.fix);
 
       const launch = await runAndroidLaunch(config);
       checks.push(launch);
-      if (launch.status === "fail") return this.finalize(checks, config);
+      if (launch.status === "fail") return this.finalize(checks, config, options.fix);
     }
 
     // 3. Device Capabilities
     const capabilities = await checkDeviceCapabilities(config);
     checks.push(capabilities);
-    if (capabilities.status === "fail") return this.finalize(checks, config);
+    if (capabilities.status === "fail") return this.finalize(checks, config, options.fix);
 
     // 4. APK Presence
     const apkPresence = await checkApkPresence(config);
     checks.push(apkPresence);
-    if (apkPresence.status === "fail") return this.finalize(checks, config);
+    if (apkPresence.status === "fail") return this.finalize(checks, config, options.fix);
 
     // 5. Android Settings
     const settingsResults = await checkSettings(config);
     checks.push(...settingsResults);
-    if (settingsResults.some(r => r.status === "fail")) return this.finalize(checks, config);
+    if (settingsResults.some(r => r.status === "fail")) return this.finalize(checks, config, options.fix);
 
     // 6. Handshake
     const handshake = await runHandshake(config);
     checks.push(handshake);
-    if (handshake.status === "fail") return this.finalize(checks, config);
+    if (handshake.status === "fail") return this.finalize(checks, config, options.fix);
 
     // 7. Smoke Test (Only if full)
     if (full) {
@@ -103,19 +104,29 @@ export class DoctorService {
       checks.push(smoke);
     }
 
-    return this.finalize(checks, config);
+    return this.finalize(checks, config, options.fix);
   }
 
-  private finalize(checks: DoctorCheckResult[], config: RuntimeConfig): DoctorReport {
+  private async finalize(checks: DoctorCheckResult[], config: RuntimeConfig, autoFix?: boolean): Promise<DoctorReport> {
     const ok = checks.every(c => c.status !== "fail");
 
-    let nextCommand = "";
+    const nextActions: string[] = [];
     if (ok) {
-      nextCommand = "clawperator action open-app --app com.android.settings";
+      nextActions.push("clawperator action open-app --app com.android.settings");
     } else {
-      const failing = checks.find(c => c.status === "fail");
-      if (failing?.fix?.commands?.[0]) {
-        nextCommand = failing.fix.commands[0];
+      for (const check of checks) {
+        if (check.status === "fail" && check.fix) {
+          for (const step of check.fix.steps) {
+            if (step.kind === "shell") {
+              if (autoFix) {
+                const [cmd, ...args] = step.value.split(" ");
+                try { await config.runner.run(cmd, args); } catch { /* ignore */ }
+              } else {
+                nextActions.push(step.value);
+              }
+            }
+          }
+        }
       }
     }
 
@@ -124,7 +135,7 @@ export class DoctorService {
       deviceId: config.deviceId,
       receiverPackage: config.receiverPackage,
       checks,
-      nextCommand,
+      nextActions,
     };
   }
 }

@@ -6,7 +6,7 @@ import { listDevices } from "../../devices/listDevices.js";
 
 export async function checkDeviceDiscovery(config: RuntimeConfig): Promise<DoctorCheckResult> {
   const devices = await listDevices(config);
-  
+
   if (devices.length === 0) {
     return {
       id: "device.discovery",
@@ -19,22 +19,22 @@ export async function checkDeviceDiscovery(config: RuntimeConfig): Promise<Docto
 
   const unauthorized = devices.filter(d => d.state === "unauthorized");
   if (unauthorized.length > 0 && (!config.deviceId || unauthorized.some(d => d.serial === config.deviceId))) {
-     return {
+    return {
       id: "device.discovery",
       status: "fail",
       code: ERROR_CODES.DEVICE_UNAUTHORIZED,
       summary: "Device is unauthorized.",
       detail: "Accept the RSA key prompt on the device screen.",
-      fix: {
-        title: "Accept RSA Prompt",
-        commands: ["# On the device screen: Allow USB Debugging"],
+      deviceGuidance: {
+        screen: "Device Dialog",
+        steps: ["Accept the RSA key prompt on the device screen by allowing USB Debugging."],
       },
     };
   }
 
   const offline = devices.filter(d => d.state === "offline");
   if (offline.length > 0 && (!config.deviceId || offline.some(d => d.serial === config.deviceId))) {
-     return {
+    return {
       id: "device.discovery",
       status: "fail",
       code: ERROR_CODES.DEVICE_OFFLINE,
@@ -42,7 +42,11 @@ export async function checkDeviceDiscovery(config: RuntimeConfig): Promise<Docto
       detail: "Try reconnecting the cable or restarting adb.",
       fix: {
         title: "Reconnect device",
-        commands: ["adb kill-server", "adb start-server"],
+        platform: "any",
+        steps: [
+          { kind: "shell", value: "adb kill-server" },
+          { kind: "shell", value: "adb start-server" }
+        ],
       },
     };
   }
@@ -60,7 +64,7 @@ export async function checkDeviceDiscovery(config: RuntimeConfig): Promise<Docto
 
   const target = config.deviceId ? devices.find(d => d.serial === config.deviceId) : devices[0];
   if (!target || target.state !== "device") {
-     return {
+    return {
       id: "device.discovery",
       status: "fail",
       code: ERROR_CODES.DEVICE_NOT_FOUND,

@@ -1,6 +1,8 @@
 package clawperator.task.runner
 
 import action.log.Log
+import clawperator.developeroptions.DeveloperOptionsManager
+import kotlinx.coroutines.flow.first
 import kotlin.time.Duration.Companion.milliseconds
 
 interface UiActionEngine {
@@ -10,7 +12,9 @@ interface UiActionEngine {
     ): UiActionExecutionResult
 }
 
-class UiActionEngineDefault : UiActionEngine {
+class UiActionEngineDefault(
+    private val developerOptionsManager: DeveloperOptionsManager,
+) : UiActionEngine {
     companion object {
         private const val TAG = "[UiActionEngine]"
     }
@@ -53,6 +57,7 @@ class UiActionEngineDefault : UiActionEngine {
                 is UiAction.TakeScreenshot -> executeTakeScreenshot(taskScope, action)
                 is UiAction.EnterText -> executeEnterText(taskScope, action)
                 is UiAction.Sleep -> executeSleep(taskScope, action)
+                is UiAction.DoctorPing -> executeDoctorPing(taskScope, action)
             }
 
         Log.d(
@@ -261,6 +266,22 @@ class UiActionEngineDefault : UiActionEngine {
             id = action.id,
             actionType = "sleep",
             data = mapOf("duration_ms" to action.durationMs.toString()),
+        )
+    }
+
+    private suspend fun executeDoctorPing(
+        taskScope: TaskScope,
+        action: UiAction.DoctorPing,
+    ): UiActionStepResult {
+        val optionsEnabled = developerOptionsManager.isEnabled.first()
+        val usbDebuggingEnabled = developerOptionsManager.isUsbDebuggingEnabled.first()
+        return UiActionStepResult(
+            id = action.id,
+            actionType = "doctor_ping",
+            data = mapOf(
+                "developer_options_enabled" to optionsEnabled.toString(),
+                "usb_debugging_enabled" to usbDebuggingEnabled.toString(),
+            ),
         )
     }
 }

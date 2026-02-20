@@ -6,8 +6,6 @@ import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeCo
 import { DoctorService } from "../../domain/doctor/DoctorService.js";
 import { type DoctorReport, type DoctorCheckResult } from "../../contracts/doctor.js";
 import type { OutputOptions } from "../output.js";
-import { formatSuccess, formatError } from "../output.js";
-import { ERROR_CODES } from "../../contracts/errors.js";
 
 export async function cmdDoctor(options: {
   format: OutputOptions["format"];
@@ -23,16 +21,19 @@ export async function cmdDoctor(options: {
   });
 
   const service = new DoctorService();
-  const report = await service.run({ config, full: options.full });
+  const report = await service.run({ config, full: options.full, fix: options.fix });
 
   if (options.format === "json") {
-    if (report.ok) {
-      return formatSuccess(report, options);
-    }
-    return formatError({ code: ERROR_CODES.DOCTOR_FAILED, ...report }, options);
+    process.exitCode = report.ok ? 0 : 1;
+    return JSON.stringify(report, null, 2);
   }
 
   // Pretty human output
+  if (options.fix) {
+    // If --fix was passed, we've already done fixes in DoctorService,
+    // so just print the report.
+  }
+  process.exitCode = report.ok ? 0 : 1;
   return renderPrettyDoctorReport(report);
 }
 
@@ -57,8 +58,18 @@ function renderPrettyDoctorReport(report: DoctorReport): string {
       }
       if (check.status !== "pass" && check.fix) {
         lines.push(`     Fix: ${check.fix.title}`);
-        for (const cmd of check.fix.commands) {
-          lines.push(`       > ${cmd}`);
+        for (const step of check.fix.steps) {
+          if (step.kind === "shell") {
+            lines.push(`       > ${step.value}`);
+          } else {
+            lines.push(`       - ${step.value}`);
+          }
+        }
+      }
+      if (check.status !== "pass" && check.deviceGuidance) {
+        lines.push(`     Device guidance (${check.deviceGuidance.screen}):`);
+        for (const step of check.deviceGuidance.steps) {
+          lines.push(`       - ${step}`);
         }
       }
     }
@@ -71,8 +82,12 @@ function renderPrettyDoctorReport(report: DoctorReport): string {
     lines.push("❌ Verification failed.");
   }
 
-  if (report.nextCommand) {
-    lines.push(`\nNext command: ${report.nextCommand}\n`);
+  if (report.nextActions && report.nextActions.length > 0) {
+    lines.push(`\nNext actions:`);
+    for (const action of report.nextActions) {
+      lines.push(`  ${action}`);
+    }
+    lines.push("");
   }
 
   return lines.join("\n");

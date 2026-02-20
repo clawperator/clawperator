@@ -11,10 +11,10 @@ export async function checkApkPresence(config: RuntimeConfig): Promise<DoctorChe
 
   if (!isInstalled) {
     // Check if the other variant is installed
-    const otherVariant = config.receiverPackage.endsWith(".dev") 
-      ? config.receiverPackage.replace(".dev", "") 
+    const otherVariant = config.receiverPackage.endsWith(".dev")
+      ? config.receiverPackage.replace(".dev", "")
       : config.receiverPackage + ".dev";
-    
+
     const { stdout: otherStdout } = await runAdb(config, ["shell", "pm", "list", "packages", otherVariant]);
     if (otherStdout.includes(`package:${otherVariant}`)) {
       return {
@@ -25,7 +25,10 @@ export async function checkApkPresence(config: RuntimeConfig): Promise<DoctorChe
         detail: `Expected ${config.receiverPackage} but found ${otherVariant}.`,
         fix: {
           title: "Switch variant",
-          commands: [`# Use --receiver-package ${otherVariant} or reinstall the correct APK`],
+          platform: "any",
+          steps: [
+            { kind: "manual", value: `Use --receiver-package ${otherVariant} or reinstall the correct APK` }
+          ],
         },
       };
     }
@@ -38,7 +41,10 @@ export async function checkApkPresence(config: RuntimeConfig): Promise<DoctorChe
       detail: `Package ${config.receiverPackage} was not found on the device.`,
       fix: {
         title: "Install Operator APK",
-        commands: ["./gradlew :apps:android:app:installDebug"],
+        platform: "any",
+        steps: [
+          { kind: "shell", value: "./gradlew :apps:android:app:installDebug" }
+        ],
       },
     };
   }
@@ -88,7 +94,7 @@ export async function runHandshake(config: RuntimeConfig): Promise<DoctorCheckRe
     taskId: "doctor-handshake",
     source: "clawperator-doctor",
     expectedFormat: "android-ui-automator",
-    actions: [{ id: "h1", type: "snapshot_ui" }],
+    actions: [{ id: "h1", type: "doctor_ping" }],
     timeoutMs: 5000,
   });
 
@@ -116,9 +122,9 @@ export async function runHandshake(config: RuntimeConfig): Promise<DoctorCheckRe
         code: ERROR_CODES.DEVICE_ACCESSIBILITY_NOT_RUNNING,
         summary: "Handshake failed (runtime error).",
         detail: `Operator returned an error: ${result.envelope.error}`,
-        fix: {
-          title: "Check Accessibility Service",
-          commands: ["# Ensure Clawperator Accessibility Service is ON in Android Settings"],
+        deviceGuidance: {
+          screen: "Accessibility Settings",
+          steps: ["Ensure Clawperator Accessibility Service is ON in Android Settings"],
         },
       };
     }
@@ -131,9 +137,9 @@ export async function runHandshake(config: RuntimeConfig): Promise<DoctorCheckRe
       code: ERROR_CODES.RESULT_ENVELOPE_TIMEOUT,
       summary: "Handshake timed out.",
       detail: "No [Clawperator-Result] envelope received. Is the Accessibility Service running?",
-      fix: {
-        title: "Check Accessibility Service",
-        commands: ["# Ensure Clawperator Accessibility Service is ON in Android Settings"],
+      deviceGuidance: {
+        screen: "Accessibility Settings",
+        steps: ["Ensure Clawperator Accessibility Service is ON in Android Settings"],
       },
     };
   }
@@ -168,7 +174,7 @@ export async function runSmokeTest(config: RuntimeConfig): Promise<DoctorCheckRe
   );
 
   if (result.ok) {
-    const hasSettings = result.envelope.stepResults.some(s => 
+    const hasSettings = result.envelope.stepResults.some(s =>
       s.actionType === "snapshot_ui" && s.success
     );
     if (hasSettings) {
