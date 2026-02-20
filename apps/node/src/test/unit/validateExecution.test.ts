@@ -42,7 +42,7 @@ describe("validateExecution", () => {
           timeoutMs: 5000,
           actions: [{ id: "x", type: "sleep", params: { durationMs: 0 } }],
         }),
-      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.VALIDATION_FAILED
+      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
     );
   });
 
@@ -57,7 +57,7 @@ describe("validateExecution", () => {
           timeoutMs: 5000,
           actions: [{ id: "x", type: "sleep", params: { durationMs: 0 } }],
         }),
-      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.VALIDATION_FAILED
+      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
     );
   });
 
@@ -72,7 +72,7 @@ describe("validateExecution", () => {
           timeoutMs: 5000,
           actions: [],
         }),
-      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.VALIDATION_FAILED
+      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
     );
   });
 
@@ -87,7 +87,7 @@ describe("validateExecution", () => {
           timeoutMs: 5000,
           actions: [{ id: "x", type: "unsupported_action" }],
         }),
-      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.VALIDATION_FAILED
+      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
     );
   });
 
@@ -102,7 +102,7 @@ describe("validateExecution", () => {
           timeoutMs: LIMITS.MAX_EXECUTION_TIMEOUT_MS + 1,
           actions: [{ id: "x", type: "sleep", params: { durationMs: 0 } }],
         }),
-      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.VALIDATION_FAILED
+      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
     );
   });
 
@@ -117,7 +117,7 @@ describe("validateExecution", () => {
           timeoutMs: 5000,
           actions: [{ id: "x", type: "open_app", params: {} }],
         }),
-      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.VALIDATION_FAILED
+      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
     );
   });
 
@@ -132,7 +132,7 @@ describe("validateExecution", () => {
           timeoutMs: 5000,
           actions: [{ id: "x", type: "sleep", params: { durationMs: -1 } }],
         }),
-      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.VALIDATION_FAILED
+      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
     );
   });
 
@@ -147,7 +147,7 @@ describe("validateExecution", () => {
           timeoutMs: 5000,
           actions: [{ id: "x", type: "enter_text", params: { text: "hello" } }],
         }),
-      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.VALIDATION_FAILED
+      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
     );
   });
 
@@ -163,7 +163,7 @@ describe("validateExecution", () => {
           actions: [{ id: "x", type: "sleep", params: { durationMs: 1 } }],
           unexpectedField: "nope",
         }),
-      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.VALIDATION_FAILED
+      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
     );
   });
 });

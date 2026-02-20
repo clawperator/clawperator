@@ -87,7 +87,10 @@ const executionSchema = z.object({
           (supportedTypes as readonly string[]).includes(t)
         );
       },
-      { message: "All action types must be supported" }
+      {
+        message: "All action types must be supported",
+        params: { code: ERROR_CODES.EXECUTION_ACTION_UNSUPPORTED },
+      }
     ),
   mode: z.enum(["artifact_compiled", "direct"]).optional(),
 }).strict().superRefine((execution, ctx) => {
@@ -140,7 +143,7 @@ const executionSchema = z.object({
 });
 
 export interface ValidationFailure {
-  code: typeof ERROR_CODES.VALIDATION_FAILED;
+  code: typeof ERROR_CODES.EXECUTION_VALIDATION_FAILED;
   message: string;
   details?: { path?: string; reason?: string };
 }
@@ -154,7 +157,7 @@ export function validateExecution(input: unknown): Execution {
   if (!parsed.success) {
     const first = parsed.error.errors[0];
     const err: ValidationFailure = {
-      code: ERROR_CODES.VALIDATION_FAILED,
+      code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
       message: first?.message ?? "Invalid execution payload",
       details: {
         path: first?.path.join("."),
