@@ -28,14 +28,6 @@ Commands:
                                             Build and run single wait_for_node action via execute path
   action type --selector <json> --text <value> [--submit] [--clear] [--device-id <id>] [--receiver-package <package>]
                                             Build and run single enter_text action via execute path
-  action demo-switchbot-temp [--device-id <id>] [--receiver-package <package>]
-                                            Demo: Get bedroom temperature (SwitchBot)
-  action demo-settings-overview [--device-id <id>] [--receiver-package <package>]
-                                            Demo: Capture Android settings overview
-  action demo-solax-battery [--device-id <id>] [--receiver-package <package>]
-                                            Demo: Get SolaX battery level
-  action demo-globird-usage [--device-id <id>] [--receiver-package <package>]
-                                            Demo: Get GloBird energy usage
   skills list
                                             List available skills from local indexes/cache
   skills get <skill_id>
@@ -211,16 +203,8 @@ async function main(): Promise<void> {
                 ...runOpts,
               })
             : JSON.stringify({ code: "USAGE", message: "action type --selector <json> --text <value>" });
-      } else if (sub === "demo-switchbot-temp") {
-        result = await (await import("./commands/action.js")).cmdActionDemoSwitchbotTemp({ ...out, ...runOpts });
-      } else if (sub === "demo-settings-overview") {
-        result = await (await import("./commands/action.js")).cmdActionSettingsCaptureOverview({ ...out, ...runOpts });
-      } else if (sub === "demo-solax-battery") {
-        result = await (await import("./commands/action.js")).cmdActionSolaxGetBattery({ ...out, ...runOpts });
-      } else if (sub === "demo-globird-usage") {
-        result = await (await import("./commands/action.js")).cmdActionGlobirdGetUsage({ ...out, ...runOpts });
       } else {
-        result = JSON.stringify({ code: "USAGE", message: "action click|read|wait|type|demo-switchbot-temp|demo-settings-overview|demo-solax-battery|demo-globird-usage [options]" });
+        result = JSON.stringify({ code: "USAGE", message: "action click|read|wait|type [options]" });
       }
       break;
     }
