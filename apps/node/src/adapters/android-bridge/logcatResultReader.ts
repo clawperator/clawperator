@@ -96,7 +96,12 @@ export async function waitForResultEnvelope(
 
         if (parsed) {
           flush();
-          // ... rest of the line processing
+          finalize({
+            ok: true,
+            envelope: parsed.envelope,
+            terminalSource: parsed.terminalSource,
+          });
+          return;
         }
       }
     });

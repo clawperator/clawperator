@@ -44,7 +44,9 @@ Commands:
   doctor
                                             Run environment and runtime checks (Stage 3)
   doctor --fix
-                                            Attempt non-destructive automatic fixes (Stage 3)
+                                            Attempt non-destructive host fixes (Stage 3)
+  doctor --full
+                                            Full Android build + install + handshake + smoke (Stage 3)
 
 Global options:
   --device-id <id>                          Target Android device serial
@@ -268,6 +270,7 @@ async function main(): Promise<void> {
       result = await (await import("./commands/doctor.js")).cmdDoctor({
         ...out,
         fix: hasFlag(rest, "--fix"),
+        full: hasFlag(rest, "--full"),
         deviceId: global.deviceId ?? getOpt(rest, "--device-id"),
         receiverPackage: global.receiverPackage ?? getOpt(rest, "--receiver-package"),
       });

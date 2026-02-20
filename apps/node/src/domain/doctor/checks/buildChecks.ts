@@ -1,0 +1,92 @@
+import { execSync } from "node:child_process";
+import { type RuntimeConfig } from "../../../adapters/android-bridge/runtimeConfig.js";
+import { type DoctorCheckResult } from "../../../contracts/doctor.js";
+import { ERROR_CODES } from "../../../contracts/errors.js";
+import { runAdb } from "../../../adapters/android-bridge/adbClient.js";
+
+export async function checkJavaVersion(): Promise<DoctorCheckResult> {
+  try {
+    const versionOutput = execSync("java -version 2>&1").toString();
+    if (versionOutput.includes('version "17') || versionOutput.includes('version "21') || versionOutput.includes('openjdk 17') || versionOutput.includes('openjdk 21')) {
+      return {
+        id: "host.java.version",
+        status: "pass",
+        summary: "Java 17+ is installed.",
+      };
+    }
+    return {
+      id: "host.java.version",
+      status: "fail",
+      summary: "Java 17 or 21 is required for Android builds.",
+      detail: versionOutput.split("\n")[0],
+    };
+  } catch {
+    return {
+      id: "host.java.version",
+      status: "fail",
+      summary: "Java not found.",
+      detail: "Java JDK 17+ is required to build Android apps.",
+    };
+  }
+}
+
+export async function runAndroidBuild(): Promise<DoctorCheckResult> {
+  try {
+    // Run from project root. Assuming we are in apps/node/src/domain/doctor/checks/
+    // Project root is ../../../../../../
+    execSync("./gradlew :apps:android:app:assembleDebug", { stdio: "pipe" });
+    return {
+      id: "build.android.assemble",
+      status: "pass",
+      summary: "Android app build successful.",
+    };
+  } catch (e) {
+    return {
+      id: "build.android.assemble",
+      status: "fail",
+      code: ERROR_CODES.ANDROID_BUILD_FAILED,
+      summary: "Android app build failed.",
+      detail: (e as Error).message,
+    };
+  }
+}
+
+export async function runAndroidInstall(_config: RuntimeConfig): Promise<DoctorCheckResult> {
+  try {
+    execSync("./gradlew :apps:android:app:installDebug", { stdio: "pipe" });
+    return {
+      id: "build.android.install",
+      status: "pass",
+      summary: "Android app installed successfully.",
+    };
+  } catch (e) {
+    return {
+      id: "build.android.install",
+      status: "fail",
+      code: ERROR_CODES.ANDROID_INSTALL_FAILED,
+      summary: "Android app installation failed.",
+      detail: (e as Error).message,
+    };
+  }
+}
+
+export async function runAndroidLaunch(config: RuntimeConfig): Promise<DoctorCheckResult> {
+  const mainActivity = `${config.receiverPackage}/com.clawperator.operator.MainActivity`;
+  const { code, stderr } = await runAdb(config, ["shell", "am", "start", "-n", mainActivity]);
+  
+  if (code !== 0) {
+    return {
+      id: "build.android.launch",
+      status: "fail",
+      code: ERROR_CODES.ANDROID_APP_LAUNCH_FAILED,
+      summary: "Failed to launch Operator app.",
+      detail: stderr,
+    };
+  }
+
+  return {
+    id: "build.android.launch",
+    status: "pass",
+    summary: "Operator app launched successfully.",
+  };
+}
