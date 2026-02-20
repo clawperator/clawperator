@@ -78,7 +78,8 @@ class UiActionEngineDefault : UiActionEngine {
         taskScope: TaskScope,
         action: UiAction.CloseApp,
     ): UiActionStepResult {
-        taskScope.closeApp(action.applicationId, action.retry)
+        // NOTE: Reliable force-stop is now handled pre-flight by the Node CLI via ADB.
+        // This remains as a success placeholder to satisfy the action contract.
         return UiActionStepResult(
             id = action.id,
             actionType = "close_app",

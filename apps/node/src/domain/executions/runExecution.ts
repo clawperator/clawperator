@@ -58,7 +58,16 @@ export async function runExecution(
   }
 
   try {
-    // Clear logcat so we only see this command's output
+    // 1. Handle pre-flight side effects (e.g., force-close apps via adb)
+    // The Android runtime cannot reliably force-stop other apps due to sandbox restrictions.
+    // Performing this via adb before dispatch ensures a predictable starting state.
+    for (const action of execution.actions) {
+      if (action.type === "close_app" && action.params?.applicationId) {
+        await runAdb(config, ["shell", "am", "force-stop", action.params.applicationId]);
+      }
+    }
+
+    // 2. Clear logcat so we only see this command's output
     await runAdb(config, ["logcat", "-c"]);
 
     const payload = JSON.stringify(execution);
