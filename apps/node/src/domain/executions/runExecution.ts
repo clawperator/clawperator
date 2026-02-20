@@ -1,3 +1,7 @@
+import { writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { spawn } from "node:child_process";
 import type { Execution } from "../../contracts/execution.js";
 import { validateExecution, validatePayloadSize } from "./validateExecution.js";
 import { resolveDevice } from "../devices/resolveDevice.js";
@@ -98,6 +102,42 @@ export async function runExecution(
           if (snapStep) {
             snapStep.data = { ...snapStep.data, text: fullSnapshot };
           }
+        }
+      }
+
+      // Post-process take_screenshot via adb exec-out
+      const hasScreenshot = result.envelope.stepResults.some(s => s.actionType === "take_screenshot");
+      if (hasScreenshot) {
+        const screenshotPath = join(tmpdir(), `clawperator-screenshot-${execution.commandId}-${Date.now()}.png`);
+        try {
+          const deviceArgs = config.deviceId ? ["-s", config.deviceId] : [];
+          const proc = spawn(config.adbPath, [...deviceArgs, "exec-out", "screencap", "-p"], {
+            stdio: ["ignore", "pipe", "ignore"],
+            shell: false,
+          });
+          
+          let buffer = Buffer.alloc(0);
+          proc.stdout?.on("data", (chunk: Buffer) => {
+            buffer = Buffer.concat([buffer, chunk]);
+          });
+
+          await new Promise((resolve, reject) => {
+            proc.on("close", (code) => {
+              if (code === 0) resolve(true);
+              else reject(new Error(`screencap exited with code ${code}`));
+            });
+            proc.on("error", reject);
+          });
+
+          if (buffer.length > 0) {
+            await writeFile(screenshotPath, buffer);
+            const screenStep = result.envelope.stepResults.find(s => s.actionType === "take_screenshot");
+            if (screenStep) {
+              screenStep.data = { ...screenStep.data, path: screenshotPath };
+            }
+          }
+        } catch (e) {
+          console.warn(`⚠️ Failed to capture screenshot via adb: ${String(e)}`);
         }
       }
 

@@ -18,6 +18,8 @@ Commands:
                                             Produce deterministic next-action suggestion from current UI
   observe snapshot [--device-id <id>] [--receiver-package <package>]
                                             Capture current UI snapshot output
+  observe screenshot [--device-id <id>] [--receiver-package <package>]
+                                            Capture current device screenshot (png)
   inspect ui [--device-id <id>] [--receiver-package <package>]
                                             Alias of observe snapshot with formatted output
   action click --selector <json> [--device-id <id>] [--receiver-package <package>]
@@ -156,8 +158,14 @@ async function main(): Promise<void> {
           deviceId: global.deviceId ?? getOpt(rest, "--device-id"),
           receiverPackage: global.receiverPackage ?? getOpt(rest, "--receiver-package"),
         });
+      } else if (rest[0] === "screenshot") {
+        result = await (await import("./commands/observe.js")).cmdObserveScreenshot({
+          ...out,
+          deviceId: global.deviceId ?? getOpt(rest, "--device-id"),
+          receiverPackage: global.receiverPackage ?? getOpt(rest, "--receiver-package"),
+        });
       } else {
-        result = JSON.stringify({ code: "USAGE", message: "observe snapshot [options]" });
+        result = JSON.stringify({ code: "USAGE", message: "observe snapshot|screenshot [options]" });
       }
       break;
     case "inspect":

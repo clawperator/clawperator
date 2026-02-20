@@ -60,6 +60,11 @@ sealed interface UiAction {
         val retry: TaskRetry = TaskRetry.None,
     ) : UiAction
 
+    data class TakeScreenshot(
+        override val id: String,
+        val retry: TaskRetry = TaskRetry.None,
+    ) : UiAction
+
     data class EnterText(
         override val id: String,
         val matcher: NodeMatcher,

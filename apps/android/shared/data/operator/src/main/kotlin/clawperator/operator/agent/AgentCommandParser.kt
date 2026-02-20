@@ -144,6 +144,11 @@ class AgentCommandParserDefault : AgentCommandParser {
                     format = params.parseSnapshotFormat(),
                     retry = params.parseRetryOrDefault(defaultRetry = TaskRetry.None),
                 )
+            "take_screenshot" ->
+                UiAction.TakeScreenshot(
+                    id = id,
+                    retry = params.parseRetryOrDefault(defaultRetry = TaskRetry.None),
+                )
             "sleep" ->
                 UiAction.Sleep(
                     id = id,

@@ -52,6 +52,7 @@ const supportedTypes = [
   "read_text",
   "enter_text",
   "snapshot_ui",
+  "take_screenshot",
   "sleep",
 ] as const;
 
