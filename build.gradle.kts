@@ -22,7 +22,7 @@ buildscript {
     extra.apply {
         set("buildToolsVersion", libs.versions.buildTools.get())
         set("compileSdkVersion", 35)
-        set("minSdkVersion", 26)
+        set("minSdkVersion", 21)
         set("targetSdkVersion", 35)
 
         set("librariesPath", "libraries")
