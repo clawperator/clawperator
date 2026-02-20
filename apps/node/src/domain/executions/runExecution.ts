@@ -22,7 +22,7 @@ export interface RunExecutionOptions {
 
 export type RunExecutionResult =
   | { ok: true; envelope: ResultEnvelope; deviceId: string; terminalSource: TerminalSource }
-  | { ok: false; error: { code: string; message: string; [k: string]: unknown } };
+  | { ok: false; error: { code: string; message: string; [k: string]: unknown }; deviceId?: string };
 
 /**
  * Internal helper to validate, resolve device, and perform actual execution.
@@ -60,13 +60,11 @@ async function performExecution(
   }
 
   if (!tryAcquire(deviceId, execution.commandId)) {
-    return { ok: false, error: getConflictError(deviceId, execution.commandId) };
+    return { ok: false, error: getConflictError(deviceId, execution.commandId), deviceId };
   }
 
   try {
     // 1. Handle pre-flight side effects (e.g., force-close apps via adb)
-    // The Android runtime cannot reliably force-stop other apps due to sandbox restrictions.
-    // Performing this via adb before dispatch ensures a predictable starting state.
     for (const action of execution.actions) {
       if (action.type === "close_app" && action.params?.applicationId) {
         await runAdb(config, ["shell", "am", "force-stop", action.params.applicationId]);
@@ -91,8 +89,7 @@ async function performExecution(
     );
 
     if (result.ok) {
-      // Post-process to retrieve snapshot text from logcat if any snapshot_ui actions were run.
-      // We do this by dumping the buffer and filtering for TaskScopeDefault tags.
+      // Post-process to retrieve snapshot text from logcat
       const hasSnapshot = result.envelope.stepResults.some(s => s.actionType === "snapshot_ui");
       if (hasSnapshot) {
         const dump = await runAdb(config, ["logcat", "-d", "-v", "tag"]);
@@ -147,12 +144,12 @@ async function performExecution(
       return { ok: true, envelope: result.envelope, deviceId, terminalSource: result.terminalSource };
     }
     if ("broadcastFailed" in result && result.broadcastFailed && "diagnostics" in result) {
-      return { ok: false, error: { ...result.diagnostics } };
+      return { ok: false, error: { ...result.diagnostics }, deviceId };
     }
     if ("timeout" in result && result.timeout && "diagnostics" in result) {
-      return { ok: false, error: { ...result.diagnostics } };
+      return { ok: false, error: { ...result.diagnostics }, deviceId };
     }
-    return { ok: false, error: { code: "UNKNOWN", message: ("error" in result ? result.error : undefined) ?? "Unknown error" } };
+    return { ok: false, error: { code: "UNKNOWN", message: ("error" in result ? result.error : undefined) ?? "Unknown error" }, deviceId };
   } finally {
     release(deviceId, execution.commandId);
   }
@@ -167,7 +164,7 @@ export async function runExecution(
   options: RunExecutionOptions = {}
 ): Promise<RunExecutionResult> {
   const result = await performExecution(executionInput, options);
-  const resolvedDeviceId: string | null = result.ok ? result.deviceId : (options.deviceId || null);
+  const resolvedDeviceId: string | null = result.deviceId || options.deviceId || null;
   if (resolvedDeviceId !== null) {
     emitExecution(resolvedDeviceId, executionInput, result);
   }

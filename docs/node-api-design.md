@@ -53,7 +53,7 @@ Contracts:
 
 Features that are not required for initial launch but are high priority:
 
-- `clawperator --serve`: HTTP/SSE server for remote agents (e.g., OpenClaw).
+- `clawperator serve`: HTTP/SSE server for remote agents (e.g., OpenClaw).
 - `clawperator doctor prescribe`: Detailed diagnostics via Android runtime endpoints.
 - `clawperator doctor --fix`: Automated remediation for common ADB/permission issues.
 - `clawperator skills sync`: Canonical skills repo integration.

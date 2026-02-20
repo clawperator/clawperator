@@ -45,6 +45,7 @@ async function runSample() {
   if (!dispatchRes.ok) {
     const error = await dispatchRes.json();
     console.error('❌ Dispatch failed:', error);
+    await reader.cancel();
     process.exit(1);
   }
 
@@ -68,6 +69,7 @@ async function runSample() {
         if (data.envelope && data.envelope.commandId === commandId) {
           console.log('✅ Received Result for', commandId);
           console.log(JSON.stringify(data.envelope, null, 2));
+          await reader.cancel();
           process.exit(0);
         }
       }

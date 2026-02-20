@@ -1,5 +1,6 @@
 import { EventEmitter } from "node:events";
 import type { ResultEnvelope } from "../../contracts/result.js";
+import type { RunExecutionResult } from "../executions/runExecution.js";
 
 /**
  * Global event emitter for Clawperator envelopes.
@@ -18,6 +19,6 @@ export function emitResult(deviceId: string, envelope: ResultEnvelope): void {
   clawperatorEvents.emit(CLAW_EVENT_TYPES.RESULT, { deviceId, envelope });
 }
 
-export function emitExecution(deviceId: string, input: any, result: any): void {
+export function emitExecution(deviceId: string, input: unknown, result: RunExecutionResult): void {
   clawperatorEvents.emit(CLAW_EVENT_TYPES.EXECUTION, { deviceId, input, result });
 }

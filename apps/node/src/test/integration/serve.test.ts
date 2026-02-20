@@ -12,9 +12,11 @@ describe("serve API integration", () => {
   });
 
   after(async () => {
-    await new Promise<void>((resolve, reject) => {
-      server.close((err) => (err ? reject(err) : resolve()));
-    });
+    if (server) {
+      await new Promise<void>((resolve, reject) => {
+        server.close((err) => (err ? reject(err) : resolve()));
+      });
+    }
   });
 
   test("GET /devices returns success", async () => {
@@ -38,11 +40,14 @@ describe("serve API integration", () => {
     assert.strictEqual(res.status, 200);
     assert.strictEqual(res.headers.get("Content-Type"), "text/event-stream");
     
-    // Read the first chunk (heartbeat)
     const reader = res.body?.getReader();
-    const { value } = await reader!.read();
-    const text = new TextDecoder().decode(value);
-    assert.ok(text.includes("CONNECTED"));
-    reader?.cancel();
+    try {
+      // Read the first chunk (heartbeat)
+      const { value } = await reader!.read();
+      const text = new TextDecoder().decode(value);
+      assert.ok(text.includes("CONNECTED"));
+    } finally {
+      await reader?.cancel();
+    }
   });
 });
