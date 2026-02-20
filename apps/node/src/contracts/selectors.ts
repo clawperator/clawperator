@@ -6,6 +6,8 @@ export interface NodeMatcher {
   role?: string;
   textEquals?: string;
   textContains?: string;
+  contentDescEquals?: string;
+  contentDescContains?: string;
 }
 
 export function isNodeMatcherEmpty(m: NodeMatcher): boolean {
@@ -13,7 +15,9 @@ export function isNodeMatcherEmpty(m: NodeMatcher): boolean {
     (m.resourceId == null || m.resourceId === "") &&
     (m.role == null || m.role === "") &&
     (m.textEquals == null || m.textEquals === "") &&
-    (m.textContains == null || m.textContains === "")
+    (m.textContains == null || m.textContains === "") &&
+    (m.contentDescEquals == null || m.contentDescEquals === "") &&
+    (m.contentDescContains == null || m.contentDescContains === "")
   );
 }
 
@@ -23,5 +27,7 @@ export function nodeMatcherToParams(m: NodeMatcher): Record<string, string> {
   if (m.role) out.role = m.role;
   if (m.textEquals) out.textEquals = m.textEquals;
   if (m.textContains) out.textContains = m.textContains;
+  if (m.contentDescEquals) out.contentDescEquals = m.contentDescEquals;
+  if (m.contentDescContains) out.contentDescContains = m.contentDescContains;
   return out;
 }

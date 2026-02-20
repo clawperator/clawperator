@@ -234,17 +234,17 @@ class TaskUiScopeDefault(
                 findNodeByMatcher(matcher, uiTree)
                     ?: throw IllegalStateException("No UI node found matching criteria: $matcher")
 
-                                val taskUiNode =
-                                    TaskUiNode(
-                                        resourceId = uiNode.resourceId,
-                                        label = uiNode.label,
-                                        contentDescription = uiNode.contentDescription,
-                                        clickable = uiNode.isClickable,
-                                        role = uiNode.role.name.lowercase(),
-                                        bounds = uiNode.bounds,
-                                        debugPath = uiNode.id.value,
-                                    )
-                        Log.d("$TAG Found matching node: $taskUiNode")
+            val taskUiNode =
+                TaskUiNode(
+                    resourceId = uiNode.resourceId,
+                    label = uiNode.label,
+                    contentDescription = uiNode.contentDescription,
+                    clickable = uiNode.isClickable,
+                    role = uiNode.role.name.lowercase(),
+                    bounds = uiNode.bounds,
+                    debugPath = uiNode.id.value,
+                )
+            Log.d("$TAG Found matching node: $taskUiNode")
             taskUiNode
         }
 
