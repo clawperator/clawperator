@@ -66,6 +66,8 @@ These are human-first workflows. Clawperator provides reliable app control and d
 4. **Execute**: Dispatch a payload via `clawperator execute --execution payload.json`.
 5. **Observe**: Use `clawperator observe snapshot` or `clawperator observe screenshot`.
 
+For a complete, runnable integration sample (SSE + REST), see: **`apps/node/examples/basic-api-usage.js`**.
+
 ---
 
 ## Technical Integration Guide
