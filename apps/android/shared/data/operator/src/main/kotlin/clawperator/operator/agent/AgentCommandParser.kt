@@ -130,10 +130,23 @@ class AgentCommandParserDefault : AgentCommandParser {
                     retry = params.parseRetryOrDefault(defaultRetry = TaskRetryPresets.UiReadiness),
                     validator = params.parseValidator(),
                 )
+            "enter_text", "type_text" ->
+                UiAction.EnterText(
+                    id = id,
+                    matcher = params.parseMatcherRequired("matcher"),
+                    text = params.stringRequired("text", MAX_MATCHER_VALUE_LENGTH),
+                    submit = params.booleanOrDefault("submit", false),
+                    retry = params.parseRetryOrDefault(defaultRetry = TaskRetryPresets.UiReadiness),
+                )
             "snapshot_ui" ->
                 UiAction.SnapshotUi(
                     id = id,
                     format = params.parseSnapshotFormat(),
+                    retry = params.parseRetryOrDefault(defaultRetry = TaskRetry.None),
+                )
+            "take_screenshot" ->
+                UiAction.TakeScreenshot(
+                    id = id,
                     retry = params.parseRetryOrDefault(defaultRetry = TaskRetry.None),
                 )
             "sleep" ->
@@ -219,9 +232,12 @@ class AgentCommandParserDefault : AgentCommandParser {
         val role = matcherObject.stringOrNull("role")
         val textEquals = matcherObject.stringOrNull("textEquals")
         val textContains = matcherObject.stringOrNull("textContains")
+        val contentDescEquals = matcherObject.stringOrNull("contentDescEquals")
+        val contentDescContains = matcherObject.stringOrNull("contentDescContains")
 
         require(
-            resourceId != null || role != null || textEquals != null || textContains != null,
+            resourceId != null || role != null || textEquals != null || textContains != null ||
+                contentDescEquals != null || contentDescContains != null,
         ) { "$key must include at least one matcher field" }
 
         return NodeMatcher(
@@ -229,6 +245,8 @@ class AgentCommandParserDefault : AgentCommandParser {
             role = role,
             textEquals = textEquals,
             textContains = textContains,
+            contentDescEquals = contentDescEquals,
+            contentDescContains = contentDescContains,
         )
     }
 

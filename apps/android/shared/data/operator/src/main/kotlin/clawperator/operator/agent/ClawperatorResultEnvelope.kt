@@ -43,7 +43,7 @@ fun buildCanonicalSuccessLine(
         CanonicalStepResult(
             id = step.id,
             actionType = step.actionType,
-            success = true,
+            success = step.success,
             // UiActionStepResult.data is currently Map<String, String>; keep this direct mapping in sync if that contract changes.
             data = step.data,
         )

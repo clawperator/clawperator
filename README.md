@@ -107,7 +107,7 @@ This is intentionally a two-handed model:
 5. **Execute a Command:**
    ```bash
    # Create a tiny execution file
-   echo '{"commandId":"q1","taskId":"t1","source":"manual","actions":[{"id":"a1","type":"open_app","params":{"applicationId":"com.android.settings"}}]}' > /tmp/exec.json
+   echo '{"commandId":"q1","taskId":"t1","source":"manual","expectedFormat":"android-ui-automator","actions":[{"id":"a1","type":"open_app","params":{"applicationId":"com.android.settings"}}]}' > /tmp/exec.json
    
    # Run it
    clawperator execute --execution /tmp/exec.json --device-id <device_id> --receiver-package com.clawperator.operator.dev

@@ -206,6 +206,7 @@ class TaskUiScopeDefault(
                         TaskUiNode(
                             resourceId = uiNode.resourceId,
                             label = uiNode.label,
+                            contentDescription = uiNode.contentDescription,
                             clickable = uiNode.isClickable,
                             role = uiNode.role.name.lowercase(),
                             bounds = uiNode.bounds,
@@ -237,12 +238,12 @@ class TaskUiScopeDefault(
                 TaskUiNode(
                     resourceId = uiNode.resourceId,
                     label = uiNode.label,
+                    contentDescription = uiNode.contentDescription,
                     clickable = uiNode.isClickable,
                     role = uiNode.role.name.lowercase(),
                     bounds = uiNode.bounds,
                     debugPath = uiNode.id.value,
                 )
-
             Log.d("$TAG Found matching node: $taskUiNode")
             taskUiNode
         }
@@ -674,6 +675,7 @@ class TaskUiScopeDefault(
         TaskUiNode(
             resourceId = uiNode.resourceId,
             label = uiNode.label,
+            contentDescription = uiNode.contentDescription,
             clickable = uiNode.isClickable,
             role = uiNode.role.name.lowercase(),
             bounds = uiNode.bounds,
@@ -739,6 +741,7 @@ class TaskUiScopeDefault(
                         TaskUiNode(
                             resourceId = uiNode.resourceId,
                             label = uiNode.label,
+                            contentDescription = uiNode.contentDescription,
                             clickable = uiNode.isClickable,
                             role = uiNode.role.name.lowercase(),
                             bounds = uiNode.bounds,

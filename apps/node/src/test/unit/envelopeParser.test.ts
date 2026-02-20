@@ -67,4 +67,14 @@ describe("parseTerminalEnvelope", () => {
     assert.strictEqual(parsed!.envelope.stepResults.length, 1);
     assert.strictEqual(parsed!.envelope.stepResults[0].id, "s1");
   });
+
+  it("parses step results with success: false and error data", () => {
+    const json = `{"commandId":"${CMD_ID}","taskId":"t1","status":"success","stepResults":[{"id":"s1","actionType":"close_app","success":false,"data":{"error":"UNSUPPORTED"}}],"error":null}`;
+    const line = `${RESULT_ENVELOPE_PREFIX} ${json}`;
+    const parsed = parseTerminalEnvelope(line, CMD_ID);
+    assert.ok(parsed);
+    const step = parsed!.envelope.stepResults[0];
+    assert.strictEqual(step.success, false);
+    assert.strictEqual(step.data?.error, "UNSUPPORTED");
+  });
 });

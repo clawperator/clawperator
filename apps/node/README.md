@@ -1,6 +1,14 @@
-# Clawperator Node API
+# Clawperator Node API (The Hand)
 
-Node runtime for Clawperator: deterministic Android execution for LLM agents. See `docs/node-api-for-agents.md`, `docs/node-api-design.md`, and `docs/node-api-alpha-release-checklist.md`.
+This module is the canonical **Hand** for Clawperator. It provides a stable, platform-agnostic Node.js API and CLI for executing deterministic Android automations.
+
+## Architectural Doctrine: Generic Actuator
+
+**Clawperator is an actuator, not a planner.** 
+
+1. **No App-Specific Logic:** This codebase must NEVER contain app-specific code (e.g., SwitchBot, Life360, Google Home). It is a generic execution engine that knows only how to process `Execution` JSON payloads.
+2. **Skills Live Elsewhere:** App-specific "skills" (the reasoning/recipes) live in the [clawperator-skills](https://github.com/clawpilled/clawperator-skills) repository.
+3. **Brain vs. Hand:** The LLM (The Brain) reasons about state; Clawperator (The Hand) executes the physical UI actions and returns structured sensory data.
 
 ## Setup
 
@@ -8,13 +16,28 @@ Node runtime for Clawperator: deterministic Android execution for LLM agents. Se
 - `adb` on PATH (or set `ADB_PATH`)
 - Optional: `CLAWPERATOR_RECEIVER_PACKAGE` (default: `com.clawperator.operator.dev`)
 
-## Observability: `terminalSource`
+## Core Contracts
 
-Success responses for execute, observe, and action commands include **`terminalSource`**:
+### 1. `expectedFormat` Required
+Every command that interacts with a device MUST include `expectedFormat: "android-ui-automator"`. This ensures future-proofing for iOS/Web targets.
 
-- **`clawperator_result`** – canonical `[Clawperator-Result]` envelope. Node accepts only this; the Operator app must emit it.
+### 2. Canonical Envelope: `[Clawperator-Result]`
+Clawperator only accepts one source of truth for execution outcomes: the `[Clawperator-Result]` JSON envelope emitted by the Android runtime.
 
-## Build & test
+## Usage
+
+```bash
+# List devices
+clawperator devices
+
+# Execute a generic payload (The Hand only cares about the schema)
+clawperator execute --execution ./path/to/execution.json
+
+# Build a single-step action
+clawperator action click --selector '{"resourceId":"com.example:id/btn"}'
+```
+
+## Build & Test
 
 ```bash
 npm install
@@ -22,30 +45,4 @@ npm run build
 npm run test
 ```
 
-## Usage
-
-```bash
-# List devices
-node dist/cli/index.js devices
-
-# List packages (single device or --device-id required if multiple)
-node dist/cli/index.js packages list --third-party
-
-# Execute a payload (file or inline JSON)
-node dist/cli/index.js execute --execution ./path/to/execution.json
-node dist/cli/index.js execute --execution '{"commandId":"c1","taskId":"t1","source":"test","timeoutMs":30000,"actions":[{"id":"s1","type":"sleep","params":{"durationMs":1000}}]}'
-
-# Observe snapshot (UI tree)
-node dist/cli/index.js observe snapshot
-
-# Action wrappers (compile to execute)
-node dist/cli/index.js action click --selector '{"resourceId":"com.example:id/btn"}'
-node dist/cli/index.js action type --selector '{"resourceId":"com.example:id/input"}' --text "hello" --submit
-```
-
-## Stages
-
-- **Stage 0** (done): Contracts, limits, validation, aliases, JSON output.
-- **Stage 1** (done): CLI core (devices, packages, execute, observe, inspect, action), Android bridge, single-flight, canonical `[Clawperator-Result]` envelope only (legacy path removed).
-- **Stage 2** (done): Skills list/get/compile-artifact/sync.
-- **Stage 3** (planned): HTTP wrapper, doctor/doctor --fix.
+For detailed protocol documentation, see `docs/node-api-design.md`.

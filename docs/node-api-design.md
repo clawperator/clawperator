@@ -96,6 +96,34 @@ LLM agents must use these codes to decide their next step.
 - `NODE_NOT_CLICKABLE`: The target element was found but is not enabled/clickable.
 - `SECURITY_BLOCK_DETECTED`: A system-level security overlay (e.g., "Package Installer" or "Permission Dialog") is blocking interaction.
 
+## Detailed Step-Level Error Handling (v0.1)
+
+While the top-level `status` indicates overall command success, individual `stepResults` can provide granular failure diagnostics. This is essential for agents to reason about partial completions.
+
+### Step Error Format
+When a step fails but the runtime continues (or fails fast), the `stepResults` entry will include:
+- `success: false`
+- `data.error`: A stable machine-readable error code.
+- `data.message`: A human-readable (and LLM-readable) explanation.
+
+### Example: `UNSUPPORTED_RUNTIME_CLOSE`
+This error occurs when a `close_app` action is dispatched to the Android runtime. Because of sandbox restrictions, the runtime cannot reliably close other apps.
+
+**Desired Outcome:** The agent should see this error and know that the 'Hand' (Node CLI) is responsible for pre-flight closure via ADB.
+
+```json
+{
+  "id": "step-1",
+  "actionType": "close_app",
+  "success": false,
+  "data": {
+    "application_id": "com.example.app",
+    "error": "UNSUPPORTED_RUNTIME_CLOSE",
+    "message": "Android runtime cannot reliably close apps. Use the Clawperator Node API or 'adb shell am force-stop' directly for this action."
+  }
+}
+```
+
 ## Safety & Concurrency
 
 ### In-Flight Semantics
@@ -164,6 +192,7 @@ Example execution:
   "commandId": "cmd-123",
   "taskId": "task-123",
   "source": "openclaw",
+  "expectedFormat": "android-ui-automator",
   "timeoutMs": 90000,
   "actions": [
     { "id": "close", "type": "close_app", "params": { "applicationId": "com.example.app" } },
@@ -392,7 +421,7 @@ Examples:
 - `read` -> `read_text`
 - `snapshot` -> `snapshot_ui`
 - `sleep` -> `sleep`
-- `act` -> `action` (alias for the primary `action` subcommand)
+- `action`: Primary entry point for single-step interactions.
 
 Rules:
 

@@ -11,6 +11,8 @@ const ACTION_ALIAS_TO_CANONICAL: Record<string, string> = {
   read: "read_text",
   snapshot: "snapshot_ui",
   sleep: "sleep",
+  screenshot: "take_screenshot",
+  capture_screenshot: "take_screenshot",
   type_text: "enter_text",
   text_entry: "enter_text",
   input_text: "enter_text",
@@ -25,6 +27,7 @@ export const CANONICAL_ACTION_TYPES = [
   "read_text",
   "enter_text",
   "snapshot_ui",
+  "take_screenshot",
   "sleep",
 ] as const;
 

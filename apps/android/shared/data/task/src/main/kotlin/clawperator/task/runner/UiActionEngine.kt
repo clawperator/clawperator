@@ -50,6 +50,8 @@ class UiActionEngineDefault : UiActionEngine {
                 is UiAction.ScrollAndClick -> executeScrollAndClick(taskScope, action)
                 is UiAction.ReadText -> executeReadText(taskScope, action)
                 is UiAction.SnapshotUi -> executeSnapshotUi(taskScope, action)
+                is UiAction.TakeScreenshot -> executeTakeScreenshot(taskScope, action)
+                is UiAction.EnterText -> executeEnterText(taskScope, action)
                 is UiAction.Sleep -> executeSleep(taskScope, action)
             }
 
@@ -77,11 +79,17 @@ class UiActionEngineDefault : UiActionEngine {
         taskScope: TaskScope,
         action: UiAction.CloseApp,
     ): UiActionStepResult {
-        taskScope.closeApp(action.applicationId, action.retry)
+        // The Android runtime cannot reliably force-stop other apps due to sandbox restrictions.
+        // We return an error here to signal that the 'Hand' (Node CLI) should have handled this via ADB.
         return UiActionStepResult(
             id = action.id,
             actionType = "close_app",
-            data = mapOf("application_id" to action.applicationId),
+            success = false,
+            data = mapOf(
+                "application_id" to action.applicationId,
+                "error" to "UNSUPPORTED_RUNTIME_CLOSE",
+                "message" to "Android runtime cannot reliably close apps. Use the Clawperator Node API or 'adb shell am force-stop' directly for this action."
+            ),
         )
     }
 
@@ -199,6 +207,46 @@ class UiActionEngineDefault : UiActionEngine {
                 mapOf(
                     "requested_format" to action.format.name.lowercase(),
                     "actual_format" to actualFormat.wireValue,
+                ),
+        )
+    }
+
+    private suspend fun executeTakeScreenshot(
+        taskScope: TaskScope,
+        action: UiAction.TakeScreenshot,
+    ): UiActionStepResult {
+        // The Android runtime cannot reliably take screenshots of the system/other apps due to security restrictions.
+        // We return an error here to signal that the 'Hand' (Node CLI) should handle this via ADB.
+        return UiActionStepResult(
+            id = action.id,
+            actionType = "take_screenshot",
+            success = false,
+            data = mapOf(
+                "error" to "UNSUPPORTED_RUNTIME_SCREENSHOT",
+                "message" to "Android runtime cannot reliably capture screenshots. Use the Clawperator Node API or 'adb exec-out screencap -p' directly for this action."
+            ),
+        )
+    }
+
+    private suspend fun executeEnterText(
+        taskScope: TaskScope,
+        action: UiAction.EnterText,
+    ): UiActionStepResult {
+        taskScope.ui {
+            enterText(
+                matcher = action.matcher,
+                text = action.text,
+                submit = action.submit,
+                retry = action.retry,
+            )
+        }
+        return UiActionStepResult(
+            id = action.id,
+            actionType = "enter_text",
+            data =
+                mapOf(
+                    "text" to action.text,
+                    "submit" to action.submit.toString(),
                 ),
         )
     }

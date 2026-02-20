@@ -40,6 +40,7 @@ buildscript {
         classpath(libs.firebase.crashlytics.gradlePlugin)
         classpath(libs.gms.google.services.gradlePlugin)
         classpath(libs.kotlin.gradlePlugin)
+        classpath("org.jetbrains.kotlin:compose-compiler-gradle-plugin:2.1.10")
         classpath(libs.compose.compiler.gradlePlugin)
 
         // Code quality tools
@@ -265,18 +266,19 @@ tasks.register("testAll") {
     group = "verification"
     description = "Runs unit tests in all modules (app + all shared libs). Use testDebugUnitTest for the same. For on-device tests: connectedDebugAndroidTest."
 
-    dependsOn(
-        "testDebugUnitTest",
-    )
+    subprojects.forEach { subproject ->
+        // Android tasks are added after evaluation, so we use matching/all to find them
+        dependsOn(subproject.tasks.matching { it.name == "testDebugUnitTest" })
+    }
 }
 
 tasks.register("unitTest") {
     group = "verification"
     description = "Alias for testDebugUnitTest; runs unit tests in all modules."
 
-    dependsOn(
-        "testDebugUnitTest",
-    )
+    subprojects.forEach { subproject ->
+        dependsOn(subproject.tasks.matching { it.name == "testDebugUnitTest" })
+    }
 }
 
 // Code quality configurations

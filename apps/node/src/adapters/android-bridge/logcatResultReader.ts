@@ -5,6 +5,7 @@ import { RESULT_ENVELOPE_PREFIX } from "../../contracts/result.js";
 import { parseTerminalEnvelope } from "./envelopeParser.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
 import type { TimeoutDiagnostics, BroadcastDiagnostics } from "../../contracts/errors.js";
+import { extractSnapshotFromLogs } from "../../domain/executions/snapshotHelper.js";
 
 export interface LogcatResultOptions {
   commandId: string;
@@ -78,11 +79,27 @@ export async function waitForResultEnvelope(
       const lines = pending.split("\n");
       pending = lines.pop() ?? "";
       for (const line of lines) {
+        if (line.includes("TaskScopeDefault:")) {
+          correlatedLines.push(line);
+        }
         if (!line.includes(RESULT_ENVELOPE_PREFIX)) continue;
+        
         const parsed = parseTerminalEnvelope(line, commandId);
         if (parsed) {
-          correlatedLines.push(line);
           flush();
+          
+          const fullSnapshot = extractSnapshotFromLogs(correlatedLines);
+          if (fullSnapshot) {
+            const snapStep = parsed.envelope.stepResults.find(s => s.actionType === "snapshot_ui");
+            if (snapStep) {
+              snapStep.data = { ...snapStep.data, text: fullSnapshot };
+            }
+          }
+
+          // Clear correlated lines so snapshot content from previous envelopes
+          // does not leak into subsequent command executions in long-running processes.
+          correlatedLines.length = 0;
+
           finalize({ ok: true, envelope: parsed.envelope, terminalSource: parsed.terminalSource });
         }
       }

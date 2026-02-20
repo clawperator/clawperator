@@ -19,6 +19,8 @@ data class UiNode(
     val role: UiRole,
     /** Human-readable label (text or content description) */
     val label: String,
+    /** Specific content description if available */
+    val contentDescription: String? = null,
     /** Platform-specific class name */
     val className: String,
     /** Screen bounds of the element */

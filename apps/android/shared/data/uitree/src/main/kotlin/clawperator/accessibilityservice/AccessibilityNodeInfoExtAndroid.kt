@@ -340,6 +340,7 @@ private fun AccessibilityNodeInfo.mapToUiNode(
             id = nodeId,
             role = role,
             label = label,
+            contentDescription = contentDescription,
             className = className,
             bounds = bounds,
             isClickable = isEffectivelyClickable,

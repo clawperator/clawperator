@@ -60,6 +60,19 @@ sealed interface UiAction {
         val retry: TaskRetry = TaskRetry.None,
     ) : UiAction
 
+    data class TakeScreenshot(
+        override val id: String,
+        val retry: TaskRetry = TaskRetry.None,
+    ) : UiAction
+
+    data class EnterText(
+        override val id: String,
+        val matcher: NodeMatcher,
+        val text: String,
+        val submit: Boolean = false,
+        val retry: TaskRetry = TaskRetryPresets.UiReadiness,
+    ) : UiAction
+
     data class Sleep(
         override val id: String,
         val durationMs: Long,
@@ -94,6 +107,7 @@ data class UiActionPlan(
 data class UiActionStepResult(
     val id: String,
     val actionType: String,
+    val success: Boolean = true,
     val data: Map<String, String> = emptyMap(),
 )
 
