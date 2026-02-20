@@ -12,7 +12,7 @@ import { runAdb } from "../../adapters/android-bridge/adbClient.js";
 import { tryAcquire, release, getConflictError } from "./executionStore.js";
 import type { ResultEnvelope, TerminalSource } from "../../contracts/result.js";
 import { extractSnapshotFromLogs } from "./snapshotHelper.js";
-import { emitResult } from "../observe/events.js";
+import { emitResult, emitExecution } from "../observe/events.js";
 
 export interface RunExecutionOptions {
   deviceId?: string;
@@ -25,9 +25,9 @@ export type RunExecutionResult =
   | { ok: false; error: { code: string; message: string; [k: string]: unknown } };
 
 /**
- * Validate, resolve device, enforce single-flight, dispatch broadcast, wait for terminal envelope.
+ * Internal helper to validate, resolve device, and perform actual execution.
  */
-export async function runExecution(
+async function performExecution(
   executionInput: unknown,
   options: RunExecutionOptions = {}
 ): Promise<RunExecutionResult> {
@@ -156,4 +156,18 @@ export async function runExecution(
   } finally {
     release(deviceId, execution.commandId);
   }
+}
+
+/**
+ * Validate, resolve device, enforce single-flight, dispatch broadcast, wait for terminal envelope.
+ * Always emits outcome to SSE subscribers via emitExecution.
+ */
+export async function runExecution(
+  executionInput: unknown,
+  options: RunExecutionOptions = {}
+): Promise<RunExecutionResult> {
+  const result = await performExecution(executionInput, options);
+  const resolvedDeviceId = result.ok ? result.deviceId : (options.deviceId || null);
+  emitExecution(resolvedDeviceId as string, executionInput, result);
+  return result;
 }
