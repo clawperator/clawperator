@@ -60,7 +60,7 @@ Features that are not required for initial launch but are high priority:
 - `clawperator observe screenshot`: First-class visual observation primitives.
 - `clawperator action [back|home|recents]`: System-level navigation hard-keys.
 
-## HTTP API Server (`--serve`)
+## HTTP API Server (`serve`)
 
 When running `clawperator serve --port <number>`, a local HTTP server is started to allow remote agents to interact with Clawperator without direct CLI access.
 

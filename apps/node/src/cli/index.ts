@@ -251,6 +251,10 @@ async function main(): Promise<void> {
       {
         const portStr = getOpt(rest, "--port");
         const port = portStr ? parseInt(portStr, 10) : 3000;
+        if (isNaN(port) || port <= 0 || port > 65535) {
+          result = JSON.stringify({ code: "USAGE", message: "Invalid port number. Must be 1-65535." });
+          break;
+        }
         await (await import("./commands/serve.js")).cmdServe({
           port,
           verbose: global.verbose,

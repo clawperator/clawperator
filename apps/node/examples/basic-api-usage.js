@@ -57,8 +57,7 @@ async function runSample() {
     if (done) break;
     
     buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split('
-');
+    const lines = buffer.split("\n");
     buffer = lines.pop(); // Keep partial line
 
     for (const line of lines) {

@@ -6,6 +6,7 @@ import type { ResultEnvelope } from "../../contracts/result.js";
  * Used by the 'serve' command to stream SSE events.
  */
 export const clawperatorEvents = new EventEmitter();
+clawperatorEvents.setMaxListeners(0); // unlimited for SSE clients
 
 export const CLAW_EVENT_TYPES = {
   RESULT: "clawperator:result", // specific canonical terminal envelope (legacy/v0.1)

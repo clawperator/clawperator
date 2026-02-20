@@ -44,10 +44,25 @@ export async function startServer(options: ServeOptions): Promise<Server> {
 
   // REST: Execute command
   app.post("/execute", async (req, res) => {
+    if (!req.body || typeof req.body !== "object") {
+      res.status(400).json({ ok: false, error: "Invalid or missing JSON body" });
+      return;
+    }
+
     const { execution, deviceId, receiverPackage } = req.body;
     
     if (!execution) {
       res.status(400).json({ ok: false, error: "Missing 'execution' in body" });
+      return;
+    }
+
+    if (deviceId !== undefined && typeof deviceId !== "string") {
+      res.status(400).json({ ok: false, error: "'deviceId' must be a string" });
+      return;
+    }
+
+    if (receiverPackage !== undefined && typeof receiverPackage !== "string") {
+      res.status(400).json({ ok: false, error: "'receiverPackage' must be a string" });
       return;
     }
 
@@ -70,10 +85,17 @@ export async function startServer(options: ServeOptions): Promise<Server> {
 
   // REST: Observe Snapshot
   app.post("/observe/snapshot", async (req, res) => {
-    const { deviceId, receiverPackage } = req.body;
+    const { deviceId, receiverPackage } = req.body || {};
+    
+    if (deviceId !== undefined && typeof deviceId !== "string") {
+      res.status(400).json({ ok: false, error: "'deviceId' must be a string" });
+      return;
+    }
+
+    const timestamp = Date.now();
     const executionInput = {
-      commandId: `serve-snap-${Date.now()}`,
-      taskId: `serve-snap-${Date.now()}`,
+      commandId: `serve-snap-${timestamp}`,
+      taskId: `serve-snap-${timestamp}`,
       source: "serve-api",
       expectedFormat: "android-ui-automator",
       timeoutMs: 30000,
@@ -95,10 +117,17 @@ export async function startServer(options: ServeOptions): Promise<Server> {
 
   // REST: Observe Screenshot
   app.post("/observe/screenshot", async (req, res) => {
-    const { deviceId, receiverPackage } = req.body;
+    const { deviceId, receiverPackage } = req.body || {};
+
+    if (deviceId !== undefined && typeof deviceId !== "string") {
+      res.status(400).json({ ok: false, error: "'deviceId' must be a string" });
+      return;
+    }
+
+    const timestamp = Date.now();
     const executionInput = {
-      commandId: `serve-shot-${Date.now()}`,
-      taskId: `serve-shot-${Date.now()}`,
+      commandId: `serve-shot-${timestamp}`,
+      taskId: `serve-shot-${timestamp}`,
       source: "serve-api",
       expectedFormat: "android-ui-automator",
       timeoutMs: 30000,

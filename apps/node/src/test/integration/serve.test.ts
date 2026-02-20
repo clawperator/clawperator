@@ -11,8 +11,10 @@ describe("serve API integration", () => {
     server = await startServer({ port, verbose: false });
   });
 
-  after(() => {
-    server.close();
+  after(async () => {
+    await new Promise<void>((resolve, reject) => {
+      server.close((err) => (err ? reject(err) : resolve()));
+    });
   });
 
   test("GET /devices returns success", async () => {

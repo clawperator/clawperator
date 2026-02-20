@@ -167,7 +167,9 @@ export async function runExecution(
   options: RunExecutionOptions = {}
 ): Promise<RunExecutionResult> {
   const result = await performExecution(executionInput, options);
-  const resolvedDeviceId = result.ok ? result.deviceId : (options.deviceId || null);
-  emitExecution(resolvedDeviceId as string, executionInput, result);
+  const resolvedDeviceId: string | null = result.ok ? result.deviceId : (options.deviceId || null);
+  if (resolvedDeviceId !== null) {
+    emitExecution(resolvedDeviceId, executionInput, result);
+  }
   return result;
 }
