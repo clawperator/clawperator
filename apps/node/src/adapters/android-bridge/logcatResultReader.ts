@@ -5,6 +5,7 @@ import { RESULT_ENVELOPE_PREFIX } from "../../contracts/result.js";
 import { parseTerminalEnvelope } from "./envelopeParser.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
 import type { TimeoutDiagnostics, BroadcastDiagnostics } from "../../contracts/errors.js";
+import { extractSnapshotFromLogs } from "../../domain/executions/snapshotHelper.js";
 
 export interface LogcatResultOptions {
   commandId: string;
@@ -87,26 +88,17 @@ export async function waitForResultEnvelope(
         if (parsed) {
           flush();
           
-          // Re-scan correlatedLines for snapshot content specifically for this command
-          const snapshotLines = correlatedLines
-            .filter(l => l.includes("TaskScopeDefault:"))
-            .map(l => {
-              // Extract everything after the tag
-              const tagIndex = l.indexOf("TaskScopeDefault:");
-              return tagIndex !== -1 ? l.slice(tagIndex + "TaskScopeDefault:".length).trim() : "";
-            })
-            // Filter out the [TaskScope] prefix common in logs
-            .map(s => s.startsWith("[TaskScope]") ? s.slice("[TaskScope]".length).trim() : s)
-            // Only keep lines that look like hierarchy content or tree
-            .filter(s => s.startsWith("<") || s.startsWith("?") || s.includes("text=") || s.includes("res="));
-          
-          if (snapshotLines.length > 0) {
-            const fullSnapshot = snapshotLines.join("\n");
+          const fullSnapshot = extractSnapshotFromLogs(correlatedLines);
+          if (fullSnapshot) {
             const snapStep = parsed.envelope.stepResults.find(s => s.actionType === "snapshot_ui");
             if (snapStep) {
               snapStep.data = { ...snapStep.data, text: fullSnapshot };
             }
           }
+
+          // Clear correlated lines so snapshot content from previous envelopes
+          // does not leak into subsequent command executions in long-running processes.
+          correlatedLines.length = 0;
 
           finalize({ ok: true, envelope: parsed.envelope, terminalSource: parsed.terminalSource });
         }

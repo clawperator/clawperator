@@ -6,7 +6,7 @@ These are the critical "next steps" required to ship a stable 0.1 proof-of-conce
 
 - [x] **CLI Action Command Refactor:** Rename the `act` subcommand to `action` as the primary/canonical entry point. (Done: removed 'act' in favor of 'action')
 - [ ] **Node CLI Refactor:** Implement the `expectedFormat` validation logic as a mandatory pre-flight check.
-- [ ] **Conformance Test APK:** Create a tiny Android app with stable Compose nodes, known resource-ids, and scroll lists for reliable smoke testing in CI/CD.
+- [x] **Conformance Test APK:** Create a tiny Android app with stable Compose nodes, known resource-ids, and scroll lists for reliable smoke testing in CI/CD. (Done: added 'app-conformance' module)
 - [ ] **Skill Migration (Bash to Node):** Migrate existing bash-based skills (e.g., Life360, Google Home) to use the Node SDK/API.
     - *Goal:* Replace raw `adb` calls and complex shell-script parsing with typed Node.js implementations for better reliability and JSON handling.
 

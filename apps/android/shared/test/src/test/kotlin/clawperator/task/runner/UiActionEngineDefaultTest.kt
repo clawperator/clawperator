@@ -78,6 +78,8 @@ class UiActionEngineDefaultTest : ActionTest {
                         ),
                 )
 
+            assertEquals("step-scroll-click", result.stepResults.single().id)
+            assertTrue(uiScope.scrollIntoViewCalled)
             assertTrue(uiScope.clickCalled)
         }
 

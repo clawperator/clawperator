@@ -1,4 +1,4 @@
-package com.clawperator.conformance
+package clawperator.conformance
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -105,7 +105,10 @@ fun HomeScreen(onOpenList: () -> Unit) {
 fun ListScreen(onBack: () -> Unit, onRowClick: (String) -> Unit) {
     val items = (0..199).map { "row_$it" }
     Column(modifier = Modifier.fillMaxSize()) {
-        Button(onClick = onBack, modifier = Modifier.padding(16.dp)) {
+        Button(
+            onClick = onBack,
+            modifier = Modifier.padding(16.dp).testTag("btn_back")
+        ) {
             Text("Back")
         }
         LazyColumn(
@@ -149,7 +152,10 @@ fun DetailScreen(rowId: String, onBack: () -> Unit) {
             style = MaterialTheme.typography.headlineMedium
         )
         Spacer(modifier = Modifier.height(32.dp))
-        Button(onClick = onBack) {
+        Button(
+            onClick = onBack,
+            modifier = Modifier.testTag("btn_back_to_list")
+        ) {
             Text("Back to List")
         }
     }

@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.clawperator.conformance"
+    namespace = "clawperator.conformance"
     compileSdk = 35
 
     defaultConfig {
@@ -43,6 +43,19 @@ android {
 
     buildFeatures {
         compose = true
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
+    }
+
+    kotlinOptions {
+        jvmTarget = "11"
+    }
+
+    composeOptions {
+        kotlinCompilerExtensionVersion = "1.5.3"
     }
 
     packaging {

@@ -27,8 +27,8 @@ rootProject.name = "clawperator"
 include(":apps:android")
 project(":apps:android").projectDir = file("apps/android")
 
-include(":apps:android:conformance")
-project(":apps:android:conformance").projectDir = file("apps/android/conformance")
+include(":apps:android:app-conformance")
+project(":apps:android:app-conformance").projectDir = file("apps/android/app-conformance")
 
 include(":app")
 project(":app").projectDir = file("apps/android/app")

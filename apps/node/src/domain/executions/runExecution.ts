@@ -7,6 +7,7 @@ import { waitForResultEnvelope } from "../../adapters/android-bridge/logcatResul
 import { runAdb } from "../../adapters/android-bridge/adbClient.js";
 import { tryAcquire, release, getConflictError } from "./executionStore.js";
 import type { ResultEnvelope, TerminalSource } from "../../contracts/result.js";
+import { extractSnapshotFromLogs } from "./snapshotHelper.js";
 
 export interface RunExecutionOptions {
   deviceId?: string;
@@ -90,15 +91,9 @@ export async function runExecution(
       const hasSnapshot = result.envelope.stepResults.some(s => s.actionType === "snapshot_ui");
       if (hasSnapshot) {
         const dump = await runAdb(config, ["logcat", "-d", "-v", "tag"]);
-        const snapshotLines = dump.stdout.split("\n")
-          .filter(l => l.startsWith("D/TaskScopeDefault:"))
-          .map(l => l.slice("D/TaskScopeDefault:".length).trim())
-          .map(s => s.startsWith("[TaskScope]") ? s.slice("[TaskScope]".length).trim() : s)
-          // Filter for hierarchy start/content
-          .filter(s => s.startsWith("<") || s.startsWith("?") || s.includes("text=") || s.includes("res="));
+        const fullSnapshot = extractSnapshotFromLogs(dump.stdout.split("\n"));
         
-        if (snapshotLines.length > 0) {
-          const fullSnapshot = snapshotLines.join("\n");
+        if (fullSnapshot) {
           const snapStep = result.envelope.stepResults.find(s => s.actionType === "snapshot_ui");
           if (snapStep) {
             snapStep.data = { ...snapStep.data, text: fullSnapshot };
