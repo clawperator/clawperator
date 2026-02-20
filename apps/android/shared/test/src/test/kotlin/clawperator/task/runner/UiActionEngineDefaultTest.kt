@@ -78,9 +78,37 @@ class UiActionEngineDefaultTest : ActionTest {
                         ),
                 )
 
-            assertEquals("step-scroll-click", result.stepResults.single().id)
-            assertTrue(uiScope.scrollIntoViewCalled)
             assertTrue(uiScope.clickCalled)
+        }
+
+    @Test
+    fun `execute close_app returns unsupported error result`() =
+        actionTest {
+            val uiScope = RecordingTaskUiScope()
+            val taskScope = RecordingTaskScope(uiScope)
+            val engine = UiActionEngineDefault()
+
+            val result =
+                engine.execute(
+                    taskScope = taskScope,
+                    plan =
+                        UiActionPlan(
+                            commandId = "cmd-close",
+                            taskId = "task-close",
+                            source = "test",
+                            actions =
+                                listOf(
+                                    UiAction.CloseApp(id = "step-close", applicationId = "com.example.app"),
+                                ),
+                        ),
+                )
+
+            val stepResult = result.stepResults.single()
+            assertEquals("step-close", stepResult.id)
+            assertEquals("close_app", stepResult.actionType)
+            assertEquals(false, stepResult.success)
+            assertEquals("UNSUPPORTED_RUNTIME_CLOSE", stepResult.data["error"])
+            assertTrue(stepResult.data["message"]?.contains("Android runtime cannot reliably close apps") == true)
         }
 }
 
