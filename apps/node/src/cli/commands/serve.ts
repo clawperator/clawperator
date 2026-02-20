@@ -27,21 +27,6 @@ export async function startServer(options: ServeOptions): Promise<Server> {
   const app = express();
   app.use(express.json({ limit: "100kb" }));
 
-  // Error handler middleware
-  app.use((err: any, _req: express.Request, res: express.Response, next: express.NextFunction) => {
-    // JSON parse error
-    if (err instanceof SyntaxError && "status" in err && err.status === 400 && "body" in err) {
-      res.status(400).json({ ok: false, error: { code: "INVALID_JSON", message: "Malformed JSON body" } });
-      return;
-    }
-    // Payload too large
-    if (err && (err.status === 413 || err.type === "entity.too.large")) {
-      res.status(413).json({ ok: false, error: { code: ERROR_CODES.PAYLOAD_TOO_LARGE, message: "Payload exceeds 100kb limit" } });
-      return;
-    }
-    next();
-  });
-
   // Logging middleware
   app.use((req, _res, next) => {
     if (options.verbose) {
@@ -267,6 +252,21 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       console.error(`⚠️ SSE heartbeat failed: ${String(err)}`);
       cleanup();
     }
+  });
+
+  // Error handler middleware (must be registered after all routes)
+  app.use((err: any, _req: express.Request, res: express.Response, next: express.NextFunction) => {
+    // JSON parse error
+    if (err instanceof SyntaxError && "status" in err && err.status === 400 && "body" in err) {
+      res.status(400).json({ ok: false, error: { code: "INVALID_JSON", message: "Malformed JSON body" } });
+      return;
+    }
+    // Payload too large
+    if (err && (err.status === 413 || err.type === "entity.too.large")) {
+      res.status(413).json({ ok: false, error: { code: ERROR_CODES.PAYLOAD_TOO_LARGE, message: "Payload exceeds 100kb limit" } });
+      return;
+    }
+    next();
   });
 
   return new Promise((resolve, reject) => {
