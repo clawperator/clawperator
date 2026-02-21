@@ -1,34 +1,16 @@
 /**
- * Stage 3 starter: doctor preflight diagnostics.
- * Checks: adb available, device connected/resolved, receiver package installed, strict/canonical mode state.
- * doctor --fix remains a stub (no automatic fixes).
+ * Doctor diagnostics for Clawperator.
+ * Checks host, device, and readiness state for end-to-end automation.
  */
-import { isAdbAvailable, runAdb } from "../../adapters/android-bridge/adbClient.js";
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
-import { resolveDevice } from "../../domain/devices/resolveDevice.js";
+import { DoctorService } from "../../domain/doctor/DoctorService.js";
+import { type DoctorReport, type DoctorCheckResult } from "../../contracts/doctor.js";
 import type { OutputOptions } from "../output.js";
-import { formatSuccess, formatError } from "../output.js";
-import { ERROR_CODES } from "../../contracts/errors.js";
-
-export interface DoctorCheck {
-  ok: boolean;
-  message?: string;
-}
-
-export interface DoctorResult {
-  ok: boolean;
-  checks: {
-    adb: DoctorCheck;
-    device: DoctorCheck & { deviceId?: string };
-    receiverPackage: DoctorCheck & { package?: string };
-    strictMode: DoctorCheck & { strictMode: boolean };
-  };
-  fix?: { applied: boolean; message?: string };
-}
 
 export async function cmdDoctor(options: {
   format: OutputOptions["format"];
   fix?: boolean;
+  full?: boolean;
   deviceId?: string;
   receiverPackage?: string;
 }): Promise<string> {
@@ -38,52 +20,87 @@ export async function cmdDoctor(options: {
     adbPath: process.env.ADB_PATH,
   });
 
-  const checks: DoctorResult["checks"] = {
-    adb: { ok: false },
-    device: { ok: false },
-    receiverPackage: { ok: false },
-    strictMode: { ok: true, strictMode: true },
-  };
+  const service = new DoctorService();
+  const report = await service.run({ config, full: options.full, fix: options.fix });
 
-  const adbOk = await isAdbAvailable(config);
-  checks.adb = adbOk ? { ok: true } : { ok: false, message: "adb not found or not executable" };
-
-  let deviceId: string | undefined;
-  if (adbOk) {
-    try {
-      const resolved = await resolveDevice(config);
-      deviceId = resolved.deviceId;
-      config.deviceId = deviceId;
-      checks.device = { ok: true, message: resolved.deviceId, deviceId: resolved.deviceId };
-    } catch (e) {
-      checks.device = { ok: false, message: (e as { message?: string }).message ?? "No single device" };
-    }
-  } else {
-    checks.device = { ok: false, message: "Skipped (adb unavailable)" };
+  if (options.format === "json") {
+    process.exitCode = report.ok ? 0 : 1;
+    return JSON.stringify(report, null, 2);
   }
 
-  if (adbOk && deviceId) {
-    const { stdout } = await runAdb(config, ["shell", "pm", "list", "packages", "-3"], { timeoutMs: 5000 });
-    const packages = stdout.split("\n").map((l) => l.replace(/^package:/, "").trim()).filter(Boolean);
-    const receiverInstalled = packages.includes(config.receiverPackage);
-    checks.receiverPackage = receiverInstalled
-      ? { ok: true, message: "installed", package: config.receiverPackage }
-      : { ok: false, message: `Receiver package not installed on device`, package: config.receiverPackage };
-  } else {
-    checks.receiverPackage = { ok: false, message: "Skipped (adb or device unavailable)", package: config.receiverPackage };
-  }
-
-  const allOk = checks.adb.ok && checks.device.ok && checks.receiverPackage.ok;
-  const result: DoctorResult = {
-    ok: allOk,
-    checks,
-  };
+  // Pretty human output
   if (options.fix) {
-    result.fix = { applied: false, message: "doctor --fix not implemented; resolve checks manually." };
+    // If --fix was passed, we've already done fixes in DoctorService,
+    // so just print the report.
+  }
+  process.exitCode = report.ok ? 0 : 1;
+  return renderPrettyDoctorReport(report);
+}
+
+function renderPrettyDoctorReport(report: DoctorReport): string {
+  const lines: string[] = [];
+  lines.push("\n🩺 Clawperator Doctor Diagnostics\n");
+
+  // Group by prefix (e.g., host., device., readiness., build.)
+  const grouped: Record<string, DoctorCheckResult[]> = {};
+  for (const check of report.checks) {
+    const group = check.id.split(".")[0] || "other";
+    if (!grouped[group]) grouped[group] = [];
+    grouped[group].push(check);
   }
 
-  if (allOk) {
-    return formatSuccess(result, options);
+  const groupOrder = ["host", "device", "readiness", "build"];
+  const sortedGroupKeys = Object.keys(grouped).sort((a, b) => {
+    const ai = groupOrder.indexOf(a);
+    const bi = groupOrder.indexOf(b);
+    if (ai >= 0 && bi >= 0) return ai - bi;
+    if (ai >= 0) return -1;
+    if (bi >= 0) return 1;
+    return a.localeCompare(b);
+  });
+
+  for (const group of sortedGroupKeys) {
+    const checks = grouped[group];
+    lines.push(`${group.toUpperCase()}:`);
+    for (const check of checks) {
+      const icon = check.status === "pass" ? "✅" : check.status === "warn" ? "⚠️" : "❌";
+      lines.push(`  ${icon} ${check.summary}`);
+      if (check.status !== "pass" && check.detail) {
+        lines.push(`     Detail: ${check.detail}`);
+      }
+      if (check.status !== "pass" && check.fix) {
+        lines.push(`     Fix: ${check.fix.title}`);
+        for (const step of check.fix.steps) {
+          if (step.kind === "shell") {
+            lines.push(`       > ${step.value}`);
+          } else {
+            lines.push(`       - ${step.value}`);
+          }
+        }
+      }
+      if (check.status !== "pass" && check.deviceGuidance) {
+        lines.push(`     Device guidance (${check.deviceGuidance.screen}):`);
+        for (const step of check.deviceGuidance.steps) {
+          lines.push(`       - ${step}`);
+        }
+      }
+    }
+    lines.push("");
   }
-  return formatError({ code: ERROR_CODES.DOCTOR_FAILED, message: "Some checks failed", ...result }, options);
+
+  if (report.ok) {
+    lines.push("✅ Verified state reached.");
+  } else {
+    lines.push("❌ Verification failed.");
+  }
+
+  if (report.nextActions && report.nextActions.length > 0) {
+    lines.push(`\nNext actions:`);
+    for (const action of report.nextActions) {
+      lines.push(`  ${action}`);
+    }
+    lines.push("");
+  }
+
+  return lines.join("\n");
 }
