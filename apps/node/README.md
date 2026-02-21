@@ -27,6 +27,12 @@ Clawperator only accepts one source of truth for execution outcomes: the `[Clawp
 ## Usage
 
 ```bash
+# Verify environment and readiness
+clawperator doctor
+
+# Full Android build + install + handshake + smoke
+clawperator doctor --full
+
 # List devices
 clawperator devices
 

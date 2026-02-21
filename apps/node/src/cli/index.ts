@@ -22,6 +22,8 @@ Commands:
                                             Capture current device screenshot (png)
   inspect ui [--device-id <id>] [--receiver-package <package>]
                                             Alias of observe snapshot with formatted output
+  action open-app --app <packageId> [--device-id <id>] [--receiver-package <package>]
+                                            Build and run single open_app action via execute path
   action click --selector <json> [--device-id <id>] [--receiver-package <package>]
                                             Build and run single click action via execute path
   action read --selector <json> [--device-id <id>] [--receiver-package <package>]
@@ -41,10 +43,12 @@ Commands:
                                             Sync and pin skills index/cache to a git ref
   serve [--port <number>] [--host <string>]
                                             Start local HTTP/SSE server for remote control (default host: 127.0.0.1)
-  doctor
-                                            Run environment and runtime checks (Stage 3)
+  doctor [--json]
+                                            Run environment and runtime checks (Stage 3). --json is alias for --output json.
   doctor --fix
-                                            Attempt non-destructive automatic fixes (Stage 3)
+                                            Attempt non-destructive host fixes (Stage 3)
+  doctor --full
+                                            Full Android build + install + handshake + smoke (Stage 3)
 
 Global options:
   --device-id <id>                          Target Android device serial
@@ -192,6 +196,11 @@ async function main(): Promise<void> {
         result = selector
           ? await (await import("./commands/action.js")).cmdActionClick({ ...out, selector, ...runOpts })
           : JSON.stringify({ code: "USAGE", message: "action click --selector <json>" });
+      } else if (sub === "open-app") {
+        const app = getOpt(rest, "--app");
+        result = app
+          ? await (await import("./commands/action.js")).cmdActionOpenApp({ ...out, applicationId: app, ...runOpts })
+          : JSON.stringify({ code: "USAGE", message: "action open-app --app <packageId>" });
       } else if (sub === "read") {
         result = selector
           ? await (await import("./commands/action.js")).cmdActionRead({ ...out, selector, ...runOpts })
@@ -205,16 +214,16 @@ async function main(): Promise<void> {
         result =
           selector && text !== undefined
             ? await (await import("./commands/action.js")).cmdActionType({
-                ...out,
-                selector,
-                text,
-                submit: hasFlag(rest, "--submit"),
-                clear: hasFlag(rest, "--clear"),
-                ...runOpts,
-              })
+              ...out,
+              selector,
+              text,
+              submit: hasFlag(rest, "--submit"),
+              clear: hasFlag(rest, "--clear"),
+              ...runOpts,
+            })
             : JSON.stringify({ code: "USAGE", message: "action type --selector <json> --text <value>" });
       } else {
-        result = JSON.stringify({ code: "USAGE", message: "action click|read|wait|type [options]" });
+        result = JSON.stringify({ code: "USAGE", message: "action open-app|click|read|wait|type [options]" });
       }
       break;
     }
@@ -264,14 +273,18 @@ async function main(): Promise<void> {
         // Long running, we don't return.
         return;
       }
-    case "doctor":
+    case "doctor": {
+      const isJson = hasFlag(rest, "--json") || out.format === "json";
       result = await (await import("./commands/doctor.js")).cmdDoctor({
         ...out,
+        format: isJson ? "json" : "pretty",
         fix: hasFlag(rest, "--fix"),
+        full: hasFlag(rest, "--full"),
         deviceId: global.deviceId ?? getOpt(rest, "--device-id"),
         receiverPackage: global.receiverPackage ?? getOpt(rest, "--receiver-package"),
       });
       break;
+    }
     default:
       result = JSON.stringify({ code: "USAGE", message: `Unknown command: ${cmd}. Use --help.` });
   }

@@ -4,11 +4,13 @@ import { buildBroadcastShellCommand } from "../../adapters/android-bridge/broadc
 import type { RuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 
 const CONFIG: RuntimeConfig = {
+  projectRoot: ".",
   adbPath: "adb",
   deviceId: "test-device-serial",
   receiverPackage: "com.clawperator.operator.dev",
   actionAgentCommand: "app.clawperator.operator.ACTION_AGENT_COMMAND",
   payloadExtraKey: "payload",
+  runner: { run: async () => ({ code: 0, stdout: "", stderr: "" }), runShell: async () => ({ code: 0, stdout: "", stderr: "" }), spawn: () => ({}) }
 };
 
 describe("buildBroadcastShellCommand", () => {
