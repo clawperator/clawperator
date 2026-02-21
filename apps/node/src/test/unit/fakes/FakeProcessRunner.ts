@@ -26,6 +26,10 @@ export class FakeProcessRunner implements ProcessRunner {
         return result;
     }
 
+    runShell(command: string, options?: { timeoutMs?: number; cwd?: string }): Promise<ProcessResult> {
+        return this.run("bash", ["-lc", command], options);
+    }
+
     spawn(command: string, args: string[]): any {
         this.calls.push({ command, args });
         return {};

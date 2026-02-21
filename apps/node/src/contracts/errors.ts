@@ -3,6 +3,9 @@
  * Aligned with 0.1.0 Error Taxonomy in docs/node-api-design.md
  */
 export const ERROR_CODES = {
+  // Host
+  HOST_DEPENDENCY_MISSING: "HOST_DEPENDENCY_MISSING",
+
   // Setup & Connectivity
   ADB_NOT_FOUND: "ADB_NOT_FOUND",
   NO_DEVICES: "NO_DEVICES",

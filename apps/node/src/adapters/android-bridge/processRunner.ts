@@ -9,6 +9,7 @@ export interface ProcessResult {
 
 export interface ProcessRunner {
   run(command: string, args: string[], options?: { timeoutMs?: number; cwd?: string }): Promise<ProcessResult>;
+  runShell(command: string, options?: { timeoutMs?: number; cwd?: string }): Promise<ProcessResult>;
   // For logcat/streaming
   spawn(command: string, args: string[]): any;
 }
@@ -41,6 +42,14 @@ export class NodeProcessRunner implements ProcessRunner {
         resolve({ stdout, stderr, code: code ?? null });
       });
     });
+  }
+
+  async runShell(command: string, options?: { timeoutMs?: number; cwd?: string }): Promise<ProcessResult> {
+    const isWin = process.platform === "win32";
+    if (isWin) {
+      return this.run("cmd.exe", ["/c", command], options);
+    }
+    return this.run("bash", ["-lc", command], options);
   }
 
   spawn(command: string, args: string[]): any {

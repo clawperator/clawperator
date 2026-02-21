@@ -119,8 +119,7 @@ export class DoctorService {
           for (const step of check.fix.steps) {
             if (step.kind === "shell") {
               if (autoFix) {
-                const [cmd, ...args] = step.value.split(" ");
-                try { await config.runner.run(cmd, args); } catch { /* ignore */ }
+                try { await config.runner.runShell(step.value); } catch { /* ignore */ }
               } else {
                 nextActions.push(step.value);
               }

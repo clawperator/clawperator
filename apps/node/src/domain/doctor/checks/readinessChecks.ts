@@ -87,7 +87,10 @@ export async function checkSettings(config: RuntimeConfig): Promise<DoctorCheckR
   return results;
 }
 
-export async function runHandshake(config: RuntimeConfig): Promise<DoctorCheckResult> {
+export async function runHandshake(
+  config: RuntimeConfig,
+  _waitForResultEnvelope = waitForResultEnvelope
+): Promise<DoctorCheckResult> {
   const commandId = `handshake-${Date.now()}`;
   const payload = JSON.stringify({
     commandId,
@@ -101,7 +104,7 @@ export async function runHandshake(config: RuntimeConfig): Promise<DoctorCheckRe
   // Clear logcat for clean handshake capture
   await runAdb(config, ["logcat", "-c"]);
 
-  const result = await waitForResultEnvelope(
+  const result = await _waitForResultEnvelope(
     config,
     { commandId, timeoutMs: 7000 },
     async () => broadcastAgentCommand(config, payload)

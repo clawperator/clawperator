@@ -41,14 +41,26 @@ function renderPrettyDoctorReport(report: DoctorReport): string {
   const lines: string[] = [];
   lines.push("\n🩺 Clawperator Doctor Diagnostics\n");
 
+  // Group by prefix (e.g., host., device., readiness., build.)
   const grouped: Record<string, DoctorCheckResult[]> = {};
   for (const check of report.checks) {
-    const group = check.id.split(".")[0];
-    grouped[group] = grouped[group] || [];
+    const group = check.id.split(".")[0] || "other";
+    if (!grouped[group]) grouped[group] = [];
     grouped[group].push(check);
   }
 
-  for (const [group, checks] of Object.entries(grouped)) {
+  const groupOrder = ["host", "device", "readiness", "build"];
+  const sortedGroupKeys = Object.keys(grouped).sort((a, b) => {
+    const ai = groupOrder.indexOf(a);
+    const bi = groupOrder.indexOf(b);
+    if (ai >= 0 && bi >= 0) return ai - bi;
+    if (ai >= 0) return -1;
+    if (bi >= 0) return 1;
+    return a.localeCompare(b);
+  });
+
+  for (const group of sortedGroupKeys) {
+    const checks = grouped[group];
     lines.push(`${group.toUpperCase()}:`);
     for (const check of checks) {
       const icon = check.status === "pass" ? "✅" : check.status === "warn" ? "⚠️" : "❌";
