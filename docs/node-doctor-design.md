@@ -22,7 +22,7 @@ From a clean Linux/macOS box with only Node installed, `clawperator doctor` must
 ### 1.2 Output Contract
 Doctor should emit:
 - **Human Summary**: Grouped sections (Host, Device, Runtime, Handshake) with status indicators (Green/Yellow/Red).
-- **Final Guidance**: A "Next command to run" line.
+- **Final Guidance**: A "Next action(s)" list of commands to run.
 - **JSON Payload**: (Optional) Stable error codes and metadata for automated recovery.
 
 ---
@@ -115,7 +115,7 @@ interface DoctorReport {
   ok: boolean;
   deviceId?: string;
   checks: DoctorCheckResult[];
-  nextCommand?: string;
+  nextActions: string[];
 }
 ```
 
