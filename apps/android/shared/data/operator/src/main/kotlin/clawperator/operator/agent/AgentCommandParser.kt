@@ -149,6 +149,10 @@ class AgentCommandParserDefault : AgentCommandParser {
                     id = id,
                     retry = params.parseRetryOrDefault(defaultRetry = TaskRetry.None),
                 )
+            "doctor_ping" ->
+                UiAction.DoctorPing(
+                    id = id,
+                )
             "sleep" ->
                 UiAction.Sleep(
                     id = id,

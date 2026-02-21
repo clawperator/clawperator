@@ -82,7 +82,7 @@ The CLI is the canonical entry point for local development and shell-based agent
 | `execute` | Run a full execution JSON payload. |
 | `observe snapshot` | Capture UI tree as JSON/ASCII. |
 | `observe screenshot` | Capture device screen as PNG. |
-| `action <type>` | Fast wrappers for `click`, `read`, `type`, `wait`. |
+| `action <type>` | Fast wrappers for `open-app`, `click`, `read`, `type`, `wait`. |
 | `serve` | Start the local HTTP/SSE API server (default port 3000). |
 
 ### 2. The HTTP API (`serve`)

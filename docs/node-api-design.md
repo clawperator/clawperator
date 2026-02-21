@@ -42,7 +42,7 @@ Commands:
 - `clawperator packages list`: Confirm presence of receiver and target apps.
 - `clawperator execute`: Run an execution JSON payload.
 - `clawperator observe snapshot`: Get current UI tree as JSON/ASCII.
-- `clawperator action [click|read|wait]`: Quick wrappers for single-step interactions.
+- `clawperator action [open-app|click|read|wait|type]`: Quick wrappers for single-step interactions.
 
 Contracts:
 - **Canonical Envelope:** `[Clawperator-Result] {JSON}` is the ONLY way success/failure is reported.
@@ -323,6 +323,8 @@ Supported action types (v1):
 - `read_text`
 - `snapshot_ui`
 - `sleep`
+- `type_text`
+- `doctor_ping`
 
 ## Doctor and Dependency Management
 
