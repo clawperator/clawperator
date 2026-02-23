@@ -11,6 +11,8 @@ import action.battery.BatteryManagerSystem
 import action.buildconfig.BuildConfig
 import action.coroutine.CoroutineContextProvider
 import action.coroutine.CoroutineScopes
+import action.developeroptions.DeveloperOptionsManager
+import action.developeroptions.DeveloperOptionsManagerAndroid
 import action.device.DeviceCountry
 import action.device.DeviceCountryDefault
 import action.device.DeviceId
@@ -91,12 +93,11 @@ import action.theme.SystemThemeDefault
 import action.time.TimeRepository
 import action.time.TimeRepositorySystem
 import android.content.SharedPreferences
+import android.view.WindowManager as AndroidWindowManager
 import androidx.core.app.NotificationManagerCompat
 import clawperator.accessibilityservice.AccessibilityServiceManager
 import clawperator.accessibilityservice.AccessibilityServiceManagerAndroid
 import clawperator.app.AppStateManager
-import clawperator.developeroptions.DeveloperOptionsManager
-import clawperator.developeroptions.DeveloperOptionsManagerAndroid
 import clawperator.app.AppStateManagerWrapper
 import clawperator.app.AppViewModel
 import clawperator.app.close.AppCloseManager
@@ -178,13 +179,12 @@ import clawperator.workflow.WorkflowFactoryDefault
 import clawperator.workflow.WorkflowManager
 import clawperator.workflow.WorkflowManagerDefault
 import io.ktor.client.HttpClient
+import java.util.concurrent.Executor
+import java.util.concurrent.ExecutorService
 import kotlinx.coroutines.CoroutineScope
 import okhttp3.OkHttpClient
 import org.koin.core.module.Module
 import org.koin.dsl.module
-import java.util.concurrent.Executor
-import java.util.concurrent.ExecutorService
-import android.view.WindowManager as AndroidWindowManager
 
 @Suppress("RemoveExplicitTypeArguments")
 val AppModule: Module = module {
