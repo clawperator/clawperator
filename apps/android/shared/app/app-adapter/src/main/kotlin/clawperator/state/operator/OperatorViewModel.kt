@@ -4,7 +4,7 @@ import action.coroutine.flow.combineDistinct
 import action.resources.string.StringRepository
 import androidx.lifecycle.ViewModel
 import clawperator.accessibilityservice.AccessibilityServiceManager
-import clawperator.developeroptions.DeveloperOptionsManager
+import action.developeroptions.DeveloperOptionsManager
 import clawperator.state.operator.AppDoctorState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow

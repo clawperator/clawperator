@@ -1,4 +1,4 @@
-package clawperator.developeroptions
+package action.developeroptions
 
 import android.content.Context
 import android.provider.Settings
