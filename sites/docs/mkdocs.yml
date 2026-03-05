@@ -10,7 +10,32 @@ theme:
     scheme: slate
 
 nav:
-  - Getting Started: index.md
-  - CLI Reference: cli-reference.md
-  - API Overview: api-overview.md
-  - Error Codes: error-codes.md
+  - Home: index.md
+  - Getting Started:
+    - Project Overview: getting-started/project-overview.md
+    - First-Time Setup: getting-started/first-time-setup.md
+  - For AI Agents:
+    - Node API - Agent Guide: ai-agents/node-api-for-agents.md
+  - Reference:
+    - CLI Reference: reference/cli-reference.md
+    - API Overview: reference/api-overview.md
+    - Error Codes: reference/error-codes.md
+  - Architecture:
+    - Target Architecture: architecture/architecture.md
+    - Conformance Test APK: architecture/conformance-apk.md
+  - Troubleshooting:
+    - Troubleshooting the Operator App: troubleshooting/troubleshooting.md
+    - Known Issues: troubleshooting/known-issues.md
+    - Crash Logs: troubleshooting/crash-logs.md
+  - Skills:
+    - Usage Model: skills/usage-model.md
+    - Skill Authoring Guidelines: skills/skill-authoring-guidelines.md
+    - Device Prep and Runtime Tips: skills/device-prep-and-runtime-tips.md
+    - Skills Verification: skills/skills-verification.md
+    - Blocked Terms Policy: skills/blocked-terms-policy.md
+  - Design:
+    - Node Runtime and API Design: design/node-api-design.md
+    - Doctor v0.1 Design Spec: design/node-doctor-design.md
+    - Operator LLM Playbook: design/operator-llm-playbook.md
+    - Skill Design: design/skill-design.md
+    - Alpha Release Checklist: design/node-api-alpha-release-checklist.md
