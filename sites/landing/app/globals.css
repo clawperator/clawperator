@@ -7,10 +7,15 @@
   --line: rgba(16, 16, 16, 0.14);
   --glow: radial-gradient(circle at 20% 0%, #f2dfbf 0%, transparent 45%),
     radial-gradient(circle at 80% 100%, #cad8bf 0%, transparent 55%);
+  --toolbar-height: 80px;
 }
 
 * {
   box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
@@ -24,12 +29,113 @@ body {
 .page-shell {
   width: min(800px, 92vw);
   margin: 0 auto;
-  padding: 2rem 0 1.8rem;
+  padding: calc(var(--toolbar-height) + 1.2rem) 0 1.8rem;
+}
+
+.top-toolbar {
+  width: 100%;
+  min-height: 80px;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  background: linear-gradient(90deg, #061126 0%, #0a1a2f 100%);
+  color: #dce6f6;
+  border-bottom: 1px solid rgba(167, 193, 223, 0.18);
+  box-shadow: 0 8px 24px rgba(2, 10, 20, 0.34);
+  backdrop-filter: blur(8px);
+}
+
+.top-toolbar-inner {
+  width: min(800px, 92vw);
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.toolbar-brand {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  color: #ecf2ff;
+  text-decoration: none;
+  min-width: 0;
+}
+
+.toolbar-logo {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.5rem;
+  flex-shrink: 0;
+}
+
+.toolbar-brand-text {
+  font-size: 1.05rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  line-height: 1.1;
+}
+
+.toolbar-brand-stack {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.toolbar-subtitle {
+  font-size: 0.86rem;
+  line-height: 1.15;
+  color: #9fb4d4;
+}
+
+.toolbar-links {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.toolbar-links a {
+  color: #c6d4e9;
+  text-decoration: none;
+  padding: 0.28rem 0.56rem;
+  border-radius: 8px;
+  font-size: 0.92rem;
+}
+
+.toolbar-links a:hover {
+  background: rgba(170, 194, 225, 0.14);
+  color: #ecf2ff;
+}
+
+.toolbar-links .toolbar-cta {
+  border: 1px solid rgba(81, 216, 182, 0.42);
+  color: #8ef7d7;
+  background: rgba(66, 197, 163, 0.1);
+}
+
+.toolbar-links .toolbar-cta:hover {
+  background: rgba(66, 197, 163, 0.2);
 }
 
 .hero-card {
   padding: 0;
   animation: rise 0.7s ease-out both;
+}
+
+#top,
+#install,
+#features,
+#why,
+#what,
+#how-it-works {
+  scroll-margin-top: calc(var(--toolbar-height) + 14px);
 }
 
 .brand-row {
@@ -241,12 +347,36 @@ h1 {
   line-height: 1.45;
 }
 
+.site-footer {
+  min-height: 180px;
+  margin-top: 2.2rem;
+  border-top: 1px solid rgba(16, 16, 16, 0.16);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 0.55rem;
+}
+
+.footer-title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--accent-strong);
+}
+
+.footer-copy {
+  margin: 0;
+  color: rgba(16, 16, 16, 0.7);
+}
+
 .footer-links {
-  margin-top: 1.25rem;
-  padding: 0 0.2rem;
   display: flex;
   flex-wrap: wrap;
-  gap: 1rem;
+  justify-content: center;
+  gap: 0.8rem;
 }
 
 .footer-links a {
@@ -314,6 +444,47 @@ h1 {
   font-size: 1rem;
 }
 
+.loop-section {
+  margin-top: 1.9rem;
+}
+
+.loop-steps {
+  margin-top: 1rem;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.loop-step {
+  display: grid;
+  grid-template-columns: 3.3rem minmax(0, 1fr);
+  gap: 0.8rem;
+  align-items: flex-start;
+  border: 1px solid rgba(16, 16, 16, 0.16);
+  border-radius: 14px;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.52), rgba(248, 248, 238, 0.75));
+  padding: 0.9rem 1rem;
+}
+
+.loop-index {
+  margin: 0;
+  font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 700;
+  color: #1f5f4a;
+  font-size: 1.35rem;
+  line-height: 1.1;
+}
+
+.loop-step h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  line-height: 1.2;
+}
+
+.loop-step p {
+  margin: 0.35rem 0 0;
+  max-width: 60ch;
+}
+
 @keyframes rise {
   from {
     opacity: 0;
@@ -327,6 +498,24 @@ h1 {
 }
 
 @media (max-width: 840px) {
+  :root {
+    --toolbar-height: 124px;
+  }
+
+  .top-toolbar {
+    min-height: var(--toolbar-height);
+  }
+
+  .top-toolbar-inner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .toolbar-links {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
   .grid-2-col {
     grid-template-columns: 1fr;
     gap: 1rem;
@@ -344,5 +533,10 @@ h1 {
   .command-row {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .loop-step {
+    grid-template-columns: 1fr;
+    gap: 0.45rem;
   }
 }

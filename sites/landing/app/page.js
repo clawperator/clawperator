@@ -64,9 +64,35 @@ export default function Home() {
   };
 
   return (
-    <main className="page-shell">
+    <>
+      <header className="top-toolbar">
+        <div className="top-toolbar-inner">
+          <a href="#top" className="toolbar-brand">
+            <img src="/clawperator-logo.png" alt="" aria-hidden="true" className="toolbar-logo" />
+            <span className="toolbar-brand-stack">
+              <span className="toolbar-brand-text">Clawperator</span>
+              <span className="toolbar-subtitle">Android automation for agents</span>
+            </span>
+          </a>
+
+          <nav className="toolbar-links" aria-label="Page sections">
+            <a href="#install">Install</a>
+            <a href="#why">Why</a>
+            <a href="#what">What</a>
+            <a href="#how-it-works">How it works</a>
+            <a href="https://docs.clawperator.com" target="_blank" rel="noreferrer">
+              Docs
+            </a>
+            <a href="https://github.com/clawpilled/clawperator" target="_blank" rel="noreferrer" className="toolbar-cta">
+              GitHub
+            </a>
+          </nav>
+        </div>
+      </header>
+
+      <main className="page-shell">
       {/* Hero Section */}
-      <section className="hero-card">
+      <section id="top" className="hero-card">
         <div className="brand-row">
           <img src="/clawperator-logo.png" alt="Clawperator logo" className="logo" />
           <p className="brand-text">Clawperator</p>
@@ -78,7 +104,7 @@ export default function Home() {
           strict command semantics, and machine-readable outcomes.
         </p>
 
-        <div className="quickstart-block" aria-label="Quickstart terminal">
+        <div id="install" className="quickstart-block" aria-label="Quickstart terminal">
           <div className="quickstart-top">
             <div className="traffic-lights" aria-hidden="true">
               <span className="dot red" />
@@ -145,7 +171,7 @@ export default function Home() {
       </section>
 
       {/* Feature Grid - Core Principles */}
-      <section className="feature-grid" aria-label="Core features">
+      <section id="features" className="feature-grid" aria-label="Core features">
         {features.map((feature) => (
           <article key={feature.title} className="feature-card">
             <h2>{feature.title}</h2>
@@ -155,7 +181,7 @@ export default function Home() {
       </section>
 
       {/* Why Section */}
-      <section className="content-section">
+      <section id="why" className="content-section">
         <h2>Why Clawperator?</h2>
         <p>
           Many consumer services only expose critical data in mobile apps, not public web APIs.
@@ -175,7 +201,7 @@ export default function Home() {
       </section>
 
       {/* What Section */}
-      <section className="content-section">
+      <section id="what" className="content-section">
         <h2>What Is Clawperator?</h2>
         <p>
           Clawperator is the execution layer for LLM-driven Android automation. It provides a deterministic Node.js
@@ -211,17 +237,61 @@ export default function Home() {
         </div>
       </section>
 
-      <footer className="footer-links">
-        <a href="https://docs.clawperator.com" target="_blank" rel="noreferrer">
-          docs.clawperator.com
-        </a>
-        <a href="https://github.com/clawpilled/clawperator" target="_blank" rel="noreferrer">
-          GitHub
-        </a>
-        <a href="https://www.npmjs.com/package/clawperator" target="_blank" rel="noreferrer">
-          npm
-        </a>
-      </footer>
-    </main>
+      <section id="how-it-works" className="content-section loop-section">
+        <h2>How It Works</h2>
+        <p>The hand loop is simple and deterministic: observe, decide, execute, and report.</p>
+
+        <div className="loop-steps" aria-label="Clawperator hand loop">
+          <article className="loop-step">
+            <p className="loop-index">01</p>
+            <div>
+              <h3>Observe</h3>
+              <p>Capture structured UI state from the Android device so the agent can reason on a stable snapshot.</p>
+            </div>
+          </article>
+
+          <article className="loop-step">
+            <p className="loop-index">02</p>
+            <div>
+              <h3>Decide</h3>
+              <p>The brain chooses the next action based on selectors and current state. Clawperator does not plan.</p>
+            </div>
+          </article>
+
+          <article className="loop-step">
+            <p className="loop-index">03</p>
+            <div>
+              <h3>Execute</h3>
+              <p>Run deterministic device actions (tap, type, scroll, read) with strict validation and no hidden retries.</p>
+            </div>
+          </article>
+
+          <article className="loop-step">
+            <p className="loop-index">04</p>
+            <div>
+              <h3>Return</h3>
+              <p>Emit one canonical terminal envelope (`[Clawperator-Result]`) with machine-readable success or failure.</p>
+            </div>
+          </article>
+        </div>
+      </section>
+
+        <footer className="site-footer">
+          <p className="footer-title">Clawperator</p>
+          <p className="footer-copy">Built for fast, reproducible Android automation from single actions to full agent runs.</p>
+          <nav className="footer-links" aria-label="Footer links">
+            <a href="https://docs.clawperator.com" target="_blank" rel="noreferrer">
+              docs
+            </a>
+            <a href="https://github.com/clawpilled/clawperator" target="_blank" rel="noreferrer">
+              github
+            </a>
+            <a href="https://www.npmjs.com/package/clawperator" target="_blank" rel="noreferrer">
+              npm
+            </a>
+          </nav>
+        </footer>
+      </main>
+    </>
   );
 }
