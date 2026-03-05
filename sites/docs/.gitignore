@@ -1,3 +1,6 @@
 site/
 .cache/
 .venv/
+.generated/
+docs_inventory.json
+docs_build.json

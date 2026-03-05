@@ -43,7 +43,13 @@ Design consequence:
 - Typical local layout is sibling repos:
   - `../clawperator` (this repo)
   - `../clawperator-skills` (skills repo)
+- Repo-specific Codex skills live in `.agents/skills/` in this repository.
+- Current project-local skill:
+  - `.agents/skills/clawperator-generate-docs/` - regenerates `sites/docs/docs/` from `docs/`, `apps/node`, and `../clawperator-skills/docs` using `sites/docs/source-map.yaml`
 - Clawperator runtime and Node API execute plans/actions; skill logic, recipes, and app-specific wrappers live in `../clawperator-skills`.
+- Keep the distinction clear:
+  - `../clawperator-skills` contains runtime/user-facing skills consumed by Clawperator
+  - `.agents/skills/` contains repository-local Codex workflows for maintaining this repo
 - When changing contracts that affect skills (action shapes, envelope fields, CLI behavior), bump skill version, update both repos in lockstep and re-run skills smoke checks.
 
 ## Required Iteration Loop

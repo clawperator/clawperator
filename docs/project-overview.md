@@ -23,6 +23,7 @@ The system consists of two primary layers:
 Skills are reusable templates for app-specific workflows (e.g., "get thermostat temperature" or "check grocery prices").
 
 -   **Canonical Home:** `../clawperator-skills` (a dedicated sibling repository).
+-   **Project-local maintenance skills:** Repository-specific Codex workflows live in `.agents/skills/`. For example, `.agents/skills/clawperator-generate-docs/` regenerates the MkDocs site content in `sites/docs/docs/` from the canonical doc sources.
 -   **Nature of Skills:** Due to the dynamic nature of mobile apps (A/B tests, server-side flags, unexpected popups), skills are treated as **highly informed context** for the Agent rather than purely deterministic scripts.
 -   **Agent Responsibility:** The Agent uses skill templates as a baseline, modifying them at runtime to handle personal configurations (variable substitution) or UI drift.
 
