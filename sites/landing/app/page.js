@@ -93,16 +93,19 @@ export default function Home() {
       <main className="page-shell">
       {/* Hero Section */}
       <section id="top" className="hero-card">
-        <div className="brand-row">
-          <img src="/clawperator-logo.png" alt="Clawperator logo" className="logo" />
-          <p className="brand-text">Clawperator</p>
-        </div>
+        <div className="hero-grid">
+          <div>
+            <h1>Deterministic Android Automation for AI Agents</h1>
+            <p className="hero-copy">
+              Clawperator is the execution hand for an LLM brain. Drive real Android devices with stable contracts,
+              strict command semantics, and machine-readable outcomes.
+            </p>
+          </div>
 
-        <h1>Deterministic Android Automation for AI Agents</h1>
-        <p className="hero-copy">
-          Clawperator is the execution hand for an LLM brain. Drive real Android devices with stable contracts,
-          strict command semantics, and machine-readable outcomes.
-        </p>
+          <div className="hero-mascot-wrap" aria-hidden="true">
+            <img src="/clawperator-logo.png" alt="" className="hero-mascot" />
+          </div>
+        </div>
 
         <div id="install" className="quickstart-block" aria-label="Quickstart terminal">
           <div className="quickstart-top">
@@ -172,6 +175,11 @@ export default function Home() {
 
       {/* Feature Grid - Core Principles */}
       <section id="features" className="feature-grid" aria-label="Core features">
+        <div className="feature-intro">
+          <h2>Features</h2>
+          <p>Tools agents can trust: deterministic execution, structured outputs, and composable automation.</p>
+        </div>
+
         {features.map((feature) => (
           <article key={feature.title} className="feature-card">
             <h2>{feature.title}</h2>
