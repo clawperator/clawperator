@@ -51,4 +51,4 @@ npm run build
 npm run test
 ```
 
-For detailed protocol documentation, see `docs/node-api-design.md`.
+For detailed protocol documentation, see `docs/design/node-api-design.md`.

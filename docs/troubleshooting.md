@@ -103,8 +103,8 @@ If the versions are incompatible, you may see:
 3. **Hang/Timeout**: The APK crashed or failed to emit the envelope because of a protocol error.
 
 **How to fix:**
-- Upgrade the Node CLI: `npm install -g @clawperator/cli@latest`
-- Update the Android APK: Download the latest release from [GitHub Releases](https://github.com/Clawcave/clawperator/releases) and run `./gradlew installDebug` or install the provided APK.
+- Upgrade the Node CLI: `npm install -g clawperator@latest`
+- Update the Android APK: Download the latest release from [GitHub Releases](https://github.com/clawpilled/clawperator/releases) and install via `adb install -r clawperator-vX.X.X.apk`.
 
 ---
 
