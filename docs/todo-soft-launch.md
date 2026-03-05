@@ -222,7 +222,7 @@ One-command installation that sets up everything a user needs: Node.js, adb, the
   - Action: Before finalizing the install script, check the actual layout of the `clawperator-skills` repo to determine where `skills-registry.json` lives relative to the repo root. The path set in the env var must match exactly. If the clone target is `~/.clawperator/skills/` and the registry file is at repo root, the path is `~/.clawperator/skills/skills-registry.json`. If the registry is in a subdirectory, adjust accordingly
   - **Flag:** Do not hardcode this path without confirming the skills repo structure first
 
-- [ ] **Make script available via landing page**
+- [x] **Make script available via landing page**
   - Action: Covered in Phase 3 (symlink/copy to `sites/landing/public/install.sh`). Note the dependency here
 
 - [ ] **[HUMAN] Test on clean Ubuntu 24.04 VM**
@@ -253,7 +253,7 @@ One-command installation that sets up everything a user needs: Node.js, adb, the
 
 ---
 
-## Phase 3: Landing Page
+## Phase 3: Landing Page [COMPLETE]
 
 ### Objective
 
@@ -261,45 +261,46 @@ Professional landing page at clawperator.com that communicates what Clawperator 
 
 ### Tasks
 
-- [ ] **Scaffold `/sites/landing/` from Peekaboo template**
+- [x] **Scaffold `/sites/landing/` from Peekaboo template**
   - File: `sites/landing/` (new directory)
   - Action: Copy the Peekaboo Next.js template into `sites/landing/`. The template is already available locally at `/Users/chrislacy/clawpilled/eval/Peekaboo/docs/site` - no need to clone from GitHub. Remove template-specific content and branding
+  - Note: Source path currently contains a static site snapshot, so landing implementation uses a clean Next.js scaffold under `sites/landing/` with Clawperator-specific content
   - Notes: The `sites/` directory does not currently exist. Create it. Follow existing monorepo conventions
 
-- [ ] **Update hero section content**
+- [x] **Update hero section content**
   - File: `sites/landing/` (various component files)
   - Action: Set headline, subheadline, and description copy. Key message: "Deterministic Android Automation for AI Agents" with one-line install command prominently displayed
 
-- [ ] **Add features section**
+- [x] **Add features section**
   - File: `sites/landing/` (component files)
   - Action: Add three feature blocks: Deterministic (no hidden retries, strict contracts), Observable (structured UI snapshots, canonical result envelopes), Reliable (machine-readable error codes, agent-friendly diagnostics)
 
-- [ ] **Add quick start code block**
+- [x] **Add quick start code block**
   - File: `sites/landing/` (component files)
   - Action: Show the install command: `curl -fsSL https://clawperator.com/install.sh | bash`
 
-- [ ] **Add Clawperator logo**
+- [x] **Add Clawperator logo**
   - File: `docs/img/clawperator-logo.png` -> `sites/landing/public/`
   - Action: Copy (or reference) the logo from `docs/img/clawperator-logo.png`
 
-- [ ] **Configure static export**
+- [x] **Configure static export**
   - File: `sites/landing/next.config.js`
   - Action: Set `output: 'export'` for Cloudflare Pages static deployment
 
-- [ ] **Make install script available at `/install.sh`**
+- [x] **Make install script available at `/install.sh`**
   - File: `sites/landing/public/install.sh`
   - Action: Copy or symlink `/scripts/install.sh` to `sites/landing/public/install.sh` so it is served at `https://clawperator.com/install.sh`
   - Notes: Symlinks may not work with Next.js static export depending on the build tool. A build script or CI step that copies the file before `next build` may be more reliable
 
-- [ ] **Add footer links**
+- [x] **Add footer links**
   - File: `sites/landing/` (footer component)
   - Action: Links to: docs.clawperator.com, GitHub repo, npm package
 
-- [ ] **Add `sites/landing/.gitignore`**
+- [x] **Add `sites/landing/.gitignore`**
   - File: `sites/landing/.gitignore` (new)
   - Action: Exclude build artifacts: `node_modules/`, `.next/`, `out/`
 
-- [ ] **Test local build**
+- [x] **Test local build**
   - Action: `cd sites/landing && npm install && npm run build` - verify `out/` directory is generated and `out/install.sh` exists
 
 - [ ] **[HUMAN] Deploy to Cloudflare Pages**
