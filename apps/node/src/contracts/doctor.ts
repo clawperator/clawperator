@@ -22,6 +22,7 @@ export interface DoctorCheckResult {
 
 export interface DoctorReport {
   ok: boolean;
+  criticalOk: boolean;
   deviceId?: string;
   receiverPackage?: string;
   checks: DoctorCheckResult[];
