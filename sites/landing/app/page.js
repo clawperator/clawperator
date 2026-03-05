@@ -93,21 +93,23 @@ export default function Home() {
       <main className="page-shell">
       {/* Hero Section */}
       <section id="top" className="hero-card">
-        <div className="hero-grid">
-          <div>
-            <h1>Deterministic Android Automation for AI Agents</h1>
-            <p className="hero-copy">
-              Clawperator is the execution hand for an LLM brain. Drive real Android devices with stable contracts,
-              strict command semantics, and machine-readable outcomes.
-            </p>
-          </div>
-
-          <div className="hero-mascot-wrap" aria-hidden="true">
-            <img src="/clawperator-logo.png" alt="" className="hero-mascot" />
-          </div>
+        <div className="hero-waterfall">
+          <img src="/clawperator-logo.png" alt="" aria-hidden="true" className="hero-logo" />
+          <p className="hero-product-name">Clawperator</p>
+          <h1 className="hero-catchphrase">Deterministic Android Automation for AI Agents</h1>
+          <p className="hero-summary">
+            Let AI agents use and control Android apps on behalf of users.
+            <br />
+            Clawperator connects your agent to a dedicated Android device so it can observe the screen, perform UI
+            actions, and receive structured results.
+          </p>
         </div>
 
-        <div id="install" className="quickstart-block" aria-label="Quickstart terminal">
+        <div className="quickstart-intro">
+          <h2 id="install">Quick Start</h2>
+        </div>
+
+        <div className="quickstart-block" aria-label="Quickstart terminal">
           <div className="quickstart-top">
             <div className="traffic-lights" aria-hidden="true">
               <span className="dot red" />
