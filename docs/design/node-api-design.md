@@ -363,7 +363,7 @@ Runtime should execute against cached/pinned skill content, not live network fet
 
 Skill compilation requirements are defined in:
 
-- `docs/skill-design.md`
+- `docs/design/skill-design.md`
 
 When skill artifacts are missing/stale, runtime can still execute direct executions supplied by the agent.
 

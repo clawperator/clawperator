@@ -31,12 +31,12 @@ Design consequence:
   - `com.clawperator.operator.dev` (Local/Debug)
 - **Clawperator is an actuator:** It does not own strategy, planning, or autonomous reasoning. These live in the Agent.
 
-## Source of Truth Docs
-- `docs/project-overview.md`
-- `docs/operator-llm-playbook.md`
-- `docs/node-api-design.md`
-- `docs/node-api-for-agents.md`
-- `docs/node-api-alpha-release-checklist.md`
+## Key Docs
+- `docs/node-api-for-agents.md` - API contract, CLI reference, error codes
+- `docs/first-time-setup.md` - Device setup and APK installation
+- `docs/architecture.md` - System design
+- `docs/troubleshooting.md` - Common issues
+- `docs/design/` - Internal design documents
 
 ## Skills
 - Skills are maintained in a dedicated repository: [github.com/clawpilled/clawperator-skills](https://github.com/clawpilled/clawperator-skills).
@@ -81,10 +81,5 @@ For non-trivial changes, do all steps before commit:
 - When making breaking contract changes, include migration notes in commit message and docs.
 
 ## Documentation Style
-- **No em dashes:** Never use em dashes (`—`). Use a regular dash or hyphen (`-`) instead for clarity and consistency.
-- Use clean,Monospaced-friendly formatting for all markdown files.
-
-## Near-Term Engineering Priorities
-- Keep Android and Node contracts aligned and minimal.
-- Continue strengthening real-device smoke coverage and deterministic diagnostics.
-- Improve docs and onboarding so first-time agents can run end-to-end quickly.
+- **No em dashes:** Never use em dashes (`-`). Use a regular dash or hyphen (`-`) instead for clarity and consistency.
+- Use clean, monospace-friendly formatting for all markdown files.

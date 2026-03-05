@@ -73,7 +73,7 @@ Make docs agent-first and approachable. A new user should understand Clawperator
   - Notes: This is distinct from the README quickstart - it's the detailed "Day 1" guide. Should reference the APK download URL from GitHub Releases once that workflow exists (Phase 6)
 
 - [ ] **Move design docs to `docs/design/`**
-  - Files: `docs/node-api-design.md`, `docs/node-doctor-design.md`, `docs/skill-design.md`, `docs/operator-llm-playbook.md`, `docs/wip-plan.md`, `docs/v1-todo.md`, `docs/node-api-alpha-release-checklist.md`
+  - Files: `docs/node-api-design.md`, `docs/node-doctor-design.md`, `docs/skill-design.md`, `docs/operator-llm-playbook.md`, `docs/node-api-alpha-release-checklist.md` (moved to `docs/design/`)
   - Action: Create `docs/design/` subdirectory and move these files. Update any cross-references in remaining docs
   - Notes: Keep in `docs/` root: `architecture.md`, `troubleshooting.md`, `conformance-apk.md`, `known-issues.md`, `crash-logs.md`, `first-time-setup.md` (new), `project-overview.md`
 
@@ -94,9 +94,9 @@ None. This phase is a prerequisite for everything else.
 
 ### Files to Audit (no changes expected, just verify current)
 
-- `docs/operator-llm-playbook.md` - verify content reflects current skills model before docs site migration
-- `docs/node-api-design.md` - verify against actual implementation before migrating to design/
-- `docs/skill-design.md` - verify content is accurate for skills authoring guide in docs site
+- `docs/design/operator-llm-playbook.md` - verify content reflects current skills model before docs site migration
+- `docs/design/node-api-design.md` - verify against actual implementation before migrating to docs site
+- `docs/design/skill-design.md` - verify content is accurate for skills authoring guide in docs site
 
 ---
 
