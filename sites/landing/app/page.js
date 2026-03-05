@@ -211,57 +211,51 @@ export default function Home() {
 
       {/* Why Section */}
       <section id="why" className="content-section">
-        <h2>Why Clawperator?</h2>
+        <h2>Unlocking the Mobile-First World</h2>
         <p>
-          Many consumer services only expose critical data in mobile apps, not public web APIs.
+          Your digital life often lives behind mobile walls. From family tracking and home automation to grocery 
+          delivery and ride-hailing, many essential services only exist as apps—not web APIs.
         </p>
-
-        <ul>
-          <li>Family tracking and location apps</li>
-          <li>Home automation apps</li>
-          <li>Grocery and shopping apps</li>
-          <li>Ride-hailing apps</li>
-        </ul>
-
         <p>
-          Clawperator lets AI agents interact with these apps on your behalf. The interface stays predictable and
-          stable so skills can be created, reused, and shared.
+          Clawperator gives your AI agent the "hands" it needs to help you where you actually spend your 
+          time. It provides a stable, predictable way for agents to navigate the apps you use every day, 
+          turning mobile silos into open platforms.
         </p>
       </section>
 
       {/* What Section */}
       <section id="what" className="content-section">
-        <h2>What Is Clawperator?</h2>
+        <h2>The Bridge Between Brain and Device</h2>
         <p>
-          Clawperator is the execution layer for LLM-driven Android automation. It provides a deterministic Node.js
-          CLI and HTTP API, the hand for an LLM brain.
+          Think of Clawperator as the execution layer for AI. It translates high-level agent reasoning into 
+          precise, real-world device actions. It's the rock-solid connection that lets an LLM "brain" 
+          interact with physical Android hardware.
         </p>
         <div className="grid-2-col">
           <div>
-            <h3>What agents can do</h3>
+            <h3>Empower Your Agent</h3>
             <ul>
-              <li>Connect to a real Android device</li>
-              <li>Run deterministic UI actions (tap, scroll, type, read)</li>
-              <li>Observe screen state via structured snapshots</li>
-              <li>Get canonical terminal results (`[Clawperator-Result]`)</li>
-              <li>Compose primitives into repeatable skills</li>
+              <li>Connect to real Android hardware instantly</li>
+              <li>Execute precise taps, scrolls, and typing</li>
+              <li>"See" the screen through structured UI data</li>
+              <li>Build and share repeatable automation skills</li>
             </ul>
           </div>
           <div>
-            <h3>Design principles</h3>
+            <h3>Built for Reliability</h3>
             <ul>
-              <li><strong>Deterministic:</strong> Strict contracts, no hidden retries, one result envelope per command.</li>
-              <li><strong>Observable:</strong> Structured UI snapshots and machine-readable error codes.</li>
-              <li><strong>Agent-first:</strong> JSON output, typed errors, single-flight concurrency.</li>
+              <li><strong>Deterministic:</strong> No guesswork or hidden retries.</li>
+              <li><strong>Observable:</strong> Every action returns a verifiable result.</li>
+              <li><strong>Agent-First:</strong> Built for JSON and machine-readable errors.</li>
             </ul>
           </div>
         </div>
 
         <div className="setup-note">
           <p>
-            <strong>Typical setup:</strong> A dedicated Android device (any cheap or old phone) stays connected to
-            your host machine as a permanent actuator. Your agent sends commands through Clawperator, and Clawperator
-            executes and reports results.
+            <strong>The Actuator Model:</strong> Use any cheap or old Android phone as a dedicated 
+            "burner" device. Keep it connected to your host machine, and your agent has a permanent, 
+            24/7 hand to get things done.
           </p>
         </div>
       </section>

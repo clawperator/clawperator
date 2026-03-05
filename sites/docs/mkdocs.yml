@@ -1,0 +1,16 @@
+site_name: Clawperator
+site_description: Deterministic actuator tool for device automation
+docs_dir: docs
+
+theme:
+  name: material
+  logo: img/clawperator-logo.png
+  favicon: img/clawperator-logo.png
+  palette:
+    scheme: slate
+
+nav:
+  - Getting Started: index.md
+  - CLI Reference: cli-reference.md
+  - API Overview: api-overview.md
+  - Error Codes: error-codes.md
