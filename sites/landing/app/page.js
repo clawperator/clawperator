@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const installCommands = {
   oneLiner: "curl -fsSL https://clawperator.com/install.sh | bash",
@@ -25,6 +25,8 @@ const features = [
 export default function Home() {
   const [mode, setMode] = useState("oneLiner");
   const [copied, setCopied] = useState(false);
+  const [showToolbar, setShowToolbar] = useState(false);
+  const heroLogoRef = useRef(null);
   const activeCommand = mode === "npm" ? installCommands.npm : installCommands.oneLiner;
 
   const handleCopy = async () => {
@@ -63,9 +65,26 @@ export default function Home() {
     }
   };
 
+  useEffect(() => {
+    if (!heroLogoRef.current) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries;
+        setShowToolbar(!entry.isIntersecting);
+      },
+      { threshold: 0 }
+    );
+
+    observer.observe(heroLogoRef.current);
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <>
-      <header className="top-toolbar">
+      <header className={showToolbar ? "top-toolbar visible" : "top-toolbar hidden"}>
         <div className="top-toolbar-inner">
           <a href="#top" className="toolbar-brand">
             <img src="/clawperator-logo.png" alt="" aria-hidden="true" className="toolbar-logo" />
@@ -94,7 +113,7 @@ export default function Home() {
       {/* Hero Section */}
       <section id="top" className="hero-card">
         <div className="hero-waterfall">
-          <img src="/clawperator-logo.png" alt="" aria-hidden="true" className="hero-logo" />
+          <img ref={heroLogoRef} src="/clawperator-logo.png" alt="" aria-hidden="true" className="hero-logo" />
           <p className="hero-product-name">Clawperator</p>
           <h1 className="hero-catchphrase">Deterministic Android Automation for AI Agents</h1>
           <p className="hero-summary">
