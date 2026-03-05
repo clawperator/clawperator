@@ -78,6 +78,7 @@ main/release/output.json
 firebase/functions/node_modules/
 /apps/node/node_modules/
 /apps/node/dist/
+/apps/node/*.tgz
 
 # Environment variables
 .env
