@@ -1,0 +1,7 @@
+src/
+tsconfig.json
+.eslintrc*
+*.test.ts
+examples/
+dist/test/
+dist/**/*.map

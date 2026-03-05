@@ -1,12 +1,30 @@
 {
   "name": "clawperator",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha.1",
   "description": "Clawperator Node API - reliable Android execution for LLM agents",
   "type": "module",
   "main": "dist/cli/index.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/clawpilled/clawperator.git",
+    "directory": "apps/node"
+  },
+  "homepage": "https://clawperator.com",
+  "bugs": "https://github.com/clawpilled/clawperator/issues",
   "bin": {
     "clawperator": "./dist/cli/index.js"
   },
+  "publishConfig": {
+    "access": "public",
+    "tag": "alpha"
+  },
+  "files": [
+    "dist/",
+    "!dist/test/**",
+    "!dist/**/*.map",
+    "README.md",
+    "LICENSE"
+  ],
   "engines": {
     "node": ">=22.0.0"
   },
