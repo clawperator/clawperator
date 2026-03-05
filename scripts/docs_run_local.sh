@@ -10,6 +10,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 DOCS_DIR="$REPO_ROOT/sites/docs"
+VENV_DIR="$DOCS_DIR/.venv"
 
 echo "--- Running Clawperator Documentation Site Locally ---"
 echo "Repository Root: $REPO_ROOT"
@@ -20,18 +21,11 @@ if [ ! -d "$DOCS_DIR" ]; then
     exit 1
 fi
 
-cd "$DOCS_DIR"
+# Build first so local server always runs against current docs output.
+"$SCRIPT_DIR/docs_build.sh"
 
-# Install dependencies if not already installed
-if ! command -v mkdocs &> /dev/null || [ ! -d "$DOCS_DIR/.venv" ]; then
-    echo "Setting up Python virtual environment..."
-    python3 -m venv "$DOCS_DIR/.venv"
-    source "$DOCS_DIR/.venv/bin/activate"
-    echo "Installing MkDocs dependencies..."
-    pip install -r requirements.txt
-else
-    source "$DOCS_DIR/.venv/bin/activate"
-fi
+cd "$DOCS_DIR"
+source "$VENV_DIR/bin/activate"
 
 echo "--- Starting MkDocs dev server at http://localhost:8000 ---"
 echo "Press Ctrl+C to stop the server."
