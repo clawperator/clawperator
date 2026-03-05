@@ -13,6 +13,7 @@
   --accent-info: #2fc4d6;
 
   --toolbar-height: 80px;
+  --section-gap: 3.4rem;
 }
 
 * {
@@ -34,7 +35,7 @@ body {
 .page-shell {
   width: min(800px, 92vw);
   margin: 0 auto;
-  padding: calc(var(--toolbar-height) + 2rem) 0 2.4rem;
+  padding: 2rem 0 2.4rem;
 }
 
 .top-toolbar {
@@ -49,6 +50,19 @@ body {
   align-items: center;
   background: var(--bg);
   border-bottom: 1px solid var(--border);
+  transition: transform 220ms ease, opacity 220ms ease;
+}
+
+.top-toolbar.hidden {
+  transform: translateY(-100%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.top-toolbar.visible {
+  transform: translateY(0);
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .top-toolbar-inner {
@@ -185,7 +199,7 @@ body {
 }
 
 .quickstart-intro {
-  margin-top: 2rem;
+  margin-top: var(--section-gap);
 }
 
 .quickstart-intro h2 {
@@ -356,7 +370,7 @@ body {
 
 .feature-intro {
   grid-column: 1 / -1;
-  margin: 4.5rem 0 0.25rem;
+  margin: var(--section-gap) 0 0.25rem;
   padding-top: 0;
 }
 
@@ -420,7 +434,7 @@ body {
 }
 
 .content-section {
-  margin-top: 4.5rem;
+  margin-top: var(--section-gap);
   padding-top: 0;
 }
 
@@ -495,7 +509,7 @@ body {
 }
 
 .loop-section {
-  margin-top: 4.5rem;
+  margin-top: var(--section-gap);
 }
 
 .loop-steps {
