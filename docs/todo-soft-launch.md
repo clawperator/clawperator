@@ -185,7 +185,7 @@ Publish the `clawperator` CLI to npm so it can be installed with `npm install -g
 
 ---
 
-## Phase 2: Install Script
+## Phase 2: Install Script [COMPLETE]
 
 ### Objective
 
@@ -193,7 +193,7 @@ One-command installation that sets up everything a user needs: Node.js, adb, the
 
 ### Tasks
 
-- [ ] **Create `/scripts/install.sh`**
+- [x] **Create `/scripts/install.sh`**
   - File: `scripts/install.sh` (new)
   - Action: Create a POSIX-compatible bash script with the following flow:
     1. Detect OS: `uname -s` for Linux/macOS; detect distro via `/etc/os-release` for apt vs pacman vs other
@@ -205,20 +205,20 @@ One-command installation that sets up everything a user needs: Node.js, adb, the
     7. Print next steps: download APK URL, `clawperator doctor`, link to first-time-setup doc
   - Notes: Script will be served at `https://clawperator.com/install.sh` via the landing page. Must be safe to run repeatedly (idempotent). Reference existing `scripts/clawperator_grant_android_permissions.sh` for bash style conventions
 
-- [ ] **Add error handling and cleanup**
+- [x] **Add error handling and cleanup**
   - File: `scripts/install.sh`
   - Action: Add `set -euo pipefail` at top, `trap` for cleanup on failure, clear user-facing error messages for each possible failure point
 
-- [ ] **Check for `git` as a dependency**
+- [x] **Check for `git` as a dependency**
   - File: `scripts/install.sh`
   - Action: Before the skills clone step, check `command -v git`. If missing, install via Homebrew (`brew install git`) on macOS or apt (`sudo apt-get install -y git`) on Linux. `git` is required for both the direct clone step and `clawperator skills install`
 
-- [ ] **Handle shell RC files for both zsh and bash**
+- [x] **Handle shell RC files for both zsh and bash**
   - File: `scripts/install.sh`
   - Action: Append the `CLAWPERATOR_SKILLS_REGISTRY` export to both `~/.zshrc` (if it exists) and `~/.bashrc` (if it exists), guarded by a `grep` check so the line is only added once. On macOS, `~/.zshrc` is the default shell since Catalina; on Linux, `~/.bashrc` is typical. Targeting both covers mixed environments
   - Notes: Do NOT append unconditionally to shell RC files that don't exist - check first with `[ -f ~/.zshrc ]` etc.
 
-- [ ] **Verify `CLAWPERATOR_SKILLS_REGISTRY` path against skills repo structure**
+- [x] **Verify `CLAWPERATOR_SKILLS_REGISTRY` path against skills repo structure**
   - Action: Before finalizing the install script, check the actual layout of the `clawperator-skills` repo to determine where `skills-registry.json` lives relative to the repo root. The path set in the env var must match exactly. If the clone target is `~/.clawperator/skills/` and the registry file is at repo root, the path is `~/.clawperator/skills/skills-registry.json`. If the registry is in a subdirectory, adjust accordingly
   - **Flag:** Do not hardcode this path without confirming the skills repo structure first
 
