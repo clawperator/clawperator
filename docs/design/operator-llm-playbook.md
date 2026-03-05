@@ -114,6 +114,6 @@ Due to the dynamic nature of mobile apps (A/B tests, server-side flags, unexpect
 
 ## 6) Where to update docs
 
-- Skill model/design: `docs/skill-design.md`
-- Canonical LLM/operator usage: `docs/operator-llm-playbook.md` (this file)
+- Skill model/design: `docs/design/skill-design.md`
+- Canonical LLM/operator usage: `docs/design/operator-llm-playbook.md` (this file)
 - App-specific skill packages: `skills/<applicationId>.<intent>/...`
