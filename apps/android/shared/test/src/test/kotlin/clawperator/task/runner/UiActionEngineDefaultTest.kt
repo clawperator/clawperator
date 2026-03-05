@@ -1,10 +1,13 @@
 package clawperator.task.runner
 
+import action.developeroptions.DeveloperOptionsManager
 import action.math.geometry.Rect
 import clawperator.test.ActionTest
 import clawperator.test.actionTest
 import clawperator.uitree.ToggleState
 import clawperator.uitree.UiTreeClickTypes
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -16,7 +19,8 @@ class UiActionEngineDefaultTest : ActionTest {
         actionTest {
             val uiScope = RecordingTaskUiScope()
             val taskScope = RecordingTaskScope(uiScope)
-            val engine = UiActionEngineDefault()
+            val developerOptionsManager = FakeDeveloperOptionsManager()
+            val engine = UiActionEngineDefault(developerOptionsManager)
 
             val result =
                 engine.execute(
@@ -55,7 +59,8 @@ class UiActionEngineDefaultTest : ActionTest {
         actionTest {
             val uiScope = RecordingTaskUiScope()
             val taskScope = RecordingTaskScope(uiScope)
-            val engine = UiActionEngineDefault()
+            val developerOptionsManager = FakeDeveloperOptionsManager()
+            val engine = UiActionEngineDefault(developerOptionsManager)
 
             val result =
                 engine.execute(
@@ -88,7 +93,8 @@ class UiActionEngineDefaultTest : ActionTest {
         actionTest {
             val uiScope = RecordingTaskUiScope()
             val taskScope = RecordingTaskScope(uiScope)
-            val engine = UiActionEngineDefault()
+            val developerOptionsManager = FakeDeveloperOptionsManager()
+            val engine = UiActionEngineDefault(developerOptionsManager)
 
             val result =
                 engine.execute(
@@ -255,4 +261,9 @@ private class RecordingTaskUiScope : TaskUiScope {
     ) {
         // Test implementation - no-op
     }
+}
+
+private class FakeDeveloperOptionsManager : DeveloperOptionsManager {
+    override val isEnabled: Flow<Boolean> = flowOf(true)
+    override val isUsbDebuggingEnabled: Flow<Boolean> = flowOf(true)
 }
