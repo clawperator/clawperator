@@ -43,8 +43,24 @@ Design consequence:
 - Typical local layout is sibling repos:
   - `../clawperator` (this repo)
   - `../clawperator-skills` (skills repo)
+- Repo-specific Codex skills live in `.agents/skills/` in this repository.
+- Current project-local skill:
+  - `.agents/skills/clawperator-generate-docs/` - regenerates `sites/docs/docs/` from `docs/`, `apps/node`, and `../clawperator-skills/docs` using `sites/docs/source-map.yaml`
 - Clawperator runtime and Node API execute plans/actions; skill logic, recipes, and app-specific wrappers live in `../clawperator-skills`.
+- Keep the distinction clear:
+  - `../clawperator-skills` contains runtime/user-facing skills consumed by Clawperator
+  - `.agents/skills/` contains repository-local Codex workflows for maintaining this repo
 - When changing contracts that affect skills (action shapes, envelope fields, CLI behavior), bump skill version, update both repos in lockstep and re-run skills smoke checks.
+
+## Documentation Discipline
+
+`sites/docs/docs/` is generated output produced by the `clawperator-generate-docs` skill. Never edit it directly - changes will be overwritten on the next run.
+
+If you find an error in a generated page, check `sites/docs/source-map.yaml` to find the source file, fix it there, then re-run the skill to regenerate. Source locations:
+- Content errors: `docs/` or `../clawperator-skills/docs/`
+- CLI/API reference errors: `apps/node/src/`
+
+Commit the source fix and the regenerated output together.
 
 ## Required Iteration Loop
 For non-trivial changes, do all steps before commit:

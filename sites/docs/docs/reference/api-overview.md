@@ -1,4 +1,4 @@
-# Node API Overview
+# API Overview
 
 Clawperator exposes a Node-based interface for agent-driven device automation. The agent (brain) calls this API to dispatch actions to an Android device (hand). The API handles device resolution, payload validation, broadcast dispatch, and result collection.
 
