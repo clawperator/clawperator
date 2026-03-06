@@ -1,10 +1,13 @@
 name: Publish npm Package
 
 on:
-  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
 
 permissions:
   contents: read
+  id-token: write
 
 concurrency:
   group: publish-npm-${{ github.ref }}
@@ -25,6 +28,9 @@ jobs:
           registry-url: https://registry.npmjs.org
           cache: npm
           cache-dependency-path: apps/node/package-lock.json
+
+      - name: Upgrade npm for Trusted Publishing
+        run: npm install --global npm@^11.5.1
 
       - name: Validate tag matches package version
         shell: bash
@@ -49,7 +55,5 @@ jobs:
         run: npm --prefix apps/node run test
 
       - name: Publish package
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         working-directory: apps/node
-        run: npm publish --access public --tag latest
+        run: npm publish --provenance --access public --tag latest
