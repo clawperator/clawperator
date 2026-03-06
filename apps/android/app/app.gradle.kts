@@ -78,11 +78,18 @@ android {
         }
         create("release") {
             // Fall back to using debug keystore if environment variables are not set. Required for CI.
-            storeFile = env("ANDROID_KEYSTORE_PATH", "KEYSTORE_LOCATION")?.let { file(it) }
+            storeFile = env("CLAWPERATOR_ANDROID_KEYSTORE_PATH")?.let { file(it) }
+                ?: env("ANDROID_KEYSTORE_PATH", "KEYSTORE_LOCATION")?.let { file(it) }
                 ?: file("../../../scripts/debug.keystore")
-            storePassword = env("ANDROID_KEYSTORE_PASSWORD", "KEYSTORE_PASSWORD") ?: "android"
-            keyAlias = env("ANDROID_KEY_ALIAS", "ACTION_LAUNCHER_KEY_ALIAS") ?: "androiddebugkey"
-            keyPassword = env("ANDROID_KEY_PASSWORD", "ACTION_LAUNCHER_KEY_PASSWORD") ?: "android"
+            storePassword = env("CLAWPERATOR_ANDROID_KEYSTORE_PASSWORD")
+                ?: env("ANDROID_KEYSTORE_PASSWORD", "KEYSTORE_PASSWORD")
+                ?: "android"
+            keyAlias = env("CLAWPERATOR_ANDROID_KEY_ALIAS")
+                ?: env("ANDROID_KEY_ALIAS", "ACTION_LAUNCHER_KEY_ALIAS")
+                ?: "androiddebugkey"
+            keyPassword = env("CLAWPERATOR_ANDROID_KEY_PASSWORD")
+                ?: env("ANDROID_KEY_PASSWORD", "ACTION_LAUNCHER_KEY_PASSWORD")
+                ?: "android"
 
             isV1SigningEnabled = true
             isV2SigningEnabled = true

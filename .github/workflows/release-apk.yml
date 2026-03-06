@@ -22,10 +22,10 @@ jobs:
       CLOUDFLARE_R2_SECRET_ACCESS_KEY: ${{ secrets.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
       CLOUDFLARE_R2_BUCKET: ${{ secrets.CLOUDFLARE_R2_BUCKET }}
       CLOUDFLARE_DOWNLOADS_BASE_URL: ${{ secrets.CLOUDFLARE_DOWNLOADS_BASE_URL }}
-      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      CLAWPERATOR_ANDROID_KEYSTORE_BASE64: ${{ secrets.CLAWPERATOR_ANDROID_KEYSTORE_BASE64 }}
+      CLAWPERATOR_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.CLAWPERATOR_ANDROID_KEYSTORE_PASSWORD }}
+      CLAWPERATOR_ANDROID_KEY_ALIAS: ${{ secrets.CLAWPERATOR_ANDROID_KEY_ALIAS }}
+      CLAWPERATOR_ANDROID_KEY_PASSWORD: ${{ secrets.CLAWPERATOR_ANDROID_KEY_PASSWORD }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -71,7 +71,7 @@ jobs:
             latest_channel="stable"
           fi
 
-          if [[ -z "${ANDROID_KEYSTORE_BASE64}" || -z "${ANDROID_KEYSTORE_PASSWORD}" || -z "${ANDROID_KEY_ALIAS}" || -z "${ANDROID_KEY_PASSWORD}" ]]; then
+          if [[ -z "${CLAWPERATOR_ANDROID_KEYSTORE_BASE64}" || -z "${CLAWPERATOR_ANDROID_KEYSTORE_PASSWORD}" || -z "${CLAWPERATOR_ANDROID_KEY_ALIAS}" || -z "${CLAWPERATOR_ANDROID_KEY_PASSWORD}" ]]; then
             echo "Android signing secrets are required for tagged releases." >&2
             exit 1
           fi
@@ -97,7 +97,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/android-release.keystore"
+          echo "$CLAWPERATOR_ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/android-release.keystore"
 
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
@@ -105,10 +105,10 @@ jobs:
       - name: Build release APK
         env:
           CLAWPERATOR_VERSION_NAME: ${{ steps.release_meta.outputs.version }}
-          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/android-release.keystore
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          CLAWPERATOR_ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/android-release.keystore
+          CLAWPERATOR_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.CLAWPERATOR_ANDROID_KEYSTORE_PASSWORD }}
+          CLAWPERATOR_ANDROID_KEY_ALIAS: ${{ secrets.CLAWPERATOR_ANDROID_KEY_ALIAS }}
+          CLAWPERATOR_ANDROID_KEY_PASSWORD: ${{ secrets.CLAWPERATOR_ANDROID_KEY_PASSWORD }}
         run: ./gradlew :app:assembleRelease
 
       - name: Prepare release artifacts

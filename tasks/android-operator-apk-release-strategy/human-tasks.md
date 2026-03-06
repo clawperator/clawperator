@@ -14,15 +14,14 @@ Use these markers while working through the list:
 
 ## 1. Release Policy Decisions
 
-- [ ] Confirm that stable releases must always be signed with the production release keystore.
-- [ ] Confirm whether prerelease builds (`alpha`, `beta`) must also use the production release keystore.
-  - Recommendation: yes, if operationally possible.
-- [ ] Confirm that only tags created from `main` are allowed to publish stable releases.
-  - Recommendation: yes.
+- [✅] Confirm that stable releases must always be signed with the production release keystore.
+- [✅] Confirm whether prerelease builds (`alpha`, `beta`) must also use the production release keystore.
+- [❌] Confirm that only tags created from `main` are allowed to publish stable releases. - allow tags to be creaetd from any branch, so long as it does not Negatively introduce complexity too much. 
 - [ ] Confirm whether Cloudflare Worker deployment will be:
   - manual at first
   - or automated from GitHub Actions
-- [ ] Confirm whether `/operator-beta.apk` should ship in the first implementation or be deferred until after stable is working.
+  Answer: My preference is to configure automatic deployment through the Cloudflare dashboard. 
+- [ ] Confirm whether `/operator-beta.apk` should ship in the first implementation or be deferred until after stable is working. Defer for now. 
   - Recommendation: implement now because the metadata model already supports it.
 
 ## 2. Android Release Signing

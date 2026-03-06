@@ -531,7 +531,7 @@ Automated APK and npm publishing on version tags via GitHub Actions.
 
 ### Concerns
 
-- APK signing: release APKs require a signing keystore stored as GitHub secrets (`ANDROID_KEYSTORE_BASE64`, `ANDROID_KEY_ALIAS`, etc.). For alpha, debug APKs may be acceptable but should be clearly labeled in the release
+- APK signing: release APKs require a signing keystore stored as GitHub secrets (`CLAWPERATOR_ANDROID_KEYSTORE_BASE64`, `CLAWPERATOR_ANDROID_KEY_ALIAS`, etc.). For alpha, debug APKs may be acceptable but should be clearly labeled in the release
 - The `v*` tag pattern will match tags on any branch - consider adding a `branches: [main]` filter or using a `workflow_dispatch` gate for safety
 - `npm publish --prefix` may not work as expected in some npm versions - test the command form before relying on it in CI; alternative: `cd apps/node && npm publish`
 
