@@ -18,6 +18,21 @@ Adopt a hybrid model:
 - Cloudflare R2 plus `downloads.clawperator.com` becomes the canonical binary distribution origin
 - `clawperator.com/operator.apk` becomes a short-cache redirect to the current stable version
 
+## Current Status
+
+Implemented:
+
+- tagged releases build the signed APK
+- tagged releases create the GitHub Release
+- tagged releases upload the APK and checksum to R2
+- tagged releases update `operator/latest.json`
+- `downloads.clawperator.com` serves the R2-backed artifacts and metadata
+
+Remaining gap for the public stable URL:
+
+- `https://clawperator.com/operator.apk` still needs Cloudflare Worker routing
+- this is currently a manual Cloudflare dashboard task, not a GitHub Actions deployment task
+
 This is the right split because GitHub Releases is good for provenance, release notes, and visibility, while R2 is better for stable URLs, cache control, metadata pointers, and future channel management.
 
 ## End State
@@ -112,6 +127,12 @@ Prefer:
 
 This avoids redirect drift, keeps channel logic centralized, and supports future auth or rate limiting if needed.
 
+Current implementation note:
+
+- the repo does not yet deploy or manage this Worker
+- the next repo-owned step is to add Worker source and scaffolding
+- the next human-owned step is to create the Worker service and route in Cloudflare
+
 ### 5. Release signing must be explicit before broad public launch
 
 The current Android Gradle config in [`apps/android/app/app.gradle.kts`](../../apps/android/app/app.gradle.kts) falls back to a debug keystore when release env vars are absent. That is acceptable for internal CI continuity, but not for a durable public update story.
@@ -134,6 +155,14 @@ Human tasks:
 - approve whether `/operator.apk` stays a Worker route or another Cloudflare-managed redirect mechanism
 - create and deploy the Cloudflare Worker route for `/operator.apk` if Worker-based delivery is retained
 - configure any remaining cache, DNS, and zone-level settings needed for the public stable URL
+
+Concrete dashboard tasks still remaining:
+
+- create Worker service `operator-apk-redirect`
+- add Worker environment variable `CLAWPERATOR_APK_METADATA_URL=https://downloads.clawperator.com/operator/latest.json`
+- deploy the Worker to production
+- add route `clawperator.com/operator.apk`
+- verify the route returns `302` to the `apk_url` from `latest.json`
 
 Why human-owned:
 
@@ -226,6 +255,12 @@ Why human-owned:
 - `downloads.clawperator.com` backed by R2
 - Worker that serves metadata-aware redirects
 - caching headers for APKs, metadata, and redirects
+
+Current status:
+
+- `downloads.clawperator.com` is complete
+- metadata upload is complete
+- Worker redirect remains to be implemented and deployed
 
 ### Plan
 

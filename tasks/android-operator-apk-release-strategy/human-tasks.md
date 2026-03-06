@@ -18,10 +18,10 @@ Use these markers while working through the list:
 - [x] Confirm that releases use the production release keystore.
 - [x] Confirm that only tags created from `main` are allowed to publish stable releases.
   - Current decision: allow tags to be created from any branch, so long as that does not introduce too much operational complexity.
-- [ ] Confirm whether Cloudflare Worker deployment will be:
+- [x] Confirm whether Cloudflare Worker deployment will be:
   - manual at first
   - or automated from GitHub Actions
-  Answer: My preference is to configure automatic deployment through the Cloudflare dashboard. 
+  - Current decision: manage the first Worker deployment in the Cloudflare dashboard, not from GitHub Actions.
 - [x] Confirm that there is no separate beta channel for now.
   - Current decision: use one stable release path only.
 
@@ -69,33 +69,60 @@ Use these markers while working through the list:
 
 ## 4. Cloudflare Setup
 
-- [ ] Decide which Cloudflare account will own the APK hosting infrastructure.
-- [ ] Confirm billing ownership for that account.
+- [x] Decide which Cloudflare account will own the APK hosting infrastructure.
+- [x] Confirm billing ownership for that account.
 - [x] Create the R2 bucket for release artifacts.
   - Recommended bucket purpose: Clawperator release binaries only.
 - [x] Configure the custom domain `downloads.clawperator.com`.
 - [x] Ensure DNS for `clawperator.com` can support the `/operator.apk` routing approach.
-- [ ] Decide whether the Worker will live in the same account as the R2 bucket.
+- [x] Decide whether the Worker will live in the same account as the R2 bucket.
   - Recommendation: yes, to reduce cross-account friction.
-- [ ] Create the Worker that will serve redirect logic, or approve CI to deploy it later.
+- [ ] Create the Worker that will serve redirect logic.
+- [ ] In Cloudflare Workers, create a Worker service for the stable APK redirect.
+  - Recommended service name: `operator-apk-redirect`
+- [ ] In the Worker settings, add environment variable `CLAWPERATOR_APK_METADATA_URL`.
+  - Value: `https://downloads.clawperator.com/operator/latest.json`
+- [ ] Deploy the Worker once to the production environment.
+- [ ] Add the route on the `clawperator.com` zone:
+  - route: `clawperator.com/operator.apk`
+  - target: `operator-apk-redirect`
+- [ ] Verify the Worker response in the browser or with `curl -I`:
+  - `https://clawperator.com/operator.apk`
+  - Expected result: `302` redirect to the immutable versioned APK URL from `latest.json`
 - [x] Create least-privilege API credentials for CI.
 - [x] Verify that the credentials can:
   - upload objects to R2
   - update metadata pointer files
-  - optionally deploy/update the Worker
+  - Worker deployment remains manual for now
 
 ## 5. Domain and Routing Approval
 
 - [ ] Approve the public URL structure:
   - `https://clawperator.com/operator.apk`
   - `https://downloads.clawperator.com/operator/latest.json`
-  - `https://clawperator.com/operator-beta.apk`
 - [ ] Confirm whether `clawperator.com/operator.apk` should be a Worker route or a redirect rule backed by a Worker fetch.
   - Recommendation: Worker route.
 - [ ] Approve cache behavior:
   - versioned APKs are immutable and long cached
   - metadata is short cached
   - redirect path is short cached or not stored
+
+### Cloudflare Dashboard Steps Still Required
+
+These are the remaining manual tasks in the Cloudflare dashboard to make `https://clawperator.com/operator.apk` live:
+
+1. Open `Workers & Pages`.
+2. Create Worker `operator-apk-redirect`.
+3. Add production environment variable:
+   - `CLAWPERATOR_APK_METADATA_URL=https://downloads.clawperator.com/operator/latest.json`
+4. Deploy the Worker.
+5. Open the `clawperator.com` zone and add route:
+   - `clawperator.com/operator.apk`
+6. Confirm the route is attached to `operator-apk-redirect`.
+7. Test:
+   - `https://clawperator.com/operator.apk`
+   - confirm `302`
+   - confirm `Location` matches the current `apk_url` in `latest.json`
 
 ## 6. npm Publishing Ownership
 
