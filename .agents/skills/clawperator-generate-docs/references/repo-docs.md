@@ -23,6 +23,7 @@
 - Scratch output lives in `sites/docs/.generated/`.
 - Inventory output lives in `sites/docs/docs_inventory.json`.
 - Build metadata lives in `sites/docs/docs_build.json`.
+- **Never edit `sites/docs/docs/` directly.** It is generated output. Fix errors in the source files listed above, then regenerate. Direct edits will be overwritten on the next run and hide the real defect.
 
 ## Minimal-diff rules
 

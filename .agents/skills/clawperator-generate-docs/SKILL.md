@@ -7,6 +7,23 @@ description: Regenerate the Clawperator public docs site from the canonical sour
 
 Keep authored documentation in its current home. Treat `sites/docs/docs/` as generated public-site output.
 
+## Source of Truth Contract
+
+**`sites/docs/docs/` is generated output. Never edit it directly.**
+
+Treat it like a build artifact - the same way you would never hand-edit a compiled binary or `dist/` output. Direct edits to generated files will be overwritten the next time the skill runs, and they obscure the real problem in the source.
+
+When you find an error in a generated page:
+1. Identify the source file via `sites/docs/source-map.yaml` (check the `sources:` field for the relevant output page).
+2. Fix the error in the source file (`docs/`, `../clawperator-skills/docs/`, or `apps/node/src/`).
+3. Re-run this skill to regenerate the affected output pages.
+4. Commit the source fix and the regenerated output together.
+
+Source locations by topic:
+- Product overview, setup, architecture, troubleshooting, design: `docs/`
+- Skills authoring, usage model, device prep: `../clawperator-skills/docs/`
+- CLI reference, error codes, API contracts: `apps/node/src/`
+
 ## Workflow
 
 1. Confirm the repo roots exist:
