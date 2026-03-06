@@ -4,33 +4,66 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
-val getVersionCode: (Int, Int, Int, Int) -> Int = { major, minor, patch, build ->
-    major * 10000000 + minor * 100000 + patch * 1000 + build * 10 + 1
+data class ParsedVersion(
+    val name: String,
+    val major: Int,
+    val minor: Int,
+    val patch: Int,
+    val prereleaseLabel: String?,
+    val prereleaseNumber: Int?
+)
+
+fun parseVersionName(versionName: String): ParsedVersion {
+    val match = Regex("""^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z]+)(?:\.(\d+))?)?$""")
+        .matchEntire(versionName)
+        ?: throw GradleException("Unsupported Clawperator version format: $versionName")
+
+    return ParsedVersion(
+        name = versionName,
+        major = match.groupValues[1].toInt(),
+        minor = match.groupValues[2].toInt(),
+        patch = match.groupValues[3].toInt(),
+        prereleaseLabel = match.groupValues[4].ifBlank { null }?.lowercase(),
+        prereleaseNumber = match.groupValues[5].ifBlank { null }?.toInt()
+    )
 }
 
-val getVersionName: (Int, Int, String?, Int?) -> String = { major, minor, type, versionCode ->
-    var versionName = "$major.$minor"
-    if (type != null) {
-        versionName = "$versionName-$type"
+fun computeVersionCode(version: ParsedVersion): Int {
+    val prereleaseOffset = when (version.prereleaseLabel) {
+        null -> 900
+        "rc" -> 800 + (version.prereleaseNumber ?: 0)
+        "beta" -> 500 + (version.prereleaseNumber ?: 0)
+        "alpha" -> 200 + (version.prereleaseNumber ?: 0)
+        else -> 100 + (version.prereleaseNumber ?: 0)
     }
-    if (versionCode != null) {
-        versionName = "$versionName-($versionCode)"
-    }
-    versionName
+
+    return version.major * 10000000 +
+        version.minor * 100000 +
+        version.patch * 1000 +
+        prereleaseOffset
+}
+
+fun readNodePackageVersion(): String {
+    val packageJson = rootProject.file("apps/node/package.json")
+    val versionLine = Regex(""""version"\s*:\s*"([^"]+)"""")
+        .find(packageJson.readText())
+        ?.groupValues
+        ?.get(1)
+        ?: throw GradleException("Unable to read version from ${packageJson.path}")
+
+    return versionLine
 }
 
 android {
     namespace = "com.clawperator.operator"
 
-    val versionMajor = 1
-    val versionMinor = 0
-    val versionPatch = 0
-    val versionBuild = 0
+    val resolvedVersionName = System.getenv("CLAWPERATOR_VERSION_NAME") ?: readNodePackageVersion()
+    val resolvedVersion = parseVersionName(resolvedVersionName)
 
     defaultConfig {
         applicationId = "com.clawperator.operator"
-        versionCode = getVersionCode(versionMajor, versionMinor, versionPatch, versionBuild)
-        versionName = getVersionName(versionMajor, versionMinor, "DEMO", null)
+        versionCode = System.getenv("CLAWPERATOR_VERSION_CODE")?.toInt() ?: computeVersionCode(resolvedVersion)
+        versionName = resolvedVersion.name
     }
 
     signingConfigs {
