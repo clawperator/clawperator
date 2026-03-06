@@ -34,7 +34,7 @@ For every tagged release, GitHub Actions should:
 4. Upload the same APK and checksum to Cloudflare R2
 5. Update the appropriate metadata pointer:
    - stable releases update `latest.json`
-   - prereleases update `latest-beta.json`
+   - prereleases do not update a mutable channel pointer
 6. Publish the Node package to npm:
    - alpha tags -> `alpha`
    - beta and rc tags -> `beta`
@@ -73,14 +73,12 @@ For every tagged release, GitHub Actions should:
 Expected public structure:
 
 - `https://downloads.clawperator.com/operator/latest.json`
-- `https://downloads.clawperator.com/operator/latest-beta.json`
 - `https://downloads.clawperator.com/operator/vX.Y.Z/operator-vX.Y.Z.apk`
 - `https://downloads.clawperator.com/operator/vX.Y.Z/operator-vX.Y.Z.apk.sha256`
 
 Expected stable UX:
 
 - `https://clawperator.com/operator.apk` redirects to the current stable immutable APK
-- `https://clawperator.com/operator-beta.apk` redirects to the current beta immutable APK
 
 ## Release Checklist
 
@@ -117,7 +115,7 @@ After the workflows finish, verify:
 
 - GitHub Release exists at `https://github.com/clawpilled/clawperator/releases`
 - npm package version exists at `https://www.npmjs.com/package/clawperator`
-- metadata file exists at `https://downloads.clawperator.com/operator/latest.json` or `latest-beta.json`
+- stable metadata file exists at `https://downloads.clawperator.com/operator/latest.json`
 - APK URL in metadata resolves
 - checksum file matches the APK
 
@@ -135,4 +133,5 @@ Rollback means:
 
 - Stable releases should use the production Android signing key.
 - Prereleases should also use the production key unless there is a conscious exception.
+- Prerelease tags publish immutable versioned artifacts only. They do not move a mutable download pointer.
 - Worker deployment for `/operator.apk` can be managed separately from the artifact upload workflow if needed.

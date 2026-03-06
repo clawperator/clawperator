@@ -63,8 +63,8 @@ jobs:
 
           if [[ "$tag_version" =~ -(alpha|beta|rc)(\.[0-9]+)?$ ]]; then
             is_prerelease=true
-            latest_metadata_name="latest-beta.json"
-            latest_channel="beta"
+            latest_metadata_name=""
+            latest_channel="prerelease"
           else
             is_prerelease=false
             latest_metadata_name="latest.json"
@@ -142,9 +142,11 @@ jobs:
               "published_at": os.environ["PUBLISHED_AT"],
           }
 
-          with open(os.environ["LATEST_METADATA_NAME"], "w", encoding="utf-8") as fh:
-              json.dump(metadata, fh, indent=2)
-              fh.write("\n")
+          latest_metadata_name = os.environ.get("LATEST_METADATA_NAME", "")
+          if latest_metadata_name:
+              with open(latest_metadata_name, "w", encoding="utf-8") as fh:
+                  json.dump(metadata, fh, indent=2)
+                  fh.write("\n")
           PY
         env:
           RELEASE_VERSION: ${{ steps.release_meta.outputs.version }}
@@ -158,6 +160,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          metadata_pointer="${{ steps.release_meta.outputs.latest_metadata_name }}"
+          if [[ -n "$metadata_pointer" ]]; then
+            metadata_line="- Cloudflare metadata pointer: \`${metadata_pointer}\`"
+          else
+            metadata_line="- Cloudflare metadata pointer: not updated for prerelease tags"
+          fi
           cat <<'EOF' > release-notes.md
           ## Install
 
@@ -168,8 +176,8 @@ jobs:
           ## Artifacts
 
           - GitHub Release asset: `${{ steps.release_meta.outputs.artifact_name }}`
-          - Cloudflare metadata pointer: `${{ steps.release_meta.outputs.latest_metadata_name }}`
           EOF
+          printf '%s\n' "$metadata_line" >> release-notes.md
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -205,7 +213,9 @@ jobs:
             --content-type "text/plain; charset=utf-8" \
             --cache-control "public, max-age=31536000, immutable"
 
-          aws s3 cp "${{ steps.release_meta.outputs.latest_metadata_name }}" "s3://${CLAWPERATOR_CLOUDFLARE_R2_BUCKET}/operator/${{ steps.release_meta.outputs.latest_metadata_name }}" \
-            --endpoint-url "$endpoint" \
-            --content-type "application/json; charset=utf-8" \
-            --cache-control "public, max-age=60"
+          if [[ -n "${{ steps.release_meta.outputs.latest_metadata_name }}" ]]; then
+            aws s3 cp "${{ steps.release_meta.outputs.latest_metadata_name }}" "s3://${CLAWPERATOR_CLOUDFLARE_R2_BUCKET}/operator/${{ steps.release_meta.outputs.latest_metadata_name }}" \
+              --endpoint-url "$endpoint" \
+              --content-type "application/json; charset=utf-8" \
+              --cache-control "public, max-age=60"
+          fi
