@@ -1,6 +1,6 @@
 # Usage Model
 
-Related runtime/API repository: [clawperator](https://github.com/clawcave/clawperator.git)
+Related runtime/API repository: [clawperator](https://github.com/clawpilled/clawperator)
 
 ## Core Principle
 
