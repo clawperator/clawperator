@@ -1,0 +1,171 @@
+site:
+  output_dir: sites/docs/docs
+  scratch_dir: sites/docs/.generated
+  inventory_file: sites/docs/docs_inventory.json
+  build_metadata_file: sites/docs/docs_build.json
+
+repos:
+  clawperator_root: .
+  node_api_root: apps/node
+  skills_root: ../clawperator-skills
+
+rules:
+  preserve_titles: true
+  preserve_slugs: true
+  preserve_order: true
+  forbid_reflow_only_changes: true
+  max_changed_files: 12
+  max_line_churn: 400
+  max_percent_churn: 20
+
+sections:
+  - id: home
+    title: Home
+    pages:
+      - output: index.md
+        title: Clawperator Docs
+        mode: curated
+        sources:
+          - docs/project-overview.md
+          - docs/first-time-setup.md
+          - docs/architecture.md
+        notes: Keep this as a short landing page. Link outward instead of duplicating long docs.
+
+  - id: getting-started
+    title: Getting Started
+    pages:
+      - output: getting-started/project-overview.md
+        title: Project Overview
+        mode: copy
+        sources:
+          - docs/project-overview.md
+      - output: getting-started/first-time-setup.md
+        title: First-Time Setup
+        mode: copy
+        sources:
+          - docs/first-time-setup.md
+
+  - id: architecture
+    title: Architecture
+    pages:
+      - output: architecture/architecture.md
+        title: Clawperator Target Architecture
+        mode: copy
+        sources:
+          - docs/architecture.md
+      - output: architecture/conformance-apk.md
+        title: Conformance Test APK
+        mode: copy
+        sources:
+          - docs/conformance-apk.md
+
+  - id: ai-agents
+    title: For AI Agents
+    pages:
+      - output: ai-agents/node-api-for-agents.md
+        title: Clawperator Node API - Agent Guide
+        mode: copy
+        sources:
+          - docs/node-api-for-agents.md
+
+  - id: reference
+    title: Reference
+    pages:
+      - output: reference/cli-reference.md
+        title: CLI Reference
+        mode: code-derived
+        sources:
+          - apps/node/src/cli/index.ts
+          - apps/node/src/cli/commands
+        notes: Prefer extracting commands and flags from source or live CLI help.
+      - output: reference/error-codes.md
+        title: Error Codes
+        mode: code-derived
+        sources:
+          - apps/node/src/contracts/errors.ts
+          - apps/node/src/contracts/result.ts
+        notes: Keep error names and semantics aligned to code.
+      - output: reference/api-overview.md
+        title: API Overview
+        mode: curated
+        sources:
+          - docs/node-api-for-agents.md
+          - apps/node/src/contracts
+        notes: Keep narrative short. Reference code-derived details instead of duplicating them.
+
+  - id: troubleshooting
+    title: Troubleshooting
+    pages:
+      - output: troubleshooting/troubleshooting.md
+        title: Troubleshooting the Operator App
+        mode: copy
+        sources:
+          - docs/troubleshooting.md
+      - output: troubleshooting/known-issues.md
+        title: Known Issues
+        mode: copy
+        sources:
+          - docs/known-issues.md
+      - output: troubleshooting/crash-logs.md
+        title: Crash Logs
+        mode: copy
+        sources:
+          - docs/crash-logs.md
+
+  - id: skills
+    title: Skills
+    pages:
+      - output: skills/usage-model.md
+        title: Usage Model
+        mode: copy
+        sources:
+          - ../clawperator-skills/docs/usage-model.md
+      - output: skills/skill-authoring-guidelines.md
+        title: Skill Authoring Guidelines
+        mode: copy
+        sources:
+          - ../clawperator-skills/docs/skill-authoring-guidelines.md
+      - output: skills/device-prep-and-runtime-tips.md
+        title: Device Prep and Runtime Tips
+        mode: copy
+        sources:
+          - ../clawperator-skills/docs/device-prep-and-runtime-tips.md
+      - output: skills/skills-verification.md
+        title: Skills Verification
+        mode: copy
+        sources:
+          - ../clawperator-skills/docs/skills-verification.md
+      - output: skills/blocked-terms-policy.md
+        title: Blocked Terms Policy
+        mode: copy
+        sources:
+          - ../clawperator-skills/docs/blocked-terms-policy.md
+
+  - id: design
+    title: Design
+    pages:
+      - output: design/node-api-design.md
+        title: Clawperator Node Runtime and API Design
+        mode: copy
+        sources:
+          - docs/design/node-api-design.md
+      - output: design/node-doctor-design.md
+        title: Clawperator Doctor v0.1 Design Spec
+        mode: copy
+        sources:
+          - docs/design/node-doctor-design.md
+      - output: design/operator-llm-playbook.md
+        title: Operator LLM Playbook
+        mode: copy
+        sources:
+          - docs/design/operator-llm-playbook.md
+      - output: design/skill-design.md
+        title: Clawperator Skill Design
+        mode: copy
+        sources:
+          - docs/design/skill-design.md
+      - output: design/node-api-alpha-release-checklist.md
+        title: Node API Alpha Release Checklist
+        mode: copy
+        sources:
+          - docs/design/node-api-alpha-release-checklist.md

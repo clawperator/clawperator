@@ -1,0 +1,4 @@
+interface:
+  display_name: "Generate Docs"
+  short_description: "Regenerate Clawperator public docs"
+  default_prompt: "Use $clawperator-generate-docs to regenerate the Clawperator docs site from its canonical sources with minimal diff."

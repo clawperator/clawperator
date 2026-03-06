@@ -1,0 +1,10 @@
+# Local-only skill symlinks (global ~/.agents/skills/* links for pr-autoloop toolchain)
+pr-create
+pr-feedback-digest
+pr-request-copilot-review
+pr-review-loop
+pr-squash-merge
+pr-triage-feedback
+
+# Runtime cache - machine-specific state, never commit
+**/.cache/
