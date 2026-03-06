@@ -56,4 +56,4 @@ jobs:
 
       - name: Publish package
         working-directory: apps/node
-        run: npm publish --access public --tag latest
+        run: npm publish --provenance --access public --tag latest
