@@ -64,7 +64,7 @@ clawperator execute \
 - Node.js >= 22
 - `adb` in PATH
 - Android device with USB debugging enabled
-- Clawperator APK installed ([download from GitHub Releases](https://github.com/clawpilled/clawperator/releases))
+- Clawperator APK installed ([stable download](https://clawperator.com/operator.apk), [historical releases](https://github.com/clawpilled/clawperator/releases))
 
 ## For AI Agents
 
