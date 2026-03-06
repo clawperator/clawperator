@@ -7,8 +7,8 @@ Ship a release system that satisfies all of the following at once:
 - `https://clawperator.com/operator.apk` always installs the latest stable APK
 - immutable versioned APKs remain available for rollback, audit, and reproducibility
 - `scripts/install.sh` can fetch, verify, and optionally install the correct APK
-- GitHub tag pushes still drive the release process for both APK and npm publishing
-- the system can expand cleanly to beta and other channels later
+- GitHub tag pushes drive the Android APK release process today
+- Node publishing remains version-aligned, but is deferred to a follow-up change using npm Trusted Publishing
 
 ## Recommendation
 
@@ -25,9 +25,7 @@ This is the right split because GitHub Releases is good for provenance, release 
 ### Public URLs
 
 - `https://clawperator.com/operator.apk` -> latest stable redirect
-- `https://clawperator.com/operator-beta.apk` -> latest beta redirect
 - `https://downloads.clawperator.com/operator/latest.json` -> stable metadata pointer
-- `https://downloads.clawperator.com/operator/latest-beta.json` -> beta metadata pointer
 - `https://downloads.clawperator.com/operator/vX.Y.Z/operator-vX.Y.Z.apk` -> immutable versioned APK
 - `https://downloads.clawperator.com/operator/vX.Y.Z/operator-vX.Y.Z.apk.sha256` -> immutable checksum
 
@@ -57,7 +55,6 @@ For the immediate future, Clawperator should use a single release version for:
 
 Examples:
 
-- npm package `1.0.0-alpha.1` pairs with Android APK `1.0.0-alpha.1`
 - npm package `1.0.0` pairs with Android APK `1.0.0`
 
 This should be treated as a release philosophy and workflow constraint until there is a deliberate API-versioning scheme that justifies decoupling them.
@@ -66,7 +63,8 @@ Implications:
 
 - one git tag represents one coherent product release across both surfaces
 - release notes should describe the combined Node and Android change set
-- CI should publish both npm and APK artifacts from the same tag
+- Android CI should publish the APK from that tag
+- npm publishing should later publish the Node package from that same tag using Trusted Publishing
 - docs should describe one product version, not separate Android and Node release trains
 
 Non-goal for now:
@@ -124,8 +122,6 @@ Before stable launch:
 - wire it into CI secrets
 - confirm upgrade continuity across versions with the same signing identity
 
-For alpha, a debug-signed APK may be temporarily acceptable only if clearly labeled and never presented as stable.
-
 ## Human Intervention Required
 
 The following items are not fully automatable from this repo alone and require explicit human setup, access, or policy decisions.
@@ -134,12 +130,10 @@ The following items are not fully automatable from this repo alone and require e
 
 Human tasks:
 
-- create or select the Cloudflare account that will own this infrastructure
-- create the R2 bucket for release artifacts
-- configure the `downloads.clawperator.com` custom domain
-- create and deploy the Cloudflare Worker route for `/operator.apk` and `/operator-beta.apk`
-- configure cache, DNS, and zone-level settings if the Worker depends on them
-- create API credentials for GitHub Actions with least-privilege access to R2 and Worker deployment if deployment is automated from CI
+- complete or confirm the Cloudflare account ownership model for this infrastructure
+- approve whether `/operator.apk` stays a Worker route or another Cloudflare-managed redirect mechanism
+- create and deploy the Cloudflare Worker route for `/operator.apk` if Worker-based delivery is retained
+- configure any remaining cache, DNS, and zone-level settings needed for the public stable URL
 
 Why human-owned:
 
@@ -165,7 +159,6 @@ Why human-owned:
 
 Human tasks:
 
-- add `NPM_TOKEN`
 - add Android signing secrets
 - add Cloudflare R2 credentials
 - add any Worker deployment credentials if separate from R2 credentials
@@ -178,8 +171,7 @@ Why human-owned:
 
 Human tasks:
 
-- decide whether debug-signed alpha builds are allowed at all
-- decide whether prerelease tags can be cut from any branch or only from `main`
+- decide whether stable tags can be cut from any branch or only from `main`
 - decide who is allowed to publish stable tags
 - decide whether Cloudflare Worker deployment happens from the same release workflow or a separate infrastructure workflow
 
@@ -205,7 +197,7 @@ Why human-owned:
 
 ### Deliverables
 
-- R2 bucket structure for stable and beta channels
+- R2 bucket structure for the stable channel
 - JSON metadata contract for `latest.json`
 - SHA-256 checksum generation contract
 - naming convention for APK artifacts
@@ -219,7 +211,6 @@ Why human-owned:
    - `operator/vX.Y.Z/`
 3. Publish mutable pointers:
    - `operator/latest.json`
-   - `operator/latest-beta.json`
 4. Include channel and GitHub release URL in metadata for supportability.
 
 ### Acceptance Criteria
@@ -242,7 +233,6 @@ Why human-owned:
 2. Bind Worker to the bucket.
 3. Implement routes:
    - `/operator.apk` -> stable channel redirect
-   - `/operator-beta.apk` -> beta channel redirect
    - `/operator/latest.json` passthrough
 4. Set headers:
    - versioned APKs: `public, max-age=31536000, immutable`
@@ -284,14 +274,12 @@ Why human-owned:
    - create GitHub Release using `softprops/action-gh-release`
    - upload APK to GitHub Release
    - upload APK and checksum to R2
-   - write and upload `latest.json` or `latest-beta.json` depending on tag
-3. Detect prerelease from tag content:
-   - `alpha` or `beta` => GitHub prerelease
-   - stable semver => production stable pointer update
+   - write and upload `latest.json`
+3. Treat plain semver tags as the release model for now.
 4. In `publish-npm.yml`:
-   - keep existing plan from soft launch doc
-   - publish `alpha` tags to npm `alpha`
-   - publish stable tags to npm `latest`
+   - keep the workflow manual-only until npm Trusted Publishing is configured
+   - replace token-based publish with npm Trusted Publishing (OIDC)
+   - restore tag-driven npm publish only after OIDC is verified
 5. Ensure the Android artifact version and npm package version are derived from the same release tag and remain in sync.
 
 ### Human Dependencies
@@ -310,21 +298,11 @@ Stable releases update:
 - `latest.json`
 - `/operator.apk` effective target
 
-Prerelease tags update:
-
-- GitHub prerelease
-- R2 versioned artifact
-- `latest-beta.json`
-- `/operator-beta.apk` effective target
-
-They should not move stable pointers.
-
 ### Acceptance Criteria
 
-- one tag push creates a complete release across GitHub, npm, and R2
-- prereleases never become stable by accident
+- one tag push creates a complete APK release across GitHub and R2
 - release notes stay visible on GitHub even though install traffic uses Clawperator URLs
-- published Node and Android artifacts carry the same release version
+- Android and Node artifacts remain version-aligned even while npm publishing is deferred
 
 ## Workstream 4: `install.sh` APK Awareness
 
@@ -387,9 +365,9 @@ Update [install.sh](/Users/chrislacy/clawpilled/clawperator/scripts/install.sh) 
    - rollback procedure
    - required secrets
 3. Create or update `CHANGELOG.md` so GitHub Releases and docs tell the same story.
-4. Document channel semantics:
-   - stable is default for end users
-   - beta is opt-in
+4. Document the current release model:
+   - stable is the only public channel for now
+   - beta and prerelease channels are deferred until there is a concrete need
 
 ### Acceptance Criteria
 
@@ -409,11 +387,11 @@ Update [install.sh](/Users/chrislacy/clawpilled/clawperator/scripts/install.sh) 
 ### Plan
 
 1. Define required secrets:
-   - `NPM_TOKEN`
    - Android release signing secrets
    - Cloudflare R2 credentials
-2. Decide and document alpha policy:
-   - debug-signed alpha allowed temporarily, or not allowed at all
+2. Define the npm follow-up plan:
+   - configure npm Trusted Publishing for `publish-npm.yml`
+   - do not depend on `NPM_TOKEN` for the long-term CI publish model
 3. Before stable launch, verify:
    - release-signed APK installs cleanly over previous release-signed APK
    - app upgrade path works on a real device
@@ -438,9 +416,9 @@ Update [install.sh](/Users/chrislacy/clawpilled/clawperator/scripts/install.sh) 
 
 ## Phase A: Decide Release Policy
 
-- choose alpha signing policy
 - choose Cloudflare account ownership model
 - confirm domain routing for `downloads.clawperator.com`
+- decide when npm Trusted Publishing will be implemented
 
 Human gate:
 
@@ -477,14 +455,13 @@ Human gate:
 
 ## Phase E: Dry Run and Soft Launch
 
-- publish a test prerelease tag
+- publish a stable semver tag
 - validate GitHub Release, R2 upload, metadata, redirect, checksum, and adb install path
-- verify stable pointer is untouched by prerelease
-- run one stable cut after prerelease validation succeeds
+- verify `latest.json` and hosted stable APK behavior end-to-end
 
 Human gate:
 
-- a human should review the first prerelease and first stable release end-to-end before relying on the pipeline
+- a human should review the first stable release end-to-end before relying on the pipeline
 
 ## Risks and Mitigations
 
@@ -500,7 +477,6 @@ Mitigation:
 Mitigation:
 
 - hard-fail stable release job if release keystore secrets are absent
-- permit debug fallback only in explicitly prerelease contexts if leadership accepts that tradeoff
 
 ### Risk: Redirect caching serves stale latest version
 
@@ -527,22 +503,24 @@ Mitigation:
 
 - create `.github/workflows/release-apk.yml`
 - extend release job to upload APK and checksum to Cloudflare R2
-- add metadata generation step for `latest.json` and `latest-beta.json`
-- create Cloudflare Worker for `/operator.apk` and `/operator-beta.apk`
+- add metadata generation step for `latest.json`
+- create Cloudflare Worker for `/operator.apk`
 - update `scripts/install.sh` to resolve metadata, verify checksum, and optionally `adb install`
 - update all docs that currently point normal users to GitHub Releases
 - create `docs/RELEASING.md`
 - create `CHANGELOG.md`
 - provision Android signing secrets for stable
 - provision Cloudflare credentials in GitHub Actions
-- run an end-to-end prerelease rehearsal with a test tag
+- configure npm Trusted Publishing for `publish-npm.yml`
+- run an end-to-end stable release rehearsal with a test tag
 
 ## Success Criteria
 
 This plan is complete when all of the following are true:
 
-- a stable release tag publishes APK and npm artifacts automatically
+- a stable release tag publishes APK artifacts automatically
 - `https://clawperator.com/operator.apk` installs the latest stable build via redirect
 - `scripts/install.sh` fetches the same stable build, verifies checksum, and can install it over adb
 - users can still access historical versions and release notes through GitHub Releases
 - rollback to a prior stable version is a metadata change, not a rebuild
+- npm publishing has a separate follow-up path using Trusted Publishing without breaking version alignment
