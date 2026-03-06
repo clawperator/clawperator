@@ -17,12 +17,12 @@ Push a semver tag with a `v` prefix:
 - `v0.1.1`
 - `v1.0.0`
 
-That tag currently triggers:
+That tag triggers:
 
 - `.github/workflows/release-apk.yml`
+- `.github/workflows/publish-npm.yml`
 
-The APK workflow validates that the tag version exactly matches `apps/node/package.json`.
-The npm publish workflow is currently manual-only and out of scope for this release track.
+Both workflows validate that the tag version exactly matches `apps/node/package.json`.
 
 ## Release Outputs
 
@@ -34,6 +34,8 @@ For every tagged release, GitHub Actions should:
 4. Upload the same APK and checksum to Cloudflare R2
 5. Update the stable metadata pointer:
    - all releases update `latest.json`
+6. Publish the Node package to npm via Trusted Publishing (OIDC):
+   - all published releases use npm dist-tag `latest`
 
 ## Required Secrets
 
@@ -51,6 +53,11 @@ For every tagged release, GitHub Actions should:
 - `CLAWPERATOR_CLOUDFLARE_SECRET_ACCESS_KEY`
 - `CLAWPERATOR_CLOUDFLARE_R2_BUCKET`
 - `CLAWPERATOR_CLOUDFLARE_DOWNLOADS_BASE_URL`
+
+### npm publishing
+
+- npm Trusted Publisher configured for `clawpilled/clawperator`
+- workflow filename on npm must exactly match `publish-npm.yml`
 
 ## Versioning Rules
 
@@ -81,7 +88,8 @@ Expected stable UX:
 6. Verify GitHub Actions completed successfully.
 7. Verify GitHub Release assets exist.
 8. Verify Cloudflare metadata and artifact uploads exist.
-9. Verify installation on a real device.
+9. Verify npm publish succeeded.
+10. Verify installation on a real device.
 
 ## Tag Commands
 
@@ -97,6 +105,7 @@ git push origin v0.1.0
 After the workflows finish, verify:
 
 - GitHub Release exists at `https://github.com/clawpilled/clawperator/releases`
+- npm package version exists at `https://www.npmjs.com/package/clawperator`
 - stable metadata file exists at `https://downloads.clawperator.com/operator/latest.json`
 - APK URL in metadata resolves
 - checksum file matches the APK

@@ -99,17 +99,16 @@ Use these markers while working through the list:
 
 ## 6. npm Publishing Ownership
 
-- Deferred from this PR.
-- Keep Android and Node versions aligned, but do not gate Android release work on npm publishing.
-- [ ] Configure npm Trusted Publishing for GitHub Actions instead of token-based publish.
+- [x] Configure npm Trusted Publishing for GitHub Actions instead of token-based publish.
   - Package settings URL: `https://www.npmjs.com/package/clawperator/access`
   - Trusted Publisher type: `GitHub Actions`
   - Organization or user: `clawpilled`
   - Repository: `clawperator`
   - Workflow filename: `publish-npm.yml`
   - Environment name: leave empty unless GitHub Environments are introduced later
-- [ ] After Trusted Publishing is configured on npm, update `.github/workflows/publish-npm.yml` to use OIDC-based publish instead of `NPM_TOKEN`.
-  - Reason: npm token auth works, but publish is still being rejected; npm guidance is to move CI publishing to Trusted Publishing (OIDC).
+- [x] After Trusted Publishing is configured on npm, update `.github/workflows/publish-npm.yml` to use OIDC-based publish instead of `NPM_TOKEN`.
+- [ ] Optionally tighten npm package publishing access to `Require two-factor authentication and disallow tokens`.
+  - Trusted Publishing will continue to work if you choose to remove token fallback.
 
 ## 7. Documentation and Ownership Records
 
