@@ -15,14 +15,14 @@ Use these markers while working through the list:
 ## 1. Release Policy Decisions
 
 - [✅] Confirm that stable releases must always be signed with the production release keystore.
-- [✅] Confirm whether prerelease builds (`alpha`, `beta`) must also use the production release keystore.
+- [x] Confirm that releases use the production release keystore.
 - [❌] Confirm that only tags created from `main` are allowed to publish stable releases. - allow tags to be creaetd from any branch, so long as it does not Negatively introduce complexity too much. 
 - [ ] Confirm whether Cloudflare Worker deployment will be:
   - manual at first
   - or automated from GitHub Actions
   Answer: My preference is to configure automatic deployment through the Cloudflare dashboard. 
-- [ ] Confirm whether `/operator-beta.apk` should ship in the first implementation or be deferred until after stable is working. Defer for now. 
-  - Recommendation: implement now because the metadata model already supports it.
+- [x] Confirm that there is no separate beta channel for now.
+  - Current decision: use one stable release path only.
 
 ## 2. Android Release Signing
 
@@ -102,8 +102,7 @@ Use these markers while working through the list:
 - [ ] Confirm which npm account or organization owns the `clawperator` package.
 - [ ] Ensure the token used for CI has publish rights to that package.
 - [ ] Confirm tag policy:
-  - prerelease tags publish to npm `alpha`
-  - stable tags publish to npm `latest`
+  - release tags publish to npm `latest`
 
 ## 7. Documentation and Ownership Records
 
@@ -120,15 +119,15 @@ Use these markers while working through the list:
 
 ## 8. Test and Verification Tasks
 
-- [ ] Provide or approve a safe prerelease tag for end-to-end testing.
-  - Example: `v1.0.0-alpha.1`
-- [ ] Review the first successful prerelease pipeline run.
-- [ ] Manually verify that the prerelease:
-  - created a GitHub prerelease
-  - uploaded the APK to R2
-  - generated correct checksum metadata
-  - did not move the stable pointer
-- [ ] Manually verify the first stable release pipeline run.
+- [ ] Provide or approve a safe release tag for end-to-end testing.
+  - Example: `v0.1.0`
+- [x] Review the first successful release pipeline run.
+  - Verified with `v0.1.0-alpha.2` before simplifying version policy.
+- [x] Manually verify that the release pipeline can:
+  - create a GitHub Release
+  - upload the APK to R2
+  - generate checksum metadata
+- [ ] Manually verify the first stable `latest.json` update using a plain semver tag.
 - [ ] Validate installation on a real Android device using:
   - direct `adb install`
   - `clawperator.com/operator.apk`
@@ -153,8 +152,8 @@ Use these markers while working through the list:
 3. Add GitHub Actions secrets.
 4. Set up Cloudflare account resources and credentials.
 5. Review the implementation PR for workflows and docs.
-6. Run one prerelease dry run.
-7. Run one stable release after prerelease validation passes.
+6. Run one release dry run.
+7. Run one stable release after workflow validation passes.
 
 ## Notes for the Implementing Agent
 

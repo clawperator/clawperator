@@ -48,25 +48,8 @@ jobs:
       - name: Test package
         run: npm --prefix apps/node run test
 
-      - name: Detect npm dist-tag
-        id: npm_meta
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          version="${GITHUB_REF_NAME#v}"
-          if [[ "$version" =~ -alpha(\.[0-9]+)?$ ]]; then
-            dist_tag="alpha"
-          elif [[ "$version" =~ -(beta|rc)(\.[0-9]+)?$ ]]; then
-            dist_tag="beta"
-          else
-            dist_tag="latest"
-          fi
-
-          echo "dist_tag=${dist_tag}" >> "$GITHUB_OUTPUT"
-
       - name: Publish package
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         working-directory: apps/node
-        run: npm publish --access public --tag "${{ steps.npm_meta.outputs.dist_tag }}"
+        run: npm publish --access public --tag latest

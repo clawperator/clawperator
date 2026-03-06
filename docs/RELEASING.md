@@ -13,16 +13,16 @@ One git tag represents one coherent product release.
 
 Push a semver tag with a `v` prefix:
 
-- `v0.1.0-alpha.2`
-- `v0.1.0-beta.1`
+- `v0.1.0`
+- `v0.1.1`
 - `v1.0.0`
 
 That tag triggers:
 
 - `.github/workflows/release-apk.yml`
-- `.github/workflows/publish-npm.yml`
 
-Both workflows validate that the tag version exactly matches `apps/node/package.json`.
+The APK release workflow validates that the tag version exactly matches `apps/node/package.json`.
+The npm publish workflow is currently manual-only via `workflow_dispatch`.
 
 ## Release Outputs
 
@@ -33,12 +33,9 @@ For every tagged release, GitHub Actions should:
 3. Create a GitHub Release and upload the APK plus checksum
 4. Upload the same APK and checksum to Cloudflare R2
 5. Update the appropriate metadata pointer:
-   - stable releases update `latest.json`
-   - prereleases do not update a mutable channel pointer
+   - all releases update `latest.json`
 6. Publish the Node package to npm:
-   - alpha tags -> `alpha`
-   - beta and rc tags -> `beta`
-   - stable tags -> `latest`
+   - all published releases use npm dist-tag `latest`
 
 ## Required Secrets
 
@@ -90,23 +87,16 @@ Expected stable UX:
 6. Verify GitHub Actions completed successfully.
 7. Verify GitHub Release assets exist.
 8. Verify Cloudflare metadata and artifact uploads exist.
-9. Verify npm publish succeeded.
+9. If you ran the npm publish workflow manually, verify npm publish succeeded.
 10. Verify installation on a real device.
 
 ## Tag Commands
 
-Example prerelease:
+Example release:
 
 ```bash
-git tag v0.1.0-alpha.2
-git push origin v0.1.0-alpha.2
-```
-
-Example stable release:
-
-```bash
-git tag v1.0.0
-git push origin v1.0.0
+git tag v0.1.0
+git push origin v0.1.0
 ```
 
 ## Verification
@@ -131,7 +121,5 @@ Rollback means:
 
 ## Notes
 
-- Stable releases should use the production Android signing key.
-- Prereleases should also use the production key unless there is a conscious exception.
-- Prerelease tags publish immutable versioned artifacts only. They do not move a mutable download pointer.
+- Releases should use the production Android signing key.
 - Worker deployment for `/operator.apk` can be managed separately from the artifact upload workflow if needed.

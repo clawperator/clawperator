@@ -61,15 +61,9 @@ jobs:
             exit 1
           fi
 
-          if [[ "$tag_version" =~ -(alpha|beta|rc)(\.[0-9]+)?$ ]]; then
-            is_prerelease=true
-            latest_metadata_name=""
-            latest_channel="prerelease"
-          else
-            is_prerelease=false
-            latest_metadata_name="latest.json"
-            latest_channel="stable"
-          fi
+          is_prerelease=false
+          latest_metadata_name="latest.json"
+          latest_channel="stable"
 
           if [[ -z "${CLAWPERATOR_ANDROID_KEYSTORE_BASE64}" || -z "${CLAWPERATOR_ANDROID_KEYSTORE_PASSWORD}" || -z "${CLAWPERATOR_ANDROID_KEY_ALIAS}" || -z "${CLAWPERATOR_ANDROID_KEY_PASSWORD}" ]]; then
             echo "Android signing secrets are required for tagged releases." >&2
@@ -86,7 +80,6 @@ jobs:
           artifact_prefix="operator/v${tag_version}"
 
           echo "version=${tag_version}" >> "$GITHUB_OUTPUT"
-          echo "is_prerelease=${is_prerelease}" >> "$GITHUB_OUTPUT"
           echo "latest_metadata_name=${latest_metadata_name}" >> "$GITHUB_OUTPUT"
           echo "latest_channel=${latest_channel}" >> "$GITHUB_OUTPUT"
           echo "artifact_name=${artifact_name}" >> "$GITHUB_OUTPUT"
@@ -160,12 +153,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          metadata_pointer="${{ steps.release_meta.outputs.latest_metadata_name }}"
-          if [[ -n "$metadata_pointer" ]]; then
-            metadata_line="- Cloudflare metadata pointer: \`${metadata_pointer}\`"
-          else
-            metadata_line="- Cloudflare metadata pointer: not updated for prerelease tags"
-          fi
           cat <<'EOF' > release-notes.md
           ## Install
 
@@ -176,14 +163,13 @@ jobs:
           ## Artifacts
 
           - GitHub Release asset: `${{ steps.release_meta.outputs.artifact_name }}`
+          - Cloudflare metadata pointer: `${{ steps.release_meta.outputs.latest_metadata_name }}`
           EOF
-          printf '%s\n' "$metadata_line" >> release-notes.md
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           name: ${{ github.ref_name }}
-          prerelease: ${{ steps.release_meta.outputs.is_prerelease == 'true' }}
           body_path: release-notes.md
           files: |
             ${{ steps.release_meta.outputs.artifact_name }}
@@ -213,9 +199,7 @@ jobs:
             --content-type "text/plain; charset=utf-8" \
             --cache-control "public, max-age=31536000, immutable"
 
-          if [[ -n "${{ steps.release_meta.outputs.latest_metadata_name }}" ]]; then
-            aws s3 cp "${{ steps.release_meta.outputs.latest_metadata_name }}" "s3://${CLAWPERATOR_CLOUDFLARE_R2_BUCKET}/operator/${{ steps.release_meta.outputs.latest_metadata_name }}" \
-              --endpoint-url "$endpoint" \
-              --content-type "application/json; charset=utf-8" \
-              --cache-control "public, max-age=60"
-          fi
+          aws s3 cp "${{ steps.release_meta.outputs.latest_metadata_name }}" "s3://${CLAWPERATOR_CLOUDFLARE_R2_BUCKET}/operator/${{ steps.release_meta.outputs.latest_metadata_name }}" \
+            --endpoint-url "$endpoint" \
+            --content-type "application/json; charset=utf-8" \
+            --cache-control "public, max-age=60"
