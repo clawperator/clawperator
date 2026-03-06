@@ -11,9 +11,7 @@
   },
   "homepage": "https://clawperator.com",
   "bugs": "https://github.com/clawpilled/clawperator/issues",
-  "bin": {
-    "clawperator": "./dist/cli/index.js"
-  },
+  "bin": "dist/cli/index.js",
   "publishConfig": {
     "access": "public",
     "tag": "alpha"

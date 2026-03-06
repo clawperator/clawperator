@@ -4,6 +4,9 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
+fun env(name: String, legacyName: String? = null): String? =
+    System.getenv(name) ?: legacyName?.let(System::getenv)
+
 data class ParsedVersion(
     val name: String,
     val major: Int,
@@ -75,10 +78,11 @@ android {
         }
         create("release") {
             // Fall back to using debug keystore if environment variables are not set. Required for CI.
-            storeFile = System.getenv("KEYSTORE_LOCATION")?.let { file(it) } ?: file("../../../scripts/debug.keystore")
-            storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "android"
-            keyAlias = System.getenv("ACTION_LAUNCHER_KEY_ALIAS") ?: "androiddebugkey"
-            keyPassword = System.getenv("ACTION_LAUNCHER_KEY_PASSWORD") ?: "android"
+            storeFile = env("ANDROID_KEYSTORE_PATH", "KEYSTORE_LOCATION")?.let { file(it) }
+                ?: file("../../../scripts/debug.keystore")
+            storePassword = env("ANDROID_KEYSTORE_PASSWORD", "KEYSTORE_PASSWORD") ?: "android"
+            keyAlias = env("ANDROID_KEY_ALIAS", "ACTION_LAUNCHER_KEY_ALIAS") ?: "androiddebugkey"
+            keyPassword = env("ANDROID_KEY_PASSWORD", "ACTION_LAUNCHER_KEY_PASSWORD") ?: "android"
 
             isV1SigningEnabled = true
             isV2SigningEnabled = true

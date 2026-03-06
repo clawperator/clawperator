@@ -1,0 +1,74 @@
+name: Publish npm Package
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-npm-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish-npm:
+    name: Publish Node Package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: https://registry.npmjs.org
+          cache: npm
+          cache-dependency-path: apps/node/package-lock.json
+
+      - name: Validate tag matches package version
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          tag_version="${GITHUB_REF_NAME#v}"
+          package_version="$(node -p "require('./apps/node/package.json').version")"
+
+          if [[ "$tag_version" != "$package_version" ]]; then
+            echo "Tag version $tag_version does not match apps/node/package.json version $package_version" >&2
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: npm --prefix apps/node ci
+
+      - name: Build package
+        run: npm --prefix apps/node run build
+
+      - name: Test package
+        run: npm --prefix apps/node run test
+
+      - name: Detect npm dist-tag
+        id: npm_meta
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          version="${GITHUB_REF_NAME#v}"
+          if [[ "$version" =~ -alpha(\.[0-9]+)?$ ]]; then
+            dist_tag="alpha"
+          elif [[ "$version" =~ -(beta|rc)(\.[0-9]+)?$ ]]; then
+            dist_tag="beta"
+          else
+            dist_tag="latest"
+          fi
+
+          echo "dist_tag=${dist_tag}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish package
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        working-directory: apps/node
+        run: npm publish --access public --tag "${{ steps.npm_meta.outputs.dist_tag }}"
