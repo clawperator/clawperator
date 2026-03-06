@@ -57,9 +57,9 @@ Use these markers while working through the list:
   - `CLAWPERATOR_ANDROID_KEY_PASSWORD`
 - [ ] Add Cloudflare credentials for R2 upload.
   - Repository secret names:
-  - `CLAWPERATOR_CLOUDFLARE_R2_ACCOUNT_ID`
-  - `CLAWPERATOR_CLOUDFLARE_R2_ACCESS_KEY_ID`
-  - `CLAWPERATOR_CLOUDFLARE_R2_SECRET_ACCESS_KEY`
+  - `CLAWPERATOR_CLOUDFLARE_ACCOUNT_ID`
+  - `CLAWPERATOR_CLOUDFLARE_ACCESS_KEY_ID`
+  - `CLAWPERATOR_CLOUDFLARE_SECRET_ACCESS_KEY`
   - `CLAWPERATOR_CLOUDFLARE_R2_BUCKET`
   - `CLAWPERATOR_CLOUDFLARE_DOWNLOADS_BASE_URL`
 - [ ] If Worker deployment will be automated, add Worker deployment credentials too.
