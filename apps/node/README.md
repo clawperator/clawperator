@@ -13,7 +13,7 @@ npm install -g clawperator
 - Node.js 22+
 - `adb` on `PATH`
 - Android device with USB debugging enabled
-- Clawperator APK installed from [GitHub Releases](https://github.com/clawpilled/clawperator/releases)
+- Clawperator APK installed from [clawperator.com/operator.apk](https://clawperator.com/operator.apk)
 
 ## Quick Start
 

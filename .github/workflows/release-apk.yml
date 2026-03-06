@@ -1,0 +1,207 @@
+name: Release APK
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-apk-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release-apk:
+    name: Build and Publish APK
+    runs-on: ubuntu-latest
+    env:
+      CLAWPERATOR_CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLAWPERATOR_CLOUDFLARE_ACCOUNT_ID }}
+      CLAWPERATOR_CLOUDFLARE_ACCESS_KEY_ID: ${{ secrets.CLAWPERATOR_CLOUDFLARE_ACCESS_KEY_ID }}
+      CLAWPERATOR_CLOUDFLARE_SECRET_ACCESS_KEY: ${{ secrets.CLAWPERATOR_CLOUDFLARE_SECRET_ACCESS_KEY }}
+      CLAWPERATOR_CLOUDFLARE_R2_BUCKET: ${{ secrets.CLAWPERATOR_CLOUDFLARE_R2_BUCKET }}
+      CLAWPERATOR_CLOUDFLARE_DOWNLOADS_BASE_URL: ${{ secrets.CLAWPERATOR_CLOUDFLARE_DOWNLOADS_BASE_URL }}
+      CLAWPERATOR_ANDROID_KEYSTORE_BASE64: ${{ secrets.CLAWPERATOR_ANDROID_KEYSTORE_BASE64 }}
+      CLAWPERATOR_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.CLAWPERATOR_ANDROID_KEYSTORE_PASSWORD }}
+      CLAWPERATOR_ANDROID_KEY_ALIAS: ${{ secrets.CLAWPERATOR_ANDROID_KEY_ALIAS }}
+      CLAWPERATOR_ANDROID_KEY_PASSWORD: ${{ secrets.CLAWPERATOR_ANDROID_KEY_PASSWORD }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Validate release inputs
+        id: release_meta
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          tag_version="${GITHUB_REF_NAME#v}"
+          package_version="$(python - <<'PY'
+          import json
+          with open("apps/node/package.json", "r", encoding="utf-8") as fh:
+              print(json.load(fh)["version"])
+          PY
+          )"
+
+          if [[ "$tag_version" != "$package_version" ]]; then
+            echo "Tag version $tag_version does not match apps/node/package.json version $package_version" >&2
+            exit 1
+          fi
+
+          is_prerelease=false
+          latest_metadata_name="latest.json"
+          latest_channel="stable"
+
+          if [[ -z "${CLAWPERATOR_ANDROID_KEYSTORE_BASE64}" || -z "${CLAWPERATOR_ANDROID_KEYSTORE_PASSWORD}" || -z "${CLAWPERATOR_ANDROID_KEY_ALIAS}" || -z "${CLAWPERATOR_ANDROID_KEY_PASSWORD}" ]]; then
+            echo "Android signing secrets are required for tagged releases." >&2
+            exit 1
+          fi
+
+          if [[ -z "${CLAWPERATOR_CLOUDFLARE_ACCOUNT_ID}" || -z "${CLAWPERATOR_CLOUDFLARE_ACCESS_KEY_ID}" || -z "${CLAWPERATOR_CLOUDFLARE_SECRET_ACCESS_KEY}" || -z "${CLAWPERATOR_CLOUDFLARE_R2_BUCKET}" || -z "${CLAWPERATOR_CLOUDFLARE_DOWNLOADS_BASE_URL}" ]]; then
+            echo "Cloudflare R2 secrets are required for tagged releases." >&2
+            exit 1
+          fi
+
+          artifact_name="operator-v${tag_version}.apk"
+          checksum_name="${artifact_name}.sha256"
+          artifact_prefix="operator/v${tag_version}"
+
+          echo "version=${tag_version}" >> "$GITHUB_OUTPUT"
+          echo "latest_metadata_name=${latest_metadata_name}" >> "$GITHUB_OUTPUT"
+          echo "latest_channel=${latest_channel}" >> "$GITHUB_OUTPUT"
+          echo "artifact_name=${artifact_name}" >> "$GITHUB_OUTPUT"
+          echo "checksum_name=${checksum_name}" >> "$GITHUB_OUTPUT"
+          echo "artifact_prefix=${artifact_prefix}" >> "$GITHUB_OUTPUT"
+
+      - name: Decode Android keystore
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "$CLAWPERATOR_ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/android-release.keystore"
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x ./gradlew
+
+      - name: Build release APK
+        env:
+          CLAWPERATOR_VERSION_NAME: ${{ steps.release_meta.outputs.version }}
+          CLAWPERATOR_ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/android-release.keystore
+          CLAWPERATOR_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.CLAWPERATOR_ANDROID_KEYSTORE_PASSWORD }}
+          CLAWPERATOR_ANDROID_KEY_ALIAS: ${{ secrets.CLAWPERATOR_ANDROID_KEY_ALIAS }}
+          CLAWPERATOR_ANDROID_KEY_PASSWORD: ${{ secrets.CLAWPERATOR_ANDROID_KEY_PASSWORD }}
+        run: ./gradlew :app:assembleRelease
+
+      - name: Prepare release artifacts
+        id: artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          release_apk="$(find apps/android/app/build/outputs/apk/release -name '*.apk' | head -n 1)"
+          if [[ -z "$release_apk" ]]; then
+            echo "Release APK not found." >&2
+            exit 1
+          fi
+
+          published_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          export PUBLISHED_AT="$published_at"
+          cp "$release_apk" "${{ steps.release_meta.outputs.artifact_name }}"
+          sha256sum "${{ steps.release_meta.outputs.artifact_name }}" | awk '{ print $1 }' > "${{ steps.release_meta.outputs.checksum_name }}"
+          echo "published_at=${published_at}" >> "$GITHUB_OUTPUT"
+
+          python - <<'PY'
+          import json
+          import os
+
+          metadata = {
+              "version": os.environ["RELEASE_VERSION"],
+              "channel": os.environ["LATEST_CHANNEL"],
+              "apk_url": os.environ["APK_URL"],
+              "sha256_url": os.environ["SHA256_URL"],
+              "github_release_url": os.environ["GITHUB_RELEASE_URL"],
+              "published_at": os.environ["PUBLISHED_AT"],
+          }
+
+          latest_metadata_name = os.environ.get("LATEST_METADATA_NAME", "")
+          if latest_metadata_name:
+              with open(latest_metadata_name, "w", encoding="utf-8") as fh:
+                  json.dump(metadata, fh, indent=2)
+                  fh.write("\n")
+          PY
+        env:
+          RELEASE_VERSION: ${{ steps.release_meta.outputs.version }}
+          LATEST_CHANNEL: ${{ steps.release_meta.outputs.latest_channel }}
+          APK_URL: ${{ env.CLAWPERATOR_CLOUDFLARE_DOWNLOADS_BASE_URL }}/${{ steps.release_meta.outputs.artifact_prefix }}/${{ steps.release_meta.outputs.artifact_name }}
+          SHA256_URL: ${{ env.CLAWPERATOR_CLOUDFLARE_DOWNLOADS_BASE_URL }}/${{ steps.release_meta.outputs.artifact_prefix }}/${{ steps.release_meta.outputs.checksum_name }}
+          GITHUB_RELEASE_URL: https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}
+          LATEST_METADATA_NAME: ${{ steps.release_meta.outputs.latest_metadata_name }}
+
+      - name: Create release notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat <<'EOF' > release-notes.md
+          ## Install
+
+          - Stable APK URL: https://clawperator.com/operator.apk
+          - Setup guide: https://github.com/${{ github.repository }}/blob/${{ github.sha }}/docs/first-time-setup.md
+          - Release runbook: https://github.com/${{ github.repository }}/blob/${{ github.sha }}/docs/RELEASING.md
+
+          ## Artifacts
+
+          - GitHub Release asset: `${{ steps.release_meta.outputs.artifact_name }}`
+          - Cloudflare metadata pointer: `${{ steps.release_meta.outputs.latest_metadata_name }}`
+          EOF
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          body_path: release-notes.md
+          files: |
+            ${{ steps.release_meta.outputs.artifact_name }}
+            ${{ steps.release_meta.outputs.checksum_name }}
+
+      - name: Install awscli
+        run: python -m pip install --upgrade awscli
+
+      - name: Upload artifacts to Cloudflare R2
+        shell: bash
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CLAWPERATOR_CLOUDFLARE_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CLAWPERATOR_CLOUDFLARE_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          AWS_REGION: auto
+          AWS_EC2_METADATA_DISABLED: "true"
+        run: |
+          set -euo pipefail
+          endpoint="https://${CLAWPERATOR_CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"
+
+          aws s3 cp "${{ steps.release_meta.outputs.artifact_name }}" "s3://${CLAWPERATOR_CLOUDFLARE_R2_BUCKET}/${{ steps.release_meta.outputs.artifact_prefix }}/${{ steps.release_meta.outputs.artifact_name }}" \
+            --endpoint-url "$endpoint" \
+            --content-type "application/vnd.android.package-archive" \
+            --content-disposition "attachment; filename=\"${{ steps.release_meta.outputs.artifact_name }}\"" \
+            --cache-control "public, max-age=31536000, immutable"
+
+          aws s3 cp "${{ steps.release_meta.outputs.checksum_name }}" "s3://${CLAWPERATOR_CLOUDFLARE_R2_BUCKET}/${{ steps.release_meta.outputs.artifact_prefix }}/${{ steps.release_meta.outputs.checksum_name }}" \
+            --endpoint-url "$endpoint" \
+            --content-type "text/plain; charset=utf-8" \
+            --cache-control "public, max-age=31536000, immutable"
+
+          aws s3 cp "${{ steps.release_meta.outputs.latest_metadata_name }}" "s3://${CLAWPERATOR_CLOUDFLARE_R2_BUCKET}/operator/${{ steps.release_meta.outputs.latest_metadata_name }}" \
+            --endpoint-url "$endpoint" \
+            --content-type "application/json; charset=utf-8" \
+            --cache-control "public, max-age=60"
