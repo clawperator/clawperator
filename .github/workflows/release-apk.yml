@@ -17,11 +17,11 @@ jobs:
     name: Build and Publish APK
     runs-on: ubuntu-latest
     env:
-      CLOUDFLARE_R2_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_R2_ACCOUNT_ID }}
-      CLOUDFLARE_R2_ACCESS_KEY_ID: ${{ secrets.CLOUDFLARE_R2_ACCESS_KEY_ID }}
-      CLOUDFLARE_R2_SECRET_ACCESS_KEY: ${{ secrets.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
-      CLOUDFLARE_R2_BUCKET: ${{ secrets.CLOUDFLARE_R2_BUCKET }}
-      CLOUDFLARE_DOWNLOADS_BASE_URL: ${{ secrets.CLOUDFLARE_DOWNLOADS_BASE_URL }}
+      CLAWPERATOR_CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLAWPERATOR_CLOUDFLARE_ACCOUNT_ID }}
+      CLAWPERATOR_CLOUDFLARE_ACCESS_KEY_ID: ${{ secrets.CLAWPERATOR_CLOUDFLARE_ACCESS_KEY_ID }}
+      CLAWPERATOR_CLOUDFLARE_SECRET_ACCESS_KEY: ${{ secrets.CLAWPERATOR_CLOUDFLARE_SECRET_ACCESS_KEY }}
+      CLAWPERATOR_CLOUDFLARE_R2_BUCKET: ${{ secrets.CLAWPERATOR_CLOUDFLARE_R2_BUCKET }}
+      CLAWPERATOR_CLOUDFLARE_DOWNLOADS_BASE_URL: ${{ secrets.CLAWPERATOR_CLOUDFLARE_DOWNLOADS_BASE_URL }}
       CLAWPERATOR_ANDROID_KEYSTORE_BASE64: ${{ secrets.CLAWPERATOR_ANDROID_KEYSTORE_BASE64 }}
       CLAWPERATOR_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.CLAWPERATOR_ANDROID_KEYSTORE_PASSWORD }}
       CLAWPERATOR_ANDROID_KEY_ALIAS: ${{ secrets.CLAWPERATOR_ANDROID_KEY_ALIAS }}
@@ -76,7 +76,7 @@ jobs:
             exit 1
           fi
 
-          if [[ -z "${CLOUDFLARE_R2_ACCOUNT_ID}" || -z "${CLOUDFLARE_R2_ACCESS_KEY_ID}" || -z "${CLOUDFLARE_R2_SECRET_ACCESS_KEY}" || -z "${CLOUDFLARE_R2_BUCKET}" || -z "${CLOUDFLARE_DOWNLOADS_BASE_URL}" ]]; then
+          if [[ -z "${CLAWPERATOR_CLOUDFLARE_ACCOUNT_ID}" || -z "${CLAWPERATOR_CLOUDFLARE_ACCESS_KEY_ID}" || -z "${CLAWPERATOR_CLOUDFLARE_SECRET_ACCESS_KEY}" || -z "${CLAWPERATOR_CLOUDFLARE_R2_BUCKET}" || -z "${CLAWPERATOR_CLOUDFLARE_DOWNLOADS_BASE_URL}" ]]; then
             echo "Cloudflare R2 secrets are required for tagged releases." >&2
             exit 1
           fi
@@ -149,8 +149,8 @@ jobs:
         env:
           RELEASE_VERSION: ${{ steps.release_meta.outputs.version }}
           LATEST_CHANNEL: ${{ steps.release_meta.outputs.latest_channel }}
-          APK_URL: ${{ env.CLOUDFLARE_DOWNLOADS_BASE_URL }}/${{ steps.release_meta.outputs.artifact_prefix }}/${{ steps.release_meta.outputs.artifact_name }}
-          SHA256_URL: ${{ env.CLOUDFLARE_DOWNLOADS_BASE_URL }}/${{ steps.release_meta.outputs.artifact_prefix }}/${{ steps.release_meta.outputs.checksum_name }}
+          APK_URL: ${{ env.CLAWPERATOR_CLOUDFLARE_DOWNLOADS_BASE_URL }}/${{ steps.release_meta.outputs.artifact_prefix }}/${{ steps.release_meta.outputs.artifact_name }}
+          SHA256_URL: ${{ env.CLAWPERATOR_CLOUDFLARE_DOWNLOADS_BASE_URL }}/${{ steps.release_meta.outputs.artifact_prefix }}/${{ steps.release_meta.outputs.checksum_name }}
           GITHUB_RELEASE_URL: https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}
           LATEST_METADATA_NAME: ${{ steps.release_meta.outputs.latest_metadata_name }}
 
@@ -187,25 +187,25 @@ jobs:
       - name: Upload artifacts to Cloudflare R2
         shell: bash
         env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.CLOUDFLARE_R2_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.CLAWPERATOR_CLOUDFLARE_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CLAWPERATOR_CLOUDFLARE_SECRET_ACCESS_KEY }}
           AWS_EC2_METADATA_DISABLED: "true"
         run: |
           set -euo pipefail
-          endpoint="https://${CLOUDFLARE_R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          endpoint="https://${CLAWPERATOR_CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"
 
-          aws s3 cp "${{ steps.release_meta.outputs.artifact_name }}" "s3://${CLOUDFLARE_R2_BUCKET}/${{ steps.release_meta.outputs.artifact_prefix }}/${{ steps.release_meta.outputs.artifact_name }}" \
+          aws s3 cp "${{ steps.release_meta.outputs.artifact_name }}" "s3://${CLAWPERATOR_CLOUDFLARE_R2_BUCKET}/${{ steps.release_meta.outputs.artifact_prefix }}/${{ steps.release_meta.outputs.artifact_name }}" \
             --endpoint-url "$endpoint" \
             --content-type "application/vnd.android.package-archive" \
             --content-disposition "attachment; filename=\"${{ steps.release_meta.outputs.artifact_name }}\"" \
             --cache-control "public, max-age=31536000, immutable"
 
-          aws s3 cp "${{ steps.release_meta.outputs.checksum_name }}" "s3://${CLOUDFLARE_R2_BUCKET}/${{ steps.release_meta.outputs.artifact_prefix }}/${{ steps.release_meta.outputs.checksum_name }}" \
+          aws s3 cp "${{ steps.release_meta.outputs.checksum_name }}" "s3://${CLAWPERATOR_CLOUDFLARE_R2_BUCKET}/${{ steps.release_meta.outputs.artifact_prefix }}/${{ steps.release_meta.outputs.checksum_name }}" \
             --endpoint-url "$endpoint" \
             --content-type "text/plain; charset=utf-8" \
             --cache-control "public, max-age=31536000, immutable"
 
-          aws s3 cp "${{ steps.release_meta.outputs.latest_metadata_name }}" "s3://${CLOUDFLARE_R2_BUCKET}/operator/${{ steps.release_meta.outputs.latest_metadata_name }}" \
+          aws s3 cp "${{ steps.release_meta.outputs.latest_metadata_name }}" "s3://${CLAWPERATOR_CLOUDFLARE_R2_BUCKET}/operator/${{ steps.release_meta.outputs.latest_metadata_name }}" \
             --endpoint-url "$endpoint" \
             --content-type "application/json; charset=utf-8" \
             --cache-control "public, max-age=60"
