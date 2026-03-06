@@ -32,12 +32,17 @@ fun parseVersionName(versionName: String): ParsedVersion {
 }
 
 fun computeVersionCode(version: ParsedVersion): Int {
+    val prereleaseNumber = version.prereleaseNumber ?: 0
+    if (prereleaseNumber > 99) {
+        throw GradleException("Prerelease number must be between 0 and 99: ${version.name}")
+    }
+
     val prereleaseOffset = when (version.prereleaseLabel) {
         null -> 900
-        "rc" -> 800 + (version.prereleaseNumber ?: 0)
-        "beta" -> 500 + (version.prereleaseNumber ?: 0)
-        "alpha" -> 200 + (version.prereleaseNumber ?: 0)
-        else -> 100 + (version.prereleaseNumber ?: 0)
+        "rc" -> 800 + prereleaseNumber
+        "beta" -> 500 + prereleaseNumber
+        "alpha" -> 200 + prereleaseNumber
+        else -> 100 + prereleaseNumber
     }
 
     return version.major * 10000000 +

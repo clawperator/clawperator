@@ -209,11 +209,11 @@ install_cli() {
         return 1
     fi
 
-    echo -e "${BLUE}Installing Clawperator CLI (@alpha)...${NC}"
-    if npm install -g clawperator@alpha; then
+    echo -e "${BLUE}Installing Clawperator CLI (@latest)...${NC}"
+    if npm install -g clawperator@latest; then
         echo -e "${GREEN}✅ Clawperator CLI installed.${NC}"
     else
-        echo -e "${RED}❌ Failed to install Clawperator CLI. Try running 'sudo npm install -g clawperator@alpha' if permissions failed.${NC}"
+        echo -e "${RED}❌ Failed to install Clawperator CLI. Try running 'sudo npm install -g clawperator@latest' if permissions failed.${NC}"
         return 1
     fi
 }
@@ -311,8 +311,22 @@ sha256_binary() {
 
 parse_operator_metadata() {
     local METADATA_PATH=$1
+    local metadata_version=""
+    local metadata_apk_url=""
+    local metadata_sha_url=""
 
-    mapfile -t METADATA_VALUES < <(node - "$METADATA_PATH" <<'EOF'
+    while IFS= read -r metadata_line; do
+        if [ -z "$metadata_version" ]; then
+            metadata_version="$metadata_line"
+        elif [ -z "$metadata_apk_url" ]; then
+            metadata_apk_url="$metadata_line"
+        elif [ -z "$metadata_sha_url" ]; then
+            metadata_sha_url="$metadata_line"
+        else
+            echo -e "${RED}❌ APK metadata contained unexpected extra lines.${NC}"
+            return 1
+        fi
+    done < <(node - "$METADATA_PATH" <<'EOF'
 const fs = require("fs");
 
 const metadataPath = process.argv[2];
@@ -330,14 +344,14 @@ console.log(metadata.sha256_url);
 EOF
     )
 
-    if [ "${#METADATA_VALUES[@]}" -ne 3 ]; then
+    if [ -z "$metadata_version" ] || [ -z "$metadata_apk_url" ] || [ -z "$metadata_sha_url" ]; then
         echo -e "${RED}❌ Failed to parse APK metadata from ${METADATA_PATH}.${NC}"
         return 1
     fi
 
-    OPERATOR_VERSION="${METADATA_VALUES[0]}"
-    OPERATOR_APK_URL="${METADATA_VALUES[1]}"
-    OPERATOR_SHA_URL="${METADATA_VALUES[2]}"
+    OPERATOR_VERSION="$metadata_version"
+    OPERATOR_APK_URL="$metadata_apk_url"
+    OPERATOR_SHA_URL="$metadata_sha_url"
 }
 
 download_operator_apk() {

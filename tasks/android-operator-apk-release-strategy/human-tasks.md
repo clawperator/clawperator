@@ -14,9 +14,10 @@ Use these markers while working through the list:
 
 ## 1. Release Policy Decisions
 
-- [✅] Confirm that stable releases must always be signed with the production release keystore.
+- [x] Confirm that stable releases must always be signed with the production release keystore.
 - [x] Confirm that releases use the production release keystore.
-- [❌] Confirm that only tags created from `main` are allowed to publish stable releases. - allow tags to be creaetd from any branch, so long as it does not Negatively introduce complexity too much. 
+- [x] Confirm that only tags created from `main` are allowed to publish stable releases.
+  - Current decision: allow tags to be created from any branch, so long as that does not introduce too much operational complexity.
 - [ ] Confirm whether Cloudflare Worker deployment will be:
   - manual at first
   - or automated from GitHub Actions

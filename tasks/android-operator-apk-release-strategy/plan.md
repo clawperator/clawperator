@@ -84,7 +84,7 @@ But docs, installer UX, and stable redirects should move to the Clawperator doma
 
 ### 2. Build from the actual Android app module
 
-The authoritative Android application module in this repo is `:app`, defined in [settings.gradle.kts](/Users/chrislacy/clawpilled/clawperator/settings.gradle.kts).
+The authoritative Android application module in this repo is `:app`, defined in [`settings.gradle.kts`](../../settings.gradle.kts).
 
 That means the workflow should verify and use:
 
@@ -114,7 +114,7 @@ This avoids redirect drift, keeps channel logic centralized, and supports future
 
 ### 5. Release signing must be explicit before broad public launch
 
-The current Android Gradle config in [app.gradle.kts](/Users/chrislacy/clawpilled/clawperator/apps/android/app/app.gradle.kts) falls back to a debug keystore when release env vars are absent. That is acceptable for internal CI continuity, but not for a durable public update story.
+The current Android Gradle config in [`apps/android/app/app.gradle.kts`](../../apps/android/app/app.gradle.kts) falls back to a debug keystore when release env vars are absent. That is acceptable for internal CI continuity, but not for a durable public update story.
 
 Before stable launch:
 
