@@ -48,7 +48,6 @@ Use these markers while working through the list:
 
 ## 3. GitHub Repository Secrets
 
-- [ ] Add `NPM_TOKEN` to GitHub Actions secrets.
 - [x] Add Android signing secrets to GitHub Actions secrets.
   - Repository secret names:
   - `CLAWPERATOR_ANDROID_KEYSTORE_BASE64`
@@ -99,10 +98,8 @@ Use these markers while working through the list:
 
 ## 6. npm Publishing Ownership
 
-- [ ] Confirm which npm account or organization owns the `clawperator` package.
-- [ ] Ensure the token used for CI has publish rights to that package.
-- [ ] Confirm tag policy:
-  - release tags publish to npm `latest`
+- Deferred for a later PR.
+- Keep Android and Node versions aligned, but do not gate this branch on npm publishing.
 
 ## 7. Documentation and Ownership Records
 
