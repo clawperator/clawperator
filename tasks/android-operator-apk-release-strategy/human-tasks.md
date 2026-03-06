@@ -26,31 +26,40 @@ Use these markers while working through the list:
 
 ## 2. Android Release Signing
 
-- [ ] Generate a production Android signing keystore for Clawperator.
-- [ ] Record and securely store:
+- [x] Generate a production Android signing keystore for Clawperator.
+  - Created keystore: `clawperator-release.jks`
+  - Alias: `clawperator-release`
+  - Keystore type: `PKCS12`
+  - Certificate subject: `CN=Clawperator, OU=Clawpilled, O=Towerdock Pty Ltd, L=Brisbane, ST=Qld, C=AU`
+  - SHA-256 fingerprint: `FF:A5:20:15:98:FF:36:A9:99:9B:B5:FF:56:D3:F9:59:12:16:18:AB:CF:F1:12:9F:CB:6C:76:FC:50:F2:6F:30`
+- [x] Record and securely store:
   - keystore filename
   - key alias
   - keystore password
   - key password
-- [ ] Decide the long-term backup location for the keystore.
+- [x] Decide the long-term backup location for the keystore.
   - Requirement: at least one secure backup outside a single laptop.
-- [ ] Decide who has access to the keystore and credentials.
-- [ ] Base64-encode the keystore for GitHub Actions secret storage.
-- [ ] Perform a local dry run with the release keystore to confirm Gradle signing works before wiring CI.
+- [x] Decide who has access to the keystore and credentials.
+  - Current state: stored in password manager with private operational metadata.
+- [x] Base64-encode the keystore for GitHub Actions secret storage.
+- [x] Perform a local dry run with the release keystore to confirm Gradle signing works before wiring CI.
+  - Verified `./gradlew :app:clean :app:assembleRelease`
+  - Verified APK signing with `apksigner verify --print-certs`
 
 ## 3. GitHub Repository Secrets
 
 - [ ] Add `NPM_TOKEN` to GitHub Actions secrets.
-- [ ] Add Android signing secrets to GitHub Actions secrets.
-  - Suggested names:
-  - `ANDROID_KEYSTORE_BASE64`
-  - `ANDROID_KEYSTORE_PASSWORD`
-  - `ANDROID_KEY_ALIAS`
-  - `ANDROID_KEY_PASSWORD`
+- [x] Add Android signing secrets to GitHub Actions secrets.
+  - Repository secret names:
+  - `CLAWPERATOR_ANDROID_KEYSTORE_BASE64`
+  - `CLAWPERATOR_ANDROID_KEYSTORE_PASSWORD`
+  - `CLAWPERATOR_ANDROID_KEY_ALIAS`
+  - `CLAWPERATOR_ANDROID_KEY_PASSWORD`
 - [ ] Add Cloudflare credentials for R2 upload.
   - Exact names can be finalized during workflow implementation.
 - [ ] If Worker deployment will be automated, add Worker deployment credentials too.
-- [ ] Confirm whether secrets should live at repo scope or org scope.
+- [x] Confirm whether secrets should live at repo scope or org scope.
+  - Current decision: repository scope.
   - Recommendation: org scope if multiple repos or maintainers will share ownership.
 
 ## 4. Cloudflare Setup
@@ -136,8 +145,8 @@ Use these markers while working through the list:
 
 1. Finalize release policy decisions.
 2. Generate and back up the Android release keystore.
-3. Set up Cloudflare account resources and credentials.
-4. Add GitHub Actions secrets.
+3. Add GitHub Actions secrets.
+4. Set up Cloudflare account resources and credentials.
 5. Review the implementation PR for workflows and docs.
 6. Run one prerelease dry run.
 7. Run one stable release after prerelease validation passes.
