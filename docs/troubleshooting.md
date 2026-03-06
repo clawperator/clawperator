@@ -104,7 +104,7 @@ If the versions are incompatible, you may see:
 
 **How to fix:**
 - Upgrade the Node CLI: `npm install -g clawperator@latest`
-- Update the Android APK: Download the latest release from [GitHub Releases](https://github.com/clawpilled/clawperator/releases) and install via `adb install -r clawperator-vX.X.X.apk`.
+- Update the Android APK: Download the latest stable release from [clawperator.com/operator.apk](https://clawperator.com/operator.apk) and install via `adb install -r operator-vX.X.X.apk`. Historical versions remain on [GitHub Releases](https://github.com/clawpilled/clawperator/releases).
 
 ---
 
