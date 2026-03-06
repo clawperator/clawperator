@@ -54,7 +54,7 @@ Use these markers while working through the list:
   - `CLAWPERATOR_ANDROID_KEYSTORE_PASSWORD`
   - `CLAWPERATOR_ANDROID_KEY_ALIAS`
   - `CLAWPERATOR_ANDROID_KEY_PASSWORD`
-- [ ] Add Cloudflare credentials for R2 upload.
+- [x] Add Cloudflare credentials for R2 upload.
   - Repository secret names:
   - `CLAWPERATOR_CLOUDFLARE_ACCOUNT_ID`
   - `CLAWPERATOR_CLOUDFLARE_ACCESS_KEY_ID`
@@ -70,15 +70,15 @@ Use these markers while working through the list:
 
 - [ ] Decide which Cloudflare account will own the APK hosting infrastructure.
 - [ ] Confirm billing ownership for that account.
-- [ ] Create the R2 bucket for release artifacts.
+- [x] Create the R2 bucket for release artifacts.
   - Recommended bucket purpose: Clawperator release binaries only.
-- [ ] Configure the custom domain `downloads.clawperator.com`.
-- [ ] Ensure DNS for `clawperator.com` can support the `/operator.apk` routing approach.
+- [x] Configure the custom domain `downloads.clawperator.com`.
+- [x] Ensure DNS for `clawperator.com` can support the `/operator.apk` routing approach.
 - [ ] Decide whether the Worker will live in the same account as the R2 bucket.
   - Recommendation: yes, to reduce cross-account friction.
 - [ ] Create the Worker that will serve redirect logic, or approve CI to deploy it later.
-- [ ] Create least-privilege API credentials for CI.
-- [ ] Verify that the credentials can:
+- [x] Create least-privilege API credentials for CI.
+- [x] Verify that the credentials can:
   - upload objects to R2
   - update metadata pointer files
   - optionally deploy/update the Worker
@@ -98,8 +98,17 @@ Use these markers while working through the list:
 
 ## 6. npm Publishing Ownership
 
-- Deferred for a later PR.
-- Keep Android and Node versions aligned, but do not gate this branch on npm publishing.
+- Deferred from this PR.
+- Keep Android and Node versions aligned, but do not gate Android release work on npm publishing.
+- [ ] Configure npm Trusted Publishing for GitHub Actions instead of token-based publish.
+  - Package settings URL: `https://www.npmjs.com/package/clawperator/access`
+  - Trusted Publisher type: `GitHub Actions`
+  - Organization or user: `clawpilled`
+  - Repository: `clawperator`
+  - Workflow filename: `publish-npm.yml`
+  - Environment name: leave empty unless GitHub Environments are introduced later
+- [ ] After Trusted Publishing is configured on npm, update `.github/workflows/publish-npm.yml` to use OIDC-based publish instead of `NPM_TOKEN`.
+  - Reason: npm token auth works, but publish is still being rejected; npm guidance is to move CI publishing to Trusted Publishing (OIDC).
 
 ## 7. Documentation and Ownership Records
 
@@ -124,7 +133,8 @@ Use these markers while working through the list:
   - create a GitHub Release
   - upload the APK to R2
   - generate checksum metadata
-- [ ] Manually verify the first stable `latest.json` update using a plain semver tag.
+- [x] Manually verify the first stable `latest.json` update using a plain semver tag.
+  - Verified with `v0.1.2`
 - [ ] Validate installation on a real Android device using:
   - direct `adb install`
   - `clawperator.com/operator.apk`
