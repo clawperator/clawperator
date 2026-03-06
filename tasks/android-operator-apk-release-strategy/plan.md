@@ -137,9 +137,9 @@ This avoids redirect drift, keeps channel logic centralized, and supports future
 
 Current implementation note:
 
-- the repo does not yet deploy or manage this Worker
-- the next repo-owned step is to add Worker source and scaffolding
-- the next human-owned step is to create the Worker service and route in Cloudflare
+- the repo now contains a Worker implementation under `workers/operator-apk-redirect/`
+- the repo does not yet deploy or manage this Worker automatically
+- the next human-owned step is to create and configure the Worker service and routes in Cloudflare
 
 ### 5. Release signing must be explicit before broad public launch
 
@@ -270,7 +270,7 @@ Current status:
 
 - `downloads.clawperator.com` is complete
 - metadata upload is complete
-- Worker redirect remains to be implemented and deployed
+- Worker redirect is implemented in repo but still requires Cloudflare deployment and routing
 
 ### Plan
 

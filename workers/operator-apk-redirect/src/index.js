@@ -10,6 +10,17 @@ function jsonError(status, message) {
   });
 }
 
+function methodNotAllowed() {
+  return new Response(JSON.stringify({ error: "Method not allowed" }), {
+    status: 405,
+    headers: {
+      "allow": "GET, HEAD",
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store",
+    },
+  });
+}
+
 function redirectResponse(location) {
   return new Response(null, {
     status: 302,
@@ -29,18 +40,26 @@ export default {
     }
 
     if (request.method !== "GET" && request.method !== "HEAD") {
-      return jsonError(405, "Method not allowed");
+      return methodNotAllowed();
     }
 
     if (!env.CLAWPERATOR_APK_METADATA_URL) {
       return jsonError(500, "Missing CLAWPERATOR_APK_METADATA_URL");
     }
 
+    let metadataUrl;
+    try {
+      metadataUrl = new URL(env.CLAWPERATOR_APK_METADATA_URL);
+    } catch {
+      return jsonError(500, "CLAWPERATOR_APK_METADATA_URL is invalid");
+    }
+
     let metadataResponse;
     try {
-      metadataResponse = await fetch(env.CLAWPERATOR_APK_METADATA_URL, {
-        headers: {
-          "cache-control": "no-cache",
+      metadataResponse = await fetch(metadataUrl.toString(), {
+        cf: {
+          cacheTtl: 60,
+          cacheEverything: true,
         },
       });
     } catch {
@@ -71,6 +90,10 @@ export default {
 
     if (apkUrl.protocol !== "https:") {
       return jsonError(502, "APK metadata must use an https URL");
+    }
+
+    if (apkUrl.hostname !== metadataUrl.hostname) {
+      return jsonError(502, "APK metadata hostname is not allowed");
     }
 
     return redirectResponse(apkUrl.toString());
