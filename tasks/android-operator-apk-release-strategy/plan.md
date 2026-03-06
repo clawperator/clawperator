@@ -5,6 +5,7 @@
 Ship a release system that satisfies all of the following at once:
 
 - `https://clawperator.com/operator.apk` always installs the latest stable APK
+- `https://clawperator.com/apk` and `https://clawperator.com/install.apk` act as equivalent stable aliases
 - immutable versioned APKs remain available for rollback, audit, and reproducibility
 - `scripts/install.sh` can fetch, verify, and optionally install the correct APK
 - GitHub tag pushes drive the Android APK release process today
@@ -17,6 +18,7 @@ Adopt a hybrid model:
 - GitHub Releases remains the release event and public changelog surface
 - Cloudflare R2 plus `downloads.clawperator.com` becomes the canonical binary distribution origin
 - `clawperator.com/operator.apk` becomes a short-cache redirect to the current stable version
+- `clawperator.com/apk` and `clawperator.com/install.apk` become equivalent short-cache redirects
 
 ## Current Status
 
@@ -31,6 +33,8 @@ Implemented:
 Remaining gap for the public stable URL:
 
 - `https://clawperator.com/operator.apk` still needs Cloudflare Worker routing
+- `https://clawperator.com/apk` still needs Cloudflare Worker routing
+- `https://clawperator.com/install.apk` still needs Cloudflare Worker routing
 - this is currently a manual Cloudflare dashboard task, not a GitHub Actions deployment task
 
 This is the right split because GitHub Releases is good for provenance, release notes, and visibility, while R2 is better for stable URLs, cache control, metadata pointers, and future channel management.
@@ -40,6 +44,8 @@ This is the right split because GitHub Releases is good for provenance, release 
 ### Public URLs
 
 - `https://clawperator.com/operator.apk` -> latest stable redirect
+- `https://clawperator.com/apk` -> latest stable redirect alias
+- `https://clawperator.com/install.apk` -> latest stable redirect alias
 - `https://downloads.clawperator.com/operator/latest.json` -> stable metadata pointer
 - `https://downloads.clawperator.com/operator/vX.Y.Z/operator-vX.Y.Z.apk` -> immutable versioned APK
 - `https://downloads.clawperator.com/operator/vX.Y.Z/operator-vX.Y.Z.apk.sha256` -> immutable checksum
@@ -122,6 +128,8 @@ Rollback must mean updating the pointer in `latest.json`, not replacing an exist
 Prefer:
 
 - `/operator.apk` handled by Cloudflare Worker
+- `/apk` handled by the same Cloudflare Worker
+- `/install.apk` handled by the same Cloudflare Worker
 - Worker reads `latest.json`
 - Worker 302 redirects to the versioned immutable APK URL
 
@@ -153,7 +161,7 @@ Human tasks:
 
 - complete or confirm the Cloudflare account ownership model for this infrastructure
 - approve whether `/operator.apk` stays a Worker route or another Cloudflare-managed redirect mechanism
-- create and deploy the Cloudflare Worker route for `/operator.apk` if Worker-based delivery is retained
+- create and deploy the Cloudflare Worker routes for `/operator.apk`, `/apk`, and `/install.apk` if Worker-based delivery is retained
 - configure any remaining cache, DNS, and zone-level settings needed for the public stable URL
 
 Concrete dashboard tasks still remaining:
@@ -162,6 +170,8 @@ Concrete dashboard tasks still remaining:
 - add Worker environment variable `CLAWPERATOR_APK_METADATA_URL=https://downloads.clawperator.com/operator/latest.json`
 - deploy the Worker to production
 - add route `clawperator.com/operator.apk`
+- add route `clawperator.com/apk`
+- add route `clawperator.com/install.apk`
 - verify the route returns `302` to the `apk_url` from `latest.json`
 
 Why human-owned:
@@ -268,6 +278,8 @@ Current status:
 2. Bind Worker to the bucket.
 3. Implement routes:
    - `/operator.apk` -> stable channel redirect
+   - `/apk` -> stable channel redirect alias
+   - `/install.apk` -> stable channel redirect alias
    - `/operator/latest.json` passthrough
 4. Set headers:
    - versioned APKs: `public, max-age=31536000, immutable`
@@ -285,6 +297,7 @@ Current status:
 ### Acceptance Criteria
 
 - `clawperator.com/operator.apk` always resolves to the current stable immutable artifact
+- the alias URLs resolve to the same immutable artifact as `clawperator.com/operator.apk`
 - clients never need to know bucket internals
 - cache behavior is predictable and rollback-safe
 

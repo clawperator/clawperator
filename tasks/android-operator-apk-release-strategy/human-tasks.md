@@ -75,6 +75,8 @@ Use these markers while working through the list:
   - Recommended bucket purpose: Clawperator release binaries only.
 - [x] Configure the custom domain `downloads.clawperator.com`.
 - [x] Ensure DNS for `clawperator.com` can support the `/operator.apk` routing approach.
+- [x] Confirm the stable APK redirect should support short aliases.
+  - Aliases to support: `/operator.apk`, `/apk`, `/install.apk`
 - [x] Decide whether the Worker will live in the same account as the R2 bucket.
   - Recommendation: yes, to reduce cross-account friction.
 - [ ] Create the Worker that will serve redirect logic.
@@ -85,9 +87,13 @@ Use these markers while working through the list:
 - [ ] Deploy the Worker once to the production environment.
 - [ ] Add the route on the `clawperator.com` zone:
   - route: `clawperator.com/operator.apk`
+  - route: `clawperator.com/apk`
+  - route: `clawperator.com/install.apk`
   - target: `operator-apk-redirect`
 - [ ] Verify the Worker response in the browser or with `curl -I`:
   - `https://clawperator.com/operator.apk`
+  - `https://clawperator.com/apk`
+  - `https://clawperator.com/install.apk`
   - Expected result: `302` redirect to the immutable versioned APK URL from `latest.json`
 - [x] Create least-privilege API credentials for CI.
 - [x] Verify that the credentials can:
@@ -99,6 +105,8 @@ Use these markers while working through the list:
 
 - [ ] Approve the public URL structure:
   - `https://clawperator.com/operator.apk`
+  - `https://clawperator.com/apk`
+  - `https://clawperator.com/install.apk`
   - `https://downloads.clawperator.com/operator/latest.json`
 - [ ] Confirm whether `clawperator.com/operator.apk` should be a Worker route or a redirect rule backed by a Worker fetch.
   - Recommendation: Worker route.
@@ -117,12 +125,16 @@ These are the remaining manual tasks in the Cloudflare dashboard to make `https:
    - `CLAWPERATOR_APK_METADATA_URL=https://downloads.clawperator.com/operator/latest.json`
 4. Deploy the Worker.
 5. Open the `clawperator.com` zone and add route:
-   - `clawperator.com/operator.apk`
-6. Confirm the route is attached to `operator-apk-redirect`.
+  - `clawperator.com/operator.apk`
+  - `clawperator.com/apk`
+  - `clawperator.com/install.apk`
+6. Confirm each route is attached to `operator-apk-redirect`.
 7. Test:
-   - `https://clawperator.com/operator.apk`
-   - confirm `302`
-   - confirm `Location` matches the current `apk_url` in `latest.json`
+  - `https://clawperator.com/operator.apk`
+  - `https://clawperator.com/apk`
+  - `https://clawperator.com/install.apk`
+  - confirm `302`
+  - confirm `Location` matches the current `apk_url` in `latest.json`
 
 ## 6. npm Publishing Ownership
 
@@ -165,6 +177,8 @@ These are the remaining manual tasks in the Cloudflare dashboard to make `https:
 - [ ] Validate installation on a real Android device using:
   - direct `adb install`
   - `clawperator.com/operator.apk`
+  - `clawperator.com/apk`
+  - `clawperator.com/install.apk`
   - `scripts/install.sh`
 - [ ] Validate that an upgraded build installs cleanly over the previous release-signed build.
 
