@@ -1,10 +1,13 @@
 name: Publish npm Package
 
 on:
-  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
 
 permissions:
   contents: read
+  id-token: write
 
 concurrency:
   group: publish-npm-${{ github.ref }}
@@ -49,7 +52,5 @@ jobs:
         run: npm --prefix apps/node run test
 
       - name: Publish package
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         working-directory: apps/node
         run: npm publish --access public --tag latest

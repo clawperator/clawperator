@@ -8,7 +8,7 @@ Ship a release system that satisfies all of the following at once:
 - immutable versioned APKs remain available for rollback, audit, and reproducibility
 - `scripts/install.sh` can fetch, verify, and optionally install the correct APK
 - GitHub tag pushes drive the Android APK release process today
-- Node publishing remains version-aligned, but is deferred to a follow-up change using npm Trusted Publishing
+- Node publishing remains version-aligned and should publish via npm Trusted Publishing
 
 ## Recommendation
 
@@ -64,7 +64,7 @@ Implications:
 - one git tag represents one coherent product release across both surfaces
 - release notes should describe the combined Node and Android change set
 - Android CI should publish the APK from that tag
-- npm publishing should later publish the Node package from that same tag using Trusted Publishing
+- npm publishing should publish the Node package from that same tag using Trusted Publishing
 - docs should describe one product version, not separate Android and Node release trains
 
 Non-goal for now:
@@ -277,9 +277,9 @@ Why human-owned:
    - write and upload `latest.json`
 3. Treat plain semver tags as the release model for now.
 4. In `publish-npm.yml`:
-   - keep the workflow manual-only until npm Trusted Publishing is configured
-   - replace token-based publish with npm Trusted Publishing (OIDC)
-   - restore tag-driven npm publish only after OIDC is verified
+   - trigger on release tags
+   - use npm Trusted Publishing (OIDC) instead of `NPM_TOKEN`
+   - request `id-token: write`
 5. Ensure the Android artifact version and npm package version are derived from the same release tag and remain in sync.
 
 ### Human Dependencies
@@ -302,7 +302,7 @@ Stable releases update:
 
 - one tag push creates a complete APK release across GitHub and R2
 - release notes stay visible on GitHub even though install traffic uses Clawperator URLs
-- Android and Node artifacts remain version-aligned even while npm publishing is deferred
+- Android and Node artifacts remain version-aligned and publish from the same tag
 
 ## Workstream 4: `install.sh` APK Awareness
 
@@ -390,7 +390,7 @@ Update [install.sh](/Users/chrislacy/clawpilled/clawperator/scripts/install.sh) 
    - Android release signing secrets
    - Cloudflare R2 credentials
 2. Define the npm follow-up plan:
-   - configure npm Trusted Publishing for `publish-npm.yml`
+   - keep npm Trusted Publishing configured for `publish-npm.yml`
    - do not depend on `NPM_TOKEN` for the long-term CI publish model
 3. Before stable launch, verify:
    - release-signed APK installs cleanly over previous release-signed APK
@@ -418,7 +418,7 @@ Update [install.sh](/Users/chrislacy/clawpilled/clawperator/scripts/install.sh) 
 
 - choose Cloudflare account ownership model
 - confirm domain routing for `downloads.clawperator.com`
-- decide when npm Trusted Publishing will be implemented
+- confirm npm Trusted Publishing is configured for `publish-npm.yml`
 
 Human gate:
 
@@ -523,4 +523,4 @@ This plan is complete when all of the following are true:
 - `scripts/install.sh` fetches the same stable build, verifies checksum, and can install it over adb
 - users can still access historical versions and release notes through GitHub Releases
 - rollback to a prior stable version is a metadata change, not a rebuild
-- npm publishing has a separate follow-up path using Trusted Publishing without breaking version alignment
+- npm publishing works via Trusted Publishing without breaking version alignment
