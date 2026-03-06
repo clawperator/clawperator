@@ -3,7 +3,9 @@
   "initial_pr_sha": "103be5e26d7af60263dae701e34b1c702b57c775",
   "last_seen_comment_urls": [
     "https://github.com/clawpilled/clawperator/pull/8#discussion_r2893155903",
+    "https://github.com/clawpilled/clawperator/pull/8#discussion_r2893169527",
     "https://github.com/clawpilled/clawperator/pull/8#discussion_r2893155916",
+    "https://github.com/clawpilled/clawperator/pull/8#discussion_r2893169541",
     "https://github.com/clawpilled/clawperator/pull/8#discussion_r2893136726",
     "https://github.com/clawpilled/clawperator/pull/8#discussion_r2893155929",
     "https://github.com/clawpilled/clawperator/pull/8#discussion_r2893124416",
@@ -14,8 +16,8 @@
     "https://github.com/clawpilled/clawperator/pull/8#discussion_r2893116770",
     "https://github.com/clawpilled/clawperator/pull/8#discussion_r2893084811",
     "https://github.com/clawpilled/clawperator/pull/8#discussion_r2893103357",
-    "https://github.com/clawpilled/clawperator/pull/8#discussion_r2893116789",
     "https://github.com/clawpilled/clawperator/pull/8#discussion_r2893162970",
+    "https://github.com/clawpilled/clawperator/pull/8#discussion_r2893116789",
     "https://github.com/clawpilled/clawperator/pull/8#discussion_r2893092169",
     "https://github.com/clawpilled/clawperator/pull/8#discussion_r2893162944",
     "https://github.com/clawpilled/clawperator/pull/8#discussion_r2893136742",
@@ -33,8 +35,8 @@
     "https://github.com/clawpilled/clawperator/pull/8#discussion_r2893136760",
     "https://github.com/clawpilled/clawperator/pull/8#discussion_r2893124429"
   ],
-  "last_feedback_hash": "d644ba64c982b6744036c7463fa36256e635533037aa3a448f7c9a1360eaf91c",
-  "last_review_request_time": "2026-03-06T00:56:09.913261+00:00",
-  "last_poll_time": "2026-03-06T00:58:47.113985+00:00",
+  "last_feedback_hash": "9cd83b1e7d6147dda789f0bc829ec6d86e5cfc8507e3a519113df3bcd36e14ba",
+  "last_review_request_time": "2026-03-06T00:58:55.527645+00:00",
+  "last_poll_time": "2026-03-06T01:01:17.633834+00:00",
   "backoff_level": 0
 }
