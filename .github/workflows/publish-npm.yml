@@ -29,6 +29,9 @@ jobs:
           cache: npm
           cache-dependency-path: apps/node/package-lock.json
 
+      - name: Upgrade npm for Trusted Publishing
+        run: npm install --global npm@^11.5.1
+
       - name: Validate tag matches package version
         shell: bash
         run: |
