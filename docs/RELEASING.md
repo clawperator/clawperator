@@ -20,9 +20,9 @@ Push a semver tag with a `v` prefix:
 That tag triggers:
 
 - `.github/workflows/release-apk.yml`
+- `.github/workflows/publish-npm.yml`
 
-The APK release workflow validates that the tag version exactly matches `apps/node/package.json`.
-The npm publish workflow is currently manual-only via `workflow_dispatch`.
+Both workflows validate that the tag version exactly matches `apps/node/package.json`.
 
 ## Release Outputs
 
@@ -87,7 +87,7 @@ Expected stable UX:
 6. Verify GitHub Actions completed successfully.
 7. Verify GitHub Release assets exist.
 8. Verify Cloudflare metadata and artifact uploads exist.
-9. If you ran the npm publish workflow manually, verify npm publish succeeded.
+9. Verify npm publish succeeded.
 10. Verify installation on a real device.
 
 ## Tag Commands
