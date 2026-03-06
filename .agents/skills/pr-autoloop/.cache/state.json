@@ -2,7 +2,10 @@
   "pr_url": "https://github.com/clawpilled/clawperator/pull/8",
   "initial_pr_sha": "103be5e26d7af60263dae701e34b1c702b57c775",
   "last_seen_comment_urls": [
+    "https://github.com/clawpilled/clawperator/pull/8#discussion_r2893155903",
+    "https://github.com/clawpilled/clawperator/pull/8#discussion_r2893155916",
     "https://github.com/clawpilled/clawperator/pull/8#discussion_r2893136726",
+    "https://github.com/clawpilled/clawperator/pull/8#discussion_r2893155929",
     "https://github.com/clawpilled/clawperator/pull/8#discussion_r2893124416",
     "https://github.com/clawpilled/clawperator/pull/8#discussion_r2893084828",
     "https://github.com/clawpilled/clawperator/pull/8#discussion_r2893130546",
@@ -28,8 +31,8 @@
     "https://github.com/clawpilled/clawperator/pull/8#discussion_r2893136760",
     "https://github.com/clawpilled/clawperator/pull/8#discussion_r2893124429"
   ],
-  "last_feedback_hash": "9031aea70d9e763626bd2e448f8e7796462664efc50ad461177133b9c06f958a",
-  "last_review_request_time": "2026-03-06T00:51:09.016007+00:00",
-  "last_poll_time": "2026-03-06T00:53:42.426218+00:00",
+  "last_feedback_hash": "b58bb1d071c2084d2d412bd492dcb432d983a8621f09fb38ff85dbe8c740cb61",
+  "last_review_request_time": "2026-03-06T00:53:51.811170+00:00",
+  "last_poll_time": "2026-03-06T00:56:00.735853+00:00",
   "backoff_level": 0
 }
