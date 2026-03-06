@@ -2,6 +2,12 @@
 
 This Worker serves the stable APK redirect for Clawperator.
 
+Important:
+
+- this Worker is not auto-deployed from GitHub today
+- changes in this directory do not reach production automatically
+- the current deployment flow is manual: copy the source into the Cloudflare dashboard editor and deploy there
+
 Supported public paths:
 
 - `/operator.apk`
@@ -21,9 +27,10 @@ Expected production environment variable:
 Cloudflare dashboard setup:
 
 1. Create Worker `operator-apk-redirect`
-2. Add production variable `CLAWPERATOR_APK_METADATA_URL`
-3. Deploy the Worker
-4. Add routes:
+2. Copy the code from `src/index.js` into the Cloudflare dashboard editor
+3. Add production variable `CLAWPERATOR_APK_METADATA_URL`
+4. Deploy the Worker
+5. Add routes:
    - `clawperator.com/operator.apk`
    - `clawperator.com/apk`
    - `clawperator.com/install.apk`

@@ -1,10 +1,6 @@
-interface Env {
-  CLAWPERATOR_APK_METADATA_URL: string;
-}
-
 const SUPPORTED_PATHS = new Set(["/operator.apk", "/apk", "/install.apk"]);
 
-function jsonError(status: number, message: string): Response {
+function jsonError(status, message) {
   return new Response(JSON.stringify({ error: message }), {
     status,
     headers: {
@@ -14,7 +10,7 @@ function jsonError(status: number, message: string): Response {
   });
 }
 
-function redirectResponse(location: string): Response {
+function redirectResponse(location) {
   return new Response(null, {
     status: 302,
     headers: {
@@ -25,7 +21,7 @@ function redirectResponse(location: string): Response {
 }
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request, env) {
     const url = new URL(request.url);
 
     if (!SUPPORTED_PATHS.has(url.pathname)) {
@@ -40,7 +36,7 @@ export default {
       return jsonError(500, "Missing CLAWPERATOR_APK_METADATA_URL");
     }
 
-    let metadataResponse: Response;
+    let metadataResponse;
     try {
       metadataResponse = await fetch(env.CLAWPERATOR_APK_METADATA_URL, {
         headers: {
@@ -55,9 +51,9 @@ export default {
       return jsonError(502, "APK metadata endpoint returned an error");
     }
 
-    let metadata: { apk_url?: string };
+    let metadata;
     try {
-      metadata = (await metadataResponse.json()) as { apk_url?: string };
+      metadata = await metadataResponse.json();
     } catch {
       return jsonError(502, "APK metadata response was not valid JSON");
     }
@@ -66,7 +62,7 @@ export default {
       return jsonError(502, "APK metadata did not include apk_url");
     }
 
-    let apkUrl: URL;
+    let apkUrl;
     try {
       apkUrl = new URL(metadata.apk_url);
     } catch {
