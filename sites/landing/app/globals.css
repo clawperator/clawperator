@@ -730,6 +730,9 @@ body {
   border-radius: 14px;
   background: var(--surface);
   padding: 1.25rem 1.5rem;
+  max-width: 420px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .workflow-subtitle {
@@ -742,7 +745,6 @@ body {
 .workflow-exchange {
   display: grid;
   gap: 0.55rem;
-  max-width: 420px;
 }
 
 .workflow-msg {
