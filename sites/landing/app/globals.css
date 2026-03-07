@@ -165,17 +165,11 @@ body {
 .hero-waterfall::before {
   content: "";
   position: absolute;
-  top: -1rem;
-  width: 420px;
-  height: 420px;
+  top: -1.5rem;
+  width: 340px;
+  height: 340px;
   border-radius: 999px;
-  background: radial-gradient(
-    circle at center,
-    rgba(255, 110, 70, 0.2) 0%,
-    rgba(255, 110, 70, 0.1) 40%,
-    rgba(255, 110, 70, 0.04) 60%,
-    transparent 80%
-  );
+  background: radial-gradient(circle at center, rgba(255, 120, 80, 0.18), transparent 70%);
   z-index: -1;
   pointer-events: none;
 }
