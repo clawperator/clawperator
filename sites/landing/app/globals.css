@@ -236,6 +236,22 @@ body {
   overflow: hidden;
 }
 
+.quickstart-docs {
+  margin: 0.95rem 0 0;
+  color: var(--text-muted);
+  line-height: 1.65;
+}
+
+.quickstart-docs a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.quickstart-docs a:hover {
+  color: var(--accent-hover);
+  text-decoration: underline;
+}
+
 .quickstart-top {
   padding: 0.75rem 0.9rem;
   display: flex;
