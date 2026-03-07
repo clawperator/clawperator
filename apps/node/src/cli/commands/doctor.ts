@@ -11,6 +11,7 @@ export async function cmdDoctor(options: {
   format: OutputOptions["format"];
   fix?: boolean;
   full?: boolean;
+  checkOnly?: boolean;
   deviceId?: string;
   receiverPackage?: string;
 }): Promise<string> {
@@ -24,7 +25,7 @@ export async function cmdDoctor(options: {
   const report = await service.run({ config, full: options.full, fix: options.fix });
 
   if (options.format === "json") {
-    process.exitCode = report.ok ? 0 : 1;
+    process.exitCode = getDoctorExitCode(report, options.checkOnly);
     return JSON.stringify(report, null, 2);
   }
 
@@ -33,74 +34,92 @@ export async function cmdDoctor(options: {
     // If --fix was passed, we've already done fixes in DoctorService,
     // so just print the report.
   }
-  process.exitCode = report.ok ? 0 : 1;
+  process.exitCode = getDoctorExitCode(report, options.checkOnly);
   return renderPrettyDoctorReport(report);
 }
 
 function renderPrettyDoctorReport(report: DoctorReport): string {
   const lines: string[] = [];
-  lines.push("\n🩺 Clawperator Doctor Diagnostics\n");
+  const criticalChecks = report.checks.filter(isCriticalCheck);
+  const warningChecks = report.checks.filter(check => !isCriticalCheck(check) && check.status !== "pass");
+  const passedChecks = report.checks.filter(check => check.status === "pass" && !isCriticalCheck(check));
 
-  // Group by prefix (e.g., host., device., readiness., build.)
-  const grouped: Record<string, DoctorCheckResult[]> = {};
-  for (const check of report.checks) {
-    const group = check.id.split(".")[0] || "other";
-    if (!grouped[group]) grouped[group] = [];
-    grouped[group].push(check);
-  }
+  lines.push("");
+  lines.push("Clawperator Doctor Diagnostics");
+  lines.push("");
 
-  const groupOrder = ["host", "device", "readiness", "build"];
-  const sortedGroupKeys = Object.keys(grouped).sort((a, b) => {
-    const ai = groupOrder.indexOf(a);
-    const bi = groupOrder.indexOf(b);
-    if (ai >= 0 && bi >= 0) return ai - bi;
-    if (ai >= 0) return -1;
-    if (bi >= 0) return 1;
-    return a.localeCompare(b);
-  });
-
-  for (const group of sortedGroupKeys) {
-    const checks = grouped[group];
-    lines.push(`${group.toUpperCase()}:`);
-    for (const check of checks) {
-      const icon = check.status === "pass" ? "✅" : check.status === "warn" ? "⚠️" : "❌";
-      lines.push(`  ${icon} ${check.summary}`);
-      if (check.status !== "pass" && check.detail) {
-        lines.push(`     Detail: ${check.detail}`);
-      }
-      if (check.status !== "pass" && check.fix) {
-        lines.push(`     Fix: ${check.fix.title}`);
-        for (const step of check.fix.steps) {
-          if (step.kind === "shell") {
-            lines.push(`       > ${step.value}`);
-          } else {
-            lines.push(`       - ${step.value}`);
-          }
-        }
-      }
-      if (check.status !== "pass" && check.deviceGuidance) {
-        lines.push(`     Device guidance (${check.deviceGuidance.screen}):`);
-        for (const step of check.deviceGuidance.steps) {
-          lines.push(`       - ${step}`);
-        }
-      }
+  if (criticalChecks.length > 0) {
+    lines.push("Critical checks:");
+    for (const check of criticalChecks) {
+      renderCheck(lines, check);
     }
     lines.push("");
   }
 
-  if (report.ok) {
-    lines.push("✅ Verified state reached.");
+  if (warningChecks.length > 0) {
+    lines.push("Warnings:");
+    for (const check of warningChecks) {
+      renderCheck(lines, check);
+    }
+    lines.push("");
+  }
+
+  if (passedChecks.length > 0) {
+    lines.push(`Additional passed checks: ${passedChecks.length}`);
+    lines.push("");
+  }
+
+  if (report.criticalOk ?? report.ok) {
+    lines.push(report.ok ? "[OK] Ready to use Clawperator." : "[WARN] Critical checks passed. Address warnings before relying on the setup.");
   } else {
-    lines.push("❌ Verification failed.");
+    lines.push("[FAIL] Critical setup checks failed.");
   }
 
   if (report.nextActions && report.nextActions.length > 0) {
-    lines.push(`\nNext actions:`);
-    for (const action of report.nextActions) {
-      lines.push(`  ${action}`);
-    }
     lines.push("");
+    lines.push("Next actions:");
+    for (const action of report.nextActions) {
+      lines.push(`  - ${action}`);
+    }
   }
 
   return lines.join("\n");
+}
+
+function getDoctorExitCode(report: DoctorReport, checkOnly?: boolean): number {
+  if (checkOnly) return 0;
+  return (report.criticalOk ?? report.ok) ? 0 : 1;
+}
+
+function isCriticalCheck(check: DoctorCheckResult): boolean {
+  return [
+    "host.node.version",
+    "host.adb.presence",
+    "host.adb.server",
+    "host.java.version",
+    "device.discovery",
+    "build.android.assemble",
+    "build.android.install",
+    "build.android.launch",
+  ].some(prefix => check.id.startsWith(prefix));
+}
+
+function renderCheck(lines: string[], check: DoctorCheckResult): void {
+  const status = check.status === "pass" ? "[OK]" : check.status === "warn" ? "[WARN]" : "[FAIL]";
+  lines.push(`  ${status} ${check.summary}`);
+  if (check.status !== "pass" && check.detail) {
+    lines.push(`    ${check.detail}`);
+  }
+  if (check.status !== "pass" && check.fix) {
+    lines.push(`    ${check.fix.title}:`);
+    for (const step of check.fix.steps) {
+      lines.push(`      - ${step.value}`);
+    }
+  }
+  if (check.status !== "pass" && check.deviceGuidance) {
+    lines.push(`    On device (${check.deviceGuidance.screen}):`);
+    for (const step of check.deviceGuidance.steps) {
+      lines.push(`      - ${step}`);
+    }
+  }
 }

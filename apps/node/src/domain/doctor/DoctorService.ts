@@ -35,28 +35,32 @@ export class DoctorService {
     const checks: DoctorCheckResult[] = [];
 
     // 1. Host Checks
-    checks.push(await checkNodeVersion());
+    const nodeVersion = await checkNodeVersion();
+    checks.push(nodeVersion);
+    if (this.shouldHaltOnFailure(nodeVersion)) return this.finalize(checks, config, options.fix);
 
     const adbPresence = await checkAdbPresence(config);
     checks.push(adbPresence);
-    if (adbPresence.status === "fail") return this.finalize(checks, config, options.fix);
+    if (this.shouldHaltOnFailure(adbPresence)) return this.finalize(checks, config, options.fix);
 
     const adbServer = await checkAdbServer(config);
     checks.push(adbServer);
-    if (adbServer.status === "fail") return this.finalize(checks, config, options.fix);
+    if (this.shouldHaltOnFailure(adbServer)) return this.finalize(checks, config, options.fix);
 
     if (full) {
-      checks.push(await checkJavaVersion(config));
+      const javaVersion = await checkJavaVersion(config);
+      checks.push(javaVersion);
+      if (this.shouldHaltOnFailure(javaVersion)) return this.finalize(checks, config, options.fix);
 
       const build = await runAndroidBuild(config);
       checks.push(build);
-      if (build.status === "fail") return this.finalize(checks, config, options.fix);
+      if (this.shouldHaltOnFailure(build)) return this.finalize(checks, config, options.fix);
     }
 
     // 2. Device Discovery
     const discovery = await checkDeviceDiscovery(config);
     checks.push(discovery);
-    if (discovery.status === "fail") return this.finalize(checks, config, options.fix);
+    if (this.shouldHaltOnFailure(discovery)) return this.finalize(checks, config, options.fix);
 
     // After discovery, ensure we have a deviceId in config for subsequent checks
     if (!config.deviceId) {
@@ -71,32 +75,28 @@ export class DoctorService {
     if (full) {
       const install = await runAndroidInstall(config);
       checks.push(install);
-      if (install.status === "fail") return this.finalize(checks, config, options.fix);
+      if (this.shouldHaltOnFailure(install)) return this.finalize(checks, config, options.fix);
 
       const launch = await runAndroidLaunch(config);
       checks.push(launch);
-      if (launch.status === "fail") return this.finalize(checks, config, options.fix);
+      if (this.shouldHaltOnFailure(launch)) return this.finalize(checks, config, options.fix);
     }
 
     // 3. Device Capabilities
-    const capabilities = await checkDeviceCapabilities(config);
-    checks.push(capabilities);
-    if (capabilities.status === "fail") return this.finalize(checks, config, options.fix);
+    checks.push(await checkDeviceCapabilities(config));
 
     // 4. APK Presence
     const apkPresence = await checkApkPresence(config);
     checks.push(apkPresence);
-    if (apkPresence.status === "fail") return this.finalize(checks, config, options.fix);
 
     // 5. Android Settings
     const settingsResults = await checkSettings(config);
     checks.push(...settingsResults);
-    if (settingsResults.some(r => r.status === "fail")) return this.finalize(checks, config, options.fix);
 
     // 6. Handshake
-    const handshake = await runHandshake(config);
-    checks.push(handshake);
-    if (handshake.status === "fail") return this.finalize(checks, config, options.fix);
+    if (apkPresence.status === "pass") {
+      checks.push(await runHandshake(config));
+    }
 
     // 7. Smoke Test (Only if full)
     if (full) {
@@ -108,33 +108,69 @@ export class DoctorService {
   }
 
   private async finalize(checks: DoctorCheckResult[], config: RuntimeConfig, autoFix?: boolean): Promise<DoctorReport> {
-    const ok = checks.every(c => c.status !== "fail");
+    const criticalOk = checks
+      .filter(check => this.isCriticalCheck(check))
+      .every(check => check.status !== "fail");
+    const ok = checks.every(check => check.status === "pass");
 
     const nextActions: string[] = [];
-    if (ok) {
-      nextActions.push("clawperator action open-app --app com.android.settings");
-    } else {
-      for (const check of checks) {
-        if (check.status === "fail" && check.fix) {
-          for (const step of check.fix.steps) {
-            if (step.kind === "shell") {
-              if (autoFix) {
-                try { await config.runner.runShell(step.value); } catch { /* ignore */ }
-              } else {
-                nextActions.push(step.value);
+    if (criticalOk && ok) {
+      nextActions.push("Read the setup guide: https://docs.clawperator.com/getting-started/first-time-setup/");
+      nextActions.push(
+        config.deviceId
+          ? `Try: clawperator observe snapshot --device-id ${config.deviceId}`
+          : "Try: clawperator observe snapshot --device-id <device_id>"
+      );
+    }
+
+    for (const check of checks) {
+      if (check.status === "pass") continue;
+      if (check.fix) {
+        for (const step of check.fix.steps) {
+          if (step.kind === "shell") {
+            if (autoFix) {
+              try {
+                await config.runner.runShell(step.value);
+              } catch {
+                // Keep diagnostics deterministic even if best-effort fix fails.
               }
+            } else {
+              nextActions.push(step.value);
             }
+            continue;
           }
+          nextActions.push(step.value);
         }
+      }
+      if (check.deviceGuidance) {
+        nextActions.push(`On device, open ${check.deviceGuidance.screen} and follow the listed steps.`);
       }
     }
 
     return {
       ok,
+      criticalOk,
       deviceId: config.deviceId,
       receiverPackage: config.receiverPackage,
       checks,
-      nextActions,
+      nextActions: nextActions.length > 0 ? [...new Set(nextActions)] : undefined,
     };
+  }
+
+  private shouldHaltOnFailure(check: DoctorCheckResult): boolean {
+    return check.status === "fail" && this.isCriticalCheck(check);
+  }
+
+  private isCriticalCheck(check: DoctorCheckResult): boolean {
+    return [
+      "host.node.version",
+      "host.adb.presence",
+      "host.adb.server",
+      "host.java.version",
+      "device.discovery",
+      "build.android.assemble",
+      "build.android.install",
+      "build.android.launch",
+    ].some(prefix => check.id.startsWith(prefix));
   }
 }

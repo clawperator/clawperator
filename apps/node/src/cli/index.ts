@@ -57,6 +57,8 @@ Commands:
                                             Attempt non-destructive host fixes (Stage 3)
   doctor --full
                                             Full Android build + install + handshake + smoke (Stage 3)
+  doctor --check-only
+                                            Run all checks but always exit 0 (for CI/automation)
 
 Global options:
   --device-id <id>                          Target Android device serial
@@ -320,6 +322,7 @@ async function main(): Promise<void> {
         format: isJson ? "json" : "pretty",
         fix: hasFlag(rest, "--fix"),
         full: hasFlag(rest, "--full"),
+        checkOnly: hasFlag(rest, "--check-only"),
         deviceId: global.deviceId ?? getOpt(rest, "--device-id"),
         receiverPackage: global.receiverPackage ?? getOpt(rest, "--receiver-package"),
       });
