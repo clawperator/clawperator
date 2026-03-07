@@ -16,3 +16,14 @@ This checklist tracks the remaining pre-launch work after the release, docs, ins
 - Public docs and landing sites are live and aligned to the hosted install flow.
 - Skills install/update/search/run support exists in the Node CLI.
 - Doctor now distinguishes critical failures from warnings and skips handshake when the APK is missing.
+
+## Deferred Items (Not in This Roadmap)
+
+These are explicitly deferred beyond the current pre-release work:
+
+- `--safe-logs` flag
+- animated demos or video walkthroughs
+- community/repository hygiene docs such as `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, and `SECURITY.md`
+- CI for skills repo validation
+- comprehensive integration tests
+- `execute best-effort --goal`
