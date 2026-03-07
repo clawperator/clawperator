@@ -113,9 +113,9 @@ export default function Home() {
       {/* Hero Section */}
       <section id="top" className="hero-card">
         <div className="hero-waterfall">
+          <p className="hero-problem">Most services only expose their real functionality through mobile apps.</p>
           <img ref={heroLogoRef} src="/clawperator-logo.png" alt="" aria-hidden="true" className="hero-logo" />
           <p className="hero-product-name">Clawperator</p>
-          <p className="hero-problem">Most services only expose their real functionality through mobile apps.</p>
           <h1 className="hero-catchphrase">Your agent thinks. Clawperator acts.</h1>
           <p className="hero-summary">
             Let AI agents control Android apps on behalf of users.
