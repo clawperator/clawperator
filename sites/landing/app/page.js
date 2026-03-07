@@ -119,9 +119,12 @@ export default function Home() {
           <p className="hero-summary">
             Let AI agents control Android apps on behalf of users.
             <br />
-            Your AI agent or LLM is the "brain": it reads the current state, decides what should happen next, and sends
-            the command. Clawperator is the "hand": it connects that agent to a dedicated Android burner phone, performs
-            the app actions, and returns results your code can trust.
+            Your agent or LLM is the «brain».
+            <br />
+            Clawperator is the «hand».
+            <br />
+            The brain decides what to do next. Clawperator connects that agent to a dedicated Android burner phone,
+            executes the action, and returns structured results your code can trust.
           </p>
         </div>
 
@@ -203,7 +206,7 @@ export default function Home() {
       <section id="features" className="feature-grid" aria-label="Core features">
         <div className="feature-intro">
           <h2>Features</h2>
-          <p>Built for agent loops that need clear device state, predictable actions, and results you can automate against.</p>
+          <p>Built for agent loops that need clear device state, predictable actions, and machine-readable results.</p>
         </div>
 
         {features.map((feature) => (
@@ -241,8 +244,9 @@ export default function Home() {
             <h3>What your agent gets</h3>
             <ul>
               <li>Connect to a real Android burner phone from a simple Node API or CLI</li>
-              <li>Tap, type, scroll, launch apps, and inspect the current UI state</li>
-              <li>Work with OpenClaw, custom agents, and Claude/OpenAI-based systems that can make API calls</li>
+              <li>Tap, type, scroll, launch apps, and inspect the current UI</li>
+              <li>Works with OpenClaw, custom agents, and any AI system capable of making API calls</li>
+              <li>Compose reusable skills that automate real mobile workflows</li>
               <li>Build repeatable automations without baking app-specific strategy into the runtime</li>
             </ul>
           </div>
@@ -260,7 +264,8 @@ export default function Home() {
         <div className="setup-note">
           <p>
             <strong>The burner phone model:</strong> Clawperator commonly runs on a cheap Android phone dedicated to
-            agent work. Your laptop hosts the brain. The phone becomes the hand.
+            agent work. This keeps automation isolated from your primary phone and gives your agent a persistent device
+            it can safely control.
           </p>
         </div>
       </section>
@@ -268,8 +273,8 @@ export default function Home() {
       <section id="reliability" className="content-section">
         <h2>Reliability</h2>
         <p>
-          Clawperator is designed for agents that need predictable behavior, not magic. Commands are strict, results are
-          explicit, and the runtime stays out of the planning loop.
+          Clawperator favors predictable execution over automation magic. Commands are strict, results are explicit, and
+          the runtime stays out of the planning loop.
         </p>
         <div className="grid-2-col">
           <div>
@@ -332,7 +337,7 @@ export default function Home() {
 
         <footer className="site-footer">
           <p className="footer-title">Clawperator</p>
-          <p className="footer-copy">Open source Android control for AI agents, from single commands to full burner-phone workflows.</p>
+          <p className="footer-copy">Open source Android automation for AI agents. From single commands to full burner-device workflows.</p>
           <nav className="footer-links" aria-label="Footer links">
             <a href="https://docs.clawperator.com" target="_blank" rel="noreferrer">
               docs
