@@ -137,7 +137,7 @@ export default function Home() {
                 href={`#${id}`}
                 className={activeSection === id ? "toolbar-section-link active" : "toolbar-section-link"}
               >
-                {id === "install" ? "Install" : id === "workflows" ? "Workflows" : id === "why" ? "Why" : id === "what" ? "What" : id === "skills" ? "Skills" : "How it works"}
+                {id === "install" ? "Install" : id === "workflows" ? "Examples" : id === "why" ? "Why" : id === "what" ? "What" : id === "skills" ? "Skills" : "How it works"}
               </a>
             ))}
             <a href="https://docs.clawperator.com" target="_blank" rel="noreferrer">
@@ -257,7 +257,7 @@ export default function Home() {
       </section>
 
       <section id="workflows" className="content-section">
-        <h2>Example Agent Workflows</h2>
+        <h2>Real-world examples</h2>
         <p className="workflow-subtitle">
           Every workflow below is executed on a real Android device.
           A natural request goes in, a concrete result comes back.
