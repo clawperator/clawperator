@@ -285,7 +285,7 @@ export default function Home() {
 
       <section className="content-section architecture-section" aria-label="The architecture">
         <h2>The architecture</h2>
-        <div className="architecture-strip" aria-label="AI agent or LLM connects through the Clawperator runtime to an Android burner device, which operates mobile apps">
+        <div className="architecture-strip">
           <article className="architecture-card architecture-card-edge">
             <p className="architecture-label">AI Agent / LLM</p>
             <p className="architecture-meta">the brain</p>
