@@ -261,7 +261,10 @@ export async function startServer(options: ServeOptions): Promise<Server> {
           durationMs: result.durationMs,
         });
       } else {
-        res.status(400).json({
+        const status = result.code === SKILL_NOT_FOUND ? 404
+          : result.code === "REGISTRY_READ_FAILED" ? 500
+          : 400;
+        res.status(status).json({
           ok: false,
           error: {
             code: result.code,

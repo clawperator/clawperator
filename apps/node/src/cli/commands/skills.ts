@@ -5,7 +5,6 @@ import { syncSkills } from "../../domain/skills/syncSkills.js";
 import { searchSkills } from "../../domain/skills/searchSkills.js";
 import { runSkill } from "../../domain/skills/runSkill.js";
 import { getRegistryPath } from "../../adapters/skills-repo/localSkillsRegistry.js";
-import { getDefaultSkillsRegistryPath } from "../../domain/skills/skillsConfig.js";
 import type { OutputOptions } from "../output.js";
 import { formatSuccess, formatError } from "../output.js";
 
@@ -60,12 +59,11 @@ export async function cmdSkillsInstall(
 ): Promise<string> {
   const result = await syncSkills("main");
   if (result.ok) {
-    const registryPath = getDefaultSkillsRegistryPath();
     return formatSuccess({
       synced: result.synced,
       message: result.message,
-      registryPath,
-      envInstruction: `export CLAWPERATOR_SKILLS_REGISTRY="${registryPath}"`,
+      registryPath: result.registryPath,
+      envInstruction: `export CLAWPERATOR_SKILLS_REGISTRY="${result.registryPath}"`,
     }, options);
   }
   return formatError({ code: result.code, message: result.message }, options);

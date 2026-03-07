@@ -99,11 +99,16 @@ export async function runSkill(
           return;
         }
 
-        const exitCode = "code" in err && typeof err.code === "number" ? err.code : 1;
+        // err.code is a string for spawn errors (ENOENT, EACCES) and a number for exit codes
+        const errCode = "code" in err ? err.code : undefined;
+        const exitCode = typeof errCode === "number" ? errCode : 1;
+        const detail = typeof errCode === "string"
+          ? `${errCode}: ${err.message}`
+          : `exited with code ${exitCode}`;
         resolve({
           ok: false,
           code: SKILL_EXECUTION_FAILED,
-          message: `Skill ${skillId} exited with code ${exitCode}`,
+          message: `Skill ${skillId} ${detail}`,
           skillId,
           exitCode,
           stderr: stderr || undefined,

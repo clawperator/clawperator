@@ -312,4 +312,19 @@ describe("runSkill", () => {
     assert.ok(!result.ok);
     assert.strictEqual(result.code, SKILL_SCRIPT_NOT_FOUND);
   });
+
+  it("runs script and captures output on success", async () => {
+    const result = await runSkill("com.test.echo", ["hello"]);
+    assert.ok(result.ok, `Expected runSkill to succeed: ${"message" in result ? result.message : ""}`);
+    assert.strictEqual(result.skillId, "com.test.echo");
+    assert.strictEqual(result.exitCode, 0);
+    assert.ok(result.output.includes("TEST_OUTPUT:hello"));
+    assert.ok(typeof result.durationMs === "number" && result.durationMs >= 0);
+  });
+
+  it("runs script with no args", async () => {
+    const result = await runSkill("com.test.echo", []);
+    assert.ok(result.ok);
+    assert.ok(result.output.includes("TEST_OUTPUT:no-args"));
+  });
 });

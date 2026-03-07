@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
-import { access, readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { access, readFile, mkdir } from "node:fs/promises";
+import { join, dirname } from "node:path";
 import { SKILLS_REPO_URL, DEFAULT_SKILLS_DIR, DEFAULT_SKILLS_REGISTRY_SUBPATH } from "./skillsConfig.js";
 import { SKILLS_SYNC_FAILED, SKILLS_GIT_NOT_FOUND } from "../../contracts/skills.js";
 
@@ -18,9 +18,9 @@ export interface SyncSkillsError {
   message: string;
 }
 
-function exec(cmd: string, args: string[]): Promise<{ stdout: string; stderr: string }> {
+function exec(cmd: string, args: string[], timeoutMs = 120_000): Promise<{ stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
-    execFile(cmd, args, { timeout: 60_000 }, (err, stdout, stderr) => {
+    execFile(cmd, args, { timeout: timeoutMs, maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
       if (err) reject(err);
       else resolve({ stdout, stderr });
     });
@@ -64,8 +64,15 @@ export async function syncSkills(
     if (await dirExists(join(dir, ".git"))) {
       await exec("git", ["-C", dir, "fetch", "--quiet"]);
       await exec("git", ["-C", dir, "checkout", ref]);
-      await exec("git", ["-C", dir, "pull", "--ff-only", "--quiet"]);
+      // Only pull if on a branch (not detached HEAD from a tag/commit)
+      try {
+        await exec("git", ["-C", dir, "symbolic-ref", "HEAD"], 5_000);
+        await exec("git", ["-C", dir, "pull", "--ff-only", "--quiet"]);
+      } catch {
+        // Detached HEAD (tag/commit ref) - fetch+checkout is sufficient
+      }
     } else {
+      await mkdir(dirname(dir), { recursive: true });
       await exec("git", ["clone", SKILLS_REPO_URL, dir]);
       if (ref !== "main") {
         await exec("git", ["-C", dir, "checkout", ref]);
