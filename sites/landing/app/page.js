@@ -96,10 +96,10 @@ export default function Home() {
 
           <nav className="toolbar-links" aria-label="Page sections">
             <a href="#install">Install</a>
+            <a href="#workflows">Workflows</a>
             <a href="#why">Why</a>
             <a href="#what">What</a>
             <a href="#skills">Skills</a>
-            <a href="#workflows">Workflows</a>
             <a href="#how-it-works">How it works</a>
             <a href="https://docs.clawperator.com" target="_blank" rel="noreferrer">
               Docs
@@ -215,6 +215,79 @@ export default function Home() {
           </a>
           .
         </p>
+      </section>
+
+      <section id="workflows" className="content-section">
+        <h2>Example Agent Workflows</h2>
+        <p>
+          Real interactions between users, agents, and mobile apps running on a burner phone.
+          Each workflow starts with a natural request and ends with a concrete result.
+        </p>
+
+        <div className="workflow-cards">
+          <article className="workflow-card">
+            <div className="workflow-exchange">
+              <div className="workflow-msg workflow-msg-user">
+                <p className="workflow-role">User <span className="workflow-channel">via Telegram</span></p>
+                <p>&ldquo;Hey assistant, what&rsquo;s my current home battery level?&rdquo;</p>
+              </div>
+              <div className="workflow-msg workflow-msg-agent">
+                <p className="workflow-role">Agent</p>
+                <p className="workflow-action">runs solar-app.get-battery-status on burner phone</p>
+              </div>
+              <div className="workflow-msg workflow-msg-result">
+                <p className="workflow-role">Result</p>
+                <p>Battery: 73% - Charging from solar - Estimated full: 14:20</p>
+              </div>
+              <div className="workflow-msg workflow-msg-agent">
+                <p className="workflow-role">Agent <span className="workflow-channel">replies via Telegram</span></p>
+                <p>&ldquo;Your home battery is at 73% and charging from solar. Should be full around 2:20pm.&rdquo;</p>
+              </div>
+            </div>
+          </article>
+
+          <article className="workflow-card">
+            <div className="workflow-exchange">
+              <div className="workflow-msg workflow-msg-user">
+                <p className="workflow-role">User</p>
+                <p>&ldquo;Turn on the living room AC.&rdquo;</p>
+              </div>
+              <div className="workflow-msg workflow-msg-agent">
+                <p className="workflow-role">Agent</p>
+                <p className="workflow-action">runs google-home.start-ac - mode: cool, room: living room</p>
+              </div>
+              <div className="workflow-msg workflow-msg-result">
+                <p className="workflow-role">Result</p>
+                <p>AC started. Current room temperature: 27&#176;C.</p>
+              </div>
+              <div className="workflow-msg workflow-msg-agent">
+                <p className="workflow-role">Agent</p>
+                <p>&ldquo;Living room AC is on and cooling. It&rsquo;s 27&#176;C in there right now.&rdquo;</p>
+              </div>
+            </div>
+          </article>
+
+          <article className="workflow-card">
+            <div className="workflow-exchange">
+              <div className="workflow-msg workflow-msg-user">
+                <p className="workflow-role">User</p>
+                <p>&ldquo;Where is Amy right now?&rdquo;</p>
+              </div>
+              <div className="workflow-msg workflow-msg-agent">
+                <p className="workflow-role">Agent</p>
+                <p className="workflow-action">runs life360.get-location on burner phone</p>
+              </div>
+              <div className="workflow-msg workflow-msg-result">
+                <p className="workflow-role">Result</p>
+                <p>Amy is travelling along Riverside Rd, last updated 2 min ago.</p>
+              </div>
+              <div className="workflow-msg workflow-msg-agent">
+                <p className="workflow-role">Agent</p>
+                <p>&ldquo;Amy is on Riverside Rd, heading east. Location updated 2 minutes ago.&rdquo;</p>
+              </div>
+            </div>
+          </article>
+        </div>
       </section>
 
       {/* Feature Grid - Core Principles */}
@@ -400,79 +473,6 @@ export default function Home() {
               <li>One install command pulls the full skills library</li>
             </ul>
           </div>
-        </div>
-      </section>
-
-      <section id="workflows" className="content-section">
-        <h2>Example Agent Workflows</h2>
-        <p>
-          Real interactions between users, agents, and mobile apps running on a burner phone.
-          Each workflow starts with a natural request and ends with a concrete result.
-        </p>
-
-        <div className="workflow-cards">
-          <article className="workflow-card">
-            <div className="workflow-exchange">
-              <div className="workflow-msg workflow-msg-user">
-                <p className="workflow-role">User <span className="workflow-channel">via Telegram</span></p>
-                <p>&ldquo;Hey assistant, what&rsquo;s my current home battery level?&rdquo;</p>
-              </div>
-              <div className="workflow-msg workflow-msg-agent">
-                <p className="workflow-role">Agent</p>
-                <p className="workflow-action">runs solar-app.get-battery-status on burner phone</p>
-              </div>
-              <div className="workflow-msg workflow-msg-result">
-                <p className="workflow-role">Result</p>
-                <p>Battery: 73% - Charging from solar - Estimated full: 14:20</p>
-              </div>
-              <div className="workflow-msg workflow-msg-agent">
-                <p className="workflow-role">Agent <span className="workflow-channel">replies via Telegram</span></p>
-                <p>&ldquo;Your home battery is at 73% and charging from solar. Should be full around 2:20pm.&rdquo;</p>
-              </div>
-            </div>
-          </article>
-
-          <article className="workflow-card">
-            <div className="workflow-exchange">
-              <div className="workflow-msg workflow-msg-user">
-                <p className="workflow-role">User</p>
-                <p>&ldquo;Turn on the living room AC.&rdquo;</p>
-              </div>
-              <div className="workflow-msg workflow-msg-agent">
-                <p className="workflow-role">Agent</p>
-                <p className="workflow-action">runs google-home.start-ac - mode: cool, room: living room</p>
-              </div>
-              <div className="workflow-msg workflow-msg-result">
-                <p className="workflow-role">Result</p>
-                <p>AC started. Current room temperature: 27&#176;C.</p>
-              </div>
-              <div className="workflow-msg workflow-msg-agent">
-                <p className="workflow-role">Agent</p>
-                <p>&ldquo;Living room AC is on and cooling. It&rsquo;s 27&#176;C in there right now.&rdquo;</p>
-              </div>
-            </div>
-          </article>
-
-          <article className="workflow-card">
-            <div className="workflow-exchange">
-              <div className="workflow-msg workflow-msg-user">
-                <p className="workflow-role">User</p>
-                <p>&ldquo;Where is Amy right now?&rdquo;</p>
-              </div>
-              <div className="workflow-msg workflow-msg-agent">
-                <p className="workflow-role">Agent</p>
-                <p className="workflow-action">runs life360.get-location on burner phone</p>
-              </div>
-              <div className="workflow-msg workflow-msg-result">
-                <p className="workflow-role">Result</p>
-                <p>Amy is travelling along Riverside Rd, last updated 2 min ago.</p>
-              </div>
-              <div className="workflow-msg workflow-msg-agent">
-                <p className="workflow-role">Agent</p>
-                <p>&ldquo;Amy is on Riverside Rd, heading east. Location updated 2 minutes ago.&rdquo;</p>
-              </div>
-            </div>
-          </article>
         </div>
       </section>
 
