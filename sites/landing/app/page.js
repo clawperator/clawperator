@@ -119,8 +119,9 @@ export default function Home() {
           <p className="hero-summary">
             Let AI agents control Android apps on behalf of users.
             <br />
-            The brain decides what to do next. Clawperator is the hand: it connects any agent to a dedicated Android
-            burner phone so it can see the screen, tap through apps, and return results your code can trust.
+            Your AI agent or LLM is the brain: it reads the current state, decides what should happen next, and sends
+            the command. Clawperator is the hand: it connects that agent to a dedicated Android burner phone, performs
+            the app actions, and returns results your code can trust.
           </p>
         </div>
 
