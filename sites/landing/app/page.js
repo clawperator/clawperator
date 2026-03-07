@@ -115,6 +115,7 @@ export default function Home() {
         <div className="hero-waterfall">
           <img ref={heroLogoRef} src="/clawperator-logo.png" alt="" aria-hidden="true" className="hero-logo" />
           <p className="hero-product-name">Clawperator</p>
+          <p className="hero-problem">Most services only expose their real functionality through mobile apps.</p>
           <h1 className="hero-catchphrase">Your agent thinks. Clawperator acts.</h1>
           <p className="hero-summary">
             Let AI agents control Android apps on behalf of users.
@@ -268,6 +269,42 @@ export default function Home() {
             it can safely control.
           </p>
         </div>
+      </section>
+
+      <section className="content-section architecture-section" aria-label="The architecture">
+        <h2>The architecture</h2>
+        <div className="architecture-strip" role="img" aria-label="AI agent or LLM connects through the Clawperator runtime to an Android burner device, which operates mobile apps">
+          <article className="architecture-card">
+            <p className="architecture-label">AI Agent / LLM</p>
+            <p className="architecture-meta">the «brain»</p>
+          </article>
+          <div className="architecture-connector">
+            <span className="architecture-line" />
+            <span className="architecture-text">Node API / CLI</span>
+          </div>
+          <article className="architecture-card">
+            <p className="architecture-label">Clawperator</p>
+            <p className="architecture-meta">runtime / «hand»</p>
+          </article>
+          <div className="architecture-connector">
+            <span className="architecture-line" />
+            <span className="architecture-text">USB / ADB</span>
+          </div>
+          <article className="architecture-card">
+            <p className="architecture-label">Android Burner Device</p>
+            <p className="architecture-meta">dedicated actuator</p>
+          </article>
+          <div className="architecture-connector">
+            <span className="architecture-line" />
+          </div>
+          <article className="architecture-card">
+            <p className="architecture-label">Mobile Apps</p>
+            <p className="architecture-meta">the real interfaces</p>
+          </article>
+        </div>
+        <p>
+          Your agent reasons about what should happen. Clawperator executes those decisions on a real Android device.
+        </p>
       </section>
 
       <section id="reliability" className="content-section">
