@@ -84,8 +84,8 @@ node "$REPO_ROOT/apps/node/dist/cli/index.js" doctor --json > "$TMP_DIR/out3.jso
 EXIT_CODE=$?
 set -e
 
-if [ "$EXIT_CODE" -eq 0 ]; then
-  echo "[Error] Doctor should have exited with a non-zero code when APK is missing!"
+if [ "$EXIT_CODE" -ne 0 ]; then
+  echo "[Error] Doctor should exit 0 when only warning-level checks fail!"
   exit 1
 fi
 
@@ -94,6 +94,43 @@ if grep -q "RECEIVER_NOT_INSTALLED" "$TMP_DIR/out3.json"; then
 else
   echo "[Error] RECEIVER_NOT_INSTALLED error code not found in output."
   cat "$TMP_DIR/out3.json"
+  exit 1
+fi
+
+if grep -q '"criticalOk": true' "$TMP_DIR/out3.json"; then
+  echo "[Success] criticalOk reports that core setup is usable."
+else
+  echo "[Error] criticalOk should be true when only warning checks fail."
+  cat "$TMP_DIR/out3.json"
+  exit 1
+fi
+
+if grep -q '"id": "readiness.handshake"' "$TMP_DIR/out3.json"; then
+  echo "[Error] Handshake should be skipped when the APK is missing."
+  cat "$TMP_DIR/out3.json"
+  exit 1
+else
+  echo "[Success] Handshake skipped when APK is missing."
+fi
+
+echo "=== Scenario 4: CHECK_ONLY (Fake ADB) ==="
+export FAKE_ADB_SCENARIO="NO_DEVICE"
+
+set +e
+node "$REPO_ROOT/apps/node/dist/cli/index.js" doctor --json --check-only > "$TMP_DIR/out4.json"
+EXIT_CODE=$?
+set -e
+
+if [ "$EXIT_CODE" -ne 0 ]; then
+  echo "[Error] Doctor --check-only should always exit 0."
+  exit 1
+fi
+
+if grep -q "NO_DEVICES" "$TMP_DIR/out4.json"; then
+  echo "[Success] --check-only preserves the failing diagnostics."
+else
+  echo "[Error] NO_DEVICES error code not found in --check-only output."
+  cat "$TMP_DIR/out4.json"
   exit 1
 fi
 
