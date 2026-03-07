@@ -139,6 +139,13 @@ export default function Home() {
             One command installs the CLI, fetches the latest operator app, verifies it, and helps prepare a connected
             Android device for your agent.
           </p>
+          <p>
+            Clawperator has comprehensive documentation, setup guides, and API references at{" "}
+            <a href="https://docs.clawperator.com" target="_blank" rel="noreferrer">
+              docs.clawperator.com
+            </a>
+            .
+          </p>
         </div>
 
         <div className="quickstart-block" aria-label="Quickstart terminal">
