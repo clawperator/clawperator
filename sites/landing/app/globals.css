@@ -6,7 +6,7 @@
   --border-strong: #3a4b6e;
 
   --text: #e8eef9;
-  --text-muted: #9fb0cc;
+  --text-muted: #cbd5e1;
 
   --accent: #ff6a3d;
   --accent-hover: #ff835e;
@@ -33,7 +33,7 @@ body {
 }
 
 .page-shell {
-  width: min(800px, 92vw);
+  width: min(860px, 92vw);
   margin: 0 auto;
   padding: 2rem 0 2.4rem;
 }
@@ -66,7 +66,7 @@ body {
 }
 
 .top-toolbar-inner {
-  width: min(800px, 92vw);
+  width: min(860px, 92vw);
   margin: 0 auto;
   display: flex;
   align-items: center;
@@ -84,8 +84,8 @@ body {
 }
 
 .toolbar-logo {
-  width: 2rem;
-  height: 2rem;
+  width: 2.6rem;
+  height: auto;
   border-radius: 0.5rem;
   flex-shrink: 0;
 }
@@ -155,22 +155,43 @@ body {
 }
 
 .hero-waterfall {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
 }
 
+.hero-waterfall::before {
+  content: "";
+  position: absolute;
+  top: -1rem;
+  width: 420px;
+  height: 420px;
+  border-radius: 999px;
+  background: radial-gradient(
+    circle at center,
+    rgba(255, 110, 70, 0.2) 0%,
+    rgba(255, 110, 70, 0.1) 40%,
+    rgba(255, 110, 70, 0.04) 60%,
+    transparent 80%
+  );
+  z-index: -1;
+  pointer-events: none;
+}
+
 .hero-logo {
-  width: 144px;
-  height: 144px;
-  object-fit: contain;
+  width: 187px;
+  height: auto;
   display: block;
+  margin-top: 1.25rem;
+  transform: translateY(20px);
+  animation: float 6s ease-in-out infinite;
 }
 
 .hero-product-name {
-  margin: 0.8rem 0 0;
-  font-size: 3.2rem;
+  margin: 2.15rem 0 0;
+  font-size: 3.7rem;
   line-height: 1.05;
   font-weight: 700;
   letter-spacing: 0.01em;
@@ -178,26 +199,29 @@ body {
 }
 
 .hero-problem {
-  margin: 1rem 0 0;
-  color: var(--accent-info);
+  margin: 0 0 1rem;
+  color: #9ca3af;
   font-size: 0.95rem;
   line-height: 1.5;
   letter-spacing: 0.02em;
+  opacity: 0.82;
+  order: -1;
 }
 
 .hero-catchphrase {
-  margin: 1rem 0 0;
-  font-size: 1.8rem;
-  line-height: 1.25;
-  letter-spacing: 0.06em;
+  margin: 0.55rem 0 0;
+  font-size: 2.55rem;
+  line-height: 1.12;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-  font-weight: 600;
+  font-weight: 800;
   color: var(--accent);
   text-wrap: balance;
 }
 
 .hero-summary {
-  margin: 1.1rem 0 0;
+  margin: 1.5rem 0 0;
+  max-width: 640px;
   font-size: 1rem;
   line-height: 1.7;
   color: var(--text-muted);
@@ -205,7 +229,19 @@ body {
 }
 
 .quickstart-intro {
-  margin-top: var(--section-gap);
+  margin-top: 5.8rem;
+  padding-top: 2rem;
+  position: relative;
+}
+
+.quickstart-intro::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.12), transparent);
 }
 
 .quickstart-intro h2 {
@@ -229,15 +265,16 @@ body {
 
 .quickstart-block {
   margin-top: 1rem;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: #0f1726;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  background: #111c36;
   color: var(--text);
   overflow: hidden;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.24);
 }
 
 .quickstart-docs {
-  margin: 0.95rem 0 0;
+  margin: 1rem 0 0;
   color: var(--text-muted);
   line-height: 1.65;
 }
@@ -253,7 +290,7 @@ body {
 }
 
 .quickstart-top {
-  padding: 0.75rem 0.9rem;
+  padding: 1rem 1.1rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -291,7 +328,7 @@ body {
   gap: 0.35rem;
   background: #0b1221;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 999px;
   padding: 0.2rem;
 }
 
@@ -299,10 +336,11 @@ body {
   border: 0;
   background: transparent;
   color: var(--text-muted);
-  border-radius: 8px;
-  padding: 0.42rem 0.72rem;
+  border-radius: 999px;
+  padding: 0.38rem 0.75rem;
   font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.84rem;
+  font-size: 0.75rem;
+  font-weight: 600;
   cursor: pointer;
   transition: background 120ms ease, color 120ms ease;
 }
@@ -319,7 +357,7 @@ body {
 }
 
 .quickstart-command {
-  padding: 1rem;
+  padding: 1.75rem;
 }
 
 .quickstart-hint {
@@ -677,18 +715,34 @@ body {
   }
 }
 
+@keyframes float {
+  0% {
+    transform: translateY(20px);
+  }
+
+  50% {
+    transform: translateY(14px);
+  }
+
+  100% {
+    transform: translateY(20px);
+  }
+}
+
 @media (max-width: 900px) {
   .hero-logo {
-    width: 120px;
-    height: 120px;
+    width: 156px;
+    height: auto;
+    margin-top: 1rem;
   }
 
   .hero-product-name {
-    font-size: 2.6rem;
+    margin-top: 1.8rem;
+    font-size: 3rem;
   }
 
   .hero-catchphrase {
-    font-size: 1.42rem;
+    font-size: 2rem;
   }
 }
 
