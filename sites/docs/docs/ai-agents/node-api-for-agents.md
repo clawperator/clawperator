@@ -23,7 +23,12 @@ Clawperator provides a deterministic execution layer for LLM agents to control A
 | `action type --selector <json> --text <value>` | Type text |
 | `action wait --selector <json>` | Wait for element |
 | `skills list` | List available skills |
+| `skills get <skill_id>` | Show skill metadata |
+| `skills search [--app <pkg>] [--intent <i>] [--keyword <k>]` | Search skills by app, intent, or keyword (at least one filter required) |
 | `skills compile-artifact <id> --artifact <name>` | Compile skill to execution payload |
+| `skills run <skill_id> [--device-id <id>]` | Invoke a skill script (convenience wrapper) |
+| `skills install` | Clone skills repo to `~/.clawperator/skills/` |
+| `skills update [--ref <git-ref>]` | Pull latest skills (optionally pin to a ref) |
 | `serve` | Start HTTP/SSE server |
 | `doctor` | Run environment diagnostics |
 
@@ -41,6 +46,9 @@ Start with `clawperator serve [--port <n>] [--host <ip>]`. Default: `127.0.0.1:3
 | `POST /execute` | Body: `{"execution": <payload>, "deviceId": "...", "receiverPackage": "..."}` |
 | `POST /observe/snapshot` | Capture UI tree |
 | `POST /observe/screenshot` | Capture screenshot |
+| `GET /skills` | List skills. Query params: `?app=<pkg>&intent=<i>&keyword=<k>` |
+| `GET /skills/:skillId` | Get skill metadata |
+| `POST /skills/:skillId/run` | Run skill. Body: `{"deviceId": "...", "args": [...]}` |
 | `GET /events` | SSE stream: `clawperator:result`, `clawperator:execution`, `heartbeat` |
 
 See `apps/node/examples/basic-api-usage.js` for a complete SSE + REST example.
@@ -91,6 +99,62 @@ Full error taxonomy: `apps/node/src/contracts/errors.ts`
 - **Device targeting:** Specify `--device-id` when multiple devices are connected. Omit for single-device setups.
 - **Validation before dispatch:** Every payload is schema-validated before any ADB command is issued.
 
+## Skills
+
+Skills are packaged Android automation scripts maintained in the [clawperator-skills](https://github.com/clawpilled/clawperator-skills) repository. The Node API provides discovery and metadata - skills are standalone and can be invoked directly by agents without the Node API.
+
+### Setup
+
+```bash
+clawperator skills install
+export CLAWPERATOR_SKILLS_REGISTRY="$HOME/.clawperator/skills/skills/skills-registry.json"
+```
+
+### Discovery
+
+```bash
+# List all skills
+clawperator skills list
+
+# Search by target app
+clawperator skills search --app com.android.settings
+
+# Get skill metadata
+clawperator skills get com.android.settings.capture-overview
+```
+
+### Invocation
+
+Skills can be invoked three ways:
+
+1. **Direct script invocation** (standalone - no Node API required):
+   ```bash
+   node ~/.clawperator/skills/skills/com.android.settings.capture-overview/scripts/capture_settings_overview.js <device_id>
+   ```
+
+2. **Convenience wrapper** via Node API:
+   ```bash
+   clawperator skills run com.android.settings.capture-overview --device-id <device_id>
+   ```
+
+3. **Artifact compile + execute** (for skills with `.recipe.json` artifacts):
+   ```bash
+   clawperator skills compile-artifact <skill_id> --artifact <name> --vars '{"KEY":"value"}'
+   clawperator execute --execution <compiled_output>
+   ```
+
+### Skills Run Response
+
+```json
+{
+  "ok": true,
+  "skillId": "com.android.settings.capture-overview",
+  "output": "Settings Overview captured\nTEXT_BEGIN\n...\nTEXT_END",
+  "exitCode": 0,
+  "durationMs": 8500
+}
+```
+
 ## Use Cases
 
 - **Price comparison:** Open shopping apps, search, capture prices via `read_text`, return structured comparison.
@@ -109,7 +173,7 @@ Single-flight per device. A second overlapping execution returns `EXECUTION_CONF
 Only for diagnostics or gaps not covered by the API. For routine automation, use Clawperator so result/error semantics stay consistent.
 
 **Does Clawperator run skills?**
-It compiles skill artifacts into execution payloads and runs them. It has no runtime awareness of skill semantics.
+Skills are standalone programs that agents can invoke directly. The Node API provides discovery (`skills list`, `skills search`), metadata (`skills get`), and a convenience `skills run` wrapper. Skills do not need the Node API to execute - agents can call skill scripts directly.
 
 **How should agents handle sensitive text in results?**
 Default behavior is full-fidelity results for agent reasoning. PII redaction (`--safe-logs`) is a planned feature.

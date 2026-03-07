@@ -241,12 +241,61 @@ Capture screenshot. Body: `{ "deviceId"?, "receiverPackage"? }`.
 
 Same response shape as `/execute`. The PNG path is in `envelope.stepResults[0].data.path`.
 
+### `GET /skills`
+
+List or search skills. Use query parameters to filter.
+
+**Query parameters:** `?app=<package_id>&intent=<intent>&keyword=<text>` (all optional).
+
+**Response:**
+```json
+{ "ok": true, "skills": [{ "id": "...", "applicationId": "...", "intent": "...", "summary": "..." }], "count": 2 }
+```
+
+### `GET /skills/:skillId`
+
+Get metadata for a specific skill.
+
+**Response (success):**
+```json
+{ "ok": true, "skill": { "id": "...", "applicationId": "...", "intent": "...", "summary": "...", "scripts": [...], "artifacts": [...] } }
+```
+
+**Response (not found):** HTTP 404
+```json
+{ "ok": false, "error": { "code": "SKILL_NOT_FOUND", "message": "..." } }
+```
+
+### `POST /skills/:skillId/run`
+
+Run a skill script (convenience wrapper).
+
+**Request body:**
+```json
+{
+  "deviceId": "<device_serial>",
+  "args": ["extra", "args"]
+}
+```
+
+Both fields are optional.
+
+**Response (success):**
+```json
+{ "ok": true, "skillId": "...", "output": "...", "exitCode": 0, "durationMs": 8500 }
+```
+
+**Response (error):**
+```json
+{ "ok": false, "error": { "code": "SKILL_EXECUTION_FAILED", "message": "...", "skillId": "...", "exitCode": 1, "stderr": "..." } }
+```
+
 ### `GET /events` (SSE)
 
 Server-Sent Events stream. Emits two event types:
 
-- `result` - fired when an execution completes: `{ deviceId, envelope }`
-- `execution` - fired for every execution attempt: `{ deviceId, input, result }`
+- `clawperator:result` - fired when an execution completes: `{ deviceId, envelope }`
+- `clawperator:execution` - fired for every execution attempt: `{ deviceId, input, result }`
 - `heartbeat` - initial connection confirmation
 
 ---
@@ -257,6 +306,7 @@ Server-Sent Events stream. Emits two event types:
 |----------|-------------|
 | `ADB_PATH` | Override path to `adb` binary |
 | `CLAWPERATOR_RECEIVER_PACKAGE` | Default receiver package (fallback if not passed as option) |
+| `CLAWPERATOR_SKILLS_REGISTRY` | Path to `skills-registry.json`. If unset, defaults to `./skills/skills-registry.json` relative to the working directory. After `skills install`, set to `~/.clawperator/skills/skills/skills-registry.json`. |
 
 ---
 
