@@ -294,8 +294,8 @@ Both fields are optional.
 
 Server-Sent Events stream. Emits two event types:
 
-- `result` - fired when an execution completes: `{ deviceId, envelope }`
-- `execution` - fired for every execution attempt: `{ deviceId, input, result }`
+- `clawperator:result` - fired when an execution completes: `{ deviceId, envelope }`
+- `clawperator:execution` - fired for every execution attempt: `{ deviceId, input, result }`
 - `heartbeat` - initial connection confirmation
 
 ---
