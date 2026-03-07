@@ -123,11 +123,23 @@ body {
   padding: 0.3rem 0.58rem;
   border-radius: 8px;
   font-size: 0.92rem;
+  transition: color 150ms ease, background 150ms ease;
 }
 
 .toolbar-links a:hover {
   color: var(--text);
   background: rgba(159, 176, 204, 0.12);
+}
+
+.toolbar-section-link {
+  border-bottom: 2px solid transparent;
+  border-radius: 8px 8px 0 0;
+  transition: color 150ms ease, border-color 150ms ease;
+}
+
+.toolbar-section-link.active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
 }
 
 .toolbar-links .toolbar-cta {

@@ -26,8 +26,11 @@ export default function Home() {
   const [mode, setMode] = useState("oneLiner");
   const [copied, setCopied] = useState(false);
   const [showToolbar, setShowToolbar] = useState(false);
+  const [activeSection, setActiveSection] = useState(null);
   const heroLogoRef = useRef(null);
   const activeCommand = mode === "npm" ? installCommands.npm : installCommands.oneLiner;
+
+  const sectionIds = ["install", "workflows", "why", "what", "skills", "how-it-works"];
 
   const handleCopy = async () => {
     try {
@@ -82,6 +85,39 @@ export default function Home() {
     return () => observer.disconnect();
   }, []);
 
+  useEffect(() => {
+    const visibleSections = new Map();
+    const sectionObserver = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            visibleSections.set(entry.target.id, entry.intersectionRatio);
+          } else {
+            visibleSections.delete(entry.target.id);
+          }
+        }
+        // Pick the section with the highest visibility, preserving page order for ties
+        let best = null;
+        let bestRatio = 0;
+        for (const id of sectionIds) {
+          const ratio = visibleSections.get(id);
+          if (ratio !== undefined && ratio >= bestRatio) {
+            best = id;
+            bestRatio = ratio;
+          }
+        }
+        setActiveSection(best);
+      },
+      { threshold: [0, 0.2, 0.4], rootMargin: `-${80 + 16}px 0px -30% 0px` }
+    );
+
+    for (const id of sectionIds) {
+      const el = document.getElementById(id);
+      if (el) sectionObserver.observe(el);
+    }
+    return () => sectionObserver.disconnect();
+  }, []);
+
   return (
     <>
       <header className={showToolbar ? "top-toolbar visible" : "top-toolbar hidden"}>
@@ -95,12 +131,15 @@ export default function Home() {
           </a>
 
           <nav className="toolbar-links" aria-label="Page sections">
-            <a href="#install">Install</a>
-            <a href="#workflows">Workflows</a>
-            <a href="#why">Why</a>
-            <a href="#what">What</a>
-            <a href="#skills">Skills</a>
-            <a href="#how-it-works">How it works</a>
+            {sectionIds.map((id) => (
+              <a
+                key={id}
+                href={`#${id}`}
+                className={activeSection === id ? "toolbar-section-link active" : "toolbar-section-link"}
+              >
+                {id === "install" ? "Install" : id === "workflows" ? "Workflows" : id === "why" ? "Why" : id === "what" ? "What" : id === "skills" ? "Skills" : "How it works"}
+              </a>
+            ))}
             <a href="https://docs.clawperator.com" target="_blank" rel="noreferrer">
               Docs
             </a>
