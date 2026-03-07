@@ -120,12 +120,16 @@ export default function Home() {
           <p className="hero-summary">
             Let AI agents control Android apps on behalf of users.
             <br />
-            Your agent or LLM is the «brain».
             <br />
-            Clawperator is the «hand».
+            Your agent or LLM is the brain.
             <br />
-            The brain decides what to do next. Clawperator connects that agent to a dedicated Android burner phone,
-            executes the action, and returns structured results your code can trust.
+            Clawperator is the hand.
+            <br />
+            <br />
+            The brain decides what to do next.
+            <br />
+            Clawperator connects that agent to a dedicated Android burner phone, executes the action, and returns
+            structured results your code can trust.
           </p>
         </div>
 
@@ -207,7 +211,7 @@ export default function Home() {
       <section id="features" className="feature-grid" aria-label="Core features">
         <div className="feature-intro">
           <h2>Features</h2>
-          <p>Built for agent loops that need clear device state, predictable actions, and machine-readable results.</p>
+          <p>Built for agent loops that require clear device state, predictable actions, and machine-readable results.</p>
         </div>
 
         {features.map((feature) => (
@@ -276,7 +280,7 @@ export default function Home() {
         <div className="architecture-strip" role="img" aria-label="AI agent or LLM connects through the Clawperator runtime to an Android burner device, which operates mobile apps">
           <article className="architecture-card">
             <p className="architecture-label">AI Agent / LLM</p>
-            <p className="architecture-meta">the «brain»</p>
+            <p className="architecture-meta">the brain</p>
           </article>
           <div className="architecture-connector">
             <span className="architecture-line" />
@@ -284,7 +288,7 @@ export default function Home() {
           </div>
           <article className="architecture-card">
             <p className="architecture-label">Clawperator</p>
-            <p className="architecture-meta">runtime / «hand»</p>
+            <p className="architecture-meta">runtime / hand</p>
           </article>
           <div className="architecture-connector">
             <span className="architecture-line" />
@@ -299,11 +303,12 @@ export default function Home() {
           </div>
           <article className="architecture-card">
             <p className="architecture-label">Mobile Apps</p>
-            <p className="architecture-meta">the real interfaces</p>
+            <p className="architecture-meta">the real APIs</p>
           </article>
         </div>
         <p>
           Your agent reasons about what should happen. Clawperator executes those decisions on a real Android device.
+          This turns mobile apps into programmable interfaces your agent can use.
         </p>
       </section>
 
