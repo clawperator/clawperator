@@ -26,8 +26,12 @@ export default function Home() {
   const [mode, setMode] = useState("oneLiner");
   const [copied, setCopied] = useState(false);
   const [showToolbar, setShowToolbar] = useState(false);
+  const [activeSection, setActiveSection] = useState(null);
   const heroLogoRef = useRef(null);
   const activeCommand = mode === "npm" ? installCommands.npm : installCommands.oneLiner;
+
+  const sectionIds = ["install", "workflows", "why", "what", "skills", "how-it-works"];
+  const sectionLabels = { install: "Install", workflows: "Examples", why: "Why", what: "What", skills: "Skills", "how-it-works": "How it works" };
 
   const handleCopy = async () => {
     try {
@@ -82,6 +86,39 @@ export default function Home() {
     return () => observer.disconnect();
   }, []);
 
+  useEffect(() => {
+    const visibleSections = new Map();
+    const sectionObserver = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            visibleSections.set(entry.target.id, entry.intersectionRatio);
+          } else {
+            visibleSections.delete(entry.target.id);
+          }
+        }
+        // Pick the section with the highest visibility; later sections win ties
+        let best = null;
+        let bestRatio = 0;
+        for (const id of sectionIds) {
+          const ratio = visibleSections.get(id);
+          if (ratio !== undefined && ratio >= bestRatio) {
+            best = id;
+            bestRatio = ratio;
+          }
+        }
+        setActiveSection(best);
+      },
+      { threshold: [0, 0.2, 0.4], rootMargin: `-${80 + 16}px 0px -30% 0px` }
+    );
+
+    for (const id of sectionIds) {
+      const el = document.getElementById(id);
+      if (el) sectionObserver.observe(el);
+    }
+    return () => sectionObserver.disconnect();
+  }, []);
+
   return (
     <>
       <header className={showToolbar ? "top-toolbar visible" : "top-toolbar hidden"}>
@@ -95,10 +132,15 @@ export default function Home() {
           </a>
 
           <nav className="toolbar-links" aria-label="Page sections">
-            <a href="#install">Install</a>
-            <a href="#why">Why</a>
-            <a href="#what">What</a>
-            <a href="#how-it-works">How it works</a>
+            {sectionIds.map((id) => (
+              <a
+                key={id}
+                href={`#${id}`}
+                className={activeSection === id ? "toolbar-section-link active" : "toolbar-section-link"}
+              >
+                {sectionLabels[id] || id}
+              </a>
+            ))}
             <a href="https://docs.clawperator.com" target="_blank" rel="noreferrer">
               Docs
             </a>
@@ -213,6 +255,68 @@ export default function Home() {
           </a>
           .
         </p>
+      </section>
+
+      <section id="workflows" className="content-section">
+        <h2>Real-world examples</h2>
+        <p className="workflow-subtitle">
+          Each workflow below runs on a real Android device.
+          A natural request goes in, a concrete result comes back.
+        </p>
+
+        <div className="workflow-cards">
+          <article className="workflow-card">
+            <div className="workflow-exchange">
+              <div className="workflow-msg workflow-msg-user">
+                <p className="workflow-role">User <span className="workflow-channel">via Telegram</span></p>
+                <p>&ldquo;Hey assistant, what&rsquo;s my current home battery level?&rdquo;</p>
+              </div>
+              <div className="workflow-msg workflow-msg-agent">
+                <p className="workflow-role">OpenClaw</p>
+                <p>Uses Clawperator to open the home battery app on the Android device and read the current battery level.</p>
+              </div>
+              <div className="workflow-msg workflow-msg-response">
+                <p className="workflow-role">Response</p>
+                <p>&ldquo;Your home battery is at 73% and charging from solar. Should be full around 2:20pm.&rdquo;</p>
+              </div>
+            </div>
+          </article>
+
+          <article className="workflow-card">
+            <div className="workflow-exchange">
+              <div className="workflow-msg workflow-msg-user">
+                <p className="workflow-role">User <span className="workflow-channel">via Telegram</span></p>
+                <p>&ldquo;Turn on the living room AC.&rdquo;</p>
+              </div>
+              <div className="workflow-msg workflow-msg-agent">
+                <p className="workflow-role">OpenClaw</p>
+                <p>Uses Clawperator to open the Google Home app on the Android device and turn on the living room AC in cooling mode.</p>
+              </div>
+              <div className="workflow-msg workflow-msg-response">
+                <p className="workflow-role">Response</p>
+                <p>&ldquo;Living room AC is on and cooling. It&rsquo;s 27&#176;C in there right now.&rdquo;</p>
+              </div>
+            </div>
+          </article>
+
+          <article className="workflow-card">
+            <div className="workflow-exchange">
+              <div className="workflow-msg workflow-msg-user">
+                <p className="workflow-role">User <span className="workflow-channel">via Telegram</span></p>
+                <p>&ldquo;Where is Amy right now?&rdquo;</p>
+              </div>
+              <div className="workflow-msg workflow-msg-agent">
+                <p className="workflow-role">OpenClaw</p>
+                <p>Uses Clawperator to open Life360 on the Android device and look up Amy&rsquo;s current location.</p>
+              </div>
+              <div className="workflow-msg workflow-msg-response">
+                <p className="workflow-role">Response</p>
+                <p>&ldquo;Amy is on Riverside Rd, heading east. Location updated 2 minutes ago.&rdquo;</p>
+              </div>
+            </div>
+          </article>
+
+        </div>
       </section>
 
       {/* Feature Grid - Core Principles */}
@@ -343,6 +447,59 @@ export default function Home() {
               <li>Machine-readable errors instead of hand-parsed logs</li>
               <li>Stable command and task identifiers through the full request path</li>
               <li>A runtime that executes validated actions instead of inventing strategy</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="skills" className="content-section">
+        <h2>Skills</h2>
+        <p>
+          Skills are packaged automation scripts that turn common mobile workflows into repeatable, agent-ready
+          operations. Each skill targets a specific app and task - check the air conditioner status, capture a
+          settings overview, or pull data from a tracking app.
+        </p>
+        <p>
+          Skills live in a dedicated{" "}
+          <a href="https://github.com/clawpilled/clawperator-skills" target="_blank" rel="noreferrer">
+            open source repository
+          </a>{" "}
+          and are designed to be standalone. Your agent can invoke a skill script directly, or use the Node API
+          to discover, search, and run skills through a single interface.
+        </p>
+
+        <div className="skills-examples">
+          <article className="skill-example">
+            <p className="skill-example-label">Discover</p>
+            <pre><code>clawperator skills search --app com.android.settings</code></pre>
+          </article>
+          <article className="skill-example">
+            <p className="skill-example-label">Run</p>
+            <pre><code>{`clawperator skills run com.android.settings.capture-overview \\
+  --device-id <device_id>`}</code></pre>
+          </article>
+          <article className="skill-example">
+            <p className="skill-example-label">Or invoke directly</p>
+            <pre><code>{`node ~/.clawperator/skills/skills/com.android.settings.capture-overview/scripts/capture_settings_overview.js \\
+  <device_id>`}</code></pre>
+          </article>
+        </div>
+
+        <div className="grid-2-col">
+          <div>
+            <h3>For agents</h3>
+            <ul>
+              <li>Search skills by app, intent, or keyword</li>
+              <li>Get structured metadata before deciding what to run</li>
+              <li>Invoke directly or through the Node API - no lock-in</li>
+            </ul>
+          </div>
+          <div>
+            <h3>For builders</h3>
+            <ul>
+              <li>Write a script, add a registry entry, and your skill is live</li>
+              <li>Skills are plain scripts - Node, shell, or anything with a shebang</li>
+              <li>One install command pulls the full skills library</li>
             </ul>
           </div>
         </div>
