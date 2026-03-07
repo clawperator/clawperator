@@ -276,8 +276,7 @@ export default function Home() {
               </div>
               <div className="workflow-msg workflow-msg-response">
                 <p className="workflow-role">Response</p>
-                <p>Battery: 73% &bull; Charging from solar &bull; Estimated full: 14:20</p>
-                <p className="workflow-reply">&ldquo;Your home battery is at 73% and charging from solar. Should be full around 2:20pm.&rdquo;</p>
+                <p>&ldquo;Your home battery is at 73% and charging from solar. Should be full around 2:20pm.&rdquo;</p>
               </div>
             </div>
           </article>
@@ -294,8 +293,7 @@ export default function Home() {
               </div>
               <div className="workflow-msg workflow-msg-response">
                 <p className="workflow-role">Response</p>
-                <p>AC started &bull; Current room temperature: 27&#176;C</p>
-                <p className="workflow-reply">&ldquo;Living room AC is on and cooling. It&rsquo;s 27&#176;C in there right now.&rdquo;</p>
+                <p>&ldquo;Living room AC is on and cooling. It&rsquo;s 27&#176;C in there right now.&rdquo;</p>
               </div>
             </div>
           </article>
@@ -312,8 +310,7 @@ export default function Home() {
               </div>
               <div className="workflow-msg workflow-msg-response">
                 <p className="workflow-role">Response</p>
-                <p>Amy &bull; Riverside Rd, heading east &bull; Updated 2 min ago</p>
-                <p className="workflow-reply">&ldquo;Amy is on Riverside Rd, heading east. Location updated 2 minutes ago.&rdquo;</p>
+                <p>&ldquo;Amy is on Riverside Rd, heading east. Location updated 2 minutes ago.&rdquo;</p>
               </div>
             </div>
           </article>
