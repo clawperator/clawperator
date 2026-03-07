@@ -202,7 +202,7 @@ check_curl() {
         return 0
     fi
 
-    echo -e "${RED}❌ curl is required to download the Clawperator APK metadata.${NC}"
+    echo -e "${RED}❌ curl is required to download the Clawperator operator metadata, APK, and checksum files.${NC}"
     return 1
 }
 
@@ -312,14 +312,16 @@ setup_skills() {
     update_rc "$HOME/.bash_profile"
 }
 
-sha256_binary() {
+sha256_file() {
+    local FILE_PATH=$1
+
     if command -v sha256sum &> /dev/null; then
-        echo "sha256sum"
+        sha256sum "$FILE_PATH" | awk '{ print $1 }'
         return 0
     fi
 
     if command -v shasum &> /dev/null; then
-        echo "shasum -a 256"
+        shasum -a 256 "$FILE_PATH" | awk '{ print $1 }'
         return 0
     fi
 
@@ -388,11 +390,10 @@ download_operator_apk() {
 }
 
 verify_operator_apk() {
-    local SHA_TOOL
-    SHA_TOOL="$(sha256_binary)" || {
+    if ! command -v sha256sum &> /dev/null && ! command -v shasum &> /dev/null; then
         echo -e "${RED}❌ No SHA-256 tool found. Install shasum or sha256sum.${NC}"
         return 1
-    }
+    fi
 
     local EXPECTED_HASH
     EXPECTED_HASH="$(awk '{ print $1 }' "$APK_SHA_PATH")"
@@ -402,7 +403,7 @@ verify_operator_apk() {
     fi
 
     local ACTUAL_HASH
-    ACTUAL_HASH="$($SHA_TOOL "$APK_LOCAL_PATH" | awk '{ print $1 }')"
+    ACTUAL_HASH="$(sha256_file "$APK_LOCAL_PATH")"
 
     if [ "$EXPECTED_HASH" != "$ACTUAL_HASH" ]; then
         echo -e "${RED}❌ APK checksum mismatch.${NC}"
@@ -420,6 +421,10 @@ count_connected_devices() {
     adb devices | awk 'NR > 1 && $2 == "device" { count++ } END { print count + 0 }'
 }
 
+has_unready_android_devices() {
+    adb devices | awk 'NR > 1 && ($2 == "unauthorized" || $2 == "offline") { found=1 } END { if (found) print "yes"; else print "no"; }'
+}
+
 list_connected_devices() {
     adb devices | awk 'NR > 1 && $2 == "device" { print $1 }'
 }
@@ -429,7 +434,14 @@ maybe_install_operator_apk() {
     DEVICE_COUNT="$(count_connected_devices)"
 
     if [ "$DEVICE_COUNT" -eq 0 ]; then
-        echo -e "${YELLOW}⚠️  No connected Android device detected. Skipping APK install.${NC}"
+        if [ "$(has_unready_android_devices)" = "yes" ]; then
+            echo -e "${YELLOW}⚠️  Android device detected but not ready for ADB.${NC}"
+            echo -e "${YELLOW}   - If the device shows as 'unauthorized', unlock it and accept the USB debugging prompt.${NC}"
+            echo -e "${YELLOW}   - If it shows as 'offline', try reconnecting the USB cable or restarting ADB (adb kill-server && adb start-server).${NC}"
+            echo -e "${YELLOW}Skipping APK install until the device is ready.${NC}"
+        else
+            echo -e "${YELLOW}⚠️  No connected Android device detected. Skipping APK install.${NC}"
+        fi
         return 0
     fi
 
@@ -451,8 +463,8 @@ maybe_install_operator_apk() {
             read -r INSTALL_APK_RESPONSE < /dev/tty
             INSTALL_APK_RESPONSE="${INSTALL_APK_RESPONSE:-Y}"
         else
-            INSTALL_APK_RESPONSE="Y"
-            echo -e "${BLUE}No interactive TTY detected. Installing operator APK automatically.${NC}"
+            INSTALL_APK_RESPONSE="N"
+            echo -e "${YELLOW}⚠️  No interactive TTY detected. Skipping automatic APK install.${NC}"
         fi
     fi
 
