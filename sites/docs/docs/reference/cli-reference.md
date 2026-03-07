@@ -218,6 +218,68 @@ clawperator skills compile-artifact --skill-id <id> --artifact <name> [--vars <j
 
 ---
 
+### `skills search`
+
+Search skills by target application, intent, or keyword.
+
+```
+clawperator skills search --app <package_id> [--intent <intent>] [--keyword <text>]
+```
+
+| Flag | Description |
+|------|-------------|
+| `--app <package_id>` | Filter by Android application ID |
+| `--intent <intent>` | Filter by skill intent |
+| `--keyword <text>` | Search skill ID and summary text |
+
+At least one filter is required.
+
+---
+
+### `skills run`
+
+Invoke a skill's primary script as a convenience wrapper.
+
+```
+clawperator skills run <skill_id> [--device-id <id>] [-- <extra_args>]
+```
+
+| Flag / Arg | Description |
+|------------|-------------|
+| `<skill_id>` | Skill ID (required) |
+| `--device-id <id>` | Device serial passed as first script arg |
+| `-- <extra_args>` | Additional arguments passed through to the script |
+
+Skills are standalone programs. This command is a convenience - agents can also invoke skill scripts directly.
+
+---
+
+### `skills install`
+
+Clone the skills repository to `~/.clawperator/skills/`.
+
+```
+clawperator skills install
+```
+
+Prints the `CLAWPERATOR_SKILLS_REGISTRY` env var export instruction on success.
+
+---
+
+### `skills update`
+
+Pull latest skills from the repository.
+
+```
+clawperator skills update [--ref <git-ref>]
+```
+
+| Flag | Description |
+|------|-------------|
+| `--ref <git-ref>` | Pin to a specific git ref (default: `main`) |
+
+---
+
 ### `skills sync`
 
 Sync and pin the skills index/cache to a specific git ref.
@@ -250,6 +312,9 @@ HTTP endpoints exposed:
 - `POST /execute` - run an execution payload
 - `POST /observe/snapshot` - capture UI snapshot
 - `POST /observe/screenshot` - capture screenshot
+- `GET /skills` - list or search skills
+- `GET /skills/:skillId` - get skill metadata
+- `POST /skills/:skillId/run` - run a skill script
 - `GET /events` - SSE stream of execution results
 
 See [api-overview.md](./api-overview.md) for HTTP API details.
