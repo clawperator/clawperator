@@ -132,14 +132,29 @@ body {
 }
 
 .toolbar-section-link {
-  border-bottom: 2px solid transparent;
-  border-radius: 8px 8px 0 0;
-  transition: color 150ms ease, border-color 150ms ease;
+  position: relative;
+  transition: color 150ms ease;
+}
+
+.toolbar-section-link::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 12px;
+  height: 2px;
+  border-radius: 1px;
+  background: transparent;
+  transition: background 150ms ease;
 }
 
 .toolbar-section-link.active {
   color: var(--text);
-  border-bottom-color: var(--accent);
+}
+
+.toolbar-section-link.active::after {
+  background: var(--accent);
 }
 
 .toolbar-links .toolbar-cta {
