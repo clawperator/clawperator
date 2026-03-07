@@ -185,13 +185,11 @@ body {
   text-transform: uppercase;
   font-weight: 600;
   color: var(--accent);
-  max-width: 24ch;
   text-wrap: balance;
 }
 
 .hero-summary {
   margin: 1.1rem 0 0;
-  max-width: 760px;
   font-size: 1rem;
   line-height: 1.7;
   color: var(--text-muted);
@@ -395,7 +393,6 @@ body {
 
 .feature-intro p {
   margin: 0.65rem 0 0;
-  max-width: 65ch;
   color: var(--text-muted);
   line-height: 1.65;
 }
@@ -462,7 +459,6 @@ body {
   margin: 1rem 0 0;
   font-size: 1rem;
   line-height: 1.7;
-  max-width: 68ch;
   text-wrap: pretty;
   color: var(--text-muted);
 }
@@ -470,7 +466,6 @@ body {
 .content-section ul {
   padding-left: 1.2rem;
   margin: 1rem 0 0;
-  max-width: 65ch;
 }
 
 .content-section li {
@@ -546,7 +541,6 @@ body {
 
 .loop-step p {
   margin: 0.35rem 0 0;
-  max-width: 60ch;
   color: var(--text-muted);
 }
 
