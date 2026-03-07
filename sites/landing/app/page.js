@@ -271,8 +271,8 @@ export default function Home() {
                 <p>&ldquo;Hey assistant, what&rsquo;s my current home battery level?&rdquo;</p>
               </div>
               <div className="workflow-msg workflow-msg-agent">
-                <p className="workflow-role">Agent <span className="workflow-channel">via OpenClaw</span></p>
-                <p className="workflow-action">solar-app.get-battery-status()</p>
+                <p className="workflow-role">OpenClaw</p>
+                <p>Uses Clawperator to open the home battery app on the Android device and read the current battery level.</p>
               </div>
               <div className="workflow-msg workflow-msg-response">
                 <p className="workflow-role">Response</p>
@@ -288,8 +288,8 @@ export default function Home() {
                 <p>&ldquo;Turn on the living room AC.&rdquo;</p>
               </div>
               <div className="workflow-msg workflow-msg-agent">
-                <p className="workflow-role">Agent <span className="workflow-channel">via OpenClaw</span></p>
-                <p className="workflow-action">google-home.start-ac(mode=cool, room=living-room)</p>
+                <p className="workflow-role">OpenClaw</p>
+                <p>Uses Clawperator to open the Google Home app on the Android device and turn on the living room AC in cooling mode.</p>
               </div>
               <div className="workflow-msg workflow-msg-response">
                 <p className="workflow-role">Response</p>
@@ -305,8 +305,8 @@ export default function Home() {
                 <p>&ldquo;Where is Amy right now?&rdquo;</p>
               </div>
               <div className="workflow-msg workflow-msg-agent">
-                <p className="workflow-role">Agent <span className="workflow-channel">via OpenClaw</span></p>
-                <p className="workflow-action">life360.get-location()</p>
+                <p className="workflow-role">OpenClaw</p>
+                <p>Uses Clawperator to open Life360 on the Android device and look up Amy&rsquo;s current location.</p>
               </div>
               <div className="workflow-msg workflow-msg-response">
                 <p className="workflow-role">Response</p>
