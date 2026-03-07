@@ -308,7 +308,9 @@ export default function Home() {
         </div>
         <p>
           Your agent reasons about what should happen. Clawperator executes those decisions on a real Android device.
-          This turns mobile apps into programmable interfaces your agent can use.
+          This turns mobile apps into programmable interfaces your agent can use. The Clawperator runtime includes the
+          CLI on your host machine and a lightweight operator app running on the Android device, installed
+          automatically by the setup script.
         </p>
       </section>
 
