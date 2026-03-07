@@ -63,7 +63,7 @@ export async function checkSettings(config: RuntimeConfig): Promise<DoctorCheckR
   if (devOptions.stdout.trim() !== "1") {
     results.push({
       id: "readiness.settings.dev_options",
-      status: "fail",
+      status: "warn",
       code: ERROR_CODES.DEVICE_DEV_OPTIONS_DISABLED,
       summary: "Developer options are disabled.",
       detail: "Enable Developer Options in Android Settings (Tap Build Number 7 times).",
@@ -76,7 +76,7 @@ export async function checkSettings(config: RuntimeConfig): Promise<DoctorCheckR
   if (adbEnabled.stdout.trim() !== "1") {
     results.push({
       id: "readiness.settings.usb_debugging",
-      status: "fail",
+      status: "warn",
       code: ERROR_CODES.DEVICE_USB_DEBUGGING_DISABLED,
       summary: "USB debugging is disabled.",
     });

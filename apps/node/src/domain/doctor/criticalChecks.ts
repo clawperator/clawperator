@@ -6,6 +6,7 @@ export const CRITICAL_DOCTOR_CHECK_PREFIXES = [
   "host.adb.server",
   "host.java.version",
   "device.discovery",
+  "device.capability",
   "build.android.assemble",
   "build.android.install",
   "build.android.launch",

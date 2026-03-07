@@ -44,6 +44,7 @@ function renderPrettyDoctorReport(report: DoctorReport): string {
   const criticalChecks = report.checks.filter(isCriticalDoctorCheck);
   const advisoryChecks = report.checks.filter(check => !isCriticalDoctorCheck(check) && check.status !== "pass");
   const passedChecks = report.checks.filter(check => check.status === "pass" && !isCriticalDoctorCheck(check));
+  const allOk = report.checks.every(check => check.status === "pass");
 
   lines.push("");
   lines.push("Clawperator Doctor Diagnostics");
@@ -71,7 +72,7 @@ function renderPrettyDoctorReport(report: DoctorReport): string {
   }
 
   if (report.criticalOk ?? report.ok) {
-    lines.push(report.ok ? "[OK] Ready to use Clawperator." : "[WARN] Critical checks passed. Address warnings before relying on the setup.");
+    lines.push(allOk ? "[OK] Ready to use Clawperator." : "[WARN] Critical checks passed. Address warnings before relying on the setup.");
   } else {
     lines.push("[FAIL] Critical setup checks failed.");
   }
