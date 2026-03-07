@@ -1,5 +1,11 @@
 # Node API Alpha Release Checklist
 
+Historical note:
+
+- This document is retained as the original alpha-release checklist and design-time gate.
+- It is no longer the active tracker for remaining work.
+- Current remaining launch work is tracked in `docs/todo-before-public-release.md` and `tasks/version-handshaking/plan.md`.
+
 Use this as a release gate for the initial public alpha.
 
 Status values:

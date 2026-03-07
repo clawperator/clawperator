@@ -49,16 +49,25 @@ Contracts:
 - **`expectedFormat` Required:** Every observation/execution must include `expectedFormat: "android-ui-automator"`.
 - **Single-Flight Lock:** Only one execution per `deviceId` / `receiverPackage` at a time. Overlaps return `EXECUTION_CONFLICT_IN_FLIGHT`.
 
-## Post-v1 Roadmap (Planned)
+## Current Posture and Next Work
 
-Features that are not required for initial launch but are high priority:
+The project has now shipped beyond the original initial-launch shape. The following capabilities are implemented in the current CLI/runtime surface:
 
-- `clawperator serve`: HTTP/SSE server for remote agents (e.g., OpenClaw).
+- `clawperator serve`
+- `clawperator doctor --fix`
+- `clawperator skills install`
+- `clawperator skills update`
+- `clawperator skills search`
+- `clawperator skills run`
+- `clawperator observe screenshot`
+
+The primary remaining product-surface gap is explicit CLI/APK version compatibility checking and handshaking.
+
+Still-planned follow-up areas:
+
 - `clawperator doctor prescribe`: Detailed diagnostics via Android runtime endpoints.
-- `clawperator doctor --fix`: Automated remediation for common ADB/permission issues.
-- `clawperator skills sync`: Canonical skills repo integration. (Implemented: `skills install`, `skills update`, `skills search`, `skills run`)
-- `clawperator observe screenshot`: First-class visual observation primitives.
 - `clawperator action [back|home|recents]`: System-level navigation hard-keys.
+- execution-time version compatibility enforcement beyond doctor checks
 
 ## HTTP API Server (`serve`)
 
@@ -356,8 +365,9 @@ Canonical source of skills:
 Distribution model:
 
 1. `clawperator-skills` CI generates `skills-index.json` on `main`.
-2. `clawperator skills sync --ref <ref>` pulls skills + index at a pinned ref.
-3. Local cache stores synced artifacts for deterministic offline execution.
+2. `clawperator skills install` clones the local skills checkout on first setup.
+3. `clawperator skills update [--ref <ref>]` refreshes the checkout and can pin to a specific ref when needed.
+4. Local cache stores synced artifacts for deterministic offline execution.
 
 Runtime should execute against cached/pinned skill content, not live network fetches during execution.
 
@@ -486,7 +496,7 @@ Runtime responsibilities:
 - `src/domain/devices/*`
   - adb discovery and selection
 - `src/domain/skills/*`
-  - sync/list/get/compile-artifact
+  - install/update/search/run/list/get/compile-artifact
 - `src/domain/executions/*`
   - validation, run, state transitions
 - `src/adapters/android-bridge/*`
@@ -542,12 +552,13 @@ Clawperator should define layered tests, with real-device execution as a first-c
    - result envelope parsing with strict prefix
    - hard limits and validation constants
 2. Phase 2
-   - skills sync/list/get/compile-artifact
+   - skills install/update/search/run/list/get/compile-artifact
    - cached pinned-ref execution + explicit fallback/direct modes
 3. Phase 3
-   - `--serve` HTTP wrapper
+   - `serve` HTTP wrapper
    - SSE event streaming + alias normalization layer
 4. Phase 4
+   - explicit CLI/APK version compatibility checks
    - migrate from logcat envelope to stronger transport if needed
 
 ## Stability & Versioning
