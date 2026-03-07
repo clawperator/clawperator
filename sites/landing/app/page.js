@@ -259,7 +259,7 @@ export default function Home() {
       <section id="workflows" className="content-section">
         <h2>Real-world examples</h2>
         <p className="workflow-subtitle">
-          Every workflow below is executed on a real Android device.
+          Each workflow below runs on a real Android device.
           A natural request goes in, a concrete result comes back.
         </p>
 
@@ -272,15 +272,12 @@ export default function Home() {
               </div>
               <div className="workflow-msg workflow-msg-agent">
                 <p className="workflow-role">Agent <span className="workflow-channel">via OpenClaw</span></p>
-                <p className="workflow-action">invokes skill solar-app.get-battery-status on burner phone</p>
+                <p className="workflow-action">solar-app.get-battery-status()</p>
               </div>
-              <div className="workflow-msg workflow-msg-result">
-                <p className="workflow-role">Result</p>
+              <div className="workflow-msg workflow-msg-response">
+                <p className="workflow-role">Response</p>
                 <p>Battery: 73% &bull; Charging from solar &bull; Estimated full: 14:20</p>
-              </div>
-              <div className="workflow-msg workflow-msg-agent">
-                <p className="workflow-role">Agent <span className="workflow-channel">replies via Telegram</span></p>
-                <p>&ldquo;Your home battery is at 73% and charging from solar. Should be full around 2:20pm.&rdquo;</p>
+                <p className="workflow-reply">&ldquo;Your home battery is at 73% and charging from solar. Should be full around 2:20pm.&rdquo;</p>
               </div>
             </div>
           </article>
@@ -293,15 +290,12 @@ export default function Home() {
               </div>
               <div className="workflow-msg workflow-msg-agent">
                 <p className="workflow-role">Agent <span className="workflow-channel">via OpenClaw</span></p>
-                <p className="workflow-action">invokes skill google-home.start-ac &bull; mode: cool &bull; room: living room</p>
+                <p className="workflow-action">google-home.start-ac(mode=cool, room=living-room)</p>
               </div>
-              <div className="workflow-msg workflow-msg-result">
-                <p className="workflow-role">Result</p>
+              <div className="workflow-msg workflow-msg-response">
+                <p className="workflow-role">Response</p>
                 <p>AC started &bull; Current room temperature: 27&#176;C</p>
-              </div>
-              <div className="workflow-msg workflow-msg-agent">
-                <p className="workflow-role">Agent <span className="workflow-channel">replies via Telegram</span></p>
-                <p>&ldquo;Living room AC is on and cooling. It&rsquo;s 27&#176;C in there right now.&rdquo;</p>
+                <p className="workflow-reply">&ldquo;Living room AC is on and cooling. It&rsquo;s 27&#176;C in there right now.&rdquo;</p>
               </div>
             </div>
           </article>
@@ -314,15 +308,12 @@ export default function Home() {
               </div>
               <div className="workflow-msg workflow-msg-agent">
                 <p className="workflow-role">Agent <span className="workflow-channel">via OpenClaw</span></p>
-                <p className="workflow-action">invokes skill life360.get-location on burner phone</p>
+                <p className="workflow-action">life360.get-location()</p>
               </div>
-              <div className="workflow-msg workflow-msg-result">
-                <p className="workflow-role">Result</p>
+              <div className="workflow-msg workflow-msg-response">
+                <p className="workflow-role">Response</p>
                 <p>Amy &bull; Riverside Rd, heading east &bull; Updated 2 min ago</p>
-              </div>
-              <div className="workflow-msg workflow-msg-agent">
-                <p className="workflow-role">Agent <span className="workflow-channel">replies via Telegram</span></p>
-                <p>&ldquo;Amy is on Riverside Rd, heading east. Location updated 2 minutes ago.&rdquo;</p>
+                <p className="workflow-reply">&ldquo;Amy is on Riverside Rd, heading east. Location updated 2 minutes ago.&rdquo;</p>
               </div>
             </div>
           </article>
