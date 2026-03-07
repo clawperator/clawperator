@@ -757,6 +757,12 @@ body {
   }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .hero-logo {
+    animation: none;
+  }
+}
+
 @media (max-width: 900px) {
   .hero-logo {
     width: 156px;
