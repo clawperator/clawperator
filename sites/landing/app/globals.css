@@ -566,49 +566,83 @@ body {
 .architecture-strip {
   margin-top: 1.2rem;
   display: grid;
-  gap: 0.75rem;
+  gap: 1.15rem;
+  max-width: 520px;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 1.35rem 1rem;
+  justify-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 14px;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-size: 32px 32px;
+  background-position: center;
 }
 
 .architecture-card {
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: linear-gradient(180deg, rgba(26, 34, 51, 0.95), rgba(18, 24, 38, 0.95));
-  padding: 1rem 1.1rem;
+  width: min(100%, 360px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 1rem 1.15rem;
+  text-align: center;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.16);
+}
+
+.architecture-card-edge {
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.architecture-card-core {
+  background: rgba(255, 120, 80, 0.06);
+  border-color: rgba(255, 120, 80, 0.2);
+  box-shadow: 0 12px 28px rgba(255, 106, 61, 0.08);
 }
 
 .architecture-label {
   margin: 0;
   font-size: 1rem;
-  line-height: 1.35;
+  line-height: 1.3;
   color: var(--text);
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .architecture-meta {
   margin: 0.28rem 0 0;
   color: var(--text-muted);
-  font-size: 0.94rem;
-  line-height: 1.5;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  opacity: 0.78;
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
 }
 
 .architecture-connector {
-  display: flex;
-  align-items: center;
+  display: grid;
+  justify-items: center;
   gap: 0.7rem;
-  padding-left: 0.5rem;
 }
 
 .architecture-line {
-  width: 1px;
-  height: 1.5rem;
-  background: linear-gradient(180deg, var(--accent), var(--accent-info));
+  width: 2px;
+  height: 36px;
+  background: linear-gradient(180deg, rgba(255, 120, 80, 0.65), rgba(255, 120, 80, 0.18));
+  box-shadow: 0 0 6px rgba(255, 120, 80, 0.28);
+  border-radius: 999px;
 }
 
 .architecture-text {
-  color: var(--text-muted);
-  font-size: 0.86rem;
+  color: rgba(232, 238, 249, 0.86);
+  font-size: 0.8rem;
   line-height: 1.3;
   font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  padding: 0.34rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(11, 18, 33, 0.9);
+  letter-spacing: 0.01em;
 }
 
 .loop-section {

@@ -286,7 +286,7 @@ export default function Home() {
       <section className="content-section architecture-section" aria-label="The architecture">
         <h2>The architecture</h2>
         <div className="architecture-strip" role="img" aria-label="AI agent or LLM connects through the Clawperator runtime to an Android burner device, which operates mobile apps">
-          <article className="architecture-card">
+          <article className="architecture-card architecture-card-edge">
             <p className="architecture-label">AI Agent / LLM</p>
             <p className="architecture-meta">the brain</p>
           </article>
@@ -294,7 +294,7 @@ export default function Home() {
             <span className="architecture-line" />
             <span className="architecture-text">Node API / CLI</span>
           </div>
-          <article className="architecture-card">
+          <article className="architecture-card architecture-card-core">
             <p className="architecture-label">Clawperator</p>
             <p className="architecture-meta">runtime / hand</p>
           </article>
@@ -302,14 +302,14 @@ export default function Home() {
             <span className="architecture-line" />
             <span className="architecture-text">USB / ADB</span>
           </div>
-          <article className="architecture-card">
+          <article className="architecture-card architecture-card-core">
             <p className="architecture-label">Android Burner Device</p>
             <p className="architecture-meta">dedicated actuator</p>
           </article>
           <div className="architecture-connector">
             <span className="architecture-line" />
           </div>
-          <article className="architecture-card">
+          <article className="architecture-card architecture-card-edge">
             <p className="architecture-label">Mobile Apps</p>
             <p className="architecture-meta">the real APIs</p>
           </article>
