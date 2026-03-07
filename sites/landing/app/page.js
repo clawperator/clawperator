@@ -258,9 +258,9 @@ export default function Home() {
 
       <section id="workflows" className="content-section">
         <h2>Example Agent Workflows</h2>
-        <p>
-          Real interactions between users, agents, and mobile apps running on a burner phone.
-          Each workflow starts with a natural request and ends with a concrete result.
+        <p className="workflow-subtitle">
+          Every workflow below is executed on a real Android device.
+          A natural request goes in, a concrete result comes back.
         </p>
 
         <div className="workflow-cards">
@@ -272,11 +272,11 @@ export default function Home() {
               </div>
               <div className="workflow-msg workflow-msg-agent">
                 <p className="workflow-role">Agent</p>
-                <p className="workflow-action">runs solar-app.get-battery-status on burner phone</p>
+                <p className="workflow-action">invokes skill solar-app.get-battery-status on burner phone</p>
               </div>
               <div className="workflow-msg workflow-msg-result">
                 <p className="workflow-role">Result</p>
-                <p>Battery: 73% - Charging from solar - Estimated full: 14:20</p>
+                <p>Battery: 73% &bull; Charging from solar &bull; Estimated full: 14:20</p>
               </div>
               <div className="workflow-msg workflow-msg-agent">
                 <p className="workflow-role">Agent <span className="workflow-channel">replies via Telegram</span></p>
@@ -293,11 +293,15 @@ export default function Home() {
               </div>
               <div className="workflow-msg workflow-msg-agent">
                 <p className="workflow-role">Agent</p>
-                <p className="workflow-action">runs google-home.start-ac - mode: cool, room: living room</p>
+                <p className="workflow-action">
+                  invokes skill google-home.start-ac<br />
+                  <span className="workflow-param">mode: cool</span><br />
+                  <span className="workflow-param">room: living room</span>
+                </p>
               </div>
               <div className="workflow-msg workflow-msg-result">
                 <p className="workflow-role">Result</p>
-                <p>AC started. Current room temperature: 27&#176;C.</p>
+                <p>AC started &bull; Current room temperature: 27&#176;C</p>
               </div>
               <div className="workflow-msg workflow-msg-agent">
                 <p className="workflow-role">Agent</p>
@@ -314,15 +318,36 @@ export default function Home() {
               </div>
               <div className="workflow-msg workflow-msg-agent">
                 <p className="workflow-role">Agent</p>
-                <p className="workflow-action">runs life360.get-location on burner phone</p>
+                <p className="workflow-action">invokes skill life360.get-location on burner phone</p>
               </div>
               <div className="workflow-msg workflow-msg-result">
                 <p className="workflow-role">Result</p>
-                <p>Amy is travelling along Riverside Rd, last updated 2 min ago.</p>
+                <p>Amy &bull; Riverside Rd, heading east &bull; Updated 2 min ago</p>
               </div>
               <div className="workflow-msg workflow-msg-agent">
                 <p className="workflow-role">Agent</p>
                 <p>&ldquo;Amy is on Riverside Rd, heading east. Location updated 2 minutes ago.&rdquo;</p>
+              </div>
+            </div>
+          </article>
+
+          <article className="workflow-card">
+            <div className="workflow-exchange">
+              <div className="workflow-msg workflow-msg-user">
+                <p className="workflow-role">User</p>
+                <p>&ldquo;Has my Amazon package shipped yet?&rdquo;</p>
+              </div>
+              <div className="workflow-msg workflow-msg-agent">
+                <p className="workflow-role">Agent</p>
+                <p className="workflow-action">invokes skill amazon-shopping.check-delivery on burner phone</p>
+              </div>
+              <div className="workflow-msg workflow-msg-result">
+                <p className="workflow-role">Result</p>
+                <p>Order #408-2951 &bull; Shipped via AusPost &bull; Arriving Wednesday</p>
+              </div>
+              <div className="workflow-msg workflow-msg-agent">
+                <p className="workflow-role">Agent</p>
+                <p>&ldquo;Your Amazon order shipped with AusPost. It should arrive Wednesday.&rdquo;</p>
               </div>
             </div>
           </article>
