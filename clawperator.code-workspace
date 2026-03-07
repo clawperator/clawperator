@@ -7,7 +7,7 @@
 			"path": "../clawperator-skills"
 		},
 		{
-			"path": "../../.clawpilled"
+			"path": "${env:HOME}/.clawpilled"
 		}
 	],
 	"settings": {}
