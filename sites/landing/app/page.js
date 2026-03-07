@@ -293,11 +293,7 @@ export default function Home() {
               </div>
               <div className="workflow-msg workflow-msg-agent">
                 <p className="workflow-role">Agent</p>
-                <p className="workflow-action">
-                  invokes skill google-home.start-ac<br />
-                  <span className="workflow-param">mode: cool</span><br />
-                  <span className="workflow-param">room: living room</span>
-                </p>
+                <p className="workflow-action">invokes skill google-home.start-ac &bull; mode: cool &bull; room: living room</p>
               </div>
               <div className="workflow-msg workflow-msg-result">
                 <p className="workflow-role">Result</p>

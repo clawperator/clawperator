@@ -726,11 +726,10 @@ body {
 }
 
 .workflow-card {
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 14px;
-  background: #0d1527;
-  padding: 1.5rem 2rem;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.03);
+  background: var(--surface);
+  padding: 1.25rem 1.5rem;
 }
 
 .workflow-subtitle {
@@ -742,30 +741,14 @@ body {
 
 .workflow-exchange {
   display: grid;
-  gap: 0;
+  gap: 0.55rem;
 }
 
 .workflow-msg {
-  padding: 0.45rem 0.85rem;
+  padding: 0.45rem 0.75rem;
   border-radius: 8px;
-  border: 1px solid transparent;
-  background: rgba(255, 255, 255, 0.03);
-  position: relative;
-  margin-top: 0.65rem;
-}
-
-.workflow-msg:first-child {
-  margin-top: 0;
-}
-
-.workflow-msg + .workflow-msg::before {
-  content: "";
-  position: absolute;
-  top: -0.45rem;
-  left: 1.4rem;
-  width: 1px;
-  height: 0.25rem;
-  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.02);
 }
 
 .workflow-msg p {
@@ -776,25 +759,20 @@ body {
 }
 
 .workflow-role {
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   font-weight: 600;
-  color: rgba(232, 238, 249, 0.55);
+  color: rgba(232, 238, 249, 0.4);
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  margin: 0 0 0.15rem;
+  margin: 0 0 0.1rem;
   line-height: 1.2;
 }
 
 .workflow-channel {
   font-weight: 500;
-  color: rgba(232, 238, 249, 0.38);
-  font-size: 0.68rem;
+  color: rgba(232, 238, 249, 0.3);
+  font-size: 0.66rem;
   text-transform: none;
-}
-
-.workflow-msg-user {
-  border-color: rgba(255, 255, 255, 0.06);
-  background: rgba(255, 255, 255, 0.025);
 }
 
 .workflow-msg-user p:not(.workflow-role) {
@@ -802,38 +780,21 @@ body {
 }
 
 .workflow-msg-agent {
-  border-color: rgba(255, 120, 80, 0.1);
-  background: rgba(255, 120, 80, 0.03);
+  /* no special styling */
 }
 
 .workflow-action {
   font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.84rem;
-  color: rgba(232, 238, 249, 0.78);
-}
-
-.workflow-param {
-  color: rgba(232, 238, 249, 0.5);
-  font-size: 0.8rem;
-  padding-left: 0.4rem;
+  color: rgba(232, 238, 249, 0.7);
 }
 
 .workflow-msg-result {
-  border-color: rgba(47, 196, 214, 0.3);
-  border-left: 3px solid var(--accent-info);
-  background: rgba(47, 196, 214, 0.08);
-  padding: 0.55rem 0.85rem;
-  box-shadow: 0 2px 8px rgba(47, 196, 214, 0.06);
+  /* same as other rows */
 }
 
 .workflow-msg-result .workflow-role {
-  color: var(--accent-info);
-  opacity: 0.85;
-}
-
-.workflow-msg-result p:not(.workflow-role) {
-  color: var(--text);
-  font-weight: 500;
+  color: rgba(232, 238, 249, 0.4);
 }
 
 .loop-section {
