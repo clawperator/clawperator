@@ -10,20 +10,20 @@ This repository supports a local pre-commit guard to reduce accidental commits o
 
 ## Shared local config path
 
-When `clawperator` and `clawperator-skills` are checked out side by side, both use the same optional sibling config directory:
+When `clawperator` and `clawperator-skills` are checked out side by side, both use the same optional user-scoped config directory:
 
-- `../.clawcave/` (relative to each repo root)
+- `~/.clawpilled/`
 
 Expected files:
 
-- `../.clawcave/blocked-terms.txt`
-- `../.clawcave/pre-commit-blocked-terms.sh`
+- `~/.clawpilled/blocked-terms.txt`
+- `~/.clawpilled/pre-commit-blocked-terms.sh`
 
 Bootstrap:
 
 ```bash
-mkdir -p ../.clawcave
-cp ./blocked-terms.txt.example ../.clawcave/blocked-terms.txt
+mkdir -p ~/.clawpilled
+cp ./blocked-terms.txt.example ~/.clawpilled/blocked-terms.txt
 ```
 
 ## `blocked-terms.txt` format
@@ -45,14 +45,17 @@ family-member-name
 
 ## Install hooks in each repo
 
-From each repo root:
+If a repo includes the helper installer script, run it from that repo root:
 
 ```bash
 ./scripts/install_blocked_terms_hook.sh
 ```
 
-This writes `.git/hooks/pre-commit` to call the shared hook script.
-If `../.clawcave/` is missing, the hook will warn and skip checks (non-blocking).
+Today that helper lives in `clawperator-skills/scripts/install_blocked_terms_hook.sh`.
+For repos that do not ship the helper, create `.git/hooks/pre-commit` to exec `~/.clawpilled/pre-commit-blocked-terms.sh`.
+
+The helper writes `.git/hooks/pre-commit` to call the shared hook script.
+If `~/.clawpilled/` is missing, the hook will warn and skip checks (non-blocking).
 
 ## What the hook checks
 
@@ -64,11 +67,13 @@ If `../.clawcave/` is missing, the hook will warn and skip checks (non-blocking)
 
 ## Scan already-committed content
 
-Use:
+If you have the helper script available, use:
 
 ```bash
 ./scripts/scan_blocked_terms.sh
 ```
+
+Today that scanner lives in `clawperator-skills/scripts/scan_blocked_terms.sh`.
 
 Modes:
 

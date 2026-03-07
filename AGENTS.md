@@ -86,8 +86,8 @@ For non-trivial changes, do all steps before commit:
 - Do not hardcode personal names, device identifiers, or local machine paths.
 - Use placeholders in examples:
   - `<device_id>`, `<device_serial>`, `<person_name>`, `<local_user>`
-- If local blocked-terms policy is enabled, keep it in sibling config dir:
-  - `../.clawcave/blocked-terms.txt`
+- If local blocked-terms policy is enabled, keep it in the user-scoped config dir:
+  - `~/.clawpilled/blocked-terms.txt`
 - Before release or force-push events, run a blocked-term scan and verify clean history.
 
 ## Coding and Commit Conventions
