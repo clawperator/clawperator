@@ -271,7 +271,7 @@ export default function Home() {
                 <p>&ldquo;Hey assistant, what&rsquo;s my current home battery level?&rdquo;</p>
               </div>
               <div className="workflow-msg workflow-msg-agent">
-                <p className="workflow-role">Agent</p>
+                <p className="workflow-role">Agent <span className="workflow-channel">via OpenClaw</span></p>
                 <p className="workflow-action">invokes skill solar-app.get-battery-status on burner phone</p>
               </div>
               <div className="workflow-msg workflow-msg-result">
@@ -288,11 +288,11 @@ export default function Home() {
           <article className="workflow-card">
             <div className="workflow-exchange">
               <div className="workflow-msg workflow-msg-user">
-                <p className="workflow-role">User</p>
+                <p className="workflow-role">User <span className="workflow-channel">via Telegram</span></p>
                 <p>&ldquo;Turn on the living room AC.&rdquo;</p>
               </div>
               <div className="workflow-msg workflow-msg-agent">
-                <p className="workflow-role">Agent</p>
+                <p className="workflow-role">Agent <span className="workflow-channel">via OpenClaw</span></p>
                 <p className="workflow-action">invokes skill google-home.start-ac &bull; mode: cool &bull; room: living room</p>
               </div>
               <div className="workflow-msg workflow-msg-result">
@@ -300,7 +300,7 @@ export default function Home() {
                 <p>AC started &bull; Current room temperature: 27&#176;C</p>
               </div>
               <div className="workflow-msg workflow-msg-agent">
-                <p className="workflow-role">Agent</p>
+                <p className="workflow-role">Agent <span className="workflow-channel">replies via Telegram</span></p>
                 <p>&ldquo;Living room AC is on and cooling. It&rsquo;s 27&#176;C in there right now.&rdquo;</p>
               </div>
             </div>
@@ -309,11 +309,11 @@ export default function Home() {
           <article className="workflow-card">
             <div className="workflow-exchange">
               <div className="workflow-msg workflow-msg-user">
-                <p className="workflow-role">User</p>
+                <p className="workflow-role">User <span className="workflow-channel">via Telegram</span></p>
                 <p>&ldquo;Where is Amy right now?&rdquo;</p>
               </div>
               <div className="workflow-msg workflow-msg-agent">
-                <p className="workflow-role">Agent</p>
+                <p className="workflow-role">Agent <span className="workflow-channel">via OpenClaw</span></p>
                 <p className="workflow-action">invokes skill life360.get-location on burner phone</p>
               </div>
               <div className="workflow-msg workflow-msg-result">
@@ -321,7 +321,7 @@ export default function Home() {
                 <p>Amy &bull; Riverside Rd, heading east &bull; Updated 2 min ago</p>
               </div>
               <div className="workflow-msg workflow-msg-agent">
-                <p className="workflow-role">Agent</p>
+                <p className="workflow-role">Agent <span className="workflow-channel">replies via Telegram</span></p>
                 <p>&ldquo;Amy is on Riverside Rd, heading east. Location updated 2 minutes ago.&rdquo;</p>
               </div>
             </div>

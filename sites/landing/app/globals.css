@@ -742,6 +742,7 @@ body {
 .workflow-exchange {
   display: grid;
   gap: 0.55rem;
+  max-width: 420px;
 }
 
 .workflow-msg {
