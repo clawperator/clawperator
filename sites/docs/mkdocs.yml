@@ -3,11 +3,8 @@ site_description: Deterministic actuator tool for device automation
 docs_dir: docs
 
 theme:
-  name: material
-  logo: img/clawperator-logo.png
-  favicon: img/clawperator-logo.png
-  palette:
-    scheme: slate
+  name: terminal
+  palette: dark
 
 nav:
   - Home: index.md
