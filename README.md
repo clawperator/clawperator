@@ -41,6 +41,12 @@ Clawperator is the execution layer for LLM-driven Android automation. It provide
 curl -fsSL https://clawperator.com/install.sh | bash
 ```
 
+The installer:
+- installs or upgrades the CLI prerequisites
+- downloads the current stable operator APK via `latest.json`
+- verifies the APK checksum
+- offers to install the APK to a single connected Android device, even when run via `curl ... | bash`
+
 Or install the CLI directly:
 
 ```bash

@@ -17,6 +17,9 @@ APK_METADATA_URL="${CLAWPERATOR_APK_METADATA_URL:-https://downloads.clawperator.
 APK_DOWNLOAD_DIR="${HOME}/.clawperator/downloads"
 APK_LOCAL_PATH="${APK_DOWNLOAD_DIR}/operator.apk"
 APK_SHA_PATH="${APK_DOWNLOAD_DIR}/operator.apk.sha256"
+INSTALL_COMMAND="curl -fsSL https://clawperator.com/install.sh | bash"
+SKILLS_SETUP_STATUS="not-run"
+SKILLS_REGISTRY_PATH=""
 
 TEMP_FILES=()
 
@@ -35,7 +38,8 @@ cleanup_temp_files() {
 on_error() {
     local line_number="$1"
     echo -e "${RED}❌ Installation failed (line ${line_number}).${NC}"
-    echo -e "${YELLOW}Review the error above, fix prerequisites, then re-run ./scripts/install.sh.${NC}"
+    echo -e "${YELLOW}Review the error above, fix prerequisites, then re-run:${NC}"
+    echo -e "${YELLOW}${INSTALL_COMMAND}${NC}"
 }
 
 trap cleanup_temp_files EXIT
@@ -223,22 +227,37 @@ setup_skills() {
     local SKILLS_DIR="$HOME/.clawperator/skills"
     local SKILLS_REPO_URL="https://github.com/clawpilled/clawperator-skills"
     echo -e "${BLUE}Setting up Clawperator Skills in $SKILLS_DIR...${NC}"
-    # NOTE:
-    # The skills repo is currently private. On macOS, git-credential-osxkeychain may
-    # prompt for keychain access during clone/pull. This is expected for authenticated
-    # GitHub access until the repo is made public.
+
+    if [ "${CLAWPERATOR_INSTALL_SKIP_SKILLS:-0}" = "1" ]; then
+        SKILLS_SETUP_STATUS="skipped"
+        echo -e "${YELLOW}⚠️  Skipping skills setup because CLAWPERATOR_INSTALL_SKIP_SKILLS=1.${NC}"
+        return 0
+    fi
+
+    warn_skills_setup_failed() {
+        local reason="$1"
+        SKILLS_SETUP_STATUS="skipped"
+        echo -e "${YELLOW}⚠️  Skills setup skipped: ${reason}${NC}"
+        echo -e "${YELLOW}Core CLI + APK installation will continue.${NC}"
+        echo -e "${YELLOW}If you have access to the skills repo later, re-run the installer or clone it into ~/.clawperator/skills manually.${NC}"
+    }
 
     if [ -d "$SKILLS_DIR" ]; then
         if [ ! -d "$SKILLS_DIR/.git" ]; then
-            echo -e "${RED}❌ $SKILLS_DIR exists but is not a git repository.${NC}"
-            echo -e "${YELLOW}Move or remove it, then re-run install.sh.${NC}"
-            return 1
+            warn_skills_setup_failed "$SKILLS_DIR exists but is not a git repository."
+            return 0
         fi
         echo -e "${YELLOW}⚠️  Skills directory already exists. Updating...${NC}"
-        git -C "$SKILLS_DIR" pull --ff-only
+        if ! GIT_TERMINAL_PROMPT=0 git -C "$SKILLS_DIR" pull --ff-only; then
+            warn_skills_setup_failed "unable to update the skills repository without interactive GitHub credentials."
+            return 0
+        fi
     else
         mkdir -p "$(dirname "$SKILLS_DIR")"
-        git clone "$SKILLS_REPO_URL" "$SKILLS_DIR"
+        if ! GIT_TERMINAL_PROMPT=0 git clone "$SKILLS_REPO_URL" "$SKILLS_DIR"; then
+            warn_skills_setup_failed "unable to clone the skills repository anonymously."
+            return 0
+        fi
     fi
 
     local REGISTRY_FILE=""
@@ -253,18 +272,16 @@ setup_skills() {
         fi
     done
     if [ -z "$REGISTRY_FILE" ]; then
-        echo -e "${RED}❌ Failed to find skills-registry.json in cloned repo.${NC}"
-        echo -e "${RED}   Checked:${NC}"
-        for candidate in "${REGISTRY_CANDIDATES[@]}"; do
-            echo -e "${RED}   - $candidate${NC}"
-        done
-        return 1
+        warn_skills_setup_failed "skills-registry.json was not found after clone/update."
+        return 0
     fi
     if ! node -e "JSON.parse(require('fs').readFileSync(process.argv[1], 'utf8'))" "$REGISTRY_FILE" >/dev/null 2>&1; then
-        echo -e "${RED}❌ skills-registry.json is not valid JSON: $REGISTRY_FILE${NC}"
-        return 1
+        warn_skills_setup_failed "skills-registry.json is invalid JSON: $REGISTRY_FILE"
+        return 0
     fi
 
+    SKILLS_SETUP_STATUS="configured"
+    SKILLS_REGISTRY_PATH="$REGISTRY_FILE"
     echo -e "${GREEN}✅ Skills setup complete.${NC}"
 
     # Set Env Var in Shell RCs
@@ -391,7 +408,8 @@ verify_operator_apk() {
         echo -e "${RED}❌ APK checksum mismatch.${NC}"
         echo -e "${RED}Expected: ${EXPECTED_HASH}${NC}"
         echo -e "${RED}Actual:   ${ACTUAL_HASH}${NC}"
-        echo -e "${YELLOW}Delete ${APK_LOCAL_PATH} and ${APK_SHA_PATH}, then re-run install.sh.${NC}"
+        echo -e "${YELLOW}Delete ${APK_LOCAL_PATH} and ${APK_SHA_PATH}, then re-run:${NC}"
+        echo -e "${YELLOW}${INSTALL_COMMAND}${NC}"
         return 1
     fi
 
@@ -400,6 +418,10 @@ verify_operator_apk() {
 
 count_connected_devices() {
     adb devices | awk 'NR > 1 && $2 == "device" { count++ } END { print count + 0 }'
+}
+
+list_connected_devices() {
+    adb devices | awk 'NR > 1 && $2 == "device" { print $1 }'
 }
 
 maybe_install_operator_apk() {
@@ -413,19 +435,26 @@ maybe_install_operator_apk() {
 
     if [ "$DEVICE_COUNT" -gt 1 ]; then
         echo -e "${YELLOW}⚠️  Multiple Android devices detected. Skipping APK install.${NC}"
+        echo -e "${YELLOW}Connected devices:${NC}"
+        while IFS= read -r device_id; do
+            [ -n "$device_id" ] || continue
+            echo -e "${YELLOW} - ${device_id}${NC}"
+        done < <(list_connected_devices)
         echo -e "${YELLOW}Install manually with: adb -s <device_id> install -r ${APK_LOCAL_PATH}${NC}"
         return 0
     fi
 
-    if [ ! -t 0 ]; then
-        echo -e "${YELLOW}⚠️  Non-interactive shell detected. Skipping APK install.${NC}"
-        echo -e "${YELLOW}Install manually with: adb install -r ${APK_LOCAL_PATH}${NC}"
-        return 0
+    local INSTALL_APK_RESPONSE="${CLAWPERATOR_INSTALL_APK:-}"
+    if [ -z "$INSTALL_APK_RESPONSE" ]; then
+        if [ -r /dev/tty ] && [ -w /dev/tty ]; then
+            printf "Install operator APK %s on the connected device now? [Y/n] " "$OPERATOR_VERSION" > /dev/tty
+            read -r INSTALL_APK_RESPONSE < /dev/tty
+            INSTALL_APK_RESPONSE="${INSTALL_APK_RESPONSE:-Y}"
+        else
+            INSTALL_APK_RESPONSE="Y"
+            echo -e "${BLUE}No interactive TTY detected. Installing operator APK automatically.${NC}"
+        fi
     fi
-
-    printf "Install operator APK %s on the connected device now? [Y/n] " "$OPERATOR_VERSION"
-    read -r INSTALL_APK_RESPONSE
-    INSTALL_APK_RESPONSE="${INSTALL_APK_RESPONSE:-Y}"
 
     case "$INSTALL_APK_RESPONSE" in
         y|Y|yes|YES)
@@ -465,7 +494,15 @@ main() {
     echo -e "   ${BLUE}https://clawperator.com/operator.apk${NC}"
     echo -e "4. Historical release notes and artifacts remain at:"
     echo -e "   ${BLUE}https://github.com/clawpilled/clawperator/releases${NC}"
-    echo -e "5. Run ${YELLOW}clawperator doctor${NC} to verify setup"
+    if [ "$SKILLS_SETUP_STATUS" = "configured" ]; then
+        echo -e "5. Skills registry configured at:"
+        echo -e "   ${BLUE}${SKILLS_REGISTRY_PATH}${NC}"
+        echo -e "6. Run ${YELLOW}clawperator doctor${NC} to verify setup"
+    else
+        echo -e "5. ${YELLOW}Skills were not configured during install.${NC}"
+        echo -e "   ${YELLOW}Core CLI + operator APK are installed. Skills can be added later when the repo is accessible.${NC}"
+        echo -e "6. Run ${YELLOW}clawperator doctor${NC} to verify setup"
+    fi
     echo ""
     echo -e "For more info, visit: ${BLUE}https://docs.clawperator.com${NC}"
     echo ""
