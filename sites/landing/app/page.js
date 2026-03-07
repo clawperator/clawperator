@@ -9,16 +9,16 @@ const installCommands = {
 
 const features = [
   {
-    title: "Deterministic",
-    body: "Strict contracts, no hidden retries, and a single canonical result envelope for every command."
+    title: "Deterministic Actions",
+    body: "Each command does one thing, returns one result, and never hides retries behind the scenes."
   },
   {
-    title: "Observable",
-    body: "Rich, structured UI snapshots and explicit terminal markers for reliable agent state tracking."
+    title: "Structured Device State",
+    body: "Your agent gets clear UI snapshots and machine-readable results it can actually branch on."
   },
   {
-    title: "Agent-First",
-    body: "Machine-readable error codes and JSON-native output designed for robust branching logic."
+    title: "Agent-Friendly Errors",
+    body: "Failures come back as explicit, machine-readable errors instead of vague logs or guesswork."
   }
 ];
 
@@ -113,19 +113,32 @@ export default function Home() {
       {/* Hero Section */}
       <section id="top" className="hero-card">
         <div className="hero-waterfall">
+          <p className="hero-problem">Most services only expose their real functionality through mobile apps.</p>
           <img ref={heroLogoRef} src="/clawperator-logo.png" alt="" aria-hidden="true" className="hero-logo" />
           <p className="hero-product-name">Clawperator</p>
-          <h1 className="hero-catchphrase">Deterministic Android Automation for AI Agents</h1>
+          <h1 className="hero-catchphrase">Your agent thinks. Clawperator acts.</h1>
           <p className="hero-summary">
-            Let AI agents use and control Android apps on behalf of users.
+            Let AI agents control Android apps on behalf of users.
             <br />
-            Clawperator connects your agent to a dedicated Android device so it can observe the screen, perform UI
-            actions, and receive structured results.
+            <br />
+            Your agent or LLM is the brain.
+            <br />
+            Clawperator is the hand.
+            <br />
+            <br />
+            The brain decides what to do next.
+            <br />
+            Clawperator connects that agent to a dedicated Android burner phone, executes the action, and returns
+            structured results your code can trust.
           </p>
         </div>
 
         <div className="quickstart-intro">
           <h2 id="install">Quick Start</h2>
+          <p>
+            One command installs the CLI, fetches the latest operator app, verifies it, and helps prepare a connected
+            Android device for your agent.
+          </p>
         </div>
 
         <div className="quickstart-block" aria-label="Quickstart terminal">
@@ -192,13 +205,21 @@ export default function Home() {
             </div>
           </div>
         </div>
+
+        <p className="quickstart-docs">
+          Clawperator has comprehensive documentation, setup guides, and API references at{" "}
+          <a href="https://docs.clawperator.com" target="_blank" rel="noreferrer">
+            docs.clawperator.com
+          </a>
+          .
+        </p>
       </section>
 
       {/* Feature Grid - Core Principles */}
       <section id="features" className="feature-grid" aria-label="Core features">
         <div className="feature-intro">
           <h2>Features</h2>
-          <p>Tools agents can trust: deterministic execution, structured outputs, and composable automation.</p>
+          <p>Built for agent loops that require clear device state, predictable actions, and machine-readable results.</p>
         </div>
 
         {features.map((feature) => (
@@ -211,65 +232,132 @@ export default function Home() {
 
       {/* Why Section */}
       <section id="why" className="content-section">
-        <h2>Unlocking the Mobile-First World</h2>
+        <h2>Why use Clawperator?</h2>
         <p>
-          Your digital life often lives behind mobile walls. From family tracking and home automation to grocery 
-          delivery and ride-hailing, many essential services only exist as apps—not web APIs.
+          Many important services still live inside mobile apps. Home automation controls, grocery apps, family
+          tracking tools, ride-hailing, banking companions, and other everyday workflows often have no public API worth
+          using.
         </p>
         <p>
-          Clawperator gives your AI agent the "hands" it needs to help you where you actually spend your 
-          time. It provides a stable, predictable way for agents to navigate the apps you use every day, 
-          turning mobile silos into open platforms.
+          Clawperator gives your agent a practical way to work in that world. Instead of pretending every service has an
+          integration, you connect the agent to a real Android device and let it operate the app UI the same way a
+          person would.
         </p>
       </section>
 
       {/* What Section */}
       <section id="what" className="content-section">
-        <h2>The Bridge Between Brain and Device</h2>
+        <h2>What is Clawperator?</h2>
         <p>
-          Think of Clawperator as the execution layer for AI. It translates high-level agent reasoning into 
-          precise, real-world device actions. It's the rock-solid connection that lets an LLM "brain" 
-          interact with physical Android hardware.
+          Clawperator is the hand for your agent. The agent is the brain: it reads state, reasons about the next step,
+          and decides what to do. Clawperator executes that decision on Android and reports back what happened.
         </p>
         <div className="grid-2-col">
           <div>
-            <h3>Empower Your Agent</h3>
+            <h3>What your agent gets</h3>
             <ul>
-              <li>Connect to real Android hardware instantly</li>
-              <li>Execute precise taps, scrolls, and typing</li>
-              <li>"See" the screen through structured UI data</li>
-              <li>Build and share repeatable automation skills</li>
+              <li>Connect to a real Android burner phone from a simple Node API or CLI</li>
+              <li>Tap, type, scroll, launch apps, and inspect the current UI</li>
+              <li>Works with OpenClaw, custom agents, and any AI system capable of making API calls</li>
+              <li>Compose reusable skills that automate real mobile workflows</li>
+              <li>Build repeatable automations without baking app-specific strategy into the runtime</li>
             </ul>
           </div>
           <div>
-            <h3>Built for Reliability</h3>
+            <h3>Typical setup</h3>
             <ul>
-              <li><strong>Deterministic:</strong> No guesswork or hidden retries.</li>
-              <li><strong>Observable:</strong> Every action returns a verifiable result.</li>
-              <li><strong>Agent-First:</strong> Built for JSON and machine-readable errors.</li>
+              <li>Use any cheap or old Android phone as a dedicated device for your agent</li>
+              <li>Keep it plugged in and connected to your host machine as a permanent hand</li>
+              <li>Point your agent at the CLI or Node API and let it drive the phone on the user&apos;s behalf</li>
+              <li>Coming soon: run the same model entirely in an Android emulator, without a physical device</li>
             </ul>
           </div>
         </div>
 
         <div className="setup-note">
           <p>
-            <strong>The Actuator Model:</strong> Use any cheap or old Android phone as a dedicated 
-            "burner" device. Keep it connected to your host machine, and your agent has a permanent, 
-            24/7 hand to get things done.
+            <strong>The burner phone model:</strong> Clawperator commonly runs on a cheap Android phone dedicated to
+            agent work. This keeps automation isolated from your primary phone and gives your agent a persistent device
+            it can safely control.
           </p>
+        </div>
+      </section>
+
+      <section className="content-section architecture-section" aria-label="The architecture">
+        <h2>The architecture</h2>
+        <div className="architecture-strip">
+          <article className="architecture-card architecture-card-edge">
+            <p className="architecture-label">AI Agent / LLM</p>
+            <p className="architecture-meta">the brain</p>
+          </article>
+          <div className="architecture-connector">
+            <span className="architecture-line" />
+            <span className="architecture-text">Node API / CLI</span>
+          </div>
+          <article className="architecture-card architecture-card-core">
+            <p className="architecture-label">Clawperator</p>
+            <p className="architecture-meta">runtime / hand</p>
+          </article>
+          <div className="architecture-connector">
+            <span className="architecture-line" />
+            <span className="architecture-text">USB / ADB</span>
+          </div>
+          <article className="architecture-card architecture-card-core">
+            <p className="architecture-label">Android Burner Device</p>
+            <p className="architecture-meta">dedicated actuator</p>
+          </article>
+          <div className="architecture-connector">
+            <span className="architecture-line" />
+          </div>
+          <article className="architecture-card architecture-card-edge">
+            <p className="architecture-label">Mobile Apps</p>
+            <p className="architecture-meta">the real APIs</p>
+          </article>
+        </div>
+        <p>
+          Your agent reasons about what should happen. Clawperator executes those decisions on a real Android device.
+          This turns mobile apps into programmable interfaces your agent can use. The Clawperator runtime includes the
+          CLI on your host machine and a lightweight operator app running on the Android device, installed
+          automatically by the setup script.
+        </p>
+      </section>
+
+      <section id="reliability" className="content-section">
+        <h2>Reliability</h2>
+        <p>
+          Clawperator favors predictable execution over automation magic. Commands are strict, results are explicit, and
+          the runtime stays out of the planning loop.
+        </p>
+        <div className="grid-2-col">
+          <div>
+            <h3>What stays predictable</h3>
+            <ul>
+              <li>Deterministic execution with no hidden retries</li>
+              <li>One result per command, with clear success or failure</li>
+              <li>Structured UI snapshots your agent can inspect between steps</li>
+            </ul>
+          </div>
+          <div>
+            <h3>What your agent can rely on</h3>
+            <ul>
+              <li>Machine-readable errors instead of hand-parsed logs</li>
+              <li>Stable command and task identifiers through the full request path</li>
+              <li>A runtime that executes validated actions instead of inventing strategy</li>
+            </ul>
+          </div>
         </div>
       </section>
 
       <section id="how-it-works" className="content-section loop-section">
         <h2>How It Works</h2>
-        <p>The hand loop is simple and deterministic: observe, decide, execute, and report.</p>
+        <p>The loop is simple: the brain observes and decides, the hand executes and reports back.</p>
 
         <div className="loop-steps" aria-label="Clawperator hand loop">
           <article className="loop-step">
             <p className="loop-index">01</p>
             <div>
               <h3>Observe</h3>
-              <p>Capture structured UI state from the Android device so the agent can reason on a stable snapshot.</p>
+              <p>Capture the current Android UI as structured state so the agent can reason on a real snapshot of the app.</p>
             </div>
           </article>
 
@@ -277,7 +365,7 @@ export default function Home() {
             <p className="loop-index">02</p>
             <div>
               <h3>Decide</h3>
-              <p>The brain chooses the next action based on selectors and current state. Clawperator does not plan.</p>
+              <p>The agent chooses the next action. Clawperator does not plan, improvise, or decide on its own.</p>
             </div>
           </article>
 
@@ -285,7 +373,7 @@ export default function Home() {
             <p className="loop-index">03</p>
             <div>
               <h3>Execute</h3>
-              <p>Run deterministic device actions (tap, type, scroll, read) with strict validation and no hidden retries.</p>
+              <p>Clawperator performs the requested tap, type, scroll, read, or app action on the connected Android device.</p>
             </div>
           </article>
 
@@ -293,7 +381,7 @@ export default function Home() {
             <p className="loop-index">04</p>
             <div>
               <h3>Return</h3>
-              <p>Emit one canonical terminal envelope (`[Clawperator-Result]`) with machine-readable success or failure.</p>
+              <p>Return one machine-readable result so the agent can continue, recover, or stop with confidence.</p>
             </div>
           </article>
         </div>
@@ -301,7 +389,7 @@ export default function Home() {
 
         <footer className="site-footer">
           <p className="footer-title">Clawperator</p>
-          <p className="footer-copy">Built for fast, reproducible Android automation from single actions to full agent runs.</p>
+          <p className="footer-copy">Open source Android automation for AI agents. From single commands to full burner-device workflows.</p>
           <nav className="footer-links" aria-label="Footer links">
             <a href="https://docs.clawperator.com" target="_blank" rel="noreferrer">
               docs
