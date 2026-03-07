@@ -24,6 +24,11 @@ Source locations by topic:
 - Skills authoring, usage model, device prep: `../clawperator-skills/docs/`
 - CLI reference, error codes, API contracts: `apps/node/src/`
 
+Historical docs policy:
+- Do not preserve stale planning docs, completed release checklists, or superseded roadmaps just for history.
+- If a doc is no longer an active source of truth, delete it after migrating any remaining actionable content elsewhere.
+- Treat stale public-doc pages as defects, not archive material.
+
 ## Workflow
 
 1. Confirm the repo roots exist:
@@ -50,6 +55,19 @@ Source locations by topic:
    - Run `scripts/write_build_metadata.py --repo-root <clawperator> --skills-root <clawperator-skills> --output <clawperator>/sites/docs/docs_build.json`
    - This is the docs build identifier. Do not hand-bump a docs version.
 
+### Removing Docs
+
+When a source doc should be deleted because it is stale or no longer useful, remove all of its public-doc references in the same change:
+
+1. Delete the source doc.
+2. Remove its entry from `sites/docs/source-map.yaml`.
+3. Remove any nav entry from `sites/docs/mkdocs.yml`.
+4. Remove any index or landing-page links that point to it.
+5. Delete the generated page under `sites/docs/docs/`.
+6. Re-run the normal inventory/diff/build-metadata flow so the docs site no longer contains dead links.
+
+Do not leave deleted docs referenced in the docs site manifest or navigation.
+
 ## Churn Policy
 
 - Prefer minimal edits to existing generated pages.
@@ -57,6 +75,7 @@ Source locations by topic:
 - Do not change page titles unless the source title changed or the current title is wrong.
 - Do not rewrap paragraphs just to change formatting.
 - Flag high churn before applying it. Use `scripts/diff_report.py` thresholds as the default guardrail.
+- If a user explicitly wants stale docs removed, prefer deletion plus link cleanup over adding "historical note" text.
 
 ## Node API Rules
 
