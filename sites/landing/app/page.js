@@ -331,26 +331,6 @@ export default function Home() {
             </div>
           </article>
 
-          <article className="workflow-card">
-            <div className="workflow-exchange">
-              <div className="workflow-msg workflow-msg-user">
-                <p className="workflow-role">User</p>
-                <p>&ldquo;Has my Amazon package shipped yet?&rdquo;</p>
-              </div>
-              <div className="workflow-msg workflow-msg-agent">
-                <p className="workflow-role">Agent</p>
-                <p className="workflow-action">invokes skill amazon-shopping.check-delivery on burner phone</p>
-              </div>
-              <div className="workflow-msg workflow-msg-result">
-                <p className="workflow-role">Result</p>
-                <p>Order #408-2951 &bull; Shipped via AusPost &bull; Arriving Wednesday</p>
-              </div>
-              <div className="workflow-msg workflow-msg-agent">
-                <p className="workflow-role">Agent</p>
-                <p>&ldquo;Your Amazon order shipped with AusPost. It should arrive Wednesday.&rdquo;</p>
-              </div>
-            </div>
-          </article>
         </div>
       </section>
 
