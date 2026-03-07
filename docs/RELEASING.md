@@ -77,6 +77,7 @@ Expected public structure:
 Expected stable UX:
 
 - `https://clawperator.com/operator.apk` redirects to the current stable immutable APK
+- `https://clawperator.com/install.sh` installs from `latest.json` and should not point users at GitHub Releases for the primary install path
 
 ## Release Checklist
 
@@ -109,6 +110,7 @@ After the workflows finish, verify:
 - stable metadata file exists at `https://downloads.clawperator.com/operator/latest.json`
 - APK URL in metadata resolves
 - checksum file matches the APK
+- `curl -fsSL https://clawperator.com/install.sh | bash` downloads the current stable APK, verifies the checksum, and installs it on a single connected device
 
 ## Rollback
 
