@@ -24,7 +24,7 @@ Clawperator provides a deterministic execution layer for LLM agents to control A
 | `action wait --selector <json>` | Wait for element |
 | `skills list` | List available skills |
 | `skills get <skill_id>` | Show skill metadata |
-| `skills search --app <pkg> [--intent <i>] [--keyword <k>]` | Search skills by app, intent, or keyword |
+| `skills search [--app <pkg>] [--intent <i>] [--keyword <k>]` | Search skills by app, intent, or keyword (at least one filter required) |
 | `skills compile-artifact <id> --artifact <name>` | Compile skill to execution payload |
 | `skills run <skill_id> [--device-id <id>]` | Invoke a skill script (convenience wrapper) |
 | `skills install` | Clone skills repo to `~/.clawperator/skills/` |

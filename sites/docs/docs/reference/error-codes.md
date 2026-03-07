@@ -96,13 +96,13 @@ These codes are produced by `clawperator doctor` and related checks.
 
 ## Skills
 
-These codes are produced by skills commands (`skills list`, `skills get`, `skills search`, `skills run`, `skills compile-artifact`, `skills install`, `skills update`).
+These codes are produced by the skills CLI commands (`skills list`, `skills get`, `skills search`, `skills run`, `skills compile-artifact`, `skills install`, `skills update`, `skills sync`) and may also be returned by the HTTP skills endpoints when running in serve mode.
 
 | Code | Description |
 |------|-------------|
 | `SKILL_NOT_FOUND` | No skill with the given ID exists in the registry |
 | `ARTIFACT_NOT_FOUND` | The named artifact does not exist for the skill |
-| `COMPILE_VARS_REQUIRED` | Artifact compilation requires variable substitution |
+| `COMPILE_VARS_REQUIRED` | Reserved; not currently emitted |
 | `COMPILE_VAR_MISSING` | A required placeholder variable was not provided |
 | `COMPILE_VARS_PARSE_FAILED` | The `--vars` JSON string could not be parsed |
 | `COMPILE_VALIDATION_FAILED` | Compiled artifact failed execution schema validation |

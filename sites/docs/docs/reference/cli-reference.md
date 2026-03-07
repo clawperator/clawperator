@@ -223,7 +223,7 @@ clawperator skills compile-artifact --skill-id <id> --artifact <name> [--vars <j
 Search skills by target application, intent, or keyword.
 
 ```
-clawperator skills search --app <package_id> [--intent <intent>] [--keyword <text>]
+clawperator skills search [--app <package_id>] [--intent <intent>] [--keyword <text>]
 ```
 
 | Flag | Description |
