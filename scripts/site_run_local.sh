@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # site_run_local.sh
-# Build (if needed) and run the Clawperator landing page locally on port 8080.
+# Build and run the Clawperator landing page locally on port 8080.
 # Opens the browser automatically.
 
 set -euo pipefail
@@ -12,15 +12,8 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 LANDING_DIR="$REPO_ROOT/sites/landing"
 OUT_DIR="$LANDING_DIR/out"
 
-# Build by default so local preview always reflects latest source.
-# Set CLAWPERATOR_SKIP_BUILD=1 to skip rebuild and serve existing out/ as-is.
-if [ "${CLAWPERATOR_SKIP_BUILD:-0}" != "1" ]; then
-    echo "--- Building latest landing site before serving (set CLAWPERATOR_SKIP_BUILD=1 to skip) ---"
-    "$SCRIPT_DIR/site_build.sh"
-elif [ ! -d "$OUT_DIR" ]; then
-    echo "--- Build output not found. Building now... ---"
-    "$SCRIPT_DIR/site_build.sh"
-fi
+echo "--- Building latest landing site before serving ---"
+"$SCRIPT_DIR/site_build.sh"
 
 cd "$OUT_DIR"
 
