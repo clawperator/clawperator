@@ -4,6 +4,7 @@
  */
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 import { DoctorService } from "../../domain/doctor/DoctorService.js";
+import { isCriticalDoctorCheck } from "../../domain/doctor/criticalChecks.js";
 import { type DoctorReport, type DoctorCheckResult } from "../../contracts/doctor.js";
 import type { OutputOptions } from "../output.js";
 
@@ -40,9 +41,9 @@ export async function cmdDoctor(options: {
 
 function renderPrettyDoctorReport(report: DoctorReport): string {
   const lines: string[] = [];
-  const criticalChecks = report.checks.filter(isCriticalCheck);
-  const warningChecks = report.checks.filter(check => !isCriticalCheck(check) && check.status !== "pass");
-  const passedChecks = report.checks.filter(check => check.status === "pass" && !isCriticalCheck(check));
+  const criticalChecks = report.checks.filter(isCriticalDoctorCheck);
+  const advisoryChecks = report.checks.filter(check => !isCriticalDoctorCheck(check) && check.status !== "pass");
+  const passedChecks = report.checks.filter(check => check.status === "pass" && !isCriticalDoctorCheck(check));
 
   lines.push("");
   lines.push("Clawperator Doctor Diagnostics");
@@ -56,9 +57,9 @@ function renderPrettyDoctorReport(report: DoctorReport): string {
     lines.push("");
   }
 
-  if (warningChecks.length > 0) {
-    lines.push("Warnings:");
-    for (const check of warningChecks) {
+  if (advisoryChecks.length > 0) {
+    lines.push("Advisory checks:");
+    for (const check of advisoryChecks) {
       renderCheck(lines, check);
     }
     lines.push("");
@@ -89,19 +90,6 @@ function renderPrettyDoctorReport(report: DoctorReport): string {
 function getDoctorExitCode(report: DoctorReport, checkOnly?: boolean): number {
   if (checkOnly) return 0;
   return (report.criticalOk ?? report.ok) ? 0 : 1;
-}
-
-function isCriticalCheck(check: DoctorCheckResult): boolean {
-  return [
-    "host.node.version",
-    "host.adb.presence",
-    "host.adb.server",
-    "host.java.version",
-    "device.discovery",
-    "build.android.assemble",
-    "build.android.install",
-    "build.android.launch",
-  ].some(prefix => check.id.startsWith(prefix));
 }
 
 function renderCheck(lines: string[], check: DoctorCheckResult): void {

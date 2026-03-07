@@ -58,7 +58,7 @@ Commands:
   doctor --full
                                             Full Android build + install + handshake + smoke (Stage 3)
   doctor --check-only
-                                            Run all checks but always exit 0 (for CI/automation)
+                                            Keep doctor non-blocking by always exiting 0 (for CI/automation)
 
 Global options:
   --device-id <id>                          Target Android device serial

@@ -26,7 +26,7 @@ describe("DoctorService", () => {
     const report = await new DoctorService().run({ config });
 
     assert.strictEqual(report.criticalOk, true);
-    assert.strictEqual(report.ok, false);
+    assert.strictEqual(report.ok, true);
     assert.strictEqual(report.deviceId, "test-device-1");
 
     const apkPresence = report.checks.find(check => check.id === "readiness.apk.presence");

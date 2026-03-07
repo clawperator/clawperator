@@ -22,6 +22,7 @@ import {
   runAndroidInstall,
   runAndroidLaunch
 } from "./checks/buildChecks.js";
+import { isCriticalDoctorCheck } from "./criticalChecks.js";
 
 export interface RunDoctorOptions {
   config: RuntimeConfig;
@@ -95,13 +96,16 @@ export class DoctorService {
 
     // 6. Handshake
     if (apkPresence.status === "pass") {
-      checks.push(await runHandshake(config));
+      const handshake = await runHandshake(config);
+      checks.push(handshake);
+      if (this.shouldHaltOnFailure(handshake)) return this.finalize(checks, config, options.fix);
     }
 
     // 7. Smoke Test (Only if full)
-    if (full) {
+    if (full && apkPresence.status === "pass") {
       const smoke = await runSmokeTest(config);
       checks.push(smoke);
+      if (this.shouldHaltOnFailure(smoke)) return this.finalize(checks, config, options.fix);
     }
 
     return this.finalize(checks, config, options.fix);
@@ -109,12 +113,13 @@ export class DoctorService {
 
   private async finalize(checks: DoctorCheckResult[], config: RuntimeConfig, autoFix?: boolean): Promise<DoctorReport> {
     const criticalOk = checks
-      .filter(check => this.isCriticalCheck(check))
+      .filter(check => isCriticalDoctorCheck(check))
       .every(check => check.status !== "fail");
-    const ok = checks.every(check => check.status === "pass");
+    const ok = criticalOk;
+    const allOk = checks.every(check => check.status === "pass");
 
     const nextActions: string[] = [];
-    if (criticalOk && ok) {
+    if (criticalOk && allOk) {
       nextActions.push("Read the setup guide: https://docs.clawperator.com/getting-started/first-time-setup/");
       nextActions.push(
         config.deviceId
@@ -158,19 +163,6 @@ export class DoctorService {
   }
 
   private shouldHaltOnFailure(check: DoctorCheckResult): boolean {
-    return check.status === "fail" && this.isCriticalCheck(check);
-  }
-
-  private isCriticalCheck(check: DoctorCheckResult): boolean {
-    return [
-      "host.node.version",
-      "host.adb.presence",
-      "host.adb.server",
-      "host.java.version",
-      "device.discovery",
-      "build.android.assemble",
-      "build.android.install",
-      "build.android.launch",
-    ].some(prefix => check.id.startsWith(prefix));
+    return check.status === "fail" && isCriticalDoctorCheck(check);
   }
 }
