@@ -479,7 +479,7 @@ export default function Home() {
           </article>
           <article className="skill-example">
             <p className="skill-example-label">Or invoke directly</p>
-            <pre><code>{`node ~/.clawperator/skills/scripts/capture_settings_overview.js \\
+            <pre><code>{`node ~/.clawperator/skills/skills/com.android.settings.capture-overview/scripts/capture_settings_overview.js \\
   <device_id>`}</code></pre>
           </article>
         </div>
