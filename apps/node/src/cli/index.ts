@@ -36,9 +36,17 @@ Commands:
                                             List available skills from local indexes/cache
   skills get <skill_id>
                                             Show skill metadata
+  skills search --app <package_id> [--intent <intent>] [--keyword <text>]
+                                            Search skills by app package, intent, or keyword
   skills compile-artifact <skill_id> --artifact <name> [--vars <json>]
   skills compile-artifact --skill-id <id> --artifact <name> [--vars <json>]
                                             Compile from a skill artifact (skill: positional or --skill-id; artifact: ac-status or ac-status.recipe.json)
+  skills run <skill_id> [--device-id <id>] [-- <extra_args>]
+                                            Invoke a skill script (convenience wrapper)
+  skills install
+                                            Clone skills repository to ~/.clawperator/skills/
+  skills update [--ref <git-ref>]
+                                            Pull latest skills (optionally pin to a ref)
   skills sync --ref <git-ref>
                                             Sync and pin skills index/cache to a git ref
   serve [--port <number>] [--host <string>]
@@ -234,6 +242,15 @@ async function main(): Promise<void> {
         result = rest[1]
           ? await (await import("./commands/skills.js")).cmdSkillsGet(rest[1], out)
           : JSON.stringify({ code: "USAGE", message: "skills get <skill_id>" });
+      } else if (rest[0] === "search") {
+        const app = getOpt(rest, "--app");
+        const intent = getOpt(rest, "--intent");
+        const keyword = getOpt(rest, "--keyword");
+        if (!app && !intent && !keyword) {
+          result = JSON.stringify({ code: "USAGE", message: "skills search requires --app <package_id>, --intent <intent>, or --keyword <text>" });
+        } else {
+          result = await (await import("./commands/skills.js")).cmdSkillsSearch({ app, intent, keyword }, out);
+        }
       } else if (rest[0] === "compile-artifact") {
         const skillId = getOpt(rest, "--skill-id") ?? rest[1];
         const artifact = getOpt(rest, "--artifact");
@@ -247,13 +264,34 @@ async function main(): Promise<void> {
         } else {
           result = await (await import("./commands/skills.js")).cmdSkillsCompileArtifact(skillId, artifact, vars, out);
         }
+      } else if (rest[0] === "run") {
+        const skillId = rest[1];
+        if (!skillId) {
+          result = JSON.stringify({ code: "USAGE", message: "skills run <skill_id> [--device-id <id>] [-- <extra_args>]" });
+        } else {
+          // Build args to pass to the skill script
+          const scriptArgs: string[] = [];
+          const deviceId = global.deviceId ?? getOpt(rest, "--device-id");
+          if (deviceId) scriptArgs.push(deviceId);
+          // Pass anything after "--" as extra args
+          const dashDash = rest.indexOf("--");
+          if (dashDash >= 0) {
+            scriptArgs.push(...rest.slice(dashDash + 1));
+          }
+          result = await (await import("./commands/skills.js")).cmdSkillsRun(skillId, scriptArgs, out);
+        }
+      } else if (rest[0] === "install") {
+        result = await (await import("./commands/skills.js")).cmdSkillsInstall(out);
+      } else if (rest[0] === "update") {
+        const ref = getOpt(rest, "--ref") ?? "main";
+        result = await (await import("./commands/skills.js")).cmdSkillsUpdate(ref, out);
       } else if (rest[0] === "sync") {
         const ref = getOpt(rest, "--ref");
         result = ref
           ? await (await import("./commands/skills.js")).cmdSkillsSync(ref, out)
           : JSON.stringify({ code: "USAGE", message: "skills sync --ref <git-ref>" });
       } else {
-        result = JSON.stringify({ code: "USAGE", message: "skills list|get|compile-artifact|sync ..." });
+        result = JSON.stringify({ code: "USAGE", message: "skills list|get|search|compile-artifact|run|install|update|sync ..." });
       }
       break;
     case "serve":

@@ -6,8 +6,10 @@ import { join } from "node:path";
 import { listSkills } from "../../domain/skills/listSkills.js";
 import { getSkill } from "../../domain/skills/getSkill.js";
 import { compileArtifact } from "../../domain/skills/compileArtifact.js";
+import { searchSkills } from "../../domain/skills/searchSkills.js";
+import { runSkill } from "../../domain/skills/runSkill.js";
 import { validateExecution, validatePayloadSize } from "../../domain/executions/validateExecution.js";
-import { SKILL_NOT_FOUND, ARTIFACT_NOT_FOUND, COMPILE_VAR_MISSING } from "../../contracts/skills.js";
+import { SKILL_NOT_FOUND, ARTIFACT_NOT_FOUND, COMPILE_VAR_MISSING, SKILL_SCRIPT_NOT_FOUND } from "../../contracts/skills.js";
 
 function resolveTestRegistryPath(): string {
   const candidates = [
@@ -259,5 +261,55 @@ describe("compileArtifact", () => {
     assert.strictEqual(validated.commandId, execution.commandId);
     assert.ok(Array.isArray(validated.actions) && validated.actions.length > 0);
     validatePayloadSize(JSON.stringify(execution));
+  });
+});
+
+describe("searchSkills", () => {
+  it("filters by applicationId", async () => {
+    const result = await searchSkills({ app: "com.android.settings" });
+    assert.ok(result.ok);
+    assert.strictEqual(result.skills.length, 1);
+    assert.strictEqual(result.skills[0].id, "com.android.settings.capture-overview");
+  });
+
+  it("filters by intent", async () => {
+    const result = await searchSkills({ intent: "get-aircon-status" });
+    assert.ok(result.ok);
+    assert.strictEqual(result.skills.length, 1);
+    assert.strictEqual(result.skills[0].id, "com.google.android.apps.chromecast.app.get-aircon-status");
+  });
+
+  it("filters by keyword in summary", async () => {
+    const result = await searchSkills({ keyword: "screenshot" });
+    assert.ok(result.ok);
+    assert.strictEqual(result.skills.length, 1);
+    assert.strictEqual(result.skills[0].id, "com.android.settings.capture-overview");
+  });
+
+  it("returns empty array for no matches", async () => {
+    const result = await searchSkills({ app: "com.nonexistent.app" });
+    assert.ok(result.ok);
+    assert.strictEqual(result.skills.length, 0);
+  });
+
+  it("combines app and intent filters", async () => {
+    const result = await searchSkills({ app: "com.android.settings", intent: "get-aircon-status" });
+    assert.ok(result.ok);
+    assert.strictEqual(result.skills.length, 0);
+  });
+});
+
+describe("runSkill", () => {
+  it("returns SKILL_NOT_FOUND for unknown skill", async () => {
+    const result = await runSkill("nonexistent.skill", []);
+    assert.ok(!result.ok);
+    assert.strictEqual(result.code, SKILL_NOT_FOUND);
+  });
+
+  it("returns SKILL_SCRIPT_NOT_FOUND when script file missing", async () => {
+    // The fixture registry has a script path that doesn't exist on disk
+    const result = await runSkill("com.android.settings.capture-overview", []);
+    assert.ok(!result.ok);
+    assert.strictEqual(result.code, SKILL_SCRIPT_NOT_FOUND);
   });
 });
