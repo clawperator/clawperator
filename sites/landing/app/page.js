@@ -31,6 +31,7 @@ export default function Home() {
   const activeCommand = mode === "npm" ? installCommands.npm : installCommands.oneLiner;
 
   const sectionIds = ["install", "workflows", "why", "what", "skills", "how-it-works"];
+  const sectionLabels = { install: "Install", workflows: "Examples", why: "Why", what: "What", skills: "Skills", "how-it-works": "How it works" };
 
   const handleCopy = async () => {
     try {
@@ -96,7 +97,7 @@ export default function Home() {
             visibleSections.delete(entry.target.id);
           }
         }
-        // Pick the section with the highest visibility, preserving page order for ties
+        // Pick the section with the highest visibility; later sections win ties
         let best = null;
         let bestRatio = 0;
         for (const id of sectionIds) {
@@ -137,7 +138,7 @@ export default function Home() {
                 href={`#${id}`}
                 className={activeSection === id ? "toolbar-section-link active" : "toolbar-section-link"}
               >
-                {id === "install" ? "Install" : id === "workflows" ? "Examples" : id === "why" ? "Why" : id === "what" ? "What" : id === "skills" ? "Skills" : "How it works"}
+                {sectionLabels[id] || id}
               </a>
             ))}
             <a href="https://docs.clawperator.com" target="_blank" rel="noreferrer">
