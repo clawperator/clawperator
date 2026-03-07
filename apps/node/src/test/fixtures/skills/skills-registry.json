@@ -39,6 +39,18 @@
         "skills/com.test.echo/scripts/echo.js"
       ],
       "artifacts": []
+    },
+    {
+      "id": "com.test.fail",
+      "applicationId": "com.test",
+      "intent": "fail",
+      "summary": "Test skill that exits with non-zero code.",
+      "path": "skills/com.test.echo",
+      "skillFile": "skills/com.test.echo/SKILL.md",
+      "scripts": [
+        "skills/com.test.echo/scripts/exit_fail.js"
+      ],
+      "artifacts": []
     }
   ]
 }

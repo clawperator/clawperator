@@ -9,7 +9,7 @@ import { compileArtifact } from "../../domain/skills/compileArtifact.js";
 import { searchSkills } from "../../domain/skills/searchSkills.js";
 import { runSkill } from "../../domain/skills/runSkill.js";
 import { validateExecution, validatePayloadSize } from "../../domain/executions/validateExecution.js";
-import { SKILL_NOT_FOUND, ARTIFACT_NOT_FOUND, COMPILE_VAR_MISSING, SKILL_SCRIPT_NOT_FOUND } from "../../contracts/skills.js";
+import { SKILL_NOT_FOUND, ARTIFACT_NOT_FOUND, COMPILE_VAR_MISSING, SKILL_SCRIPT_NOT_FOUND, SKILL_EXECUTION_FAILED } from "../../contracts/skills.js";
 
 function resolveTestRegistryPath(): string {
   const candidates = [
@@ -326,5 +326,12 @@ describe("runSkill", () => {
     const result = await runSkill("com.test.echo", []);
     assert.ok(result.ok);
     assert.ok(result.output.includes("TEST_OUTPUT:no-args"));
+  });
+
+  it("returns SKILL_EXECUTION_FAILED for non-zero exit", async () => {
+    const result = await runSkill("com.test.fail", []);
+    assert.ok(!result.ok);
+    assert.strictEqual(result.code, SKILL_EXECUTION_FAILED);
+    assert.ok(result.stderr?.includes("FAIL_OUTPUT:intentional"));
   });
 });

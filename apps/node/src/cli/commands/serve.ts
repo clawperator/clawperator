@@ -246,9 +246,25 @@ export async function startServer(options: ServeOptions): Promise<Server> {
   // REST: Run skill (convenience)
   app.post("/skills/:skillId/run", async (req, res) => {
     try {
-      const { deviceId, args } = req.body || {};
+      if (!req.body || typeof req.body !== "object" || Array.isArray(req.body)) {
+        res.status(400).json({ ok: false, error: { code: "INVALID_BODY", message: "Request body must be a JSON object" } });
+        return;
+      }
+
+      const { deviceId, args } = req.body as { deviceId?: unknown; args?: unknown };
+
+      if (deviceId !== undefined && typeof deviceId !== "string") {
+        res.status(400).json({ ok: false, error: { code: "INVALID_DEVICE_ID", message: "'deviceId' must be a string" } });
+        return;
+      }
+
+      if (args !== undefined && !Array.isArray(args)) {
+        res.status(400).json({ ok: false, error: { code: "INVALID_ARGS", message: "'args' must be an array" } });
+        return;
+      }
+
       const scriptArgs: string[] = [];
-      if (deviceId && typeof deviceId === "string") scriptArgs.push(deviceId);
+      if (typeof deviceId === "string" && deviceId.length > 0) scriptArgs.push(deviceId);
       if (Array.isArray(args)) scriptArgs.push(...args.map(String));
 
       const result = await runSkill(req.params.skillId, scriptArgs);

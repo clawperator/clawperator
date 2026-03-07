@@ -87,23 +87,36 @@ export async function syncSkills(
     };
   }
 
-  // Validate registry exists after sync
+  // Validate registry exists and is valid after sync
+  let raw: string;
   try {
-    const raw = await readFile(registryPath, "utf-8");
-    const data = JSON.parse(raw);
-    if (!Array.isArray(data.skills)) {
-      return {
-        ok: false,
-        code: SKILLS_SYNC_FAILED,
-        message: `Registry at ${registryPath} is invalid: skills array required`,
-      };
-    }
+    raw = await readFile(registryPath, "utf-8");
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return {
       ok: false,
       code: SKILLS_SYNC_FAILED,
-      message: `Registry not found after sync: ${msg}. Expected at ${registryPath}`,
+      message: `Registry file not found or unreadable after sync: ${msg}. Expected at ${registryPath}`,
+    };
+  }
+
+  let data: any;
+  try {
+    data = JSON.parse(raw);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return {
+      ok: false,
+      code: SKILLS_SYNC_FAILED,
+      message: `Registry at ${registryPath} is invalid JSON: ${msg}`,
+    };
+  }
+
+  if (!Array.isArray(data.skills)) {
+    return {
+      ok: false,
+      code: SKILLS_SYNC_FAILED,
+      message: `Registry at ${registryPath} is invalid: skills array required`,
     };
   }
 

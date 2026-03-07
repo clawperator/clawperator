@@ -270,11 +270,13 @@ async function main(): Promise<void> {
           result = JSON.stringify({ code: "USAGE", message: "skills run <skill_id> [--device-id <id>] [-- <extra_args>]" });
         } else {
           // Build args to pass to the skill script
+          // Only parse options from args before "--" to avoid double-counting
+          const dashDash = rest.indexOf("--");
+          const optSegment = dashDash >= 0 ? rest.slice(0, dashDash) : rest;
           const scriptArgs: string[] = [];
-          const deviceId = global.deviceId ?? getOpt(rest, "--device-id");
+          const deviceId = global.deviceId ?? getOpt(optSegment, "--device-id");
           if (deviceId) scriptArgs.push(deviceId);
           // Pass anything after "--" as extra args
-          const dashDash = rest.indexOf("--");
           if (dashDash >= 0) {
             scriptArgs.push(...rest.slice(dashDash + 1));
           }
