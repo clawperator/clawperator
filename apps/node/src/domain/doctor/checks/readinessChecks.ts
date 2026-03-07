@@ -19,7 +19,7 @@ export async function checkApkPresence(config: RuntimeConfig): Promise<DoctorChe
     if (otherStdout.includes(`package:${otherVariant}`)) {
       return {
         id: "readiness.apk.presence",
-        status: "fail",
+        status: "warn",
         code: ERROR_CODES.RECEIVER_VARIANT_MISMATCH,
         summary: `Wrong Operator variant installed.`,
         detail: `Expected ${config.receiverPackage} but found ${otherVariant}.`,
@@ -35,7 +35,7 @@ export async function checkApkPresence(config: RuntimeConfig): Promise<DoctorChe
 
     return {
       id: "readiness.apk.presence",
-      status: "fail",
+      status: "warn",
       code: ERROR_CODES.RECEIVER_NOT_INSTALLED,
       summary: "Operator APK not installed.",
       detail: `Package ${config.receiverPackage} was not found on the device.`,
@@ -43,7 +43,7 @@ export async function checkApkPresence(config: RuntimeConfig): Promise<DoctorChe
         title: "Install Operator APK",
         platform: "any",
         steps: [
-          { kind: "shell", value: "./gradlew :apps:android:app:installDebug" }
+          { kind: "manual", value: "Download and install the APK from https://github.com/clawpilled/clawperator/releases/latest" }
         ],
       },
     };
@@ -63,7 +63,7 @@ export async function checkSettings(config: RuntimeConfig): Promise<DoctorCheckR
   if (devOptions.stdout.trim() !== "1") {
     results.push({
       id: "readiness.settings.dev_options",
-      status: "fail",
+      status: "warn",
       code: ERROR_CODES.DEVICE_DEV_OPTIONS_DISABLED,
       summary: "Developer options are disabled.",
       detail: "Enable Developer Options in Android Settings (Tap Build Number 7 times).",
@@ -76,7 +76,7 @@ export async function checkSettings(config: RuntimeConfig): Promise<DoctorCheckR
   if (adbEnabled.stdout.trim() !== "1") {
     results.push({
       id: "readiness.settings.usb_debugging",
-      status: "fail",
+      status: "warn",
       code: ERROR_CODES.DEVICE_USB_DEBUGGING_DISABLED,
       summary: "USB debugging is disabled.",
     });
