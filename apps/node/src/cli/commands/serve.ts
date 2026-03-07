@@ -2,8 +2,13 @@ import express from "express";
 import { Server } from "node:http";
 import { runExecution } from "../../domain/executions/runExecution.js";
 import { listDevices } from "../../domain/devices/listDevices.js";
+import { listSkills } from "../../domain/skills/listSkills.js";
+import { getSkill } from "../../domain/skills/getSkill.js";
+import { searchSkills } from "../../domain/skills/searchSkills.js";
+import { runSkill } from "../../domain/skills/runSkill.js";
 import { clawperatorEvents, CLAW_EVENT_TYPES } from "../../domain/observe/events.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
+import { SKILL_NOT_FOUND } from "../../contracts/skills.js";
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 
 interface ServeOptions {
@@ -196,6 +201,101 @@ export async function startServer(options: ServeOptions): Promise<Server> {
     }
   });
 
+  // REST: List or search skills
+  app.get("/skills", async (req, res) => {
+    try {
+      const app = req.query.app as string | undefined;
+      const intent = req.query.intent as string | undefined;
+      const keyword = req.query.keyword as string | undefined;
+
+      if (app || intent || keyword) {
+        const result = await searchSkills({ app, intent, keyword });
+        if (result.ok) {
+          res.json({ ok: true, skills: result.skills, count: result.skills.length });
+        } else {
+          res.status(500).json({ ok: false, error: { code: result.code, message: result.message } });
+        }
+      } else {
+        const result = await listSkills();
+        if (result.ok) {
+          res.json({ ok: true, skills: result.skills, count: result.skills.length });
+        } else {
+          res.status(500).json({ ok: false, error: { code: result.code, message: result.message } });
+        }
+      }
+    } catch (e) {
+      res.status(500).json({ ok: false, error: { code: "INTERNAL_ERROR", message: String(e) } });
+    }
+  });
+
+  // REST: Get skill by ID
+  app.get("/skills/:skillId", async (req, res) => {
+    try {
+      const result = await getSkill(req.params.skillId);
+      if (result.ok) {
+        res.json({ ok: true, skill: result.skill });
+      } else {
+        const status = result.code === SKILL_NOT_FOUND ? 404 : 500;
+        res.status(status).json({ ok: false, error: { code: result.code, message: result.message } });
+      }
+    } catch (e) {
+      res.status(500).json({ ok: false, error: { code: "INTERNAL_ERROR", message: String(e) } });
+    }
+  });
+
+  // REST: Run skill (convenience)
+  app.post("/skills/:skillId/run", async (req, res) => {
+    try {
+      if (!req.body || typeof req.body !== "object" || Array.isArray(req.body)) {
+        res.status(400).json({ ok: false, error: { code: "INVALID_BODY", message: "Request body must be a JSON object" } });
+        return;
+      }
+
+      const { deviceId, args } = req.body as { deviceId?: unknown; args?: unknown };
+
+      if (deviceId !== undefined && typeof deviceId !== "string") {
+        res.status(400).json({ ok: false, error: { code: "INVALID_DEVICE_ID", message: "'deviceId' must be a string" } });
+        return;
+      }
+
+      if (args !== undefined && !Array.isArray(args)) {
+        res.status(400).json({ ok: false, error: { code: "INVALID_ARGS", message: "'args' must be an array" } });
+        return;
+      }
+
+      const scriptArgs: string[] = [];
+      if (typeof deviceId === "string" && deviceId.length > 0) scriptArgs.push(deviceId);
+      if (Array.isArray(args)) scriptArgs.push(...args.map(String));
+
+      const result = await runSkill(req.params.skillId, scriptArgs);
+      if (result.ok) {
+        res.json({
+          ok: true,
+          skillId: result.skillId,
+          output: result.output,
+          exitCode: result.exitCode,
+          durationMs: result.durationMs,
+        });
+      } else {
+        const status = result.code === SKILL_NOT_FOUND ? 404
+          : result.code === "REGISTRY_READ_FAILED" ? 500
+          : 400;
+        res.status(status).json({
+          ok: false,
+          error: {
+            code: result.code,
+            message: result.message,
+            skillId: result.skillId,
+            exitCode: result.exitCode,
+            stderr: result.stderr,
+          },
+        });
+      }
+    } catch (e) {
+      res.status(500).json({ ok: false, error: { code: "INTERNAL_ERROR", message: String(e) } });
+    }
+  });
+
   // SSE: Event streaming
   app.get("/events", (req, res) => {
     res.setHeader("Content-Type", "text/event-stream");
@@ -283,6 +383,9 @@ export async function startServer(options: ServeOptions): Promise<Server> {
         console.log(`- POST /execute`);
         console.log(`- POST /observe/snapshot`);
         console.log(`- POST /observe/screenshot`);
+        console.log(`- GET  /skills`);
+        console.log(`- GET  /skills/:skillId`);
+        console.log(`- POST /skills/:skillId/run`);
         console.log(`- GET  /events (SSE)`);
       }
       resolve(server);

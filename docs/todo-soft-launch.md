@@ -410,7 +410,7 @@ Make `clawperator skills install` and `clawperator skills update` work by clonin
 
 ### Tasks
 
-- [ ] **Implement `syncSkills` domain service**
+- [x] **Implement `syncSkills` domain service**
   - File: `apps/node/src/domain/skills/syncSkills.ts`
   - Action: Replace the stub implementation with real git clone/pull logic:
     - On first run (directory does not exist): `git clone <skills-repo-url> ~/.clawperator/skills/`
@@ -418,18 +418,18 @@ Make `clawperator skills install` and `clawperator skills update` work by clonin
     - Support optional `ref` param to checkout a specific git ref after clone
   - Notes: `syncSkills` does not receive `RuntimeConfig` (it currently takes only a `ref: string`). Use `child_process.execFile` (or `execa` if already a dep) directly for the git commands - this is a setup utility, not an execution path, so using `ProcessRunner` would require threading unnecessary context through. Current stub at `apps/node/src/domain/skills/syncSkills.ts:16` returns `ok: true, synced: false` - replace the body. Expand the return type interfaces to cover failure cases
 
-- [ ] **Add `skills install` and `skills update` subcommands to CLI**
+- [x] **Add `skills install` and `skills update` subcommands to CLI**
   - File: `apps/node/src/cli/index.ts`
   - Action: Wire up two new subcommand branches in the `skills` command handler:
     - `skills install` - calls `syncSkills` with default ref, prints the `CLAWPERATOR_SKILLS_REGISTRY` env var instruction
     - `skills update` - calls `syncSkills` with `--ref` if provided, pulls latest
   - Notes: The CLI index currently handles `skills list`, `skills get`, `skills compile-artifact`, and `skills sync`. The new `install` and `update` subcommands should be added alongside. `skills install` is the user-facing "first time setup" command; `skills update` is for keeping skills current
 
-- [ ] **Add `cmdSkillsInstall` and `cmdSkillsUpdate` to `skills.ts` command module**
+- [x] **Add `cmdSkillsInstall` and `cmdSkillsUpdate` to `skills.ts` command module**
   - File: `apps/node/src/cli/commands/skills.ts`
   - Action: Add two exported functions following the existing pattern (`cmdSkillsList`, `cmdSkillsGet`, etc.). Both delegate to `syncSkills` from `domain/skills/syncSkills.ts`
 
-- [ ] **Update CLI help text**
+- [x] **Update CLI help text**
   - File: `apps/node/src/cli/index.ts`
   - Action: Add `skills install` and `skills update` to the `HELP` constant
 
@@ -437,11 +437,11 @@ Make `clawperator skills install` and `clawperator skills update` work by clonin
   - File: `scripts/install.sh`
   - Action: After `npm install -g clawperator@alpha`, add `clawperator skills install` call. This replaces the manual `git clone` step for skills
 
-- [ ] **Validate skills-registry.json after clone**
+- [x] **Validate skills-registry.json after clone**
   - File: `apps/node/src/domain/skills/syncSkills.ts`
   - Action: After a successful clone, verify that `skills-registry.json` exists at the expected path and contains valid JSON before returning `ok: true`. If the file is missing or malformed, return an error - this catches partial clones or wrong repo URL early
 
-- [ ] **Build and test**
+- [x] **Build and test**
   - Action: `npm --prefix apps/node run build && npm --prefix apps/node run test`
   - Action: Manually test: `clawperator skills install`, `clawperator skills list`, `clawperator skills update`
 
