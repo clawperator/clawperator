@@ -98,6 +98,7 @@ export default function Home() {
             <a href="#install">Install</a>
             <a href="#why">Why</a>
             <a href="#what">What</a>
+            <a href="#skills">Skills</a>
             <a href="#how-it-works">How it works</a>
             <a href="https://docs.clawperator.com" target="_blank" rel="noreferrer">
               Docs
@@ -343,6 +344,59 @@ export default function Home() {
               <li>Machine-readable errors instead of hand-parsed logs</li>
               <li>Stable command and task identifiers through the full request path</li>
               <li>A runtime that executes validated actions instead of inventing strategy</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="skills" className="content-section">
+        <h2>Skills</h2>
+        <p>
+          Skills are packaged automation scripts that turn common mobile workflows into repeatable, agent-ready
+          operations. Each skill targets a specific app and task - check the air conditioner status, capture a
+          settings overview, or pull data from a tracking app.
+        </p>
+        <p>
+          Skills live in a dedicated{" "}
+          <a href="https://github.com/clawpilled/clawperator-skills" target="_blank" rel="noreferrer">
+            open source repository
+          </a>{" "}
+          and are designed to be standalone. Your agent can invoke a skill script directly, or use the Node API
+          to discover, search, and run skills through a single interface.
+        </p>
+
+        <div className="skills-examples">
+          <article className="skill-example">
+            <p className="skill-example-label">Discover</p>
+            <pre><code>clawperator skills search --app com.android.settings</code></pre>
+          </article>
+          <article className="skill-example">
+            <p className="skill-example-label">Run</p>
+            <pre><code>{`clawperator skills run com.android.settings.capture-overview \\
+  --device-id <device_id>`}</code></pre>
+          </article>
+          <article className="skill-example">
+            <p className="skill-example-label">Or invoke directly</p>
+            <pre><code>{`node ~/.clawperator/skills/scripts/capture_settings_overview.js \\
+  <device_id>`}</code></pre>
+          </article>
+        </div>
+
+        <div className="grid-2-col">
+          <div>
+            <h3>For agents</h3>
+            <ul>
+              <li>Search skills by app, intent, or keyword</li>
+              <li>Get structured metadata before deciding what to run</li>
+              <li>Invoke directly or through the Node API - no lock-in</li>
+            </ul>
+          </div>
+          <div>
+            <h3>For builders</h3>
+            <ul>
+              <li>Write a script, add a registry entry, and your skill is live</li>
+              <li>Skills are plain scripts - Node, shell, or anything with a shebang</li>
+              <li>One install command pulls the full skills library</li>
             </ul>
           </div>
         </div>
