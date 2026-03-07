@@ -730,6 +730,7 @@ body {
   border-radius: 14px;
   background: rgba(255, 120, 60, 0.04);
   padding: 1.25rem 1.5rem;
+  width: 100%;
   max-width: 560px;
   margin-left: auto;
   margin-right: auto;
