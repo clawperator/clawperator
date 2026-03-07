@@ -6,7 +6,9 @@ You've installed the Clawperator CLI. This guide walks through setting up your A
 
 - A dedicated Android device (any cheap or old phone works - Android 5.0+)
 - A USB cable
-- The Clawperator APK from [clawperator.com/operator.apk](https://clawperator.com/operator.apk)
+- The Clawperator installer or APK:
+  - `curl -fsSL https://clawperator.com/install.sh | bash`
+  - [clawperator.com/operator.apk](https://clawperator.com/operator.apk)
 
 This device will stay connected to your machine as a dedicated actuator. It does not need to be your primary phone.
 
@@ -14,7 +16,15 @@ This device will stay connected to your machine as a dedicated actuator. It does
 
 ## Step 1: Download the APK
 
-Download the latest APK from [clawperator.com/operator.apk](https://clawperator.com/operator.apk) and save the `operator-vX.X.X.apk` file locally.
+If you want the simplest path, run:
+
+```bash
+curl -fsSL https://clawperator.com/install.sh | bash
+```
+
+With one connected device, the installer downloads the latest stable APK, verifies its checksum, and offers to install it immediately. If no device is connected, or if multiple devices are connected, it still saves the APK locally at `~/.clawperator/downloads/operator.apk`.
+
+For manual installation, download the latest APK from [clawperator.com/operator.apk](https://clawperator.com/operator.apk) and save it locally.
 
 Historical versions and release notes remain available on [GitHub Releases](https://github.com/clawpilled/clawperator/releases).
 
@@ -60,13 +70,13 @@ You should see your device listed as `device` (not `unauthorized`).
 ## Step 5: Install the APK
 
 ```bash
-adb install -r /path/to/operator-vX.X.X.apk
+adb install -r ~/.clawperator/downloads/operator.apk
 ```
 
 If you have multiple devices connected, specify the target:
 
 ```bash
-adb -s <device_id> install -r /path/to/operator-vX.X.X.apk
+adb -s <device_id> install -r ~/.clawperator/downloads/operator.apk
 ```
 
 ---

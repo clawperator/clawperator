@@ -87,6 +87,21 @@ If you must use **Wireless Debugging**, be aware that your mileage may vary (YMM
 
 ---
 
+## Installer behavior
+
+`curl -fsSL https://clawperator.com/install.sh | bash` uses the stable metadata file at `https://downloads.clawperator.com/operator/latest.json`, downloads the immutable APK and `.sha256`, verifies the checksum, then handles device install like this:
+
+1. **One connected device** - the installer offers to run `adb install -r ~/.clawperator/downloads/operator.apk`.
+2. **Multiple connected devices** - the installer skips the install and prints `adb -s <device_id> install -r ~/.clawperator/downloads/operator.apk`.
+3. **No connected devices** - the installer skips the install and leaves the verified APK at `~/.clawperator/downloads/operator.apk`.
+4. **`adb` missing** - the installer attempts to install `adb` automatically, or stops with a manual install link if it cannot.
+
+### Installer cloned everything except skills
+
+If the installer finishes but warns that skills setup was skipped, the core CLI and operator APK are still installed. The current skills repository may require separate access. This does not block `clawperator doctor`, device discovery, or direct command execution.
+
+---
+
 ## Version Compatibility Matrix
 
 To ensure deterministic results, the Node CLI and the Android APK must be compatible.
@@ -104,7 +119,7 @@ If the versions are incompatible, you may see:
 
 **How to fix:**
 - Upgrade the Node CLI: `npm install -g clawperator@latest`
-- Update the Android APK: Download the latest stable release from [clawperator.com/operator.apk](https://clawperator.com/operator.apk) and install via `adb install -r operator-vX.X.X.apk`. Historical versions remain on [GitHub Releases](https://github.com/clawpilled/clawperator/releases).
+- Update the Android APK: Download the latest stable release from [clawperator.com/operator.apk](https://clawperator.com/operator.apk) and install via `adb install -r ~/.clawperator/downloads/operator.apk` or `adb install -r /path/to/operator-vX.X.X.apk`. Historical versions remain on [GitHub Releases](https://github.com/clawpilled/clawperator/releases).
 
 ---
 

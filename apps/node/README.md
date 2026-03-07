@@ -8,6 +8,12 @@ Deterministic Node.js CLI and API for Android automation, designed for AI agents
 npm install -g clawperator
 ```
 
+For the full host + APK install flow, use:
+
+```bash
+curl -fsSL https://clawperator.com/install.sh | bash
+```
+
 ## Requirements
 
 - Node.js 22+
