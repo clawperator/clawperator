@@ -730,7 +730,7 @@ body {
   border-radius: 14px;
   background: var(--surface);
   padding: 1.25rem 1.5rem;
-  max-width: 420px;
+  max-width: 560px;
   margin-left: auto;
   margin-right: auto;
 }
