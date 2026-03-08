@@ -47,7 +47,7 @@ mkdocs build
 STATIC_DIR="$DOCS_DIR/static"
 if [ -d "$STATIC_DIR" ]; then
     echo "Copying static root files..."
-    cp "$STATIC_DIR"/* "$DOCS_DIR/site/"
+    cp -R "$STATIC_DIR"/. "$DOCS_DIR/site/"
 fi
 
 # Verify build output
