@@ -64,11 +64,33 @@ if [ "$command" = "shell" ]; then
     exit 0
   fi
 
+  if [ "$subcommand" = "dumpsys" ] && [ "$2" = "package" ]; then
+    pkg="$3"
+    if [ "$SCENARIO" = "VERSION_UNREADABLE" ]; then
+      echo "Package [$pkg]"
+      exit 0
+    fi
+    if [ "$SCENARIO" = "VERSION_MISMATCH" ]; then
+      echo "Package [$pkg]"
+      echo "  versionCode=200000 minSdk=21 targetSdk=35"
+      echo "  versionName=0.2.0-d"
+      exit 0
+    fi
+    echo "Package [$pkg]"
+    echo "  versionCode=104900 minSdk=21 targetSdk=35"
+    echo "  versionName=0.1.4-d"
+    exit 0
+  fi
+
   if [ "$subcommand" = "settings" ]; then
     # Dev options / usb debugging
     echo "1"
     exit 0
   fi
+fi
+
+if [ "$command" = "logcat" ] && [ "${1:-}" = "-c" ]; then
+  exit 0
 fi
 
 # Fallback

@@ -4,19 +4,44 @@ import { type DoctorCheckResult } from "../../../contracts/doctor.js";
 import { ERROR_CODES } from "../../../contracts/errors.js";
 import { broadcastAgentCommand } from "../../../adapters/android-bridge/broadcastAgentCommand.js";
 import { waitForResultEnvelope } from "../../../adapters/android-bridge/logcatResultReader.js";
+import { getAlternateReceiverVariant, hasListedPackage, probeVersionCompatibility } from "../../version/compatibility.js";
 
 export async function checkApkPresence(config: RuntimeConfig): Promise<DoctorCheckResult> {
-  const { stdout } = await runAdb(config, ["shell", "pm", "list", "packages", config.receiverPackage]);
-  const isInstalled = stdout.includes(`package:${config.receiverPackage}`);
+  const packageList = await runAdb(config, ["shell", "pm", "list", "packages", config.receiverPackage]);
+  if (packageList.code !== 0) {
+    return {
+      id: "readiness.apk.presence",
+      status: "fail",
+      code: ERROR_CODES.DEVICE_SHELL_UNAVAILABLE,
+      summary: "Could not query installed packages on the device.",
+      detail: packageList.stderr || undefined,
+      evidence: {
+        receiverPackage: config.receiverPackage,
+        exitCode: packageList.code ?? undefined,
+      },
+    };
+  }
+  const isInstalled = hasListedPackage(packageList.stdout, config.receiverPackage);
 
   if (!isInstalled) {
     // Check if the other variant is installed
-    const otherVariant = config.receiverPackage.endsWith(".dev")
-      ? config.receiverPackage.replace(".dev", "")
-      : config.receiverPackage + ".dev";
+    const otherVariant = getAlternateReceiverVariant(config.receiverPackage);
 
-    const { stdout: otherStdout } = await runAdb(config, ["shell", "pm", "list", "packages", otherVariant]);
-    if (otherStdout.includes(`package:${otherVariant}`)) {
+    const alternateList = await runAdb(config, ["shell", "pm", "list", "packages", otherVariant]);
+    if (alternateList.code !== 0) {
+      return {
+        id: "readiness.apk.presence",
+        status: "fail",
+        code: ERROR_CODES.DEVICE_SHELL_UNAVAILABLE,
+        summary: "Could not query installed packages on the device.",
+        detail: alternateList.stderr || undefined,
+        evidence: {
+          receiverPackage: otherVariant,
+          exitCode: alternateList.code ?? undefined,
+        },
+      };
+    }
+    if (hasListedPackage(alternateList.stdout, otherVariant)) {
       return {
         id: "readiness.apk.presence",
         status: "warn",
@@ -87,6 +112,48 @@ export async function checkSettings(config: RuntimeConfig): Promise<DoctorCheckR
   return results;
 }
 
+export async function checkVersionCompatibility(config: RuntimeConfig): Promise<DoctorCheckResult> {
+  const result = await probeVersionCompatibility(config);
+  const errorCode = result.error?.code ?? ERROR_CODES.VERSION_INCOMPATIBLE;
+
+  if (result.compatible) {
+    return {
+      id: "readiness.version.compatibility",
+      status: "pass",
+      summary: `CLI ${result.cliVersion} is compatible with installed APK ${result.apkVersion}.`,
+      evidence: {
+        cliVersion: result.cliVersion,
+        apkVersion: result.apkVersion,
+        apkVersionCode: result.apkVersionCode,
+        receiverPackage: result.receiverPackage,
+      },
+    };
+  }
+
+  return {
+    id: "readiness.version.compatibility",
+    status: "fail",
+    code: errorCode,
+    summary: errorCode === ERROR_CODES.VERSION_INCOMPATIBLE
+      ? "CLI and installed APK versions are not compatible."
+      : "Could not verify CLI and installed APK version compatibility.",
+    detail: result.error?.message,
+    fix: result.remediation && result.remediation.length > 0
+      ? {
+        title: "Align CLI and APK versions",
+        platform: "any",
+        steps: result.remediation.map(step => ({ kind: "manual" as const, value: step })),
+      }
+      : undefined,
+    evidence: {
+      cliVersion: result.cliVersion,
+      apkVersion: result.apkVersion,
+      apkVersionCode: result.apkVersionCode,
+      receiverPackage: result.receiverPackage,
+    },
+  };
+}
+
 export async function runHandshake(
   config: RuntimeConfig,
   _waitForResultEnvelope = waitForResultEnvelope
@@ -144,6 +211,16 @@ export async function runHandshake(
         screen: "Accessibility Settings",
         steps: ["Ensure Clawperator Accessibility Service is ON in Android Settings"],
       },
+    };
+  }
+
+  if ("broadcastFailed" in result && result.broadcastFailed) {
+    return {
+      id: "readiness.handshake",
+      status: "fail",
+      code: result.diagnostics.code,
+      summary: "Handshake broadcast failed.",
+      detail: result.diagnostics.message,
     };
   }
 
