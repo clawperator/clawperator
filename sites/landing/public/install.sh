@@ -472,13 +472,13 @@ maybe_install_operator_apk() {
 
     local INSTALL_APK_RESPONSE="${CLAWPERATOR_INSTALL_APK:-}"
     if [ -z "$INSTALL_APK_RESPONSE" ]; then
-        if [ -r /dev/tty ] && [ -w /dev/tty ]; then
-            printf "Install operator APK %s on the connected device now? [Y/n] " "$OPERATOR_VERSION" > /dev/tty
-            read -r INSTALL_APK_RESPONSE < /dev/tty
+        if tty -s; then
+            printf "Install operator APK %s on the connected device now? [Y/n] " "$OPERATOR_VERSION"
+            read -r INSTALL_APK_RESPONSE
             INSTALL_APK_RESPONSE="${INSTALL_APK_RESPONSE:-Y}"
         else
-            INSTALL_APK_RESPONSE="N"
-            echo -e "${YELLOW}⚠️  No interactive TTY detected. Skipping automatic APK install.${NC}"
+            INSTALL_APK_RESPONSE="Y"
+            echo -e "${BLUE}Non-interactive install detected. Proceeding with APK install.${NC}"
         fi
     fi
 
