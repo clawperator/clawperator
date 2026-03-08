@@ -7,11 +7,13 @@ export async function cmdObserveSnapshot(options: {
   format: OutputOptions["format"];
   deviceId?: string;
   receiverPackage?: string;
+  timeoutMs?: number;
 }): Promise<string> {
   try {
     const result = await observeSnapshot({
       deviceId: options.deviceId,
       receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_RECEIVER_PACKAGE,
+      timeoutMs: options.timeoutMs,
     });
     if (result.ok) {
       return formatSuccess(
@@ -34,11 +36,13 @@ export async function cmdObserveScreenshot(options: {
   format: OutputOptions["format"];
   deviceId?: string;
   receiverPackage?: string;
+  timeoutMs?: number;
 }): Promise<string> {
   try {
     const result = await observeScreenshot({
       deviceId: options.deviceId,
       receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_RECEIVER_PACKAGE,
+      timeoutMs: options.timeoutMs,
     });
     if (result.ok) {
       return formatSuccess(

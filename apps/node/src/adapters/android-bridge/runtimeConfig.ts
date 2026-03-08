@@ -33,7 +33,7 @@ export function getDefaultRuntimeConfig(overrides?: Partial<RuntimeConfig>): Run
   return {
     projectRoot: defaultProjectRoot,
     adbPath: "adb",
-    receiverPackage: "com.clawperator.operator.dev",
+    receiverPackage: "com.clawperator.operator",
     actionAgentCommand: DEFAULT_ACTION_AGENT_COMMAND,
     payloadExtraKey: EXTRA_AGENT_PAYLOAD,
     runner: new NodeProcessRunner(),

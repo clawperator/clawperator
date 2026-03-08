@@ -5,14 +5,14 @@ import type { RunExecutionOptions } from "../executions/runExecution.js";
 /**
  * Build execution that runs a single take_screenshot and run it.
  */
-export function buildScreenshotExecution(): Execution {
+export function buildScreenshotExecution(options?: { timeoutMs?: number }): Execution {
   const commandId = `screenshot-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
   return {
     commandId,
     taskId: commandId,
     source: "clawperator-observe",
     expectedFormat: "android-ui-automator",
-    timeoutMs: 30_000,
+    timeoutMs: options?.timeoutMs ?? 30_000,
     actions: [
       {
         id: "snap",

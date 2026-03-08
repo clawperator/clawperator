@@ -36,6 +36,19 @@ Clawperator provides a deterministic execution layer for LLM agents to control A
 
 **Global options:** `--device-id <id>`, `--receiver-package <pkg>`, `--output <json|pretty>`, `--timeout-ms <n>`, `--verbose`
 
+Default receiver package:
+
+- release APK: `com.clawperator.operator`
+- local debug APK: pass `--receiver-package com.clawperator.operator.dev`
+
+Use subcommand help when the docs and the current CLI differ:
+
+```bash
+clawperator observe snapshot --help
+clawperator skills sync --help
+clawperator doctor --help
+```
+
 Use `clawperator version --check-compat` before automation batches when the agent needs to verify that the installed APK matches the CLI's supported `major.minor` version:
 
 ```bash
@@ -108,6 +121,7 @@ Full error taxonomy: `apps/node/src/contracts/errors.ts`
 - **Single-flight:** One execution per device at a time. Concurrent requests return `EXECUTION_CONFLICT_IN_FLIGHT`.
 - **No hidden retries:** If an action fails, the error is returned immediately. Retry logic belongs in the agent.
 - **Deterministic results:** Exactly one terminal envelope per `commandId`. Timeouts return `RESULT_ENVELOPE_TIMEOUT` with diagnostics.
+- **Timeout override:** `--timeout-ms <n>` overrides the execution timeout for `execute`, `observe snapshot`, and `observe screenshot` within policy limits.
 - **Device targeting:** Specify `--device-id` when multiple devices are connected. Omit for single-device setups.
 - **Validation before dispatch:** Every payload is schema-validated before any ADB command is issued.
 
