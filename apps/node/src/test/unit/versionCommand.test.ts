@@ -25,7 +25,7 @@ describe("cmdVersion", () => {
     runner.queueResult({ code: 0, stdout: "package:com.clawperator.operator\n", stderr: "" });
     runner.queueResult({
       code: 0,
-      stdout: "    versionCode=104900 minSdk=21 targetSdk=35\n    versionName=0.1.4-d\n",
+      stdout: "    versionCode=200000 minSdk=21 targetSdk=35\n    versionName=0.2.0-d\n",
       stderr: "",
     });
 
@@ -39,8 +39,8 @@ describe("cmdVersion", () => {
 
     assert.strictEqual(parsed.compatible, true);
     assert.strictEqual(parsed.receiverPackage, "com.clawperator.operator");
-    assert.strictEqual(parsed.apkVersion, "0.1.4-d");
-    assert.strictEqual(parsed.apkVersionCode, 104900);
+    assert.strictEqual(parsed.apkVersion, "0.2.0-d");
+    assert.strictEqual(parsed.apkVersionCode, 200000);
   });
 
   it("returns a non-compatible payload when the APK is missing", async () => {
