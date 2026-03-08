@@ -52,7 +52,8 @@ export async function checkApkPresence(config: RuntimeConfig): Promise<DoctorChe
           title: "Switch variant",
           platform: "any",
           steps: [
-            { kind: "manual", value: `Use --receiver-package ${otherVariant} or reinstall the correct APK` }
+            { kind: "manual", value: `Use --receiver-package ${otherVariant} or reinstall the correct APK` },
+            { kind: "manual", value: `Public installs typically use com.clawperator.operator; local debug builds use com.clawperator.operator.dev` },
           ],
         },
       };
@@ -212,17 +213,27 @@ export async function runHandshake(
   if ("timeout" in result && result.timeout) {
     const deviceFlag = config.deviceId ? ` --device-id ${config.deviceId}` : "";
     const pkgFlag = config.receiverPackage ? ` --receiver-package ${config.receiverPackage}` : "";
+    const timeoutMessage = [
+      `No [Clawperator-Result] envelope received within 7000ms.`,
+      `Broadcast dispatch: ${result.diagnostics.broadcastDispatchStatus}.`,
+      `Receiver package: ${config.receiverPackage}.`,
+      config.deviceId ? `Device: ${config.deviceId}.` : undefined,
+      (result.diagnostics.lastCorrelatedEvents?.length ?? 0) > 0
+        ? "Re-run with --verbose to inspect correlated Android log lines."
+        : undefined,
+    ].filter(Boolean).join(" ");
     return {
       id: "readiness.handshake",
       status: "fail",
       code: ERROR_CODES.RESULT_ENVELOPE_TIMEOUT,
       summary: "Handshake timed out.",
-      detail: "No [Clawperator-Result] envelope received. Is the Accessibility Service running?",
+      detail: timeoutMessage,
       fix: {
         title: "Grant accessibility permissions via adb",
         platform: "any",
         steps: [
           { kind: "shell", value: `clawperator grant-device-permissions${deviceFlag}${pkgFlag}` },
+          { kind: "shell", value: `clawperator observe snapshot${deviceFlag}${pkgFlag} --timeout-ms 5000 --verbose` },
         ],
       },
       deviceGuidance: {

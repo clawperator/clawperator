@@ -8,17 +8,19 @@ clawperator <command> [options]
 
 ## Global Options
 
-These flags apply to all commands.
+These flags are parsed globally. Command support varies by path.
 
 | Flag | Description |
 |------|-------------|
 | `--device-id <id>` | Target Android device serial |
 | `--receiver-package <package>` | Target Operator package for broadcast dispatch |
 | `--output <json\|pretty>` | Output format (default: `json`) |
-| `--timeout-ms <number>` | Override execution timeout within policy limits |
+| `--timeout-ms <number>` | Override execution timeout for `execute`, `observe snapshot`, `observe screenshot`, and `inspect ui` within policy limits |
 | `--verbose` | Include debug diagnostics in output |
 | `--help` | Show help |
 | `--version` | Show version |
+
+Default receiver package: `com.clawperator.operator`. Use `--receiver-package com.clawperator.operator.dev` for local debug APKs.
 
 ---
 
@@ -56,7 +58,7 @@ clawperator packages list [--device-id <id>] [--third-party]
 Execute a validated command payload.
 
 ```
-clawperator execute --execution <json-or-file> [--device-id <id>] [--receiver-package <package>]
+clawperator execute --execution <json-or-file> [--device-id <id>] [--receiver-package <package>] [--timeout-ms <number>]
 ```
 
 | Flag | Description |
@@ -64,6 +66,7 @@ clawperator execute --execution <json-or-file> [--device-id <id>] [--receiver-pa
 | `--execution <json-or-file>` | Execution payload as inline JSON or a path to a JSON file (required) |
 | `--device-id <id>` | Target device serial |
 | `--receiver-package <package>` | Target Operator package |
+| `--timeout-ms <number>` | Override execution timeout within policy limits |
 
 The `--execution` value must conform to the `Execution` contract (see [api-overview.md](./api-overview.md)).
 
@@ -76,7 +79,7 @@ The `--execution` value must conform to the `Execution` contract (see [api-overv
 Capture the current UI snapshot from the device.
 
 ```
-clawperator observe snapshot [--device-id <id>] [--receiver-package <package>]
+clawperator observe snapshot [--device-id <id>] [--receiver-package <package>] [--timeout-ms <number>] [--output <json\|pretty>] [--verbose]
 ```
 
 Returns ASCII-formatted UI tree via the `snapshot_ui` action.
@@ -88,7 +91,7 @@ Returns ASCII-formatted UI tree via the `snapshot_ui` action.
 Capture the current device screen as a PNG file.
 
 ```
-clawperator observe screenshot [--device-id <id>] [--receiver-package <package>]
+clawperator observe screenshot [--device-id <id>] [--receiver-package <package>] [--timeout-ms <number>] [--output <json\|pretty>] [--verbose]
 ```
 
 The PNG is saved to a temp path and the path is returned in the result envelope.
@@ -100,8 +103,10 @@ The PNG is saved to a temp path and the path is returned in the result envelope.
 Alias for `observe snapshot` with formatted output.
 
 ```
-clawperator inspect ui [--device-id <id>] [--receiver-package <package>]
+clawperator inspect ui [--device-id <id>] [--receiver-package <package>] [--timeout-ms <number>] [--output <json\|pretty>] [--verbose]
 ```
+
+`inspect ui` is a wrapper alias over `observe snapshot`.
 
 ---
 
@@ -292,6 +297,20 @@ clawperator skills sync --ref <git-ref>
 |------|-------------|
 | `--ref <git-ref>` | Git ref to pin to (required) |
 
+Use `clawperator skills sync --help` when you need the current clone and registry-path guidance.
+
+---
+
+### `grant-device-permissions`
+
+Grant accessibility and notification permissions to the Operator APK via adb.
+
+```
+clawperator grant-device-permissions [--device-id <id>] [--receiver-package <package>] [--output <json\|pretty>]
+```
+
+Use the release package by default. Pass `--receiver-package com.clawperator.operator.dev` for local debug builds.
+
 ---
 
 ### `serve`
@@ -326,7 +345,11 @@ See [api-overview.md](./api-overview.md) for HTTP API details.
 Run environment and runtime checks.
 
 ```
-clawperator doctor [--json] [--fix] [--full] [--device-id <id>] [--receiver-package <package>]
+clawperator doctor [--output <json\|pretty>] [--device-id <id>] [--receiver-package <package>] [--verbose]
+clawperator doctor --json
+clawperator doctor --fix
+clawperator doctor --full
+clawperator doctor --check-only
 ```
 
 | Flag | Description |
@@ -334,10 +357,11 @@ clawperator doctor [--json] [--fix] [--full] [--device-id <id>] [--receiver-pack
 | `--json` | Output as JSON (alias for `--output json`) |
 | `--fix` | Attempt non-destructive host fixes |
 | `--full` | Full Android build + install + handshake + smoke |
+| `--check-only` | Always exit 0 for CI or automation |
 | `--device-id <id>` | Target device serial |
 | `--receiver-package <package>` | Target Operator package |
 
-`doctor` checks APK presence before attempting version compatibility and handshake validation.
+`doctor` checks APK presence before attempting version compatibility and handshake validation. Use `clawperator doctor --help` if you need the current timeout and package-target guidance.
 
 ---
 
@@ -357,6 +381,8 @@ clawperator version --check-compat [--device-id <id>] [--receiver-package <packa
 | `--receiver-package <package>` | Target Operator package |
 
 `clawperator version --check-compat` reports the CLI version, installed APK version, APK `versionCode`, receiver package, compatibility verdict, and remediation guidance when versions do not match.
+
+Use `clawperator version --help` for the current compatibility-check notes and default receiver-package guidance.
 
 ---
 
