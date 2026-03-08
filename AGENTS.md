@@ -62,6 +62,8 @@ If you find an error in a generated page, check `sites/docs/source-map.yaml` to 
 
 Commit the source fix and the regenerated output together.
 
+If a change affects a public API, CLI command, error code, execution contract, setup flow, or user-visible runtime behavior, update the relevant authored docs in the same change. This usually includes `docs/node-api-for-agents.md`, `docs/first-time-setup.md`, `docs/troubleshooting.md`, and any other affected source doc, then regenerate `sites/docs/docs/` so the public docs stay aligned with the shipped behavior.
+
 Delete stale documentation instead of preserving it as historical context unless it is still an active source of truth. Completed task files, superseded roadmaps, and obsolete release checklists should be removed once their remaining actionable content is migrated elsewhere.
 
 When removing a source doc, also remove its docs-site references and generated output:
