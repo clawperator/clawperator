@@ -31,8 +31,17 @@ Clawperator provides a deterministic execution layer for LLM agents to control A
 | `skills update [--ref <git-ref>]` | Pull latest skills (optionally pin to a ref) |
 | `serve` | Start HTTP/SSE server |
 | `doctor` | Run environment diagnostics |
+| `version` | Print the CLI version or check CLI/APK compatibility |
 
 **Global options:** `--device-id <id>`, `--receiver-package <pkg>`, `--output <json|pretty>`, `--timeout-ms <n>`, `--verbose`
+
+Use `clawperator version --check-compat` before automation batches when the agent needs to verify that the installed APK matches the CLI's supported `major.minor` version:
+
+```bash
+clawperator version --check-compat --receiver-package com.clawperator.operator
+```
+
+The response includes the CLI version, detected APK version, APK `versionCode`, receiver package, compatibility verdict, and remediation guidance on mismatch.
 
 ## HTTP API (`clawperator serve`)
 
@@ -85,6 +94,8 @@ Branch agent logic on codes from `envelope.error` or `stepResults[].data.error`:
 | `RESULT_ENVELOPE_TIMEOUT` | Command dispatched but no result received |
 | `RECEIVER_NOT_INSTALLED` | Clawperator APK not found on device |
 | `DEVICE_UNAUTHORIZED` | Device not authorized for ADB |
+| `VERSION_INCOMPATIBLE` | CLI and installed APK versions do not share the same `major.minor` |
+| `APK_VERSION_UNREADABLE` | The device package dump did not expose a readable APK version |
 | `EXECUTION_VALIDATION_FAILED` | Payload failed schema validation |
 | `SECURITY_BLOCK_DETECTED` | Android blocked the action (e.g., secure keyboard) |
 | `NODE_NOT_CLICKABLE` | Element found but not interactable |

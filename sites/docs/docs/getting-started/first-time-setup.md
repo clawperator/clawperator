@@ -142,3 +142,11 @@ For reliable automation:
 See [Troubleshooting the Operator App](../troubleshooting/troubleshooting.md) for common issues.
 
 For environment checks: `clawperator doctor --output pretty`
+
+Verify the installed CLI/APK pair explicitly:
+
+```bash
+clawperator version --check-compat --receiver-package com.clawperator.operator
+```
+
+For local debug builds, use `com.clawperator.operator.dev` instead.

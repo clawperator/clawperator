@@ -12,6 +12,7 @@ import {
 } from "./checks/deviceChecks.js";
 import {
   checkApkPresence,
+  checkVersionCompatibility,
   checkSettings,
   runHandshake,
   runSmokeTest
@@ -90,19 +91,27 @@ export class DoctorService {
     const apkPresence = await checkApkPresence(config);
     checks.push(apkPresence);
 
+    let versionCompatibilityPassed = false;
+    if (apkPresence.status === "pass") {
+      const versionCompatibility = await checkVersionCompatibility(config);
+      checks.push(versionCompatibility);
+      if (this.shouldHaltOnFailure(versionCompatibility)) return this.finalize(checks, config, options.fix);
+      versionCompatibilityPassed = versionCompatibility.status === "pass";
+    }
+
     // 5. Android Settings
     const settingsResults = await checkSettings(config);
     checks.push(...settingsResults);
 
     // 6. Handshake
-    if (apkPresence.status === "pass") {
+    if (apkPresence.status === "pass" && versionCompatibilityPassed) {
       const handshake = await runHandshake(config);
       checks.push(handshake);
       if (this.shouldHaltOnFailure(handshake)) return this.finalize(checks, config, options.fix);
     }
 
     // 7. Smoke Test (Only if full)
-    if (full && apkPresence.status === "pass") {
+    if (full && apkPresence.status === "pass" && versionCompatibilityPassed) {
       const smoke = await runSmokeTest(config);
       checks.push(smoke);
       if (this.shouldHaltOnFailure(smoke)) return this.finalize(checks, config, options.fix);

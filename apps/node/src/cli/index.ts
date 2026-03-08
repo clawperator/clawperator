@@ -59,6 +59,10 @@ Commands:
                                             Full Android build + install + handshake + smoke (Stage 3)
   doctor --check-only
                                             Keep doctor non-blocking by always exiting 0 (for CI/automation)
+  version
+                                            Show the CLI version
+  version --check-compat [--device-id <id>] [--receiver-package <package>]
+                                            Compare the CLI version with the installed Operator APK version
 
 Global options:
   --device-id <id>                          Target Android device serial
@@ -328,6 +332,14 @@ async function main(): Promise<void> {
       });
       break;
     }
+    case "version":
+      result = await (await import("./commands/version.js")).cmdVersion({
+        ...out,
+        checkCompat: hasFlag(rest, "--check-compat"),
+        deviceId: global.deviceId ?? getOpt(rest, "--device-id"),
+        receiverPackage: global.receiverPackage ?? getOpt(rest, "--receiver-package"),
+      });
+      break;
     default:
       result = JSON.stringify({ code: "USAGE", message: `Unknown command: ${cmd}. Use --help.` });
   }

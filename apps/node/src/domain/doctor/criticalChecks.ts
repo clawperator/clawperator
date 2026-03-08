@@ -10,6 +10,7 @@ export const CRITICAL_DOCTOR_CHECK_PREFIXES = [
   "build.android.assemble",
   "build.android.install",
   "build.android.launch",
+  "readiness.version.compatibility",
   "readiness.handshake",
   "readiness.smoke",
 ] as const;

@@ -38,24 +38,7 @@ The second target matters because it exercises the full path:
 
 ## Remaining Work
 
-### 1. Version Compatibility and Handshaking
-
-Dependency:
-
-- `tasks/version-handshaking/plan.md`
-
-Why it matters:
-
-- remote setup becomes unreliable if the CLI and APK can silently drift
-- the agent needs a deterministic way to detect and fix mismatch before attempting skill setup
-
-Exit criteria:
-
-- doctor reports compatibility clearly
-- the CLI can check compatibility directly
-- mismatch remediation is obvious and documented
-
-### 2. Remote Install Path Validation on the Real Mac Mini
+### 1. Remote Install Path Validation on the Real Mac Mini
 
 Validate the actual target environment instead of relying on generic installer confidence.
 
@@ -73,7 +56,7 @@ Exit criteria:
 - the second run is safe and predictable
 - failure messages are actionable without local repo knowledge
 
-### 3. OpenClaw-Oriented Bootstrap Documentation
+### 2. OpenClaw-Oriented Bootstrap Documentation
 
 Create a short canonical doc for the exact deployment model:
 
@@ -94,7 +77,7 @@ Suggested output:
 
 - `docs/openclaw-remote-bootstrap.md`
 
-### 4. Deterministic Skill Setup Verification Flow
+### 3. Deterministic Skill Setup Verification Flow
 
 Define the minimum verification sequence the agent should run after install and before announcing success.
 
@@ -111,7 +94,7 @@ Exit criteria:
 - the agent has a deterministic readiness checklist
 - success means "host installed, device reachable, runtime healthy, skills available"
 
-### 5. Recovery Guidance for Remote Failures
+### 4. Recovery Guidance for Remote Failures
 
 The remote agent must know what to do when setup partially fails.
 
@@ -127,7 +110,7 @@ Suggested output:
 
 - fold this into `docs/openclaw-remote-bootstrap.md` or `docs/troubleshooting.md`
 
-### 6. Trust Boundary Review for Personal-Account Use
+### 5. Trust Boundary Review for Personal-Account Use
 
 Before treating this as ready for personal-account automation, explicitly confirm the operational trust model.
 
@@ -139,7 +122,7 @@ Questions to settle:
 
 This is not a request for new governance. It is a narrow product-surface clarification so the agent does not overclaim completion.
 
-### 7. Cron-to-User Outcome Validation
+### 6. Cron-to-User Outcome Validation
 
 Validate the specific Solax reporting use case end to end.
 
@@ -177,7 +160,6 @@ Exit criteria:
 
 This task is complete when:
 
-- version compatibility checks are implemented
 - the hosted install flow is verified on the real Mac mini + Android device setup
 - there is one canonical remote-bootstrap doc for the OpenClaw deployment model
 - the agent has a deterministic post-install verification checklist
@@ -186,9 +168,8 @@ This task is complete when:
 
 ## Suggested Execution Order
 
-1. Finish `tasks/version-handshaking/plan.md`.
-2. Validate the installer on the real Mac mini.
-3. Write the remote-bootstrap doc.
-4. Define and validate the post-install verification checklist.
-5. Document failure recovery and trust-boundary expectations.
-6. Validate the Solax hourly battery-status automation end to end.
+1. Validate the installer on the real Mac mini.
+2. Write the remote-bootstrap doc.
+3. Define and validate the post-install verification checklist.
+4. Document failure recovery and trust-boundary expectations.
+5. Validate the Solax hourly battery-status automation end to end.

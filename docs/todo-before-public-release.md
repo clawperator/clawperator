@@ -4,9 +4,6 @@ This checklist tracks the remaining pre-launch work after the release, docs, ins
 
 ## Remaining Work
 
-- [ ] Implement explicit CLI/APK version compatibility checks. See `tasks/version-handshaking/plan.md`.
-- [ ] Add a compatibility reference doc and troubleshooting coverage for version mismatch remediation.
-- [ ] Add `clawperator version --check-compat` so users and agents can verify the installed pair directly.
 - [ ] Decide whether execution-time compatibility enforcement should ship in the normal execution path or remain doctor-only for now.
 - [ ] Run a real-device validation pass covering installer flow, APK install/upgrade, doctor, and handshake on the release APK.
 
@@ -16,6 +13,7 @@ This checklist tracks the remaining pre-launch work after the release, docs, ins
 - Public docs and landing sites are live and aligned to the hosted install flow.
 - Skills install/update/search/run support exists in the Node CLI.
 - Doctor now distinguishes critical failures from warnings and skips handshake when the APK is missing.
+- CLI/APK version compatibility checks now ship in `clawperator doctor` and `clawperator version --check-compat`.
 
 ## Deferred Items (Not in This Roadmap)
 

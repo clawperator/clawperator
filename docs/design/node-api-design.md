@@ -61,7 +61,7 @@ The project has now shipped beyond the original initial-launch shape. The follow
 - `clawperator skills run`
 - `clawperator observe screenshot`
 
-The primary remaining product-surface gap is explicit CLI/APK version compatibility checking and handshaking.
+The CLI/runtime surface now includes explicit CLI/APK version compatibility checking and handshaking via `clawperator doctor` and `clawperator version --check-compat`.
 
 Still-planned follow-up areas:
 
@@ -558,7 +558,6 @@ Clawperator should define layered tests, with real-device execution as a first-c
    - `serve` HTTP wrapper
    - SSE event streaming + alias normalization layer
 4. Phase 4
-   - explicit CLI/APK version compatibility checks
    - migrate from logcat envelope to stronger transport if needed
 
 ## Stability & Versioning
