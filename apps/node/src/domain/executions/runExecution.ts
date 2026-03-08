@@ -13,11 +13,13 @@ import { tryAcquire, release, getConflictError } from "./executionStore.js";
 import type { ResultEnvelope, TerminalSource } from "../../contracts/result.js";
 import { extractSnapshotFromLogs } from "./snapshotHelper.js";
 import { emitResult, emitExecution } from "../observe/events.js";
+import { LIMITS } from "../../contracts/limits.js";
 
 export interface RunExecutionOptions {
   deviceId?: string;
   receiverPackage?: string;
   adbPath?: string;
+  timeoutMs?: number;
 }
 
 export type RunExecutionResult =
@@ -42,6 +44,28 @@ async function performExecution(
     execution = validateExecution(executionInput);
   } catch (e) {
     return { ok: false, error: e as { code: string; message: string; [k: string]: unknown } };
+  }
+
+  if (options.timeoutMs !== undefined) {
+    if (!Number.isFinite(options.timeoutMs)) {
+      return {
+        ok: false,
+        error: {
+          code: "EXECUTION_VALIDATION_FAILED",
+          message: "timeoutMs must be a finite number",
+        },
+      };
+    }
+    if (options.timeoutMs < LIMITS.MIN_EXECUTION_TIMEOUT_MS || options.timeoutMs > LIMITS.MAX_EXECUTION_TIMEOUT_MS) {
+      return {
+        ok: false,
+        error: {
+          code: "EXECUTION_VALIDATION_FAILED",
+          message: `timeoutMs must be between ${LIMITS.MIN_EXECUTION_TIMEOUT_MS} and ${LIMITS.MAX_EXECUTION_TIMEOUT_MS}`,
+        },
+      };
+    }
+    execution = { ...execution, timeoutMs: options.timeoutMs };
   }
 
   try {

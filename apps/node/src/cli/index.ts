@@ -78,12 +78,95 @@ Global options:
 Notes:
   - inspect ui is a wrapper alias over observe snapshot.
   - action commands are thin wrappers that compile to execution and call execute.
+  - The default receiver package is com.clawperator.operator. Use --receiver-package com.clawperator.operator.dev for local debug builds.
   - Terminal result semantics are driven by [Clawperator-Result].
 `;
+
+const HELP_TOPICS: Record<string, string> = {
+  "observe snapshot": `clawperator observe snapshot
+
+Usage:
+  clawperator observe snapshot [--device-id <id>] [--receiver-package <package>] [--timeout-ms <number>] [--output <json|pretty>] [--verbose]
+
+Notes:
+  - Captures a UI snapshot via the canonical execution path.
+  - Default receiver package: com.clawperator.operator
+  - Use --receiver-package com.clawperator.operator.dev for local debug APKs.
+  - --timeout-ms overrides the execution timeout within policy limits.
+`,
+  "skills install": `clawperator skills install
+
+Usage:
+  clawperator skills install [--output <json|pretty>]
+
+Notes:
+  - Clones the skills repository to ~/.clawperator/skills/
+  - On success, set:
+      export CLAWPERATOR_SKILLS_REGISTRY="$HOME/.clawperator/skills/skills/skills-registry.json"
+  - If the skills repository requires authentication, install may fail until credentials are configured.
+`,
+  "skills sync": `clawperator skills sync
+
+Usage:
+  clawperator skills sync --ref <git-ref> [--output <json|pretty>]
+
+Notes:
+  - Fetches or clones ~/.clawperator/skills/ and pins the local registry to the requested git ref.
+  - Requires git access to the configured skills repository.
+  - Registry path after sync:
+      $HOME/.clawperator/skills/skills/skills-registry.json
+`,
+  "doctor": `clawperator doctor
+
+Usage:
+  clawperator doctor [--output <json|pretty>] [--device-id <id>] [--receiver-package <package>] [--verbose]
+  clawperator doctor --fix
+  clawperator doctor --full
+  clawperator doctor --check-only
+
+Notes:
+  - Default receiver package: com.clawperator.operator
+  - Use --receiver-package com.clawperator.operator.dev for local debug APKs.
+  - If handshake times out, rerun with --verbose and compare the installed APK package with --receiver-package.
+`,
+  "version": `clawperator version
+
+Usage:
+  clawperator version
+  clawperator version --check-compat [--device-id <id>] [--receiver-package <package>] [--output <json|pretty>]
+
+Notes:
+  - Default receiver package: com.clawperator.operator
+  - Use --receiver-package com.clawperator.operator.dev for local debug APKs.
+  - --check-compat compares CLI major.minor with the installed APK variant on the device.
+`,
+  "grant-device-permissions": `clawperator grant-device-permissions
+
+Usage:
+  clawperator grant-device-permissions [--device-id <id>] [--receiver-package <package>] [--output <json|pretty>]
+
+Notes:
+  - Default receiver package: com.clawperator.operator
+  - Use --receiver-package com.clawperator.operator.dev for local debug APKs.
+  - Enables the accessibility service and attempts notification permission via adb.
+`,
+};
+
+function resolveHelpTopic(rest: string[]): string | undefined {
+  if (rest.length === 0) return undefined;
+  if (rest[0] === "observe" && rest[1] === "snapshot") return "observe snapshot";
+  if (rest[0] === "skills" && rest[1] === "install") return "skills install";
+  if (rest[0] === "skills" && rest[1] === "sync") return "skills sync";
+  if (rest[0] === "doctor") return "doctor";
+  if (rest[0] === "version") return "version";
+  if (rest[0] === "grant-device-permissions") return "grant-device-permissions";
+  return undefined;
+}
 
 function getGlobalOpts(argv: string[]): {
   deviceId?: string;
   receiverPackage?: string;
+  timeoutMs?: number;
   output: "json" | "pretty";
   verbose: boolean;
   rest: string[];
@@ -91,6 +174,7 @@ function getGlobalOpts(argv: string[]): {
   const rest: string[] = [];
   let deviceId: string | undefined;
   let receiverPackage: string | undefined;
+  let timeoutMs: number | undefined;
   let output: "json" | "pretty" = "json";
   let verbose = false;
   for (let i = 0; i < argv.length; i++) {
@@ -100,13 +184,15 @@ function getGlobalOpts(argv: string[]): {
       receiverPackage = argv[++i];
     } else if (argv[i] === "--output" && argv[i + 1]) {
       output = argv[++i] === "pretty" ? "pretty" : "json";
+    } else if (argv[i] === "--timeout-ms" && argv[i + 1]) {
+      timeoutMs = Number(argv[++i]);
     } else if (argv[i] === "--verbose") {
       verbose = true;
     } else {
       rest.push(argv[i]);
     }
   }
-  return { deviceId, receiverPackage, output, verbose, rest };
+  return { deviceId, receiverPackage, timeoutMs, output, verbose, rest };
 }
 
 function getOpt(rest: string[], flag: string): string | undefined {
@@ -120,7 +206,7 @@ function hasFlag(rest: string[], flag: string): boolean {
 
 async function main(): Promise<void> {
   const argv = process.argv.slice(2);
-  if (argv.length === 0 || argv.includes("--help") || argv[0] === "help") {
+  if (argv.length === 0 || argv[0] === "help") {
     console.log(HELP);
     process.exit(0);
   }
@@ -131,6 +217,11 @@ async function main(): Promise<void> {
   }
 
   const global = getGlobalOpts(argv);
+  if (argv.includes("--help")) {
+    const topic = resolveHelpTopic(global.rest);
+    console.log(topic ? HELP_TOPICS[topic] : HELP);
+    process.exit(0);
+  }
   const [cmd, ...rest] = global.rest;
   const out = { format: global.output as "json" | "pretty", verbose: global.verbose };
 
@@ -169,6 +260,7 @@ async function main(): Promise<void> {
             execution,
             deviceId: global.deviceId ?? getOpt(rest, "--device-id"),
             receiverPackage: global.receiverPackage ?? getOpt(rest, "--receiver-package"),
+            timeoutMs: global.timeoutMs,
           });
         }
       }
@@ -179,12 +271,14 @@ async function main(): Promise<void> {
           ...out,
           deviceId: global.deviceId ?? getOpt(rest, "--device-id"),
           receiverPackage: global.receiverPackage ?? getOpt(rest, "--receiver-package"),
+          timeoutMs: global.timeoutMs,
         });
       } else if (rest[0] === "screenshot") {
         result = await (await import("./commands/observe.js")).cmdObserveScreenshot({
           ...out,
           deviceId: global.deviceId ?? getOpt(rest, "--device-id"),
           receiverPackage: global.receiverPackage ?? getOpt(rest, "--receiver-package"),
+          timeoutMs: global.timeoutMs,
         });
       } else {
         result = JSON.stringify({ code: "USAGE", message: "observe snapshot|screenshot [options]" });

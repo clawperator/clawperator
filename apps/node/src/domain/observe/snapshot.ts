@@ -5,7 +5,7 @@ import type { RunExecutionOptions } from "../executions/runExecution.js";
 /**
  * Build execution that runs a single snapshot_ui and run it.
  */
-export function buildSnapshotExecution(options?: { format?: "ascii" | "json" }): Execution {
+export function buildSnapshotExecution(options?: { format?: "ascii" | "json"; timeoutMs?: number }): Execution {
   const format = options?.format ?? "ascii";
   const commandId = `snapshot-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
   return {
@@ -13,7 +13,7 @@ export function buildSnapshotExecution(options?: { format?: "ascii" | "json" }):
     taskId: commandId,
     source: "clawperator-observe",
     expectedFormat: "android-ui-automator",
-    timeoutMs: 30_000,
+    timeoutMs: options?.timeoutMs ?? 30_000,
     actions: [
       {
         id: "snap",
@@ -26,6 +26,6 @@ export function buildSnapshotExecution(options?: { format?: "ascii" | "json" }):
 }
 
 export async function observeSnapshot(runOptions?: RunExecutionOptions) {
-  const execution = buildSnapshotExecution();
+  const execution = buildSnapshotExecution({ timeoutMs: runOptions?.timeoutMs });
   return runExecution(execution, runOptions);
 }

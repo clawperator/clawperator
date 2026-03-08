@@ -8,6 +8,7 @@ import { getSkill } from "../../domain/skills/getSkill.js";
 import { compileArtifact } from "../../domain/skills/compileArtifact.js";
 import { searchSkills } from "../../domain/skills/searchSkills.js";
 import { runSkill } from "../../domain/skills/runSkill.js";
+import { loadRegistry } from "../../adapters/skills-repo/localSkillsRegistry.js";
 import { validateExecution, validatePayloadSize } from "../../domain/executions/validateExecution.js";
 import { SKILL_NOT_FOUND, ARTIFACT_NOT_FOUND, COMPILE_VAR_MISSING, SKILL_SCRIPT_NOT_FOUND, SKILL_EXECUTION_FAILED } from "../../contracts/skills.js";
 
@@ -68,6 +69,25 @@ describe("listSkills", () => {
     assert.ok(chromecast);
     assert.strictEqual(chromecast.artifacts.length, 1);
     assert.ok(chromecast.artifacts[0].endsWith("ac-status.recipe.json"));
+  });
+});
+
+describe("loadRegistry", () => {
+  it("reports the configured registry path when CLAWPERATOR_SKILLS_REGISTRY is invalid", async () => {
+    const original = process.env.CLAWPERATOR_SKILLS_REGISTRY;
+    process.env.CLAWPERATOR_SKILLS_REGISTRY = "/tmp/does-not-exist/skills-registry.json";
+    try {
+      await assert.rejects(
+        () => loadRegistry(),
+        /Registry not found at configured path: \/tmp\/does-not-exist\/skills-registry\.json/
+      );
+    } finally {
+      if (original === undefined) {
+        delete process.env.CLAWPERATOR_SKILLS_REGISTRY;
+      } else {
+        process.env.CLAWPERATOR_SKILLS_REGISTRY = original;
+      }
+    }
   });
 });
 
