@@ -2,9 +2,14 @@ import { afterEach, describe, it } from "node:test";
 import assert from "node:assert";
 import { cmdVersion } from "../../cli/commands/version.js";
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
-import { probeVersionCompatibility } from "../../domain/version/compatibility.js";
+import { getCliVersion, probeVersionCompatibility } from "../../domain/version/compatibility.js";
 import { FakeProcessRunner } from "./fakes/FakeProcessRunner.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
+
+function mockApkVersionForCurrentCli(): { versionName: string; versionCode: number } {
+  const [major, minor] = getCliVersion().split(".");
+  return { versionName: `${major}.${minor}.0-d`, versionCode: 100 };
+}
 
 afterEach(() => {
   process.exitCode = undefined;
@@ -20,12 +25,13 @@ describe("cmdVersion", () => {
 
   it("reports compatibility details for an installed compatible APK", async () => {
     const runner = new FakeProcessRunner();
+    const { versionName, versionCode } = mockApkVersionForCurrentCli();
 
     runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "package:com.clawperator.operator\n", stderr: "" });
     runner.queueResult({
       code: 0,
-      stdout: "    versionCode=200000 minSdk=21 targetSdk=35\n    versionName=0.2.0-d\n",
+      stdout: `    versionCode=${versionCode} minSdk=21 targetSdk=35\n    versionName=${versionName}\n`,
       stderr: "",
     });
 
@@ -39,8 +45,8 @@ describe("cmdVersion", () => {
 
     assert.strictEqual(parsed.compatible, true);
     assert.strictEqual(parsed.receiverPackage, "com.clawperator.operator");
-    assert.strictEqual(parsed.apkVersion, "0.2.0-d");
-    assert.strictEqual(parsed.apkVersionCode, 200000);
+    assert.strictEqual(parsed.apkVersion, versionName);
+    assert.strictEqual(parsed.apkVersionCode, versionCode);
   });
 
   it("returns a non-compatible payload when the APK is missing", async () => {
