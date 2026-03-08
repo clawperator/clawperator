@@ -39,7 +39,7 @@ Design consequence:
 - `docs/design/` - Internal design documents
 
 ## Skills
-- Skills are maintained in a dedicated repository: [github.com/clawpilled/clawperator-skills](https://github.com/clawpilled/clawperator-skills).
+- Skills are distributed as a git bundle at `https://clawperator.com/install/clawperator-skills.bundle`. The canonical source is in the sibling repo `../clawperator-skills`.
 - Typical local layout is sibling repos:
   - `../clawperator` (this repo)
   - `../clawperator-skills` (skills repo)
