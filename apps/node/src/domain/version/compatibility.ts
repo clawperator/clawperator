@@ -39,11 +39,39 @@ export function hasListedPackage(packageListOutput: string, packageName: string)
     .some(line => line === `package:${packageName}`);
 }
 
+interface InstalledReceiverVariantResult {
+  installed: boolean;
+  alternateVariant?: string;
+  error?: ClawperatorError;
+}
+
+function buildReceiverProbeError(
+  receiverPackage: string,
+  stderr: string,
+  exitCode: number | null
+): ClawperatorError {
+  return {
+    code: ERROR_CODES.DEVICE_SHELL_UNAVAILABLE,
+    message: `Could not query installed packages for ${receiverPackage}.`,
+    hint: "Verify adb shell access on the device and retry the compatibility check.",
+    details: {
+      stderr: stderr || undefined,
+      exitCode: exitCode ?? undefined,
+    },
+  };
+}
+
 async function getInstalledReceiverVariant(
   config: RuntimeConfig,
   receiverPackage: string
-): Promise<{ installed: boolean; alternateVariant?: string }> {
+): Promise<InstalledReceiverVariantResult> {
   const packageList = await runAdb(config, ["shell", "pm", "list", "packages", receiverPackage]);
+  if (packageList.code !== 0) {
+    return {
+      installed: false,
+      error: buildReceiverProbeError(receiverPackage, packageList.stderr, packageList.code),
+    };
+  }
   if (hasListedPackage(packageList.stdout, receiverPackage)) {
     return { installed: true };
   }
@@ -52,6 +80,12 @@ async function getInstalledReceiverVariant(
     ? receiverPackage.replace(".dev", "")
     : `${receiverPackage}.dev`;
   const alternateList = await runAdb(config, ["shell", "pm", "list", "packages", alternateVariant]);
+  if (alternateList.code !== 0) {
+    return {
+      installed: false,
+      error: buildReceiverProbeError(alternateVariant, alternateList.stderr, alternateList.code),
+    };
+  }
   if (hasListedPackage(alternateList.stdout, alternateVariant)) {
     return { installed: false, alternateVariant };
   }
@@ -130,6 +164,19 @@ export async function probeVersionCompatibility(config: RuntimeConfig): Promise<
   }
 
   const receiverVariant = await getInstalledReceiverVariant(config, receiverPackage);
+  if (receiverVariant.error) {
+    return {
+      cliVersion,
+      receiverPackage,
+      compatible: false,
+      error: receiverVariant.error,
+      remediation: [
+        "Verify adb shell access with: adb shell pm list packages",
+        "Reconnect the device or restart adb if shell commands are failing",
+      ],
+    };
+  }
+
   if (!receiverVariant.installed) {
     if (receiverVariant.alternateVariant) {
       return {

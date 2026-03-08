@@ -182,4 +182,25 @@ describe("probeVersionCompatibility", () => {
     assert.strictEqual(result.error?.code, ERROR_CODES.RECEIVER_VARIANT_MISMATCH);
     assert.ok(result.remediation?.includes("Use --receiver-package com.clawperator.operator.dev"));
   });
+
+  it("returns a shell error when package queries fail", async () => {
+    const runner = new FakeProcessRunner();
+    const config = getDefaultRuntimeConfig({
+      runner,
+      deviceId: "test-device-1",
+      receiverPackage: "com.clawperator.operator",
+    });
+
+    runner.queueResult({ code: 1, stdout: "", stderr: "cmd: Can't find service: package", error: new Error("shell failed") });
+
+    const result = await probeVersionCompatibility(config);
+
+    assert.strictEqual(result.compatible, false);
+    assert.strictEqual(result.error?.code, ERROR_CODES.DEVICE_SHELL_UNAVAILABLE);
+    assert.match(result.error?.message ?? "", /Could not query installed packages/);
+    assert.deepStrictEqual(result.remediation, [
+      "Verify adb shell access with: adb shell pm list packages",
+      "Reconnect the device or restart adb if shell commands are failing",
+    ]);
+  });
 });
