@@ -30,6 +30,7 @@ Keep them distinct when editing:
 -   Landing-site root files such as `install.sh`, `robots.txt`, `llms.txt`, and `sitemap.xml` belong to `sites/landing/public/`.
 -   Docs content should be changed in `docs/`, `apps/node/src/`, or `../clawperator-skills/docs/`, not directly in `sites/docs/docs/`.
 -   Docs-site root files such as `robots.txt` and `llms.txt` live in `sites/docs/static/` and are copied into the built site by `./scripts/docs_build.sh`.
+-   Both public sites deploy automatically to Cloudflare after changes are merged to `main`.
 
 ## The Role of Skills
 Skills are reusable templates for app-specific workflows (e.g., "get thermostat temperature" or "check grocery prices").

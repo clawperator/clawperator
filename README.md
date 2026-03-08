@@ -86,6 +86,8 @@ Website surfaces in this repo:
 
 When updating website content, make sure you are editing the correct surface. The docs content itself is sourced from `docs/`, `apps/node/src/`, and `../clawperator-skills/docs`, then published through `sites/docs/`.
 
+Both public sites deploy automatically to Cloudflare after changes are merged to `main`.
+
 - [First-Time Setup](docs/first-time-setup.md) - Device prep, APK install, accessibility
 - [Node API for Agents](docs/node-api-for-agents.md) - CLI, HTTP API, execution contract
 - [Architecture](docs/architecture.md) - System design
