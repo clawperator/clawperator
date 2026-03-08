@@ -182,7 +182,7 @@ This task is complete when:
 - there is one canonical remote-bootstrap doc for the OpenClaw deployment model
 - the agent has a deterministic post-install verification checklist
 - the likely remote recovery paths are documented
- - the Solax hourly battery-status automation can be configured and validated end to end
+- the Solax hourly battery-status automation can be configured and validated end to end
 
 ## Suggested Execution Order
 
