@@ -39,6 +39,12 @@ export function hasListedPackage(packageListOutput: string, packageName: string)
     .some(line => line === `package:${packageName}`);
 }
 
+export function getAlternateReceiverVariant(receiverPackage: string): string {
+  return receiverPackage.endsWith(".dev")
+    ? receiverPackage.slice(0, -4)
+    : `${receiverPackage}.dev`;
+}
+
 interface InstalledReceiverVariantResult {
   installed: boolean;
   alternateVariant?: string;
@@ -76,9 +82,7 @@ async function getInstalledReceiverVariant(
     return { installed: true };
   }
 
-  const alternateVariant = receiverPackage.endsWith(".dev")
-    ? receiverPackage.replace(".dev", "")
-    : `${receiverPackage}.dev`;
+  const alternateVariant = getAlternateReceiverVariant(receiverPackage);
   const alternateList = await runAdb(config, ["shell", "pm", "list", "packages", alternateVariant]);
   if (alternateList.code !== 0) {
     return {

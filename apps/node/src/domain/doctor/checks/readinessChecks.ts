@@ -4,7 +4,7 @@ import { type DoctorCheckResult } from "../../../contracts/doctor.js";
 import { ERROR_CODES } from "../../../contracts/errors.js";
 import { broadcastAgentCommand } from "../../../adapters/android-bridge/broadcastAgentCommand.js";
 import { waitForResultEnvelope } from "../../../adapters/android-bridge/logcatResultReader.js";
-import { hasListedPackage, probeVersionCompatibility } from "../../version/compatibility.js";
+import { getAlternateReceiverVariant, hasListedPackage, probeVersionCompatibility } from "../../version/compatibility.js";
 
 export async function checkApkPresence(config: RuntimeConfig): Promise<DoctorCheckResult> {
   const { stdout } = await runAdb(config, ["shell", "pm", "list", "packages", config.receiverPackage]);
@@ -12,9 +12,7 @@ export async function checkApkPresence(config: RuntimeConfig): Promise<DoctorChe
 
   if (!isInstalled) {
     // Check if the other variant is installed
-    const otherVariant = config.receiverPackage.endsWith(".dev")
-      ? config.receiverPackage.replace(".dev", "")
-      : config.receiverPackage + ".dev";
+    const otherVariant = getAlternateReceiverVariant(config.receiverPackage);
 
     const { stdout: otherStdout } = await runAdb(config, ["shell", "pm", "list", "packages", otherVariant]);
     if (hasListedPackage(otherStdout, otherVariant)) {

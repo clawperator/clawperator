@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert";
 import {
+  getAlternateReceiverVariant,
   isVersionCompatible,
   normalizeCompatibilityVersion,
   parseCompatibilityVersion,
@@ -11,6 +12,18 @@ describe("version compatibility", () => {
   it("normalizes the debug suffix before compatibility parsing", () => {
     assert.strictEqual(normalizeCompatibilityVersion("0.1.4-d"), "0.1.4");
     assert.strictEqual(normalizeCompatibilityVersion("0.1.4-rc.1-d"), "0.1.4-rc.1");
+  });
+
+  it("removes only a trailing debug suffix when deriving the alternate package", () => {
+    assert.strictEqual(getAlternateReceiverVariant("com.clawperator.operator.dev"), "com.clawperator.operator");
+    assert.strictEqual(
+      getAlternateReceiverVariant("com.example.devtools.operator.dev"),
+      "com.example.devtools.operator"
+    );
+    assert.strictEqual(
+      getAlternateReceiverVariant("com.example.devtools.operator"),
+      "com.example.devtools.operator.dev"
+    );
   });
 
   it("parses release and prerelease versions", () => {
