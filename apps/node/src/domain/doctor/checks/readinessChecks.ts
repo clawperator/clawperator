@@ -90,6 +90,7 @@ export async function checkSettings(config: RuntimeConfig): Promise<DoctorCheckR
 
 export async function checkVersionCompatibility(config: RuntimeConfig): Promise<DoctorCheckResult> {
   const result = await probeVersionCompatibility(config);
+  const errorCode = result.error?.code ?? ERROR_CODES.VERSION_INCOMPATIBLE;
 
   if (result.compatible) {
     return {
@@ -108,8 +109,10 @@ export async function checkVersionCompatibility(config: RuntimeConfig): Promise<
   return {
     id: "readiness.version.compatibility",
     status: "fail",
-    code: result.error?.code ?? ERROR_CODES.VERSION_INCOMPATIBLE,
-    summary: "CLI and installed APK versions are not compatible.",
+    code: errorCode,
+    summary: errorCode === ERROR_CODES.VERSION_INCOMPATIBLE
+      ? "CLI and installed APK versions are not compatible."
+      : "Could not verify CLI and installed APK version compatibility.",
     detail: result.error?.message,
     fix: result.remediation && result.remediation.length > 0
       ? {

@@ -120,7 +120,7 @@ export async function probeVersionCompatibility(config: RuntimeConfig): Promise<
       error: {
         code: ERROR_CODES.CLI_VERSION_INVALID,
         message: `CLI version ${cliVersion} is not parseable for compatibility checks.`,
-        hint: "Reinstall the CLI or check apps/node/package.json.",
+        hint: "Reinstall the CLI or verify that the installed package is intact.",
         details: { cause: String(error) },
       },
       remediation: [
@@ -158,7 +158,8 @@ export async function probeVersionCompatibility(config: RuntimeConfig): Promise<
         hint: "Install the Operator APK or choose the correct receiver package.",
       },
       remediation: [
-        "Install the Operator APK from https://github.com/clawpilled/clawperator/releases/latest",
+        "Install the Operator APK from https://clawperator.com/operator.apk",
+        "If you need a specific build, use the install script: curl -fsSL https://clawperator.com/install.sh | bash",
         `If a different variant is installed, rerun with --receiver-package <package>`,
       ],
     };

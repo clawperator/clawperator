@@ -97,6 +97,7 @@ describe("DoctorService", () => {
     assert.ok(versionCheck);
     assert.strictEqual(versionCheck.status, "fail");
     assert.strictEqual(versionCheck.code, ERROR_CODES.APK_VERSION_UNREADABLE);
+    assert.strictEqual(versionCheck.summary, "Could not verify CLI and installed APK version compatibility.");
     assert.ok(!report.checks.some(check => check.id === "readiness.handshake"));
   });
 

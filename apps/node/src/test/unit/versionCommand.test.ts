@@ -60,6 +60,11 @@ describe("cmdVersion", () => {
 
     assert.strictEqual(parsed.compatible, false);
     assert.strictEqual(parsed.error.code, ERROR_CODES.RECEIVER_NOT_INSTALLED);
+    assert.deepStrictEqual(parsed.remediation, [
+      "Install the Operator APK from https://clawperator.com/operator.apk",
+      "If you need a specific build, use the install script: curl -fsSL https://clawperator.com/install.sh | bash",
+      "If a different variant is installed, rerun with --receiver-package <package>",
+    ]);
   });
 
   it("reports a variant mismatch when the alternate receiver package is installed", async () => {
