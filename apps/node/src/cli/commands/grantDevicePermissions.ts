@@ -3,7 +3,7 @@ import { grantDevicePermissions } from "../../domain/device/grantPermissions.js"
 import type { OutputOptions } from "../output.js";
 import { formatSuccess, formatError } from "../output.js";
 
-export async function cmdSetupDevice(options: {
+export async function cmdGrantDevicePermissions(options: {
   format: OutputOptions["format"];
   deviceId?: string;
   receiverPackage?: string;
@@ -19,7 +19,7 @@ export async function cmdSetupDevice(options: {
   if (!result.accessibility.ok && !result.accessibility.alreadyEnabled) {
     return formatError(
       {
-        code: "SETUP_DEVICE_FAILED",
+        code: "GRANT_DEVICE_PERMISSIONS_FAILED",
         message: result.accessibility.error ?? "Failed to grant accessibility permission.",
         receiverPackage: result.receiverPackage,
         notification: result.notification,

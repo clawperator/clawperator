@@ -49,7 +49,7 @@ Commands:
                                             Pull latest skills (optionally pin to a ref)
   skills sync --ref <git-ref>
                                             Sync and pin skills index/cache to a git ref
-  setup-device [--device-id <id>] [--receiver-package <package>]
+  grant-device-permissions [--device-id <id>] [--receiver-package <package>]
                                             Grant accessibility and notification permissions to the Operator APK via adb
   serve [--port <number>] [--host <string>]
                                             Start local HTTP/SSE server for remote control (default host: 127.0.0.1)
@@ -334,8 +334,8 @@ async function main(): Promise<void> {
       });
       break;
     }
-    case "setup-device":
-      result = await (await import("./commands/setupDevice.js")).cmdSetupDevice({
+    case "grant-device-permissions":
+      result = await (await import("./commands/grantDevicePermissions.js")).cmdGrantDevicePermissions({
         ...out,
         deviceId: global.deviceId ?? getOpt(rest, "--device-id"),
         receiverPackage: global.receiverPackage ?? getOpt(rest, "--receiver-package"),

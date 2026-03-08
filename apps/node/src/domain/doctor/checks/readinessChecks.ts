@@ -198,7 +198,7 @@ export async function runHandshake(
           title: "Grant accessibility permissions via adb",
           platform: "any",
           steps: [
-            { kind: "shell", value: `clawperator setup-device${deviceFlag}${pkgFlag}` },
+            { kind: "shell", value: `clawperator grant-device-permissions${deviceFlag}${pkgFlag}` },
           ],
         },
         deviceGuidance: {
@@ -222,7 +222,7 @@ export async function runHandshake(
         title: "Grant accessibility permissions via adb",
         platform: "any",
         steps: [
-          { kind: "shell", value: `clawperator setup-device${deviceFlag}${pkgFlag}` },
+          { kind: "shell", value: `clawperator grant-device-permissions${deviceFlag}${pkgFlag}` },
         ],
       },
       deviceGuidance: {
