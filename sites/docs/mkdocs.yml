@@ -3,8 +3,20 @@ site_description: Deterministic actuator tool for device automation
 docs_dir: docs
 
 theme:
-  name: terminal
-  palette: dark
+  name: material
+  logo: img/clawperator-logo.png
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+
+extra_css:
+  - stylesheets/extra.css
 
 nav:
   - Home: index.md
