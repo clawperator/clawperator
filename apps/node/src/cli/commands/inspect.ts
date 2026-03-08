@@ -8,6 +8,7 @@ export async function cmdInspectUi(options: {
   format: OutputOptions["format"];
   deviceId?: string;
   receiverPackage?: string;
+  timeoutMs?: number;
 }): Promise<string> {
   return cmdObserveSnapshot(options);
 }

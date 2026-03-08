@@ -290,6 +290,7 @@ async function main(): Promise<void> {
           ...out,
           deviceId: global.deviceId ?? getOpt(rest, "--device-id"),
           receiverPackage: global.receiverPackage ?? getOpt(rest, "--receiver-package"),
+          timeoutMs: global.timeoutMs,
         });
       } else {
         result = JSON.stringify({ code: "USAGE", message: "inspect ui [options]" });

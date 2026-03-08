@@ -34,4 +34,11 @@ describe("CLI help", () => {
     assert.match(stdout, /--ref <git-ref>/);
     assert.doesNotMatch(stdout, /action open-app/);
   });
+
+  it("forwards timeout parsing through inspect ui", async () => {
+    const { stdout, code } = await runCli(["inspect", "ui", "--timeout-ms", "nope"]);
+    assert.notStrictEqual(code, 0);
+    assert.match(stdout, /EXECUTION_VALIDATION_FAILED/);
+    assert.match(stdout, /Expected number, received nan/);
+  });
 });

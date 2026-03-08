@@ -2,13 +2,15 @@ import { describe, it, before, after } from "node:test";
 import assert from "node:assert";
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
+import { mkdtemp, mkdir, copyFile, rm } from "node:fs/promises";
 import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { listSkills } from "../../domain/skills/listSkills.js";
 import { getSkill } from "../../domain/skills/getSkill.js";
 import { compileArtifact } from "../../domain/skills/compileArtifact.js";
 import { searchSkills } from "../../domain/skills/searchSkills.js";
 import { runSkill } from "../../domain/skills/runSkill.js";
-import { loadRegistry } from "../../adapters/skills-repo/localSkillsRegistry.js";
+import { getRegistryPath, loadRegistry } from "../../adapters/skills-repo/localSkillsRegistry.js";
 import { validateExecution, validatePayloadSize } from "../../domain/executions/validateExecution.js";
 import { SKILL_NOT_FOUND, ARTIFACT_NOT_FOUND, COMPILE_VAR_MISSING, SKILL_SCRIPT_NOT_FOUND, SKILL_EXECUTION_FAILED } from "../../contracts/skills.js";
 
@@ -87,6 +89,36 @@ describe("loadRegistry", () => {
       } else {
         process.env.CLAWPERATOR_SKILLS_REGISTRY = original;
       }
+    }
+  });
+
+  it("falls back when the caller passes the derived default path", async () => {
+    const originalCwd = process.cwd();
+    const originalRegistry = process.env.CLAWPERATOR_SKILLS_REGISTRY;
+    const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-registry-"));
+    const appNodeDir = join(tempRoot, "apps", "node");
+    const fallbackDir = join(tempRoot, "skills");
+    const fallbackPath = join(fallbackDir, "skills-registry.json");
+
+    await mkdir(appNodeDir, { recursive: true });
+    await mkdir(fallbackDir, { recursive: true });
+    await copyFile(TEST_REGISTRY_PATH, fallbackPath);
+
+    delete process.env.CLAWPERATOR_SKILLS_REGISTRY;
+    process.chdir(appNodeDir);
+
+    try {
+      const result = await loadRegistry(getRegistryPath());
+      assert.ok(result.resolvedPath.endsWith("/skills/skills-registry.json"));
+      assert.ok(Array.isArray(result.registry.skills));
+    } finally {
+      process.chdir(originalCwd);
+      if (originalRegistry === undefined) {
+        delete process.env.CLAWPERATOR_SKILLS_REGISTRY;
+      } else {
+        process.env.CLAWPERATOR_SKILLS_REGISTRY = originalRegistry;
+      }
+      await rm(tempRoot, { recursive: true, force: true });
     }
   });
 });
