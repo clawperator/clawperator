@@ -186,12 +186,21 @@ export async function runHandshake(
         detail: "Node successfully dispatched a command and received a valid result envelope.",
       };
     } else {
+      const deviceFlag = config.deviceId ? ` --device-id ${config.deviceId}` : "";
+      const pkgFlag = config.receiverPackage ? ` --receiver-package ${config.receiverPackage}` : "";
       return {
         id: "readiness.handshake",
         status: "fail",
         code: ERROR_CODES.DEVICE_ACCESSIBILITY_NOT_RUNNING,
         summary: "Handshake failed (runtime error).",
         detail: `Operator returned an error: ${result.envelope.error}`,
+        fix: {
+          title: "Grant accessibility permissions via adb",
+          platform: "any",
+          steps: [
+            { kind: "shell", value: `clawperator grant-device-permissions${deviceFlag}${pkgFlag}` },
+          ],
+        },
         deviceGuidance: {
           screen: "Accessibility Settings",
           steps: ["Ensure Clawperator Accessibility Service is ON in Android Settings"],
@@ -201,12 +210,21 @@ export async function runHandshake(
   }
 
   if ("timeout" in result && result.timeout) {
+    const deviceFlag = config.deviceId ? ` --device-id ${config.deviceId}` : "";
+    const pkgFlag = config.receiverPackage ? ` --receiver-package ${config.receiverPackage}` : "";
     return {
       id: "readiness.handshake",
       status: "fail",
       code: ERROR_CODES.RESULT_ENVELOPE_TIMEOUT,
       summary: "Handshake timed out.",
       detail: "No [Clawperator-Result] envelope received. Is the Accessibility Service running?",
+      fix: {
+        title: "Grant accessibility permissions via adb",
+        platform: "any",
+        steps: [
+          { kind: "shell", value: `clawperator grant-device-permissions${deviceFlag}${pkgFlag}` },
+        ],
+      },
       deviceGuidance: {
         screen: "Accessibility Settings",
         steps: ["Ensure Clawperator Accessibility Service is ON in Android Settings"],

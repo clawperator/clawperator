@@ -14,6 +14,7 @@ nav:
     - First-Time Setup: getting-started/first-time-setup.md
   - For AI Agents:
     - Node API - Agent Guide: ai-agents/node-api-for-agents.md
+    - OpenClaw Remote Bootstrap: ai-agents/openclaw-remote-bootstrap.md
   - Reference:
     - CLI Reference: reference/cli-reference.md
     - API Overview: reference/api-overview.md

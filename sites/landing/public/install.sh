@@ -244,12 +244,26 @@ setup_skills() {
 
     if [ -d "$SKILLS_DIR" ]; then
         if [ ! -d "$SKILLS_DIR/.git" ]; then
-            warn_skills_setup_failed "$SKILLS_DIR exists but is not a git repository."
+            warn_skills_setup_failed "$SKILLS_DIR exists but is not a git repository. Remove it and re-run to clone fresh."
             return 0
         fi
+        # Ensure the remote is configured - it may be missing if the directory was created locally.
+        local EXISTING_REMOTE
+        EXISTING_REMOTE="$(GIT_TERMINAL_PROMPT=0 git -C "$SKILLS_DIR" remote get-url origin 2>/dev/null || echo "")"
+        if [ -z "$EXISTING_REMOTE" ]; then
+            echo -e "${YELLOW}⚠️  Skills directory has no remote configured. Adding origin...${NC}"
+            if ! GIT_TERMINAL_PROMPT=0 git -C "$SKILLS_DIR" remote add origin "$SKILLS_REPO_URL"; then
+                warn_skills_setup_failed "could not add remote to existing skills directory. Remove $SKILLS_DIR and re-run."
+                return 0
+            fi
+        fi
         echo -e "${YELLOW}⚠️  Skills directory already exists. Updating...${NC}"
-        if ! GIT_TERMINAL_PROMPT=0 git -C "$SKILLS_DIR" pull --ff-only; then
-            warn_skills_setup_failed "unable to update the skills repository without interactive GitHub credentials."
+        if ! GIT_TERMINAL_PROMPT=0 git -C "$SKILLS_DIR" fetch origin; then
+            warn_skills_setup_failed "could not fetch from skills repository. Check network access or run: clawperator skills install"
+            return 0
+        fi
+        if ! GIT_TERMINAL_PROMPT=0 git -C "$SKILLS_DIR" reset --hard origin/main; then
+            warn_skills_setup_failed "could not update skills to the latest version. Try removing $SKILLS_DIR and re-running."
             return 0
         fi
     else
@@ -458,13 +472,13 @@ maybe_install_operator_apk() {
 
     local INSTALL_APK_RESPONSE="${CLAWPERATOR_INSTALL_APK:-}"
     if [ -z "$INSTALL_APK_RESPONSE" ]; then
-        if [ -r /dev/tty ] && [ -w /dev/tty ]; then
+        if tty -s; then
             printf "Install operator APK %s on the connected device now? [Y/n] " "$OPERATOR_VERSION" > /dev/tty
             read -r INSTALL_APK_RESPONSE < /dev/tty
             INSTALL_APK_RESPONSE="${INSTALL_APK_RESPONSE:-Y}"
         else
-            INSTALL_APK_RESPONSE="N"
-            echo -e "${YELLOW}⚠️  No interactive TTY detected. Skipping automatic APK install.${NC}"
+            INSTALL_APK_RESPONSE="Y"
+            echo -e "${BLUE}Non-interactive install detected. Proceeding with APK install.${NC}"
         fi
     fi
 
@@ -512,7 +526,10 @@ main() {
         echo -e "6. Run ${YELLOW}clawperator doctor${NC} to verify setup"
     else
         echo -e "5. ${YELLOW}Skills were not configured during install.${NC}"
-        echo -e "   ${YELLOW}Core CLI + operator APK are installed. Skills can be added later when the repo is accessible.${NC}"
+        echo -e "   To set up skills later, run:"
+        echo -e "   ${YELLOW}clawperator skills install${NC}"
+        echo -e "   Then add to your shell profile (~/.zshrc or ~/.bashrc):"
+        echo -e "   ${YELLOW}export CLAWPERATOR_SKILLS_REGISTRY=\"\$HOME/.clawperator/skills/skills/skills-registry.json\"${NC}"
         echo -e "6. Run ${YELLOW}clawperator doctor${NC} to verify setup"
     fi
     echo ""

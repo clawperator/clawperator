@@ -67,6 +67,11 @@ sections:
         mode: copy
         sources:
           - docs/node-api-for-agents.md
+      - output: ai-agents/openclaw-remote-bootstrap.md
+        title: OpenClaw Remote Bootstrap Guide
+        mode: copy
+        sources:
+          - docs/openclaw-remote-bootstrap.md
 
   - id: reference
     title: Reference
