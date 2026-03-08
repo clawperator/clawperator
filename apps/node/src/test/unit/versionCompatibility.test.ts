@@ -6,6 +6,7 @@ import {
   normalizeCompatibilityVersion,
   parseCompatibilityVersion,
   parseInstalledApkVersion,
+  readCliVersion,
 } from "../../domain/version/compatibility.js";
 
 describe("version compatibility", () => {
@@ -24,6 +25,11 @@ describe("version compatibility", () => {
       getAlternateReceiverVariant("com.example.devtools.operator"),
       "com.example.devtools.operator.dev"
     );
+  });
+
+  it("throws when the CLI package metadata has no version", () => {
+    assert.throws(() => readCliVersion({}), /package\.json version is missing/);
+    assert.throws(() => readCliVersion({ version: "   " }), /package\.json version is missing/);
   });
 
   it("parses release and prerelease versions", () => {

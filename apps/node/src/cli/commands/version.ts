@@ -13,7 +13,16 @@ export async function cmdVersion(options: OutputOptions & {
   runner?: ProcessRunner;
 }): Promise<string> {
   if (!options.checkCompat) {
-    return formatSuccess({ cliVersion: getCliVersion() }, options);
+    try {
+      return formatSuccess({ cliVersion: getCliVersion() }, options);
+    } catch (error) {
+      process.exitCode = 1;
+      return formatError({
+        code: "CLI_VERSION_INVALID",
+        message: "CLI version metadata is missing or unreadable.",
+        details: { cause: String(error) },
+      }, options);
+    }
   }
 
   const config = getDefaultRuntimeConfig({

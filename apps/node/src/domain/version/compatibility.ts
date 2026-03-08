@@ -32,6 +32,10 @@ export interface VersionCompatibilityProbe {
   remediation?: string[];
 }
 
+interface CliPackageMetadata {
+  version?: string;
+}
+
 export function hasListedPackage(packageListOutput: string, packageName: string): boolean {
   return packageListOutput
     .split("\n")
@@ -43,6 +47,13 @@ export function getAlternateReceiverVariant(receiverPackage: string): string {
   return receiverPackage.endsWith(".dev")
     ? receiverPackage.slice(0, -4)
     : `${receiverPackage}.dev`;
+}
+
+export function readCliVersion(pkg: CliPackageMetadata): string {
+  if (!pkg.version || pkg.version.trim().length === 0) {
+    throw new Error("package.json version is missing");
+  }
+  return pkg.version;
 }
 
 interface InstalledReceiverVariantResult {
@@ -98,8 +109,8 @@ async function getInstalledReceiverVariant(
 }
 
 export function getCliVersion(): string {
-  const pkg = require("../../../package.json") as { version?: string };
-  return pkg.version ?? "0.1.0";
+  const pkg = require("../../../package.json") as CliPackageMetadata;
+  return readCliVersion(pkg);
 }
 
 export function normalizeCompatibilityVersion(versionName: string): string {
@@ -144,7 +155,26 @@ export function isVersionCompatible(cliVersion: string, apkVersion: string): boo
 }
 
 export async function probeVersionCompatibility(config: RuntimeConfig): Promise<VersionCompatibilityProbe> {
-  const cliVersion = getCliVersion();
+  let cliVersion: string;
+  try {
+    cliVersion = getCliVersion();
+  } catch (error) {
+    return {
+      cliVersion: "unknown",
+      receiverPackage: config.receiverPackage,
+      compatible: false,
+      error: {
+        code: ERROR_CODES.CLI_VERSION_INVALID,
+        message: "CLI version metadata is missing or unreadable.",
+        hint: "Reinstall the CLI or verify that the installed package is intact.",
+        details: { cause: String(error) },
+      },
+      remediation: [
+        "Reinstall the CLI: npm install -g clawperator@latest",
+      ],
+    };
+  }
+
   const receiverPackage = config.receiverPackage;
 
   let parsedCli: ParsedCompatibilityVersion;
