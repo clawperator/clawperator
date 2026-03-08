@@ -61,6 +61,8 @@ The Operator APK requires the Android Accessibility Service to be running. Enabl
 clawperator grant-device-permissions
 ```
 
+By default, the CLI targets the release package `com.clawperator.operator`. For local debug builds, pass `--receiver-package com.clawperator.operator.dev`.
+
 With multiple devices connected, target one explicitly:
 
 ```bash
@@ -84,6 +86,8 @@ Run the doctor to confirm all checks pass:
 ```bash
 clawperator doctor --output pretty
 ```
+
+If you are using a local debug APK, add `--receiver-package com.clawperator.operator.dev` to `grant-device-permissions`, `doctor`, `version --check-compat`, and `observe snapshot`.
 
 Expected passing output (condensed):
 
@@ -129,6 +133,8 @@ Expected output begins with `Settings Overview captured` followed by the UI snap
 
 **Cause:** The Accessibility Service is not running on the device.
 
+This can also happen if the command was sent to the wrong receiver package. Public installs usually use `com.clawperator.operator`. Local debug builds use `com.clawperator.operator.dev`.
+
 **Fix:**
 
 ```bash
@@ -142,6 +148,12 @@ clawperator doctor --output pretty
 ```
 
 Wait 3 seconds after granting, then re-run doctor.
+
+If it still fails, collect a direct snapshot with explicit timeout and diagnostics:
+
+```bash
+clawperator observe snapshot --timeout-ms 5000 --output pretty --verbose
+```
 
 ---
 
