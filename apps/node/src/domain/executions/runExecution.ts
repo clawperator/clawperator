@@ -14,6 +14,7 @@ import type { ResultEnvelope, TerminalSource } from "../../contracts/result.js";
 import { extractSnapshotFromLogs } from "./snapshotHelper.js";
 import { emitResult, emitExecution } from "../observe/events.js";
 import { LIMITS } from "../../contracts/limits.js";
+import { ERROR_CODES } from "../../contracts/errors.js";
 
 export interface RunExecutionOptions {
   deviceId?: string;
@@ -51,7 +52,7 @@ async function performExecution(
       return {
         ok: false,
         error: {
-          code: "EXECUTION_VALIDATION_FAILED",
+          code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
           message: "timeoutMs must be a finite number",
         },
       };
@@ -60,7 +61,7 @@ async function performExecution(
       return {
         ok: false,
         error: {
-          code: "EXECUTION_VALIDATION_FAILED",
+          code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
           message: `timeoutMs must be between ${LIMITS.MIN_EXECUTION_TIMEOUT_MS} and ${LIMITS.MAX_EXECUTION_TIMEOUT_MS}`,
         },
       };

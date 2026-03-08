@@ -3,7 +3,7 @@ import assert from "node:assert";
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdtemp, mkdir, copyFile, rm } from "node:fs/promises";
-import { join } from "node:path";
+import { join, normalize } from "node:path";
 import { tmpdir } from "node:os";
 import { listSkills } from "../../domain/skills/listSkills.js";
 import { getSkill } from "../../domain/skills/getSkill.js";
@@ -60,6 +60,24 @@ function runCli(args: string[]): Promise<{ stdout: string; stderr: string; code:
   });
 }
 
+function runNodeSnippet(
+  script: string,
+  options?: { cwd?: string; env?: NodeJS.ProcessEnv }
+): Promise<{ stdout: string; stderr: string; code: number }> {
+  return new Promise((resolve) => {
+    const proc = spawn(process.execPath, ["--input-type=module", "-e", script], {
+      cwd: options?.cwd ?? process.cwd(),
+      env: options?.env ?? process.env,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let stdout = "";
+    let stderr = "";
+    proc.stdout?.on("data", (d) => (stdout += d.toString()));
+    proc.stderr?.on("data", (d) => (stderr += d.toString()));
+    proc.on("close", (code) => resolve({ stdout, stderr, code: code ?? -1 }));
+  });
+}
+
 describe("listSkills", () => {
   it("returns skills from registry when available", async () => {
     const result = await listSkills();
@@ -93,8 +111,6 @@ describe("loadRegistry", () => {
   });
 
   it("falls back when the caller passes the derived default path", async () => {
-    const originalCwd = process.cwd();
-    const originalRegistry = process.env.CLAWPERATOR_SKILLS_REGISTRY;
     const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-registry-"));
     const appNodeDir = join(tempRoot, "apps", "node");
     const fallbackDir = join(tempRoot, "skills");
@@ -104,20 +120,26 @@ describe("loadRegistry", () => {
     await mkdir(fallbackDir, { recursive: true });
     await copyFile(TEST_REGISTRY_PATH, fallbackPath);
 
-    delete process.env.CLAWPERATOR_SKILLS_REGISTRY;
-    process.chdir(appNodeDir);
-
     try {
-      const result = await loadRegistry(getRegistryPath());
-      assert.ok(result.resolvedPath.endsWith("/skills/skills-registry.json"));
-      assert.ok(Array.isArray(result.registry.skills));
-    } finally {
-      process.chdir(originalCwd);
-      if (originalRegistry === undefined) {
+      const modulePath = join(process.cwd(), "dist", "adapters", "skills-repo", "localSkillsRegistry.js");
+      const script = `
+        import { loadRegistry, getRegistryPath } from ${JSON.stringify(modulePath)};
+        process.chdir(${JSON.stringify(appNodeDir)});
         delete process.env.CLAWPERATOR_SKILLS_REGISTRY;
-      } else {
-        process.env.CLAWPERATOR_SKILLS_REGISTRY = originalRegistry;
-      }
+        const result = await loadRegistry(getRegistryPath());
+        console.log(JSON.stringify({
+          resolvedPath: result.resolvedPath,
+          skillCount: result.registry.skills.length,
+        }));
+      `;
+      const child = await runNodeSnippet(script, {
+        env: { ...process.env },
+      });
+      assert.strictEqual(child.code, 0, child.stderr);
+      const parsed = JSON.parse(child.stdout);
+      assert.strictEqual(normalize(parsed.resolvedPath), normalize(fallbackPath));
+      assert.ok(parsed.skillCount > 0);
+    } finally {
       await rm(tempRoot, { recursive: true, force: true });
     }
   });

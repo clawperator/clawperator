@@ -103,7 +103,7 @@ The PNG is saved to a temp path and the path is returned in the result envelope.
 Alias for `observe snapshot` with formatted output.
 
 ```
-clawperator inspect ui [--device-id <id>] [--receiver-package <package>] [--timeout-ms <number>]
+clawperator inspect ui [--device-id <id>] [--receiver-package <package>] [--timeout-ms <number>] [--output <json\|pretty>] [--verbose]
 ```
 
 `inspect ui` is a wrapper alias over `observe snapshot`.
@@ -344,7 +344,7 @@ See [api-overview.md](./api-overview.md) for HTTP API details.
 
 Run environment and runtime checks.
 
-``` 
+```
 clawperator doctor [--output <json\|pretty>] [--device-id <id>] [--receiver-package <package>] [--verbose]
 clawperator doctor --json
 clawperator doctor --fix
