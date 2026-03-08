@@ -27,13 +27,18 @@ export type RunExecutionResult =
   | { ok: true; envelope: ResultEnvelope; deviceId: string; terminalSource: TerminalSource }
   | { ok: false; error: { code: string; message: string; [k: string]: unknown }; deviceId?: string };
 
+interface PerformExecutionResult {
+  execution?: Execution;
+  result: RunExecutionResult;
+}
+
 /**
  * Internal helper to validate, resolve device, and perform actual execution.
  */
 async function performExecution(
   executionInput: unknown,
   options: RunExecutionOptions = {}
-): Promise<RunExecutionResult> {
+): Promise<PerformExecutionResult> {
   const config = getDefaultRuntimeConfig({
     deviceId: options.deviceId,
     receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_RECEIVER_PACKAGE,
@@ -44,25 +49,31 @@ async function performExecution(
   try {
     execution = validateExecution(executionInput);
   } catch (e) {
-    return { ok: false, error: e as { code: string; message: string; [k: string]: unknown } };
+    return { result: { ok: false, error: e as { code: string; message: string; [k: string]: unknown } } };
   }
 
   if (options.timeoutMs !== undefined) {
     if (!Number.isFinite(options.timeoutMs)) {
       return {
-        ok: false,
-        error: {
-          code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
-          message: "timeoutMs must be a finite number",
+        execution,
+        result: {
+          ok: false,
+          error: {
+            code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+            message: "timeoutMs must be a finite number",
+          },
         },
       };
     }
     if (options.timeoutMs < LIMITS.MIN_EXECUTION_TIMEOUT_MS || options.timeoutMs > LIMITS.MAX_EXECUTION_TIMEOUT_MS) {
       return {
-        ok: false,
-        error: {
-          code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
-          message: `timeoutMs must be between ${LIMITS.MIN_EXECUTION_TIMEOUT_MS} and ${LIMITS.MAX_EXECUTION_TIMEOUT_MS}`,
+        execution,
+        result: {
+          ok: false,
+          error: {
+            code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+            message: `timeoutMs must be between ${LIMITS.MIN_EXECUTION_TIMEOUT_MS} and ${LIMITS.MAX_EXECUTION_TIMEOUT_MS}`,
+          },
         },
       };
     }
@@ -72,7 +83,7 @@ async function performExecution(
   try {
     validatePayloadSize(JSON.stringify(execution));
   } catch (e) {
-    return { ok: false, error: e as { code: string; message: string; [k: string]: unknown } };
+    return { execution, result: { ok: false, error: e as { code: string; message: string; [k: string]: unknown } } };
   }
 
   let deviceId: string;
@@ -81,11 +92,11 @@ async function performExecution(
     deviceId = resolved.deviceId;
     config.deviceId = deviceId;
   } catch (e) {
-    return { ok: false, error: e as { code: string; message: string; [k: string]: unknown } };
+    return { execution, result: { ok: false, error: e as { code: string; message: string; [k: string]: unknown } } };
   }
 
   if (!tryAcquire(deviceId, execution.commandId)) {
-    return { ok: false, error: getConflictError(deviceId, execution.commandId), deviceId };
+    return { execution, result: { ok: false, error: getConflictError(deviceId, execution.commandId), deviceId } };
   }
 
   try {
@@ -166,7 +177,10 @@ async function performExecution(
       }
 
       emitResult(deviceId, result.envelope);
-      return { ok: true, envelope: result.envelope, deviceId, terminalSource: result.terminalSource };
+      return {
+        execution,
+        result: { ok: true, envelope: result.envelope, deviceId, terminalSource: result.terminalSource },
+      };
     }
 
     // Handle failure emission for SSE subscribers relying on the terminal envelope signal.
@@ -181,18 +195,25 @@ async function performExecution(
     if ("broadcastFailed" in result && result.broadcastFailed && "diagnostics" in result) {
       failureEnvelope.error = result.diagnostics.code;
       emitResult(deviceId, failureEnvelope);
-      return { ok: false, error: { ...result.diagnostics }, deviceId };
+      return { execution, result: { ok: false, error: { ...result.diagnostics }, deviceId } };
     }
     if ("timeout" in result && result.timeout && "diagnostics" in result) {
       failureEnvelope.error = result.diagnostics.code;
       emitResult(deviceId, failureEnvelope);
-      return { ok: false, error: { ...result.diagnostics }, deviceId };
+      return { execution, result: { ok: false, error: { ...result.diagnostics }, deviceId } };
     }
     
     const errCode = ("code" in result && result.code) ? (result.code as string) : (("error" in result && typeof result.error === "string") ? result.error : "UNKNOWN_RUNTIME_ERROR");
     failureEnvelope.error = errCode;
     emitResult(deviceId, failureEnvelope);
-    return { ok: false, error: { code: errCode, message: ("error" in result && typeof result.error === "string") ? result.error : "Unknown error" }, deviceId };
+    return {
+      execution,
+      result: {
+        ok: false,
+        error: { code: errCode, message: ("error" in result && typeof result.error === "string") ? result.error : "Unknown error" },
+        deviceId,
+      },
+    };
   } finally {
     release(deviceId, execution.commandId);
   }
@@ -206,13 +227,13 @@ export async function runExecution(
   executionInput: unknown,
   options: RunExecutionOptions = {}
 ): Promise<RunExecutionResult> {
-  const result = await performExecution(executionInput, options);
+  const { execution, result } = await performExecution(executionInput, options);
   
   // We emit the execution outcome even if resolution failed, as long as we have SOME deviceId 
   // (either from options or resolved during the process).
   const resolvedDeviceId: string | null = result.deviceId || options.deviceId || null;
   if (resolvedDeviceId !== null) {
-    emitExecution(resolvedDeviceId, executionInput, result);
+    emitExecution(resolvedDeviceId, execution ?? executionInput, result);
   }
   return result;
 }

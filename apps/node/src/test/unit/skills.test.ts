@@ -10,7 +10,7 @@ import { getSkill } from "../../domain/skills/getSkill.js";
 import { compileArtifact } from "../../domain/skills/compileArtifact.js";
 import { searchSkills } from "../../domain/skills/searchSkills.js";
 import { runSkill } from "../../domain/skills/runSkill.js";
-import { getRegistryPath, loadRegistry } from "../../adapters/skills-repo/localSkillsRegistry.js";
+import { loadRegistry } from "../../adapters/skills-repo/localSkillsRegistry.js";
 import { validateExecution, validatePayloadSize } from "../../domain/executions/validateExecution.js";
 import { SKILL_NOT_FOUND, ARTIFACT_NOT_FOUND, COMPILE_VAR_MISSING, SKILL_SCRIPT_NOT_FOUND, SKILL_EXECUTION_FAILED } from "../../contracts/skills.js";
 
@@ -78,6 +78,10 @@ function runNodeSnippet(
   });
 }
 
+function normalizeMacTmpPath(path: string): string {
+  return normalize(path).replace(/^\/private(?=\/var\/)/, "");
+}
+
 describe("listSkills", () => {
   it("returns skills from registry when available", async () => {
     const result = await listSkills();
@@ -137,7 +141,7 @@ describe("loadRegistry", () => {
       });
       assert.strictEqual(child.code, 0, child.stderr);
       const parsed = JSON.parse(child.stdout);
-      assert.strictEqual(normalize(parsed.resolvedPath), normalize(fallbackPath));
+      assert.strictEqual(normalizeMacTmpPath(parsed.resolvedPath), normalizeMacTmpPath(fallbackPath));
       assert.ok(parsed.skillCount > 0);
     } finally {
       await rm(tempRoot, { recursive: true, force: true });
