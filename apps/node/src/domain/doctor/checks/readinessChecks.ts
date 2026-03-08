@@ -7,15 +7,41 @@ import { waitForResultEnvelope } from "../../../adapters/android-bridge/logcatRe
 import { getAlternateReceiverVariant, hasListedPackage, probeVersionCompatibility } from "../../version/compatibility.js";
 
 export async function checkApkPresence(config: RuntimeConfig): Promise<DoctorCheckResult> {
-  const { stdout } = await runAdb(config, ["shell", "pm", "list", "packages", config.receiverPackage]);
-  const isInstalled = hasListedPackage(stdout, config.receiverPackage);
+  const packageList = await runAdb(config, ["shell", "pm", "list", "packages", config.receiverPackage]);
+  if (packageList.code !== 0) {
+    return {
+      id: "readiness.apk.presence",
+      status: "fail",
+      code: ERROR_CODES.DEVICE_SHELL_UNAVAILABLE,
+      summary: "Could not query installed packages on the device.",
+      detail: packageList.stderr || undefined,
+      evidence: {
+        receiverPackage: config.receiverPackage,
+        exitCode: packageList.code ?? undefined,
+      },
+    };
+  }
+  const isInstalled = hasListedPackage(packageList.stdout, config.receiverPackage);
 
   if (!isInstalled) {
     // Check if the other variant is installed
     const otherVariant = getAlternateReceiverVariant(config.receiverPackage);
 
-    const { stdout: otherStdout } = await runAdb(config, ["shell", "pm", "list", "packages", otherVariant]);
-    if (hasListedPackage(otherStdout, otherVariant)) {
+    const alternateList = await runAdb(config, ["shell", "pm", "list", "packages", otherVariant]);
+    if (alternateList.code !== 0) {
+      return {
+        id: "readiness.apk.presence",
+        status: "fail",
+        code: ERROR_CODES.DEVICE_SHELL_UNAVAILABLE,
+        summary: "Could not query installed packages on the device.",
+        detail: alternateList.stderr || undefined,
+        evidence: {
+          receiverPackage: otherVariant,
+          exitCode: alternateList.code ?? undefined,
+        },
+      };
+    }
+    if (hasListedPackage(alternateList.stdout, otherVariant)) {
       return {
         id: "readiness.apk.presence",
         status: "warn",
@@ -185,6 +211,16 @@ export async function runHandshake(
         screen: "Accessibility Settings",
         steps: ["Ensure Clawperator Accessibility Service is ON in Android Settings"],
       },
+    };
+  }
+
+  if ("broadcastFailed" in result && result.broadcastFailed) {
+    return {
+      id: "readiness.handshake",
+      status: "fail",
+      code: result.diagnostics.code,
+      summary: "Handshake broadcast failed.",
+      detail: result.diagnostics.message,
     };
   }
 

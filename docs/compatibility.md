@@ -43,7 +43,7 @@ The compatibility check reports:
 - compatibility verdict
 - remediation guidance when versions do not match
 
-`clawperator doctor` also runs this check after confirming the APK is installed.
+`clawperator doctor` also runs this check after confirming the requested receiver package is installed.
 
 ## Common mismatch symptoms
 

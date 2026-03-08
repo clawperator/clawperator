@@ -1,16 +1,45 @@
 import { describe, it } from "node:test";
 import assert from "node:assert";
-import { runHandshake } from "../../../domain/doctor/checks/readinessChecks.js";
+import { checkApkPresence, runHandshake } from "../../../domain/doctor/checks/readinessChecks.js";
 import { getDefaultRuntimeConfig } from "../../../adapters/android-bridge/runtimeConfig.js";
 import { ERROR_CODES } from "../../../contracts/errors.js";
+import { FakeProcessRunner } from "../fakes/FakeProcessRunner.js";
+
+describe("checkApkPresence", () => {
+    it("returns a shell failure when package queries cannot run", async () => {
+        const runner = new FakeProcessRunner();
+        const config = getDefaultRuntimeConfig({
+            runner,
+            deviceId: "test-device",
+            receiverPackage: "com.test.operator",
+        });
+
+        runner.queueResult({ code: 1, stdout: "", stderr: "cmd: Can't find service: package", error: new Error("shell failed") });
+
+        const result = await checkApkPresence(config);
+
+        assert.strictEqual(result.status, "fail");
+        assert.strictEqual(result.code, ERROR_CODES.DEVICE_SHELL_UNAVAILABLE);
+        assert.match(result.detail ?? "", /Can't find service: package/);
+    });
+});
 
 describe("runHandshake", () => {
-    const config = getDefaultRuntimeConfig({
-        deviceId: "test-device",
-        receiverPackage: "com.test.operator",
-    });
+    function createConfig(runner = new FakeProcessRunner()) {
+        return {
+            config: getDefaultRuntimeConfig({
+                runner,
+                deviceId: "test-device",
+                receiverPackage: "com.test.operator",
+            }),
+            runner,
+        };
+    }
 
     it("returns pass when envelope status is success", async () => {
+        const { config, runner } = createConfig();
+        runner.queueResult({ code: 0, stdout: "", stderr: "" });
+
         const mockWait = async () => ({
             ok: true as const,
             envelope: { status: "success" as const, commandId: "test-cmd", taskId: "test-task", stepResults: [] },
@@ -23,6 +52,9 @@ describe("runHandshake", () => {
     });
 
     it("returns fail when envelope status is error", async () => {
+        const { config, runner } = createConfig();
+        runner.queueResult({ code: 0, stdout: "", stderr: "" });
+
         const mockWait = async () => ({
             ok: true as const,
             envelope: { status: "failed" as const, commandId: "test-cmd", taskId: "test-task", stepResults: [], error: "Boom" },
@@ -36,6 +68,9 @@ describe("runHandshake", () => {
     });
 
     it("returns fail on timeout", async () => {
+        const { config, runner } = createConfig();
+        runner.queueResult({ code: 0, stdout: "", stderr: "" });
+
         const mockWait = async () => ({
             ok: false as const,
             timeout: true as const,
@@ -53,6 +88,9 @@ describe("runHandshake", () => {
     });
 
     it("returns fail on broadcast failure", async () => {
+        const { config, runner } = createConfig();
+        runner.queueResult({ code: 0, stdout: "", stderr: "" });
+
         const mockWait = async () => ({
             ok: false as const,
             broadcastFailed: true as const,
