@@ -49,7 +49,7 @@ Design consequence:
   - `clawperator.com/robots.txt`, `llms.txt`, `sitemap.xml`, `install.sh` come from `sites/landing/public/`
   - `docs.clawperator.com/robots.txt` and `llms.txt` come from `sites/docs/static/`
 - Deployment behavior:
-  - both public sites deploy automatically to Cloudflare after changes are merged to `main`
+  - both public website surfaces deploy automatically to Cloudflare after changes are merged to `main`
   - for website-only changes, source/build validation in this repo is usually sufficient before PR
   - no manual website deployment step is expected unless the automation is broken
 - Build commands:
