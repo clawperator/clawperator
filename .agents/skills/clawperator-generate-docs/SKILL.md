@@ -31,13 +31,20 @@ Historical docs policy:
 
 ## Workflow
 
+Helper scripts for this skill live in the skill directory, not in the repo root:
+- `.agents/skills/clawperator-generate-docs/scripts/build_inventory.py`
+- `.agents/skills/clawperator-generate-docs/scripts/diff_report.py`
+- `.agents/skills/clawperator-generate-docs/scripts/write_build_metadata.py`
+
+When this file refers to `scripts/...`, resolve that path relative to the skill directory first.
+
 1. Confirm the repo roots exist:
    - Clawperator repo: current working tree
    - Skills repo: `../clawperator-skills` unless the user states otherwise
    - Public docs site: `sites/docs/`
 2. Read `sites/docs/source-map.yaml` before editing docs output. It defines the public IA, slugs, output paths, and which sources feed each page.
 3. Generate an inventory before rewriting anything:
-   - Run `scripts/build_inventory.py --repo-root <clawperator> --skills-root <clawperator-skills> --output <clawperator>/sites/docs/docs_inventory.json`
+   - Run `.agents/skills/clawperator-generate-docs/scripts/build_inventory.py --repo-root <clawperator> --skills-root <clawperator-skills> --output <clawperator>/sites/docs/docs_inventory.json`
    - Use the inventory to confirm headings, doc areas, and candidate source files.
 4. Preserve source-of-truth boundaries:
    - `docs/**/*.md` and `../clawperator-skills/docs/**/*.md` are authored narrative docs.
@@ -47,12 +54,12 @@ Historical docs policy:
    - Render proposed files into `sites/docs/.generated/`
    - Keep titles, slugs, and ordering stable unless `sites/docs/source-map.yaml` changes or the user requests an IA change.
 6. Gate churn before copying files over:
-   - Run `scripts/diff_report.py <clawperator>/sites/docs/docs <clawperator>/sites/docs/.generated`
+   - Run `.agents/skills/clawperator-generate-docs/scripts/diff_report.py <clawperator>/sites/docs/docs <clawperator>/sites/docs/.generated`
    - Prefer patch edits over full rewrites.
    - Reject reflow-only churn, title churn, or broad page rewrites without a source change that justifies them.
 7. If the diff is acceptable, copy only the changed files from `.generated/` into `sites/docs/docs/`.
 8. Emit build metadata after a successful regeneration:
-   - Run `scripts/write_build_metadata.py --repo-root <clawperator> --skills-root <clawperator-skills> --output <clawperator>/sites/docs/docs_build.json`
+   - Run `.agents/skills/clawperator-generate-docs/scripts/write_build_metadata.py --repo-root <clawperator> --skills-root <clawperator-skills> --output <clawperator>/sites/docs/docs_build.json`
    - This is the docs build identifier. Do not hand-bump a docs version.
 
 ### Removing Docs
@@ -74,7 +81,7 @@ Do not leave deleted docs referenced in the docs site manifest or navigation.
 - Do not reorder navigation or rename output files unless `sites/docs/source-map.yaml` changes.
 - Do not change page titles unless the source title changed or the current title is wrong.
 - Do not rewrap paragraphs just to change formatting.
-- Flag high churn before applying it. Use `scripts/diff_report.py` thresholds as the default guardrail.
+- Flag high churn before applying it. Use `.agents/skills/clawperator-generate-docs/scripts/diff_report.py` thresholds as the default guardrail.
 - If a user explicitly wants stale docs removed, prefer deletion plus link cleanup over adding "historical note" text.
 
 ## Node API Rules
@@ -97,11 +104,11 @@ Do not leave deleted docs referenced in the docs site manifest or navigation.
 
 ## Resources
 
-- `scripts/build_inventory.py`
+- `.agents/skills/clawperator-generate-docs/scripts/build_inventory.py`
   - Generate `docs_inventory.json` from the three source areas.
-- `scripts/diff_report.py`
+- `.agents/skills/clawperator-generate-docs/scripts/diff_report.py`
   - Summarize file and line churn between current docs and proposed docs.
-- `scripts/write_build_metadata.py`
+- `.agents/skills/clawperator-generate-docs/scripts/write_build_metadata.py`
   - Write deterministic build metadata from repo commits and the source-map checksum.
 - `references/repo-docs.md`
   - Repo-specific source-of-truth map and generation contract.
