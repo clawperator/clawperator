@@ -147,6 +147,7 @@ body {
   display: flex;
   align-items: center;
   background: var(--toolbar-bg);
+  -webkit-backdrop-filter: blur(16px);
   backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--border);
   transition: transform 220ms ease, opacity 220ms ease;
