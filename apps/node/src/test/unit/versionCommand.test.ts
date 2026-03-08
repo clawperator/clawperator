@@ -82,6 +82,26 @@ describe("cmdVersion", () => {
     assert.match(parsed.error.message, /Expected com\.clawperator\.operator\.dev/);
   });
 
+  it("treats the debug APK as an alternate variant when the release package is requested", async () => {
+    const runner = new FakeProcessRunner();
+
+    runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "package:com.clawperator.operator.dev\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "package:com.clawperator.operator.dev\n", stderr: "" });
+
+    const output = await cmdVersion({
+      format: "json",
+      checkCompat: true,
+      receiverPackage: "com.clawperator.operator",
+      runner,
+    });
+    const parsed = JSON.parse(output);
+
+    assert.strictEqual(parsed.compatible, false);
+    assert.strictEqual(parsed.error.code, ERROR_CODES.RECEIVER_VARIANT_MISMATCH);
+    assert.match(parsed.error.message, /Expected com\.clawperator\.operator but found installed variant com\.clawperator\.operator\.dev/);
+  });
+
   it("sets a non-zero exit code when device resolution fails", async () => {
     const runner = new FakeProcessRunner();
 
@@ -138,5 +158,23 @@ describe("probeVersionCompatibility", () => {
 
     assert.strictEqual(result.compatible, false);
     assert.strictEqual(result.error?.code, ERROR_CODES.APK_VERSION_INVALID);
+  });
+
+  it("returns variant mismatch when only the debug APK matches a release package substring", async () => {
+    const runner = new FakeProcessRunner();
+    const config = getDefaultRuntimeConfig({
+      runner,
+      deviceId: "test-device-1",
+      receiverPackage: "com.clawperator.operator",
+    });
+
+    runner.queueResult({ code: 0, stdout: "package:com.clawperator.operator.dev\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "package:com.clawperator.operator.dev\n", stderr: "" });
+
+    const result = await probeVersionCompatibility(config);
+
+    assert.strictEqual(result.compatible, false);
+    assert.strictEqual(result.error?.code, ERROR_CODES.RECEIVER_VARIANT_MISMATCH);
+    assert.ok(result.remediation?.includes("Use --receiver-package com.clawperator.operator.dev"));
   });
 });

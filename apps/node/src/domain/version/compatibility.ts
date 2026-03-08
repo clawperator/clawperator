@@ -32,12 +32,19 @@ export interface VersionCompatibilityProbe {
   remediation?: string[];
 }
 
+export function hasListedPackage(packageListOutput: string, packageName: string): boolean {
+  return packageListOutput
+    .split("\n")
+    .map(line => line.trim())
+    .some(line => line === `package:${packageName}`);
+}
+
 async function getInstalledReceiverVariant(
   config: RuntimeConfig,
   receiverPackage: string
 ): Promise<{ installed: boolean; alternateVariant?: string }> {
   const packageList = await runAdb(config, ["shell", "pm", "list", "packages", receiverPackage]);
-  if (packageList.stdout.includes(`package:${receiverPackage}`)) {
+  if (hasListedPackage(packageList.stdout, receiverPackage)) {
     return { installed: true };
   }
 
@@ -45,7 +52,7 @@ async function getInstalledReceiverVariant(
     ? receiverPackage.replace(".dev", "")
     : `${receiverPackage}.dev`;
   const alternateList = await runAdb(config, ["shell", "pm", "list", "packages", alternateVariant]);
-  if (alternateList.stdout.includes(`package:${alternateVariant}`)) {
+  if (hasListedPackage(alternateList.stdout, alternateVariant)) {
     return { installed: false, alternateVariant };
   }
 
