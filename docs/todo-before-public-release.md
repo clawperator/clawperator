@@ -17,7 +17,7 @@ This checklist tracks the remaining pre-launch work after the release, docs, ins
 
 ## npm Publishing
 
-npm provenance attestation requires the source repo to be public. Until the repo is public, the publish workflow runs with `NPM_CONFIG_PROVENANCE=false`. Re-enable `--provenance` and `id-token: write` in `.github/workflows/publish-npm.yml` when the repo goes public.
+The workflow uses npm Trusted Publishing (OIDC) for authentication - `id-token: write` is required for this and must stay. Provenance attestation is a separate feature that also uses the OIDC token but requires the source repo to be public. Until the repo is public, the publish workflow runs with `NPM_CONFIG_PROVENANCE=false`. Re-enable `--provenance` in `.github/workflows/publish-npm.yml` when the repo goes public (`id-token: write` is already present and stays regardless).
 
 ## Deferred Items (Not in This Roadmap)
 
