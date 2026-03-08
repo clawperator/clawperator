@@ -24,6 +24,6 @@ export function buildScreenshotExecution(options?: { timeoutMs?: number }): Exec
 }
 
 export async function observeScreenshot(runOptions?: RunExecutionOptions) {
-  const execution = buildScreenshotExecution({ timeoutMs: runOptions?.timeoutMs });
+  const execution = buildScreenshotExecution();
   return runExecution(execution, runOptions);
 }

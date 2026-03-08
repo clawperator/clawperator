@@ -155,6 +155,7 @@ Notes:
 function resolveHelpTopic(rest: string[]): string | undefined {
   if (rest.length === 0) return undefined;
   if (rest[0] === "observe" && rest[1] === "snapshot") return "observe snapshot";
+  if (rest[0] === "inspect" && rest[1] === "ui") return "observe snapshot";
   if (rest[0] === "skills" && rest[1] === "install") return "skills install";
   if (rest[0] === "skills" && rest[1] === "sync") return "skills sync";
   if (rest[0] === "doctor") return "doctor";

@@ -35,10 +35,18 @@ describe("CLI help", () => {
     assert.doesNotMatch(stdout, /action open-app/);
   });
 
+  it("shows inspect ui help instead of top-level help", async () => {
+    const { stdout, code } = await runCli(["inspect", "ui", "--help"]);
+    assert.strictEqual(code, 0);
+    assert.match(stdout, /clawperator observe snapshot/);
+    assert.match(stdout, /--timeout-ms <number>/);
+    assert.doesNotMatch(stdout, /skills compile-artifact/);
+  });
+
   it("forwards timeout parsing through inspect ui", async () => {
     const { stdout, code } = await runCli(["inspect", "ui", "--timeout-ms", "nope"]);
     assert.notStrictEqual(code, 0);
     assert.match(stdout, /EXECUTION_VALIDATION_FAILED/);
-    assert.match(stdout, /Expected number, received nan/);
+    assert.match(stdout, /timeoutMs must be a finite number/);
   });
 });

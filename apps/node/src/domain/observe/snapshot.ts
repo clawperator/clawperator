@@ -26,6 +26,6 @@ export function buildSnapshotExecution(options?: { format?: "ascii" | "json"; ti
 }
 
 export async function observeSnapshot(runOptions?: RunExecutionOptions) {
-  const execution = buildSnapshotExecution({ timeoutMs: runOptions?.timeoutMs });
+  const execution = buildSnapshotExecution();
   return runExecution(execution, runOptions);
 }
