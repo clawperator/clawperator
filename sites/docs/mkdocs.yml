@@ -5,9 +5,7 @@ docs_dir: docs
 theme:
   name: terminal
   palette: default
-
-extra_css:
-  - stylesheets/terminal-theme.css
+  custom_dir: overrides
 
 nav:
   - Home: index.md
