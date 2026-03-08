@@ -7,7 +7,6 @@ on:
 
 permissions:
   contents: read
-  id-token: write
 
 concurrency:
   group: publish-npm-${{ github.ref }}
@@ -56,4 +55,6 @@ jobs:
 
       - name: Publish package
         working-directory: apps/node
-        run: npm publish --provenance --access public --tag latest
+        run: npm publish --access public --tag latest
+        env:
+          NPM_CONFIG_PROVENANCE: "false"
