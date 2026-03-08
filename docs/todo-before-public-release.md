@@ -1,20 +1,29 @@
 # TODO Before Public Release
 
-This checklist tracks changes required before the public launch.
+This checklist tracks the remaining pre-launch work after the release, docs, installer, landing, skills, and doctor improvements completed on March 6-8, 2026.
 
-## Skills Repo Access
+## Remaining Work
 
-- [ ] Make `https://github.com/clawpilled/clawperator-skills` publicly accessible.
-- [ ] Re-run `scripts/install.sh` on a clean macOS machine and verify no GitHub credential prompt appears.
-- [ ] Re-run `scripts/install.sh` on a clean Linux machine and verify non-interactive skills setup works.
+- [ ] Implement explicit CLI/APK version compatibility checks. See `tasks/version-handshaking/plan.md`.
+- [ ] Add a compatibility reference doc and troubleshooting coverage for version mismatch remediation.
+- [ ] Add `clawperator version --check-compat` so users and agents can verify the installed pair directly.
+- [ ] Decide whether execution-time compatibility enforcement should ship in the normal execution path or remain doctor-only for now.
+- [ ] Run a real-device validation pass covering installer flow, APK install/upgrade, doctor, and handshake on the release APK.
 
-## Install Script Follow-up
+## Current State
 
-- [ ] Update `scripts/install.sh` to use anonymous, non-interactive git clone/pull for the public skills repo.
-- [ ] Remove or update the inline note in `setup_skills()` about private-repo credential prompts.
-- [ ] Confirm `skills-registry.json` path still matches the skills repo layout.
+- Release automation, APK hosting, and stable redirect URLs are in place.
+- Public docs and landing sites are live and aligned to the hosted install flow.
+- Skills install/update/search/run support exists in the Node CLI.
+- Doctor now distinguishes critical failures from warnings and skips handshake when the APK is missing.
 
-## Docs Follow-up
+## Deferred Items (Not in This Roadmap)
 
-- [ ] Add a note to public docs that installer should not require GitHub auth once skills repo is public.
-- [ ] Verify all install docs match final install behavior (`clawperator skills install` vs direct git clone, depending on final implementation).
+These are explicitly deferred beyond the current pre-release work:
+
+- `--safe-logs` flag
+- animated demos or video walkthroughs
+- community/repository hygiene docs such as `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, and `SECURITY.md`
+- CI for skills repo validation
+- comprehensive integration tests
+- `execute best-effort --goal`

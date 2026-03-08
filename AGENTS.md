@@ -62,6 +62,13 @@ If you find an error in a generated page, check `sites/docs/source-map.yaml` to 
 
 Commit the source fix and the regenerated output together.
 
+Delete stale documentation instead of preserving it as historical context unless it is still an active source of truth. Completed task files, superseded roadmaps, and obsolete release checklists should be removed once their remaining actionable content is migrated elsewhere.
+
+When removing a source doc, also remove its docs-site references and generated output:
+- `sites/docs/source-map.yaml`
+- `sites/docs/mkdocs.yml`
+- `sites/docs/docs/` pages that would otherwise become dead links
+
 ## Required Iteration Loop
 For non-trivial changes, do all steps before commit:
 1. Make focused changes.
