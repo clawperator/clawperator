@@ -102,24 +102,21 @@ If the installer finishes but warns that skills setup was skipped, the core CLI 
 
 ---
 
-## Version Compatibility Matrix
+## Version Compatibility
 
-To ensure deterministic results, the Node CLI and the Android APK must be compatible.
+The Node CLI and the Android APK must have matching `major.minor` versions.
 
-| Node CLI Version | Android APK Version | Protocol Support |
-| :--- | :--- | :--- |
-| `0.1.x` | `0.1.0`+ | `[Clawperator-Result]` v1 |
-| `0.2.x` | `0.2.0`+ | `[Clawperator-Result]` v2 |
+- `0.1.4` and `0.1.9` are compatible
+- `0.1.4` and `0.1.4-d` are compatible
+- `0.1.4` and `0.2.0` are not compatible
 
-### Detecting a Mismatch
-If the versions are incompatible, you may see:
-1. **`RESULT_ENVELOPE_MALFORMED`**: The APK sent a JSON structure the CLI doesn't understand.
-2. **`EXECUTION_ACTION_UNSUPPORTED`**: The CLI sent a new action type (e.g., `back`) that the older APK hasn't implemented.
-3. **Hang/Timeout**: The APK crashed or failed to emit the envelope because of a protocol error.
+Use:
 
-**How to fix:**
-- Upgrade the Node CLI: `npm install -g clawperator@latest`
-- Update the Android APK: Download the latest stable release from [clawperator.com/operator.apk](https://clawperator.com/operator.apk) and install via `adb install -r ~/.clawperator/downloads/operator.apk` or `adb install -r /path/to/operator-vX.X.X.apk`. Historical versions remain on [GitHub Releases](https://github.com/clawpilled/clawperator/releases).
+```bash
+clawperator version --check-compat --receiver-package com.clawperator.operator
+```
+
+If the versions do not match, upgrade the CLI and install a compatible APK. For the full rule, examples, and remediation steps, see [Version Compatibility](compatibility.md).
 
 ---
 

@@ -79,6 +79,9 @@ These codes are produced by `clawperator doctor` and related checks.
 | `ANDROID_APP_LAUNCH_FAILED` | The app failed to launch after install |
 | `SMOKE_OPEN_SETTINGS_FAILED` | Smoke test: opening device Settings failed |
 | `SCRCPY_NOT_FOUND` | `scrcpy` binary not found (optional dependency) |
+| `APK_VERSION_UNREADABLE` | The installed APK version could not be read from `adb shell dumpsys package` |
+| `APK_VERSION_INVALID` | The installed APK version string is not parseable for compatibility checks |
+| `CLI_VERSION_INVALID` | The CLI version string is not parseable for compatibility checks |
 | `VERSION_INCOMPATIBLE` | Node API and Android runtime versions are incompatible |
 | `LOGCAT_UNAVAILABLE` | Could not access device logcat |
 
