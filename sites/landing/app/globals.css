@@ -1,19 +1,112 @@
 :root {
-  --bg: #0b0f19;
-  --surface: #121826;
-  --surface-2: #1a2233;
-  --border: #27324a;
-  --border-strong: #3a4b6e;
+  color-scheme: light;
 
-  --text: #e8eef9;
-  --text-muted: #cbd5e1;
+  --bg: #f5f1e7;
+  --surface: #fffaf3;
+  --surface-2: #f2e8da;
+  --border: #dbcbb8;
+  --border-strong: #c9b295;
+
+  --text: #1e2430;
+  --text-muted: #5c6370;
 
   --accent: #ff6a3d;
   --accent-hover: #ff835e;
   --accent-info: #2fc4d6;
 
+  --toolbar-bg: rgba(245, 241, 231, 0.92);
+  --toolbar-link-hover: rgba(30, 36, 48, 0.08);
+  --toolbar-cta-hover-text: #7d2200;
+  --toolbar-cta-hover-bg: rgba(255, 106, 61, 0.12);
+
+  --hero-problem: #6b7280;
+  --section-rule: rgba(30, 36, 48, 0.14);
+
+  --panel-bg: #fff9f2;
+  --panel-top-bg: #f2e7d8;
+  --panel-toggle-bg: #ece0cf;
+  --panel-border: rgba(124, 92, 55, 0.18);
+  --panel-shadow: 0 18px 40px rgba(100, 72, 37, 0.12);
+  --button-copied-text: #7d2200;
+  --button-copied-bg: rgba(255, 106, 61, 0.14);
+
+  --note-bg: rgba(47, 196, 214, 0.14);
+
+  --grid-line: rgba(30, 36, 48, 0.06);
+  --architecture-card-bg: rgba(255, 255, 255, 0.72);
+  --architecture-card-border: rgba(124, 92, 55, 0.15);
+  --architecture-card-edge-bg: rgba(255, 255, 255, 0.46);
+  --architecture-core-bg: rgba(255, 120, 80, 0.1);
+  --architecture-core-border: rgba(255, 120, 80, 0.26);
+  --architecture-core-shadow: 0 12px 28px rgba(255, 106, 61, 0.12);
+  --architecture-text: rgba(30, 36, 48, 0.82);
+  --architecture-pill-border: rgba(124, 92, 55, 0.16);
+  --architecture-pill-bg: rgba(255, 255, 255, 0.85);
+
+  --skill-example-bg: #fff9f2;
+  --workflow-card-border: rgba(255, 120, 60, 0.24);
+  --workflow-card-bg: rgba(255, 120, 60, 0.08);
+  --workflow-msg-border: rgba(124, 92, 55, 0.1);
+  --workflow-msg-bg: rgba(255, 255, 255, 0.58);
+  --workflow-role: rgba(30, 36, 48, 0.5);
+  --workflow-channel: rgba(30, 36, 48, 0.34);
+  --workflow-action: rgba(30, 36, 48, 0.68);
+
   --toolbar-height: 80px;
   --section-gap: 3.4rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+
+    --bg: #0b0f19;
+    --surface: #121826;
+    --surface-2: #1a2233;
+    --border: #27324a;
+    --border-strong: #3a4b6e;
+
+    --text: #e8eef9;
+    --text-muted: #cbd5e1;
+
+    --toolbar-bg: rgba(11, 15, 25, 0.92);
+    --toolbar-link-hover: rgba(159, 176, 204, 0.12);
+    --toolbar-cta-hover-text: #ffd9cc;
+    --toolbar-cta-hover-bg: rgba(255, 106, 61, 0.14);
+
+    --hero-problem: #9ca3af;
+    --section-rule: rgba(255, 255, 255, 0.12);
+
+    --panel-bg: #111c36;
+    --panel-top-bg: #101a2b;
+    --panel-toggle-bg: #0b1221;
+    --panel-border: rgba(255, 255, 255, 0.12);
+    --panel-shadow: 0 18px 40px rgba(0, 0, 0, 0.24);
+    --button-copied-text: #ffd1c1;
+    --button-copied-bg: rgba(255, 106, 61, 0.16);
+
+    --note-bg: rgba(47, 196, 214, 0.12);
+
+    --grid-line: rgba(255, 255, 255, 0.025);
+    --architecture-card-bg: rgba(255, 255, 255, 0.03);
+    --architecture-card-border: rgba(255, 255, 255, 0.08);
+    --architecture-card-edge-bg: rgba(255, 255, 255, 0.025);
+    --architecture-core-bg: rgba(255, 120, 80, 0.06);
+    --architecture-core-border: rgba(255, 120, 80, 0.2);
+    --architecture-core-shadow: 0 12px 28px rgba(255, 106, 61, 0.08);
+    --architecture-text: rgba(232, 238, 249, 0.86);
+    --architecture-pill-border: rgba(255, 255, 255, 0.08);
+    --architecture-pill-bg: rgba(11, 18, 33, 0.9);
+
+    --skill-example-bg: #111c36;
+    --workflow-card-border: rgba(255, 120, 60, 0.22);
+    --workflow-card-bg: rgba(255, 120, 60, 0.06);
+    --workflow-msg-border: rgba(255, 255, 255, 0.05);
+    --workflow-msg-bg: rgba(255, 255, 255, 0.02);
+    --workflow-role: rgba(232, 238, 249, 0.45);
+    --workflow-channel: rgba(232, 238, 249, 0.28);
+    --workflow-action: rgba(232, 238, 249, 0.65);
+  }
 }
 
 * {
@@ -27,7 +120,10 @@ html {
 body {
   margin: 0;
   min-height: 100vh;
-  background: radial-gradient(circle at 50% -20%, rgba(255, 106, 61, 0.08), transparent 50%), var(--bg);
+  background:
+    radial-gradient(circle at 50% -20%, rgba(255, 106, 61, 0.08), transparent 50%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.28), transparent 42%),
+    var(--bg);
   color: var(--text);
   font-family: var(--font-heading), "Avenir Next", "Segoe UI", sans-serif;
 }
@@ -48,7 +144,8 @@ body {
   z-index: 30;
   display: flex;
   align-items: center;
-  background: var(--bg);
+  background: var(--toolbar-bg);
+  backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--border);
   transition: transform 220ms ease, opacity 220ms ease;
 }
@@ -128,7 +225,7 @@ body {
 
 .toolbar-links a:hover {
   color: var(--text);
-  background: rgba(159, 176, 204, 0.12);
+  background: var(--toolbar-link-hover);
 }
 
 .toolbar-section-link {
@@ -163,9 +260,9 @@ body {
 }
 
 .toolbar-links .toolbar-cta:hover {
-  color: #ffd9cc;
+  color: var(--toolbar-cta-hover-text);
   border-color: var(--accent-hover);
-  background: rgba(255, 106, 61, 0.14);
+  background: var(--toolbar-cta-hover-bg);
 }
 
 .hero-card {
@@ -223,7 +320,7 @@ body {
 
 .hero-problem {
   margin: 0 0 1rem;
-  color: #9ca3af;
+  color: var(--hero-problem);
   font-size: 0.95rem;
   line-height: 1.5;
   letter-spacing: 0.02em;
@@ -263,7 +360,7 @@ body {
   left: 0;
   right: 0;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.12), transparent);
+  background: linear-gradient(90deg, transparent, var(--section-rule), transparent);
 }
 
 .quickstart-intro h2 {
@@ -287,12 +384,12 @@ body {
 
 .quickstart-block {
   margin-top: 1rem;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--panel-border);
   border-radius: 18px;
-  background: #111c36;
+  background: var(--panel-bg);
   color: var(--text);
   overflow: hidden;
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.24);
+  box-shadow: var(--panel-shadow);
 }
 
 .quickstart-docs {
@@ -318,7 +415,7 @@ body {
   justify-content: space-between;
   gap: 0.9rem;
   border-bottom: 1px solid var(--border);
-  background: #101a2b;
+  background: var(--panel-top-bg);
 }
 
 .traffic-lights {
@@ -348,7 +445,7 @@ body {
 .mode-switcher {
   display: inline-flex;
   gap: 0.35rem;
-  background: #0b1221;
+  background: var(--panel-toggle-bg);
   border: 1px solid var(--border);
   border-radius: 999px;
   padding: 0.2rem;
@@ -369,7 +466,7 @@ body {
 
 .mode-btn:hover {
   color: var(--text);
-  background: rgba(159, 176, 204, 0.14);
+  background: var(--toolbar-link-hover);
 }
 
 .mode-btn.active {
@@ -438,9 +535,9 @@ body {
 }
 
 .copy-btn.copied {
-  color: #ffd1c1;
+  color: var(--button-copied-text);
   border-color: var(--accent-hover);
-  background: rgba(255, 106, 61, 0.16);
+  background: var(--button-copied-bg);
 }
 
 .feature-grid {
@@ -576,7 +673,7 @@ body {
 .setup-note {
   margin-top: 1rem;
   padding: 0.95rem 1rem;
-  background: rgba(47, 196, 214, 0.12);
+  background: var(--note-bg);
   border-left: 4px solid var(--accent-info);
   border-radius: 0 12px 12px 0;
 }
@@ -600,33 +697,33 @@ body {
   margin-right: auto;
   padding: 1.35rem 1rem;
   justify-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--architecture-card-border);
   border-radius: 14px;
   background-image:
-    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
   background-size: 32px 32px;
   background-position: center;
 }
 
 .architecture-card {
   width: min(100%, 360px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--architecture-card-border);
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--architecture-card-bg);
   padding: 1rem 1.15rem;
   text-align: center;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.16);
+  box-shadow: var(--panel-shadow);
 }
 
 .architecture-card-edge {
-  background: rgba(255, 255, 255, 0.025);
+  background: var(--architecture-card-edge-bg);
 }
 
 .architecture-card-core {
-  background: rgba(255, 120, 80, 0.06);
-  border-color: rgba(255, 120, 80, 0.2);
-  box-shadow: 0 12px 28px rgba(255, 106, 61, 0.08);
+  background: var(--architecture-core-bg);
+  border-color: var(--architecture-core-border);
+  box-shadow: var(--architecture-core-shadow);
 }
 
 .architecture-label {
@@ -662,14 +759,14 @@ body {
 }
 
 .architecture-text {
-  color: rgba(232, 238, 249, 0.86);
+  color: var(--architecture-text);
   font-size: 0.8rem;
   line-height: 1.3;
   font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
   padding: 0.34rem 0.65rem;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(11, 18, 33, 0.9);
+  border: 1px solid var(--architecture-pill-border);
+  background: var(--architecture-pill-bg);
   letter-spacing: 0.01em;
 }
 
@@ -681,12 +778,12 @@ body {
 }
 
 .skill-example {
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--panel-border);
   border-radius: 18px;
-  background: #111c36;
+  background: var(--skill-example-bg);
   padding: 1.1rem 1.75rem;
   overflow-x: auto;
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.24);
+  box-shadow: var(--panel-shadow);
 }
 
 .skill-example-label {
@@ -726,9 +823,9 @@ body {
 }
 
 .workflow-card {
-  border: 1px solid rgba(255, 120, 60, 0.22);
+  border: 1px solid var(--workflow-card-border);
   border-radius: 14px;
-  background: rgba(255, 120, 60, 0.06);
+  background: var(--workflow-card-bg);
   padding: 1.25rem 1.5rem;
   width: 100%;
   max-width: 560px;
@@ -751,8 +848,8 @@ body {
 .workflow-msg {
   padding: 0.45rem 0.75rem;
   border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--workflow-msg-border);
+  background: var(--workflow-msg-bg);
 }
 
 .workflow-msg p {
@@ -765,7 +862,7 @@ body {
 .workflow-role {
   font-size: 0.72rem;
   font-weight: 600;
-  color: rgba(232, 238, 249, 0.45);
+  color: var(--workflow-role);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   margin: 0 0 0.1rem;
@@ -774,7 +871,7 @@ body {
 
 .workflow-channel {
   font-weight: 500;
-  color: rgba(232, 238, 249, 0.28);
+  color: var(--workflow-channel);
   font-size: 0.66rem;
   text-transform: none;
 }
@@ -786,7 +883,7 @@ body {
 .workflow-action {
   font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.84rem;
-  color: rgba(232, 238, 249, 0.65);
+  color: var(--workflow-action);
 }
 
 .workflow-reply {
