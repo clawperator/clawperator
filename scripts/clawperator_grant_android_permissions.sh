@@ -1,0 +1,1 @@
+../apps/node/bin/grant-permissions.sh

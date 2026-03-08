@@ -49,22 +49,20 @@ If any requirement is not met, the app shows an orange background and a dedicate
 
 **How to fix:**
 
-1. On the **host computer** (where you run the agent or Node API), run the permissions script from the Clawperator repo:
+1. On the **host computer**, run:
    ```bash
-   ./scripts/clawperator_grant_android_permissions.sh
+   clawperator grant-device-permissions
    ```
-   This script uses `adb` to open the right Accessibility settings and can help enable the Clawperator operator service on the connected device.
+   This uses `adb` to enable the Clawperator accessibility service on the connected device without requiring screen interaction. Add `--device-id <id>` if multiple devices are connected.
 
-2. On the **device**, you can also enable it manually:
+2. On the **device** (manual alternative):
    - Open **Settings** → **Accessibility** (or **Settings** → **Apps** → **Special app access** → **Accessibility**).
    - Find the **Clawperator** (or operator) service and turn it **On**.
    - Confirm any system dialog (e.g. "Allow [app] to observe your actions...").
 
-3. After enabling, the operator app’s doctor screen should move to **Ready** (green) once the service is connected. If you see "Permissions not granted" or an accessibility-related message, run the grant script again or re-enable the service in Accessibility settings.
+3. After enabling, run `clawperator doctor` to confirm the handshake passes. If doctor still fails, wait 2-3 seconds for the service to initialize and retry.
 
-**Note:** Android revokes the accessibility permission if the Clawperator app crashes. If the doctor screen shows "Permissions not granted" after the app had been ready, the service may have been disabled by a crash - re-run the grant script or re-enable the Clawperator service in Settings → Accessibility.
-
-**In the app:** If requirements 1 and 2 are met but the accessibility service is not running, the doctor screen shows a message like "Accessibility permissions are not configured" and instructs you to run `clawperator_grant_android_permissions.sh`.
+**Note:** Android revokes the accessibility permission if the Clawperator app crashes. If the doctor screen shows "Permissions not granted" after the app had been ready, the service may have been disabled by a crash - re-run `clawperator grant-device-permissions` or re-enable the Clawperator service in Settings → Accessibility.
 
 ---
 
@@ -84,6 +82,21 @@ If you must use **Wireless Debugging**, be aware that your mileage may vary (YMM
    ```
 
 **Warning:** Wireless debugging sessions are prone to disconnection. If the device drops off the network, the Node CLI will return `NO_DEVICES`. For production use, always prefer a wired connection.
+
+---
+
+## Installer behavior
+
+`curl -fsSL https://clawperator.com/install.sh | bash` uses the stable metadata file at `https://downloads.clawperator.com/operator/latest.json`, downloads the immutable APK and `.sha256`, verifies the checksum, then handles device install like this:
+
+1. **One connected device** - the installer offers to run `adb install -r ~/.clawperator/downloads/operator.apk`.
+2. **Multiple connected devices** - the installer skips the install and prints `adb -s <device_id> install -r ~/.clawperator/downloads/operator.apk`.
+3. **No connected devices** - the installer skips the install and leaves the verified APK at `~/.clawperator/downloads/operator.apk`.
+4. **`adb` missing** - the installer attempts to install `adb` automatically, or stops with a manual install link if it cannot.
+
+### Installer cloned everything except skills
+
+If the installer finishes but warns that skills setup was skipped, the core CLI and operator APK are still installed. The current skills repository may require separate access. This does not block `clawperator doctor`, device discovery, or direct command execution.
 
 ---
 
