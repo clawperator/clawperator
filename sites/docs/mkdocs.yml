@@ -8,7 +8,8 @@ theme:
   custom_dir: overrides
 
 nav:
-  - Home: index.md
+  - Docs Home: index.md
+  - clawperator.com: https://clawperator.com
   - Getting Started:
     - Project Overview: getting-started/project-overview.md
     - First-Time Setup: getting-started/first-time-setup.md
