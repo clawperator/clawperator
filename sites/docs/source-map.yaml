@@ -164,8 +164,3 @@ sections:
         mode: copy
         sources:
           - docs/design/skill-design.md
-      - output: design/node-api-alpha-release-checklist.md
-        title: Node API Alpha Release Checklist
-        mode: copy
-        sources:
-          - docs/design/node-api-alpha-release-checklist.md
