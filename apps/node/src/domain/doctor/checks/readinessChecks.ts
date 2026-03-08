@@ -4,6 +4,7 @@ import { type DoctorCheckResult } from "../../../contracts/doctor.js";
 import { ERROR_CODES } from "../../../contracts/errors.js";
 import { broadcastAgentCommand } from "../../../adapters/android-bridge/broadcastAgentCommand.js";
 import { waitForResultEnvelope } from "../../../adapters/android-bridge/logcatResultReader.js";
+import { probeVersionCompatibility } from "../../version/compatibility.js";
 
 export async function checkApkPresence(config: RuntimeConfig): Promise<DoctorCheckResult> {
   const { stdout } = await runAdb(config, ["shell", "pm", "list", "packages", config.receiverPackage]);
@@ -85,6 +86,45 @@ export async function checkSettings(config: RuntimeConfig): Promise<DoctorCheckR
   }
 
   return results;
+}
+
+export async function checkVersionCompatibility(config: RuntimeConfig): Promise<DoctorCheckResult> {
+  const result = await probeVersionCompatibility(config);
+
+  if (result.compatible) {
+    return {
+      id: "readiness.version.compatibility",
+      status: "pass",
+      summary: `CLI ${result.cliVersion} is compatible with installed APK ${result.apkVersion}.`,
+      evidence: {
+        cliVersion: result.cliVersion,
+        apkVersion: result.apkVersion,
+        apkVersionCode: result.apkVersionCode,
+        receiverPackage: result.receiverPackage,
+      },
+    };
+  }
+
+  return {
+    id: "readiness.version.compatibility",
+    status: "fail",
+    code: result.error?.code ?? ERROR_CODES.VERSION_INCOMPATIBLE,
+    summary: "CLI and installed APK versions are not compatible.",
+    detail: result.error?.message,
+    fix: result.remediation && result.remediation.length > 0
+      ? {
+        title: "Align CLI and APK versions",
+        platform: "any",
+        steps: result.remediation.map(step => ({ kind: "manual" as const, value: step })),
+      }
+      : undefined,
+    evidence: {
+      cliVersion: result.cliVersion,
+      apkVersion: result.apkVersion,
+      apkVersionCode: result.apkVersionCode,
+      receiverPackage: result.receiverPackage,
+    },
+  };
 }
 
 export async function runHandshake(

@@ -337,6 +337,27 @@ clawperator doctor [--json] [--fix] [--full] [--device-id <id>] [--receiver-pack
 | `--device-id <id>` | Target device serial |
 | `--receiver-package <package>` | Target Operator package |
 
+`doctor` checks APK presence before attempting version compatibility and handshake validation.
+
+---
+
+### `version`
+
+Show the CLI version, or compare it with the installed Operator APK.
+
+```
+clawperator version
+clawperator version --check-compat [--device-id <id>] [--receiver-package <package>]
+```
+
+| Flag | Description |
+|------|-------------|
+| `--check-compat` | Compare the CLI version with the installed APK version |
+| `--device-id <id>` | Target device serial |
+| `--receiver-package <package>` | Target Operator package |
+
+`clawperator version --check-compat` reports the CLI version, installed APK version, APK `versionCode`, receiver package, compatibility verdict, and remediation guidance when versions do not match.
+
 ---
 
 ## Exit Codes

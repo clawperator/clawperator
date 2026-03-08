@@ -96,6 +96,11 @@ sections:
   - id: troubleshooting
     title: Troubleshooting
     pages:
+      - output: troubleshooting/compatibility.md
+        title: Version Compatibility
+        mode: copy
+        sources:
+          - docs/compatibility.md
       - output: troubleshooting/troubleshooting.md
         title: Troubleshooting the Operator App
         mode: copy

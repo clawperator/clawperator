@@ -21,6 +21,7 @@ nav:
     - Target Architecture: architecture/architecture.md
     - Conformance Test APK: architecture/conformance-apk.md
   - Troubleshooting:
+    - Version Compatibility: troubleshooting/compatibility.md
     - Troubleshooting the Operator App: troubleshooting/troubleshooting.md
     - Known Issues: troubleshooting/known-issues.md
     - Crash Logs: troubleshooting/crash-logs.md
