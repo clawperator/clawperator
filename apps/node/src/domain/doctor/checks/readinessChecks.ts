@@ -187,7 +187,7 @@ export async function runHandshake(
       };
     } else {
       const deviceFlag = config.deviceId ? ` --device-id ${config.deviceId}` : "";
-      const pkgFlag = ` --receiver-package ${config.receiverPackage}`;
+      const pkgFlag = config.receiverPackage ? ` --receiver-package ${config.receiverPackage}` : "";
       return {
         id: "readiness.handshake",
         status: "fail",
@@ -211,7 +211,7 @@ export async function runHandshake(
 
   if ("timeout" in result && result.timeout) {
     const deviceFlag = config.deviceId ? ` --device-id ${config.deviceId}` : "";
-    const pkgFlag = ` --receiver-package ${config.receiverPackage}`;
+    const pkgFlag = config.receiverPackage ? ` --receiver-package ${config.receiverPackage}` : "";
     return {
       id: "readiness.handshake",
       status: "fail",

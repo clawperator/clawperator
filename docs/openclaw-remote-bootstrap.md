@@ -161,7 +161,7 @@ Or install the APK manually:
 adb install -r <path-to-operator.apk>
 ```
 
-The APK is cached at `~/.clawperator/operator/` after first install.
+The APK is cached at `~/.clawperator/downloads/operator.apk` after first install.
 
 ---
 

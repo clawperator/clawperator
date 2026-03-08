@@ -50,27 +50,27 @@ export async function grantAccessibilityPermission(
   const current = currentResult.stdout.trim();
   const alreadyEnabled = current.includes(svc);
 
-  const newValue = alreadyEnabled
-    ? current
-    : !current || current === "null"
-      ? svc
-      : `${current}:${svc}`;
+  if (alreadyEnabled) {
+    return { ok: true, alreadyEnabled: true };
+  }
+
+  const newValue = !current || current === "null" ? svc : `${current}:${svc}`;
 
   const enableResult = await runAdb(config, [
     "shell", "settings", "put", "secure", "accessibility_enabled", "1",
   ]);
   if (enableResult.code !== 0) {
-    return { ok: false, alreadyEnabled, error: enableResult.stderr || "Could not set accessibility_enabled" };
+    return { ok: false, alreadyEnabled: false, error: enableResult.stderr || "Could not set accessibility_enabled" };
   }
 
   const setResult = await runAdb(config, [
     "shell", "settings", "put", "secure", "enabled_accessibility_services", newValue,
   ]);
   if (setResult.code !== 0) {
-    return { ok: false, alreadyEnabled, error: setResult.stderr || "Could not set enabled_accessibility_services" };
+    return { ok: false, alreadyEnabled: false, error: setResult.stderr || "Could not set enabled_accessibility_services" };
   }
 
-  return { ok: true, alreadyEnabled };
+  return { ok: true, alreadyEnabled: false };
 }
 
 export async function grantNotificationPermission(
@@ -81,8 +81,8 @@ export async function grantNotificationPermission(
     "shell", "pm", "grant", receiverPackage, "android.permission.POST_NOTIFICATIONS",
   ]);
   if (result.code !== 0) {
-    // Android <13 or already granted - not fatal
-    return { ok: false, skipped: true, error: result.stderr || undefined };
+    // Android <13 or already granted - not fatal, treat as a successful skip
+    return { ok: true, skipped: true, error: result.stderr || undefined };
   }
   return { ok: true, skipped: false };
 }

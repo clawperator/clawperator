@@ -473,8 +473,8 @@ maybe_install_operator_apk() {
     local INSTALL_APK_RESPONSE="${CLAWPERATOR_INSTALL_APK:-}"
     if [ -z "$INSTALL_APK_RESPONSE" ]; then
         if tty -s; then
-            printf "Install operator APK %s on the connected device now? [Y/n] " "$OPERATOR_VERSION"
-            read -r INSTALL_APK_RESPONSE
+            printf "Install operator APK %s on the connected device now? [Y/n] " "$OPERATOR_VERSION" > /dev/tty
+            read -r INSTALL_APK_RESPONSE < /dev/tty
             INSTALL_APK_RESPONSE="${INSTALL_APK_RESPONSE:-Y}"
         else
             INSTALL_APK_RESPONSE="Y"

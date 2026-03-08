@@ -16,7 +16,7 @@ export async function cmdGrantDevicePermissions(options: {
 
   const result = await grantDevicePermissions(config, options.receiverPackage);
 
-  if (!result.accessibility.ok && !result.accessibility.alreadyEnabled) {
+  if (!result.accessibility.ok) {
     return formatError(
       {
         code: "GRANT_DEVICE_PERMISSIONS_FAILED",
