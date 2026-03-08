@@ -51,6 +51,7 @@
   --workflow-role: rgba(30, 36, 48, 0.5);
   --workflow-channel: rgba(30, 36, 48, 0.34);
   --workflow-action: rgba(30, 36, 48, 0.68);
+  --bg-top-wash: linear-gradient(180deg, rgba(255, 255, 255, 0.28), transparent 42%);
 
   --toolbar-height: 80px;
   --section-gap: 3.4rem;
@@ -106,6 +107,7 @@
     --workflow-role: rgba(232, 238, 249, 0.45);
     --workflow-channel: rgba(232, 238, 249, 0.28);
     --workflow-action: rgba(232, 238, 249, 0.65);
+    --bg-top-wash: linear-gradient(180deg, transparent, transparent);
   }
 }
 
@@ -122,7 +124,7 @@ body {
   min-height: 100vh;
   background:
     radial-gradient(circle at 50% -20%, rgba(255, 106, 61, 0.08), transparent 50%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.28), transparent 42%),
+    var(--bg-top-wash),
     var(--bg);
   color: var(--text);
   font-family: var(--font-heading), "Avenir Next", "Segoe UI", sans-serif;
