@@ -44,6 +44,12 @@ pip install -r "$REQUIREMENTS_FILE"
 echo "Running MkDocs build..."
 mkdocs build
 
+STATIC_DIR="$DOCS_DIR/static"
+if [ -d "$STATIC_DIR" ]; then
+    echo "Copying static root files..."
+    cp -R "$STATIC_DIR"/. "$DOCS_DIR/site/"
+fi
+
 # Verify build output
 if [ -d "site" ] && [ -f "site/index.html" ]; then
     echo "--- Successfully built documentation site to $DOCS_DIR/site ---"

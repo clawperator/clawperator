@@ -38,6 +38,24 @@ Design consequence:
 - `docs/troubleshooting.md` - Common issues
 - `docs/design/` - Internal design documents
 
+## Public Sites
+- Clawperator has two public website surfaces with different build systems and purposes:
+  - `sites/landing/` - Next.js static landing site for `https://clawperator.com`
+  - `sites/docs/` - MkDocs documentation site for `https://docs.clawperator.com`
+- Do not confuse the landing site with the docs site when making website changes:
+  - marketing homepage, install entrypoints, and root-level files for `clawperator.com` belong in `sites/landing/`
+  - technical docs content for `docs.clawperator.com` belongs in `docs/`, `apps/node/src/`, `../clawperator-skills/docs/`, and is published through `sites/docs/`
+- Root-level machine-facing files must be updated on the correct surface:
+  - `clawperator.com/robots.txt`, `llms.txt`, `sitemap.xml`, `install.sh` come from `sites/landing/public/`
+  - `docs.clawperator.com/robots.txt` and `llms.txt` come from `sites/docs/static/`
+- Deployment behavior:
+  - both public website surfaces deploy automatically to Cloudflare after changes are merged to `main`
+  - for website-only changes, source/build validation in this repo is usually sufficient before PR
+  - no manual website deployment step is expected unless the automation is broken
+- Build commands:
+  - landing site: `./scripts/site_build.sh`
+  - docs site: `./scripts/docs_build.sh`
+
 ## Skills
 - Skills are maintained in a dedicated repository: [github.com/clawpilled/clawperator-skills](https://github.com/clawpilled/clawperator-skills).
 - Typical local layout is sibling repos:
@@ -55,6 +73,8 @@ Design consequence:
 ## Documentation Discipline
 
 `sites/docs/docs/` is generated output produced by the `clawperator-generate-docs` skill. Never edit it directly - changes will be overwritten on the next run.
+
+`sites/docs/site/` is deployable MkDocs build output. Do not hand-edit it either, except as a temporary local build artifact. Source-controlled docs-site root files live in `sites/docs/static/` and are copied into `sites/docs/site/` by `./scripts/docs_build.sh`.
 
 If you find an error in a generated page, check `sites/docs/source-map.yaml` to find the source file, fix it there, then re-run the skill to regenerate. Source locations:
 - Content errors: `docs/` or `../clawperator-skills/docs/`
