@@ -49,4 +49,11 @@ describe("CLI help", () => {
     assert.match(stdout, /EXECUTION_VALIDATION_FAILED/);
     assert.match(stdout, /timeoutMs must be a finite number/);
   });
+
+  it("returns usage when timeout value is missing", async () => {
+    const { stdout, code } = await runCli(["inspect", "ui", "--timeout-ms"]);
+    assert.notStrictEqual(code, 0);
+    assert.match(stdout, /"code":"USAGE"/);
+    assert.match(stdout, /--timeout-ms requires a value/);
+  });
 });

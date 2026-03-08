@@ -152,6 +152,8 @@ Notes:
 `,
 };
 
+class UsageError extends Error {}
+
 function resolveHelpTopic(rest: string[]): string | undefined {
   if (rest.length === 0) return undefined;
   if (rest[0] === "observe" && rest[1] === "snapshot") return "observe snapshot";
@@ -185,7 +187,10 @@ function getGlobalOpts(argv: string[]): {
       receiverPackage = argv[++i];
     } else if (argv[i] === "--output" && argv[i + 1]) {
       output = argv[++i] === "pretty" ? "pretty" : "json";
-    } else if (argv[i] === "--timeout-ms" && argv[i + 1]) {
+    } else if (argv[i] === "--timeout-ms") {
+      if (!argv[i + 1]) {
+        throw new UsageError("--timeout-ms requires a value");
+      }
       timeoutMs = Number(argv[++i]);
     } else if (argv[i] === "--verbose") {
       verbose = true;
@@ -217,7 +222,16 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
-  const global = getGlobalOpts(argv);
+  let global: ReturnType<typeof getGlobalOpts>;
+  try {
+    global = getGlobalOpts(argv);
+  } catch (error) {
+    if (error instanceof UsageError) {
+      console.log(JSON.stringify({ code: "USAGE", message: error.message }));
+      process.exit(1);
+    }
+    throw error;
+  }
   if (argv.includes("--help")) {
     const topic = resolveHelpTopic(global.rest);
     console.log(topic ? HELP_TOPICS[topic] : HELP);

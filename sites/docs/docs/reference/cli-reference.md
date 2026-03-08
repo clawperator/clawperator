@@ -344,8 +344,9 @@ See [api-overview.md](./api-overview.md) for HTTP API details.
 
 Run environment and runtime checks.
 
-```
+``` 
 clawperator doctor [--output <json\|pretty>] [--device-id <id>] [--receiver-package <package>] [--verbose]
+clawperator doctor --json
 clawperator doctor --fix
 clawperator doctor --full
 clawperator doctor --check-only
@@ -353,6 +354,7 @@ clawperator doctor --check-only
 
 | Flag | Description |
 |------|-------------|
+| `--json` | Output as JSON (alias for `--output json`) |
 | `--fix` | Attempt non-destructive host fixes |
 | `--full` | Full Android build + install + handshake + smoke |
 | `--check-only` | Always exit 0 for CI or automation |
