@@ -39,6 +39,7 @@ export async function cmdVersion(options: OutputOptions & {
       remediation: result.remediation,
     }, options);
   } catch (error) {
+    process.exitCode = 1;
     return formatError(error as ClawperatorError, options);
   }
 }

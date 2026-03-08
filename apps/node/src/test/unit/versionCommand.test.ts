@@ -60,6 +60,23 @@ describe("cmdVersion", () => {
     assert.strictEqual(parsed.compatible, false);
     assert.strictEqual(parsed.error.code, ERROR_CODES.RECEIVER_NOT_INSTALLED);
   });
+
+  it("sets a non-zero exit code when device resolution fails", async () => {
+    const runner = new FakeProcessRunner();
+
+    runner.queueResult({ code: 0, stdout: "List of devices attached\n", stderr: "" });
+
+    const output = await cmdVersion({
+      format: "json",
+      checkCompat: true,
+      receiverPackage: "com.clawperator.operator.dev",
+      runner,
+    });
+    const parsed = JSON.parse(output);
+
+    assert.strictEqual(parsed.code, ERROR_CODES.NO_DEVICES);
+    assert.strictEqual(process.exitCode, 1);
+  });
 });
 
 describe("probeVersionCompatibility", () => {

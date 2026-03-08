@@ -156,6 +156,7 @@ Real-device validation target:
 
 ## Handoff Notes
 
+- This task plan was added alongside broader repo cleanup and planning updates on the branch that introduced it.
 - This task is ready for another agent to take over.
 - The largest hidden gotcha is Android debug version naming (`-d`) on top of normal semver and prerelease labels.
 - Keep the implementation narrow. The required outcome is explicit compatibility detection and reporting, not a broad redesign of execution or release versioning.
