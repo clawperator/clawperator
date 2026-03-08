@@ -19,6 +19,18 @@ The system consists of two primary layers:
 -   **Android Runtime (`apps/android`):** An Android application that leverages Accessibility APIs to inspect the UI tree and perform actions (taps, scrolls, text entry, and system hard-keys like `back`/`home`). It listens for commands via a broadcast receiver.
 -   **Node Runtime/CLI (`apps/node`):** The primary interface for agents. It wraps `adb` interactions, validates execution payloads, dispatches commands to the Android device, and parses canonical result envelopes from logs.
 
+## Website Surfaces
+This repository also contains two separate public website builds:
+
+-   **Landing site (`sites/landing`):** The static Next.js site for `https://clawperator.com`. This is the marketing homepage and install/download entrypoint.
+-   **Docs site (`sites/docs`):** The MkDocs site for `https://docs.clawperator.com`. This is the technical documentation surface.
+
+Keep them distinct when editing:
+
+-   Landing-site root files such as `install.sh`, `robots.txt`, `llms.txt`, and `sitemap.xml` belong to `sites/landing/public/`.
+-   Docs content should be changed in `docs/`, `apps/node/src/`, or `../clawperator-skills/docs/`, not directly in `sites/docs/docs/`.
+-   Docs-site root files such as `robots.txt` and `llms.txt` live in `sites/docs/static/` and are copied into the built site by `./scripts/docs_build.sh`.
+
 ## The Role of Skills
 Skills are reusable templates for app-specific workflows (e.g., "get thermostat temperature" or "check grocery prices").
 

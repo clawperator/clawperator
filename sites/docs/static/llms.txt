@@ -1,0 +1,19 @@
+# Clawperator Docs
+
+This site contains the technical documentation for Clawperator, a deterministic Android automation runtime for AI agents.
+
+## Preferred pages
+
+- Docs home: https://docs.clawperator.com/
+- Agent guide: https://docs.clawperator.com/ai-agents/node-api-for-agents/
+- API overview: https://docs.clawperator.com/reference/api-overview/
+- CLI reference: https://docs.clawperator.com/reference/cli-reference/
+- Error codes: https://docs.clawperator.com/reference/error-codes/
+- Architecture: https://docs.clawperator.com/architecture/architecture/
+
+## Guidance for agents
+
+- Prefer this docs site over the marketing homepage for technical behavior.
+- The Node API is strict and contract-driven.
+- Clawperator executes validated actions and returns structured results.
+- Reasoning and planning stay in the external agent.

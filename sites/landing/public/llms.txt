@@ -1,0 +1,19 @@
+# Clawperator
+
+Clawperator is a deterministic Android automation runtime for AI agents. It exposes a strict Node API and CLI that let an agent observe Android UI state, execute validated actions, and receive one structured result per command.
+
+## Preferred starting points
+
+- Homepage: https://clawperator.com/
+- Docs: https://docs.clawperator.com/
+- Agent guide: https://docs.clawperator.com/ai-agents/node-api-for-agents/
+- API overview: https://docs.clawperator.com/reference/api-overview/
+- CLI reference: https://docs.clawperator.com/reference/cli-reference/
+- GitHub: https://github.com/clawpilled/clawperator
+
+## Notes for agents
+
+- The docs site contains the substantive technical documentation.
+- Prefer the Node API and CLI docs over inferring behavior from marketing copy.
+- Clawperator is an actuator, not an autonomous planner.
+- Skills are maintained separately at https://github.com/clawpilled/clawperator-skills
