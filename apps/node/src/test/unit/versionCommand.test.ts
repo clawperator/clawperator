@@ -48,6 +48,7 @@ describe("cmdVersion", () => {
 
     runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "", stderr: "" });
 
     const output = await cmdVersion({
       format: "json",
@@ -59,6 +60,26 @@ describe("cmdVersion", () => {
 
     assert.strictEqual(parsed.compatible, false);
     assert.strictEqual(parsed.error.code, ERROR_CODES.RECEIVER_NOT_INSTALLED);
+  });
+
+  it("reports a variant mismatch when the alternate receiver package is installed", async () => {
+    const runner = new FakeProcessRunner();
+
+    runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "package:com.clawperator.operator\n", stderr: "" });
+
+    const output = await cmdVersion({
+      format: "json",
+      checkCompat: true,
+      receiverPackage: "com.clawperator.operator.dev",
+      runner,
+    });
+    const parsed = JSON.parse(output);
+
+    assert.strictEqual(parsed.compatible, false);
+    assert.strictEqual(parsed.error.code, ERROR_CODES.RECEIVER_VARIANT_MISMATCH);
+    assert.match(parsed.error.message, /Expected com\.clawperator\.operator\.dev/);
   });
 
   it("sets a non-zero exit code when device resolution fails", async () => {
@@ -80,6 +101,24 @@ describe("cmdVersion", () => {
 });
 
 describe("probeVersionCompatibility", () => {
+  it("returns variant mismatch when only the alternate receiver package is installed", async () => {
+    const runner = new FakeProcessRunner();
+    const config = getDefaultRuntimeConfig({
+      runner,
+      deviceId: "test-device-1",
+      receiverPackage: "com.clawperator.operator.dev",
+    });
+
+    runner.queueResult({ code: 0, stdout: "", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "package:com.clawperator.operator\n", stderr: "" });
+
+    const result = await probeVersionCompatibility(config);
+
+    assert.strictEqual(result.compatible, false);
+    assert.strictEqual(result.error?.code, ERROR_CODES.RECEIVER_VARIANT_MISMATCH);
+    assert.ok(result.remediation?.includes("Use --receiver-package com.clawperator.operator"));
+  });
+
   it("returns invalid when the installed APK version is malformed", async () => {
     const runner = new FakeProcessRunner();
     const config = getDefaultRuntimeConfig({

@@ -32,6 +32,26 @@ export interface VersionCompatibilityProbe {
   remediation?: string[];
 }
 
+async function getInstalledReceiverVariant(
+  config: RuntimeConfig,
+  receiverPackage: string
+): Promise<{ installed: boolean; alternateVariant?: string }> {
+  const packageList = await runAdb(config, ["shell", "pm", "list", "packages", receiverPackage]);
+  if (packageList.stdout.includes(`package:${receiverPackage}`)) {
+    return { installed: true };
+  }
+
+  const alternateVariant = receiverPackage.endsWith(".dev")
+    ? receiverPackage.replace(".dev", "")
+    : `${receiverPackage}.dev`;
+  const alternateList = await runAdb(config, ["shell", "pm", "list", "packages", alternateVariant]);
+  if (alternateList.stdout.includes(`package:${alternateVariant}`)) {
+    return { installed: false, alternateVariant };
+  }
+
+  return { installed: false };
+}
+
 export function getCliVersion(): string {
   const pkg = require("../../../package.json") as { version?: string };
   return pkg.version ?? "0.1.0";
@@ -102,8 +122,25 @@ export async function probeVersionCompatibility(config: RuntimeConfig): Promise<
     };
   }
 
-  const packageList = await runAdb(config, ["shell", "pm", "list", "packages", receiverPackage]);
-  if (!packageList.stdout.includes(`package:${receiverPackage}`)) {
+  const receiverVariant = await getInstalledReceiverVariant(config, receiverPackage);
+  if (!receiverVariant.installed) {
+    if (receiverVariant.alternateVariant) {
+      return {
+        cliVersion,
+        receiverPackage,
+        compatible: false,
+        error: {
+          code: ERROR_CODES.RECEIVER_VARIANT_MISMATCH,
+          message: `Expected ${receiverPackage} but found installed variant ${receiverVariant.alternateVariant}.`,
+          hint: "Use the installed receiver package or reinstall the correct APK variant.",
+        },
+        remediation: [
+          `Use --receiver-package ${receiverVariant.alternateVariant}`,
+          `Reinstall the correct APK variant for ${receiverPackage}`,
+        ],
+      };
+    }
+
     return {
       cliVersion,
       receiverPackage,
