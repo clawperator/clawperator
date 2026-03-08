@@ -15,6 +15,10 @@ This checklist tracks the remaining pre-launch work after the release, docs, ins
 - Doctor now distinguishes critical failures from warnings and skips handshake when the APK is missing.
 - CLI/APK version compatibility checks now ship in `clawperator doctor` and `clawperator version --check-compat`.
 
+## npm Publishing
+
+npm provenance attestation requires the source repo to be public. Until the repo is public, the publish workflow runs with `NPM_CONFIG_PROVENANCE=false`. Re-enable `--provenance` and `id-token: write` in `.github/workflows/publish-npm.yml` when the repo goes public.
+
 ## Deferred Items (Not in This Roadmap)
 
 These are explicitly deferred beyond the current pre-release work:
