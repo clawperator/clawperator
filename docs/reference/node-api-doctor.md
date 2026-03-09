@@ -23,7 +23,7 @@ Supported flags:
 - `--receiver-package <package>` - override the target Operator package
 - `--fix` - run shell-based remediation steps from failing checks
 - `--full` - include Android build, install, launch, and smoke test checks
-- `--check-only` - always exit `0`, even when critical checks fail
+- `--check-only` - always exit `0`, even when critical checks fail; does not change halt behavior (doctor still returns early on critical failures)
 
 Default receiver package:
 
@@ -213,4 +213,4 @@ clawperator doctor --full
 - `clawperator grant-device-permissions` - enable Accessibility and related app ops via adb
 - `clawperator observe snapshot` - direct runtime check once doctor reports the environment is ready
 
-For initial installation and device setup, see [First-Time Setup](../getting-started/first-time-setup.md) and [OpenClaw Remote Bootstrap](../ai-agents/openclaw-remote-bootstrap.md).
+For initial installation and device setup, see [First-Time Setup](../getting-started/first-time-setup.md) and [Agent Bootstrap Guide](../ai-agents/openclaw-remote-bootstrap.md).

@@ -106,7 +106,7 @@ sections:
         title: Clawperator Doctor
         mode: copy
         sources:
-          - docs/node-api-doctor.md
+          - docs/reference/node-api-doctor.md
 
   - id: troubleshooting
     title: Troubleshooting
