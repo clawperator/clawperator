@@ -335,7 +335,7 @@ Supported action types (v1):
 2. run `clawperator grant-device-permissions`
 3. print exact remediation when automatic fix is unavailable
 
-See [Clawperator Doctor](../node-api-doctor.md) for the full check list and JSON report shape.
+See [Clawperator Doctor](../reference/node-api-doctor.md) for the full check list and JSON report shape.
 
 ## Skill Integration Mechanism
 
