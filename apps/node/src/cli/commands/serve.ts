@@ -10,6 +10,11 @@ import { clawperatorEvents, CLAW_EVENT_TYPES } from "../../domain/observe/events
 import { ERROR_CODES } from "../../contracts/errors.js";
 import { SKILL_NOT_FOUND } from "../../contracts/skills.js";
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
+import { listConfiguredAvds, inspectConfiguredAvd } from "../../domain/android-emulators/configuredAvds.js";
+import { listRunningEmulators } from "../../domain/android-emulators/runningEmulators.js";
+import { createAvd, deleteAvd, startAvd, stopAvd, waitForBootCompletion, waitForEmulatorRegistration } from "../../domain/android-emulators/lifecycle.js";
+import { provisionEmulator } from "../../domain/android-emulators/provision.js";
+import { DEFAULT_EMULATOR_AVD_NAME, DEFAULT_EMULATOR_DEVICE_PROFILE, DEFAULT_EMULATOR_SYSTEM_IMAGE, SUPPORTED_EMULATOR_API_LEVEL } from "../../domain/android-emulators/constants.js";
 
 interface ServeOptions {
   port: number;
@@ -69,8 +74,22 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       case ERROR_CODES.EXECUTION_VALIDATION_FAILED: return 400;
       case ERROR_CODES.PAYLOAD_TOO_LARGE: return 413;
       case ERROR_CODES.RESULT_ENVELOPE_TIMEOUT: return 504;
+      case ERROR_CODES.EMULATOR_NOT_FOUND: return 404;
+      case ERROR_CODES.EMULATOR_NOT_RUNNING: return 404;
+      case ERROR_CODES.EMULATOR_UNSUPPORTED: return 409;
+      case ERROR_CODES.EMULATOR_ALREADY_RUNNING: return 409;
       default: return 400;
     }
+  }
+
+  function getEmulatorConfig() {
+    return getDefaultRuntimeConfig({
+      adbPath: process.env.ADB_PATH,
+      emulatorPath: process.env.EMULATOR_PATH,
+      sdkmanagerPath: process.env.SDKMANAGER_PATH,
+      avdmanagerPath: process.env.AVDMANAGER_PATH,
+      receiverPackage: process.env.CLAWPERATOR_RECEIVER_PACKAGE,
+    });
   }
 
   // REST: Execute command
@@ -225,6 +244,109 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       }
     } catch (e) {
       res.status(500).json({ ok: false, error: { code: "INTERNAL_ERROR", message: String(e) } });
+    }
+  });
+
+  app.get("/android/emulators", async (_req, res) => {
+    try {
+      const config = getEmulatorConfig();
+      const running = await listRunningEmulators(config);
+      const avds = await listConfiguredAvds(config, new Set(running.map((emulator) => emulator.avdName)));
+      res.json({ avds });
+    } catch (error) {
+      res.status(500).json({ ok: false, error: { code: "INTERNAL_ERROR", message: String(error) } });
+    }
+  });
+
+  app.get("/android/emulators/:name", async (req, res) => {
+    try {
+      const config = getEmulatorConfig();
+      const running = await listRunningEmulators(config);
+      const avd = await inspectConfiguredAvd(req.params.name, new Set(running.map((emulator) => emulator.avdName)));
+      res.json(avd);
+    } catch (error) {
+      res.status(500).json({ ok: false, error: { code: "INTERNAL_ERROR", message: String(error) } });
+    }
+  });
+
+  app.get("/android/emulators/running", async (_req, res) => {
+    try {
+      const config = getEmulatorConfig();
+      const devices = await listRunningEmulators(config);
+      res.json({ devices });
+    } catch (error) {
+      res.status(500).json({ ok: false, error: { code: "INTERNAL_ERROR", message: String(error) } });
+    }
+  });
+
+  app.post("/android/emulators/create", async (req, res) => {
+    try {
+      const config = getEmulatorConfig();
+      const body = (req.body && typeof req.body === "object") ? req.body as Record<string, unknown> : {};
+      const name = typeof body.name === "string" && body.name.length > 0 ? body.name : DEFAULT_EMULATOR_AVD_NAME;
+      const apiLevel = typeof body.apiLevel === "number" ? body.apiLevel : SUPPORTED_EMULATOR_API_LEVEL;
+      const abi = typeof body.abi === "string" && body.abi.length > 0 ? body.abi : "arm64-v8a";
+      const deviceProfile = typeof body.deviceProfile === "string" && body.deviceProfile.length > 0
+        ? body.deviceProfile
+        : DEFAULT_EMULATOR_DEVICE_PROFILE;
+      const playStore = body.playStore !== false;
+      const systemImage = playStore
+        ? `system-images;android-${apiLevel};google_apis_playstore;${abi}`
+        : DEFAULT_EMULATOR_SYSTEM_IMAGE.replace("google_apis_playstore", "google_apis");
+
+      await createAvd(config, { name, systemImage, deviceProfile });
+      const avd = await inspectConfiguredAvd(name);
+      res.json(avd);
+    } catch (error) {
+      const e = error as { code?: string; message?: string };
+      res.status(mapErrorToStatus(e.code ?? "INTERNAL_ERROR")).json({ ok: false, error: { code: e.code ?? "INTERNAL_ERROR", message: e.message ?? String(error) } });
+    }
+  });
+
+  app.post("/android/emulators/:name/start", async (req, res) => {
+    try {
+      const config = getEmulatorConfig();
+      const name = req.params.name;
+      startAvd(config, name);
+      const serial = await waitForEmulatorRegistration(config, name);
+      await waitForBootCompletion(config, serial);
+      res.json({ type: "emulator", avdName: name, serial, booted: true });
+    } catch (error) {
+      const e = error as { code?: string; message?: string };
+      res.status(mapErrorToStatus(e.code ?? "INTERNAL_ERROR")).json({ ok: false, error: { code: e.code ?? "INTERNAL_ERROR", message: e.message ?? String(error) } });
+    }
+  });
+
+  app.post("/android/emulators/:name/stop", async (req, res) => {
+    try {
+      const config = getEmulatorConfig();
+      await stopAvd(config, req.params.name);
+      res.json({ ok: true, avdName: req.params.name, stopped: true });
+    } catch (error) {
+      const e = error as { code?: string; message?: string };
+      res.status(mapErrorToStatus(e.code ?? "INTERNAL_ERROR")).json({ ok: false, error: { code: e.code ?? "INTERNAL_ERROR", message: e.message ?? String(error) } });
+    }
+  });
+
+  app.delete("/android/emulators/:name", async (req, res) => {
+    try {
+      const config = getEmulatorConfig();
+      await deleteAvd(config, req.params.name);
+      res.json({ ok: true, avdName: req.params.name, deleted: true });
+    } catch (error) {
+      const e = error as { code?: string; message?: string };
+      res.status(mapErrorToStatus(e.code ?? "INTERNAL_ERROR")).json({ ok: false, error: { code: e.code ?? "INTERNAL_ERROR", message: e.message ?? String(error) } });
+    }
+  });
+
+  app.post("/android/provision/emulator", async (_req, res) => {
+    try {
+      const config = getEmulatorConfig();
+      const result = await provisionEmulator(config);
+      res.json(result);
+    } catch (error) {
+      const e = error as { code?: string; message?: string };
+      res.status(mapErrorToStatus(e.code ?? "INTERNAL_ERROR")).json({ ok: false, error: { code: e.code ?? "INTERNAL_ERROR", message: e.message ?? String(error) } });
     }
   });
 

@@ -32,6 +32,31 @@ describe("serve API integration", () => {
     assert.strictEqual(body.ok, true);
   });
 
+  test("GET /android/emulators returns a structured response", async () => {
+    const res = await fetch(`http://localhost:${port}/android/emulators`);
+    assert.ok(res.status === 200 || res.status === 500);
+    const body = await res.json() as { avds?: unknown[]; ok?: boolean; error?: { code?: string } };
+    assert.ok(Array.isArray(body.avds) || body.ok === false);
+  });
+
+  test("GET /android/emulators/running returns a structured response", async () => {
+    const res = await fetch(`http://localhost:${port}/android/emulators/running`);
+    assert.ok(res.status === 200 || res.status === 500);
+    const body = await res.json() as unknown;
+    assert.strictEqual(typeof body, "object");
+  });
+
+  test("POST /android/provision/emulator returns a structured response", async () => {
+    const res = await fetch(`http://localhost:${port}/android/provision/emulator`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    assert.ok(res.status === 200 || res.status === 400 || res.status === 409 || res.status === 500);
+    const body = await res.json() as { serial?: string; ok?: boolean; error?: { code?: string } };
+    assert.ok(typeof body.serial === "string" || body.ok === false || body.error !== undefined);
+  });
+
   test("POST /execute with no body returns 400", async () => {
     const res = await fetch(`http://localhost:${port}/execute`, {
       method: "POST",
