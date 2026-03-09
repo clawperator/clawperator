@@ -291,7 +291,7 @@ setup_skills() {
             return 0
         fi
     fi
-    
+
     local REGISTRY_FILE=""
     local REGISTRY_CANDIDATES=(
         "$SKILLS_DIR/skills-registry.json"

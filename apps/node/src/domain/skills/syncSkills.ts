@@ -86,7 +86,7 @@ export async function syncSkills(
         }
         const buffer = await response.arrayBuffer();
         await writeFile(tmpBundle, Buffer.from(buffer));
-        
+
         // NOTE: HTTP-served git bundles are static files - git re-downloads the
         // entire bundle on every fetch (no incremental delta like a live git server).
         await exec("git", [
