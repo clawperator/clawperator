@@ -460,12 +460,9 @@ export default function Home() {
           settings overview, or pull data from a tracking app.
         </p>
         <p>
-          Skills live in a dedicated{" "}
-          <a href="https://github.com/clawpilled/clawperator-skills" target="_blank" rel="noreferrer">
-            open source repository
-          </a>{" "}
-          and are designed to be standalone. Your agent can invoke a skill script directly, or use the Node API
-          to discover, search, and run skills through a single interface.
+          Skills are packaged and distributed as a versioned bundle via the Clawperator install.
+          Each skill is standalone and designed to be invoked directly or through the Node API -
+          discover, search, and run skills through a single interface.
         </p>
 
         <div className="skills-examples">

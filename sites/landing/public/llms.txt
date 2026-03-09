@@ -16,4 +16,7 @@ Clawperator is a deterministic Android automation runtime for AI agents. It expo
 - The docs site contains the substantive technical documentation.
 - Prefer the Node API and CLI docs over inferring behavior from marketing copy.
 - Clawperator is an actuator, not an autonomous planner.
-- Skills are maintained separately at https://github.com/clawpilled/clawperator-skills
+- Skills are distributed as a bundle at https://clawperator.com/install/clawperator-skills.bundle
+- Install skills: run `clawperator skills install` after setup
+- Skills registry: `~/.clawperator/skills/skills/skills-registry.json` (set via CLAWPERATOR_SKILLS_REGISTRY)
+- Skill scripts are authored in Node.js; invoke with: `node skills/<id>/scripts/<name>.js <deviceId> [args]`
