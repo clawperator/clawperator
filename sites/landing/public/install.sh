@@ -466,6 +466,7 @@ maybe_install_operator_apk() {
                 fi
             else
                 echo -e "${RED}❌ Failed to install operator APK via adb.${NC}"
+                return 1
             fi
             ;;
         *)
@@ -494,6 +495,19 @@ process.stdin.on('data', c => d += c).on('end', () => {
 " 2>/dev/null
 }
 
+doctor_report_ok() {
+    local json="$1"
+    printf '%s' "$json" | node -e "
+let d='';
+process.stdin.on('data', c => d += c).on('end', () => {
+  try {
+    const r = JSON.parse(d);
+    process.exitCode = (r.criticalOk ?? r.ok) ? 0 : 1;
+  } catch { process.exitCode = 1; }
+});
+" 2>/dev/null
+}
+
 # 8. Run Doctor and Apply Fixes
 run_doctor_and_fix() {
     echo -e "${BLUE}Running Clawperator Doctor to verify environment...${NC}"
@@ -510,13 +524,11 @@ run_doctor_and_fix() {
         check_git || return 1
     fi
 
-    # Download and Verify APK if needed
-    if doctor_check_status "$DOCTOR_JSON" "readiness.apk.presence" "fail"; then
-        download_operator_apk || return 1
-        verify_operator_apk || return 1
-        maybe_install_operator_apk || return 1
-    elif doctor_check_status "$DOCTOR_JSON" "readiness.apk.presence" "warn"; then
-        # Could be missing or wrong variant, try installing
+    # Download and Verify APK if needed.
+    # Reinstall when the APK is missing, the wrong variant is installed, or the installed APK is version-incompatible.
+    if doctor_check_status "$DOCTOR_JSON" "readiness.apk.presence" "fail" || \
+       doctor_check_status "$DOCTOR_JSON" "readiness.apk.presence" "warn" || \
+       doctor_check_status "$DOCTOR_JSON" "readiness.version.compatibility" "fail"; then
         download_operator_apk || return 1
         verify_operator_apk || return 1
         maybe_install_operator_apk || return 1
@@ -563,6 +575,17 @@ main() {
     esac
 
     echo ""
+    echo -e "${BLUE}Final Doctor Check...${NC}"
+    local FINAL_DOCTOR_JSON
+    FINAL_DOCTOR_JSON="$("$CLAWPERATOR_BIN_PATH" doctor --format json)"
+    if ! doctor_report_ok "$FINAL_DOCTOR_JSON"; then
+        echo -e "${RED}❌ Final doctor check failed.${NC}"
+        "$CLAWPERATOR_BIN_PATH" doctor --output pretty || true
+        return 1
+    fi
+    "$CLAWPERATOR_BIN_PATH" doctor --output pretty
+
+    echo ""
     echo -e "${GREEN}════════════════════════════════════════════════════════════════${NC}"
     echo -e "${GREEN}  Installation Successful!${NC}"
     echo -e "${GREEN}════════════════════════════════════════════════════════════════${NC}"
@@ -577,9 +600,6 @@ main() {
     echo -e "   ${BLUE}https://clawperator.com/operator.apk${NC}"
     echo -e "5. Historical releases and artifacts remain at:"
     echo -e "   ${BLUE}https://github.com/clawpilled/clawperator/releases${NC}"
-    echo ""
-    echo -e "6. Final Doctor Check:"
-    "$CLAWPERATOR_BIN_PATH" doctor
     echo ""
     
     if [ "$SKILLS_SETUP_STATUS" = "configured" ]; then
