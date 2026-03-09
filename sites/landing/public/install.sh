@@ -17,9 +17,11 @@ APK_METADATA_URL="${CLAWPERATOR_APK_METADATA_URL:-https://downloads.clawperator.
 APK_DOWNLOAD_DIR="${HOME}/.clawperator/downloads"
 APK_LOCAL_PATH="${APK_DOWNLOAD_DIR}/operator.apk"
 APK_SHA_PATH="${APK_DOWNLOAD_DIR}/operator.apk.sha256"
+DEFAULT_RECEIVER_PACKAGE="com.clawperator.operator"
 INSTALL_COMMAND="curl -fsSL https://clawperator.com/install.sh | bash"
 SKILLS_SETUP_STATUS="not-run"
 SKILLS_REGISTRY_PATH=""
+CLAWPERATOR_BIN_PATH=""
 
 TEMP_FILES=()
 
@@ -514,8 +516,23 @@ maybe_install_operator_apk() {
     case "$INSTALL_APK_RESPONSE" in
         y|Y|yes|YES)
             echo -e "${BLUE}Installing operator APK on connected device...${NC}"
-            adb install -r "$APK_LOCAL_PATH"
-            echo -e "${GREEN}✅ Operator APK installed.${NC}"
+            if adb install -r "$APK_LOCAL_PATH"; then
+                echo -e "${GREEN}✅ Operator APK installed.${NC}"
+                
+                # Auto-grant permissions if we have a CLI binary and exactly one device
+                if [ -n "$CLAWPERATOR_BIN_PATH" ] && [ "$DEVICE_COUNT" -eq 1 ]; then
+                    local DEVICE_ID
+                    DEVICE_ID="$(list_connected_devices)"
+                    echo -e "${BLUE}Auto-granting device permissions for $DEVICE_ID...${NC}"
+                    if "$CLAWPERATOR_BIN_PATH" grant-device-permissions --device-id "$DEVICE_ID" --receiver-package "$DEFAULT_RECEIVER_PACKAGE" > /dev/null 2>&1; then
+                        echo -e "${GREEN}✅ Accessibility permissions granted.${NC}"
+                    else
+                        echo -e "${YELLOW}⚠️  Auto-grant failed. You may need to grant accessibility permissions manually.${NC}"
+                    fi
+                fi
+            else
+                echo -e "${RED}❌ Failed to install operator APK via adb.${NC}"
+            fi
             ;;
         *)
             echo -e "${YELLOW}⚠️  Skipped APK installation. Manual command: adb install -r ${APK_LOCAL_PATH}${NC}"
@@ -531,10 +548,30 @@ main() {
     check_git || exit 1
     check_curl || exit 1
     install_cli || exit 1
+
+    # Discover the binary path for immediate use and display
+    CLAWPERATOR_BIN_PATH="$(command -v clawperator || true)"
+    if [ -z "$CLAWPERATOR_BIN_PATH" ]; then
+        local NPM_PREFIX
+        NPM_PREFIX="$(npm config get prefix)"
+        if [ -f "$NPM_PREFIX/bin/clawperator" ]; then
+            CLAWPERATOR_BIN_PATH="$NPM_PREFIX/bin/clawperator"
+        fi
+    fi
+
     setup_skills || exit 1
     download_operator_apk || exit 1
     verify_operator_apk || exit 1
     maybe_install_operator_apk || exit 1
+
+    local DETECTED_SHELL
+    DETECTED_SHELL="$(basename "$SHELL")"
+    local SOURCE_CMD=""
+    case "$DETECTED_SHELL" in
+        zsh) SOURCE_CMD="source ~/.zshrc" ;;
+        bash) [ -f "$HOME/.bashrc" ] && SOURCE_CMD="source ~/.bashrc" || SOURCE_CMD="source ~/.bash_profile" ;;
+        *) SOURCE_CMD="source ~/.$(basename "$SHELL")rc" ;;
+    esac
 
     echo ""
     echo -e "${GREEN}════════════════════════════════════════════════════════════════${NC}"
@@ -542,24 +579,26 @@ main() {
     echo -e "${GREEN}════════════════════════════════════════════════════════════════${NC}"
     echo ""
     echo -e "Next steps:"
-    echo -e "1. ${YELLOW}Restart your terminal${NC} or run: source ~/.zshrc (or ~/.bashrc)"
-    echo -e "2. The latest operator APK (${YELLOW}${OPERATOR_VERSION}${NC}) is saved at:"
+    echo -e "1. ${YELLOW}Update your session PATH:${NC} run '${SOURCE_CMD}'"
+    echo -e "2. ${YELLOW}Clawperator binary installed at:${NC}"
+    echo -e "   ${BLUE}${CLAWPERATOR_BIN_PATH:-clawperator}${NC}"
+    echo -e "3. The latest operator APK (${YELLOW}${OPERATOR_VERSION}${NC}) is saved at:"
     echo -e "   ${BLUE}${APK_LOCAL_PATH}${NC}"
-    echo -e "3. Stable download URL:"
+    echo -e "4. Stable download URL:"
     echo -e "   ${BLUE}https://clawperator.com/operator.apk${NC}"
-    echo -e "4. Historical release notes and artifacts remain at:"
+    echo -e "5. Historical release notes and artifacts remain at:"
     echo -e "   ${BLUE}https://github.com/clawpilled/clawperator/releases${NC}"
+    echo -e "6. Run ${YELLOW}clawperator doctor${NC} to verify setup"
+    echo ""
     if [ "$SKILLS_SETUP_STATUS" = "configured" ]; then
-        echo -e "5. Skills registry configured at:"
+        echo -e "7. Skills registry configured at:"
         echo -e "   ${BLUE}${SKILLS_REGISTRY_PATH}${NC}"
-        echo -e "6. Run ${YELLOW}clawperator doctor${NC} to verify setup"
     else
-        echo -e "5. ${YELLOW}Skills were not configured during install.${NC}"
+        echo -e "7. ${YELLOW}Skills were not configured during install.${NC}"
         echo -e "   To set up skills later, run:"
         echo -e "   ${YELLOW}clawperator skills install${NC}"
         echo -e "   Then add to your shell profile (~/.zshrc or ~/.bashrc):"
         echo -e "   ${YELLOW}export CLAWPERATOR_SKILLS_REGISTRY=\"\$HOME/.clawperator/skills/skills/skills-registry.json\"${NC}"
-        echo -e "6. Run ${YELLOW}clawperator doctor${NC} to verify setup"
     fi
     echo ""
     echo -e "For more info, visit: ${BLUE}https://docs.clawperator.com${NC}"
