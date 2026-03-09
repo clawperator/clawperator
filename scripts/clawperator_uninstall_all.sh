@@ -7,6 +7,7 @@
 # What this removes:
 #   - Clawperator CLI (npm global package)
 #   - Operator APK from all connected devices (release and debug variants)
+#   - Any Android emulators named `clawperator-*`
 #   - ~/.clawperator/ (downloads, skills repo, all local state)
 #   - CLAWPERATOR_SKILLS_REGISTRY export from shell RC files
 #   - Any running `clawperator serve` processes
@@ -28,6 +29,8 @@ RELEASE_PKG="com.clawperator.operator"
 DEBUG_PKG="com.clawperator.operator.dev"
 CLAWPERATOR_DIR="$HOME/.clawperator"
 SHELL_RCS=("$HOME/.zshrc" "$HOME/.bashrc" "$HOME/.bash_profile")
+DEFAULT_AVDMANAGER_PATH="$HOME/Library/Android/sdk/cmdline-tools/latest/bin/avdmanager"
+DEFAULT_EMULATOR_PATH="$HOME/Library/Android/sdk/emulator/emulator"
 
 DRY_RUN=false
 DEVICE_SERIAL=""
@@ -77,6 +80,20 @@ run_cmd() {
     else
         "$@"
     fi
+}
+
+find_sdk_tool() {
+    local tool_name="$1"
+    local default_path="$2"
+    if command -v "$tool_name" > /dev/null 2>&1; then
+        command -v "$tool_name"
+        return 0
+    fi
+    if [ -x "$default_path" ]; then
+        echo "$default_path"
+        return 0
+    fi
+    return 1
 }
 
 # ---------------------------------------------------------------------------
@@ -193,7 +210,67 @@ uninstall_apks() {
 }
 
 # ---------------------------------------------------------------------------
-# 4. Remove ~/.clawperator/
+# 4. Remove clawperator emulators
+
+remove_clawperator_emulators() {
+    echo -e "${BLUE}Removing clawperator emulators...${NC}"
+
+    local emulator_bin=""
+    local avdmanager_bin=""
+
+    if ! emulator_bin="$(find_sdk_tool emulator "$DEFAULT_EMULATOR_PATH")"; then
+        echo "   emulator not found. Skipping AVD cleanup."
+        return
+    fi
+    if ! avdmanager_bin="$(find_sdk_tool avdmanager "$DEFAULT_AVDMANAGER_PATH")"; then
+        echo "   avdmanager not found. Skipping AVD cleanup."
+        return
+    fi
+
+    local avd_names
+    avd_names="$("$emulator_bin" -list-avds 2>/dev/null | awk '/^clawperator-/ { print $1 }')"
+    if [ -z "$avd_names" ]; then
+        echo "   No clawperator emulators found."
+        return
+    fi
+
+    while IFS= read -r avd_name; do
+        [ -n "$avd_name" ] || continue
+
+        local serial=""
+        serial="$(adb devices | awk '$1 ~ /^emulator-/ && $2 == "device" { print $1 }' | while read -r emulator_serial; do
+            [ -n "$emulator_serial" ] || continue
+            local resolved_name
+            resolved_name="$(adb -s "$emulator_serial" emu avd name 2>/dev/null | tail -n 1 | tr -d '\r')"
+            if [ "$resolved_name" = "$avd_name" ]; then
+                echo "$emulator_serial"
+                break
+            fi
+        done)"
+
+        if [ -n "$serial" ]; then
+            echo -e "${BLUE}Stopping running emulator ${avd_name} (${serial})...${NC}"
+            if [ "$DRY_RUN" = true ]; then
+                echo -e "${YELLOW}[dry-run] adb -s ${serial} emu kill${NC}"
+            else
+                adb -s "$serial" emu kill > /dev/null 2>&1 || warn "Failed to stop running emulator ${avd_name}."
+                sleep 2
+            fi
+        fi
+
+        echo -e "${BLUE}Deleting emulator ${avd_name}...${NC}"
+        if [ "$DRY_RUN" = true ]; then
+            echo -e "${YELLOW}[dry-run] ${avdmanager_bin} delete avd --name ${avd_name}${NC}"
+        elif "$avdmanager_bin" delete avd --name "$avd_name" > /dev/null 2>&1; then
+            echo -e "${GREEN}✅ Deleted emulator ${avd_name}.${NC}"
+        else
+            warn "Failed to delete emulator ${avd_name}."
+        fi
+    done <<< "$avd_names"
+}
+
+# ---------------------------------------------------------------------------
+# 5. Remove ~/.clawperator/
 
 remove_data_dir() {
     echo -e "${BLUE}Removing ${CLAWPERATOR_DIR}...${NC}"
@@ -206,7 +283,7 @@ remove_data_dir() {
 }
 
 # ---------------------------------------------------------------------------
-# 5. Clean CLAWPERATOR_SKILLS_REGISTRY from shell RC files
+# 6. Clean CLAWPERATOR_SKILLS_REGISTRY from shell RC files
 
 clean_shell_rcs() {
     echo -e "${BLUE}Cleaning shell RC files...${NC}"
@@ -247,6 +324,8 @@ main() {
     uninstall_cli
     echo ""
     uninstall_apks
+    echo ""
+    remove_clawperator_emulators
     echo ""
     remove_data_dir
     echo ""
