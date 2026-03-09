@@ -278,7 +278,6 @@ copy_file_mode() {
 
     return 0
 }
-
 setup_skills_via_cli() {
     if [ "${CLAWPERATOR_INSTALL_SKIP_SKILLS:-0}" = "1" ]; then
         SKILLS_SETUP_STATUS="skipped"
