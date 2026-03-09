@@ -12,7 +12,7 @@ import { SKILL_NOT_FOUND } from "../../contracts/skills.js";
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 import { listConfiguredAvds, inspectConfiguredAvd } from "../../domain/android-emulators/configuredAvds.js";
 import { listRunningEmulators } from "../../domain/android-emulators/runningEmulators.js";
-import { createAvd, deleteAvd, startAvd, stopAvd, waitForBootCompletion, waitForEmulatorRegistration } from "../../domain/android-emulators/lifecycle.js";
+import { createAvd, deleteAvd, enableEmulatorDeveloperSettings, startAvd, stopAvd, waitForBootCompletion, waitForEmulatorRegistration } from "../../domain/android-emulators/lifecycle.js";
 import { provisionEmulator } from "../../domain/android-emulators/provision.js";
 import { DEFAULT_EMULATOR_AVD_NAME, DEFAULT_EMULATOR_DEVICE_PROFILE, DEFAULT_EMULATOR_SYSTEM_IMAGE, SUPPORTED_EMULATOR_API_LEVEL } from "../../domain/android-emulators/constants.js";
 
@@ -310,6 +310,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       startAvd(config, name);
       const serial = await waitForEmulatorRegistration(config, name);
       await waitForBootCompletion(config, serial);
+      await enableEmulatorDeveloperSettings(config, serial);
       res.json({ type: "emulator", avdName: name, serial, booted: true });
     } catch (error) {
       const e = error as { code?: string; message?: string };

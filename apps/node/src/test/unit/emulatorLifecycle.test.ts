@@ -8,6 +8,7 @@ import { ERROR_CODES } from "../../contracts/errors.js";
 import {
   createAvd,
   deleteAvd,
+  enableEmulatorDeveloperSettings,
   ensureSystemImageInstalled,
   stopAvd,
   waitForBootCompletion,
@@ -127,5 +128,21 @@ describe("emulator lifecycle", () => {
     const deleteConfig = getDefaultRuntimeConfig({ runner: deleteRunner });
     await deleteAvd(deleteConfig, "clawperator-pixel");
     assert.deepStrictEqual(deleteRunner.calls[1].args, ["delete", "avd", "--name", "clawperator-pixel"]);
+  });
+
+  it("enables developer settings and adb on a booted emulator", async () => {
+    const runner = new FakeProcessRunner();
+    runner.queueResult({ code: 0, stdout: "", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "", stderr: "" });
+
+    const config = getDefaultRuntimeConfig({ runner });
+    await enableEmulatorDeveloperSettings(config, "emulator-5554");
+
+    assert.deepStrictEqual(runner.calls[0].args, [
+      "-s", "emulator-5554", "shell", "settings", "put", "global", "development_settings_enabled", "1",
+    ]);
+    assert.deepStrictEqual(runner.calls[1].args, [
+      "-s", "emulator-5554", "shell", "settings", "put", "global", "adb_enabled", "1",
+    ]);
   });
 });

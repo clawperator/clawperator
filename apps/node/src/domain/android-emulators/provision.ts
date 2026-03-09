@@ -8,6 +8,7 @@ import {
 import { inspectConfiguredAvd, listConfiguredAvds } from "./configuredAvds.js";
 import {
   createAvd,
+  enableEmulatorDeveloperSettings,
   startAvd,
   waitForBootCompletion,
   waitForEmulatorRegistration,
@@ -42,6 +43,7 @@ export async function provisionEmulator(
   const running = await listRunningEmulators(config);
   const runningSupported = running.find((emulator) => emulator.supported);
   if (runningSupported) {
+    await enableEmulatorDeveloperSettings(config, runningSupported.serial);
     return {
       type: "emulator",
       avdName: runningSupported.avdName,
@@ -59,6 +61,7 @@ export async function provisionEmulator(
     startAvd(config, supportedConfigured.name);
     const serial = await waitForEmulatorRegistration(config, supportedConfigured.name);
     await waitForBootCompletion(config, serial);
+    await enableEmulatorDeveloperSettings(config, serial);
     return {
       type: "emulator",
       avdName: supportedConfigured.name,
@@ -90,6 +93,7 @@ export async function provisionEmulator(
   startAvd(config, desiredName);
   const serial = await waitForEmulatorRegistration(config, desiredName);
   await waitForBootCompletion(config, serial);
+  await enableEmulatorDeveloperSettings(config, serial);
   return {
     type: "emulator",
     avdName: desiredName,

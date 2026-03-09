@@ -3,7 +3,7 @@ import type { OutputOptions } from "../output.js";
 import { formatError, formatSuccess } from "../output.js";
 import { DEFAULT_EMULATOR_AVD_NAME, DEFAULT_EMULATOR_DEVICE_PROFILE, DEFAULT_EMULATOR_SYSTEM_IMAGE, SUPPORTED_EMULATOR_API_LEVEL } from "../../domain/android-emulators/constants.js";
 import { inspectConfiguredAvd, listConfiguredAvds } from "../../domain/android-emulators/configuredAvds.js";
-import { createAvd, deleteAvd, startAvd, stopAvd, waitForBootCompletion, waitForEmulatorRegistration } from "../../domain/android-emulators/lifecycle.js";
+import { createAvd, deleteAvd, enableEmulatorDeveloperSettings, startAvd, stopAvd, waitForBootCompletion, waitForEmulatorRegistration } from "../../domain/android-emulators/lifecycle.js";
 import { provisionEmulator } from "../../domain/android-emulators/provision.js";
 import { listRunningEmulators } from "../../domain/android-emulators/runningEmulators.js";
 
@@ -82,6 +82,7 @@ export async function cmdEmulatorStart(name: string, options: OutputOptions): Pr
     startAvd(config, name);
     const serial = await waitForEmulatorRegistration(config, name);
     await waitForBootCompletion(config, serial);
+    await enableEmulatorDeveloperSettings(config, serial);
     return formatSuccess({ type: "emulator", avdName: name, serial, booted: true }, options);
   } catch (error) {
     return formatError(error, options);

@@ -143,6 +143,35 @@ export async function waitForBootCompletion(
   );
 }
 
+export async function enableEmulatorDeveloperSettings(
+  config: RuntimeConfig,
+  serial: string
+): Promise<void> {
+  const developmentSettings = await runAdb(
+    { ...config, deviceId: serial },
+    ["shell", "settings", "put", "global", "development_settings_enabled", "1"]
+  );
+  if (developmentSettings.code !== 0) {
+    throw buildError(
+      ERROR_CODES.EMULATOR_START_FAILED,
+      `Failed to enable Developer Options on emulator ${serial}`,
+      { serial, stderr: developmentSettings.stderr }
+    );
+  }
+
+  const adbSettings = await runAdb(
+    { ...config, deviceId: serial },
+    ["shell", "settings", "put", "global", "adb_enabled", "1"]
+  );
+  if (adbSettings.code !== 0) {
+    throw buildError(
+      ERROR_CODES.EMULATOR_START_FAILED,
+      `Failed to enable adb on emulator ${serial}`,
+      { serial, stderr: adbSettings.stderr }
+    );
+  }
+}
+
 export async function stopAvd(config: RuntimeConfig, name: string): Promise<void> {
   const running = await resolveRunningEmulatorByName(config, name);
   if (!running) {

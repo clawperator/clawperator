@@ -45,6 +45,8 @@ describe("emulator provisioning", () => {
     runner.queueResult({ code: 0, stdout: "OK\nclawperator-pixel\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "1\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "1\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "", stderr: "" });
 
     const config = getDefaultRuntimeConfig({ runner });
     const result = await provisionEmulator(config);
@@ -83,6 +85,8 @@ describe("emulator provisioning", () => {
     runner.queueResult({ code: 0, stdout: "OK\nclawperator-pixel\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "1\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "1\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "", stderr: "" });
 
     const config = getDefaultRuntimeConfig({ runner });
     const result = await provisionEmulator(config);
@@ -108,6 +112,8 @@ describe("emulator provisioning", () => {
     runner.queueResult({ code: 0, stdout: "1\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "1\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "1\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "", stderr: "" });
 
     const config = getDefaultRuntimeConfig({ runner });
     const result = await provisionEmulator(config);
