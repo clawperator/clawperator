@@ -114,6 +114,7 @@ The CLI must add:
 
 ```bash
 clawperator emulator list
+clawperator emulator inspect <name>
 clawperator emulator create
 clawperator emulator start <name>
 clawperator emulator stop <name>
@@ -127,6 +128,7 @@ The Node HTTP server started by `clawperator serve` must add:
 
 ```text
 GET    /android/emulators
+GET    /android/emulators/:name
 GET    /android/emulators/running
 
 POST   /android/emulators/create
@@ -168,7 +170,7 @@ Newly created AVDs should default to a profile equivalent to:
 
 - device profile: Pixel 8
 - Google Play image
-- supported Android API level
+- Android API level 35
 - supported ABI
 
 The initial requested package example is:
@@ -195,6 +197,7 @@ Unless implementation discovers a hard blocker, v1 should standardize on:
 
 - default AVD name: `clawperator-pixel`
 - default device profile: `pixel_7`
+- supported Android API level: `35`
 - Google Play system image package derived from the supported API level and chosen ABI
 
 Avoid dynamically generated AVD names in v1. A stable default name simplifies reuse and duplicate-avoidance logic.
@@ -224,10 +227,12 @@ Suggested shape:
 ```json
 {
   "name": "clawperator-pixel",
+  "exists": true,
   "apiLevel": 35,
   "playStore": true,
   "abi": "arm64-v8a",
-  "deviceProfile": "pixel",
+  "deviceProfile": "pixel_7",
+  "systemImage": "system-images;android-35;google_apis_playstore;arm64-v8a",
   "running": false,
   "supported": true,
   "unsupportedReasons": []
@@ -436,12 +441,15 @@ hw.device.name=pixel_7
 ### Deliverables
 
 - function to list configured AVDs
+- function to inspect a configured AVD by name
 - function to evaluate compatibility
 - machine-readable unsupported reasons
 
 ### Notes
 
 The support rules must live in one place. The same evaluator should be used by `list`, `status`, `create`, and `provision`.
+
+`inspect` should return the full normalized view for one AVD so callers do not need to inspect raw config files manually.
 
 ## Phase 3: Running Emulator Discovery and Name-to-Serial Resolution
 
@@ -601,6 +609,7 @@ Expose the emulator subsystem through the Clawperator CLI.
 3. Add command routing in `apps/node/src/cli/index.ts`.
 4. Implement:
    - `clawperator emulator list`
+   - `clawperator emulator inspect <name>`
    - `clawperator emulator create`
    - `clawperator emulator start <name>`
    - `clawperator emulator stop <name>`
@@ -615,6 +624,7 @@ Expose the emulator subsystem through the Clawperator CLI.
    - reuse decisions
    - boot waiting
    - final AVD name and serial
+8. Ensure `inspect` exposes the full normalized AVD view for diagnosis.
 
 ### Deliverables
 
@@ -628,6 +638,40 @@ Preserve existing output conventions:
 
 - JSON by default
 - pretty output only as a formatting layer over the same structured result
+
+### `inspect` Command Contract
+
+Purpose:
+
+- explain compatibility decisions
+- explain why an AVD is unsupported
+- verify what provisioning is likely to reuse
+- allow agents to reason without scraping `list`
+
+Example:
+
+```bash
+clawperator emulator inspect clawperator-pixel --output json
+```
+
+Example output:
+
+```json
+{
+  "name": "clawperator-pixel",
+  "exists": true,
+  "running": false,
+  "supported": true,
+  "apiLevel": 35,
+  "abi": "arm64-v8a",
+  "playStore": true,
+  "deviceProfile": "pixel_7",
+  "systemImage": "system-images;android-35;google_apis_playstore;arm64-v8a",
+  "unsupportedReasons": []
+}
+```
+
+`list` is the overview surface. `inspect` is the diagnostic surface.
 
 ## Phase 7: HTTP API Surface
 
