@@ -7,7 +7,7 @@ This page describes the current shipped behavior. It replaces the older v0.1 des
 ## Command Surface
 
 ```bash
-clawperator doctor [--output <json|pretty>] [--device-id <id>] [--receiver-package <package>] [--verbose]
+clawperator doctor [--output <json|pretty>] [--device-id <id>] [--receiver-package <package>]
 clawperator doctor --json
 clawperator doctor --fix
 clawperator doctor --full
@@ -34,7 +34,7 @@ If you use a local debug APK, pass `--receiver-package com.clawperator.operator.
 
 ## What Doctor Checks
 
-Doctor runs checks in a fixed order and stops early when a critical check fails.
+Doctor runs checks in a fixed order. When a critical check fails, subsequent checks that depend on it are skipped, but doctor may continue to gather additional diagnostics before exiting.
 
 ### 1. Host checks
 
@@ -132,7 +132,7 @@ Important fields:
 - `ok` - currently mirrors whether all critical checks passed
 - `criticalOk` - explicit critical-check verdict used by the CLI exit code
 - `checks[]` - ordered check results with IDs, status, summary, and optional diagnostics
-- `nextActions[]` - deduplicated shell commands or manual instructions derived from failing checks
+- `nextActions[]` - deduplicated shell commands or manual instructions; populated from failing check remediation steps, and may also include suggested follow-up commands when all checks pass
 
 Each `DoctorCheckResult` can also include:
 
@@ -170,8 +170,7 @@ On handshake timeout, the report includes:
 - broadcast dispatch status
 - receiver package
 - device id when available
-- guidance to retry with `--verbose`
-- follow-up commands such as `clawperator grant-device-permissions` and `clawperator observe snapshot --timeout-ms 5000 --verbose`
+- follow-up commands such as `clawperator grant-device-permissions` and `clawperator observe snapshot --timeout-ms 5000`
 
 ## Common Usage
 

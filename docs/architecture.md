@@ -9,7 +9,7 @@ Clawperator is a two-layer system: an Android runtime that executes actions on t
 The Android app runs as a persistent background service on the dedicated actuator device. It uses the Android Accessibility API to:
 
 - Inspect the live UI tree of any foreground application
-- Perform precise interactions: taps, scrolls, text entry, system keys (back, home)
+- Perform precise interactions: taps, scrolls, text entry
 - Listen for commands via a broadcast receiver (`ACTION_AGENT_COMMAND`)
 - Emit structured results via logcat using the canonical `[Clawperator-Result]` envelope
 
