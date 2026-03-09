@@ -17,7 +17,7 @@ APK_METADATA_URL="${CLAWPERATOR_APK_METADATA_URL:-https://downloads.clawperator.
 APK_DOWNLOAD_DIR="${HOME}/.clawperator/downloads"
 APK_LOCAL_PATH="${APK_DOWNLOAD_DIR}/operator.apk"
 APK_SHA_PATH="${APK_DOWNLOAD_DIR}/operator.apk.sha256"
-DEFAULT_RECEIVER_PACKAGE="com.clawperator.operator"
+DEFAULT_RECEIVER_PACKAGE="${CLAWPERATOR_RECEIVER_PACKAGE:-com.clawperator.operator}"
 INSTALL_COMMAND="curl -fsSL https://clawperator.com/install.sh | bash"
 SKILLS_SETUP_STATUS="not-run"
 SKILLS_REGISTRY_PATH=""
@@ -529,7 +529,8 @@ run_doctor_and_fix() {
 
     # Download and Verify APK if needed.
     # Reinstall when the APK is missing, the wrong variant is installed, or the installed APK is version-incompatible.
-    if doctor_check_status "$DOCTOR_JSON" "readiness.apk.presence" "fail" || \
+    if doctor_check_status "$DOCTOR_JSON" "device.discovery" "fail" || \
+       doctor_check_status "$DOCTOR_JSON" "readiness.apk.presence" "fail" || \
        doctor_check_status "$DOCTOR_JSON" "readiness.apk.presence" "warn" || \
        doctor_check_status "$DOCTOR_JSON" "readiness.version.compatibility" "fail"; then
         download_operator_apk || return 1
@@ -580,7 +581,7 @@ main() {
     echo ""
     echo -e "${BLUE}Final Doctor Check...${NC}"
     local FINAL_DOCTOR_JSON
-    FINAL_DOCTOR_JSON="$("$CLAWPERATOR_BIN_PATH" doctor --format json)"
+    FINAL_DOCTOR_JSON="$("$CLAWPERATOR_BIN_PATH" doctor --format json || true)"
     if ! doctor_report_ok "$FINAL_DOCTOR_JSON"; then
         echo -e "${RED}❌ Final doctor check failed.${NC}"
         "$CLAWPERATOR_BIN_PATH" doctor --output pretty || true
