@@ -25,7 +25,7 @@ export interface PermissionGrantResult {
 }
 
 export async function detectReceiverPackage(config: RuntimeConfig): Promise<string | undefined> {
-  for (const pkg of [DEFAULT_DEBUG_PACKAGE, DEFAULT_RELEASE_PACKAGE]) {
+  for (const pkg of [DEFAULT_RELEASE_PACKAGE, DEFAULT_DEBUG_PACKAGE]) {
     const result = await runAdb(config, ["shell", "pm", "list", "packages", pkg]);
     if (result.code === 0 && result.stdout.trim().includes(`package:${pkg}`)) {
       return pkg;

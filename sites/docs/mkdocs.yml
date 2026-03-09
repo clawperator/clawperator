@@ -13,6 +13,7 @@ nav:
   - Getting Started:
     - Project Overview: getting-started/project-overview.md
     - First-Time Setup: getting-started/first-time-setup.md
+    - The Android Operator APK: getting-started/android-operator-apk.md
   - For AI Agents:
     - Node API - Agent Guide: ai-agents/node-api-for-agents.md
     - OpenClaw Remote Bootstrap: ai-agents/openclaw-remote-bootstrap.md

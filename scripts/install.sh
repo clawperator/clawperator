@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# install.sh
+# install.sh (v0.2.1)
 # One-command installation for Clawperator CLI and environment.
 # Target: macOS and Linux (Ubuntu/Debian/Arch).
 
@@ -239,8 +239,16 @@ setup_skills() {
         SKILLS_SETUP_STATUS="skipped"
         echo -e "${YELLOW}⚠️  Skills setup skipped: ${reason}${NC}"
         echo -e "${YELLOW}Core CLI + APK installation will continue.${NC}"
-        echo -e "${YELLOW}To set up skills later, re-run the installer or run: git clone ${SKILLS_REPO_URL} ~/.clawperator/skills${NC}"
+        echo -e "${YELLOW}To set up skills later, re-run the installer or run: clawperator skills install${NC}"
     }
+
+    local TMP_BUNDLE
+    TMP_BUNDLE=$(mktemp "/tmp/clawperator-skills.XXXXXX")
+    register_temp_file "$TMP_BUNDLE"
+    if ! curl -fsSL "$SKILLS_REPO_URL" -o "$TMP_BUNDLE"; then
+        warn_skills_setup_failed "unable to download the skills bundle from ${SKILLS_REPO_URL}."
+        return 0
+    fi
 
     if [ -d "$SKILLS_DIR" ]; then
         if [ ! -d "$SKILLS_DIR/.git" ]; then
@@ -263,8 +271,8 @@ setup_skills() {
             fi
         fi
         echo -e "${YELLOW}⚠️  Skills directory already exists. Updating...${NC}"
-        if ! GIT_TERMINAL_PROMPT=0 git -C "$SKILLS_DIR" fetch origin --quiet; then
-            warn_skills_setup_failed "could not fetch from skills repository. Check network access or run: clawperator skills install"
+        if ! GIT_TERMINAL_PROMPT=0 git -C "$SKILLS_DIR" fetch "$TMP_BUNDLE" "+refs/heads/*:refs/remotes/origin/*" --quiet; then
+            warn_skills_setup_failed "could not fetch from skills bundle. Check network access or run: clawperator skills install"
             return 0
         fi
         if ! GIT_TERMINAL_PROMPT=0 git -C "$SKILLS_DIR" reset --hard origin/main; then
@@ -273,8 +281,13 @@ setup_skills() {
         fi
     else
         mkdir -p "$(dirname "$SKILLS_DIR")"
-        if ! GIT_TERMINAL_PROMPT=0 git clone "$SKILLS_REPO_URL" "$SKILLS_DIR"; then
-            warn_skills_setup_failed "unable to clone the skills bundle from ${SKILLS_REPO_URL}."
+        if ! GIT_TERMINAL_PROMPT=0 git clone "$TMP_BUNDLE" "$SKILLS_DIR" >/dev/null 2>&1; then
+            warn_skills_setup_failed "unable to clone from the downloaded skills bundle."
+            return 0
+        fi
+        # Fix the remote to point to the actual URL, not the temp file
+        if ! GIT_TERMINAL_PROMPT=0 git -C "$SKILLS_DIR" remote set-url origin "$SKILLS_REPO_URL"; then
+            warn_skills_setup_failed "could not set remote URL after cloning."
             return 0
         fi
     fi
@@ -410,7 +423,7 @@ download_operator_apk() {
 
     echo -e "${BLUE}Downloading operator APK ${OPERATOR_VERSION}...${NC}"
     curl -fsSL "$OPERATOR_APK_URL" -o "$APK_LOCAL_PATH"
-    
+
     if [ -n "$OPERATOR_EXPECTED_SHA256" ]; then
         echo "$OPERATOR_EXPECTED_SHA256" > "$APK_SHA_PATH"
     else

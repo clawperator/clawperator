@@ -44,6 +44,11 @@ sections:
         mode: copy
         sources:
           - docs/first-time-setup.md
+      - output: getting-started/android-operator-apk.md
+        title: The Android Operator APK
+        mode: copy
+        sources:
+          - docs/android-operator-apk.md
 
   - id: architecture
     title: Architecture
