@@ -1,4 +1,3 @@
-import { spawn } from "node:child_process";
 import { setTimeout as delay } from "node:timers/promises";
 import { runAdb } from "../../adapters/android-bridge/adbClient.js";
 import type { RuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
@@ -93,12 +92,14 @@ export function startAvd(
   extraArgs: string[] = []
 ): void {
   const args = [`@${name}`, "-no-snapshot-load", "-no-boot-anim", ...extraArgs];
-  const child = spawn(config.emulatorPath, args, {
+  const child = config.runner.spawn(config.emulatorPath, args, {
     detached: true,
     stdio: "ignore",
     shell: false,
   });
-  child.unref();
+  if (child && typeof child.unref === "function") {
+    child.unref();
+  }
 }
 
 export async function waitForEmulatorRegistration(
