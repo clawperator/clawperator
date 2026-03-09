@@ -460,7 +460,7 @@ export default function Home() {
           settings overview, or pull data from a tracking app.
         </p>
         <p>
-          Skills are packaged and distributed as a versioned bundle via the Clawperator install.
+          Skills are packaged and distributed as a versioned bundle via the Clawperator installer.
           Each skill is standalone and designed to be invoked directly or through the Node API -
           discover, search, and run skills through a single interface.
         </p>
