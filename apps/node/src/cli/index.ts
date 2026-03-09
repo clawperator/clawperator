@@ -54,7 +54,7 @@ Commands:
   serve [--port <number>] [--host <string>]
                                             Start local HTTP/SSE server for remote control (default host: 127.0.0.1)
   doctor [--json]
-                                            Run environment and runtime checks (Stage 3). --json is alias for --output json.
+                                            Run environment and runtime checks (Stage 3). --json/--format json is alias for --output json.
   doctor --fix
                                             Attempt non-destructive host fixes (Stage 3)
   doctor --full
@@ -69,7 +69,8 @@ Commands:
 Global options:
   --device-id <id>                          Target Android device serial
   --receiver-package <package>              Target Operator package for broadcast dispatch
-  --output <json|pretty>                    Output format (default: json)
+  --output <json|pretty>, --format <json|pretty>
+                                            Output format (default: json)
   --timeout-ms <number>                     Override execution timeout within policy limits
   --verbose                                 Include debug diagnostics in output
   --help                                    Show help
@@ -185,7 +186,7 @@ function getGlobalOpts(argv: string[]): {
       deviceId = argv[++i];
     } else if (argv[i] === "--receiver-package" && argv[i + 1]) {
       receiverPackage = argv[++i];
-    } else if (argv[i] === "--output" && argv[i + 1]) {
+    } else if ((argv[i] === "--output" || argv[i] === "--format") && argv[i + 1]) {
       output = argv[++i] === "pretty" ? "pretty" : "json";
     } else if (argv[i] === "--timeout-ms") {
       if (!argv[i + 1]) {

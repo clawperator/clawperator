@@ -30,8 +30,12 @@ The installer:
 
 - detects `node`, `adb`, `git`, `curl`
 - installs the `clawperator` CLI to a location on `PATH`
-- downloads and installs the Operator APK on the connected device
-- downloads the skills bundle to `~/.clawperator/skills/`
+- runs `clawperator doctor --format json` to detect what still needs repair
+- downloads and installs or upgrades the Operator APK on the connected device when doctor reports it missing, mismatched, or incompatible
+- auto-runs `clawperator grant-device-permissions` after a successful APK install when exactly one device is connected
+- runs `clawperator skills install` to populate `~/.clawperator/skills/`
+- writes `CLAWPERATOR_SKILLS_REGISTRY` into your shell profile when skills setup succeeds
+- runs a final doctor check and exits non-zero if the environment is still not ready
 
 In non-interactive mode (piped execution), the APK install proceeds automatically without prompts.
 
@@ -51,7 +55,7 @@ The installer writes `CLAWPERATOR_SKILLS_REGISTRY` to your shell profile automat
 echo $CLAWPERATOR_SKILLS_REGISTRY
 ```
 
-If the variable is empty (skills setup was skipped during install), set it explicitly:
+If the variable is empty, skills setup either failed or was skipped during install. Set it explicitly:
 
 ```bash
 export CLAWPERATOR_SKILLS_REGISTRY="$HOME/.clawperator/skills/skills/skills-registry.json"
@@ -189,6 +193,24 @@ The APK is cached at `~/.clawperator/downloads/operator.apk` after first install
 
 ---
 
+### CLI/APK version mismatch (VERSION_INCOMPATIBLE)
+
+**Cause:** The installed APK does not match the CLI's expected `major.minor` version.
+
+**Check:**
+
+```bash
+clawperator version --check-compat
+```
+
+**Fix:** Re-run the installer. The installer now upgrades an incompatible installed APK as part of the normal bootstrap flow:
+
+```bash
+curl -fsSL https://clawperator.com/install.sh | bash
+```
+
+---
+
 ### Skills list fails or returns empty (REGISTRY_READ_FAILED)
 
 **Cause:** The skills repo was not set up correctly by the installer, or the registry env var is not set.
@@ -202,30 +224,9 @@ export CLAWPERATOR_SKILLS_REGISTRY="$HOME/.clawperator/skills/skills/skills-regi
 # If skills install was skipped entirely
 clawperator skills install
 
-# If the repo exists but has no remote (common after a failed installer run)
-cd ~/.clawperator/skills
-git remote add origin https://clawperator.com/install/clawperator-skills.bundle
-git fetch origin
-git reset --hard origin/main
-cd -
-```
-
----
-
-### CLI/APK version mismatch (VERSION_INCOMPATIBLE)
-
-**Cause:** The installed APK does not match the CLI's expected `major.minor` version.
-
-**Check:**
-
-```bash
-clawperator version --check-compat
-```
-
-**Fix:** Re-run the installer to align the APK version with the CLI:
-
-```bash
-curl -fsSL https://clawperator.com/install.sh | bash
+# If auth or clone state broke the local checkout, remove it and retry
+rm -rf ~/.clawperator/skills
+clawperator skills install
 ```
 
 ---
