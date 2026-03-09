@@ -494,6 +494,8 @@ main() {
     validate_os || exit 1
     check_node || exit 1
     check_curl || exit 1
+    check_adb || exit 1
+    check_git || exit 1
     
     install_cli || exit 1
     
