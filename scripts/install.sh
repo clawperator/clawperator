@@ -218,132 +218,38 @@ install_cli() {
     echo -e "${BLUE}Installing Clawperator CLI (@latest)...${NC}"
     if npm install -g clawperator@latest; then
         echo -e "${GREEN}✅ Clawperator CLI installed.${NC}"
+        
+        # Discover the binary path for immediate use
+        CLAWPERATOR_BIN_PATH="$(command -v clawperator || true)"
+        if [ -z "$CLAWPERATOR_BIN_PATH" ]; then
+            local NPM_PREFIX
+            NPM_PREFIX="$(npm config get prefix)"
+            if [ -f "$NPM_PREFIX/bin/clawperator" ]; then
+                CLAWPERATOR_BIN_PATH="$NPM_PREFIX/bin/clawperator"
+            fi
+        fi
     else
         echo -e "${RED}❌ Failed to install Clawperator CLI. Try running 'sudo npm install -g clawperator@latest' if permissions failed.${NC}"
         return 1
     fi
 }
 
-# 7. Clone Skills
-setup_skills() {
-    local SKILLS_DIR="$HOME/.clawperator/skills"
-    local SKILLS_REPO_URL="https://clawperator.com/install/clawperator-skills.bundle"
-    echo -e "${BLUE}Setting up Clawperator Skills in $SKILLS_DIR...${NC}"
-
+# 7. Setup Skills (via CLI)
+setup_skills_via_cli() {
     if [ "${CLAWPERATOR_INSTALL_SKIP_SKILLS:-0}" = "1" ]; then
-        SKILLS_SETUP_STATUS="skipped"
         echo -e "${YELLOW}⚠️  Skipping skills setup because CLAWPERATOR_INSTALL_SKIP_SKILLS=1.${NC}"
         return 0
     fi
 
-    warn_skills_setup_failed() {
-        local reason="$1"
-        SKILLS_SETUP_STATUS="skipped"
-        echo -e "${YELLOW}⚠️  Skills setup skipped: ${reason}${NC}"
-        echo -e "${YELLOW}Core CLI + APK installation will continue.${NC}"
-        echo -e "${YELLOW}To set up skills later, re-run the installer or run: clawperator skills install${NC}"
-    }
-
-    local TMP_BUNDLE
-    TMP_BUNDLE=$(mktemp "/tmp/clawperator-skills.XXXXXX")
-    register_temp_file "$TMP_BUNDLE"
-    if ! curl -fsSL "$SKILLS_REPO_URL" -o "$TMP_BUNDLE"; then
-        warn_skills_setup_failed "unable to download the skills bundle from ${SKILLS_REPO_URL}."
-        return 0
-    fi
-
-    if [ -d "$SKILLS_DIR" ]; then
-        if [ ! -d "$SKILLS_DIR/.git" ]; then
-            warn_skills_setup_failed "$SKILLS_DIR exists but is not a git repository. Remove it and re-run to clone fresh."
-            return 0
-        fi
-        # Ensure the remote is configured - it may be missing if the directory was created locally.
-        local EXISTING_REMOTE
-        EXISTING_REMOTE="$(GIT_TERMINAL_PROMPT=0 git -C "$SKILLS_DIR" remote get-url origin 2>/dev/null || echo "")"
-        if [ -z "$EXISTING_REMOTE" ]; then
-            echo -e "${YELLOW}⚠️  Skills directory has no remote configured. Adding origin...${NC}"
-            if ! GIT_TERMINAL_PROMPT=0 git -C "$SKILLS_DIR" remote add origin "$SKILLS_REPO_URL"; then
-                warn_skills_setup_failed "could not add remote to existing skills directory. Remove $SKILLS_DIR and re-run."
-                return 0
-            fi
-        elif [ "$EXISTING_REMOTE" != "$SKILLS_REPO_URL" ]; then
-            if ! GIT_TERMINAL_PROMPT=0 git -C "$SKILLS_DIR" remote set-url origin "$SKILLS_REPO_URL"; then
-                warn_skills_setup_failed "could not update the skills remote URL. Remove $SKILLS_DIR and re-run."
-                return 0
-            fi
-        fi
-        echo -e "${YELLOW}⚠️  Skills directory already exists. Updating...${NC}"
-        if ! GIT_TERMINAL_PROMPT=0 git -C "$SKILLS_DIR" fetch "$TMP_BUNDLE" "+refs/heads/*:refs/remotes/origin/*" --quiet; then
-            warn_skills_setup_failed "could not fetch from skills bundle. Check network access or run: clawperator skills install"
-            return 0
-        fi
-        if ! GIT_TERMINAL_PROMPT=0 git -C "$SKILLS_DIR" reset --hard origin/main; then
-            warn_skills_setup_failed "could not update skills to the latest version. Try removing $SKILLS_DIR and re-running."
-            return 0
-        fi
+    echo -e "${BLUE}Setting up Clawperator Skills...${NC}"
+    if "$CLAWPERATOR_BIN_PATH" skills install > /dev/null; then
+        echo -e "${GREEN}✅ Skills setup complete.${NC}"
+        SKILLS_SETUP_STATUS="configured"
+        # Registry path for display
+        SKILLS_REGISTRY_PATH="$HOME/.clawperator/skills/skills/skills-registry.json"
     else
-        mkdir -p "$(dirname "$SKILLS_DIR")"
-        if ! GIT_TERMINAL_PROMPT=0 git clone "$TMP_BUNDLE" "$SKILLS_DIR" >/dev/null 2>&1; then
-            warn_skills_setup_failed "unable to clone from the downloaded skills bundle."
-            return 0
-        fi
-        # Fix the remote to point to the actual URL, not the temp file
-        if ! GIT_TERMINAL_PROMPT=0 git -C "$SKILLS_DIR" remote set-url origin "$SKILLS_REPO_URL"; then
-            warn_skills_setup_failed "could not set remote URL after cloning."
-            return 0
-        fi
+        echo -e "${YELLOW}⚠️  Skills setup failed via CLI. You can set them up later with 'clawperator skills install'.${NC}"
     fi
-
-    local REGISTRY_FILE=""
-    local REGISTRY_CANDIDATES=(
-        "$SKILLS_DIR/skills-registry.json"
-        "$SKILLS_DIR/skills/skills-registry.json"
-    )
-    for candidate in "${REGISTRY_CANDIDATES[@]}"; do
-        if [ -f "$candidate" ]; then
-            REGISTRY_FILE="$candidate"
-            break
-        fi
-    done
-    if [ -z "$REGISTRY_FILE" ]; then
-        warn_skills_setup_failed "skills-registry.json was not found after clone/update."
-        return 0
-    fi
-    if ! node -e "JSON.parse(require('fs').readFileSync(process.argv[1], 'utf8'))" "$REGISTRY_FILE" >/dev/null 2>&1; then
-        warn_skills_setup_failed "skills-registry.json is invalid JSON: $REGISTRY_FILE"
-        return 0
-    fi
-
-    SKILLS_SETUP_STATUS="configured"
-    SKILLS_REGISTRY_PATH="$REGISTRY_FILE"
-    echo -e "${GREEN}✅ Skills setup complete.${NC}"
-
-    # Set Env Var in Shell RCs
-    local EXPORT_LINE="export CLAWPERATOR_SKILLS_REGISTRY=\"$REGISTRY_FILE\""
-
-    update_rc() {
-        local RC_FILE=$1
-        if [ -f "$RC_FILE" ]; then
-            if grep -q "CLAWPERATOR_SKILLS_REGISTRY" "$RC_FILE"; then
-                local TMP_FILE
-                TMP_FILE="$(mktemp)"
-                register_temp_file "$TMP_FILE"
-                grep -v "CLAWPERATOR_SKILLS_REGISTRY" "$RC_FILE" > "$TMP_FILE"
-                printf "\n# Clawperator Skills Registry\n%s\n" "$EXPORT_LINE" >> "$TMP_FILE"
-                mv "$TMP_FILE" "$RC_FILE"
-                echo -e "${BLUE}Updated CLAWPERATOR_SKILLS_REGISTRY in $RC_FILE${NC}"
-            else
-                echo -e "${BLUE}Adding CLAWPERATOR_SKILLS_REGISTRY to $RC_FILE${NC}"
-                echo "" >> "$RC_FILE"
-                echo "# Clawperator Skills Registry" >> "$RC_FILE"
-                echo "$EXPORT_LINE" >> "$RC_FILE"
-            fi
-        fi
-    }
-
-    update_rc "$HOME/.zshrc"
-    update_rc "$HOME/.bashrc"
-    update_rc "$HOME/.bash_profile"
 }
 
 sha256_file() {
@@ -540,29 +446,62 @@ maybe_install_operator_apk() {
     esac
 }
 
+# 8. Run Doctor and Apply Fixes
+run_doctor_and_fix() {
+    echo -e "${BLUE}Running Clawperator Doctor to verify environment...${NC}"
+    local DOCTOR_JSON
+    DOCTOR_JSON="$("$CLAWPERATOR_BIN_PATH" doctor --format json || true)"
+    
+    # Check for ADB
+    if echo "$DOCTOR_JSON" | grep -q '"id": "host.adb.presence", "status": "fail"'; then
+        check_adb || return 1
+    fi
+
+    # Check for Git (required for skills)
+    if echo "$DOCTOR_JSON" | grep -q '"id": "host.git.presence"' && echo "$DOCTOR_JSON" | grep -q '"status": "fail"'; then
+        check_git || return 1
+    fi
+
+    # Download and Verify APK if needed
+    if echo "$DOCTOR_JSON" | grep -q '"id": "readiness.apk.presence", "status": "fail"'; then
+        download_operator_apk || return 1
+        verify_operator_apk || return 1
+        maybe_install_operator_apk || return 1
+    elif echo "$DOCTOR_JSON" | grep -q '"id": "readiness.apk.presence", "status": "warn"'; then
+        # Could be missing or wrong variant, try installing
+        download_operator_apk || return 1
+        verify_operator_apk || return 1
+        maybe_install_operator_apk || return 1
+    fi
+
+    # Check for Handshake (permissions)
+    # Re-run doctor to see if APK install fixed handshake, or if we need to grant permissions
+    DOCTOR_JSON="$("$CLAWPERATOR_BIN_PATH" doctor --format json || true)"
+    if echo "$DOCTOR_JSON" | grep -q '"id": "readiness.handshake", "status": "fail"'; then
+        local DEVICE_COUNT
+        DEVICE_COUNT="$(count_connected_devices)"
+        if [ "$DEVICE_COUNT" -eq 1 ]; then
+            local DEVICE_ID
+            DEVICE_ID="$(list_connected_devices)"
+            echo -e "${BLUE}Handshake failed. Auto-granting device permissions for $DEVICE_ID...${NC}"
+            "$CLAWPERATOR_BIN_PATH" grant-device-permissions --device-id "$DEVICE_ID" --receiver-package "$DEFAULT_RECEIVER_PACKAGE" > /dev/null 2>&1 || true
+        fi
+    fi
+}
+
 # Main
 main() {
     validate_os || exit 1
     check_node || exit 1
-    check_adb || exit 1
-    check_git || exit 1
     check_curl || exit 1
+    
     install_cli || exit 1
-
-    # Discover the binary path for immediate use and display
-    CLAWPERATOR_BIN_PATH="$(command -v clawperator || true)"
-    if [ -z "$CLAWPERATOR_BIN_PATH" ]; then
-        local NPM_PREFIX
-        NPM_PREFIX="$(npm config get prefix)"
-        if [ -f "$NPM_PREFIX/bin/clawperator" ]; then
-            CLAWPERATOR_BIN_PATH="$NPM_PREFIX/bin/clawperator"
-        fi
-    fi
-
-    setup_skills || exit 1
-    download_operator_apk || exit 1
-    verify_operator_apk || exit 1
-    maybe_install_operator_apk || exit 1
+    
+    # Use doctor to drive the rest of the installation
+    run_doctor_and_fix || exit 1
+    
+    # Setup skills via CLI
+    setup_skills_via_cli || exit 1
 
     local DETECTED_SHELL
     DETECTED_SHELL="$(basename "$SHELL")"
@@ -582,14 +521,17 @@ main() {
     echo -e "1. ${YELLOW}Update your session PATH:${NC} run '${SOURCE_CMD}'"
     echo -e "2. ${YELLOW}Clawperator binary installed at:${NC}"
     echo -e "   ${BLUE}${CLAWPERATOR_BIN_PATH:-clawperator}${NC}"
-    echo -e "3. The latest operator APK (${YELLOW}${OPERATOR_VERSION}${NC}) is saved at:"
+    echo -e "3. The latest operator APK (${YELLOW}${OPERATOR_VERSION:-unknown}${NC}) is saved at:"
     echo -e "   ${BLUE}${APK_LOCAL_PATH}${NC}"
     echo -e "4. Stable download URL:"
     echo -e "   ${BLUE}https://clawperator.com/operator.apk${NC}"
     echo -e "5. Historical releases and artifacts remain at:"
     echo -e "   ${BLUE}https://github.com/clawpilled/clawperator/releases${NC}"
-    echo -e "6. Run ${YELLOW}\`clawperator doctor\`${NC} to verify setup"
     echo ""
+    echo -e "Final Doctor Check:"
+    "$CLAWPERATOR_BIN_PATH" doctor
+    echo ""
+    
     if [ "$SKILLS_SETUP_STATUS" = "configured" ]; then
         echo -e "7. Skills registry configured at:"
         echo -e "   ${BLUE}${SKILLS_REGISTRY_PATH}${NC}"
