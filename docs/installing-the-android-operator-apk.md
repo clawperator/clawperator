@@ -36,7 +36,7 @@ clawperator grant-device-permissions
 ```
 
 ## Logging and Debugging
-Starting from v0.2.1, the Operator APK enables **debug logging in release builds** by default. This ensures that remote AI agents can observe the internal state and troubleshoot issues directly through `adb logcat` even when using production APKs.
+Starting from v0.2.1, the Operator APK enables **debug logging in release builds** by default. This ensures that remote AI agents can observe the internal state and troubleshoot issues directly through `adb logcat` even when using production APKs. The app is intentionally "noisy" in logcat to provide maximum visibility into UI events and command execution state for AI agents.
 
 To view logs:
 ```bash
