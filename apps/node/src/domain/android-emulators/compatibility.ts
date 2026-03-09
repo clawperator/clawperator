@@ -1,5 +1,4 @@
 import {
-  DEFAULT_EMULATOR_TAG,
   SUPPORTED_EMULATOR_ABIS,
   SUPPORTED_EMULATOR_API_LEVEL,
   SUPPORTED_EMULATOR_DEVICE_PROFILES,
@@ -15,7 +14,7 @@ export interface EmulatorCompatibilityInput {
 }
 
 function hasPlayStoreSystemImage(systemImage: string | null): boolean {
-  return systemImage !== null && systemImage.includes(DEFAULT_EMULATOR_TAG);
+  return systemImage !== null && systemImage.includes("google_apis_playstore");
 }
 
 export function evaluateEmulatorCompatibility(

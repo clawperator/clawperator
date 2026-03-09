@@ -71,7 +71,6 @@ describe("configured AVD discovery", () => {
     const avd = await inspectConfiguredAvd("Pixel_9");
     assert.strictEqual(avd.supported, false);
     assert.deepStrictEqual(avd.unsupportedReasons, [
-      "missing_play_store",
       "unsupported_api_level",
       "unsupported_device_profile",
     ]);
