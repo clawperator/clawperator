@@ -17,7 +17,7 @@ export class FakeProcessRunner implements ProcessRunner {
         });
     }
 
-    async run(command: string, args: string[], _options?: { timeoutMs?: number }): Promise<ProcessResult> {
+    async run(command: string, args: string[], _options?: { timeoutMs?: number; cwd?: string; input?: string }): Promise<ProcessResult> {
         this.calls.push({ command, args });
         const result = this.queue.shift();
         if (!result) {

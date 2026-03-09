@@ -8,24 +8,30 @@ export interface ProcessResult {
 }
 
 export interface ProcessRunner {
-  run(command: string, args: string[], options?: { timeoutMs?: number; cwd?: string }): Promise<ProcessResult>;
+  run(command: string, args: string[], options?: { timeoutMs?: number; cwd?: string; input?: string }): Promise<ProcessResult>;
   runShell(command: string, options?: { timeoutMs?: number; cwd?: string }): Promise<ProcessResult>;
   // For logcat/streaming
   spawn(command: string, args: string[], options?: { detached?: boolean; stdio?: any; shell?: boolean }): any;
 }
 
 export class NodeProcessRunner implements ProcessRunner {
-  async run(command: string, args: string[], options?: { timeoutMs?: number; cwd?: string }): Promise<ProcessResult> {
+  async run(command: string, args: string[], options?: { timeoutMs?: number; cwd?: string; input?: string }): Promise<ProcessResult> {
     return new Promise((resolve) => {
+      const stdin = options?.input !== undefined ? "pipe" : "ignore";
       const proc = spawn(command, args, {
         cwd: options?.cwd,
-        stdio: ["ignore", "pipe", "pipe"],
+        stdio: [stdin, "pipe", "pipe"],
         shell: false,
       });
       let stdout = "";
       let stderr = "";
       proc.stdout?.on("data", (d) => (stdout += d.toString()));
       proc.stderr?.on("data", (d) => (stderr += d.toString()));
+
+      if (options?.input !== undefined) {
+        proc.stdin?.write(options.input);
+        proc.stdin?.end();
+      }
 
       const timeoutMs = options?.timeoutMs ?? 30_000;
       const t = setTimeout(() => {

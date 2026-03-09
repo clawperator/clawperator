@@ -20,7 +20,7 @@ export async function runAndroidSdkTool(
   config: RuntimeConfig,
   tool: AndroidSdkTool,
   args: string[],
-  options?: { timeoutMs?: number; cwd?: string }
+  options?: { timeoutMs?: number; cwd?: string; input?: string }
 ): Promise<ProcessResult> {
   return config.runner.run(getToolPath(config, tool), args, options);
 }

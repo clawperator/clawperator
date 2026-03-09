@@ -258,22 +258,22 @@ export async function startServer(options: ServeOptions): Promise<Server> {
     }
   });
 
+  app.get("/android/emulators/running", async (_req, res) => {
+    try {
+      const config = getEmulatorConfig();
+      const devices = await listRunningEmulators(config);
+      res.json({ devices });
+    } catch (error) {
+      res.status(500).json({ ok: false, error: { code: "INTERNAL_ERROR", message: String(error) } });
+    }
+  });
+
   app.get("/android/emulators/:name", async (req, res) => {
     try {
       const config = getEmulatorConfig();
       const running = await listRunningEmulators(config);
       const avd = await inspectConfiguredAvd(req.params.name, new Set(running.map((emulator) => emulator.avdName)));
       res.json(avd);
-    } catch (error) {
-      res.status(500).json({ ok: false, error: { code: "INTERNAL_ERROR", message: String(error) } });
-    }
-  });
-
-  app.get("/android/emulators/running", async (_req, res) => {
-    try {
-      const config = getEmulatorConfig();
-      const devices = await listRunningEmulators(config);
-      res.json({ devices });
     } catch (error) {
       res.status(500).json({ ok: false, error: { code: "INTERNAL_ERROR", message: String(error) } });
     }

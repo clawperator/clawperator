@@ -34,8 +34,10 @@ export async function isSystemImageInstalled(config: RuntimeConfig, systemImage:
 }
 
 export async function acceptAndroidSdkLicenses(config: RuntimeConfig): Promise<void> {
-  const command = `yes | "${config.sdkmanagerPath}" --licenses`;
-  const result = await config.runner.runShell(command, { timeoutMs: 120_000 });
+  const result = await runAndroidSdkTool(config, "sdkmanager", ["--licenses"], {
+    timeoutMs: 120_000,
+    input: "y\n".repeat(100),
+  });
   if (result.code !== 0) {
     throw buildError(
       ERROR_CODES.ANDROID_SYSTEM_IMAGE_INSTALL_FAILED,
@@ -75,8 +77,12 @@ export async function createAvd(
   const deviceProfile = options.deviceProfile ?? DEFAULT_EMULATOR_DEVICE_PROFILE;
 
   await ensureSystemImageInstalled(config, systemImage);
-  const command = `printf 'no\n' | "${config.avdmanagerPath}" create avd --force --name "${options.name}" --package "${systemImage}" --device "${deviceProfile}"`;
-  const result = await config.runner.runShell(command, { timeoutMs: 120_000 });
+  const result = await runAndroidSdkTool(
+    config,
+    "avdmanager",
+    ["create", "avd", "--force", "--name", options.name, "--package", systemImage, "--device", deviceProfile],
+    { timeoutMs: 120_000, input: "no\n" }
+  );
   if (result.code !== 0) {
     throw buildError(
       ERROR_CODES.ANDROID_AVD_CREATE_FAILED,

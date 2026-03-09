@@ -48,9 +48,10 @@ describe("emulator lifecycle", () => {
 
     assert.strictEqual(runner.calls[0].command, "sdkmanager");
     assert.deepStrictEqual(runner.calls[0].args, ["--list_installed"]);
-    assert.strictEqual(runner.calls[1].command, "bash");
-    assert.match(runner.calls[1].args[1], /sdkmanager" --licenses/);
+    assert.strictEqual(runner.calls[1].command, "sdkmanager");
+    assert.deepStrictEqual(runner.calls[1].args, ["--licenses"]);
     assert.strictEqual(runner.calls[2].command, "sdkmanager");
+    assert.deepStrictEqual(runner.calls[2].args, ["system-images;android-35;google_apis_playstore;arm64-v8a"]);
   });
 
   it("creates an AVD with a deterministic avdmanager command", async () => {
@@ -65,10 +66,12 @@ describe("emulator lifecycle", () => {
     const config = getDefaultRuntimeConfig({ runner });
     await createAvd(config, { name: "clawperator-pixel" });
 
-    assert.strictEqual(runner.calls[1].command, "bash");
-    assert.match(runner.calls[1].args[1], /avdmanagerPath|avdmanager/);
-    assert.match(runner.calls[1].args[1], /create avd --force --name "clawperator-pixel"/);
-    assert.match(runner.calls[1].args[1], /--device "pixel_7"/);
+    assert.strictEqual(runner.calls[1].command, "avdmanager");
+    assert.deepStrictEqual(runner.calls[1].args, [
+      "create", "avd", "--force", "--name", "clawperator-pixel",
+      "--package", "system-images;android-35;google_apis_playstore;arm64-v8a",
+      "--device", "pixel_7",
+    ]);
   });
 
   it("starts an AVD detached with fully ignored stdio", () => {
