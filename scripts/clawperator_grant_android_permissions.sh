@@ -230,6 +230,11 @@ main() {
         TARGET_PACKAGE=$(detect_package)
     fi
 
+    # Validate TARGET_PACKAGE to prevent command injection
+    if [[ ! "$TARGET_PACKAGE" =~ ^[a-zA-Z0-9_.]+$ ]]; then
+        echo -e "${RED}❌ Error: Invalid package name format: '$TARGET_PACKAGE'${NC}"
+        exit 1
+    fi
     echo -e "${BLUE}📱 Target package: $TARGET_PACKAGE${NC}"
     echo ""
 

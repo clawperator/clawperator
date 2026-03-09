@@ -262,12 +262,12 @@ setup_skills() {
             echo -e "${YELLOW}⚠️  Skills directory has no remote configured. Adding origin...${NC}"
             if ! GIT_TERMINAL_PROMPT=0 git -C "$SKILLS_DIR" remote add origin "$SKILLS_REPO_URL"; then
                 warn_skills_setup_failed "could not add remote to existing skills directory. Remove $SKILLS_DIR and re-run."
-                                return 0
+                return 0
             fi
         elif [ "$EXISTING_REMOTE" != "$SKILLS_REPO_URL" ]; then
             if ! GIT_TERMINAL_PROMPT=0 git -C "$SKILLS_DIR" remote set-url origin "$SKILLS_REPO_URL"; then
                 warn_skills_setup_failed "could not update the skills remote URL. Remove $SKILLS_DIR and re-run."
-                                return 0
+                return 0
             fi
         fi
         echo -e "${YELLOW}⚠️  Skills directory already exists. Updating...${NC}"
