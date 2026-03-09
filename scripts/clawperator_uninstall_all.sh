@@ -84,11 +84,25 @@ run_cmd() {
 
 stop_processes() {
     echo -e "${BLUE}Stopping running Clawperator processes...${NC}"
-    if pgrep -f "clawperator" > /dev/null 2>&1; then
-        run_cmd pkill -f "clawperator" || true
-        echo -e "${GREEN}✅ Sent TERM to clawperator processes.${NC}"
+    local process_ids=""
+    process_ids="$(pgrep -f "clawperator serve" 2>/dev/null || true)"
+    process_ids="$(printf '%s\n' "$process_ids" | awk -v self="$$" 'NF && $1 != self { print $1 }')"
+
+    if [ -n "$process_ids" ]; then
+        if [ "$DRY_RUN" = true ]; then
+            while IFS= read -r pid; do
+                [ -n "$pid" ] || continue
+                echo -e "${YELLOW}[dry-run] kill ${pid}${NC}"
+            done <<< "$process_ids"
+        else
+            while IFS= read -r pid; do
+                [ -n "$pid" ] || continue
+                kill "$pid" || true
+            done <<< "$process_ids"
+        fi
+        echo -e "${GREEN}✅ Sent TERM to clawperator serve processes.${NC}"
     else
-        echo "   No running clawperator processes found."
+        echo "   No running clawperator serve processes found."
     fi
 }
 

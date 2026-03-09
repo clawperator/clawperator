@@ -2,8 +2,6 @@ import { describe, it } from "node:test";
 import assert from "node:assert";
 import { spawn } from "node:child_process";
 import { join } from "node:path";
-import { mkdtemp, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
 
 function runCli(args: string[]): Promise<{ stdout: string; stderr: string; code: number }> {
   const cliPath = join(process.cwd(), "dist", "cli", "index.js");
@@ -60,27 +58,12 @@ describe("CLI help", () => {
   });
 
   it("accepts --format as an alias for --output", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "clawperator-format-"));
-    const executionPath = join(dir, "execution.json");
-    await writeFile(
-      executionPath,
-      JSON.stringify({
-        commandId: "cmd-format-test",
-        taskId: "task-format-test",
-        source: "unit-test",
-        expectedFormat: "android-ui-automator",
-        actions: [{ id: "s1", type: "snapshot_ui" }],
-      }),
-      "utf8",
-    );
-
-    const jsonResult = await runCli(["execute", "--execution", executionPath, "--format", "json"]);
+    const jsonResult = await runCli(["inspect", "ui", "--timeout-ms", "nope", "--format", "json"]);
     assert.notStrictEqual(jsonResult.code, 0);
-    assert.match(jsonResult.stdout, /"code":"RECEIVER_NOT_INSTALLED"/);
+    assert.match(jsonResult.stdout, /^\{"code":"EXECUTION_VALIDATION_FAILED","message":"timeoutMs must be a finite number"\}/);
 
-    const prettyResult = await runCli(["execute", "--execution", executionPath, "--format", "pretty"]);
+    const prettyResult = await runCli(["inspect", "ui", "--timeout-ms", "nope", "--format", "pretty"]);
     assert.notStrictEqual(prettyResult.code, 0);
-    assert.match(prettyResult.stdout, /RECEIVER_NOT_INSTALLED/);
-    assert.doesNotMatch(prettyResult.stdout, /"code":"RECEIVER_NOT_INSTALLED"/);
+    assert.match(prettyResult.stdout, /^\{\n  "code": "EXECUTION_VALIDATION_FAILED",\n  "message": "timeoutMs must be a finite number"\n\}/);
   });
 });

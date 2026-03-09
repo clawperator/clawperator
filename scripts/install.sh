@@ -268,7 +268,7 @@ setup_skills_via_cli() {
                     local TMP_FILE
                     TMP_FILE="$(mktemp)"
                     register_temp_file "$TMP_FILE"
-                    grep -v "CLAWPERATOR_SKILLS_REGISTRY" "$RC_FILE" > "$TMP_FILE"
+                    grep -v "CLAWPERATOR_SKILLS_REGISTRY" "$RC_FILE" > "$TMP_FILE" || true
                     printf "\n# Clawperator Skills Registry\n%s\n" "$EXPORT_LINE" >> "$TMP_FILE"
                     mv "$TMP_FILE" "$RC_FILE"
                     echo -e "${BLUE}Updated CLAWPERATOR_SKILLS_REGISTRY in $RC_FILE${NC}"
