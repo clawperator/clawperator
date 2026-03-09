@@ -256,11 +256,13 @@ setup_skills() {
                 warn_skills_setup_failed "could not add remote to existing skills directory. Remove $SKILLS_DIR and re-run."
                 return 0
             fi
+        elif [ "$EXISTING_REMOTE" != "$SKILLS_REPO_URL" ]; then
+            if ! GIT_TERMINAL_PROMPT=0 git -C "$SKILLS_DIR" remote set-url origin "$SKILLS_REPO_URL"; then
+                warn_skills_setup_failed "could not update the skills remote URL. Remove $SKILLS_DIR and re-run."
+                return 0
+            fi
         fi
         echo -e "${YELLOW}⚠️  Skills directory already exists. Updating...${NC}"
-        if [ "$EXISTING_REMOTE" != "$SKILLS_REPO_URL" ]; then
-            GIT_TERMINAL_PROMPT=0 git -C "$SKILLS_DIR" remote set-url origin "$SKILLS_REPO_URL"
-        fi
         if ! GIT_TERMINAL_PROMPT=0 git -C "$SKILLS_DIR" fetch origin --quiet; then
             warn_skills_setup_failed "could not fetch from skills repository. Check network access or run: clawperator skills install"
             return 0
