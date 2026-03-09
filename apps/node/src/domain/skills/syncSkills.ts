@@ -77,7 +77,7 @@ export async function syncSkills(
       // Only pull if on a branch (not detached HEAD from a tag/commit)
       try {
         await exec("git", ["-C", dir, "symbolic-ref", "HEAD"], 5_000);
-        await exec("git", ["-C", dir, "pull", "--ff-only", "--quiet"]);
+        await exec("git", ["-C", dir, "merge", "--ff-only", "--quiet", `origin/${ref}`]);
       } catch {
         // Detached HEAD (tag/commit ref) - fetch+checkout is sufficient
       }

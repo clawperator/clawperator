@@ -96,7 +96,12 @@ If you must use **Wireless Debugging**, be aware that your mileage may vary (YMM
 
 ### Installer cloned everything except skills
 
-If the installer finishes but warns that skills setup was skipped, the core CLI and operator APK are still installed. The current skills repository may require separate access. This does not block `clawperator doctor`, device discovery, or direct command execution.
+If the installer finishes but warns that skills setup was skipped, the core CLI and operator APK are still installed. This does not block `clawperator doctor`, device discovery, or direct command execution. To set up skills manually:
+
+```bash
+git clone https://clawperator.com/install/clawperator-skills.bundle ~/.clawperator/skills
+export CLAWPERATOR_SKILLS_REGISTRY="$HOME/.clawperator/skills/skills/skills-registry.json"
+```
 
 ---
 
