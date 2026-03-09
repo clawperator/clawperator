@@ -34,7 +34,7 @@ If you use a local debug APK, pass `--receiver-package com.clawperator.operator.
 
 ## What Doctor Checks
 
-Doctor runs checks in a fixed order. When a critical check fails, subsequent checks that depend on it are skipped, but doctor may continue to gather additional diagnostics before exiting.
+Doctor runs checks in a fixed order. When a critical check fails, doctor returns immediately - all subsequent checks are skipped. The one exception is `device.capability`: it is a critical check (its failure marks the report as not ok), but a failure there does not halt the run; doctor continues into the runtime readiness phase regardless.
 
 ### 1. Host checks
 
@@ -144,7 +144,7 @@ Each `DoctorCheckResult` can also include:
 
 ## How `--fix` Works Today
 
-`--fix` does not have a separate repair plan. It runs the same checks, then automatically executes any shell-based remediation steps attached to failing checks.
+`--fix` does not have a separate repair plan. After the check run completes (or halts early on a critical failure), doctor applies available shell-based remediation steps from the collected checks during finalization. Checks are not re-run after fixes are applied. If the run halted early, only checks that ran before the halt will have their fix steps executed.
 
 Today that can include actions such as:
 
