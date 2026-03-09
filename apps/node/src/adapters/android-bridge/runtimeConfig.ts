@@ -10,6 +10,12 @@ export interface RuntimeConfig {
   projectRoot: string;
   /** adb binary path */
   adbPath: string;
+  /** emulator binary path */
+  emulatorPath: string;
+  /** sdkmanager binary path */
+  sdkmanagerPath: string;
+  /** avdmanager binary path */
+  avdmanagerPath: string;
   /** Target device serial (optional; resolved by domain if not set) */
   deviceId?: string;
   /** Receiver package for broadcast -p (required at dispatch time) */
@@ -33,6 +39,9 @@ export function getDefaultRuntimeConfig(overrides?: Partial<RuntimeConfig>): Run
   return {
     projectRoot: defaultProjectRoot,
     adbPath: "adb",
+    emulatorPath: "emulator",
+    sdkmanagerPath: "sdkmanager",
+    avdmanagerPath: "avdmanager",
     receiverPackage: "com.clawperator.operator",
     actionAgentCommand: DEFAULT_ACTION_AGENT_COMMAND,
     payloadExtraKey: EXTRA_AGENT_PAYLOAD,

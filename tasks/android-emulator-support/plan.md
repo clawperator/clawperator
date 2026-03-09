@@ -168,7 +168,7 @@ A supported AVD must satisfy all required characteristics:
 
 Newly created AVDs should default to a profile equivalent to:
 
-- device profile: Pixel 8
+- device profile: Pixel 7
 - Google Play image
 - Android API level 35
 - supported ABI
@@ -682,14 +682,15 @@ Expose emulator management through `clawperator serve`.
 ### Tasks
 
 1. Add `GET /android/emulators`
-2. Add `GET /android/emulators/running`
-3. Add `POST /android/emulators/create`
-4. Add `POST /android/emulators/:name/start`
-5. Add `POST /android/emulators/:name/stop`
-6. Add `DELETE /android/emulators/:name`
-7. Add `POST /android/provision/emulator`
-8. Validate request bodies explicitly and return structured errors on invalid input.
-9. Map common failures to appropriate HTTP status codes.
+2. Add `GET /android/emulators/:name`
+3. Add `GET /android/emulators/running`
+4. Add `POST /android/emulators/create`
+5. Add `POST /android/emulators/:name/start`
+6. Add `POST /android/emulators/:name/stop`
+7. Add `DELETE /android/emulators/:name`
+8. Add `POST /android/provision/emulator`
+9. Validate request bodies explicitly and return structured errors on invalid input.
+10. Map common failures to appropriate HTTP status codes.
 
 ### Suggested Endpoint Contracts
 
@@ -705,12 +706,31 @@ Returns configured AVDs:
       "apiLevel": 35,
       "playStore": true,
       "abi": "arm64-v8a",
-      "deviceProfile": "pixel",
+      "deviceProfile": "pixel_7",
       "running": false,
       "supported": true,
       "unsupportedReasons": []
     }
   ]
+}
+```
+
+#### `GET /android/emulators/:name`
+
+Returns the full normalized view of a single AVD:
+
+```json
+{
+  "name": "clawperator-pixel",
+  "exists": true,
+  "running": false,
+  "supported": true,
+  "apiLevel": 35,
+  "abi": "arm64-v8a",
+  "playStore": true,
+  "deviceProfile": "pixel_7",
+  "systemImage": "system-images;android-35;google_apis_playstore;arm64-v8a",
+  "unsupportedReasons": []
 }
 ```
 
@@ -918,6 +938,7 @@ Add tests for:
 Add tests for:
 
 - `GET /android/emulators`
+- `GET /android/emulators/:name`
 - `GET /android/emulators/running`
 - `POST /android/emulators/create`
 - `POST /android/emulators/:name/start`
@@ -932,6 +953,7 @@ Add tests for:
 - top-level help text
 - emulator help topics
 - `provision emulator` alias parity
+- `emulator inspect <name>` output shape
 - usage errors for missing required args
 - explicit `--output json` and `--output pretty` behavior on emulator commands
 
@@ -987,21 +1009,22 @@ The feature is complete when all of the following are true:
 1. `clawperator provision emulator` exists and works.
 2. `clawperator emulator provision` behaves identically.
 3. `clawperator emulator list` shows configured AVDs and labels unsupported ones.
-4. `clawperator emulator status` shows running emulators and boot state.
-5. `clawperator emulator create` creates a supported AVD and installs its system image if needed.
-6. `clawperator emulator start <name>` starts a named AVD and returns a usable serial.
-7. `clawperator emulator stop <name>` stops a named running emulator.
-8. `clawperator emulator delete <name>` deletes a named AVD.
-9. `POST /android/provision/emulator` provisions according to the required reuse order.
-10. Provisioning prefers:
+4. `clawperator emulator inspect <name>` returns a full normalized view for diagnosis.
+5. `clawperator emulator status` shows running emulators and boot state.
+6. `clawperator emulator create` creates a supported AVD and installs its system image if needed.
+7. `clawperator emulator start <name>` starts a named AVD and returns a usable serial.
+8. `clawperator emulator stop <name>` stops a named running emulator.
+9. `clawperator emulator delete <name>` deletes a named AVD.
+10. `POST /android/provision/emulator` provisions according to the required reuse order.
+11. Provisioning prefers:
     - running supported emulator
     - then stopped supported AVD
     - then new AVD creation
-11. Provisioning does not auto-select unsupported AVDs.
-12. Provisioning waits for `sys.boot_completed=1`.
-13. The returned emulator serial works with existing Clawperator device-targeted commands.
-14. Documentation reflects the new CLI and HTTP surfaces.
-15. Node build and tests pass.
+12. Provisioning does not auto-select unsupported AVDs.
+13. Provisioning waits for both `sys.boot_completed=1` and `dev.bootcomplete=1` when determining readiness.
+14. The returned emulator serial works with existing Clawperator device-targeted commands.
+15. Documentation reflects the new CLI and HTTP surfaces.
+16. Node build and tests pass.
 
 ## Recommended Implementation Order
 
@@ -1050,21 +1073,9 @@ Use `--output pretty` for human-oriented examples only.
 
 These decisions should be made explicitly in code and docs:
 
-1. exact supported API level policy
-2. exact default AVD name
-3. exact supported device profile list
-4. whether `start` waits only for ADB registration or full boot
-5. whether `delete` requires the AVD to be stopped first
-6. whether v1 uses a single ABI or host-aware ABI selection
+1. exact supported device profile list beyond the default `pixel_7`
+2. whether `start` waits only for ADB registration or full boot
+3. whether `delete` requires the AVD to be stopped first
+4. whether v1 uses a single ABI or host-aware ABI selection
 
 Choose clear defaults, document them in code comments where needed, and keep behavior deterministic.
-
-## Nice-to-Have Follow-Up Command
-
-Not required for this implementation, but likely useful shortly after shipping:
-
-```bash
-clawperator emulator inspect <name>
-```
-
-This would expose raw or near-raw metadata for debugging compatibility decisions. Do not block v1 on this command.

@@ -1,0 +1,18 @@
+export const DEFAULT_EMULATOR_AVD_NAME = "clawperator-pixel";
+export const SUPPORTED_EMULATOR_API_LEVEL = 35;
+export const DEFAULT_EMULATOR_DEVICE_PROFILE = "pixel_7";
+export const SUPPORTED_EMULATOR_ABIS = ["arm64-v8a"] as const;
+export const DEFAULT_EMULATOR_ABI = SUPPORTED_EMULATOR_ABIS[0];
+export const SUPPORTED_EMULATOR_DEVICE_PROFILES = [DEFAULT_EMULATOR_DEVICE_PROFILE] as const;
+export const DEFAULT_EMULATOR_TAG = "google_apis_playstore";
+
+export const DEFAULT_EMULATOR_SYSTEM_IMAGE = [
+  "system-images",
+  `android-${SUPPORTED_EMULATOR_API_LEVEL}`,
+  DEFAULT_EMULATOR_TAG,
+  DEFAULT_EMULATOR_ABI,
+].join(";");
+
+export const EMULATOR_BOOT_TIMEOUT_MS = 180_000;
+export const ADB_REGISTRATION_TIMEOUT_MS = 60_000;
+export const BOOT_POLL_INTERVAL_MS = 2_000;
