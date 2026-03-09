@@ -7,7 +7,8 @@
 # What this removes:
 #   - Clawperator CLI (npm global package)
 #   - Operator APK from all connected devices (release and debug variants)
-#   - Any Android emulators named `clawperator-*`
+#   - Any running Android emulators named `clawperator-*` (stopped via adb)
+#   - Any configured Android AVDs named `clawperator-*` (deleted via avdmanager)
 #   - ~/.clawperator/ (downloads, skills repo, all local state)
 #   - CLAWPERATOR_SKILLS_REGISTRY export from shell RC files
 #   - Any running `clawperator serve` processes
@@ -124,7 +125,39 @@ stop_processes() {
 }
 
 # ---------------------------------------------------------------------------
-# 2. Uninstall the npm global package
+# 2. Stop running clawperator emulators
+
+stop_clawperator_emulators() {
+    echo -e "${BLUE}Stopping running clawperator emulators...${NC}"
+    if ! command -v adb &> /dev/null; then
+        echo "   adb not found. Skipping emulator shutdown."
+        return
+    fi
+
+    local found=false
+    while IFS= read -r emulator_serial; do
+        [ -n "$emulator_serial" ] || continue
+        local avd_name
+        avd_name="$(adb -s "$emulator_serial" emu avd name 2>/dev/null | sed -n '2p' | tr -d '\r')"
+        if [[ "$avd_name" == clawperator-* ]]; then
+            found=true
+            echo -e "${BLUE}Stopping emulator ${avd_name} (${emulator_serial})...${NC}"
+            if [ "$DRY_RUN" = true ]; then
+                echo -e "${YELLOW}[dry-run] adb -s ${emulator_serial} emu kill${NC}"
+            else
+                adb -s "$emulator_serial" emu kill > /dev/null 2>&1 || warn "Failed to stop emulator ${avd_name}."
+                sleep 2
+            fi
+        fi
+    done < <(adb devices | awk 'NR > 1 && $1 ~ /^emulator-/ && $2 == "device" { print $1 }')
+
+    if [ "$found" = false ]; then
+        echo "   No running clawperator emulators found."
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# 3. Uninstall the npm global package
 
 uninstall_cli() {
     echo -e "${BLUE}Uninstalling Clawperator CLI...${NC}"
@@ -144,7 +177,7 @@ uninstall_cli() {
 }
 
 # ---------------------------------------------------------------------------
-# 3. Uninstall APKs from connected Android devices
+# 4. Uninstall APKs from connected Android devices
 
 uninstall_apk_from_device() {
     local SERIAL="$1"
@@ -210,10 +243,10 @@ uninstall_apks() {
 }
 
 # ---------------------------------------------------------------------------
-# 4. Remove clawperator emulators
+# 5. Remove clawperator AVDs
 
 remove_clawperator_emulators() {
-    echo -e "${BLUE}Removing clawperator emulators...${NC}"
+    echo -e "${BLUE}Removing clawperator AVDs...${NC}"
 
     local emulator_bin=""
     local avdmanager_bin=""
@@ -230,47 +263,25 @@ remove_clawperator_emulators() {
     local avd_names
     avd_names="$("$emulator_bin" -list-avds 2>/dev/null | awk '/^clawperator-/ { print $1 }')"
     if [ -z "$avd_names" ]; then
-        echo "   No clawperator emulators found."
+        echo "   No clawperator AVDs found."
         return
     fi
 
     while IFS= read -r avd_name; do
         [ -n "$avd_name" ] || continue
-
-        local serial=""
-        serial="$(adb devices | awk '$1 ~ /^emulator-/ && $2 == "device" { print $1 }' | while read -r emulator_serial; do
-            [ -n "$emulator_serial" ] || continue
-            local resolved_name
-            resolved_name="$(adb -s "$emulator_serial" emu avd name 2>/dev/null | tail -n 1 | tr -d '\r')"
-            if [ "$resolved_name" = "$avd_name" ]; then
-                echo "$emulator_serial"
-                break
-            fi
-        done)"
-
-        if [ -n "$serial" ]; then
-            echo -e "${BLUE}Stopping running emulator ${avd_name} (${serial})...${NC}"
-            if [ "$DRY_RUN" = true ]; then
-                echo -e "${YELLOW}[dry-run] adb -s ${serial} emu kill${NC}"
-            else
-                adb -s "$serial" emu kill > /dev/null 2>&1 || warn "Failed to stop running emulator ${avd_name}."
-                sleep 2
-            fi
-        fi
-
-        echo -e "${BLUE}Deleting emulator ${avd_name}...${NC}"
+        echo -e "${BLUE}Deleting AVD ${avd_name}...${NC}"
         if [ "$DRY_RUN" = true ]; then
             echo -e "${YELLOW}[dry-run] ${avdmanager_bin} delete avd --name ${avd_name}${NC}"
         elif "$avdmanager_bin" delete avd --name "$avd_name" > /dev/null 2>&1; then
-            echo -e "${GREEN}✅ Deleted emulator ${avd_name}.${NC}"
+            echo -e "${GREEN}✅ Deleted AVD ${avd_name}.${NC}"
         else
-            warn "Failed to delete emulator ${avd_name}."
+            warn "Failed to delete AVD ${avd_name}."
         fi
     done <<< "$avd_names"
 }
 
 # ---------------------------------------------------------------------------
-# 5. Remove ~/.clawperator/
+# 6. Remove ~/.clawperator/
 
 remove_data_dir() {
     echo -e "${BLUE}Removing ${CLAWPERATOR_DIR}...${NC}"
@@ -283,7 +294,7 @@ remove_data_dir() {
 }
 
 # ---------------------------------------------------------------------------
-# 6. Clean CLAWPERATOR_SKILLS_REGISTRY from shell RC files
+# 7. Clean CLAWPERATOR_SKILLS_REGISTRY from shell RC files
 
 clean_shell_rcs() {
     echo -e "${BLUE}Cleaning shell RC files...${NC}"
@@ -320,6 +331,8 @@ main() {
     echo ""
 
     stop_processes
+    echo ""
+    stop_clawperator_emulators
     echo ""
     uninstall_cli
     echo ""
