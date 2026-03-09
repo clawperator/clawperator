@@ -10,7 +10,7 @@ This doc covers the exact steps a remote OpenClaw agent should follow to install
 
 Before starting:
 
-- The host Mac has `node` (v18 or later), `adb`, `git`, and `curl` installed
+- The host Mac has `curl`, `adb`, and `git` installed (`node` v22 is installed automatically by the installer if not present)
 - One Android device is physically connected via USB
 - USB debugging is enabled on the device
 - The device has previously authorized USB debugging for this host (the RSA prompt was accepted)
@@ -31,7 +31,7 @@ The installer:
 - detects `node`, `adb`, `git`, `curl`
 - installs the `clawperator` CLI to a location on `PATH`
 - downloads and installs the Operator APK on the connected device
-- attempts to clone the skills repo to `~/.clawperator/skills/`
+- downloads the skills bundle to `~/.clawperator/skills/`
 
 In non-interactive mode (piped execution), the APK install proceeds automatically without prompts.
 
@@ -45,10 +45,22 @@ clawperator --version
 
 ## Step 2 - Set the Skills Registry
 
-The skills registry path must be set explicitly. Add to the shell profile or export for the session:
+The installer writes `CLAWPERATOR_SKILLS_REGISTRY` to your shell profile automatically when skills are set up successfully. Restart your terminal or source your profile, then verify:
+
+```bash
+echo $CLAWPERATOR_SKILLS_REGISTRY
+```
+
+If the variable is empty (skills setup was skipped during install), set it explicitly:
 
 ```bash
 export CLAWPERATOR_SKILLS_REGISTRY="$HOME/.clawperator/skills/skills/skills-registry.json"
+```
+
+If skills were not installed at all, run:
+
+```bash
+clawperator skills install
 ```
 
 ---
