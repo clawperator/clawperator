@@ -612,8 +612,8 @@ main() {
     # Use doctor to drive the rest of the installation
     run_doctor_and_fix || exit 1
     
-    # Setup skills via CLI
-    setup_skills_via_cli || exit 1
+    # Setup skills via CLI (best-effort)
+    setup_skills_via_cli
 
     local ACTIVE_SHELL="${SHELL:-/bin/bash}"
     local DETECTED_SHELL

@@ -66,9 +66,8 @@ describe("CLI help", () => {
 
     const prettyResult = await runCli(["inspect", "ui", "--timeout-ms", "nope", "--format", "pretty"]);
     assert.notStrictEqual(prettyResult.code, 0);
-    assert.match(prettyResult.stdout, /EXECUTION_VALIDATION_FAILED/);
-    assert.match(prettyResult.stdout, /timeoutMs must be a finite number/);
-    assert.match(prettyResult.stdout, /\{/);
-    assert.match(prettyResult.stdout, /\}/);
+    const pretty = JSON.parse(prettyResult.stdout);
+    assert.strictEqual(pretty.code, "EXECUTION_VALIDATION_FAILED");
+    assert.strictEqual(pretty.message, "timeoutMs must be a finite number");
   });
 });
