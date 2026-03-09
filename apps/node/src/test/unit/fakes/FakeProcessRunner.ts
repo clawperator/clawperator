@@ -30,8 +30,8 @@ export class FakeProcessRunner implements ProcessRunner {
         return this.run("bash", ["-lc", command], options);
     }
 
-    spawn(command: string, args: string[]): any {
+    spawn(command: string, args: string[], _options?: { detached?: boolean; stdio?: any; shell?: boolean }): any {
         this.calls.push({ command, args });
-        return {};
+        return { unref() {} };
     }
 }

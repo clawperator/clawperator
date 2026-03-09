@@ -123,6 +123,7 @@ describe("emulator lifecycle", () => {
 
     const deleteRunner = new FakeProcessRunner();
     deleteRunner.queueResult({ code: 0, stdout: "List of devices attached\n", stderr: "" });
+    deleteRunner.queueResult({ code: 0, stdout: "", stderr: "" });
     const deleteConfig = getDefaultRuntimeConfig({ runner: deleteRunner });
     await deleteAvd(deleteConfig, "clawperator-pixel");
     assert.deepStrictEqual(deleteRunner.calls[1].args, ["delete", "avd", "--name", "clawperator-pixel"]);

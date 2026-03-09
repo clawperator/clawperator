@@ -11,7 +11,7 @@ export interface ProcessRunner {
   run(command: string, args: string[], options?: { timeoutMs?: number; cwd?: string }): Promise<ProcessResult>;
   runShell(command: string, options?: { timeoutMs?: number; cwd?: string }): Promise<ProcessResult>;
   // For logcat/streaming
-  spawn(command: string, args: string[]): any;
+  spawn(command: string, args: string[], options?: { detached?: boolean; stdio?: any; shell?: boolean }): any;
 }
 
 export class NodeProcessRunner implements ProcessRunner {
@@ -52,10 +52,11 @@ export class NodeProcessRunner implements ProcessRunner {
     return this.run("bash", ["-lc", command], options);
   }
 
-  spawn(command: string, args: string[]): any {
+  spawn(command: string, args: string[], options?: { detached?: boolean; stdio?: any; shell?: boolean }): any {
     return spawn(command, args, {
-      stdio: ["ignore", "pipe", "pipe"],
-      shell: false,
+      detached: options?.detached ?? false,
+      stdio: options?.stdio ?? ["ignore", "pipe", "pipe"],
+      shell: options?.shell ?? false,
     });
   }
 }
