@@ -22,7 +22,7 @@ If you want the simplest path, run:
 curl -fsSL https://clawperator.com/install.sh | bash
 ```
 
-With one connected device, the installer downloads the latest stable APK, verifies its checksum, and offers to install it immediately. If no device is connected, or if multiple devices are connected, it still saves the APK locally at `~/.clawperator/downloads/operator.apk`.
+With one connected device, the installer installs the CLI, runs `clawperator doctor --format json` to detect missing setup, downloads the latest stable APK when needed, verifies its checksum, and offers to install or upgrade it immediately. If the APK install succeeds, the installer also attempts to auto-grant device permissions and finishes with a final doctor check. If no device is connected, or if multiple devices are connected, it still saves the APK locally at `~/.clawperator/downloads/operator.apk`.
 
 For manual installation, download the latest APK from [clawperator.com/operator.apk](https://clawperator.com/operator.apk) and save it locally.
 
@@ -93,6 +93,8 @@ clawperator grant-device-permissions
 
 This uses `adb` to enable the accessibility service without touching the device screen. Optionally pass `--device-id <id>` if multiple devices are connected.
 
+For a standard public install, the default receiver package is `com.clawperator.operator`. For local debug builds, pass `--receiver-package com.clawperator.operator.dev`.
+
 **On the device (manual alternative):**
 
 1. Open **Settings**
@@ -113,7 +115,7 @@ Run the diagnostic check:
 clawperator doctor
 ```
 
-A fully configured device will show all checks passing. Common warnings:
+A fully configured device will show all checks passing. The installer itself now runs a final doctor check and exits non-zero if the environment is still not ready. Common warnings:
 
 | Warning | Fix |
 | :--- | :--- |
