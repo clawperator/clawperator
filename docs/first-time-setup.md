@@ -161,7 +161,7 @@ For reliable automation:
 
 ## Troubleshooting
 
-See [Troubleshooting the Operator App](troubleshooting.md) for common issues.
+See [Troubleshooting the Operator App](../troubleshooting/troubleshooting.md) for common issues.
 
 For environment checks: `clawperator doctor --output pretty`
 

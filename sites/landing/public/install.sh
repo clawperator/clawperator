@@ -218,7 +218,9 @@ install_cli() {
     echo -e "${BLUE}Installing Clawperator CLI (@latest)...${NC}"
     if npm install -g clawperator@latest; then
         echo -e "${GREEN}✅ Clawperator CLI installed.${NC}"
-        
+
+        hash -r
+
         # Discover the binary path for immediate use
         CLAWPERATOR_BIN_PATH="$(command -v clawperator || true)"
         if [ -z "$CLAWPERATOR_BIN_PATH" ]; then
@@ -227,6 +229,12 @@ install_cli() {
             if [ -f "$NPM_PREFIX/bin/clawperator" ]; then
                 CLAWPERATOR_BIN_PATH="$NPM_PREFIX/bin/clawperator"
             fi
+        fi
+        if [ -z "$CLAWPERATOR_BIN_PATH" ]; then
+            echo -e "${RED}❌ Clawperator CLI installed but the binary could not be found on PATH.${NC}"
+            echo -e "${YELLOW}Refresh your shell PATH and re-run:${NC}"
+            echo -e "${YELLOW}${INSTALL_COMMAND}${NC}"
+            return 1
         fi
     else
         echo -e "${RED}❌ Failed to install Clawperator CLI. Try running 'sudo npm install -g clawperator@latest' if permissions failed.${NC}"
@@ -519,11 +527,6 @@ run_doctor_and_fix() {
         check_adb || return 1
     fi
 
-    # Check for Git (required for skills)
-    if doctor_check_status "$DOCTOR_JSON" "host.git.presence" "fail"; then
-        check_git || return 1
-    fi
-
     # Download and Verify APK if needed.
     # Reinstall when the APK is missing, the wrong variant is installed, or the installed APK is version-incompatible.
     if doctor_check_status "$DOCTOR_JSON" "readiness.apk.presence" "fail" || \
@@ -603,10 +606,10 @@ main() {
     echo ""
     
     if [ "$SKILLS_SETUP_STATUS" = "configured" ]; then
-        echo -e "7. Skills registry configured at:"
+        echo -e "6. Skills registry configured at:"
         echo -e "   ${BLUE}${SKILLS_REGISTRY_PATH}${NC}"
     else
-        echo -e "7. ${YELLOW}Skills were not configured during install.${NC}"
+        echo -e "6. ${YELLOW}Skills were not configured during install.${NC}"
         echo -e "   To set up skills later, run:"
         echo -e "   ${YELLOW}clawperator skills install${NC}"
         echo -e "   Then add to your shell profile (~/.zshrc or ~/.bashrc):"
