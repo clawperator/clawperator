@@ -1,6 +1,6 @@
 # Clawperator Doctor
 
-`clawperator doctor` is the runtime readiness check for the Node CLI. It verifies that the host environment, connected device, installed Operator APK, and end-to-end command path are in a usable state before an agent relies on the device.
+`clawperator doctor` is the runtime readiness check for the Node CLI. It verifies that the host environment, connected device, and installed Operator APK are in a usable state, and that the end-to-end command path is functional, before an agent relies on the device.
 
 This page describes the current shipped behavior. It replaces the older v0.1 design notes.
 
@@ -21,7 +21,7 @@ Supported flags:
 - `--json` - shorthand for `--output json`
 - `--device-id <id>` - target one device when multiple are connected
 - `--receiver-package <package>` - override the target Operator package
-- `--fix` - run shell-based remediation steps from failing checks
+- `--fix` - run shell-based remediation steps from non-passing checks (both `fail` and `warn`)
 - `--full` - include Android build, install, launch, and smoke test checks
 - `--check-only` - always exit `0`, even when critical checks fail; does not change halt behavior (doctor still returns early on critical failures)
 
@@ -60,7 +60,7 @@ Doctor runs checks in a fixed order. When a critical check fails, doctor returns
 - `readiness.settings.dev_options` - warns if Android Developer Options are disabled
 - `readiness.settings.usb_debugging` - warns if USB debugging is disabled
 - `readiness.handshake` - sends a `doctor_ping` command and waits for one canonical `[Clawperator-Result]` envelope
-- `readiness.smoke` - opens Android Settings and confirms it can be observed via `snapshot_ui` (`--full` only, runs after handshake)
+- `readiness.smoke` - opens Android Settings and runs a `snapshot_ui` step; passes if the snapshot command succeeds (`--full` only, runs after handshake)
 
 ## Critical vs Advisory Checks
 
