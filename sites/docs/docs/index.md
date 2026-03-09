@@ -10,6 +10,8 @@ Clawperator is a deterministic actuator tool for LLM-driven Android automation. 
 ## For AI Agents
 
 - [Node API - Agent Guide](ai-agents/node-api-for-agents.md) - CLI and HTTP API reference for agents
+- [Agent Bootstrap Guide](ai-agents/openclaw-remote-bootstrap.md) - Step-by-step environment setup for remote agents
+- [Operator LLM Playbook](design/operator-llm-playbook.md) - Action contracts, skill packaging, and runtime conventions
 
 ## Reference
 
@@ -20,11 +22,12 @@ Clawperator is a deterministic actuator tool for LLM-driven Android automation. 
 
 ## Architecture
 
-- [Architecture](architecture/architecture.md)
+- [System Overview](architecture/architecture.md)
 - [Conformance Test APK](architecture/conformance-apk.md)
 
 ## Troubleshooting
 
+- [Version Compatibility](troubleshooting/compatibility.md)
 - [Troubleshooting the Operator App](troubleshooting/troubleshooting.md)
 - [Known Issues](troubleshooting/known-issues.md)
 - [Crash Logs](troubleshooting/crash-logs.md)
@@ -33,6 +36,7 @@ Clawperator is a deterministic actuator tool for LLM-driven Android automation. 
 
 - [Usage Model](skills/usage-model.md)
 - [Skill Authoring Guidelines](skills/skill-authoring-guidelines.md)
+- [Skill Design](design/skill-design.md)
 - [Device Prep and Runtime Tips](skills/device-prep-and-runtime-tips.md)
 - [Skills Verification](skills/skills-verification.md)
 - [Blocked Terms Policy](skills/blocked-terms-policy.md)
@@ -40,5 +44,3 @@ Clawperator is a deterministic actuator tool for LLM-driven Android automation. 
 ## Design
 
 - [Node Runtime and API Design](design/node-api-design.md)
-- [Operator LLM Playbook](design/operator-llm-playbook.md)
-- [Skill Design](design/skill-design.md)
