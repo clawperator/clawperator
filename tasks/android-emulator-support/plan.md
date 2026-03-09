@@ -166,7 +166,7 @@ A supported AVD must satisfy all required characteristics:
 
 Newly created AVDs should default to a profile equivalent to:
 
-- device profile: Pixel
+- device profile: Pixel 8
 - Google Play image
 - supported Android API level
 - supported ABI
@@ -188,6 +188,16 @@ Implementation requirement:
 - keep room for host-aware ABI selection if required
 
 If a single ABI is selected for v1, document that choice clearly and ensure all compatibility checks align with it.
+
+### Default v1 Values
+
+Unless implementation discovers a hard blocker, v1 should standardize on:
+
+- default AVD name: `clawperator-pixel`
+- default device profile: `pixel_7`
+- Google Play system image package derived from the supported API level and chosen ABI
+
+Avoid dynamically generated AVD names in v1. A stable default name simplifies reuse and duplicate-avoidance logic.
 
 ### Unsupported AVD Labeling
 
@@ -349,6 +359,16 @@ Create the foundation needed for all later phases.
    - system image channel / package identifier
    - boot timeout
    - polling intervals
+5. Add explicit timeout constants, at minimum:
+   - `EMULATOR_BOOT_TIMEOUT_MS = 180_000`
+   - `ADB_REGISTRATION_TIMEOUT_MS = 60_000`
+   - `BOOT_POLL_INTERVAL_MS = 2_000`
+6. Add explicit host tool presence checks for:
+   - `adb`
+   - `emulator`
+   - `sdkmanager`
+   - `avdmanager`
+7. Return a stable `ANDROID_SDK_TOOL_MISSING` style error before any provisioning work if a required tool is unavailable.
 
 ### Deliverables
 
@@ -373,13 +393,43 @@ Be able to inspect configured AVDs and label them as supported or unsupported.
 2. For each AVD, gather enough metadata to evaluate compatibility.
 3. Parse the AVD config deterministically.
    - likely from AVD config files and metadata rather than only command output
-4. Normalize the resulting data into the configured AVD model.
-5. Implement compatibility evaluation:
+4. Resolve AVD metadata from the canonical AVD files:
+
+```text
+~/.android/avd/<name>.avd/config.ini
+~/.android/avd/<name>.ini
+```
+
+5. Treat the following fields as the primary compatibility inputs:
+
+```text
+PlayStore.enabled
+abi.type
+image.sysdir.1
+hw.device.name
+```
+
+Example values:
+
+```text
+PlayStore.enabled=true
+abi.type=arm64-v8a
+image.sysdir.1=system-images/android-35/google_apis_playstore/arm64-v8a/
+hw.device.name=pixel_7
+```
+
+6. Use these fields as the reliable source of truth for:
+   - Play Store support
+   - ABI
+   - system image family and API level
+   - device profile
+7. Normalize the resulting data into the configured AVD model.
+8. Implement compatibility evaluation:
    - check Google Play support
    - check API level
    - check ABI
    - check device profile
-6. Mark each AVD with:
+9. Mark each AVD with:
    - `supported`
    - `unsupportedReasons`
 
@@ -406,14 +456,31 @@ Be able to identify currently running emulators and map serials back to AVD name
 3. For each emulator serial, resolve:
    - AVD name
    - boot completion state
-4. Implement boot detection using:
+4. Resolve serial to AVD name using the emulator console command:
+
+```bash
+adb -s <serial> emu avd name
+```
+
+Example output:
+
+```text
+OK
+clawperator-pixel
+```
+
+5. Do not attempt to infer AVD names from process lists.
+6. Implement boot detection using:
 
 ```bash
 adb -s <serial> shell getprop sys.boot_completed
 ```
 
-5. Reuse compatibility evaluation for running emulators by connecting running serials back to configured AVD metadata where possible.
-6. Build a deterministic name-to-serial mapping for lifecycle commands.
+7. Strengthen boot detection by checking both:
+   - `sys.boot_completed=1`
+   - `dev.bootcomplete=1`
+8. Reuse compatibility evaluation for running emulators by connecting running serials back to configured AVD metadata where possible.
+9. Build a deterministic name-to-serial mapping for lifecycle commands.
 
 ### Deliverables
 
@@ -434,19 +501,44 @@ Implement the low-level lifecycle operations needed by both CLI and provisioning
 ### Tasks
 
 1. Implement system image presence check.
-2. Implement system image install if missing using `sdkmanager`.
-3. Implement AVD creation using `avdmanager`.
-4. Implement AVD start using `emulator @<name>`.
-5. Ensure start is non-blocking from the CLI perspective.
-6. Wait for the emulator to appear in `adb devices`.
-7. Wait for Android boot completion.
-8. Implement emulator stop using:
+2. Before system image installation, accept SDK licenses non-interactively:
+
+```bash
+yes | sdkmanager --licenses
+```
+
+3. Implement system image install if missing using `sdkmanager`.
+4. Implement AVD creation using `avdmanager`.
+5. Implement AVD start using deterministic flags:
+
+```bash
+emulator @<name> -no-snapshot-load -no-boot-anim
+```
+
+`-no-snapshot-load` is required for deterministic provisioning. Avoid restoring stale snapshots.
+
+6. Launch the emulator as a detached background process from Node.
+7. The process spawn should be equivalent to:
+   - detached process
+   - ignored stdio
+   - parent process does not wait for emulator lifetime
+
+Example Node behavior:
+
+```ts
+spawn(emulatorBinary, args, { detached: true, stdio: "ignore" })
+```
+
+8. Ensure start is non-blocking from the CLI perspective.
+9. Wait for the emulator to appear in `adb devices`.
+10. Wait for Android boot completion.
+11. Implement emulator stop using:
 
 ```bash
 adb -s <serial> emu kill
 ```
 
-9. Implement AVD deletion using `avdmanager delete avd`.
+12. Implement AVD deletion using `avdmanager delete avd`.
 
 ### Deliverables
 
@@ -797,6 +889,7 @@ Add tests for:
 - emulator help topics
 - `provision emulator` alias parity
 - usage errors for missing required args
+- explicit `--output json` and `--output pretty` behavior on emulator commands
 
 ### Test Infrastructure Work
 
@@ -899,6 +992,16 @@ If documentation references emulator provisioning during setup, it should instru
 
 Existing execution and observation routes should continue to work unchanged. Emulator support should compose with the current architecture, not replace it.
 
+### Prefer Explicit Output Control in Examples
+
+When documenting or testing agent-facing flows, prefer examples that show:
+
+```bash
+--output json
+```
+
+Use `--output pretty` for human-oriented examples only.
+
 ## Open Decisions to Resolve During Implementation
 
 These decisions should be made explicitly in code and docs:
@@ -911,3 +1014,13 @@ These decisions should be made explicitly in code and docs:
 6. whether v1 uses a single ABI or host-aware ABI selection
 
 Choose clear defaults, document them in code comments where needed, and keep behavior deterministic.
+
+## Nice-to-Have Follow-Up Command
+
+Not required for this implementation, but likely useful shortly after shipping:
+
+```bash
+clawperator emulator inspect <name>
+```
+
+This would expose raw or near-raw metadata for debugging compatibility decisions. Do not block v1 on this command.
