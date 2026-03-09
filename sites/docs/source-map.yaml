@@ -54,7 +54,7 @@ sections:
     title: Architecture
     pages:
       - output: architecture/architecture.md
-        title: Clawperator Target Architecture
+        title: Clawperator Architecture
         mode: copy
         sources:
           - docs/architecture.md
@@ -102,6 +102,11 @@ sections:
           - docs/node-api-for-agents.md
           - apps/node/src/contracts
         notes: Keep narrative short. Reference code-derived details instead of duplicating them.
+      - output: reference/node-api-doctor.md
+        title: Clawperator Doctor
+        mode: copy
+        sources:
+          - docs/reference/node-api-doctor.md
 
   - id: troubleshooting
     title: Troubleshooting
@@ -164,11 +169,6 @@ sections:
         mode: copy
         sources:
           - docs/design/node-api-design.md
-      - output: design/node-doctor-design.md
-        title: Clawperator Doctor v0.1 Design Spec
-        mode: copy
-        sources:
-          - docs/design/node-doctor-design.md
       - output: design/operator-llm-playbook.md
         title: Operator LLM Playbook
         mode: copy
