@@ -94,7 +94,7 @@ export function startAvd(
   const args = [`@${name}`, "-no-snapshot-load", "-no-boot-anim", ...extraArgs];
   const child = config.runner.spawn(config.emulatorPath, args, {
     detached: true,
-    stdio: "ignore",
+    stdio: ["ignore", "ignore", "ignore"],
     shell: false,
   });
   if (child && typeof child.unref === "function") {

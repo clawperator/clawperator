@@ -53,9 +53,11 @@ export class NodeProcessRunner implements ProcessRunner {
   }
 
   spawn(command: string, args: string[], options?: { detached?: boolean; stdio?: any; shell?: boolean }): any {
+    const detached = options?.detached ?? false;
+    const stdio = options?.stdio ?? (detached ? ["ignore", "ignore", "ignore"] : ["ignore", "pipe", "pipe"]);
     return spawn(command, args, {
-      detached: options?.detached ?? false,
-      stdio: options?.stdio ?? ["ignore", "pipe", "pipe"],
+      detached,
+      stdio,
       shell: options?.shell ?? false,
     });
   }

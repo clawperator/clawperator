@@ -10,6 +10,7 @@ import {
   deleteAvd,
   enableEmulatorDeveloperSettings,
   ensureSystemImageInstalled,
+  startAvd,
   stopAvd,
   waitForBootCompletion,
   waitForEmulatorRegistration,
@@ -68,6 +69,21 @@ describe("emulator lifecycle", () => {
     assert.match(runner.calls[1].args[1], /avdmanagerPath|avdmanager/);
     assert.match(runner.calls[1].args[1], /create avd --force --name "clawperator-pixel"/);
     assert.match(runner.calls[1].args[1], /--device "pixel_7"/);
+  });
+
+  it("starts an AVD detached with fully ignored stdio", () => {
+    const runner = new FakeProcessRunner();
+    const config = getDefaultRuntimeConfig({ runner });
+
+    startAvd(config, "clawperator-pixel");
+
+    assert.strictEqual(runner.calls[0].command, config.emulatorPath);
+    assert.deepStrictEqual(runner.calls[0].args, ["@clawperator-pixel", "-no-snapshot-load", "-no-boot-anim"]);
+    assert.deepStrictEqual(runner.calls[0].options, {
+      detached: true,
+      stdio: ["ignore", "ignore", "ignore"],
+      shell: false,
+    });
   });
 
   it("waits for emulator registration by polling adb devices and emulator console naming", async () => {
