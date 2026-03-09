@@ -243,7 +243,7 @@ setup_skills() {
     }
 
     local TMP_BUNDLE
-    TMP_BUNDLE=$(mktemp -t clawperator-skills-XXXXXX)
+    TMP_BUNDLE=$(mktemp "/tmp/clawperator-skills.XXXXXX")
     register_temp_file "$TMP_BUNDLE"
     if ! curl -fsSL "$SKILLS_REPO_URL" -o "$TMP_BUNDLE"; then
         warn_skills_setup_failed "unable to download the skills bundle from ${SKILLS_REPO_URL}."
