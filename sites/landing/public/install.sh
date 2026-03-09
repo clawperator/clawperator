@@ -352,6 +352,7 @@ parse_operator_metadata() {
     local metadata_version=""
     local metadata_apk_url=""
     local metadata_sha_url=""
+    local metadata_sha256=""
 
     while IFS= read -r metadata_line; do
         if [ -z "$metadata_version" ]; then
@@ -360,6 +361,8 @@ parse_operator_metadata() {
             metadata_apk_url="$metadata_line"
         elif [ -z "$metadata_sha_url" ]; then
             metadata_sha_url="$metadata_line"
+        elif [ -z "$metadata_sha256" ]; then
+            metadata_sha256="$metadata_line"
         else
             echo -e "${RED}❌ APK metadata contained unexpected extra lines.${NC}"
             return 1
@@ -379,6 +382,7 @@ for (const key of ["version", "apk_url", "sha256_url"]) {
 console.log(metadata.version);
 console.log(metadata.apk_url);
 console.log(metadata.sha256_url);
+console.log(metadata.sha256 || "");
 EOF
     )
 
@@ -390,6 +394,7 @@ EOF
     OPERATOR_VERSION="$metadata_version"
     OPERATOR_APK_URL="$metadata_apk_url"
     OPERATOR_SHA_URL="$metadata_sha_url"
+    OPERATOR_EXPECTED_SHA256="$metadata_sha256"
 }
 
 download_operator_apk() {
@@ -405,7 +410,13 @@ download_operator_apk() {
 
     echo -e "${BLUE}Downloading operator APK ${OPERATOR_VERSION}...${NC}"
     curl -fsSL "$OPERATOR_APK_URL" -o "$APK_LOCAL_PATH"
-    curl -fsSL "$OPERATOR_SHA_URL" -o "$APK_SHA_PATH"
+    
+    if [ -n "$OPERATOR_EXPECTED_SHA256" ]; then
+        echo "$OPERATOR_EXPECTED_SHA256" > "$APK_SHA_PATH"
+    else
+        echo -e "${YELLOW}⚠️  Metadata did not contain inline checksum. Downloading separate file...${NC}"
+        curl -fsSL "$OPERATOR_SHA_URL" -o "$APK_SHA_PATH"
+    fi
 }
 
 verify_operator_apk() {
