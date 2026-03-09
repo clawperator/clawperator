@@ -1,29 +1,89 @@
-# Clawperator Target Architecture
+# Clawperator Architecture
 
-## Product Boundary
-Clawperator is a local Android execution runtime for operator commands issued by an external LLM/controller (OpenClaw).
+Clawperator is a two-layer system: an Android runtime that executes actions on the device, and a Node CLI/API that agents talk to.
 
-## Core Runtime (keep)
-- Android app shell (`androidApp`)
-- Operator runtime receiver/service path
-- Accessibility-driven UI action execution
-- Generic action engine and command parsing/validation
-- On-device logging/telemetry for action steps
+## Layers
 
-## To Remove During Migration
-- Firebase/FCM command transport and backend dependencies
-- User/account and app-style launcher UI concerns
-- Non-essential rendering/pixel/resource-heavy surfaces
-- Non-critical modules not required for operator execution
+### Android Runtime (`apps/android`)
 
-## Layout Direction
-Near-term:
-- Keep project buildable while pruning modules incrementally.
+The Android app runs as a persistent background service on the dedicated actuator device. It uses the Android Accessibility API to:
 
-Target:
-- Android operator app under `/apps/android`
-- Node-side integration app under `/apps/node` (deferred, not in current migration)
+- Inspect the live UI tree of any foreground application
+- Perform precise interactions: taps, scrolls, text entry, system keys (back, home)
+- Listen for commands via a broadcast receiver (`ACTION_AGENT_COMMAND`)
+- Emit structured results via logcat using the canonical `[Clawperator-Result]` envelope
 
-## Naming Direction
-- Final package/application namespace target: `com.clawperator.operator`.
-- Rename work happens after major pruning to reduce churn.
+The app ships in two variants:
+
+- `com.clawperator.operator` - release APK, used by default
+- `com.clawperator.operator.dev` - local debug APK, used when building from source
+
+### Node CLI/API (`apps/node`)
+
+The Node package is the agent-facing interface. It:
+
+- Wraps all `adb` interactions so agents do not need to issue raw shell commands
+- Validates execution payloads before dispatch
+- Broadcasts commands to the Android receiver via `adb shell am broadcast`
+- Reads and parses the `[Clawperator-Result]` envelope from logcat
+- Exposes an HTTP/SSE server (`clawperator serve`) for remote agent access
+- Provides `clawperator doctor` for environment diagnostics
+
+## Data Flow
+
+```
+Agent
+  |
+  | CLI invocation or HTTP POST
+  v
+Node CLI/API (apps/node)
+  |
+  | adb shell am broadcast ACTION_AGENT_COMMAND
+  v
+Android Receiver (apps/android)
+  |
+  | Accessibility API actions
+  v
+Device UI
+  |
+  | [Clawperator-Result] envelope via logcat
+  v
+Node CLI/API
+  |
+  | Structured result
+  v
+Agent
+```
+
+## Android Build Modules
+
+```
+apps/android/
+  app/              - Operator APK (com.clawperator.operator)
+  app-conformance/  - Conformance test APK for execution layer testing
+  shared/           - Shared Android modules (action engine, contracts, etc.)
+```
+
+## Conformance APK
+
+`apps/android/app-conformance` is a dedicated test app with a deterministic, stable UI. It exists to test Clawperator's execution layer without relying on third-party apps. See [Conformance Test APK](conformance-apk.md).
+
+## Website Surfaces
+
+Two separate public sites are maintained in this repository:
+
+- `sites/landing/` - Next.js static site for `https://clawperator.com` (marketing, installer)
+- `sites/docs/` - MkDocs site for `https://docs.clawperator.com` (technical docs)
+
+Both deploy automatically to Cloudflare when changes merge to `main`.
+
+## Skills
+
+Skills are packaged app-specific automation recipes maintained in a sibling repository (`../clawperator-skills`). The Node CLI provides discovery, metadata lookup, and a convenience run wrapper. Skills are standalone and can also be invoked directly without the Node CLI.
+
+## Key Design Constraints
+
+- **Deterministic execution:** one broadcast in, one `[Clawperator-Result]` envelope out
+- **Single-flight lock:** only one execution per device at a time
+- **No autonomous planning in the runtime:** Clawperator executes commands; reasoning stays in the agent
+- **No direct adb required for agents:** all routine automation goes through the Node CLI/API
