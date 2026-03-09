@@ -13,6 +13,8 @@ Clawperator exposes a Node-based interface for agent-driven device automation. T
 
 Single-flight enforcement: only one execution per device runs at a time. Concurrent calls return `EXECUTION_CONFLICT_IN_FLIGHT`.
 
+Clawperator can also provision and manage Android emulators through the Node layer. That gives agents a deterministic alternative runtime to a physical Android device.
+
 ---
 
 ## Execution Payload
@@ -185,6 +187,93 @@ For `take_screenshot`, `data.path` contains the local file path of the PNG.
 ## HTTP API (serve mode)
 
 Start with `clawperator serve [--port 3000] [--host 127.0.0.1]`.
+
+### `GET /android/emulators`
+
+Return configured Android Virtual Devices with normalized compatibility metadata.
+
+**Response:**
+```json
+{
+  "avds": [
+    {
+      "name": "clawperator-pixel",
+      "exists": true,
+      "running": false,
+      "supported": true,
+      "apiLevel": 35,
+      "abi": "arm64-v8a",
+      "playStore": true,
+      "deviceProfile": "pixel_7",
+      "systemImage": "system-images;android-35;google_apis_playstore;arm64-v8a",
+      "unsupportedReasons": []
+    }
+  ]
+}
+```
+
+### `GET /android/emulators/:name`
+
+Return the normalized view of one AVD. This is the emulator diagnosis endpoint.
+
+### `GET /android/emulators/running`
+
+Return running emulator devices and boot state.
+
+**Response:**
+```json
+{
+  "devices": [
+    {
+      "type": "emulator",
+      "avdName": "clawperator-pixel",
+      "serial": "emulator-5554",
+      "booted": true
+    }
+  ]
+}
+```
+
+### `POST /android/emulators/create`
+
+Create a new supported AVD. The request body may include:
+
+- `name`
+- `apiLevel`
+- `deviceProfile`
+- `abi`
+- `playStore`
+
+### `POST /android/emulators/:name/start`
+
+Start an existing AVD and return a booted emulator device:
+
+```json
+{
+  "type": "emulator",
+  "avdName": "clawperator-pixel",
+  "serial": "emulator-5554",
+  "booted": true
+}
+```
+
+### `POST /android/emulators/:name/stop`
+
+Stop a running emulator by AVD name.
+
+### `DELETE /android/emulators/:name`
+
+Delete an AVD by name.
+
+### `POST /android/provision/emulator`
+
+Provision a supported emulator using deterministic reuse-first orchestration:
+
+1. reuse a running supported emulator
+2. start a stopped supported AVD
+3. create a new supported AVD
+
+The default profile is Android API `35`, Google Play, ABI `arm64-v8a`, device profile `pixel_7`, and AVD name `clawperator-pixel`.
 
 ### `GET /devices`
 
