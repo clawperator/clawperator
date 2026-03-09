@@ -5,19 +5,21 @@ description: Updates the version number across the entire Clawperator project, r
 
 Use this skill to increase or set the project version number everywhere in the repository (package.json, docs, scripts, tests, etc.). 
 
+**Source of Truth:** The canonical version number for the entire Clawperator project is defined in `apps/node/package.json`. The Android APK derives its `versionName` and `versionCode` automatically from this file during the Gradle build process. 
+
 It takes the old version and the new version as arguments.
 
 Run:
 
 ```bash
 cd "$(git rev-parse --show-toplevel)"
-~/.agents/skills/set-version-number/scripts/set_version.py <old_version> <new_version>
+.agents/skills/set-version-number/scripts/set_version.py <old_version> <new_version>
 ```
 
 Example:
 
 ```bash
-~/.agents/skills/set-version-number/scripts/set_version.py 0.2.0 0.2.1
+.agents/skills/set-version-number/scripts/set_version.py 0.2.0 0.2.1
 ```
 
 The script will:
