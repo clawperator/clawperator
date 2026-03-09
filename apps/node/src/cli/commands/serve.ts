@@ -252,9 +252,10 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       const config = getEmulatorConfig();
       const running = await listRunningEmulators(config);
       const avds = await listConfiguredAvds(config, new Set(running.map((emulator) => emulator.avdName)));
-      res.json({ avds });
+      res.json({ ok: true, avds });
     } catch (error) {
-      res.status(500).json({ ok: false, error: { code: "INTERNAL_ERROR", message: String(error) } });
+      const e = error as { code?: string; message?: string };
+      res.status(mapErrorToStatus(e.code ?? "INTERNAL_ERROR")).json({ ok: false, error: { code: e.code ?? "INTERNAL_ERROR", message: e.message ?? String(error) } });
     }
   });
 
@@ -262,9 +263,10 @@ export async function startServer(options: ServeOptions): Promise<Server> {
     try {
       const config = getEmulatorConfig();
       const devices = await listRunningEmulators(config);
-      res.json({ devices });
+      res.json({ ok: true, devices });
     } catch (error) {
-      res.status(500).json({ ok: false, error: { code: "INTERNAL_ERROR", message: String(error) } });
+      const e = error as { code?: string; message?: string };
+      res.status(mapErrorToStatus(e.code ?? "INTERNAL_ERROR")).json({ ok: false, error: { code: e.code ?? "INTERNAL_ERROR", message: e.message ?? String(error) } });
     }
   });
 
@@ -273,9 +275,10 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       const config = getEmulatorConfig();
       const running = await listRunningEmulators(config);
       const avd = await inspectConfiguredAvd(req.params.name, new Set(running.map((emulator) => emulator.avdName)));
-      res.json(avd);
+      res.json({ ok: true, ...avd });
     } catch (error) {
-      res.status(500).json({ ok: false, error: { code: "INTERNAL_ERROR", message: String(error) } });
+      const e = error as { code?: string; message?: string };
+      res.status(mapErrorToStatus(e.code ?? "INTERNAL_ERROR")).json({ ok: false, error: { code: e.code ?? "INTERNAL_ERROR", message: e.message ?? String(error) } });
     }
   });
 
@@ -296,7 +299,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
 
       await createAvd(config, { name, systemImage, deviceProfile });
       const avd = await inspectConfiguredAvd(name);
-      res.json(avd);
+      res.json({ ok: true, ...avd });
     } catch (error) {
       const e = error as { code?: string; message?: string };
       res.status(mapErrorToStatus(e.code ?? "INTERNAL_ERROR")).json({ ok: false, error: { code: e.code ?? "INTERNAL_ERROR", message: e.message ?? String(error) } });
@@ -307,11 +310,21 @@ export async function startServer(options: ServeOptions): Promise<Server> {
     try {
       const config = getEmulatorConfig();
       const name = req.params.name;
+      const avd = await inspectConfiguredAvd(name);
+      if (!avd.exists) {
+        res.status(mapErrorToStatus(ERROR_CODES.EMULATOR_NOT_FOUND)).json({ ok: false, error: { code: ERROR_CODES.EMULATOR_NOT_FOUND, message: `AVD ${name} not found` } });
+        return;
+      }
+      const runningList = await listRunningEmulators(config);
+      if (runningList.some((e) => e.avdName === name)) {
+        res.status(mapErrorToStatus(ERROR_CODES.EMULATOR_ALREADY_RUNNING)).json({ ok: false, error: { code: ERROR_CODES.EMULATOR_ALREADY_RUNNING, message: `Emulator ${name} is already running` } });
+        return;
+      }
       startAvd(config, name);
       const serial = await waitForEmulatorRegistration(config, name);
       await waitForBootCompletion(config, serial);
       await enableEmulatorDeveloperSettings(config, serial);
-      res.json({ type: "emulator", avdName: name, serial, booted: true });
+      res.json({ ok: true, type: "emulator", avdName: name, serial, booted: true });
     } catch (error) {
       const e = error as { code?: string; message?: string };
       res.status(mapErrorToStatus(e.code ?? "INTERNAL_ERROR")).json({ ok: false, error: { code: e.code ?? "INTERNAL_ERROR", message: e.message ?? String(error) } });
@@ -344,7 +357,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
     try {
       const config = getEmulatorConfig();
       const result = await provisionEmulator(config);
-      res.json(result);
+      res.json({ ok: true, ...result });
     } catch (error) {
       const e = error as { code?: string; message?: string };
       res.status(mapErrorToStatus(e.code ?? "INTERNAL_ERROR")).json({ ok: false, error: { code: e.code ?? "INTERNAL_ERROR", message: e.message ?? String(error) } });

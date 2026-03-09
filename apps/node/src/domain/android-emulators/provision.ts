@@ -25,8 +25,12 @@ function buildError(
   return { code, message, details };
 }
 
-function findFirstSupportedAvd(avds: ConfiguredAvd[]): ConfiguredAvd | undefined {
-  return avds.find((avd) => avd.supported);
+function findBestSupportedAvd(avds: ConfiguredAvd[], desiredName: string): ConfiguredAvd | undefined {
+  const supported = avds.filter((avd) => avd.supported);
+  if (supported.length === 0) return undefined;
+  const preferred = supported.find((avd) => avd.name === desiredName);
+  if (preferred) return preferred;
+  return [...supported].sort((a, b) => a.name.localeCompare(b.name))[0];
 }
 
 export async function provisionEmulator(
@@ -62,7 +66,7 @@ export async function provisionEmulator(
   }
 
   const configured = await listConfiguredAvds(config);
-  const supportedConfigured = findFirstSupportedAvd(configured);
+  const supportedConfigured = findBestSupportedAvd(configured, desiredName);
   if (supportedConfigured) {
     startAvd(config, supportedConfigured.name);
     const serial = await waitForEmulatorRegistration(config, supportedConfigured.name);

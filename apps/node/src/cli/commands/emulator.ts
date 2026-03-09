@@ -1,6 +1,7 @@
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 import type { OutputOptions } from "../output.js";
 import { formatError, formatSuccess } from "../output.js";
+import { ERROR_CODES } from "../../contracts/errors.js";
 import { DEFAULT_EMULATOR_AVD_NAME, DEFAULT_EMULATOR_DEVICE_PROFILE, SUPPORTED_EMULATOR_API_LEVEL } from "../../domain/android-emulators/constants.js";
 import { inspectConfiguredAvd, listConfiguredAvds } from "../../domain/android-emulators/configuredAvds.js";
 import { createAvd, deleteAvd, enableEmulatorDeveloperSettings, startAvd, stopAvd, waitForBootCompletion, waitForEmulatorRegistration } from "../../domain/android-emulators/lifecycle.js";
@@ -79,6 +80,14 @@ export async function cmdEmulatorCreate(options: EmulatorCommandOptions): Promis
 export async function cmdEmulatorStart(name: string, options: OutputOptions): Promise<string> {
   try {
     const config = getConfig();
+    const avd = await inspectConfiguredAvd(name);
+    if (!avd.exists) {
+      throw { code: ERROR_CODES.EMULATOR_NOT_FOUND, message: `AVD ${name} not found` };
+    }
+    const runningList = await listRunningEmulators(config);
+    if (runningList.some((e) => e.avdName === name)) {
+      throw { code: ERROR_CODES.EMULATOR_ALREADY_RUNNING, message: `Emulator ${name} is already running` };
+    }
     startAvd(config, name);
     const serial = await waitForEmulatorRegistration(config, name);
     await waitForBootCompletion(config, serial);

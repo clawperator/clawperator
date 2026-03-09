@@ -58,7 +58,9 @@ describe("getDefaultRuntimeConfig", () => {
       delete process.env.ANDROID_SDK_ROOT;
 
       const config = getDefaultRuntimeConfig();
-      // When ANDROID_HOME path does not exist, each tool falls back to its plain name
+      // Nonexistent ANDROID_HOME candidate is not used for any tool
+      assert.ok(!config.emulatorPath.startsWith("/nonexistent/android-sdk"), "emulatorPath must not use the nonexistent ANDROID_HOME candidate");
+      // sdkmanager and avdmanager have no other OS-specific fallback so they resolve to the plain name
       assert.strictEqual(config.sdkmanagerPath, "sdkmanager");
       assert.strictEqual(config.avdmanagerPath, "avdmanager");
     } finally {

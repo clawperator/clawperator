@@ -137,17 +137,21 @@ Provision a ready emulator:
 clawperator provision emulator --output json
 ```
 
-Typical provisioning result:
+Typical provisioning result (CLI output):
 
 ```json
 {
-  "ok": true,
   "type": "emulator",
   "avdName": "clawperator-pixel",
   "serial": "emulator-5554",
-  "booted": true
+  "booted": true,
+  "created": false,
+  "started": false,
+  "reused": true
 }
 ```
+
+HTTP response from `POST /android/provision/emulator` wraps the same payload with `"ok": true`.
 
 If both a physical device and an emulator are connected, continue to pass `--device-id <serial>` to execution and observe commands so targeting stays explicit.
 
