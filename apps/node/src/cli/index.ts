@@ -69,8 +69,8 @@ Commands:
 Global options:
   --device-id <id>                          Target Android device serial
   --receiver-package <package>              Target Operator package for broadcast dispatch
-  --output <json|pretty>                    Output format (default: json)
-  --format <json|pretty>                    Alias for --output
+  --output <json|pretty>, --format <json|pretty>
+                                            Output format (default: json)
   --timeout-ms <number>                     Override execution timeout within policy limits
   --verbose                                 Include debug diagnostics in output
   --help                                    Show help

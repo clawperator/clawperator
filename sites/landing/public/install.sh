@@ -237,8 +237,8 @@ install_cli() {
 # 7. Setup Skills (via CLI)
 setup_skills_via_cli() {
     if [ "${CLAWPERATOR_INSTALL_SKIP_SKILLS:-0}" = "1" ]; then
-        echo -e "${YELLOW}⚠️  Skipping skills setup because CLAWPERATOR_INSTALL_SKIP_SKILLS=1.${NC}"
         SKILLS_SETUP_STATUS="skipped"
+        echo -e "${YELLOW}⚠️  Skipping skills setup because CLAWPERATOR_INSTALL_SKIP_SKILLS=1.${NC}"
         return 0
     fi
 
@@ -248,6 +248,33 @@ setup_skills_via_cli() {
         SKILLS_SETUP_STATUS="configured"
         # Registry path for display
         SKILLS_REGISTRY_PATH="$HOME/.clawperator/skills/skills/skills-registry.json"
+
+        # Set Env Var in Shell RCs
+        local EXPORT_LINE="export CLAWPERATOR_SKILLS_REGISTRY=\"$SKILLS_REGISTRY_PATH\""
+
+        update_rc() {
+            local RC_FILE=$1
+            if [ -f "$RC_FILE" ]; then
+                if grep -q "CLAWPERATOR_SKILLS_REGISTRY" "$RC_FILE"; then
+                    local TMP_FILE
+                    TMP_FILE="$(mktemp)"
+                    register_temp_file "$TMP_FILE"
+                    grep -v "CLAWPERATOR_SKILLS_REGISTRY" "$RC_FILE" > "$TMP_FILE"
+                    printf "\n# Clawperator Skills Registry\n%s\n" "$EXPORT_LINE" >> "$TMP_FILE"
+                    mv "$TMP_FILE" "$RC_FILE"
+                    echo -e "${BLUE}Updated CLAWPERATOR_SKILLS_REGISTRY in $RC_FILE${NC}"
+                else
+                    echo -e "${BLUE}Adding CLAWPERATOR_SKILLS_REGISTRY to $RC_FILE${NC}"
+                    echo "" >> "$RC_FILE"
+                    echo "# Clawperator Skills Registry" >> "$RC_FILE"
+                    echo "$EXPORT_LINE" >> "$RC_FILE"
+                fi
+            fi
+        }
+
+        update_rc "$HOME/.zshrc"
+        update_rc "$HOME/.bashrc"
+        update_rc "$HOME/.bash_profile"
     else
         echo -e "${YELLOW}⚠️  Skills setup failed via CLI. You can set them up later with 'clawperator skills install'.${NC}"
     fi
