@@ -23,6 +23,7 @@ Clawperator is a deterministic actuator tool for LLM-driven Android automation. 
 ## Architecture
 
 - [System Overview](architecture/architecture.md)
+- [Node Runtime and API Design](design/node-api-design.md)
 - [Conformance Test APK](architecture/conformance-apk.md)
 
 ## Troubleshooting
@@ -41,6 +42,3 @@ Clawperator is a deterministic actuator tool for LLM-driven Android automation. 
 - [Skills Verification](skills/skills-verification.md)
 - [Blocked Terms Policy](skills/blocked-terms-policy.md)
 
-## Design
-
-- [Node Runtime and API Design](design/node-api-design.md)

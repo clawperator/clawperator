@@ -25,6 +25,7 @@ nav:
     - Doctor: reference/node-api-doctor.md
   - Architecture:
     - System Overview: architecture/architecture.md
+    - Node Runtime and API Design: design/node-api-design.md
     - Conformance Test APK: architecture/conformance-apk.md
   - Troubleshooting:
     - Version Compatibility: troubleshooting/compatibility.md
@@ -38,5 +39,3 @@ nav:
     - Device Prep and Runtime Tips: skills/device-prep-and-runtime-tips.md
     - Skills Verification: skills/skills-verification.md
     - Blocked Terms Policy: skills/blocked-terms-policy.md
-  - Design:
-    - Node Runtime and API Design: design/node-api-design.md
