@@ -125,11 +125,12 @@ jobs:
           published_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
           export PUBLISHED_AT="$published_at"
           cp "$release_apk" "${{ steps.release_meta.outputs.artifact_name }}"
-          
+
           # Compute checksum and ensure it's just the hash
           sha256="$(sha256sum "${{ steps.release_meta.outputs.artifact_name }}" | awk '{ print $1 }')"
           echo "$sha256" > "${{ steps.release_meta.outputs.checksum_name }}"
-          
+          export ARTIFACT_SHA256="$sha256"
+
           echo "published_at=${published_at}" >> "$GITHUB_OUTPUT"
           echo "sha256=${sha256}" >> "$GITHUB_OUTPUT"
 
@@ -156,7 +157,6 @@ jobs:
         env:
           RELEASE_VERSION: ${{ steps.release_meta.outputs.version }}
           LATEST_CHANNEL: ${{ steps.release_meta.outputs.latest_channel }}
-          ARTIFACT_SHA256: ${{ steps.artifacts.outputs.sha256 }}
           APK_URL: ${{ env.CLAWPERATOR_CLOUDFLARE_DOWNLOADS_BASE_URL }}/${{ steps.release_meta.outputs.artifact_prefix }}/${{ steps.release_meta.outputs.artifact_name }}
           SHA256_URL: ${{ env.CLAWPERATOR_CLOUDFLARE_DOWNLOADS_BASE_URL }}/${{ steps.release_meta.outputs.artifact_prefix }}/${{ steps.release_meta.outputs.checksum_name }}
           GITHUB_RELEASE_URL: https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}

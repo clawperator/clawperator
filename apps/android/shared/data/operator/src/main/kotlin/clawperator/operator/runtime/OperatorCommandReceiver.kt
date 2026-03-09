@@ -5,7 +5,6 @@ import action.log.Log
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.content.pm.ApplicationInfo
 import android.os.Build
 import clawperator.accessibilityservice.AccessibilityServiceManager
 import clawperator.accessibilityservice.closeNotificationPanel
@@ -42,10 +41,6 @@ class OperatorCommandReceiver :
 
         when (intent?.action) {
             ACTION_AGENT_COMMAND -> {
-                if (!isDebuggableBuild(context)) {
-                    Log.e("[Operator-Receiver] ACTION_AGENT_COMMAND is disabled for non-debuggable builds")
-                    return
-                }
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                     accessibilityService.closeNotificationPanel()
                 }
@@ -82,10 +77,4 @@ class OperatorCommandReceiver :
             }
         }
     }
-
-    private fun isDebuggableBuild(context: Context?): Boolean =
-        context
-            ?.applicationInfo
-            ?.let { info -> (info.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0 }
-            ?: false
 }

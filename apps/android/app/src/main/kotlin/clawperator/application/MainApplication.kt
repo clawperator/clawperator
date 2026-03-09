@@ -25,9 +25,11 @@ class MainApplication : SystemApplication() {
         if (LocalCrashLog.hasExistingLog()) {
             LocalCrashLog.logInfo("[stability] crash-log present on startup")
         }
-        if (BuildConfig.DEBUG) {
-            Timber.plant(Timber.DebugTree())
-        }
+
+        // Always plant DebugTree - verbose logcat is a core feature, not a bug.
+        // Clawperator runs on dedicated agent devices where logcat is the primary observability
+        // interface for remote LLMs. See docs/android-operator-apk.md for details.
+        Timber.plant(Timber.DebugTree())
 
         Factory.multiProcessAllowed = false
 
