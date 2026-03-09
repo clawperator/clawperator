@@ -73,7 +73,7 @@ if [ "$command" = "shell" ]; then
     if [ "$SCENARIO" = "VERSION_MISMATCH" ]; then
       echo "Package [$pkg]"
       echo "  versionCode=200000 minSdk=21 targetSdk=35"
-      echo "  versionName=0.2.0-d"
+      echo "  versionName=0.2.1-d"
       exit 0
     fi
     echo "Package [$pkg]"

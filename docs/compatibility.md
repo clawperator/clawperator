@@ -12,7 +12,7 @@ Examples:
 - CLI `0.1.4` and APK `0.1.9` - compatible
 - CLI `0.1.4` and APK `0.1.4-d` - compatible
 - CLI `0.1.4-rc.1` and APK `0.1.4-d` - compatible
-- CLI `0.1.4` and APK `0.2.0` - not compatible
+- CLI `0.1.4` and APK `0.2.1` - not compatible
 
 Notes:
 

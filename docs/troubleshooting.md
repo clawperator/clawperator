@@ -111,7 +111,7 @@ The Node CLI and the Android APK must have matching `major.minor` versions.
 
 - `0.1.4` and `0.1.9` are compatible
 - `0.1.4` and `0.1.4-d` are compatible
-- `0.1.4` and `0.2.0` are not compatible
+- `0.1.4` and `0.2.1` are not compatible
 
 Use:
 

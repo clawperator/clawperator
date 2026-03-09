@@ -25,8 +25,8 @@ If you need to install the APK manually:
 ### Historical Versions
 Historical versions of the APK can be downloaded from `downloads.clawperator.com`. The URL structure follows the versioning pattern:
 - `https://downloads.clawperator.com/operator/v<version>/operator-v<version>.apk`
-Example for v0.2.0:
-- [https://downloads.clawperator.com/operator/v0.2.0/operator-v0.2.0.apk](https://downloads.clawperator.com/operator/v0.2.0/operator-v0.2.0.apk)
+Example for v0.2.1:
+- [https://downloads.clawperator.com/operator/v0.2.1/operator-v0.2.1.apk](https://downloads.clawperator.com/operator/v0.2.1/operator-v0.2.1.apk)
 
 ## Granting Permissions
 After installation, you must grant accessibility and notification permissions for the Operator to function correctly.
