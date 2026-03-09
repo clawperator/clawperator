@@ -14,7 +14,7 @@ import { listConfiguredAvds, inspectConfiguredAvd } from "../../domain/android-e
 import { listRunningEmulators } from "../../domain/android-emulators/runningEmulators.js";
 import { createAvd, deleteAvd, enableEmulatorDeveloperSettings, startAvd, stopAvd, waitForBootCompletion, waitForEmulatorRegistration } from "../../domain/android-emulators/lifecycle.js";
 import { provisionEmulator } from "../../domain/android-emulators/provision.js";
-import { DEFAULT_EMULATOR_AVD_NAME, DEFAULT_EMULATOR_DEVICE_PROFILE, DEFAULT_EMULATOR_SYSTEM_IMAGE, SUPPORTED_EMULATOR_API_LEVEL } from "../../domain/android-emulators/constants.js";
+import { DEFAULT_EMULATOR_AVD_NAME, DEFAULT_EMULATOR_DEVICE_PROFILE, SUPPORTED_EMULATOR_API_LEVEL } from "../../domain/android-emulators/constants.js";
 
 interface ServeOptions {
   port: number;
@@ -78,7 +78,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       case ERROR_CODES.EMULATOR_NOT_RUNNING: return 404;
       case ERROR_CODES.EMULATOR_UNSUPPORTED: return 409;
       case ERROR_CODES.EMULATOR_ALREADY_RUNNING: return 409;
-      default: return 400;
+      default: return 500;
     }
   }
 
@@ -292,7 +292,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       const playStore = body.playStore !== false;
       const systemImage = playStore
         ? `system-images;android-${apiLevel};google_apis_playstore;${abi}`
-        : DEFAULT_EMULATOR_SYSTEM_IMAGE.replace("google_apis_playstore", "google_apis");
+        : `system-images;android-${apiLevel};google_apis;${abi}`;
 
       await createAvd(config, { name, systemImage, deviceProfile });
       const avd = await inspectConfiguredAvd(name);

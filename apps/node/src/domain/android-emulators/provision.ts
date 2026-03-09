@@ -1,4 +1,5 @@
 import type { RuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
+import { assertRequiredEmulatorTools } from "./hostRequirements.js";
 import { type ClawperatorError, ERROR_CODES } from "../../contracts/errors.js";
 import {
   DEFAULT_EMULATOR_AVD_NAME,
@@ -36,6 +37,8 @@ export async function provisionEmulator(
     deviceProfile?: string;
   }
 ): Promise<ProvisionedEmulator> {
+  await assertRequiredEmulatorTools(config);
+
   const desiredName = options?.name ?? DEFAULT_EMULATOR_AVD_NAME;
   const systemImage = options?.systemImage ?? DEFAULT_EMULATOR_SYSTEM_IMAGE;
   const deviceProfile = options?.deviceProfile ?? DEFAULT_EMULATOR_DEVICE_PROFILE;
@@ -43,12 +46,15 @@ export async function provisionEmulator(
   const running = await listRunningEmulators(config);
   const runningSupported = running.find((emulator) => emulator.supported);
   if (runningSupported) {
+    if (!runningSupported.booted) {
+      await waitForBootCompletion(config, runningSupported.serial);
+    }
     await enableEmulatorDeveloperSettings(config, runningSupported.serial);
     return {
       type: "emulator",
       avdName: runningSupported.avdName,
       serial: runningSupported.serial,
-      booted: runningSupported.booted,
+      booted: true,
       created: false,
       started: false,
       reused: true,

@@ -1,7 +1,7 @@
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 import type { OutputOptions } from "../output.js";
 import { formatError, formatSuccess } from "../output.js";
-import { DEFAULT_EMULATOR_AVD_NAME, DEFAULT_EMULATOR_DEVICE_PROFILE, DEFAULT_EMULATOR_SYSTEM_IMAGE, SUPPORTED_EMULATOR_API_LEVEL } from "../../domain/android-emulators/constants.js";
+import { DEFAULT_EMULATOR_AVD_NAME, DEFAULT_EMULATOR_DEVICE_PROFILE, SUPPORTED_EMULATOR_API_LEVEL } from "../../domain/android-emulators/constants.js";
 import { inspectConfiguredAvd, listConfiguredAvds } from "../../domain/android-emulators/configuredAvds.js";
 import { createAvd, deleteAvd, enableEmulatorDeveloperSettings, startAvd, stopAvd, waitForBootCompletion, waitForEmulatorRegistration } from "../../domain/android-emulators/lifecycle.js";
 import { provisionEmulator } from "../../domain/android-emulators/provision.js";
@@ -62,7 +62,7 @@ export async function cmdEmulatorCreate(options: EmulatorCommandOptions): Promis
     const name = options.name ?? DEFAULT_EMULATOR_AVD_NAME;
     const apiLevel = options.apiLevel ?? SUPPORTED_EMULATOR_API_LEVEL;
     const systemImage = options.playStore === false
-      ? DEFAULT_EMULATOR_SYSTEM_IMAGE.replace("google_apis_playstore", "google_apis")
+      ? `system-images;android-${apiLevel};google_apis;${options.abi ?? "arm64-v8a"}`
       : `system-images;android-${apiLevel};google_apis_playstore;${options.abi ?? "arm64-v8a"}`;
     await createAvd(config, {
       name,
