@@ -238,6 +238,7 @@ install_cli() {
 setup_skills_via_cli() {
     if [ "${CLAWPERATOR_INSTALL_SKIP_SKILLS:-0}" = "1" ]; then
         echo -e "${YELLOW}⚠️  Skipping skills setup because CLAWPERATOR_INSTALL_SKIP_SKILLS=1.${NC}"
+        SKILLS_SETUP_STATUS="skipped"
         return 0
     fi
 
@@ -446,28 +447,48 @@ maybe_install_operator_apk() {
     esac
 }
 
+# Helper: check if a specific doctor check has a given status.
+# Uses node (guaranteed installed) to properly parse the pretty-printed JSON.
+# Usage: doctor_check_status <json_var> <check_id> <status>
+# Returns 0 if the check exists and has the given status, 1 otherwise.
+doctor_check_status() {
+    local json="$1"
+    local check_id="$2"
+    local expected_status="$3"
+    printf '%s' "$json" | node -e "
+let d='';
+process.stdin.on('data', c => d += c).on('end', () => {
+  try {
+    const r = JSON.parse(d);
+    const c = (r.checks || []).find(x => x.id === '$check_id');
+    process.exitCode = (c && c.status === '$expected_status') ? 0 : 1;
+  } catch { process.exitCode = 1; }
+});
+" 2>/dev/null
+}
+
 # 8. Run Doctor and Apply Fixes
 run_doctor_and_fix() {
     echo -e "${BLUE}Running Clawperator Doctor to verify environment...${NC}"
     local DOCTOR_JSON
     DOCTOR_JSON="$("$CLAWPERATOR_BIN_PATH" doctor --format json || true)"
-    
+
     # Check for ADB
-    if echo "$DOCTOR_JSON" | grep -q '"id": "host.adb.presence", "status": "fail"'; then
+    if doctor_check_status "$DOCTOR_JSON" "host.adb.presence" "fail"; then
         check_adb || return 1
     fi
 
     # Check for Git (required for skills)
-    if echo "$DOCTOR_JSON" | grep -q '"id": "host.git.presence"' && echo "$DOCTOR_JSON" | grep -q '"status": "fail"'; then
+    if doctor_check_status "$DOCTOR_JSON" "host.git.presence" "fail"; then
         check_git || return 1
     fi
 
     # Download and Verify APK if needed
-    if echo "$DOCTOR_JSON" | grep -q '"id": "readiness.apk.presence", "status": "fail"'; then
+    if doctor_check_status "$DOCTOR_JSON" "readiness.apk.presence" "fail"; then
         download_operator_apk || return 1
         verify_operator_apk || return 1
         maybe_install_operator_apk || return 1
-    elif echo "$DOCTOR_JSON" | grep -q '"id": "readiness.apk.presence", "status": "warn"'; then
+    elif doctor_check_status "$DOCTOR_JSON" "readiness.apk.presence" "warn"; then
         # Could be missing or wrong variant, try installing
         download_operator_apk || return 1
         verify_operator_apk || return 1
@@ -477,7 +498,7 @@ run_doctor_and_fix() {
     # Check for Handshake (permissions)
     # Re-run doctor to see if APK install fixed handshake, or if we need to grant permissions
     DOCTOR_JSON="$("$CLAWPERATOR_BIN_PATH" doctor --format json || true)"
-    if echo "$DOCTOR_JSON" | grep -q '"id": "readiness.handshake", "status": "fail"'; then
+    if doctor_check_status "$DOCTOR_JSON" "readiness.handshake" "fail"; then
         local DEVICE_COUNT
         DEVICE_COUNT="$(count_connected_devices)"
         if [ "$DEVICE_COUNT" -eq 1 ]; then
@@ -530,7 +551,7 @@ main() {
     echo -e "5. Historical releases and artifacts remain at:"
     echo -e "   ${BLUE}https://github.com/clawpilled/clawperator/releases${NC}"
     echo ""
-    echo -e "Final Doctor Check:"
+    echo -e "6. Final Doctor Check:"
     "$CLAWPERATOR_BIN_PATH" doctor
     echo ""
     
