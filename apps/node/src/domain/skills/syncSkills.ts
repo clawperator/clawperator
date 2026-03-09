@@ -77,13 +77,27 @@ export async function syncSkills(
       const tmpBundle = join(tmpdir(), `clawperator-skills-${Date.now()}.bundle`);
       try {
         const response = await fetch(SKILLS_BUNDLE_URL);
-        if (!response.ok) throw new Error(`Failed to download skills bundle: ${response.statusText}`);
+        if (!response.ok) {
+          let statusInfo = `HTTP ${response.status}`;
+          if (response.statusText) {
+            statusInfo += ` ${response.statusText}`;
+          }
+          throw new Error(`Failed to download skills bundle from ${SKILLS_BUNDLE_URL}: ${statusInfo}`);
+        }
         const buffer = await response.arrayBuffer();
         await writeFile(tmpBundle, Buffer.from(buffer));
         
         // NOTE: HTTP-served git bundles are static files - git re-downloads the
         // entire bundle on every fetch (no incremental delta like a live git server).
-        await exec("git", ["-C", dir, "fetch", tmpBundle, "+refs/heads/*:refs/remotes/origin/*", "--quiet"]);
+        await exec("git", [
+          "-C",
+          dir,
+          "fetch",
+          tmpBundle,
+          "+refs/heads/*:refs/remotes/origin/*",
+          "+refs/tags/*:refs/tags/*",
+          "--quiet",
+        ]);
         await exec("git", ["-C", dir, "checkout", ref]);
         // Only fast-forward merge if on a branch (not detached HEAD from a tag/commit).
         // Check symbolic-ref separately so a merge failure is not silently swallowed.
@@ -105,7 +119,13 @@ export async function syncSkills(
       const tmpBundle = join(tmpdir(), `clawperator-skills-${Date.now()}.bundle`);
       try {
         const response = await fetch(SKILLS_BUNDLE_URL);
-        if (!response.ok) throw new Error(`Failed to download skills bundle: ${response.statusText}`);
+        if (!response.ok) {
+          let statusInfo = `HTTP ${response.status}`;
+          if (response.statusText) {
+            statusInfo += ` ${response.statusText}`;
+          }
+          throw new Error(`Failed to download skills bundle from ${SKILLS_BUNDLE_URL}: ${statusInfo}`);
+        }
         const buffer = await response.arrayBuffer();
         await writeFile(tmpBundle, Buffer.from(buffer));
         await exec("git", ["clone", tmpBundle, dir]);

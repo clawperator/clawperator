@@ -243,7 +243,7 @@ setup_skills() {
     }
 
     local TMP_BUNDLE
-    TMP_BUNDLE=$(mktemp "/tmp/clawperator-skills-XXXXXX.bundle")
+    TMP_BUNDLE=$(mktemp -t clawperator-skills-XXXXXX)
     register_temp_file "$TMP_BUNDLE"
     if ! curl -fsSL "$SKILLS_REPO_URL" -o "$TMP_BUNDLE"; then
         warn_skills_setup_failed "unable to download the skills bundle from ${SKILLS_REPO_URL}."
@@ -253,7 +253,7 @@ setup_skills() {
     if [ -d "$SKILLS_DIR" ]; then
         if [ ! -d "$SKILLS_DIR/.git" ]; then
             warn_skills_setup_failed "$SKILLS_DIR exists but is not a git repository. Remove it and re-run to clone fresh."
-                        return 0
+            return 0
         fi
         # Ensure the remote is configured - it may be missing if the directory was created locally.
         local EXISTING_REMOTE
@@ -273,22 +273,22 @@ setup_skills() {
         echo -e "${YELLOW}⚠️  Skills directory already exists. Updating...${NC}"
         if ! GIT_TERMINAL_PROMPT=0 git -C "$SKILLS_DIR" fetch "$TMP_BUNDLE" "+refs/heads/*:refs/remotes/origin/*" --quiet; then
             warn_skills_setup_failed "could not fetch from skills bundle. Check network access or run: clawperator skills install"
-                        return 0
+            return 0
         fi
         if ! GIT_TERMINAL_PROMPT=0 git -C "$SKILLS_DIR" reset --hard origin/main; then
             warn_skills_setup_failed "could not update skills to the latest version. Try removing $SKILLS_DIR and re-running."
-                        return 0
+            return 0
         fi
     else
         mkdir -p "$(dirname "$SKILLS_DIR")"
         if ! GIT_TERMINAL_PROMPT=0 git clone "$TMP_BUNDLE" "$SKILLS_DIR" >/dev/null 2>&1; then
             warn_skills_setup_failed "unable to clone from the downloaded skills bundle."
-                        return 0
+            return 0
         fi
         # Fix the remote to point to the actual URL, not the temp file
         if ! GIT_TERMINAL_PROMPT=0 git -C "$SKILLS_DIR" remote set-url origin "$SKILLS_REPO_URL"; then
             warn_skills_setup_failed "could not set remote URL after cloning."
-                        return 0
+            return 0
         fi
     fi
     

@@ -74,21 +74,21 @@ check_device() {
     fi
 }
 
-get_adb_prefix() {
+# Call this before using ADB_CMD
+setup_adb_cmd() {
     if [ -n "${DEVICE_SERIAL:-}" ]; then
-        echo "adb -s $DEVICE_SERIAL"
+        ADB_CMD=(adb -s "$DEVICE_SERIAL")
     else
-        echo "adb"
+        ADB_CMD=(adb)
     fi
 }
 
 detect_package() {
-    local adb_cmd
-    adb_cmd=$(get_adb_prefix)
+    setup_adb_cmd
 
     # Try to find Clawperator packages
     local packages
-    packages=$($adb_cmd shell pm list packages | sed 's/package://' | grep -E "^com\.clawperator\.operator" || echo "")
+    packages=$("${ADB_CMD[@]}" shell pm list packages | sed 's/package://' | grep -E "^com\.clawperator\.operator" || echo "")
 
     if echo "$packages" | grep -q "$DEFAULT_DEBUG_PKG"; then
         echo "$DEFAULT_DEBUG_PKG"
@@ -104,15 +104,14 @@ detect_package() {
 
 grant_accessibility_permission() {
     local package=$1
-    local adb_cmd
-    adb_cmd=$(get_adb_prefix)
+    setup_adb_cmd
     local svc="$package/clawperator.operator.accessibilityservice.OperatorAccessibilityService"
 
     echo -e "${BLUE}🔧 Configuring Accessibility Service...${NC}"
 
     # Read current enabled accessibility services
     local current_services
-    current_services=$($adb_cmd shell settings get secure enabled_accessibility_services 2>/dev/null || echo "")
+    current_services=$("${ADB_CMD[@]}" shell settings get secure enabled_accessibility_services 2>/dev/null || echo "")
 
     # Build new services list (append if missing)
     local new_services
@@ -130,23 +129,22 @@ grant_accessibility_permission() {
 
     # Enable accessibility and set services
     echo -e "${BLUE}⚙️  Setting accessibility_enabled=1...${NC}"
-    $adb_cmd shell settings put secure accessibility_enabled 1
+    "${ADB_CMD[@]}" shell settings put secure accessibility_enabled 1
 
     echo -e "${BLUE}⚙️  Setting enabled_accessibility_services...${NC}"
-    $adb_cmd shell settings put secure enabled_accessibility_services "$new_services"
+    "${ADB_CMD[@]}" shell settings put secure enabled_accessibility_services "$new_services"
 
     echo -e "${GREEN}✅ Accessibility service configured${NC}"
 }
 
 grant_notification_permission() {
     local package=$1
-    local adb_cmd
-    adb_cmd=$(get_adb_prefix)
+    setup_adb_cmd
 
     echo -e "${BLUE}🔔 Granting notification permission...${NC}"
 
     # Try to grant POST_NOTIFICATIONS permission (Android 13+)
-    if $adb_cmd shell pm grant "$package" android.permission.POST_NOTIFICATIONS 2>/dev/null; then
+    if "${ADB_CMD[@]}" shell pm grant "$package" android.permission.POST_NOTIFICATIONS 2>/dev/null; then
         echo -e "${GREEN}✅ Notification permission granted${NC}"
     else
         echo -e "${YELLOW}⚠️  Could not grant notification permission via ADB${NC}"
