@@ -72,14 +72,21 @@ export async function syncSkills(
         // No remote configured - add one
         await exec("git", ["-C", dir, "remote", "add", "origin", SKILLS_BUNDLE_URL]);
       }
-      await exec("git", ["-C", dir, "fetch", "--quiet"]);
+      // NOTE: HTTP-served git bundles are static files - git re-downloads the
+      // entire bundle on every fetch (no incremental delta like a live git server).
+      await exec("git", ["-C", dir, "fetch", "origin", "--quiet"]);
       await exec("git", ["-C", dir, "checkout", ref]);
-      // Only pull if on a branch (not detached HEAD from a tag/commit)
+      // Only fast-forward merge if on a branch (not detached HEAD from a tag/commit).
+      // Check symbolic-ref separately so a merge failure is not silently swallowed.
+      let onBranch = false;
       try {
         await exec("git", ["-C", dir, "symbolic-ref", "HEAD"], 5_000);
-        await exec("git", ["-C", dir, "merge", "--ff-only", "--quiet", `origin/${ref}`]);
+        onBranch = true;
       } catch {
-        // Detached HEAD (tag/commit ref) - fetch+checkout is sufficient
+        // Detached HEAD - fetch+checkout is sufficient
+      }
+      if (onBranch) {
+        await exec("git", ["-C", dir, "merge", "--ff-only", "--quiet", `origin/${ref}`]);
       }
     } else {
       await mkdir(dirname(dir), { recursive: true });

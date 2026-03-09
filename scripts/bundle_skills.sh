@@ -10,13 +10,22 @@
 #
 # Defaults to the sibling repo at ../clawperator-skills if no path is given.
 # After running, commit the updated bundle file to publish it.
+#
+# Note: HTTP-served git bundles are static files. Clients re-download the entire
+# bundle on every fetch - there is no incremental delta like a live git server.
+# Keep the bundle small by avoiding unnecessary large binary assets in the skills repo.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-SKILLS_REPO="${1:-$REPO_ROOT/../clawperator-skills}"
+RAW_SKILLS_REPO="${1:-$REPO_ROOT/../clawperator-skills}"
+if command -v realpath >/dev/null 2>&1; then
+    SKILLS_REPO="$(realpath "$RAW_SKILLS_REPO" 2>/dev/null || echo "$RAW_SKILLS_REPO")"
+else
+    SKILLS_REPO="$(cd "$RAW_SKILLS_REPO" 2>/dev/null && pwd || echo "$RAW_SKILLS_REPO")"
+fi
 OUTPUT_DIR="$REPO_ROOT/sites/landing/public/install"
 BUNDLE_FILE="$OUTPUT_DIR/clawperator-skills.bundle"
 
@@ -42,7 +51,7 @@ mkdir -p "$OUTPUT_DIR"
 
 git -C "$SKILLS_REPO" bundle create "$BUNDLE_FILE" HEAD main
 
-git bundle verify "$BUNDLE_FILE"
+git -C "$SKILLS_REPO" bundle verify "$BUNDLE_FILE"
 
 SIZE="$(du -sh "$BUNDLE_FILE" | cut -f1)"
 echo -e "${GREEN}✅ Bundle written to: $BUNDLE_FILE (${SIZE})${NC}"
