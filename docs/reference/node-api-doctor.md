@@ -129,7 +129,7 @@ Important fields:
 - `ok` - currently mirrors whether all critical checks passed
 - `criticalOk` - explicit critical-check verdict used by the CLI exit code
 - `checks[]` - ordered check results with IDs, status, summary, and optional diagnostics
-- `nextActions[]` - optional; deduplicated shell commands or manual instructions; populated from failing check remediation steps, or suggested follow-up commands when all checks pass; omitted when there are no actions to surface
+- `nextActions[]` - optional; deduplicated shell commands or manual instructions; populated from non-passing check remediation steps, or suggested follow-up commands when all checks pass; omitted when there are no actions to surface. Note: when `--fix` is used, shell remediation steps are executed during finalization and are not included in `nextActions` - only manual and on-device guidance steps remain
 
 Each `DoctorCheckResult` can also include:
 
