@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process";
-import { access, readFile, mkdir } from "node:fs/promises";
+import { access, readFile, mkdir, unlink, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { SKILLS_BUNDLE_URL, DEFAULT_SKILLS_DIR, DEFAULT_SKILLS_REGISTRY_SUBPATH } from "./skillsConfig.js";
 import { SKILLS_SYNC_FAILED, SKILLS_GIT_NOT_FOUND } from "../../contracts/skills.js";
@@ -72,10 +73,13 @@ export async function syncSkills(
         // No remote configured - add one
         await exec("git", ["-C", dir, "remote", "add", "origin", SKILLS_BUNDLE_URL]);
       }
-      // Download bundle using curl to a temporary file since git cannot fetch/clone directly from a remote HTTP bundle file
-      const tmpBundle = `/tmp/clawperator-skills-${Date.now()}.bundle`;
+      // Download bundle to a temporary file since git cannot fetch/clone directly from a remote HTTP bundle file
+      const tmpBundle = join(tmpdir(), `clawperator-skills-${Date.now()}.bundle`);
       try {
-        await exec("curl", ["-fsSL", SKILLS_BUNDLE_URL, "-o", tmpBundle]);
+        const response = await fetch(SKILLS_BUNDLE_URL);
+        if (!response.ok) throw new Error(`Failed to download skills bundle: ${response.statusText}`);
+        const buffer = await response.arrayBuffer();
+        await writeFile(tmpBundle, Buffer.from(buffer));
         
         // NOTE: HTTP-served git bundles are static files - git re-downloads the
         // entire bundle on every fetch (no incremental delta like a live git server).
@@ -94,13 +98,16 @@ export async function syncSkills(
           await exec("git", ["-C", dir, "merge", "--ff-only", "--quiet", `origin/${ref}`]);
         }
       } finally {
-        await exec("rm", ["-f", tmpBundle]);
+        try { await unlink(tmpBundle); } catch { /* ignore */ }
       }
     } else {
       await mkdir(dirname(dir), { recursive: true });
-      const tmpBundle = `/tmp/clawperator-skills-${Date.now()}.bundle`;
+      const tmpBundle = join(tmpdir(), `clawperator-skills-${Date.now()}.bundle`);
       try {
-        await exec("curl", ["-fsSL", SKILLS_BUNDLE_URL, "-o", tmpBundle]);
+        const response = await fetch(SKILLS_BUNDLE_URL);
+        if (!response.ok) throw new Error(`Failed to download skills bundle: ${response.statusText}`);
+        const buffer = await response.arrayBuffer();
+        await writeFile(tmpBundle, Buffer.from(buffer));
         await exec("git", ["clone", tmpBundle, dir]);
         // Set origin to the remote URL instead of the temporary file
         await exec("git", ["-C", dir, "remote", "set-url", "origin", SKILLS_BUNDLE_URL]);
@@ -108,7 +115,7 @@ export async function syncSkills(
           await exec("git", ["-C", dir, "checkout", ref]);
         }
       } finally {
-        await exec("rm", ["-f", tmpBundle]);
+        try { await unlink(tmpBundle); } catch { /* ignore */ }
       }
     }
   } catch (e) {
