@@ -1,5 +1,6 @@
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { existsSync } from "node:fs";
 import { type ProcessRunner, NodeProcessRunner } from "./processRunner.js";
 
 export const DEFAULT_ACTION_AGENT_COMMAND = "app.clawperator.operator.ACTION_AGENT_COMMAND";
@@ -28,6 +29,18 @@ export interface RuntimeConfig {
   runner: ProcessRunner;
 }
 
+function resolveDefaultSdkToolPath(
+  fallback: string,
+  candidatePaths: string[]
+): string {
+  for (const candidatePath of candidatePaths) {
+    if (existsSync(candidatePath)) {
+      return candidatePath;
+    }
+  }
+  return fallback;
+}
+
 export function getDefaultRuntimeConfig(overrides?: Partial<RuntimeConfig>): RuntimeConfig {
   const definedOverrides = Object.fromEntries(
     Object.entries(overrides ?? {}).filter(([, value]) => value !== undefined)
@@ -35,11 +48,16 @@ export function getDefaultRuntimeConfig(overrides?: Partial<RuntimeConfig>): Run
 
   const __dirname = dirname(fileURLToPath(import.meta.url));
   const defaultProjectRoot = join(__dirname, "../../../../..");
+  const homeDirectory = process.env.HOME;
+  const defaultEmulatorPath = resolveDefaultSdkToolPath("emulator", [
+    ...(homeDirectory ? [join(homeDirectory, "Library/Android/sdk/emulator/emulator")] : []),
+    "/opt/homebrew/share/android-commandlinetools/emulator/emulator",
+  ]);
 
   return {
     projectRoot: defaultProjectRoot,
     adbPath: "adb",
-    emulatorPath: "emulator",
+    emulatorPath: defaultEmulatorPath,
     sdkmanagerPath: "sdkmanager",
     avdmanagerPath: "avdmanager",
     receiverPackage: "com.clawperator.operator",

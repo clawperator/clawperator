@@ -1,5 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 
 describe("getDefaultRuntimeConfig", () => {
@@ -29,5 +31,21 @@ describe("getDefaultRuntimeConfig", () => {
     assert.strictEqual(config.deviceId, "device-1");
     assert.strictEqual(config.emulatorPath, "custom-emulator");
     assert.strictEqual(config.receiverPackage, "custom.receiver");
+  });
+
+  it("discovers the standard macOS emulator path when available", () => {
+    const config = getDefaultRuntimeConfig();
+    const homeDirectory = process.env.HOME;
+    const standardPath = homeDirectory
+      ? join(homeDirectory, "Library/Android/sdk/emulator/emulator")
+      : undefined;
+
+    if (standardPath && existsSync(standardPath)) {
+      assert.strictEqual(config.emulatorPath, standardPath);
+      return;
+    }
+
+    assert.strictEqual(typeof config.emulatorPath, "string");
+    assert.ok(config.emulatorPath.length > 0);
   });
 });

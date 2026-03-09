@@ -97,7 +97,27 @@ describe("configured AVD discovery", () => {
     assert.strictEqual(avds.length, 1);
     assert.strictEqual(avds[0].name, "clawperator-pixel");
     assert.strictEqual(avds[0].running, true);
-    assert.strictEqual(runner.calls[0].command, "emulator");
+    assert.strictEqual(runner.calls[0].command, config.emulatorPath);
     assert.deepStrictEqual(runner.calls[0].args, ["-list-avds"]);
+  });
+
+  it("recognizes Google Play AVDs when PlayStore.enabled is no but the system image is playstore", async () => {
+    await writeAvd(
+      testHome,
+      "clawperator-pixel",
+      [
+        "PlayStore.enabled=no",
+        "abi.type=arm64-v8a",
+        "image.sysdir.1=system-images/android-35/google_apis_playstore/arm64-v8a/",
+        "tag.id=google_apis_playstore",
+        "hw.device.name=pixel_7",
+        "target=android-35",
+      ].join("\n")
+    );
+
+    const avd = await inspectConfiguredAvd("clawperator-pixel");
+    assert.strictEqual(avd.playStore, true);
+    assert.strictEqual(avd.supported, true);
+    assert.deepStrictEqual(avd.unsupportedReasons, []);
   });
 });

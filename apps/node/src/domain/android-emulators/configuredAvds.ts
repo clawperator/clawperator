@@ -56,7 +56,18 @@ function parseSystemImage(config: IniMap): string | null {
 }
 
 function parsePlayStore(config: IniMap): boolean {
-  return config["PlayStore.enabled"] === "true";
+  const explicit = config["PlayStore.enabled"]?.toLowerCase();
+  if (explicit === "true" || explicit === "yes") {
+    return true;
+  }
+
+  const tagId = config["tag.id"]?.toLowerCase();
+  if (tagId === "google_apis_playstore") {
+    return true;
+  }
+
+  const systemImage = config["image.sysdir.1"]?.toLowerCase();
+  return systemImage?.includes("google_apis_playstore") ?? false;
 }
 
 function parseDeviceProfile(config: IniMap): string | null {
