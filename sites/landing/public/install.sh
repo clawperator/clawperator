@@ -243,6 +243,41 @@ install_cli() {
 }
 
 # 7. Setup Skills (via CLI)
+parse_skills_registry_path() {
+    node -e '
+let raw = "";
+process.stdin.setEncoding("utf8");
+process.stdin.on("data", (chunk) => {
+  raw += chunk;
+});
+process.stdin.on("end", () => {
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed.registryPath === "string") {
+      process.stdout.write(parsed.registryPath);
+    }
+  } catch {}
+});
+' 2>/dev/null || true
+}
+
+copy_file_mode() {
+    local SOURCE_PATH=$1
+    local TARGET_PATH=$2
+    local FILE_MODE=""
+
+    if FILE_MODE="$(stat -f '%Lp' "$SOURCE_PATH" 2>/dev/null)"; then
+        chmod "$FILE_MODE" "$TARGET_PATH"
+        return 0
+    fi
+
+    if FILE_MODE="$(stat -c '%a' "$SOURCE_PATH" 2>/dev/null)"; then
+        chmod "$FILE_MODE" "$TARGET_PATH"
+        return 0
+    fi
+
+    return 0
+}
 setup_skills_via_cli() {
     if [ "${CLAWPERATOR_INSTALL_SKIP_SKILLS:-0}" = "1" ]; then
         SKILLS_SETUP_STATUS="skipped"
@@ -252,11 +287,14 @@ setup_skills_via_cli() {
 
     echo -e "${BLUE}Setting up Clawperator Skills...${NC}"
     local SKILLS_OUTPUT=""
-    if SKILLS_OUTPUT="$("$CLAWPERATOR_BIN_PATH" skills install 2>&1)"; then
+    local DEFAULT_SKILLS_REGISTRY_PATH="$HOME/.clawperator/skills/skills/skills-registry.json"
+    if SKILLS_OUTPUT="$("$CLAWPERATOR_BIN_PATH" skills install --output json 2>&1)"; then
         echo -e "${GREEN}✅ Skills setup complete.${NC}"
         SKILLS_SETUP_STATUS="configured"
-        # Registry path for display
-        SKILLS_REGISTRY_PATH="$HOME/.clawperator/skills/skills/skills-registry.json"
+        SKILLS_REGISTRY_PATH="$(printf '%s' "$SKILLS_OUTPUT" | parse_skills_registry_path)"
+        if [ -z "$SKILLS_REGISTRY_PATH" ]; then
+            SKILLS_REGISTRY_PATH="$DEFAULT_SKILLS_REGISTRY_PATH"
+        fi
 
         # Set Env Var in Shell RCs
         local EXPORT_LINE="export CLAWPERATOR_SKILLS_REGISTRY=\"$SKILLS_REGISTRY_PATH\""
@@ -266,10 +304,11 @@ setup_skills_via_cli() {
             if [ -f "$RC_FILE" ]; then
                 if grep -q "CLAWPERATOR_SKILLS_REGISTRY" "$RC_FILE"; then
                     local TMP_FILE
-                    TMP_FILE="$(mktemp)"
+                    TMP_FILE="$(mktemp "${RC_FILE}.XXXXXX")"
                     register_temp_file "$TMP_FILE"
                     grep -v "CLAWPERATOR_SKILLS_REGISTRY" "$RC_FILE" > "$TMP_FILE" || true
                     printf "\n# Clawperator Skills Registry\n%s\n" "$EXPORT_LINE" >> "$TMP_FILE"
+                    copy_file_mode "$RC_FILE" "$TMP_FILE"
                     mv "$TMP_FILE" "$RC_FILE"
                     echo -e "${BLUE}Updated CLAWPERATOR_SKILLS_REGISTRY in $RC_FILE${NC}"
                 else
@@ -284,11 +323,14 @@ setup_skills_via_cli() {
         update_rc "$HOME/.zshrc"
         update_rc "$HOME/.bashrc"
         update_rc "$HOME/.bash_profile"
+        return 0
     else
+        SKILLS_SETUP_STATUS="failed"
         echo -e "${YELLOW}⚠️  Skills setup failed via CLI. You can set them up later with 'clawperator skills install'.${NC}"
         if [ -n "$SKILLS_OUTPUT" ]; then
             echo "$SKILLS_OUTPUT"
         fi
+        return 0
     fi
 }
 
@@ -570,8 +612,8 @@ main() {
     # Use doctor to drive the rest of the installation
     run_doctor_and_fix || exit 1
     
-    # Setup skills via CLI
-    setup_skills_via_cli || exit 1
+    # Setup skills via CLI (best-effort)
+    setup_skills_via_cli
 
     local ACTIVE_SHELL="${SHELL:-/bin/bash}"
     local DETECTED_SHELL
