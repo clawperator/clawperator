@@ -586,7 +586,7 @@ main() {
     echo -e "   ${BLUE}${APK_LOCAL_PATH}${NC}"
     echo -e "4. Stable download URL:"
     echo -e "   ${BLUE}https://clawperator.com/operator.apk${NC}"
-    echo -e "5. Historical release notes and artifacts remain at:"
+    echo -e "5. Historical releases and artifacts remain at:"
     echo -e "   ${BLUE}https://github.com/clawpilled/clawperator/releases${NC}"
     echo -e "6. Run ${YELLOW}\`clawperator doctor\`${NC} to verify setup"
     echo ""
