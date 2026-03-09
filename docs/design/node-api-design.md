@@ -32,42 +32,27 @@ Design implication:
 
 - If a workflow is common (for example package listing, screenshots, device discovery, app open/close, execution, snapshot, logs), provide a first-class Clawperator command/API for it.
 
-## v1 Delivery Shape (Shipping)
+## Shipped Commands
 
-The v1 release focuses on stable, CLI-driven execution for single-device setups.
+Core commands:
 
-Commands:
 - `clawperator doctor`: Validate prerequisites and environment.
 - `clawperator devices`: Discover connected device IDs.
-- `clawperator packages list`: Confirm presence of receiver and target apps.
+- `clawperator packages list`: Confirm presence of receiver and target apps on device.
 - `clawperator execute`: Run an execution JSON payload.
 - `clawperator observe snapshot`: Get current UI tree as JSON/ASCII.
-- `clawperator action [open-app|click|read|wait|type]`: Quick wrappers for single-step interactions.
+- `clawperator observe screenshot`: Capture device screen.
+- `clawperator action [open-app|click|read|wait|type]`: Single-step interaction wrappers.
+- `clawperator serve`: Start HTTP/SSE server for remote agent access.
+- `clawperator doctor --fix`: Best-effort environment remediation.
+- `clawperator skills install/update/search/run`: Skills lifecycle.
+- `clawperator version --check-compat`: CLI/APK compatibility check.
 
 Contracts:
+
 - **Canonical Envelope:** `[Clawperator-Result] {JSON}` is the ONLY way success/failure is reported.
 - **`expectedFormat` Required:** Every observation/execution must include `expectedFormat: "android-ui-automator"`.
 - **Single-Flight Lock:** Only one execution per `deviceId` / `receiverPackage` at a time. Overlaps return `EXECUTION_CONFLICT_IN_FLIGHT`.
-
-## Current Posture and Next Work
-
-The project has now shipped beyond the original initial-launch shape. The following capabilities are implemented in the current CLI/runtime surface:
-
-- `clawperator serve`
-- `clawperator doctor --fix`
-- `clawperator skills install`
-- `clawperator skills update`
-- `clawperator skills search`
-- `clawperator skills run`
-- `clawperator observe screenshot`
-
-The CLI/runtime surface now includes explicit CLI/APK version compatibility checking and handshaking via `clawperator doctor` and `clawperator version --check-compat`.
-
-Still-planned follow-up areas:
-
-- `clawperator doctor prescribe`: Detailed diagnostics via Android runtime endpoints.
-- `clawperator action [back|home|recents]`: System-level navigation hard-keys.
-- execution-time version compatibility enforcement beyond doctor checks
 
 ## HTTP API Server (`serve`)
 
@@ -75,7 +60,7 @@ When running `clawperator serve [--port <number>] [--host <string>]`, a local HT
 
 > ⚠️ **Security Warning**: The HTTP API currently provides **no authentication or authorization**. By default, it binds to `127.0.0.1` (localhost) for safety. If you bind to `0.0.0.0` or a public IP via `--host`, any client on your network can remotely control your connected Android devices. Only expose this API on trusted networks or behind an authenticated gateway.
 
-### REST Endpoints (v0.1)
+### REST Endpoints
 
 - **`GET /devices`**: List all connected Android devices and their states.
 - **`POST /execute`**: Execute a full JSON execution payload.
@@ -129,7 +114,7 @@ LLM agents must use these codes to decide their next step.
 - `NODE_NOT_CLICKABLE`: The target element was found but is not enabled/clickable.
 - `SECURITY_BLOCK_DETECTED`: A system-level security overlay (e.g., "Package Installer" or "Permission Dialog") is blocking interaction.
 
-## Detailed Step-Level Error Handling (v0.1)
+## Detailed Step-Level Error Handling
 
 While the top-level `status` indicates overall command success, individual `stepResults` can provide granular failure diagnostics. This is essential for agents to reason about partial completions.
 
@@ -163,10 +148,10 @@ This error occurs when a `close_app` action is dispatched to the Android runtime
 A command is considered "in-flight" from the moment the ADB broadcast is sent until the `[Clawperator-Result]` is received or the `timeoutMs` is reached. If a command times out, the lock is held for an additional 2000ms "settle" window before allowing the next execution.
 
 ### PII Redaction Policy
-By default, Clawperator returns **full-fidelity** UI text to the agent for maximum reasoning accuracy. 
+By default, Clawperator returns **full-fidelity** UI text to the agent for maximum reasoning accuracy.
+
 - **User Warning:** Results *will* contain sensitive data (names, account digits, OTPs) if they are visible on the screen.
 - **Agent Mitigation:** Do not ship raw Clawperator results to long-term storage without user consent.
-- **Upcoming:** A `--safe-logs` flag is planned for regex-based redaction of common PII patterns.
 
 ## API-First, ADB-Capable
 
@@ -342,19 +327,17 @@ Supported action types (v1):
 1. `adb` installed and executable
 2. adb server reachable
 3. connected devices and states
-4. target package presence (optional input)
-5. accessibility service status (advisory)
-6. `scrcpy` installed (recommended for read-only device observation during automation)
+4. target package presence and version compatibility
+5. Android Developer Options and USB debugging (advisory)
+6. end-to-end handshake via `doctor_ping`
 
 `clawperator doctor --fix` capabilities (best effort):
 
-1. install/update Android platform-tools (`adb`)
-2. install cmdline-tools if missing (optional)
-3. restart adb server
-4. install `scrcpy` when supported by host package manager (for example Homebrew on macOS)
-5. print exact remediation when automatic fix is unavailable
+1. restart adb server
+2. run `clawperator grant-device-permissions`
+3. print exact remediation when automatic fix is unavailable
 
-Docker is optional and not required for v1.
+See [Clawperator Doctor](../reference/node-api-doctor.md) for the full check list and JSON report shape.
 
 ## Skill Integration Mechanism
 
@@ -397,51 +380,6 @@ Migration policy:
 - For new high-value or high-complexity skills, prefer Node.js/TypeScript implementations.
 - Temporary Bash implementations (including the current Life360 flow) are acceptable only as stopgaps and must be queued for early migration once minimal Node skill SDK/runtime helpers are in place.
 
-## Agent Handoff Notes (2026-02)
-
-These notes are implementation-critical for upcoming Node skill/runtime work:
-
-1. ADB target selection must be explicit when multiple devices are connected.
-   - Current real-world setup often includes both a physical phone and an emulator.
-   - Execution should fail fast with a clear error if multiple devices exist and no `deviceId`/serial is provided.
-   - Every adb/logcat/broadcast/screencap call must consistently route through the selected device.
-
-2. Broadcast payload transport must avoid shell interpolation risks.
-   - Do not construct `adb shell ...` commands by embedding untrusted JSON into one double-quoted shell string.
-   - Use argument-safe invocation patterns, or robust escaping when forced through a shell boundary.
-   - Treat user-provided query text as untrusted input for command transport.
-
-3. Multimodal skill outputs should return file references, not binary blobs.
-   - Current practical contract: return `SCREENSHOT|path=<absolute_path>`.
-   - Keep text output as primary; image output should be optional and additive.
-   - Prefer deterministic local output directories and explicit file naming.
-
-4. UI overlays/dialogs are a first-class runtime concern.
-   - App flows (for example Life360) can surface blocking dialogs after navigation, not only on app launch.
-   - Overlay detection/dismissal must be reusable and stage-aware (pre-navigation, detail, pre-capture).
-   - Screenshot capture should happen only after overlay checks; if impossible, emit a clear fallback note.
-
-5. Runtime output should distinguish data quality from capture context.
-   - Example pattern: structured detail lines plus `SCREENSHOT_NOTE|...` when fallback capture strategy is used.
-   - This helps downstream agents/users interpret whether visual context reflects the same UI state as extracted text.
-
-## Fallback Guidance Artifact
-
-Clawperator should ship a static guidance document for agent recovery loops:
-
-- `docs/fallback-instructions.md`
-
-Failure responses should include:
-
-1. machine-readable error code
-2. short remediation hint
-3. reference path to fallback guidance doc
-
-Example fields:
-
-- `error.code` (for example `RECIPE_COMPILE_FAILED`, `VERIFY_FAILED`)
-- `error.hint`
-- `error.fallback_instructions_path`
 
 ## Agent-Friendly Command and Alias Layer
 
@@ -465,29 +403,7 @@ Rules:
 2. Aliases are input-only conveniences.
 3. Alias table is explicit/versioned (no fuzzy guessing in parser).
 
-## Future Input Primitive: Region-Based Tap
-
-To reduce brittle coordinate magic numbers in skills, add a first-class region tap primitive.
-
-Goal:
-
-- Let callers specify relative screen regions (for example `top_left`, `top_right`, `center`) instead of raw `x,y`.
-- Runtime computes final coordinates using current device metrics and safe-area policy.
-
-Suggested contract:
-
-- `action.tap_region` with:
-  - `region`: enum (`top_left`, `top_right`, `center`, `bottom_left`, `bottom_right`, etc.)
-  - `insetPolicy`: enum (`exclude_system_bars`, `include_full_screen`)
-  - `offsetPx` (optional): fine adjustment after anchor selection
-
-Runtime responsibilities:
-
-1. Resolve display size/orientation.
-2. Apply status/navigation bar insets based on `insetPolicy`.
-3. Emit resolved coordinates in execution results for observability.
-4. Reject out-of-bounds taps with structured validation errors.
-
+## Node Module Structure
 
 - `src/cli/*`
   - command handlers and argument parsing
@@ -544,21 +460,6 @@ Clawperator should define layered tests, with real-device execution as a first-c
 3. Disable dangerous capabilities by default (`purchase_risk` off unless explicit policy).
 4. Audit trail for compile, execute, and result envelopes.
 5. Best-effort mode still obeys capability policy and hard limits.
-
-## Phased Plan
-
-1. Phase 1
-   - CLI foundation (`doctor`, `devices`, `execute`, `observe snapshot`, basic `action` commands)
-   - result envelope parsing with strict prefix
-   - hard limits and validation constants
-2. Phase 2
-   - skills install/update/search/run/list/get/compile-artifact
-   - cached pinned-ref execution + explicit fallback/direct modes
-3. Phase 3
-   - `serve` HTTP wrapper
-   - SSE event streaming + alias normalization layer
-4. Phase 4
-   - migrate from logcat envelope to stronger transport if needed
 
 ## Stability & Versioning
 

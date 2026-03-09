@@ -34,7 +34,7 @@ Clawperator provides a deterministic execution layer for LLM agents to control A
 | `doctor` | Run environment diagnostics |
 | `version` | Print the CLI version or check CLI/APK compatibility |
 
-**Global options:** `--device-id <id>`, `--receiver-package <pkg>`, `--output <json|pretty>`, `--timeout-ms <n>`, `--verbose`
+**Global options:** `--device-id <id>`, `--receiver-package <pkg>`, `--output <json|pretty>`, `--format <json|pretty>` (alias for `--output`), `--timeout-ms <n>`, `--verbose`
 
 Default receiver package:
 
