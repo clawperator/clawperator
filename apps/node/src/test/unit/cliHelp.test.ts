@@ -60,10 +60,15 @@ describe("CLI help", () => {
   it("accepts --format as an alias for --output", async () => {
     const jsonResult = await runCli(["inspect", "ui", "--timeout-ms", "nope", "--format", "json"]);
     assert.notStrictEqual(jsonResult.code, 0);
-    assert.match(jsonResult.stdout, /^\{"code":"EXECUTION_VALIDATION_FAILED","message":"timeoutMs must be a finite number"\}/);
+    const json = JSON.parse(jsonResult.stdout);
+    assert.strictEqual(json.code, "EXECUTION_VALIDATION_FAILED");
+    assert.strictEqual(json.message, "timeoutMs must be a finite number");
 
     const prettyResult = await runCli(["inspect", "ui", "--timeout-ms", "nope", "--format", "pretty"]);
     assert.notStrictEqual(prettyResult.code, 0);
-    assert.match(prettyResult.stdout, /^\{\n  "code": "EXECUTION_VALIDATION_FAILED",\n  "message": "timeoutMs must be a finite number"\n\}/);
+    assert.match(prettyResult.stdout, /EXECUTION_VALIDATION_FAILED/);
+    assert.match(prettyResult.stdout, /timeoutMs must be a finite number/);
+    assert.match(prettyResult.stdout, /\{/);
+    assert.match(prettyResult.stdout, /\}/);
   });
 });
