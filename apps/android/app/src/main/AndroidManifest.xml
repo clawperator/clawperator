@@ -57,6 +57,11 @@
         android:exported="false"
         android:foregroundServiceType="dataSync" />
 
+      <!--
+        Requires DUMP permission to restrict broadcast access to privileged senders.
+        This prevents malicious apps from injecting commands while allowing the
+        clawperator Node API (via adb shell) to send commands.
+      -->
       <receiver
         android:name="clawperator.operator.runtime.OperatorCommandReceiver"
         android:enabled="true"
