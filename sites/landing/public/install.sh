@@ -588,7 +588,7 @@ main() {
     echo -e "   ${BLUE}https://clawperator.com/operator.apk${NC}"
     echo -e "5. Historical release notes and artifacts remain at:"
     echo -e "   ${BLUE}https://github.com/clawpilled/clawperator/releases${NC}"
-    echo -e "6. Run ${YELLOW}clawperator doctor${NC} to verify setup"
+    echo -e "6. Run ${YELLOW}\`clawperator doctor\`${NC} to verify setup"
     echo ""
     if [ "$SKILLS_SETUP_STATUS" = "configured" ]; then
         echo -e "7. Skills registry configured at:"
