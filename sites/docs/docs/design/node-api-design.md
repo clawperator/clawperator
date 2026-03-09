@@ -328,7 +328,8 @@ Supported action types (v1):
 2. adb server reachable
 3. connected devices and states
 4. target package presence and version compatibility
-5. accessibility service status (advisory)
+5. Android Developer Options and USB debugging (advisory)
+6. end-to-end handshake via `doctor_ping`
 
 `clawperator doctor --fix` capabilities (best effort):
 

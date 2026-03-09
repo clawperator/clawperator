@@ -132,7 +132,7 @@ Important fields:
 - `ok` - currently mirrors whether all critical checks passed
 - `criticalOk` - explicit critical-check verdict used by the CLI exit code
 - `checks[]` - ordered check results with IDs, status, summary, and optional diagnostics
-- `nextActions[]` - deduplicated shell commands or manual instructions; populated from failing check remediation steps, and may also include suggested follow-up commands when all checks pass
+- `nextActions[]` - optional; deduplicated shell commands or manual instructions; populated from failing check remediation steps, or suggested follow-up commands when all checks pass; omitted when there are no actions to surface
 
 Each `DoctorCheckResult` can also include:
 
