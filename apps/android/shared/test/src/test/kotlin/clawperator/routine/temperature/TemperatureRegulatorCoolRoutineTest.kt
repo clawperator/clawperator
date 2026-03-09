@@ -16,7 +16,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.datetime.DayOfWeek
+import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.LocalTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toInstant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.time.Duration
@@ -25,6 +28,8 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
 class TemperatureRegulatorCoolRoutineTest : ActionTest {
+
+    private val utc = TimeZone.UTC
 
     private fun createRoutine(
         timeRepository: TimeRepositoryMock,
@@ -662,7 +667,8 @@ class TemperatureRegulatorCoolRoutineTest : ActionTest {
     @Test
     fun `schedule inactive - skips temperature reads and sleeps until next transition`() =
         actionTest {
-            val timeRepository = TimeRepositoryMock()
+            val inactiveTime = LocalDateTime(2024, 1, 2, 12, 0).toInstant(utc)
+            val timeRepository = TimeRepositoryMock(inactiveTime.toEpochMilliseconds())
             val workflowManager = WorkflowManagerMock().apply {
                 setAmbientTemperature(Temperature.Companion.TemperatureC(25.0f)) // above threshold
                 setAirConditionerState(ToggleState.Off)
@@ -687,7 +693,7 @@ class TemperatureRegulatorCoolRoutineTest : ActionTest {
             val routine = createRoutine(timeRepository, workflowManager)
             val job = launch { routine.run(spec, statusSink) }
 
-            // First poll - should check schedule and find it's inactive (assuming current time is not Monday 9-17)
+            // First poll - Tuesday 12:00 UTC is outside a Monday 9:00-17:00 window.
             advanceTimeBy(1.seconds)
 
             // Should have schedule_check stage but no read_environment stage yet
@@ -703,7 +709,8 @@ class TemperatureRegulatorCoolRoutineTest : ActionTest {
 
     @Test
     fun `schedule active - proceeds with normal temperature regulation`() = actionTest {
-        val timeRepository = TimeRepositoryMock()
+        val activeTime = LocalDateTime(2024, 1, 1, 12, 0).toInstant(utc)
+        val timeRepository = TimeRepositoryMock(activeTime.toEpochMilliseconds())
         val workflowManager = WorkflowManagerMock().apply {
             setAmbientTemperature(Temperature.Companion.TemperatureC(25.0f)) // above threshold
             setAirConditionerState(ToggleState.Off)
@@ -746,7 +753,8 @@ class TemperatureRegulatorCoolRoutineTest : ActionTest {
 
     @Test
     fun `schedule inactive resets hysteresis timer`() = actionTest {
-        val timeRepository = TimeRepositoryMock()
+        val inactiveTime = LocalDateTime(2024, 1, 2, 12, 0).toInstant(utc)
+        val timeRepository = TimeRepositoryMock(inactiveTime.toEpochMilliseconds())
         val workflowManager = WorkflowManagerMock().apply {
             setAmbientTemperature(Temperature.Companion.TemperatureC(23.0f)) // below threshold
             setAirConditionerState(ToggleState.On)
