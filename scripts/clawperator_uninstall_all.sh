@@ -117,30 +117,38 @@ uninstall_cli() {
 
 uninstall_apk_from_device() {
     local SERIAL="$1"
-    local ADB_CMD
+    local LABEL
     if [ -n "$SERIAL" ]; then
-        ADB_CMD="adb -s $SERIAL"
-        local LABEL="$SERIAL"
+        LABEL="$SERIAL"
     else
-        ADB_CMD="adb"
-        local LABEL="default device"
+        LABEL="default device"
     fi
 
     for PKG in "$RELEASE_PKG" "$DEBUG_PKG"; do
-        # shellcheck disable=SC2086
-        if $ADB_CMD shell pm list packages 2>/dev/null | grep -q "package:${PKG}$"; then
+        if [ -n "$SERIAL" ]; then
+            if ! adb -s "$SERIAL" shell pm list packages 2>/dev/null | grep -q "package:${PKG}$"; then
+                echo "   ${PKG} not installed on ${LABEL}."
+                continue
+            fi
+        elif ! adb shell pm list packages 2>/dev/null | grep -q "package:${PKG}$"; then
+            echo "   ${PKG} not installed on ${LABEL}."
+            continue
+        fi
+
             echo -e "${BLUE}Uninstalling ${PKG} from ${LABEL}...${NC}"
             if [ "$DRY_RUN" = true ]; then
-                echo -e "${YELLOW}[dry-run] ${ADB_CMD} uninstall ${PKG}${NC}"
-            # shellcheck disable=SC2086
-            elif $ADB_CMD uninstall "$PKG" > /dev/null 2>&1; then
+                if [ -n "$SERIAL" ]; then
+                    echo -e "${YELLOW}[dry-run] adb -s ${SERIAL} uninstall ${PKG}${NC}"
+                else
+                    echo -e "${YELLOW}[dry-run] adb uninstall ${PKG}${NC}"
+                fi
+            elif [ -n "$SERIAL" ] && adb -s "$SERIAL" uninstall "$PKG" > /dev/null 2>&1; then
+                echo -e "${GREEN}✅ ${PKG} uninstalled from ${LABEL}.${NC}"
+            elif [ -z "$SERIAL" ] && adb uninstall "$PKG" > /dev/null 2>&1; then
                 echo -e "${GREEN}✅ ${PKG} uninstalled from ${LABEL}.${NC}"
             else
                 warn "Failed to uninstall ${PKG} from ${LABEL}."
             fi
-        else
-            echo "   ${PKG} not installed on ${LABEL}."
-        fi
     done
 }
 
@@ -197,7 +205,7 @@ clean_shell_rcs() {
             else
                 local TMP
                 TMP="$(mktemp)"
-                grep -v "CLAWPERATOR\|# Clawperator" "$RC_FILE" > "$TMP"
+                grep -E -v "CLAWPERATOR|# Clawperator" "$RC_FILE" > "$TMP"
                 mv "$TMP" "$RC_FILE"
                 echo -e "${GREEN}✅ Cleaned ${RC_FILE}.${NC}"
             fi

@@ -251,7 +251,8 @@ setup_skills_via_cli() {
     fi
 
     echo -e "${BLUE}Setting up Clawperator Skills...${NC}"
-    if "$CLAWPERATOR_BIN_PATH" skills install > /dev/null; then
+    local SKILLS_OUTPUT=""
+    if SKILLS_OUTPUT="$("$CLAWPERATOR_BIN_PATH" skills install 2>&1)"; then
         echo -e "${GREEN}✅ Skills setup complete.${NC}"
         SKILLS_SETUP_STATUS="configured"
         # Registry path for display
@@ -285,6 +286,9 @@ setup_skills_via_cli() {
         update_rc "$HOME/.bash_profile"
     else
         echo -e "${YELLOW}⚠️  Skills setup failed via CLI. You can set them up later with 'clawperator skills install'.${NC}"
+        if [ -n "$SKILLS_OUTPUT" ]; then
+            echo "$SKILLS_OUTPUT"
+        fi
     fi
 }
 
@@ -569,13 +573,14 @@ main() {
     # Setup skills via CLI
     setup_skills_via_cli || exit 1
 
+    local ACTIVE_SHELL="${SHELL:-/bin/bash}"
     local DETECTED_SHELL
-    DETECTED_SHELL="$(basename "$SHELL")"
+    DETECTED_SHELL="$(basename "$ACTIVE_SHELL")"
     local SOURCE_CMD=""
     case "$DETECTED_SHELL" in
         zsh) SOURCE_CMD="source ~/.zshrc" ;;
         bash) [ -f "$HOME/.bashrc" ] && SOURCE_CMD="source ~/.bashrc" || SOURCE_CMD="source ~/.bash_profile" ;;
-        *) SOURCE_CMD="source ~/.$(basename "$SHELL")rc" ;;
+        *) SOURCE_CMD="source ~/.$(basename "$ACTIVE_SHELL")rc" ;;
     esac
 
     echo ""
