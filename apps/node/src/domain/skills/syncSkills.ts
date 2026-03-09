@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { access, readFile, mkdir } from "node:fs/promises";
 import { join, dirname } from "node:path";
-import { SKILLS_REPO_URL, DEFAULT_SKILLS_DIR, DEFAULT_SKILLS_REGISTRY_SUBPATH } from "./skillsConfig.js";
+import { SKILLS_BUNDLE_URL, DEFAULT_SKILLS_DIR, DEFAULT_SKILLS_REGISTRY_SUBPATH } from "./skillsConfig.js";
 import { SKILLS_SYNC_FAILED, SKILLS_GIT_NOT_FOUND } from "../../contracts/skills.js";
 
 export interface SyncSkillsResult {
@@ -62,18 +62,35 @@ export async function syncSkills(
 
   try {
     if (await dirExists(join(dir, ".git"))) {
-      await exec("git", ["-C", dir, "fetch", "--quiet"]);
+      // Migrate remote URL if it still points to an old location
+      try {
+        const { stdout } = await exec("git", ["-C", dir, "remote", "get-url", "origin"]);
+        if (stdout.trim() !== SKILLS_BUNDLE_URL) {
+          await exec("git", ["-C", dir, "remote", "set-url", "origin", SKILLS_BUNDLE_URL]);
+        }
+      } catch {
+        // No remote configured - add one
+        await exec("git", ["-C", dir, "remote", "add", "origin", SKILLS_BUNDLE_URL]);
+      }
+      // NOTE: HTTP-served git bundles are static files - git re-downloads the
+      // entire bundle on every fetch (no incremental delta like a live git server).
+      await exec("git", ["-C", dir, "fetch", "origin", "--quiet"]);
       await exec("git", ["-C", dir, "checkout", ref]);
-      // Only pull if on a branch (not detached HEAD from a tag/commit)
+      // Only fast-forward merge if on a branch (not detached HEAD from a tag/commit).
+      // Check symbolic-ref separately so a merge failure is not silently swallowed.
+      let onBranch = false;
       try {
         await exec("git", ["-C", dir, "symbolic-ref", "HEAD"], 5_000);
-        await exec("git", ["-C", dir, "pull", "--ff-only", "--quiet"]);
+        onBranch = true;
       } catch {
-        // Detached HEAD (tag/commit ref) - fetch+checkout is sufficient
+        // Detached HEAD - fetch+checkout is sufficient
+      }
+      if (onBranch) {
+        await exec("git", ["-C", dir, "merge", "--ff-only", "--quiet", `origin/${ref}`]);
       }
     } else {
       await mkdir(dirname(dir), { recursive: true });
-      await exec("git", ["clone", SKILLS_REPO_URL, dir]);
+      await exec("git", ["clone", SKILLS_BUNDLE_URL, dir]);
       if (ref !== "main") {
         await exec("git", ["-C", dir, "checkout", ref]);
       }

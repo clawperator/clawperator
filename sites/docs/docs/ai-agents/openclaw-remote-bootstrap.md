@@ -192,7 +192,7 @@ clawperator skills install
 
 # If the repo exists but has no remote (common after a failed installer run)
 cd ~/.clawperator/skills
-git remote add origin git@github.com:clawpilled/clawperator-skills.git
+git remote add origin https://clawperator.com/install/clawperator-skills.bundle
 git fetch origin
 git reset --hard origin/main
 cd -

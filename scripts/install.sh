@@ -225,7 +225,7 @@ install_cli() {
 # 7. Clone Skills
 setup_skills() {
     local SKILLS_DIR="$HOME/.clawperator/skills"
-    local SKILLS_REPO_URL="https://github.com/clawpilled/clawperator-skills"
+    local SKILLS_REPO_URL="https://clawperator.com/install/clawperator-skills.bundle"
     echo -e "${BLUE}Setting up Clawperator Skills in $SKILLS_DIR...${NC}"
 
     if [ "${CLAWPERATOR_INSTALL_SKIP_SKILLS:-0}" = "1" ]; then
@@ -239,7 +239,7 @@ setup_skills() {
         SKILLS_SETUP_STATUS="skipped"
         echo -e "${YELLOW}⚠️  Skills setup skipped: ${reason}${NC}"
         echo -e "${YELLOW}Core CLI + APK installation will continue.${NC}"
-        echo -e "${YELLOW}If you have access to the skills repo later, re-run the installer or clone it into ~/.clawperator/skills manually.${NC}"
+        echo -e "${YELLOW}To set up skills later, re-run the installer or run: git clone ${SKILLS_REPO_URL} ~/.clawperator/skills${NC}"
     }
 
     if [ -d "$SKILLS_DIR" ]; then
@@ -256,9 +256,14 @@ setup_skills() {
                 warn_skills_setup_failed "could not add remote to existing skills directory. Remove $SKILLS_DIR and re-run."
                 return 0
             fi
+        elif [ "$EXISTING_REMOTE" != "$SKILLS_REPO_URL" ]; then
+            if ! GIT_TERMINAL_PROMPT=0 git -C "$SKILLS_DIR" remote set-url origin "$SKILLS_REPO_URL"; then
+                warn_skills_setup_failed "could not update the skills remote URL. Remove $SKILLS_DIR and re-run."
+                return 0
+            fi
         fi
         echo -e "${YELLOW}⚠️  Skills directory already exists. Updating...${NC}"
-        if ! GIT_TERMINAL_PROMPT=0 git -C "$SKILLS_DIR" fetch origin; then
+        if ! GIT_TERMINAL_PROMPT=0 git -C "$SKILLS_DIR" fetch origin --quiet; then
             warn_skills_setup_failed "could not fetch from skills repository. Check network access or run: clawperator skills install"
             return 0
         fi
@@ -269,7 +274,7 @@ setup_skills() {
     else
         mkdir -p "$(dirname "$SKILLS_DIR")"
         if ! GIT_TERMINAL_PROMPT=0 git clone "$SKILLS_REPO_URL" "$SKILLS_DIR"; then
-            warn_skills_setup_failed "unable to clone the skills repository anonymously."
+            warn_skills_setup_failed "unable to clone the skills bundle from ${SKILLS_REPO_URL}."
             return 0
         fi
     fi

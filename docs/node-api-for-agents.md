@@ -127,7 +127,7 @@ Full error taxonomy: `apps/node/src/contracts/errors.ts`
 
 ## Skills
 
-Skills are packaged Android automation scripts maintained in the [clawperator-skills](https://github.com/clawpilled/clawperator-skills) repository. The Node API provides discovery and metadata - skills are standalone and can be invoked directly by agents without the Node API.
+Skills are packaged Android automation scripts distributed via the clawperator-skills bundle at `https://clawperator.com/install/clawperator-skills.bundle`. The Node API provides discovery and metadata - skills are standalone and can be invoked directly by agents without the Node API.
 
 ### Setup
 
