@@ -423,7 +423,7 @@ download_operator_apk() {
 
     echo -e "${BLUE}Downloading operator APK ${OPERATOR_VERSION}...${NC}"
     curl -fsSL "$OPERATOR_APK_URL" -o "$APK_LOCAL_PATH"
-    
+
     if [ -n "$OPERATOR_EXPECTED_SHA256" ]; then
         echo "$OPERATOR_EXPECTED_SHA256" > "$APK_SHA_PATH"
     else
