@@ -49,17 +49,30 @@ export function getDefaultRuntimeConfig(overrides?: Partial<RuntimeConfig>): Run
   const __dirname = dirname(fileURLToPath(import.meta.url));
   const defaultProjectRoot = join(__dirname, "../../../../..");
   const homeDirectory = process.env.HOME;
+  const androidHome = process.env.ANDROID_HOME ?? process.env.ANDROID_SDK_ROOT;
+
   const defaultEmulatorPath = resolveDefaultSdkToolPath("emulator", [
+    ...(androidHome ? [join(androidHome, "emulator", "emulator")] : []),
     ...(homeDirectory ? [join(homeDirectory, "Library/Android/sdk/emulator/emulator")] : []),
     "/opt/homebrew/share/android-commandlinetools/emulator/emulator",
+  ]);
+
+  const defaultSdkmanagerPath = resolveDefaultSdkToolPath("sdkmanager", [
+    ...(androidHome ? [join(androidHome, "cmdline-tools", "latest", "bin", "sdkmanager")] : []),
+    ...(homeDirectory ? [join(homeDirectory, "Library/Android/sdk/cmdline-tools/latest/bin/sdkmanager")] : []),
+  ]);
+
+  const defaultAvdmanagerPath = resolveDefaultSdkToolPath("avdmanager", [
+    ...(androidHome ? [join(androidHome, "cmdline-tools", "latest", "bin", "avdmanager")] : []),
+    ...(homeDirectory ? [join(homeDirectory, "Library/Android/sdk/cmdline-tools/latest/bin/avdmanager")] : []),
   ]);
 
   return {
     projectRoot: defaultProjectRoot,
     adbPath: "adb",
     emulatorPath: defaultEmulatorPath,
-    sdkmanagerPath: "sdkmanager",
-    avdmanagerPath: "avdmanager",
+    sdkmanagerPath: defaultSdkmanagerPath,
+    avdmanagerPath: defaultAvdmanagerPath,
     receiverPackage: "com.clawperator.operator",
     actionAgentCommand: DEFAULT_ACTION_AGENT_COMMAND,
     payloadExtraKey: EXTRA_AGENT_PAYLOAD,

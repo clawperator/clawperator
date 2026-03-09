@@ -48,4 +48,30 @@ describe("getDefaultRuntimeConfig", () => {
     assert.strictEqual(typeof config.emulatorPath, "string");
     assert.ok(config.emulatorPath.length > 0);
   });
+
+  it("prefers ANDROID_HOME paths for emulator, sdkmanager, and avdmanager", () => {
+    const originalAndroidHome = process.env.ANDROID_HOME;
+    const originalAndroidSdkRoot = process.env.ANDROID_SDK_ROOT;
+    try {
+      // Point ANDROID_HOME at a location that does not exist - fallback to plain name expected
+      process.env.ANDROID_HOME = "/nonexistent/android-sdk";
+      delete process.env.ANDROID_SDK_ROOT;
+
+      const config = getDefaultRuntimeConfig();
+      // When ANDROID_HOME path does not exist, each tool falls back to its plain name
+      assert.strictEqual(config.sdkmanagerPath, "sdkmanager");
+      assert.strictEqual(config.avdmanagerPath, "avdmanager");
+    } finally {
+      if (originalAndroidHome !== undefined) {
+        process.env.ANDROID_HOME = originalAndroidHome;
+      } else {
+        delete process.env.ANDROID_HOME;
+      }
+      if (originalAndroidSdkRoot !== undefined) {
+        process.env.ANDROID_SDK_ROOT = originalAndroidSdkRoot;
+      } else {
+        delete process.env.ANDROID_SDK_ROOT;
+      }
+    }
+  });
 });
