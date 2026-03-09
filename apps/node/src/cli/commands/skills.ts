@@ -4,12 +4,11 @@ import { compileArtifact } from "../../domain/skills/compileArtifact.js";
 import { syncSkills } from "../../domain/skills/syncSkills.js";
 import { searchSkills } from "../../domain/skills/searchSkills.js";
 import { runSkill } from "../../domain/skills/runSkill.js";
-import { getRegistryPath } from "../../adapters/skills-repo/localSkillsRegistry.js";
 import type { OutputOptions } from "../output.js";
 import { formatSuccess, formatError } from "../output.js";
 
 export async function cmdSkillsList(options: { format: OutputOptions["format"] }): Promise<string> {
-  const result = await listSkills(getRegistryPath());
+  const result = await listSkills();
   if (result.ok) {
     return formatSuccess({ skills: result.skills, count: result.skills.length }, options);
   }
@@ -20,7 +19,7 @@ export async function cmdSkillsGet(
   skillId: string,
   options: { format: OutputOptions["format"] }
 ): Promise<string> {
-  const result = await getSkill(skillId, getRegistryPath());
+  const result = await getSkill(skillId);
   if (result.ok) {
     return formatSuccess({ skill: result.skill }, options);
   }
@@ -33,7 +32,7 @@ export async function cmdSkillsCompileArtifact(
   varsJson: string,
   options: { format: OutputOptions["format"] }
 ): Promise<string> {
-  const result = await compileArtifact(skillId, artifact, varsJson ?? "{}", getRegistryPath());
+  const result = await compileArtifact(skillId, artifact, varsJson ?? "{}");
   if (result.ok) {
     return formatSuccess({ execution: result.execution }, options);
   }
@@ -84,7 +83,7 @@ export async function cmdSkillsSearch(
   query: { app?: string; intent?: string; keyword?: string },
   options: { format: OutputOptions["format"] }
 ): Promise<string> {
-  const result = await searchSkills(query, getRegistryPath());
+  const result = await searchSkills(query);
   if (result.ok) {
     return formatSuccess({ skills: result.skills, count: result.skills.length }, options);
   }
@@ -96,7 +95,7 @@ export async function cmdSkillsRun(
   args: string[],
   options: { format: OutputOptions["format"] }
 ): Promise<string> {
-  const result = await runSkill(skillId, args, getRegistryPath());
+  const result = await runSkill(skillId, args);
   if (result.ok) {
     return formatSuccess({
       skillId: result.skillId,

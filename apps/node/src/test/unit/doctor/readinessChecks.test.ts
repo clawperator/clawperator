@@ -85,6 +85,9 @@ describe("runHandshake", () => {
         const result = await runHandshake(config, mockWait);
         assert.strictEqual(result.status, "fail");
         assert.strictEqual(result.code, ERROR_CODES.RESULT_ENVELOPE_TIMEOUT);
+        assert.match(result.detail ?? "", /Broadcast dispatch: sent/);
+        assert.match(result.detail ?? "", /Receiver package: com\.test\.operator/);
+        assert.ok(result.fix?.steps.some(step => step.kind === "shell" && step.value.includes("observe snapshot")));
     });
 
     it("returns fail on broadcast failure", async () => {

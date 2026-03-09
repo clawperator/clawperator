@@ -8,12 +8,14 @@ theme:
   custom_dir: overrides
 
 nav:
-  - Home: index.md
+  - Docs Home: index.md
+  - clawperator.com: https://clawperator.com
   - Getting Started:
     - Project Overview: getting-started/project-overview.md
     - First-Time Setup: getting-started/first-time-setup.md
   - For AI Agents:
     - Node API - Agent Guide: ai-agents/node-api-for-agents.md
+    - OpenClaw Remote Bootstrap: ai-agents/openclaw-remote-bootstrap.md
   - Reference:
     - CLI Reference: reference/cli-reference.md
     - API Overview: reference/api-overview.md

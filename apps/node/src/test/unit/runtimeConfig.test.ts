@@ -11,6 +11,7 @@ describe("getDefaultRuntimeConfig", () => {
     assert.strictEqual(typeof config.payloadExtraKey, "string");
     assert.ok(config.adbPath.length > 0);
     assert.ok(config.receiverPackage.length > 0);
+    assert.strictEqual(config.receiverPackage, "com.clawperator.operator");
   });
 
   it("merges overrides", () => {

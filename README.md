@@ -80,6 +80,14 @@ See [Node API for Agents](docs/node-api-for-agents.md) for the full API contract
 
 Full docs at [docs.clawperator.com](https://docs.clawperator.com)
 
+Website surfaces in this repo:
+- `sites/landing/` builds the marketing/install site at [clawperator.com](https://clawperator.com)
+- `sites/docs/` builds the technical documentation site at [docs.clawperator.com](https://docs.clawperator.com)
+
+When updating website content, make sure you are editing the correct surface. The docs content itself is sourced from `docs/`, `apps/node/src/`, and `../clawperator-skills/docs`, then published through `sites/docs/`.
+
+Both public sites deploy automatically to Cloudflare after changes are merged to `main`.
+
 - [First-Time Setup](docs/first-time-setup.md) - Device prep, APK install, accessibility
 - [Node API for Agents](docs/node-api-for-agents.md) - CLI, HTTP API, execution contract
 - [Architecture](docs/architecture.md) - System design

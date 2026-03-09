@@ -28,15 +28,30 @@ export interface LoadRegistryResult {
 }
 
 export async function loadRegistry(registryPath?: string): Promise<LoadRegistryResult> {
-  let path = registryPath ?? getRegistryPath();
+  const configuredPath = process.env.CLAWPERATOR_SKILLS_REGISTRY;
+  let path = registryPath ?? configuredPath ?? getDefaultRegistryPath();
   let raw: string;
   try {
     raw = await readFile(path, "utf-8");
   } catch {
+    if (!registryPath && configuredPath) {
+      throw new Error(
+        `Registry not found at configured path: ${path}. ` +
+        "Update CLAWPERATOR_SKILLS_REGISTRY or run clawperator skills install."
+      );
+    }
+
     const fallback = join(process.cwd(), "..", "..", "skills", "skills-registry.json");
     if (fallback !== path) {
-      raw = await readFile(fallback, "utf-8");
-      path = fallback;
+      try {
+        raw = await readFile(fallback, "utf-8");
+        path = fallback;
+      } catch {
+        throw new Error(
+          `Registry not found. Checked: ${path}, ${fallback}. ` +
+          "Run from repo root, set CLAWPERATOR_SKILLS_REGISTRY, or run clawperator skills install."
+        );
+      }
     } else {
       throw new Error(`Registry not found: ${path}. Run from repo root or set CLAWPERATOR_SKILLS_REGISTRY.`);
     }

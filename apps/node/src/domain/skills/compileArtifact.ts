@@ -3,7 +3,6 @@ import { createHash } from "node:crypto";
 import {
   loadRegistry,
   findSkillById,
-  getRegistryPath,
   resolveArtifactPath,
   getArtifactPathFromSkill,
 } from "../../adapters/skills-repo/localSkillsRegistry.js";
@@ -69,11 +68,10 @@ export async function compileArtifact(
   varsJson: string,
   registryPath?: string
 ): Promise<CompileArtifactResult | CompileArtifactError> {
-  const path = registryPath ?? getRegistryPath();
   let resolvedPath: string;
   let registry: SkillsRegistry;
   try {
-    const loaded = await loadRegistry(path);
+    const loaded = await loadRegistry(registryPath);
     registry = loaded.registry;
     resolvedPath = loaded.resolvedPath;
   } catch (e) {
@@ -82,7 +80,7 @@ export async function compileArtifact(
       ok: false,
       code: REGISTRY_READ_FAILED,
       message,
-      details: { registryPath: path },
+      details: registryPath ? { registryPath } : undefined,
     };
   }
 

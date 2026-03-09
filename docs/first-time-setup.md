@@ -83,9 +83,17 @@ adb -s <device_id> install -r ~/.clawperator/downloads/operator.apk
 
 ## Step 6: Enable the Accessibility Service
 
-Clawperator uses Android's Accessibility API to observe and interact with UI elements. You must enable the service manually.
+Clawperator uses Android's Accessibility API to observe and interact with UI elements. You must enable the service before it can accept commands.
 
-On the device:
+**From the host machine (recommended for remote and agent-driven setups):**
+
+```bash
+clawperator grant-device-permissions
+```
+
+This uses `adb` to enable the accessibility service without touching the device screen. Optionally pass `--device-id <id>` if multiple devices are connected.
+
+**On the device (manual alternative):**
 
 1. Open **Settings**
 2. Go to **Accessibility** (or **Accessibility > Installed Services** on some devices)
