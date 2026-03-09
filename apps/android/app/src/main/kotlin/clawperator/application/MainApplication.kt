@@ -25,9 +25,9 @@ class MainApplication : SystemApplication() {
         if (LocalCrashLog.hasExistingLog()) {
             LocalCrashLog.logInfo("[stability] crash-log present on startup")
         }
-        if (BuildConfig.DEBUG) {
-            Timber.plant(Timber.DebugTree())
-        }
+
+        // Always plant DebugTree to enable logcat output in release builds for remote agents.
+        Timber.plant(Timber.DebugTree())
 
         Factory.multiProcessAllowed = false
 

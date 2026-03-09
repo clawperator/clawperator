@@ -72,27 +72,43 @@ export async function syncSkills(
         // No remote configured - add one
         await exec("git", ["-C", dir, "remote", "add", "origin", SKILLS_BUNDLE_URL]);
       }
-      // NOTE: HTTP-served git bundles are static files - git re-downloads the
-      // entire bundle on every fetch (no incremental delta like a live git server).
-      await exec("git", ["-C", dir, "fetch", "origin", "--quiet"]);
-      await exec("git", ["-C", dir, "checkout", ref]);
-      // Only fast-forward merge if on a branch (not detached HEAD from a tag/commit).
-      // Check symbolic-ref separately so a merge failure is not silently swallowed.
-      let onBranch = false;
+      // Download bundle using curl to a temporary file since git cannot fetch/clone directly from a remote HTTP bundle file
+      const tmpBundle = `/tmp/clawperator-skills-${Date.now()}.bundle`;
       try {
-        await exec("git", ["-C", dir, "symbolic-ref", "HEAD"], 5_000);
-        onBranch = true;
-      } catch {
-        // Detached HEAD - fetch+checkout is sufficient
-      }
-      if (onBranch) {
-        await exec("git", ["-C", dir, "merge", "--ff-only", "--quiet", `origin/${ref}`]);
+        await exec("curl", ["-fsSL", SKILLS_BUNDLE_URL, "-o", tmpBundle]);
+        
+        // NOTE: HTTP-served git bundles are static files - git re-downloads the
+        // entire bundle on every fetch (no incremental delta like a live git server).
+        await exec("git", ["-C", dir, "fetch", tmpBundle, "+refs/heads/*:refs/remotes/origin/*", "--quiet"]);
+        await exec("git", ["-C", dir, "checkout", ref]);
+        // Only fast-forward merge if on a branch (not detached HEAD from a tag/commit).
+        // Check symbolic-ref separately so a merge failure is not silently swallowed.
+        let onBranch = false;
+        try {
+          await exec("git", ["-C", dir, "symbolic-ref", "HEAD"], 5_000);
+          onBranch = true;
+        } catch {
+          // Detached HEAD - fetch+checkout is sufficient
+        }
+        if (onBranch) {
+          await exec("git", ["-C", dir, "merge", "--ff-only", "--quiet", `origin/${ref}`]);
+        }
+      } finally {
+        await exec("rm", ["-f", tmpBundle]);
       }
     } else {
       await mkdir(dirname(dir), { recursive: true });
-      await exec("git", ["clone", SKILLS_BUNDLE_URL, dir]);
-      if (ref !== "main") {
-        await exec("git", ["-C", dir, "checkout", ref]);
+      const tmpBundle = `/tmp/clawperator-skills-${Date.now()}.bundle`;
+      try {
+        await exec("curl", ["-fsSL", SKILLS_BUNDLE_URL, "-o", tmpBundle]);
+        await exec("git", ["clone", tmpBundle, dir]);
+        // Set origin to the remote URL instead of the temporary file
+        await exec("git", ["-C", dir, "remote", "set-url", "origin", SKILLS_BUNDLE_URL]);
+        if (ref !== "main") {
+          await exec("git", ["-C", dir, "checkout", ref]);
+        }
+      } finally {
+        await exec("rm", ["-f", tmpBundle]);
       }
     }
   } catch (e) {

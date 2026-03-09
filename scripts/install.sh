@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# install.sh
+# install.sh (v0.2.1)
 # One-command installation for Clawperator CLI and environment.
 # Target: macOS and Linux (Ubuntu/Debian/Arch).
 
@@ -242,9 +242,16 @@ setup_skills() {
         echo -e "${YELLOW}To set up skills later, re-run the installer or run: git clone ${SKILLS_REPO_URL} ~/.clawperator/skills${NC}"
     }
 
+    local TMP_BUNDLE="/tmp/clawperator-skills-$$.bundle"
+    if ! curl -fsSL "$SKILLS_REPO_URL" -o "$TMP_BUNDLE"; then
+        warn_skills_setup_failed "unable to download the skills bundle from ${SKILLS_REPO_URL}."
+        return 0
+    fi
+
     if [ -d "$SKILLS_DIR" ]; then
         if [ ! -d "$SKILLS_DIR/.git" ]; then
             warn_skills_setup_failed "$SKILLS_DIR exists but is not a git repository. Remove it and re-run to clone fresh."
+            rm -f "$TMP_BUNDLE"
             return 0
         fi
         # Ensure the remote is configured - it may be missing if the directory was created locally.
@@ -254,30 +261,38 @@ setup_skills() {
             echo -e "${YELLOW}⚠️  Skills directory has no remote configured. Adding origin...${NC}"
             if ! GIT_TERMINAL_PROMPT=0 git -C "$SKILLS_DIR" remote add origin "$SKILLS_REPO_URL"; then
                 warn_skills_setup_failed "could not add remote to existing skills directory. Remove $SKILLS_DIR and re-run."
+                rm -f "$TMP_BUNDLE"
                 return 0
             fi
         elif [ "$EXISTING_REMOTE" != "$SKILLS_REPO_URL" ]; then
             if ! GIT_TERMINAL_PROMPT=0 git -C "$SKILLS_DIR" remote set-url origin "$SKILLS_REPO_URL"; then
                 warn_skills_setup_failed "could not update the skills remote URL. Remove $SKILLS_DIR and re-run."
+                rm -f "$TMP_BUNDLE"
                 return 0
             fi
         fi
         echo -e "${YELLOW}⚠️  Skills directory already exists. Updating...${NC}"
-        if ! GIT_TERMINAL_PROMPT=0 git -C "$SKILLS_DIR" fetch origin --quiet; then
-            warn_skills_setup_failed "could not fetch from skills repository. Check network access or run: clawperator skills install"
+        if ! GIT_TERMINAL_PROMPT=0 git -C "$SKILLS_DIR" fetch "$TMP_BUNDLE" "+refs/heads/*:refs/remotes/origin/*" --quiet; then
+            warn_skills_setup_failed "could not fetch from skills bundle. Check network access or run: clawperator skills install"
+            rm -f "$TMP_BUNDLE"
             return 0
         fi
         if ! GIT_TERMINAL_PROMPT=0 git -C "$SKILLS_DIR" reset --hard origin/main; then
             warn_skills_setup_failed "could not update skills to the latest version. Try removing $SKILLS_DIR and re-running."
+            rm -f "$TMP_BUNDLE"
             return 0
         fi
     else
         mkdir -p "$(dirname "$SKILLS_DIR")"
-        if ! GIT_TERMINAL_PROMPT=0 git clone "$SKILLS_REPO_URL" "$SKILLS_DIR"; then
-            warn_skills_setup_failed "unable to clone the skills bundle from ${SKILLS_REPO_URL}."
+        if ! GIT_TERMINAL_PROMPT=0 git clone "$TMP_BUNDLE" "$SKILLS_DIR" >/dev/null 2>&1; then
+            warn_skills_setup_failed "unable to clone from the downloaded skills bundle."
+            rm -f "$TMP_BUNDLE"
             return 0
         fi
+        # Fix the remote to point to the actual URL, not the temp file
+        GIT_TERMINAL_PROMPT=0 git -C "$SKILLS_DIR" remote set-url origin "$SKILLS_REPO_URL"
     fi
+    rm -f "$TMP_BUNDLE" 
 
     local REGISTRY_FILE=""
     local REGISTRY_CANDIDATES=(
