@@ -36,15 +36,21 @@ If you use a local debug APK, pass `--receiver-package com.clawperator.operator.
 
 Doctor runs checks in a fixed order. When a critical check fails, doctor returns immediately - all subsequent checks are skipped. The one exception is `device.capability`: it is a critical check (its failure marks the report as not ok), but a failure there does not halt the run; doctor continues into the runtime readiness phase regardless.
 
+`--full` mode inserts additional build/install/launch checks at two points in the sequence rather than appending them at the end. The full execution order is:
+
 ### 1. Host checks
 
 - `host.node.version` - Node.js major version must be `22` or newer
 - `host.adb.presence` - `adb` must be installed and reachable in `PATH`
 - `host.adb.server` - `adb start-server` must succeed
+- `host.java.version` - Java 17 or 21 must be installed (`--full` only)
+- `build.android.assemble` - runs `./gradlew :app:assembleDebug` (`--full` only)
 
 ### 2. Device discovery
 
 - `device.discovery` - exactly one reachable target device must be available, or `--device-id` must disambiguate multiple devices
+- `build.android.install` - runs `./gradlew :app:installDebug` (`--full` only)
+- `build.android.launch` - launches `clawperator.activity.MainActivity` (`--full` only)
 - `device.capability` - the target device shell must be reachable; the report also captures SDK level, `wm size`, and `wm density` as evidence
 
 ### 3. Runtime readiness
@@ -54,16 +60,7 @@ Doctor runs checks in a fixed order. When a critical check fails, doctor returns
 - `readiness.settings.dev_options` - warns if Android Developer Options are disabled
 - `readiness.settings.usb_debugging` - warns if USB debugging is disabled
 - `readiness.handshake` - sends a `doctor_ping` command and waits for one canonical `[Clawperator-Result]` envelope
-
-### 4. Full-mode checks
-
-`--full` adds Android build and runtime validation:
-
-- `host.java.version` - Java 17 or 21 must be installed
-- `build.android.assemble` - runs `./gradlew :app:assembleDebug`
-- `build.android.install` - runs `./gradlew :app:installDebug`
-- `build.android.launch` - launches `clawperator.activity.MainActivity`
-- `readiness.smoke` - opens Android Settings and confirms it can be observed via `snapshot_ui`
+- `readiness.smoke` - opens Android Settings and confirms it can be observed via `snapshot_ui` (`--full` only, runs after handshake)
 
 ## Critical vs Advisory Checks
 

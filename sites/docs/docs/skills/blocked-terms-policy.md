@@ -10,7 +10,7 @@ This repository supports a local pre-commit guard to reduce accidental commits o
 
 ## Shared local config path
 
-`clawperator` and `clawperator-skills` both look for an optional user-scoped config directory at:
+`clawperator` and `clawperator-skills` share the convention of a user-scoped config directory at:
 
 - `~/.clawpilled/`
 
