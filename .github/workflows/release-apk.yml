@@ -110,17 +110,28 @@ jobs:
         run: |
           set -euo pipefail
 
-          release_apk="$(find apps/android/app/build/outputs/apk/release -name '*.apk' | head -n 1)"
-          if [[ -z "$release_apk" ]]; then
+          # Prefer app-release.apk but fall back to find if needed
+          release_apk="apps/android/app/build/outputs/apk/release/app-release.apk"
+          if [[ ! -f "$release_apk" ]]; then
+            release_apk="$(find apps/android/app/build/outputs/apk/release -name '*.apk' | head -n 1)"
+          fi
+
+          if [[ -z "$release_apk" || ! -f "$release_apk" ]]; then
             echo "Release APK not found." >&2
             exit 1
           fi
 
+          echo "Using APK: $release_apk"
           published_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
           export PUBLISHED_AT="$published_at"
           cp "$release_apk" "${{ steps.release_meta.outputs.artifact_name }}"
-          sha256sum "${{ steps.release_meta.outputs.artifact_name }}" | awk '{ print $1 }' > "${{ steps.release_meta.outputs.checksum_name }}"
+          
+          # Compute checksum and ensure it's just the hash
+          sha256="$(sha256sum "${{ steps.release_meta.outputs.artifact_name }}" | awk '{ print $1 }')"
+          echo "$sha256" > "${{ steps.release_meta.outputs.checksum_name }}"
+          
           echo "published_at=${published_at}" >> "$GITHUB_OUTPUT"
+          echo "sha256=${sha256}" >> "$GITHUB_OUTPUT"
 
           python - <<'PY'
           import json
@@ -129,6 +140,7 @@ jobs:
           metadata = {
               "version": os.environ["RELEASE_VERSION"],
               "channel": os.environ["LATEST_CHANNEL"],
+              "sha256": os.environ["ARTIFACT_SHA256"],
               "apk_url": os.environ["APK_URL"],
               "sha256_url": os.environ["SHA256_URL"],
               "github_release_url": os.environ["GITHUB_RELEASE_URL"],
@@ -144,6 +156,7 @@ jobs:
         env:
           RELEASE_VERSION: ${{ steps.release_meta.outputs.version }}
           LATEST_CHANNEL: ${{ steps.release_meta.outputs.latest_channel }}
+          ARTIFACT_SHA256: ${{ steps.artifacts.outputs.sha256 }}
           APK_URL: ${{ env.CLAWPERATOR_CLOUDFLARE_DOWNLOADS_BASE_URL }}/${{ steps.release_meta.outputs.artifact_prefix }}/${{ steps.release_meta.outputs.artifact_name }}
           SHA256_URL: ${{ env.CLAWPERATOR_CLOUDFLARE_DOWNLOADS_BASE_URL }}/${{ steps.release_meta.outputs.artifact_prefix }}/${{ steps.release_meta.outputs.checksum_name }}
           GITHUB_RELEASE_URL: https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}
