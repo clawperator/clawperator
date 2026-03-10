@@ -253,7 +253,10 @@ export default function Home() {
           </div>
 
           <div className="quickstart-command">
-            <p className="quickstart-hint"># No Android device? Provision a local emulator after install</p>
+            <p className="quickstart-hint">
+              No Android device handy? No worries. Clawperator can create a Google Play equipped Android emulator on
+              your Mac mini or OpenClaw box after install.
+            </p>
             <div className="command-row">
               <pre>
                 <code>clawperator provision emulator</code>
