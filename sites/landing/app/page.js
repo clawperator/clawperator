@@ -155,8 +155,7 @@ export default function Home() {
             <br />
             The brain decides what to do next.
             <br />
-            Clawperator connects that agent to a dedicated Android burner phone or local Android emulator, executes the
-            action, and returns structured results your code can trust.
+            Clawperator connects that agent to a dedicated Android burner phone or local Android emulator, executes the action, and returns reliable, structured results your agent can trust and use to build your own private workflows on top of.
           </p>
 
           <div className="hero-image-panel">
