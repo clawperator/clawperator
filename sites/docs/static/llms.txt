@@ -4,6 +4,7 @@ This site contains the technical documentation for Clawperator, a deterministic 
 
 ## Preferred pages
 
+- Full compiled docs: https://docs.clawperator.com/llms-full.txt
 - Docs home: https://docs.clawperator.com/
 - Agent guide: https://docs.clawperator.com/ai-agents/node-api-for-agents/
 - API overview: https://docs.clawperator.com/reference/api-overview/

@@ -11,6 +11,7 @@ Clawperator operates an Android device on behalf of a user. That Android device 
 
 - Homepage: https://clawperator.com/
 - Docs: https://docs.clawperator.com/
+- Full compiled docs: https://docs.clawperator.com/llms-full.txt
 - Agent guide: https://docs.clawperator.com/ai-agents/node-api-for-agents/
 - API overview: https://docs.clawperator.com/reference/api-overview/
 - CLI reference: https://docs.clawperator.com/reference/cli-reference/
