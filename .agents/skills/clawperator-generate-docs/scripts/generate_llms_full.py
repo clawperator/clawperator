@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 
 import os
+import sys
 import yaml
 
 def main():
-    import sys
-    
-    # We assume the script is run from within the sites/docs directory 
-    # (or we find sites/docs from the script path)
+    # Locate the repository root (and sites/docs) relative to this script's path,
+    # so the script can be run from any current working directory.
     script_dir = os.path.dirname(os.path.abspath(__file__))
     repo_root = os.path.abspath(os.path.join(script_dir, "..", "..", "..", ".."))
     docs_site_dir = os.path.join(repo_root, "sites", "docs")
@@ -19,10 +18,15 @@ def main():
     with open(source_map_path, "r", encoding="utf-8") as f:
         source_map = yaml.safe_load(f)
         
+    if not isinstance(source_map, dict):
+        raise ValueError(f"Failed to load a valid dictionary from {source_map_path}")
+        
     compiled_content = []
     
     compiled_content.append("# Clawperator Full Documentation")
     compiled_content.append("This document contains all the technical documentation for Clawperator, compiled into a single file for easy digestion by AI agents.\n")
+    
+    missing_pages = []
     
     for section in source_map.get("sections", []):
         section_title = section.get("title")
@@ -39,11 +43,12 @@ def main():
             page_path = os.path.join(docs_dir, page_output)
             
             if not os.path.exists(page_path):
-                print(f"Warning: File not found: {page_path}")
+                print(f"Error: File not found: {page_path}")
+                missing_pages.append(page_path)
                 continue
                 
             with open(page_path, "r", encoding="utf-8") as pf:
-                page_content = pf.read().strip()
+                page_content = pf.read().rstrip("\n")
                 
             # If the page doesn't start with a markdown header, add the title
             if not page_content.startswith("# "):
@@ -54,6 +59,11 @@ def main():
             compiled_content.append(page_content)
             compiled_content.append("\n---")
             
+    if missing_pages:
+        print(f"Error: Failed to generate llms-full.txt due to {len(missing_pages)} missing pages.")
+        sys.exit(1)
+        
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
     with open(output_path, "w", encoding="utf-8") as out_f:
         out_f.write("\n".join(compiled_content))
         
