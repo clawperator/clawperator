@@ -93,8 +93,8 @@ main() {
   printf 'github_release=%s assets=%s\n' "$release_url" "$release_assets"
 
   local npm_json
-  npm_json="$(npm view clawperator version time --json)"
-  [[ "$(json_field "$npm_json" "version")" == "$version" ]] || die "npm latest version is not ${version}"
+  npm_json="$(npm view "clawperator@${version}" version time --json)" || die "npm package clawperator@${version} not found"
+  [[ "$(json_field "$npm_json" "version")" == "$version" ]] || die "npm returned unexpected version for clawperator@${version}"
   printf 'npm_version=%s published_at=%s\n' \
     "$(json_field "$npm_json" "version")" \
     "$(json_time_for_version "$npm_json" "$version")"

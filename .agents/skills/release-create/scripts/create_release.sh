@@ -11,6 +11,10 @@ require_cmd() {
   command -v "$1" >/dev/null 2>&1 || die "required command not found: $1"
 }
 
+json_version_field() {
+  node -e 'const data = JSON.parse(process.argv[1]); const value = data.version; if (typeof value !== "string" || value.length === 0) process.exit(2); console.log(value);' "$1"
+}
+
 json_field() {
   local json="$1"
   local field="$2"
@@ -101,11 +105,11 @@ main() {
   [[ -z "$git_status" ]] || die "working tree has uncommitted or untracked changes"
 
   local package_version
-  package_version="$(node -p "require('./apps/node/package.json').version")"
+  package_version="$(json_version_field "$(git show "${target_sha}:apps/node/package.json")")"
   [[ "$package_version" == "$version" ]] || die "apps/node/package.json is $package_version, expected $version"
 
   local lock_version
-  lock_version="$(node -p "require('./apps/node/package-lock.json').version")"
+  lock_version="$(json_version_field "$(git show "${target_sha}:apps/node/package-lock.json")")"
   [[ "$lock_version" == "$version" ]] || die "apps/node/package-lock.json is $lock_version, expected $version"
 
   if npm view clawperator@"$version" version >/dev/null 2>&1; then
