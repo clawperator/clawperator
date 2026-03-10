@@ -48,11 +48,20 @@ A successful upgrade typically involves manual refinement in these files:
 
 ### 3. Verify and Regenerate
 After making manual corrections:
-1. Re-run `npm run build && npm run test` in `apps/node`.
-2. Re-run `clawperator-generate-docs` to ensure your manual source fixes are propagated to `sites/docs/docs/`.
-3. Run `./scripts/docs_build.sh` to update `llms-full.txt` and other generated artifacts.
+1. **Rigorously verify local tests:** Run `npm run build && npm run test` in `apps/node`. 
+    - **CRITICAL:** NEVER ignore a test failure. Even if a failure seems "environmental" or "local-only", it MUST be resolved. If it fails for you, it will fail in CI.
+    - **SYNC DIST:** Ensure you run the `build` command before `test` so that your TypeScript changes are reflected in the executed JavaScript.
+2. **Regenerate docs:** Re-run `clawperator-generate-docs` to ensure your manual source fixes are propagated to `sites/docs/docs/`.
+3. **Rebuild artifacts:** Run `./scripts/docs_build.sh` to update `llms-full.txt` and other generated artifacts.
 
-**Validation is mandatory.** Do not consider the task complete until the tests pass and the documentation correctly reflects both the new version and its relationship to historical versions.
+## Release Tagging Mandate
+
+Do NOT tag a release until:
+1. Every single unit test passes locally.
+2. You have manually verified that documentation logic (examples, links) is correct for the new version.
+3. You have confirmed the version in `apps/node/package.json` matches your target.
+
+**Validation is the only path to finality.** If tests fail, the version bump is incomplete. Fix the tests before proceeding.
 
 Prerequisites:
 - Must be run from within the `clawperator` git repository.
