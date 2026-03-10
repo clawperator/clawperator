@@ -47,7 +47,13 @@ def main():
             if not page_output:
                 continue
                 
-            page_path = os.path.join(docs_dir, page_output)
+            page_path = os.path.abspath(os.path.join(docs_dir, page_output))
+            
+            # Guard against path traversal
+            if not page_path.startswith(os.path.abspath(docs_dir)):
+                print(f"Error: Invalid page output path attempts traversal: {page_output}")
+                missing_pages.append(page_output)
+                continue
             
             if not os.path.exists(page_path):
                 print(f"Error: File not found: {page_path}")
