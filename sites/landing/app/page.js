@@ -107,7 +107,7 @@ export default function Home() {
 
   return (
     <>
-      <header className="top-toolbar visible">
+      <header className="top-toolbar">
         <div className="top-toolbar-inner">
           <a href="#top" className="toolbar-brand">
             <img src="/clawperator-logo.png" alt="" aria-hidden="true" className="toolbar-logo" />
@@ -168,6 +168,8 @@ export default function Home() {
               src="https://static.clawperator.com/img/hero/clawperator_hero.webp"
               alt="Diagram showing how OpenClaw and Clawperator let AI agents control real Android apps and return results to chat. This image was made with human claws."
               title="this image was made with human claws"
+              width="780"
+              height="420"
               className="hero-diagram"
             />
           </div>
