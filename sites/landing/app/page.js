@@ -152,10 +152,10 @@ export default function Home() {
               </a>
             ))}
             <a href="https://docs.clawperator.com" target="_blank" rel="noreferrer">
-              Docs
+              Technical docs
             </a>
             <a href="https://github.com/clawpilled/clawperator" target="_blank" rel="noreferrer" className="toolbar-cta">
-              GitHub
+              GitHub repository
             </a>
           </nav>
         </div>
@@ -335,8 +335,8 @@ export default function Home() {
             , or the machine-oriented <a href="/index.md">markdown landing page</a>.
           </p>
           <div className="agent-entry-links">
-            <a href="/agents">/agents</a>
-            <a href="/index.md">/index.md</a>
+            <a href="/agents">Agent routing page</a>
+            <a href="/index.md">Markdown landing page</a>
             <a href="https://docs.clawperator.com/reference/cli-reference/" target="_blank" rel="noreferrer">
               CLI reference
             </a>
