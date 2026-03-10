@@ -19,6 +19,42 @@ loop.
 
 ---
 
+## User-facing product framing
+
+The capability described in this doc should be called **"zero-shot automation"** in all
+user-facing copy. This is the established term from the AI/ML space for performing a
+task with no prior examples or pre-written scripts, and it is increasingly legible to a
+general AI-curious audience.
+
+The product has two distinct modes that must be differentiated clearly in copy and
+documentation:
+
+**Explore mode** (zero-shot automation):
+The agent encounters an app it has never automated before. It inspects the live UI tree,
+reasons about what to press, executes actions, re-observes, and completes the task -
+all without any pre-written skill. No setup. No script. Works on any app the user has
+installed and signed into on their device.
+
+**Skill mode** (known-flow execution):
+The agent uses a pre-built skill - either from the shared skills library or from a
+skill the agent itself synthesized during a prior explore-mode session. The flow is
+known in advance. Multi-action payloads can be used. Execution is faster and more
+reliable because the UI path has been validated before.
+
+Copy should highlight that skills built during explore mode are **private and
+user-specific**: they encode that user's app version, account state, regional UI
+variant, and personal navigation path. They are not generic scripts. This distinction
+matters both for the value proposition (the skill is yours, tuned to your device and
+your apps) and for setting correct expectations (a skill built on one account may not
+work identically on another).
+
+The transition from explore mode to skill mode - where the agent packages its
+explore-mode observations into a reusable skill - is a key product moment. The doc
+should make this path legible even if it does not fully describe skill authoring (that
+is covered elsewhere).
+
+---
+
 ## Why this is a separate task
 
 The `update-docs-for-emulator` branch covers device environment setup. This
@@ -49,10 +85,23 @@ These are documented and do not need to be rewritten:
 ## Critical pre-work: snapshot format is a hard blocker
 
 **The snapshot output format cannot be documented accurately without live device
-testing. This is not optional pre-work - the doc cannot be written without it.**
+output. This is not optional pre-work - the doc cannot be written without it.**
 
-The following must be captured from a running device or emulator before writing
-the doc:
+**However, this step requires no user intervention.** The agent executing this task
+can complete all of the live-capture steps autonomously, provided a device or emulator
+is connected and `clawperator doctor` reports clean. The agent should:
+
+- Run `clawperator` commands directly against the connected device.
+- Read the Android app source (under `apps/android/` in this repo) to understand
+  the structural shape of the accessibility node tree before running live captures.
+- Examine existing skill scripts and snapshot artifacts under
+  `~/src/clawperator-skills` - these contain real, device-captured output that can
+  bootstrap understanding of the ASCII format before any new capture is run.
+
+The agent does not need to ask the user to operate the device, provide output, or
+confirm results. The agent should run the captures itself and document what it observes.
+
+The following must be captured and recorded before writing the doc:
 
 1. Run `clawperator observe snapshot` and capture the full ASCII output.
 2. Construct and run an execute payload with `snapshot_ui` action and
@@ -348,12 +397,16 @@ Section outline:
 
 ## Dependencies
 
-This task depends on `tasks/fix-documentation-gaps/` or on manually confirming:
-- The snapshot JSON field names from live device output
+This task depends on `tasks/fix-documentation-gaps/` or on the agent directly
+confirming from source and live device output:
+- The snapshot JSON field names (live capture required)
 - The `enter_text` action type name (already confirmed from source)
 - The `data` contents per action type from live output
 
-A working device or emulator is required to capture live snapshot examples.
+A connected device or running emulator is required. The agent executing this task
+should run the captures itself - see the "Critical pre-work" section. The agent can
+also reference `~/src/clawperator-skills` for existing snapshot artifacts, and the
+Android app source for the node tree structure, before running live captures.
 
 ---
 
