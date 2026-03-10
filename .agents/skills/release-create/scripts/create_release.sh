@@ -11,6 +11,12 @@ require_cmd() {
   command -v "$1" >/dev/null 2>&1 || die "required command not found: $1"
 }
 
+cleanup_worktree() {
+  if [[ -n "${TEMP_WORKTREE_DIR:-}" && -d "${TEMP_WORKTREE_DIR}" ]]; then
+    git worktree remove --force "$TEMP_WORKTREE_DIR" >/dev/null 2>&1 || true
+  fi
+}
+
 json_version_field() {
   node -e 'const data = JSON.parse(process.argv[1]); const value = data.version; if (typeof value !== "string" || value.length === 0) process.exit(2); console.log(value);' "$1"
 }
@@ -99,6 +105,8 @@ main() {
   repo_slug="$(gh repo view --json nameWithOwner --jq '.nameWithOwner')"
   local target_sha
   target_sha="$(git rev-parse --verify "${target_ref}^{commit}")"
+  local head_sha
+  head_sha="$(git rev-parse --verify HEAD^{commit})"
 
   local git_status
   git_status="$(git status --porcelain)"
@@ -133,9 +141,17 @@ main() {
   printf 'target_sha=%s\n' "$target_sha"
   printf 'repo=%s\n' "$repo_slug"
 
-  npm --prefix apps/node ci
-  npm --prefix apps/node run build
-  npm --prefix apps/node run test
+  local validation_root="$repo_root"
+  if [[ "$target_sha" != "$head_sha" ]]; then
+    TEMP_WORKTREE_DIR="$(mktemp -d "${TMPDIR:-/tmp}/release-create.XXXXXX")"
+    trap cleanup_worktree EXIT
+    git worktree add --detach "$TEMP_WORKTREE_DIR" "$target_sha" >/dev/null
+    validation_root="$TEMP_WORKTREE_DIR"
+  fi
+
+  npm --prefix "$validation_root/apps/node" ci
+  npm --prefix "$validation_root/apps/node" run build
+  npm --prefix "$validation_root/apps/node" run test
 
   git tag -a "$tag_name" "$target_sha" -m "Release $tag_name"
   git push origin "refs/tags/$tag_name"
