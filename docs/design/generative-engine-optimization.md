@@ -181,6 +181,12 @@ Also verify:
   pages
 - markdown routes return the intended content type
 
+For a repeatable live pass, run:
+
+```sh
+./scripts/geo_verify_public_surfaces.sh
+```
+
 ## Cloudflare caveat
 
 Source files are not the full truth once deployed.
