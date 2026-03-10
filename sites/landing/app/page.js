@@ -175,16 +175,16 @@ export default function Home() {
             The brain decides what to do next.
             <br />
             Clawperator connects that agent to a dedicated Android burner phone or local Android emulator, executes the
-            action, and returns structured results your code can trust.
+            action, and returns structured results your code can trust and branch on.
           </p>
 
           <div className="hero-image-panel">
             <img
               src="https://static.clawperator.com/img/hero/clawperator_hero.webp"
               alt="Diagram showing how OpenClaw and Clawperator let AI agents control real Android apps and return results to chat. This image was made with human claws."
+              title="this image was made with human claws"
               className="hero-diagram"
             />
-            <p className="hero-diagram-note">Made with human claws.</p>
           </div>
           </div>
         <div className="quickstart-intro">

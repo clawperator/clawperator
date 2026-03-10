@@ -370,15 +370,6 @@ body {
   display: block;
 }
 
-.hero-diagram-note {
-  margin: 1.15rem 0 0;
-  font-size: 0.82rem;
-  font-weight: 550;
-  color: #5c6370;
-  opacity: 0.72;
-  letter-spacing: 0.01em;
-}
-
 .quickstart-intro {
   margin-top: 5.8rem;
   padding-top: 2rem;
