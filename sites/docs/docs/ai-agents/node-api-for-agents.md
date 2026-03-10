@@ -213,12 +213,12 @@ Combine fields to increase specificity when a single field is ambiguous:
 | `close_app` | `applicationId: string` | - |
 | `click` | `matcher: NodeMatcher` | `clickType: "default" \| "long_click" \| "focus"` (default: `"default"`) |
 | `enter_text` | `matcher: NodeMatcher`, `text: string` | `submit: boolean` (default: `false`), `clear: boolean` (accepted by Node contract, currently ignored by Android runtime) |
-| `read_text` | `matcher: NodeMatcher` | `validator: string` (currently `"temperature"`), `retry: object` |
+| `read_text` | `matcher: NodeMatcher` | `validator: "temperature"` (only supported validator today), `retry: object` |
 | `wait_for_node` | `matcher: NodeMatcher` | `retry: object` |
 | `snapshot_ui` | - | `retry: object` |
 | `take_screenshot` | - | `path: string`, `retry: object` |
 | `sleep` | `durationMs: number` | - |
-| `scroll_and_click` | `target: NodeMatcher` | `container: NodeMatcher`, `direction: "down" \| "up" \| "left" \| "right"` (default: `"down"`), `maxSwipes: number` (default: `10`, range: 1-50), `distanceRatio: number` (default: `0.7`, range: 0-1), `settleDelayMs: number` (default: `250`, range: 0-10000), `findFirstScrollableChild: boolean` (default: `false`) |
+| `scroll_and_click` | `target: NodeMatcher` | `container: NodeMatcher`, `direction: "down" \| "up" \| "left" \| "right"` (default: `"down"`), `maxSwipes: number` (default: `10`, range: 1-50), `distanceRatio: number` (default: `0.7`, range: 0-1), `settleDelayMs: number` (default: `250`, range: 0-10000), `findFirstScrollableChild: boolean` (default: `false`), `scrollRetry: object` (default preset: `maxAttempts=4`, `initialDelayMs=400`, `maxDelayMs=2000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`), `clickRetry: object` (default preset: `maxAttempts=5`, `initialDelayMs=500`, `maxDelayMs=3000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`) |
 
 ### CLI-to-action-type mapping
 
@@ -239,9 +239,13 @@ Combine fields to increase specificity when a single field is ambiguous:
 
 **`enter_text`:** The CLI command is `action type` but the execution payload action type is `enter_text`. The `submit` param triggers a keyboard Enter/submit after typing - use this for search fields and single-field forms where pressing Enter submits. The Node contract still accepts `clear`, but the Android runtime does not implement it yet, so it currently has no effect.
 
+**`read_text`:** `validator` is not an open-ended string in practice. The Android runtime currently supports only `"temperature"` and rejects any other value.
+
 **`snapshot_ui`:** Clawperator returns a single canonical snapshot format: `hierarchy_xml`. The Android runtime writes the hierarchy dump to device logcat, and the Node layer injects that raw XML into `data.text` after execution. `data.actual_format` is always `"hierarchy_xml"` for successful snapshot steps.
 
 **`take_screenshot`:** `observe screenshot` uses the same execution contract under the hood. Android reports `UNSUPPORTED_RUNTIME_SCREENSHOT`, then the Node layer captures the screenshot via `adb exec-out screencap -p`, writes it to `data.path`, and normalizes the step result to `success: true` when capture succeeds.
+
+**`scroll_and_click`:** This action has two separate retry knobs. `scrollRetry` controls the scroll/search loop and defaults to the `UiScroll` preset (`maxAttempts=4`, `initialDelayMs=400`, `maxDelayMs=2000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`). `clickRetry` controls the final click attempt and defaults to the `UiReadiness` preset (`maxAttempts=5`, `initialDelayMs=500`, `maxDelayMs=3000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`).
 
 ## Result Envelope
 
