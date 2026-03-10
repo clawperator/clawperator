@@ -642,7 +642,7 @@ main() {
     echo -e "${GREEN}════════════════════════════════════════════════════════════════${NC}"
     echo ""
     echo -e "Next steps:"
-    echo -e "1. ${YELLOW}Update your session PATH:${NC} run '${SOURCE_CMD}'"
+    echo -e "1. ${YELLOW}Update your session environment${NC} (PATH + CLAWPERATOR_SKILLS_REGISTRY): run '${SOURCE_CMD}'"
     echo -e "2. ${YELLOW}Clawperator binary installed at:${NC}"
     echo -e "   ${BLUE}${CLAWPERATOR_BIN_PATH:-clawperator}${NC}"
     echo -e "3. The latest operator APK (${YELLOW}${OPERATOR_VERSION:-unknown}${NC}) is saved at:"
