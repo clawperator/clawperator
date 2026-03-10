@@ -1,26 +1,29 @@
 # Clawperator
 
-Clawperator is a deterministic Android automation runtime for AI agents. It exposes a strict Node API and CLI that let an agent observe Android UI state, execute validated actions, and receive one structured result per command.
+Clawperator is a deterministic Android automation runtime for AI agents. It is the actuator layer: your external agent or LLM owns reasoning and planning, and Clawperator executes validated Android actions and returns structured results.
 
 Clawperator operates an Android device on behalf of a user. That Android device can be:
 
 - a physical Android burner device connected over adb
 - a local Android emulator provisioned through the Node CLI
 
-## Preferred starting points
+## Start here
 
 - Homepage: https://clawperator.com/
+- For agents: https://clawperator.com/agents
+- Markdown agent page: https://clawperator.com/agent.md
 - Docs: https://docs.clawperator.com/
-- Full compiled docs: https://docs.clawperator.com/llms-full.txt
 - Agent guide: https://docs.clawperator.com/ai-agents/node-api-for-agents/
+- Operator LLM playbook: https://docs.clawperator.com/design/operator-llm-playbook/
 - API overview: https://docs.clawperator.com/reference/api-overview/
 - CLI reference: https://docs.clawperator.com/reference/cli-reference/
+- Full compiled docs: https://clawperator.com/llms-full.txt
 - GitHub: https://github.com/clawpilled/clawperator
 
 ## Notes for agents
 
-- The docs site contains the substantive technical documentation.
-- Prefer the Node API and CLI docs over inferring behavior from marketing copy.
+- The docs site contains the canonical technical documentation.
+- Prefer the docs site, Node API guide, and CLI reference over inferring behavior from marketing copy.
 - Clawperator is an actuator, not an autonomous planner.
 - A physical Android burner device is the preferred actuator environment for compatibility and long-running reliability.
 - If no physical Android device is available, install Clawperator first, then provision an emulator with `clawperator provision emulator`.

@@ -320,6 +320,31 @@ export default function Home() {
           </a>
           .
         </p>
+
+        <div className="agent-entry-strip" aria-label="For agents">
+          <p className="agent-entry-title">For agents</p>
+          <p className="agent-entry-copy">
+            Prefer the technical docs over this overview page. Start with the{" "}
+            <a href="https://docs.clawperator.com/ai-agents/node-api-for-agents/" target="_blank" rel="noreferrer">
+              Node API guide
+            </a>
+            , the{" "}
+            <a href="https://docs.clawperator.com/design/operator-llm-playbook/" target="_blank" rel="noreferrer">
+              Operator LLM playbook
+            </a>
+            , or the machine-oriented <a href="/agent.md">markdown landing page</a>.
+          </p>
+          <div className="agent-entry-links">
+            <a href="/agents">/agents</a>
+            <a href="/agent.md">/agent.md</a>
+            <a href="https://docs.clawperator.com/reference/cli-reference/" target="_blank" rel="noreferrer">
+              CLI reference
+            </a>
+            <a href="https://docs.clawperator.com/reference/api-overview/" target="_blank" rel="noreferrer">
+              API overview
+            </a>
+          </div>
+        </div>
       </section>
 
       <section id="workflows" className="content-section">

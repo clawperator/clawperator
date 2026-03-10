@@ -426,6 +426,54 @@ body {
   text-decoration: underline;
 }
 
+.agent-entry-strip {
+  margin-top: 1.15rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.agent-entry-title {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.2;
+  font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+}
+
+.agent-entry-copy {
+  margin: 0.45rem 0 0;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.agent-entry-copy a,
+.agent-entry-links a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.agent-entry-copy a:hover,
+.agent-entry-links a:hover {
+  color: var(--accent-hover);
+  text-decoration: underline;
+}
+
+.agent-entry-links {
+  margin-top: 0.8rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem 0.9rem;
+}
+
+.agent-entry-links a {
+  font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.88rem;
+}
+
 .quickstart-top {
   padding: 1rem 1.1rem;
   display: flex;
@@ -1083,6 +1131,11 @@ body {
   .command-row {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .agent-entry-links {
+    flex-direction: column;
+    gap: 0.5rem;
   }
 
   .loop-step {
