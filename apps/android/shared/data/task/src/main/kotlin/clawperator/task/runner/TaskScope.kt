@@ -15,7 +15,6 @@ interface TaskScope {
     )
 
     suspend fun logUiTree(
-        format: UiSnapshotFormat = UiSnapshotFormat.Ascii,
         retry: TaskRetry = TaskRetry.None,
     ): UiSnapshotActualFormat
 

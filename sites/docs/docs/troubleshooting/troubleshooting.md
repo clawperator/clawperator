@@ -210,7 +210,8 @@ Android emulators are resource-intensive. On machines without hardware virtualiz
 
 Recommended settings:
 
-- Enable hardware virtualization (Intel HAXM or KVM) on the host
+- Ensure hardware virtualization / emulator acceleration is enabled on the host
+  (for example, Hypervisor.framework on macOS, WHPX on Windows, or KVM on Linux)
 - Ensure the Android emulator has GPU acceleration enabled (check AVD configuration)
 - Allocate sufficient RAM to the emulator (2 GB minimum recommended)
 

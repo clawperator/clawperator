@@ -48,14 +48,23 @@ For app automation commands, default to:
 ---
 
 ### Supported action types (current)
-- `open_app`
-- `close_app`
-- `sleep`
-- `wait_for_node`
-- `click`
-- `scroll_and_click`
-- `read_text`
-- `snapshot_ui`
+
+| Action type | Key params | Notes |
+| :--- | :--- | :--- |
+| `open_app` | `applicationId: string` | Launches app by package ID |
+| `close_app` | `applicationId: string` | Node runs `adb shell am force-stop` pre-flight; Android step always returns `success: false` (expected) |
+| `enter_text` | `matcher: NodeMatcher`, `text: string`, `submit?: boolean`, `clear?: boolean` | CLI: `action type`. `submit: true` presses Enter after typing. `clear` is accepted by Node but currently ignored by Android |
+| `click` | `matcher: NodeMatcher`, `clickType?: "default"\|"long_click"\|"focus"` | CLI: `action click` |
+| `read_text` | `matcher: NodeMatcher`, `validator?: "temperature"`, `retry?: object` | CLI: `action read`. Result in `data.text`. Other validator values are rejected by the runtime |
+| `wait_for_node` | `matcher: NodeMatcher`, `retry?: object` | CLI: `action wait`. Waits with internal retry |
+| `snapshot_ui` | `retry?: object` | CLI: `observe snapshot`. Snapshot content in `data.text` as `hierarchy_xml` |
+| `take_screenshot` | `path?: string`, `retry?: object` | Node captures screenshot via ADB and returns local file path |
+| `scroll_and_click` | `target: NodeMatcher`, `container?: NodeMatcher`, `direction?`, `maxSwipes?`, `distanceRatio?`, `settleDelayMs?`, `findFirstScrollableChild?`, `scrollRetry?: object`, `clickRetry?: object` | Scrolls until target is visible, then clicks. `scrollRetry` defaults to UiScroll; `clickRetry` defaults to UiReadiness |
+| `sleep` | `durationMs: number` | Pause between steps. Must fit within the execution `timeoutMs` budget |
+
+**`enter_text` vs CLI `action type`:** The CLI command is `action type` but the action type field in execution payloads is `enter_text`. These map to the same runtime action. When building execution payloads directly, always use `enter_text`.
+
+**NodeMatcher fields:** `resourceId`, `contentDescEquals`, `textEquals`, `textContains`, `contentDescContains`, `role`. All fields are AND-combined. Prefer `resourceId` when available. Full reference in `docs/node-api-for-agents.md`.
 
 ### Visual verification with ADB screenshots (recommended)
 Use screenshots alongside UI-tree logs when building/debugging skills.

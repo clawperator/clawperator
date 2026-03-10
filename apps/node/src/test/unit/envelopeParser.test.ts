@@ -42,6 +42,11 @@ describe("parseResultEnvelope", () => {
     assert.strictEqual(parseResultEnvelope(line, CMD_ID), "malformed");
   });
 
+  it("returns 'malformed' for an envelope with invalid status", () => {
+    const line = `${RESULT_ENVELOPE_PREFIX} {"commandId":"${CMD_ID}","taskId":"t1","status":"queued","stepResults":[],"error":null}`;
+    assert.strictEqual(parseResultEnvelope(line, CMD_ID), "malformed");
+  });
+
   it("parses canonical line in logcat format (tag prefix before [Clawperator-Result])", () => {
     const json = `{"commandId":"${CMD_ID}","taskId":"t1","status":"success","stepResults":[],"error":null}`;
     const line = `02-19 12:00:00.000  1234  5678 I ClawperatorResult: ${RESULT_ENVELOPE_PREFIX} ${json}`;
@@ -98,5 +103,46 @@ describe("parseTerminalEnvelope", () => {
       assert.strictEqual(step.success, false);
       assert.strictEqual(step.data?.error, "UNSUPPORTED");
     }
+  });
+
+  it("normalizes missing step data to an empty object", () => {
+    const json = `{"commandId":"${CMD_ID}","taskId":"t1","status":"success","stepResults":[{"id":"s1","actionType":"snapshot_ui","success":true}],"error":null}`;
+    const line = `${RESULT_ENVELOPE_PREFIX} ${json}`;
+    const parsed = parseTerminalEnvelope(line, CMD_ID);
+    assert.ok(parsed && typeof parsed === "object");
+    if (typeof parsed === "object") {
+      assert.deepStrictEqual(parsed.envelope.stepResults[0].data, {});
+    }
+  });
+
+  it("normalizes non-string step data values to strings", () => {
+    const json = `{"commandId":"${CMD_ID}","taskId":"t1","status":"success","stepResults":[{"id":"s1","actionType":"sleep","success":true,"data":{"duration_ms":1000,"ok":true}}],"error":null}`;
+    const line = `${RESULT_ENVELOPE_PREFIX} ${json}`;
+    const parsed = parseTerminalEnvelope(line, CMD_ID);
+    assert.ok(parsed && typeof parsed === "object");
+    if (typeof parsed === "object") {
+      assert.deepStrictEqual(parsed.envelope.stepResults[0].data, {
+        duration_ms: "1000",
+        ok: "true",
+      });
+    }
+  });
+
+  it("returns malformed when step success is missing", () => {
+    const json = `{"commandId":"${CMD_ID}","taskId":"t1","status":"success","stepResults":[{"id":"s1","actionType":"snapshot_ui","data":{}}],"error":null}`;
+    const line = `${RESULT_ENVELOPE_PREFIX} ${json}`;
+    assert.strictEqual(parseTerminalEnvelope(line, CMD_ID), "malformed");
+  });
+
+  it("returns malformed when step success is not boolean", () => {
+    const json = `{"commandId":"${CMD_ID}","taskId":"t1","status":"success","stepResults":[{"id":"s1","actionType":"snapshot_ui","success":"false","data":{}}],"error":null}`;
+    const line = `${RESULT_ENVELOPE_PREFIX} ${json}`;
+    assert.strictEqual(parseTerminalEnvelope(line, CMD_ID), "malformed");
+  });
+
+  it("returns malformed when envelope identifiers are not strings", () => {
+    const json = `{"commandId":123,"taskId":"t1","status":"success","stepResults":[],"error":null}`;
+    const line = `${RESULT_ENVELOPE_PREFIX} ${json}`;
+    assert.strictEqual(parseTerminalEnvelope(line, CMD_ID), "malformed");
   });
 });

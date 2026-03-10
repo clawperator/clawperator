@@ -11,7 +11,7 @@ import { waitForResultEnvelope } from "../../adapters/android-bridge/logcatResul
 import { runAdb } from "../../adapters/android-bridge/adbClient.js";
 import { tryAcquire, release, getConflictError } from "./executionStore.js";
 import type { ResultEnvelope, TerminalSource } from "../../contracts/result.js";
-import { extractSnapshotFromLogs } from "./snapshotHelper.js";
+import { extractSnapshotsFromLogs } from "./snapshotHelper.js";
 import { emitResult, emitExecution } from "../observe/events.js";
 import { LIMITS } from "../../contracts/limits.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
@@ -30,6 +30,40 @@ export type RunExecutionResult =
 interface PerformExecutionResult {
   execution?: Execution;
   result: RunExecutionResult;
+}
+
+export function attachSnapshotsToStepResults(stepResults: ResultEnvelope["stepResults"], snapshots: string[]): void {
+  const snapshotSteps = stepResults.filter(step => step.actionType === "snapshot_ui" && step.success);
+  if (snapshotSteps.length === 0 || snapshots.length === 0) {
+    return;
+  }
+
+  let snapshotIndex = snapshots.length - 1;
+  for (let stepIndex = snapshotSteps.length - 1; stepIndex >= 0 && snapshotIndex >= 0; stepIndex -= 1) {
+    const snapshotText = snapshots[snapshotIndex];
+    const targetStep = snapshotSteps[stepIndex];
+    if (snapshotText && targetStep) {
+      targetStep.data = { ...targetStep.data, text: snapshotText };
+    }
+    snapshotIndex -= 1;
+  }
+}
+
+export function finalizeSuccessfulScreenshotCapture(
+  screenStep: ResultEnvelope["stepResults"][number] | undefined,
+  screenshotPath: string
+): void {
+  if (!screenStep) {
+    return;
+  }
+
+  if (screenStep.data.error === "UNSUPPORTED_RUNTIME_SCREENSHOT") {
+    screenStep.success = true;
+    const { error: _error, message: _message, ...remainingData } = screenStep.data;
+    screenStep.data = remainingData;
+  }
+
+  screenStep.data = { ...screenStep.data, path: screenshotPath };
 }
 
 /**
@@ -129,28 +163,23 @@ async function performExecution(
       const hasSnapshot = result.envelope.stepResults.some(s => s.actionType === "snapshot_ui");
       if (hasSnapshot) {
         const dump = await runAdb(config, ["logcat", "-d", "-v", "tag"]);
-        const fullSnapshot = extractSnapshotFromLogs(dump.stdout.split("\n"));
-        
-        if (fullSnapshot) {
-          const snapStep = result.envelope.stepResults.find(s => s.actionType === "snapshot_ui");
-          if (snapStep) {
-            snapStep.data = { ...snapStep.data, text: fullSnapshot };
-          }
-        }
+        const snapshots = extractSnapshotsFromLogs(dump.stdout.split("\n"));
+        attachSnapshotsToStepResults(result.envelope.stepResults, snapshots);
       }
 
-      // Post-process take_screenshot via adb exec-out
-      const screenAction = execution.actions.find(a => a.type === "take_screenshot");
       const hasScreenshot = result.envelope.stepResults.some(s => s.actionType === "take_screenshot");
+      const screenAction = execution.actions.find(a => a.type === "take_screenshot");
       if (hasScreenshot) {
-        const screenshotPath = screenAction?.params?.path || join(tmpdir(), `clawperator-screenshot-${execution.commandId}-${Date.now()}.png`);
         try {
+          const screenshotPath = screenAction?.params?.path || join(tmpdir(), `clawperator-screenshot-${execution.commandId}-${Date.now()}.png`);
+          const screenStep = result.envelope.stepResults.find(s => s.actionType === "take_screenshot");
+
           const deviceArgs = config.deviceId ? ["-s", config.deviceId] : [];
           const proc = spawn(config.adbPath, [...deviceArgs, "exec-out", "screencap", "-p"], {
             stdio: ["ignore", "pipe", "ignore"],
             shell: false,
           });
-          
+
           let buffer = Buffer.alloc(0);
           proc.stdout?.on("data", (chunk: Buffer) => {
             buffer = Buffer.concat([buffer, chunk]);
@@ -164,13 +193,12 @@ async function performExecution(
             proc.on("error", reject);
           });
 
-          if (buffer.length > 0) {
-            await writeFile(screenshotPath, buffer);
-            const screenStep = result.envelope.stepResults.find(s => s.actionType === "take_screenshot");
-            if (screenStep) {
-              screenStep.data = { ...screenStep.data, path: screenshotPath };
-            }
+          if (buffer.length === 0) {
+            throw new Error("screencap returned empty output");
           }
+
+          await writeFile(screenshotPath, buffer);
+          finalizeSuccessfulScreenshotCapture(screenStep, screenshotPath);
         } catch (e) {
           console.warn(`⚠️ Failed to capture screenshot via adb: ${String(e)}`);
         }
