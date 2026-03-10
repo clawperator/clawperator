@@ -394,6 +394,286 @@ and `llms.txt` coverage for the same route.
 
 ---
 
+---
+
+## Additions from second agent review (Claude, March 10 2026)
+
+The following items were missing or underrepresented after an independent live crawl
+of both domains. They are grouped by whether they belong inside existing workstreams
+or are new workstreams entirely.
+
+---
+
+### New Workstream A: Create `docs.clawperator.com/llms.txt`
+
+Workstream 5 mentions "llms.txt on both hosts" in its acceptance criteria, but the
+docs host has no `llms.txt` at all (returns 404). Creating it is a distinct
+deliverable from strengthening the existing root one.
+
+#### Why this is a separate workstream
+
+- The docs host is the substantive technical surface. Agents that land there after
+  following a link from the homepage have no machine-readable index to work from.
+- An agent that does not know about `llms.txt` at the root domain but does inspect
+  `docs.clawperator.com` directly will find nothing.
+- This is the highest-signal file missing from the docs host.
+
+#### Minimum content
+
+```markdown
+# Clawperator Documentation
+
+> Deterministic Android automation runtime for AI agents.
+> Clawperator is the actuator. Your LLM is the brain.
+
+## Key pages
+
+- [Node API Agent Guide](https://docs.clawperator.com/ai-agents/node-api-for-agents/): Full reference for agents — actions, matchers, result envelopes, error codes.
+- [Operator LLM Playbook](https://docs.clawperator.com/design/operator-llm-playbook/): Decision guidance for LLMs operating Clawperator.
+- [API Overview](https://docs.clawperator.com/reference/api-overview/): HTTP API endpoints (POST /execute, GET /devices, etc.).
+- [CLI Reference](https://docs.clawperator.com/reference/cli-reference/): Full CLI command reference.
+- [Error Codes](https://docs.clawperator.com/reference/error-codes/): All error codes with meanings.
+- [Skills Usage Model](https://docs.clawperator.com/skills/usage-model/): Packaged automation recipes — discovery and invocation.
+- [First-Time Setup](https://docs.clawperator.com/getting-started/first-time-setup/): Device and emulator setup.
+- [Troubleshooting](https://docs.clawperator.com/troubleshooting/troubleshooting/): Common issues.
+
+## Optional
+
+- [llms-full.txt](https://clawperator.com/llms-full.txt): Complete documentation concatenated into a single file.
+```
+
+#### For MkDocs
+
+Place the file at `docs/llms.txt` in the docs source tree. MkDocs copies files in
+`docs/` that are not `.md` into the built output verbatim.
+
+#### Acceptance criteria
+
+- `curl -I https://docs.clawperator.com/llms.txt` returns `200`
+- `curl https://docs.clawperator.com/llms.txt` returns link-rich markdown
+- The Node API guide and Operator LLM Playbook are directly reachable in one hop
+
+---
+
+### New Workstream B: Publish `llms-full.txt`
+
+Workstream 5 says "consider adding `llms-full.txt`". This should be a concrete
+deliverable. It is not a substitute for fixing robots.txt or sitemaps — it is a
+separate, high-value artifact for agents that want everything in one fetch.
+
+#### What it is
+
+A single static file at `https://clawperator.com/llms-full.txt` that concatenates
+the content of all documentation pages in reading order, separated by headings.
+
+#### Why this matters
+
+- An agent can fetch one URL and have the complete technical corpus in context.
+- This is particularly valuable for ChatGPT, Claude, and similar systems that do
+  multi-step research: one fetch replaces a dozen page fetches.
+- Several agent frameworks explicitly look for `llms-full.txt` alongside `llms.txt`.
+- It bypasses any remaining crawl friction on the docs host entirely.
+
+#### Suggested build step
+
+```bash
+# Run after mkdocs build
+cat \
+  docs/getting-started/first-time-setup.md \
+  docs/getting-started/terminology.md \
+  docs/ai-agents/node-api-for-agents.md \
+  docs/design/operator-llm-playbook.md \
+  docs/reference/api-overview.md \
+  docs/reference/cli-reference.md \
+  docs/reference/error-codes.md \
+  docs/skills/usage-model.md \
+  docs/skills/skill-authoring-guidelines.md \
+  docs/architecture/architecture.md \
+  docs/troubleshooting/troubleshooting.md \
+  > site/llms-full.txt
+```
+
+Reference it from `llms.txt` on both hosts so agents know it exists.
+
+#### Acceptance criteria
+
+- `curl https://clawperator.com/llms-full.txt` returns the full concatenated docs
+- The file is referenced from `clawperator.com/llms.txt` and
+  `docs.clawperator.com/llms.txt`
+- The file is listed in the root sitemap
+
+---
+
+### Additions to Workstream 1: Named AI crawler User-Agents in `robots.txt`
+
+The plan recommends `User-agent: *` which is sufficient for spec-compliant crawlers.
+However, some WAF and CDN rules apply per-User-Agent selectively, and can block a
+specific bot even when `*` allows it. Listing named AI crawlers explicitly is a
+cheap, unambiguous signal.
+
+Add to both `clawperator.com/robots.txt` and `docs.clawperator.com/robots.txt`:
+
+```txt
+User-agent: *
+Allow: /
+
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: anthropic-ai
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Googlebot
+Allow: /
+```
+
+This is not a replacement for fixing edge-layer blocking (Workstream 7), but it
+removes ambiguity for crawlers that check their own User-Agent entry before `*`.
+
+---
+
+### Additions to Workstream 4: HTTP headers and HTML `<head>` hints for agent.md
+
+When the agent landing page and markdown file are live, two additional details
+matter:
+
+#### Correct `Content-Type` for `agent.md`
+
+Agents and HTTP clients that inspect `Content-Type` should receive:
+
+```
+Content-Type: text/markdown; charset=utf-8
+```
+
+If the static host serves `.md` files as `application/octet-stream` or
+`text/plain`, the agent may treat the response as a download rather than text.
+Verify this and add a MIME type override in the hosting config if needed.
+
+#### `<link rel="alternate">` in the HTML `<head>`
+
+Add to the `<head>` of the homepage and `/agents` page:
+
+```html
+<link rel="alternate" type="text/markdown" href="https://clawperator.com/agent.md">
+```
+
+This is a semantic, spec-adjacent hint that some agent frameworks use to
+auto-discover machine-readable alternates. It costs nothing and reinforces the
+HTML comment approach already described in Workstream 4.
+
+---
+
+### New Workstream C: Anti-AI tag audit
+
+Before shipping any of the above, verify that no page on either host accidentally
+blocks AI indexing. These markers can override a permissive `robots.txt`:
+
+#### Check for `noai` and `noimageai` meta tags
+
+```bash
+# After mkdocs build, scan built HTML
+grep -r 'noai\|noimageai\|noindex' site/
+```
+
+If found, determine whether the MkDocs theme or a plugin is injecting them. The
+`mkdocs-terminal` theme used on the docs site should not inject these, but confirm.
+
+#### Check `X-Robots-Tag` HTTP response headers
+
+```bash
+curl -I https://docs.clawperator.com/ai-agents/node-api-for-agents/
+```
+
+Look for `X-Robots-Tag: noindex` or `X-Robots-Tag: noai` in the response. These
+can be injected by Cloudflare transform rules, workers, or hosting-layer config
+independently of anything in the page source.
+
+#### Acceptance criteria
+
+- No `noai`, `noimageai`, or `noindex` directives on any page intended for public
+  indexing
+- No `X-Robots-Tag` header blocking AI crawlers on any technical docs page
+
+---
+
+### New Workstream D: GitHub README as crawl surface
+
+Agents researching Clawperator frequently land on the GitHub repo
+(`https://github.com/clawpilled/clawperator`) before or instead of the docs site.
+The README is a high-value crawl surface that should be treated as a first-class
+agent entrypoint.
+
+#### Recommended README additions
+
+- A clear one-sentence product definition in the first 50 words
+- A "For AI agents" section with direct links to:
+  - `docs.clawperator.com/ai-agents/node-api-for-agents/`
+  - `docs.clawperator.com/design/operator-llm-playbook/`
+  - `clawperator.com/llms.txt`
+  - `clawperator.com/llms-full.txt` (once available)
+- The actuator-not-planner framing, stated explicitly
+
+GitHub renders README.md and the raw markdown is directly fetchable by agents at
+`https://raw.githubusercontent.com/clawpilled/clawperator/main/README.md`.
+
+#### Acceptance criteria
+
+- README first paragraph clearly defines Clawperator in plain text
+- "For AI agents" section links directly to the Node API guide and LLM playbook
+
+---
+
+### Addition to Validation checklist
+
+Add these checks to the existing validation checklist:
+
+```sh
+# Check Content-Type for new files
+curl -I https://clawperator.com/agent.md
+curl -I https://clawperator.com/llms-full.txt
+curl -I https://docs.clawperator.com/llms.txt
+
+# Verify no anti-AI headers on docs pages
+curl -I https://docs.clawperator.com/ai-agents/node-api-for-agents/
+curl -I https://docs.clawperator.com/design/operator-llm-playbook/
+
+# Verify llms-full.txt is non-empty and contains expected content
+curl https://clawperator.com/llms-full.txt | wc -c
+curl https://clawperator.com/llms-full.txt | grep "node-api\|enter_text\|EXECUTION_CONFLICT"
+```
+
+---
+
+### Updated implementation sequence (merged)
+
+Incorporates the additions above into the original sequence:
+
+1. Fix `docs.clawperator.com/robots.txt` at source and edge (Workstream 1).
+2. Add named AI crawler User-Agents to both `robots.txt` files (addition to WS1).
+3. Run anti-AI tag audit across both hosts (Workstream C).
+4. Generate and publish the docs sitemap (Workstream 2).
+5. Expand root sitemap to advertise docs (Workstream 3).
+6. Create `docs.clawperator.com/llms.txt` (Workstream A — new).
+7. Add `/agents` and `/agent.md` on the landing site with correct Content-Type
+   and `<link rel="alternate">` (Workstream 4 + additions).
+8. Publish `llms-full.txt` (Workstream B — new).
+9. Strengthen root `llms.txt` and reference `llms-full.txt` from both hosts
+   (Workstream 5).
+10. Add "For agents" section to homepage (Workstream 6).
+11. Strengthen GitHub README (Workstream D — new).
+12. Re-run full validation checklist from a plain shell.
+
+---
+
 ## Validation checklist
 
 After implementation and deploy, verify from a plain shell:
