@@ -3,7 +3,7 @@
 set -euo pipefail
 
 die() {
-  printf 'create-release: %s\n' "$1" >&2
+  printf 'release-create: %s\n' "$1" >&2
   exit 1
 }
 
@@ -82,7 +82,7 @@ main() {
   require_cmd node
   require_cmd gh
 
-  [[ $# -ge 1 && $# -le 2 ]] || die "usage: .agents/skills/create-release/scripts/create_release.sh <version> [sha]"
+  [[ $# -ge 1 && $# -le 2 ]] || die "usage: .agents/skills/release-create/scripts/create_release.sh <version> [sha]"
 
   local version="$1"
   local target_ref="${2:-HEAD}"

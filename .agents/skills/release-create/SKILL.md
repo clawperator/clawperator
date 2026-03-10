@@ -1,5 +1,5 @@
 ---
-name: create-release
+name: release-create
 description: Validates a Clawperator release candidate, creates and pushes an annotated git tag for a specific version and commit, and inspects the resulting GitHub Actions release workflows.
 ---
 
@@ -20,13 +20,13 @@ Run:
 
 ```bash
 cd "$(git rev-parse --show-toplevel)"
-.agents/skills/create-release/scripts/create_release.sh <version> [sha]
+.agents/skills/release-create/scripts/create_release.sh <version> [sha]
 ```
 
 Example:
 
 ```bash
-.agents/skills/create-release/scripts/create_release.sh 0.2.4
+.agents/skills/release-create/scripts/create_release.sh 0.2.4
 ```
 
 If `sha` is omitted, the script tags `HEAD`.
