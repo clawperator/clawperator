@@ -135,7 +135,7 @@ by metadata or response headers.
 
 - landing homepage
 - `/agents`
-- `/agent.md`
+- `/index.md`
 - docs homepage
 - Node API guide
 - CLI reference
@@ -254,7 +254,7 @@ Expand the existing root file into a better dispatcher.
 - direct deep links into the docs corpus
 - explicit statement that the docs site is the canonical technical source
 - link to `/agents`
-- link to `/agent.md`
+- link to `/index.md`
 - link to `llms-full.txt` once it exists
 
 #### Implementation targets
@@ -332,7 +332,7 @@ and routes agents to the right docs.
   - install entrypoint
   - GitHub repo
 
-### 3.2 Add `/agent.md`
+### 3.2 Add `/index.md`
 
 #### Outcome
 
@@ -356,11 +356,11 @@ These are support signals, not the main discovery mechanism.
 
 #### Required additions
 
-- visible body link to `/agent.md`
+- visible body link to `/index.md`
 - visible body link to `/agents`
-- `/agent.md` included in `llms.txt`
-- `/agent.md` included in sitemap
-- `<link rel="alternate" type="text/markdown" href="https://clawperator.com/agent.md">`
+- `/index.md` included in `llms.txt`
+- `/index.md` included in sitemap
+- `<link rel="alternate" type="text/markdown" href="https://clawperator.com/index.md">`
   in the `<head>` of the homepage and `/agents`
 
 #### Optional addition
@@ -368,7 +368,7 @@ These are support signals, not the main discovery mechanism.
 Add this HTML comment near the top of the homepage source:
 
 ```html
-<!-- For automated agents and crawlers: a machine-oriented markdown version of this page is available at https://clawperator.com/agent.md -->
+<!-- For automated agents and crawlers: a machine-oriented markdown version of this page is available at https://clawperator.com/index.md -->
 ```
 
 This is optional because there is no standard requiring crawlers to inspect
@@ -393,8 +393,8 @@ Place it high enough on the page that a shallow fetch sees it early.
 ### Phase 3 acceptance
 
 - `curl https://clawperator.com/agents` yields useful machine-readable text
-- `curl https://clawperator.com/agent.md` yields useful markdown
-- `curl -I https://clawperator.com/agent.md` reports the intended content type
+- `curl https://clawperator.com/index.md` yields useful markdown
+- `curl -I https://clawperator.com/index.md` reports the intended content type
 - the homepage source contains normal links to the agent entrypoints
 
 ---
@@ -450,7 +450,7 @@ curl -I https://clawperator.com/llms.txt
 curl -I https://clawperator.com/llms-full.txt
 curl -I https://clawperator.com/sitemap.xml
 curl -I https://clawperator.com/agents
-curl -I https://clawperator.com/agent.md
+curl -I https://clawperator.com/index.md
 
 curl -I https://docs.clawperator.com
 curl -I https://docs.clawperator.com/robots.txt
@@ -466,7 +466,7 @@ curl -I https://docs.clawperator.com/reference/cli-reference/
 ```sh
 curl https://clawperator.com/llms.txt
 curl https://clawperator.com/llms-full.txt | wc -c
-curl https://clawperator.com/agent.md
+curl https://clawperator.com/index.md
 curl https://docs.clawperator.com/robots.txt
 curl https://docs.clawperator.com/llms.txt
 curl https://docs.clawperator.com/sitemap.xml
@@ -477,13 +477,13 @@ curl https://docs.clawperator.com/sitemap.xml
 ```sh
 curl -I https://docs.clawperator.com/ai-agents/node-api-for-agents/
 curl -I https://docs.clawperator.com/design/operator-llm-playbook/
-curl -I https://clawperator.com/agent.md
+curl -I https://clawperator.com/index.md
 ```
 
 Verify:
 
 - no blocking `X-Robots-Tag`
-- `agent.md` content type is correct
+- `index.md` content type is correct
 - docs sitemap is not empty
 - both `llms.txt` files are live
 - `llms-full.txt` is non-empty
@@ -497,7 +497,7 @@ Use this exact order unless a local dependency forces a small swap.
 1. Phase 1: fix `robots.txt`, anti-AI audit, and edge behavior.
 2. Phase 2: publish docs sitemap, root sitemap strategy, docs `llms.txt`, root
    `llms.txt`, and `llms-full.txt`.
-3. Phase 3: add `/agents`, `/agent.md`, head hints, and homepage links.
+3. Phase 3: add `/agents`, `/index.md`, head hints, and homepage links.
 4. Phase 4: update `README.md`.
 5. Phase 5: validate from live URLs after deploy.
 
@@ -509,7 +509,7 @@ This task is done when:
 
 - both hosts expose clear crawl-policy files
 - the docs corpus is discoverable through sitemap and `llms.txt`
-- the root site exposes `/agents` and `/agent.md`
+- the root site exposes `/agents` and `/index.md`
 - `llms-full.txt` exists and is linked from both hosts
 - no anti-indexing metadata or headers block intended public pages
 - GitHub README routes agents to the technical docs
