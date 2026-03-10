@@ -383,6 +383,131 @@ Do not change in this task:
 
 ---
 
+## API gaps identified during source audit
+
+These issues were found by cross-referencing TypeScript contracts, Android Kotlin
+source, and Node post-processing during the `fix-documentation-gaps` audit. They are
+not documentation problems - they are behavioral inconsistencies or broken contracts
+in the implementation itself. They are captured here so they can be considered when
+designing the `agent-ui-loop` doc and deciding whether to work around them, route
+around them, or surface them as known limitations.
+
+### Gap A: `enter_text` `clear` param is silently ignored
+
+**Source:** `apps/node/src/contracts/execution.ts` (defines `clear?: boolean`),
+`apps/node/src/domain/actions/typeText.ts` (passes `clear` in params), vs.
+`apps/android/.../AgentCommandParser.kt` (does not parse `clear`) and
+`apps/android/.../UiAction.kt` (`EnterText` has no `clear` field).
+
+**Behavior:** The `clear` param is accepted by the Node layer and forwarded to Android,
+but the Android runtime silently ignores it. An agent that passes `clear: true` to
+overwrite a pre-filled field gets text appended to the existing content instead.
+
+**Impact on loop doc:** The loop doc should not describe `clear` as a working param.
+Either note it as unimplemented and document the workaround (clear the field manually
+via a separate action or rely on `select all` via another mechanism), or omit it
+entirely until the Android side implements it.
+
+**Candidate fix:** Implement `clear` in `AgentCommandParser.kt` and `UiAction.EnterText`
+to clear the field before typing. Alternatively, remove `clear` from the TypeScript
+contract to avoid the misleading signal.
+
+---
+
+### Gap B: `close_app` step result is always `success: false` even when the operation succeeds
+
+**Source:** `apps/android/.../UiActionEngine.kt` (`executeCloseApp` always returns
+`success = false` with `UNSUPPORTED_RUNTIME_CLOSE`). `apps/node/src/domain/executions/runExecution.ts`
+(pre-flight runs `adb shell am force-stop` before dispatch).
+
+**Behavior:** The Node layer correctly force-stops the app before sending the payload
+to Android. The Android step always fails with `UNSUPPORTED_RUNTIME_CLOSE`. The
+overall execution `status` is `"success"` (Android uses `buildCanonicalSuccessLine`
+whenever execution completes), but `stepResults[n].success` is `false`.
+
+**Impact on loop doc:** The loop doc must warn agents not to branch on `stepResults[].success`
+for `close_app` steps. Any agent that checks per-step success before continuing will
+incorrectly detect failure and halt. The loop pattern needs to explicitly handle this.
+
+**Candidate fix:** The Node layer already has the pre-flight result (ADB exit code).
+It could synthesize a `success: true` override for the `close_app` step result, or
+strip the Android step result from the envelope and inject a Node-generated one.
+Alternatively, the Android side could detect the force-stop and return success.
+
+---
+
+### Gap C: `snapshot_ui` `format: "json"` has no effect
+
+**Source:** `apps/android/.../TaskScopeDefault.kt` (`logUiTree` receives
+`format: UiSnapshotFormat` but ignores it). Output format is determined by whether
+`hierarchyDump` is available (produces `hierarchy_xml`) or not (produces `ascii`).
+The `UiSnapshotFormat.Json` enum value exists but is never used to change behavior.
+
+**Behavior:** Requesting `format: "json"` in a `snapshot_ui` action produces the same
+output as `format: "ascii"`. The `data.actual_format` will be `"ascii"` or
+`"hierarchy_xml"` depending on device state, never `"json"`.
+
+**Impact on loop doc:** The loop doc must not describe JSON snapshot as an available
+option via `format: "json"`. The current plan section on "JSON snapshot" (sections 3
+and 10) is based on the expectation that this works - it does not. Either remove the
+JSON snapshot path from the doc or gate it on the Android implementation being fixed.
+
+**Candidate fix:** Implement a JSON serialization path in `logUiTree`/`UiTreeFormatter`
+that converts the UI node tree to a structured JSON format when `format == Json`.
+Until that is implemented, either remove the `json` enum value from `UiSnapshotFormat`
+or return an error when `json` is requested.
+
+---
+
+### Gap D: Snapshot content is not part of the `[Clawperator-Result]` envelope
+
+**Source:** `apps/android/.../TaskScopeDefault.kt` (logs UI tree via `Log.d()`).
+`apps/node/src/domain/executions/snapshotHelper.ts` (extracts snapshot from logcat
+using heuristic pattern matching: lines containing `"TaskScopeDefault:"`, then
+filtering by lines starting with `<` or `?` or containing `text=` or `res=`).
+`apps/node/src/domain/executions/runExecution.ts` (post-processes by reading logcat
+after execution and injecting content into `data.text`).
+
+**Behavior:** The snapshot content is logged to device logcat as a debug message.
+The Node layer reads logcat after the execution completes and injects the content into
+`stepResults[n].data.text`. If the heuristic extraction fails (noisy logcat, format
+change, timing issue), `data.text` is silently absent - there is no error code.
+There is no way for an agent to distinguish "snapshot was empty" from "extraction
+failed".
+
+**Impact on loop doc:** The loop doc must note that `data.text` may be absent and
+describe the fallback (re-observe). Any agent that assumes `data.text` is always
+present after a successful `snapshot_ui` step will fail silently on extraction errors.
+
+**Candidate fix:** Include the snapshot content directly in the `[Clawperator-Result]`
+envelope emitted by Android. The Android side should serialize the tree into the
+`data` map (e.g., as `data["content"]`), eliminating the logcat extraction path.
+This makes the contract explicit and removes the heuristic fragility.
+
+---
+
+### Gap E: `StepResult.error` is a phantom field in the TypeScript contract
+
+**Source:** `apps/node/src/contracts/result.ts` (`StepResult` declares `error?: string`
+as a top-level sibling of `data`). `apps/android/.../ClawperatorResultEnvelope.kt`
+(`CanonicalStepResult` has no `error` field - only `id`, `actionType`, `success`, `data`).
+
+**Behavior:** The TypeScript type says `step.error` exists. Android never emits it.
+Agents or Node consumers that check `step.error` will always get `undefined`. Per-step
+failure details are in `step.data.error` (inside the `data` map) - a completely
+different access path.
+
+**Impact on loop doc:** The loop doc must use `step.data.error` for per-step error
+codes, not `step.error`. This is already the correct documented behavior, but the
+TypeScript type creates a trap for consumers writing typed code against the contract.
+
+**Candidate fix:** Remove `error?: string` from `StepResult` in `result.ts` to match
+the actual emitted JSON. Or, add `error` to `CanonicalStepResult` in Kotlin and emit
+it as a top-level field for step failures (which would require choosing one canonical
+location for per-step error codes).
+
+---
+
 ## Suggested branch name
 
 `docs-agent-ui-loop`
