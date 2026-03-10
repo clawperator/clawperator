@@ -1,6 +1,6 @@
 ---
 name: geo-verify-public-surfaces
-description: Verify the live crawl-facing GEO surfaces for clawperator.com and docs.clawperator.com, then summarize the findings for the user. Use when an agent needs to check robots.txt, llms.txt, llms-full.txt, sitemap endpoints, markdown entrypoints, redirect aliases, and anti-indexing headers after deployment.
+description: Verify the live crawl-facing GEO surfaces for clawperator.com and docs.clawperator.com, then summarize the findings for the user. Use when an agent needs to check robots.txt, llms.txt, llms-full.txt, sitemap endpoints, markdown entrypoints, redirect aliases, anti-indexing headers, and Cloudflare anti-bot behavior after deployment.
 ---
 
 # GEO Verify Public Surfaces
@@ -8,6 +8,10 @@ description: Verify the live crawl-facing GEO surfaces for clawperator.com and d
 This skill validates the live machine-facing surfaces for Clawperator and
 produces a concise summary that an agent can relay without asking a human to
 scan raw headers.
+
+It also probes for Cloudflare anti-agent behavior, since default bot-mitigation
+settings can silently break machine-facing routes even when source files are
+present.
 
 ## What this skill covers
 
@@ -23,6 +27,10 @@ scan raw headers.
 - `https://docs.clawperator.com/llms-full.txt`
 - `https://docs.clawperator.com/sitemap.xml`
 - key docs entrypoints such as the Node API guide and CLI reference
+- Cloudflare behavior for named bot user agents such as `GPTBot`,
+  `ChatGPT-User`, `ClaudeBot`, `PerplexityBot`, and `Googlebot`
+- challenge pages, mitigation headers, AI-blocking headers, and suspicious
+  fallback bodies on machine-facing routes
 
 ## Workflow
 
@@ -36,7 +44,8 @@ scan raw headers.
 4. In your user-facing response:
    - lead with whether the live GEO surface passes or fails overall
    - call out only the failing or suspicious routes
-   - mention notable edge behavior such as relative redirect `Location` headers
+   - mention notable edge behavior such as relative redirect `Location` headers,
+     `X-Robots-Tag`, `cf-mitigated`, challenge pages, or bot-specific failures
    - do not dump all headers unless the user asked for raw output
 
 ## Targeting rules

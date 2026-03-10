@@ -5,28 +5,83 @@ import json
 import re
 import subprocess
 import sys
+import tempfile
 
 
 USER_AGENT = "Mozilla/5.0 (compatible; ClawperatorGeoVerifier/1.0; +https://clawperator.com/)"
+BOT_USER_AGENTS = {
+    "GPTBot": "Mozilla/5.0 (compatible; GPTBot/1.0; +https://openai.com/gptbot)",
+    "ChatGPT-User": "Mozilla/5.0 (compatible; ChatGPT-User/1.0; +https://openai.com/bot)",
+    "ClaudeBot": "Mozilla/5.0 (compatible; ClaudeBot/1.0; +https://www.anthropic.com/claudebot)",
+    "PerplexityBot": "Mozilla/5.0 (compatible; PerplexityBot/1.0; +https://www.perplexity.ai/perplexitybot)",
+    "Googlebot": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+}
 
 
 def build_checks(landing_base_url, docs_base_url):
     return [
-        {"kind": "url", "url": f"{landing_base_url}/robots.txt", "content_type": r"text/plain"},
-        {"kind": "url", "url": f"{landing_base_url}/llms.txt", "content_type": r"text/plain"},
-        {"kind": "url", "url": f"{landing_base_url}/llms-full.txt", "content_type": r"text/plain"},
-        {"kind": "url", "url": f"{landing_base_url}/index.md", "content_type": r"text/markdown|text/plain"},
+        {
+            "kind": "url",
+            "url": f"{landing_base_url}/robots.txt",
+            "content_type": r"text/plain",
+            "body_pattern": r"(?im)^User-agent:\s+\*",
+            "probe_bots": True,
+        },
+        {
+            "kind": "url",
+            "url": f"{landing_base_url}/llms.txt",
+            "content_type": r"text/plain",
+            "body_pattern": r"(?m)^#\s+",
+            "probe_bots": True,
+        },
+        {
+            "kind": "url",
+            "url": f"{landing_base_url}/llms-full.txt",
+            "content_type": r"text/plain",
+            "body_pattern": r"(?m)^#\s+",
+            "probe_bots": True,
+        },
+        {
+            "kind": "url",
+            "url": f"{landing_base_url}/index.md",
+            "content_type": r"text/markdown|text/plain",
+            "body_pattern": r"(?im)^#\s+Clawperator",
+            "probe_bots": True,
+        },
         {"kind": "url", "url": f"{landing_base_url}/agents", "content_type": r"text/html"},
         {"kind": "url", "url": f"{landing_base_url}/sitemap.xml", "content_type": r"application/xml|text/xml"},
         {"kind": "redirect", "url": f"{landing_base_url}/agent.md", "location": r"/index.md"},
         {"kind": "redirect", "url": f"{landing_base_url}/agents.md", "location": r"/index.md"},
         {"kind": "redirect", "url": f"{landing_base_url}/for-agents", "location": r"/agents"},
-        {"kind": "url", "url": f"{docs_base_url}/robots.txt", "content_type": r"text/plain"},
-        {"kind": "url", "url": f"{docs_base_url}/llms.txt", "content_type": r"text/plain"},
-        {"kind": "url", "url": f"{docs_base_url}/llms-full.txt", "content_type": r"text/plain"},
+        {
+            "kind": "url",
+            "url": f"{docs_base_url}/robots.txt",
+            "content_type": r"text/plain",
+            "body_pattern": r"(?im)^User-agent:\s+\*",
+            "probe_bots": True,
+        },
+        {
+            "kind": "url",
+            "url": f"{docs_base_url}/llms.txt",
+            "content_type": r"text/plain",
+            "body_pattern": r"(?im)^#\s+Clawperator Documentation",
+            "probe_bots": True,
+        },
+        {
+            "kind": "url",
+            "url": f"{docs_base_url}/llms-full.txt",
+            "content_type": r"text/plain",
+            "body_pattern": r"(?im)^#\s+Clawperator Full Documentation",
+            "probe_bots": True,
+        },
         {"kind": "url", "url": f"{docs_base_url}/sitemap.xml", "content_type": r"application/xml|text/xml"},
         {"kind": "url", "url": f"{docs_base_url}/", "content_type": r"text/html"},
-        {"kind": "url", "url": f"{docs_base_url}/ai-agents/node-api-for-agents/", "content_type": r"text/html"},
+        {
+            "kind": "url",
+            "url": f"{docs_base_url}/ai-agents/node-api-for-agents/",
+            "content_type": r"text/html",
+            "probe_bots": True,
+        },
         {"kind": "url", "url": f"{docs_base_url}/reference/cli-reference/", "content_type": r"text/html"},
     ]
 
@@ -46,6 +101,22 @@ def run_curl(args):
         text=True,
     )
     return proc.returncode, proc.stdout + proc.stderr
+
+
+def run_curl_get(url, user_agent=USER_AGENT):
+    with tempfile.NamedTemporaryFile() as header_file:
+        proc = subprocess.run(
+            ["curl", "-sSL", "-A", user_agent, "-D", header_file.name, url],
+            capture_output=True,
+            text=True,
+        )
+        header_text = ""
+        try:
+            with open(header_file.name, "r", encoding="utf-8", errors="replace") as fh:
+                header_text = fh.read()
+        except OSError:
+            header_text = ""
+    return proc.returncode, header_text, proc.stdout + proc.stderr
 
 
 def parse_headers(raw):
@@ -96,6 +167,23 @@ def verify_url(check, allow_noindex=False):
     if re.search(r"\b(noai|noimageai)\b", x_robots, re.IGNORECASE):
         reasons.append(f"unexpected AI-blocking header: {x_robots}")
 
+    if check.get("body_pattern"):
+        get_code, get_headers_text, body = run_curl_get(check["url"])
+        if get_code != 0:
+            reasons.append(f"GET failed with exit code {get_code}")
+        else:
+            get_status, _ = parse_headers(get_headers_text)
+            if not re.search(r"^HTTP/[0-9.]+\s+200\b", get_status or "", re.IGNORECASE):
+                reasons.append(f"expected GET 200, got {get_status or 'no status line'}")
+            if not re.search(check["body_pattern"], body, re.IGNORECASE):
+                reasons.append("unexpected body content")
+            if re.search(r"(?i)content signals|attention required|just a moment|captcha|verify you are human|access denied|403 forbidden|404 - clawperator", body):
+                reasons.append("response body looks like an anti-bot, policy, or fallback page")
+
+    if check.get("probe_bots"):
+        bot_failures = probe_bot_access(check["url"], allow_noindex=allow_noindex)
+        reasons.extend(bot_failures)
+
     if reasons:
         return fail(check["url"], reasons, status=status, headers=headers, raw=raw)
 
@@ -106,6 +194,32 @@ def verify_url(check, allow_noindex=False):
         "status": status,
         "headers": headers,
     }
+
+
+def probe_bot_access(url, allow_noindex=False):
+    failures = []
+    for bot_name, user_agent in BOT_USER_AGENTS.items():
+        code, header_text, body = run_curl_get(url, user_agent=user_agent)
+        if code != 0:
+            failures.append(f"{bot_name} GET failed with exit code {code}")
+            continue
+
+        status, headers = parse_headers(header_text)
+        x_robots = headers.get("x-robots-tag", "")
+        cf_mitigated = headers.get("cf-mitigated", "")
+
+        if not re.search(r"^HTTP/[0-9.]+\s+200\b", status or "", re.IGNORECASE):
+            failures.append(f"{bot_name} got {status or 'no status line'}")
+            continue
+        if cf_mitigated:
+            failures.append(f"{bot_name} was mitigated by Cloudflare: {cf_mitigated}")
+        if re.search(r"\b(noai|noimageai)\b", x_robots, re.IGNORECASE):
+            failures.append(f"{bot_name} saw AI-blocking header: {x_robots}")
+        if not allow_noindex and re.search(r"\bnoindex\b", x_robots, re.IGNORECASE):
+            failures.append(f"{bot_name} saw noindex header: {x_robots}")
+        if re.search(r"(?i)attention required|just a moment|captcha|verify you are human|access denied", body):
+            failures.append(f"{bot_name} received challenge-like body content")
+    return failures
 
 
 def verify_redirect(check):
