@@ -18,7 +18,7 @@ const CONFIG: RuntimeConfig = {
 
 describe("buildBroadcastShellCommand", () => {
   it("single-quotes payload so JSON spacing is preserved on device shell", () => {
-    const payload = `{"commandId":"cmd-1","taskId":"task-1","source":"debug","timeoutMs":5000,"actions":[{"id":"snap","type":"snapshot_ui","params":{"format":"ascii"}}]}`;
+    const payload = `{"commandId":"cmd-1","taskId":"task-1","source":"debug","timeoutMs":5000,"actions":[{"id":"snap","type":"snapshot_ui"}]}`;
     const cmd = buildBroadcastShellCommand(CONFIG, payload);
 
     assert.ok(cmd.includes("--es 'payload' '{\"commandId\":\"cmd-1\""));

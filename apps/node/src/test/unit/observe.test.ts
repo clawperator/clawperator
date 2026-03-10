@@ -3,11 +3,29 @@ import { describe, it } from "node:test";
 import assert from "node:assert";
 import { buildSnapshotExecution } from "../../domain/observe/snapshot.js";
 import { buildScreenshotExecution } from "../../domain/observe/screenshot.js";
-import { runExecution } from "../../domain/executions/runExecution.js";
+import { attachSnapshotsToStepResults, runExecution } from "../../domain/executions/runExecution.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
 import { clawperatorEvents, CLAW_EVENT_TYPES } from "../../domain/observe/events.js";
 
 describe("observe executions", () => {
+  it("maps snapshots only onto successful snapshot_ui steps", () => {
+    const stepResults = [
+      { id: "snap-1", actionType: "snapshot_ui", success: true, data: {} },
+      { id: "tap-1", actionType: "tap", success: true, data: {} },
+      { id: "snap-2", actionType: "snapshot_ui", success: true, data: {} },
+      { id: "snap-3", actionType: "snapshot_ui", success: false, data: {} },
+    ];
+
+    attachSnapshotsToStepResults(stepResults, ["first snapshot", "second snapshot"]);
+
+    assert.deepStrictEqual(stepResults, [
+      { id: "snap-1", actionType: "snapshot_ui", success: true, data: { text: "first snapshot" } },
+      { id: "tap-1", actionType: "tap", success: true, data: {} },
+      { id: "snap-2", actionType: "snapshot_ui", success: true, data: { text: "second snapshot" } },
+      { id: "snap-3", actionType: "snapshot_ui", success: false, data: {} },
+    ]);
+  });
+
   it("applies timeout override to snapshot execution", () => {
     const execution = buildSnapshotExecution({ timeoutMs: 5000 });
     assert.strictEqual(execution.timeoutMs, 5000);

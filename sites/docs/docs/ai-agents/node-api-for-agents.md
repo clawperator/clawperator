@@ -6,7 +6,7 @@ Clawperator provides a deterministic execution layer for LLM agents to control A
 
 - **Execution**: A payload of one or more actions dispatched to the device. Every execution produces exactly one `[Clawperator-Result]` envelope.
 - **Action**: A single step (`open_app`, `click`, `read_text`, etc.) within an execution.
-- **Snapshot**: A captured UI tree (JSON or ASCII) for observing device state.
+- **Snapshot**: A captured UI hierarchy dump (`hierarchy_xml`) for observing device state.
 - **Skill**: A packaged recipe from the skills repo, compiled into an execution payload.
 
 ## CLI Reference
@@ -24,7 +24,7 @@ Clawperator provides a deterministic execution layer for LLM agents to control A
 | `emulator provision` | Reuse or create a supported Android emulator and return its ADB serial |
 | `provision emulator` | Alias of `emulator provision` |
 | `execute --execution <json\|file>` | Run a full execution payload |
-| `observe snapshot` | Capture UI tree as JSON or ASCII |
+| `observe snapshot` | Capture UI hierarchy dump (`hierarchy_xml`) |
 | `observe screenshot` | Capture device screen as PNG |
 | `action open-app --app <id>` | Open an application |
 | `action click --selector <json>` | Click a UI element |
@@ -171,13 +171,218 @@ Every execution requires `expectedFormat: "android-ui-automator"`.
   "timeoutMs": 60000,
   "actions": [
     { "id": "step1", "type": "open_app", "params": { "applicationId": "com.example.app" } },
-    { "id": "step2", "type": "click", "params": { "matcher": { "textEquals": "Login" } } },
-    { "id": "step3", "type": "snapshot_ui" }
+    { "id": "step2", "type": "enter_text", "params": { "matcher": { "resourceId": "com.example.app:id/search_input" }, "text": "hello", "submit": true } },
+    { "id": "step3", "type": "click", "params": { "matcher": { "textEquals": "Login" }, "clickType": "default" } },
+    { "id": "step4", "type": "snapshot_ui" }
   ]
 }
 ```
 
-**Result envelope:** Exactly one `[Clawperator-Result]` JSON block is emitted to logcat on completion. Node reads and returns it.
+**Result envelope:** Exactly one `[Clawperator-Result]` JSON block is emitted to logcat on completion. Node reads and returns it. See the Result Envelope section for the full shape and per-action `data` contents.
+
+## NodeMatcher Reference
+
+A NodeMatcher identifies a single UI element for action targeting. Used as a required param in `click`, `enter_text`, `read_text`, `wait_for_node`, and `scroll_and_click`.
+
+All specified fields are combined with AND semantics: every specified field must match the target element. At least one field is required per matcher.
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `resourceId` | `string` | Developer-assigned element ID. Format: `"com.example.app:id/element_name"`. Most stable - prefer over all others when present. |
+| `contentDescEquals` | `string` | Exact match on accessibility content description. Use for icon buttons with no visible text. |
+| `textEquals` | `string` | Exact match on visible text label. Fragile for server-driven or localized content. |
+| `textContains` | `string` | Substring match on visible text. Use when full text is dynamic or may be truncated. |
+| `contentDescContains` | `string` | Substring match on accessibility label. Fallback for partial or dynamic accessibility labels. |
+| `role` | `string` | Matches by Clawperator semantic role name (for example, `button`, `textfield`, `text`, `switch`, `checkbox`, `image`, `listitem`, `toolbar`, `tab`). This is derived from runtime role inference, not the raw UIAutomator `class` string. Low selectivity - many elements share a role. Use as a secondary constraint only, never alone. |
+
+**Selector priority (most to least stable):** `resourceId` > `contentDescEquals` > `textEquals` > `textContains` > `contentDescContains` > `role`
+
+Combine fields to increase specificity when a single field is ambiguous:
+
+```json
+{ "resourceId": "com.example.app:id/submit_btn", "textEquals": "Submit" }
+```
+
+## Action Reference
+
+### Action types and params
+
+| Action | Required params | Optional params |
+| :--- | :--- | :--- |
+| `open_app` | `applicationId: string` | - |
+| `close_app` | `applicationId: string` | - |
+| `click` | `matcher: NodeMatcher` | `clickType: "default" \| "long_click" \| "focus"` (default: `"default"`) |
+| `enter_text` | `matcher: NodeMatcher`, `text: string` | `submit: boolean` (default: `false`), `clear: boolean` (accepted by Node contract, currently ignored by Android runtime) |
+| `read_text` | `matcher: NodeMatcher` | `validator: "temperature"` (only supported validator today), `retry: object` |
+| `wait_for_node` | `matcher: NodeMatcher` | `retry: object` |
+| `snapshot_ui` | - | `retry: object` |
+| `take_screenshot` | - | `path: string`, `retry: object` |
+| `sleep` | `durationMs: number` | - |
+| `scroll_and_click` | `target: NodeMatcher` | `container: NodeMatcher`, `direction: "down" \| "up" \| "left" \| "right"` (default: `"down"`), `maxSwipes: number` (default: `10`, range: 1-50), `distanceRatio: number` (default: `0.7`, range: 0-1), `settleDelayMs: number` (default: `250`, range: 0-10000), `findFirstScrollableChild: boolean` (default: `false`), `scrollRetry: object` (default preset: `maxAttempts=4`, `initialDelayMs=400`, `maxDelayMs=2000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`), `clickRetry: object` (default preset: `maxAttempts=5`, `initialDelayMs=500`, `maxDelayMs=3000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`) |
+
+### CLI-to-action-type mapping
+
+| CLI command | Payload action type |
+| :--- | :--- |
+| `action type --selector <json> --text <value>` | `enter_text` |
+| `action click --selector <json>` | `click` |
+| `action read --selector <json>` | `read_text` |
+| `action wait --selector <json>` | `wait_for_node` |
+| `action open-app --app <id>` | `open_app` |
+| `observe snapshot` | `snapshot_ui` |
+
+### Action behavior notes
+
+- `sleep.durationMs` is not capped per step. It must fit within the execution `timeoutMs` budget, and `timeoutMs` is capped at `120000`.
+
+**`close_app`:** The Node layer intercepts `close_app` actions and runs `adb shell am force-stop <applicationId>` before dispatching to Android. The Android step always returns `success: false` with `data.error: "UNSUPPORTED_RUNTIME_CLOSE"` - this is expected. The overall execution `status` remains `"success"` and the app is force-stopped. Do not treat this step result as a recoverable failure.
+
+**`enter_text`:** The CLI command is `action type` but the execution payload action type is `enter_text`. The `submit` param triggers a keyboard Enter/submit after typing - use this for search fields and single-field forms where pressing Enter submits. The Node contract still accepts `clear`, but the Android runtime does not implement it yet, so it currently has no effect.
+
+**`read_text`:** `validator` is not an open-ended string in practice. The Android runtime currently supports only `"temperature"` and rejects any other value.
+
+**`snapshot_ui`:** Clawperator returns a single canonical snapshot format: `hierarchy_xml`. The Android runtime writes the hierarchy dump to device logcat, and the Node layer injects that raw XML into `data.text` after execution. `data.actual_format` is always `"hierarchy_xml"` for successful snapshot steps.
+
+**`take_screenshot`:** `observe screenshot` uses the same execution contract under the hood. Android reports `UNSUPPORTED_RUNTIME_SCREENSHOT`, then the Node layer captures the screenshot via `adb exec-out screencap -p`, writes it to `data.path`, and normalizes the step result to `success: true` when capture succeeds.
+
+**`scroll_and_click`:** This action has two separate retry knobs. `scrollRetry` controls the scroll/search loop and defaults to the `UiScroll` preset (`maxAttempts=4`, `initialDelayMs=400`, `maxDelayMs=2000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`). `clickRetry` controls the final click attempt and defaults to the `UiReadiness` preset (`maxAttempts=5`, `initialDelayMs=500`, `maxDelayMs=3000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`).
+
+## Result Envelope
+
+Every execution emits exactly one `[Clawperator-Result]` envelope:
+
+```json
+{
+  "commandId": "...",
+  "taskId": "...",
+  "status": "success" | "failed",
+  "stepResults": [
+    {
+      "id": "...",
+      "actionType": "...",
+      "success": true | false,
+      "data": { "key": "value" }
+    }
+  ],
+  "error": "ERROR_CODE" | null
+}
+```
+
+- `status` is `"success"` when the execution completes (including partial step failures like `close_app`). `status` is `"failed"` only on total execution failure (dispatch error, timeout, validation failure).
+- `error` (top-level) contains an error code on total failure.
+- `data.error` on a step result contains the per-step error code when `success` is `false`.
+- All `data` values are strings. `data` is always an object (never `null`), but may be empty.
+
+### Per-action result data
+
+Typical `data` keys by action type:
+
+| Action | Typical `data` keys |
+| :--- | :--- |
+| `open_app` | `application_id` |
+| `close_app` | `application_id`, `error` (`"UNSUPPORTED_RUNTIME_CLOSE"`), `message` |
+| `click` | `click_types` |
+| `enter_text` | `text` (text typed), `submit` (`"true"` or `"false"`) |
+| `read_text` | `text` (extracted text value), `validator` (`"none"` or validator type) |
+| `snapshot_ui` | `actual_format`, `text` (snapshot content - see note below) |
+| `take_screenshot` | `path` (local screenshot file path after Node capture) |
+| `wait_for_node` | `resource_id`, `label` (matched node details) |
+| `scroll_and_click` | `max_swipes`, `direction`, `click_types` |
+| `sleep` | `duration_ms` |
+
+For any failed step: `success: false` and `data.error` contains the error code string.
+
+**Snapshot content delivery:** The UI hierarchy is produced by the Android runtime and written to device logcat. The Node layer reads logcat after execution and injects the raw XML into `data.text`. `data.actual_format` is `"hierarchy_xml"` on successful snapshot steps.
+
+**`read_text` value:** The extracted text value is in `data.text`.
+
+## Snapshot Output Format
+
+`snapshot_ui` and `clawperator observe snapshot` produce the canonical `hierarchy_xml` format. `data.actual_format` reports `"hierarchy_xml"` on success.
+
+### `hierarchy_xml`
+
+Structured XML produced by UIAutomator. Each `<node>` represents one UI element. Attributes map directly to NodeMatcher fields:
+
+| XML attribute | NodeMatcher field | Notes |
+| :--- | :--- | :--- |
+| `resource-id` | `resourceId` | `"com.example.app:id/name"`. Empty string when not set by developer. |
+| `text` | `textEquals` / `textContains` | Visible text content. Empty string if none. |
+| `content-desc` | `contentDescEquals` / `contentDescContains` | Accessibility label. Empty string if none. |
+| `class` | - | Java widget class name, e.g., `"android.widget.Button"`. Informational only - `NodeMatcher.role` uses Clawperator semantic role names such as `button`, `textfield`, `text`, or `switch`, not the raw `class` attribute. |
+| `clickable` | - | `"true"` if the element accepts tap events. |
+| `scrollable` | - | `"true"` marks a scroll container. Use as `container` in `scroll_and_click`. |
+| `bounds` | - | `"[x1,y1][x2,y2]"` pixel rectangle. Useful for understanding spatial layout. |
+| `enabled` | - | `"false"` means the element is visible but not interactable. |
+| `long-clickable` | - | `"true"` if the element accepts long-press. Use `clickType: "long_click"`. |
+
+**Annotated example from Android Settings main screen (live device capture):**
+
+```xml
+<hierarchy rotation="0">
+  <node index="0" text="" resource-id="" class="android.widget.FrameLayout"
+        package="com.android.settings" content-desc=""
+        clickable="false" enabled="true" scrollable="false"
+        bounds="[0,0][1080,2340]">
+    ...
+        <!-- Scrollable list - use as 'container' in scroll_and_click -->
+        <node index="0" text="" resource-id="com.android.settings:id/recycler_view"
+              class="androidx.recyclerview.widget.RecyclerView"
+              package="com.android.settings" content-desc=""
+              clickable="false" enabled="true" focusable="true" scrollable="true"
+              bounds="[0,884][1080,2196]">
+
+          <!-- Icon-only button: no text, target via content-desc -->
+          <node index="0" text="" resource-id="" class="android.widget.Button"
+                package="com.android.settings" content-desc="Search settings"
+                clickable="true" enabled="true" focusable="true"
+                bounds="[912,692][1080,884]" />
+
+          <!-- Clickable row: the LinearLayout is the tap target -->
+          <node index="2" text="" resource-id="" class="android.widget.LinearLayout"
+                package="com.android.settings" content-desc=""
+                clickable="true" enabled="true" scrollable="false"
+                bounds="[30,1252][1050,1461]">
+            <!-- Title label with stable resource-id -->
+            <node index="0" text="Connections" resource-id="android:id/title"
+                  class="android.widget.TextView" package="com.android.settings"
+                  content-desc="" clickable="false" enabled="true"
+                  bounds="[216,1294][507,1364]" />
+            <!-- Subtitle label -->
+            <node index="1" text="Wi-Fi  •  Bluetooth  •  SIM manager"
+                  resource-id="android:id/summary" class="android.widget.TextView"
+                  package="com.android.settings" content-desc=""
+                  clickable="false" enabled="true"
+                  bounds="[216,1364][816,1419]" />
+          </node>
+
+          <node index="3" text="" resource-id="" class="android.widget.LinearLayout"
+                package="com.android.settings" content-desc=""
+                clickable="true" enabled="true" scrollable="false"
+                bounds="[30,1461][1050,1721]">
+            <node index="0" text="Connected devices" resource-id="android:id/title"
+                  class="android.widget.TextView" package="com.android.settings"
+                  content-desc="" clickable="false" enabled="true"
+                  bounds="[216,1503][661,1573]" />
+            <node index="1" text="Quick Share  •  Samsung DeX  •  Android Auto"
+                  resource-id="android:id/summary" class="android.widget.TextView"
+                  package="com.android.settings" content-desc=""
+                  clickable="false" enabled="true"
+                  bounds="[216,1573][996,1679]" />
+          </node>
+
+        </node>
+    ...
+  </node>
+</hierarchy>
+```
+
+**Reading patterns:**
+
+- **Tap targets** are `clickable="true"` nodes. In list UIs these are often container (`LinearLayout`) nodes whose text-bearing children hold the visible label while the container itself has `text=""`. Match the text-bearing child node (for example, `textEquals: "Connections"` or `resourceId: "android:id/title"`), then rely on the runtime to click a clickable ancestor when needed.
+- **Icon-only buttons** (no `text`) use `content-desc` for their label. Target with `contentDescEquals`.
+- **Scroll containers** have `scrollable="true"`. Pass their `resource-id` as the `container` matcher in `scroll_and_click`.
+- **Disabled elements** have `enabled="false"`. They cannot be interacted with - scrolling or waiting for a state change is required first.
 
 ## Error Codes
 

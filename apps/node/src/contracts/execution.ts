@@ -6,7 +6,6 @@ import type { NodeMatcher } from "./selectors.js";
 export interface ActionParams {
   applicationId?: string;
   durationMs?: number;
-  format?: "ascii" | "json";
   path?: string;
   matcher?: NodeMatcher;
   text?: string;

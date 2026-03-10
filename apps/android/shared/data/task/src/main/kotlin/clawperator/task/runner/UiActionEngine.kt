@@ -203,14 +203,13 @@ class UiActionEngineDefault(
         action: UiAction.SnapshotUi,
     ): UiActionStepResult {
         // Snapshot action routes through TaskScope.logUiTree, the same core path used for UI hierarchy dumps.
-        val actualFormat = taskScope.logUiTree(format = action.format, retry = action.retry)
+        val actualFormat = taskScope.logUiTree(retry = action.retry)
 
         return UiActionStepResult(
             id = action.id,
             actionType = "snapshot_ui",
             data =
                 mapOf(
-                    "requested_format" to action.format.name.lowercase(),
                     "actual_format" to actualFormat.wireValue,
                 ),
         )

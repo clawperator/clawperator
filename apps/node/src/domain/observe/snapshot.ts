@@ -5,8 +5,7 @@ import type { RunExecutionOptions } from "../executions/runExecution.js";
 /**
  * Build execution that runs a single snapshot_ui and run it.
  */
-export function buildSnapshotExecution(options?: { format?: "ascii" | "json"; timeoutMs?: number }): Execution {
-  const format = options?.format ?? "ascii";
+export function buildSnapshotExecution(options?: { timeoutMs?: number }): Execution {
   const commandId = `snapshot-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
   return {
     commandId,
@@ -18,7 +17,6 @@ export function buildSnapshotExecution(options?: { format?: "ascii" | "json"; ti
       {
         id: "snap",
         type: "snapshot_ui",
-        params: { format },
       },
     ],
     mode: "direct",

@@ -28,7 +28,6 @@ const nodeMatcherSchema = z
 const actionParamsSchema = z.object({
   applicationId: z.string().optional(),
   durationMs: z.number().optional(),
-  format: z.enum(["ascii", "json"]).optional(),
   path: z.string().optional(),
   matcher: nodeMatcherSchema.optional(),
   text: z.string().max(LIMITS.MAX_MATCHER_VALUE_LENGTH).optional(),
