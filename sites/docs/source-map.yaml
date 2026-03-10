@@ -46,11 +46,11 @@ sections:
         mode: copy
         sources:
           - docs/first-time-setup.md
-      - output: getting-started/openclaw-remote-bootstrap.md
-        title: OpenClaw Remote Bootstrap Guide
+      - output: getting-started/openclaw-first-run.md
+        title: OpenClaw First Run
         mode: copy
         sources:
-          - docs/openclaw-remote-bootstrap.md
+          - docs/openclaw-first-run.md
       - output: getting-started/project-overview.md
         title: Project Overview
         mode: copy

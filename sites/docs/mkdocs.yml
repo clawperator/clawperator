@@ -14,7 +14,7 @@ nav:
     - Running Clawperator on Android: getting-started/running-clawperator-on-android.md
     - Clawperator Terminology: getting-started/terminology.md
     - First-Time Setup: getting-started/first-time-setup.md
-    - OpenClaw Remote Bootstrap Guide: getting-started/openclaw-remote-bootstrap.md
+    - OpenClaw First Run: getting-started/openclaw-first-run.md
     - Project Overview: getting-started/project-overview.md
     - Clawperator Operator Android app: getting-started/android-operator-apk.md
   - For AI Agents:
