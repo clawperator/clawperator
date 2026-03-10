@@ -57,7 +57,7 @@ def main():
             
             if not os.path.exists(page_path):
                 print(f"Error: File not found: {page_path}")
-                missing_pages.append(page_path)
+                missing_pages.append(page_output)
                 continue
                 
             with open(page_path, "r", encoding="utf-8") as pf:
