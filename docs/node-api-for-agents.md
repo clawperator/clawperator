@@ -217,7 +217,7 @@ Combine fields to increase specificity when a single field is ambiguous:
 | `wait_for_node` | `matcher: NodeMatcher` | `retry: object` |
 | `snapshot_ui` | - | `retry: object` |
 | `take_screenshot` | - | `path: string`, `retry: object` |
-| `sleep` | `durationMs: number` (max: 120000) | - |
+| `sleep` | `durationMs: number` | - |
 | `scroll_and_click` | `target: NodeMatcher` | `container: NodeMatcher`, `direction: "down" \| "up" \| "left" \| "right"` (default: `"down"`), `maxSwipes: number` (default: `10`, range: 1-50), `distanceRatio: number` (default: `0.7`, range: 0-1), `settleDelayMs: number` (default: `250`, range: 0-10000), `findFirstScrollableChild: boolean` (default: `false`) |
 
 ### CLI-to-action-type mapping
@@ -232,6 +232,8 @@ Combine fields to increase specificity when a single field is ambiguous:
 | `observe snapshot` | `snapshot_ui` |
 
 ### Action behavior notes
+
+- `sleep.durationMs` is not capped per step. It must fit within the execution `timeoutMs` budget, and `timeoutMs` is capped at `120000`.
 
 **`close_app`:** The Node layer intercepts `close_app` actions and runs `adb shell am force-stop <applicationId>` before dispatching to Android. The Android step always returns `success: false` with `data.error: "UNSUPPORTED_RUNTIME_CLOSE"` - this is expected. The overall execution `status` remains `"success"` and the app is force-stopped. Do not treat this step result as a recoverable failure.
 
