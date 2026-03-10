@@ -52,7 +52,7 @@ export default function AgentsPage() {
         </div>
         <div className="setup-note">
           <p>
-            A markdown version of this page is also available at <a href="/agent.md">/agent.md</a>.
+            A markdown version of this page is also available at <a href="/index.md">/index.md</a>.
           </p>
         </div>
       </section>

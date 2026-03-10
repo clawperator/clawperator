@@ -21,7 +21,7 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <head>
-        <link rel="alternate" type="text/markdown" href="https://clawperator.com/agent.md" />
+        <link rel="alternate" type="text/markdown" href="https://clawperator.com/index.md" />
       </head>
       <body className={`${headingFont.variable} ${monoFont.variable}`}>{children}</body>
     </html>

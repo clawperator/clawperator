@@ -332,11 +332,11 @@ export default function Home() {
             <a href="https://docs.clawperator.com/design/operator-llm-playbook/" target="_blank" rel="noreferrer">
               Operator LLM playbook
             </a>
-            , or the machine-oriented <a href="/agent.md">markdown landing page</a>.
+            , or the machine-oriented <a href="/index.md">markdown landing page</a>.
           </p>
           <div className="agent-entry-links">
             <a href="/agents">/agents</a>
-            <a href="/agent.md">/agent.md</a>
+            <a href="/index.md">/index.md</a>
             <a href="https://docs.clawperator.com/reference/cli-reference/" target="_blank" rel="noreferrer">
               CLI reference
             </a>
