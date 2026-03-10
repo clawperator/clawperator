@@ -53,7 +53,7 @@ For app automation commands, default to:
 | :--- | :--- | :--- |
 | `open_app` | `applicationId: string` | Launches app by package ID |
 | `close_app` | `applicationId: string` | Node runs `adb shell am force-stop` pre-flight; Android step always returns `success: false` (expected) |
-| `enter_text` | `matcher: NodeMatcher`, `text: string`, `submit?: boolean` | CLI: `action type`. `submit: true` presses Enter after typing |
+| `enter_text` | `matcher: NodeMatcher`, `text: string`, `submit?: boolean`, `clear?: boolean` | CLI: `action type`. `submit: true` presses Enter after typing. `clear` is accepted by Node but currently ignored by Android |
 | `click` | `matcher: NodeMatcher`, `clickType?: "default"\|"long_click"\|"focus"` | CLI: `action click` |
 | `read_text` | `matcher: NodeMatcher` | CLI: `action read`. Result in `data.text` |
 | `wait_for_node` | `matcher: NodeMatcher` | CLI: `action wait`. Waits with internal retry |

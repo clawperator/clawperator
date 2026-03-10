@@ -61,11 +61,9 @@ The `update-docs-for-emulator` branch covers device environment setup. This
 task covers agent runtime behavior and output interpretation. They are
 orthogonal. Mixing them would delay the emulator docs merge.
 
-The related task `tasks/fix-documentation-gaps/plan.md` covers reference
-accuracy - making sure documented contracts match the code. This task covers
-the usage pattern that builds on top of those contracts. Both should be done,
-but this task depends on `fix-documentation-gaps` being complete first, or at
-minimum on the snapshot format and action type names being confirmed from source.
+The reference-contract audit that originally blocked this task has been completed in
+the current branch. This task now builds on the authored docs and shipped contract as
+they exist today, rather than depending on a separate gap-tracking plan.
 
 ---
 
@@ -74,7 +72,7 @@ minimum on the snapshot format and action type names being confirmed from source
 These are documented and do not need to be rewritten:
 
 - Execution payload structure and required fields (`node-api-for-agents.md`)
-- Action types list in playbook (incomplete and has errors - see `fix-documentation-gaps`)
+- Action types list in playbook and Node API guide
 - Error codes (`node-api-for-agents.md`)
 - Single-flight, no-hidden-retries, determinism guarantees (`node-api-for-agents.md`)
 - Skills system (`node-api-for-agents.md`, skills docs)
@@ -84,31 +82,27 @@ These are documented and do not need to be rewritten:
 
 ## Prerequisites
 
-This doc depends on `tasks/fix-documentation-gaps/` being complete, or at minimum on
-the following gaps from that task being closed:
+Reference-contract accuracy is no longer blocked. The current source of truth for this
+task is:
 
-- **Gap 9** (snapshot output format): annotated ASCII and JSON examples with confirmed
-  field names. The snapshot section of this doc is built directly from those examples.
-- **Gap 1** (`enter_text` action type): confirmed name and full params.
-- **Gap 3** (action params per type): all confirmed params per action type.
-- **Gap 5** (ResultEnvelope `data` shapes): confirmed per-action `data` contents.
+- `docs/node-api-for-agents.md` for the canonical action, matcher, envelope, and
+  snapshot contracts
+- `docs/design/operator-llm-playbook.md` for operator-facing usage constraints
+- current Node and Android source only when a doc detail needs reconfirmation
 
-The format capture and contract verification work belongs in `fix-documentation-gaps`.
-Do not re-do it here. Pick up the outputs from that task.
+### Architectural note: single canonical snapshot format
 
-### Architectural note: ASCII-only CLI, JSON via execute payload
+Confirmed from the current branch source and live device validation:
 
-Confirmed from source (`apps/node/src/domain/observe/snapshot.ts`):
-`clawperator observe snapshot` (CLI) is hardcoded to `format: "ascii"`. The format
-parameter is not exposed at the CLI level.
+- `clawperator observe snapshot` and `snapshot_ui` both return the same canonical
+  snapshot format: `hierarchy_xml`
+- successful snapshot steps report `data.actual_format = "hierarchy_xml"`
+- the Android runtime writes the hierarchy dump to logcat and the Node layer injects
+  that raw XML into `data.text`
+- there is no longer a public or supported `snapshot_ui.params.format` choice
 
-- **JSON format is only available via the raw execute API** - `snapshot_ui` action
-  with `params: { format: "json" }` in a full execute payload.
-- **`clawperator observe snapshot` always returns ASCII.** There is no `--format json`
-  flag.
-
-This split is the structural foundation of the snapshot section in this doc. It must
-appear early, before any snapshot examples.
+This single-format contract is the structural foundation of the snapshot section in
+this doc. It must appear early, before any loop examples.
 
 ---
 
@@ -123,7 +117,7 @@ The basic loop:
 
 1. `open_app` - launch the target app
 2. `sleep` 1000ms or `wait_for_node` on a stable element - let the app settle
-3. `observe snapshot` or `snapshot_ui` (json) - read current UI state
+3. `observe snapshot` or `snapshot_ui` - read current UI state
 4. Agent inspects tree, identifies the target element, reads its matcher fields
 5. Construct an action payload (click, enter_text, scroll_and_click) targeting
    that element by its most stable matcher
@@ -169,18 +163,15 @@ requires prior knowledge of the UI flow, not a starting point.
 
 This must be a first-class section with concrete examples - not a footnote.
 
-### 3. Snapshot output format - ASCII and JSON
-
-The annotated ASCII and JSON examples for this section come from
-`tasks/fix-documentation-gaps/` Gap 9. Do not capture or document the raw format here.
+### 3. Snapshot output format - canonical `hierarchy_xml`
 
 This section of the doc must cover:
 
-- The two access paths (CLI = ASCII only, execute payload = ASCII or JSON) - see
-  architectural note in the Prerequisites section above
-- How to read the ASCII tree to identify elements and extract matcher field values
-- How to traverse the JSON tree programmatically to find target nodes
-- When to use ASCII vs JSON vs screenshot (modality decision guide)
+- The two access paths (`observe snapshot` and `snapshot_ui`) and the fact that both
+  return the same `hierarchy_xml` output
+- How to read the XML hierarchy to identify elements and extract matcher field values
+- How `data.text` and `data.actual_format` are delivered in the result envelope
+- When to use hierarchy XML vs screenshot (modality decision guide)
 
 ### 4. Full NodeMatcher reference
 
@@ -190,7 +181,7 @@ Only `textEquals` appears in current docs. All six with priority guidance:
 1. `resourceId` - most stable. Format: `"com.example.app:id/element_name"`.
    Only present when the app developer set it - absent in many third-party apps.
 2. `contentDescEquals` - stable for icon buttons with no visible text. Read
-   from the `contentDescription` field in JSON snapshot output.
+   from the `content-desc` attribute in hierarchy XML snapshot output.
 3. `textEquals` - stable for fixed UI labels. Fragile for server-driven,
    localized, or dynamically formatted text.
 4. `textContains` - useful for dynamic or truncated text where a stable
@@ -206,22 +197,22 @@ and `textEquals` for disambiguation when multiple elements share a resource ID).
 ### 5. Action type names and params - confirmed from source
 
 The playbook lists action types but is incomplete and has at least one omission.
-Confirmed from `apps/node/src/domain/actions/`:
+Confirmed from the current Node and Android source:
 
 - `open_app` - `params.applicationId` (string)
-- `close_app` - needs verification from Android code
+- `close_app` - `params.applicationId` (string)
 - `click` - `params.matcher` (NodeMatcher), `params.clickType` ("default" | "long_click" | "focus")
 - `enter_text` - **this is the correct action type name** (NOT `type_text`).
-  Confirmed in `typeText.ts`. Not listed in the playbook at all.
   Params: `matcher` (NodeMatcher), `text` (string), `submit` (boolean, default false),
-  `clear` (boolean, default false)
+  `clear` (accepted by Node, currently ignored by Android runtime)
 - `read_text` - `params.matcher` (NodeMatcher). Confirmed.
-- `wait_for_node` - `params.matcher` (NodeMatcher), `params.durationMs`. Confirmed.
-- `snapshot_ui` - `params.format` ("ascii" | "json", default "ascii"). Confirmed.
-- `sleep` - `params.durationMs`. Needs verification.
+- `wait_for_node` - `params.matcher` (NodeMatcher). Retry behavior comes from runtime
+  retry config, not a `durationMs` param.
+- `snapshot_ui` - no params required for the canonical `hierarchy_xml` snapshot path.
+- `sleep` - `params.durationMs` (number).
 - `scroll_and_click` - `target` (NodeMatcher), `container` (NodeMatcher),
   `direction`, `maxSwipes`, `distanceRatio`, `settleDelayMs`,
-  `findFirstScrollableChild`. Needs full verification from Android code.
+  `findFirstScrollableChild`. Defaults and ranges are documented in the Node API guide.
 
 `enter_text` being absent from the playbook is the most significant accuracy
 gap. It must be confirmed and documented before the loop doc can be written.
@@ -247,9 +238,9 @@ From `apps/node/src/contracts/result.ts`:
 }
 ```
 
-The `data` field contents per action type must be confirmed from live device
-output before documenting. Expected (unconfirmed):
-- `snapshot_ui`: UI tree (string for ascii, object for json)
+The `data` field contents per action type are now documented in the Node API guide.
+Important shapes for this loop doc:
+- `snapshot_ui`: `data.actual_format = "hierarchy_xml"` and `data.text` contains the XML tree
 - `read_text`: extracted text value
 - `click`, `enter_text`, `open_app`: minimal or empty on success
 - Any failed step: `data.error` contains the error code string
@@ -285,29 +276,27 @@ What each error means in an explore loop context, and what the agent should do:
 
 ### 9. Screenshot vs. snapshot modality
 
-- **ASCII snapshot**: default path. Low context cost. Use for all targeting.
-- **JSON snapshot**: structured tree. More useful for agent reasoning. Only
-  available via execute payload.
+- **Hierarchy XML snapshot**: default path. Low context cost. Use for targeting and
+  machine-readable UI inspection.
 - **Screenshot** (`observe screenshot` or `POST /observe/screenshot`): visual
   context. Higher token cost (image input). Use for disambiguation when the
   tree alone is insufficient to understand the current screen state. Cannot
   substitute the tree for element targeting.
 
-Concrete guidance: the agent should start with ASCII snapshot. Use JSON when
-building reusable automation that needs to traverse the tree programmatically.
-Use screenshot when the ASCII tree is ambiguous (e.g., multiple elements with
-the same text, or the agent needs to understand spatial layout).
+Concrete guidance: the agent should start with the hierarchy XML snapshot. Use
+screenshot when the tree is ambiguous (e.g., multiple elements with the same
+text, or the agent needs to understand spatial layout).
 
 ### 10. The two snapshot access paths
 
 This must appear early in the doc, before any snapshot examples:
 
-**Path A - CLI shortcut (ASCII only):**
+**Path A - CLI shortcut:**
 ```bash
 clawperator observe snapshot --device-id <serial>
 ```
 
-**Path B - Execute payload (ASCII or JSON):**
+**Path B - Execute payload:**
 ```json
 {
   "commandId": "snap-001",
@@ -316,10 +305,15 @@ clawperator observe snapshot --device-id <serial>
   "expectedFormat": "android-ui-automator",
   "timeoutMs": 30000,
   "actions": [
-    { "id": "snap", "type": "snapshot_ui", "params": { "format": "json" } }
+    { "id": "snap", "type": "snapshot_ui" }
   ]
 }
 ```
+
+Both paths return the same snapshot content contract:
+
+- `stepResults[0].data.actual_format` is `"hierarchy_xml"` on success
+- `stepResults[0].data.text` contains the raw UI hierarchy XML
 
 ---
 
@@ -330,11 +324,11 @@ clawperator observe snapshot --device-id <serial>
 Section outline:
 
 1. Overview - skillless usage model and when to use it vs. skills
-2. The two snapshot access paths - ASCII via CLI, JSON via execute payload
+2. The two snapshot access paths - CLI and execute payload, both returning `hierarchy_xml`
 3. The observe-decide-act loop - complete pattern with worked example
 4. Multi-action payload vs. sequential observe loop - decision framework
    (must be a standalone section, not a sub-bullet)
-5. Snapshot output format - annotated ASCII and JSON examples from live device
+5. Snapshot output format - annotated `hierarchy_xml` example from live device
 6. NodeMatcher reference - all six fields, priority order, how to find values
 7. Action reference - all confirmed action types with params
 8. ResultEnvelope - full shape and per-action `data` contents
@@ -351,8 +345,8 @@ Section outline:
 ### Update to `docs/node-api-for-agents.md`
 
 - Add "Skillless usage" subsection or FAQ entry pointing to `agent-ui-loop.md`
-- Note that `observe snapshot` CLI is ASCII-only; JSON requires execute payload
-- Show a `snapshot_ui` with `format: "json"` in the execution payload example
+- Keep the snapshot contract wording aligned to the canonical `hierarchy_xml` format
+- Show `snapshot_ui` examples without a `format` param
 
 ### `sites/docs/` updates
 
@@ -364,10 +358,11 @@ Section outline:
 
 ## Dependencies
 
-This task depends on `tasks/fix-documentation-gaps/` being complete, specifically
-Gaps 1, 3, 5, and 9. The snapshot output format (Gap 9) and confirmed action params
-(Gaps 1, 3) are direct inputs to this doc. Do not start writing the snapshot section
-or action reference section of this doc without those gaps being closed.
+This task depends on the current branch contract remaining stable:
+
+- `snapshot_ui` and `observe snapshot` continue to expose canonical `hierarchy_xml`
+- the Node API guide remains the source of truth for per-action params and result data
+- any future contract changes must update this plan before implementation work starts
 
 ---
 
@@ -386,7 +381,7 @@ Do not change in this task:
 ## API gaps identified during source audit
 
 These issues were found by cross-referencing TypeScript contracts, Android Kotlin
-source, and Node post-processing during the `fix-documentation-gaps` audit. They are
+source, and Node post-processing on this branch. They are
 not documentation problems - they are behavioral inconsistencies or broken contracts
 in the implementation itself. They are captured here so they can be considered when
 designing the `agent-ui-loop` doc and deciding whether to work around them, route
@@ -436,57 +431,7 @@ Alternatively, the Android side could detect the force-stop and return success.
 
 ---
 
-### Gap C: `snapshot_ui` `format: "json"` has no effect
-
-**Source:** `apps/android/.../TaskScopeDefault.kt` (`logUiTree` receives
-`format: UiSnapshotFormat` but ignores it). Output format is determined by whether
-`hierarchyDump` is available (produces `hierarchy_xml`) or not (produces `ascii`).
-The `UiSnapshotFormat.Json` enum value exists but is never used to change behavior.
-
-**Behavior:** Requesting `format: "json"` in a `snapshot_ui` action produces the same
-output as `format: "ascii"`. The `data.actual_format` will be `"ascii"` or
-`"hierarchy_xml"` depending on device state, never `"json"`.
-
-**Impact on loop doc:** The loop doc must not describe JSON snapshot as an available
-option via `format: "json"`. The current plan section on "JSON snapshot" (sections 3
-and 10) is based on the expectation that this works - it does not. Either remove the
-JSON snapshot path from the doc or gate it on the Android implementation being fixed.
-
-**Candidate fix:** Implement a JSON serialization path in `logUiTree`/`UiTreeFormatter`
-that converts the UI node tree to a structured JSON format when `format == Json`.
-Until that is implemented, either remove the `json` enum value from `UiSnapshotFormat`
-or return an error when `json` is requested.
-
----
-
-### Gap D: Snapshot content is not part of the `[Clawperator-Result]` envelope
-
-**Source:** `apps/android/.../TaskScopeDefault.kt` (logs UI tree via `Log.d()`).
-`apps/node/src/domain/executions/snapshotHelper.ts` (extracts snapshot from logcat
-using heuristic pattern matching: lines containing `"TaskScopeDefault:"`, then
-filtering by lines starting with `<` or `?` or containing `text=` or `res=`).
-`apps/node/src/domain/executions/runExecution.ts` (post-processes by reading logcat
-after execution and injecting content into `data.text`).
-
-**Behavior:** The snapshot content is logged to device logcat as a debug message.
-The Node layer reads logcat after the execution completes and injects the content into
-`stepResults[n].data.text`. If the heuristic extraction fails (noisy logcat, format
-change, timing issue), `data.text` is silently absent - there is no error code.
-There is no way for an agent to distinguish "snapshot was empty" from "extraction
-failed".
-
-**Impact on loop doc:** The loop doc must note that `data.text` may be absent and
-describe the fallback (re-observe). Any agent that assumes `data.text` is always
-present after a successful `snapshot_ui` step will fail silently on extraction errors.
-
-**Candidate fix:** Include the snapshot content directly in the `[Clawperator-Result]`
-envelope emitted by Android. The Android side should serialize the tree into the
-`data` map (e.g., as `data["content"]`), eliminating the logcat extraction path.
-This makes the contract explicit and removes the heuristic fragility.
-
----
-
-### Gap E: `StepResult.error` is a phantom field in the TypeScript contract
+### Gap C: `StepResult.error` is a phantom field in the TypeScript contract
 
 **Source:** `apps/node/src/contracts/result.ts` (`StepResult` declares `error?: string`
 as a top-level sibling of `data`). `apps/android/.../ClawperatorResultEnvelope.kt`
