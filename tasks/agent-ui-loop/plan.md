@@ -240,8 +240,7 @@ From `apps/node/src/contracts/result.ts`:
       "id": "snap",
       "actionType": "snapshot_ui",
       "success": true,
-      "data": { ... },
-      "error": null
+      "data": { ... }
     }
   ],
   "error": null
@@ -253,7 +252,7 @@ output before documenting. Expected (unconfirmed):
 - `snapshot_ui`: UI tree (string for ascii, object for json)
 - `read_text`: extracted text value
 - `click`, `enter_text`, `open_app`: minimal or empty on success
-- Any failed step: `error` contains the error code string
+- Any failed step: `data.error` contains the error code string
 
 ### 7. Settle delays and timing
 

@@ -306,7 +306,6 @@ These examples are the direct input for the snapshot section in `agent-ui-loop.m
 
 ### 1. Fix `docs/node-api-for-agents.md`
 
-- Fix error path reference: `stepResults[].data.error` -> `stepResults[].error`
 - Add NodeMatcher reference section (all six fields, AND semantics, stability ranking)
 - Add note that `observe snapshot` CLI is ASCII-only; JSON format requires execute API
 - Add annotated ASCII snapshot example (from live capture per Gap 9)
