@@ -2,7 +2,7 @@
 
 <img src="docs/img/clawperator-logo.png" width="200" height="200" alt="Clawperator logo" />
 
-Clawperator ("Claw Operator") is a deterministic actuator tool that enables LLM agents to automate the control of Android devices on behalf of a user.
+Clawperator ("Claw Operator") is a deterministic Android automation runtime for AI agents. It is the actuator layer: the external agent or LLM owns reasoning and planning, and Clawperator executes validated Android actions on behalf of a user.
 
 ## Why Clawperator?
 
@@ -74,7 +74,12 @@ clawperator execute \
 
 ## For AI Agents
 
-See [Node API for Agents](docs/node-api-for-agents.md) for the full API contract, error codes, and integration examples.
+Clawperator is an actuator, not an autonomous planner. Use these entrypoints first:
+
+- [Node API for Agents](https://docs.clawperator.com/ai-agents/node-api-for-agents/) - canonical action contracts, result envelopes, and error codes
+- [Operator LLM Playbook](https://docs.clawperator.com/design/operator-llm-playbook/) - guidance for agent loops and runtime usage
+- [llms.txt](https://clawperator.com/llms.txt) - root machine-readable index
+- [llms-full.txt](https://clawperator.com/llms-full.txt) - full compiled technical corpus in one fetch
 
 ## Documentation
 

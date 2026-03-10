@@ -1,6 +1,7 @@
 site_name: Clawperator
 site_description: Deterministic actuator tool for device automation
 docs_dir: docs
+site_url: https://docs.clawperator.com/
 
 theme:
   name: terminal
