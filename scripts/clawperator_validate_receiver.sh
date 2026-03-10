@@ -54,6 +54,7 @@ cat > "$VALIDATE_JSON" <<JSON
   "commandId": "$VALIDATE_CMD_ID",
   "taskId": "validate-task-1",
   "source": "validate-receiver",
+  "expectedFormat": "android-ui-automator",
   "timeoutMs": 20000,
   "actions": [
     { "id": "snap", "type": "snapshot_ui", "params": { "format": "ascii" } }

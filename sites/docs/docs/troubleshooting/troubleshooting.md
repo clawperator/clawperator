@@ -94,6 +94,101 @@ If you must use **Wireless Debugging**, be aware that your mileage may vary (YMM
 3. **No connected devices** - the installer skips the install and leaves the verified APK at `~/.clawperator/downloads/operator.apk`.
 4. **`adb` missing** - the installer attempts to install `adb` automatically, or stops with a manual install link if it cannot.
 
+## Emulator provisioning issues
+
+Clawperator can provision a local Android emulator through the Node CLI and API. If provisioning fails, use the checks below.
+
+### Missing Android SDK tools
+
+If provisioning returns `ANDROID_SDK_TOOL_MISSING`, verify that all required tools are available:
+
+```bash
+which adb
+which emulator
+which sdkmanager
+which avdmanager
+```
+
+If one tool is outside your normal shell `PATH`, pass it explicitly when starting the HTTP API or CLI process:
+
+```bash
+ADB_PATH=/path/to/adb \
+EMULATOR_PATH=/path/to/emulator \
+SDKMANAGER_PATH=/path/to/sdkmanager \
+AVDMANAGER_PATH=/path/to/avdmanager \
+clawperator provision emulator
+```
+
+### AVD exists but is unsupported
+
+If `clawperator emulator inspect <name> --output json` shows `supported: false`, the AVD will not be auto-selected by provisioning. Clawperator currently supports:
+
+- Android API level `35`
+- Google Play system image
+- ABI `arm64-v8a`
+- device profile `pixel_7`
+
+Inspect the normalized metadata and unsupported reasons:
+
+```bash
+clawperator emulator inspect <name> --output json
+```
+
+Clawperator evaluates compatibility from:
+
+- `~/.android/avd/<name>.avd/config.ini`
+- `~/.android/avd/<name>.ini`
+
+The key fields are:
+
+- `PlayStore.enabled`
+- `abi.type`
+- `image.sysdir.1`
+- `hw.device.name`
+
+### Emulator starts but never becomes ready
+
+Provisioning waits for two Android boot signals:
+
+- `getprop sys.boot_completed`
+- `getprop dev.bootcomplete`
+
+If either never flips to `1`, Clawperator returns `EMULATOR_BOOT_TIMEOUT`. This usually points to a broken AVD, stale emulator state, or a host-level emulator issue.
+
+Recommended recovery:
+
+1. Stop the emulator with `clawperator emulator stop <name>`.
+2. Delete the AVD with `clawperator emulator delete <name>`.
+3. Re-run `clawperator provision emulator`.
+
+Clawperator starts emulators with `-no-snapshot-load` to avoid stale snapshot state, so repeated boot timeouts usually indicate a deeper emulator or SDK problem.
+
+### Emulator process launches but does not appear in adb
+
+If start returns `EMULATOR_START_FAILED`, the emulator process did not register with adb before the registration timeout expired.
+
+Check:
+
+- `adb devices`
+- `clawperator emulator status --output json`
+
+If the emulator window appears but adb never sees it, restart the adb server:
+
+```bash
+adb kill-server
+adb start-server
+```
+
+Then retry:
+
+```bash
+clawperator emulator start clawperator-pixel
+```
+
+### Multiple devices connected
+
+Once an emulator is provisioned, you may have both a physical device and an emulator connected at the same time. In that state, continue to pass `--device-id <serial>` to `execute`, `observe`, `action`, and `skills run` commands.
+
 ### Installer cloned everything except skills
 
 If the installer finishes but warns that skills setup was skipped, the core CLI and operator APK are still installed. This does not block `clawperator doctor`, device discovery, or direct command execution. To set up skills manually:
