@@ -1,6 +1,6 @@
 # Clawperator Doctor
 
-`clawperator doctor` is the runtime readiness check for the Node CLI. It verifies that the host environment, connected device, and installed Operator APK are in a usable state, and that the end-to-end command path is functional, before an agent relies on the device.
+`clawperator doctor` is the runtime readiness check for the Node CLI. It verifies that the host environment, connected device, and installed [Clawperator Operator Android app](../getting-started/android-operator-apk.md) are in a usable state, and that the end-to-end command path is functional, before an agent relies on the device.
 
 This page describes the current shipped behavior. It replaces the older v0.1 design notes.
 
@@ -27,10 +27,10 @@ Supported flags:
 
 Default receiver package:
 
-- release APK: `com.clawperator.operator`
-- local debug APK: `com.clawperator.operator.dev`
+- release app package: `com.clawperator.operator`
+- local debug app package: `com.clawperator.operator.dev`
 
-If you use a local debug APK, pass `--receiver-package com.clawperator.operator.dev` consistently to `doctor`, `grant-device-permissions`, `version --check-compat`, and `observe snapshot`.
+If you use a local debug build of the [Clawperator Operator Android app](../getting-started/android-operator-apk.md), pass `--receiver-package com.clawperator.operator.dev` consistently to `doctor`, `grant-device-permissions`, `version --check-compat`, and `observe snapshot`.
 
 ## What Doctor Checks
 
@@ -56,7 +56,7 @@ Doctor runs checks in a fixed order. When a critical check fails, doctor returns
 ### 3. Runtime readiness
 
 - `readiness.apk.presence` - confirms the requested receiver package is installed, or warns if the other release/debug variant is installed instead
-- `readiness.version.compatibility` - verifies that the CLI and installed APK share a compatible `major.minor`
+- `readiness.version.compatibility` - verifies that the CLI and installed [Clawperator Operator Android app](../getting-started/android-operator-apk.md) share a compatible `major.minor`
 - `readiness.settings.dev_options` - warns if Android Developer Options are disabled
 - `readiness.settings.usb_debugging` - warns if USB debugging is disabled
 - `readiness.handshake` - sends a `doctor_ping` command and waits for one canonical `[Clawperator-Result]` envelope
@@ -71,13 +71,13 @@ Critical checks currently include:
 - host Node/adb/java checks
 - device discovery and shell availability
 - Android build/install/launch checks in `--full`
-- APK version compatibility
+- [Clawperator Operator Android app](../getting-started/android-operator-apk.md) version compatibility
 - handshake
 - smoke test in `--full`
 
 Advisory warnings currently include:
 
-- APK not installed or wrong release/debug variant installed
+- [Clawperator Operator Android app](../getting-started/android-operator-apk.md) not installed or wrong release/debug variant installed
 - Developer Options disabled
 - USB debugging disabled
 
@@ -183,7 +183,7 @@ Machine-readable installer or automation check:
 clawperator doctor --format json
 ```
 
-Target a specific device and debug APK:
+Target a specific device and debug build of the [Clawperator Operator Android app](../getting-started/android-operator-apk.md):
 
 ```bash
 clawperator doctor \
@@ -210,4 +210,4 @@ clawperator doctor --full
 - `clawperator grant-device-permissions` - enable Accessibility and related app ops via adb
 - `clawperator observe snapshot` - direct runtime check once doctor reports the environment is ready
 
-For initial installation and device setup, see [First-Time Setup](../getting-started/first-time-setup.md) and [Agent Bootstrap Guide](../ai-agents/openclaw-remote-bootstrap.md).
+For initial installation and device setup, see [First-Time Setup](../getting-started/first-time-setup.md) and [OpenClaw First Run](../getting-started/openclaw-first-run.md).

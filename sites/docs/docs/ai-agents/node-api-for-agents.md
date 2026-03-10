@@ -41,7 +41,7 @@ Clawperator provides a deterministic execution layer for LLM agents to control A
 | `grant-device-permissions` | Enable accessibility and notification permissions on the connected device via adb |
 | `serve` | Start HTTP/SSE server |
 | `doctor` | Run environment diagnostics |
-| `version` | Print the CLI version or check CLI/APK compatibility |
+| `version` | Print the CLI version or check CLI / Clawperator Operator Android app compatibility |
 
 **Global options:** `--device-id <id>`, `--receiver-package <pkg>`, `--output <json|pretty>`, `--format <json|pretty>` (alias for `--output`), `--timeout-ms <n>`, `--verbose`
 
@@ -49,8 +49,8 @@ For agent callers, `--output json` is the canonical output mode. `pretty` is for
 
 Default receiver package:
 
-- release APK: `com.clawperator.operator`
-- local debug APK: pass `--receiver-package com.clawperator.operator.dev`
+- release app package: `com.clawperator.operator`
+- local debug app package: pass `--receiver-package com.clawperator.operator.dev`
 
 Use subcommand help when the docs and the current CLI differ:
 
@@ -60,13 +60,13 @@ clawperator skills sync --help
 clawperator doctor --help
 ```
 
-Use `clawperator version --check-compat` before automation batches when the agent needs to verify that the installed APK matches the CLI's supported `major.minor` version:
+Use `clawperator version --check-compat` before automation batches when the agent needs to verify that the installed [Clawperator Operator Android app](../getting-started/android-operator-apk.md) matches the CLI's supported `major.minor` version:
 
 ```bash
 clawperator version --check-compat --receiver-package com.clawperator.operator
 ```
 
-The response includes the CLI version, detected APK version, APK `versionCode`, receiver package, compatibility verdict, and remediation guidance on mismatch.
+The response includes the CLI version, detected [Clawperator Operator Android app](../getting-started/android-operator-apk.md) version, app `versionCode`, receiver package, compatibility verdict, and remediation guidance on mismatch.
 
 ## HTTP API (`clawperator serve`)
 
@@ -96,6 +96,9 @@ Start with `clawperator serve [--port <n>] [--host <ip>]`. Default: `127.0.0.1:3
 See `apps/node/examples/basic-api-usage.js` for a complete SSE + REST example.
 
 ## Android Emulator Support
+
+Note: Clawperator does not configure accounts, install the Android apps the user wants Clawperator to operate, or complete first-run app setup inside the emulator.
+Agents should assume the emulator already contains the logged-in Android apps required for automation.
 
 Clawperator supports Android emulator provisioning as an alternative runtime to a physical Android device. Emulator lifecycle management lives in the Node CLI and HTTP API, not in `install.sh`.
 
@@ -196,10 +199,10 @@ Branch agent logic on codes from `envelope.error` or `stepResults[].data.error`:
 | `EMULATOR_DELETE_FAILED` | Emulator deletion failed |
 | `NODE_NOT_FOUND` | Selector matched no UI element |
 | `RESULT_ENVELOPE_TIMEOUT` | Command dispatched but no result received |
-| `RECEIVER_NOT_INSTALLED` | Clawperator APK not found on device |
+| `RECEIVER_NOT_INSTALLED` | [Clawperator Operator Android app](../getting-started/android-operator-apk.md) not found on device |
 | `DEVICE_UNAUTHORIZED` | Device not authorized for ADB |
-| `VERSION_INCOMPATIBLE` | CLI and installed APK versions do not share the same `major.minor` |
-| `APK_VERSION_UNREADABLE` | The device package dump did not expose a readable APK version |
+| `VERSION_INCOMPATIBLE` | CLI and installed [Clawperator Operator Android app](../getting-started/android-operator-apk.md) versions do not share the same `major.minor` |
+| `APK_VERSION_UNREADABLE` | The device package dump did not expose a readable [Clawperator Operator Android app](../getting-started/android-operator-apk.md) version |
 | `EXECUTION_VALIDATION_FAILED` | Payload failed schema validation |
 | `SECURITY_BLOCK_DETECTED` | Android blocked the action (e.g., secure keyboard) |
 | `NODE_NOT_CLICKABLE` | Element found but not interactable |
@@ -234,7 +237,7 @@ export CLAWPERATOR_SKILLS_REGISTRY="$HOME/.clawperator/skills/skills/skills-regi
 # List all skills
 clawperator skills list
 
-# Search by target app
+# Search by Android application ID
 clawperator skills search --app com.android.settings
 
 # Get skill metadata
@@ -292,6 +295,9 @@ Only for diagnostics or gaps not covered by the API. For routine automation, use
 
 **Does Clawperator run skills?**
 Skills are standalone programs that agents can invoke directly. The Node API provides discovery (`skills list`, `skills search`), metadata (`skills get`), and a convenience `skills run` wrapper. Skills do not need the Node API to execute - agents can call skill scripts directly.
+
+**Does Clawperator configure accounts or app settings?**
+No. Clawperator automates the UI on whatever user-installed Android apps are already installed and signed in on the device. It does not log in to apps, create accounts, or configure device settings on behalf of the user. If an automation targets an app that requires authentication, the user must sign in to that app manually on the device before the agent runs. For emulators using a Google Play system image, the user must also sign in to a Google account before Play Store-gated apps are accessible.
 
 **How should agents handle sensitive text in results?**
 Default behavior is full-fidelity results for agent reasoning. PII redaction (`--safe-logs`) is a planned feature.

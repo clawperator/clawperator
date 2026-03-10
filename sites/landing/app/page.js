@@ -170,16 +170,21 @@ export default function Home() {
             <br />
             The brain decides what to do next.
             <br />
-            Clawperator connects that agent to a dedicated Android burner phone, executes the action, and returns
-            structured results your code can trust.
+            Clawperator connects that agent to a dedicated Android burner phone or local Android emulator, executes the
+            action, and returns structured results your code can trust.
           </p>
         </div>
 
         <div className="quickstart-intro">
           <h2 id="install">Quick Start</h2>
           <p>
-            One command installs the CLI, fetches the latest operator app, verifies it, and helps prepare a connected
-            Android device for your agent.
+            One command installs the CLI, fetches the latest operator app, verifies it, and helps prepare an Android
+            device for your agent.
+          </p>
+          <p>
+            A cheap burner Android phone is still the preferred setup for compatibility and long-running reliability.
+            Do not have an Android device handy? No problem. Clawperator can provision a Google Play equipped emulator
+            for you after install and walk you through the same setup flow.
           </p>
         </div>
 
@@ -246,6 +251,18 @@ export default function Home() {
               </button>
             </div>
           </div>
+
+          <div className="quickstart-command">
+            <p className="quickstart-hint">
+              No Android device handy? No worries. Clawperator can create a Google Play equipped Android emulator on
+              your Mac mini or OpenClaw box after install.
+            </p>
+            <div className="command-row">
+              <pre>
+                <code>clawperator provision emulator</code>
+              </pre>
+            </div>
+          </div>
         </div>
 
         <p className="quickstart-docs">
@@ -260,7 +277,7 @@ export default function Home() {
       <section id="workflows" className="content-section">
         <h2>Real-world examples</h2>
         <p className="workflow-subtitle">
-          Each workflow below runs on a real Android device.
+          Each workflow below runs on an Android device.
           A natural request goes in, a concrete result comes back.
         </p>
 
@@ -344,7 +361,7 @@ export default function Home() {
         </p>
         <p>
           Clawperator gives your agent a practical way to work in that world. Instead of pretending every service has an
-          integration, you connect the agent to a real Android device and let it operate the app UI the same way a
+          integration, you connect the agent to an Android device and let it operate the app UI the same way a
           person would.
         </p>
       </section>
@@ -360,7 +377,7 @@ export default function Home() {
           <div>
             <h3>What your agent gets</h3>
             <ul>
-              <li>Connect to a real Android burner phone from a simple Node API or CLI</li>
+              <li>Connect to a physical Android burner phone or local Android emulator from a simple Node API or CLI</li>
               <li>Tap, type, scroll, launch apps, and inspect the current UI</li>
               <li>Works with OpenClaw, custom agents, and any AI system capable of making API calls</li>
               <li>Compose reusable skills that automate real mobile workflows</li>
@@ -373,7 +390,7 @@ export default function Home() {
               <li>Use any cheap or old Android phone as a dedicated device for your agent</li>
               <li>Keep it plugged in and connected to your host machine as a permanent hand</li>
               <li>Point your agent at the CLI or Node API and let it drive the phone on the user&apos;s behalf</li>
-              <li>Coming soon: run the same model entirely in an Android emulator, without a physical device</li>
+              <li>Or provision a Google Play equipped Android emulator locally when you do not have a device handy</li>
             </ul>
           </div>
         </div>
@@ -382,7 +399,8 @@ export default function Home() {
           <p>
             <strong>The burner phone model:</strong> Clawperator commonly runs on a cheap Android phone dedicated to
             agent work. This keeps automation isolated from your primary phone and gives your agent a persistent device
-            it can safely control.
+            it can safely control. When a physical device is not available, Clawperator can also provision a local
+            Android emulator as a fallback environment.
           </p>
         </div>
       </section>
@@ -407,8 +425,8 @@ export default function Home() {
             <span className="architecture-text">USB / ADB</span>
           </div>
           <article className="architecture-card architecture-card-core">
-            <p className="architecture-label">Android Burner Device</p>
-            <p className="architecture-meta">dedicated actuator</p>
+            <p className="architecture-label">Android Device</p>
+            <p className="architecture-meta">physical or emulator</p>
           </article>
           <div className="architecture-connector">
             <span className="architecture-line" />
@@ -419,10 +437,10 @@ export default function Home() {
           </article>
         </div>
         <p>
-          Your agent reasons about what should happen. Clawperator executes those decisions on a real Android device.
-          This turns mobile apps into programmable interfaces your agent can use. The Clawperator runtime includes the
-          CLI on your host machine and a lightweight operator app running on the Android device, installed
-          automatically by the setup script.
+          Your agent reasons about what should happen. Clawperator executes those decisions on an Android device. This
+          turns mobile apps into programmable interfaces your agent can use. The Clawperator runtime includes the CLI
+          on your host machine and a lightweight operator app running on the Android device, installed automatically by
+          the setup script.
         </p>
       </section>
 

@@ -11,12 +11,14 @@ nav:
   - Docs Home: index.md
   - clawperator.com: https://clawperator.com
   - Getting Started:
-    - Project Overview: getting-started/project-overview.md
+    - Running Clawperator on Android: getting-started/running-clawperator-on-android.md
+    - Clawperator Terminology: getting-started/terminology.md
     - First-Time Setup: getting-started/first-time-setup.md
-    - The Android Operator APK: getting-started/android-operator-apk.md
+    - OpenClaw First Run: getting-started/openclaw-first-run.md
+    - Project Overview: getting-started/project-overview.md
+    - Clawperator Operator Android app: getting-started/android-operator-apk.md
   - For AI Agents:
     - Node API - Agent Guide: ai-agents/node-api-for-agents.md
-    - Agent Bootstrap Guide: ai-agents/openclaw-remote-bootstrap.md
     - Operator LLM Playbook: design/operator-llm-playbook.md
   - Reference:
     - CLI Reference: reference/cli-reference.md
@@ -26,7 +28,7 @@ nav:
   - Architecture:
     - System Overview: architecture/architecture.md
     - Node Runtime and API Design: design/node-api-design.md
-    - Conformance Test APK: architecture/conformance-apk.md
+
   - Troubleshooting:
     - Version Compatibility: troubleshooting/compatibility.md
     - Troubleshooting the Operator App: troubleshooting/troubleshooting.md

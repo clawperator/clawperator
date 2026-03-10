@@ -24,28 +24,40 @@ sections:
     pages:
       - output: index.md
         title: Clawperator Docs
-        mode: curated
+        mode: copy
         sources:
-          - docs/project-overview.md
-          - docs/first-time-setup.md
-          - docs/architecture.md
-        notes: Keep this as a short landing page. Link outward instead of duplicating long docs.
+          - docs/index.md
 
   - id: getting-started
     title: Getting Started
     pages:
-      - output: getting-started/project-overview.md
-        title: Project Overview
+      - output: getting-started/running-clawperator-on-android.md
+        title: Running Clawperator on Android
         mode: copy
         sources:
-          - docs/project-overview.md
+          - docs/running-clawperator-on-android.md
+      - output: getting-started/terminology.md
+        title: Clawperator Terminology
+        mode: copy
+        sources:
+          - docs/terminology.md
       - output: getting-started/first-time-setup.md
         title: First-Time Setup
         mode: copy
         sources:
           - docs/first-time-setup.md
+      - output: getting-started/openclaw-first-run.md
+        title: OpenClaw First Run
+        mode: copy
+        sources:
+          - docs/openclaw-first-run.md
+      - output: getting-started/project-overview.md
+        title: Project Overview
+        mode: copy
+        sources:
+          - docs/project-overview.md
       - output: getting-started/android-operator-apk.md
-        title: The Android Operator APK
+        title: Clawperator Operator Android app
         mode: copy
         sources:
           - docs/android-operator-apk.md
@@ -58,11 +70,7 @@ sections:
         mode: copy
         sources:
           - docs/architecture.md
-      - output: architecture/conformance-apk.md
-        title: Conformance Test APK
-        mode: copy
-        sources:
-          - docs/conformance-apk.md
+
 
   - id: ai-agents
     title: For AI Agents
@@ -72,11 +80,6 @@ sections:
         mode: copy
         sources:
           - docs/node-api-for-agents.md
-      - output: ai-agents/openclaw-remote-bootstrap.md
-        title: OpenClaw Remote Bootstrap Guide
-        mode: copy
-        sources:
-          - docs/openclaw-remote-bootstrap.md
 
   - id: reference
     title: Reference
