@@ -44,6 +44,9 @@ pip install -r "$REQUIREMENTS_FILE"
 echo "Running MkDocs build..."
 mkdocs build
 
+echo "Generating llms-full.txt..."
+python "$REPO_ROOT/.agents/skills/clawperator-generate-docs/scripts/generate_llms_full.py"
+
 STATIC_DIR="$DOCS_DIR/static"
 if [ -d "$STATIC_DIR" ]; then
     echo "Copying static root files..."
