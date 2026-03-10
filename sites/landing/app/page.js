@@ -25,19 +25,21 @@ const features = [
 export default function Home() {
   const [mode, setMode] = useState("oneLiner");
   const [copied, setCopied] = useState(false);
+  const [emulatorCommandCopied, setEmulatorCommandCopied] = useState(false);
   const [activeSection, setActiveSection] = useState(null);
   const activeCommand = mode === "npm" ? installCommands.npm : installCommands.oneLiner;
+  const emulatorCommand = "clawperator provision emulator";
 
   const sectionIds = ["install", "workflows", "why", "what", "skills", "how-it-works"];
   const sectionLabels = { install: "Install", workflows: "Examples", why: "Why", what: "What", skills: "Skills", "how-it-works": "How it works" };
 
-  const handleCopy = async () => {
+  const copyToClipboard = async (text, setCopiedState) => {
     try {
       if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(activeCommand);
+        await navigator.clipboard.writeText(text);
       } else {
         const textarea = document.createElement("textarea");
-        textarea.value = activeCommand;
+        textarea.value = text;
         textarea.setAttribute("readonly", "");
         textarea.style.position = "fixed";
         textarea.style.opacity = "0";
@@ -46,12 +48,12 @@ export default function Home() {
         document.execCommand("copy");
         document.body.removeChild(textarea);
       }
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1200);
+      setCopiedState(true);
+      window.setTimeout(() => setCopiedState(false), 1200);
     } catch {
       try {
         const textarea = document.createElement("textarea");
-        textarea.value = activeCommand;
+        textarea.value = text;
         textarea.setAttribute("readonly", "");
         textarea.style.position = "fixed";
         textarea.style.opacity = "0";
@@ -59,13 +61,16 @@ export default function Home() {
         textarea.select();
         document.execCommand("copy");
         document.body.removeChild(textarea);
-        setCopied(true);
-        window.setTimeout(() => setCopied(false), 1200);
+        setCopiedState(true);
+        window.setTimeout(() => setCopiedState(false), 1200);
       } catch {
-        setCopied(false);
+        setCopiedState(false);
       }
     }
   };
+
+  const handleCopy = () => copyToClipboard(activeCommand, setCopied);
+  const handleEmulatorCommandCopy = () => copyToClipboard(emulatorCommand, setEmulatorCommandCopied);
 
   useEffect(() => {
     const visibleSections = new Map();
@@ -251,8 +256,33 @@ export default function Home() {
             </p>
             <div className="command-row">
               <pre>
-                <code>clawperator provision emulator</code>
+                <code>{emulatorCommand}</code>
               </pre>
+              <button
+                type="button"
+                className={emulatorCommandCopied ? "copy-btn copied" : "copy-btn"}
+                onClick={handleEmulatorCommandCopy}
+                aria-label={emulatorCommandCopied ? "Copied" : "Copy command"}
+                title={emulatorCommandCopied ? "Copied" : "Copy command"}
+              >
+                {emulatorCommandCopied ? (
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path
+                      d="M20 7L9 18l-5-5"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.3"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <rect x="9" y="9" width="11" height="11" rx="2" ry="2" fill="none" stroke="currentColor" strokeWidth="2" />
+                    <rect x="4" y="4" width="11" height="11" rx="2" ry="2" fill="none" stroke="currentColor" strokeWidth="2" />
+                  </svg>
+                )}
+              </button>
             </div>
           </div>
         </div>
