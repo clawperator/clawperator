@@ -52,7 +52,7 @@ sections:
         sources:
           - docs/project-overview.md
       - output: getting-started/android-operator-apk.md
-        title: The Android Operator APK
+        title: Clawperator Operator Android app
         mode: copy
         sources:
           - docs/android-operator-apk.md

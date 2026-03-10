@@ -1,10 +1,12 @@
-# The Android Operator APK
+# Clawperator Operator Android app
 
-The Operator APK is the "hand" of the Clawperator system. It runs as a background service on your dedicated Android device to execute actions requested by the Node API.
+The [Clawperator Operator Android app](android-operator-apk.md) is Clawperator's own Android app. It runs as a background service on the dedicated Android device and executes actions requested by the Node API.
+
+This term is intentionally different from the Android apps the user wants Clawperator to operate. Those user-installed Android apps are not part of Clawperator itself.
 
 ## Application IDs
 
-The Operator APK is distributed in two variants, each with its own application ID:
+The [Clawperator Operator Android app](android-operator-apk.md) is distributed in two variants, each with its own application ID:
 
 * **`com.clawperator.operator`**: The stable, release version. This is the default package used by the CLI and intended for most users and remote AI agents.
 * **`com.clawperator.operator.dev`**: The local debug version. This is used by developers building the APK from source locally.
@@ -18,15 +20,15 @@ The Operator APK is distributed in two variants, each with its own application I
 - `adb` installed on your host machine.
 
 ### Automatic Installation
-The easiest way to install the APK is via the one-line installer:
+The easiest way to install the [Clawperator Operator Android app](android-operator-apk.md) is via the one-line installer:
 ```bash
 curl -fsSL https://clawperator.com/install.sh | bash
 ```
-This will download the latest APK and install it to your connected device.
+This will download the latest app package and install it to your connected device.
 
 ### Manual Installation
-If you need to install the APK manually:
-1. Download the latest APK from [clawperator.com/operator.apk](https://clawperator.com/operator.apk).
+If you need to install the [Clawperator Operator Android app](android-operator-apk.md) manually:
+1. Download the latest app package from [clawperator.com/operator.apk](https://clawperator.com/operator.apk).
 2. Connect your device via USB.
 3. Run the following command:
    ```bash
@@ -34,14 +36,14 @@ If you need to install the APK manually:
    ```
 
 ### Historical Versions
-Historical versions of the APK can be downloaded from `downloads.clawperator.com`. The URL structure follows the versioning pattern:
+Historical versions of the app package can be downloaded from `downloads.clawperator.com`. The URL structure follows the versioning pattern:
 - `https://downloads.clawperator.com/operator/v<version>/operator-v<version>.apk`
 
 Example for v0.2.1:
 - [https://downloads.clawperator.com/operator/v0.2.1/operator-v0.2.1.apk](https://downloads.clawperator.com/operator/v0.2.1/operator-v0.2.1.apk)
 
 ## Granting Permissions
-After installation, you must grant accessibility and notification permissions for the Operator to function correctly. This allows it to inspect the screen and interact with the UI.
+After installation, you must grant accessibility and notification permissions for the [Clawperator Operator Android app](android-operator-apk.md) to function correctly. This allows it to inspect the screen and interact with the UI.
 
 You can do this via the CLI:
 ```bash
@@ -50,7 +52,7 @@ clawperator grant-device-permissions
 
 ## Logging and Debugging
 
-Starting from v0.2.1, the Operator APK enables **debug logging in release builds** by default. 
+Starting from v0.2.1, the [Clawperator Operator Android app](android-operator-apk.md) enables **debug logging in release builds** by default.
 
 The app is **intentionally "noisy" in logcat**. This provides maximum visibility into UI events, accessibility node trees, and command execution states, ensuring that remote AI agents can observe the internal state and troubleshoot issues directly through `adb logcat` even when using production APKs.
 

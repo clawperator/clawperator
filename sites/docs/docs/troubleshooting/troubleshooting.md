@@ -87,11 +87,11 @@ If you must use **Wireless Debugging**, be aware that your mileage may vary (YMM
 
 ## Installer behavior
 
-`curl -fsSL https://clawperator.com/install.sh | bash` uses the stable metadata file at `https://downloads.clawperator.com/operator/latest.json`, downloads the immutable APK and `.sha256`, verifies the checksum, then handles device install like this:
+`curl -fsSL https://clawperator.com/install.sh | bash` uses the stable metadata file at `https://downloads.clawperator.com/operator/latest.json`, downloads the immutable package for the [Clawperator Operator Android app](../getting-started/android-operator-apk.md) plus its `.sha256`, verifies the checksum, then handles device install like this:
 
 1. **One connected device** - the installer offers to run `adb install -r ~/.clawperator/downloads/operator.apk`.
 2. **Multiple connected devices** - the installer skips the install and prints `adb -s <device_id> install -r ~/.clawperator/downloads/operator.apk`.
-3. **No connected devices** - the installer skips the install and leaves the verified APK at `~/.clawperator/downloads/operator.apk`.
+3. **No connected devices** - the installer skips the install and leaves the verified package for the [Clawperator Operator Android app](../getting-started/android-operator-apk.md) at `~/.clawperator/downloads/operator.apk`.
 4. **`adb` missing** - the installer attempts to install `adb` automatically, or stops with a manual install link if it cannot.
 
 ## Emulator-Specific Issues
@@ -222,7 +222,7 @@ Once an emulator is provisioned, you may have both a physical device and an emul
 
 ### Installer cloned everything except skills
 
-If the installer finishes but warns that skills setup was skipped, the core CLI and operator APK are still installed. This does not block `clawperator doctor`, device discovery, or direct command execution. To set up skills manually:
+If the installer finishes but warns that skills setup was skipped, the core CLI and [Clawperator Operator Android app](../getting-started/android-operator-apk.md) are still installed. This does not block `clawperator doctor`, device discovery, or direct command execution. To set up skills manually:
 
 ```bash
 git clone https://clawperator.com/install/clawperator-skills.bundle ~/.clawperator/skills
@@ -233,7 +233,7 @@ export CLAWPERATOR_SKILLS_REGISTRY="$HOME/.clawperator/skills/skills/skills-regi
 
 ## Version Compatibility
 
-The Node CLI and the Android APK must have matching `major.minor` versions.
+The Node CLI and the installed [Clawperator Operator Android app](../getting-started/android-operator-apk.md) must have matching `major.minor` versions.
 
 - `0.1.4` and `0.1.9` are compatible
 - `0.1.4` and `0.1.4-d` are compatible
@@ -245,7 +245,7 @@ Use:
 clawperator version --check-compat --receiver-package com.clawperator.operator
 ```
 
-If the versions do not match, upgrade the CLI and install a compatible APK. For the full rule, examples, and remediation steps, see [Version Compatibility](compatibility.md).
+If the versions do not match, upgrade the CLI and install a compatible [Clawperator Operator Android app](../getting-started/android-operator-apk.md). For the full rule, examples, and remediation steps, see [Version Compatibility](compatibility.md).
 
 ---
 

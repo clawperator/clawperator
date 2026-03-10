@@ -23,7 +23,7 @@ The simplest path is to run the installer:
 curl -fsSL https://clawperator.com/install.sh | bash
 ```
 
-The installer installs the CLI, downloads the latest stable APK locally, and runs `clawperator doctor` to detect missing setup.
+The installer installs the CLI, downloads the latest stable [Clawperator Operator Android app](android-operator-apk.md) package locally, and runs `clawperator doctor` to detect missing setup.
 
 Historical versions and release notes remain available on [GitHub Releases](https://github.com/clawpilled/clawperator/releases).
 
@@ -80,9 +80,9 @@ If both a physical device and an emulator are connected, you will need to pass `
 
 ---
 
-## Step 3 - Install the APK
+## Step 3 - Install the Clawperator Operator Android app
 
-Install the operator APK onto the connected device or emulator:
+Install the [Clawperator Operator Android app](android-operator-apk.md) onto the connected device or emulator:
 
 ```bash
 adb install -r ~/.clawperator/downloads/operator.apk
@@ -127,7 +127,7 @@ A fully configured device will show all checks passing. Common warnings:
 | Warning | Fix |
 | :--- | :--- |
 | `DEVICE_UNAUTHORIZED` | Tap "Allow" on the device USB debugging dialog |
-| `RECEIVER_NOT_INSTALLED` | Complete Step 3 (install APK) |
+| `RECEIVER_NOT_INSTALLED` | Complete Step 3 (install the [Clawperator Operator Android app](android-operator-apk.md)) |
 | `DEVICE_ACCESSIBILITY_NOT_RUNNING` | Complete Step 4 (enable accessibility service) |
 | `DEVICE_DEV_OPTIONS_DISABLED` | Enable Developer options (physical device only) |
 | `DEVICE_USB_DEBUGGING_DISABLED` | Enable USB debugging (physical device only) |
@@ -151,9 +151,9 @@ clawperator action open-app \
   --receiver-package com.clawperator.operator
 ```
 
-> Use `com.clawperator.operator` for release APK, `com.clawperator.operator.dev` for debug APK.
+> Use `com.clawperator.operator` for the release [Clawperator Operator Android app](android-operator-apk.md), `com.clawperator.operator.dev` for the local debug build.
 
-Before running real automations, make sure the target app is installed, signed in, and already configured on the device or emulator.
+Before running real automations, make sure the Android apps the user wants Clawperator to operate are installed, signed in, and already configured on the device or emulator.
 
 ---
 
@@ -174,7 +174,7 @@ See [Troubleshooting the Operator App](https://docs.clawperator.com/troubleshoot
 
 For environment checks: `clawperator doctor --output pretty`
 
-Verify the installed CLI/APK pair explicitly:
+Verify the installed CLI and [Clawperator Operator Android app](android-operator-apk.md) pair explicitly:
 
 ```bash
 clawperator version --check-compat --receiver-package com.clawperator.operator

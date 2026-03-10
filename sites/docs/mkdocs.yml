@@ -15,7 +15,7 @@ nav:
     - First-Time Setup: getting-started/first-time-setup.md
     - OpenClaw Remote Bootstrap Guide: getting-started/openclaw-remote-bootstrap.md
     - Project Overview: getting-started/project-overview.md
-    - The Android Operator APK: getting-started/android-operator-apk.md
+    - Clawperator Operator Android app: getting-started/android-operator-apk.md
   - For AI Agents:
     - Node API - Agent Guide: ai-agents/node-api-for-agents.md
     - Operator LLM Playbook: design/operator-llm-playbook.md

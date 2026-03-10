@@ -1,18 +1,18 @@
 # Version Compatibility
 
-Clawperator expects the Node CLI and the installed Android Operator APK to move together.
+Clawperator expects the Node CLI and the installed [Clawperator Operator Android app](../getting-started/android-operator-apk.md) to move together.
 
 ## Compatibility rule
 
-The CLI and APK are compatible when their `major.minor` versions match.
+The CLI and the [Clawperator Operator Android app](../getting-started/android-operator-apk.md) are compatible when their `major.minor` versions match.
 
 Examples:
 
-- CLI `0.1.4` and APK `0.1.4` - compatible
-- CLI `0.1.4` and APK `0.1.9` - compatible
-- CLI `0.1.4` and APK `0.1.4-d` - compatible
-- CLI `0.1.4-rc.1` and APK `0.1.4-d` - compatible
-- CLI `0.1.4` and APK `0.2.1` - not compatible
+- CLI `0.1.4` and app `0.1.4` - compatible
+- CLI `0.1.4` and app `0.1.9` - compatible
+- CLI `0.1.4` and app `0.1.4-d` - compatible
+- CLI `0.1.4-rc.1` and app `0.1.4-d` - compatible
+- CLI `0.1.4` and app `0.2.1` - not compatible
 
 Notes:
 
@@ -28,7 +28,7 @@ Print the CLI version:
 clawperator version
 ```
 
-Check the CLI against the installed APK:
+Check the CLI against the installed [Clawperator Operator Android app](../getting-started/android-operator-apk.md):
 
 ```bash
 clawperator version --check-compat --receiver-package com.clawperator.operator
@@ -37,8 +37,8 @@ clawperator version --check-compat --receiver-package com.clawperator.operator
 The compatibility check reports:
 
 - CLI version
-- installed APK version
-- installed APK versionCode
+- installed [Clawperator Operator Android app](../getting-started/android-operator-apk.md) version
+- installed [Clawperator Operator Android app](../getting-started/android-operator-apk.md) `versionCode`
 - receiver package checked
 - compatibility verdict
 - remediation guidance when versions do not match
@@ -47,11 +47,11 @@ The compatibility check reports:
 
 ## Common mismatch symptoms
 
-When the CLI and APK are out of sync, you may see:
+When the CLI and the [Clawperator Operator Android app](../getting-started/android-operator-apk.md) are out of sync, you may see:
 
 - `VERSION_INCOMPATIBLE` from `clawperator doctor` or `clawperator version --check-compat`
-- `RESULT_ENVELOPE_MALFORMED` if the CLI and APK disagree on result shape
-- `EXECUTION_ACTION_UNSUPPORTED` when the CLI sends an action the APK does not support yet
+- `RESULT_ENVELOPE_MALFORMED` if the CLI and the [Clawperator Operator Android app](../getting-started/android-operator-apk.md) disagree on result shape
+- `EXECUTION_ACTION_UNSUPPORTED` when the CLI sends an action the [Clawperator Operator Android app](../getting-started/android-operator-apk.md) does not support yet
 - timeouts or handshake failures after a partial upgrade
 
 ## Remediation
@@ -62,7 +62,7 @@ Upgrade the CLI:
 npm install -g clawperator@latest
 ```
 
-Install a compatible APK:
+Install a compatible [Clawperator Operator Android app](../getting-started/android-operator-apk.md):
 
 ```bash
 adb install -r <apk_path>
@@ -70,10 +70,10 @@ adb install -r <apk_path>
 
 If you are using a local debug build, make sure the receiver package matches the installed variant:
 
-- release APK: `com.clawperator.operator`
-- debug APK: `com.clawperator.operator.dev`
+- release app package: `com.clawperator.operator`
+- debug app package: `com.clawperator.operator.dev`
 
-If the APK version cannot be read, verify the device can return package metadata:
+If the [Clawperator Operator Android app](../getting-started/android-operator-apk.md) version cannot be read, verify the device can return package metadata:
 
 ```bash
 adb shell dumpsys package <receiverPackage>

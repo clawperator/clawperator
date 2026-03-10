@@ -35,13 +35,13 @@ The installer:
 - detects `node`, `adb`, `git`, `curl`
 - installs the `clawperator` CLI to a location on `PATH`
 - runs `clawperator doctor --format json` to detect what still needs repair
-- downloads and installs or upgrades the Operator APK on the connected device when doctor reports it missing, mismatched, or incompatible
-- auto-runs `clawperator grant-device-permissions` after a successful APK install when exactly one device is connected
+- downloads and installs or upgrades the [Clawperator Operator Android app](android-operator-apk.md) on the connected device when doctor reports it missing, mismatched, or incompatible
+- auto-runs `clawperator grant-device-permissions` after a successful [Clawperator Operator Android app](android-operator-apk.md) install when exactly one device is connected
 - runs `clawperator skills install` to populate `~/.clawperator/skills/`
 - writes `CLAWPERATOR_SKILLS_REGISTRY` into your shell profile when skills setup succeeds
 - runs a final doctor check and exits non-zero if the environment is still not ready
 
-In non-interactive mode (piped execution), the APK install proceeds automatically without prompts.
+In non-interactive mode (piped execution), installation of the [Clawperator Operator Android app](android-operator-apk.md) proceeds automatically without prompts.
 
 Verify the CLI is available after install:
 
@@ -75,7 +75,7 @@ clawperator skills install
 
 ## Step 3 - Grant Device Permissions
 
-The Operator APK requires the Android Accessibility Service to be running. Enable it via the CLI:
+The [Clawperator Operator Android app](android-operator-apk.md) requires the Android Accessibility Service to be running. Enable it via the CLI:
 
 ```bash
 clawperator grant-device-permissions
@@ -89,7 +89,7 @@ With multiple devices connected, target one explicitly:
 clawperator grant-device-permissions --device-id <device_id>
 ```
 
-With the debug APK variant:
+With the debug variant of the [Clawperator Operator Android app](android-operator-apk.md):
 
 ```bash
 clawperator grant-device-permissions --receiver-package com.clawperator.operator.dev
@@ -97,7 +97,7 @@ clawperator grant-device-permissions --receiver-package com.clawperator.operator
 
 This command enables the accessibility service via adb and does not require on-device interaction.
 
-It does not install target apps, sign into them, or configure their first-run state.
+It does not install the Android apps the user wants Clawperator to operate, sign into them, or configure their first-run state.
 
 ---
 
@@ -109,7 +109,7 @@ Run the doctor to confirm all checks pass:
 clawperator doctor --output pretty
 ```
 
-If you are using a local debug APK, add `--receiver-package com.clawperator.operator.dev` to `grant-device-permissions`, `doctor`, `version --check-compat`, and `observe snapshot`.
+If you are using a local debug build of the [Clawperator Operator Android app](android-operator-apk.md), add `--receiver-package com.clawperator.operator.dev` to `grant-device-permissions`, `doctor`, `version --check-compat`, and `observe snapshot`.
 
 Expected passing output (condensed):
 
@@ -117,7 +117,7 @@ Expected passing output (condensed):
 PASS  Node version is compatible
 PASS  adb is installed and healthy
 PASS  Device is connected and reachable
-PASS  Operator APK is installed
+PASS  Clawperator Operator Android app is installed
 PASS  Developer options are enabled
 PASS  USB debugging is enabled
 PASS  Handshake successful
@@ -163,7 +163,7 @@ This can also happen if the command was sent to the wrong receiver package. Publ
 clawperator grant-device-permissions [--device-id <id>] [--receiver-package <pkg>]
 ```
 
-If the `grant-device-permissions` command fails, check that the APK is installed and the device is reachable:
+If the `grant-device-permissions` command fails, check that the [Clawperator Operator Android app](android-operator-apk.md) is installed and the device is reachable:
 
 ```bash
 clawperator doctor --output pretty
@@ -179,9 +179,9 @@ clawperator observe snapshot --timeout-ms 5000 --output pretty --verbose
 
 ---
 
-### Operator APK not installed (RECEIVER_NOT_INSTALLED)
+### Clawperator Operator Android app not installed (`RECEIVER_NOT_INSTALLED`)
 
-**Cause:** The installer did not install the APK, or the wrong variant is installed.
+**Cause:** The installer did not install the [Clawperator Operator Android app](android-operator-apk.md), or the wrong variant is installed.
 
 **Fix:** Re-run the installer:
 
@@ -189,19 +189,19 @@ clawperator observe snapshot --timeout-ms 5000 --output pretty --verbose
 curl -fsSL https://clawperator.com/install.sh | bash
 ```
 
-Or install the APK manually:
+Or install the [Clawperator Operator Android app](android-operator-apk.md) manually:
 
 ```bash
 adb install -r <path-to-operator.apk>
 ```
 
-The APK is cached at `~/.clawperator/downloads/operator.apk` after first install.
+The app package is cached at `~/.clawperator/downloads/operator.apk` after first install.
 
 ---
 
-### CLI/APK version mismatch (VERSION_INCOMPATIBLE)
+### CLI / Clawperator Operator Android app version mismatch (`VERSION_INCOMPATIBLE`)
 
-**Cause:** The installed APK does not match the CLI's expected `major.minor` version.
+**Cause:** The installed [Clawperator Operator Android app](android-operator-apk.md) does not match the CLI's expected `major.minor` version.
 
 **Check:**
 
@@ -209,7 +209,7 @@ The APK is cached at `~/.clawperator/downloads/operator.apk` after first install
 clawperator version --check-compat
 ```
 
-**Fix:** Re-run the installer. The installer now upgrades an incompatible installed APK as part of the normal bootstrap flow:
+**Fix:** Re-run the installer. The installer now upgrades an incompatible installed [Clawperator Operator Android app](android-operator-apk.md) as part of the normal bootstrap flow:
 
 ```bash
 curl -fsSL https://clawperator.com/install.sh | bash

@@ -5,7 +5,13 @@ Clawperator operates an Android device on behalf of a user. In these docs, "Andr
 - a physical Android phone connected over `adb`
 - a local Android emulator provisioned through the Node CLI
 
-This is the canonical actuator model for Clawperator. The Node runtime talks to an Android device, and the Android device runs the Operator app.
+This is the canonical actuator model for Clawperator. The Node runtime talks to an Android device, and the Android device runs the [Clawperator Operator Android app](android-operator-apk.md).
+
+## Terminology
+
+- **Android device**: the actuator environment. This can be a physical Android device or a local Android emulator.
+- **[Clawperator Operator Android app](android-operator-apk.md)**: Clawperator's own Android app. It receives commands from the Node runtime and executes them through Android Accessibility.
+- **User-installed Android apps**: the apps the user wants Clawperator to operate, such as Settings, shopping apps, banking apps, or social apps. These apps are the user's responsibility to install and sign into.
 
 ## The actuator model
 
@@ -26,7 +32,7 @@ Before automation starts, the user is responsible for preparing the Android devi
 - installing the apps the automation will target
 - signing into Google, Play Store, and any app-specific accounts
 - completing first-run flows, prompts, and app configuration
-- ensuring the target apps are in a usable state for automation
+- ensuring the user-installed Android apps are in a usable state for automation
 
 Clawperator does not:
 
@@ -87,13 +93,13 @@ The default supported emulator profile is:
 Even on an emulator, the user still needs to:
 
 - sign in to a Google account if Play Store access is needed
-- install the target apps
+- install the user-installed Android apps
 - sign in to those apps
 - complete any first-run configuration
 
-## Installing the Operator APK
+## Installing the Clawperator Operator Android app
 
-The Operator APK installs the same way on both environments:
+The [Clawperator Operator Android app](android-operator-apk.md) installs the same way on both environments:
 
 ```bash
 adb install -r ~/.clawperator/downloads/operator.apk
@@ -107,7 +113,7 @@ adb -s <device_id> install -r ~/.clawperator/downloads/operator.apk
 
 ## Granting permissions
 
-Clawperator uses Android Accessibility to observe and operate the UI. After the APK is installed, enable the required permissions from the host:
+Clawperator uses Android Accessibility to observe and operate the UI. After the [Clawperator Operator Android app](android-operator-apk.md) is installed, enable the required permissions from the host:
 
 ```bash
 clawperator grant-device-permissions
@@ -123,4 +129,4 @@ Use `doctor` to confirm the Android device is ready:
 clawperator doctor
 ```
 
-`doctor` verifies that the device is reachable, the Operator APK is installed, and the runtime handshake is working. All critical checks must pass before automation starts.
+`doctor` verifies that the device is reachable, the [Clawperator Operator Android app](android-operator-apk.md) is installed, and the runtime handshake is working. All critical checks must pass before automation starts.

@@ -22,8 +22,8 @@ The Android app runs as a persistent background service on the dedicated actuato
 
 The app ships in two variants:
 
-- `com.clawperator.operator` - release APK, used by default
-- `com.clawperator.operator.dev` - local debug APK, used when building from source
+- `com.clawperator.operator` - release build of the [Clawperator Operator Android app](../getting-started/android-operator-apk.md), used by default
+- `com.clawperator.operator.dev` - local debug build of the [Clawperator Operator Android app](../getting-started/android-operator-apk.md), used when building from source
 
 ### Node CLI/API (`apps/node`)
 
@@ -84,7 +84,7 @@ The default supported profile is Android API `35`, Google Play, ABI `arm64-v8a`,
 
 ```
 apps/android/
-  app/              - Operator APK (com.clawperator.operator)
+  app/              - Clawperator Operator Android app (com.clawperator.operator)
   app-conformance/  - Conformance test APK for execution layer testing
   shared/           - Shared Android modules (action engine, contracts, etc.)
 ```
