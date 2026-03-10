@@ -25,66 +25,71 @@ const features = [
 export default function Home() {
   const [mode, setMode] = useState("oneLiner");
   const [copied, setCopied] = useState(false);
-  const [showToolbar, setShowToolbar] = useState(false);
+  const [emulatorCommandCopied, setEmulatorCommandCopied] = useState(false);
   const [activeSection, setActiveSection] = useState(null);
-  const heroLogoRef = useRef(null);
   const activeCommand = mode === "npm" ? installCommands.npm : installCommands.oneLiner;
+  const emulatorCommand = "clawperator provision emulator";
 
   const sectionIds = ["install", "workflows", "why", "what", "skills", "how-it-works"];
   const sectionLabels = { install: "Install", workflows: "Examples", why: "Why", what: "What", skills: "Skills", "how-it-works": "How it works" };
 
-  const handleCopy = async () => {
+  const copyTimeoutRef = useRef(null);
+  const emulatorCopyTimeoutRef = useRef(null);
+
+  const copyToClipboard = async (text, setCopiedState, timeoutRef) => {
+    const fallbackCopy = () => {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      textarea.setAttribute("readonly", "");
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.select();
+      const successful = document.execCommand("copy");
+      document.body.removeChild(textarea);
+      return successful;
+    };
+
     try {
       if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(activeCommand);
+        await navigator.clipboard.writeText(text);
       } else {
-        const textarea = document.createElement("textarea");
-        textarea.value = activeCommand;
-        textarea.setAttribute("readonly", "");
-        textarea.style.position = "fixed";
-        textarea.style.opacity = "0";
-        document.body.appendChild(textarea);
-        textarea.select();
-        document.execCommand("copy");
-        document.body.removeChild(textarea);
+        if (!fallbackCopy()) throw new Error("Fallback copy failed");
       }
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1200);
     } catch {
       try {
-        const textarea = document.createElement("textarea");
-        textarea.value = activeCommand;
-        textarea.setAttribute("readonly", "");
-        textarea.style.position = "fixed";
-        textarea.style.opacity = "0";
-        document.body.appendChild(textarea);
-        textarea.select();
-        document.execCommand("copy");
-        document.body.removeChild(textarea);
-        setCopied(true);
-        window.setTimeout(() => setCopied(false), 1200);
+        if (!fallbackCopy()) {
+          setCopiedState(false);
+          return;
+        }
       } catch {
-        setCopied(false);
+        setCopiedState(false);
+        return;
       }
     }
+
+    if (timeoutRef.current) {
+      window.clearTimeout(timeoutRef.current);
+    }
+    
+    setCopiedState(true);
+    timeoutRef.current = window.setTimeout(() => {
+      setCopiedState(false);
+      timeoutRef.current = null;
+    }, 1200);
   };
 
+  const handleCopy = () => copyToClipboard(activeCommand, setCopied, copyTimeoutRef);
+  const handleEmulatorCommandCopy = () => copyToClipboard(emulatorCommand, setEmulatorCommandCopied, emulatorCopyTimeoutRef);
+
   useEffect(() => {
-    if (!heroLogoRef.current) {
-      return;
-    }
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const [entry] = entries;
-        setShowToolbar(!entry.isIntersecting);
-      },
-      { threshold: 0 }
-    );
-
-    observer.observe(heroLogoRef.current);
-    return () => observer.disconnect();
+    return () => {
+      if (copyTimeoutRef.current) window.clearTimeout(copyTimeoutRef.current);
+      if (emulatorCopyTimeoutRef.current) window.clearTimeout(emulatorCopyTimeoutRef.current);
+    };
   }, []);
+
+  const toolbarRef = useRef(null);
 
   useEffect(() => {
     const visibleSections = new Map();
@@ -109,7 +114,12 @@ export default function Home() {
         }
         setActiveSection(best);
       },
-      { threshold: [0, 0.2, 0.4], rootMargin: `-${80 + 16}px 0px -30% 0px` }
+      { 
+        threshold: [0, 0.2, 0.4], 
+        // Use a rootMargin that accounts for the actual toolbar height + small buffer.
+        // We measure the offsetHeight of the toolbarRef if available.
+        rootMargin: `-${(toolbarRef.current?.offsetHeight || 80) + 20}px 0px -30% 0px` 
+      }
     );
 
     for (const id of sectionIds) {
@@ -121,7 +131,7 @@ export default function Home() {
 
   return (
     <>
-      <header className={showToolbar ? "top-toolbar visible" : "top-toolbar hidden"}>
+      <header ref={toolbarRef} className="top-toolbar">
         <div className="top-toolbar-inner">
           <a href="#top" className="toolbar-brand">
             <img src="/clawperator-logo.png" alt="" aria-hidden="true" className="toolbar-logo" />
@@ -156,9 +166,13 @@ export default function Home() {
       <section id="top" className="hero-card">
         <div className="hero-waterfall">
           <p className="hero-problem">Most services only expose their real functionality through mobile apps.</p>
-          <img ref={heroLogoRef} src="/clawperator-logo.png" alt="" aria-hidden="true" className="hero-logo" />
+          <img src="/clawperator-logo.png" alt="" aria-hidden="true" className="hero-logo" />
           <p className="hero-product-name">Clawperator</p>
-          <h1 className="hero-catchphrase">Your agent thinks. Clawperator acts.</h1>
+          <h1 className="hero-catchphrase">
+            YOUR AGENT THINKS.
+            <br />
+            CLAWPERATOR ACTS.
+          </h1>
           <p className="hero-summary">
             Let AI agents control Android apps on behalf of users.
             <br />
@@ -170,11 +184,20 @@ export default function Home() {
             <br />
             The brain decides what to do next.
             <br />
-            Clawperator connects that agent to a dedicated Android burner phone or local Android emulator, executes the
-            action, and returns structured results your code can trust.
+            Clawperator connects that agent to a dedicated Android burner phone or local Android emulator, executes the action, and returns reliable, structured results your agent can trust and use to build your own private workflows on top of.
           </p>
-        </div>
 
+          <div className="hero-image-panel">
+            <img
+              src="https://static.clawperator.com/img/hero/clawperator_hero.webp"
+              alt="Diagram showing how OpenClaw and Clawperator let AI agents control real Android apps and return results to chat. This image was made with human claws."
+              title="this image was made with human claws"
+              width="780"
+              height="293"
+              className="hero-diagram"
+            />
+          </div>
+          </div>
         <div className="quickstart-intro">
           <h2 id="install">Quick Start</h2>
           <p>
@@ -259,8 +282,33 @@ export default function Home() {
             </p>
             <div className="command-row">
               <pre>
-                <code>clawperator provision emulator</code>
+                <code>{emulatorCommand}</code>
               </pre>
+              <button
+                type="button"
+                className={emulatorCommandCopied ? "copy-btn copied" : "copy-btn"}
+                onClick={handleEmulatorCommandCopy}
+                aria-label={emulatorCommandCopied ? "Copied" : "Copy command"}
+                title={emulatorCommandCopied ? "Copied" : "Copy command"}
+              >
+                {emulatorCommandCopied ? (
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path
+                      d="M20 7L9 18l-5-5"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.3"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <rect x="9" y="9" width="11" height="11" rx="2" ry="2" fill="none" stroke="currentColor" strokeWidth="2" />
+                    <rect x="4" y="4" width="11" height="11" rx="2" ry="2" fill="none" stroke="currentColor" strokeWidth="2" />
+                  </svg>
+                )}
+              </button>
             </div>
           </div>
         </div>
@@ -282,23 +330,6 @@ export default function Home() {
         </p>
 
         <div className="workflow-cards">
-          <article className="workflow-card">
-            <div className="workflow-exchange">
-              <div className="workflow-msg workflow-msg-user">
-                <p className="workflow-role">User <span className="workflow-channel">via Telegram</span></p>
-                <p>&ldquo;Hey assistant, what&rsquo;s my current home battery level?&rdquo;</p>
-              </div>
-              <div className="workflow-msg workflow-msg-agent">
-                <p className="workflow-role">OpenClaw</p>
-                <p>Uses Clawperator to open the home battery app on the Android device and read the current battery level.</p>
-              </div>
-              <div className="workflow-msg workflow-msg-response">
-                <p className="workflow-role">Response</p>
-                <p>&ldquo;Your home battery is at 73% and charging from solar. Should be full around 2:20pm.&rdquo;</p>
-              </div>
-            </div>
-          </article>
-
           <article className="workflow-card">
             <div className="workflow-exchange">
               <div className="workflow-msg workflow-msg-user">
