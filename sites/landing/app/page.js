@@ -169,7 +169,7 @@ export default function Home() {
               alt="Diagram showing how OpenClaw and Clawperator let AI agents control real Android apps and return results to chat. This image was made with human claws."
               title="this image was made with human claws"
               width="780"
-              height="420"
+              height="293"
               className="hero-diagram"
             />
           </div>
