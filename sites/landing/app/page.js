@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const installCommands = {
   oneLiner: "curl -fsSL https://clawperator.com/install.sh | bash",
@@ -33,7 +33,10 @@ export default function Home() {
   const sectionIds = ["install", "workflows", "why", "what", "skills", "how-it-works"];
   const sectionLabels = { install: "Install", workflows: "Examples", why: "Why", what: "What", skills: "Skills", "how-it-works": "How it works" };
 
-  const copyToClipboard = async (text, setCopiedState) => {
+  const copyTimeoutRef = useRef(null);
+  const emulatorCopyTimeoutRef = useRef(null);
+
+  const copyToClipboard = async (text, setCopiedState, timeoutRef) => {
     try {
       if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(text);
@@ -48,29 +51,23 @@ export default function Home() {
         document.execCommand("copy");
         document.body.removeChild(textarea);
       }
-      setCopiedState(true);
-      window.setTimeout(() => setCopiedState(false), 1200);
-    } catch {
-      try {
-        const textarea = document.createElement("textarea");
-        textarea.value = text;
-        textarea.setAttribute("readonly", "");
-        textarea.style.position = "fixed";
-        textarea.style.opacity = "0";
-        document.body.appendChild(textarea);
-        textarea.select();
-        document.execCommand("copy");
-        document.body.removeChild(textarea);
-        setCopiedState(true);
-        window.setTimeout(() => setCopiedState(false), 1200);
-      } catch {
-        setCopiedState(false);
+      
+      if (timeoutRef.current) {
+        window.clearTimeout(timeoutRef.current);
       }
+      
+      setCopiedState(true);
+      timeoutRef.current = window.setTimeout(() => {
+        setCopiedState(false);
+        timeoutRef.current = null;
+      }, 1200);
+    } catch {
+      setCopiedState(false);
     }
   };
 
-  const handleCopy = () => copyToClipboard(activeCommand, setCopied);
-  const handleEmulatorCommandCopy = () => copyToClipboard(emulatorCommand, setEmulatorCommandCopied);
+  const handleCopy = () => copyToClipboard(activeCommand, setCopied, copyTimeoutRef);
+  const handleEmulatorCommandCopy = () => copyToClipboard(emulatorCommand, setEmulatorCommandCopied, emulatorCopyTimeoutRef);
 
   useEffect(() => {
     const visibleSections = new Map();
@@ -95,7 +92,12 @@ export default function Home() {
         }
         setActiveSection(best);
       },
-      { threshold: [0, 0.2, 0.4], rootMargin: `-${80 + 16}px 0px -30% 0px` }
+      { 
+        threshold: [0, 0.2, 0.4], 
+        // Use a more generous rootMargin or one that adjusts to toolbar height.
+        // We'll use a slightly larger offset to account for the toolbar + some buffer.
+        rootMargin: "-140px 0px -30% 0px" 
+      }
     );
 
     for (const id of sectionIds) {
