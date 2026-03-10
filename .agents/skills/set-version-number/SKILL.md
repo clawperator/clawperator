@@ -19,7 +19,7 @@ cd "$(git rev-parse --show-toplevel)"
 Example:
 
 ```bash
-.agents/skills/set-version-number/scripts/set_version.py 0.2.1 0.2.3
+.agents/skills/set-version-number/scripts/set_version.py 0.2.1 0.2.4
 ```
 
 The script will:
