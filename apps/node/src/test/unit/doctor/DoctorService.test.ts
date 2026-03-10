@@ -54,7 +54,7 @@ describe("DoctorService", () => {
     runner.queueResult({ code: 0, stdout: "package:com.clawperator.operator.dev\n", stderr: "" });
     runner.queueResult({
       code: 0,
-      stdout: "    versionCode=200000 minSdk=21 targetSdk=35\n    versionName=0.2.1-d\n",
+      stdout: "    versionCode=200000 minSdk=21 targetSdk=35\n    versionName=0.2.2-d\n",
       stderr: "",
     });
     runner.queueResult({ code: 0, stdout: "1\n", stderr: "" });
