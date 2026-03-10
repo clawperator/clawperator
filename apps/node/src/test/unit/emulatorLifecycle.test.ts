@@ -26,15 +26,21 @@ async function writeAvd(homeDir: string, name: string, configIni: string): Promi
 
 describe("emulator lifecycle", () => {
   const originalHome = process.env.HOME;
+  const originalAndroidHome = process.env.ANDROID_HOME;
+  const originalAndroidSdkRoot = process.env.ANDROID_SDK_ROOT;
   let testHome: string;
 
   beforeEach(async () => {
     testHome = await mkdtemp(join(tmpdir(), "clawperator-emulator-lifecycle-test-"));
     process.env.HOME = testHome;
+    delete process.env.ANDROID_HOME;
+    delete process.env.ANDROID_SDK_ROOT;
   });
 
   afterEach(() => {
     process.env.HOME = originalHome;
+    process.env.ANDROID_HOME = originalAndroidHome;
+    process.env.ANDROID_SDK_ROOT = originalAndroidSdkRoot;
   });
 
   it("installs a missing system image after accepting licenses", async () => {
@@ -46,11 +52,11 @@ describe("emulator lifecycle", () => {
     const config = getDefaultRuntimeConfig({ runner });
     await ensureSystemImageInstalled(config, "system-images;android-35;google_apis_playstore;arm64-v8a");
 
-    assert.strictEqual(runner.calls[0].command, "sdkmanager");
+    assert.strictEqual(runner.calls[0].command, config.sdkmanagerPath);
     assert.deepStrictEqual(runner.calls[0].args, ["--list_installed"]);
-    assert.strictEqual(runner.calls[1].command, "sdkmanager");
+    assert.strictEqual(runner.calls[1].command, config.sdkmanagerPath);
     assert.deepStrictEqual(runner.calls[1].args, ["--licenses"]);
-    assert.strictEqual(runner.calls[2].command, "sdkmanager");
+    assert.strictEqual(runner.calls[2].command, config.sdkmanagerPath);
     assert.deepStrictEqual(runner.calls[2].args, ["system-images;android-35;google_apis_playstore;arm64-v8a"]);
   });
 
@@ -66,7 +72,7 @@ describe("emulator lifecycle", () => {
     const config = getDefaultRuntimeConfig({ runner });
     await createAvd(config, { name: "clawperator-pixel" });
 
-    assert.strictEqual(runner.calls[1].command, "avdmanager");
+    assert.strictEqual(runner.calls[1].command, config.avdmanagerPath);
     assert.deepStrictEqual(runner.calls[1].args, [
       "create", "avd", "--force", "--name", "clawperator-pixel",
       "--package", "system-images;android-35;google_apis_playstore;arm64-v8a",
