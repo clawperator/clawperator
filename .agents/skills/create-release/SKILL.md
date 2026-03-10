@@ -1,0 +1,59 @@
+---
+name: create-release
+description: Validates a Clawperator release candidate, creates and pushes an annotated git tag for a specific version and commit, and inspects the resulting GitHub Actions release workflows.
+---
+
+Use this skill after the release version has already been committed to the repository. Keep version bumping separate.
+
+This skill creates a release by:
+1. Verifying the requested version matches `apps/node/package.json`.
+2. Refusing to proceed if the version is already published on npm, if the tag already exists, or if a GitHub Release already exists.
+3. Running the same local Node checks used by `.github/workflows/publish-npm.yml`:
+   - `npm --prefix apps/node ci`
+   - `npm --prefix apps/node run build`
+   - `npm --prefix apps/node run test`
+4. Creating an annotated `v<version>` tag at the requested SHA.
+5. Pushing only that tag.
+6. Inspecting the resulting `Publish npm Package` and `Release APK` workflow runs with `gh`.
+
+Run:
+
+```bash
+cd "$(git rev-parse --show-toplevel)"
+.agents/skills/create-release/scripts/create_release.sh <version> [sha]
+```
+
+Example:
+
+```bash
+.agents/skills/create-release/scripts/create_release.sh 0.2.4
+```
+
+If `sha` is omitted, the script tags `HEAD`.
+
+## Preconditions
+
+- The target release commit must already exist locally.
+- `apps/node/package.json` and `apps/node/package-lock.json` must already contain the target version.
+- Any generated docs or release-facing artifacts should already be updated and committed.
+- `git`, `npm`, and `gh` must be installed and authenticated.
+
+## Safety Rules
+
+- Do not force-move existing tags.
+- Do not publish a version that already exists on npm.
+- Do not push a branch as part of this step. Push the tag only.
+- Do not use this skill to repair a partially published version. Bump to a new version instead.
+
+## Output Expectations
+
+The script prints:
+
+- release version
+- target tag
+- target commit SHA
+- local validation status
+- pushed tag confirmation
+- detected workflow run URLs and conclusions
+
+If a workflow does not appear quickly, the script reports that clearly instead of guessing success.
