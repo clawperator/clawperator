@@ -218,25 +218,32 @@ The warning must NOT:
 
 ---
 
-#### REQ-2.2 - Document the `actual_format` / empty `data.text` contract gap in code comments
+#### REQ-2.2 - Update docs to reflect the new extraction failure contract
 
 The `snapshot_ui` note in `docs/node-api-for-agents.md` currently states that
 `data.actual_format` is `"hierarchy_xml"` and `data.text` contains the snapshot. It does
 not state what happens when extraction fails.
 
-**Required documentation update (as specified in `docs-audit.md` ISSUE-01):**
+This documentation update must be written to reflect the post-REQ-2.3 contract (where
+`success: false` + `SNAPSHOT_EXTRACTION_FAILED` is the failure signal), not the
+pre-REQ-2.3 behavior (where `success: true` with absent `data.text` was the silent
+failure). REQ-2.2 must be implemented after REQ-2.3 so the docs match the shipped code.
 
-Add a warning to the `snapshot_ui` action behavior note:
+**Required documentation update (supersedes `docs-audit.md` ISSUE-01):**
+
+Update the `snapshot_ui` action behavior note to document the failure case:
 
 ```
-**Warning - empty data.text:** `success: true` does not guarantee `data.text` is
-populated. When the logcat extraction finds no `[TaskScope] UI Hierarchy:` marker,
-`data.text` is absent. Always check `data.text` is non-empty before parsing.
+**Failure case - extraction error:** When the logcat extraction finds no
+`[TaskScope] UI Hierarchy:` marker, the step returns `success: false` with
+`data.error: "SNAPSHOT_EXTRACTION_FAILED"`. This typically means the installed
+clawperator binary is out of date with the Android Operator APK.
 See Troubleshooting for resolution steps.
 ```
 
-Add a troubleshooting section for empty snapshots in `docs/troubleshooting.md`
-(full text specified in `docs-audit.md` ISSUE-04).
+Add a troubleshooting section for snapshot extraction failures in `docs/troubleshooting.md`
+(based on `docs-audit.md` ISSUE-04, updated to reference the `SNAPSHOT_EXTRACTION_FAILED`
+error code rather than the pre-REQ-2.3 empty `data.text` symptom).
 
 ---
 
