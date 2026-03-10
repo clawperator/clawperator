@@ -139,7 +139,7 @@ body {
 .top-toolbar {
   width: 100%;
   min-height: var(--toolbar-height);
-  position: fixed;
+  position: sticky;
   top: 0;
   left: 0;
   right: 0;
@@ -150,19 +150,6 @@ body {
   -webkit-backdrop-filter: blur(16px);
   backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--border);
-  transition: transform 220ms ease, opacity 220ms ease;
-}
-
-.top-toolbar.hidden {
-  transform: translateY(-100%);
-  opacity: 0;
-  pointer-events: none;
-}
-
-.top-toolbar.visible {
-  transform: translateY(0);
-  opacity: 1;
-  pointer-events: auto;
 }
 
 .top-toolbar-inner {
@@ -348,6 +335,34 @@ body {
   line-height: 1.7;
   color: var(--text-muted);
   text-wrap: pretty;
+}
+
+.hero-image-panel {
+  margin-top: 2.2rem;
+  background-color: #f7f4ee;
+  border: 1px solid rgba(124, 92, 55, 0.12);
+  border-radius: 20px;
+  padding: 1.8rem 1.4rem;
+  width: 100%;
+  max-width: 780px;
+  box-shadow: 0 14px 44px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+@media (prefers-color-scheme: dark) {
+  .hero-image-panel {
+    background-color: #f0ede4; /* Slightly darker but still light enough for black text */
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow: 0 14px 44px rgba(0, 0, 0, 0.3);
+  }
+}
+
+.hero-diagram {
+  width: 100%;
+  height: auto;
+  display: block;
 }
 
 .quickstart-intro {
