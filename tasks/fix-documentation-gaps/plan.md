@@ -156,6 +156,7 @@ shape `stepResults[].data` takes per action type.
 From `apps/node/src/contracts/result.ts`, the envelope shape is:
 
 ```typescript
+// Emitted JSON shape (matches Android CanonicalStepResult - source of truth)
 {
   commandId: string,
   taskId: string,
@@ -164,8 +165,9 @@ From `apps/node/src/contracts/result.ts`, the envelope shape is:
     id: string,
     actionType: string,
     success: boolean,
-    data?: Record<string, unknown>,  // shape varies per action type
-    error?: string                   // error code on failure
+    data: Record<string, string>,    // error code in data.error on failure
+                                     // (note: TypeScript contract has error?: string
+                                     //  as a sibling here, but it is never emitted)
   }>,
   error?: string | null              // top-level error code
 }
@@ -191,21 +193,29 @@ shape. Correct the error path reference from `stepResults[].data.error` to
 
 ---
 
-### Gap 6: Error path field name is wrong in current docs
+### Gap 6: TypeScript contract has an unimplemented field (`StepResult.error`)
 
-**Severity: Medium.** This is a concrete contract error that will cause agents to look
-for data at the wrong path.
+**Severity: Medium - code issue, docs are actually correct.**
 
-Current `node-api-for-agents.md` text:
+`apps/node/src/contracts/result.ts` defines `StepResult.error?: string` as a
+top-level sibling of `data`. This field is **not emitted** by the Android runtime.
+The Kotlin `CanonicalStepResult` class does not include an `error` field. Instead,
+per-step failure details are encoded inside the `data` map as `data.error`.
 
-> "Branch agent logic on codes from `envelope.error` or `stepResults[].data.error`"
+This is confirmed by:
+- `apps/android/shared/data/operator/src/main/kotlin/clawperator/operator/agent/ClawperatorResultEnvelope.kt`:
+  `CanonicalStepResult` has fields `id`, `actionType`, `success`, `data` only.
+- `apps/node/src/test/unit/envelopeParser.test.ts`: parser tests assert
+  `step.data?.error` for per-step failure codes, not `step.error`.
 
-From `apps/node/src/contracts/result.ts`, the actual field is `stepResults[].error`,
-not `stepResults[].data.error`. The `data` field holds success payload. The `error`
-field holds the error code. They are siblings, not nested.
+The current docs text (`stepResults[].data.error`) matches the actual emitted JSON
+and should remain. The TypeScript contract has a phantom field that is never populated.
 
-**Fix:** Change `stepResults[].data.error` to `stepResults[].error` in
-`node-api-for-agents.md`.
+**Fix required (code, not docs):** Either remove `error?: string` from `StepResult`
+in `result.ts` to match the emitted JSON, or update the Android `CanonicalStepResult`
+to emit it as a top-level field. This is a separate code task and out of scope here.
+The docs should continue to document `stepResults[].data.error` until the code is
+aligned.
 
 ---
 

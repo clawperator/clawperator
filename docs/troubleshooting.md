@@ -202,7 +202,7 @@ If an agent is blocked on a login screen or onboarding flow, treat that as devic
 
 ### App not installed or not detected on the emulator
 
-If an automation targets an app that is not installed on the emulator, the UI action will fail with `NODE_NOT_FOUND` or the app will not open. Install the app from the Play Store or via `adb install` before running.
+If an automation targets an app that is not installed on the emulator, the `open_app` step will fail - the execution envelope will return `status: "failed"` with the reason in `envelope.error`. `NODE_NOT_FOUND` is a selector/matcher error and will not appear for a missing app. Install the app from the Play Store or via `adb install` before running.
 
 ### Slow emulator boot or sluggish UI
 
