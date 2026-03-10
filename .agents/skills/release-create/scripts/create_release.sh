@@ -96,8 +96,9 @@ main() {
   local target_sha
   target_sha="$(git rev-parse --verify "${target_ref}^{commit}")"
 
-  git diff --quiet || die "working tree has unstaged changes"
-  git diff --cached --quiet || die "index has staged but uncommitted changes"
+  local git_status
+  git_status="$(git status --porcelain)"
+  [[ -z "$git_status" ]] || die "working tree has uncommitted or untracked changes"
 
   local package_version
   package_version="$(node -p "require('./apps/node/package.json').version")"

@@ -11,10 +11,22 @@ require_cmd() {
   command -v "$1" >/dev/null 2>&1 || die "required command not found: $1"
 }
 
-json_eval() {
+json_field() {
   local json="$1"
-  local expr="$2"
-  node -e 'const data = JSON.parse(process.argv[1]); const expr = process.argv[2]; const fn = new Function("data", `return (${expr});`); const value = fn(data); if (value === undefined || value === null) process.exit(2); if (typeof value === "object") { console.log(JSON.stringify(value)); } else { console.log(String(value)); }' "$json" "$expr"
+  local field="$2"
+  node -e 'const data = JSON.parse(process.argv[1]); const field = process.argv[2]; const value = data[field]; if (value === undefined || value === null) process.exit(2); if (typeof value === "object") { console.log(JSON.stringify(value)); } else { console.log(String(value)); }' "$json" "$field"
+}
+
+json_array_join() {
+  local json="$1"
+  local field="$2"
+  node -e 'const data = JSON.parse(process.argv[1]); const field = process.argv[2]; const value = data[field]; if (!Array.isArray(value)) process.exit(2); console.log(value.join(","));' "$json" "$field"
+}
+
+json_time_for_version() {
+  local json="$1"
+  local version="$2"
+  node -e 'const data = JSON.parse(process.argv[1]); const version = process.argv[2]; const value = data.time?.[version]; if (value === undefined || value === null) process.exit(2); console.log(String(value));' "$json" "$version"
 }
 
 main() {
@@ -27,6 +39,7 @@ main() {
   [[ $# -eq 1 ]] || die "usage: .agents/skills/release-verify/scripts/release_verify.sh <version>"
 
   local version="$1"
+  [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$ ]] || die "version must look like semver"
   local tag_name="v${version}"
   local repo_root
   repo_root="$(git rev-parse --show-toplevel)"
@@ -55,9 +68,9 @@ main() {
   [[ "$publish_run_json" != "[]" ]] || die "Publish npm Package workflow run not found for ${tag_name}"
   local publish_run
   publish_run="$(node -e 'const items = JSON.parse(process.argv[1]); console.log(JSON.stringify(items[0]));' "$publish_run_json")"
-  [[ "$(json_eval "$publish_run" 'data.status')" == "completed" ]] || die "Publish npm Package workflow not completed"
-  [[ "$(json_eval "$publish_run" 'data.conclusion')" == "success" ]] || die "Publish npm Package workflow did not succeed"
-  printf 'workflow=Publish npm Package conclusion=success url=%s\n' "$(json_eval "$publish_run" 'data.url')"
+  [[ "$(json_field "$publish_run" "status")" == "completed" ]] || die "Publish npm Package workflow not completed"
+  [[ "$(json_field "$publish_run" "conclusion")" == "success" ]] || die "Publish npm Package workflow did not succeed"
+  printf 'workflow=Publish npm Package conclusion=success url=%s\n' "$(json_field "$publish_run" "url")"
 
   local apk_run_json
   apk_run_json="$(gh run list \
@@ -71,34 +84,34 @@ main() {
   [[ "$apk_run_json" != "[]" ]] || die "Release APK workflow run not found for ${tag_name}"
   local apk_run
   apk_run="$(node -e 'const items = JSON.parse(process.argv[1]); console.log(JSON.stringify(items[0]));' "$apk_run_json")"
-  [[ "$(json_eval "$apk_run" 'data.status')" == "completed" ]] || die "Release APK workflow not completed"
-  [[ "$(json_eval "$apk_run" 'data.conclusion')" == "success" ]] || die "Release APK workflow did not succeed"
-  printf 'workflow=Release APK conclusion=success url=%s\n' "$(json_eval "$apk_run" 'data.url')"
+  [[ "$(json_field "$apk_run" "status")" == "completed" ]] || die "Release APK workflow not completed"
+  [[ "$(json_field "$apk_run" "conclusion")" == "success" ]] || die "Release APK workflow did not succeed"
+  printf 'workflow=Release APK conclusion=success url=%s\n' "$(json_field "$apk_run" "url")"
 
   local release_json
   release_json="$(gh api "repos/${repo_slug}/releases/tags/${tag_name}")" || die "GitHub Release ${tag_name} not found"
   local release_url
-  release_url="$(json_eval "$release_json" 'data.html_url')"
+  release_url="$(json_field "$release_json" "html_url")"
   local release_assets
-  release_assets="$(json_eval "$release_json" 'data.assets.map(asset => asset.name).join(",")')"
+  release_assets="$(node -e 'const data = JSON.parse(process.argv[1]); const names = Array.isArray(data.assets) ? data.assets.map(asset => asset.name) : []; if (names.length === 0) process.exit(2); console.log(names.join(","));' "$release_json")"
   [[ "$release_assets" == *"operator-${tag_name}.apk"* ]] || die "GitHub Release is missing operator-${tag_name}.apk"
   [[ "$release_assets" == *"operator-${tag_name}.apk.sha256"* ]] || die "GitHub Release is missing operator-${tag_name}.apk.sha256"
   printf 'github_release=%s assets=%s\n' "$release_url" "$release_assets"
 
   local npm_json
   npm_json="$(npm view clawperator version time --json)"
-  [[ "$(json_eval "$npm_json" 'data.version')" == "$version" ]] || die "npm latest version is not ${version}"
+  [[ "$(json_field "$npm_json" "version")" == "$version" ]] || die "npm latest version is not ${version}"
   printf 'npm_version=%s published_at=%s\n' \
-    "$(json_eval "$npm_json" 'data.version')" \
-    "$(json_eval "$npm_json" "data.time['${version}']")"
+    "$(json_field "$npm_json" "version")" \
+    "$(json_time_for_version "$npm_json" "$version")"
 
   local latest_json
   latest_json="$(curl -fsSL https://downloads.clawperator.com/operator/latest.json)" || die "failed to fetch latest.json"
-  [[ "$(json_eval "$latest_json" 'data.version')" == "$version" ]] || die "latest.json version does not match ${version}"
+  [[ "$(json_field "$latest_json" "version")" == "$version" ]] || die "latest.json version does not match ${version}"
   local latest_apk_url latest_sha_url latest_sha
-  latest_apk_url="$(json_eval "$latest_json" 'data.apk_url')"
-  latest_sha_url="$(json_eval "$latest_json" 'data.sha256_url')"
-  latest_sha="$(json_eval "$latest_json" 'data.sha256')"
+  latest_apk_url="$(json_field "$latest_json" "apk_url")"
+  latest_sha_url="$(json_field "$latest_json" "sha256_url")"
+  latest_sha="$(json_field "$latest_json" "sha256")"
   printf 'latest_json_version=%s apk_url=%s sha256=%s\n' "$version" "$latest_apk_url" "$latest_sha"
 
   local expected_apk_url expected_sha_url
