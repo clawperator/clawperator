@@ -1,16 +1,21 @@
 # First-Time Setup
 
-You've installed the Clawperator CLI. This guide walks through setting up your Android device so it can be used as an actuator.
+You've installed the Clawperator CLI. This guide walks through setting up either a physical Android device or an Android emulator so it can be used as an actuator.
 
 ## What You Need
 
-- A dedicated Android device (any cheap or old phone works - Android 5.0+)
+- A dedicated Android device (any cheap or old phone works - Android 5.0+), or an Android emulator
 - A USB cable
 - The Clawperator installer or APK:
   - `curl -fsSL https://clawperator.com/install.sh | bash`
   - [clawperator.com/operator.apk](https://clawperator.com/operator.apk)
 
-This device will stay connected to your machine as a dedicated actuator. It does not need to be your primary phone.
+The actuator target can be either:
+
+- a physical Android device connected over adb
+- a local Android emulator provisioned through the Clawperator CLI
+
+For a physical device, follow the full setup below. For an emulator-first setup, complete Step 1, then jump to [Emulator Setup](#emulator-setup), then return to Step 5 to install the APK into the booted emulator.
 
 ---
 
@@ -79,6 +84,12 @@ If you have multiple devices connected, specify the target:
 adb -s <device_id> install -r ~/.clawperator/downloads/operator.apk
 ```
 
+This applies equally to emulators. After `clawperator provision emulator`, install to the returned serial:
+
+```bash
+adb -s emulator-5554 install -r ~/.clawperator/downloads/operator.apk
+```
+
 ---
 
 ## Step 6: Enable the Accessibility Service
@@ -145,6 +156,46 @@ clawperator action open-app \
 ```
 
 > Use `com.clawperator.operator` for release APK, `com.clawperator.operator.dev` for debug APK.
+
+## Emulator Setup
+
+Clawperator can provision a supported Android emulator after installation. Emulator logic lives in the Node CLI and API, not in `install.sh`.
+
+Requirements:
+
+- `adb` in `PATH`
+- `emulator` in `PATH`
+- `sdkmanager` in `PATH`
+- `avdmanager` in `PATH`
+
+Provision a booted Google Play emulator:
+
+```bash
+clawperator provision emulator --output json
+```
+
+The default supported emulator profile is:
+
+- Android API level `35`
+- Google Play system image
+- ABI `arm64-v8a`
+- device profile `pixel_7`
+- AVD name `clawperator-pixel`
+
+You can inspect configured AVDs at any time:
+
+```bash
+clawperator emulator list --output json
+clawperator emulator inspect clawperator-pixel --output json
+```
+
+After provisioning finishes:
+
+1. install the Clawperator APK into the returned emulator serial
+2. enable permissions with `clawperator grant-device-permissions --device-id <serial>`
+3. run `clawperator doctor --device-id <serial>`
+
+If both a physical device and an emulator are connected, always pass `--device-id <serial>` to avoid ambiguous targeting.
 
 ---
 

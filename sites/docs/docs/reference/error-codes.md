@@ -84,6 +84,18 @@ These codes are produced by `clawperator doctor` and related checks.
 | `CLI_VERSION_INVALID` | The CLI version string is not parseable for compatibility checks |
 | `VERSION_INCOMPATIBLE` | Node API and Android runtime versions are incompatible |
 | `LOGCAT_UNAVAILABLE` | Could not access device logcat |
+| `ANDROID_SDK_TOOL_MISSING` | A required Android SDK tool such as `adb`, `emulator`, `sdkmanager`, or `avdmanager` is not available |
+| `EMULATOR_NOT_FOUND` | The requested AVD does not exist |
+| `EMULATOR_ALREADY_RUNNING` | The requested operation requires the AVD to be stopped first |
+| `EMULATOR_NOT_RUNNING` | The requested AVD is not currently running |
+| `EMULATOR_UNSUPPORTED` | The AVD exists but does not satisfy Clawperator compatibility rules |
+| `EMULATOR_CREATE_FAILED` | Reserved generic emulator creation failure code |
+| `EMULATOR_START_FAILED` | Emulator process did not register with adb in time |
+| `EMULATOR_STOP_FAILED` | Emulator stop request failed |
+| `EMULATOR_DELETE_FAILED` | Emulator deletion failed |
+| `EMULATOR_BOOT_TIMEOUT` | Android boot completion did not finish before timeout |
+| `ANDROID_SYSTEM_IMAGE_INSTALL_FAILED` | Android SDK system image install or license acceptance failed |
+| `ANDROID_AVD_CREATE_FAILED` | `avdmanager` failed to create the AVD |
 
 ---
 

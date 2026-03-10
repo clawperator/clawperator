@@ -10,6 +10,15 @@ Usage:
 
 Commands:
   devices                                   List connected Android devices
+  emulator list                             List configured Android emulators (AVDs)
+  emulator inspect <name>                   Show normalized metadata for one AVD
+  emulator create [--name <name>]           Create a supported Google Play AVD
+  emulator start <name>                     Start an AVD and wait until Android is ready
+  emulator stop <name>                      Stop a running emulator by AVD name
+  emulator delete <name>                    Delete an AVD by name
+  emulator status                           List running emulators and boot state
+  emulator provision                        Reuse or create a supported emulator
+  provision emulator                        Alias of emulator provision
   packages list [--device-id <id>] [--third-party]
                                             List installed package IDs on a device
   execute --execution <json-or-file> [--device-id <id>] [--receiver-package <package>]
@@ -151,6 +160,24 @@ Notes:
   - Use --receiver-package com.clawperator.operator.dev for local debug APKs.
   - Enables the accessibility service and attempts notification permission via adb.
 `,
+  "emulator": `clawperator emulator
+
+Usage:
+  clawperator emulator list [--output <json|pretty>]
+  clawperator emulator inspect <name> [--output <json|pretty>]
+  clawperator emulator create [--name <name>] [--output <json|pretty>]
+  clawperator emulator start <name> [--output <json|pretty>]
+  clawperator emulator stop <name> [--output <json|pretty>]
+  clawperator emulator delete <name> [--output <json|pretty>]
+  clawperator emulator status [--output <json|pretty>]
+  clawperator emulator provision [--output <json|pretty>]
+  clawperator provision emulator [--output <json|pretty>]
+
+Notes:
+  - Emulator provisioning prefers: running supported emulator, stopped supported AVD, then new AVD creation.
+  - New AVDs target Android API 35 and a Google Play image by default.
+  - JSON is the canonical output format for agent callers.
+`,
 };
 
 class UsageError extends Error {}
@@ -164,6 +191,8 @@ function resolveHelpTopic(rest: string[]): string | undefined {
   if (rest[0] === "doctor") return "doctor";
   if (rest[0] === "version") return "version";
   if (rest[0] === "grant-device-permissions") return "grant-device-permissions";
+  if (rest[0] === "emulator") return "emulator";
+  if (rest[0] === "provision" && rest[1] === "emulator") return "emulator";
   return undefined;
 }
 
@@ -246,6 +275,47 @@ async function main(): Promise<void> {
   switch (cmd) {
     case "devices":
       result = await (await import("./commands/devices.js")).cmdDevices(out);
+      break;
+    case "emulator": {
+      const sub = rest[0];
+      if (sub === "list") {
+        result = await (await import("./commands/emulator.js")).cmdEmulatorList(out);
+      } else if (sub === "inspect") {
+        result = rest[1]
+          ? await (await import("./commands/emulator.js")).cmdEmulatorInspect(rest[1], out)
+          : JSON.stringify({ code: "USAGE", message: "emulator inspect <name>" });
+      } else if (sub === "create") {
+        result = await (await import("./commands/emulator.js")).cmdEmulatorCreate({
+          ...out,
+          name: getOpt(rest, "--name"),
+        });
+      } else if (sub === "start") {
+        result = rest[1]
+          ? await (await import("./commands/emulator.js")).cmdEmulatorStart(rest[1], out)
+          : JSON.stringify({ code: "USAGE", message: "emulator start <name>" });
+      } else if (sub === "stop") {
+        result = rest[1]
+          ? await (await import("./commands/emulator.js")).cmdEmulatorStop(rest[1], out)
+          : JSON.stringify({ code: "USAGE", message: "emulator stop <name>" });
+      } else if (sub === "delete") {
+        result = rest[1]
+          ? await (await import("./commands/emulator.js")).cmdEmulatorDelete(rest[1], out)
+          : JSON.stringify({ code: "USAGE", message: "emulator delete <name>" });
+      } else if (sub === "status") {
+        result = await (await import("./commands/emulator.js")).cmdEmulatorStatus(out);
+      } else if (sub === "provision") {
+        result = await (await import("./commands/emulator.js")).cmdProvisionEmulator(out);
+      } else {
+        result = JSON.stringify({ code: "USAGE", message: "emulator list|inspect|create|start|stop|delete|status|provision" });
+      }
+      break;
+    }
+    case "provision":
+      if (rest[0] === "emulator") {
+        result = await (await import("./commands/emulator.js")).cmdProvisionEmulator(out);
+      } else {
+        result = JSON.stringify({ code: "USAGE", message: "provision emulator" });
+      }
       break;
     case "packages":
       if (rest[0] === "list") {

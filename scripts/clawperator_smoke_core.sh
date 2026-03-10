@@ -81,6 +81,7 @@ cat > "$SMOKE_JSON" <<JSON
   "commandId": "smoke-cmd-1",
   "taskId": "smoke-task-1",
   "source": "smoke-test",
+  "expectedFormat": "android-ui-automator",
   "timeoutMs": 60000,
   "actions": [
     { "id": "close", "type": "close_app", "params": { "applicationId": "$BASELINE_APP_PACKAGE" } },

@@ -2,7 +2,7 @@ import { type ProcessRunner, type ProcessResult } from "../../../adapters/androi
 
 export class FakeProcessRunner implements ProcessRunner {
     private queue: ProcessResult[] = [];
-    public calls: { command: string, args: string[] }[] = [];
+    public calls: { command: string, args: string[], options?: { detached?: boolean; stdio?: any; shell?: boolean } }[] = [];
 
     queueResult(result: ProcessResult) {
         this.queue.push(result);
@@ -17,7 +17,7 @@ export class FakeProcessRunner implements ProcessRunner {
         });
     }
 
-    async run(command: string, args: string[], _options?: { timeoutMs?: number }): Promise<ProcessResult> {
+    async run(command: string, args: string[], _options?: { timeoutMs?: number; cwd?: string; input?: string }): Promise<ProcessResult> {
         this.calls.push({ command, args });
         const result = this.queue.shift();
         if (!result) {
@@ -30,8 +30,8 @@ export class FakeProcessRunner implements ProcessRunner {
         return this.run("bash", ["-lc", command], options);
     }
 
-    spawn(command: string, args: string[]): any {
-        this.calls.push({ command, args });
-        return {};
+    spawn(command: string, args: string[], options?: { detached?: boolean; stdio?: any; shell?: boolean }): any {
+        this.calls.push({ command, args, options });
+        return { unref() {} };
     }
 }
