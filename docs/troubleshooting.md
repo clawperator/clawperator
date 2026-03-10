@@ -94,7 +94,7 @@ If you must use **Wireless Debugging**, be aware that your mileage may vary (YMM
 3. **No connected devices** - the installer skips the install and leaves the verified APK at `~/.clawperator/downloads/operator.apk`.
 4. **`adb` missing** - the installer attempts to install `adb` automatically, or stops with a manual install link if it cannot.
 
-## Emulator provisioning issues
+## Emulator-Specific Issues
 
 Clawperator can provision a local Android emulator through the Node CLI and API. If provisioning fails, use the checks below.
 

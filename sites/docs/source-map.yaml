@@ -34,21 +34,26 @@ sections:
   - id: getting-started
     title: Getting Started
     pages:
-      - output: getting-started/project-overview.md
-        title: Project Overview
-        mode: copy
-        sources:
-          - docs/project-overview.md
-      - output: getting-started/first-time-setup.md
-        title: First-Time Setup
-        mode: copy
-        sources:
-          - docs/first-time-setup.md
       - output: getting-started/running-clawperator-on-android.md
         title: Running Clawperator on Android
         mode: copy
         sources:
           - docs/running-clawperator-on-android.md
+      - output: getting-started/first-time-setup.md
+        title: First-Time Setup
+        mode: copy
+        sources:
+          - docs/first-time-setup.md
+      - output: getting-started/openclaw-remote-bootstrap.md
+        title: OpenClaw Remote Bootstrap Guide
+        mode: copy
+        sources:
+          - docs/openclaw-remote-bootstrap.md
+      - output: getting-started/project-overview.md
+        title: Project Overview
+        mode: copy
+        sources:
+          - docs/project-overview.md
       - output: getting-started/android-operator-apk.md
         title: The Android Operator APK
         mode: copy
@@ -77,11 +82,6 @@ sections:
         mode: copy
         sources:
           - docs/node-api-for-agents.md
-      - output: ai-agents/openclaw-remote-bootstrap.md
-        title: OpenClaw Remote Bootstrap Guide
-        mode: copy
-        sources:
-          - docs/openclaw-remote-bootstrap.md
 
   - id: reference
     title: Reference

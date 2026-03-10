@@ -2,6 +2,12 @@
 
 Clawperator is a two-layer system: an Android runtime that executes actions on the device, and a Node CLI/API that agents talk to.
 
+The Android runtime runs on an Android device which may be:
+* a physical Android device
+* a local Android emulator
+
+Emulator lifecycle belongs to the Node layer, not the installer.
+
 ## Layers
 
 ### Android Runtime (`apps/android`)

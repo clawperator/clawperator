@@ -97,6 +97,9 @@ See `apps/node/examples/basic-api-usage.js` for a complete SSE + REST example.
 
 ## Android Emulator Support
 
+Note: Clawperator does not configure accounts or install apps inside the emulator.
+Agents should assume the emulator already contains logged-in apps required for automation.
+
 Clawperator supports Android emulator provisioning as an alternative runtime to a physical Android device. Emulator lifecycle management lives in the Node CLI and HTTP API, not in `install.sh`.
 
 Provisioning policy is deterministic:
@@ -292,6 +295,9 @@ Only for diagnostics or gaps not covered by the API. For routine automation, use
 
 **Does Clawperator run skills?**
 Skills are standalone programs that agents can invoke directly. The Node API provides discovery (`skills list`, `skills search`), metadata (`skills get`), and a convenience `skills run` wrapper. Skills do not need the Node API to execute - agents can call skill scripts directly.
+
+**Does Clawperator configure accounts or app settings?**
+No. Clawperator automates the UI on whatever apps are already installed and signed in on the device. It does not log in to apps, create accounts, or configure device settings on behalf of the user. If an automation targets an app that requires authentication, the user must sign in to that app manually on the device before the agent runs. For emulators using a Google Play system image, the user must also sign in to a Google account before Play Store-gated apps are accessible.
 
 **How should agents handle sensitive text in results?**
 Default behavior is full-fidelity results for agent reasoning. PII redaction (`--safe-logs`) is a planned feature.
