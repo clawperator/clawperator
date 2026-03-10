@@ -42,6 +42,11 @@ describe("parseResultEnvelope", () => {
     assert.strictEqual(parseResultEnvelope(line, CMD_ID), "malformed");
   });
 
+  it("returns 'malformed' for an envelope with invalid status", () => {
+    const line = `${RESULT_ENVELOPE_PREFIX} {"commandId":"${CMD_ID}","taskId":"t1","status":"queued","stepResults":[],"error":null}`;
+    assert.strictEqual(parseResultEnvelope(line, CMD_ID), "malformed");
+  });
+
   it("parses canonical line in logcat format (tag prefix before [Clawperator-Result])", () => {
     const json = `{"commandId":"${CMD_ID}","taskId":"t1","status":"success","stepResults":[],"error":null}`;
     const line = `02-19 12:00:00.000  1234  5678 I ClawperatorResult: ${RESULT_ENVELOPE_PREFIX} ${json}`;

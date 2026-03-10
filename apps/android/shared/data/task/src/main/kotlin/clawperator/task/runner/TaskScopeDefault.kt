@@ -204,7 +204,9 @@ class TaskScopeDefault(
             try {
                 Log.d("$TAG Logging UI tree")
                 val hierarchyDump = uiTreeInspector.getCurrentUiHierarchyDump()
-                    ?: throw IllegalStateException("UI hierarchy dump not available")
+                    ?: throw IllegalStateException(
+                        "SNAPSHOT_HIERARCHY_UNAVAILABLE: UI hierarchy dump not available; accessibility service may not be ready",
+                    )
                 Log.d("$TAG UI Hierarchy:\n$hierarchyDump")
                 val nodeCount = countNodesInHierarchyDump(hierarchyDump)
                 val maxDepth = maxDepthInHierarchyDump(hierarchyDump)

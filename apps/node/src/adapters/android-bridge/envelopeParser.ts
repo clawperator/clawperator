@@ -38,11 +38,14 @@ export function parseTerminalEnvelope(line: string, commandId: string): ParsedTe
 
 function normalizeResultEnvelope(raw: unknown): ResultEnvelope {
   const envelope = raw as Partial<ResultEnvelope> & { stepResults?: unknown[] };
+  if (envelope.status !== "success" && envelope.status !== "failed") {
+    throw new Error("Invalid envelope status");
+  }
 
   return {
     commandId: String(envelope.commandId ?? ""),
     taskId: String(envelope.taskId ?? ""),
-    status: envelope.status === "failed" ? "failed" : "success",
+    status: envelope.status,
     stepResults: Array.isArray(envelope.stepResults) ? envelope.stepResults.map(normalizeStepResult) : [],
     error: typeof envelope.error === "string" || envelope.error === null ? envelope.error : null,
   };
@@ -56,7 +59,6 @@ function normalizeStepResult(raw: unknown): StepResult {
     actionType: String(step.actionType ?? ""),
     success: step.success === false ? false : true,
     data: normalizeStepResultData(step.data),
-    ...(typeof step.error === "string" ? { error: step.error } : {}),
   };
 }
 

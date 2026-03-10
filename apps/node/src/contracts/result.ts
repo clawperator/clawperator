@@ -13,7 +13,6 @@ export interface StepResult {
   actionType: string;
   success: boolean;
   data: StepResultData;
-  error?: string;
 }
 
 export interface ResultEnvelope {

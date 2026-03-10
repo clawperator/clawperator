@@ -11,7 +11,7 @@ import { waitForResultEnvelope } from "../../adapters/android-bridge/logcatResul
 import { runAdb } from "../../adapters/android-bridge/adbClient.js";
 import { tryAcquire, release, getConflictError } from "./executionStore.js";
 import type { ResultEnvelope, TerminalSource } from "../../contracts/result.js";
-import { extractSnapshotFromLogs } from "./snapshotHelper.js";
+import { extractSnapshotsFromLogs } from "./snapshotHelper.js";
 import { emitResult, emitExecution } from "../observe/events.js";
 import { LIMITS } from "../../contracts/limits.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
@@ -129,28 +129,37 @@ async function performExecution(
       const hasSnapshot = result.envelope.stepResults.some(s => s.actionType === "snapshot_ui");
       if (hasSnapshot) {
         const dump = await runAdb(config, ["logcat", "-d", "-v", "tag"]);
-        const fullSnapshot = extractSnapshotFromLogs(dump.stdout.split("\n"));
-        
-        if (fullSnapshot) {
-          const snapStep = result.envelope.stepResults.find(s => s.actionType === "snapshot_ui");
-          if (snapStep) {
-            snapStep.data = { ...snapStep.data, text: fullSnapshot };
+        const snapshots = extractSnapshotsFromLogs(dump.stdout.split("\n"));
+        const snapshotSteps = result.envelope.stepResults.filter(s => s.actionType === "snapshot_ui");
+
+        snapshotSteps.forEach((snapStep, index) => {
+          const snapshotText = snapshots[index];
+          if (snapshotText) {
+            snapStep.data = { ...snapStep.data, text: snapshotText };
           }
-        }
+        });
       }
 
-      // Post-process take_screenshot via adb exec-out
-      const screenAction = execution.actions.find(a => a.type === "take_screenshot");
       const hasScreenshot = result.envelope.stepResults.some(s => s.actionType === "take_screenshot");
+      const screenAction = execution.actions.find(a => a.type === "take_screenshot");
       if (hasScreenshot) {
-        const screenshotPath = screenAction?.params?.path || join(tmpdir(), `clawperator-screenshot-${execution.commandId}-${Date.now()}.png`);
         try {
+          const screenshotPath = screenAction?.params?.path || join(tmpdir(), `clawperator-screenshot-${execution.commandId}-${Date.now()}.png`);
+          const screenStep = result.envelope.stepResults.find(s => s.actionType === "take_screenshot");
+          const hasUnsupportedRuntimeScreenshot = screenStep?.data.error === "UNSUPPORTED_RUNTIME_SCREENSHOT";
+
+          if (screenStep && hasUnsupportedRuntimeScreenshot) {
+            screenStep.success = true;
+            const { error: _error, message: _message, ...remainingData } = screenStep.data;
+            screenStep.data = remainingData;
+          }
+
           const deviceArgs = config.deviceId ? ["-s", config.deviceId] : [];
           const proc = spawn(config.adbPath, [...deviceArgs, "exec-out", "screencap", "-p"], {
             stdio: ["ignore", "pipe", "ignore"],
             shell: false,
           });
-          
+
           let buffer = Buffer.alloc(0);
           proc.stdout?.on("data", (chunk: Buffer) => {
             buffer = Buffer.concat([buffer, chunk]);
@@ -166,7 +175,6 @@ async function performExecution(
 
           if (buffer.length > 0) {
             await writeFile(screenshotPath, buffer);
-            const screenStep = result.envelope.stepResults.find(s => s.actionType === "take_screenshot");
             if (screenStep) {
               screenStep.data = { ...screenStep.data, path: screenshotPath };
             }

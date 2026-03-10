@@ -2,35 +2,63 @@
  * Shared logic for extracting UI snapshot text from logcat lines.
  */
 export function extractSnapshotFromLogs(lines: string[]): string | null {
+  const snapshots = extractSnapshotsFromLogs(lines);
+  return snapshots.length > 0 ? snapshots[snapshots.length - 1] : null;
+}
+
+export function extractSnapshotsFromLogs(lines: string[]): string[] {
   const messages = lines
     .map(extractLogMessage)
     .filter((message): message is string => Boolean(message));
 
-  const startIndex = messages.findIndex((message) => message.includes("[TaskScope] UI Hierarchy:"));
-  if (startIndex === -1) return null;
+  const snapshots: string[] = [];
+  let currentSnapshotLines: string[] | null = null;
 
-  const snapshotLines: string[] = [];
-  const firstLineRemainder = messages[startIndex].split("[TaskScope] UI Hierarchy:")[1]?.trim();
-  if (firstLineRemainder) {
-    snapshotLines.push(firstLineRemainder);
-  }
+  for (const message of messages) {
+    if (message.includes("[TaskScope] UI Hierarchy:")) {
+      const currentSnapshot = currentSnapshotLines?.join("\n").trim();
+      if (currentSnapshot) {
+        snapshots.push(currentSnapshot);
+      }
 
-  for (let i = startIndex + 1; i < messages.length; i += 1) {
-    const message = messages[i];
+      currentSnapshotLines = [];
+      const firstLineRemainder = message.split("[TaskScope] UI Hierarchy:")[1]?.trim();
+      if (firstLineRemainder) {
+        currentSnapshotLines.push(firstLineRemainder);
+      }
+      continue;
+    }
+
+    if (currentSnapshotLines === null) {
+      continue;
+    }
+
     const trimmed = message.trim();
-
     if (trimmed.startsWith("[") && !trimmed.startsWith("<?xml") && !trimmed.startsWith("<")) {
-      break;
+      const currentSnapshot = currentSnapshotLines.join("\n").trim();
+      if (currentSnapshot) {
+        snapshots.push(currentSnapshot);
+      }
+      currentSnapshotLines = null;
+      continue;
     }
 
-    snapshotLines.push(message);
+    currentSnapshotLines.push(message);
     if (trimmed === "</hierarchy>") {
-      break;
+      const currentSnapshot = currentSnapshotLines.join("\n").trim();
+      if (currentSnapshot) {
+        snapshots.push(currentSnapshot);
+      }
+      currentSnapshotLines = null;
     }
   }
 
-  const snapshot = snapshotLines.join("\n").trim();
-  return snapshot.length > 0 ? snapshot : null;
+  const trailingSnapshot = currentSnapshotLines?.join("\n").trim();
+  if (trailingSnapshot) {
+    snapshots.push(trailingSnapshot);
+  }
+
+  return snapshots;
 }
 
 function extractLogMessage(line: string): string | null {

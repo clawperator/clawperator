@@ -213,9 +213,10 @@ Combine fields to increase specificity when a single field is ambiguous:
 | `close_app` | `applicationId: string` | - |
 | `click` | `matcher: NodeMatcher` | `clickType: "default" \| "long_click" \| "focus"` (default: `"default"`) |
 | `enter_text` | `matcher: NodeMatcher`, `text: string` | `submit: boolean` (default: `false`), `clear: boolean` (accepted by Node contract, currently ignored by Android runtime) |
-| `read_text` | `matcher: NodeMatcher` | - |
-| `wait_for_node` | `matcher: NodeMatcher` | - |
-| `snapshot_ui` | - | - |
+| `read_text` | `matcher: NodeMatcher` | `validator: string` (currently `"temperature"`), `retry: object` |
+| `wait_for_node` | `matcher: NodeMatcher` | `retry: object` |
+| `snapshot_ui` | - | `retry: object` |
+| `take_screenshot` | - | `path: string`, `retry: object` |
 | `sleep` | `durationMs: number` (max: 120000) | - |
 | `scroll_and_click` | `target: NodeMatcher` | `container: NodeMatcher`, `direction: "down" \| "up" \| "left" \| "right"` (default: `"down"`), `maxSwipes: number` (default: `10`, range: 1-50), `distanceRatio: number` (default: `0.7`, range: 0-1), `settleDelayMs: number` (default: `250`, range: 0-10000), `findFirstScrollableChild: boolean` (default: `false`) |
 
@@ -237,6 +238,8 @@ Combine fields to increase specificity when a single field is ambiguous:
 **`enter_text`:** The CLI command is `action type` but the execution payload action type is `enter_text`. The `submit` param triggers a keyboard Enter/submit after typing - use this for search fields and single-field forms where pressing Enter submits. The Node contract still accepts `clear`, but the Android runtime does not implement it yet, so it currently has no effect.
 
 **`snapshot_ui`:** Clawperator returns a single canonical snapshot format: `hierarchy_xml`. The Android runtime writes the hierarchy dump to device logcat, and the Node layer injects that raw XML into `data.text` after execution. `data.actual_format` is always `"hierarchy_xml"` for successful snapshot steps.
+
+**`take_screenshot`:** `observe screenshot` uses the same execution contract under the hood. Android reports `UNSUPPORTED_RUNTIME_SCREENSHOT`, then the Node layer captures the screenshot via `adb exec-out screencap -p`, writes it to `data.path`, and normalizes the step result to `success: true` when capture succeeds.
 
 ## Result Envelope
 
@@ -266,16 +269,17 @@ Every execution emits exactly one `[Clawperator-Result]` envelope:
 
 ### Per-action result data
 
-The `data` field contents per action type on success:
+Typical `data` keys by action type:
 
-| Action | `data` keys (on success) |
+| Action | Typical `data` keys |
 | :--- | :--- |
 | `open_app` | `application_id` |
-| `close_app` | `application_id`, `error` (`"UNSUPPORTED_RUNTIME_CLOSE"`), `message` (always `success: false` - see note above) |
+| `close_app` | `application_id`, `error` (`"UNSUPPORTED_RUNTIME_CLOSE"`), `message` |
 | `click` | `click_types` |
 | `enter_text` | `text` (text typed), `submit` (`"true"` or `"false"`) |
 | `read_text` | `text` (extracted text value), `validator` (`"none"` or validator type) |
 | `snapshot_ui` | `actual_format`, `text` (snapshot content - see note below) |
+| `take_screenshot` | `path` (local screenshot file path after Node capture) |
 | `wait_for_node` | `resource_id`, `label` (matched node details) |
 | `scroll_and_click` | `max_swipes`, `direction`, `click_types` |
 | `sleep` | `duration_ms` |

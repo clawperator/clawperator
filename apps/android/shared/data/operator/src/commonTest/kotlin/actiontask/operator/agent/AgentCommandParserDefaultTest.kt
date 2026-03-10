@@ -61,7 +61,7 @@ class AgentCommandParserDefaultTest {
         val snapshot = command.actions[2] as UiAction.SnapshotUi
         assertEquals(TaskRetryPresets.AppLaunch, open.retry)
         assertEquals(TaskRetryPresets.UiReadiness, read.retry)
-        assertEquals(TaskRetry.None, snapshot.retry)
+        assertEquals(TaskRetryPresets.UiReadiness, snapshot.retry)
     }
 
     @Test

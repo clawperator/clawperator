@@ -56,7 +56,7 @@ sealed interface UiAction {
 
     data class SnapshotUi(
         override val id: String,
-        val retry: TaskRetry = TaskRetry.None,
+        val retry: TaskRetry = TaskRetryPresets.UiReadiness,
     ) : UiAction
 
     data class DoctorPing(

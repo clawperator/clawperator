@@ -140,7 +140,7 @@ class AgentCommandParserDefault : AgentCommandParser {
             "snapshot_ui" ->
                 UiAction.SnapshotUi(
                     id = id,
-                    retry = params.parseRetryOrDefault(defaultRetry = TaskRetry.None),
+                    retry = params.parseRetryOrDefault(defaultRetry = TaskRetryPresets.UiReadiness),
                 )
             "take_screenshot" ->
                 UiAction.TakeScreenshot(
