@@ -14,6 +14,15 @@ Clawperator provides a deterministic execution layer for LLM agents to control A
 | Command | Description |
 | :--- | :--- |
 | `devices` | List connected Android serials and states |
+| `emulator list` | List configured Android Virtual Devices with compatibility metadata |
+| `emulator inspect <name>` | Show normalized metadata for one Android Virtual Device |
+| `emulator create [--name <name>]` | Create the default supported Android emulator |
+| `emulator start <name>` | Start an existing Android Virtual Device and wait until boot completes |
+| `emulator stop <name>` | Stop a running Android emulator by AVD name |
+| `emulator delete <name>` | Delete an Android Virtual Device by name |
+| `emulator status` | List running Android emulators and boot state |
+| `emulator provision` | Reuse or create a supported Android emulator and return its ADB serial |
+| `provision emulator` | Alias of `emulator provision` |
 | `execute --execution <json\|file>` | Run a full execution payload |
 | `observe snapshot` | Capture UI tree as JSON or ASCII |
 | `observe screenshot` | Capture device screen as PNG |
@@ -35,6 +44,8 @@ Clawperator provides a deterministic execution layer for LLM agents to control A
 | `version` | Print the CLI version or check CLI/APK compatibility |
 
 **Global options:** `--device-id <id>`, `--receiver-package <pkg>`, `--output <json|pretty>`, `--format <json|pretty>` (alias for `--output`), `--timeout-ms <n>`, `--verbose`
+
+For agent callers, `--output json` is the canonical output mode. `pretty` is for human inspection.
 
 Default receiver package:
 
@@ -66,6 +77,14 @@ Start with `clawperator serve [--port <n>] [--host <ip>]`. Default: `127.0.0.1:3
 | Endpoint | Description |
 | :--- | :--- |
 | `GET /devices` | Returns `{ ok: true, devices: [...] }` |
+| `GET /android/emulators` | Returns configured AVDs with compatibility metadata |
+| `GET /android/emulators/:name` | Returns normalized metadata for one AVD |
+| `GET /android/emulators/running` | Returns running emulator devices and boot state |
+| `POST /android/emulators/create` | Ensure the system image exists and create an AVD |
+| `POST /android/emulators/:name/start` | Start an AVD and return a booted emulator device |
+| `POST /android/emulators/:name/stop` | Stop a running emulator by AVD name |
+| `DELETE /android/emulators/:name` | Delete an AVD by name |
+| `POST /android/provision/emulator` | Reuse or create a supported emulator and return a booted device |
 | `POST /execute` | Body: `{"execution": <payload>, "deviceId": "...", "receiverPackage": "..."}` |
 | `POST /observe/snapshot` | Capture UI tree |
 | `POST /observe/screenshot` | Capture screenshot |
@@ -75,6 +94,66 @@ Start with `clawperator serve [--port <n>] [--host <ip>]`. Default: `127.0.0.1:3
 | `GET /events` | SSE stream: `clawperator:result`, `clawperator:execution`, `heartbeat` |
 
 See `apps/node/examples/basic-api-usage.js` for a complete SSE + REST example.
+
+## Android Emulator Support
+
+Clawperator supports Android emulator provisioning as an alternative runtime to a physical Android device. Emulator lifecycle management lives in the Node CLI and HTTP API, not in `install.sh`.
+
+Provisioning policy is deterministic:
+
+1. Reuse a running supported emulator.
+2. Start a stopped supported AVD.
+3. Create a new supported AVD if none exist.
+
+The default supported emulator profile is:
+
+- Android API level `35`
+- Google Play system image
+- ABI `arm64-v8a`
+- device profile `pixel_7`
+- default AVD name `clawperator-pixel`
+
+Compatibility is determined from AVD metadata under:
+
+- `~/.android/avd/<name>.avd/config.ini`
+- `~/.android/avd/<name>.ini`
+
+The implementation normalizes and evaluates these fields:
+
+- `PlayStore.enabled`
+- `abi.type`
+- `image.sysdir.1`
+- `hw.device.name`
+
+Inspect one AVD:
+
+```bash
+clawperator emulator inspect clawperator-pixel --output json
+```
+
+Provision a ready emulator:
+
+```bash
+clawperator provision emulator --output json
+```
+
+Typical provisioning result (CLI output):
+
+```json
+{
+  "type": "emulator",
+  "avdName": "clawperator-pixel",
+  "serial": "emulator-5554",
+  "booted": true,
+  "created": false,
+  "started": false,
+  "reused": true
+}
+```
+
+HTTP response from `POST /android/provision/emulator` wraps the same payload with `"ok": true`.
+
+If both a physical device and an emulator are connected, continue to pass `--device-id <serial>` to execution and observe commands so targeting stays explicit.
 
 ## Execution Payload
 
@@ -104,6 +183,17 @@ Branch agent logic on codes from `envelope.error` or `stepResults[].data.error`:
 | Code | Meaning |
 | :--- | :--- |
 | `EXECUTION_CONFLICT_IN_FLIGHT` | Device is busy with another execution |
+| `ANDROID_SDK_TOOL_MISSING` | A required Android SDK tool such as `adb`, `emulator`, `sdkmanager`, or `avdmanager` is not available |
+| `EMULATOR_NOT_FOUND` | Requested AVD does not exist |
+| `EMULATOR_NOT_RUNNING` | Requested AVD is not currently running |
+| `EMULATOR_ALREADY_RUNNING` | Requested operation requires the AVD to be stopped first |
+| `EMULATOR_UNSUPPORTED` | The AVD exists but does not satisfy Clawperator compatibility rules |
+| `EMULATOR_START_FAILED` | Emulator process failed to register with adb in time |
+| `EMULATOR_BOOT_TIMEOUT` | Emulator registered with adb but Android did not finish booting in time |
+| `ANDROID_AVD_CREATE_FAILED` | AVD creation failed |
+| `ANDROID_SYSTEM_IMAGE_INSTALL_FAILED` | System image install or SDK license acceptance failed |
+| `EMULATOR_STOP_FAILED` | Emulator stop request failed |
+| `EMULATOR_DELETE_FAILED` | Emulator deletion failed |
 | `NODE_NOT_FOUND` | Selector matched no UI element |
 | `RESULT_ENVELOPE_TIMEOUT` | Command dispatched but no result received |
 | `RECEIVER_NOT_INSTALLED` | Clawperator APK not found on device |
@@ -123,6 +213,8 @@ Full error taxonomy: `apps/node/src/contracts/errors.ts`
 - **Deterministic results:** Exactly one terminal envelope per `commandId`. Timeouts return `RESULT_ENVELOPE_TIMEOUT` with diagnostics.
 - **Timeout override:** `--timeout-ms <n>` overrides the execution timeout for `execute`, `observe snapshot`, and `observe screenshot` within policy limits.
 - **Device targeting:** Specify `--device-id` when multiple devices are connected. Omit for single-device setups.
+- **Emulator reuse over creation:** Provisioning never creates duplicate AVDs when a supported running or stopped emulator already exists.
+- **Deterministic emulator boots:** Emulator starts use `-no-snapshot-load` and wait for both `sys.boot_completed` and `dev.bootcomplete`.
 - **Validation before dispatch:** Every payload is schema-validated before any ADB command is issued.
 
 ## Skills

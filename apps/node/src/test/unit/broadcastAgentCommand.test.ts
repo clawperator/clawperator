@@ -6,6 +6,9 @@ import type { RuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.
 const CONFIG: RuntimeConfig = {
   projectRoot: ".",
   adbPath: "adb",
+  emulatorPath: "emulator",
+  sdkmanagerPath: "sdkmanager",
+  avdmanagerPath: "avdmanager",
   deviceId: "test-device-serial",
   receiverPackage: "com.clawperator.operator.dev",
   actionAgentCommand: "app.clawperator.operator.ACTION_AGENT_COMMAND",

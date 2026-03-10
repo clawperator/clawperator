@@ -26,6 +26,103 @@ Default receiver package: `com.clawperator.operator`. Use `--receiver-package co
 
 ## Commands
 
+### `emulator list`
+
+List configured Android Virtual Devices and their compatibility metadata.
+
+```
+clawperator emulator list [--output <json|pretty>]
+```
+
+---
+
+### `emulator inspect`
+
+Show the normalized metadata for one Android Virtual Device.
+
+```
+clawperator emulator inspect <name> [--output <json|pretty>]
+```
+
+This is the diagnostic command for understanding whether an AVD is supported and why.
+
+---
+
+### `emulator create`
+
+Create the default supported Google Play Android Virtual Device.
+
+```
+clawperator emulator create [--name <name>] [--output <json|pretty>]
+```
+
+Defaults:
+
+- Android API `35`
+- Google Play image
+- ABI `arm64-v8a`
+- device profile `pixel_7`
+- AVD name `clawperator-pixel`
+
+---
+
+### `emulator start`
+
+Start an existing Android Virtual Device and wait for Android boot completion.
+
+```
+clawperator emulator start <name> [--output <json|pretty>]
+```
+
+---
+
+### `emulator stop`
+
+Stop a running Android emulator by AVD name.
+
+```
+clawperator emulator stop <name> [--output <json|pretty>]
+```
+
+---
+
+### `emulator delete`
+
+Delete an Android Virtual Device by name.
+
+```
+clawperator emulator delete <name> [--output <json|pretty>]
+```
+
+---
+
+### `emulator status`
+
+List running Android emulators and boot state.
+
+```
+clawperator emulator status [--output <json|pretty>]
+```
+
+---
+
+### `emulator provision`
+
+Reuse or create a supported Android emulator and return a booted ADB target.
+
+```
+clawperator emulator provision [--output <json|pretty>]
+clawperator provision emulator [--output <json|pretty>]
+```
+
+Provisioning prefers:
+
+1. a running supported emulator
+2. a stopped supported AVD
+3. creation of a new supported AVD
+
+---
+
 ### `devices`
 
 List connected Android devices.

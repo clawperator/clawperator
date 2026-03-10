@@ -23,11 +23,14 @@ The app ships in two variants:
 The Node package is the agent-facing interface. It:
 
 - Wraps all `adb` interactions so agents do not need to issue raw shell commands
+- Owns Android emulator discovery, creation, lifecycle, and provisioning
 - Validates execution payloads before dispatch
 - Broadcasts commands to the Android receiver via `adb shell am broadcast`
 - Reads and parses the `[Clawperator-Result]` envelope from logcat
 - Exposes an HTTP/SSE server (`clawperator serve`) for remote agent access
 - Provides `clawperator doctor` for environment diagnostics
+
+Android emulator support is intentionally implemented in the Node layer. `install.sh` remains a bootstrap script and does not manage emulator lifecycle.
 
 ## Data Flow
 
@@ -54,6 +57,21 @@ Node CLI/API
   v
 Agent
 ```
+
+## Emulator Provisioning Flow
+
+When the agent needs an emulator instead of a physical device, the Node layer follows a deterministic reuse-first flow:
+
+1. Inspect running emulators from `adb devices`.
+2. Resolve running emulator names with `adb -s <serial> emu avd name`.
+3. Reuse a running supported emulator if one exists.
+4. Otherwise inspect configured AVDs from `~/.android/avd/`.
+5. Start a stopped supported AVD if one exists.
+6. Otherwise install the default system image and create a new AVD.
+7. Start the emulator detached with `-no-snapshot-load -no-boot-anim`.
+8. Wait for adb registration and Android boot completion.
+
+The default supported profile is Android API `35`, Google Play, ABI `arm64-v8a`, device profile `pixel_7`, and AVD name `clawperator-pixel`.
 
 ## Android Build Modules
 
