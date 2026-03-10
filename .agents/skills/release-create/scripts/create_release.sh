@@ -33,6 +33,7 @@ await_workflow() {
   local target_sha="$3"
   local repo="$4"
   local attempts=18
+  local completion_attempts=180
   local sleep_seconds=10
   local run_json=""
   local status=""
@@ -63,7 +64,12 @@ await_workflow() {
 
   status="$(json_field "$item_json" "status" || true)"
 
+  local poll_count=0
   while [[ "$status" != "completed" ]]; do
+    poll_count=$((poll_count + 1))
+    if (( poll_count > completion_attempts )); then
+      die "workflow $workflow_name for tag $tag_name in repo $repo did not complete after $((completion_attempts * sleep_seconds)) seconds"
+    fi
     sleep "$sleep_seconds"
     item_json="$(gh run list \
       --repo "$repo" \
@@ -78,11 +84,27 @@ await_workflow() {
     status="$(json_field "$item_json" "status" || true)"
   done
 
+  local final_status
+  local conclusion
+  local url
+  final_status="$(json_field "$item_json" "status")"
+  conclusion="$(json_field "$item_json" "conclusion")"
+  url="$(json_field "$item_json" "url")"
+
+  if [[ "$conclusion" != "success" ]]; then
+    printf 'workflow=%s status=%s conclusion=%s url=%s\n' \
+      "$workflow_name" \
+      "$final_status" \
+      "$conclusion" \
+      "$url"
+    die "workflow $workflow_name for tag $tag_name in repo $repo completed with conclusion '$conclusion' (expected 'success'); see $url"
+  fi
+
   printf 'workflow=%s status=%s conclusion=%s url=%s\n' \
     "$workflow_name" \
-    "$(json_field "$item_json" "status")" \
-    "$(json_field "$item_json" "conclusion")" \
-    "$(json_field "$item_json" "url")"
+    "$final_status" \
+    "$conclusion" \
+    "$url"
 }
 
 main() {
@@ -117,8 +139,11 @@ main() {
   lock_version="$(json_version_field "$(git show "${target_sha}:apps/node/package-lock.json")")"
   [[ "$lock_version" == "$version" ]] || die "apps/node/package-lock.json is $lock_version, expected $version"
 
-  if npm view clawperator@"$version" version >/dev/null 2>&1; then
+  local npm_view_output
+  if npm_view_output="$(npm view "clawperator@${version}" version 2>&1)"; then
     die "npm already has clawperator@$version"
+  elif ! printf '%s\n' "$npm_view_output" | grep -qiE 'E404|404 Not Found'; then
+    die "failed to check npm for clawperator@$version: $npm_view_output"
   fi
 
   if gh release view "$tag_name" --repo "$repo_slug" >/dev/null 2>&1; then
