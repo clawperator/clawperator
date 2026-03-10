@@ -240,11 +240,53 @@ Expected (unconfirmed):
 
 ---
 
+### Gap 9: Snapshot output format not documented
+
+**Severity: High.** An agent cannot parse or act on snapshot output without knowing
+what that output looks like. This is also a direct prerequisite for
+`tasks/agent-ui-loop/` - the snapshot section of that doc is built from the annotated
+examples produced here.
+
+The `snapshot_ui` action and `clawperator observe snapshot` CLI produce output in two
+formats. Neither is documented anywhere.
+
+**ASCII format** (via CLI or `snapshot_ui` with `format: "ascii"`):
+The exact line format, indentation scheme, and which attributes appear per line must be
+captured from live device output. Do not document this from assumptions.
+
+**JSON format** (via `snapshot_ui` with `format: "json"`, execute payload only):
+Node tree field names are unconfirmed. Likely fields (must be verified from live output
+before documenting): `text`, `contentDescription`, `resourceId`, `className`,
+`bounds`/`rect`, `isClickable`, `isEnabled`, `isScrollable`, `children`, `nodeId`/`id`.
+
+Node ID stability must also be confirmed: do node IDs remain the same across
+re-observations of the same screen? Across app restarts?
+
+**Live capture procedure (agent-completable, no user intervention required):**
+The agent executing this task can run these steps autonomously with a connected device.
+Before running live captures, examine existing skill scripts and snapshot artifacts in
+`~/src/clawperator-skills` for bootstrap context, and read the Android app source for
+the accessibility node tree structure.
+
+1. Run `clawperator observe snapshot --device-id <serial>` and record the full output
+   with annotations on what each line represents.
+2. Execute a payload with `snapshot_ui` and `params: { format: "json" }`, then record
+   the JSON tree from `stepResults[0].data`.
+3. Confirm whether ASCII from the CLI matches `snapshot_ui` with `format: "ascii"` in
+   an execute payload.
+4. Inspect the raw `[Clawperator-Result]` envelope from logcat to confirm the exact
+   `stepResults[].data` shape for `snapshot_ui`, `read_text`, and `click`.
+5. Re-observe the same screen multiple times and compare node IDs to confirm stability
+   across observations and across app restarts.
+
+**Fix:** Add annotated ASCII and JSON snapshot examples to `node-api-for-agents.md`.
+These examples are the direct input for the snapshot section in `agent-ui-loop.md`.
+
+---
+
 ## What is NOT in scope for this task
 
 - The full agent loop pattern and usage guide - that is `tasks/agent-ui-loop/`
-- Adding snapshot format examples with annotated real output - that requires live device
-  access and belongs in `agent-ui-loop/`
 - Changing execution contracts - this is a doc accuracy task, not a code task
 - CLI command reference beyond what is needed to correct errors
 
@@ -257,6 +299,8 @@ Expected (unconfirmed):
 - Fix error path reference: `stepResults[].data.error` -> `stepResults[].error`
 - Add NodeMatcher reference section (all six fields, AND semantics, stability ranking)
 - Add note that `observe snapshot` CLI is ASCII-only; JSON format requires execute API
+- Add annotated ASCII snapshot example (from live capture per Gap 9)
+- Add annotated JSON snapshot example with confirmed field names (from live capture per Gap 9)
 - Add a `snapshot_ui` with `format: "json"` example to the execution payload sample
 - Add per-action params table (all confirmed action types)
 - Add ResultEnvelope shape with `data` field clarification (note unconfirmed `data`

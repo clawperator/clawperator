@@ -82,60 +82,33 @@ These are documented and do not need to be rewritten:
 
 ---
 
-## Critical pre-work: snapshot format is a hard blocker
+## Prerequisites
 
-**The snapshot output format cannot be documented accurately without live device
-output. This is not optional pre-work - the doc cannot be written without it.**
+This doc depends on `tasks/fix-documentation-gaps/` being complete, or at minimum on
+the following gaps from that task being closed:
 
-**However, this step requires no user intervention.** The agent executing this task
-can complete all of the live-capture steps autonomously, provided a device or emulator
-is connected and `clawperator doctor` reports clean. The agent should:
+- **Gap 9** (snapshot output format): annotated ASCII and JSON examples with confirmed
+  field names. The snapshot section of this doc is built directly from those examples.
+- **Gap 1** (`enter_text` action type): confirmed name and full params.
+- **Gap 3** (action params per type): all confirmed params per action type.
+- **Gap 5** (ResultEnvelope `data` shapes): confirmed per-action `data` contents.
 
-- Run `clawperator` commands directly against the connected device.
-- Read the Android app source (under `apps/android/` in this repo) to understand
-  the structural shape of the accessibility node tree before running live captures.
-- Examine existing skill scripts and snapshot artifacts under
-  `~/src/clawperator-skills` - these contain real, device-captured output that can
-  bootstrap understanding of the ASCII format before any new capture is run.
+The format capture and contract verification work belongs in `fix-documentation-gaps`.
+Do not re-do it here. Pick up the outputs from that task.
 
-The agent does not need to ask the user to operate the device, provide output, or
-confirm results. The agent should run the captures itself and document what it observes.
-
-The following must be captured and recorded before writing the doc:
-
-1. Run `clawperator observe snapshot` and capture the full ASCII output.
-2. Construct and run an execute payload with `snapshot_ui` action and
-   `params: { format: "json" }`, then capture the raw JSON tree from
-   `stepResults[0].data`.
-3. Confirm whether the ASCII content from `observe snapshot` matches what
-   `snapshot_ui` with `format: "ascii"` returns inside an execute payload.
-4. Inspect the raw `[Clawperator-Result]` envelope from logcat directly to
-   confirm the exact `stepResults[].data` shape for `snapshot_ui`, `read_text`,
-   and `click`.
-5. Confirm whether node IDs in the JSON tree are stable across re-observations
-   of the same screen, and across app restarts.
-6. Confirm `enter_text` action name by running `clawperator action type ...`
-   and reading the `actionType` field in the returned envelope.
-
-### A concrete architectural fact that shapes the whole doc
+### Architectural note: ASCII-only CLI, JSON via execute payload
 
 Confirmed from source (`apps/node/src/domain/observe/snapshot.ts`):
-`clawperator observe snapshot` (CLI) is hardcoded to `format: "ascii"`.
-The format parameter is not exposed at the CLI level - `cmdObserveSnapshot`
-does not pass a format option to the domain function.
+`clawperator observe snapshot` (CLI) is hardcoded to `format: "ascii"`. The format
+parameter is not exposed at the CLI level.
 
-This means:
+- **JSON format is only available via the raw execute API** - `snapshot_ui` action
+  with `params: { format: "json" }` in a full execute payload.
+- **`clawperator observe snapshot` always returns ASCII.** There is no `--format json`
+  flag.
 
-- **JSON format snapshot tree is only available via the raw execute API** -
-  by sending a `snapshot_ui` action with `params: { format: "json" }` in a
-  full execute payload.
-- **`clawperator observe snapshot` always returns ASCII.** This is the CLI
-  convenience path. There is no `--format json` flag.
-
-This split must be the structural foundation of the snapshot section. Agents
-using the CLI get ASCII. Agents constructing execute payloads can request JSON.
-JSON is substantially more useful for agent reasoning (structured, traversable)
-but requires more setup. The doc must explain both paths and when to use each.
+This split is the structural foundation of the snapshot section in this doc. It must
+appear early, before any snapshot examples.
 
 ---
 
@@ -198,21 +171,16 @@ This must be a first-class section with concrete examples - not a footnote.
 
 ### 3. Snapshot output format - ASCII and JSON
 
-Two formats, two access paths (see pre-work section above):
+The annotated ASCII and JSON examples for this section come from
+`tasks/fix-documentation-gaps/` Gap 9. Do not capture or document the raw format here.
 
-**ASCII** (via `clawperator observe snapshot` or `snapshot_ui` with `format: "ascii"`):
-- Indented text tree of the UI hierarchy
-- The exact line format and which attributes appear inline must be captured
-  from live device output - do not invent this from assumptions
+This section of the doc must cover:
 
-**JSON** (only via execute payload with `snapshot_ui` action and `params: { format: "json" }`):
-- Structured tree agents can traverse programmatically
-- Likely node fields (must be confirmed from live output - do not document
-  field names that have not been verified):
-  `text`, `contentDescription`, `resourceId`, `className`/`role`, `bounds`/`rect`,
-  `isClickable`, `isEnabled`, `isScrollable`, `children`, `nodeId`/`id`
-
-Both formats and access paths must be documented with annotated real output.
+- The two access paths (CLI = ASCII only, execute payload = ASCII or JSON) - see
+  architectural note in the Prerequisites section above
+- How to read the ASCII tree to identify elements and extract matcher field values
+- How to traverse the JSON tree programmatically to find target nodes
+- When to use ASCII vs JSON vs screenshot (modality decision guide)
 
 ### 4. Full NodeMatcher reference
 
@@ -397,16 +365,10 @@ Section outline:
 
 ## Dependencies
 
-This task depends on `tasks/fix-documentation-gaps/` or on the agent directly
-confirming from source and live device output:
-- The snapshot JSON field names (live capture required)
-- The `enter_text` action type name (already confirmed from source)
-- The `data` contents per action type from live output
-
-A connected device or running emulator is required. The agent executing this task
-should run the captures itself - see the "Critical pre-work" section. The agent can
-also reference `~/src/clawperator-skills` for existing snapshot artifacts, and the
-Android app source for the node tree structure, before running live captures.
+This task depends on `tasks/fix-documentation-gaps/` being complete, specifically
+Gaps 1, 3, 5, and 9. The snapshot output format (Gap 9) and confirmed action params
+(Gaps 1, 3) are direct inputs to this doc. Do not start writing the snapshot section
+or action reference section of this doc without those gaps being closed.
 
 ---
 
