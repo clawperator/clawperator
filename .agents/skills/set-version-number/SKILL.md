@@ -63,6 +63,22 @@ Do NOT tag a release until:
 
 **Validation is the only path to finality.** If tests fail, the version bump is incomplete. Fix the tests before proceeding.
 
+## Commit Requirement
+
+After the manual audit and all required validation steps succeed, create a dedicated commit for the version bump with this exact subject:
+
+```bash
+git commit -m "chore(version): set to <new_version>"
+```
+
+Example:
+
+```bash
+git commit -m "chore(version): set to 0.2.4"
+```
+
+Do not fold unrelated changes into this commit.
+
 Prerequisites:
 - Must be run from within the `clawperator` git repository.
 - Node.js, Python, and Git must be available.
