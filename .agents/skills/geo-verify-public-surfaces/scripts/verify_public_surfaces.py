@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import argparse
 import json
 import re
 import subprocess
@@ -9,24 +10,33 @@ import sys
 USER_AGENT = "Mozilla/5.0 (compatible; ClawperatorGeoVerifier/1.0; +https://clawperator.com/)"
 
 
-URL_CHECKS = [
-    {"kind": "url", "url": "https://clawperator.com/robots.txt", "content_type": r"text/plain"},
-    {"kind": "url", "url": "https://clawperator.com/llms.txt", "content_type": r"text/plain"},
-    {"kind": "url", "url": "https://clawperator.com/llms-full.txt", "content_type": r"text/plain"},
-    {"kind": "url", "url": "https://clawperator.com/index.md", "content_type": r"text/markdown|text/plain"},
-    {"kind": "url", "url": "https://clawperator.com/agents", "content_type": r"text/html"},
-    {"kind": "url", "url": "https://clawperator.com/sitemap.xml", "content_type": r"application/xml|text/xml"},
-    {"kind": "redirect", "url": "https://clawperator.com/agent.md", "location": r"/index.md"},
-    {"kind": "redirect", "url": "https://clawperator.com/agents.md", "location": r"/index.md"},
-    {"kind": "redirect", "url": "https://clawperator.com/for-agents", "location": r"/agents"},
-    {"kind": "url", "url": "https://docs.clawperator.com/robots.txt", "content_type": r"text/plain"},
-    {"kind": "url", "url": "https://docs.clawperator.com/llms.txt", "content_type": r"text/plain"},
-    {"kind": "url", "url": "https://docs.clawperator.com/llms-full.txt", "content_type": r"text/plain"},
-    {"kind": "url", "url": "https://docs.clawperator.com/sitemap.xml", "content_type": r"application/xml|text/xml"},
-    {"kind": "url", "url": "https://docs.clawperator.com/", "content_type": r"text/html"},
-    {"kind": "url", "url": "https://docs.clawperator.com/ai-agents/node-api-for-agents/", "content_type": r"text/html"},
-    {"kind": "url", "url": "https://docs.clawperator.com/reference/cli-reference/", "content_type": r"text/html"},
-]
+def build_checks(landing_base_url, docs_base_url):
+    return [
+        {"kind": "url", "url": f"{landing_base_url}/robots.txt", "content_type": r"text/plain"},
+        {"kind": "url", "url": f"{landing_base_url}/llms.txt", "content_type": r"text/plain"},
+        {"kind": "url", "url": f"{landing_base_url}/llms-full.txt", "content_type": r"text/plain"},
+        {"kind": "url", "url": f"{landing_base_url}/index.md", "content_type": r"text/markdown|text/plain"},
+        {"kind": "url", "url": f"{landing_base_url}/agents", "content_type": r"text/html"},
+        {"kind": "url", "url": f"{landing_base_url}/sitemap.xml", "content_type": r"application/xml|text/xml"},
+        {"kind": "redirect", "url": f"{landing_base_url}/agent.md", "location": r"/index.md"},
+        {"kind": "redirect", "url": f"{landing_base_url}/agents.md", "location": r"/index.md"},
+        {"kind": "redirect", "url": f"{landing_base_url}/for-agents", "location": r"/agents"},
+        {"kind": "url", "url": f"{docs_base_url}/robots.txt", "content_type": r"text/plain"},
+        {"kind": "url", "url": f"{docs_base_url}/llms.txt", "content_type": r"text/plain"},
+        {"kind": "url", "url": f"{docs_base_url}/llms-full.txt", "content_type": r"text/plain"},
+        {"kind": "url", "url": f"{docs_base_url}/sitemap.xml", "content_type": r"application/xml|text/xml"},
+        {"kind": "url", "url": f"{docs_base_url}/", "content_type": r"text/html"},
+        {"kind": "url", "url": f"{docs_base_url}/ai-agents/node-api-for-agents/", "content_type": r"text/html"},
+        {"kind": "url", "url": f"{docs_base_url}/reference/cli-reference/", "content_type": r"text/html"},
+    ]
+
+
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--landing-base-url", default="https://clawperator.com")
+    parser.add_argument("--docs-base-url", default="https://docs.clawperator.com")
+    parser.add_argument("--allow-noindex", action="store_true")
+    return parser.parse_args()
 
 
 def run_curl(args):
@@ -65,7 +75,7 @@ def fail(url, reasons, status="", headers=None, raw=""):
     }
 
 
-def verify_url(check):
+def verify_url(check, allow_noindex=False):
     code, raw = run_curl([check["url"]])
     if code != 0:
         return fail(check["url"], [f"curl failed with exit code {code}"], raw=raw)
@@ -81,7 +91,7 @@ def verify_url(check):
         reasons.append(f"unexpected content-type: {content_type or 'missing'}")
 
     x_robots = headers.get("x-robots-tag", "")
-    if re.search(r"\bnoindex\b", x_robots, re.IGNORECASE):
+    if not allow_noindex and re.search(r"\bnoindex\b", x_robots, re.IGNORECASE):
         reasons.append(f"unexpected noindex header: {x_robots}")
     if re.search(r"\b(noai|noimageai)\b", x_robots, re.IGNORECASE):
         reasons.append(f"unexpected AI-blocking header: {x_robots}")
@@ -127,10 +137,16 @@ def verify_redirect(check):
 
 
 def main():
+    args = parse_args()
+    checks = build_checks(
+        args.landing_base_url.rstrip("/"),
+        args.docs_base_url.rstrip("/"),
+    )
+
     results = []
-    for check in URL_CHECKS:
+    for check in checks:
         if check["kind"] == "url":
-            result = verify_url(check)
+            result = verify_url(check, allow_noindex=args.allow_noindex)
         else:
             result = verify_redirect(check)
         results.append(result)
@@ -164,6 +180,9 @@ def main():
                 "ok": len(failed) == 0,
                 "passed": len(passed),
                 "failed": len(failed),
+                "landingBaseUrl": args.landing_base_url.rstrip("/"),
+                "docsBaseUrl": args.docs_base_url.rstrip("/"),
+                "allowNoindex": args.allow_noindex,
                 "results": [
                     {
                         "url": result["url"],

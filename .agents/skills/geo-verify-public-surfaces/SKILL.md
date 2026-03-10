@@ -27,7 +27,10 @@ scan raw headers.
 ## Workflow
 
 1. Run the helper script:
-   - `.agents/skills/geo-verify-public-surfaces/scripts/verify_public_surfaces.py`
+   - production defaults:
+     - `.agents/skills/geo-verify-public-surfaces/scripts/verify_public_surfaces.py`
+   - custom preview hosts:
+     - `.agents/skills/geo-verify-public-surfaces/scripts/verify_public_surfaces.py --landing-base-url <landing_url> --docs-base-url <docs_url> --allow-noindex`
 2. Let the script complete even if one or more checks fail.
 3. Read the final summary section and any failing checks.
 4. In your user-facing response:
@@ -35,6 +38,16 @@ scan raw headers.
    - call out only the failing or suspicious routes
    - mention notable edge behavior such as relative redirect `Location` headers
    - do not dump all headers unless the user asked for raw output
+
+## Targeting rules
+
+- If no flags are provided, the helper checks production:
+  - `https://clawperator.com`
+  - `https://docs.clawperator.com`
+- For preview validation, pass both preview hosts explicitly.
+- For preview validation, usually also pass `--allow-noindex` because branch
+  previews often carry `X-Robots-Tag: noindex` by design.
+- Use preview URLs from Cloudflare check runs or PR comments when available.
 
 ## Output contract
 
