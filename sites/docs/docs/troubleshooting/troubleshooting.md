@@ -238,7 +238,7 @@ The Node CLI and the installed [Clawperator Operator Android app](../getting-sta
 
 - `0.1.4` and `0.1.9` are compatible
 - `0.1.4` and `0.1.4-d` are compatible
-- `0.1.4` and `0.2.1` are not compatible
+- `0.1.4` and `0.2.2` are not compatible
 
 Use:
 
