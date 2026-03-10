@@ -89,6 +89,8 @@ export default function Home() {
     };
   }, []);
 
+  const toolbarRef = useRef(null);
+
   useEffect(() => {
     const visibleSections = new Map();
     const sectionObserver = new IntersectionObserver(
@@ -114,9 +116,9 @@ export default function Home() {
       },
       { 
         threshold: [0, 0.2, 0.4], 
-        // Use a more generous rootMargin or one that adjusts to toolbar height.
-        // We'll use a slightly larger offset to account for the toolbar + some buffer.
-        rootMargin: "-140px 0px -30% 0px" 
+        // Use a rootMargin that accounts for the actual toolbar height + small buffer.
+        // We measure the offsetHeight of the toolbarRef if available.
+        rootMargin: `-${(toolbarRef.current?.offsetHeight || 80) + 20}px 0px -30% 0px` 
       }
     );
 
@@ -129,7 +131,7 @@ export default function Home() {
 
   return (
     <>
-      <header className="top-toolbar">
+      <header ref={toolbarRef} className="top-toolbar">
         <div className="top-toolbar-inner">
           <a href="#top" className="toolbar-brand">
             <img src="/clawperator-logo.png" alt="" aria-hidden="true" className="toolbar-logo" />
