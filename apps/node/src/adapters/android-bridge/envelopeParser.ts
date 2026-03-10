@@ -1,4 +1,4 @@
-import type { ResultEnvelope, TerminalSource } from "../../contracts/result.js";
+import type { ResultEnvelope, StepResult, StepResultData, TerminalSource } from "../../contracts/result.js";
 import { RESULT_ENVELOPE_PREFIX } from "../../contracts/result.js";
 
 export interface ParsedTerminal {
@@ -16,7 +16,7 @@ export function parseResultEnvelope(line: string, commandId: string): ResultEnve
   if (prefixIndex === -1) return null;
   const json = trimmed.slice(prefixIndex + RESULT_ENVELOPE_PREFIX.length).trim();
   try {
-    const data = JSON.parse(json) as ResultEnvelope;
+    const data = normalizeResultEnvelope(JSON.parse(json));
     if (data.commandId === commandId) return data;
     return null; // different commandId
   } catch {
@@ -34,4 +34,40 @@ export function parseTerminalEnvelope(line: string, commandId: string): ParsedTe
     return { envelope, terminalSource: "clawperator_result" };
   }
   return envelope;
+}
+
+function normalizeResultEnvelope(raw: unknown): ResultEnvelope {
+  const envelope = raw as Partial<ResultEnvelope> & { stepResults?: unknown[] };
+
+  return {
+    commandId: String(envelope.commandId ?? ""),
+    taskId: String(envelope.taskId ?? ""),
+    status: envelope.status === "failed" ? "failed" : "success",
+    stepResults: Array.isArray(envelope.stepResults) ? envelope.stepResults.map(normalizeStepResult) : [],
+    error: typeof envelope.error === "string" || envelope.error === null ? envelope.error : null,
+  };
+}
+
+function normalizeStepResult(raw: unknown): StepResult {
+  const step = raw as Partial<StepResult> & { data?: unknown };
+
+  return {
+    id: String(step.id ?? ""),
+    actionType: String(step.actionType ?? ""),
+    success: step.success === false ? false : true,
+    data: normalizeStepResultData(step.data),
+    ...(typeof step.error === "string" ? { error: step.error } : {}),
+  };
+}
+
+function normalizeStepResultData(raw: unknown): StepResultData {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return {};
+  }
+
+  const normalized: StepResultData = {};
+  for (const [key, value] of Object.entries(raw)) {
+    normalized[key] = typeof value === "string" ? value : String(value);
+  }
+  return normalized;
 }

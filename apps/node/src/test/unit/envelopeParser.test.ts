@@ -99,4 +99,27 @@ describe("parseTerminalEnvelope", () => {
       assert.strictEqual(step.data?.error, "UNSUPPORTED");
     }
   });
+
+  it("normalizes missing step data to an empty object", () => {
+    const json = `{"commandId":"${CMD_ID}","taskId":"t1","status":"success","stepResults":[{"id":"s1","actionType":"snapshot_ui","success":true}],"error":null}`;
+    const line = `${RESULT_ENVELOPE_PREFIX} ${json}`;
+    const parsed = parseTerminalEnvelope(line, CMD_ID);
+    assert.ok(parsed && typeof parsed === "object");
+    if (typeof parsed === "object") {
+      assert.deepStrictEqual(parsed.envelope.stepResults[0].data, {});
+    }
+  });
+
+  it("normalizes non-string step data values to strings", () => {
+    const json = `{"commandId":"${CMD_ID}","taskId":"t1","status":"success","stepResults":[{"id":"s1","actionType":"sleep","success":true,"data":{"duration_ms":1000,"ok":true}}],"error":null}`;
+    const line = `${RESULT_ENVELOPE_PREFIX} ${json}`;
+    const parsed = parseTerminalEnvelope(line, CMD_ID);
+    assert.ok(parsed && typeof parsed === "object");
+    if (typeof parsed === "object") {
+      assert.deepStrictEqual(parsed.envelope.stepResults[0].data, {
+        duration_ms: "1000",
+        ok: "true",
+      });
+    }
+  });
 });

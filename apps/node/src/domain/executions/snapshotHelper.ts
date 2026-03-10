@@ -34,9 +34,12 @@ export function extractSnapshotFromLogs(lines: string[]): string | null {
 }
 
 function extractLogMessage(line: string): string | null {
-  const match = line.match(/^[A-Z]\/.*?:\s?(.*)$/);
-  if (match) {
-    return match[1];
+  if (/^[A-Z]\//.test(line)) {
+    const delimiterIndex = line.indexOf(":");
+    if (delimiterIndex !== -1) {
+      const message = line.slice(delimiterIndex + 1);
+      return message.startsWith(" ") ? message.slice(1) : message;
+    }
   }
 
   const trimmed = line.trim();

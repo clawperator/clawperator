@@ -6,11 +6,13 @@ export type TerminalSource = "clawperator_result";
 /**
  * Result envelope contract: [Clawperator-Result] terminal envelope.
  */
+export type StepResultData = Record<string, string>;
+
 export interface StepResult {
   id: string;
   actionType: string;
   success: boolean;
-  data?: Record<string, unknown>;
+  data: StepResultData;
   error?: string;
 }
 

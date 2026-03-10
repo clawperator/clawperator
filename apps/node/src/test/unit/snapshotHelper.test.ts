@@ -26,6 +26,24 @@ describe("extractSnapshotFromLogs", () => {
     );
   });
 
+  it("preserves colons in marker and hierarchy lines", () => {
+    const lines = [
+      "D/E       : [TaskScope] UI Hierarchy:",
+      "D/E       : <hierarchy rotation=\"0\">",
+      "D/E       :   <node index=\"0\" text=\"UTC: Brisbane\" resource-id=\"android:id/title\" />",
+      "D/E       : </hierarchy>",
+    ];
+
+    assert.strictEqual(
+      extractSnapshotFromLogs(lines),
+      [
+        "<hierarchy rotation=\"0\">",
+        "  <node index=\"0\" text=\"UTC: Brisbane\" resource-id=\"android:id/title\" />",
+        "</hierarchy>",
+      ].join("\n"),
+    );
+  });
+
   it("returns null when no hierarchy marker is present", () => {
     const lines = [
       "D/w       : [TaskRunnerManager] Task execution started",
