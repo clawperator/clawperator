@@ -1,12 +1,12 @@
 # Clawperator Operator Android app
 
-The [Clawperator Operator Android app](android-operator-apk.md) is Clawperator's own Android app. It runs as a background service on the dedicated Android device and executes actions requested by the Node API.
+This is Clawperator's own Android app. It runs as a background service on the dedicated Android device and executes actions requested by the Node API.
 
-This term is intentionally different from the Android apps the user wants Clawperator to operate. Those user-installed Android apps are not part of Clawperator itself.
+This app is intentionally distinct from the Android apps the user wants Clawperator to operate. Those user-installed Android apps are not part of Clawperator itself. See [Clawperator Terminology](terminology.md) for the full distinction.
 
 ## Application IDs
 
-The [Clawperator Operator Android app](android-operator-apk.md) is distributed in two variants, each with its own application ID:
+The app is distributed in two variants, each with its own application ID:
 
 * **`com.clawperator.operator`**: The stable, release version. This is the default package used by the CLI and intended for most users and remote AI agents.
 * **`com.clawperator.operator.dev`**: The local debug version. This is used by developers building the APK from source locally.
@@ -20,41 +20,38 @@ The [Clawperator Operator Android app](android-operator-apk.md) is distributed i
 - `adb` installed on your host machine.
 
 ### Automatic Installation
-The easiest way to install the [Clawperator Operator Android app](android-operator-apk.md) is via the one-line installer:
+The easiest way to install is via the one-line installer:
 ```bash
 curl -fsSL https://clawperator.com/install.sh | bash
 ```
-This will download the latest app package and install it to your connected device.
+This downloads the latest app package and installs it to your connected device.
 
 ### Manual Installation
-If you need to install the [Clawperator Operator Android app](android-operator-apk.md) manually:
+To install manually:
 1. Download the latest app package from [clawperator.com/operator.apk](https://clawperator.com/operator.apk).
 2. Connect your device via USB.
-3. Run the following command:
+3. Run:
    ```bash
    adb install -r operator.apk
    ```
 
 ### Historical Versions
-Historical versions of the app package can be downloaded from `downloads.clawperator.com`. The URL structure follows the versioning pattern:
+Historical versions can be downloaded from `downloads.clawperator.com`. The URL structure follows the versioning pattern:
 - `https://downloads.clawperator.com/operator/v<version>/operator-v<version>.apk`
 
 Example for v0.2.1:
 - [https://downloads.clawperator.com/operator/v0.2.1/operator-v0.2.1.apk](https://downloads.clawperator.com/operator/v0.2.1/operator-v0.2.1.apk)
 
 ## Granting Permissions
-After installation, you must grant accessibility and notification permissions for the [Clawperator Operator Android app](android-operator-apk.md) to function correctly. This allows it to inspect the screen and interact with the UI.
+After installation, grant accessibility permissions so the app can inspect the screen and interact with the UI:
 
-You can do this via the CLI:
 ```bash
 clawperator grant-device-permissions
 ```
 
 ## Logging and Debugging
 
-Starting from v0.2.1, the [Clawperator Operator Android app](android-operator-apk.md) enables **debug logging in release builds** by default.
-
-The app is **intentionally "noisy" in logcat**. This provides maximum visibility into UI events, accessibility node trees, and command execution states, ensuring that remote AI agents can observe the internal state and troubleshoot issues directly through `adb logcat` even when using production APKs.
+The app enables **debug logging in release builds** by default. This provides maximum visibility into UI events, accessibility node trees, and command execution states, so remote AI agents can observe internal state and troubleshoot issues directly through `adb logcat` even when using production APKs.
 
 To view logs:
 ```bash
