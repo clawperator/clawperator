@@ -135,6 +135,7 @@ Turn the current GEO checklist into a repeatable post-deploy verification pass.
 ### Work
 
 - create a simple verification checklist for both public hosts
+- implement the live check as a repo-local skill, not just a raw shell script
 - verify status code, content type, and redirect behavior for machine-facing
   routes
 - verify `robots.txt`, `llms.txt`, `llms-full.txt`, `/index.md`, `/agents`, and
@@ -146,7 +147,7 @@ Turn the current GEO checklist into a repeatable post-deploy verification pass.
 ### Implementation targets
 
 - internal GEO documentation
-- optional validation script if the checks can be automated cleanly
+- repo-local GEO verification skill under `.agents/skills/`
 
 ### Acceptance criteria
 
