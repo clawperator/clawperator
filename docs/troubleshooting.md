@@ -237,8 +237,7 @@ export CLAWPERATOR_SKILLS_REGISTRY="$HOME/.clawperator/skills/skills/skills-regi
 The Node CLI and the installed [Clawperator Operator Android app](../getting-started/android-operator-apk.md) must have matching `major.minor` versions.
 
 - `0.1.4` and `0.1.9` are compatible
-- `0.1.4` and `0.1.4-d` are compatible
-- `0.1.4` and `0.2.1` are not compatible
+- `0.1.4` and `0.2.x` are not compatible
 
 Use:
 
