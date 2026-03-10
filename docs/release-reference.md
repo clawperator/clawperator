@@ -1,4 +1,4 @@
-# Releasing
+# Release Reference
 
 ## Scope
 
