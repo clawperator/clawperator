@@ -159,15 +159,15 @@ From `apps/node/src/contracts/result.ts`, the envelope shape is:
 {
   commandId: string,
   taskId: string,
-  status: "success" | "error",
+  status: "success" | "failed",
   stepResults: Array<{
     id: string,
     actionType: string,
     success: boolean,
-    data?: unknown,      // shape varies per action type
-    error?: string       // error code on failure
+    data?: Record<string, unknown>,  // shape varies per action type
+    error?: string                   // error code on failure
   }>,
-  error?: string         // top-level error code
+  error?: string | null              // top-level error code
 }
 ```
 

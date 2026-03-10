@@ -181,7 +181,7 @@ Every execution requires `expectedFormat: "android-ui-automator"`.
 
 ## Error Codes
 
-Branch agent logic on codes from `envelope.error` or `stepResults[].data.error`:
+Branch agent logic on codes from `envelope.error` or `stepResults[].error`:
 
 | Code | Meaning |
 | :--- | :--- |
