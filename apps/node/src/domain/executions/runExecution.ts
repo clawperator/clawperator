@@ -32,6 +32,39 @@ interface PerformExecutionResult {
   result: RunExecutionResult;
 }
 
+export function attachSnapshotsToStepResults(stepResults: ResultEnvelope["stepResults"], snapshots: string[]): void {
+  const snapshotSteps = stepResults.filter(step => step.actionType === "snapshot_ui");
+  if (snapshotSteps.length === 0 || snapshots.length === 0) {
+    return;
+  }
+
+  const relevantSnapshots = snapshots.slice(-snapshotSteps.length);
+  const startIndex = snapshotSteps.length - relevantSnapshots.length;
+  relevantSnapshots.forEach((snapshotText, index) => {
+    const targetStep = snapshotSteps[startIndex + index];
+    if (snapshotText && targetStep) {
+      targetStep.data = { ...targetStep.data, text: snapshotText };
+    }
+  });
+}
+
+export function finalizeSuccessfulScreenshotCapture(
+  screenStep: ResultEnvelope["stepResults"][number] | undefined,
+  screenshotPath: string
+): void {
+  if (!screenStep) {
+    return;
+  }
+
+  if (screenStep.data.error === "UNSUPPORTED_RUNTIME_SCREENSHOT") {
+    screenStep.success = true;
+    const { error: _error, message: _message, ...remainingData } = screenStep.data;
+    screenStep.data = remainingData;
+  }
+
+  screenStep.data = { ...screenStep.data, path: screenshotPath };
+}
+
 /**
  * Internal helper to validate, resolve device, and perform actual execution.
  */
@@ -130,14 +163,7 @@ async function performExecution(
       if (hasSnapshot) {
         const dump = await runAdb(config, ["logcat", "-d", "-v", "tag"]);
         const snapshots = extractSnapshotsFromLogs(dump.stdout.split("\n"));
-        const snapshotSteps = result.envelope.stepResults.filter(s => s.actionType === "snapshot_ui");
-
-        snapshotSteps.forEach((snapStep, index) => {
-          const snapshotText = snapshots[index];
-          if (snapshotText) {
-            snapStep.data = { ...snapStep.data, text: snapshotText };
-          }
-        });
+        attachSnapshotsToStepResults(result.envelope.stepResults, snapshots);
       }
 
       const hasScreenshot = result.envelope.stepResults.some(s => s.actionType === "take_screenshot");
@@ -146,13 +172,6 @@ async function performExecution(
         try {
           const screenshotPath = screenAction?.params?.path || join(tmpdir(), `clawperator-screenshot-${execution.commandId}-${Date.now()}.png`);
           const screenStep = result.envelope.stepResults.find(s => s.actionType === "take_screenshot");
-          const hasUnsupportedRuntimeScreenshot = screenStep?.data.error === "UNSUPPORTED_RUNTIME_SCREENSHOT";
-
-          if (screenStep && hasUnsupportedRuntimeScreenshot) {
-            screenStep.success = true;
-            const { error: _error, message: _message, ...remainingData } = screenStep.data;
-            screenStep.data = remainingData;
-          }
 
           const deviceArgs = config.deviceId ? ["-s", config.deviceId] : [];
           const proc = spawn(config.adbPath, [...deviceArgs, "exec-out", "screencap", "-p"], {
@@ -173,12 +192,12 @@ async function performExecution(
             proc.on("error", reject);
           });
 
-          if (buffer.length > 0) {
-            await writeFile(screenshotPath, buffer);
-            if (screenStep) {
-              screenStep.data = { ...screenStep.data, path: screenshotPath };
-            }
+          if (buffer.length === 0) {
+            throw new Error("screencap returned empty output");
           }
+
+          await writeFile(screenshotPath, buffer);
+          finalizeSuccessfulScreenshotCapture(screenStep, screenshotPath);
         } catch (e) {
           console.warn(`⚠️ Failed to capture screenshot via adb: ${String(e)}`);
         }

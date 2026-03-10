@@ -127,4 +127,22 @@ describe("parseTerminalEnvelope", () => {
       });
     }
   });
+
+  it("returns malformed when step success is missing", () => {
+    const json = `{"commandId":"${CMD_ID}","taskId":"t1","status":"success","stepResults":[{"id":"s1","actionType":"snapshot_ui","data":{}}],"error":null}`;
+    const line = `${RESULT_ENVELOPE_PREFIX} ${json}`;
+    assert.strictEqual(parseTerminalEnvelope(line, CMD_ID), "malformed");
+  });
+
+  it("returns malformed when step success is not boolean", () => {
+    const json = `{"commandId":"${CMD_ID}","taskId":"t1","status":"success","stepResults":[{"id":"s1","actionType":"snapshot_ui","success":"false","data":{}}],"error":null}`;
+    const line = `${RESULT_ENVELOPE_PREFIX} ${json}`;
+    assert.strictEqual(parseTerminalEnvelope(line, CMD_ID), "malformed");
+  });
+
+  it("returns malformed when envelope identifiers are not strings", () => {
+    const json = `{"commandId":123,"taskId":"t1","status":"success","stepResults":[],"error":null}`;
+    const line = `${RESULT_ENVELOPE_PREFIX} ${json}`;
+    assert.strictEqual(parseTerminalEnvelope(line, CMD_ID), "malformed");
+  });
 });

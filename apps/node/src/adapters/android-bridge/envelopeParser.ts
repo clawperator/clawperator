@@ -38,26 +38,41 @@ export function parseTerminalEnvelope(line: string, commandId: string): ParsedTe
 
 function normalizeResultEnvelope(raw: unknown): ResultEnvelope {
   const envelope = raw as Partial<ResultEnvelope> & { stepResults?: unknown[] };
+  if (typeof envelope.commandId !== "string" || typeof envelope.taskId !== "string") {
+    throw new Error("Invalid envelope identifiers");
+  }
   if (envelope.status !== "success" && envelope.status !== "failed") {
     throw new Error("Invalid envelope status");
   }
+  if (!Array.isArray(envelope.stepResults)) {
+    throw new Error("Invalid envelope stepResults");
+  }
+  if (!(typeof envelope.error === "string" || envelope.error === null)) {
+    throw new Error("Invalid envelope error");
+  }
 
   return {
-    commandId: String(envelope.commandId ?? ""),
-    taskId: String(envelope.taskId ?? ""),
+    commandId: envelope.commandId,
+    taskId: envelope.taskId,
     status: envelope.status,
-    stepResults: Array.isArray(envelope.stepResults) ? envelope.stepResults.map(normalizeStepResult) : [],
-    error: typeof envelope.error === "string" || envelope.error === null ? envelope.error : null,
+    stepResults: envelope.stepResults.map(normalizeStepResult),
+    error: envelope.error,
   };
 }
 
 function normalizeStepResult(raw: unknown): StepResult {
   const step = raw as Partial<StepResult> & { data?: unknown };
+  if (typeof step.id !== "string" || typeof step.actionType !== "string") {
+    throw new Error("Invalid step result identifiers");
+  }
+  if (typeof step.success !== "boolean") {
+    throw new Error("Invalid step result success");
+  }
 
   return {
-    id: String(step.id ?? ""),
-    actionType: String(step.actionType ?? ""),
-    success: step.success === false ? false : true,
+    id: step.id,
+    actionType: step.actionType,
+    success: step.success,
     data: normalizeStepResultData(step.data),
   };
 }
