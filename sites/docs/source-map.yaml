@@ -24,12 +24,9 @@ sections:
     pages:
       - output: index.md
         title: Clawperator Docs
-        mode: curated
+        mode: copy
         sources:
-          - docs/project-overview.md
-          - docs/first-time-setup.md
-          - docs/architecture.md
-        notes: Keep this as a short landing page. Link outward instead of duplicating long docs.
+          - docs/index.md
 
   - id: getting-started
     title: Getting Started

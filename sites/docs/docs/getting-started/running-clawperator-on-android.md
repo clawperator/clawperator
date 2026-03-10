@@ -1,109 +1,126 @@
 # Running Clawperator on Android
 
-## 1. The Actuator Device
+Clawperator operates an Android device on behalf of a user. In these docs, "Android device" means either:
 
-Clawperator operates a dedicated Android environment. This environment may be:
-- a physical phone
-- an Android emulator
+- a physical Android phone connected over `adb`
+- a local Android emulator provisioned through the Node CLI
 
-### The Model
+This is the canonical actuator model for Clawperator. The Node runtime talks to an Android device, and the Android device runs the Operator app.
+
+## The actuator model
 
 ```text
 Agent (Brain)
     |
 Clawperator Node Runtime
     |
-Android Device (Physical or Emulator)
+Android Device (physical or emulator)
 ```
 
-**Key principle:**
-Clawperator operates the device. It does not configure the user’s accounts.
+Clawperator operates the device UI. It does not own account setup, app configuration, or user credentials.
 
-## 2. User Responsibilities
+## User responsibilities
 
-**Very important clarification:**
+Before automation starts, the user is responsible for preparing the Android device. That includes:
 
-Users must:
-- install apps
-- sign into apps
-- configure apps
-- ensure apps are ready for automation
+- installing the apps the automation will target
+- signing into Google, Play Store, and any app-specific accounts
+- completing first-run flows, prompts, and app configuration
+- ensuring the target apps are in a usable state for automation
 
-Clawperator will not:
-- sign into accounts
+Clawperator does not:
+
 - create accounts
-- configure apps
-- bypass authentication
+- sign into accounts
+- configure apps on the user's behalf
+- bypass authentication or anti-abuse gates
 
-*Clawperator assumes the Android device is already configured with the user’s apps and logins. It simply operates the device’s UI on behalf of the user.*
+Agents should assume the device already contains the required apps, logins, and configuration.
 
-## 3. Choosing an Android Environment
+## Choosing an Android environment
 
-You have two options for the actuator environment.
+Clawperator supports two actuator environments.
 
-### Option A — Physical Device (recommended)
+### Option A - Physical Android device
 
-- Highest reliability
-- Best compatibility
-- Lowest friction
+This is the recommended path for production use.
 
-**Use cases:**
-- production automation
-- home automation
-- long-running agents
+- best app compatibility
+- least divergence from a normal user device
+- lowest risk of emulator detection
+- strong fit for persistent or long-running automation
 
-### Option B — Android Emulator
+Use a physical device when reliability matters more than convenience.
 
-- Useful for testing
-- Useful when no physical device is available
-- **Note:** some apps may detect the emulator, and some apps may refuse login.
+### Option B - Android emulator
 
-Clawperator does not guarantee emulator compatibility for third-party apps.
+This is primarily for development, testing, and situations where no physical device is available.
 
-## 4. Emulator Provisioning
+- no dedicated hardware required
+- quick to reprovision
+- useful for local validation and agent development
+
+Some apps detect emulator environments or refuse login on them. Clawperator does not guarantee third-party app compatibility on emulators.
+
+## Emulator provisioning
+
+Provisioning is owned by the Node CLI and API, not by `install.sh`.
 
 ```bash
 clawperator provision emulator
 ```
 
-What happens during provisioning:
-1. Node runtime checks for a running supported emulator and reuses it if found.
-2. If none is running, it starts a stopped supported AVD if one exists.
-3. Otherwise, it creates a new AVD with the default profile (and installs the system image if needed).
+Provisioning is deterministic and reuse-first:
 
-**The default emulator profile:**
-- API level: 35
-- Device: Pixel 7
-- ABI: arm64-v8a
-- System image: Google Play
+1. Reuse a running supported emulator.
+2. Start a stopped supported AVD.
+3. Create a new supported AVD if none exist.
 
-**Reminder:** Even with an emulator, users still need to:
-- log into a Google account (if using Play Store)
-- install apps
-- log into apps
+The default supported emulator profile is:
 
-## 5. Installing the Operator APK
+- Android API level `35`
+- device profile `pixel_7`
+- ABI `arm64-v8a`
+- Google Play system image
+- default AVD name `clawperator-pixel`
+
+Even on an emulator, the user still needs to:
+
+- sign in to a Google account if Play Store access is needed
+- install the target apps
+- sign in to those apps
+- complete any first-run configuration
+
+## Installing the Operator APK
+
+The Operator APK installs the same way on both environments:
 
 ```bash
-adb install operator.apk
+adb install -r ~/.clawperator/downloads/operator.apk
 ```
 
-This works exactly the same for:
-- a physical device
-- an emulator
+If multiple devices are connected, target one explicitly:
 
-## 6. Granting Permissions
+```bash
+adb -s <device_id> install -r ~/.clawperator/downloads/operator.apk
+```
+
+## Granting permissions
+
+Clawperator uses Android Accessibility to observe and operate the UI. After the APK is installed, enable the required permissions from the host:
 
 ```bash
 clawperator grant-device-permissions
 ```
 
-Clawperator uses Android's Accessibility API to observe and interact with UI elements. This command enables the accessibility service requirement from the host machine without needing to touch the device screen.
+This works for both physical devices and emulators. If multiple devices are connected, pass `--device-id <id>`.
 
-## 7. Verifying Setup
+## Verifying setup
+
+Use `doctor` to confirm the Android device is ready:
 
 ```bash
 clawperator doctor
 ```
 
-This command runs readiness checks to ensure the Android device is properly configured, the APK is installed, and permissions are granted. All checks must pass before the device can be used for automation.
+`doctor` verifies that the device is reachable, the Operator APK is installed, and the runtime handshake is working. All critical checks must pass before automation starts.

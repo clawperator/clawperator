@@ -198,6 +198,8 @@ To sign in:
 
 Some apps require additional configuration (such as accepting terms of service or completing a first-run flow) before Clawperator can interact with them.
 
+If an agent is blocked on a login screen or onboarding flow, treat that as device-preparation work that must be completed by the user.
+
 ### App not installed or not detected on the emulator
 
 If an automation targets an app that is not installed on the emulator, the UI action will fail with `NODE_NOT_FOUND` or the app will not open. Install the app from the Play Store or via `adb install` before running.

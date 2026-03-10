@@ -210,4 +210,4 @@ clawperator doctor --full
 - `clawperator grant-device-permissions` - enable Accessibility and related app ops via adb
 - `clawperator observe snapshot` - direct runtime check once doctor reports the environment is ready
 
-For initial installation and device setup, see [First-Time Setup](../getting-started/first-time-setup.md) and [Agent Bootstrap Guide](../getting-started/openclaw-remote-bootstrap.md).
+For initial installation and device setup, see [First-Time Setup](../getting-started/first-time-setup.md) and [OpenClaw Remote Bootstrap Guide](../getting-started/openclaw-remote-bootstrap.md).

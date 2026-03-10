@@ -97,8 +97,8 @@ See `apps/node/examples/basic-api-usage.js` for a complete SSE + REST example.
 
 ## Android Emulator Support
 
-Note: Clawperator does not configure accounts or install apps inside the emulator.
-Agents should assume the emulator already contains logged-in apps required for automation.
+Note: Clawperator does not configure accounts, install target apps, or complete first-run app setup inside the emulator.
+Agents should assume the emulator already contains the logged-in apps required for automation.
 
 Clawperator supports Android emulator provisioning as an alternative runtime to a physical Android device. Emulator lifecycle management lives in the Node CLI and HTTP API, not in `install.sh`.
 

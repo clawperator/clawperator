@@ -7,6 +7,7 @@ The Android runtime runs on an Android device which may be:
 * a local Android emulator
 
 Emulator lifecycle belongs to the Node layer, not the installer.
+User accounts, app installs, and app configuration remain the user's responsibility on either environment.
 
 ## Layers
 

@@ -7,6 +7,8 @@ Clawperator can operate either a physical Android device or a local Android emul
 
 The emulator option is intended primarily for development and testing. Some applications may detect or block emulator environments.
 
+In both environments, the user owns app installation, sign-in, and app configuration. Clawperator only operates the device UI.
+
 This approach ensures that the user's primary phone (e.g., an iPhone) remains undisturbed while the actuator device handles automation tasks. Physical device setups have virtually no hardware requirements - any cheap or old Android device works.
 
 ## Core Philosophy: The Brain and the Hand

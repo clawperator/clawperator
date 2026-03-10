@@ -4,6 +4,8 @@ This doc covers the exact steps a remote OpenClaw agent should follow to install
 
 **Deployment model:** Mac mini host running OpenClaw, with a connected Android device (physical via USB or emulator provisioned through the Node CLI).
 
+Clawperator operates the Android device UI. The user is still responsible for app installation, account login, and app configuration on that device.
+
 ---
 
 ## Preconditions
@@ -94,6 +96,8 @@ clawperator grant-device-permissions --receiver-package com.clawperator.operator
 ```
 
 This command enables the accessibility service via adb and does not require on-device interaction.
+
+It does not install target apps, sign into them, or configure their first-run state.
 
 ---
 

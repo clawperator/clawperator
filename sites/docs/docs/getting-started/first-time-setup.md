@@ -9,11 +9,13 @@ This device may be:
 
 In both cases, the device must be configured with the apps and user logins required by the automation.
 
+Clawperator operates the UI on that device. It does not create accounts, sign into apps, or complete app configuration on behalf of the user.
+
 For an overview of the actuator model and user responsibilities, see [Running Clawperator on Android](running-clawperator-on-android.md).
 
 ---
 
-## Step 1 — Install CLI
+## Step 1 - Install CLI
 
 The simplest path is to run the installer:
 
@@ -27,7 +29,7 @@ Historical versions and release notes remain available on [GitHub Releases](http
 
 ---
 
-## Step 2 — Choose Android Environment
+## Step 2 - Choose Android Environment
 
 ### Option A: Physical Device
 
@@ -78,7 +80,7 @@ If both a physical device and an emulator are connected, you will need to pass `
 
 ---
 
-## Step 3: Install the APK
+## Step 3 - Install the APK
 
 Install the operator APK onto the connected device or emulator:
 
@@ -94,7 +96,7 @@ adb -s <device_id> install -r ~/.clawperator/downloads/operator.apk
 
 ---
 
-## Step 4: Enable the Accessibility Service
+## Step 4 - Enable the Accessibility Service
 
 Clawperator uses Android's Accessibility API to observe and interact with UI elements. You must enable the service before it can accept commands.
 
@@ -112,7 +114,7 @@ For a standard public install, the default receiver package is `com.clawperator.
 
 ---
 
-## Step 5: Verify Setup
+## Step 5 - Verify Setup
 
 Run the diagnostic check:
 
@@ -132,7 +134,7 @@ A fully configured device will show all checks passing. Common warnings:
 
 ---
 
-## Step 6: Run Your First Command
+## Step 6 - Run Your First Command
 
 Observe the current UI state:
 
@@ -150,6 +152,8 @@ clawperator action open-app \
 ```
 
 > Use `com.clawperator.operator` for release APK, `com.clawperator.operator.dev` for debug APK.
+
+Before running real automations, make sure the target app is installed, signed in, and already configured on the device or emulator.
 
 ---
 
