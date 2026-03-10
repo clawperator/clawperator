@@ -33,19 +33,20 @@ interface PerformExecutionResult {
 }
 
 export function attachSnapshotsToStepResults(stepResults: ResultEnvelope["stepResults"], snapshots: string[]): void {
-  const snapshotSteps = stepResults.filter(step => step.actionType === "snapshot_ui");
+  const snapshotSteps = stepResults.filter(step => step.actionType === "snapshot_ui" && step.success);
   if (snapshotSteps.length === 0 || snapshots.length === 0) {
     return;
   }
 
-  const relevantSnapshots = snapshots.slice(-snapshotSteps.length);
-  const startIndex = snapshotSteps.length - relevantSnapshots.length;
-  relevantSnapshots.forEach((snapshotText, index) => {
-    const targetStep = snapshotSteps[startIndex + index];
+  let snapshotIndex = snapshots.length - 1;
+  for (let stepIndex = snapshotSteps.length - 1; stepIndex >= 0 && snapshotIndex >= 0; stepIndex -= 1) {
+    const snapshotText = snapshots[snapshotIndex];
+    const targetStep = snapshotSteps[stepIndex];
     if (snapshotText && targetStep) {
       targetStep.data = { ...targetStep.data, text: snapshotText };
     }
-  });
+    snapshotIndex -= 1;
+  }
 }
 
 export function finalizeSuccessfulScreenshotCapture(
