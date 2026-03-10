@@ -308,23 +308,6 @@ export default function Home() {
             <div className="workflow-exchange">
               <div className="workflow-msg workflow-msg-user">
                 <p className="workflow-role">User <span className="workflow-channel">via Telegram</span></p>
-                <p>&ldquo;Hey assistant, what&rsquo;s my current home battery level?&rdquo;</p>
-              </div>
-              <div className="workflow-msg workflow-msg-agent">
-                <p className="workflow-role">OpenClaw</p>
-                <p>Uses Clawperator to open the home battery app on the Android device and read the current battery level.</p>
-              </div>
-              <div className="workflow-msg workflow-msg-response">
-                <p className="workflow-role">Response</p>
-                <p>&ldquo;Your home battery is at 73% and charging from solar. Should be full around 2:20pm.&rdquo;</p>
-              </div>
-            </div>
-          </article>
-
-          <article className="workflow-card">
-            <div className="workflow-exchange">
-              <div className="workflow-msg workflow-msg-user">
-                <p className="workflow-role">User <span className="workflow-channel">via Telegram</span></p>
                 <p>&ldquo;Turn on the living room AC.&rdquo;</p>
               </div>
               <div className="workflow-msg workflow-msg-agent">
