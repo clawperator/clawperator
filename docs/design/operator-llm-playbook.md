@@ -48,14 +48,22 @@ For app automation commands, default to:
 ---
 
 ### Supported action types (current)
-- `open_app`
-- `close_app`
-- `sleep`
-- `wait_for_node`
-- `click`
-- `scroll_and_click`
-- `read_text`
-- `snapshot_ui`
+
+| Action type | Key params | Notes |
+| :--- | :--- | :--- |
+| `open_app` | `applicationId: string` | Launches app by package ID |
+| `close_app` | `applicationId: string` | Node runs `adb shell am force-stop` pre-flight; Android step always returns `success: false` (expected) |
+| `enter_text` | `matcher: NodeMatcher`, `text: string`, `submit?: boolean` | CLI: `action type`. `submit: true` presses Enter after typing |
+| `click` | `matcher: NodeMatcher`, `clickType?: "default"\|"long_click"\|"focus"` | CLI: `action click` |
+| `read_text` | `matcher: NodeMatcher` | CLI: `action read`. Result in `data.text` |
+| `wait_for_node` | `matcher: NodeMatcher` | CLI: `action wait`. Waits with internal retry |
+| `snapshot_ui` | `format?: "ascii"\|"json"` (default: `"ascii"`) | CLI: `observe snapshot` (ASCII only). Snapshot content in `data.text` |
+| `scroll_and_click` | `target: NodeMatcher`, `container?: NodeMatcher`, `direction?`, `maxSwipes?`, `distanceRatio?`, `settleDelayMs?`, `findFirstScrollableChild?` | Scrolls until target is visible, then clicks |
+| `sleep` | `durationMs: number` (max 120000) | Pause between steps |
+
+**`enter_text` vs CLI `action type`:** The CLI command is `action type` but the action type field in execution payloads is `enter_text`. These map to the same runtime action. When building execution payloads directly, always use `enter_text`.
+
+**NodeMatcher fields:** `resourceId`, `contentDescEquals`, `textEquals`, `textContains`, `contentDescContains`, `role`. All fields are AND-combined. Prefer `resourceId` when available. Full reference in `docs/node-api-for-agents.md`.
 
 ### Visual verification with ADB screenshots (recommended)
 Use screenshots alongside UI-tree logs when building/debugging skills.

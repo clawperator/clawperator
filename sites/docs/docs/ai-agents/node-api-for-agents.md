@@ -24,7 +24,7 @@ Clawperator provides a deterministic execution layer for LLM agents to control A
 | `emulator provision` | Reuse or create a supported Android emulator and return its ADB serial |
 | `provision emulator` | Alias of `emulator provision` |
 | `execute --execution <json\|file>` | Run a full execution payload |
-| `observe snapshot` | Capture UI tree as JSON or ASCII |
+| `observe snapshot` | Capture UI tree (ASCII only via CLI; see Snapshot notes in Action Reference) |
 | `observe screenshot` | Capture device screen as PNG |
 | `action open-app --app <id>` | Open an application |
 | `action click --selector <json>` | Click a UI element |
@@ -171,13 +171,120 @@ Every execution requires `expectedFormat: "android-ui-automator"`.
   "timeoutMs": 60000,
   "actions": [
     { "id": "step1", "type": "open_app", "params": { "applicationId": "com.example.app" } },
-    { "id": "step2", "type": "click", "params": { "matcher": { "textEquals": "Login" } } },
-    { "id": "step3", "type": "snapshot_ui" }
+    { "id": "step2", "type": "enter_text", "params": { "matcher": { "resourceId": "com.example.app:id/search_input" }, "text": "hello", "submit": true } },
+    { "id": "step3", "type": "click", "params": { "matcher": { "textEquals": "Login" }, "clickType": "default" } },
+    { "id": "step4", "type": "snapshot_ui", "params": { "format": "ascii" } }
   ]
 }
 ```
 
-**Result envelope:** Exactly one `[Clawperator-Result]` JSON block is emitted to logcat on completion. Node reads and returns it.
+**Result envelope:** Exactly one `[Clawperator-Result]` JSON block is emitted to logcat on completion. Node reads and returns it. See the Result Envelope section for the full shape and per-action `data` contents.
+
+## NodeMatcher Reference
+
+A NodeMatcher identifies a single UI element for action targeting. Used as a required param in `click`, `enter_text`, `read_text`, `wait_for_node`, and `scroll_and_click`.
+
+All specified fields are combined with AND semantics: every specified field must match the target element. At least one field is required per matcher.
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `resourceId` | `string` | Developer-assigned element ID. Format: `"com.example.app:id/element_name"`. Most stable - prefer over all others when present. |
+| `contentDescEquals` | `string` | Exact match on accessibility content description. Use for icon buttons with no visible text. |
+| `textEquals` | `string` | Exact match on visible text label. Fragile for server-driven or localized content. |
+| `textContains` | `string` | Substring match on visible text. Use when full text is dynamic or may be truncated. |
+| `contentDescContains` | `string` | Substring match on accessibility label. Fallback for partial or dynamic accessibility labels. |
+| `role` | `string` | Matches by element class name (e.g., `"android.widget.Button"`). Low selectivity - many elements share a role. Use as a secondary constraint only, never alone. |
+
+**Selector priority (most to least stable):** `resourceId` > `contentDescEquals` > `textEquals` > `textContains` > `contentDescContains` > `role`
+
+Combine fields to increase specificity when a single field is ambiguous:
+
+```json
+{ "resourceId": "com.example.app:id/submit_btn", "textEquals": "Submit" }
+```
+
+## Action Reference
+
+### Action types and params
+
+| Action | Required params | Optional params |
+| :--- | :--- | :--- |
+| `open_app` | `applicationId: string` | - |
+| `close_app` | `applicationId: string` | - |
+| `click` | `matcher: NodeMatcher` | `clickType: "default" \| "long_click" \| "focus"` (default: `"default"`) |
+| `enter_text` | `matcher: NodeMatcher`, `text: string` | `submit: boolean` (default: `false`) |
+| `read_text` | `matcher: NodeMatcher` | - |
+| `wait_for_node` | `matcher: NodeMatcher` | - |
+| `snapshot_ui` | - | `format: "ascii" \| "json"` (default: `"ascii"`) |
+| `sleep` | `durationMs: number` (max: 120000) | - |
+| `scroll_and_click` | `target: NodeMatcher` | `container: NodeMatcher`, `direction: "down" \| "up" \| "left" \| "right"` (default: `"down"`), `maxSwipes: number` (default: `10`, range: 1-50), `distanceRatio: number` (default: `0.7`, range: 0-1), `settleDelayMs: number` (default: `250`, range: 0-10000), `findFirstScrollableChild: boolean` (default: `false`) |
+
+### CLI-to-action-type mapping
+
+| CLI command | Payload action type |
+| :--- | :--- |
+| `action type --selector <json> --text <value>` | `enter_text` |
+| `action click --selector <json>` | `click` |
+| `action read --selector <json>` | `read_text` |
+| `action wait --selector <json>` | `wait_for_node` |
+| `action open-app --app <id>` | `open_app` |
+| `observe snapshot` | `snapshot_ui` with `format: "ascii"` (ASCII only) |
+
+### Action behavior notes
+
+**`close_app`:** The Node layer intercepts `close_app` actions and runs `adb shell am force-stop <applicationId>` before dispatching to Android. The Android step always returns `success: false` with `data.error: "UNSUPPORTED_RUNTIME_CLOSE"` - this is expected. The overall execution `status` remains `"success"` and the app is force-stopped. Do not treat this step result as a recoverable failure.
+
+**`enter_text`:** The CLI command is `action type` but the execution payload action type is `enter_text`. The `submit` param triggers a keyboard Enter/submit after typing - use this for search fields and single-field forms where pressing Enter submits. Note: `clear` appears in the TypeScript contract but is not implemented by the Android runtime and has no effect.
+
+**`snapshot_ui`:** The `format` param is forwarded to Android but actual output format depends on device state - most devices produce `"ascii"`. The actual format used is reported in `data.actual_format`. The snapshot content itself is delivered in `data.text` (see Result Envelope below). `clawperator observe snapshot` (CLI) always uses `format: "ascii"` and returns the snapshot in the same way.
+
+## Result Envelope
+
+Every execution emits exactly one `[Clawperator-Result]` envelope:
+
+```json
+{
+  "commandId": "...",
+  "taskId": "...",
+  "status": "success" | "failed",
+  "stepResults": [
+    {
+      "id": "...",
+      "actionType": "...",
+      "success": true | false,
+      "data": { "key": "value" }
+    }
+  ],
+  "error": "ERROR_CODE" | null
+}
+```
+
+- `status` is `"success"` when the execution completes (including partial step failures like `close_app`). `status` is `"failed"` only on total execution failure (dispatch error, timeout, validation failure).
+- `error` (top-level) contains an error code on total failure.
+- `data.error` on a step result contains the per-step error code when `success` is `false`.
+- All `data` values are strings. `data` is always an object (never `null`), but may be empty.
+
+### Per-action result data
+
+The `data` field contents per action type on success:
+
+| Action | `data` keys (on success) |
+| :--- | :--- |
+| `open_app` | `application_id` |
+| `close_app` | `application_id`, `error` (`"UNSUPPORTED_RUNTIME_CLOSE"`), `message` (always `success: false` - see note above) |
+| `click` | `click_types` |
+| `enter_text` | `text` (text typed), `submit` (`"true"` or `"false"`) |
+| `read_text` | `text` (extracted text value), `validator` (`"none"` or validator type) |
+| `snapshot_ui` | `requested_format`, `actual_format`, `text` (snapshot content - see note below) |
+| `wait_for_node` | `resource_id`, `label` (matched node details) |
+| `scroll_and_click` | `max_swipes`, `direction`, `click_types` |
+| `sleep` | `duration_ms` |
+
+For any failed step: `success: false` and `data.error` contains the error code string.
+
+**Snapshot content delivery:** The UI tree is produced by the Android runtime and written to device logcat. The Node layer reads logcat after execution and injects the content into `data.text`. `data.actual_format` is `"ascii"` or `"hierarchy_xml"` (reflecting what the device actually produced). The `text` field in `data` contains the raw snapshot string - ASCII tree lines or XML hierarchy dump depending on `actual_format`.
+
+**`read_text` value:** The extracted text value is in `data.text`.
 
 ## Error Codes
 
