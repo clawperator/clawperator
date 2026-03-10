@@ -133,7 +133,7 @@ body {
 .page-shell {
   width: min(860px, 92vw);
   margin: 0 auto;
-  padding: 2rem 0 2.4rem;
+  padding: calc(var(--toolbar-height) + 2rem) 0 2.4rem;
 }
 
 .top-toolbar {
@@ -150,19 +150,6 @@ body {
   -webkit-backdrop-filter: blur(16px);
   backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--border);
-  transition: transform 220ms ease, opacity 220ms ease;
-}
-
-.top-toolbar.hidden {
-  transform: translateY(-100%);
-  opacity: 0;
-  pointer-events: none;
-}
-
-.top-toolbar.visible {
-  transform: translateY(0);
-  opacity: 1;
-  pointer-events: auto;
 }
 
 .top-toolbar-inner {

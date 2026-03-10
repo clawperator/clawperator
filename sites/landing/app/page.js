@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 const installCommands = {
   oneLiner: "curl -fsSL https://clawperator.com/install.sh | bash",
@@ -25,9 +25,7 @@ const features = [
 export default function Home() {
   const [mode, setMode] = useState("oneLiner");
   const [copied, setCopied] = useState(false);
-  const [showToolbar, setShowToolbar] = useState(false);
   const [activeSection, setActiveSection] = useState(null);
-  const heroLogoRef = useRef(null);
   const activeCommand = mode === "npm" ? installCommands.npm : installCommands.oneLiner;
 
   const sectionIds = ["install", "workflows", "why", "what", "skills", "how-it-works"];
@@ -70,23 +68,6 @@ export default function Home() {
   };
 
   useEffect(() => {
-    if (!heroLogoRef.current) {
-      return;
-    }
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const [entry] = entries;
-        setShowToolbar(!entry.isIntersecting);
-      },
-      { threshold: 0 }
-    );
-
-    observer.observe(heroLogoRef.current);
-    return () => observer.disconnect();
-  }, []);
-
-  useEffect(() => {
     const visibleSections = new Map();
     const sectionObserver = new IntersectionObserver(
       (entries) => {
@@ -121,7 +102,7 @@ export default function Home() {
 
   return (
     <>
-      <header className={showToolbar ? "top-toolbar visible" : "top-toolbar hidden"}>
+      <header className="top-toolbar visible">
         <div className="top-toolbar-inner">
           <a href="#top" className="toolbar-brand">
             <img src="/clawperator-logo.png" alt="" aria-hidden="true" className="toolbar-logo" />
@@ -156,7 +137,7 @@ export default function Home() {
       <section id="top" className="hero-card">
         <div className="hero-waterfall">
           <p className="hero-problem">Most services only expose their real functionality through mobile apps.</p>
-          <img ref={heroLogoRef} src="/clawperator-logo.png" alt="" aria-hidden="true" className="hero-logo" />
+          <img src="/clawperator-logo.png" alt="" aria-hidden="true" className="hero-logo" />
           <p className="hero-product-name">Clawperator</p>
           <h1 className="hero-catchphrase">
             YOUR AGENT THINKS.
@@ -175,7 +156,7 @@ export default function Home() {
             The brain decides what to do next.
             <br />
             Clawperator connects that agent to a dedicated Android burner phone or local Android emulator, executes the
-            action, and returns structured results your code can trust and branch on.
+            action, and returns structured results your code can trust.
           </p>
 
           <div className="hero-image-panel">
