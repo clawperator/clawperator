@@ -8,6 +8,12 @@ Use this page as a technical map:
 - start with the Node API guide if you are integrating an agent
 - use the reference section for exact command, payload, and error semantics
 
+## Machine-facing routes
+
+- [llms.txt](https://docs.clawperator.com/llms.txt) - compact machine-oriented docs entrypoint
+- [llms-full.txt](https://docs.clawperator.com/llms-full.txt) - compiled full docs corpus on the docs host
+- [sitemap.xml](https://docs.clawperator.com/sitemap.xml) - canonical crawl map for this docs host
+
 ## Recommended paths
 
 ### Start here if you are integrating an agent

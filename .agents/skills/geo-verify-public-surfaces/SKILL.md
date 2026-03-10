@@ -20,6 +20,7 @@ scan raw headers.
 - alias redirects such as `/agent.md`, `/agents.md`, and `/for-agents`
 - `https://docs.clawperator.com/robots.txt`
 - `https://docs.clawperator.com/llms.txt`
+- `https://docs.clawperator.com/llms-full.txt`
 - `https://docs.clawperator.com/sitemap.xml`
 - key docs entrypoints such as the Node API guide and CLI reference
 

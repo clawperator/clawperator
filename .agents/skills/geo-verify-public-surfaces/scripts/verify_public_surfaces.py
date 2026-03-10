@@ -21,6 +21,7 @@ URL_CHECKS = [
     {"kind": "redirect", "url": "https://clawperator.com/for-agents", "location": r"/agents"},
     {"kind": "url", "url": "https://docs.clawperator.com/robots.txt", "content_type": r"text/plain"},
     {"kind": "url", "url": "https://docs.clawperator.com/llms.txt", "content_type": r"text/plain"},
+    {"kind": "url", "url": "https://docs.clawperator.com/llms-full.txt", "content_type": r"text/plain"},
     {"kind": "url", "url": "https://docs.clawperator.com/sitemap.xml", "content_type": r"application/xml|text/xml"},
     {"kind": "url", "url": "https://docs.clawperator.com/", "content_type": r"text/html"},
     {"kind": "url", "url": "https://docs.clawperator.com/ai-agents/node-api-for-agents/", "content_type": r"text/html"},
