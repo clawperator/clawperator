@@ -7,11 +7,7 @@ Clawperator operates an Android device on behalf of a user. In these docs, "Andr
 
 This is the canonical actuator model for Clawperator. The Node runtime talks to an Android device, and the Android device runs the [Clawperator Operator Android app](android-operator-apk.md).
 
-## Terminology
-
-- **Android device**: the actuator environment. This can be a physical Android device or a local Android emulator.
-- **[Clawperator Operator Android app](android-operator-apk.md)**: Clawperator's own Android app. It receives commands from the Node runtime and executes them through Android Accessibility.
-- **User-installed Android apps**: the apps the user wants Clawperator to operate, such as Settings, shopping apps, banking apps, or social apps. These apps are the user's responsibility to install and sign into.
+Canonical definitions for terms such as "Android device", "[Clawperator Operator Android app](android-operator-apk.md)", and "user-installed Android apps" live in [Clawperator Terminology](terminology.md).
 
 ## The actuator model
 

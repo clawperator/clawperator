@@ -36,6 +36,11 @@ sections:
         mode: copy
         sources:
           - docs/running-clawperator-on-android.md
+      - output: getting-started/terminology.md
+        title: Clawperator Terminology
+        mode: copy
+        sources:
+          - docs/terminology.md
       - output: getting-started/first-time-setup.md
         title: First-Time Setup
         mode: copy

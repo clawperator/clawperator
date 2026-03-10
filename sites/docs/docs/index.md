@@ -5,6 +5,7 @@ Clawperator is a deterministic actuator tool for LLM-driven Android automation. 
 ## Getting Started
 
 - [Running Clawperator on Android](getting-started/running-clawperator-on-android.md) - Canonical actuator model, physical device vs emulator, and user responsibilities
+- [Clawperator Terminology](getting-started/terminology.md) - Canonical definitions for Android device, Operator app, user-installed Android apps, and other core terms
 - [First-Time Setup](getting-started/first-time-setup.md) - Install the CLI, choose an Android environment, and prepare the [Clawperator Operator Android app](getting-started/android-operator-apk.md)
 - [OpenClaw Remote Bootstrap Guide](getting-started/openclaw-remote-bootstrap.md) - Step-by-step environment setup for remote agents
 - [Project Overview](getting-started/project-overview.md) - Mission, architecture, and repository surfaces

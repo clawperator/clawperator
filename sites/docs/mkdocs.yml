@@ -12,6 +12,7 @@ nav:
   - clawperator.com: https://clawperator.com
   - Getting Started:
     - Running Clawperator on Android: getting-started/running-clawperator-on-android.md
+    - Clawperator Terminology: getting-started/terminology.md
     - First-Time Setup: getting-started/first-time-setup.md
     - OpenClaw Remote Bootstrap Guide: getting-started/openclaw-remote-bootstrap.md
     - Project Overview: getting-started/project-overview.md
