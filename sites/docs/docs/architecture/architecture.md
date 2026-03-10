@@ -91,7 +91,7 @@ apps/android/
 
 ## Conformance APK
 
-`apps/android/app-conformance` is a dedicated test app with a deterministic, stable UI. It exists to test Clawperator's execution layer without relying on third-party apps. See [Conformance Test APK](conformance-apk.md).
+`apps/android/app-conformance` is a dedicated test app with a deterministic, stable UI. It exists to test Clawperator's execution layer without relying on third-party apps.
 
 ## Website Surfaces
 

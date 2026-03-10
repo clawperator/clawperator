@@ -70,11 +70,7 @@ sections:
         mode: copy
         sources:
           - docs/architecture.md
-      - output: architecture/conformance-apk.md
-        title: Conformance Test APK
-        mode: copy
-        sources:
-          - docs/conformance-apk.md
+
 
   - id: ai-agents
     title: For AI Agents
