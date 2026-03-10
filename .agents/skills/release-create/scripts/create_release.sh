@@ -45,8 +45,7 @@ await_workflow() {
   done
 
   if [[ "$run_json" == "[]" || -z "$run_json" ]]; then
-    printf 'workflow=%s status=not-found\n' "$workflow_name"
-    return 0
+    die "workflow $workflow_name for tag $tag_name in repo $repo not found after polling"
   fi
 
   local item_json
@@ -85,6 +84,7 @@ main() {
   [[ $# -ge 1 && $# -le 2 ]] || die "usage: .agents/skills/release-create/scripts/create_release.sh <version> [sha]"
 
   local version="$1"
+  [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$ ]] || die "version must look like semver"
   local target_ref="${2:-HEAD}"
   local repo_root
   repo_root="$(git rev-parse --show-toplevel)"

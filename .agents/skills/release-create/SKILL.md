@@ -6,7 +6,7 @@ description: Validates a Clawperator release candidate, creates and pushes an an
 Use this skill after the release version has already been committed to the repository. Keep version bumping separate.
 
 This skill creates a release by:
-1. Verifying the requested version matches `apps/node/package.json`.
+1. Verifying the requested version matches both `apps/node/package.json` and `apps/node/package-lock.json`.
 2. Refusing to proceed if the version is already published on npm, if the tag already exists, or if a GitHub Release already exists.
 3. Running the same local Node checks used by `.github/workflows/publish-npm.yml`:
    - `npm --prefix apps/node ci`

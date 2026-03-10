@@ -17,12 +17,6 @@ json_field() {
   node -e 'const data = JSON.parse(process.argv[1]); const field = process.argv[2]; const value = data[field]; if (value === undefined || value === null) process.exit(2); if (typeof value === "object") { console.log(JSON.stringify(value)); } else { console.log(String(value)); }' "$json" "$field"
 }
 
-json_array_join() {
-  local json="$1"
-  local field="$2"
-  node -e 'const data = JSON.parse(process.argv[1]); const field = process.argv[2]; const value = data[field]; if (!Array.isArray(value)) process.exit(2); console.log(value.join(","));' "$json" "$field"
-}
-
 json_time_for_version() {
   local json="$1"
   local version="$2"

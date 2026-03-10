@@ -7,7 +7,7 @@ For the full release reference, see `docs/release-reference.md`.
 ## Release Model
 
 - One git tag represents one coherent Clawperator release.
-- The release version must already be committed in `apps/node/package.json`.
+- The release version must already be committed in both `apps/node/package.json` and `apps/node/package-lock.json`.
 - Pushing `vX.Y.Z` triggers both release workflows:
   - `.github/workflows/publish-npm.yml`
   - `.github/workflows/release-apk.yml`
@@ -28,7 +28,7 @@ For the full release reference, see `docs/release-reference.md`.
 - Do not release from a dirty working tree.
 - Do not reuse or force-move release tags.
 - Do not try to repair a partially published npm version. Bump to a new version instead.
-- The tag must point at the exact commit whose `package.json` version matches the tag.
+- The tag must point at the exact commit whose `package.json` and `package-lock.json` versions match the tag.
 - Keep the release commit and post-release version bump as separate commits.
 
 ## Standard Commands
@@ -36,7 +36,7 @@ For the full release reference, see `docs/release-reference.md`.
 Release creation:
 
 ```bash
-.agents/skills/release-create/scripts/create_release.sh 0.2.4 <commit_sha>
+.agents/skills/release-create/scripts/create_release.sh 0.2.4 [commit_sha]
 ```
 
 Release verification:
