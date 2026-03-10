@@ -2,7 +2,14 @@
 
 import os
 import sys
-import yaml
+
+try:
+    import yaml
+except ImportError as exc:
+    raise ImportError(
+        "PyYAML is required to run generate_llms_full.py. "
+        "Please install it (e.g., 'pip install PyYAML') or add it to sites/docs/requirements.txt."
+    ) from exc
 
 def main():
     # Locate the repository root (and sites/docs) relative to this script's path,
