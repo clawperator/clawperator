@@ -37,37 +37,57 @@ export default function Home() {
   const emulatorCopyTimeoutRef = useRef(null);
 
   const copyToClipboard = async (text, setCopiedState, timeoutRef) => {
+    const fallbackCopy = () => {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      textarea.setAttribute("readonly", "");
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.select();
+      const successful = document.execCommand("copy");
+      document.body.removeChild(textarea);
+      return successful;
+    };
+
     try {
       if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(text);
       } else {
-        const textarea = document.createElement("textarea");
-        textarea.value = text;
-        textarea.setAttribute("readonly", "");
-        textarea.style.position = "fixed";
-        textarea.style.opacity = "0";
-        document.body.appendChild(textarea);
-        textarea.select();
-        document.execCommand("copy");
-        document.body.removeChild(textarea);
+        if (!fallbackCopy()) throw new Error("Fallback copy failed");
       }
-      
-      if (timeoutRef.current) {
-        window.clearTimeout(timeoutRef.current);
-      }
-      
-      setCopiedState(true);
-      timeoutRef.current = window.setTimeout(() => {
-        setCopiedState(false);
-        timeoutRef.current = null;
-      }, 1200);
     } catch {
-      setCopiedState(false);
+      try {
+        if (!fallbackCopy()) {
+          setCopiedState(false);
+          return;
+        }
+      } catch {
+        setCopiedState(false);
+        return;
+      }
     }
+
+    if (timeoutRef.current) {
+      window.clearTimeout(timeoutRef.current);
+    }
+    
+    setCopiedState(true);
+    timeoutRef.current = window.setTimeout(() => {
+      setCopiedState(false);
+      timeoutRef.current = null;
+    }, 1200);
   };
 
   const handleCopy = () => copyToClipboard(activeCommand, setCopied, copyTimeoutRef);
   const handleEmulatorCommandCopy = () => copyToClipboard(emulatorCommand, setEmulatorCommandCopied, emulatorCopyTimeoutRef);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimeoutRef.current) window.clearTimeout(copyTimeoutRef.current);
+      if (emulatorCopyTimeoutRef.current) window.clearTimeout(emulatorCopyTimeoutRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     const visibleSections = new Map();
