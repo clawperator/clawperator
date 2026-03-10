@@ -193,7 +193,7 @@ All specified fields are combined with AND semantics: every specified field must
 | `textEquals` | `string` | Exact match on visible text label. Fragile for server-driven or localized content. |
 | `textContains` | `string` | Substring match on visible text. Use when full text is dynamic or may be truncated. |
 | `contentDescContains` | `string` | Substring match on accessibility label. Fallback for partial or dynamic accessibility labels. |
-| `role` | `string` | Matches by element class name (e.g., `"android.widget.Button"`). Low selectivity - many elements share a role. Use as a secondary constraint only, never alone. |
+| `role` | `string` | Matches by Clawperator semantic role name (for example, `button`, `textfield`, `text`, `switch`, `checkbox`, `image`, `listitem`, `toolbar`, `tab`). This is derived from runtime role inference, not the raw UIAutomator `class` string. Low selectivity - many elements share a role. Use as a secondary constraint only, never alone. |
 
 **Selector priority (most to least stable):** `resourceId` > `contentDescEquals` > `textEquals` > `textContains` > `contentDescContains` > `role`
 
@@ -303,7 +303,7 @@ Structured XML produced by UIAutomator. Each `<node>` represents one UI element.
 | `resource-id` | `resourceId` | `"com.example.app:id/name"`. Empty string when not set by developer. |
 | `text` | `textEquals` / `textContains` | Visible text content. Empty string if none. |
 | `content-desc` | `contentDescEquals` / `contentDescContains` | Accessibility label. Empty string if none. |
-| `class` | `role` | Java class name, e.g., `"android.widget.Button"`. |
+| `class` | - | Java widget class name, e.g., `"android.widget.Button"`. Informational only - `NodeMatcher.role` uses Clawperator semantic role names such as `button`, `textfield`, `text`, or `switch`, not the raw `class` attribute. |
 | `clickable` | - | `"true"` if the element accepts tap events. |
 | `scrollable` | - | `"true"` marks a scroll container. Use as `container` in `scroll_and_click`. |
 | `bounds` | - | `"[x1,y1][x2,y2]"` pixel rectangle. Useful for understanding spatial layout. |
