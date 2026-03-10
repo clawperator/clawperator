@@ -9,7 +9,6 @@ import clawperator.task.runner.TaskScrollDirection
 import clawperator.task.runner.UiAction
 import clawperator.task.runner.UiActionEngine
 import clawperator.task.runner.UiActionPlan
-import clawperator.task.runner.UiSnapshotFormat
 import clawperator.task.runner.UiTextValidator
 import clawperator.task.runner.nodeMatcher
 import clawperator.uitree.ToggleState
@@ -66,7 +65,6 @@ class WorkflowFactoryDefault(
                                     ),
                                     UiAction.SnapshotUi(
                                         id = "switchbot.snapshot_ui",
-                                        format = UiSnapshotFormat.Ascii,
                                     ),
                                     UiAction.ReadText(
                                         id = "switchbot.read_temperature",

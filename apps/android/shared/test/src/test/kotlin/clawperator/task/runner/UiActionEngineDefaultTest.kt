@@ -41,7 +41,7 @@ class UiActionEngineDefaultTest : ActionTest {
                                         id = "step-read",
                                         matcher = nodeMatcher { resourceId("com.example:id/title") },
                                     ),
-                                    UiAction.SnapshotUi(id = "step-snapshot", format = UiSnapshotFormat.Ascii),
+                                    UiAction.SnapshotUi(id = "step-snapshot"),
                                 ),
                         ),
                 )
@@ -140,11 +140,10 @@ private class RecordingTaskScope(
     }
 
     override suspend fun logUiTree(
-        format: UiSnapshotFormat,
         retry: TaskRetry,
     ): UiSnapshotActualFormat {
         logUiTreeCount++
-        return UiSnapshotActualFormat.Ascii
+        return UiSnapshotActualFormat.HierarchyXml
     }
 
     override suspend fun closeApp(
