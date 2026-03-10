@@ -23,7 +23,13 @@ loop.
 
 The `update-docs-for-emulator` branch covers device environment setup. This
 task covers agent runtime behavior and output interpretation. They are
-orthogonal. Mixing them would delay the emulator docs merge with no benefit.
+orthogonal. Mixing them would delay the emulator docs merge.
+
+The related task `tasks/fix-documentation-gaps/plan.md` covers reference
+accuracy - making sure documented contracts match the code. This task covers
+the usage pattern that builds on top of those contracts. Both should be done,
+but this task depends on `fix-documentation-gaps` being complete first, or at
+minimum on the snapshot format and action type names being confirmed from source.
 
 ---
 
@@ -32,8 +38,7 @@ orthogonal. Mixing them would delay the emulator docs merge with no benefit.
 These are documented and do not need to be rewritten:
 
 - Execution payload structure and required fields (`node-api-for-agents.md`)
-- Action types list: `open_app`, `close_app`, `sleep`, `wait_for_node`,
-  `click`, `scroll_and_click`, `read_text`, `snapshot_ui` (`operator-llm-playbook.md`)
+- Action types list in playbook (incomplete and has errors - see `fix-documentation-gaps`)
 - Error codes (`node-api-for-agents.md`)
 - Single-flight, no-hidden-retries, determinism guarantees (`node-api-for-agents.md`)
 - Skills system (`node-api-for-agents.md`, skills docs)
@@ -41,180 +46,264 @@ These are documented and do not need to be rewritten:
 
 ---
 
+## Critical pre-work: snapshot format is a hard blocker
+
+**The snapshot output format cannot be documented accurately without live device
+testing. This is not optional pre-work - the doc cannot be written without it.**
+
+The following must be captured from a running device or emulator before writing
+the doc:
+
+1. Run `clawperator observe snapshot` and capture the full ASCII output.
+2. Construct and run an execute payload with `snapshot_ui` action and
+   `params: { format: "json" }`, then capture the raw JSON tree from
+   `stepResults[0].data`.
+3. Confirm whether the ASCII content from `observe snapshot` matches what
+   `snapshot_ui` with `format: "ascii"` returns inside an execute payload.
+4. Inspect the raw `[Clawperator-Result]` envelope from logcat directly to
+   confirm the exact `stepResults[].data` shape for `snapshot_ui`, `read_text`,
+   and `click`.
+5. Confirm whether node IDs in the JSON tree are stable across re-observations
+   of the same screen, and across app restarts.
+6. Confirm `enter_text` action name by running `clawperator action type ...`
+   and reading the `actionType` field in the returned envelope.
+
+### A concrete architectural fact that shapes the whole doc
+
+Confirmed from source (`apps/node/src/domain/observe/snapshot.ts`):
+`clawperator observe snapshot` (CLI) is hardcoded to `format: "ascii"`.
+The format parameter is not exposed at the CLI level - `cmdObserveSnapshot`
+does not pass a format option to the domain function.
+
+This means:
+
+- **JSON format snapshot tree is only available via the raw execute API** -
+  by sending a `snapshot_ui` action with `params: { format: "json" }` in a
+  full execute payload.
+- **`clawperator observe snapshot` always returns ASCII.** This is the CLI
+  convenience path. There is no `--format json` flag.
+
+This split must be the structural foundation of the snapshot section. Agents
+using the CLI get ASCII. Agents constructing execute payloads can request JSON.
+JSON is substantially more useful for agent reasoning (structured, traversable)
+but requires more setup. The doc must explain both paths and when to use each.
+
+---
+
 ## What is missing
 
-The contracts exist in code but are not documented in any agent-facing doc:
+### 1. The observe-decide-act loop pattern
 
-### 1. Full NodeMatcher reference (`apps/node/src/contracts/selectors.ts`)
+No doc currently describes the complete interaction pattern for ad-hoc app
+automation. This is the core thing this doc exists to provide.
 
-Six matcher fields are defined. Only `textEquals` appears in any current
-example. The full set:
+The basic loop:
 
-- `resourceId` - Android resource ID (e.g. `com.example.app:id/button_login`)
-- `role` - Accessibility role/class name
-- `textEquals` - Exact visible text match
-- `textContains` - Partial visible text match
-- `contentDescEquals` - Exact content description match (accessibility label)
-- `contentDescContains` - Partial content description match
+1. `open_app` - launch the target app
+2. `sleep` 1000ms or `wait_for_node` on a stable element - let the app settle
+3. `observe snapshot` or `snapshot_ui` (json) - read current UI state
+4. Agent inspects tree, identifies the target element, reads its matcher fields
+5. Construct an action payload (click, enter_text, scroll_and_click) targeting
+   that element by its most stable matcher
+6. Execute and read `stepResults[].success`
+7. Re-observe to confirm expected state change
+8. Repeat until task complete or terminal error
 
-Agents need to know: which matcher to prefer, when to fall back, and how to
-read the snapshot output to find values for each field.
+### 2. Multi-action payload vs. sequential observe loop
 
-### 2. Full ActionParams reference (`apps/node/src/contracts/execution.ts`)
+**This is the most conceptually important decision an agent must make, and it
+is completely absent from current docs.**
 
-Most params are undocumented. Relevant ones for skillless loop:
+Getting this wrong in either direction causes real problems:
 
-For `click`: `matcher`, `clickType` (default | long_click | focus)
+- **Too many actions in one payload**: if any intermediate step hits an
+  unexpected screen (popup, login prompt, A/B test variant, first-run flow,
+  network error state), the whole payload fails. The agent receives the failure
+  error code but has no visibility into what the UI looked like at the point of
+  failure. The agent is now blind and must re-observe from scratch.
+- **One action at a time, always**: correct but unnecessarily slow for
+  confirmed-deterministic flows where the UI path is already known.
 
-For `type_text`: `matcher`, `text`, `submit` (submit keyboard), `clear`
-(clear field before typing)
+The doc must give a concrete decision framework:
 
-For `scroll_and_click`: `target` (NodeMatcher for element to click),
-`container` (NodeMatcher for scrollable ancestor), `direction` (up/down/left/right),
-`maxSwipes`, `distanceRatio`, `settleDelayMs`, `findFirstScrollableChild`
+**Use a multi-action payload when:**
+- The full UI path is known in advance and has been validated (skill-level
+  knowledge of that app's flow)
+- All steps are strictly sequential with no conditional branching
+- Intermediate states are irreversible regardless (e.g., form submission)
+- The agent can tolerate reduced diagnostic visibility for speed
 
-For `wait_for_node`: `matcher`, `durationMs`
+**Use single-action + re-observe when (default for skillless usage):**
+- Exploring an app for the first time - the agent does not know what UI state
+  each action will produce
+- Any step could land on an unexpected screen
+- The agent needs to extract data from an intermediate state before acting again
+- Recovery from failure is more important than execution speed
+- Any step depends on conditions visible only after the previous step completes
 
-For `snapshot_ui`: `format` (ascii | json) - default is ascii, json gives
-structured tree
+**The rule**: for skillless, exploratory usage the default must always be
+single-action + re-observe. Multi-action payloads are an optimization that
+requires prior knowledge of the UI flow, not a starting point.
 
-For `sleep`: `durationMs`
+This must be a first-class section with concrete examples - not a footnote.
 
-The `retry`, `scrollRetry`, `clickRetry` params exist but are advanced - note
-their existence and defer to source until behavior is confirmed.
+### 3. Snapshot output format - ASCII and JSON
 
-### 3. `snapshot_ui` / `observe snapshot` output format
+Two formats, two access paths (see pre-work section above):
 
-This is the biggest gap. Agents need to know what the output actually looks like
-to be able to use it for decision-making.
+**ASCII** (via `clawperator observe snapshot` or `snapshot_ui` with `format: "ascii"`):
+- Indented text tree of the UI hierarchy
+- The exact line format and which attributes appear inline must be captured
+  from live device output - do not invent this from assumptions
 
-Two formats exist: `ascii` and `json`. Both need to be documented with real
-example output, annotated to show what each field means.
+**JSON** (only via execute payload with `snapshot_ui` action and `params: { format: "json" }`):
+- Structured tree agents can traverse programmatically
+- Likely node fields (must be confirmed from live output - do not document
+  field names that have not been verified):
+  `text`, `contentDescription`, `resourceId`, `className`/`role`, `bounds`/`rect`,
+  `isClickable`, `isEnabled`, `isScrollable`, `children`, `nodeId`/`id`
 
-Key questions to answer from source code and live testing:
+Both formats and access paths must be documented with annotated real output.
 
-- What fields does a JSON snapshot node have?
-  (expected: nodeId/id, text, contentDescription, resourceId, className/role,
-  bounds/rect, isClickable, isEnabled, isScrollable, children[])
-- What does the ASCII tree look like? How are nodes indented? What attributes
-  are shown inline?
-- How does `snapshot_ui` within an execution differ from `clawperator observe
-  snapshot` at the CLI? (CLI wraps an implicit execution; output shape should
-  be identical but confirm)
-- Where in the ResultEnvelope does the snapshot live?
-  (`stepResults[n].data` for `snapshot_ui` action; `observe snapshot` stdout)
-- Are node IDs stable across re-observations of the same screen? Across
-  app restarts?
+### 4. Full NodeMatcher reference
 
-Source locations to check:
-- Android app: UI tree serialization code
-- `apps/node/src/` observe/snapshot command handler
-- Any existing snapshot fixtures in test files
+Six matcher fields in source (`apps/node/src/contracts/selectors.ts`).
+Only `textEquals` appears in current docs. All six with priority guidance:
 
-### 4. ResultEnvelope shape (`apps/node/src/contracts/result.ts`)
+1. `resourceId` - most stable. Format: `"com.example.app:id/element_name"`.
+   Only present when the app developer set it - absent in many third-party apps.
+2. `contentDescEquals` - stable for icon buttons with no visible text. Read
+   from the `contentDescription` field in JSON snapshot output.
+3. `textEquals` - stable for fixed UI labels. Fragile for server-driven,
+   localized, or dynamically formatted text.
+4. `textContains` - useful for dynamic or truncated text where a stable
+   substring exists.
+5. `contentDescContains` - fallback for partial accessibility labels.
+6. `role` - last resort. Many elements share the same role. Only useful as
+   a secondary constraint combined with another field.
 
-The contract is:
+Matchers are combined with AND semantics: all specified fields must match.
+This should be documented with an example (e.g., targeting by both `resourceId`
+and `textEquals` for disambiguation when multiple elements share a resource ID).
 
-```ts
-interface StepResult {
-  id: string;
-  actionType: string;
-  success: boolean;
-  data?: Record<string, unknown>;
-  error?: string;
-}
+### 5. Action type names and params - confirmed from source
 
-interface ResultEnvelope {
-  commandId: string;
-  taskId: string;
-  status: "success" | "failed";
-  stepResults: StepResult[];
-  error?: string | null;
+The playbook lists action types but is incomplete and has at least one omission.
+Confirmed from `apps/node/src/domain/actions/`:
+
+- `open_app` - `params.applicationId` (string)
+- `close_app` - needs verification from Android code
+- `click` - `params.matcher` (NodeMatcher), `params.clickType` ("default" | "long_click" | "focus")
+- `enter_text` - **this is the correct action type name** (NOT `type_text`).
+  Confirmed in `typeText.ts`. Not listed in the playbook at all.
+  Params: `matcher` (NodeMatcher), `text` (string), `submit` (boolean, default false),
+  `clear` (boolean, default false)
+- `read_text` - `params.matcher` (NodeMatcher). Confirmed.
+- `wait_for_node` - `params.matcher` (NodeMatcher), `params.durationMs`. Confirmed.
+- `snapshot_ui` - `params.format` ("ascii" | "json", default "ascii"). Confirmed.
+- `sleep` - `params.durationMs`. Needs verification.
+- `scroll_and_click` - `target` (NodeMatcher), `container` (NodeMatcher),
+  `direction`, `maxSwipes`, `distanceRatio`, `settleDelayMs`,
+  `findFirstScrollableChild`. Needs full verification from Android code.
+
+`enter_text` being absent from the playbook is the most significant accuracy
+gap. It must be confirmed and documented before the loop doc can be written.
+
+### 6. ResultEnvelope and per-action data shapes
+
+From `apps/node/src/contracts/result.ts`:
+
+```json
+{
+  "commandId": "...",
+  "taskId": "...",
+  "status": "success",
+  "stepResults": [
+    {
+      "id": "snap",
+      "actionType": "snapshot_ui",
+      "success": true,
+      "data": { ... },
+      "error": null
+    }
+  ],
+  "error": null
 }
 ```
 
-Missing: documentation of what `data` contains per action type. Minimum
-needed for the skillless loop:
+The `data` field contents per action type must be confirmed from live device
+output before documenting. Expected (unconfirmed):
+- `snapshot_ui`: UI tree (string for ascii, object for json)
+- `read_text`: extracted text value
+- `click`, `enter_text`, `open_app`: minimal or empty on success
+- Any failed step: `error` contains the error code string
 
-- `snapshot_ui` - `data` contains the UI tree (ascii string or json object)
-- `read_text` - `data` contains the extracted text string
-- `click`, `open_app`, `close_app` - `data` is likely empty or minimal on
-  success
+### 7. Settle delays and timing
 
-This needs verification from source or live testing, then documentation.
+After `open_app`, Android UI transitions are asynchronous - the Activity must
+load and render. After a tap that navigates, the destination screen must settle.
+A snapshot taken before the UI settles captures a transitional state.
 
-### 5. The observe-decide-act loop pattern
+Must document:
+- `sleep` - fixed delay. Simple but fragile. Use as a last resort.
+- `wait_for_node` - waits for a specific element to appear. More reliable
+  because it succeeds as soon as the element is present rather than waiting
+  a fixed duration.
+- Typical values for `sleep`: 500ms for minor transitions, 1000-1500ms for
+  full-screen navigations and app launches.
+- The playbook's 500-1500ms recommendation applies here. Expand it with examples.
 
-No doc currently describes the complete interaction loop for ad-hoc app
-automation. This is the core missing pattern.
+### 8. Error recovery patterns
 
-What needs to be written:
+What each error means in an explore loop context, and what the agent should do:
 
-a) The basic loop:
-   1. `open_app` - launch the target app
-   2. `snapshot_ui` (json format) - observe current state
-   3. Agent inspects tree, identifies target element and its matcher
-   4. Construct action (click, type_text, scroll_and_click) with that matcher
-   5. Execute
-   6. Re-observe to confirm expected state change
-   7. Repeat until task complete or terminal error
+- `NODE_NOT_FOUND`: expected element not present. Do not retry the same action.
+  Re-observe first - the UI may be on a completely different screen.
+- `RESULT_ENVELOPE_TIMEOUT`: accessibility service may have been disabled or
+  app crashed. Run `doctor` to diagnose.
+- `EXECUTION_CONFLICT_IN_FLIGHT`: another execution is active. Wait and retry.
+- `NODE_NOT_CLICKABLE`: element found but not interactable. May need to scroll
+  it into view first, or the element may require a different interaction type.
+- `SECURITY_BLOCK_DETECTED`: Android blocked the action. Cannot be worked
+  around without changing the approach (e.g., secure keyboard blocks typing).
 
-b) When to pack multiple actions into one payload vs. observe between each step:
-   - Use multi-action payloads for deterministic flows where the UI path is
-     known (skills-style)
-   - Use single-action + re-observe for exploratory flows where the agent does
-     not know the next UI state in advance
-   - Single-flight lock applies per payload: an agent doing a single action +
-     observe loop will be slower but more adaptive
+### 9. Screenshot vs. snapshot modality
 
-c) Settle delays - when the UI is in transition:
-   - After `open_app`, wait for the app's launch animation to settle before
-     observing (use `sleep` action or `wait_for_node` on a known stable element)
-   - After navigation actions (taps that cause screen transitions), settle
-     before the next snapshot
-   - The playbook recommends 500-1500ms; document this with concrete examples
+- **ASCII snapshot**: default path. Low context cost. Use for all targeting.
+- **JSON snapshot**: structured tree. More useful for agent reasoning. Only
+  available via execute payload.
+- **Screenshot** (`observe screenshot` or `POST /observe/screenshot`): visual
+  context. Higher token cost (image input). Use for disambiguation when the
+  tree alone is insufficient to understand the current screen state. Cannot
+  substitute the tree for element targeting.
 
-d) Handling `NODE_NOT_FOUND`:
-   - The element the agent expected is not present
-   - Agent should re-observe to understand current state (unexpected screen,
-     popup, loading state)
-   - Do not retry the same action - diagnose first
+Concrete guidance: the agent should start with ASCII snapshot. Use JSON when
+building reusable automation that needs to traverse the tree programmatically.
+Use screenshot when the ASCII tree is ambiguous (e.g., multiple elements with
+the same text, or the agent needs to understand spatial layout).
 
-e) Using `screenshot` alongside snapshots:
-   - ASCII/JSON tree gives structure but not visual context
-   - Screenshots give visual context but cost more tokens (image input)
-   - Recommended: use snapshot as primary; screenshot for disambiguation when
-     tree alone is insufficient
-   - Screenshot is not a substitute for snapshot when targeting elements -
-     the tree is required for node selection
+### 10. The two snapshot access paths
 
-### 6. Selector priority guidance
+This must appear early in the doc, before any snapshot examples:
 
-Agents need to know which matcher field to prefer when multiple options are
-available from the snapshot. Documented priority order should be:
+**Path A - CLI shortcut (ASCII only):**
+```bash
+clawperator observe snapshot --device-id <serial>
+```
 
-1. `resourceId` - most stable, app-controlled, survives text localization
-2. `contentDescEquals` - stable for icon buttons with no visible text
-3. `textEquals` - stable for fixed labels, fragile for server-driven text
-4. `textContains` - useful for dynamic content (partial match)
-5. `contentDescContains` - fallback for partial accessibility labels
-6. `role` - last resort, high ambiguity (many elements share the same role)
-
-Note: resource IDs are only present when the app developer set them. Many
-third-party apps have inconsistent or absent resource IDs - the agent must
-fall back gracefully.
-
-### 7. `type_text` action (currently undocumented as a named action)
-
-The `text`, `submit`, and `clear` params in `ActionParams` suggest a text
-input action. Needs verification: is the action type named `type_text` or
-`type`? Check `apps/node/src/cli/commands/` and the Android action handler.
-
-Once confirmed, document:
-- How to target the input field (matcher)
-- `text`: the string to type
-- `submit`: whether to submit the keyboard (e.g. search, enter)
-- `clear`: whether to clear the field contents before typing
+**Path B - Execute payload (ASCII or JSON):**
+```json
+{
+  "commandId": "snap-001",
+  "taskId": "snap-001",
+  "source": "my-agent",
+  "expectedFormat": "android-ui-automator",
+  "timeoutMs": 30000,
+  "actions": [
+    { "id": "snap", "type": "snapshot_ui", "params": { "format": "json" } }
+  ]
+}
+```
 
 ---
 
@@ -222,31 +311,32 @@ Once confirmed, document:
 
 ### New doc: `docs/agent-ui-loop.md`
 
-The primary deliverable. Covers:
+Section outline:
 
-1. Overview - what skillless loop usage is and when to use it
-2. The snapshot output format - JSON and ASCII, annotated example
-3. NodeMatcher reference - all six fields, priority order, when to use each
-4. ActionParams reference - relevant params per action type
-5. ResultEnvelope - full shape, what `data` contains per action
-6. The observe-decide-act loop - the complete interaction pattern with example
-7. Multi-action payload vs. sequential observe loop - when to use each
-8. Settle delays and timing - when and why
-9. Error recovery - handling `NODE_NOT_FOUND`, unexpected screens, timeouts
-10. Screenshot vs. snapshot - modality guide
+1. Overview - skillless usage model and when to use it vs. skills
+2. The two snapshot access paths - ASCII via CLI, JSON via execute payload
+3. The observe-decide-act loop - complete pattern with worked example
+4. Multi-action payload vs. sequential observe loop - decision framework
+   (must be a standalone section, not a sub-bullet)
+5. Snapshot output format - annotated ASCII and JSON examples from live device
+6. NodeMatcher reference - all six fields, priority order, how to find values
+7. Action reference - all confirmed action types with params
+8. ResultEnvelope - full shape and per-action `data` contents
+9. Settle delays and timing - sleep vs. wait_for_node, typical values
+10. Error recovery - what each error means in context
+11. Screenshot vs. snapshot - modality guide
 
 ### Updates to `docs/design/operator-llm-playbook.md`
 
-- Expand the "Supported action types" section with param detail for each type
-  (currently it is a bare list)
-- Add `type_text` if it exists but is missing from the list
-- Link to the new `agent-ui-loop.md` for the loop pattern
+- Fix action type list: add `enter_text`, verify and add `close_app` and `sleep`
+- Expand each action type with its params
+- Link to `agent-ui-loop.md` for the loop pattern
 
 ### Update to `docs/node-api-for-agents.md`
 
-- Add a brief "Skillless usage" subsection or FAQ entry pointing to the new doc
-- Expand the execution payload example to show `snapshot_ui` with `format: "json"`
-- Add NodeMatcher and ActionParams detail or link to new doc
+- Add "Skillless usage" subsection or FAQ entry pointing to `agent-ui-loop.md`
+- Note that `observe snapshot` CLI is ASCII-only; JSON requires execute payload
+- Show a `snapshot_ui` with `format: "json"` in the execution payload example
 
 ### `sites/docs/` updates
 
@@ -256,34 +346,25 @@ The primary deliverable. Covers:
 
 ---
 
-## Pre-work required before writing
+## Dependencies
 
-The snapshot output format cannot be documented accurately from source alone.
-Before writing `agent-ui-loop.md`, the implementer should:
+This task depends on `tasks/fix-documentation-gaps/` or on manually confirming:
+- The snapshot JSON field names from live device output
+- The `enter_text` action type name (already confirmed from source)
+- The `data` contents per action type from live output
 
-1. Provision an emulator or connect a physical device
-2. Open a real app (e.g. `com.android.settings`)
-3. Run `clawperator observe snapshot --output json` and capture real output
-4. Run `clawperator observe snapshot` (ascii) and capture real output
-5. Run a `snapshot_ui` action within an execution payload with `format: "json"`
-   and inspect the raw `[Clawperator-Result]` envelope from logcat to confirm
-   the `stepResults[].data` shape
-6. Confirm the `type_text` action name and params by checking source or live
-   testing a text input flow
-
-This grounding ensures the doc reflects actual runtime behavior and not
-assumptions about field names or shapes.
+A working device or emulator is required to capture live snapshot examples.
 
 ---
 
 ## Scope boundaries
 
-Do NOT change in this task:
+Do not change in this task:
 
-- CLI command reference (code-derived, separate maintenance path)
+- CLI command reference (code-derived)
 - Error code reference (code-derived)
 - Any execution payload schema (contract changes require code changes first)
-- Skills documentation (separate concern)
+- Skills documentation
 - Device setup documentation (covered by `update-docs-for-emulator`)
 
 ---
