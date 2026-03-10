@@ -7,6 +7,16 @@
 
 ---
 
+## Is the Android binary involved?
+
+No. The Android Operator APK correctly emits `[TaskScope] UI Hierarchy:` to logcat and has
+always done so. The APK requires no changes.
+
+This is a **Node API bug only.** The published npm package contains stale compiled
+output with the wrong logcat marker. The TypeScript source in this repo is correct.
+
+---
+
 ## Problem
 
 `snapshot_ui` steps return `success: true` with `data.actual_format: "hierarchy_xml"` but
@@ -55,13 +65,15 @@ substantially rewritten at some point without a corresponding package release.
 
 ## Scope
 
-This PRD covers three required work streams. All three must ship together.
+This PRD covers four required work streams. All four must ship together.
 
 ### Stream 1: `clawperator` - Fix the regression and add regression tests
 
 ### Stream 2: `clawperator` - Fix the silent failure contract
 
 ### Stream 3: `clawperator-skills` - Update skills for the new contract and document the workaround
+
+### Stream 4: `clawperator-skills` - Fix binary preference order in `utils/common.js`
 
 ---
 
@@ -172,33 +184,37 @@ even harder to detect.
 
 ### Stream 2: Fix the silent failure contract in `runExecution.ts`
 
-#### REQ-2.1 - Emit a warning when snapshot steps succeed but produce no text
+#### REQ-2.1 - Emit a warning when snapshot extraction fails
 
-When `snapshot_ui` steps complete with `success: true` but `extractSnapshotsFromLogs`
-returns an empty array, the current code silently skips populating `data.text`. An agent
-or skill has no way to know extraction failed without checking `data.text` length.
+When `snapshot_ui` steps complete ADB communication but `extractSnapshotsFromLogs`
+returns an empty array, REQ-2.3 will set `success: false` with `SNAPSHOT_EXTRACTION_FAILED`.
+The step result now carries the failure signal. In addition, a human-readable warning
+must be emitted to stderr so that users running CLI commands interactively can diagnose
+the problem without parsing JSON.
 
 **Required change in `apps/node/src/domain/executions/runExecution.ts`:**
 
-After calling `attachSnapshotsToStepResults`, check whether any `snapshot_ui` step has
-`success: true` but no `data.text`. If so, emit a warning to stderr.
+After applying REQ-2.3's `success: false` transform, check whether any `snapshot_ui`
+step now has `data.error === "SNAPSHOT_EXTRACTION_FAILED"`. If so, emit a warning to
+stderr for each affected step.
 
 The warning must:
-- Identify the specific step IDs that are affected
-- State that `data.text` is empty despite `success: true`
+- Identify the specific step ID that is affected
+- State that UI hierarchy extraction produced no output
 - Suggest running `clawperator doctor` and checking the CLI version
 
 The warning must NOT:
-- Change the `success` field on the step (that is a separate contract issue, tracked below)
+- Modify any field on the step result (REQ-2.3 handles that)
 - Fail the overall execution
 - Appear in stdout (which is the machine-readable result envelope)
 
 **Acceptance criteria:**
 - Running `clawperator execute` with a `snapshot_ui` action using the broken binary
   (or a mock that returns empty snapshots) produces a warning on stderr containing the
-  step ID and the phrase "data.text is empty"
+  step ID and the phrase "UI hierarchy extraction produced no output"
 - Running with a working binary produces no such warning
-- The result envelope `status` and `stepResults` are unchanged
+- The result envelope `status` and `stepResults` carry the `success: false` / error
+  fields set by REQ-2.3; REQ-2.1 only adds the human-readable stderr signal
 
 ---
 
@@ -224,6 +240,53 @@ Add a troubleshooting section for empty snapshots in `docs/troubleshooting.md`
 
 ---
 
+#### REQ-2.3 - Change `snapshot_ui` step result to `success: false` when extraction produces no snapshots
+
+Currently `snapshot_ui` steps that complete ADB communication successfully but produce
+no XML are returned with `success: true` and an absent `data.text`. This is a misleading
+contract: success means "the action ran without a device error", not "you got useful data".
+
+**Required changes:**
+
+1. In `apps/node/src/domain/executions/runExecution.ts`, after calling
+   `attachSnapshotsToStepResults`, iterate over `snapshot_ui` steps that have
+   `success: true` but no `data.text`. For each, set:
+   - `success: false`
+   - `data.error: "SNAPSHOT_EXTRACTION_FAILED"`
+   - `data.message: "UI hierarchy extraction produced no output. The [TaskScope] UI Hierarchy: marker was not found in logcat. Check clawperator version compatibility."`
+
+2. Add the new error code string `"SNAPSHOT_EXTRACTION_FAILED"` to
+   `apps/node/src/contracts/errors.ts` (or wherever action-level error strings are
+   declared) so it is part of the published contract surface.
+
+3. Update `docs/node-api-for-agents.md` to document that `snapshot_ui` returns
+   `success: false` with `data.error: "SNAPSHOT_EXTRACTION_FAILED"` when the logcat
+   extraction finds no hierarchy block. Remove or update any text that implied
+   `success: true` with empty `data.text` was a possible outcome.
+
+4. Update the `SKILL.md` files for any skill that documents the `success: true` +
+   empty `data.text` pattern as a state to check. After this change, skills should
+   check `result.success === false && result.data?.error === "SNAPSHOT_EXTRACTION_FAILED"`
+   instead of checking for empty `data.text`.
+
+**Acceptance criteria:**
+- Running `clawperator execute` with a `snapshot_ui` action when the broken binary is
+  active (or using a mock that returns zero snapshots) produces a step result with
+  `success: false` and `data.error === "SNAPSHOT_EXTRACTION_FAILED"`
+- Running with a working binary where the marker is found produces `success: true`
+  and non-empty `data.text` as before
+- The new error string is exported from the errors contract module
+- `docs/node-api-for-agents.md` is updated to reflect the new contract
+
+**Skill compatibility note:**
+
+The 7 snapshot-using skills in `clawperator-skills` currently check for empty `data.text`
+after `runClawperator()`. After this change they will instead see `success: false`
+(which most already handle at the top-level result check). Verify each skill's error
+branch is triggered correctly and that no skill silently ignores `success: false`.
+
+---
+
 ### Stream 3: Update `clawperator-skills`
 
 #### REQ-3.1 - Add snapshot sanity check to `utils/common.js`
@@ -234,8 +297,14 @@ when the broken binary is used. A single change to the shared utility benefits a
 **Required change in `skills/utils/common.js`:**
 
 After parsing the result from `execFileSync`, check whether any `snapshot_ui` step has
-`success: true` but empty or absent `data.text`. If found, write a diagnostic message to
-`process.stderr`.
+`success: false` and `data.error === "SNAPSHOT_EXTRACTION_FAILED"`. If found, write a
+diagnostic message to `process.stderr`.
+
+Note: after REQ-2.3 ships, the clawperator binary itself will set these fields. This
+check in `utils/common.js` provides a skills-layer fallback so the diagnostic appears
+even if an older binary is used that does not yet set the error code - in that case,
+also check for `success: true` with absent or empty `data.text` as the fallback
+condition.
 
 The message must:
 - Identify this as the known snapshotHelper version mismatch issue
@@ -244,9 +313,9 @@ The message must:
 
 Example format:
 ```
-[clawperator-skills] WARNING: snapshot_ui step "<id>" returned success:true but data.text
-is empty. This is a known issue when the globally installed clawperator binary is out of
-date with the Android Operator APK.
+[clawperator-skills] WARNING: snapshot_ui step "<id>" extraction failed
+(SNAPSHOT_EXTRACTION_FAILED). This is a known issue when the globally installed
+clawperator binary is out of date with the Android Operator APK.
 Fix: set CLAW_BIN to a local or updated build:
   export CLAW_BIN=/path/to/clawperator/apps/node/dist/cli/index.js
 Or run: clawperator version --check-compat
@@ -297,23 +366,73 @@ Same requirement as REQ-3.2 for the install skill.
 #### REQ-3.4 - Update the existing skills' error messages to be less misleading (optional but recommended)
 
 Skills like Coles, Woolworths, GloBird, Life360, and Settings exit with messages like
-"⚠️ Could not capture Coles search snapshot" when `data.text` is empty. These messages
+"Could not capture Coles search snapshot" when `data.text` is empty. These messages
 give no indication whether the problem is the app, the network, the device, or the binary.
 
-After REQ-3.1 ships (the shared warning in `utils/common.js`), users will see the binary
-warning before the skill-level error. This is sufficient. Updating individual skill error
+After REQ-3.1 ships (the shared warning in `utils/common.js`) and REQ-2.3 ships (step
+returns `success: false`), users will see the binary warning before the skill-level error
+and the step result will be clearly marked as failed. Updating individual skill error
 messages is not required for correctness but is a quality improvement.
 
 **If addressed:** Change the `else` branches in each skill from:
 ```js
-console.error('⚠️ Could not capture X snapshot');
+console.error('Could not capture X snapshot');
 ```
 to:
 ```js
-console.error('⚠️ Could not capture X snapshot. Check stderr for diagnostic details.');
+console.error('Could not capture X snapshot. Check stderr for diagnostic details.');
 ```
 
 This is lower priority than REQ-3.1 through REQ-3.3.
+
+---
+
+### Stream 4: Fix binary preference order in `utils/common.js`
+
+#### REQ-4.1 - Prefer local sibling build over global binary in `utils/common.js`
+
+The current resolution order in `utils/common.js` is:
+1. `CLAW_BIN` env var (explicit override)
+2. Global `clawperator` binary (via `which`)
+3. Local sibling build fallback (only when global binary absent)
+
+Step 3 never fires for users who have installed the global binary, which is the common
+case. When the global binary is stale (the current bug), there is no automatic fallback
+to a working local build even when one is present at the sibling repo path.
+
+**Required change in `skills/utils/common.js`:**
+
+Swap steps 2 and 3 so the preference order becomes:
+1. `CLAW_BIN` env var (explicit override - unchanged)
+2. Local sibling build (if `existsSync` confirms the path is present)
+3. Global `clawperator` binary (via `which` or direct invocation)
+
+The sibling build path to check:
+```
+path.resolve(__dirname, '../../../../clawperator/apps/node/dist/cli/index.js')
+```
+(relative to `skills/utils/common.js`)
+
+**Rationale for safety:**
+- `CLAW_BIN` remains the explicit override for users with non-sibling repo layouts
+- The `existsSync` check means this only activates when the local build is actually present
+- Users without a sibling checkout fall through to the global binary as before
+- Local build always tracks the source tree, so it stays compatible with the APK
+
+**Required stderr log line when local build is selected:**
+```
+[clawperator-skills] INFO: using local sibling build: <path>
+```
+
+This makes the selection auditable without being noisy (INFO, not WARNING).
+
+**Acceptance criteria:**
+- Running any skill when `CLAW_BIN` is unset and the sibling build exists at the expected
+  path uses the sibling build path (confirmed by the INFO log line on stderr)
+- Running any skill when `CLAW_BIN` is unset and no sibling build exists falls through
+  to the global `clawperator` binary as before
+- Running any skill with `CLAW_BIN` set always uses that value regardless of sibling
+  build presence
 
 ---
 
@@ -325,38 +444,39 @@ The fix is complete when ALL of the following are true:
    two new tests in `snapshotHelper.test.ts` and one new test in `runExecution.test.ts`
 
 2. Running `clawperator observe snapshot --device-id <device>` with the updated binary
-   returns non-empty `data.text` (or `data.text` absent with a clear error if the screen
-   is locked or the Operator APK is not responding)
+   returns non-empty `data.text` (or a clear error if the screen is locked or the
+   Operator APK is not responding)
 
-3. Running `node search_play_store.js <device> "Firefox"` without `CLAW_BIN` set produces
-   a diagnostic warning on stderr when the device has the broken binary installed, before
-   any skill-level error
+3. Running `node search_play_store.js <device> "Firefox"` without `CLAW_BIN` set uses
+   the local sibling build when present (confirmed by INFO log on stderr) - or produces
+   the diagnostic warning if only the broken global binary is available
 
-4. Running `node install_play_app.js <device>` without `CLAW_BIN` when already on the
-   app details page produces a diagnostic warning on stderr, not just "Preflight snapshot
-   returned empty. Is the device on the app details page?"
+4. Running `node install_play_app.js <device>` without `CLAW_BIN` set when already on
+   the app details page: if snapshotHelper is broken, produces the diagnostic warning
+   on stderr rather than only "Preflight snapshot returned empty"
 
-5. `clawperator version --check-compat` reports compatible after the new binary is
+5. When snapshot extraction fails (no logcat marker found), the `snapshot_ui` step
+   returns `success: false` with `data.error: "SNAPSHOT_EXTRACTION_FAILED"` rather
+   than `success: true` with absent `data.text`
+
+6. `clawperator version --check-compat` reports compatible after the new binary is
    installed
 
-6. `docs/node-api-for-agents.md` and `docs/troubleshooting.md` contain the additions
-   specified in `docs-audit.md` ISSUE-01 and ISSUE-04
+7. `docs/node-api-for-agents.md` and `docs/troubleshooting.md` contain the additions
+   specified in `docs-audit.md` ISSUE-01 and ISSUE-04, and the `snapshot_ui` contract
+   section reflects the updated `success: false` behavior
+
+8. Running any skill with no `CLAW_BIN` set and a local sibling build present logs
+   `[clawperator-skills] INFO: using local sibling build: <path>` to stderr
 
 ---
 
 ## Out of scope
 
-- Changing `success: true` to `success: false` on `snapshot_ui` steps when `data.text`
-  is empty. This is a valid follow-on improvement but is a contract change that requires
-  more coordination with skill authors and the API contract docs. Track separately.
-
-- Changing `utils/common.js` binary preference order (Fix C from `snapshot-bug-skill-exposure.md`).
-  This is an option but has side effects for users with non-sibling repo layouts. Track
-  separately after Fix A ships and the regression recurs in a different form.
-
 - Updating the skills authoring guide (`docs/skill-authoring-guidelines.md`) with
-  guidance on checking `data.text`. This is a good follow-on but not required to unblock
-  the fix.
+  guidance on the new `success: false` / `SNAPSHOT_EXTRACTION_FAILED` contract. This is
+  a good follow-on but not required to unblock the fix. REQ-2.3 covers updating
+  `docs/node-api-for-agents.md`; the authoring guide can be updated separately.
 
 ---
 
@@ -366,16 +486,27 @@ The fix is complete when ALL of the following are true:
    these are currently passing in the local build and will validate the fix is correct
 
 2. Rebuild the package (`npm --prefix apps/node run build`) - the source is already
-   correct, no code changes needed
+   correct, no code changes needed for the extraction logic
 
-3. Add the stderr warning to `runExecution.ts` (REQ-2.1)
+3. Add the `success: false` / `SNAPSHOT_EXTRACTION_FAILED` change to `runExecution.ts`
+   (REQ-2.3) - do this before the warning change so the warning can check `success`
 
-4. Add the stderr warning to `utils/common.js` (REQ-3.1)
+4. Add the stderr warning to `runExecution.ts` (REQ-2.1) - now that step results
+   carry `success: false`, the warning signals the path to diagnosis
 
-5. Update the two Play Store SKILL.md files (REQ-3.2, REQ-3.3)
+5. Add the error code string to `contracts/errors.ts` (REQ-2.3)
 
-6. Update `docs/node-api-for-agents.md` and `docs/troubleshooting.md` (REQ-2.2)
+6. Fix binary preference order in `utils/common.js` (REQ-4.1)
 
-7. Publish the new npm package version
+7. Add the snapshot sanity check warning to `utils/common.js` (REQ-3.1) - update
+   to check `success === false && data.error === "SNAPSHOT_EXTRACTION_FAILED"` rather
+   than checking for empty `data.text`, since REQ-2.3 now makes the failure explicit
 
-Steps 1-6 can be done in a single PR. Step 7 is a release action.
+8. Update the two Play Store SKILL.md files (REQ-3.2, REQ-3.3)
+
+9. Update `docs/node-api-for-agents.md` and `docs/troubleshooting.md` (REQ-2.2,
+   REQ-2.3 docs component)
+
+10. Publish the new npm package version
+
+Steps 1-9 can be done in a single PR. Step 10 is a release action.
