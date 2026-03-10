@@ -53,4 +53,4 @@ Skills are reusable templates for app-specific workflows (e.g., "get thermostat 
 ## Safety & Privacy
 - **Full-fidelity results:** By default, result envelopes contain exactly what is on screen, including sensitive text. Agents should not forward raw results to long-term storage without user consent.
 - **Control:** The "Two-Handed" model ensures that agents can only execute within the safety bounds defined by the Clawperator runtime.
-- **Observability:** Agents use `snapshot_ui` (ASCII or JSON) and screenshots to "see" the device state.
+- **Observability:** Agents use `snapshot_ui` (`hierarchy_xml`) and screenshots to "see" the device state.

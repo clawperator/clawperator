@@ -56,7 +56,6 @@ sealed interface UiAction {
 
     data class SnapshotUi(
         override val id: String,
-        val format: UiSnapshotFormat = UiSnapshotFormat.Ascii,
         val retry: TaskRetry = TaskRetry.None,
     ) : UiAction
 
@@ -85,16 +84,9 @@ sealed interface UiAction {
     ) : UiAction
 }
 
-enum class UiSnapshotFormat {
-    Ascii,
-    Json,
-}
-
 enum class UiSnapshotActualFormat(
     val wireValue: String,
 ) {
-    Ascii("ascii"),
-    Json("json"),
     HierarchyXml("hierarchy_xml"),
 }
 

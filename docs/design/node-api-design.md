@@ -40,7 +40,7 @@ Core commands:
 - `clawperator devices`: Discover connected device IDs.
 - `clawperator packages list`: Confirm presence of receiver and target apps on device.
 - `clawperator execute`: Run an execution JSON payload.
-- `clawperator observe snapshot`: Get current UI tree as JSON/ASCII.
+- `clawperator observe snapshot`: Get current UI hierarchy as `hierarchy_xml`.
 - `clawperator observe screenshot`: Capture device screen.
 - `clawperator action [open-app|click|read|wait|type]`: Single-step interaction wrappers.
 - `clawperator serve`: Start HTTP/SSE server for remote agent access.

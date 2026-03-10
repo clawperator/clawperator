@@ -57,7 +57,7 @@ For app automation commands, default to:
 | `click` | `matcher: NodeMatcher`, `clickType?: "default"\|"long_click"\|"focus"` | CLI: `action click` |
 | `read_text` | `matcher: NodeMatcher` | CLI: `action read`. Result in `data.text` |
 | `wait_for_node` | `matcher: NodeMatcher` | CLI: `action wait`. Waits with internal retry |
-| `snapshot_ui` | `format?: "ascii"\|"json"` (default: `"ascii"`) | CLI: `observe snapshot` (ASCII only). Snapshot content in `data.text` |
+| `snapshot_ui` | - | CLI: `observe snapshot`. Snapshot content in `data.text` as `hierarchy_xml` |
 | `scroll_and_click` | `target: NodeMatcher`, `container?: NodeMatcher`, `direction?`, `maxSwipes?`, `distanceRatio?`, `settleDelayMs?`, `findFirstScrollableChild?` | Scrolls until target is visible, then clicks |
 | `sleep` | `durationMs: number` (max 120000) | Pause between steps |
 

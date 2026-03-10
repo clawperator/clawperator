@@ -36,8 +36,7 @@ class AgentCommandParserDefaultTest {
                 },
                 {
                   "id": "step-3",
-                  "type": "snapshot_ui",
-                  "params": { "format": "ascii" }
+                  "type": "snapshot_ui"
                 }
               ]
             }

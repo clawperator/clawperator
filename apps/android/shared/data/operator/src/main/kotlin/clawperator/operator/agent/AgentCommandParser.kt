@@ -5,7 +5,6 @@ import clawperator.task.runner.TaskRetry
 import clawperator.task.runner.TaskRetryPresets
 import clawperator.task.runner.TaskScrollDirection
 import clawperator.task.runner.UiAction
-import clawperator.task.runner.UiSnapshotFormat
 import clawperator.task.runner.UiTextValidator
 import clawperator.uitree.UiTreeClickTypes
 import kotlinx.serialization.json.Json
@@ -141,7 +140,6 @@ class AgentCommandParserDefault : AgentCommandParser {
             "snapshot_ui" ->
                 UiAction.SnapshotUi(
                     id = id,
-                    format = params.parseSnapshotFormat(),
                     retry = params.parseRetryOrDefault(defaultRetry = TaskRetry.None),
                 )
             "take_screenshot" ->
@@ -168,15 +166,6 @@ class AgentCommandParserDefault : AgentCommandParser {
         return when (raw.lowercase()) {
             "temperature" -> UiTextValidator.Temperature
             else -> error("unsupported validator: $raw")
-        }
-    }
-
-    private fun JsonObject.parseSnapshotFormat(): UiSnapshotFormat {
-        val raw = this.stringOrNull("format") ?: return UiSnapshotFormat.Ascii
-        return when (raw.lowercase()) {
-            "ascii" -> UiSnapshotFormat.Ascii
-            "json" -> UiSnapshotFormat.Json
-            else -> error("unsupported snapshot format: $raw")
         }
     }
 

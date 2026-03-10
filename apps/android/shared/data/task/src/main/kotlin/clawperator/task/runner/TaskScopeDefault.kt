@@ -10,11 +10,9 @@ import clawperator.uitree.UiNode
 import clawperator.uitree.UiTreeFilterer
 import clawperator.uitree.UiTreeFormatter
 import clawperator.uitree.UiTreeInspector
-import clawperator.uitree.UiTreeTraversal
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.withContext
 import kotlin.random.Random
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
@@ -192,7 +190,6 @@ class TaskScopeDefault(
     }
 
     override suspend fun logUiTree(
-        format: UiSnapshotFormat,
         retry: TaskRetry,
     ): UiSnapshotActualFormat {
         val sink = currentTaskStatus()
@@ -207,42 +204,17 @@ class TaskScopeDefault(
             try {
                 Log.d("$TAG Logging UI tree")
                 val hierarchyDump = uiTreeInspector.getCurrentUiHierarchyDump()
-                val nodeCount: Int
-                val maxDepth: Int
-                val actualFormat: UiSnapshotActualFormat
-
-                if (hierarchyDump != null) {
-                    Log.d("$TAG UI Hierarchy:\n$hierarchyDump")
-                    nodeCount = countNodesInHierarchyDump(hierarchyDump)
-                    maxDepth = maxDepthInHierarchyDump(hierarchyDump)
-                    actualFormat = UiSnapshotActualFormat.HierarchyXml
-                } else {
-                    val uiTreeRaw =
-                        uiTreeInspector.getCurrentUiTree()
-                            ?: throw IllegalStateException("UI tree not available")
-                    val uiTree = uiTreeFilterer.filterOnScreenOnly(uiTreeRaw)
-                    val treeLog =
-                        withContext(coroutineScopeIo.coroutineContext) {
-                            val indexMap = UiTreeTraversal.buildIndexMap(uiTree.root)
-                            uiTreeFormatter.toAsciiTree(
-                                uiTree,
-                                showTreeIndex = true,
-                                showId = false,
-                                indexMap = indexMap,
-                            )
-                        }
-                    Log.d("$TAG UI Tree (fallback):\n$treeLog")
-                    nodeCount = countNodes(uiTree.root)
-                    maxDepth = calculateMaxDepth(uiTree.root)
-                    actualFormat = UiSnapshotActualFormat.Ascii
-                }
+                    ?: throw IllegalStateException("UI hierarchy dump not available")
+                Log.d("$TAG UI Hierarchy:\n$hierarchyDump")
+                val nodeCount = countNodesInHierarchyDump(hierarchyDump)
+                val maxDepth = maxDepthInHierarchyDump(hierarchyDump)
+                val actualFormat = UiSnapshotActualFormat.HierarchyXml
 
                 val totalElapsedMs = getCurrentTimeMillis() - stageStartTime
 
                 val successPayload =
                     payload(
                         "stage_id" to "logUiTree",
-                        "requested_format" to format.name.lowercase(),
                         "node_count" to nodeCount,
                         "max_depth" to maxDepth,
                         "actual_format" to actualFormat.wireValue,

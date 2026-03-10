@@ -158,7 +158,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       source: "serve-api",
       expectedFormat: "android-ui-automator",
       timeoutMs: 30000,
-      actions: [{ id: "snap", type: "snapshot_ui", params: { format: "ascii" } }],
+      actions: [{ id: "snap", type: "snapshot_ui" }],
     };
 
     try {

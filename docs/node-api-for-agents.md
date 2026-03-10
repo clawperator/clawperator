@@ -6,7 +6,7 @@ Clawperator provides a deterministic execution layer for LLM agents to control A
 
 - **Execution**: A payload of one or more actions dispatched to the device. Every execution produces exactly one `[Clawperator-Result]` envelope.
 - **Action**: A single step (`open_app`, `click`, `read_text`, etc.) within an execution.
-- **Snapshot**: A captured UI tree (JSON or ASCII) for observing device state.
+- **Snapshot**: A captured UI hierarchy dump (`hierarchy_xml`) for observing device state.
 - **Skill**: A packaged recipe from the skills repo, compiled into an execution payload.
 
 ## CLI Reference
@@ -24,7 +24,7 @@ Clawperator provides a deterministic execution layer for LLM agents to control A
 | `emulator provision` | Reuse or create a supported Android emulator and return its ADB serial |
 | `provision emulator` | Alias of `emulator provision` |
 | `execute --execution <json\|file>` | Run a full execution payload |
-| `observe snapshot` | Capture UI tree (ASCII only via CLI; see Snapshot notes in Action Reference) |
+| `observe snapshot` | Capture UI hierarchy dump (`hierarchy_xml`) |
 | `observe screenshot` | Capture device screen as PNG |
 | `action open-app --app <id>` | Open an application |
 | `action click --selector <json>` | Click a UI element |
@@ -173,7 +173,7 @@ Every execution requires `expectedFormat: "android-ui-automator"`.
     { "id": "step1", "type": "open_app", "params": { "applicationId": "com.example.app" } },
     { "id": "step2", "type": "enter_text", "params": { "matcher": { "resourceId": "com.example.app:id/search_input" }, "text": "hello", "submit": true } },
     { "id": "step3", "type": "click", "params": { "matcher": { "textEquals": "Login" }, "clickType": "default" } },
-    { "id": "step4", "type": "snapshot_ui", "params": { "format": "ascii" } }
+    { "id": "step4", "type": "snapshot_ui" }
   ]
 }
 ```
@@ -215,7 +215,7 @@ Combine fields to increase specificity when a single field is ambiguous:
 | `enter_text` | `matcher: NodeMatcher`, `text: string` | `submit: boolean` (default: `false`) |
 | `read_text` | `matcher: NodeMatcher` | - |
 | `wait_for_node` | `matcher: NodeMatcher` | - |
-| `snapshot_ui` | - | `format: "ascii" \| "json"` (default: `"ascii"`) |
+| `snapshot_ui` | - | - |
 | `sleep` | `durationMs: number` (max: 120000) | - |
 | `scroll_and_click` | `target: NodeMatcher` | `container: NodeMatcher`, `direction: "down" \| "up" \| "left" \| "right"` (default: `"down"`), `maxSwipes: number` (default: `10`, range: 1-50), `distanceRatio: number` (default: `0.7`, range: 0-1), `settleDelayMs: number` (default: `250`, range: 0-10000), `findFirstScrollableChild: boolean` (default: `false`) |
 
@@ -228,7 +228,7 @@ Combine fields to increase specificity when a single field is ambiguous:
 | `action read --selector <json>` | `read_text` |
 | `action wait --selector <json>` | `wait_for_node` |
 | `action open-app --app <id>` | `open_app` |
-| `observe snapshot` | `snapshot_ui` with `format: "ascii"` (ASCII only) |
+| `observe snapshot` | `snapshot_ui` |
 
 ### Action behavior notes
 
@@ -236,7 +236,7 @@ Combine fields to increase specificity when a single field is ambiguous:
 
 **`enter_text`:** The CLI command is `action type` but the execution payload action type is `enter_text`. The `submit` param triggers a keyboard Enter/submit after typing - use this for search fields and single-field forms where pressing Enter submits. Note: `clear` appears in the TypeScript contract but is not implemented by the Android runtime and has no effect.
 
-**`snapshot_ui`:** The `format` param is forwarded to Android but actual output format depends on device state - most devices produce `"ascii"`. The actual format used is reported in `data.actual_format`. The snapshot content itself is delivered in `data.text` (see Result Envelope below). `clawperator observe snapshot` (CLI) always uses `format: "ascii"` and returns the snapshot in the same way.
+**`snapshot_ui`:** Clawperator returns a single canonical snapshot format: `hierarchy_xml`. The Android runtime writes the hierarchy dump to device logcat, and the Node layer injects that raw XML into `data.text` after execution. `data.actual_format` is always `"hierarchy_xml"` for successful snapshot steps.
 
 ## Result Envelope
 
@@ -275,16 +275,104 @@ The `data` field contents per action type on success:
 | `click` | `click_types` |
 | `enter_text` | `text` (text typed), `submit` (`"true"` or `"false"`) |
 | `read_text` | `text` (extracted text value), `validator` (`"none"` or validator type) |
-| `snapshot_ui` | `requested_format`, `actual_format`, `text` (snapshot content - see note below) |
+| `snapshot_ui` | `actual_format`, `text` (snapshot content - see note below) |
 | `wait_for_node` | `resource_id`, `label` (matched node details) |
 | `scroll_and_click` | `max_swipes`, `direction`, `click_types` |
 | `sleep` | `duration_ms` |
 
 For any failed step: `success: false` and `data.error` contains the error code string.
 
-**Snapshot content delivery:** The UI tree is produced by the Android runtime and written to device logcat. The Node layer reads logcat after execution and injects the content into `data.text`. `data.actual_format` is `"ascii"` or `"hierarchy_xml"` (reflecting what the device actually produced). The `text` field in `data` contains the raw snapshot string - ASCII tree lines or XML hierarchy dump depending on `actual_format`.
+**Snapshot content delivery:** The UI hierarchy is produced by the Android runtime and written to device logcat. The Node layer reads logcat after execution and injects the raw XML into `data.text`. `data.actual_format` is `"hierarchy_xml"` on successful snapshot steps.
 
 **`read_text` value:** The extracted text value is in `data.text`.
+
+## Snapshot Output Format
+
+`snapshot_ui` and `clawperator observe snapshot` produce the canonical `hierarchy_xml` format. `data.actual_format` reports `"hierarchy_xml"` on success.
+
+### `hierarchy_xml`
+
+Structured XML produced by UIAutomator. Each `<node>` represents one UI element. Attributes map directly to NodeMatcher fields:
+
+| XML attribute | NodeMatcher field | Notes |
+| :--- | :--- | :--- |
+| `resource-id` | `resourceId` | `"com.example.app:id/name"`. Empty string when not set by developer. |
+| `text` | `textEquals` / `textContains` | Visible text content. Empty string if none. |
+| `content-desc` | `contentDescEquals` / `contentDescContains` | Accessibility label. Empty string if none. |
+| `class` | `role` | Java class name, e.g., `"android.widget.Button"`. |
+| `clickable` | - | `"true"` if the element accepts tap events. |
+| `scrollable` | - | `"true"` marks a scroll container. Use as `container` in `scroll_and_click`. |
+| `bounds` | - | `"[x1,y1][x2,y2]"` pixel rectangle. Useful for understanding spatial layout. |
+| `enabled` | - | `"false"` means the element is visible but not interactable. |
+| `long-clickable` | - | `"true"` if the element accepts long-press. Use `clickType: "long_click"`. |
+
+**Annotated example from Android Settings main screen (live device capture):**
+
+```xml
+<hierarchy rotation="0">
+  <node index="0" text="" resource-id="" class="android.widget.FrameLayout"
+        package="com.android.settings" content-desc=""
+        clickable="false" enabled="true" scrollable="false"
+        bounds="[0,0][1080,2340]">
+    ...
+        <!-- Scrollable list - use as 'container' in scroll_and_click -->
+        <node index="0" text="" resource-id="com.android.settings:id/recycler_view"
+              class="androidx.recyclerview.widget.RecyclerView"
+              package="com.android.settings" content-desc=""
+              clickable="false" enabled="true" focusable="true" scrollable="true"
+              bounds="[0,884][1080,2196]">
+
+          <!-- Icon-only button: no text, target via content-desc -->
+          <node index="0" text="" resource-id="" class="android.widget.Button"
+                package="com.android.settings" content-desc="Search settings"
+                clickable="true" enabled="true" focusable="true"
+                bounds="[912,692][1080,884]" />
+
+          <!-- Clickable row: the LinearLayout is the tap target -->
+          <node index="2" text="" resource-id="" class="android.widget.LinearLayout"
+                package="com.android.settings" content-desc=""
+                clickable="true" enabled="true" scrollable="false"
+                bounds="[30,1252][1050,1461]">
+            <!-- Title label with stable resource-id -->
+            <node index="0" text="Connections" resource-id="android:id/title"
+                  class="android.widget.TextView" package="com.android.settings"
+                  content-desc="" clickable="false" enabled="true"
+                  bounds="[216,1294][507,1364]" />
+            <!-- Subtitle label -->
+            <node index="1" text="Wi-Fi  •  Bluetooth  •  SIM manager"
+                  resource-id="android:id/summary" class="android.widget.TextView"
+                  package="com.android.settings" content-desc=""
+                  clickable="false" enabled="true"
+                  bounds="[216,1364][816,1419]" />
+          </node>
+
+          <node index="3" text="" resource-id="" class="android.widget.LinearLayout"
+                package="com.android.settings" content-desc=""
+                clickable="true" enabled="true" scrollable="false"
+                bounds="[30,1461][1050,1721]">
+            <node index="0" text="Connected devices" resource-id="android:id/title"
+                  class="android.widget.TextView" package="com.android.settings"
+                  content-desc="" clickable="false" enabled="true"
+                  bounds="[216,1503][661,1573]" />
+            <node index="1" text="Quick Share  •  Samsung DeX  •  Android Auto"
+                  resource-id="android:id/summary" class="android.widget.TextView"
+                  package="com.android.settings" content-desc=""
+                  clickable="false" enabled="true"
+                  bounds="[216,1573][996,1679]" />
+          </node>
+
+        </node>
+    ...
+  </node>
+</hierarchy>
+```
+
+**Reading patterns:**
+
+- **Tap targets** are `clickable="true"` nodes. In list UIs these are often container (`LinearLayout`) nodes whose text-bearing children hold the visible label. Match the container using `textEquals` with that label text.
+- **Icon-only buttons** (no `text`) use `content-desc` for their label. Target with `contentDescEquals`.
+- **Scroll containers** have `scrollable="true"`. Pass their `resource-id` as the `container` matcher in `scroll_and_click`.
+- **Disabled elements** have `enabled="false"`. They cannot be interacted with - scrolling or waiting for a state change is required first.
 
 ## Error Codes
 

@@ -19,11 +19,10 @@ class TaskScopeNoOp : TaskScope {
     }
 
     override suspend fun logUiTree(
-        format: UiSnapshotFormat,
         retry: TaskRetry,
     ): UiSnapshotActualFormat {
         // No-op implementation
-        return UiSnapshotActualFormat.Ascii
+        return UiSnapshotActualFormat.HierarchyXml
     }
 
     override suspend fun <T> ui(block: suspend TaskUiScope.() -> T): T {
