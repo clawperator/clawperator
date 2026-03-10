@@ -250,6 +250,24 @@ The markdown page helps brittle or markdown-preferring agents.
 - `curl https://clawperator.com/agent.md` yields useful markdown
 - both pages link directly to the Node API and CLI docs
 
+### Homepage hinting
+
+Once `/agent.md` exists, add all of the following on the landing page:
+
+- a normal visible link such as `For agents: /agent.md`
+- an entry for `/agent.md` in `llms.txt`
+- an entry for `/agent.md` in the sitemap
+
+Optionally add a top-of-document HTML comment as a fallback hint for crawlers
+that retain comments in source fetches:
+
+```html
+<!-- For automated agents and crawlers: a machine-oriented markdown version of this page is available at https://clawperator.com/agent.md -->
+```
+
+This comment is not a standard and must not be the only discovery mechanism.
+Treat it as a cheap extra hint, not a primary path.
+
 ---
 
 ## Workstream 5: Strengthen `llms.txt`
@@ -364,6 +382,15 @@ For example:
 
 This is not a substitute for fixing the crawl basics, but it can help weaker
 agent stacks.
+
+### Add an HTML comment pointer on the homepage
+
+If the landing page remains more visually oriented than machine oriented, add a
+factual HTML comment near the top of the source pointing crawlers to `/agent.md`.
+
+This is optional because there is no standard requiring crawlers to inspect or
+honor comments. It should only ship alongside visible links, sitemap coverage,
+and `llms.txt` coverage for the same route.
 
 ---
 
