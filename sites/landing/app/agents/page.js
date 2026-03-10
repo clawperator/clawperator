@@ -15,6 +15,8 @@ const links = [
   { href: "https://github.com/clawpilled/clawperator", label: "GitHub repo" }
 ];
 
+const isExternalLink = (href) => href.startsWith("http://") || href.startsWith("https://");
+
 export default function AgentsPage() {
   return (
     <main className="page-shell">
@@ -44,7 +46,9 @@ export default function AgentsPage() {
             <ul>
               {links.map((link) => (
                 <li key={link.href}>
-                  <a href={link.href}>{link.label}</a>
+                  <a href={link.href} target={isExternalLink(link.href) ? "_blank" : undefined} rel={isExternalLink(link.href) ? "noreferrer" : undefined}>
+                    {link.label}
+                  </a>
                 </li>
               ))}
             </ul>
