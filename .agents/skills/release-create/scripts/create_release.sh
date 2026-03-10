@@ -105,9 +105,6 @@ main() {
   repo_slug="$(gh repo view --json nameWithOwner --jq '.nameWithOwner')"
   local target_sha
   target_sha="$(git rev-parse --verify "${target_ref}^{commit}")"
-  local head_sha
-  head_sha="$(git rev-parse --verify HEAD^{commit})"
-
   local git_status
   git_status="$(git status --porcelain)"
   [[ -z "$git_status" ]] || die "working tree has uncommitted or untracked changes"
@@ -141,13 +138,10 @@ main() {
   printf 'target_sha=%s\n' "$target_sha"
   printf 'repo=%s\n' "$repo_slug"
 
-  local validation_root="$repo_root"
-  if [[ "$target_sha" != "$head_sha" ]]; then
-    TEMP_WORKTREE_DIR="$(mktemp -d "${TMPDIR:-/tmp}/release-create.XXXXXX")"
-    trap cleanup_worktree EXIT
-    git worktree add --detach "$TEMP_WORKTREE_DIR" "$target_sha" >/dev/null
-    validation_root="$TEMP_WORKTREE_DIR"
-  fi
+  TEMP_WORKTREE_DIR="$(mktemp -d "${TMPDIR:-/tmp}/release-create.XXXXXX")"
+  trap cleanup_worktree EXIT
+  git worktree add --detach "$TEMP_WORKTREE_DIR" "$target_sha" >/dev/null
+  local validation_root="$TEMP_WORKTREE_DIR"
 
   npm --prefix "$validation_root/apps/node" ci
   npm --prefix "$validation_root/apps/node" run build

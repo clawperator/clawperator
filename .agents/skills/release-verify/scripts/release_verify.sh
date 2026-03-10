@@ -87,7 +87,7 @@ main() {
   local release_url
   release_url="$(json_field "$release_json" "html_url")"
   local release_assets
-  release_assets="$(node -e 'const data = JSON.parse(process.argv[1]); const names = Array.isArray(data.assets) ? data.assets.map(asset => asset.name) : []; if (names.length === 0) process.exit(2); console.log(names.join(","));' "$release_json")"
+  release_assets="$(node -e 'const data = JSON.parse(process.argv[1]); const names = Array.isArray(data.assets) ? data.assets.map(asset => asset.name) : []; if (names.length === 0) process.exit(2); console.log(names.join(","));' "$release_json")" || die "GitHub Release has no assets yet"
   [[ "$release_assets" == *"operator-${tag_name}.apk"* ]] || die "GitHub Release is missing operator-${tag_name}.apk"
   [[ "$release_assets" == *"operator-${tag_name}.apk.sha256"* ]] || die "GitHub Release is missing operator-${tag_name}.apk.sha256"
   printf 'github_release=%s assets=%s\n' "$release_url" "$release_assets"
