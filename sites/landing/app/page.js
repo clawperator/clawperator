@@ -274,7 +274,7 @@ export default function Home() {
       <section id="workflows" className="content-section">
         <h2>Real-world examples</h2>
         <p className="workflow-subtitle">
-          Each workflow below runs on a physical Android device.
+          Each workflow below runs on an Android device.
           A natural request goes in, a concrete result comes back.
         </p>
 
