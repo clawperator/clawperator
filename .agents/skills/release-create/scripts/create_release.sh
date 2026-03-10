@@ -2,6 +2,10 @@
 
 set -euo pipefail
 
+WORKFLOW_APPEAR_ATTEMPTS=30
+WORKFLOW_COMPLETION_ATTEMPTS=360
+WORKFLOW_POLL_INTERVAL_SECONDS=10
+
 die() {
   printf 'release-create: %s\n' "$1" >&2
   exit 1
@@ -32,9 +36,9 @@ await_workflow() {
   local tag_name="$2"
   local target_sha="$3"
   local repo="$4"
-  local attempts=18
-  local completion_attempts=180
-  local sleep_seconds=10
+  local attempts="$WORKFLOW_APPEAR_ATTEMPTS"
+  local completion_attempts="$WORKFLOW_COMPLETION_ATTEMPTS"
+  local sleep_seconds="$WORKFLOW_POLL_INTERVAL_SECONDS"
   local run_json=""
   local status=""
 
