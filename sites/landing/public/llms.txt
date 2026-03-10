@@ -2,6 +2,11 @@
 
 Clawperator is a deterministic Android automation runtime for AI agents. It exposes a strict Node API and CLI that let an agent observe Android UI state, execute validated actions, and receive one structured result per command.
 
+Clawperator operates an Android device on behalf of a user. That Android device can be:
+
+- a physical Android burner device connected over adb
+- a local Android emulator provisioned through the Node CLI
+
 ## Preferred starting points
 
 - Homepage: https://clawperator.com/
@@ -16,6 +21,9 @@ Clawperator is a deterministic Android automation runtime for AI agents. It expo
 - The docs site contains the substantive technical documentation.
 - Prefer the Node API and CLI docs over inferring behavior from marketing copy.
 - Clawperator is an actuator, not an autonomous planner.
+- A physical Android burner device is the preferred actuator environment for compatibility and long-running reliability.
+- If no physical Android device is available, install Clawperator first, then provision an emulator with `clawperator provision emulator`.
+- Clawperator does not configure user accounts or app login state. The user must prepare the Android device or emulator with the required apps and sign-ins.
 - Skills are distributed as a bundle at https://clawperator.com/install/clawperator-skills.bundle
 - Install skills: run `clawperator skills install` after setup
 - Skills registry: `~/.clawperator/skills/skills/skills-registry.json` (set via CLAWPERATOR_SKILLS_REGISTRY)

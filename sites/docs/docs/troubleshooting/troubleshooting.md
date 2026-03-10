@@ -87,14 +87,14 @@ If you must use **Wireless Debugging**, be aware that your mileage may vary (YMM
 
 ## Installer behavior
 
-`curl -fsSL https://clawperator.com/install.sh | bash` uses the stable metadata file at `https://downloads.clawperator.com/operator/latest.json`, downloads the immutable APK and `.sha256`, verifies the checksum, then handles device install like this:
+`curl -fsSL https://clawperator.com/install.sh | bash` uses the stable metadata file at `https://downloads.clawperator.com/operator/latest.json`, downloads the immutable package for the [Clawperator Operator Android app](../getting-started/android-operator-apk.md) plus its `.sha256`, verifies the checksum, then handles device install like this:
 
 1. **One connected device** - the installer offers to run `adb install -r ~/.clawperator/downloads/operator.apk`.
 2. **Multiple connected devices** - the installer skips the install and prints `adb -s <device_id> install -r ~/.clawperator/downloads/operator.apk`.
-3. **No connected devices** - the installer skips the install and leaves the verified APK at `~/.clawperator/downloads/operator.apk`.
+3. **No connected devices** - the installer skips the install and leaves the verified package for the [Clawperator Operator Android app](../getting-started/android-operator-apk.md) at `~/.clawperator/downloads/operator.apk`.
 4. **`adb` missing** - the installer attempts to install `adb` automatically, or stops with a manual install link if it cannot.
 
-## Emulator provisioning issues
+## Emulator-Specific Issues
 
 Clawperator can provision a local Android emulator through the Node CLI and API. If provisioning fails, use the checks below.
 
@@ -185,13 +185,44 @@ Then retry:
 clawperator emulator start clawperator-pixel
 ```
 
+### App requires a Google account or Play Store sign-in
+
+The default emulator profile uses a Google Play system image. Some apps require a Google account to be signed in to the emulator before they can run. Clawperator does not handle account setup.
+
+To sign in:
+
+1. Open the Play Store app on the emulator
+2. Sign in with a Google account
+3. Accept any prompts
+4. Return to the home screen before running automations
+
+Some apps require additional configuration (such as accepting terms of service or completing a first-run flow) before Clawperator can interact with them.
+
+If an agent is blocked on a login screen or onboarding flow, treat that as device-preparation work that must be completed by the user.
+
+### App not installed or not detected on the emulator
+
+If an automation targets an app that is not installed on the emulator, the `open_app` step will fail - the execution envelope will return `status: "failed"` with the reason in `envelope.error`. `NODE_NOT_FOUND` is a selector/matcher error and will not appear for a missing app. Install the app from the Play Store or via `adb install` before running.
+
+### Slow emulator boot or sluggish UI
+
+Android emulators are resource-intensive. On machines without hardware virtualization or GPU acceleration, boots can be slow and UI interactions may be sluggish.
+
+Recommended settings:
+
+- Enable hardware virtualization (Intel HAXM or KVM) on the host
+- Ensure the Android emulator has GPU acceleration enabled (check AVD configuration)
+- Allocate sufficient RAM to the emulator (2 GB minimum recommended)
+
+If the emulator is consistently slow, consider using a physical device instead.
+
 ### Multiple devices connected
 
 Once an emulator is provisioned, you may have both a physical device and an emulator connected at the same time. In that state, continue to pass `--device-id <serial>` to `execute`, `observe`, `action`, and `skills run` commands.
 
 ### Installer cloned everything except skills
 
-If the installer finishes but warns that skills setup was skipped, the core CLI and operator APK are still installed. This does not block `clawperator doctor`, device discovery, or direct command execution. To set up skills manually:
+If the installer finishes but warns that skills setup was skipped, the core CLI and [Clawperator Operator Android app](../getting-started/android-operator-apk.md) are still installed. This does not block `clawperator doctor`, device discovery, or direct command execution. To set up skills manually:
 
 ```bash
 git clone https://clawperator.com/install/clawperator-skills.bundle ~/.clawperator/skills
@@ -202,7 +233,7 @@ export CLAWPERATOR_SKILLS_REGISTRY="$HOME/.clawperator/skills/skills/skills-regi
 
 ## Version Compatibility
 
-The Node CLI and the Android APK must have matching `major.minor` versions.
+The Node CLI and the installed [Clawperator Operator Android app](../getting-started/android-operator-apk.md) must have matching `major.minor` versions.
 
 - `0.1.4` and `0.1.9` are compatible
 - `0.1.4` and `0.1.4-d` are compatible
@@ -214,7 +245,7 @@ Use:
 clawperator version --check-compat --receiver-package com.clawperator.operator
 ```
 
-If the versions do not match, upgrade the CLI and install a compatible APK. For the full rule, examples, and remediation steps, see [Version Compatibility](compatibility.md).
+If the versions do not match, upgrade the CLI and install a compatible [Clawperator Operator Android app](../getting-started/android-operator-apk.md). For the full rule, examples, and remediation steps, see [Version Compatibility](compatibility.md).
 
 ---
 
