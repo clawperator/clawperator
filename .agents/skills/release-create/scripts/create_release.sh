@@ -40,17 +40,22 @@ await_workflow() {
   local completion_attempts="$WORKFLOW_COMPLETION_ATTEMPTS"
   local sleep_seconds="$WORKFLOW_POLL_INTERVAL_SECONDS"
   local run_json=""
+  local run_lookup_output=""
   local status=""
 
   for ((i = 1; i <= attempts; i++)); do
-    run_json="$(gh run list \
+    if run_lookup_output="$(gh run list \
       --repo "$repo" \
       --workflow "$workflow_name" \
       --branch "$tag_name" \
       --commit "$target_sha" \
       --event push \
       --limit 1 \
-      --json databaseId,workflowName,headBranch,headSha,status,conclusion,url 2>/dev/null || true)"
+      --json databaseId,workflowName,headBranch,headSha,status,conclusion,url 2>&1)"; then
+      run_json="$run_lookup_output"
+    else
+      run_json=""
+    fi
 
     if [[ "$run_json" != "[]" && -n "$run_json" ]]; then
       break
@@ -60,6 +65,9 @@ await_workflow() {
   done
 
   if [[ "$run_json" == "[]" || -z "$run_json" ]]; then
+    if [[ -n "$run_lookup_output" && "$run_lookup_output" != "[]" ]]; then
+      die "workflow $workflow_name for tag $tag_name in repo $repo was not found after polling; last gh error: $run_lookup_output"
+    fi
     die "workflow $workflow_name for tag $tag_name in repo $repo not found after polling"
   fi
 
