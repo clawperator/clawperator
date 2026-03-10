@@ -883,8 +883,8 @@ To install manually:
 Historical versions can be downloaded from `downloads.clawperator.com`. The URL structure follows the versioning pattern:
 - `https://downloads.clawperator.com/operator/v<version>/operator-v<version>.apk`
 
-Example for v0.2.2:
-- [https://downloads.clawperator.com/operator/v0.2.2/operator-v0.2.2.apk](https://downloads.clawperator.com/operator/v0.2.2/operator-v0.2.2.apk)
+Example for v0.2.3:
+- [https://downloads.clawperator.com/operator/v0.2.3/operator-v0.2.3.apk](https://downloads.clawperator.com/operator/v0.2.3/operator-v0.2.3.apk)
 
 ## Granting Permissions
 After installation, grant accessibility permissions so the app can inspect the screen and interact with the UI:
@@ -3205,8 +3205,7 @@ export CLAWPERATOR_SKILLS_REGISTRY="$HOME/.clawperator/skills/skills/skills-regi
 The Node CLI and the installed [Clawperator Operator Android app](../getting-started/android-operator-apk.md) must have matching `major.minor` versions.
 
 - `0.1.4` and `0.1.9` are compatible
-- `0.1.4` and `0.1.4-d` are compatible
-- `0.1.4` and `0.2.2` are not compatible
+- `0.1.4` and `0.2.x` are not compatible
 
 Use:
 
