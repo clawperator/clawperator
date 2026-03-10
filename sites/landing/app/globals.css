@@ -350,6 +350,35 @@ body {
   text-wrap: pretty;
 }
 
+.hero-image-panel {
+  margin-top: 2.2rem;
+  background-color: #f7f4ee;
+  border: 1px solid rgba(124, 92, 55, 0.12);
+  border-radius: 20px;
+  padding: 1.8rem 1.4rem;
+  width: 100%;
+  max-width: 780px;
+  box-shadow: 0 14px 44px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.hero-diagram {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.hero-diagram-note {
+  margin: 1.15rem 0 0;
+  font-size: 0.82rem;
+  font-weight: 550;
+  color: #5c6370;
+  opacity: 0.72;
+  letter-spacing: 0.01em;
+}
+
 .quickstart-intro {
   margin-top: 5.8rem;
   padding-top: 2rem;

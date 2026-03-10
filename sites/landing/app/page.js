@@ -158,7 +158,11 @@ export default function Home() {
           <p className="hero-problem">Most services only expose their real functionality through mobile apps.</p>
           <img ref={heroLogoRef} src="/clawperator-logo.png" alt="" aria-hidden="true" className="hero-logo" />
           <p className="hero-product-name">Clawperator</p>
-          <h1 className="hero-catchphrase">Your agent thinks. Clawperator acts.</h1>
+          <h1 className="hero-catchphrase">
+            YOUR AGENT THINKS.
+            <br />
+            CLAWPERATOR ACTS.
+          </h1>
           <p className="hero-summary">
             Let AI agents control Android apps on behalf of users.
             <br />
@@ -173,8 +177,16 @@ export default function Home() {
             Clawperator connects that agent to a dedicated Android burner phone or local Android emulator, executes the
             action, and returns structured results your code can trust.
           </p>
-        </div>
 
+          <div className="hero-image-panel">
+            <img
+              src="https://static.clawperator.com/img/hero/clawperator_hero.webp"
+              alt="Diagram showing how OpenClaw and Clawperator let AI agents control real Android apps and return results to chat. This image was made with human claws."
+              className="hero-diagram"
+            />
+            <p className="hero-diagram-note">Made with human claws.</p>
+          </div>
+          </div>
         <div className="quickstart-intro">
           <h2 id="install">Quick Start</h2>
           <p>
