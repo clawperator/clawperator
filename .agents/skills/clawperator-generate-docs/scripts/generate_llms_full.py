@@ -20,7 +20,11 @@ def main():
     
     docs_dir = os.path.join(docs_site_dir, "docs")
     source_map_path = os.path.join(docs_site_dir, "source-map.yaml")
-    output_path = os.path.join(docs_site_dir, "site", "llms-full.txt")
+    output_paths = [
+        os.path.join(docs_site_dir, "site", "llms-full.txt"),
+        os.path.join(docs_site_dir, "static", "llms-full.txt"),
+        os.path.join(repo_root, "sites", "landing", "public", "llms-full.txt"),
+    ]
     
     with open(source_map_path, "r", encoding="utf-8") as f:
         source_map = yaml.safe_load(f)
@@ -76,11 +80,13 @@ def main():
         print(f"Error: Failed to generate llms-full.txt due to {len(missing_pages)} missing pages.")
         sys.exit(1)
         
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    with open(output_path, "w", encoding="utf-8") as out_f:
-        out_f.write("\n".join(compiled_content))
-        
-    print(f"Successfully generated {output_path}")
+    rendered = "\n".join(compiled_content)
+
+    for output_path in output_paths:
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        with open(output_path, "w", encoding="utf-8") as out_f:
+            out_f.write(rendered)
+        print(f"Successfully generated {output_path}")
 
 if __name__ == "__main__":
     main()

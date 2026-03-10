@@ -1,15 +1,18 @@
-# Clawperator Docs
+# Clawperator Documentation
 
-This site contains the technical documentation for Clawperator, a deterministic Android automation runtime for AI agents.
+This site contains the canonical technical documentation for Clawperator, a deterministic Android automation runtime for AI agents. Clawperator is the actuator. Your external agent or LLM is the brain.
 
-## Preferred pages
+## Key pages
 
-- Full compiled docs: https://docs.clawperator.com/llms-full.txt
+- Full compiled docs: https://clawperator.com/llms-full.txt
 - Docs home: https://docs.clawperator.com/
-- Agent guide: https://docs.clawperator.com/ai-agents/node-api-for-agents/
+- Node API agent guide: https://docs.clawperator.com/ai-agents/node-api-for-agents/
+- Operator LLM playbook: https://docs.clawperator.com/design/operator-llm-playbook/
 - API overview: https://docs.clawperator.com/reference/api-overview/
 - CLI reference: https://docs.clawperator.com/reference/cli-reference/
 - Error codes: https://docs.clawperator.com/reference/error-codes/
+- First-time setup: https://docs.clawperator.com/getting-started/first-time-setup/
+- Troubleshooting: https://docs.clawperator.com/troubleshooting/troubleshooting/
 - Architecture: https://docs.clawperator.com/architecture/architecture/
 
 ## Guidance for agents
