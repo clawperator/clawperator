@@ -180,16 +180,11 @@ device confirmation before documenting):
 - `read_text`: `data` contains the extracted text value
 - `click`, `enter_text`, `open_app`, `close_app`, `sleep`: likely minimal or `null` on
   success
-- Any failed step: `error` contains the error code string, `success: false`
-
-The top-level error path (`envelope.error`) vs. per-step error path
-(`stepResults[].error`) is also not clearly explained. The current `node-api-for-agents.md`
-says "Branch agent logic on codes from `envelope.error` or `stepResults[].data.error`"
-but the field name in source is `stepResults[].error` (not `.data.error`).
+- Any failed step: `data.error` contains the error code string, `success: false`
+  (see Gap 6 for the TypeScript contract discrepancy on this field)
 
 **Fix:** Confirm `data` shapes from live device output. Document the full envelope
-shape. Correct the error path reference from `stepResults[].data.error` to
-`stepResults[].error`. Add per-action `data` shapes once confirmed.
+shape and per-action `data` contents once confirmed.
 
 ---
 
