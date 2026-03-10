@@ -1,8 +1,8 @@
 # OpenClaw Remote Bootstrap Guide
 
-This doc covers the exact steps a remote OpenClaw agent should follow to install Clawperator, prepare the connected Android device, and confirm the environment is ready for skill execution.
+This doc covers the exact steps a remote OpenClaw agent should follow to install Clawperator, prepare the Android device (physical or emulator), and confirm the environment is ready for skill execution.
 
-**Deployment model:** Mac mini host running OpenClaw, one Android device connected via USB.
+**Deployment model:** Mac mini host running OpenClaw, with a connected Android device (physical via USB or emulator provisioned through the Node CLI).
 
 ---
 
@@ -11,12 +11,14 @@ This doc covers the exact steps a remote OpenClaw agent should follow to install
 Before starting:
 
 - The host Mac has `curl`, `adb`, and `git` installed (`node` v22 is installed automatically by the installer if not present)
-- One Android device is physically connected via USB
-- USB debugging is enabled on the device
-- The device has previously authorized USB debugging for this host (the RSA prompt was accepted)
-- The device is unlocked
+- One of the following is available:
+  - A physical Android device connected via USB with USB debugging enabled and previously authorized for this host
+  - Android SDK tools (`adb`, `emulator`, `sdkmanager`, `avdmanager`) in `PATH` for emulator provisioning
+- The device or emulator is unlocked
 
-If USB debugging has not been authorized before, the first adb connection attempt will surface an on-device prompt. This requires a human tap and cannot be bypassed.
+If using a physical device and USB debugging has not been authorized before, the first adb connection attempt will surface an on-device prompt. This requires a human tap and cannot be bypassed.
+
+For an emulator setup, use `clawperator provision emulator` after the CLI is installed (see Step 1).
 
 ---
 
@@ -255,9 +257,12 @@ clawperator devices
 
 All steps in this guide are fully automatable by a remote agent, provided:
 
-- USB debugging was previously authorized by a human on the device
-- The device remains unlocked during operation
+- For physical devices: USB debugging was previously authorized by a human on the device
+- For emulators: Android SDK tools are installed and `clawperator provision emulator` can run unattended
+- The device or emulator remains unlocked during operation
 
-The one step that cannot be automated without prior human action is the first-time USB debugging authorization prompt on the device. This is an OS-level security gate. Once authorized, subsequent connections from the same host require no on-device confirmation.
+The one step that cannot be automated without prior human action is the first-time USB debugging authorization prompt on a physical device. This is an OS-level security gate. Once authorized, subsequent connections from the same host require no on-device confirmation.
 
-The `grant-device-permissions` command enables the accessibility service without requiring on-device interaction.
+Emulator provisioning is fully automated and requires no human interaction.
+
+The `grant-device-permissions` command enables the accessibility service without requiring on-device interaction, for both physical devices and emulators.

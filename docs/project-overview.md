@@ -1,9 +1,9 @@
 # Project Overview
 
 ## Mission
-Clawperator is a deterministic actuator tool for LLM-driven Android automation. It provides a stable execution layer that allows agents to perform actions on a dedicated, permanently-connected Android device (affectionately called a **"burner"**) on behalf of a user.
+Clawperator is a deterministic actuator tool for LLM-driven Android automation. It provides a stable execution layer that allows agents to perform actions on a dedicated Android device on behalf of a user.
 
-This approach ensures that the user's primary phone (e.g., an iPhone) remains undisturbed while the burner device handles automation tasks. There are virtually no hardware requirements; any cheap or old Android device can serve as a reliable actuator.
+The actuator target can be a physical Android device (affectionately called a **"burner"**) or a local Android emulator provisioned through the Node CLI. This approach ensures that the user's primary phone (e.g., an iPhone) remains undisturbed while the actuator device handles automation tasks. Physical device setups have virtually no hardware requirements - any cheap or old Android device works. The emulator option requires no dedicated hardware at all.
 
 ## Core Philosophy: The Brain and the Hand
 Clawperator is designed as the execution "hand" for an LLM "brain":
@@ -17,7 +17,7 @@ Clawperator is designed as the execution "hand" for an LLM "brain":
 The system consists of two primary layers:
 
 -   **Android Runtime (`apps/android`):** An Android application that leverages Accessibility APIs to inspect the UI tree and perform actions (taps, scrolls, text entry, and system hard-keys like `back`/`home`). It listens for commands via a broadcast receiver.
--   **Node Runtime/CLI (`apps/node`):** The primary interface for agents. It wraps `adb` interactions, validates execution payloads, dispatches commands to the Android device, and parses canonical result envelopes from logs.
+-   **Node Runtime/CLI (`apps/node`):** The primary interface for agents. It wraps `adb` interactions, validates execution payloads, dispatches commands to the Android device, parses canonical result envelopes from logs, and owns the full Android emulator lifecycle (discovery, provisioning, creation, and teardown).
 
 ## Website Surfaces
 This repository also contains two separate public website builds:

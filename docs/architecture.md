@@ -1,6 +1,6 @@
 # Clawperator Architecture
 
-Clawperator is a two-layer system: an Android runtime that executes actions on the device, and a Node CLI/API that agents talk to.
+Clawperator is a two-layer system: an Android runtime that executes actions on the device, and a Node CLI/API that agents talk to. The device target can be a physical Android device connected over USB or an Android emulator provisioned through the Node layer.
 
 ## Layers
 

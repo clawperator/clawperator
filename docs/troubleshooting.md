@@ -185,6 +185,35 @@ Then retry:
 clawperator emulator start clawperator-pixel
 ```
 
+### App requires a Google account or Play Store sign-in
+
+The default emulator profile uses a Google Play system image. Some apps require a Google account to be signed in to the emulator before they can run. Clawperator does not handle account setup.
+
+To sign in:
+
+1. Open the Play Store app on the emulator
+2. Sign in with a Google account
+3. Accept any prompts
+4. Return to the home screen before running automations
+
+Some apps require additional configuration (such as accepting terms of service or completing a first-run flow) before Clawperator can interact with them.
+
+### App not installed or not detected on the emulator
+
+If an automation targets an app that is not installed on the emulator, the UI action will fail with `NODE_NOT_FOUND` or the app will not open. Install the app from the Play Store or via `adb install` before running.
+
+### Slow emulator boot or sluggish UI
+
+Android emulators are resource-intensive. On machines without hardware virtualization or GPU acceleration, boots can be slow and UI interactions may be sluggish.
+
+Recommended settings:
+
+- Enable hardware virtualization (Intel HAXM or KVM) on the host
+- Ensure the Android emulator has GPU acceleration enabled (check AVD configuration)
+- Allocate sufficient RAM to the emulator (2 GB minimum recommended)
+
+If the emulator is consistently slow, consider using a physical device instead.
+
 ### Multiple devices connected
 
 Once an emulator is provisioned, you may have both a physical device and an emulator connected at the same time. In that state, continue to pass `--device-id <serial>` to `execute`, `observe`, `action`, and `skills run` commands.

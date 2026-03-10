@@ -44,6 +44,11 @@ sections:
         mode: copy
         sources:
           - docs/first-time-setup.md
+      - output: getting-started/running-clawperator-on-android.md
+        title: Running Clawperator on Android
+        mode: copy
+        sources:
+          - docs/running-clawperator-on-android.md
       - output: getting-started/android-operator-apk.md
         title: The Android Operator APK
         mode: copy

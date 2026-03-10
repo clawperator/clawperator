@@ -12,6 +12,7 @@ nav:
   - clawperator.com: https://clawperator.com
   - Getting Started:
     - Project Overview: getting-started/project-overview.md
+    - Running Clawperator on Android: getting-started/running-clawperator-on-android.md
     - First-Time Setup: getting-started/first-time-setup.md
     - The Android Operator APK: getting-started/android-operator-apk.md
   - For AI Agents:
