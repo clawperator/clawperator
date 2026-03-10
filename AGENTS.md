@@ -122,6 +122,7 @@ For non-trivial changes, do all steps before commit:
 ## Coding and Commit Conventions
 - Use Conventional Commits (`feat:`, `fix:`, `refactor:`, `chore:`, `docs:`).
 - Keep commits narrow and reviewable.
+- Prefer adding new incremental commits when working in branches rather than amending previous commits. This is easier for users to track at a glance. PRs are ultimately squashed and merged, so incremental commit history is not a negative.
 - Prefer explicit contracts and deterministic behavior over convenience shortcuts.
 - When making breaking contract changes, include migration notes in commit message and docs.
 
