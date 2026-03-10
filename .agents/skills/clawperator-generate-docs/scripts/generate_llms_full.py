@@ -64,7 +64,7 @@ def main():
                 page_content = pf.read().rstrip("\n")
                 
             # If the page doesn't start with a markdown header, add the title
-            if not page_content.startswith("# "):
+            if not page_content.lstrip().startswith("#"):
                 compiled_content.append(f"\n## {page_title}\n")
             else:
                 compiled_content.append("\n")
