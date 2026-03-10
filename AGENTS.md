@@ -126,6 +126,10 @@ For non-trivial changes, do all steps before commit:
 - Prefer explicit contracts and deterministic behavior over convenience shortcuts.
 - When making breaking contract changes, include migration notes in commit message and docs.
 
+## Git and Push Discipline
+- **Branch Pushing:** Agents can freely push to feature branches or any branch that has already been pushed to the remote. Frequent pushing to these branches is encouraged to ensure work is backed up and visible.
+- **Main Branch Protection:** NEVER push directly to the `main` branch without explicit user permission. Changes should typically be merged into `main` via pull requests using the `pr-autoloop` or `pr-squash-merge` skills.
+
 ## Documentation Style
 - **No em dashes:** Never use em dashes (`-`). Use a regular dash or hyphen (`-`) instead for clarity and consistency.
 - Use clean, monospace-friendly formatting for all markdown files.
