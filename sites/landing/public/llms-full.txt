@@ -883,8 +883,8 @@ To install manually:
 Historical versions can be downloaded from `downloads.clawperator.com`. The URL structure follows the versioning pattern:
 - `https://downloads.clawperator.com/operator/v<version>/operator-v<version>.apk`
 
-Example for v0.2.3:
-- [https://downloads.clawperator.com/operator/v0.2.3/operator-v0.2.3.apk](https://downloads.clawperator.com/operator/v0.2.3/operator-v0.2.3.apk)
+Example for v0.2.4:
+- [https://downloads.clawperator.com/operator/v0.2.4/operator-v0.2.4.apk](https://downloads.clawperator.com/operator/v0.2.4/operator-v0.2.4.apk)
 
 ## Granting Permissions
 After installation, grant accessibility permissions so the app can inspect the screen and interact with the UI:
@@ -2895,8 +2895,11 @@ Examples:
 - CLI `0.1.4` and app `0.1.4` - compatible
 - CLI `0.1.4` and app `0.1.9` - compatible
 - CLI `0.1.4` and app `0.1.4-d` - compatible
-- CLI `0.1.4-rc.1` and app `0.1.4-d` - compatible
-- CLI `0.1.4` and app `0.2.x` - not compatible
+- CLI `0.1.4` and app `0.1.4-rc.1` - compatible
+- CLI `0.1.4` and app `0.2.1` - not compatible
+- CLI `0.1.4` and app `0.2.2` - not compatible
+- CLI `0.1.4` and app `0.2.3` - not compatible
+- CLI `0.1.4` and app `0.2.4` - not compatible
 
 Notes:
 
