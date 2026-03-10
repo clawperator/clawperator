@@ -379,7 +379,7 @@ Structured XML produced by UIAutomator. Each `<node>` represents one UI element.
 
 **Reading patterns:**
 
-- **Tap targets** are `clickable="true"` nodes. In list UIs these are often container (`LinearLayout`) nodes whose text-bearing children hold the visible label. Match the container using `textEquals` with that label text.
+- **Tap targets** are `clickable="true"` nodes. In list UIs these are often container (`LinearLayout`) nodes whose text-bearing children hold the visible label while the container itself has `text=""`. Match the text-bearing child node (for example, `textEquals: "Connections"` or `resourceId: "android:id/title"`), then rely on the runtime to click a clickable ancestor when needed.
 - **Icon-only buttons** (no `text`) use `content-desc` for their label. Target with `contentDescEquals`.
 - **Scroll containers** have `scrollable="true"`. Pass their `resource-id` as the `container` matcher in `scroll_and_click`.
 - **Disabled elements** have `enabled="false"`. They cannot be interacted with - scrolling or waiting for a state change is required first.
