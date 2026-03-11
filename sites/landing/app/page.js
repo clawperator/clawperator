@@ -85,13 +85,12 @@ export default function Home() {
   const activeCommand = mode === "npm" ? installCommands.npm : installCommands.oneLiner;
   const emulatorCommand = "clawperator provision emulator";
 
-  const sectionIds = ["install", "workflows", "reliability", "skills", "architecture", "how-it-works", "faq"];
+  const sectionIds = ["install", "workflows", "reliability", "skills", "how-it-works", "faq"];
   const sectionLabels = {
     install: "Install",
     workflows: "Examples",
     reliability: "Why it works",
     skills: "Skills",
-    architecture: "Architecture",
     "how-it-works": "How it works",
     faq: "FAQ"
   };
@@ -508,8 +507,13 @@ if <hvac_state> == "Off":
         </div>
       </section>
 
-      <section id="architecture" className="content-section architecture-section">
-        <h2>The architecture</h2>
+      <section id="how-it-works" className="content-section architecture-section loop-section">
+        <h2>How it actually works</h2>
+        <p>
+          Your agent is the brain. Clawperator is the hand. Skills sit above the runtime as reusable app-specific
+          workflows. Whether the agent runs a skill or drives the UI step by step, Clawperator is the execution layer
+          that talks to the Android device and returns structured results.
+        </p>
         <div className="architecture-strip">
           <article className="architecture-card architecture-card-edge">
             <p className="architecture-label">AI Agent / LLM</p>
@@ -540,15 +544,29 @@ if <hvac_state> == "Off":
           </article>
         </div>
         <p>
-          Your agent reasons about what should happen. Clawperator executes those decisions on an Android device. This
-          is the execution layer: intelligence stays in the agent, execution stays in Clawperator. The runtime includes
-          the CLI on your host machine and the Clawperator Operator Android app on the Android device.
+          The runtime includes the CLI on your host machine and the Clawperator Operator Android app on the Android
+          device. The agent decides what to do next. Skills package known flows. Clawperator executes validated actions
+          against user-installed Android apps and returns machine-readable state.
         </p>
-      </section>
-
-      <section id="how-it-works" className="content-section loop-section">
-        <h2>How It Works</h2>
-        <p>The loop is simple: the agent observes and decides, the hand executes and reports back.</p>
+        <div className="grid-2-col">
+          <div>
+            <h3>When a skill exists</h3>
+            <ul>
+              <li>The agent picks a skill for a known app workflow</li>
+              <li>The skill packages the reliable path to the state or action needed</li>
+              <li>Clawperator still executes the underlying Android actions and returns the result</li>
+            </ul>
+          </div>
+          <div>
+            <h3>When no skill exists yet</h3>
+            <ul>
+              <li>The agent opens the app and inspects the live UI</li>
+              <li>It finds a reliable path step by step using the documented API</li>
+              <li>Once the flow is understood, it can turn that path into a private skill</li>
+            </ul>
+          </div>
+        </div>
+        <p>The operating loop is simple: observe, decide, execute, return.</p>
 
         <div className="loop-steps" aria-label="Clawperator hand loop">
           <article className="loop-step">
@@ -563,7 +581,7 @@ if <hvac_state> == "Off":
             <p className="loop-index">02</p>
             <div>
               <h3>Decide</h3>
-              <p>The agent chooses the next action. Clawperator does not plan, improvise, or decide on its own.</p>
+              <p>The agent chooses the next action or runs a skill. Clawperator does not plan, improvise, or decide on its own.</p>
             </div>
           </article>
 
