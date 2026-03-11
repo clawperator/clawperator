@@ -547,7 +547,7 @@ if <hvac_state> == "Off":
           <article className="architecture-card architecture-card-edge">
             <div className="architecture-card-stack">
               <p className="architecture-label">Mobile Apps</p>
-              <p className="architecture-meta">the real APIs</p>
+              <p className="architecture-meta">the app is the api</p>
             </div>
           </article>
         </div>
