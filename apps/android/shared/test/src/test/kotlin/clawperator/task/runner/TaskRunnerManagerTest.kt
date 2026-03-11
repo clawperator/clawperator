@@ -80,6 +80,13 @@ class TaskRunnerManagerTest : ActionTest {
             // No-op for testing
         }
 
+        override suspend fun openUri(
+            uri: String,
+            retry: TaskRetry,
+        ) {
+            // No-op for testing
+        }
+
         override suspend fun pause(
             duration: Duration,
             retry: TaskRetry,
