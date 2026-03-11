@@ -74,6 +74,13 @@ def build_checks(landing_base_url, docs_base_url):
             "body_pattern": r"(?im)^#\s+Clawperator Full Documentation",
             "probe_bots": True,
         },
+        {
+            "kind": "url",
+            "url": f"{docs_base_url}/geo-debug.txt",
+            "content_type": r"text/plain",
+            "body_pattern": r"(?im)^Clawperator GEO debug marker",
+            "probe_bots": True,
+        },
         {"kind": "url", "url": f"{docs_base_url}/sitemap.xml", "content_type": r"application/xml|text/xml"},
         {"kind": "url", "url": f"{docs_base_url}/", "content_type": r"text/html"},
         {
