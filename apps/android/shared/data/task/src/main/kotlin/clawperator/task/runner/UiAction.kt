@@ -8,6 +8,12 @@ import clawperator.uitree.UiTreeClickTypes
 sealed interface UiAction {
     val id: String
 
+    data class OpenUri(
+        override val id: String,
+        val uri: String,
+        val retry: TaskRetry = TaskRetryPresets.AppLaunch,
+    ) : UiAction
+
     data class OpenApp(
         override val id: String,
         val applicationId: String,

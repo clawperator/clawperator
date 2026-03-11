@@ -43,6 +43,34 @@ and not resolvable on PATH), it should:
 - The doctor check and the install step should be separated so the check can run
   read-only in diagnostic mode.
 
+## System image installation
+
+`provision emulator` requires the correct Android system image to be installed
+on the host. The supported target is defined in
+`apps/node/src/domain/android-emulators/constants.ts`:
+
+```
+SUPPORTED_EMULATOR_API_LEVEL = 35
+DEFAULT_EMULATOR_SYSTEM_IMAGE = "system-images;android-35;google_apis_playstore;arm64-v8a"
+```
+
+If this image is absent, `provision emulator` will either:
+- Fail with `ANDROID_SDK_TOOL_MISSING` (if `sdkmanager` is not on PATH), or
+- Fail with `EMULATOR_UNSUPPORTED` if a `clawperator-pixel` AVD already exists
+  but was created against a different API level.
+
+`doctor` should verify that the required system image is installed and, if not,
+install it via `sdkmanager`:
+
+```
+sdkmanager "system-images;android-35;google_apis_playstore;arm64-v8a"
+```
+
+This check must run after SDK tools are confirmed present (step 2 above).
+
+The system image check should be separated from the SDK tools check so it can
+also run read-only in diagnostic mode (reporting "missing" vs. installing).
+
 ## Related files
 
 - `apps/node/src/adapters/android-bridge/runtimeConfig.ts` - path resolution

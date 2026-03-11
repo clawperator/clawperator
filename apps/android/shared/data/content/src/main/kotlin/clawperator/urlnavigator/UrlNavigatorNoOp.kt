@@ -7,4 +7,6 @@ class UrlNavigatorNoOp : UrlNavigator {
         url: String,
         destinations: UrlNavigatorDestinations,
     ): Boolean = false
+
+    override suspend fun toUri(uri: String): Boolean = false
 }

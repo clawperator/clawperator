@@ -10,6 +10,7 @@ import clawperator.uitree.UiNode
 import clawperator.uitree.UiTreeFilterer
 import clawperator.uitree.UiTreeFormatter
 import clawperator.uitree.UiTreeInspector
+import clawperator.urlnavigator.UrlNavigator
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -26,6 +27,7 @@ class TaskScopeDefault(
     private val uiTreeFilterer: UiTreeFilterer,
     private val uiTreeFormatter: UiTreeFormatter,
     private val taskUiScope: TaskUiScope,
+    private val urlNavigator: UrlNavigator,
     private val coroutineScopeIo: CoroutineScope,
 ) : TaskScope {
     companion object {
@@ -164,6 +166,42 @@ class TaskScopeDefault(
 
         Log.d("$TAG Opening app: $applicationId")
         triggerManager.trigger(triggerShortcut.triggerEvent)
+        Unit
+    }
+
+    override suspend fun openUri(
+        uri: String,
+        retry: TaskRetry,
+    ) = withRetry(
+        retry = retry,
+        stageId = "openUri:$uri",
+        stageLabel = "Opening URI: $uri",
+        successPayload = { _, elapsedMs, attempt ->
+            payload(
+                "stage_id" to "openUri:$uri",
+                "uri" to uri,
+                "elapsed_ms" to elapsedMs,
+                "attempt" to attempt,
+            )
+        },
+        failurePayload = { throwable, attempt ->
+            val reasonCode =
+                when {
+                    throwable.message?.contains("URI_NOT_HANDLED") == true -> "uri_not_handled"
+                    else -> "unknown"
+                }
+            payload(
+                "uri" to uri,
+                "reason_code" to reasonCode,
+                "attempt" to attempt,
+            )
+        },
+    ) {
+        Log.d("$TAG Opening URI: $uri")
+        val success = urlNavigator.toUri(uri)
+        if (!success) {
+            throw IllegalStateException("URI_NOT_HANDLED: No application found to handle uri=$uri")
+        }
         Unit
     }
 

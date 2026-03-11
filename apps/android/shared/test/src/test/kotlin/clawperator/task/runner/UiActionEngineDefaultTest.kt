@@ -133,6 +133,12 @@ private class RecordingTaskScope(
         openedApps += applicationId
     }
 
+    override suspend fun openUri(
+        uri: String,
+        retry: TaskRetry,
+    ) {
+    }
+
     override suspend fun pause(
         duration: Duration,
         retry: TaskRetry,
