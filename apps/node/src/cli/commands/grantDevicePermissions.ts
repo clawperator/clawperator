@@ -18,6 +18,7 @@ export async function cmdGrantDevicePermissions(options: {
 
   const failedGrant =
     !result.accessibility.ok ? result.accessibility
+      : !result.notification.ok ? result.notification
       : !result.notificationListener.ok ? result.notificationListener
       : undefined;
 

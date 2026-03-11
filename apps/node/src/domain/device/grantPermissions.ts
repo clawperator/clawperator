@@ -90,8 +90,22 @@ export async function grantNotificationPermission(
     "shell", "pm", "grant", receiverPackage, "android.permission.POST_NOTIFICATIONS",
   ]);
   if (result.code !== 0) {
-    // Android <13 or already granted - not fatal, treat as a successful skip
-    return { ok: true, skipped: true, error: result.stderr || undefined };
+    const error = `${result.stderr} ${result.stdout}`.trim();
+    const lowerError = error.toLowerCase();
+    const expectedSkip =
+      lowerError.includes("unknown permission") ||
+      lowerError.includes("not a changeable permission type") ||
+      lowerError.includes("already granted");
+
+    if (expectedSkip) {
+      return { ok: true, skipped: true, error: error || undefined };
+    }
+
+    return {
+      ok: false,
+      skipped: false,
+      error: error || "Could not grant android.permission.POST_NOTIFICATIONS",
+    };
   }
   return { ok: true, skipped: false };
 }
