@@ -1,7 +1,5 @@
 import { describe, it } from "node:test";
 import assert from "node:assert";
-import { existsSync } from "node:fs";
-import { join } from "node:path";
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 
 describe("getDefaultRuntimeConfig", () => {
@@ -33,20 +31,28 @@ describe("getDefaultRuntimeConfig", () => {
     assert.strictEqual(config.receiverPackage, "custom.receiver");
   });
 
-  it("discovers the standard macOS emulator path when available", () => {
-    const config = getDefaultRuntimeConfig();
-    const homeDirectory = process.env.HOME;
-    const standardPath = homeDirectory
-      ? join(homeDirectory, "Library/Android/sdk/emulator/emulator")
-      : undefined;
-
-    if (standardPath && existsSync(standardPath)) {
-      assert.strictEqual(config.emulatorPath, standardPath);
-      return;
+  it("falls back to bare tool names (PATH-based) when ANDROID_HOME and ANDROID_SDK_ROOT are not set", () => {
+    const originalAndroidHome = process.env.ANDROID_HOME;
+    const originalAndroidSdkRoot = process.env.ANDROID_SDK_ROOT;
+    try {
+      delete process.env.ANDROID_HOME;
+      delete process.env.ANDROID_SDK_ROOT;
+      const config = getDefaultRuntimeConfig();
+      assert.strictEqual(config.emulatorPath, "emulator");
+      assert.strictEqual(config.sdkmanagerPath, "sdkmanager");
+      assert.strictEqual(config.avdmanagerPath, "avdmanager");
+    } finally {
+      if (originalAndroidHome !== undefined) {
+        process.env.ANDROID_HOME = originalAndroidHome;
+      } else {
+        delete process.env.ANDROID_HOME;
+      }
+      if (originalAndroidSdkRoot !== undefined) {
+        process.env.ANDROID_SDK_ROOT = originalAndroidSdkRoot;
+      } else {
+        delete process.env.ANDROID_SDK_ROOT;
+      }
     }
-
-    assert.strictEqual(typeof config.emulatorPath, "string");
-    assert.ok(config.emulatorPath.length > 0);
   });
 
   it("prefers ANDROID_HOME paths for emulator, sdkmanager, and avdmanager", () => {
