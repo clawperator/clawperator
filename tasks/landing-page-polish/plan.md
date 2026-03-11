@@ -131,6 +131,14 @@ This is stronger than a generic "control Android apps" formulation because it
 names the category, the payoff, and the closest technical analogue in one
 sentence.
 
+Implementation note:
+
+- preserve this combined line as the chosen homepage direction
+- within surrounding copy hierarchy, keep "Clawperator makes Android apps
+  programmable" legible as the native category claim
+- use the Playwright clause to accelerate understanding, not to replace the
+  product's own category language elsewhere on the page
+
 ## Messaging principles
 
 ### 1. Lead with category, then mechanism
@@ -250,6 +258,8 @@ Guidance:
 - Pair it directly with the native category claim so the analogy accelerates
   comprehension instead of replacing product identity.
 - Keep the "brain/hand" explanation, but demote it below the category claim.
+- Keep the existing hero image. It already explains the request/response loop
+  visually and should remain the primary mechanics explainer.
 
 ### Supporting body points to preserve
 
@@ -300,6 +310,12 @@ Supporting paragraph:
 - Most services still expose their real functionality through mobile apps, not
   public APIs. Clawperator turns those apps into programmable interfaces an
   agent can observe, operate, and reason over.
+
+Additional guidance:
+
+- once the hero image explains the mechanics, the next major section should
+  move into practical value, not restate the request/response model in another
+  narrative format
 
 ## 3. Determinism / trust section
 
@@ -370,13 +386,17 @@ Recommended section title:
 
 Recommended example set:
 
+- Read home battery, energy, or device status from mobile-only apps and act on
+  thresholds.
+- Monitor temperature or device state in Google Home-like apps and turn heating
+  or cooling on when needed.
 - Monitor and filter every notification from a school app so you only get the
   updates that actually matter.
 - Receive periodic screenshots from Life360 showing your child is on the way
   home, then stop automatically once they arrive.
-- Watch the temperature in a home automation app and turn the heat on when it
-  drops below your threshold.
 - Pull balances, statuses, or alerts from apps that have no useful public API.
+- Check delivery, shopping, or grocery app state where no usable public API
+  exists.
 - Build private automations around the exact Android apps your household
   already uses.
 
@@ -388,7 +408,15 @@ Recommended intro line:
 Copy note:
 
 These examples are stronger because they are specific, emotionally legible, and
-clearly tied to private real-world workflows.
+clearly tied to private real-world workflows without over-concentrating on one
+surveillance-adjacent category.
+
+Balance guidance:
+
+- do not let the examples section skew too heavily toward child tracking or
+  monitoring
+- keep a broader mix across home automation, energy, shopping, school
+  notifications, and family coordination
 
 ## 5. Skills section
 
@@ -648,10 +676,11 @@ Action:
 - replace with "What you can do with Clawperator"
 - remove the faux transcript style
 - use stronger, household-relevant, mobile-only-app examples
+- let the hero image handle the mechanics so this section can stay human-value-first
 
 #### Features
 
-Keep, but merge conceptually with Reliability if possible.
+Do not keep as a separate long-lived section. Merge into Reliability.
 
 Why:
 
@@ -660,7 +689,7 @@ Why:
 
 Action:
 
-- either collapse them into one stronger section, or make Features much tighter
+- collapse Features and Reliability into one stronger section
 - center it around deterministic, structured, built for loops
 - include the `action -> execution -> structured result` block here
 
@@ -714,7 +743,7 @@ Action:
 
 #### Reliability
 
-Keep, but likely absorb Features.
+Keep as the single trust section and absorb Features.
 
 Why:
 
@@ -787,10 +816,11 @@ Recommended homepage core:
 1. Hero
 2. Quick Start
 3. What you can do with Clawperator
-4. Deterministic / built for agent loops
+4. Built for agent loops
 5. Skills
 6. Architecture
 7. How it works
+8. FAQ
 
 Everything else should either be merged into those sections or moved to docs.
 
