@@ -21,7 +21,7 @@ For the full release reference, see `docs/release-reference.md`.
 4. Push the release branch or commit you want to tag.
 5. Create the release tag with `.agents/skills/release-create/` against the exact commit to ship.
 6. Verify the published release with `.agents/skills/release-verify/` if you want an explicit read-only confirmation pass.
-7. Review the follow-up `docs(release): update published version to X.Y.Z` commit that `release-create` prepared locally, then push or merge it so the public docs and website catch up to the live release.
+7. After npm and GitHub Release `vX.Y.Z` are both live, review the follow-up `docs(release): update published version to X.Y.Z` commit that `release-create` prepared locally, then push or merge it so the public docs and website catch up to the live release.
 8. After release, bump `main` forward to the next unreleased code version in a separate commit.
 
 ## Important Rules

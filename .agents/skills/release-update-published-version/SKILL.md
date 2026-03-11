@@ -5,6 +5,8 @@ description: Updates public release-facing docs and website artifacts to the new
 
 Use this skill only after a release is actually live on npm and GitHub Releases.
 
+It will refuse to run for versions that are not already published on both surfaces.
+
 Run:
 
 ```bash
@@ -36,6 +38,7 @@ git commit -m "docs(release): update published version to <version>"
 ## Safety Rules
 
 - Run this only after the version is verifiably live.
+- The target version must already exist as both `clawperator@<version>` on npm and `v<version>` on GitHub Releases.
 - This skill updates public-facing content. Do not use it for unreleased code versions.
 - Do not fold unrelated changes into the published-version commit.
 
