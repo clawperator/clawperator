@@ -247,7 +247,7 @@ export default function Home() {
             <br />
             CLAWPERATOR ACTS.
           </h1>
-          <p className="hero-category-line">Clawperator makes Android apps programmable - Playwright for mobile apps.</p>
+          <p className="hero-category-line">Clawperator makes Android apps programmable - think Playwright for mobile apps.</p>
           <p className="hero-summary">
             Clawperator is a deterministic execution layer that lets agents operate real Android apps and get
             structured results back.
