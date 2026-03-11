@@ -21,6 +21,7 @@ export interface RunExecutionOptions {
   receiverPackage?: string;
   adbPath?: string;
   timeoutMs?: number;
+  warn?: (message: string) => void;
 }
 
 export type RunExecutionResult =
@@ -55,7 +56,10 @@ export function attachSnapshotsToStepResults(stepResults: ResultEnvelope["stepRe
  * affected step so users running CLI commands interactively can diagnose the problem
  * without parsing JSON.
  */
-export function markExtractionFailedSnapshotSteps(stepResults: ResultEnvelope["stepResults"]): void {
+export function markExtractionFailedSnapshotSteps(
+  stepResults: ResultEnvelope["stepResults"],
+  warn?: (message: string) => void
+): void {
   for (const step of stepResults) {
     if (step.actionType === "snapshot_ui" && step.success && step.data.text === undefined) {
       step.success = false;
@@ -65,12 +69,10 @@ export function markExtractionFailedSnapshotSteps(stepResults: ResultEnvelope["s
         error: ERROR_CODES.SNAPSHOT_EXTRACTION_FAILED,
         message: "UI hierarchy extraction produced no output for this step. Check clawperator version compatibility and logcat extraction health.",
       };
-      if (process.stderr.isTTY) {
-        process.stderr.write(
-          `[clawperator] WARN: snapshot_ui step "${step.id}" UI hierarchy extraction produced no output. ` +
-          `Run 'clawperator doctor' or 'clawperator version --check-compat' to diagnose.\n`
-        );
-      }
+      warn?.(
+        `[clawperator] WARN: snapshot_ui step "${step.id}" UI hierarchy extraction produced no output. ` +
+        `Run 'clawperator doctor' or 'clawperator version --check-compat' to diagnose.\n`
+      );
     }
   }
 }
@@ -191,7 +193,7 @@ async function performExecution(
         const dump = await runAdb(config, ["logcat", "-d", "-v", "tag"]);
         const snapshots = extractSnapshotsFromLogs(dump.stdout.split("\n"));
         attachSnapshotsToStepResults(result.envelope.stepResults, snapshots);
-        markExtractionFailedSnapshotSteps(result.envelope.stepResults);
+        markExtractionFailedSnapshotSteps(result.envelope.stepResults, options.warn);
       }
 
       const hasScreenshot = result.envelope.stepResults.some(s => s.actionType === "take_screenshot");
