@@ -33,20 +33,43 @@ describe("getDefaultRuntimeConfig", () => {
     assert.strictEqual(config.receiverPackage, "custom.receiver");
   });
 
-  it("discovers the standard macOS emulator path when available", () => {
+  it("resolves emulator, sdkmanager, and avdmanager from known SDK locations", () => {
     const config = getDefaultRuntimeConfig();
     const homeDirectory = process.env.HOME;
-    const standardPath = homeDirectory
-      ? join(homeDirectory, "Library/Android/sdk/emulator/emulator")
-      : undefined;
 
-    if (standardPath && existsSync(standardPath)) {
-      assert.strictEqual(config.emulatorPath, standardPath);
-      return;
+    const emulatorCandidates = [
+      ...(homeDirectory ? [join(homeDirectory, "Library/Android/sdk/emulator/emulator")] : []),
+      "/opt/homebrew/share/android-commandlinetools/emulator/emulator",
+    ];
+    const sdkmanagerCandidates = [
+      ...(homeDirectory ? [join(homeDirectory, "Library/Android/sdk/cmdline-tools/latest/bin/sdkmanager")] : []),
+      "/opt/homebrew/share/android-commandlinetools/cmdline-tools/latest/bin/sdkmanager",
+    ];
+    const avdmanagerCandidates = [
+      ...(homeDirectory ? [join(homeDirectory, "Library/Android/sdk/cmdline-tools/latest/bin/avdmanager")] : []),
+      "/opt/homebrew/share/android-commandlinetools/cmdline-tools/latest/bin/avdmanager",
+    ];
+
+    const expectedEmulator = emulatorCandidates.find(existsSync);
+    if (expectedEmulator) {
+      assert.strictEqual(config.emulatorPath, expectedEmulator);
+    } else {
+      assert.strictEqual(config.emulatorPath, "emulator");
     }
 
-    assert.strictEqual(typeof config.emulatorPath, "string");
-    assert.ok(config.emulatorPath.length > 0);
+    const expectedSdkmanager = sdkmanagerCandidates.find(existsSync);
+    if (expectedSdkmanager) {
+      assert.strictEqual(config.sdkmanagerPath, expectedSdkmanager);
+    } else {
+      assert.strictEqual(config.sdkmanagerPath, "sdkmanager");
+    }
+
+    const expectedAvdmanager = avdmanagerCandidates.find(existsSync);
+    if (expectedAvdmanager) {
+      assert.strictEqual(config.avdmanagerPath, expectedAvdmanager);
+    } else {
+      assert.strictEqual(config.avdmanagerPath, "avdmanager");
+    }
   });
 
   it("prefers ANDROID_HOME paths for emulator, sdkmanager, and avdmanager", () => {

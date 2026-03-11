@@ -60,11 +60,13 @@ export function getDefaultRuntimeConfig(overrides?: Partial<RuntimeConfig>): Run
   const defaultSdkmanagerPath = resolveDefaultSdkToolPath("sdkmanager", [
     ...(androidHome ? [join(androidHome, "cmdline-tools", "latest", "bin", "sdkmanager")] : []),
     ...(homeDirectory ? [join(homeDirectory, "Library/Android/sdk/cmdline-tools/latest/bin/sdkmanager")] : []),
+    "/opt/homebrew/share/android-commandlinetools/cmdline-tools/latest/bin/sdkmanager",
   ]);
 
   const defaultAvdmanagerPath = resolveDefaultSdkToolPath("avdmanager", [
     ...(androidHome ? [join(androidHome, "cmdline-tools", "latest", "bin", "avdmanager")] : []),
     ...(homeDirectory ? [join(homeDirectory, "Library/Android/sdk/cmdline-tools/latest/bin/avdmanager")] : []),
+    "/opt/homebrew/share/android-commandlinetools/cmdline-tools/latest/bin/avdmanager",
   ]);
 
   return {
