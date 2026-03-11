@@ -14,14 +14,14 @@ For the full release reference, see `docs/release-reference.md`.
 
 ## Expected Sequence
 
-1. Bump the repo to the release version with `.agents/skills/set-version-number/`.
-2. Manually audit the version bump for broken tests, docs, and generated artifacts.
-3. Commit the version bump as:
-   - `chore(version): set to X.Y.Z`
-4. Push the release branch or commit you want to tag.
-5. Create the release tag with `.agents/skills/release-create/` against the exact commit to ship.
-6. Verify the published release with `.agents/skills/release-verify/`.
-7. After release, bump `main` forward to the next unreleased version in a separate commit.
+1. Run `.agents/skills/release-set-code-version-number/` to bump the repo's unreleased code version and create `chore(build): set code version to X.Y.Z` after validation passes.
+2. Audit the resulting code-version commit for broken tests and internal examples.
+3. Push the release branch or commit you want to tag.
+4. Create the release tag with `.agents/skills/release-create/` against the exact commit to ship.
+5. Verify the published release with `.agents/skills/release-verify/` if you want an explicit read-only confirmation pass.
+6. If `release-create` already prepared the follow-up `docs(release): update published version to X.Y.Z` commit, review it and then push or merge it so the public docs and website catch up to the live release.
+7. If npm or GitHub Release propagation was still catching up and `release-create` skipped that follow-up, rerun `.agents/skills/release-update-published-version/` once `clawperator@X.Y.Z` and GitHub Release `vX.Y.Z` are both discoverable.
+8. After release, bump `main` forward to the next unreleased code version in a separate commit.
 
 ## Important Rules
 
