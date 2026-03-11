@@ -23,6 +23,15 @@ def run(cmd: list[str], cwd: Path | None = None) -> str:
     return result.stdout
 
 
+def run_no_capture(cmd: list[str], cwd: Path | None = None) -> None:
+    subprocess.run(
+        cmd,
+        cwd=str(cwd) if cwd else None,
+        check=True,
+        text=True,
+    )
+
+
 def replace_in_file(path: Path, pattern: str, replacement: str, *, count: int = 0) -> bool:
     content = path.read_text(encoding="utf-8")
     new_content, replacements = re.subn(pattern, replacement, content, count=count, flags=re.MULTILINE)
@@ -97,17 +106,23 @@ def main() -> None:
     ):
         updated_files.append("apps/node/src/test/unit/versionCompatibility.test.ts")
 
-    subprocess.run(["npm", "install", "--package-lock-only"], cwd=repo_root / "apps" / "node", check=True)
-    updated_files.append("apps/node/package-lock.json")
+    run_no_capture(["npm", "install", "--package-lock-only"], cwd=repo_root / "apps" / "node")
+    if "apps/node/package-lock.json" not in updated_files:
+        updated_files.append("apps/node/package-lock.json")
 
-    subprocess.run(["npm", "--prefix", "apps/node", "ci"], cwd=repo_root, check=True)
-    subprocess.run(["npm", "--prefix", "apps/node", "run", "build"], cwd=repo_root, check=True)
-    subprocess.run(["npm", "--prefix", "apps/node", "run", "test"], cwd=repo_root, check=True)
+    run_no_capture(["npm", "--prefix", "apps/node", "ci"], cwd=repo_root)
+    run_no_capture(["npm", "--prefix", "apps/node", "run", "build"], cwd=repo_root)
+    run_no_capture(["npm", "--prefix", "apps/node", "run", "test"], cwd=repo_root)
+
+    run_no_capture(["git", "add", *updated_files], cwd=repo_root)
+    commit_message = f"chore(build): set code verstion to {new_version}"
+    run_no_capture(["git", "commit", "-m", commit_message], cwd=repo_root)
 
     print(f"Bumped code version from {old_version} to {new_version}")
     for path in updated_files:
         print(f"updated {path}")
     print("Validation passed: npm --prefix apps/node ci && npm --prefix apps/node run build && npm --prefix apps/node run test")
+    print(f"Commit created: {commit_message}")
 
 
 if __name__ == "__main__":

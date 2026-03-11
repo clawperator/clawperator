@@ -1,6 +1,6 @@
 ---
 name: release-set-code-version-number
-description: Updates the unreleased Clawperator code version on code-facing surfaces only, then runs local validation and creates the required version bump commit.
+description: Updates the unreleased Clawperator code version on code-facing surfaces only, runs local validation, and auto-commits the change.
 ---
 
 Use this skill to bump the repo's next unreleased code version without changing public release-facing docs or website content.
@@ -51,18 +51,18 @@ After the script runs, verify:
 
 Never ignore a failing test. If it fails locally, the bump is incomplete.
 
-## Commit Requirement
+## Commit Behavior
 
-After validation succeeds, create a dedicated commit with this exact subject:
+After validation succeeds, the script creates a dedicated commit automatically with this exact subject:
 
 ```bash
-git commit -m "chore(version): set to <new_version>"
+git commit -m "chore(build): set code verstion to <new_version>"
 ```
 
 Example:
 
 ```bash
-git commit -m "chore(version): set to 0.2.5"
+git commit -m "chore(build): set code verstion to 0.2.5"
 ```
 
-Do not fold unrelated changes into this commit.
+Do not fold unrelated changes into this commit. Start from a clean working tree.
