@@ -160,7 +160,7 @@ Usage:
 Notes:
   - Default receiver package: com.clawperator.operator
   - Use --receiver-package com.clawperator.operator.dev for local debug APKs.
-  - Enables the accessibility service and attempts notification permission via adb.
+  - Grants the required Operator permissions via adb, including accessibility, notification posting, and notification listener access.
 `,
   "emulator": `clawperator emulator
 
