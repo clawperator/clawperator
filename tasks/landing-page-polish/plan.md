@@ -57,6 +57,50 @@ The page should answer these skim-questions within seconds:
 - Why is Android the surface?
 - Can this help with real apps I already use?
 - Is there an ecosystem or do I have to build everything myself?
+- Do I need to own or switch to an Android phone to use this?
+
+## Terminology guardrails
+
+Keep landing-page copy aligned with `docs/terminology.md`.
+
+Specific guidance:
+
+- When referring to Clawperator's own Android app, use the canonical term
+  `Clawperator Operator Android app`.
+- Do not blur together the `Clawperator Operator Android app` and the
+  user-installed Android apps that Clawperator operates.
+- `Android device` may mean either a physical Android device or a local Android
+  emulator. Do not write copy that implies physical hardware is the only option.
+- Preserve the use of `burner` on the landing page. Do not sanitize it away.
+
+### Burner guidance
+
+The word `burner` is strategically valuable and should remain in the copy.
+
+Reasons:
+
+- it immediately signals that the user's primary phone is not the automation
+  target
+- it reduces the fear that Clawperator requires switching from iPhone to
+  Android
+- it reinforces the dedicated-device model, which is one of the product's most
+  practical advantages
+
+The page should make this obvious:
+
+- you do not need to switch from iPhone to Android
+- you do not even need to own an Android phone already
+- a cheap burner Android phone is the preferred setup for long-running
+  reliability
+- a local Google Play-equipped Android emulator is available when no device is
+  handy
+
+Recommended message to preserve or strengthen:
+
+- Use a cheap Android burner phone if you want the most reliable real-app
+  setup.
+- If you do not have an Android device, Clawperator can provision a local
+  Google Play-equipped emulator instead.
 
 ## Core messaging shift
 
@@ -210,6 +254,7 @@ Guidance:
 ### Supporting body points to preserve
 
 - dedicated Android burner phone or emulator
+- explicit reassurance that this does not require switching away from iPhone
 - agent is the brain, Clawperator is the hand
 - reliable structured results
 
@@ -479,10 +524,23 @@ Recommended points:
 
 - cheap burner phone preferred for reliability
 - emulator supported for local setup and testing
+- emulator should be described as Google Play-equipped where relevant
 - dedicated device preserves app state, logins, notifications, and long-lived
   workflows
+- iPhone users are not being asked to switch phones
+
+Terminology note:
+
+- when mentioning the install flow or readiness, refer to Clawperator's own app
+  as the `Clawperator Operator Android app`
 
 This helps the burner-phone model read as a feature, not a workaround.
+
+Recommended copy direction:
+
+- Keep `burner` in the copy.
+- Explicitly tell the reader that their primary phone can stay exactly as it is.
+- Frame the emulator as a real fallback, not a footnote.
 
 ## Recommended narrative arc
 
