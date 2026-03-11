@@ -4,7 +4,8 @@ This site contains the canonical technical documentation for Clawperator, a dete
 
 ## Key pages
 
-- Full compiled docs: https://clawperator.com/llms-full.txt
+- Full compiled docs on docs host: https://docs.clawperator.com/llms-full.txt
+- Full compiled docs on landing host: https://clawperator.com/llms-full.txt
 - Docs home: https://docs.clawperator.com/
 - Node API agent guide: https://docs.clawperator.com/ai-agents/node-api-for-agents/
 - Operator LLM playbook: https://docs.clawperator.com/design/operator-llm-playbook/

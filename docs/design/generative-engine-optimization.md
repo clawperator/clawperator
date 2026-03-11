@@ -181,6 +181,16 @@ Also verify:
   pages
 - markdown routes return the intended content type
 
+For a repeatable live pass, use the repo-local GEO verification skill:
+
+```sh
+.agents/skills/geo-verify-public-surfaces/scripts/verify_public_surfaces.py
+```
+
+The skill is preferred over a raw shell script because the agent should inspect
+the findings and summarize failures instead of asking a human to scan header
+output manually.
+
 ## Cloudflare caveat
 
 Source files are not the full truth once deployed.
