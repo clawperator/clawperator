@@ -207,6 +207,20 @@ clawperator inspect ui [--device-id <id>] [--receiver-package <package>] [--time
 
 ---
 
+### `action open-uri`
+
+Open a URI on the device using the system default handler.
+
+```
+clawperator action open-uri --uri <uri> [--device-id <id>] [--receiver-package <package>]
+```
+
+| Flag | Description |
+|------|-------------|
+| `--uri <uri>` | URI to open (required). Any scheme: `https://`, `market://`, deep links, etc. |
+
+---
+
 ### `action open-app`
 
 Open an app by package ID.

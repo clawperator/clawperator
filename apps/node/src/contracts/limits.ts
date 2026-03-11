@@ -15,6 +15,7 @@ export const LIMITS = {
   MAX_ID_LENGTH: 128,
   MAX_SOURCE_LENGTH: 64,
   MAX_MATCHER_VALUE_LENGTH: 512,
+  MAX_URI_LENGTH: 2048,
 } as const;
 
 export type Limits = typeof LIMITS;

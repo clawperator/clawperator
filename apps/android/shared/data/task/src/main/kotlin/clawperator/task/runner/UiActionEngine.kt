@@ -47,6 +47,7 @@ class UiActionEngineDefault(
 
         val result =
             when (action) {
+                is UiAction.OpenUri -> executeOpenUri(taskScope, action)
                 is UiAction.OpenApp -> executeOpenApp(taskScope, action)
                 is UiAction.CloseApp -> executeCloseApp(taskScope, action)
                 is UiAction.WaitForNode -> executeWaitForNode(taskScope, action)
@@ -66,6 +67,18 @@ class UiActionEngineDefault(
             "$TAG step_success id=${action.id} type=${action::class.simpleName} data=${result.data}",
         )
         return result
+    }
+
+    private suspend fun executeOpenUri(
+        taskScope: TaskScope,
+        action: UiAction.OpenUri,
+    ): UiActionStepResult {
+        taskScope.openUri(action.uri, action.retry)
+        return UiActionStepResult(
+            id = action.id,
+            actionType = "open_uri",
+            data = mapOf("uri" to action.uri),
+        )
     }
 
     private suspend fun executeOpenApp(
