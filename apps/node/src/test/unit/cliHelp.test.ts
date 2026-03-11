@@ -22,6 +22,54 @@ function runCli(args: string[]): Promise<{ stdout: string; stderr: string; code:
 }
 
 describe("CLI help", () => {
+  it("shows operator install help for operator install --help", async () => {
+    const { stdout, code } = await runCli(["operator", "install", "--help"]);
+    assert.strictEqual(code, 0);
+    assert.match(stdout, /clawperator operator install/);
+    assert.match(stdout, /--apk <path>/);
+    assert.doesNotMatch(stdout, /skills compile-artifact/);
+  });
+
+  it("shows operator install help for operator --help", async () => {
+    const { stdout, code } = await runCli(["operator", "--help"]);
+    assert.strictEqual(code, 0);
+    assert.match(stdout, /clawperator operator install/);
+    assert.match(stdout, /--apk <path>/);
+  });
+
+  it("shows operator install guidance for install --help", async () => {
+    const { stdout, code } = await runCli(["install", "--help"]);
+    assert.strictEqual(code, 0);
+    assert.match(stdout, /clawperator operator install/);
+    assert.match(stdout, /--apk <path>/);
+  });
+
+  it("returns structured guidance for bare clawperator install", async () => {
+    // USAGE from switch cases exits 0 per CLI convention (not a runtime error).
+    const { stdout } = await runCli(["install"]);
+    const obj = JSON.parse(stdout);
+    assert.strictEqual(obj.code, "USAGE");
+    assert.match(obj.message, /clawperator operator install/);
+    assert.ok(obj.canonical);
+    assert.match(obj.canonical, /operator install/);
+  });
+
+  it("returns USAGE when operator install is missing --apk", async () => {
+    // USAGE from switch cases exits 0 per CLI convention (not a runtime error).
+    const { stdout } = await runCli(["operator", "install"]);
+    const obj = JSON.parse(stdout);
+    assert.strictEqual(obj.code, "USAGE");
+    assert.match(obj.message, /--apk/);
+  });
+
+  it("returns USAGE for unknown operator subcommand", async () => {
+    // USAGE from switch cases exits 0 per CLI convention (not a runtime error).
+    const { stdout } = await runCli(["operator", "unknown"]);
+    const obj = JSON.parse(stdout);
+    assert.strictEqual(obj.code, "USAGE");
+    assert.match(obj.message, /operator install/);
+  });
+
   it("shows observe snapshot help instead of top-level help", async () => {
     const { stdout, code } = await runCli(["observe", "snapshot", "--help"]);
     assert.strictEqual(code, 0);

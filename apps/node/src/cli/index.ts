@@ -9,6 +9,8 @@ Usage:
   clawperator <command> [options]
 
 Commands:
+  operator install --apk <path> [--device-id <id>] [--receiver-package <package>]
+                                            Install the Operator APK and grant required device permissions
   devices                                   List connected Android devices
   emulator list                             List configured Android emulators (AVDs)
   emulator inspect <name>                   Show normalized metadata for one AVD
@@ -61,7 +63,7 @@ Commands:
   skills sync --ref <git-ref>
                                             Sync and pin skills index/cache to a git ref
   grant-device-permissions [--device-id <id>] [--receiver-package <package>]
-                                            Grant accessibility and notification permissions to the Operator APK via adb
+                                            Re-grant accessibility and notification permissions (remediation only)
   serve [--port <number>] [--host <string>]
                                             Start local HTTP/SSE server for remote control (default host: 127.0.0.1)
   doctor [--json]
@@ -88,6 +90,7 @@ Global options:
   --version                                 Show version
 
 Notes:
+  - operator install is the canonical setup command. Use it instead of raw adb install.
   - inspect ui is a wrapper alias over observe snapshot.
   - action commands are thin wrappers that compile to execution and call execute.
   - The default receiver package is com.clawperator.operator. Use --receiver-package com.clawperator.operator.dev for local debug builds.
@@ -95,6 +98,29 @@ Notes:
 `;
 
 const HELP_TOPICS: Record<string, string> = {
+  "operator install": `clawperator operator install
+
+Usage:
+  clawperator operator install --apk <path> [--device-id <id>] [--receiver-package <package>] [--output <json|pretty>]
+
+Required:
+  --apk <path>              Local filesystem path to the Operator APK file
+
+Optional:
+  --device-id <id>          Target Android device serial (required when multiple devices are connected)
+  --receiver-package <pkg>  Operator package identifier (auto-detected if omitted)
+
+Notes:
+  - This is the canonical command for installing the Clawperator Operator APK.
+  - Runs three phases in order: install, permission grant, verification.
+  - Install phase: copies the APK onto the device via adb.
+  - Permission grant phase: enables the accessibility service and notification listener.
+  - Verification phase: confirms the package is visible to the package manager.
+  - Fails with a structured error if any phase fails. The error code identifies which phase failed.
+  - Default receiver package (auto-detected): com.clawperator.operator (release) or com.clawperator.operator.dev (debug).
+  - Do not use raw adb install for normal setup. It leaves the device in a partial state without required permissions.
+  - Use clawperator grant-device-permissions for remediation after permission drift, not for initial setup.
+`,
   "observe snapshot": `clawperator observe snapshot
 
 Usage:
@@ -160,7 +186,8 @@ Usage:
 Notes:
   - Default receiver package: com.clawperator.operator
   - Use --receiver-package com.clawperator.operator.dev for local debug APKs.
-  - Grants the required Operator permissions via adb, including accessibility, notification posting, and notification listener access.
+  - Grants accessibility, notification posting, and notification listener permissions via adb.
+  - This command is for remediation after permission drift. For normal setup, use clawperator operator install instead.
 `,
   "emulator": `clawperator emulator
 
@@ -186,6 +213,9 @@ class UsageError extends Error {}
 
 function resolveHelpTopic(rest: string[]): string | undefined {
   if (rest.length === 0) return undefined;
+  if (rest[0] === "operator" && rest[1] === "install") return "operator install";
+  if (rest[0] === "operator") return "operator install";
+  if (rest[0] === "install") return "operator install";
   if (rest[0] === "observe" && rest[1] === "snapshot") return "observe snapshot";
   if (rest[0] === "inspect" && rest[1] === "ui") return "observe snapshot";
   if (rest[0] === "skills" && rest[1] === "install") return "skills install";
@@ -275,6 +305,38 @@ async function main(): Promise<void> {
   let result: string;
 
   switch (cmd) {
+    case "operator": {
+      const sub = rest[0];
+      if (sub === "install") {
+        const apkPath = getOpt(rest, "--apk");
+        if (!apkPath) {
+          result = JSON.stringify({ code: "USAGE", message: "operator install requires --apk <path>. Use clawperator operator install --help for details." });
+        } else {
+          result = await (await import("./commands/operatorInstall.js")).cmdOperatorInstall({
+            ...out,
+            apkPath,
+            deviceId: global.deviceId ?? getOpt(rest, "--device-id"),
+            receiverPackage: global.receiverPackage ?? getOpt(rest, "--receiver-package"),
+          });
+        }
+      } else {
+        result = JSON.stringify({
+          code: "USAGE",
+          message: sub
+            ? `Unknown operator subcommand '${sub}'. Use: clawperator operator install --apk <path>`
+            : "Use: clawperator operator install --apk <path>",
+        });
+      }
+      break;
+    }
+    case "install":
+      // Guidance path: users and agents that guess 'clawperator install' are directed to the canonical command.
+      result = JSON.stringify({
+        code: "USAGE",
+        message: "clawperator install is not a valid command. Use: clawperator operator install --apk <path>",
+        canonical: "clawperator operator install --apk <path> [--device-id <id>] [--receiver-package <package>]",
+      });
+      break;
     case "devices":
       result = await (await import("./commands/devices.js")).cmdDevices(out);
       break;
