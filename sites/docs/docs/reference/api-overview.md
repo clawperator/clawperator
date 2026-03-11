@@ -72,6 +72,7 @@ The core unit dispatched to the device.
 
 | Type | Required params | Description |
 |------|----------------|-------------|
+| `open_uri` | `uri` | Open a URI via the system default handler |
 | `open_app` | `applicationId` | Launch an app |
 | `close_app` | `applicationId` | Force-stop an app |
 | `click` | `matcher` | Tap a UI node |
@@ -93,6 +94,7 @@ The core unit dispatched to the device.
 | `snapshot` | `snapshot_ui` |
 | `screenshot`, `capture_screenshot` | `take_screenshot` |
 | `type_text`, `text_entry`, `input_text` | `enter_text` |
+| `open_url` | `open_uri` |
 
 ---
 
@@ -119,6 +121,7 @@ All fields are optional but at least one must be non-empty. Values are ORed inte
 
 | Param | Type | Used by |
 |-------|------|---------|
+| `uri` | string | `open_uri` |
 | `applicationId` | string | `open_app`, `close_app` |
 | `matcher` | NodeMatcher | `click`, `read_text`, `enter_text`, `wait_for_node` |
 | `text` | string | `enter_text` |
