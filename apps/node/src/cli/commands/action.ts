@@ -25,6 +25,7 @@ export async function cmdActionOpenApp(options: {
     const result = await runExecution(execution, {
       deviceId: options.deviceId,
       receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_RECEIVER_PACKAGE,
+      warn: message => process.stderr.write(message),
     });
     if (result.ok)
       return formatSuccess(
@@ -54,6 +55,7 @@ export async function cmdActionClick(options: {
     const result = await runExecution(execution, {
       deviceId: options.deviceId,
       receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_RECEIVER_PACKAGE,
+      warn: message => process.stderr.write(message),
     });
     if (result.ok)
       return formatSuccess(
@@ -83,6 +85,7 @@ export async function cmdActionRead(options: {
     const result = await runExecution(execution, {
       deviceId: options.deviceId,
       receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_RECEIVER_PACKAGE,
+      warn: message => process.stderr.write(message),
     });
     if (result.ok)
       return formatSuccess(
@@ -112,6 +115,7 @@ export async function cmdActionWait(options: {
     const result = await runExecution(execution, {
       deviceId: options.deviceId,
       receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_RECEIVER_PACKAGE,
+      warn: message => process.stderr.write(message),
     });
     if (result.ok)
       return formatSuccess(
@@ -149,6 +153,7 @@ export async function cmdActionType(options: {
     const result = await runExecution(execution, {
       deviceId: options.deviceId,
       receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_RECEIVER_PACKAGE,
+      warn: message => process.stderr.write(message),
     });
     if (result.ok)
       return formatSuccess(
