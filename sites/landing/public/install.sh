@@ -595,7 +595,8 @@ run_doctor_and_fix() {
         if [ "$DEVICE_COUNT" -eq 1 ]; then
             local DEVICE_ID
             DEVICE_ID="$(list_connected_devices)"
-            echo -e "${BLUE}Handshake failed. Auto-granting device permissions for $DEVICE_ID...${NC}"
+            # Handshake failed after install - re-grant permissions as remediation (not initial setup).
+            echo -e "${BLUE}Handshake failed. Re-granting device permissions for $DEVICE_ID as recovery...${NC}"
             "$CLAWPERATOR_BIN_PATH" grant-device-permissions --device-id "$DEVICE_ID" --receiver-package "$DEFAULT_RECEIVER_PACKAGE" > /dev/null 2>&1 || true
         fi
     fi
