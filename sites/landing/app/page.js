@@ -521,7 +521,7 @@ if <hvac_state> == "Off":
           </article>
           <div className="architecture-connector">
             <span className="architecture-line" />
-            <span className="architecture-text">Node API / CLI</span>
+            <span className="architecture-text">Node API / CLI / Skills</span>
           </div>
           <article className="architecture-card architecture-card-core">
             <p className="architecture-label">Clawperator</p>
@@ -529,7 +529,7 @@ if <hvac_state> == "Off":
           </article>
           <div className="architecture-connector">
             <span className="architecture-line" />
-            <span className="architecture-text">USB / ADB</span>
+            <span className="architecture-text">ADB</span>
           </div>
           <article className="architecture-card architecture-card-core">
             <p className="architecture-label">Android Device</p>
@@ -546,7 +546,8 @@ if <hvac_state> == "Off":
         <p>
           The runtime includes the CLI on your host machine and the Clawperator Operator Android app on the Android
           device. The agent decides what to do next. Skills give the agent reusable ways to handle app-specific
-          workflows it already understands. Clawperator executes validated actions against user-installed Android apps
+          workflows it already understands, whether those come from the open source skills repository or from private
+          skills the agent created for you. Clawperator executes validated actions against user-installed Android apps
           and returns machine-readable state.
         </p>
         <div className="grid-2-col">
