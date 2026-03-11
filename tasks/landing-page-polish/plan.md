@@ -79,6 +79,13 @@ Recommended category framing to introduce near the top:
 
 The exact final wording can be tuned, but the category must be explicit.
 
+The strongest version of this category claim is:
+
+- Turn Android apps into programmable interfaces for agents.
+
+This is stronger than a generic "control Android apps" formulation because it
+names both the category and the payoff in one sentence.
+
 ## Messaging principles
 
 ### 1. Lead with category, then mechanism
@@ -93,6 +100,10 @@ The hero should state:
 
 Then the body can explain brain/hand separation and dedicated device setup.
 
+This is a meaningful improvement over the current plan's broader category
+language. The hero should not merely imply programmability. It should state it
+directly.
+
 ### 2. Emphasize deterministic primitives over "automation"
 
 "Automation" is too soft and too generic.
@@ -106,6 +117,17 @@ The more defensible and interesting idea is:
 
 The page should make clear that the innovation is not "it can tap buttons". It
 is that the action contract is reliable enough for agent loops.
+
+This should be stated explicitly, not left as an inference.
+
+Recommended framing:
+
+- Not just Android automation.
+- More than UI automation.
+
+Then immediately explain why:
+
+- Each command does one thing, returns one result, and never hides retries.
 
 ### 3. Keep the runtime disciplined
 
@@ -156,8 +178,8 @@ it. The reader should see both the memorable phrase and the practical meaning.
 
 Recommended hero copy directions:
 
-- Clawperator makes Android apps programmable for agents.
-- Playwright for mobile apps.
+- Turn Android apps into programmable interfaces for agents.
+- Clawperator makes Android apps programmable for AI agents.
 - A deterministic execution layer that turns Android apps into machine-readable interfaces.
 
 Suggested structure:
@@ -170,23 +192,22 @@ Suggested structure:
 
 ### Candidate hero lines
 
-Option A:
+Preferred hero stack:
 
 - Your agent thinks. Clawperator acts.
-- Make Android apps programmable.
-- Playwright for mobile apps, built for agent loops.
+- Turn Android apps into programmable interfaces for agents.
+- Clawperator is a deterministic execution layer that lets agents operate real
+  Android apps and get structured results back.
 
-Option B:
+Optional technical callout:
 
-- Your agent thinks. Clawperator acts.
-- A deterministic execution layer for Android agents.
-- Turn real mobile apps into machine-readable interfaces your agent can use.
+- Playwright for Android agents. Built for real apps, not web pages.
 
-Option C:
+Guidance:
 
-- Your agent thinks. Clawperator acts.
-- Clawperator makes Android apps programmable.
-- Structured actions in, structured results out.
+- Do not make the Playwright line the main headline.
+- Use it as a supporting line or nearby callout for technical readers.
+- Keep the "brain/hand" explanation, but demote it below the category claim.
 
 ### Supporting body points to preserve
 
@@ -196,6 +217,13 @@ Option C:
 
 But that body should be tightened so it reads as proof, not explanation-heavy
 intro copy.
+
+Specific tightening guidance:
+
+- reduce references to "build your own private workflows on top of" in the hero
+- keep the hero focused on execution contract and trust
+- move workflow expansion language into later sections such as examples or
+  skills
 
 ## 2. "What" / value articulation section
 
@@ -211,6 +239,7 @@ Recommended emphasis:
 
 Strong lines worth incorporating:
 
+- Mobile apps become programmable.
 - Most services only expose their real functionality through mobile apps.
 - Clawperator turns those apps into programmable interfaces.
 - This is the API layer for the mobile internet.
@@ -218,6 +247,16 @@ Strong lines worth incorporating:
 The last line is powerful, but should be used carefully because it is bold. It
 works best in a lower section or a pull-quote style area, not necessarily as
 the main hero claim.
+
+Recommended insert:
+
+- Mobile apps become programmable.
+
+Supporting paragraph:
+
+- Most services still expose their real functionality through mobile apps, not
+  public APIs. Clawperator turns those apps into programmable interfaces an
+  agent can observe, operate, and reason over.
 
 ## 3. Determinism / trust section
 
@@ -244,6 +283,35 @@ Potential supporting line:
 
 That sequence is memorable and succinct.
 
+This deserves to become an explicit micro-block, not just a supporting phrase.
+
+Recommended block:
+
+- Built for agent loops
+- action
+- ->
+- execution
+- ->
+- structured result
+
+Supporting sentence:
+
+- That strict contract is what makes Clawperator reliable inside reasoning
+  loops.
+
+This is stronger than a standard feature grid because it compresses the system
+into one memorable mental model.
+
+Recommended subsection heading:
+
+- Not just Android automation
+
+Recommended body:
+
+- Each command does one thing, returns one result, and never hides retries.
+  Deterministic primitives are what make Android apps usable inside agent
+  loops.
+
 ## 4. Real-world examples section
 
 This section should be rewritten. The current section is underselling the
@@ -255,7 +323,7 @@ public API.
 
 Recommended section title:
 
-- With Clawperator you can do things like:
+- What you can do with Clawperator
 
 Recommended example set:
 
@@ -268,6 +336,11 @@ Recommended example set:
 - Pull balances, statuses, or alerts from apps that have no useful public API.
 - Build private automations around the exact Android apps your household
   already uses.
+
+Recommended intro line:
+
+- Clawperator is most useful where the real interface only exists in a mobile
+  app.
 
 Copy note:
 
@@ -290,9 +363,10 @@ personal automation asset.
 
 Recommended messages:
 
-- Start with open source skills included in the install flow.
-- Add private skills for the exact apps and workflows you care about.
-- Keep custom skills personal, local, and tailored to your device state.
+- Install Clawperator and you also get an open source skills library.
+- Skills package common mobile workflows into reusable building blocks.
+- Use included skills as-is, adapt them to your own setup, or create private
+  skills for personal apps, accounts, and workflows.
 
 Useful framing:
 
@@ -301,6 +375,21 @@ Useful framing:
 
 This section should make the ecosystem legible without promising a giant public
 marketplace that does not yet exist.
+
+Recommended two-column story:
+
+- Included with install
+- Yours to customize
+
+Column guidance:
+
+- Included with install: open source skill library, discoverable workflows,
+  runnable directly or through the Node API
+- Yours to customize: private skills, personal workflows, local sensitive logic,
+  public and private skills mixed in one runtime
+
+This framing is stronger than a purely technical explanation because it
+connects skills to immediate utility and long-term ownership.
 
 ## 6. "How it works" section
 
@@ -318,6 +407,14 @@ The key improvement is to connect the architecture to the product payoff:
 - this separation keeps intelligence in the agent and execution in the runtime
 
 That is not just architecture. It is a trust and maintainability story.
+
+Recommended sentence to include once, clearly:
+
+- Clawperator is a deterministic execution layer for Android-based agent
+  workflows.
+
+Use this once as the clean architectural definition. Do not over-repeat the
+phrase.
 
 ## 7. Install / getting started section
 
@@ -380,14 +477,18 @@ The site should stay precise and disciplined. That is part of its appeal.
 Needs:
 
 - clearer category line
+- preferred line: "Turn Android apps into programmable interfaces for agents."
 - stronger immediate payoff
 - less explanatory weight in the paragraph block
+- optional technical callout using Playwright language, but not as the main
+  headline
 
 ### Real-world examples
 
 Needs:
 
 - replacement, not light editing
+- title changed to "What you can do with Clawperator"
 - more concrete, human-value examples
 - stronger proof of "mobile apps as programmable interfaces"
 
@@ -398,6 +499,7 @@ Needs:
 - open source skills called out explicitly
 - private personalized skills called out explicitly
 - clearer ecosystem/platform implication without overselling
+- clearer product story built around included value plus customization
 
 ### Why / feature blocks
 
@@ -406,6 +508,8 @@ Needs:
 - harder emphasis on deterministic execution contract
 - one action -> one result -> no hidden retries
 - machine-readable outcomes and errors
+- explicit "not just UI automation" framing
+- explicit "action -> execution -> structured result" micro-block
 
 ## Suggested final tone
 
@@ -428,6 +532,8 @@ This task is successful if a technical reader can skim the page and quickly
 repeat back something close to:
 
 - Clawperator is Playwright for mobile apps.
+- More precisely: Playwright for Android agents, used as a shortcut not the
+  core headline.
 - It makes Android apps programmable for agents.
 - It is deterministic enough to use inside real reasoning loops.
 - It ships with open source skills and lets me build private skills for my own
