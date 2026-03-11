@@ -212,6 +212,7 @@ Combine fields to increase specificity when a single field is ambiguous:
 | Action | Required params | Optional params |
 | :--- | :--- | :--- |
 | `open_app` | `applicationId: string` | - |
+| `open_uri` | `uri: string` | `retry: object` |
 | `close_app` | `applicationId: string` | - |
 | `click` | `matcher: NodeMatcher` | `clickType: "default" \| "long_click" \| "focus"` (default: `"default"`) |
 | `enter_text` | `matcher: NodeMatcher`, `text: string` | `submit: boolean` (default: `false`), `clear: boolean` (accepted by Node contract, currently ignored by Android runtime) |
@@ -231,6 +232,7 @@ Combine fields to increase specificity when a single field is ambiguous:
 | `action read --selector <json>` | `read_text` |
 | `action wait --selector <json>` | `wait_for_node` |
 | `action open-app --app <id>` | `open_app` |
+| `action open-uri --uri <value>` | `open_uri` |
 | `observe snapshot` | `snapshot_ui` |
 
 ### Action behavior notes
@@ -249,7 +251,9 @@ Combine fields to increase specificity when a single field is ambiguous:
 ```
 `maxAttempts` is capped at 10. `initialDelayMs` and `maxDelayMs` are capped at 30,000 and 60,000 ms respectively. Omit the `retry` field to use the action's default preset. For `wait_for_node`, the default is `UiReadiness` (`maxAttempts=5`, `initialDelayMs=500`, `maxDelayMs=3000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`).
 
-**`open_app`:** Opens the app's default launch activity by `applicationId`. There is no `open_uri` action for deep links or content-addressed pages (such as `market://details?id=...` or arbitrary `https://` URLs). To open a specific URI, use `adb shell am start -a android.intent.action.VIEW -d "<uri>"` outside the execution payload. This is a known capability gap - see FAQ.
+**`open_app`:** Opens the app's default launch activity by `applicationId`.
+
+**`open_uri`:** Opens a URI using the Clawperator Android app's implicit `ACTION_VIEW` intent - no adb shortcut is used. The Android device's registered handler for the URI scheme is invoked directly. Any URI scheme is supported: deep links (`market://details?id=org.videolan.vlc`), standard URLs (`https://example.com`), and custom app schemes. If no application is registered for the URI scheme, the action fails with `URI_NOT_HANDLED`. A chooser dialog may appear on devices with multiple handlers for a scheme; follow the `open_uri` step with a `snapshot_ui` to verify the expected app is in the foreground. The alias `open_url` is also accepted and normalized to `open_uri`.
 
 **`close_app`:** The Node layer intercepts `close_app` actions and runs `adb shell am force-stop <applicationId>` before dispatching to Android. The Android step always returns `success: false` with `data.error: "UNSUPPORTED_RUNTIME_CLOSE"` - this is expected. The overall execution `status` remains `"success"` and the app is force-stopped. Do not treat this step result as a recoverable failure.
 
@@ -300,6 +304,7 @@ Typical `data` keys by action type:
 | Action | Typical `data` keys |
 | :--- | :--- |
 | `open_app` | `application_id` |
+| `open_uri` | `uri` |
 | `close_app` | `application_id`, `error` (`"UNSUPPORTED_RUNTIME_CLOSE"`), `message` |
 | `click` | `click_types` |
 | `enter_text` | `text` (text typed), `submit` (`"true"` or `"false"`) |
@@ -535,14 +540,19 @@ Single-flight per device. A second overlapping execution returns `EXECUTION_CONF
 **When should I use direct `adb` instead?**
 Use `adb` directly for operations not covered by the execution payload API:
 
-- **Opening specific URIs or deep links** - there is no `open_uri` action type. Use `adb shell am start -a android.intent.action.VIEW -d "<uri>"` to open a Play Store app page, a web URL, or a custom deep link. On devices with multiple apps registered for a URI scheme, this may trigger an "Open with" picker that your automation must handle.
 - **Diagnostics** when you need to inspect raw device state (logcat, package list, window focus).
 - **Pre-flight setup** outside the automation loop (granting permissions, installing APKs, checking installed packages).
 
 For routine UI automation, use Clawperator so result/error semantics stay consistent.
 
 **Can Clawperator open a specific URL or deep link?**
-Not directly. The `open_app` action only supports launching an app by its `applicationId`. To open a URI (such as a Play Store app page at `market://details?id=com.example.app`, a web URL, or a custom deep link), use `adb shell am start` outside the Clawperator execution payload. See "When to use adb directly" above.
+Yes. Use the `open_uri` action with any URI scheme - `market://`, `https://`, or a custom app deep link. The Clawperator Android app issues an `ACTION_VIEW` intent directly on the device; no adb command is needed. Example:
+
+```json
+{ "id": "nav1", "type": "open_uri", "params": { "uri": "market://details?id=org.videolan.vlc" } }
+```
+
+If multiple apps are registered for the URI scheme, a system chooser may appear. Follow the `open_uri` step with `snapshot_ui` to confirm the expected app opened.
 
 **Does Clawperator run skills?**
 Skills are standalone programs that agents can invoke directly. The Node API provides discovery (`skills list`, `skills search`), metadata (`skills get`), and a convenience `skills run` wrapper. Skills do not need the Node API to execute - agents can call skill scripts directly.
