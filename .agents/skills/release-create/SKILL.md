@@ -1,9 +1,9 @@
 ---
 name: release-create
-description: Validates a Clawperator release candidate, creates and pushes an annotated git tag for a specific version and commit, and inspects the resulting GitHub Actions release workflows.
+description: Validates a Clawperator release candidate, creates and pushes an annotated git tag for a specific version and commit, inspects the resulting GitHub Actions release workflows, and prepares the follow-up published-version docs update.
 ---
 
-Use this skill after the release version has already been committed to the repository. Keep version bumping separate.
+Use this skill after the release code version has already been committed to the repository. Keep code-version bumping separate.
 
 This skill creates a release by:
 1. Verifying the requested version matches both `apps/node/package.json` and `apps/node/package-lock.json`.
@@ -15,6 +15,7 @@ This skill creates a release by:
 4. Creating an annotated `v<version>` tag at the requested SHA.
 5. Pushing only that tag.
 6. Inspecting the resulting `Publish npm Package` and `Release APK` workflow runs with `gh`.
+7. Attempting `.agents/skills/release-update-published-version/` after the workflows succeed, retrying briefly for npm/GitHub propagation and creating a follow-up local commit for public docs and website content when the release is discoverable.
 
 Run:
 
@@ -35,7 +36,7 @@ If `sha` is omitted, the script tags `HEAD`.
 
 - The target release commit must already exist locally.
 - `apps/node/package.json` and `apps/node/package-lock.json` must already contain the target version.
-- Any generated docs or release-facing artifacts should already be updated and committed.
+- Public release-facing docs do not need to be pre-bumped. This skill will try to prepare the published-version follow-up after the release succeeds.
 - `git`, `npm`, and `gh` must be installed and authenticated.
 
 ## Safety Rules
@@ -44,6 +45,8 @@ If `sha` is omitted, the script tags `HEAD`.
 - Do not publish a version that already exists on npm.
 - Do not push a branch as part of this step. Push the tag only.
 - Do not use this skill to repair a partially published version. Bump to a new version instead.
+- The post-release published-version update is a separate local commit. Review and push or merge it explicitly.
+- If npm or GitHub Release propagation is still catching up after the workflows finish, the script reports a skipped published-version update instead of failing the release. Run `.agents/skills/release-update-published-version/` later in that case.
 
 ## Output Expectations
 
@@ -55,5 +58,7 @@ The script prints:
 - local validation status
 - pushed tag confirmation
 - detected workflow run URLs and conclusions
+- published-version follow-up commit information when the release is already discoverable
+- or a clear skipped message if publication metadata is still propagating
 
 If a workflow does not appear quickly, the script reports that clearly instead of guessing success.
