@@ -235,7 +235,7 @@ Combine fields to increase specificity when a single field is ambiguous:
 
 ### Action behavior notes
 
-- `sleep.durationMs` is capped at `120000` ms by the Android parser (values above are silently clamped). It also consumes from the outer execution `timeoutMs` budget.
+- `sleep.durationMs` must be in the range `0`-`120000` ms. Values above the cap are rejected with `EXECUTION_VALIDATION_FAILED` before dispatch (consistent with the execution `timeoutMs` validation). It also consumes from the outer execution `timeoutMs` budget.
 
 **`retry` object shape:** All action types that accept a `retry` param use the same object schema:
 ```json
