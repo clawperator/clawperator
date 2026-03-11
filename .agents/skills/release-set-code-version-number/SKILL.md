@@ -56,13 +56,13 @@ Never ignore a failing test. If it fails locally, the bump is incomplete.
 After validation succeeds, the script creates a dedicated commit automatically with this exact subject:
 
 ```bash
-git commit -m "chore(build): set code verstion to <new_version>"
+git commit -m "chore(build): set code version to <new_version>"
 ```
 
 Example:
 
 ```bash
-git commit -m "chore(build): set code verstion to 0.2.5"
+git commit -m "chore(build): set code version to 0.2.5"
 ```
 
 Do not fold unrelated changes into this commit. Start from a clean working tree.

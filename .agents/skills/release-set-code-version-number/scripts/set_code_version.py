@@ -115,7 +115,7 @@ def main() -> None:
     run_no_capture(["npm", "--prefix", "apps/node", "run", "test"], cwd=repo_root)
 
     run_no_capture(["git", "add", *updated_files], cwd=repo_root)
-    commit_message = f"chore(build): set code verstion to {new_version}"
+    commit_message = f"chore(build): set code version to {new_version}"
     run_no_capture(["git", "commit", "-m", commit_message], cwd=repo_root)
 
     print(f"Bumped code version from {old_version} to {new_version}")

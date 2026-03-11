@@ -17,7 +17,7 @@ For the full release reference, see `docs/release-reference.md`.
 1. Bump the repo's unreleased code version with `.agents/skills/release-set-code-version-number/`.
 2. Manually audit the code-version bump for broken tests and internal examples.
 3. Let the code-version skill create the version-bump commit automatically:
-   - `chore(build): set code verstion to X.Y.Z`
+   - `chore(build): set code version to X.Y.Z`
 4. Push the release branch or commit you want to tag.
 5. Create the release tag with `.agents/skills/release-create/` against the exact commit to ship.
 6. Verify the published release with `.agents/skills/release-verify/` if you want an explicit read-only confirmation pass.
