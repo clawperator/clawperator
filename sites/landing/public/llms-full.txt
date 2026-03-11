@@ -1372,7 +1372,7 @@ Structured XML produced by UIAutomator. Each `<node>` represents one UI element.
 | `enabled` | - | `"false"` means the element is visible but not interactable. |
 | `long-clickable` | - | `"true"` if the element accepts long-press. Use `clickType: "long_click"`. |
 
-**HTML entity encoding:** Some apps (notably Google Play Store) store HTML entity-encoded values in `content-desc` and `text` attributes. For example, an apostrophe appears as `&apos;`, an ampersand as `&amp;`. These entity sequences are returned as-is in `data.text` - they are not decoded. When targeting elements with special characters in their labels, use `contentDescContains` or `textContains` with a substring that avoids the encoded characters rather than an exact match requiring knowledge of the encoded form.
+**XML attribute escaping:** Snapshot output is XML, so special characters in attribute values are escaped when the hierarchy is serialized. For example, an apostrophe appears as `&apos;`, an ampersand as `&amp;`. These escaped sequences are returned as-is in `data.text` - they are not decoded after extraction. When targeting elements with special characters in their labels, use `contentDescContains` or `textContains` with a substring that avoids the escaped characters rather than an exact match requiring the full escaped form.
 
 Example: for a node with `content-desc="Search for &apos;vlc&apos;"`:
 - `contentDescContains: "Search for"` -- works
