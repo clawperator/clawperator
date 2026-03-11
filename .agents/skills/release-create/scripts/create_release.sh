@@ -15,6 +15,10 @@ require_cmd() {
   command -v "$1" >/dev/null 2>&1 || die "required command not found: $1"
 }
 
+current_branch() {
+  git branch --show-current
+}
+
 cleanup_worktree() {
   if [[ -n "${TEMP_WORKTREE_DIR:-}" && -d "${TEMP_WORKTREE_DIR}" ]]; then
     git worktree remove --force "$TEMP_WORKTREE_DIR" >/dev/null 2>&1 || true
@@ -124,6 +128,7 @@ main() {
   require_cmd npm
   require_cmd node
   require_cmd gh
+  require_cmd python3
 
   [[ $# -ge 1 && $# -le 2 ]] || die "usage: .agents/skills/release-create/scripts/create_release.sh <version> [sha]"
 
@@ -191,6 +196,22 @@ main() {
 
   await_workflow "Publish npm Package" "$tag_name" "$target_sha" "$repo_slug"
   await_workflow "Release APK" "$tag_name" "$target_sha" "$repo_slug"
+
+  local published_version_script
+  published_version_script="$repo_root/.agents/skills/release-update-published-version/scripts/update_published_version.py"
+  if [[ ! -x "$published_version_script" ]]; then
+    die "published-version update script is missing or not executable: $published_version_script"
+  fi
+
+  local branch_name
+  branch_name="$(current_branch)"
+  if [[ -z "$branch_name" ]]; then
+    printf 'published_version_update=skipped reason=detached_head\n'
+    return 0
+  fi
+
+  python3 "$published_version_script" "$version"
+  printf 'published_version_update=committed branch=%s\n' "$branch_name"
 }
 
 main "$@"
