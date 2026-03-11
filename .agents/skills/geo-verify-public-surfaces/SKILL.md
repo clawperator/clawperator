@@ -39,6 +39,9 @@ present.
      - `.agents/skills/geo-verify-public-surfaces/scripts/verify_public_surfaces.py`
    - custom preview hosts:
      - `.agents/skills/geo-verify-public-surfaces/scripts/verify_public_surfaces.py --landing-base-url <landing_url> --docs-base-url <docs_url> --allow-noindex`
+   - branch-alias preview defaults:
+     - `.agents/skills/geo-verify-public-surfaces/scripts/verify_public_surfaces.py --preview`
+     - or `.agents/skills/geo-verify-public-surfaces/scripts/verify_public_surfaces.py --preview --branch-name <branch>`
 2. Let the script complete even if one or more checks fail.
 3. Read the final summary section and any failing checks.
 4. In your user-facing response:
@@ -53,6 +56,11 @@ present.
 - If no flags are provided, the helper checks production:
   - `https://clawperator.com`
   - `https://docs.clawperator.com`
+- If `--preview` is provided and no explicit base URLs are set, the helper uses
+  Cloudflare branch aliases:
+  - `https://<branch>.clawperator.pages.dev`
+  - `https://<branch>.clawperator-docs.pages.dev`
+- The branch defaults to the current git branch name when available.
 - For preview validation, pass both preview hosts explicitly.
 - For preview validation, usually also pass `--allow-noindex` because branch
   previews often carry `X-Robots-Tag: noindex` by design.

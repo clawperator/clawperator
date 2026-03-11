@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -91,7 +92,32 @@ def parse_args():
     parser.add_argument("--landing-base-url", default="https://clawperator.com")
     parser.add_argument("--docs-base-url", default="https://docs.clawperator.com")
     parser.add_argument("--allow-noindex", action="store_true")
+    parser.add_argument("--preview", action="store_true")
+    parser.add_argument("--branch-name")
     return parser.parse_args()
+
+
+def get_git_branch_name():
+    try:
+        proc = subprocess.run(
+            ["git", "branch", "--show-current"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError:
+        return None
+    branch = proc.stdout.strip()
+    return branch or None
+
+
+def resolve_preview_urls(args):
+    branch_name = args.branch_name or os.environ.get("CF_PAGES_BRANCH") or get_git_branch_name()
+    if not branch_name:
+        raise SystemExit("--preview requires a branch name, either via --branch-name or the current git branch")
+    landing = f"https://{branch_name}.clawperator.pages.dev"
+    docs = f"https://{branch_name}.clawperator-docs.pages.dev"
+    return landing, docs
 
 
 def run_curl(args):
@@ -252,9 +278,19 @@ def verify_redirect(check):
 
 def main():
     args = parse_args()
+    if args.preview and (
+        args.landing_base_url == "https://clawperator.com"
+        and args.docs_base_url == "https://docs.clawperator.com"
+    ):
+        landing_base_url, docs_base_url = resolve_preview_urls(args)
+        args.allow_noindex = True
+    else:
+        landing_base_url = args.landing_base_url.rstrip("/")
+        docs_base_url = args.docs_base_url.rstrip("/")
+
     checks = build_checks(
-        args.landing_base_url.rstrip("/"),
-        args.docs_base_url.rstrip("/"),
+        landing_base_url,
+        docs_base_url,
     )
 
     results = []
@@ -294,8 +330,8 @@ def main():
                 "ok": len(failed) == 0,
                 "passed": len(passed),
                 "failed": len(failed),
-                "landingBaseUrl": args.landing_base_url.rstrip("/"),
-                "docsBaseUrl": args.docs_base_url.rstrip("/"),
+                "landingBaseUrl": landing_base_url,
+                "docsBaseUrl": docs_base_url,
                 "allowNoindex": args.allow_noindex,
                 "results": [
                     {
