@@ -79,12 +79,13 @@ Recommended category framing to introduce near the top:
 
 The exact final wording can be tuned, but the category must be explicit.
 
-The strongest version of this category claim is:
+The strongest chosen version of this category claim is:
 
-- Turn Android apps into programmable interfaces for agents.
+- Clawperator makes Android apps programmable - Playwright for mobile apps.
 
 This is stronger than a generic "control Android apps" formulation because it
-names both the category and the payoff in one sentence.
+names the category, the payoff, and the closest technical analogue in one
+sentence.
 
 ## Messaging principles
 
@@ -178,8 +179,8 @@ it. The reader should see both the memorable phrase and the practical meaning.
 
 Recommended hero copy directions:
 
+- Clawperator makes Android apps programmable - Playwright for mobile apps.
 - Turn Android apps into programmable interfaces for agents.
-- Clawperator makes Android apps programmable for AI agents.
 - A deterministic execution layer that turns Android apps into machine-readable interfaces.
 
 Suggested structure:
@@ -195,18 +196,15 @@ Suggested structure:
 Preferred hero stack:
 
 - Your agent thinks. Clawperator acts.
-- Turn Android apps into programmable interfaces for agents.
+- Clawperator makes Android apps programmable - Playwright for mobile apps.
 - Clawperator is a deterministic execution layer that lets agents operate real
   Android apps and get structured results back.
 
-Optional technical callout:
-
-- Playwright for Android agents. Built for real apps, not web pages.
-
 Guidance:
 
-- Do not make the Playwright line the main headline.
-- Use it as a supporting line or nearby callout for technical readers.
+- Use the Playwright analogy high on the page.
+- Pair it directly with the native category claim so the analogy accelerates
+  comprehension instead of replacing product identity.
 - Keep the "brain/hand" explanation, but demote it below the category claim.
 
 ### Supporting body points to preserve
@@ -477,11 +475,10 @@ The site should stay precise and disciplined. That is part of its appeal.
 Needs:
 
 - clearer category line
-- preferred line: "Turn Android apps into programmable interfaces for agents."
+- preferred line: "Clawperator makes Android apps programmable - Playwright for mobile apps."
 - stronger immediate payoff
 - less explanatory weight in the paragraph block
-- optional technical callout using Playwright language, but not as the main
-  headline
+- Playwright language used prominently, not buried as a lower-page aside
 
 ### Real-world examples
 
@@ -532,8 +529,6 @@ This task is successful if a technical reader can skim the page and quickly
 repeat back something close to:
 
 - Clawperator is Playwright for mobile apps.
-- More precisely: Playwright for Android agents, used as a shortcut not the
-  core headline.
 - It makes Android apps programmable for agents.
 - It is deterministic enough to use inside real reasoning loops.
 - It ships with open source skills and lets me build private skills for my own
