@@ -9,6 +9,26 @@ interface TaskScope {
         retry: TaskRetry = TaskRetry.None,
     )
 
+    /**
+     * Opens a URI using Android's implicit ACTION_VIEW intent.
+     *
+     * The Clawperator Android app issues the intent directly; no adb shortcut is used.
+     * Unlike [openApp], this accepts any URI scheme - deep links such as market://, https://, or
+     * custom app schemes are all valid. The device's default handler for the URI scheme is used.
+     *
+     * If no application is registered for the URI, the action fails with URI_NOT_HANDLED.
+     * A chooser dialog may appear on devices with multiple handlers; agents should follow up with
+     * a snapshot_ui step to verify that the expected app is in the foreground.
+     *
+     * @param uri The URI to open (e.g. "market://details?id=org.videolan.vlc", "https://example.com")
+     * @param retry Retry configuration for the launch attempt
+     * @throws IllegalStateException if no handler is found for the URI
+     */
+    suspend fun openUri(
+        uri: String,
+        retry: TaskRetry = TaskRetry.None,
+    )
+
     suspend fun pause(
         duration: Duration,
         retry: TaskRetry = TaskRetry.None,

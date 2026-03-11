@@ -14,6 +14,17 @@ interface UrlNavigator {
         url: String,
         destinations: UrlNavigatorDestinations,
     ): Boolean
+
+    /**
+     * Opens a URI using Android's implicit ACTION_VIEW intent.
+     *
+     * Unlike [toUrl], this method does not add CATEGORY_BROWSABLE, so it resolves any registered
+     * URI handler - including deep links (e.g. market://, geo://) and https URLs - not just browser
+     * targets.
+     *
+     * Returns true if an activity was started, false if no handler was found.
+     */
+    suspend fun toUri(uri: String): Boolean
 }
 
 class UrlNavigatorAndroid(
@@ -72,5 +83,12 @@ class UrlNavigatorAndroid(
         systemNavigator.toUrl(url)
         // Custom tabs don't return a result, so we assume success
         return true
+    }
+
+    override suspend fun toUri(uri: String): Boolean {
+        val parsedUri = runCatching { uri.toUri() }.getOrNull() ?: return false
+        val intent = Intent(Intent.ACTION_VIEW, parsedUri)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        return startActivityHelper.startActivity(intent)
     }
 }

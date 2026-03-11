@@ -83,6 +83,12 @@ class AgentCommandParserDefault : AgentCommandParser {
         val params: JsonObject = actionJson["params"]?.jsonObject ?: JsonObject(emptyMap())
 
         return when (type.lowercase()) {
+            "open_uri" ->
+                UiAction.OpenUri(
+                    id = id,
+                    uri = params.stringRequired("uri", MAX_MATCHER_VALUE_LENGTH),
+                    retry = params.parseRetryOrDefault(defaultRetry = TaskRetryPresets.AppLaunch),
+                )
             "open_app" ->
                 UiAction.OpenApp(
                     id = id,
