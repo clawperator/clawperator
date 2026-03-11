@@ -50,13 +50,10 @@ export function attachSnapshotsToStepResults(stepResults: ResultEnvelope["stepRe
 }
 
 /**
- * REQ-2.3 + REQ-2.1: After snapshot attachment, mark any snapshot_ui step that is still
- * success:true but has no data.text as SNAPSHOT_EXTRACTION_FAILED, and emit a warning to
- * stderr for each affected step so users running CLI commands interactively can diagnose
- * the problem without parsing JSON.
- *
- * This indicates the logcat extraction found no [TaskScope] UI Hierarchy: marker, which
- * typically means the installed clawperator binary is out of date with the APK.
+ * After snapshot attachment, mark any snapshot_ui step that is still success:true but has
+ * no data.text as SNAPSHOT_EXTRACTION_FAILED, and emit a warning to stderr for each
+ * affected step so users running CLI commands interactively can diagnose the problem
+ * without parsing JSON.
  */
 export function markExtractionFailedSnapshotSteps(stepResults: ResultEnvelope["stepResults"]): void {
   for (const step of stepResults) {
@@ -65,7 +62,7 @@ export function markExtractionFailedSnapshotSteps(stepResults: ResultEnvelope["s
       step.data = {
         ...step.data,
         error: ERROR_CODES.SNAPSHOT_EXTRACTION_FAILED,
-        message: "UI hierarchy extraction produced no output. The [TaskScope] UI Hierarchy: marker was not found in logcat. Check clawperator version compatibility.",
+        message: "UI hierarchy extraction produced no output for this step. Check clawperator version compatibility and logcat extraction health.",
       };
       process.stderr.write(
         `[clawperator] WARN: snapshot_ui step "${step.id}" UI hierarchy extraction produced no output. ` +

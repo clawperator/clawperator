@@ -243,7 +243,7 @@ Combine fields to increase specificity when a single field is ambiguous:
 
 **`snapshot_ui`:** Clawperator returns a single canonical snapshot format: `hierarchy_xml`. The Android runtime writes the hierarchy dump to device logcat, and the Node layer injects that raw XML into `data.text` after execution. `data.actual_format` is always `"hierarchy_xml"` for successful snapshot steps.
 
-**Failure case - extraction error:** When the logcat extraction finds no `[TaskScope] UI Hierarchy:` marker, the step returns `success: false` with `data.error: "SNAPSHOT_EXTRACTION_FAILED"`. This typically means the installed clawperator binary is out of date with the Android Operator APK. Run `clawperator version --check-compat` and `clawperator doctor` to diagnose. See Troubleshooting for resolution steps.
+**Failure case - extraction error:** If snapshot post-processing finishes without attaching UI hierarchy text to the step (`data.text` remains absent), the step returns `success: false` with `data.error: "SNAPSHOT_EXTRACTION_FAILED"`. A common cause is that logcat does not contain a matching `[TaskScope] UI Hierarchy:` marker for the step, but partial extraction or other logcat mismatches can also trigger this error. This typically means the installed clawperator binary is out of date with the Android Operator APK. Run `clawperator version --check-compat` and `clawperator doctor` to diagnose. See Troubleshooting for resolution steps.
 
 **`take_screenshot`:** `observe screenshot` uses the same execution contract under the hood. Android reports `UNSUPPORTED_RUNTIME_SCREENSHOT`, then the Node layer captures the screenshot via `adb exec-out screencap -p`, writes it to `data.path`, and normalizes the step result to `success: true` when capture succeeds.
 
@@ -413,7 +413,7 @@ Branch agent logic on codes from `envelope.error` or `stepResults[].data.error`:
 | `EXECUTION_VALIDATION_FAILED` | Payload failed schema validation |
 | `SECURITY_BLOCK_DETECTED` | Android blocked the action (e.g., secure keyboard) |
 | `NODE_NOT_CLICKABLE` | Element found but not interactable |
-| `SNAPSHOT_EXTRACTION_FAILED` | `snapshot_ui` step completed but the Node layer found no `[TaskScope] UI Hierarchy:` marker in logcat. The APK is correct - this is a Node binary packaging issue. Rebuild or reinstall the npm package. |
+| `SNAPSHOT_EXTRACTION_FAILED` | `snapshot_ui` step completed but the Node layer did not attach any snapshot text to the step during post-processing. The most common cause is a Node binary packaging mismatch or other logcat extraction issue. Rebuild or reinstall the npm package and check version compatibility. |
 
 Full error taxonomy: `apps/node/src/contracts/errors.ts`
 

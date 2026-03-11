@@ -240,7 +240,7 @@ export CLAWPERATOR_SKILLS_REGISTRY="$HOME/.clawperator/skills/skills/skills-regi
 [clawperator] WARN: snapshot_ui step "..." UI hierarchy extraction produced no output.
 ```
 
-**Root cause:** The installed `clawperator` npm binary is out of date. The compiled `snapshotHelper.js` in older published packages searches for a logcat marker (`TaskScopeDefault:`) that does not match the marker the Android Operator APK actually emits (`[TaskScope] UI Hierarchy:`). The APK is correct and requires no changes.
+**Most common cause:** The installed `clawperator` npm binary is out of date. The compiled `snapshotHelper.js` in older published packages searches for a logcat marker (`TaskScopeDefault:`) that does not match the marker the Android Operator APK actually emits (`[TaskScope] UI Hierarchy:`). The APK is correct and requires no changes. Other less common causes, such as partial or truncated logcat capture, can also leave a `snapshot_ui` step without extracted text and produce the same error.
 
 **How to confirm:**
 
