@@ -85,10 +85,9 @@ export default function Home() {
   const activeCommand = mode === "npm" ? installCommands.npm : installCommands.oneLiner;
   const emulatorCommand = "clawperator provision emulator";
 
-  const sectionIds = ["install", "workflows", "reliability", "skills", "how-it-works", "faq"];
+  const sectionIds = ["install", "reliability", "skills", "how-it-works", "faq"];
   const sectionLabels = {
     install: "Install",
-    workflows: "Examples",
     reliability: "Why it works",
     skills: "Skills",
     "how-it-works": "How it works",
@@ -256,6 +255,23 @@ export default function Home() {
             />
           </div>
           </div>
+
+      <section id="workflows" className="content-section">
+        <h2>What you can do with Clawperator</h2>
+        <p className="workflow-subtitle">
+          Clawperator is most useful where the real interface only exists in a mobile app.
+        </p>
+
+        <div className="workflow-cards">
+          {workflowCards.map((card) => (
+            <article key={card.title} className="workflow-card workflow-card-simple">
+              <h3>{card.title}</h3>
+              <p>{card.body}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
         <div className="quickstart-intro">
           <h2 id="install">Quick Start</h2>
           <p>
@@ -402,22 +418,6 @@ export default function Home() {
               API overview
             </a>
           </div>
-        </div>
-      </section>
-
-      <section id="workflows" className="content-section">
-        <h2>What you can do with Clawperator</h2>
-        <p className="workflow-subtitle">
-          Clawperator is most useful where the real interface only exists in a mobile app.
-        </p>
-
-        <div className="workflow-cards">
-          {workflowCards.map((card) => (
-            <article key={card.title} className="workflow-card workflow-card-simple">
-              <h3>{card.title}</h3>
-              <p>{card.body}</p>
-            </article>
-          ))}
         </div>
       </section>
 
