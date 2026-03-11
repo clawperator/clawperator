@@ -1,184 +1,86 @@
-#!/bin/bash
-
-# clawperator_grant_android_permissions.sh
-# Script to grant all necessary permissions for Clawperator Operator functionality
-# This script handles manual permission granting when automatic setup isn't sufficient
+#!/usr/bin/env bash
 
 set -euo pipefail
 
-# Color codes for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
-
-# Default package names
 DEFAULT_DEBUG_PKG="com.clawperator.operator.dev"
 DEFAULT_RELEASE_PKG="com.clawperator.operator"
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+NODE_DIR="$REPO_ROOT/apps/node"
+NODE_CLI_DIST="$NODE_DIR/dist/cli/index.js"
+
 print_usage() {
-    echo "Usage: $0 [OPTIONS]"
-    echo ""
-    echo "Grant necessary permissions for Clawperator Operator functionality"
-    echo ""
-    echo "Options:"
-    echo "  -p, --package PACKAGE    Specify package name (default: auto-detect from installed apps)"
-    echo "  -d, --debug             Use debug package name ($DEFAULT_DEBUG_PKG)"
-    echo "  -r, --release           Use release package name ($DEFAULT_RELEASE_PKG)"
-    echo "  -s, --serial SERIAL     Target specific device by serial number"
-    echo ""
-    echo "  -l, --list-devices      List connected devices"
-    echo "  -h, --help              Show this help message"
-    echo ""
-    echo "Examples:"
-    echo "  $0                      # Auto-detect package and grant permissions"
-    echo "  $0 -d                   # Grant permissions for debug build"
-    echo "  $0 -p com.custom.pkg    # Grant permissions for custom package"
-    echo "  $0 -s <device_serial>       # Target specific device"
+    cat <<EOF
+Usage: $0 [OPTIONS]
+
+Grant Clawperator Operator permissions via the repo-local Node CLI.
+
+Options:
+  -p, --package PACKAGE    Specify package name
+  -d, --debug              Use debug package name ($DEFAULT_DEBUG_PKG)
+  -r, --release            Use release package name ($DEFAULT_RELEASE_PKG)
+  -s, --serial SERIAL      Target specific device by serial number
+  -l, --list-devices       List connected devices
+  -h, --help               Show this help message
+
+Examples:
+  $0
+  $0 -d
+  $0 -p com.custom.pkg
+  $0 -s <device_serial>
+EOF
 }
 
-print_header() {
-    echo -e "${BLUE}════════════════════════════════════════════════════════════════${NC}"
-    echo -e "${BLUE}  Clawperator Operator Permission Granter${NC}"
-    echo -e "${BLUE}════════════════════════════════════════════════════════════════${NC}"
-    echo ""
-}
-
-check_adb() {
-    if ! command -v adb &> /dev/null; then
-        echo -e "${RED}❌ Error: ADB not found in PATH${NC}"
-        echo "Please install Android SDK platform-tools and add to PATH"
+require_cmd() {
+    local cmd=$1
+    local install_hint=$2
+    if ! command -v "$cmd" >/dev/null 2>&1; then
+        echo "Error: required command not found: $cmd"
+        echo "$install_hint"
         exit 1
     fi
 }
 
-check_device() {
-    local device_list
-    device_list=$(adb devices 2>/dev/null | grep -E "device$" || echo "")
-    local device_count
-    device_count=$(echo "$device_list" | wc -l | tr -d ' ')
-
-    # Handle empty device list
-    if [ -z "$device_list" ] || [ "$device_count" -eq 0 ]; then
-        echo -e "${RED}❌ Error: No Android devices connected${NC}"
-        echo "Please connect a device or start an emulator"
-        echo "Current ADB status:"
-        adb devices
-        exit 1
-    elif [ "$device_count" -gt 1 ] && [ -z "${DEVICE_SERIAL:-}" ]; then
-        echo -e "${YELLOW}⚠️  Warning: Multiple devices connected${NC}"
-        echo "Use -s flag to specify target device:"
-        adb devices
+ensure_node_cli_built() {
+    if [ ! -d "$NODE_DIR" ]; then
+        echo "Error: apps/node not found at $NODE_DIR"
         exit 1
     fi
-}
 
-# Call this before using ADB_CMD
-setup_adb_cmd() {
-    if [ -n "${DEVICE_SERIAL:-}" ]; then
-        ADB_CMD=(adb -s "$DEVICE_SERIAL")
-    else
-        ADB_CMD=(adb)
+    if [ ! -f "$NODE_DIR/package.json" ] || [ ! -f "$NODE_DIR/package-lock.json" ]; then
+        echo "Error: apps/node is missing required package metadata"
+        exit 1
     fi
-}
 
-detect_package() {
-    setup_adb_cmd
+    if [ ! -d "$NODE_DIR/node_modules" ]; then
+        echo "Error: apps/node dependencies are not installed"
+        echo "Run: npm --prefix \"$NODE_DIR\" ci"
+        exit 1
+    fi
 
-    # Try to find Clawperator packages
-    local packages
-    packages=$("${ADB_CMD[@]}" shell pm list packages | sed 's/package://' | grep -E "^com\.clawperator\.operator" || echo "")
+    npm --prefix "$NODE_DIR" run build >/dev/null
 
-    if echo "$packages" | grep -q "$DEFAULT_DEBUG_PKG"; then
-        echo "$DEFAULT_DEBUG_PKG"
-    elif echo "$packages" | grep -q "$DEFAULT_RELEASE_PKG"; then
-        echo "$DEFAULT_RELEASE_PKG"
-    else
-        echo -e "${RED}❌ Error: No Clawperator packages found on device${NC}"
-        echo "Available packages starting with 'com.clawperator.operator':"
-        echo "$packages"
+    if [ ! -f "$NODE_CLI_DIST" ]; then
+        echo "Error: expected built CLI at $NODE_CLI_DIST"
         exit 1
     fi
 }
 
-grant_accessibility_permission() {
-    local package=$1
-    setup_adb_cmd
-    local svc="$package/clawperator.operator.accessibilityservice.OperatorAccessibilityService"
-
-    echo -e "${BLUE}🔧 Configuring Accessibility Service...${NC}"
-
-    # Read current enabled accessibility services
-    local current_services
-    current_services=$("${ADB_CMD[@]}" shell settings get secure enabled_accessibility_services 2>/dev/null || echo "")
-
-    # Build new services list (append if missing)
-    local new_services
-    if [[ "$current_services" == *"$svc"* ]]; then
-        new_services="$current_services"
-        echo -e "${GREEN}✅ Accessibility service already enabled${NC}"
-    else
-        if [[ -z "$current_services" || "$current_services" == "null" ]]; then
-            new_services="$svc"
-        else
-            new_services="$current_services:$svc"
-        fi
-        echo -e "${YELLOW}📝 Adding accessibility service to enabled list${NC}"
-    fi
-
-    # Enable accessibility and set services
-    echo -e "${BLUE}⚙️  Setting accessibility_enabled=1...${NC}"
-    "${ADB_CMD[@]}" shell settings put secure accessibility_enabled 1
-
-    echo -e "${BLUE}⚙️  Setting enabled_accessibility_services...${NC}"
-    "${ADB_CMD[@]}" shell settings put secure enabled_accessibility_services "$new_services"
-
-    echo -e "${GREEN}✅ Accessibility service configured${NC}"
-}
-
-grant_notification_permission() {
-    local package=$1
-    setup_adb_cmd
-
-    echo -e "${BLUE}🔔 Granting notification permission...${NC}"
-
-    # Try to grant POST_NOTIFICATIONS permission (Android 13+)
-    if "${ADB_CMD[@]}" shell pm grant "$package" android.permission.POST_NOTIFICATIONS 2>/dev/null; then
-        echo -e "${GREEN}✅ Notification permission granted${NC}"
-    else
-        echo -e "${YELLOW}⚠️  Could not grant notification permission via ADB${NC}"
-        echo -e "${YELLOW}   (may require manual grant in system settings)${NC}"
-    fi
-}
-
-
-
-show_verification_steps() {
-    local package=$1
-
-    echo ""
-    echo -e "${BLUE}🔍 Verification Steps:${NC}"
-    echo "1. Open Android Settings > Accessibility"
-    echo "2. Look for 'Clawperator Operator' service"
-    echo "3. Ensure it's enabled and running"
-    echo "4. Launch the app - services will start automatically"
-    echo "5. Check app notification shows 'Service is running'"
-    echo "6. Run: adb logcat | grep -E '(Operator|Clawperator)' to see logs"
-    echo ""
-    echo -e "${GREEN}🎉 Setup complete for package: $package${NC}"
-}
-
-# Parse command line arguments
 PACKAGE=""
+DEVICE_SERIAL=""
 USE_DEBUG=false
 USE_RELEASE=false
-DEVICE_SERIAL=""
+LIST_DEVICES=false
 
 while [[ $# -gt 0 ]]; do
     case $1 in
         -p|--package)
-            PACKAGE="$2"
+            PACKAGE="${2:-}"
+            if [ -z "$PACKAGE" ]; then
+                echo "Error: --package requires a value"
+                exit 1
+            fi
             shift 2
             ;;
         -d|--debug)
@@ -190,63 +92,61 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         -s|--serial)
-            DEVICE_SERIAL="$2"
+            DEVICE_SERIAL="${2:-}"
+            if [ -z "$DEVICE_SERIAL" ]; then
+                echo "Error: --serial requires a value"
+                exit 1
+            fi
             shift 2
             ;;
         -l|--list-devices)
-            echo "Connected devices:"
-            adb devices
-            exit 0
+            LIST_DEVICES=true
+            shift
             ;;
         -h|--help)
             print_usage
             exit 0
             ;;
         *)
-            echo -e "${RED}❌ Unknown option: $1${NC}"
+            echo "Error: unknown option: $1"
             print_usage
             exit 1
             ;;
     esac
 done
 
-# Main execution
-main() {
-    print_header
+if [ "$USE_DEBUG" = true ] && [ "$USE_RELEASE" = true ]; then
+    echo "Error: --debug and --release are mutually exclusive"
+    exit 1
+fi
 
-    # Check prerequisites
-    check_adb
-    check_device
+if [ -n "$PACKAGE" ] && { [ "$USE_DEBUG" = true ] || [ "$USE_RELEASE" = true ]; }; then
+    echo "Error: --package cannot be combined with --debug or --release"
+    exit 1
+fi
 
-    # Determine package name
-    if [ -n "$PACKAGE" ]; then
-        TARGET_PACKAGE="$PACKAGE"
-    elif [ "$USE_DEBUG" = true ]; then
-        TARGET_PACKAGE="$DEFAULT_DEBUG_PKG"
-    elif [ "$USE_RELEASE" = true ]; then
-        TARGET_PACKAGE="$DEFAULT_RELEASE_PKG"
-    else
-        echo -e "${BLUE}🔍 Auto-detecting Clawperator package...${NC}"
-        TARGET_PACKAGE=$(detect_package)
-    fi
+require_cmd node "Install Node.js 22+ to build and run the local CLI."
+require_cmd npm "Install npm so the repo-local apps/node CLI can be built."
 
-    # Validate TARGET_PACKAGE to prevent command injection
-    if [[ ! "$TARGET_PACKAGE" =~ ^[a-zA-Z0-9_.]+$ ]]; then
-        echo -e "${RED}❌ Error: Invalid package name format: '$TARGET_PACKAGE'${NC}"
-        exit 1
-    fi
-    echo -e "${BLUE}📱 Target package: $TARGET_PACKAGE${NC}"
-    echo ""
+ensure_node_cli_built
 
-    # Grant permissions and configure services
-    grant_accessibility_permission "$TARGET_PACKAGE"
-    echo ""
+CLI_ARGS=()
+if [ "$LIST_DEVICES" = true ]; then
+    CLI_ARGS+=("devices" "--output" "pretty")
+else
+    CLI_ARGS+=("grant-device-permissions" "--output" "pretty")
+fi
 
-    grant_notification_permission "$TARGET_PACKAGE"
-    echo ""
+if [ -n "$DEVICE_SERIAL" ]; then
+    CLI_ARGS+=("--device-id" "$DEVICE_SERIAL")
+fi
 
-    show_verification_steps "$TARGET_PACKAGE"
-}
+if [ -n "$PACKAGE" ]; then
+    CLI_ARGS+=("--receiver-package" "$PACKAGE")
+elif [ "$USE_DEBUG" = true ]; then
+    CLI_ARGS+=("--receiver-package" "$DEFAULT_DEBUG_PKG")
+elif [ "$USE_RELEASE" = true ]; then
+    CLI_ARGS+=("--receiver-package" "$DEFAULT_RELEASE_PKG")
+fi
 
-# Run main function
-main "$@"
+exec node "$NODE_CLI_DIST" "${CLI_ARGS[@]}"

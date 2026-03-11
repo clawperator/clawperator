@@ -43,11 +43,21 @@ Example for v0.2.5:
 - [https://downloads.clawperator.com/operator/v0.2.5/operator-v0.2.5.apk](https://downloads.clawperator.com/operator/v0.2.5/operator-v0.2.5.apk)
 
 ## Granting Permissions
-After installation, grant accessibility permissions so the app can inspect the screen and interact with the UI:
+After installation, grant the required permissions so the app can inspect the screen, interact with the UI, and observe device notifications:
 
 ```bash
 clawperator grant-device-permissions
 ```
+
+This command grants three permissions via ADB:
+
+| Permission | ADB mechanism | Purpose |
+|---|---|---|
+| Accessibility service | `settings put secure enabled_accessibility_services` | Read UI tree and dispatch gestures |
+| Post notifications (`POST_NOTIFICATIONS`) | `pm grant android.permission.POST_NOTIFICATIONS` | Show foreground service status notification (Android 13+) |
+| Notification listener | `settings put secure enabled_notification_listeners` | Observe notifications from all apps on the device |
+
+The accessibility service and notification listener permissions are enabled by appending the Clawperator service component to the relevant secure setting, matching the format Android uses internally. The `POST_NOTIFICATIONS` grant is a standard runtime permission grant; on Android 12 and below it is silently skipped.
 
 ## Logging and Debugging
 
