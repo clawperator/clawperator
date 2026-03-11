@@ -136,6 +136,33 @@ describe("validateExecution", () => {
     );
   });
 
+  it("rejects sleep with durationMs above max", () => {
+    assert.throws(
+      () =>
+        validateExecution({
+          commandId: "c",
+          taskId: "t",
+          source: "s",
+          expectedFormat: "android-ui-automator",
+          timeoutMs: 5000,
+          actions: [{ id: "x", type: "sleep", params: { durationMs: LIMITS.MAX_EXECUTION_TIMEOUT_MS + 1 } }],
+        }),
+      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
+    );
+  });
+
+  it("accepts sleep with durationMs at max", () => {
+    const ex = validateExecution({
+      commandId: "c",
+      taskId: "t",
+      source: "s",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: LIMITS.MAX_EXECUTION_TIMEOUT_MS,
+      actions: [{ id: "x", type: "sleep", params: { durationMs: LIMITS.MAX_EXECUTION_TIMEOUT_MS } }],
+    });
+    assert.strictEqual(ex.actions[0].type, "sleep");
+  });
+
   it("rejects enter_text without matcher", () => {
     assert.throws(
       () =>
