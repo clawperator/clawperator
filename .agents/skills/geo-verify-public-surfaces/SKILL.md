@@ -25,7 +25,6 @@ present.
 - `https://docs.clawperator.com/robots.txt`
 - `https://docs.clawperator.com/llms.txt`
 - `https://docs.clawperator.com/llms-full.txt`
-- `https://docs.clawperator.com/geo-debug.txt`
 - `https://docs.clawperator.com/sitemap.xml`
 - key docs entrypoints such as the Node API guide and CLI reference
 - Cloudflare behavior for named bot user agents such as `GPTBot`,

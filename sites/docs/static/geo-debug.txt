@@ -1,3 +1,0 @@
-Clawperator GEO debug marker
-branch=geo-tests
-purpose=verify root text asset delivery on docs host
