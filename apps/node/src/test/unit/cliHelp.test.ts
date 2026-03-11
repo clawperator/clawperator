@@ -122,3 +122,42 @@ describe("CLI help", () => {
     assert.strictEqual(pretty.message, "timeoutMs must be a finite number");
   });
 });
+
+describe("operator install CLI output", () => {
+  const NONEXISTENT_APK = "/nonexistent/clawperator-test-operator.apk";
+
+  it("returns OPERATOR_APK_NOT_FOUND with exit code 1 when APK path does not exist", async () => {
+    const { stdout, code } = await runCli(["operator", "install", "--apk", NONEXISTENT_APK]);
+    assert.notStrictEqual(code, 0);
+    const obj = JSON.parse(stdout);
+    assert.strictEqual(obj.code, "OPERATOR_APK_NOT_FOUND");
+    assert.ok(obj.message, "error message should be present");
+  });
+
+  it("includes install.ok: false in output on APK not found", async () => {
+    const { stdout } = await runCli(["operator", "install", "--apk", NONEXISTENT_APK]);
+    const obj = JSON.parse(stdout);
+    assert.strictEqual(obj.install?.ok, false);
+  });
+
+  it("passes --receiver-package through to output on failure", async () => {
+    const { stdout } = await runCli([
+      "operator", "install",
+      "--apk", NONEXISTENT_APK,
+      "--receiver-package", "com.clawperator.operator.dev",
+    ]);
+    const obj = JSON.parse(stdout);
+    assert.strictEqual(obj.receiverPackage, "com.clawperator.operator.dev");
+  });
+
+  it("--output pretty still produces parseable JSON on failure", async () => {
+    const { stdout, code } = await runCli([
+      "operator", "install",
+      "--apk", NONEXISTENT_APK,
+      "--output", "pretty",
+    ]);
+    assert.notStrictEqual(code, 0);
+    const obj = JSON.parse(stdout);
+    assert.strictEqual(obj.code, "OPERATOR_APK_NOT_FOUND");
+  });
+});
