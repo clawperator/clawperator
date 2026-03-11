@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert";
-import { attachSnapshotsToStepResults, finalizeSuccessfulScreenshotCapture } from "../../domain/executions/runExecution.js";
+import { attachSnapshotsToStepResults, finalizeSuccessfulScreenshotCapture, markExtractionFailedSnapshotSteps } from "../../domain/executions/runExecution.js";
 import type { StepResult } from "../../contracts/result.js";
 
 describe("attachSnapshotsToStepResults", () => {
@@ -29,6 +29,66 @@ describe("attachSnapshotsToStepResults", () => {
 
     assert.deepStrictEqual(stepResults[0].data, { text: "<new-one/>" });
     assert.deepStrictEqual(stepResults[1].data, { text: "<new-two/>" });
+  });
+
+  it("does not set data.text when snapshot extraction returned no snapshots", () => {
+    const stepResults: StepResult[] = [
+      { id: "snap-1", actionType: "snapshot_ui", success: true, data: {} },
+    ];
+
+    attachSnapshotsToStepResults(stepResults, []);
+
+    // data.text must remain absent - not set to undefined or empty string
+    assert.ok(!("text" in stepResults[0].data), "data.text must not be set when no snapshots extracted");
+    assert.deepStrictEqual(stepResults[0].data, {});
+  });
+});
+
+describe("markExtractionFailedSnapshotSteps", () => {
+  it("marks success:true snapshot steps with no data.text as SNAPSHOT_EXTRACTION_FAILED", () => {
+    const stepResults: StepResult[] = [
+      { id: "snap-1", actionType: "snapshot_ui", success: true, data: {} },
+    ];
+
+    markExtractionFailedSnapshotSteps(stepResults);
+
+    assert.strictEqual(stepResults[0].success, false);
+    assert.strictEqual(stepResults[0].data.error, "SNAPSHOT_EXTRACTION_FAILED");
+    assert.ok(typeof stepResults[0].data.message === "string", "must include message");
+    assert.ok(!("text" in stepResults[0].data), "data.text must not be set");
+  });
+
+  it("does not modify snapshot steps that already have data.text", () => {
+    const stepResults: StepResult[] = [
+      { id: "snap-1", actionType: "snapshot_ui", success: true, data: { text: "<hierarchy/>" } },
+    ];
+
+    markExtractionFailedSnapshotSteps(stepResults);
+
+    assert.strictEqual(stepResults[0].success, true);
+    assert.deepStrictEqual(stepResults[0].data, { text: "<hierarchy/>" });
+  });
+
+  it("does not modify snapshot steps that are already failed", () => {
+    const stepResults: StepResult[] = [
+      { id: "snap-1", actionType: "snapshot_ui", success: false, data: { error: "NODE_NOT_FOUND" } },
+    ];
+
+    markExtractionFailedSnapshotSteps(stepResults);
+
+    assert.strictEqual(stepResults[0].success, false);
+    assert.strictEqual(stepResults[0].data.error, "NODE_NOT_FOUND");
+  });
+
+  it("does not modify non-snapshot steps", () => {
+    const stepResults: StepResult[] = [
+      { id: "click-1", actionType: "click", success: true, data: {} },
+    ];
+
+    markExtractionFailedSnapshotSteps(stepResults);
+
+    assert.strictEqual(stepResults[0].success, true);
+    assert.deepStrictEqual(stepResults[0].data, {});
   });
 });
 
