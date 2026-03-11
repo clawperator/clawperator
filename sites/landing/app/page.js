@@ -85,10 +85,9 @@ export default function Home() {
   const activeCommand = mode === "npm" ? installCommands.npm : installCommands.oneLiner;
   const emulatorCommand = "clawperator provision emulator";
 
-  const sectionIds = ["install", "reliability", "skills", "how-it-works", "faq"];
+  const sectionIds = ["install", "skills", "how-it-works", "faq"];
   const sectionLabels = {
     install: "Install",
-    reliability: "Why it works",
     skills: "Skills",
     "how-it-works": "How it works",
     faq: "FAQ"
@@ -153,41 +152,55 @@ export default function Home() {
   const toolbarRef = useRef(null);
 
   useEffect(() => {
-    const visibleSections = new Map();
-    const sectionObserver = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            visibleSections.set(entry.target.id, entry.intersectionRatio);
-          } else {
-            visibleSections.delete(entry.target.id);
-          }
-        }
-        // Pick the section with the highest visibility; later sections win ties
-        let best = null;
-        let bestRatio = 0;
-        for (const id of sectionIds) {
-          const ratio = visibleSections.get(id);
-          if (ratio !== undefined && ratio >= bestRatio) {
-            best = id;
-            bestRatio = ratio;
-          }
-        }
-        setActiveSection(best);
-      },
-      { 
-        threshold: [0, 0.2, 0.4], 
-        // Use a rootMargin that accounts for the actual toolbar height + small buffer.
-        // We measure the offsetHeight of the toolbarRef if available.
-        rootMargin: `-${(toolbarRef.current?.offsetHeight || 80) + 20}px 0px -30% 0px` 
-      }
-    );
+    let frame = null;
 
-    for (const id of sectionIds) {
-      const el = document.getElementById(id);
-      if (el) sectionObserver.observe(el);
-    }
-    return () => sectionObserver.disconnect();
+    const updateActiveSection = () => {
+      const toolbarHeight = toolbarRef.current?.offsetHeight || 80;
+      // Use a focus line below the toolbar so a section becomes active when it is
+      // meaningfully on screen, not the instant a heading peeks into view.
+      const focusY = window.scrollY + toolbarHeight + Math.min(window.innerHeight * 0.22, 180);
+      const docBottom = window.scrollY + window.innerHeight;
+      const docHeight = document.documentElement.scrollHeight;
+
+      // Last section needs a bottom-of-page fallback because the FAQ heading may
+      // never climb near the toolbar on shorter pages.
+      if (docBottom >= docHeight - 48) {
+        setActiveSection("faq");
+        return;
+      }
+
+      let nextActive = null;
+      for (const id of sectionIds) {
+        const el = document.getElementById(id);
+        if (!el) continue;
+        const top = el.getBoundingClientRect().top + window.scrollY;
+        if (focusY >= top) {
+          nextActive = id;
+        } else {
+          break;
+        }
+      }
+
+      setActiveSection(nextActive);
+    };
+
+    const requestUpdate = () => {
+      if (frame !== null) return;
+      frame = window.requestAnimationFrame(() => {
+        frame = null;
+        updateActiveSection();
+      });
+    };
+
+    requestUpdate();
+    window.addEventListener("scroll", requestUpdate, { passive: true });
+    window.addEventListener("resize", requestUpdate);
+
+    return () => {
+      if (frame !== null) window.cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", requestUpdate);
+      window.removeEventListener("resize", requestUpdate);
+    };
   }, []);
 
   return (
