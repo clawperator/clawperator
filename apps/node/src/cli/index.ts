@@ -427,7 +427,9 @@ async function main(): Promise<void> {
           ? await (await import("./commands/action.js")).cmdActionOpenUri({ ...out, uri, ...runOpts })
           : JSON.stringify({ code: "USAGE", message: "action open-uri --uri <value>" });
       } else {
-        result = JSON.stringify({ code: "USAGE", message: "action open-app|open-uri|click|read|wait|type [options]" });
+        const validSubs = "open-app|open-uri|click|read|wait|type";
+        const unknownPart = sub ? `Unknown action subcommand '${sub}'. Valid: ` : "";
+        result = JSON.stringify({ code: "USAGE", message: `${unknownPart}action ${validSubs} [options]` });
       }
       break;
     }
