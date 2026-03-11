@@ -21,6 +21,7 @@ export interface RunExecutionOptions {
   receiverPackage?: string;
   adbPath?: string;
   timeoutMs?: number;
+  warn?: (message: string) => void;
 }
 
 export type RunExecutionResult =
@@ -46,6 +47,33 @@ export function attachSnapshotsToStepResults(stepResults: ResultEnvelope["stepRe
       targetStep.data = { ...targetStep.data, text: snapshotText };
     }
     snapshotIndex -= 1;
+  }
+}
+
+/**
+ * After snapshot attachment, mark any snapshot_ui step that is still success:true but has
+ * no data.text as SNAPSHOT_EXTRACTION_FAILED, and emit a warning to stderr for each
+ * affected step so users running CLI commands interactively can diagnose the problem
+ * without parsing JSON.
+ */
+export function markExtractionFailedSnapshotSteps(
+  stepResults: ResultEnvelope["stepResults"],
+  warn?: (message: string) => void
+): void {
+  for (const step of stepResults) {
+    if (step.actionType === "snapshot_ui" && step.success && step.data.text === undefined) {
+      step.success = false;
+      const { text: _text, ...remainingData } = step.data;
+      step.data = {
+        ...remainingData,
+        error: ERROR_CODES.SNAPSHOT_EXTRACTION_FAILED,
+        message: "UI hierarchy extraction produced no output for this step. Check clawperator version compatibility and logcat extraction health.",
+      };
+      warn?.(
+        `[clawperator] WARN: snapshot_ui step "${step.id}" UI hierarchy extraction produced no output. ` +
+        `Run 'clawperator doctor' or 'clawperator version --check-compat' to diagnose.\n`
+      );
+    }
   }
 }
 
@@ -165,6 +193,7 @@ async function performExecution(
         const dump = await runAdb(config, ["logcat", "-d", "-v", "tag"]);
         const snapshots = extractSnapshotsFromLogs(dump.stdout.split("\n"));
         attachSnapshotsToStepResults(result.envelope.stepResults, snapshots);
+        markExtractionFailedSnapshotSteps(result.envelope.stepResults, options.warn);
       }
 
       const hasScreenshot = result.envelope.stepResults.some(s => s.actionType === "take_screenshot");
