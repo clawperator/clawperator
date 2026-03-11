@@ -253,30 +253,22 @@ but the validator registry should be extended over time. At minimum, `"non_empty
 
 ## GAP-11: CLI `action` USAGE error does not identify the unknown subcommand
 
-**Problem:** When an unrecognised action subcommand is passed, the CLI returns:
+Status: Completed
+
+**Resolution:** The CLI now includes the unrecognised action subcommand in the
+`USAGE` payload so callers can distinguish typos from version skew:
 
 ```json
-{"code":"USAGE","message":"action open-app|click|read|wait|type [options]"}
+{"code":"USAGE","message":"Unknown action subcommand 'open-uri'. Valid: action open-app|open-uri|click|read|wait|type [options]"}
 ```
 
-The message lists valid subcommands but gives no indication of what was actually
-passed. This is confusing for humans and for agents: the caller cannot tell from
-the error alone whether it mistyped a valid command, used a command that does not
-exist in the installed version, or hit a version skew (e.g. `open-uri` exists in
-a newer build but not the one on PATH).
+This removes the ambiguity for humans and agents by echoing the rejected input
+and the valid subcommand set in the same response.
 
-**Impact:** Low in normal operation, but notably bad during version skew or when
-a new action is added and a caller is targeting the wrong binary. The silence on
-the unrecognised input makes debugging slower.
+**Impact:** Low. This is a UX and debuggability improvement for typo handling and
+version-skew diagnosis.
 
-**Suggested improvement:** Include the unrecognised subcommand in the error message:
-
-```json
-{"code":"USAGE","message":"Unknown action subcommand 'open-uri'. Valid: open-app|click|read|wait|type [options]"}
-```
-
-The fix is in the `action` command dispatch in `apps/node/src/cli/index.ts` (or
-whichever file handles the `action` routing fallback).
+**Implemented in:** `apps/node/src/cli/index.ts`
 
 ---
 
@@ -294,4 +286,4 @@ whichever file handles the `action` routing fallback).
 | GAP-08 | Undocumented action type aliases | Low | Docs gap |
 | GAP-09 | No keyboard dismissal | Medium | Missing feature |
 | GAP-10 | `read_text` validator coverage minimal | Low | Limited feature |
-| GAP-11 | CLI `action` USAGE error omits the unknown subcommand | Low | UX / debuggability |
+| GAP-11 | CLI `action` USAGE error identifies the unknown subcommand | Done | Closed |
