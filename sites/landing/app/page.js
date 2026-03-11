@@ -203,6 +203,13 @@ export default function Home() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!activeSection || typeof window === "undefined") return;
+    const nextHash = `#${activeSection}`;
+    if (window.location.hash === nextHash) return;
+    window.history.replaceState(null, "", nextHash);
+  }, [activeSection]);
+
   return (
     <>
       <header ref={toolbarRef} className="top-toolbar">
