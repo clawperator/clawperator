@@ -64,10 +64,12 @@ export function markExtractionFailedSnapshotSteps(stepResults: ResultEnvelope["s
         error: ERROR_CODES.SNAPSHOT_EXTRACTION_FAILED,
         message: "UI hierarchy extraction produced no output for this step. Check clawperator version compatibility and logcat extraction health.",
       };
-      process.stderr.write(
-        `[clawperator] WARN: snapshot_ui step "${step.id}" UI hierarchy extraction produced no output. ` +
-        `Run 'clawperator doctor' or 'clawperator version --check-compat' to diagnose.\n`
-      );
+      if (process.stderr.isTTY) {
+        process.stderr.write(
+          `[clawperator] WARN: snapshot_ui step "${step.id}" UI hierarchy extraction produced no output. ` +
+          `Run 'clawperator doctor' or 'clawperator version --check-compat' to diagnose.\n`
+        );
+      }
     }
   }
 }

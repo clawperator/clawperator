@@ -58,6 +58,69 @@ describe("markExtractionFailedSnapshotSteps", () => {
     assert.ok(!("text" in stepResults[0].data), "data.text must not be set");
   });
 
+  it("only emits the warning when stderr is attached to an interactive TTY", () => {
+    const stepResults: StepResult[] = [
+      { id: "snap-1", actionType: "snapshot_ui", success: true, data: {} },
+    ];
+
+    const originalIsTTY = process.stderr.isTTY;
+    const originalWrite = process.stderr.write.bind(process.stderr);
+    const warnings: string[] = [];
+
+    Object.defineProperty(process.stderr, "isTTY", {
+      configurable: true,
+      value: true,
+    });
+    process.stderr.write = ((chunk: string | Uint8Array) => {
+      warnings.push(typeof chunk === "string" ? chunk : chunk.toString());
+      return true;
+    }) as typeof process.stderr.write;
+
+    try {
+      markExtractionFailedSnapshotSteps(stepResults);
+    } finally {
+      Object.defineProperty(process.stderr, "isTTY", {
+        configurable: true,
+        value: originalIsTTY,
+      });
+      process.stderr.write = originalWrite;
+    }
+
+    assert.strictEqual(warnings.length, 1);
+    assert.match(warnings[0], /snapshot_ui step "snap-1"/);
+  });
+
+  it("does not emit the warning when stderr is not a TTY", () => {
+    const stepResults: StepResult[] = [
+      { id: "snap-1", actionType: "snapshot_ui", success: true, data: {} },
+    ];
+
+    const originalIsTTY = process.stderr.isTTY;
+    const originalWrite = process.stderr.write.bind(process.stderr);
+    let warningCount = 0;
+
+    Object.defineProperty(process.stderr, "isTTY", {
+      configurable: true,
+      value: false,
+    });
+    process.stderr.write = (() => {
+      warningCount += 1;
+      return true;
+    }) as typeof process.stderr.write;
+
+    try {
+      markExtractionFailedSnapshotSteps(stepResults);
+    } finally {
+      Object.defineProperty(process.stderr, "isTTY", {
+        configurable: true,
+        value: originalIsTTY,
+      });
+      process.stderr.write = originalWrite;
+    }
+
+    assert.strictEqual(warningCount, 0);
+  });
+
   it("does not modify snapshot steps that already have data.text", () => {
     const stepResults: StepResult[] = [
       { id: "snap-1", actionType: "snapshot_ui", success: true, data: { text: "<hierarchy/>" } },
