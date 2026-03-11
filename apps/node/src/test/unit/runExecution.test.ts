@@ -64,7 +64,7 @@ describe("markExtractionFailedSnapshotSteps", () => {
     ];
 
     const originalIsTTY = process.stderr.isTTY;
-    const originalWrite = process.stderr.write.bind(process.stderr);
+    const originalWrite = process.stderr.write;
     const warnings: string[] = [];
 
     Object.defineProperty(process.stderr, "isTTY", {
@@ -96,7 +96,7 @@ describe("markExtractionFailedSnapshotSteps", () => {
     ];
 
     const originalIsTTY = process.stderr.isTTY;
-    const originalWrite = process.stderr.write.bind(process.stderr);
+    const originalWrite = process.stderr.write;
     let warningCount = 0;
 
     Object.defineProperty(process.stderr, "isTTY", {
@@ -130,6 +130,17 @@ describe("markExtractionFailedSnapshotSteps", () => {
 
     assert.strictEqual(stepResults[0].success, true);
     assert.deepStrictEqual(stepResults[0].data, { text: "<hierarchy/>" });
+  });
+
+  it("does not treat an existing empty-string text field as missing", () => {
+    const stepResults: StepResult[] = [
+      { id: "snap-1", actionType: "snapshot_ui", success: true, data: { text: "" } },
+    ];
+
+    markExtractionFailedSnapshotSteps(stepResults);
+
+    assert.strictEqual(stepResults[0].success, true);
+    assert.deepStrictEqual(stepResults[0].data, { text: "" });
   });
 
   it("does not modify snapshot steps that are already failed", () => {

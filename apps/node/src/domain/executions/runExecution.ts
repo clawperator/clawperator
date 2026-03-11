@@ -57,10 +57,11 @@ export function attachSnapshotsToStepResults(stepResults: ResultEnvelope["stepRe
  */
 export function markExtractionFailedSnapshotSteps(stepResults: ResultEnvelope["stepResults"]): void {
   for (const step of stepResults) {
-    if (step.actionType === "snapshot_ui" && step.success && !step.data.text) {
+    if (step.actionType === "snapshot_ui" && step.success && step.data.text === undefined) {
       step.success = false;
+      const { text: _text, ...remainingData } = step.data;
       step.data = {
-        ...step.data,
+        ...remainingData,
         error: ERROR_CODES.SNAPSHOT_EXTRACTION_FAILED,
         message: "UI hierarchy extraction produced no output for this step. Check clawperator version compatibility and logcat extraction health.",
       };
