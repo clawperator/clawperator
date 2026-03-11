@@ -58,6 +58,8 @@ Alternative names considered but not preferred:
 
 - `clawperator install`
   - too broad and likely to age poorly
+  - still likely to be guessed by users and agents, so the CLI should handle it
+    intentionally as a guidance path
 - `clawperator install-operator`
   - workable, but less extensible than a scoped subcommand
 - `clawperator operator provision`
@@ -94,6 +96,7 @@ It should not:
 - replace full `doctor`
 - absorb unrelated host bootstrap concerns
 - hide failures behind best-effort success messaging
+- promote `clawperator install` to the canonical public command name
 
 `grant-device-permissions` should remain available, but its documented purpose
 should become recovery and remediation after install drift.
@@ -108,6 +111,23 @@ Update the Node CLI parser and help text to support:
 
 If more Operator lifecycle actions are expected later, this gives them a stable
 home without growing the top-level command namespace.
+
+The parser should also handle likely mistaken invocations explicitly:
+
+- `clawperator install`
+- `clawperator install --help`
+
+Recommended behavior:
+
+- do not implement top-level `install` as the real setup command
+- return a structured usage error or guidance message that points the caller to
+  `clawperator operator install`
+- keep this guidance deterministic and machine-readable in JSON mode so agent
+  callers can recover cleanly
+
+This is preferable to silently aliasing `clawperator install`, because it keeps
+the CLI taxonomy explicit while still helping users and agents recover from the
+most obvious guessed command.
 
 Related files:
 
@@ -198,6 +218,8 @@ The public docs should make these points explicit:
 2. agents should not use raw `adb install` as the standard setup flow
 3. the canonical setup command is `clawperator operator install`
 4. `grant-device-permissions` is for remediation and recovery
+5. `clawperator install` is not the canonical command and should redirect the
+   caller to `clawperator operator install`
 
 The docs should also explain why this matters:
 
@@ -235,6 +257,11 @@ Before merge, validate at least:
 4. Relevant docs generation and build:
    - docs regeneration per repo skill
    - `./scripts/docs_build.sh`
+5. Guidance-path verification:
+   - `clawperator install`
+   - `clawperator install --help`
+   - confirm both point callers to `clawperator operator install` without
+     silently introducing a second canonical command
 
 ## Non-goals for v1
 
