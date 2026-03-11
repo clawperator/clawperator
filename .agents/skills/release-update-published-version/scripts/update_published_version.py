@@ -93,15 +93,19 @@ def main() -> None:
 
     repo_slug = run(["gh", "repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"], cwd=repo_root).strip()
     published_tag = run(
-        ["gh", "release", "view", f"v{version}", "--repo", repo_slug, "--json", "tagName"],
+        ["gh", "release", "view", f"v{version}", "--repo", repo_slug, "--json", "tagName", "--jq", ".tagName"],
         cwd=repo_root,
     ).strip()
-    if f"v{version}" not in published_tag:
+    if published_tag != f"v{version}":
         die(f"GitHub Release v{version} was not found")
 
     npm_version = run(["npm", "view", f"clawperator@{version}", "version"], cwd=repo_root).strip()
     if npm_version != version:
         die(f"npm does not report clawperator@{version}")
+
+    latest_npm_version = run(["npm", "view", "clawperator", "version"], cwd=repo_root).strip()
+    if latest_npm_version != version:
+        die(f"{version} is not the current npm release (latest is {latest_npm_version})")
 
     replace_required(
         repo_root / "docs" / "android-operator-apk.md",

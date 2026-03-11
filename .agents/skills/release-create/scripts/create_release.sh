@@ -199,8 +199,8 @@ main() {
 
   local published_version_script
   published_version_script="$repo_root/.agents/skills/release-update-published-version/scripts/update_published_version.py"
-  if [[ ! -x "$published_version_script" ]]; then
-    die "published-version update script is missing or not executable: $published_version_script"
+  if [[ ! -f "$published_version_script" ]]; then
+    die "published-version update script is missing: $published_version_script"
   fi
 
   local branch_name
