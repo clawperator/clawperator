@@ -16,6 +16,7 @@ Examples:
 - CLI `0.1.4` and app `0.2.2` - not compatible
 - CLI `0.1.4` and app `0.2.3` - not compatible
 - CLI `0.1.4` and app `0.2.4` - not compatible
+- CLI `0.1.4` and app `0.2.5` - not compatible
 
 Notes:
 
