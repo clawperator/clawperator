@@ -178,6 +178,8 @@ Every execution requires `expectedFormat: "android-ui-automator"`.
 }
 ```
 
+**Execution timeout limit:** `timeoutMs` is schema-validated. The allowed range is 1,000-120,000 ms (1 second to 2 minutes). Submitting a value outside this range causes `EXECUTION_VALIDATION_FAILED` - the execution is rejected before any action runs. Operations that require longer running time must be split across multiple execution payloads. For install or download flows, use `wait_for_node` polling within the 120-second window rather than a single long sleep.
+
 **Result envelope:** Exactly one `[Clawperator-Result]` JSON block is emitted to logcat on completion. Node reads and returns it. See the Result Envelope section for the full shape and per-action `data` contents.
 
 ## NodeMatcher Reference
@@ -214,7 +216,7 @@ Combine fields to increase specificity when a single field is ambiguous:
 | `click` | `matcher: NodeMatcher` | `clickType: "default" \| "long_click" \| "focus"` (default: `"default"`) |
 | `enter_text` | `matcher: NodeMatcher`, `text: string` | `submit: boolean` (default: `false`), `clear: boolean` (accepted by Node contract, currently ignored by Android runtime) |
 | `read_text` | `matcher: NodeMatcher` | `validator: "temperature"` (only supported validator today), `retry: object` |
-| `wait_for_node` | `matcher: NodeMatcher` | `retry: object` |
+| `wait_for_node` | `matcher: NodeMatcher` | `retry: object` - controls polling attempts and backoff delays (see `retry` object shape below). There is no per-action `timeoutMs`; the outer execution `timeoutMs` is the only wall-clock limit. |
 | `snapshot_ui` | - | `retry: object` |
 | `take_screenshot` | - | `path: string`, `retry: object` |
 | `sleep` | `durationMs: number` | - |
@@ -233,7 +235,21 @@ Combine fields to increase specificity when a single field is ambiguous:
 
 ### Action behavior notes
 
-- `sleep.durationMs` is not capped per step. It must fit within the execution `timeoutMs` budget, and `timeoutMs` is capped at `120000`.
+- `sleep.durationMs` is capped at `120000` ms by the Android parser (values above are silently clamped). It also consumes from the outer execution `timeoutMs` budget.
+
+**`retry` object shape:** All action types that accept a `retry` param use the same object schema:
+```json
+{
+  "maxAttempts": 3,
+  "initialDelayMs": 500,
+  "maxDelayMs": 3000,
+  "backoffMultiplier": 2.0,
+  "jitterRatio": 0.15
+}
+```
+`maxAttempts` is capped at 10. `initialDelayMs` and `maxDelayMs` are capped at 30,000 and 60,000 ms respectively. Omit the `retry` field to use the action's default preset. For `wait_for_node`, the default is `UiReadiness` (`maxAttempts=5`, `initialDelayMs=500`, `maxDelayMs=3000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`).
+
+**`open_app`:** Opens the app's default launch activity by `applicationId`. There is no `open_uri` action for deep links or content-addressed pages (such as `market://details?id=...` or arbitrary `https://` URLs). To open a specific URI, use `adb shell am start -a android.intent.action.VIEW -d "<uri>"` outside the execution payload. This is a known capability gap - see FAQ.
 
 **`close_app`:** The Node layer intercepts `close_app` actions and runs `adb shell am force-stop <applicationId>` before dispatching to Android. The Android step always returns `success: false` with `data.error: "UNSUPPORTED_RUNTIME_CLOSE"` - this is expected. The overall execution `status` remains `"success"` and the app is force-stopped. Do not treat this step result as a recoverable failure.
 
@@ -242,6 +258,8 @@ Combine fields to increase specificity when a single field is ambiguous:
 **`read_text`:** `validator` is not an open-ended string in practice. The Android runtime currently supports only `"temperature"` and rejects any other value.
 
 **`snapshot_ui`:** Clawperator returns a single canonical snapshot format: `hierarchy_xml`. The Android runtime writes the hierarchy dump to device logcat, and the Node layer injects that raw XML into `data.text` after execution. `data.actual_format` is always `"hierarchy_xml"` for successful snapshot steps.
+
+`observe snapshot` (CLI subcommand) and `snapshot_ui` (execution action type) use the same internal pipeline and produce identical output. `observe snapshot` builds a single-action execution internally and calls `runExecution`. Use `observe snapshot` for ad-hoc inspection from the command line. Use `snapshot_ui` as a step within a multi-action execution payload.
 
 **Failure case - extraction error:** If snapshot post-processing finishes without attaching UI hierarchy text to the step (`data.text` remains absent), the step returns `success: false` with `data.error: "SNAPSHOT_EXTRACTION_FAILED"`. A common cause is that logcat does not contain a matching `[TaskScope] UI Hierarchy:` marker for the step, but partial extraction or other logcat mismatches can also trigger this error. This typically means the installed clawperator binary is out of date with the Android Operator APK. Run `clawperator version --check-compat` and `clawperator doctor` to diagnose. See Troubleshooting for resolution steps.
 
