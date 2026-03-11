@@ -39,8 +39,8 @@ To install manually:
 Historical versions can be downloaded from `downloads.clawperator.com`. The URL structure follows the versioning pattern:
 - `https://downloads.clawperator.com/operator/v<version>/operator-v<version>.apk`
 
-Example for v0.2.4:
-- [https://downloads.clawperator.com/operator/v0.2.4/operator-v0.2.4.apk](https://downloads.clawperator.com/operator/v0.2.4/operator-v0.2.4.apk)
+Example for v0.2.5:
+- [https://downloads.clawperator.com/operator/v0.2.5/operator-v0.2.5.apk](https://downloads.clawperator.com/operator/v0.2.5/operator-v0.2.5.apk)
 
 ## Granting Permissions
 After installation, grant the required permissions so the app can inspect the screen, interact with the UI, and observe device notifications:

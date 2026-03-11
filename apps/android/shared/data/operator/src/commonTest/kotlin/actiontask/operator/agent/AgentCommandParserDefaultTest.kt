@@ -117,4 +117,103 @@ class AgentCommandParserDefaultTest {
         val command = parser.parse(payload).getOrThrow()
         assertEquals(120_000L, command.timeoutMs)
     }
+
+    @Test
+    fun `parse valid open_uri action with market scheme`() {
+        val payload =
+            """
+            {
+              "commandId": "cmd-uri-1",
+              "taskId": "task-uri-1",
+              "source": "debug",
+              "actions": [
+                {
+                  "id": "nav1",
+                  "type": "open_uri",
+                  "params": { "uri": "market://details?id=com.actionlauncher.playstore" }
+                }
+              ]
+            }
+            """.trimIndent()
+
+        val result = parser.parse(payload)
+        assertTrue(result.isSuccess)
+
+        val action = result.getOrThrow().actions[0]
+        assertIs<UiAction.OpenUri>(action)
+
+        val openUri = action as UiAction.OpenUri
+        assertEquals("nav1", openUri.id)
+        assertEquals("market://details?id=com.actionlauncher.playstore", openUri.uri)
+        assertEquals(TaskRetryPresets.AppLaunch, openUri.retry)
+    }
+
+    @Test
+    fun `parse valid open_uri action with https scheme`() {
+        val payload =
+            """
+            {
+              "commandId": "cmd-uri-2",
+              "taskId": "task-uri-2",
+              "source": "debug",
+              "actions": [
+                {
+                  "id": "nav2",
+                  "type": "open_uri",
+                  "params": { "uri": "https://example.com/page" }
+                }
+              ]
+            }
+            """.trimIndent()
+
+        val result = parser.parse(payload)
+        assertTrue(result.isSuccess)
+
+        val openUri = result.getOrThrow().actions[0] as UiAction.OpenUri
+        assertEquals("https://example.com/page", openUri.uri)
+    }
+
+    @Test
+    fun `parse open_uri rejects missing uri param`() {
+        val payload =
+            """
+            {
+              "commandId": "cmd-uri-3",
+              "taskId": "task-uri-3",
+              "source": "debug",
+              "actions": [
+                {
+                  "id": "nav3",
+                  "type": "open_uri",
+                  "params": {}
+                }
+              ]
+            }
+            """.trimIndent()
+
+        val result = parser.parse(payload)
+        assertTrue(result.isFailure)
+    }
+
+    @Test
+    fun `parse open_uri rejects blank uri`() {
+        val payload =
+            """
+            {
+              "commandId": "cmd-uri-4",
+              "taskId": "task-uri-4",
+              "source": "debug",
+              "actions": [
+                {
+                  "id": "nav4",
+                  "type": "open_uri",
+                  "params": { "uri": "   " }
+                }
+              ]
+            }
+            """.trimIndent()
+
+        val result = parser.parse(payload)
+        assertTrue(result.isFailure)
+    }
 }

@@ -33,6 +33,8 @@ Commands:
                                             Alias of observe snapshot with formatted output
   action open-app --app <packageId> [--device-id <id>] [--receiver-package <package>]
                                             Build and run single open_app action via execute path
+  action open-uri --uri <value> [--device-id <id>] [--receiver-package <package>]
+                                            Build and run single open_uri action via execute path
   action click --selector <json> [--device-id <id>] [--receiver-package <package>]
                                             Build and run single click action via execute path
   action read --selector <json> [--device-id <id>] [--receiver-package <package>]
@@ -419,8 +421,13 @@ async function main(): Promise<void> {
               ...runOpts,
             })
             : JSON.stringify({ code: "USAGE", message: "action type --selector <json> --text <value>" });
+      } else if (sub === "open-uri") {
+        const uri = getOpt(rest, "--uri");
+        result = uri
+          ? await (await import("./commands/action.js")).cmdActionOpenUri({ ...out, uri, ...runOpts })
+          : JSON.stringify({ code: "USAGE", message: "action open-uri --uri <value>" });
       } else {
-        result = JSON.stringify({ code: "USAGE", message: "action open-app|click|read|wait|type [options]" });
+        result = JSON.stringify({ code: "USAGE", message: "action open-app|open-uri|click|read|wait|type [options]" });
       }
       break;
     }

@@ -248,7 +248,7 @@ val AppModule: Module = module {
     single<TaskRunnerManager> { get<TaskRunnerManagerDefault>() }
     single<TaskRunnerManagerDefault> { TaskRunnerManagerDefault(get(), get(), get(NamedScope.CoroutineScopeMain)) }
     single<TaskScope> { get<TaskScopeDefault>() }
-    single<TaskScopeDefault> { TaskScopeDefault(get(), get(), get(), get(), get(), get(), get(), get(NamedScope.CoroutineScopeIo)) }
+    single<TaskScopeDefault> { TaskScopeDefault(get(), get(), get(), get(), get(), get(), get(), get(), get(NamedScope.CoroutineScopeIo)) }
     single<TaskStatusReporter> { get<TaskStatusReporterDefault>() }
     single<TaskStatusReporterDefault> { TaskStatusReporterDefault(get()) }
     single<TaskUiScope> { get<TaskUiScopeDefault>() }

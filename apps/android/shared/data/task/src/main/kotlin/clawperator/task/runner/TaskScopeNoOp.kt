@@ -11,6 +11,13 @@ class TaskScopeNoOp : TaskScope {
         // No-op implementation
     }
 
+    override suspend fun openUri(
+        uri: String,
+        retry: TaskRetry,
+    ) {
+        // No-op implementation
+    }
+
     override suspend fun pause(
         duration: Duration,
         retry: TaskRetry,
