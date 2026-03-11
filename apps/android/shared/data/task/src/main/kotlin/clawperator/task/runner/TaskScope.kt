@@ -20,7 +20,7 @@ interface TaskScope {
      * A chooser dialog may appear on devices with multiple handlers; agents should follow up with
      * a snapshot_ui step to verify that the expected app is in the foreground.
      *
-     * @param uri The URI to open (e.g. "market://details?id=org.videolan.vlc", "https://example.com")
+     * @param uri The URI to open (e.g. "market://details?id=com.actionlauncher.playstore", "https://example.com")
      * @param retry Retry configuration for the launch attempt
      * @throws IllegalStateException if no handler is found for the URI
      */

@@ -130,7 +130,7 @@ class AgentCommandParserDefaultTest {
                 {
                   "id": "nav1",
                   "type": "open_uri",
-                  "params": { "uri": "market://details?id=org.videolan.vlc" }
+                  "params": { "uri": "market://details?id=com.actionlauncher.playstore" }
                 }
               ]
             }
@@ -144,7 +144,7 @@ class AgentCommandParserDefaultTest {
 
         val openUri = action as UiAction.OpenUri
         assertEquals("nav1", openUri.id)
-        assertEquals("market://details?id=org.videolan.vlc", openUri.uri)
+        assertEquals("market://details?id=com.actionlauncher.playstore", openUri.uri)
         assertEquals(TaskRetryPresets.AppLaunch, openUri.retry)
     }
 

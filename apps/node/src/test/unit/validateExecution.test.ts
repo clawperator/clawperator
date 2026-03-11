@@ -173,10 +173,10 @@ describe("validateExecution", () => {
       source: "s",
       expectedFormat: "android-ui-automator",
       timeoutMs: 5000,
-      actions: [{ id: "x", type: "open_uri", params: { uri: "market://details?id=org.videolan.vlc" } }],
+      actions: [{ id: "x", type: "open_uri", params: { uri: "market://details?id=com.actionlauncher.playstore" } }],
     });
     assert.strictEqual(ex.actions[0].type, "open_uri");
-    assert.strictEqual(ex.actions[0].params?.uri, "market://details?id=org.videolan.vlc");
+    assert.strictEqual(ex.actions[0].params?.uri, "market://details?id=com.actionlauncher.playstore");
   });
 
   it("accepts open_uri with https uri", () => {
