@@ -253,7 +253,7 @@ export default function Home() {
       {/* Hero Section */}
       <section id="top" className="hero-card">
         <div className="hero-waterfall">
-          <p className="hero-problem">Most services only expose their real functionality through mobile apps.</p>
+          <p className="hero-problem">Many services don&apos;t have APIs…<br />But they do have apps.</p>
           <img src="/clawperator-logo.png" alt="" aria-hidden="true" className="hero-logo" />
           <p className="hero-product-name">Clawperator</p>
           <h1 className="hero-catchphrase">
