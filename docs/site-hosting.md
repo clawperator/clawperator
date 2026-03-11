@@ -26,12 +26,12 @@ Without that script, the deployed docs site will miss root files such as:
 
 ## Current Cloudflare split
 
-The current Cloudflare setup is split across two accounts:
+The current Cloudflare setup is split across two roles/accounts:
 
-- `clawpilled`
+- DNS account
   - owns the live `clawperator.com` zone and active DNS
   - controls zone-level features such as AI Crawl Control
-- `Action Launcher`
+- Pages account
   - currently owns the Cloudflare Pages projects for:
     - `clawperator`
     - `clawperator-docs`
@@ -41,9 +41,9 @@ This is messy and should be treated as operational debt.
 Practical consequence:
 
 - Pages deployment fixes for `docs.clawperator.com` must currently be made in
-  the `Action Launcher` account
+  the Pages account
 - zone-level overrides such as managed `robots.txt` behavior must currently be
-  managed in the `clawpilled` account
+  managed in the DNS account
 
 ## Recommendation
 

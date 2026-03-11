@@ -114,12 +114,22 @@ def get_git_branch_name():
     return branch or None
 
 
+def slugify_branch_name(branch_name):
+    slug = branch_name.strip().lower()
+    slug = re.sub(r"[^a-z0-9-]+", "-", slug)
+    slug = re.sub(r"-{2,}", "-", slug).strip("-")
+    return slug
+
+
 def resolve_preview_urls(args):
     branch_name = args.branch_name or os.environ.get("CF_PAGES_BRANCH") or get_git_branch_name()
     if not branch_name:
         raise SystemExit("--preview requires a branch name, either via --branch-name or the current git branch")
-    landing = f"https://{branch_name}.clawperator.pages.dev"
-    docs = f"https://{branch_name}.clawperator-docs.pages.dev"
+    branch_slug = slugify_branch_name(branch_name)
+    if not branch_slug:
+        raise SystemExit(f"--preview branch name {branch_name!r} cannot be converted to a valid hostname")
+    landing = f"https://{branch_slug}.clawperator.pages.dev"
+    docs = f"https://{branch_slug}.clawperator-docs.pages.dev"
     return landing, docs
 
 
