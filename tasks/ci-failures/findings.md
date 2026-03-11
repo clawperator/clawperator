@@ -1,4 +1,4 @@
-# Task: CI Test Failures - Investigation
+# Task: CI Test Failures - Investigation (RESOLVED)
 
 ## Finding: No real failures - cwd sensitivity
 
@@ -31,27 +31,24 @@ The npm script is correct:
 `npm --prefix apps/node run test` sets cwd to apps/node/ before running,
 so all tests pass. The build/test sequence in CLAUDE.md is correct.
 
-## Fragility to address
+## Fix applied
 
-Tests that spawn subprocesses or resolve file paths relative to `process.cwd()`
-will silently produce false failures when invoked from the wrong directory.
-Options:
+All three affected files were updated to derive a `packageRoot` constant from
+`import.meta.url` instead of `process.cwd()`:
 
-1. Resolve paths relative to `import.meta.url` (the test file itself) rather
-   than `process.cwd()`. This is portable regardless of invocation directory.
+  const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "../../..");
 
-2. Add a guard at the top of affected test files that asserts or corrects cwd
-   before running (e.g., `process.chdir(new URL("../../..", import.meta.url))`).
+This matches the pattern already used in `runtimeConfig.ts`. The two-candidate
+`resolveTestRegistryPath()` workaround in `skills.test.ts` was replaced with a
+single direct path relative to `packageRoot`.
 
-3. Document the constraint explicitly and add a repo-root wrapper script that
-   routes to the correct directory.
+All 155 tests now pass regardless of invocation directory:
 
-Option 1 is the most robust and matches the pattern already used in
-`runtimeConfig.ts` (`dirname(fileURLToPath(import.meta.url))`).
+  node --test apps/node/dist/test/**/*.test.js   # from repo root - 155/155
+  cd apps/node && node --test dist/test/**/*.test.js  # from package - 155/155
 
-## Affected test files
+## Fixed files
 
-- `apps/node/src/test/unit/cliHelp.test.js` - CLI binary path via process.cwd()
-- `apps/node/src/test/unit/emulatorCli.test.js` - same pattern
-- `apps/node/src/test/unit/skills.test.js` (`loadRegistry`, `compileArtifact`)
-  - needs investigation to confirm same root cause
+- `apps/node/src/test/unit/cliHelp.test.ts`
+- `apps/node/src/test/unit/emulatorCli.test.ts`
+- `apps/node/src/test/unit/skills.test.ts`
