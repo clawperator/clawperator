@@ -54,10 +54,10 @@ content, the new text is appended or merged unpredictably depending on the input
 back-navigation) is broken silently.
 
 **Suggested improvement:** Implement `clear` in the Android runtime. The mechanism is
-well-known: `performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, Bundle.EMPTY)` to
-clear, or triple-click to select-all followed by the new text. Until it is implemented,
-the Node layer should reject `clear: true` with an explicit error rather than silently
-ignoring it.
+well-known: call `performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)` with
+`ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE` set to an explicit empty string, or triple-click
+to select-all followed by the new text. Until it is implemented, the Node layer should
+reject `clear: true` with an explicit error rather than silently ignoring it.
 
 ---
 
@@ -100,9 +100,10 @@ attempts fit in 30 seconds? This is non-obvious arithmetic and produces non-dete
 actual wait times due to jitter.
 
 **Impact:** Medium. Long-running operations (app installs, downloads, page loads) are
-hard to handle correctly. The current `UiReadiness` preset times out in roughly 10-15
-seconds. An agent that does not know the preset defaults or cannot do the math will
-either timeout too early or burn excessive retries.
+hard to handle correctly. The current `UiReadiness` preset burns through its retry
+delays in roughly 6.5 seconds before accounting for the work done on each attempt. An
+agent that does not know the preset defaults or cannot do the math will either timeout
+too early or burn excessive retries.
 
 **Suggested improvement:** Accept an optional `timeoutMs` at the action level for
 `wait_for_node` (and possibly `click`, `read_text`) that caps the total polling duration
