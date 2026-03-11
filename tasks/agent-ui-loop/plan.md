@@ -55,6 +55,18 @@ is covered elsewhere).
 
 ---
 
+## Why this is a separate task
+
+The `update-docs-for-emulator` branch covers device environment setup. This
+task covers agent runtime behavior and output interpretation. They are
+orthogonal. Mixing them would delay the emulator docs merge.
+
+The reference-contract audit that originally blocked this task has been completed in
+the current branch. This task now builds on the authored docs and shipped contract as
+they exist today, rather than depending on a separate gap-tracking plan.
+
+---
+
 ## What already exists
 
 These are documented and do not need to be rewritten:
@@ -65,7 +77,6 @@ These are documented and do not need to be rewritten:
 - Single-flight, no-hidden-retries, determinism guarantees (`node-api-for-agents.md`)
 - Skills system (`node-api-for-agents.md`, skills docs)
 - Post-navigation settle delay recommendation mentioned in playbook
-- `snapshot_ui` extraction failure contract: `success: false` + `data.error: "SNAPSHOT_EXTRACTION_FAILED"` when logcat marker not found (`node-api-for-agents.md`, `troubleshooting.md`)
 
 ---
 
@@ -363,7 +374,7 @@ Do not change in this task:
 - Error code reference (code-derived)
 - Any execution payload schema (contract changes require code changes first)
 - Skills documentation
-- Device setup documentation (covered in `docs/first-time-setup.md` and `docs/troubleshooting.md`)
+- Device setup documentation (covered by `update-docs-for-emulator`)
 
 ---
 
@@ -442,3 +453,6 @@ location for per-step error codes).
 
 ---
 
+## Suggested branch name
+
+`docs-agent-ui-loop`
