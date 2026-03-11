@@ -49,7 +49,7 @@ def insert_incompatibility_case(path: Path, new_version: str) -> bool:
 
     matches = list(
         re.finditer(
-            r'^(    assert\.strictEqual\(isVersionCompatible\("0\.1\.4", "0\.\d+\.\d+"\), false\);\n)+',
+            r'^(    assert\.strictEqual\(isVersionCompatible\("0\.1\.4", "[0-9]+\.[0-9]+\.[0-9]+"\), false\);\n)+',
             content,
             flags=re.MULTILINE,
         )

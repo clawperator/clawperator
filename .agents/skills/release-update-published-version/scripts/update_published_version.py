@@ -79,8 +79,8 @@ def main() -> None:
         die("usage: .agents/skills/release-update-published-version/scripts/update_published_version.py <version>")
 
     version = sys.argv[1]
-    if not re.match(r"^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$", version):
-        die("version must look like semver")
+    if not re.match(r"^[0-9]+\.[0-9]+\.[0-9]+$", version):
+        die("version must be a plain release version like X.Y.Z")
 
     repo_root = Path(run(["git", "rev-parse", "--show-toplevel"]).strip())
     tracked_status = run(["git", "status", "--porcelain"], cwd=repo_root).strip()

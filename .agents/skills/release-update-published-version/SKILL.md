@@ -45,7 +45,7 @@ git commit -m "docs(release): update published version to <version>"
 ## Validation
 
 The script runs:
-- `./scripts/docs_build.sh`
 - `npm --prefix sites/landing run sync-install-script`
+- `./scripts/docs_build.sh`
 
 If these steps fail, the published-version update is incomplete.
