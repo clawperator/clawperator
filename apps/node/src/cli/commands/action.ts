@@ -4,6 +4,7 @@ import { buildReadExecution } from "../../domain/actions/read.js";
 import { buildWaitExecution } from "../../domain/actions/wait.js";
 import { buildTypeTextExecution } from "../../domain/actions/typeText.js";
 import { buildOpenAppExecution } from "../../domain/actions/openApp.js";
+import { buildOpenUriExecution } from "../../domain/actions/openUri.js";
 import type { NodeMatcher } from "../../contracts/selectors.js";
 import type { OutputOptions } from "../output.js";
 import { formatSuccess, formatError } from "../output.js";
@@ -150,6 +151,35 @@ export async function cmdActionType(options: {
       submit: options.submit ?? false,
       clear: options.clear ?? false,
     });
+    const result = await runExecution(execution, {
+      deviceId: options.deviceId,
+      receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_RECEIVER_PACKAGE,
+      warn: message => process.stderr.write(message),
+    });
+    if (result.ok)
+      return formatSuccess(
+        {
+          envelope: result.envelope,
+          deviceId: result.deviceId,
+          terminalSource: result.terminalSource,
+          isCanonicalTerminal: result.terminalSource === "clawperator_result",
+        },
+        options
+      );
+    return formatError(result.error, options);
+  } catch (e) {
+    return formatError(e, options);
+  }
+}
+
+export async function cmdActionOpenUri(options: {
+  format: OutputOptions["format"];
+  uri: string;
+  deviceId?: string;
+  receiverPackage?: string;
+}): Promise<string> {
+  try {
+    const execution = buildOpenUriExecution(options.uri);
     const result = await runExecution(execution, {
       deviceId: options.deviceId,
       receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_RECEIVER_PACKAGE,

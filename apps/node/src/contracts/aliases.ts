@@ -3,6 +3,7 @@
  * Canonical form is stored and logged. Table is explicit/versioned.
  */
 const ACTION_ALIAS_TO_CANONICAL: Record<string, string> = {
+  open_url: "open_uri",
   tap: "click",
   press: "click",
   wait_for: "wait_for_node",
@@ -20,6 +21,7 @@ const ACTION_ALIAS_TO_CANONICAL: Record<string, string> = {
 
 export const CANONICAL_ACTION_TYPES = [
   "open_app",
+  "open_uri",
   "close_app",
   "wait_for_node",
   "click",

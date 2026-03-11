@@ -27,6 +27,7 @@ const nodeMatcherSchema = z
 
 const actionParamsSchema = z.object({
   applicationId: z.string().optional(),
+  uri: z.string().optional(),
   durationMs: z.number().optional(),
   path: z.string().optional(),
   matcher: nodeMatcherSchema.optional(),
@@ -49,6 +50,7 @@ const actionParamsSchema = z.object({
 
 const supportedTypes = [
   "open_app",
+  "open_uri",
   "close_app",
   "wait_for_node",
   "click",
@@ -108,6 +110,11 @@ const executionSchema = z.object({
       case "close_app":
         if (!params?.applicationId || params.applicationId.trim() === "") {
           addIssue(index, `${action.type} requires params.applicationId`, ["params", "applicationId"]);
+        }
+        break;
+      case "open_uri":
+        if (!params?.uri || params.uri.trim() === "") {
+          addIssue(index, "open_uri requires params.uri", ["params", "uri"]);
         }
         break;
       case "sleep":

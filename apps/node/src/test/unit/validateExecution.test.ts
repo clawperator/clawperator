@@ -166,6 +166,72 @@ describe("validateExecution", () => {
       (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
     );
   });
+  it("accepts valid open_uri with uri", () => {
+    const ex = validateExecution({
+      commandId: "c",
+      taskId: "t",
+      source: "s",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 5000,
+      actions: [{ id: "x", type: "open_uri", params: { uri: "market://details?id=org.videolan.vlc" } }],
+    });
+    assert.strictEqual(ex.actions[0].type, "open_uri");
+    assert.strictEqual(ex.actions[0].params?.uri, "market://details?id=org.videolan.vlc");
+  });
+
+  it("accepts open_uri with https uri", () => {
+    const ex = validateExecution({
+      commandId: "c",
+      taskId: "t",
+      source: "s",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 5000,
+      actions: [{ id: "x", type: "open_uri", params: { uri: "https://example.com" } }],
+    });
+    assert.strictEqual(ex.actions[0].type, "open_uri");
+  });
+
+  it("normalizes open_url alias to open_uri", () => {
+    const ex = validateExecution({
+      commandId: "c",
+      taskId: "t",
+      source: "s",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 5000,
+      actions: [{ id: "x", type: "open_url", params: { uri: "https://example.com" } }],
+    });
+    assert.strictEqual(ex.actions[0].type, "open_uri");
+  });
+
+  it("rejects open_uri without uri", () => {
+    assert.throws(
+      () =>
+        validateExecution({
+          commandId: "c",
+          taskId: "t",
+          source: "s",
+          expectedFormat: "android-ui-automator",
+          timeoutMs: 5000,
+          actions: [{ id: "x", type: "open_uri", params: {} }],
+        }),
+      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
+    );
+  });
+
+  it("rejects open_uri with blank uri", () => {
+    assert.throws(
+      () =>
+        validateExecution({
+          commandId: "c",
+          taskId: "t",
+          source: "s",
+          expectedFormat: "android-ui-automator",
+          timeoutMs: 5000,
+          actions: [{ id: "x", type: "open_uri", params: { uri: "   " } }],
+        }),
+      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
+    );
+  });
 });
 
 describe("validatePayloadSize", () => {
