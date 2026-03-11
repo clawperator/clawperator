@@ -204,7 +204,14 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (!activeSection || typeof window === "undefined") return;
+    if (typeof window === "undefined") return;
+
+    if (!activeSection) {
+      if (!window.location.hash) return;
+      window.history.replaceState(null, "", window.location.pathname + window.location.search);
+      return;
+    }
+
     const nextHash = `#${activeSection}`;
     if (window.location.hash === nextHash) return;
     window.history.replaceState(null, "", nextHash);
