@@ -434,7 +434,13 @@ export default function Home() {
             <span>structured result</span>
           </div>
           <div className="loop-example">
-            <p className="loop-example-label">Example agent loop (pseudocode - see docs.clawperator.com for the full API)</p>
+            <p className="loop-example-label">
+              Example agent loop (pseudocode - see{" "}
+              <a href="https://docs.clawperator.com" target="_blank" rel="noreferrer">
+                docs.clawperator.com
+              </a>{" "}
+              for the full API)
+            </p>
             <pre>
               <code>{`open_app(<google_home_app_id>)
 snapshot_ui()
@@ -454,6 +460,52 @@ if <hvac_state> == "Off":
             <p>{feature.body}</p>
           </article>
         ))}
+      </section>
+
+      <section id="skills" className="content-section">
+        <h2>Skills</h2>
+        <p>
+          Clawperator automations are unlocked through skills.
+        </p>
+        <p>
+          Clawperator includes an open source, ever-expanding skills repository for common Android workflows.
+        </p>
+        <p>
+          But you are not blocked waiting for an official skill. Agents do not need a prebuilt skill to automate your
+          apps.
+        </p>
+        <p>
+          Our dedicated build-your-own-skill-from-scratch documentation walks agents through the process step by step.
+          Point your agent at the right app and tell it to make a skill. It can use the <code>clawperator</code> API
+          to inspect the app&apos;s UI, find a reliable path to the state or action you need, and create a private,
+          personalized skill for your exact workflow.
+        </p>
+
+        <div className="grid-2-col">
+          <div>
+            <h3>Included with install</h3>
+            <ul>
+              <li>Open source skills repository</li>
+              <li>Reusable building blocks for common workflows</li>
+              <li>Discoverable and runnable through the same runtime</li>
+            </ul>
+          </div>
+          <div>
+            <h3>Yours to create</h3>
+            <ul>
+              <li>Private skills for your own apps and accounts</li>
+              <li>Agent-built skills from live app exploration</li>
+              <li>Public and private skills mixed in the same runtime</li>
+            </ul>
+          </div>
+        </div>
+
+        <div className="setup-note">
+          <p>
+            <strong>You are not blocked waiting for a public skill.</strong> Start with included skills, adapt them to
+            your setup, or let your agent create private ones through Clawperator&apos;s documented API.
+          </p>
+        </div>
       </section>
 
       <section id="architecture" className="content-section architecture-section">
@@ -492,44 +544,6 @@ if <hvac_state> == "Off":
           is the execution layer: intelligence stays in the agent, execution stays in Clawperator. The runtime includes
           the CLI on your host machine and the Clawperator Operator Android app on the Android device.
         </p>
-      </section>
-
-      <section id="skills" className="content-section">
-        <h2>Skills</h2>
-        <p>
-          Clawperator ships with a growing open source skills library, but the important point is that you do not need
-          prebuilt skills to get value.
-        </p>
-        <p>
-          Because Clawperator exposes a structured, documented API, your own agent can open an app, inspect the UI,
-          figure out the flow, and build a private skill for your exact apps, accounts, and workflows.
-        </p>
-
-        <div className="grid-2-col">
-          <div>
-            <h3>Included with install</h3>
-            <ul>
-              <li>Growing open source skills library</li>
-              <li>Reusable building blocks for common mobile workflows</li>
-              <li>Discoverable and runnable through the same runtime</li>
-            </ul>
-          </div>
-          <div>
-            <h3>Yours to customize</h3>
-            <ul>
-              <li>Create private skills for personal apps and workflows</li>
-              <li>Let your agent build skills from live app exploration</li>
-              <li>Mix included skills and private skills in the same runtime</li>
-            </ul>
-          </div>
-        </div>
-
-        <div className="setup-note">
-          <p>
-            <strong>You are not blocked waiting for a public skill.</strong> Start with included skills, adapt them to
-            your setup, or let your agent create private ones through Clawperator&apos;s documented API.
-          </p>
-        </div>
       </section>
 
       <section id="how-it-works" className="content-section loop-section">
