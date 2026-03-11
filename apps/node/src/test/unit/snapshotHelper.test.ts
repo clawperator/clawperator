@@ -53,6 +53,31 @@ describe("extractSnapshotFromLogs", () => {
     assert.strictEqual(extractSnapshotFromLogs(lines), null);
   });
 
+  it("rejects TaskScopeDefault: marker (regression: published binary used this wrong marker)", () => {
+    const lines = [
+      "D/E       : TaskScopeDefault: <hierarchy rotation=\"0\">",
+      "D/E       :   <node index=\"0\" text=\"Settings\" />",
+      "D/E       : TaskScopeDefault: </hierarchy>",
+    ];
+    assert.strictEqual(extractSnapshotFromLogs(lines), null);
+  });
+
+  it("handles the exact logcat line format the Android app emits (D/E tag prefix)", () => {
+    const lines = [
+      "D/E       : [TaskScope] UI Hierarchy:",
+      "D/E       : <?xml version='1.0' encoding='UTF-8' standalone='yes' ?>",
+      "D/E       : <hierarchy rotation=\"0\">",
+      "D/E       :   <node index=\"0\" text=\"\" resource-id=\"\" class=\"android.widget.FrameLayout\" package=\"com.android.vending\" content-desc=\"\" clickable=\"false\" enabled=\"true\" bounds=\"[0,0][1080,2340]\" />",
+      "D/E       : </hierarchy>",
+    ];
+
+    const result = extractSnapshotFromLogs(lines);
+    assert.ok(result !== null, "snapshot must not be null");
+    assert.ok(result.includes("<hierarchy"), "must include hierarchy tag");
+    assert.ok(result.includes("com.android.vending"), "must include package content");
+    assert.ok(!result.includes("D/E"), "must strip logcat tag prefix from extracted content");
+  });
+
   it("returns the latest snapshot and preserves all snapshots in order", () => {
     const lines = [
       "D/E       : [TaskScope] UI Hierarchy:",

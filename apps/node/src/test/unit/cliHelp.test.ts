@@ -1,13 +1,16 @@
 import { describe, it } from "node:test";
 import assert from "node:assert";
 import { spawn } from "node:child_process";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "../../..");
 
 function runCli(args: string[]): Promise<{ stdout: string; stderr: string; code: number }> {
-  const cliPath = join(process.cwd(), "dist", "cli", "index.js");
+  const cliPath = join(packageRoot, "dist", "cli", "index.js");
   return new Promise((resolve) => {
     const proc = spawn(process.execPath, [cliPath, ...args], {
-      cwd: process.cwd(),
+      cwd: packageRoot,
       stdio: ["ignore", "pipe", "pipe"],
     });
     let stdout = "";

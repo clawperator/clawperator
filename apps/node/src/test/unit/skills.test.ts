@@ -1,10 +1,12 @@
 import { describe, it, before, after } from "node:test";
 import assert from "node:assert";
 import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
 import { mkdtemp, mkdir, copyFile, rm } from "node:fs/promises";
-import { join, normalize } from "node:path";
+import { dirname, join, normalize } from "node:path";
+import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
+
+const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "../../..");
 import { listSkills } from "../../domain/skills/listSkills.js";
 import { getSkill } from "../../domain/skills/getSkill.js";
 import { compileArtifact } from "../../domain/skills/compileArtifact.js";
@@ -14,19 +16,7 @@ import { loadRegistry } from "../../adapters/skills-repo/localSkillsRegistry.js"
 import { validateExecution, validatePayloadSize } from "../../domain/executions/validateExecution.js";
 import { SKILL_NOT_FOUND, ARTIFACT_NOT_FOUND, COMPILE_VAR_MISSING, SKILL_SCRIPT_NOT_FOUND, SKILL_EXECUTION_FAILED } from "../../contracts/skills.js";
 
-function resolveTestRegistryPath(): string {
-  const candidates = [
-    join(process.cwd(), "src", "test", "fixtures", "skills", "skills-registry.json"),
-    join(process.cwd(), "apps", "node", "src", "test", "fixtures", "skills", "skills-registry.json"),
-  ];
-  const found = candidates.find((p) => existsSync(p));
-  if (!found) {
-    throw new Error(`Test skills registry fixture not found. Checked: ${candidates.join(", ")}`);
-  }
-  return found;
-}
-
-const TEST_REGISTRY_PATH = resolveTestRegistryPath();
+const TEST_REGISTRY_PATH = join(packageRoot, "src", "test", "fixtures", "skills", "skills-registry.json");
 const ORIGINAL_REGISTRY_PATH = process.env.CLAWPERATOR_SKILLS_REGISTRY;
 
 before(() => {
@@ -42,10 +32,10 @@ after(() => {
 });
 
 function runCli(args: string[]): Promise<{ stdout: string; stderr: string; code: number }> {
-  const cliPath = join(process.cwd(), "dist", "cli", "index.js");
+  const cliPath = join(packageRoot, "dist", "cli", "index.js");
   return new Promise((resolve) => {
     const proc = spawn(process.execPath, [cliPath, ...args], {
-      cwd: process.cwd(),
+      cwd: packageRoot,
       env: {
         ...process.env,
         CLAWPERATOR_SKILLS_REGISTRY: TEST_REGISTRY_PATH,
@@ -66,7 +56,7 @@ function runNodeSnippet(
 ): Promise<{ stdout: string; stderr: string; code: number }> {
   return new Promise((resolve) => {
     const proc = spawn(process.execPath, ["--input-type=module", "-e", script], {
-      cwd: options?.cwd ?? process.cwd(),
+      cwd: options?.cwd ?? packageRoot,
       env: options?.env ?? process.env,
       stdio: ["ignore", "pipe", "pipe"],
     });
@@ -125,7 +115,7 @@ describe("loadRegistry", () => {
     await copyFile(TEST_REGISTRY_PATH, fallbackPath);
 
     try {
-      const modulePath = join(process.cwd(), "dist", "adapters", "skills-repo", "localSkillsRegistry.js");
+      const modulePath = join(packageRoot, "dist", "adapters", "skills-repo", "localSkillsRegistry.js");
       const script = `
         import { loadRegistry, getRegistryPath } from ${JSON.stringify(modulePath)};
         process.chdir(${JSON.stringify(appNodeDir)});
