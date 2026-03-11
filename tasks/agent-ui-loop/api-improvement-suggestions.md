@@ -61,31 +61,29 @@ reject `clear: true` with an explicit error rather than silently ignoring it.
 
 ---
 
-## GAP-03: No `open_uri` action (deep links and content-addressed pages)
+## GAP-03: `open_uri` action for deep links and content-addressed pages is now implemented
 
-**Problem:** `open_app` only accepts an `applicationId`. There is no action for opening
-a URI, deep link, or Android Intent. Agents that need to navigate to a specific content
-page (Play Store app detail page, YouTube video, in-app link) must exit the execution
-payload model and use raw `adb shell am start`.
+**Status:** Done.
 
-**Impact:** Medium-high. A significant class of automation tasks - "go to this specific
-page" - requires falling outside the Clawperator contract, losing result/error
-semantics.
+**Previous gap:** `open_app` only accepted an `applicationId`. There was no action for
+opening a URI, deep link, or Android Intent, so agents that needed to navigate to a
+specific content page (Play Store app detail page, YouTube video, in-app link) had to
+exit the execution payload model and use raw `adb shell am start`.
 
-**Suggested improvement:** Add an `open_uri` action:
+**Resolution:** Clawperator now supports an `open_uri` action:
 ```json
 {
   "id": "nav1",
   "type": "open_uri",
   "params": {
-    "uri": "market://details?id=org.videolan.vlc"
+    "uri": "market://details?id=com.actionlauncher.playstore"
   }
 }
 ```
 
-The Android implementation is `Intent(Intent.ACTION_VIEW, Uri.parse(uri))`. The action
-should document that a chooser dialog may appear on devices with multiple handlers for
-the URI scheme.
+The Android implementation uses `Intent(Intent.ACTION_VIEW, Uri.parse(uri))`. The docs
+now note that a chooser dialog may appear on devices with multiple handlers for the URI
+scheme, and the action is available from the Node API and CLI.
 
 ---
 
@@ -283,7 +281,7 @@ whichever file handles the `action` routing fallback).
 |----|------|--------|------|
 | GAP-01 | No standalone `scroll` action | High | Missing feature |
 | GAP-02 | `enter_text` `clear` silently no-ops | High | Silent failure |
-| GAP-03 | No `open_uri` / deep link action | Medium-high | Missing feature |
+| GAP-03 | `open_uri` deep link action implemented | Done | Closed |
 | GAP-04 | `wait_for_node` no total-time semantic | Medium | Ergonomics |
 | GAP-05 | No hardware/system key press | Medium | Missing feature |
 | GAP-06 | `sleep.durationMs` silently clamped | Low-medium | Inconsistency |
