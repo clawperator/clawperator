@@ -556,6 +556,244 @@ The page should follow this sequence:
 
 That order moves from category -> trust -> use cases -> expansion -> action.
 
+## Landing page section audit
+
+Given the audience for `clawperator.com` is now more technical, and the docs
+site is comprehensive, the landing page should be more selective about what it
+tries to teach.
+
+The landing page should answer:
+
+- what this is
+- why it matters
+- why it is credible
+- how to get started
+
+It should not try to serve as a second reference manual.
+
+### Important surface distinction
+
+Do not assume overflow content should move into `public/index.md`.
+
+`/index.md` is already a machine-oriented landing page. It should stay concise,
+stable, and crawler-friendly. It is not the right place for extra human
+explanatory sections copied from the homepage.
+
+When trimming the homepage:
+
+- move machine-oriented technical detail to docs or `/agents`
+- keep `/index.md` as the compact markdown entrypoint
+- keep the human homepage focused on category, trust, examples, skills, and
+  install
+
+### Section-by-section recommendation
+
+#### Hero
+
+Keep, but rewrite heavily.
+
+Why:
+
+- this is where category and value need to land fast
+- the current copy is too explanatory and not category-claiming enough
+
+Action:
+
+- keep the section
+- tighten the paragraph
+- add the chosen "programmable / Playwright" line high in the stack
+
+#### Quick Start
+
+Keep, but compress.
+
+Why:
+
+- install intent belongs on the homepage
+- technical users expect to see the install command immediately
+- the burner/emulator reassurance is valuable
+
+Action:
+
+- keep one-liner install
+- keep emulator fallback
+- tighten prose
+- use canonical terminology `Clawperator Operator Android app` where relevant
+
+#### Agent entry strip
+
+Keep.
+
+Why:
+
+- it correctly redirects agent readers and deeply technical users to the docs
+- it reduces pressure to over-explain the homepage
+
+Action:
+
+- keep links to docs, playbook, API reference, and `/index.md`
+- this strip becomes more important if other homepage sections are shortened
+
+#### Real-world examples
+
+Keep, but replace the current implementation.
+
+Why:
+
+- practical examples are critical for human value recognition
+- the current chat-style examples are weaker than direct value-first examples
+
+Action:
+
+- replace with "What you can do with Clawperator"
+- remove the faux transcript style
+- use stronger, household-relevant, mobile-only-app examples
+
+#### Features
+
+Keep, but merge conceptually with Reliability if possible.
+
+Why:
+
+- "Features" and "Reliability" currently overlap
+- both are trying to explain the execution contract
+
+Action:
+
+- either collapse them into one stronger section, or make Features much tighter
+- center it around deterministic, structured, built for loops
+- include the `action -> execution -> structured result` block here
+
+#### Why use Clawperator?
+
+Compress heavily or merge into hero/feature framing.
+
+Why:
+
+- this section repeats ideas that should already be established earlier
+- "mobile apps hold the real functionality" belongs near the top
+
+Action:
+
+- do not keep this as a full standalone section unless the rewrite gives it a
+  sharper role
+- best candidate for removal as a separate block
+
+#### What is Clawperator?
+
+Compress heavily.
+
+Why:
+
+- much of this material is architectural or setup detail already covered by
+  hero, quick start, and architecture
+- it currently mixes audience explanation, feature list, and setup advice in
+  one section
+
+Action:
+
+- keep only the strongest "brain/hand" framing if needed
+- move most list detail into docs-oriented surfaces
+- do not let this become a second summary section
+
+#### The architecture
+
+Keep, but shorten.
+
+Why:
+
+- the architecture diagram is a good credibility builder for technical readers
+- it reinforces the execution-layer model quickly
+
+Action:
+
+- keep the strip/diagram
+- reduce surrounding prose
+- ensure the wording uses `Clawperator Operator Android app` correctly if the
+  Android-side component is mentioned
+
+#### Reliability
+
+Keep, but likely absorb Features.
+
+Why:
+
+- this is one of the highest-value sections for a technical audience
+- it explains why Clawperator is infrastructure rather than a demo
+
+Action:
+
+- make this the main trust section
+- include no hidden retries, one result per command, explicit errors
+- remove duplicated points from Features/Why/What
+
+#### Skills
+
+Keep and expand strategically.
+
+Why:
+
+- this is one of the most important differentiators
+- the current section is too implementation-shaped and not enough product story
+
+Action:
+
+- reduce the command-heavy examples if space is tight
+- increase emphasis on included open source skills, no need for pre-existing
+  skills, and agent-created private skills
+- link to docs for execution details instead of teaching invocation mechanics in
+  depth on the homepage
+
+#### How It Works
+
+Keep, but simplify.
+
+Why:
+
+- the loop is important
+- the current four-step breakdown is readable
+
+Action:
+
+- keep the simple loop
+- avoid repeating copy already covered by hero + reliability
+- consider whether "Observe / Decide / Execute / Return" can be slightly
+  tightened to avoid redundancy
+
+### Likely removals or reductions
+
+Best candidates to reduce or merge away:
+
+- standalone "Why use Clawperator?" section
+- most of the list-heavy detail inside "What is Clawperator?"
+- command-heavy skill examples on the homepage
+- duplicated explanatory prose between Features, Reliability, and How It Works
+
+### What should move off the homepage
+
+Move or emphasize elsewhere:
+
+- deep API integration detail -> docs site
+- skill authoring mechanics and invocation specifics -> docs site
+- machine-oriented overview -> `/index.md`
+- agent-facing technical entrypoints -> `/agents` and docs
+
+### Recommendation summary
+
+The homepage should become shorter and more forceful.
+
+Recommended homepage core:
+
+1. Hero
+2. Quick Start
+3. What you can do with Clawperator
+4. Deterministic / built for agent loops
+5. Skills
+6. Architecture
+7. How it works
+
+Everything else should either be merged into those sections or moved to docs.
+
 ## Phrases worth using
 
 These are especially strong and aligned with the product:
