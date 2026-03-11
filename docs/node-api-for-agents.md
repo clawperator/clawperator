@@ -410,6 +410,15 @@ Example: for a node with `content-desc="Search for &apos;vlc&apos;"`:
 - **Scroll containers** have `scrollable="true"`. Pass their `resource-id` as the `container` matcher in `scroll_and_click`.
 - **Disabled elements** have `enabled="false"`. They cannot be interacted with - scrolling or waiting for a state change is required first.
 
+**Apps with obfuscated or missing resource-ids:** Many production apps (Google Play Store, social media apps, banking apps) set `resource-id=""` on all or most nodes. In this case, fall back to content-desc and text matchers. The fallback priority for these apps is:
+
+1. `contentDescEquals` - for elements with stable accessibility labels (icon buttons, tabs)
+2. `textEquals` - for elements with stable visible text (button labels, section headers)
+3. `contentDescContains` / `textContains` - when the value may include dynamic content, counts, or special characters (including HTML entities - see note above)
+4. `role: "textfield"` - for text inputs when no `resource-id` is present
+
+Note: `content-desc` values sometimes contain newlines when an element's label spans multiple pieces of information (for example, an app name followed by developer name in Play Store results). Use `contentDescContains` with a known stable substring rather than a full exact match.
+
 ## Error Codes
 
 Branch agent logic on codes from `envelope.error` or `stepResults[].data.error`:
