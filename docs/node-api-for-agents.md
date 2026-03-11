@@ -13,6 +13,7 @@ Clawperator provides a deterministic execution layer for LLM agents to control A
 
 | Command | Description |
 | :--- | :--- |
+| `operator install --apk <path>` | Install the Operator APK and grant required device permissions (canonical setup command) |
 | `devices` | List connected Android serials and states |
 | `emulator list` | List configured Android Virtual Devices with compatibility metadata |
 | `emulator inspect <name>` | Show normalized metadata for one Android Virtual Device |
@@ -38,7 +39,7 @@ Clawperator provides a deterministic execution layer for LLM agents to control A
 | `skills run <skill_id> [--device-id <id>]` | Invoke a skill script (convenience wrapper) |
 | `skills install` | Clone skills repo to `~/.clawperator/skills/` |
 | `skills update [--ref <git-ref>]` | Pull latest skills (optionally pin to a ref) |
-| `grant-device-permissions` | Grant required Operator permissions on the connected device via adb |
+| `grant-device-permissions` | Re-grant Operator permissions after permission drift (remediation only - use `operator install` for initial setup) |
 | `serve` | Start HTTP/SSE server |
 | `doctor` | Run environment diagnostics |
 | `version` | Print the CLI version or check CLI / Clawperator Operator Android app compatibility |

@@ -82,39 +82,43 @@ If both a physical device and an emulator are connected, you will need to pass `
 
 ## Step 3 - Install the Clawperator Operator Android app
 
-Install the [Clawperator Operator Android app](android-operator-apk.md) onto the connected device or emulator:
+Use the canonical install command to install the [Clawperator Operator Android app](android-operator-apk.md) and grant required permissions in one step:
 
 ```bash
-adb install -r ~/.clawperator/downloads/operator.apk
+clawperator operator install --apk ~/.clawperator/downloads/operator.apk
 ```
 
-If you have multiple devices connected, specify the target:
+If you have multiple devices connected, specify the target device:
 
 ```bash
-adb -s <device_id> install -r ~/.clawperator/downloads/operator.apk
+clawperator operator install \
+  --apk ~/.clawperator/downloads/operator.apk \
+  --device-id <device_id>
 ```
+
+For local debug builds, specify the receiver package:
+
+```bash
+clawperator operator install \
+  --apk ~/.clawperator/downloads/operator-debug.apk \
+  --receiver-package com.clawperator.operator.dev
+```
+
+This command runs three phases in order:
+
+1. Installs the APK onto the device via `adb`.
+2. Grants required device permissions (accessibility service, notification listener).
+3. Verifies the package is accessible after install.
+
+The command fails with a structured error if any phase fails. The error includes which phase failed and why, so agents and users can diagnose and recover.
+
+> Do not use raw `adb install` for normal setup. It copies the APK but leaves the device in a partial state without required permissions. Use `clawperator operator install` instead.
+
+> The accessibility service must remain enabled. If it is ever disabled after setup, run `clawperator grant-device-permissions` to re-enable it.
 
 ---
 
-## Step 4 - Enable the Accessibility Service
-
-Clawperator uses Android's Accessibility API to observe and interact with UI elements. You must enable the service before it can accept commands.
-
-**From the host machine (recommended for remote and agent-driven setups):**
-
-```bash
-clawperator grant-device-permissions
-```
-
-This uses `adb` to enable the accessibility service without touching the device screen. Works identically for physical devices and emulators. Optionally pass `--device-id <id>` if multiple devices are connected.
-
-For a standard public install, the default receiver package is `com.clawperator.operator`. For local debug builds, pass `--receiver-package com.clawperator.operator.dev`.
-
-> The accessibility service must remain enabled. If it is disabled, executions will time out.
-
----
-
-## Step 5 - Verify Setup
+## Step 4 - Verify Setup
 
 Run the diagnostic check:
 
@@ -127,14 +131,14 @@ A fully configured device will show all checks passing. Common warnings:
 | Warning | Fix |
 | :--- | :--- |
 | `DEVICE_UNAUTHORIZED` | Tap "Allow" on the device USB debugging dialog |
-| `RECEIVER_NOT_INSTALLED` | Complete Step 3 (install the [Clawperator Operator Android app](android-operator-apk.md)) |
-| `DEVICE_ACCESSIBILITY_NOT_RUNNING` | Complete Step 4 (enable accessibility service) |
+| `RECEIVER_NOT_INSTALLED` | Complete Step 3 (run `clawperator operator install`) |
+| `DEVICE_ACCESSIBILITY_NOT_RUNNING` | Run `clawperator grant-device-permissions` to re-grant accessibility access |
 | `DEVICE_DEV_OPTIONS_DISABLED` | Enable Developer options (physical device only) |
 | `DEVICE_USB_DEBUGGING_DISABLED` | Enable USB debugging (physical device only) |
 
 ---
 
-## Step 6 - Run Your First Command
+## Step 5 - Run Your First Command
 
 Observe the current UI state:
 
