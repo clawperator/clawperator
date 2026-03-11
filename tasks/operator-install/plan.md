@@ -129,6 +129,9 @@ This is preferable to silently aliasing `clawperator install`, because it keeps
 the CLI taxonomy explicit while still helping users and agents recover from the
 most obvious guessed command.
 
+This guidance behavior is a CLI affordance, not a public docs recommendation.
+Public docs should teach only the canonical command.
+
 Related files:
 
 - `apps/node/src/cli/index.ts`
@@ -218,8 +221,6 @@ The public docs should make these points explicit:
 2. agents should not use raw `adb install` as the standard setup flow
 3. the canonical setup command is `clawperator operator install`
 4. `grant-device-permissions` is for remediation and recovery
-5. `clawperator install` is not the canonical command and should redirect the
-   caller to `clawperator operator install`
 
 The docs should also explain why this matters:
 
