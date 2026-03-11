@@ -83,7 +83,6 @@ def main() -> None:
 
     internal_replacements = {
         ".agents/skills/release-create/SKILL.md": (re.escape(old_version), new_version),
-        ".agents/skills/release-set-code-version-number/SKILL.md": (re.escape(old_version), new_version),
         "scripts/fake_adb.sh": (re.escape(f"{old_version}-d"), f"{new_version}-d"),
     }
 
