@@ -13,46 +13,14 @@ doc file that needs editing, and the exact fix required.
 
 ---
 
-### ISSUE-01: `snapshot_ui` silently returns `success: true` with empty `data.text`
+### ~~ISSUE-01: `snapshot_ui` silently returns `success: true` with empty `data.text`~~ RESOLVED
 
-**Problem:** The docs describe `snapshot_ui` as returning `data.text` containing the XML
-hierarchy. What they don't say is that `data.text` can be empty while `success: true` and
-`data.actual_format: "hierarchy_xml"` are still reported. There is no error code, no
-`success: false`, and no diagnostic to indicate that no XML was captured.
+**Resolved by:** PR #53 (`fix(node): surface snapshot extraction failures as SNAPSHOT_EXTRACTION_FAILED`).
 
-**What actually happens:** The Node layer runs `adb logcat -d -v tag` and searches for
-`[TaskScope] UI Hierarchy:` in the output. If the marker is not found, `data.text` is
-left empty (or not set). The step result remains `success: true` and
-`data.actual_format: "hierarchy_xml"`.
-
-**Source of truth:** `apps/node/src/domain/executions/runExecution.ts` lines 165-170.
-`attachSnapshotsToStepResults` is called only when `extractSnapshotsFromLogs` finds the
-marker. When it does not, no `data.text` is written.
-
-**Impact:** An agent observing `success: true` with `actual_format: "hierarchy_xml"` has
-no signal that the snapshot failed. The only way to detect the failure is to check
-`data.text` length.
-
-**Doc file:** `docs/node-api-for-agents.md`, section "Action behavior notes", under
-`snapshot_ui`.
-
-**Current text:**
-> `data.actual_format` is always `"hierarchy_xml"` for successful snapshot steps.
-
-**Required fix:** Add a warning paragraph:
-
-```
-**Warning - empty data.text:** `snapshot_ui` returns `success: true` even when
-`data.text` is empty. This can happen when logcat does not contain the expected
-`[TaskScope] UI Hierarchy:` marker. Always check that `data.text` is non-empty before
-parsing. An empty snapshot with `success: true` indicates a runtime extraction failure,
-not an empty screen. See Troubleshooting for resolution steps.
-```
-
-Also fix the claim that `data.actual_format` is "always" `hierarchy_xml`. When
-`data.text` is empty, the format field may still report `hierarchy_xml` but the data is
-not valid. Reword to: "`data.actual_format` reports `"hierarchy_xml"` when the step
-completes."
+`snapshot_ui` steps that complete ADB communication but produce no XML now return
+`success: false` with `data.error: "SNAPSHOT_EXTRACTION_FAILED"`. The docs in
+`docs/node-api-for-agents.md` and `docs/troubleshooting.md` have been updated to
+reflect this contract.
 
 ---
 
@@ -132,59 +100,11 @@ correctly, as long as the child's bounding box is visually within the parent.
 
 ---
 
-### ISSUE-04: No troubleshooting entry for "snapshot returns empty data.text"
+### ~~ISSUE-04: No troubleshooting entry for "snapshot returns empty data.text"~~ RESOLVED
 
-**Problem:** There is no troubleshooting guidance for the most impactful failure mode
-discovered in this session: `snapshot_ui` returning `success: true` with empty `data.text`.
-This cost significant debugging time during the exploration session.
-
-**Source of truth:** Root cause is a mismatch between the logcat marker in
-`apps/node/src/domain/executions/snapshotHelper.ts` (`[TaskScope] UI Hierarchy:`) and
-what an outdated global binary searches for (`TaskScopeDefault:`). The fix is to use the
-local build or update the global install.
-
-**Doc file:** `docs/troubleshooting.md` - needs a new section.
-
-**Required fix:** Add a new section between "Version Compatibility" and the end:
-
-```markdown
-## Snapshot returns empty data.text
-
-If `snapshot_ui` returns `success: true` and `data.actual_format: "hierarchy_xml"` but
-`data.text` is empty or absent, the snapshot extraction step failed silently.
-
-### Diagnosis
-
-Run this command to confirm the Android app IS emitting the hierarchy:
-
-```bash
-adb -s <device_serial> logcat -d -v tag | grep "TaskScope"
-```
-
-If you see output containing `[TaskScope] UI Hierarchy:`, the Android side is working.
-The problem is in the Node CLI's logcat parsing.
-
-### Cause: version mismatch in snapshotHelper
-
-The Node CLI reads logcat and searches for the `[TaskScope] UI Hierarchy:` marker. An
-older or mismatched CLI build may search for a different marker (`TaskScopeDefault:`),
-causing every snapshot to be silently empty.
-
-### Fix
-
-1. Check the CLI version being used: `which clawperator && clawperator version`
-2. If using a globally installed binary that is out of date, rebuild from source:
-   ```bash
-   npm --prefix apps/node run build
-   ```
-3. Or set `CLAW_BIN` to point to the local build when running skills:
-   ```bash
-   export CLAW_BIN=/path/to/clawperator/apps/node/dist/cli/index.js
-   ```
-4. Run `clawperator doctor` after updating to confirm the snapshot round-trip works.
-
-The `clawperator doctor` command validates snapshot extraction as part of its checks.
-```
+**Resolved by:** PR #53. A full "Snapshot UI returns SNAPSHOT_EXTRACTION_FAILED" section
+was added to `docs/troubleshooting.md` covering symptom, root cause, confirmation step,
+fix (`npm install -g clawperator`), and `CLAW_BIN` workaround.
 
 ---
 
@@ -407,20 +327,20 @@ For routine UI automation, use Clawperator so result/error semantics stay consis
 
 ## Summary table
 
-| Issue | Severity | Doc file | Section |
-|-------|----------|----------|---------|
-| ISSUE-01: empty `data.text` silent success | P1 - wrong | `docs/node-api-for-agents.md` | Action behavior notes / snapshot_ui |
-| ISSUE-02: `role: "textfield"` guidance wrong | P1 - wrong | `docs/node-api-for-agents.md` | NodeMatcher Reference |
-| ISSUE-03: click behavior on `clickable=false` inaccurate | P1 - wrong | `docs/node-api-for-agents.md` | Snapshot Output / Reading patterns |
-| ISSUE-04: no troubleshooting entry for empty snapshot | P2 - missing | `docs/troubleshooting.md` | New section |
-| ISSUE-05: HTML entity encoding not documented | P2 - missing | `docs/node-api-for-agents.md` | Snapshot Output / hierarchy_xml |
-| ISSUE-06: no `open_uri` gap documented | P2 - missing | `docs/node-api-for-agents.md` | Action notes + FAQ |
-| ISSUE-07: `observe snapshot` vs `snapshot_ui` not explained | P2 - missing | `docs/node-api-for-agents.md` | Action behavior notes |
-| ISSUE-08: `timeoutMs` cap buried in sleep note | P3 - incomplete | `docs/node-api-for-agents.md` | Execution Payload |
-| ISSUE-09: `wait_for_node` `timeoutMs` param not listed | P3 - incomplete | `docs/node-api-for-agents.md` | Action Reference table |
-| ISSUE-10: `UNSUPPORTED_RUNTIME_CLOSE` missing from error table | P3 - incomplete | `docs/node-api-for-agents.md` | Error Codes |
-| ISSUE-11: Reading patterns only covers resource-id-rich apps | P3 - incomplete | `docs/node-api-for-agents.md` | Snapshot Output / Reading patterns |
-| ISSUE-12: "When to use adb" FAQ too vague | P3 - incomplete | `docs/node-api-for-agents.md` | FAQ |
+| Issue | Severity | Doc file | Section | Status |
+|-------|----------|----------|---------|--------|
+| ISSUE-01: empty `data.text` silent success | P1 - wrong | `docs/node-api-for-agents.md` | Action behavior notes / snapshot_ui | **Resolved - PR #53** |
+| ISSUE-02: `role: "textfield"` guidance wrong | P1 - wrong | `docs/node-api-for-agents.md` | NodeMatcher Reference | Open |
+| ISSUE-03: click behavior on `clickable=false` inaccurate | P1 - wrong | `docs/node-api-for-agents.md` | Snapshot Output / Reading patterns | Open |
+| ISSUE-04: no troubleshooting entry for empty snapshot | P2 - missing | `docs/troubleshooting.md` | New section | **Resolved - PR #53** |
+| ISSUE-05: HTML entity encoding not documented | P2 - missing | `docs/node-api-for-agents.md` | Snapshot Output / hierarchy_xml | Open |
+| ISSUE-06: no `open_uri` gap documented | P2 - missing | `docs/node-api-for-agents.md` | Action notes + FAQ | Open |
+| ISSUE-07: `observe snapshot` vs `snapshot_ui` not explained | P2 - missing | `docs/node-api-for-agents.md` | Action behavior notes | Open |
+| ISSUE-08: `timeoutMs` cap buried in sleep note | P3 - incomplete | `docs/node-api-for-agents.md` | Execution Payload | Open |
+| ISSUE-09: `wait_for_node` `timeoutMs` param not listed | P3 - incomplete | `docs/node-api-for-agents.md` | Action Reference table | Open |
+| ISSUE-10: `UNSUPPORTED_RUNTIME_CLOSE` missing from error table | P3 - incomplete | `docs/node-api-for-agents.md` | Error Codes | Open |
+| ISSUE-11: Reading patterns only covers resource-id-rich apps | P3 - incomplete | `docs/node-api-for-agents.md` | Snapshot Output / Reading patterns | Open |
+| ISSUE-12: "When to use adb" FAQ too vague | P3 - incomplete | `docs/node-api-for-agents.md` | FAQ | Open |
 
 ---
 
