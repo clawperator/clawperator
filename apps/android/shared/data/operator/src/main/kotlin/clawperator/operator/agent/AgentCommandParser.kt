@@ -32,6 +32,7 @@ class AgentCommandParserDefault : AgentCommandParser {
         private const val MAX_ID_LENGTH = 128
         private const val MAX_SOURCE_LENGTH = 64
         private const val MAX_MATCHER_VALUE_LENGTH = 512
+        private const val MAX_URI_LENGTH = 2048
 
         private val json = Json {
             ignoreUnknownKeys = true
@@ -86,7 +87,7 @@ class AgentCommandParserDefault : AgentCommandParser {
             "open_uri" ->
                 UiAction.OpenUri(
                     id = id,
-                    uri = params.stringRequired("uri", MAX_MATCHER_VALUE_LENGTH),
+                    uri = params.stringRequired("uri", MAX_URI_LENGTH),
                     retry = params.parseRetryOrDefault(defaultRetry = TaskRetryPresets.AppLaunch),
                 )
             "open_app" ->
@@ -262,7 +263,6 @@ class AgentCommandParserDefault : AgentCommandParser {
     private fun JsonObject.stringOrNull(key: String): String? {
         val primitive = this[key] as? JsonPrimitive ?: return null
         return primitive.content
-            .takeIf { it.length <= MAX_MATCHER_VALUE_LENGTH }
     }
 
     private fun JsonObject.intOrDefault(
