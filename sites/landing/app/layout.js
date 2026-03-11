@@ -50,13 +50,15 @@ const structuredData = {
 };
 
 export default function RootLayout({ children }) {
+  const structuredDataJson = JSON.stringify(structuredData).replace(/</g, "\\u003c");
+
   return (
     <html lang="en">
       <head>
         <link rel="alternate" type="text/markdown" href="https://clawperator.com/index.md" />
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+          dangerouslySetInnerHTML={{ __html: structuredDataJson }}
         />
       </head>
       <body className={`${headingFont.variable} ${monoFont.variable}`}>{children}</body>

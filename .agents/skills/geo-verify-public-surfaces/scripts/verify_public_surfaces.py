@@ -10,6 +10,9 @@ import tempfile
 
 
 USER_AGENT = "Mozilla/5.0 (compatible; ClawperatorGeoVerifier/1.0; +https://clawperator.com/)"
+CONNECT_TIMEOUT_SECONDS = "5"
+MAX_TIME_SECONDS = "20"
+RETRY_COUNT = "2"
 BOT_USER_AGENTS = {
     "GPTBot": "Mozilla/5.0 (compatible; GPTBot/1.0; +https://openai.com/gptbot)",
     "ChatGPT-User": "Mozilla/5.0 (compatible; ChatGPT-User/1.0; +https://openai.com/bot)",
@@ -122,26 +125,61 @@ def resolve_preview_urls(args):
 
 def run_curl(args):
     proc = subprocess.run(
-        ["curl", "-sSI", "-A", USER_AGENT, *args],
+        [
+            "curl",
+            "-sSI",
+            "--connect-timeout",
+            CONNECT_TIMEOUT_SECONDS,
+            "--max-time",
+            MAX_TIME_SECONDS,
+            "--retry",
+            RETRY_COUNT,
+            "-A",
+            USER_AGENT,
+            *args,
+        ],
         capture_output=True,
         text=True,
+        timeout=int(MAX_TIME_SECONDS) + 5,
     )
     return proc.returncode, proc.stdout + proc.stderr
 
 
 def run_curl_get(url, user_agent=USER_AGENT):
-    with tempfile.NamedTemporaryFile() as header_file:
+    with tempfile.NamedTemporaryFile(delete=False) as header_file:
+        header_path = header_file.name
+    try:
         proc = subprocess.run(
-            ["curl", "-sSL", "-A", user_agent, "-D", header_file.name, url],
+            [
+                "curl",
+                "-sSL",
+                "--connect-timeout",
+                CONNECT_TIMEOUT_SECONDS,
+                "--max-time",
+                MAX_TIME_SECONDS,
+                "--retry",
+                RETRY_COUNT,
+                "-A",
+                user_agent,
+                "-D",
+                header_path,
+                url,
+            ],
             capture_output=True,
             text=True,
+            timeout=int(MAX_TIME_SECONDS) + 5,
         )
         header_text = ""
         try:
-            with open(header_file.name, "r", encoding="utf-8", errors="replace") as fh:
+            with open(header_path, "r", encoding="utf-8", errors="replace") as fh:
                 header_text = fh.read()
         except OSError:
             header_text = ""
+    finally:
+        try:
+            os.unlink(header_path)
+        except OSError:
+            pass
     return proc.returncode, header_text, proc.stdout + proc.stderr
 
 
@@ -260,7 +298,7 @@ def verify_redirect(check):
         reasons.append(f"expected redirect, got {status or 'no status line'}")
 
     location = headers.get("location", "")
-    location_pattern = rf"({re.escape(check['location'])}|https?://\\S*{re.escape(check['location'])})"
+    location_pattern = rf"^(?:{re.escape(check['location'])}|https?://[^/]+{re.escape(check['location'])})$"
     if not re.search(location_pattern, location, re.IGNORECASE):
         reasons.append(f"unexpected redirect target: {location or 'missing'}")
 
