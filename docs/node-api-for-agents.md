@@ -193,7 +193,7 @@ All specified fields are combined with AND semantics: every specified field must
 | `textEquals` | `string` | Exact match on visible text label. Fragile for server-driven or localized content. |
 | `textContains` | `string` | Substring match on visible text. Use when full text is dynamic or may be truncated. |
 | `contentDescContains` | `string` | Substring match on accessibility label. Fallback for partial or dynamic accessibility labels. |
-| `role` | `string` | Matches by Clawperator semantic role name (for example, `button`, `textfield`, `text`, `switch`, `checkbox`, `image`, `listitem`, `toolbar`, `tab`). This is derived from runtime role inference, not the raw UIAutomator `class` string. Low selectivity - many elements share a role. Use as a secondary constraint only, never alone. |
+| `role` | `string` | Matches by Clawperator semantic role name (`button`, `textfield`, `text`, `switch`, `checkbox`, `image`, `listitem`, `toolbar`, `tab`). Derived from runtime role inference, not the raw UIAutomator `class` string. Generally low selectivity - many elements share a role. Use as a secondary constraint for most roles. **Exception:** `role: "textfield"` maps to `android.widget.EditText` and is the correct primary selector for text input fields in apps that do not assign `resource-id` to their inputs (which includes many production apps such as Google Play Store). In those apps `role: "textfield"` may be the only reliable way to target the active text input. |
 
 **Selector priority (most to least stable):** `resourceId` > `contentDescEquals` > `textEquals` > `textContains` > `contentDescContains` > `role`
 
@@ -318,6 +318,12 @@ Structured XML produced by UIAutomator. Each `<node>` represents one UI element.
 | `enabled` | - | `"false"` means the element is visible but not interactable. |
 | `long-clickable` | - | `"true"` if the element accepts long-press. Use `clickType: "long_click"`. |
 
+**HTML entity encoding:** Some apps (notably Google Play Store) store HTML entity-encoded values in `content-desc` and `text` attributes. For example, an apostrophe appears as `&apos;`, an ampersand as `&amp;`. These entity sequences are returned as-is in `data.text` - they are not decoded. When targeting elements with special characters in their labels, use `contentDescContains` or `textContains` with a substring that avoids the encoded characters rather than an exact match requiring knowledge of the encoded form.
+
+Example: for a node with `content-desc="Search for &apos;vlc&apos;"`:
+- `contentDescContains: "Search for"` -- works
+- `contentDescEquals: "Search for 'vlc'"` -- fails (apostrophe is not decoded)
+
 **Annotated example from Android Settings main screen (live device capture):**
 
 ```xml
@@ -381,7 +387,7 @@ Structured XML produced by UIAutomator. Each `<node>` represents one UI element.
 
 **Reading patterns:**
 
-- **Tap targets** are `clickable="true"` nodes. In list UIs these are often container (`LinearLayout`) nodes whose text-bearing children hold the visible label while the container itself has `text=""`. Match the text-bearing child node (for example, `textEquals: "Connections"` or `resourceId: "android:id/title"`), then rely on the runtime to click a clickable ancestor when needed.
+- **Tap targets** are `clickable="true"` nodes. In list UIs these are often container (`LinearLayout`) nodes whose text-bearing children hold the visible label while the container itself has `text=""`. Clawperator taps the center of the matched node's bounding box regardless of that node's `clickable` attribute. If those coordinates land within a `clickable="true"` area (such as a parent container), the tap registers. If they land on a non-interactive surface, the step fails with `NODE_NOT_CLICKABLE`. This means matching a non-clickable label node (for example, `textEquals: "Connections"`) works correctly as long as its bounding box is visually inside the parent tap target.
 - **Icon-only buttons** (no `text`) use `content-desc` for their label. Target with `contentDescEquals`.
 - **Scroll containers** have `scrollable="true"`. Pass their `resource-id` as the `container` matcher in `scroll_and_click`.
 - **Disabled elements** have `enabled="false"`. They cannot be interacted with - scrolling or waiting for a state change is required first.
