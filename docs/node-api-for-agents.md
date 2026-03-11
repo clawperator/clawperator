@@ -436,7 +436,8 @@ Branch agent logic on codes from `envelope.error` or `stepResults[].data.error`:
 | `APK_VERSION_UNREADABLE` | The device package dump did not expose a readable [Clawperator Operator Android app](../getting-started/android-operator-apk.md) version |
 | `EXECUTION_VALIDATION_FAILED` | Payload failed schema validation |
 | `SECURITY_BLOCK_DETECTED` | Android blocked the action (e.g., secure keyboard) |
-| `NODE_NOT_CLICKABLE` | Element found but not interactable |
+| `NODE_NOT_CLICKABLE` | Element found but tap coordinates land on a non-interactive surface |
+| `UNSUPPORTED_RUNTIME_CLOSE` | Expected per-step result for all `close_app` steps. The Android runtime does not support a force-stop action response - the Node layer handles the close via `adb shell am force-stop` before dispatch. The overall execution `status` remains `"success"`. Treat as non-fatal. |
 | `SNAPSHOT_EXTRACTION_FAILED` | `snapshot_ui` step completed but the Node layer did not attach any snapshot text to the step during post-processing. The most common cause is a Node binary packaging mismatch or other logcat extraction issue. Rebuild or reinstall the npm package and check version compatibility. |
 
 Full error taxonomy: `apps/node/src/contracts/errors.ts`
