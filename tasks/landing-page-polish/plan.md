@@ -353,6 +353,7 @@ The page should explicitly tell the reader:
 
 - install includes open source skills
 - you can run those immediately
+- you do not need pre-existing skills to get value
 - you can create your own private skills
 - private skills are personalized to your apps, accounts, and workflows
 
@@ -363,12 +364,16 @@ Recommended messages:
 
 - Install Clawperator and you also get an open source skills library.
 - Skills package common mobile workflows into reusable building blocks.
+- You are not blocked waiting for someone else to write a skill first.
+- Because the API is structured and documented, your own agent can explore an
+  app, operate it, and build private skills for the exact workflow you need.
 - Use included skills as-is, adapt them to your own setup, or create private
   skills for personal apps, accounts, and workflows.
 
 Useful framing:
 
 - Open source skills get you started.
+- You do not need a public skill to begin.
 - Private skills make Clawperator yours.
 
 This section should make the ecosystem legible without promising a giant public
@@ -384,10 +389,61 @@ Column guidance:
 - Included with install: open source skill library, discoverable workflows,
   runnable directly or through the Node API
 - Yours to customize: private skills, personal workflows, local sensitive logic,
-  public and private skills mixed in one runtime
+  public and private skills mixed in one runtime, agent-created skills derived
+  from live app exploration
 
 This framing is stronger than a purely technical explanation because it
 connects skills to immediate utility and long-term ownership.
+
+### Key message to add explicitly
+
+The section should say, in plain language:
+
+- Clawperator has a growing open source skills library.
+- But you do not need existing skills at all.
+- The documented API is enough for an agent to open an app, inspect the UI,
+  find the right controls, and build a personalized skill for that user's own
+  apps and workflows.
+
+This is one of the most important value points on the page because it removes a
+major adoption fear:
+
+- "What if the skill I need does not exist yet?"
+
+The answer should be visible on the page:
+
+- Your agent can create it.
+
+### Recommended copy direction
+
+Candidate section intro:
+
+- Clawperator includes a growing library of open source skills, but you do not
+  need a prebuilt skill to get started.
+
+Candidate supporting paragraph:
+
+- Because Clawperator exposes a structured, documented API, an agent can open
+  an app, inspect its UI, figure out the flow, and create a personalized skill
+  for your own apps and workflows.
+
+Candidate follow-up line:
+
+- Start with included skills, adapt them, or let your agent build private ones
+  from live app exploration.
+
+### Important framing constraint
+
+This should not sound like the runtime itself is autonomously planning. Keep
+the language aligned with the product boundary:
+
+- the agent explores
+- the agent decides
+- Clawperator executes
+- the resulting skill is user-specific and private
+
+That preserves the "brain and hand" model while still making the self-bootstrapping
+skills story legible.
 
 ## 6. "How it works" section
 
