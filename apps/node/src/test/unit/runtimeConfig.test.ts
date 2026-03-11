@@ -31,7 +31,7 @@ describe("getDefaultRuntimeConfig", () => {
     assert.strictEqual(config.receiverPackage, "custom.receiver");
   });
 
-  it("falls back to bare tool names (PATH-based) when ANDROID_HOME is not set", () => {
+  it("falls back to bare tool names (PATH-based) when ANDROID_HOME and ANDROID_SDK_ROOT are not set", () => {
     const originalAndroidHome = process.env.ANDROID_HOME;
     const originalAndroidSdkRoot = process.env.ANDROID_SDK_ROOT;
     try {
