@@ -794,6 +794,78 @@ Recommended homepage core:
 
 Everything else should either be merged into those sections or moved to docs.
 
+## FAQ recommendation
+
+Add a small expandable FAQ near the lower part of the homepage.
+
+Why:
+
+- it gives the page a clean place to handle adoption objections without
+  polluting the hero or quick-start copy
+- it is especially useful for device-model questions that many readers will
+  have immediately
+- it lets the page answer practical concerns in a scannable format
+
+Recommended format:
+
+- click-to-expand disclosure items
+- short answers, one paragraph each
+- link out to docs only when deeper setup detail is needed
+
+Recommended questions:
+
+- Can I use this if I have an iPhone?
+- I do not have an Android phone. Can I still use Clawperator?
+- Do I need to switch from iPhone to Android?
+- Do I need a dedicated burner phone?
+- What if the skill I need does not exist yet?
+- Does Clawperator do the thinking for my agent?
+
+Recommended answer direction:
+
+### Can I use this if I have an iPhone?
+
+Yes. Clawperator does not require you to switch your primary phone to Android.
+The usual setup is to keep using your iPhone normally and connect your agent to
+a separate Android burner phone or local Android emulator.
+
+### I do not have an Android phone. Can I still use Clawperator?
+
+Yes. Clawperator can provision a local Google Play-equipped Android emulator,
+which is useful for getting started, development, and many automation flows.
+
+### Do I need to switch from iPhone to Android?
+
+No. The whole point of the burner-device model is that your primary phone can
+stay exactly as it is.
+
+### Do I need a dedicated burner phone?
+
+A cheap dedicated burner phone is the preferred setup for compatibility and
+long-running reliability, but it is not the only option. A local Android
+emulator is available when you do not have a device handy.
+
+### What if the skill I need does not exist yet?
+
+That is fine. Clawperator includes a growing open source skills library, but
+you are not blocked on prebuilt skills. Your agent can use Clawperator's
+structured, documented API to explore an app and build a private skill for your
+own workflow.
+
+### Does Clawperator do the thinking for my agent?
+
+No. The agent decides what to do next. Clawperator executes validated Android
+actions and returns structured results.
+
+Placement guidance:
+
+- put the FAQ near the bottom of the homepage
+- after the core product-story sections
+- before or near the footer
+
+This section should reduce friction without becoming a dumping ground for every
+edge-case question.
+
 ## Phrases worth using
 
 These are especially strong and aligned with the product:
