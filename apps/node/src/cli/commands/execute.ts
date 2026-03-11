@@ -36,6 +36,7 @@ export async function cmdExecute(options: {
       deviceId: options.deviceId,
       receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_RECEIVER_PACKAGE,
       timeoutMs: options.timeoutMs,
+      warn: message => process.stderr.write(message),
     });
     if (result.ok) {
       return formatSuccess(
