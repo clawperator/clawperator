@@ -53,6 +53,7 @@ describe("version compatibility", () => {
     assert.strictEqual(isVersionCompatible("0.1.4", "0.2.2"), false);
     assert.strictEqual(isVersionCompatible("0.1.4", "0.2.3"), false);
     assert.strictEqual(isVersionCompatible("0.1.4", "0.2.4"), false);
+    assert.strictEqual(isVersionCompatible("0.1.4", "0.2.5"), false);
   });
 
   it("parses installed APK metadata from dumpsys output", () => {
