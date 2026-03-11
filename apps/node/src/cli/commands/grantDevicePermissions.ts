@@ -16,12 +16,18 @@ export async function cmdGrantDevicePermissions(options: {
 
   const result = await grantDevicePermissions(config, options.receiverPackage);
 
-  if (!result.accessibility.ok) {
+  const failedGrant =
+    !result.accessibility.ok ? result.accessibility
+      : !result.notificationListener.ok ? result.notificationListener
+      : undefined;
+
+  if (failedGrant) {
     return formatError(
       {
         code: "GRANT_DEVICE_PERMISSIONS_FAILED",
-        message: result.accessibility.error ?? "Failed to grant accessibility permission.",
+        message: failedGrant.error ?? "Failed to grant required device permissions.",
         receiverPackage: result.receiverPackage,
+        accessibility: result.accessibility,
         notification: result.notification,
         notificationListener: result.notificationListener,
       },
@@ -35,9 +41,9 @@ export async function cmdGrantDevicePermissions(options: {
       accessibility: result.accessibility,
       notification: result.notification,
       notificationListener: result.notificationListener,
-      message: result.accessibility.alreadyEnabled
-        ? "Accessibility service was already enabled."
-        : "Accessibility service enabled. Run clawperator doctor to verify.",
+      message: result.accessibility.alreadyEnabled && result.notificationListener.alreadyEnabled
+        ? "Required device permissions were already enabled."
+        : "Required device permissions enabled. Run clawperator doctor to verify.",
     },
     options
   );
