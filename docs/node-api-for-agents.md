@@ -533,7 +533,16 @@ No. It executes commands and reports structured results. Reasoning and planning 
 Single-flight per device. A second overlapping execution returns `EXECUTION_CONFLICT_IN_FLIGHT`.
 
 **When should I use direct `adb` instead?**
-Only for diagnostics or gaps not covered by the API. For routine automation, use Clawperator so result/error semantics stay consistent.
+Use `adb` directly for operations not covered by the execution payload API:
+
+- **Opening specific URIs or deep links** - there is no `open_uri` action type. Use `adb shell am start -a android.intent.action.VIEW -d "<uri>"` to open a Play Store app page, a web URL, or a custom deep link. On devices with multiple apps registered for a URI scheme, this may trigger an "Open with" picker that your automation must handle.
+- **Diagnostics** when you need to inspect raw device state (logcat, package list, window focus).
+- **Pre-flight setup** outside the automation loop (granting permissions, installing APKs, checking installed packages).
+
+For routine UI automation, use Clawperator so result/error semantics stay consistent.
+
+**Can Clawperator open a specific URL or deep link?**
+Not directly. The `open_app` action only supports launching an app by its `applicationId`. To open a URI (such as a Play Store app page at `market://details?id=com.example.app`, a web URL, or a custom deep link), use `adb shell am start` outside the Clawperator execution payload. See "When to use adb directly" above.
 
 **Does Clawperator run skills?**
 Skills are standalone programs that agents can invoke directly. The Node API provides discovery (`skills list`, `skills search`), metadata (`skills get`), and a convenience `skills run` wrapper. Skills do not need the Node API to execute - agents can call skill scripts directly.
