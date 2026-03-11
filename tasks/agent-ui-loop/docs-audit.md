@@ -330,17 +330,17 @@ For routine UI automation, use Clawperator so result/error semantics stay consis
 | Issue | Severity | Doc file | Section | Status |
 |-------|----------|----------|---------|--------|
 | ISSUE-01: empty `data.text` silent success | P1 - wrong | `docs/node-api-for-agents.md` | Action behavior notes / snapshot_ui | **Resolved - PR #53** |
-| ISSUE-02: `role: "textfield"` guidance wrong | P1 - wrong | `docs/node-api-for-agents.md` | NodeMatcher Reference | Open |
-| ISSUE-03: click behavior on `clickable=false` inaccurate | P1 - wrong | `docs/node-api-for-agents.md` | Snapshot Output / Reading patterns | Open |
+| ISSUE-02: `role: "textfield"` guidance wrong | P1 - wrong | `docs/node-api-for-agents.md` | NodeMatcher Reference | **Resolved** |
+| ISSUE-03: click behavior on `clickable=false` inaccurate | P1 - wrong | `docs/node-api-for-agents.md` | Snapshot Output / Reading patterns | **Resolved** |
 | ISSUE-04: no troubleshooting entry for empty snapshot | P2 - missing | `docs/troubleshooting.md` | New section | **Resolved - PR #53** |
-| ISSUE-05: HTML entity encoding not documented | P2 - missing | `docs/node-api-for-agents.md` | Snapshot Output / hierarchy_xml | Open |
-| ISSUE-06: no `open_uri` gap documented | P2 - missing | `docs/node-api-for-agents.md` | Action notes + FAQ | Open |
-| ISSUE-07: `observe snapshot` vs `snapshot_ui` not explained | P2 - missing | `docs/node-api-for-agents.md` | Action behavior notes | Open |
-| ISSUE-08: `timeoutMs` cap buried in sleep note | P3 - incomplete | `docs/node-api-for-agents.md` | Execution Payload | Open |
-| ISSUE-09: `wait_for_node` `timeoutMs` param not listed | P3 - incomplete | `docs/node-api-for-agents.md` | Action Reference table | Open |
-| ISSUE-10: `UNSUPPORTED_RUNTIME_CLOSE` missing from error table | P3 - incomplete | `docs/node-api-for-agents.md` | Error Codes | Open |
-| ISSUE-11: Reading patterns only covers resource-id-rich apps | P3 - incomplete | `docs/node-api-for-agents.md` | Snapshot Output / Reading patterns | Open |
-| ISSUE-12: "When to use adb" FAQ too vague | P3 - incomplete | `docs/node-api-for-agents.md` | FAQ | Open |
+| ISSUE-05: HTML entity encoding not documented | P2 - missing | `docs/node-api-for-agents.md` | Snapshot Output / hierarchy_xml | **Resolved** |
+| ISSUE-06: no `open_uri` gap documented | P2 - missing | `docs/node-api-for-agents.md` | Action notes + FAQ | **Resolved** |
+| ISSUE-07: `observe snapshot` vs `snapshot_ui` not explained | P2 - missing | `docs/node-api-for-agents.md` | Action behavior notes | **Resolved** |
+| ISSUE-08: `timeoutMs` cap buried in sleep note | P3 - incomplete | `docs/node-api-for-agents.md` | Execution Payload | **Resolved** |
+| ISSUE-09: `wait_for_node` `timeoutMs` param not listed | P3 - incomplete | `docs/node-api-for-agents.md` | Action Reference table | **Resolved** - note: no `timeoutMs` param exists; `retry` is the correct knob; added `retry` object schema |
+| ISSUE-10: `UNSUPPORTED_RUNTIME_CLOSE` missing from error table | P3 - incomplete | `docs/node-api-for-agents.md` | Error Codes | **Resolved** |
+| ISSUE-11: Reading patterns only covers resource-id-rich apps | P3 - incomplete | `docs/node-api-for-agents.md` | Snapshot Output / Reading patterns | **Resolved** |
+| ISSUE-12: "When to use adb" FAQ too vague | P3 - incomplete | `docs/node-api-for-agents.md` | FAQ | **Resolved** |
 
 ---
 
