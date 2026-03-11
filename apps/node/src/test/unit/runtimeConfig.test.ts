@@ -1,7 +1,5 @@
 import { describe, it } from "node:test";
 import assert from "node:assert";
-import { existsSync } from "node:fs";
-import { join } from "node:path";
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 
 describe("getDefaultRuntimeConfig", () => {
@@ -33,42 +31,27 @@ describe("getDefaultRuntimeConfig", () => {
     assert.strictEqual(config.receiverPackage, "custom.receiver");
   });
 
-  it("resolves emulator, sdkmanager, and avdmanager from known SDK locations", () => {
-    const config = getDefaultRuntimeConfig();
-    const homeDirectory = process.env.HOME;
-
-    const emulatorCandidates = [
-      ...(homeDirectory ? [join(homeDirectory, "Library/Android/sdk/emulator/emulator")] : []),
-      "/opt/homebrew/share/android-commandlinetools/emulator/emulator",
-    ];
-    const sdkmanagerCandidates = [
-      ...(homeDirectory ? [join(homeDirectory, "Library/Android/sdk/cmdline-tools/latest/bin/sdkmanager")] : []),
-      "/opt/homebrew/share/android-commandlinetools/cmdline-tools/latest/bin/sdkmanager",
-    ];
-    const avdmanagerCandidates = [
-      ...(homeDirectory ? [join(homeDirectory, "Library/Android/sdk/cmdline-tools/latest/bin/avdmanager")] : []),
-      "/opt/homebrew/share/android-commandlinetools/cmdline-tools/latest/bin/avdmanager",
-    ];
-
-    const expectedEmulator = emulatorCandidates.find(existsSync);
-    if (expectedEmulator) {
-      assert.strictEqual(config.emulatorPath, expectedEmulator);
-    } else {
+  it("falls back to bare tool names (PATH-based) when ANDROID_HOME is not set", () => {
+    const originalAndroidHome = process.env.ANDROID_HOME;
+    const originalAndroidSdkRoot = process.env.ANDROID_SDK_ROOT;
+    try {
+      delete process.env.ANDROID_HOME;
+      delete process.env.ANDROID_SDK_ROOT;
+      const config = getDefaultRuntimeConfig();
       assert.strictEqual(config.emulatorPath, "emulator");
-    }
-
-    const expectedSdkmanager = sdkmanagerCandidates.find(existsSync);
-    if (expectedSdkmanager) {
-      assert.strictEqual(config.sdkmanagerPath, expectedSdkmanager);
-    } else {
       assert.strictEqual(config.sdkmanagerPath, "sdkmanager");
-    }
-
-    const expectedAvdmanager = avdmanagerCandidates.find(existsSync);
-    if (expectedAvdmanager) {
-      assert.strictEqual(config.avdmanagerPath, expectedAvdmanager);
-    } else {
       assert.strictEqual(config.avdmanagerPath, "avdmanager");
+    } finally {
+      if (originalAndroidHome !== undefined) {
+        process.env.ANDROID_HOME = originalAndroidHome;
+      } else {
+        delete process.env.ANDROID_HOME;
+      }
+      if (originalAndroidSdkRoot !== undefined) {
+        process.env.ANDROID_SDK_ROOT = originalAndroidSdkRoot;
+      } else {
+        delete process.env.ANDROID_SDK_ROOT;
+      }
     }
   });
 
