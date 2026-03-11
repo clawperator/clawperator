@@ -13,23 +13,32 @@ def die(message: str) -> None:
 
 
 def run(cmd: list[str], cwd: Path | None = None) -> str:
-    result = subprocess.run(
-        cmd,
-        cwd=str(cwd) if cwd else None,
-        check=True,
-        text=True,
-        capture_output=True,
-    )
+    try:
+        result = subprocess.run(
+            cmd,
+            cwd=str(cwd) if cwd else None,
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+    except subprocess.CalledProcessError as exc:
+        stderr = (exc.stderr or "").strip()
+        stdout = (exc.stdout or "").strip()
+        details = stderr or stdout or str(exc)
+        die(details)
     return result.stdout
 
 
 def run_no_capture(cmd: list[str], cwd: Path | None = None) -> None:
-    subprocess.run(
-        cmd,
-        cwd=str(cwd) if cwd else None,
-        check=True,
-        text=True,
-    )
+    try:
+        subprocess.run(
+            cmd,
+            cwd=str(cwd) if cwd else None,
+            check=True,
+            text=True,
+        )
+    except subprocess.CalledProcessError as exc:
+        die(str(exc))
 
 
 def replace_in_file(path: Path, pattern: str, replacement: str, *, count: int = 0) -> bool:

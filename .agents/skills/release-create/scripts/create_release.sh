@@ -5,6 +5,8 @@ set -euo pipefail
 WORKFLOW_APPEAR_ATTEMPTS=30
 WORKFLOW_COMPLETION_ATTEMPTS=360
 WORKFLOW_POLL_INTERVAL_SECONDS=10
+PUBLISHED_VERSION_UPDATE_ATTEMPTS=12
+PUBLISHED_VERSION_UPDATE_INTERVAL_SECONDS=10
 
 die() {
   printf 'release-create: %s\n' "$1" >&2
@@ -33,6 +35,30 @@ json_field() {
   local json="$1"
   local field="$2"
   node -e 'const data = JSON.parse(process.argv[1]); const field = process.argv[2]; const value = data[field]; if (value === undefined || value === null) process.exit(2); if (typeof value === "object") { console.log(JSON.stringify(value)); } else { console.log(String(value)); }' "$json" "$field"
+}
+
+run_published_version_update() {
+  local script_path="$1"
+  local version="$2"
+  local attempts="$PUBLISHED_VERSION_UPDATE_ATTEMPTS"
+  local sleep_seconds="$PUBLISHED_VERSION_UPDATE_INTERVAL_SECONDS"
+  local output=""
+
+  for ((i = 1; i <= attempts; i++)); do
+    if output="$(python3 "$script_path" "$version" 2>&1)"; then
+      printf '%s\n' "$output"
+      return 0
+    fi
+
+    if printf '%s\n' "$output" | grep -qE 'release not found|npm does not report|is not the current npm release'; then
+      sleep "$sleep_seconds"
+      continue
+    fi
+
+    die "$output"
+  done
+
+  printf 'published_version_update=skipped reason=not_live_yet detail=%s\n' "$output"
 }
 
 await_workflow() {
@@ -210,8 +236,8 @@ main() {
     return 0
   fi
 
-  python3 "$published_version_script" "$version"
-  printf 'published_version_update=committed branch=%s\n' "$branch_name"
+  run_published_version_update "$published_version_script" "$version"
+  printf 'published_version_update=finished branch=%s\n' "$branch_name"
 }
 
 main "$@"
