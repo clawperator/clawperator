@@ -516,31 +516,39 @@ if <hvac_state> == "Off":
         </p>
         <div className="architecture-strip">
           <article className="architecture-card architecture-card-edge">
-            <p className="architecture-label">AI Agent / LLM</p>
-            <p className="architecture-meta">the brain</p>
+            <div className="architecture-card-stack">
+              <p className="architecture-label">AI Agent / LLM</p>
+              <p className="architecture-meta">the brain</p>
+            </div>
           </article>
           <div className="architecture-connector">
             <span className="architecture-line" />
             <span className="architecture-text">Node API / CLI / Skills</span>
           </div>
           <article className="architecture-card architecture-card-core">
-            <p className="architecture-label">Clawperator</p>
-            <p className="architecture-meta">runtime / hand</p>
+            <div className="architecture-card-stack">
+              <p className="architecture-label">Clawperator</p>
+              <p className="architecture-meta">runtime / hand</p>
+            </div>
           </article>
           <div className="architecture-connector">
             <span className="architecture-line" />
             <span className="architecture-text">ADB</span>
           </div>
           <article className="architecture-card architecture-card-core">
-            <p className="architecture-label">Android Device</p>
-            <p className="architecture-meta">physical or emulator</p>
+            <div className="architecture-card-stack">
+              <p className="architecture-label">Android Device</p>
+              <p className="architecture-meta">physical or emulator</p>
+            </div>
           </article>
           <div className="architecture-connector">
             <span className="architecture-line" />
           </div>
           <article className="architecture-card architecture-card-edge">
-            <p className="architecture-label">Mobile Apps</p>
-            <p className="architecture-meta">the real APIs</p>
+            <div className="architecture-card-stack">
+              <p className="architecture-label">Mobile Apps</p>
+              <p className="architecture-meta">the real APIs</p>
+            </div>
           </article>
         </div>
         <p>

@@ -841,9 +841,24 @@ body {
   border: 1px solid var(--architecture-card-border);
   border-radius: 10px;
   background: var(--architecture-card-bg);
-  padding: 1rem 1.15rem;
+  padding: 0;
+  min-height: 116px;
+  display: block;
   text-align: center;
   box-shadow: var(--panel-shadow);
+  overflow: hidden;
+}
+
+.architecture-card-stack {
+  width: 100%;
+  min-height: 116px;
+  padding: 0.85rem 1.15rem;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.32rem;
 }
 
 .architecture-card-edge {
@@ -856,7 +871,7 @@ body {
   box-shadow: var(--architecture-core-shadow);
 }
 
-.architecture-label {
+.architecture-card .architecture-label {
   margin: 0;
   font-size: 1rem;
   line-height: 1.3;
@@ -864,8 +879,8 @@ body {
   font-weight: 600;
 }
 
-.architecture-meta {
-  margin: 0.28rem 0 0;
+.architecture-card .architecture-meta {
+  margin: 0;
   color: var(--text-muted);
   font-size: 0.82rem;
   line-height: 1.4;
