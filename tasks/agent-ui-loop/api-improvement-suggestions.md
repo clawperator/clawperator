@@ -145,6 +145,11 @@ A small well-documented enum of key names (`BACK`, `HOME`, `RECENTS`, `ENTER`,
 
 ## GAP-06: `sleep.durationMs` is silently clamped, not validated
 
+**Status:** Completed on 2026-03-11. The Node validation layer now rejects
+`sleep.durationMs` values above `120000` ms with `EXECUTION_VALIDATION_FAILED`,
+unit tests cover the boundary behavior, and the public Node API docs have been
+updated and regenerated to describe the validated range.
+
 **Problem:** The Android parser silently clamps `sleep.durationMs` to 120,000 ms:
 ```kotlin
 params.longOrDefault("durationMs", 0L).coerceIn(0L, 120_000L)
@@ -160,9 +165,9 @@ will actually sleep 2 minutes with no indication that the value was truncated.
 **Impact:** Low-medium. Inconsistent with the explicit validation model. Could cause
 subtle timing bugs in long-running flows.
 
-**Suggested improvement:** Either validate `sleep.durationMs` against the execution cap
-and fail with `EXECUTION_VALIDATION_FAILED` on out-of-range values (consistent with
-`timeoutMs`), or document the silent clamp explicitly in the action reference.
+**Resolution:** `sleep.durationMs` is now validated against the execution cap and
+fails with `EXECUTION_VALIDATION_FAILED` on out-of-range values, consistent with
+`timeoutMs`.
 
 ---
 
@@ -284,7 +289,7 @@ whichever file handles the `action` routing fallback).
 | GAP-03 | `open_uri` deep link action implemented | Done | Closed |
 | GAP-04 | `wait_for_node` no total-time semantic | Medium | Ergonomics |
 | GAP-05 | No hardware/system key press | Medium | Missing feature |
-| GAP-06 | `sleep.durationMs` silently clamped | Low-medium | Inconsistency |
+| GAP-06 | `sleep.durationMs` silently clamped | Low-medium | Completed |
 | GAP-07 | `MAX_ACTIONS` mismatch (50 vs 64) | Low | Contract drift |
 | GAP-08 | Undocumented action type aliases | Low | Docs gap |
 | GAP-09 | No keyboard dismissal | Medium | Missing feature |

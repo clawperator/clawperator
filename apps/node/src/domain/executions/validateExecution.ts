@@ -120,6 +120,12 @@ const executionSchema = z.object({
       case "sleep":
         if (typeof params?.durationMs !== "number" || params.durationMs < 0) {
           addIssue(index, "sleep requires params.durationMs >= 0", ["params", "durationMs"]);
+        } else if (params.durationMs > LIMITS.MAX_EXECUTION_TIMEOUT_MS) {
+          addIssue(
+            index,
+            `sleep.durationMs must not exceed ${LIMITS.MAX_EXECUTION_TIMEOUT_MS} ms`,
+            ["params", "durationMs"]
+          );
         }
         break;
       case "click":
