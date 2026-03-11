@@ -1214,6 +1214,8 @@ Every execution requires `expectedFormat: "android-ui-automator"`.
 }
 ```
 
+**Execution timeout limit:** `timeoutMs` is schema-validated. The allowed range is 1,000-120,000 ms (1 second to 2 minutes). Submitting a value outside this range causes `EXECUTION_VALIDATION_FAILED` - the execution is rejected before any action runs. Operations that require longer running time must be split across multiple execution payloads. For install or download flows, use `wait_for_node` polling within the 120-second window rather than a single long sleep.
+
 **Result envelope:** Exactly one `[Clawperator-Result]` JSON block is emitted to logcat on completion. Node reads and returns it. See the Result Envelope section for the full shape and per-action `data` contents.
 
 ## NodeMatcher Reference
@@ -1229,7 +1231,7 @@ All specified fields are combined with AND semantics: every specified field must
 | `textEquals` | `string` | Exact match on visible text label. Fragile for server-driven or localized content. |
 | `textContains` | `string` | Substring match on visible text. Use when full text is dynamic or may be truncated. |
 | `contentDescContains` | `string` | Substring match on accessibility label. Fallback for partial or dynamic accessibility labels. |
-| `role` | `string` | Matches by Clawperator semantic role name (for example, `button`, `textfield`, `text`, `switch`, `checkbox`, `image`, `listitem`, `toolbar`, `tab`). This is derived from runtime role inference, not the raw UIAutomator `class` string. Low selectivity - many elements share a role. Use as a secondary constraint only, never alone. |
+| `role` | `string` | Matches by Clawperator semantic role name (`button`, `textfield`, `text`, `switch`, `checkbox`, `image`, `listitem`, `toolbar`, `tab`). Derived from runtime role inference, not the raw UIAutomator `class` string. Generally low selectivity - many elements share a role. Use as a secondary constraint for most roles. **Exception:** `role: "textfield"` targets the inferred text-input role, which is derived from common Android text-input widgets (for example class names containing `EditText`, `TextInputEditText`, or `AutoCompleteTextView`). It is the correct primary selector for text input fields in apps that do not assign `resource-id` to their inputs (which includes many production apps such as Google Play Store). In those apps `role: "textfield"` may be the only reliable way to target the active text input. |
 
 **Selector priority (most to least stable):** `resourceId` > `contentDescEquals` > `textEquals` > `textContains` > `contentDescContains` > `role`
 
@@ -1250,7 +1252,7 @@ Combine fields to increase specificity when a single field is ambiguous:
 | `click` | `matcher: NodeMatcher` | `clickType: "default" \| "long_click" \| "focus"` (default: `"default"`) |
 | `enter_text` | `matcher: NodeMatcher`, `text: string` | `submit: boolean` (default: `false`), `clear: boolean` (accepted by Node contract, currently ignored by Android runtime) |
 | `read_text` | `matcher: NodeMatcher` | `validator: "temperature"` (only supported validator today), `retry: object` |
-| `wait_for_node` | `matcher: NodeMatcher` | `retry: object` |
+| `wait_for_node` | `matcher: NodeMatcher` | `retry: object` - controls polling attempts and backoff delays (see `retry` object shape below). There is no per-action `timeoutMs`; the outer execution `timeoutMs` is the only wall-clock limit. |
 | `snapshot_ui` | - | `retry: object` |
 | `take_screenshot` | - | `path: string`, `retry: object` |
 | `sleep` | `durationMs: number` | - |
@@ -1269,7 +1271,21 @@ Combine fields to increase specificity when a single field is ambiguous:
 
 ### Action behavior notes
 
-- `sleep.durationMs` is not capped per step. It must fit within the execution `timeoutMs` budget, and `timeoutMs` is capped at `120000`.
+- `sleep.durationMs` is capped at `120000` ms by the Android parser (values above are silently clamped). It also consumes from the outer execution `timeoutMs` budget.
+
+**`retry` object shape:** All action types that accept a `retry` param use the same object schema:
+```json
+{
+  "maxAttempts": 3,
+  "initialDelayMs": 500,
+  "maxDelayMs": 3000,
+  "backoffMultiplier": 2.0,
+  "jitterRatio": 0.15
+}
+```
+`maxAttempts` is capped at 10. `initialDelayMs` and `maxDelayMs` are capped at 30,000 and 60,000 ms respectively. Omit the `retry` field to use the action's default preset. For `wait_for_node`, the default is `UiReadiness` (`maxAttempts=5`, `initialDelayMs=500`, `maxDelayMs=3000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`).
+
+**`open_app`:** Opens the app's default launch activity by `applicationId`. There is no `open_uri` action for deep links or content-addressed pages (such as `market://details?id=...` or arbitrary `https://` URLs). To open a specific URI, use `adb shell am start -a android.intent.action.VIEW -d "<uri>"` outside the execution payload. This is a known capability gap - see FAQ.
 
 **`close_app`:** The Node layer intercepts `close_app` actions and runs `adb shell am force-stop <applicationId>` before dispatching to Android. The Android step always returns `success: false` with `data.error: "UNSUPPORTED_RUNTIME_CLOSE"` - this is expected. The overall execution `status` remains `"success"` and the app is force-stopped. Do not treat this step result as a recoverable failure.
 
@@ -1278,6 +1294,10 @@ Combine fields to increase specificity when a single field is ambiguous:
 **`read_text`:** `validator` is not an open-ended string in practice. The Android runtime currently supports only `"temperature"` and rejects any other value.
 
 **`snapshot_ui`:** Clawperator returns a single canonical snapshot format: `hierarchy_xml`. The Android runtime writes the hierarchy dump to device logcat, and the Node layer injects that raw XML into `data.text` after execution. `data.actual_format` is always `"hierarchy_xml"` for successful snapshot steps.
+
+`observe snapshot` (CLI subcommand) and `snapshot_ui` (execution action type) use the same internal pipeline and produce identical output. `observe snapshot` builds a single-action execution internally and calls `runExecution`. Use `observe snapshot` for ad-hoc inspection from the command line. Use `snapshot_ui` as a step within a multi-action execution payload.
+
+**Failure case - extraction error:** If snapshot post-processing finishes without attaching UI hierarchy text to the step (`data.text` remains absent), the step returns `success: false` with `data.error: "SNAPSHOT_EXTRACTION_FAILED"`. A common cause is that logcat does not contain a matching `[TaskScope] UI Hierarchy:` marker for the step, but partial extraction or other logcat mismatches can also trigger this error. This typically means the installed clawperator binary is out of date with the Android Operator APK. Run `clawperator version --check-compat` and `clawperator doctor` to diagnose. See Troubleshooting for resolution steps.
 
 **`take_screenshot`:** `observe screenshot` uses the same execution contract under the hood. Android reports `UNSUPPORTED_RUNTIME_SCREENSHOT`, then the Node layer captures the screenshot via `adb exec-out screencap -p`, writes it to `data.path`, and normalizes the step result to `success: true` when capture succeeds.
 
@@ -1352,6 +1372,12 @@ Structured XML produced by UIAutomator. Each `<node>` represents one UI element.
 | `enabled` | - | `"false"` means the element is visible but not interactable. |
 | `long-clickable` | - | `"true"` if the element accepts long-press. Use `clickType: "long_click"`. |
 
+**XML attribute escaping:** Snapshot output is XML, so special characters in attribute values are escaped when the hierarchy is serialized. For example, an apostrophe appears as `&apos;`, an ampersand as `&amp;`. These escaped sequences are returned as-is in `data.text` - they are not decoded after extraction. When targeting elements with special characters in their labels, use `contentDescContains` or `textContains` with a substring that avoids the escaped characters rather than an exact match requiring the full escaped form.
+
+Example: for a node with `content-desc="Search for &apos;vlc&apos;"`:
+- `contentDescContains: "Search for"` -- works
+- `contentDescEquals: "Search for 'vlc'"` -- fails (apostrophe is not decoded)
+
 **Annotated example from Android Settings main screen (live device capture):**
 
 ```xml
@@ -1415,10 +1441,19 @@ Structured XML produced by UIAutomator. Each `<node>` represents one UI element.
 
 **Reading patterns:**
 
-- **Tap targets** are `clickable="true"` nodes. In list UIs these are often container (`LinearLayout`) nodes whose text-bearing children hold the visible label while the container itself has `text=""`. Match the text-bearing child node (for example, `textEquals: "Connections"` or `resourceId: "android:id/title"`), then rely on the runtime to click a clickable ancestor when needed.
+- **Tap targets** are `clickable="true"` nodes. In list UIs these are often container (`LinearLayout`) nodes whose text-bearing children hold the visible label while the container itself has `text=""`. When you match any node, Clawperator first attempts `ACTION_CLICK` on the first `clickable="true"` ancestor it finds while walking up the tree from the matched node. If that accessibility click does not succeed, Clawperator falls back to a gesture tap at the center of the matched node's bounding box. This means matching a non-clickable label node (for example, `textEquals: "Connections"`) works correctly as long as it is visually inside a clickable parent tap target. If both mechanisms fail, the execution currently terminates with a failed envelope and empty `stepResults` rather than a per-step `NODE_NOT_CLICKABLE` code.
 - **Icon-only buttons** (no `text`) use `content-desc` for their label. Target with `contentDescEquals`.
 - **Scroll containers** have `scrollable="true"`. Pass their `resource-id` as the `container` matcher in `scroll_and_click`.
 - **Disabled elements** have `enabled="false"`. They cannot be interacted with - scrolling or waiting for a state change is required first.
+
+**Apps with obfuscated or missing resource-ids:** Many production apps (Google Play Store, social media apps, banking apps) set `resource-id=""` on all or most nodes. In this case, fall back to content-desc and text matchers. The fallback priority for these apps is:
+
+1. `contentDescEquals` - for elements with stable accessibility labels (icon buttons, tabs)
+2. `textEquals` - for elements with stable visible text (button labels, section headers)
+3. `contentDescContains` / `textContains` - when the value may include dynamic content, counts, or special characters (including HTML entities - see note above)
+4. `role: "textfield"` - for text inputs when no `resource-id` is present
+
+Note: `content-desc` values sometimes contain newlines when an element's label spans multiple pieces of information (for example, an app name followed by developer name in Play Store results). Use `contentDescContains` with a known stable substring rather than a full exact match.
 
 ## Error Codes
 
@@ -1446,9 +1481,11 @@ Branch agent logic on codes from `envelope.error` or `stepResults[].data.error`:
 | `APK_VERSION_UNREADABLE` | The device package dump did not expose a readable [Clawperator Operator Android app](../getting-started/android-operator-apk.md) version |
 | `EXECUTION_VALIDATION_FAILED` | Payload failed schema validation |
 | `SECURITY_BLOCK_DETECTED` | Android blocked the action (e.g., secure keyboard) |
-| `NODE_NOT_CLICKABLE` | Element found but not interactable |
+| `NODE_NOT_CLICKABLE` | Reserved error code. Intended for "element found but not interactable", but not currently emitted consistently by the Android and Node runtimes. |
+| `UNSUPPORTED_RUNTIME_CLOSE` | Expected per-step result for all `close_app` steps. The Android runtime does not support a force-stop action response - the Node layer handles the close via `adb shell am force-stop` before dispatch. The overall execution `status` remains `"success"`. Treat as non-fatal. |
+| `SNAPSHOT_EXTRACTION_FAILED` | `snapshot_ui` step completed but the Node layer did not attach any snapshot text to the step during post-processing. The most common cause is a Node binary packaging mismatch or other logcat extraction issue. Rebuild or reinstall the npm package and check version compatibility. |
 
-Full error taxonomy: `apps/node/src/contracts/errors.ts`
+Primary top-level error taxonomy: `apps/node/src/contracts/errors.ts`. This table also includes runtime-only step error strings such as `UNSUPPORTED_RUNTIME_CLOSE`.
 
 ## Key Behaviors
 
@@ -1532,7 +1569,16 @@ No. It executes commands and reports structured results. Reasoning and planning 
 Single-flight per device. A second overlapping execution returns `EXECUTION_CONFLICT_IN_FLIGHT`.
 
 **When should I use direct `adb` instead?**
-Only for diagnostics or gaps not covered by the API. For routine automation, use Clawperator so result/error semantics stay consistent.
+Use `adb` directly for operations not covered by the execution payload API:
+
+- **Opening specific URIs or deep links** - there is no `open_uri` action type. Use `adb shell am start -a android.intent.action.VIEW -d "<uri>"` to open a Play Store app page, a web URL, or a custom deep link. On devices with multiple apps registered for a URI scheme, this may trigger an "Open with" picker that your automation must handle.
+- **Diagnostics** when you need to inspect raw device state (logcat, package list, window focus).
+- **Pre-flight setup** outside the automation loop (granting permissions, installing APKs, checking installed packages).
+
+For routine UI automation, use Clawperator so result/error semantics stay consistent.
+
+**Can Clawperator open a specific URL or deep link?**
+Not directly. The `open_app` action only supports launching an app by its `applicationId`. To open a URI (such as a Play Store app page at `market://details?id=com.example.app`, a web URL, or a custom deep link), use `adb shell am start` outside the Clawperator execution payload. See "When to use adb directly" above.
 
 **Does Clawperator run skills?**
 Skills are standalone programs that agents can invoke directly. The Node API provides discovery (`skills list`, `skills search`), metadata (`skills get`), and a convenience `skills run` wrapper. Skills do not need the Node API to execute - agents can call skill scripts directly.
