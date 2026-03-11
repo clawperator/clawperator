@@ -7,18 +7,73 @@ const installCommands = {
   npm: "npm install -g clawperator"
 };
 
-const features = [
+const reliabilityCards = [
   {
-    title: "Deterministic Actions",
-    body: "Each command does one thing, returns one result, and never hides retries behind the scenes."
+    title: "Deterministic",
+    body: "Each command does one thing, returns one result, and never hides retries."
   },
   {
-    title: "Structured Device State",
-    body: "Your agent gets clear UI snapshots and machine-readable results it can actually branch on."
+    title: "Structured",
+    body: "Agents get machine-readable UI state, explicit errors, and results they can branch on."
   },
   {
-    title: "Agent-Friendly Errors",
-    body: "Failures come back as explicit, machine-readable errors instead of vague logs or guesswork."
+    title: "Built for loops",
+    body: "Clawperator is designed for reasoning systems that need predictable execution, not best-effort automation."
+  }
+];
+
+const workflowCards = [
+  {
+    title: "Home battery and energy apps",
+    body: "Read Powerwall, battery, or inverter status from mobile-only apps and trigger actions when thresholds are crossed."
+  },
+  {
+    title: "Google Home and thermostat control",
+    body: "Check temperature, switch device state, and turn heating or cooling on without waiting for a public API that may never exist."
+  },
+  {
+    title: "School app notification filtering",
+    body: "Monitor a noisy school app, filter the clutter, and surface only the updates that actually matter."
+  },
+  {
+    title: "Family location flows",
+    body: "Check Life360-style apps and send updates or screenshots until someone gets home, then stop automatically."
+  },
+  {
+    title: "Shopping, delivery, and status checks",
+    body: "Build private workflows around grocery, courier, or account apps that only really exist as mobile interfaces."
+  },
+  {
+    title: "App-only balances and alerts",
+    body: "Pull statuses, balances, or alerts from user-installed Android apps that do not expose a usable public API."
+  }
+];
+
+const faqs = [
+  {
+    question: "Can I use this if I have an iPhone?",
+    answer:
+      "Yes. Clawperator does not require you to switch your primary phone to Android. The normal setup is to keep using your iPhone and connect your agent to a separate Android burner phone or a local Android emulator."
+  },
+  {
+    question: "I do not have an Android phone. Can I still use Clawperator?",
+    answer:
+      "Yes. Clawperator can provision a local Google Play-equipped Android emulator. That is useful for getting started, local development, and many automation flows."
+  },
+  {
+    question: "Do I need a dedicated burner phone?",
+    answer:
+      "A cheap dedicated burner phone is the preferred setup for compatibility and long-running reliability, but it is not the only option. A local Android emulator is available when you do not have a device handy."
+  },
+  {
+    question: "What if the skill I need does not exist yet?",
+    answer:
+      "That is fine. Clawperator includes a growing open source skills library, but you are not blocked on prebuilt skills. Your agent can use Clawperator's structured, documented API to explore an app, operate it, and build a private skill for your own workflow."
+  },
+  {
+    question: "Does Clawperator do the thinking for my agent?",
+    answer:
+      "No. The agent decides what to do next. Clawperator executes validated Android actions and returns structured results."
   }
 ];
 
@@ -30,8 +85,16 @@ export default function Home() {
   const activeCommand = mode === "npm" ? installCommands.npm : installCommands.oneLiner;
   const emulatorCommand = "clawperator provision emulator";
 
-  const sectionIds = ["install", "workflows", "why", "what", "skills", "how-it-works"];
-  const sectionLabels = { install: "Install", workflows: "Examples", why: "Why", what: "What", skills: "Skills", "how-it-works": "How it works" };
+  const sectionIds = ["install", "workflows", "reliability", "skills", "architecture", "how-it-works", "faq"];
+  const sectionLabels = {
+    install: "Install",
+    workflows: "Examples",
+    reliability: "Why it works",
+    skills: "Skills",
+    architecture: "Architecture",
+    "how-it-works": "How it works",
+    faq: "FAQ"
+  };
 
   const copyTimeoutRef = useRef(null);
   const emulatorCopyTimeoutRef = useRef(null);
@@ -173,18 +236,14 @@ export default function Home() {
             <br />
             CLAWPERATOR ACTS.
           </h1>
+          <p className="hero-category-line">Clawperator makes Android apps programmable - Playwright for mobile apps.</p>
           <p className="hero-summary">
-            Let AI agents control Android apps on behalf of users.
-            <br />
-            <br />
-            Your agent or LLM is the brain.
-            <br />
-            Clawperator is the hand.
-            <br />
-            <br />
-            The brain decides what to do next.
-            <br />
-            Clawperator connects that agent to a dedicated Android burner phone or local Android emulator, executes the action, and returns reliable, structured results your agent can trust and use to build your own private workflows on top of.
+            Clawperator is a deterministic execution layer that lets agents operate real Android apps and get
+            structured results back.
+          </p>
+          <p className="hero-summary hero-summary-secondary">
+            Your agent is the brain. Clawperator is the hand. Connect it to a dedicated Android burner phone or local
+            Google Play-equipped emulator, execute validated actions, and get reliable results your agent can trust.
           </p>
 
           <div className="hero-image-panel">
@@ -201,13 +260,13 @@ export default function Home() {
         <div className="quickstart-intro">
           <h2 id="install">Quick Start</h2>
           <p>
-            One command installs the CLI, fetches the latest operator app, verifies it, and helps prepare an Android
-            device for your agent.
+            One command installs the CLI, fetches the latest Clawperator Operator Android app, verifies it, and helps
+            prepare an Android device for your agent.
           </p>
           <p>
             A cheap burner Android phone is still the preferred setup for compatibility and long-running reliability.
-            Do not have an Android device handy? No problem. Clawperator can provision a Google Play equipped emulator
-            for you after install and walk you through the same setup flow.
+            You do not need to switch from iPhone to Android. If you do not have an Android device handy, Clawperator
+            can provision a local Google Play-equipped emulator and walk you through the same setup flow.
           </p>
         </div>
 
@@ -348,58 +407,35 @@ export default function Home() {
       </section>
 
       <section id="workflows" className="content-section">
-        <h2>Real-world examples</h2>
+        <h2>What you can do with Clawperator</h2>
         <p className="workflow-subtitle">
-          Each workflow below runs on an Android device.
-          A natural request goes in, a concrete result comes back.
+          Clawperator is most useful where the real interface only exists in a mobile app.
         </p>
 
         <div className="workflow-cards">
-          <article className="workflow-card">
-            <div className="workflow-exchange">
-              <div className="workflow-msg workflow-msg-user">
-                <p className="workflow-role">User <span className="workflow-channel">via Telegram</span></p>
-                <p>&ldquo;Turn on the living room AC.&rdquo;</p>
-              </div>
-              <div className="workflow-msg workflow-msg-agent">
-                <p className="workflow-role">OpenClaw</p>
-                <p>Uses Clawperator to open the Google Home app on the Android device and turn on the living room AC in cooling mode.</p>
-              </div>
-              <div className="workflow-msg workflow-msg-response">
-                <p className="workflow-role">Response</p>
-                <p>&ldquo;Living room AC is on and cooling. It&rsquo;s 27&#176;C in there right now.&rdquo;</p>
-              </div>
-            </div>
-          </article>
-
-          <article className="workflow-card">
-            <div className="workflow-exchange">
-              <div className="workflow-msg workflow-msg-user">
-                <p className="workflow-role">User <span className="workflow-channel">via Telegram</span></p>
-                <p>&ldquo;Where is Amy right now?&rdquo;</p>
-              </div>
-              <div className="workflow-msg workflow-msg-agent">
-                <p className="workflow-role">OpenClaw</p>
-                <p>Uses Clawperator to open Life360 on the Android device and look up Amy&rsquo;s current location.</p>
-              </div>
-              <div className="workflow-msg workflow-msg-response">
-                <p className="workflow-role">Response</p>
-                <p>&ldquo;Amy is on Riverside Rd, heading east. Location updated 2 minutes ago.&rdquo;</p>
-              </div>
-            </div>
-          </article>
-
+          {workflowCards.map((card) => (
+            <article key={card.title} className="workflow-card workflow-card-simple">
+              <h3>{card.title}</h3>
+              <p>{card.body}</p>
+            </article>
+          ))}
         </div>
       </section>
 
-      {/* Feature Grid - Core Principles */}
-      <section id="features" className="feature-grid" aria-label="Core features">
+      <section id="reliability" className="feature-grid">
         <div className="feature-intro">
-          <h2>Features</h2>
-          <p>Built for agent loops that require clear device state, predictable actions, and machine-readable results.</p>
+          <h2>Built for agent loops</h2>
+          <p>More than UI automation. Each command does one thing, returns one result, and never hides retries.</p>
+          <div className="contract-strip">
+            <span>action</span>
+            <span className="contract-arrow">&rarr;</span>
+            <span>execution</span>
+            <span className="contract-arrow">&rarr;</span>
+            <span>structured result</span>
+          </div>
         </div>
 
-        {features.map((feature) => (
+        {reliabilityCards.map((feature) => (
           <article key={feature.title} className="feature-card">
             <h2>{feature.title}</h2>
             <p>{feature.body}</p>
@@ -407,61 +443,7 @@ export default function Home() {
         ))}
       </section>
 
-      {/* Why Section */}
-      <section id="why" className="content-section">
-        <h2>Why use Clawperator?</h2>
-        <p>
-          Many important services still live inside mobile apps. Home automation controls, grocery apps, family
-          tracking tools, ride-hailing, banking companions, and other everyday workflows often have no public API worth
-          using.
-        </p>
-        <p>
-          Clawperator gives your agent a practical way to work in that world. Instead of pretending every service has an
-          integration, you connect the agent to an Android device and let it operate the app UI the same way a
-          person would.
-        </p>
-      </section>
-
-      {/* What Section */}
-      <section id="what" className="content-section">
-        <h2>What is Clawperator?</h2>
-        <p>
-          Clawperator is the hand for your agent. The agent is the brain: it reads state, reasons about the next step,
-          and decides what to do. Clawperator executes that decision on Android and reports back what happened.
-        </p>
-        <div className="grid-2-col">
-          <div>
-            <h3>What your agent gets</h3>
-            <ul>
-              <li>Connect to a physical Android burner phone or local Android emulator from a simple Node API or CLI</li>
-              <li>Tap, type, scroll, launch apps, and inspect the current UI</li>
-              <li>Works with OpenClaw, custom agents, and any AI system capable of making API calls</li>
-              <li>Compose reusable skills that automate real mobile workflows</li>
-              <li>Build repeatable automations without baking app-specific strategy into the runtime</li>
-            </ul>
-          </div>
-          <div>
-            <h3>Typical setup</h3>
-            <ul>
-              <li>Use any cheap or old Android phone as a dedicated device for your agent</li>
-              <li>Keep it plugged in and connected to your host machine as a permanent hand</li>
-              <li>Point your agent at the CLI or Node API and let it drive the phone on the user&apos;s behalf</li>
-              <li>Or provision a Google Play equipped Android emulator locally when you do not have a device handy</li>
-            </ul>
-          </div>
-        </div>
-
-        <div className="setup-note">
-          <p>
-            <strong>The burner phone model:</strong> Clawperator commonly runs on a cheap Android phone dedicated to
-            agent work. This keeps automation isolated from your primary phone and gives your agent a persistent device
-            it can safely control. When a physical device is not available, Clawperator can also provision a local
-            Android emulator as a fallback environment.
-          </p>
-        </div>
-      </section>
-
-      <section className="content-section architecture-section" aria-label="The architecture">
+      <section id="architecture" className="content-section architecture-section">
         <h2>The architecture</h2>
         <div className="architecture-strip">
           <article className="architecture-card architecture-card-edge">
@@ -494,91 +476,52 @@ export default function Home() {
         </div>
         <p>
           Your agent reasons about what should happen. Clawperator executes those decisions on an Android device. This
-          turns mobile apps into programmable interfaces your agent can use. The Clawperator runtime includes the CLI
-          on your host machine and a lightweight operator app running on the Android device, installed automatically by
-          the setup script.
+          is the execution layer: intelligence stays in the agent, execution stays in Clawperator. The runtime includes
+          the CLI on your host machine and the Clawperator Operator Android app on the Android device.
         </p>
-      </section>
-
-      <section id="reliability" className="content-section">
-        <h2>Reliability</h2>
-        <p>
-          Clawperator favors predictable execution over automation magic. Commands are strict, results are explicit, and
-          the runtime stays out of the planning loop.
-        </p>
-        <div className="grid-2-col">
-          <div>
-            <h3>What stays predictable</h3>
-            <ul>
-              <li>Deterministic execution with no hidden retries</li>
-              <li>One result per command, with clear success or failure</li>
-              <li>Structured UI snapshots your agent can inspect between steps</li>
-            </ul>
-          </div>
-          <div>
-            <h3>What your agent can rely on</h3>
-            <ul>
-              <li>Machine-readable errors instead of hand-parsed logs</li>
-              <li>Stable command and task identifiers through the full request path</li>
-              <li>A runtime that executes validated actions instead of inventing strategy</li>
-            </ul>
-          </div>
-        </div>
       </section>
 
       <section id="skills" className="content-section">
         <h2>Skills</h2>
         <p>
-          Skills are packaged automation scripts that turn common mobile workflows into repeatable, agent-ready
-          operations. Each skill targets a specific app and task - check the air conditioner status, capture a
-          settings overview, or pull data from a tracking app.
+          Clawperator ships with a growing open source skills library, but the important point is that you do not need
+          prebuilt skills to get value.
         </p>
         <p>
-          Skills are packaged and distributed as a versioned bundle via the Clawperator installer.
-          Each skill is standalone and designed to be invoked directly or through the Node API -
-          discover, search, and run skills through a single interface.
+          Because Clawperator exposes a structured, documented API, your own agent can open an app, inspect the UI,
+          figure out the flow, and build a private skill for your exact apps, accounts, and workflows.
         </p>
-
-        <div className="skills-examples">
-          <article className="skill-example">
-            <p className="skill-example-label">Discover</p>
-            <pre><code>clawperator skills search --app com.android.settings</code></pre>
-          </article>
-          <article className="skill-example">
-            <p className="skill-example-label">Run</p>
-            <pre><code>{`clawperator skills run com.android.settings.capture-overview \\
-  --device-id <device_id>`}</code></pre>
-          </article>
-          <article className="skill-example">
-            <p className="skill-example-label">Or invoke directly</p>
-            <pre><code>{`node ~/.clawperator/skills/skills/com.android.settings.capture-overview/scripts/capture_settings_overview.js \\
-  <device_id>`}</code></pre>
-          </article>
-        </div>
 
         <div className="grid-2-col">
           <div>
-            <h3>For agents</h3>
+            <h3>Included with install</h3>
             <ul>
-              <li>Search skills by app, intent, or keyword</li>
-              <li>Get structured metadata before deciding what to run</li>
-              <li>Invoke directly or through the Node API - no lock-in</li>
+              <li>Growing open source skills library</li>
+              <li>Reusable building blocks for common mobile workflows</li>
+              <li>Discoverable and runnable through the same runtime</li>
             </ul>
           </div>
           <div>
-            <h3>For builders</h3>
+            <h3>Yours to customize</h3>
             <ul>
-              <li>Write a script, add a registry entry, and your skill is live</li>
-              <li>Skills are plain scripts - Node, shell, or anything with a shebang</li>
-              <li>One install command pulls the full skills library</li>
+              <li>Create private skills for personal apps and workflows</li>
+              <li>Let your agent build skills from live app exploration</li>
+              <li>Mix included skills and private skills in the same runtime</li>
             </ul>
           </div>
+        </div>
+
+        <div className="setup-note">
+          <p>
+            <strong>You are not blocked waiting for a public skill.</strong> Start with included skills, adapt them to
+            your setup, or let your agent create private ones through Clawperator&apos;s documented API.
+          </p>
         </div>
       </section>
 
       <section id="how-it-works" className="content-section loop-section">
         <h2>How It Works</h2>
-        <p>The loop is simple: the brain observes and decides, the hand executes and reports back.</p>
+        <p>The loop is simple: the agent observes and decides, the hand executes and reports back.</p>
 
         <div className="loop-steps" aria-label="Clawperator hand loop">
           <article className="loop-step">
@@ -615,9 +558,21 @@ export default function Home() {
         </div>
       </section>
 
+      <section id="faq" className="content-section faq-section">
+        <h2>FAQ</h2>
+        <div className="faq-list">
+          {faqs.map((item) => (
+            <details key={item.question} className="faq-item">
+              <summary>{item.question}</summary>
+              <p>{item.answer}</p>
+            </details>
+          ))}
+        </div>
+      </section>
+
         <footer className="site-footer">
           <p className="footer-title">Clawperator</p>
-          <p className="footer-copy">Open source Android automation for AI agents. From single commands to full burner-device workflows.</p>
+          <p className="footer-copy">Open source execution infrastructure for agent-driven Android burner-device workflows.</p>
           <nav className="footer-links" aria-label="Footer links">
             <a href="https://docs.clawperator.com" target="_blank" rel="noreferrer">
               docs

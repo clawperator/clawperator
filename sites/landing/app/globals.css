@@ -261,12 +261,12 @@ body {
 
 #top,
 #install,
-#features,
-#why,
-#what,
+#reliability,
 #skills,
 #workflows,
-#how-it-works {
+#architecture,
+#how-it-works,
+#faq {
   scroll-margin-top: calc(var(--toolbar-height) + 14px);
 }
 
@@ -328,13 +328,28 @@ body {
   text-wrap: balance;
 }
 
+.hero-category-line {
+  margin: 1rem 0 0;
+  max-width: 760px;
+  font-size: 1.32rem;
+  line-height: 1.4;
+  font-weight: 700;
+  color: var(--text);
+  text-wrap: balance;
+}
+
 .hero-summary {
-  margin: 1.5rem 0 0;
+  margin: 1rem 0 0;
   max-width: 640px;
   font-size: 1rem;
   line-height: 1.7;
   color: var(--text-muted);
   text-wrap: pretty;
+}
+
+.hero-summary-secondary {
+  margin-top: 0.7rem;
+  max-width: 700px;
 }
 
 .hero-image-panel {
@@ -644,6 +659,26 @@ body {
   line-height: 1.65;
 }
 
+.contract-strip {
+  margin-top: 1rem;
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.86rem;
+}
+
+.contract-arrow {
+  color: var(--accent);
+  font-weight: 700;
+}
+
 .feature-card {
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -885,7 +920,8 @@ body {
 .workflow-cards {
   margin-top: 1.8rem;
   display: grid;
-  gap: 1.5rem;
+  gap: 1rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .workflow-card {
@@ -897,6 +933,25 @@ body {
   max-width: 560px;
   margin-left: auto;
   margin-right: auto;
+}
+
+.workflow-card-simple {
+  max-width: none;
+  margin: 0;
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+.workflow-card-simple h3 {
+  margin: 0;
+  font-size: 1.08rem;
+  line-height: 1.35;
+  color: var(--text);
+}
+
+.workflow-card-simple p {
+  margin: 0.55rem 0 0;
+  color: var(--text-muted);
 }
 
 .workflow-subtitle {
@@ -996,6 +1051,57 @@ body {
 
 .loop-step p {
   margin: 0.35rem 0 0;
+  color: var(--text-muted);
+}
+
+.faq-section {
+  margin-top: var(--section-gap);
+}
+
+.faq-list {
+  margin-top: 1rem;
+  display: grid;
+  gap: 0.8rem;
+}
+
+.faq-item {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  padding: 0.9rem 1rem;
+}
+
+.faq-item summary {
+  cursor: pointer;
+  list-style: none;
+  font-size: 1rem;
+  line-height: 1.5;
+  font-weight: 650;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.faq-item summary::-webkit-details-marker {
+  display: none;
+}
+
+.faq-item summary::after {
+  content: "+";
+  color: var(--accent);
+  font-size: 1.15rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.faq-item[open] summary::after {
+  content: "-";
+}
+
+.faq-item p {
+  margin: 0.75rem 0 0;
   color: var(--text-muted);
 }
 
@@ -1118,6 +1224,10 @@ body {
     grid-template-columns: 1fr;
   }
 
+  .workflow-cards {
+    grid-template-columns: 1fr;
+  }
+
   .grid-2-col {
     grid-template-columns: 1fr;
     gap: 1rem;
@@ -1141,5 +1251,9 @@ body {
   .loop-step {
     grid-template-columns: 1fr;
     gap: 0.45rem;
+  }
+
+  .contract-strip {
+    border-radius: 16px;
   }
 }
