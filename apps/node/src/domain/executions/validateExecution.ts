@@ -27,7 +27,7 @@ const nodeMatcherSchema = z
 
 const actionParamsSchema = z.object({
   applicationId: z.string().optional(),
-  uri: z.string().optional(),
+  uri: z.string().max(LIMITS.MAX_URI_LENGTH).optional(),
   durationMs: z.number().optional(),
   path: z.string().optional(),
   matcher: nodeMatcherSchema.optional(),

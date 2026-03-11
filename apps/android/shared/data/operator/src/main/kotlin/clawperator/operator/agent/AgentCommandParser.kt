@@ -228,12 +228,12 @@ class AgentCommandParserDefault : AgentCommandParser {
     private fun JsonObject.parseMatcherOrNull(key: String): NodeMatcher? {
         val matcherObject = this[key]?.jsonObject ?: return null
 
-        val resourceId = matcherObject.stringOrNull("resourceId")
-        val role = matcherObject.stringOrNull("role")
-        val textEquals = matcherObject.stringOrNull("textEquals")
-        val textContains = matcherObject.stringOrNull("textContains")
-        val contentDescEquals = matcherObject.stringOrNull("contentDescEquals")
-        val contentDescContains = matcherObject.stringOrNull("contentDescContains")
+        val resourceId = matcherObject.stringOrNullWithMax("resourceId", MAX_MATCHER_VALUE_LENGTH)
+        val role = matcherObject.stringOrNullWithMax("role", MAX_MATCHER_VALUE_LENGTH)
+        val textEquals = matcherObject.stringOrNullWithMax("textEquals", MAX_MATCHER_VALUE_LENGTH)
+        val textContains = matcherObject.stringOrNullWithMax("textContains", MAX_MATCHER_VALUE_LENGTH)
+        val contentDescEquals = matcherObject.stringOrNullWithMax("contentDescEquals", MAX_MATCHER_VALUE_LENGTH)
+        val contentDescContains = matcherObject.stringOrNullWithMax("contentDescContains", MAX_MATCHER_VALUE_LENGTH)
 
         require(
             resourceId != null || role != null || textEquals != null || textContains != null ||
@@ -263,6 +263,12 @@ class AgentCommandParserDefault : AgentCommandParser {
     private fun JsonObject.stringOrNull(key: String): String? {
         val primitive = this[key] as? JsonPrimitive ?: return null
         return primitive.content
+    }
+
+    private fun JsonObject.stringOrNullWithMax(key: String, maxLen: Int): String? {
+        val value = stringOrNull(key) ?: return null
+        require(value.length <= maxLen) { "$key exceeds max length of $maxLen" }
+        return value
     }
 
     private fun JsonObject.intOrDefault(
