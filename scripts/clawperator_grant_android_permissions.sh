@@ -152,7 +152,36 @@ grant_notification_permission() {
     fi
 }
 
+grant_notification_listener_permission() {
+    local package=$1
+    setup_adb_cmd
+    local svc="$package/action.notification.NotificationListenerService"
 
+    echo -e "${BLUE}🔔 Configuring Notification Listener Service...${NC}"
+
+    # Read current enabled notification listeners
+    local current_listeners
+    current_listeners=$("${ADB_CMD[@]}" shell settings get secure enabled_notification_listeners 2>/dev/null || echo "")
+
+    # Build new listeners list (append if missing)
+    local new_listeners
+    if [[ "$current_listeners" == *"$svc"* ]]; then
+        new_listeners="$current_listeners"
+        echo -e "${GREEN}✅ Notification listener already enabled${NC}"
+    else
+        if [[ -z "$current_listeners" || "$current_listeners" == "null" ]]; then
+            new_listeners="$svc"
+        else
+            new_listeners="$current_listeners:$svc"
+        fi
+        echo -e "${YELLOW}📝 Adding notification listener to enabled list${NC}"
+    fi
+
+    echo -e "${BLUE}⚙️  Setting enabled_notification_listeners...${NC}"
+    "${ADB_CMD[@]}" shell settings put secure enabled_notification_listeners "$new_listeners"
+
+    echo -e "${GREEN}✅ Notification listener configured${NC}"
+}
 
 show_verification_steps() {
     local package=$1
@@ -243,6 +272,9 @@ main() {
     echo ""
 
     grant_notification_permission "$TARGET_PACKAGE"
+    echo ""
+
+    grant_notification_listener_permission "$TARGET_PACKAGE"
     echo ""
 
     show_verification_steps "$TARGET_PACKAGE"

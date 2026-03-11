@@ -5,6 +5,8 @@ const DEFAULT_DEBUG_PACKAGE = "com.clawperator.operator.dev";
 const DEFAULT_RELEASE_PACKAGE = "com.clawperator.operator";
 const ACCESSIBILITY_SERVICE_CLASS =
   "clawperator.operator.accessibilityservice.OperatorAccessibilityService";
+const NOTIFICATION_LISTENER_SERVICE_CLASS =
+  "action.notification.NotificationListenerService";
 
 export interface AccessibilityGrantResult {
   ok: boolean;
@@ -18,10 +20,17 @@ export interface NotificationGrantResult {
   error?: string;
 }
 
+export interface NotificationListenerGrantResult {
+  ok: boolean;
+  alreadyEnabled: boolean;
+  error?: string;
+}
+
 export interface PermissionGrantResult {
   receiverPackage: string;
   accessibility: AccessibilityGrantResult;
   notification: NotificationGrantResult;
+  notificationListener: NotificationListenerGrantResult;
 }
 
 export async function detectReceiverPackage(config: RuntimeConfig): Promise<string | undefined> {
@@ -87,6 +96,38 @@ export async function grantNotificationPermission(
   return { ok: true, skipped: false };
 }
 
+export async function grantNotificationListenerPermission(
+  config: RuntimeConfig,
+  receiverPackage: string
+): Promise<NotificationListenerGrantResult> {
+  const svc = `${receiverPackage}/${NOTIFICATION_LISTENER_SERVICE_CLASS}`;
+
+  const currentResult = await runAdb(config, [
+    "shell", "settings", "get", "secure", "enabled_notification_listeners",
+  ]);
+  if (currentResult.code !== 0) {
+    return { ok: false, alreadyEnabled: false, error: currentResult.stderr || "Could not read notification listeners" };
+  }
+
+  const current = currentResult.stdout.trim();
+  const alreadyEnabled = current.includes(svc);
+
+  if (alreadyEnabled) {
+    return { ok: true, alreadyEnabled: true };
+  }
+
+  const newValue = !current || current === "null" ? svc : `${current}:${svc}`;
+
+  const setResult = await runAdb(config, [
+    "shell", "settings", "put", "secure", "enabled_notification_listeners", newValue,
+  ]);
+  if (setResult.code !== 0) {
+    return { ok: false, alreadyEnabled: false, error: setResult.stderr || "Could not set enabled_notification_listeners" };
+  }
+
+  return { ok: true, alreadyEnabled: false };
+}
+
 export async function grantDevicePermissions(
   config: RuntimeConfig,
   receiverPackage?: string
@@ -101,11 +142,13 @@ export async function grantDevicePermissions(
         error: "No Clawperator Operator APK found on device. Install the APK first.",
       },
       notification: { ok: false, skipped: true },
+      notificationListener: { ok: false, alreadyEnabled: false },
     };
   }
 
   const accessibility = await grantAccessibilityPermission(config, pkg);
   const notification = await grantNotificationPermission(config, pkg);
+  const notificationListener = await grantNotificationListenerPermission(config, pkg);
 
-  return { receiverPackage: pkg, accessibility, notification };
+  return { receiverPackage: pkg, accessibility, notification, notificationListener };
 }

@@ -23,6 +23,7 @@ export async function cmdGrantDevicePermissions(options: {
         message: result.accessibility.error ?? "Failed to grant accessibility permission.",
         receiverPackage: result.receiverPackage,
         notification: result.notification,
+        notificationListener: result.notificationListener,
       },
       options
     );
@@ -33,6 +34,7 @@ export async function cmdGrantDevicePermissions(options: {
       receiverPackage: result.receiverPackage,
       accessibility: result.accessibility,
       notification: result.notification,
+      notificationListener: result.notificationListener,
       message: result.accessibility.alreadyEnabled
         ? "Accessibility service was already enabled."
         : "Accessibility service enabled. Run clawperator doctor to verify.",
