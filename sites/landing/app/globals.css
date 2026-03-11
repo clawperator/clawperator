@@ -679,6 +679,36 @@ body {
   font-weight: 700;
 }
 
+.loop-example {
+  margin-top: 1rem;
+}
+
+.loop-example-label {
+  margin: 0 0 0.55rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.loop-example pre {
+  margin: 0;
+  border: 1px solid var(--panel-border);
+  border-radius: 16px;
+  background: var(--skill-example-bg);
+  padding: 1rem 1.1rem;
+  box-shadow: var(--panel-shadow);
+  overflow-x: auto;
+}
+
+.loop-example code {
+  font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.92rem;
+  line-height: 1.65;
+  color: var(--text);
+}
+
 .feature-card {
   border: 1px solid var(--border);
   border-radius: 10px;

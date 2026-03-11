@@ -433,6 +433,19 @@ export default function Home() {
             <span className="contract-arrow">&rarr;</span>
             <span>structured result</span>
           </div>
+          <div className="loop-example">
+            <p className="loop-example-label">Example agent loop (pseudocode - see docs.clawperator.com for the full API)</p>
+            <pre>
+              <code>{`open_app(<google_home_app_id>)
+snapshot_ui()
+click(<climate_tab>)
+snapshot_ui()
+scroll_and_click(<device_labeled_"Living room">)
+snapshot_ui()
+if <hvac_state> == "Off":
+  click(<turn_on>)`}</code>
+            </pre>
+          </div>
         </div>
 
         {reliabilityCards.map((feature) => (
