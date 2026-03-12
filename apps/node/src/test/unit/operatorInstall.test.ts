@@ -59,8 +59,10 @@ describe("installOperator - domain", () => {
 
     // adb install succeeds
     runner.queueResult({ code: 0, stdout: "Success", stderr: "" });
-    // detectReceiverPackage: release pkg found
+    // listInstalledReceiverPackages: release pkg found
     runner.queueResult({ code: 0, stdout: "package:com.clawperator.operator", stderr: "" });
+    // listInstalledReceiverPackages: debug pkg not found
+    runner.queueResult({ code: 0, stdout: "", stderr: "" });
     // grantAccessibilityPermission: settings get fails
     runner.queueResult({ code: 1, stdout: "", stderr: "settings: command failed" });
     // grantNotificationPermission: still called by grantDevicePermissions
@@ -68,6 +70,8 @@ describe("installOperator - domain", () => {
     // grantNotificationListenerPermission: still called
     runner.queueResult({ code: 0, stdout: "null", stderr: "" });
     // set enabled_notification_listeners
+    runner.queueResult({ code: 0, stdout: "", stderr: "" });
+    // grantDevicePermissions completes without verification after permission failure
     runner.queueResult({ code: 0, stdout: "", stderr: "" });
 
     const result = await installOperator(config, TEST_APK_PATH);
@@ -141,8 +145,10 @@ describe("installOperator - domain", () => {
 
     // adb install succeeds
     runner.queueResult({ code: 0, stdout: "Success", stderr: "" });
-    // detectReceiverPackage: release pkg found
+    // listInstalledReceiverPackages: release pkg found
     runner.queueResult({ code: 0, stdout: "package:com.clawperator.operator", stderr: "" });
+    // listInstalledReceiverPackages: debug pkg not found
+    runner.queueResult({ code: 0, stdout: "", stderr: "" });
     // grantAccessibilityPermission: read current (no existing)
     runner.queueResult({ code: 0, stdout: "null", stderr: "" });
     // set accessibility_enabled
@@ -207,14 +213,18 @@ describe("installOperator - domain", () => {
 
     // adb install succeeds
     runner.queueResult({ code: 0, stdout: "Success", stderr: "" });
-    // detectReceiverPackage: release pkg found
+    // listInstalledReceiverPackages: release pkg found
     runner.queueResult({ code: 0, stdout: "package:com.clawperator.operator", stderr: "" });
+    // listInstalledReceiverPackages: debug pkg not found
+    runner.queueResult({ code: 0, stdout: "", stderr: "" });
     // grantAccessibilityPermission: already enabled
     runner.queueResult({ code: 0, stdout: "com.clawperator.operator/clawperator.operator.accessibilityservice.OperatorAccessibilityService", stderr: "" });
     // grantNotificationPermission: skip (not changeable)
     runner.queueResult({ code: 1, stdout: "", stderr: "Not a changeable permission type" });
     // grantNotificationListenerPermission: already enabled
     runner.queueResult({ code: 0, stdout: "com.clawperator.operator/action.notification.NotificationListenerService", stderr: "" });
+    // set enabled_notification_listeners
+    runner.queueResult({ code: 0, stdout: "", stderr: "" });
     // verification: pm list returns nothing
     runner.queueResult({ code: 0, stdout: "", stderr: "" });
 
