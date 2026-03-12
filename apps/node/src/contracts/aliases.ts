@@ -20,6 +20,8 @@ const ACTION_ALIAS_TO_CANONICAL: Record<string, string> = {
   key_press: "press_key",
 };
 
+// NOTE: "doctor_ping" is intentionally absent. It is an internal diagnostic action
+// used only by `clawperator doctor` via broadcastAgentCommand, not the agent-facing API.
 export const CANONICAL_ACTION_TYPES = [
   "open_app",
   "open_uri",

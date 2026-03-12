@@ -49,6 +49,9 @@ const actionParamsSchema = z.object({
   clickRetry: z.record(z.unknown()).optional(),
 }).strict();
 
+// NOTE: "doctor_ping" is intentionally excluded. It is an internal diagnostic action
+// used only by `clawperator doctor`, which bypasses validateExecution and dispatches
+// directly via broadcastAgentCommand. It is not part of the public agent-facing API.
 const supportedTypes = [
   "open_app",
   "open_uri",
