@@ -155,9 +155,10 @@ const executionSchema = z.object({
         break;
       case "press_key": {
         const SUPPORTED_KEYS = ["back", "home", "recents"] as const;
-        if (!params?.key || params.key.trim() === "") {
+        const normalizedKey = params?.key?.trim().toLowerCase();
+        if (!normalizedKey) {
           addIssue(index, "press_key requires params.key", ["params", "key"]);
-        } else if (!(SUPPORTED_KEYS as readonly string[]).includes(params.key)) {
+        } else if (!(SUPPORTED_KEYS as readonly string[]).includes(normalizedKey)) {
           addIssue(
             index,
             `press_key params.key must be one of: ${SUPPORTED_KEYS.join(", ")}`,

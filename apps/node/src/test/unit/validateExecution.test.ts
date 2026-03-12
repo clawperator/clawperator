@@ -353,6 +353,19 @@ describe("validateExecution", () => {
       (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
     );
   });
+
+  it("accepts press_key with uppercase key (case-insensitive)", () => {
+    const ex = validateExecution({
+      commandId: "c",
+      taskId: "t",
+      source: "s",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 5000,
+      actions: [{ id: "x", type: "press_key", params: { key: "BACK" } }],
+    });
+    assert.strictEqual(ex.actions[0].type, "press_key");
+    assert.strictEqual(ex.actions[0].params?.key, "BACK");
+  });
 });
 
 describe("validatePayloadSize", () => {
