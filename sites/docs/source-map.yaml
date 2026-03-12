@@ -27,6 +27,11 @@ sections:
         mode: copy
         sources:
           - docs/index.md
+      - output: geo.md
+        title: GEO Status
+        mode: copy
+        sources:
+          - docs/geo.md
 
   - id: getting-started
     title: Getting Started

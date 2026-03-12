@@ -10,6 +10,7 @@ theme:
 
 nav:
   - Docs Home: index.md
+  - GEO Status: geo.md
   - clawperator.com: https://clawperator.com
   - Getting Started:
     - Running Clawperator on Android: getting-started/running-clawperator-on-android.md

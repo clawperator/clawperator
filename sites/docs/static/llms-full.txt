@@ -10,6 +10,35 @@ This document contains all the technical documentation for Clawperator, compiled
 
 Clawperator is a deterministic actuator tool for LLM-driven Android automation. It acts as the "hand" for an LLM "brain," allowing agents to automate device control on a dedicated Android device.
 
+Use this page as a technical map:
+
+- start with setup if you are preparing a device or emulator
+- start with the Node API guide if you are integrating an agent
+- use the reference section for exact command, payload, and error semantics
+
+## Machine-facing routes
+
+- [llms.txt](https://docs.clawperator.com/llms.txt) - compact machine-oriented docs entrypoint
+- [llms-full.txt](https://docs.clawperator.com/llms-full.txt) - compiled full docs corpus on the docs host
+- [sitemap.xml](https://docs.clawperator.com/sitemap.xml) - canonical crawl map for this docs host
+- [GEO Status](geo.md) - current crawl, sitemap, and bot-support status
+
+## Recommended paths
+
+### Start here if you are integrating an agent
+
+- [Node API - Agent Guide](ai-agents/node-api-for-agents.md) - Canonical CLI and HTTP API contract for agent builders
+- [Operator LLM Playbook](design/operator-llm-playbook.md) - Practical operating rules for observation, action loops, and skill execution
+- [API Overview](reference/api-overview.md) - Execution payload, action types, result envelope shape, and snapshot semantics
+- [CLI Reference](reference/cli-reference.md) - Command-line entrypoints and flags
+
+### Start here if you are preparing runtime infrastructure
+
+- [First-Time Setup](getting-started/first-time-setup.md) - Install the CLI, choose an Android environment, and prepare the [Clawperator Operator Android app](getting-started/android-operator-apk.md)
+- [Running Clawperator on Android](getting-started/running-clawperator-on-android.md) - Canonical actuator model, physical device vs emulator, and user responsibilities
+- [OpenClaw First Run](getting-started/openclaw-first-run.md) - Task-oriented runbook for installing Clawperator, preparing Android, and completing a first real skill run
+- [Clawperator Operator Android app](getting-started/android-operator-apk.md) - Package variants, installation, and permissions for Clawperator's Android app
+
 ## Getting Started
 
 - [Running Clawperator on Android](getting-started/running-clawperator-on-android.md) - Canonical actuator model, physical device vs emulator, and user responsibilities
@@ -21,20 +50,22 @@ Clawperator is a deterministic actuator tool for LLM-driven Android automation. 
 
 ## For AI Agents
 
-- [Node API - Agent Guide](ai-agents/node-api-for-agents.md) - CLI and HTTP API reference for agents
-- [Operator LLM Playbook](design/operator-llm-playbook.md) - Action contracts, skill packaging, and runtime conventions
+- [Node API - Agent Guide](ai-agents/node-api-for-agents.md) - Canonical CLI and HTTP API reference for agents
+- [Operator LLM Playbook](design/operator-llm-playbook.md) - Action contracts, runtime conventions, and skill packaging
+- [API Overview](reference/api-overview.md) - Execution payload, action types, result envelopes, and snapshot delivery
+- [CLI Reference](reference/cli-reference.md) - Exact command surface for local and scripted integrations
 
 ## Reference
 
-- [CLI Reference](reference/cli-reference.md) - Command-line usage
-- [API Overview](reference/api-overview.md) - Execution payload, action types, and result envelopes
-- [Error Codes](reference/error-codes.md) - Error code reference
+- [CLI Reference](reference/cli-reference.md) - Command-line usage and flags
+- [API Overview](reference/api-overview.md) - Execution payload, action types, result envelopes, and snapshot semantics
+- [Error Codes](reference/error-codes.md) - Structured runtime and API error code reference
 - [Doctor](reference/node-api-doctor.md) - Runtime readiness checks, exit behavior, and JSON report shape
 
 ## Architecture
 
-- [System Overview](architecture/architecture.md)
-- [Node Runtime and API Design](design/node-api-design.md)
+- [System Overview](architecture/architecture.md) - High-level architecture and execution flow
+- [Node Runtime and API Design](design/node-api-design.md) - Detailed Node contract and runtime design
 
 
 ## Troubleshooting
@@ -52,6 +83,114 @@ Clawperator is a deterministic actuator tool for LLM-driven Android automation. 
 - [Device Prep and Runtime Tips](skills/device-prep-and-runtime-tips.md)
 - [Skills Verification](skills/skills-verification.md)
 - [Blocked Terms Policy](skills/blocked-terms-policy.md)
+
+---
+
+
+# GEO Status
+
+This page summarizes the current Generative Engine Optimization (GEO) status of
+the Clawperator public web surfaces and the remaining actions that improve bot
+and agent support over time.
+
+## Current status
+
+Clawperator's public web surfaces are in good shape for bots and agents.
+
+Current strengths:
+
+- both public hosts expose working `robots.txt`
+- both public hosts expose working sitemap surfaces
+- both public hosts expose `llms.txt`
+- both public hosts expose `llms-full.txt`
+- the landing host exposes `index.md` and `/agents`
+- the docs host exposes the Node API guide, CLI reference, and API overview
+- the docs site is the canonical technical source for agent-facing behavior
+
+Recent validation outcomes:
+
+- live GEO edge verification passes for the key public routes
+- Cloudflare Browser Rendering audit passes when using the correct crawl
+  entrypoints
+- sitemap metadata is now generated from per-file git history instead of being
+  edited by hand
+
+## Durable GEO rules
+
+The current operating model is:
+
+- `https://clawperator.com/sitemap.xml` is the public sitemap index
+- `https://clawperator.com/landing-sitemap.xml` is the preferred landing-host
+  crawl entrypoint for landing-only audits
+- `https://docs.clawperator.com/sitemap.xml` is the canonical docs-host crawl
+  map
+- `robots.txt` on both hosts is intentionally simple:
+  - `User-agent: *`
+  - `Allow: /`
+  - host-specific sitemap reference
+
+This matches the product's intent: the sites are public and should be broadly
+crawlable by agent systems.
+
+## Known Cloudflare Browser Rendering quirks
+
+These are important for future audits:
+
+- after a successful `POST /crawl`, early `GET /crawl/<job_id>` requests can
+  return `404 Crawl job not found`
+- the same crawl job may become readable several seconds later
+- landing-host `source: "sitemaps"` crawls should use
+  `https://clawperator.com/landing-sitemap.xml` rather than the mixed-host root
+  sitemap index when the goal is to audit landing coverage specifically
+- Browser Rendering `/links` can return relative URLs, so evaluation tooling
+  must normalize them before checking expected links
+
+These are Cloudflare API behaviors, not evidence that the Clawperator sites are
+hostile to crawlers.
+
+## Sitemap generation
+
+Sitemap metadata is now generated from source-of-truth files.
+
+Rules:
+
+- each URL uses the last git commit time of the file or files that actually
+  define that URL
+- if a source file has local uncommitted changes, sitemap generation uses the
+  current UTC time for that file instead
+- docs sitemap metadata is patched after MkDocs build using
+  `sites/docs/source-map.yaml`
+
+Repo-local workflow:
+
+- skill: `.agents/skills/sitemaps-generate/`
+- generator:
+  `.agents/skills/sitemaps-generate/scripts/generate_sitemap_metadata.py`
+
+## Remaining improvement areas
+
+These are the meaningful follow-up items if we want to keep improving GEO:
+
+- keep validating that the landing homepage extracts cleanly to markdown, not
+  just that it is fetchable
+- rerun Browser Rendering and live-edge GEO checks after material site,
+  sitemap, robots, or Cloudflare config changes
+- keep Cloudflare WAF and bot controls aligned with the public-agent intent of
+  the project
+- preserve obvious, early links from the landing site to the docs host and the
+  canonical technical pages
+- continue treating the docs host as the source of truth for technical behavior
+
+## Practical takeaway
+
+No major GEO blocker is currently known on the public Clawperator sites.
+
+The main requirement going forward is discipline:
+
+- keep machine-facing routes stable
+- keep sitemap and robots generation automated
+- keep Cloudflare-specific audit knowledge encoded in repo-local skills and
+  docs
 
 ---
 
