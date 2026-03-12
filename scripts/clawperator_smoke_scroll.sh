@@ -2,9 +2,11 @@
 # Scroll action smoke test: deterministic Settings round-trip.
 #
 # Opens Android Settings (present on every Android device), scrolls to the
-# bottom in stages verifying edge_reached, then scrolls back to the top in
-# stages verifying edge_reached, and confirms the leading-child signature at
-# the top matches the initial snapshot.
+# bottom using a manual scroll loop (one scroll action per step, verifying
+# edge_reached), then returns to the top in a single scroll_until action
+# (bounded loop, accepts EDGE_REACHED or NO_POSITION_CHANGE as top signal),
+# and confirms the leading-child signature at the top matches the initial
+# snapshot.
 #
 # Usage:
 #   ./scripts/clawperator_smoke_scroll.sh
@@ -200,54 +202,51 @@ if [ "$REACHED_BOTTOM" = "false" ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# 3) Scroll UP until edge_reached
+# 3) Scroll UP to top using scroll_until (bounded loop, single action)
 # ---------------------------------------------------------------------------
 echo ""
-echo "--- Step 3: scroll UP until edge_reached ---"
+echo "--- Step 3: scroll UP to top using scroll_until ---"
 
-UP_STEPS=0
-REACHED_TOP=false
-while [ "$UP_STEPS" -lt "$SCROLL_MAX_STEPS" ]; do
-  UP_STEPS=$((UP_STEPS + 1))
-
-  cat > "$PAYLOAD_FILE" <<JSON
+cat > "$PAYLOAD_FILE" <<JSON
 {
-  "commandId": "scroll-smoke-up-$UP_STEPS",
+  "commandId": "scroll-smoke-up",
   "taskId": "scroll-smoke",
   "source": "smoke-scroll",
   "expectedFormat": "android-ui-automator",
-  "timeoutMs": 30000,
+  "timeoutMs": 60000,
   "actions": [
-    { "id": "scr", "type": "scroll", "params": { "direction": "up", "distanceRatio": 0.7, "settleDelayMs": 300 } }
+    {
+      "id": "scr",
+      "type": "scroll_until",
+      "params": {
+        "direction": "up",
+        "distanceRatio": 0.7,
+        "settleDelayMs": 300,
+        "maxScrolls": $SCROLL_MAX_STEPS,
+        "noPositionChangeThreshold": 3
+      }
+    }
   ]
 }
 JSON
 
-  RESULT="$(run_action "$PAYLOAD_FILE")"
-  OUTCOME="$(extract_step_field "$RESULT" "scr" "scroll_outcome")"
-  echo "  up step $UP_STEPS: scroll_outcome=$OUTCOME"
+RESULT="$(run_action "$PAYLOAD_FILE")"
+echo "$RESULT" | node -e 'console.log(JSON.stringify(JSON.parse(require("fs").readFileSync(0,"utf8")),null,2))' 2>/dev/null || echo "$RESULT"
 
-  if [ "$OUTCOME" = "edge_reached" ]; then
-    REACHED_TOP=true
-    echo "  -> top edge reached after $UP_STEPS scroll(s)"
-    break
-  fi
+TERMINATION="$(extract_step_field "$RESULT" "scr" "termination_reason")"
+SCROLLS_EXECUTED="$(extract_step_field "$RESULT" "scr" "scrolls_executed")"
+echo "  scroll_until result: termination_reason=$TERMINATION scrolls_executed=$SCROLLS_EXECUTED"
 
-  if [ "$OUTCOME" = "gesture_failed" ]; then
-    echo "ERROR: gesture_failed during upward scroll at step $UP_STEPS" >&2
-    echo "$RESULT" | node -e 'console.log(JSON.stringify(JSON.parse(require("fs").readFileSync(0,"utf8")),null,2))' 2>/dev/null || echo "$RESULT"
-    exit 1
-  fi
+REACHED_TOP=false
+if [ "$TERMINATION" = "EDGE_REACHED" ] || [ "$TERMINATION" = "NO_POSITION_CHANGE" ]; then
+  REACHED_TOP=true
+  echo "  -> top reached: $TERMINATION after $SCROLLS_EXECUTED scroll(s)"
+fi
 
-  if [ -z "$OUTCOME" ]; then
-    echo "ERROR: no scroll_outcome in step result at up step $UP_STEPS" >&2
-    echo "$RESULT" | node -e 'console.log(JSON.stringify(JSON.parse(require("fs").readFileSync(0,"utf8")),null,2))' 2>/dev/null || echo "$RESULT"
-    exit 1
-  fi
-done
+UP_STEPS="$SCROLLS_EXECUTED"
 
 if [ "$REACHED_TOP" = "false" ]; then
-  echo "ERROR: edge_reached not seen after $SCROLL_MAX_STEPS upward scrolls" >&2
+  echo "ERROR: scroll_until did not reach top (termination_reason=$TERMINATION)" >&2
   exit 1
 fi
 
