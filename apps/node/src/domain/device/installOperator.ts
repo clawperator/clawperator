@@ -75,15 +75,10 @@ export async function installOperator(
     return {
       receiverPackage: "<unknown>",
       install,
-      permissions: {
-        receiverPackage: "<unknown>",
-        accessibility: {
-          ok: false,
-          alreadyEnabled: false,
-          error: "Could not detect installed Operator package after install. Use --receiver-package to specify the package explicitly.",
-        },
-        notification: { ok: false, skipped: true },
-        notificationListener: { ok: false, alreadyEnabled: false },
+      verification: {
+        ok: false,
+        packageInstalled: false,
+        error: "Could not detect installed Operator package after install. Use --receiver-package to specify the package explicitly.",
       },
     };
   }
