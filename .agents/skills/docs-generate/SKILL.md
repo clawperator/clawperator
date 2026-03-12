@@ -1,9 +1,9 @@
 ---
-name: clawperator-generate-docs
+name: docs-generate
 description: Regenerate the Clawperator public docs site from the canonical sources in clawperator/docs, clawperator/apps/node, and clawperator-skills/docs. Use when Codex needs to inventory doc sources, update sites/docs/source-map.yaml, refresh sites/docs/docs/*.md with minimal churn, review docs diffs, or emit docs build metadata for docs.clawperator.com.
 ---
 
-# Clawperator Generate Docs
+# Docs Generate
 
 Keep authored documentation in its current home. Treat `sites/docs/docs/` as generated public-site output.
 
@@ -32,9 +32,9 @@ Historical docs policy:
 ## Workflow
 
 Helper scripts for this skill live in the skill directory, not in the repo root:
-- `.agents/skills/clawperator-generate-docs/scripts/build_inventory.py`
-- `.agents/skills/clawperator-generate-docs/scripts/diff_report.py`
-- `.agents/skills/clawperator-generate-docs/scripts/write_build_metadata.py`
+- `.agents/skills/docs-generate/scripts/build_inventory.py`
+- `.agents/skills/docs-generate/scripts/diff_report.py`
+- `.agents/skills/docs-generate/scripts/write_build_metadata.py`
 
 When this file refers to `scripts/...`, resolve that path relative to the skill directory first.
 
@@ -44,7 +44,7 @@ When this file refers to `scripts/...`, resolve that path relative to the skill 
    - Public docs site: `sites/docs/`
 2. Read `sites/docs/source-map.yaml` before editing docs output. It defines the public IA, slugs, output paths, and which sources feed each page.
 3. Generate an inventory before rewriting anything:
-   - Run `.agents/skills/clawperator-generate-docs/scripts/build_inventory.py --repo-root <clawperator> --skills-root <clawperator-skills> --output <clawperator>/sites/docs/docs_inventory.json`
+   - Run `.agents/skills/docs-generate/scripts/build_inventory.py --repo-root <clawperator> --skills-root <clawperator-skills> --output <clawperator>/sites/docs/docs_inventory.json`
    - Use the inventory to confirm headings, doc areas, and candidate source files.
 4. Preserve source-of-truth boundaries:
    - `docs/**/*.md` and `../clawperator-skills/docs/**/*.md` are authored narrative docs.
@@ -54,12 +54,12 @@ When this file refers to `scripts/...`, resolve that path relative to the skill 
    - Render proposed files into `sites/docs/.generated/`
    - Keep titles, slugs, and ordering stable unless `sites/docs/source-map.yaml` changes or the user requests an IA change.
 6. Gate churn before copying files over:
-   - Run `.agents/skills/clawperator-generate-docs/scripts/diff_report.py <clawperator>/sites/docs/docs <clawperator>/sites/docs/.generated`
+   - Run `.agents/skills/docs-generate/scripts/diff_report.py <clawperator>/sites/docs/docs <clawperator>/sites/docs/.generated`
    - Prefer patch edits over full rewrites.
    - Reject reflow-only churn, title churn, or broad page rewrites without a source change that justifies them.
 7. If the diff is acceptable, copy only the changed files from `.generated/` into `sites/docs/docs/`.
 8. Emit build metadata after a successful regeneration:
-   - Run `.agents/skills/clawperator-generate-docs/scripts/write_build_metadata.py --repo-root <clawperator> --skills-root <clawperator-skills> --output <clawperator>/sites/docs/docs_build.json`
+   - Run `.agents/skills/docs-generate/scripts/write_build_metadata.py --repo-root <clawperator> --skills-root <clawperator-skills> --output <clawperator>/sites/docs/docs_build.json`
    - This is the docs build identifier. Do not hand-bump a docs version.
 
 ### Removing Docs
@@ -81,7 +81,7 @@ Do not leave deleted docs referenced in the docs site manifest or navigation.
 - Do not reorder navigation or rename output files unless `sites/docs/source-map.yaml` changes.
 - Do not change page titles unless the source title changed or the current title is wrong.
 - Do not rewrap paragraphs just to change formatting.
-- Flag high churn before applying it. Use `.agents/skills/clawperator-generate-docs/scripts/diff_report.py` thresholds as the default guardrail.
+- Flag high churn before applying it. Use `.agents/skills/docs-generate/scripts/diff_report.py` thresholds as the default guardrail.
 - If a user explicitly wants stale docs removed, prefer deletion plus link cleanup over adding "historical note" text.
 
 ## Node API Rules
@@ -104,11 +104,11 @@ Do not leave deleted docs referenced in the docs site manifest or navigation.
 
 ## Resources
 
-- `.agents/skills/clawperator-generate-docs/scripts/build_inventory.py`
+- `.agents/skills/docs-generate/scripts/build_inventory.py`
   - Generate `docs_inventory.json` from the three source areas.
-- `.agents/skills/clawperator-generate-docs/scripts/diff_report.py`
+- `.agents/skills/docs-generate/scripts/diff_report.py`
   - Summarize file and line churn between current docs and proposed docs.
-- `.agents/skills/clawperator-generate-docs/scripts/write_build_metadata.py`
+- `.agents/skills/docs-generate/scripts/write_build_metadata.py`
   - Write deterministic build metadata from repo commits and the source-map checksum.
 - `references/repo-docs.md`
   - Repo-specific source-of-truth map and generation contract.
