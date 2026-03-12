@@ -22,7 +22,7 @@ class UiActionEngineDefaultTest : ActionTest {
             val uiScope = RecordingTaskUiScope()
             val taskScope = RecordingTaskScope(uiScope)
             val developerOptionsManager = FakeDeveloperOptionsManager()
-            val engine = UiActionEngineDefault(developerOptionsManager, FakeAccessibilityServiceManager())
+            val engine = UiActionEngineDefault(developerOptionsManager, AccessibilityServiceManagerMock())
 
             val result =
                 engine.execute(
@@ -62,7 +62,7 @@ class UiActionEngineDefaultTest : ActionTest {
             val uiScope = RecordingTaskUiScope()
             val taskScope = RecordingTaskScope(uiScope)
             val developerOptionsManager = FakeDeveloperOptionsManager()
-            val engine = UiActionEngineDefault(developerOptionsManager, FakeAccessibilityServiceManager())
+            val engine = UiActionEngineDefault(developerOptionsManager, AccessibilityServiceManagerMock())
 
             val result =
                 engine.execute(
@@ -96,7 +96,7 @@ class UiActionEngineDefaultTest : ActionTest {
             val uiScope = RecordingTaskUiScope()
             val taskScope = RecordingTaskScope(uiScope)
             val developerOptionsManager = FakeDeveloperOptionsManager()
-            val engine = UiActionEngineDefault(developerOptionsManager, FakeAccessibilityServiceManager())
+            val engine = UiActionEngineDefault(developerOptionsManager, AccessibilityServiceManagerMock())
 
             val result =
                 engine.execute(
@@ -125,9 +125,9 @@ class UiActionEngineDefaultTest : ActionTest {
     fun `execute press_key throws when accessibility service is unavailable`() =
         actionTest {
             val taskScope = RecordingTaskScope(RecordingTaskUiScope())
-            // FakeAccessibilityServiceManager is not AccessibilityServiceManagerAndroid,
+            // AccessibilityServiceManagerMock is not AccessibilityServiceManagerAndroid,
             // so currentAccessibilityService extension returns null - simulating unavailable service.
-            val engine = UiActionEngineDefault(FakeDeveloperOptionsManager(), FakeAccessibilityServiceManager())
+            val engine = UiActionEngineDefault(FakeDeveloperOptionsManager(), AccessibilityServiceManagerMock())
 
             assertFailsWith<IllegalStateException> {
                 engine.execute(
@@ -297,6 +297,6 @@ private class FakeDeveloperOptionsManager : DeveloperOptionsManager {
 }
 
 // Not AccessibilityServiceManagerAndroid, so currentAccessibilityService extension returns null.
-private class FakeAccessibilityServiceManager : AccessibilityServiceManager {
+private class AccessibilityServiceManagerMock : AccessibilityServiceManager {
     override val isRunning: Flow<Boolean> = flowOf(false)
 }
