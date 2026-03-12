@@ -2,6 +2,7 @@ package clawperator.task.runner
 
 import action.developeroptions.DeveloperOptionsManager
 import action.math.geometry.Rect
+import clawperator.accessibilityservice.AccessibilityServiceManager
 import clawperator.test.ActionTest
 import clawperator.test.actionTest
 import clawperator.uitree.ToggleState
@@ -10,6 +11,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import kotlin.time.Duration
 
@@ -20,7 +22,7 @@ class UiActionEngineDefaultTest : ActionTest {
             val uiScope = RecordingTaskUiScope()
             val taskScope = RecordingTaskScope(uiScope)
             val developerOptionsManager = FakeDeveloperOptionsManager()
-            val engine = UiActionEngineDefault(developerOptionsManager)
+            val engine = UiActionEngineDefault(developerOptionsManager, FakeAccessibilityServiceManager())
 
             val result =
                 engine.execute(
@@ -60,7 +62,7 @@ class UiActionEngineDefaultTest : ActionTest {
             val uiScope = RecordingTaskUiScope()
             val taskScope = RecordingTaskScope(uiScope)
             val developerOptionsManager = FakeDeveloperOptionsManager()
-            val engine = UiActionEngineDefault(developerOptionsManager)
+            val engine = UiActionEngineDefault(developerOptionsManager, FakeAccessibilityServiceManager())
 
             val result =
                 engine.execute(
@@ -94,7 +96,7 @@ class UiActionEngineDefaultTest : ActionTest {
             val uiScope = RecordingTaskUiScope()
             val taskScope = RecordingTaskScope(uiScope)
             val developerOptionsManager = FakeDeveloperOptionsManager()
-            val engine = UiActionEngineDefault(developerOptionsManager)
+            val engine = UiActionEngineDefault(developerOptionsManager, FakeAccessibilityServiceManager())
 
             val result =
                 engine.execute(
@@ -117,6 +119,27 @@ class UiActionEngineDefaultTest : ActionTest {
             assertEquals(false, stepResult.success)
             assertEquals("UNSUPPORTED_RUNTIME_CLOSE", stepResult.data["error"])
             assertTrue(stepResult.data["message"]?.contains("Android runtime cannot reliably close apps") == true)
+        }
+
+    @Test
+    fun `execute press_key throws when accessibility service is unavailable`() =
+        actionTest {
+            val taskScope = RecordingTaskScope(RecordingTaskUiScope())
+            // FakeAccessibilityServiceManager is not AccessibilityServiceManagerAndroid,
+            // so currentAccessibilityService extension returns null - simulating unavailable service.
+            val engine = UiActionEngineDefault(FakeDeveloperOptionsManager(), FakeAccessibilityServiceManager())
+
+            assertFailsWith<IllegalStateException> {
+                engine.execute(
+                    taskScope = taskScope,
+                    plan = UiActionPlan(
+                        commandId = "cmd-key",
+                        taskId = "task-key",
+                        source = "test",
+                        actions = listOf(UiAction.PressKey(id = "k1", key = UiSystemKey.BACK)),
+                    ),
+                )
+            }
         }
 }
 
@@ -271,4 +294,9 @@ private class RecordingTaskUiScope : TaskUiScope {
 private class FakeDeveloperOptionsManager : DeveloperOptionsManager {
     override val isEnabled: Flow<Boolean> = flowOf(true)
     override val isUsbDebuggingEnabled: Flow<Boolean> = flowOf(true)
+}
+
+// Not AccessibilityServiceManagerAndroid, so currentAccessibilityService extension returns null.
+private class FakeAccessibilityServiceManager : AccessibilityServiceManager {
+    override val isRunning: Flow<Boolean> = flowOf(false)
 }

@@ -2,6 +2,9 @@ package clawperator.task.runner
 
 import action.log.Log
 import action.developeroptions.DeveloperOptionsManager
+import android.accessibilityservice.AccessibilityService
+import clawperator.accessibilityservice.AccessibilityServiceManager
+import clawperator.accessibilityservice.currentAccessibilityService
 import kotlinx.coroutines.flow.first
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -14,6 +17,7 @@ interface UiActionEngine {
 
 class UiActionEngineDefault(
     private val developerOptionsManager: DeveloperOptionsManager,
+    private val accessibilityServiceManager: AccessibilityServiceManager,
 ) : UiActionEngine {
     companion object {
         private const val TAG = "[UiActionEngine]"
@@ -59,6 +63,7 @@ class UiActionEngineDefault(
                 is UiAction.EnterText -> executeEnterText(taskScope, action)
                 is UiAction.Sleep -> executeSleep(taskScope, action)
                 is UiAction.DoctorPing -> executeDoctorPing(taskScope, action)
+                is UiAction.PressKey -> executePressKey(action)
             }
 
         Log.d(
@@ -295,5 +300,38 @@ class UiActionEngineDefault(
                 "usb_debugging_enabled" to usbDebuggingEnabled.toString(),
             ),
         )
+    }
+
+    private fun executePressKey(action: UiAction.PressKey): UiActionStepResult {
+        val service = accessibilityServiceManager.currentAccessibilityService
+            ?: error("OperatorAccessibilityService is not running - cannot execute press_key")
+
+        val globalAction = when (action.key) {
+            UiSystemKey.BACK -> AccessibilityService.GLOBAL_ACTION_BACK
+            UiSystemKey.HOME -> AccessibilityService.GLOBAL_ACTION_HOME
+            UiSystemKey.RECENTS -> AccessibilityService.GLOBAL_ACTION_RECENTS
+        }
+
+        val keyName = action.key.name.lowercase()
+        val success = service.performGlobalAction(globalAction)
+
+        return if (success) {
+            UiActionStepResult(
+                id = action.id,
+                actionType = "press_key",
+                data = mapOf("key" to keyName),
+            )
+        } else {
+            Log.w("$TAG executePressKey: performGlobalAction returned false for key=$keyName")
+            UiActionStepResult(
+                id = action.id,
+                actionType = "press_key",
+                success = false,
+                data = mapOf(
+                    "key" to keyName,
+                    "error" to "GLOBAL_ACTION_FAILED",
+                ),
+            )
+        }
     }
 }

@@ -5,6 +5,7 @@ import clawperator.task.runner.TaskRetry
 import clawperator.task.runner.TaskRetryPresets
 import clawperator.task.runner.TaskScrollDirection
 import clawperator.task.runner.UiAction
+import clawperator.task.runner.UiSystemKey
 import clawperator.task.runner.UiTextValidator
 import clawperator.uitree.UiTreeClickTypes
 import kotlinx.serialization.json.Json
@@ -157,6 +158,11 @@ class AgentCommandParserDefault : AgentCommandParser {
             "doctor_ping" ->
                 UiAction.DoctorPing(
                     id = id,
+                )
+            "press_key", "key_press" ->
+                UiAction.PressKey(
+                    id = id,
+                    key = UiSystemKey.fromWire(params.stringRequired("key", 32)),
                 )
             "sleep" ->
                 UiAction.Sleep(

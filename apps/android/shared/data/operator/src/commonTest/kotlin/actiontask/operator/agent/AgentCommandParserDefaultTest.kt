@@ -1,6 +1,7 @@
 package clawperator.operator.agent
 
 import clawperator.task.runner.UiAction
+import clawperator.task.runner.UiSystemKey
 import clawperator.task.runner.TaskRetry
 import clawperator.task.runner.TaskRetryPresets
 import kotlin.test.Test
@@ -215,5 +216,105 @@ class AgentCommandParserDefaultTest {
 
         val result = parser.parse(payload)
         assertTrue(result.isFailure)
+    }
+
+    @Test
+    fun `parse press_key back`() {
+        val payload =
+            """
+            {
+              "commandId": "cmd-key-1",
+              "taskId": "task-key-1",
+              "source": "debug",
+              "actions": [
+                { "id": "k1", "type": "press_key", "params": { "key": "back" } }
+              ]
+            }
+            """.trimIndent()
+
+        val result = parser.parse(payload)
+        assertTrue(result.isSuccess)
+
+        val action = result.getOrThrow().actions[0]
+        assertIs<UiAction.PressKey>(action)
+        assertEquals(UiSystemKey.BACK, (action as UiAction.PressKey).key)
+    }
+
+    @Test
+    fun `parse press_key home`() {
+        val payload =
+            """
+            {
+              "commandId": "cmd-key-2",
+              "taskId": "task-key-2",
+              "source": "debug",
+              "actions": [
+                { "id": "k2", "type": "press_key", "params": { "key": "home" } }
+              ]
+            }
+            """.trimIndent()
+
+        val result = parser.parse(payload)
+        assertTrue(result.isSuccess)
+        val action = result.getOrThrow().actions[0] as UiAction.PressKey
+        assertEquals(UiSystemKey.HOME, action.key)
+    }
+
+    @Test
+    fun `parse press_key recents`() {
+        val payload =
+            """
+            {
+              "commandId": "cmd-key-3",
+              "taskId": "task-key-3",
+              "source": "debug",
+              "actions": [
+                { "id": "k3", "type": "press_key", "params": { "key": "recents" } }
+              ]
+            }
+            """.trimIndent()
+
+        val result = parser.parse(payload)
+        assertTrue(result.isSuccess)
+        val action = result.getOrThrow().actions[0] as UiAction.PressKey
+        assertEquals(UiSystemKey.RECENTS, action.key)
+    }
+
+    @Test
+    fun `parse press_key rejects unsupported key`() {
+        val payload =
+            """
+            {
+              "commandId": "cmd-key-4",
+              "taskId": "task-key-4",
+              "source": "debug",
+              "actions": [
+                { "id": "k4", "type": "press_key", "params": { "key": "volume_up" } }
+              ]
+            }
+            """.trimIndent()
+
+        val result = parser.parse(payload)
+        assertTrue(result.isFailure)
+    }
+
+    @Test
+    fun `parse press_key accepts key_press alias`() {
+        val payload =
+            """
+            {
+              "commandId": "cmd-key-5",
+              "taskId": "task-key-5",
+              "source": "debug",
+              "actions": [
+                { "id": "k5", "type": "key_press", "params": { "key": "back" } }
+              ]
+            }
+            """.trimIndent()
+
+        val result = parser.parse(payload)
+        assertTrue(result.isSuccess)
+        val action = result.getOrThrow().actions[0] as UiAction.PressKey
+        assertEquals(UiSystemKey.BACK, action.key)
     }
 }

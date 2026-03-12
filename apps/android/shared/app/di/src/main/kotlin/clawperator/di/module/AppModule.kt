@@ -254,7 +254,7 @@ val AppModule: Module = module {
     single<TaskUiScope> { get<TaskUiScopeDefault>() }
     single<TaskUiScopeDefault> { TaskUiScopeDefault(get(), get(), get(), get(), get(NamedScope.CoroutineScopeIo)) }
     single<UiActionEngine> { get<UiActionEngineDefault>() }
-    single<UiActionEngineDefault> { UiActionEngineDefault(get()) }
+    single<UiActionEngineDefault> { UiActionEngineDefault(get(), get()) }
     single<TriggerManager> { TriggerManagerDefault(get(), get(), get(), get(), get(), get(NamedScope.CoroutineScopeMain), get(NamedScope.CoroutineScopeIo)) }
     single<action.system.window.WindowManager> { WindowManagerDefault(get()) }
     single<WorkflowFactory> { get<WorkflowFactoryDefault>() }
