@@ -38,7 +38,7 @@ Compared against Cloudflare's Browser Rendering guidance on February 25, 2026:
 The remaining gaps are mostly about sitemap metadata quality, not discoverability
 breakage.
 
-Observed gaps:
+Observed gaps at the time of review:
 
 - `sites/landing/public/landing-sitemap.xml` includes only `<loc>` entries
   without `<lastmod>`
@@ -56,15 +56,20 @@ Impact:
 - the docs sitemap is in better shape than the landing sitemap, but it still
   omits optional importance hints
 
-Recommended follow-up:
+Implemented follow-up:
 
-- add ISO 8601 `<lastmod>` values to `sites/landing/public/landing-sitemap.xml`
-- add `<priority>` values to the most important landing routes in
-  `sites/landing/public/landing-sitemap.xml`
-- add `<lastmod>` to child `<sitemap>` entries in
-  `sites/landing/public/sitemap.xml`
-- optionally add `<priority>` to the docs sitemap if you want to express clear
-  relative importance for key technical pages
+- added a generator that derives landing and docs sitemap metadata from
+  source-of-truth files using each file's last git commit time
+- landing sitemap entries now include ISO 8601 `<lastmod>` and `<priority>`
+- root sitemap index entries now include `<lastmod>`
+- docs sitemap patching now adds git-derived `<lastmod>` and explicit
+  `<priority>` values after MkDocs build
+
+Current status:
+
+- these sitemap metadata gaps are addressed in the repo
+- the remaining expectation is to keep using the generator in normal build and
+  release workflows rather than editing sitemap metadata by hand
 
 Not a gap:
 

@@ -44,6 +44,12 @@ pip install -r "$REQUIREMENTS_FILE"
 echo "Running MkDocs build..."
 mkdocs build
 
+echo "Patching docs sitemap metadata..."
+"$VENV_DIR/bin/python" "$REPO_ROOT/scripts/generate_sitemap_metadata.py" docs \
+  --repo-root "$REPO_ROOT" \
+  --sitemap-path "$DOCS_DIR/site/sitemap.xml" \
+  --source-map-path "$DOCS_DIR/source-map.yaml"
+
 echo "Generating llms-full.txt..."
 "$VENV_DIR/bin/python" "$REPO_ROOT/.agents/skills/docs-generate/scripts/generate_llms_full.py"
 
