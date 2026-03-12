@@ -7,7 +7,7 @@ Raw key events are marked future (out of scope for this branch).
 
 ## GAP-A: Stale note in findings.md re: uppercase key rejection
 
-**Status:** Open
+**Status:** Closed (2026-03-12)
 **Effort:** Trivial (one line)
 
 `findings.md` line 123 records that `uppercase BACK -> EXECUTION_VALIDATION_FAILED` during live

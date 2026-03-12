@@ -120,7 +120,7 @@ Validation behavior was also confirmed:
 
 - missing `params.key` -> `EXECUTION_VALIDATION_FAILED`
 - unsupported key such as `volume_up` -> `EXECUTION_VALIDATION_FAILED`
-- uppercase `BACK` -> `EXECUTION_VALIDATION_FAILED`
+- uppercase `BACK` -> accepted (Node validation normalizes key case with `.toLowerCase()` before matching)
 - alias `key_press` -> accepted and normalized to `press_key`
 
 ---
