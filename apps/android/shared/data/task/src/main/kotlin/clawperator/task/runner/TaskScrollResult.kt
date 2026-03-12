@@ -41,3 +41,30 @@ data class TaskScrollOnceResult(
     val outcome: TaskScrollOutcome,
     val resolvedContainerId: String? = null,
 )
+
+/**
+ * Reason a [TaskUiScope.scrollLoop] bounded scroll loop terminated.
+ */
+enum class TaskScrollTerminationReason {
+    /** Content ended naturally - leading-child signature unchanged at the boundary */
+    EdgeReached,
+    /** Hit the [UiAction.ScrollUntil.maxScrolls] safety cap */
+    MaxScrollsReached,
+    /** Hit the [UiAction.ScrollUntil.maxDurationMs] safety cap */
+    MaxDurationReached,
+    /** No content movement across [UiAction.ScrollUntil.noPositionChangeThreshold] consecutive scrolls */
+    NoPositionChange,
+    /** Container resolution failed before any scroll was attempted */
+    ContainerNotFound,
+    /** Container matched but is not scrollable */
+    ContainerNotScrollable,
+}
+
+/**
+ * Full result of a [TaskUiScope.scrollLoop] bounded scroll loop.
+ */
+data class TaskScrollLoopResult(
+    val terminationReason: TaskScrollTerminationReason,
+    val scrollsExecuted: Int,
+    val resolvedContainerId: String? = null,
+)

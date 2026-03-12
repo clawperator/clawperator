@@ -503,6 +503,75 @@ describe("validateExecution", () => {
       (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
     );
   });
+
+  it("accepts scroll_until with no params", () => {
+    const result = validateExecution({
+      commandId: "c", taskId: "t", source: "s",
+      expectedFormat: "android-ui-automator", timeoutMs: 5000,
+      actions: [{ id: "x", type: "scroll_until" }],
+    });
+    assert.equal(result.actions[0].type, "scroll_until");
+  });
+
+  it("accepts scroll_until with all params", () => {
+    const result = validateExecution({
+      commandId: "c", taskId: "t", source: "s",
+      expectedFormat: "android-ui-automator", timeoutMs: 5000,
+      actions: [{
+        id: "x", type: "scroll_until",
+        params: { direction: "down", distanceRatio: 0.7, settleDelayMs: 250, maxScrolls: 25, maxDurationMs: 10000, noPositionChangeThreshold: 3 },
+      }],
+    });
+    assert.equal(result.actions[0].type, "scroll_until");
+  });
+
+  it("rejects scroll_until with invalid direction", () => {
+    assert.throws(
+      () =>
+        validateExecution({
+          commandId: "c", taskId: "t", source: "s",
+          expectedFormat: "android-ui-automator", timeoutMs: 5000,
+          actions: [{ id: "x", type: "scroll_until", params: { direction: "diagonal" } }],
+        }),
+      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
+    );
+  });
+
+  it("rejects scroll_until with maxScrolls out of range", () => {
+    assert.throws(
+      () =>
+        validateExecution({
+          commandId: "c", taskId: "t", source: "s",
+          expectedFormat: "android-ui-automator", timeoutMs: 5000,
+          actions: [{ id: "x", type: "scroll_until", params: { maxScrolls: 0 } }],
+        }),
+      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
+    );
+  });
+
+  it("rejects scroll_until with maxDurationMs out of range", () => {
+    assert.throws(
+      () =>
+        validateExecution({
+          commandId: "c", taskId: "t", source: "s",
+          expectedFormat: "android-ui-automator", timeoutMs: 5000,
+          actions: [{ id: "x", type: "scroll_until", params: { maxDurationMs: 120001 } }],
+        }),
+      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
+    );
+  });
+
+  it("rejects scroll_until with noPositionChangeThreshold out of range", () => {
+    assert.throws(
+      () =>
+        validateExecution({
+          commandId: "c", taskId: "t", source: "s",
+          expectedFormat: "android-ui-automator", timeoutMs: 5000,
+          actions: [{ id: "x", type: "scroll_until", params: { noPositionChangeThreshold: 21 } }],
+        }),
+      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
+    );
+  });
 });
 
 describe("validatePayloadSize", () => {

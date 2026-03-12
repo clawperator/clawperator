@@ -20,6 +20,8 @@ import kotlinx.coroutines.withContext
 import kotlin.random.Random
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TimeSource
 
 class TaskUiScopeDefault(
     private val uiTreeInspector: UiTreeInspector,
@@ -672,6 +674,136 @@ class TaskUiScopeDefault(
                 TaskScrollOnceResult(TaskScrollOutcome.Moved, resolvedContainerId)
             }
         }
+
+    override suspend fun scrollLoop(
+        container: NodeMatcher?,
+        direction: TaskScrollDirection,
+        distanceRatio: Float,
+        settleDelay: Duration,
+        maxScrolls: Int,
+        maxDuration: Duration,
+        noPositionChangeThreshold: Int,
+        findFirstScrollableChild: Boolean,
+    ): TaskScrollLoopResult {
+        require(maxScrolls > 0) { "maxScrolls must be > 0, got $maxScrolls" }
+        require(distanceRatio in 0f..1f) { "distanceRatio must be in [0,1], got $distanceRatio" }
+
+        Log.d("$TAG scrollLoop: dir=$direction maxScrolls=$maxScrolls maxDuration=$maxDuration")
+
+        // Resolve container once upfront; fail fast if not found
+        val uiTree = currentUiTreeFiltered()
+        val resolvedContainerId: String?
+        try {
+            val scrollNode = when (container) {
+                null ->
+                    findFirstScrollable(uiTree)
+                        ?: throw IllegalStateException("No scrollable container visible")
+                else -> {
+                    val matchedNode =
+                        findNodeByMatcher(container, uiTree)
+                            ?: throw IllegalStateException("Container not found for $container")
+                    if (isScrollable(matchedNode)) {
+                        matchedNode
+                    } else if (findFirstScrollableChild) {
+                        findFirstScrollableDescendant(matchedNode)
+                            ?: throw IllegalStateException("Scrollable container not found for $container")
+                    } else {
+                        throw IllegalStateException("Scrollable container not found for $container")
+                    }
+                }
+            }
+            resolvedContainerId = scrollNode.resourceId
+        } catch (e: IllegalStateException) {
+            val reason = when {
+                e.message?.contains("Scrollable container not found") == true ->
+                    TaskScrollTerminationReason.ContainerNotScrollable
+                else -> TaskScrollTerminationReason.ContainerNotFound
+            }
+            Log.w("$TAG scrollLoop: $reason - ${e.message}")
+            return TaskScrollLoopResult(
+                terminationReason = reason,
+                scrollsExecuted = 0,
+                resolvedContainerId = null,
+            )
+        }
+
+        val mark = TimeSource.Monotonic.markNow()
+        var scrollsExecuted = 0
+        var noMovementCount = 0
+
+        while (true) {
+            // Duration cap
+            if (mark.elapsedNow() >= maxDuration) {
+                Log.d("$TAG scrollLoop: MAX_DURATION_REACHED after $scrollsExecuted scrolls")
+                return TaskScrollLoopResult(
+                    terminationReason = TaskScrollTerminationReason.MaxDurationReached,
+                    scrollsExecuted = scrollsExecuted,
+                    resolvedContainerId = resolvedContainerId,
+                )
+            }
+
+            // Scroll cap
+            if (scrollsExecuted >= maxScrolls) {
+                Log.d("$TAG scrollLoop: MAX_SCROLLS_REACHED ($maxScrolls)")
+                return TaskScrollLoopResult(
+                    terminationReason = TaskScrollTerminationReason.MaxScrollsReached,
+                    scrollsExecuted = scrollsExecuted,
+                    resolvedContainerId = resolvedContainerId,
+                )
+            }
+
+            // Execute one scroll step
+            val stepResult = try {
+                scrollOnce(
+                    container = container,
+                    direction = direction,
+                    distanceRatio = distanceRatio,
+                    settleDelay = settleDelay,
+                    retry = TaskRetry.None,
+                    findFirstScrollableChild = findFirstScrollableChild,
+                )
+            } catch (e: IllegalStateException) {
+                // Container lost mid-loop (app navigated away etc.) - treat as edge
+                Log.d("$TAG scrollLoop: container lost mid-loop, treating as edge_reached")
+                return TaskScrollLoopResult(
+                    terminationReason = TaskScrollTerminationReason.EdgeReached,
+                    scrollsExecuted = scrollsExecuted,
+                    resolvedContainerId = resolvedContainerId,
+                )
+            }
+
+            scrollsExecuted++
+
+            when (stepResult.outcome) {
+                TaskScrollOutcome.EdgeReached -> {
+                    Log.d("$TAG scrollLoop: EDGE_REACHED after $scrollsExecuted scrolls")
+                    return TaskScrollLoopResult(
+                        terminationReason = TaskScrollTerminationReason.EdgeReached,
+                        scrollsExecuted = scrollsExecuted,
+                        resolvedContainerId = resolvedContainerId,
+                    )
+                }
+                TaskScrollOutcome.GestureFailed -> {
+                    // Gesture failures count as no movement
+                    noMovementCount++
+                    Log.d("$TAG scrollLoop: gesture_failed (noMovement=$noMovementCount)")
+                }
+                TaskScrollOutcome.Moved -> {
+                    noMovementCount = 0
+                }
+            }
+
+            // No-movement threshold
+            if (noMovementCount >= noPositionChangeThreshold) {
+                Log.d("$TAG scrollLoop: NO_POSITION_CHANGE after $scrollsExecuted scrolls (threshold=$noPositionChangeThreshold)")
+                return TaskScrollLoopResult(
+                    terminationReason = TaskScrollTerminationReason.NoPositionChange,
+                    scrollsExecuted = scrollsExecuted,
+                    resolvedContainerId = resolvedContainerId,
+                )
+            }
+        }
+    }
 
     private suspend fun currentUiTreeFiltered(): UiTree {
         val uiTreeRaw =

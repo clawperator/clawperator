@@ -140,6 +140,18 @@ class AgentCommandParserDefault : AgentCommandParser {
                     findFirstScrollableChild = params.booleanOrDefault("findFirstScrollableChild", true),
                     retry = params.parseRetryOrDefault(defaultRetry = TaskRetry.None),
                 )
+            "scroll_until" ->
+                UiAction.ScrollUntil(
+                    id = id,
+                    container = params.parseMatcherOrNull("container"),
+                    direction = params.parseDirection(),
+                    distanceRatio = params.doubleOrDefault("distanceRatio", 0.7).toFloat().coerceIn(0f, 1f),
+                    settleDelayMs = params.longOrDefault("settleDelayMs", 250L).coerceIn(0L, 10_000L),
+                    maxScrolls = params.intOrDefault("maxScrolls", 20).coerceIn(1, 200),
+                    maxDurationMs = params.longOrDefault("maxDurationMs", 10_000L).coerceIn(0L, 120_000L),
+                    noPositionChangeThreshold = params.intOrDefault("noPositionChangeThreshold", 3).coerceIn(1, 20),
+                    findFirstScrollableChild = params.booleanOrDefault("findFirstScrollableChild", true),
+                )
             "read_text" ->
                 UiAction.ReadText(
                     id = id,

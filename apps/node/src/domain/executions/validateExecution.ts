@@ -41,6 +41,9 @@ const actionParamsSchema = z.object({
   maxSwipes: z.number().optional(),
   distanceRatio: z.number().optional(),
   settleDelayMs: z.number().optional(),
+  maxScrolls: z.number().optional(),
+  maxDurationMs: z.number().optional(),
+  noPositionChangeThreshold: z.number().optional(),
   findFirstScrollableChild: z.boolean().optional(),
   validator: z.string().optional(),
   key: z.string().optional(),
@@ -60,6 +63,7 @@ const supportedTypes = [
   "click",
   "scroll_and_click",
   "scroll",
+  "scroll_until",
   "read_text",
   "enter_text",
   "snapshot_ui",
@@ -174,6 +178,45 @@ const executionSchema = z.object({
         if (params?.settleDelayMs !== undefined) {
           if (params.settleDelayMs < 0 || params.settleDelayMs > 10000) {
             addIssue(index, "scroll params.settleDelayMs must be in [0, 10000]", ["params", "settleDelayMs"]);
+          }
+        }
+        break;
+      }
+      case "scroll_until": {
+        const SUPPORTED_DIRECTIONS_SU = ["down", "up", "left", "right"] as const;
+        if (params?.direction !== undefined) {
+          const normalizedDir = params.direction.trim().toLowerCase();
+          if (!(SUPPORTED_DIRECTIONS_SU as readonly string[]).includes(normalizedDir)) {
+            addIssue(
+              index,
+              `scroll_until params.direction must be one of: ${SUPPORTED_DIRECTIONS_SU.join(", ")}`,
+              ["params", "direction"]
+            );
+          }
+        }
+        if (params?.distanceRatio !== undefined) {
+          if (params.distanceRatio < 0 || params.distanceRatio > 1) {
+            addIssue(index, "scroll_until params.distanceRatio must be in [0.0, 1.0]", ["params", "distanceRatio"]);
+          }
+        }
+        if (params?.settleDelayMs !== undefined) {
+          if (params.settleDelayMs < 0 || params.settleDelayMs > 10000) {
+            addIssue(index, "scroll_until params.settleDelayMs must be in [0, 10000]", ["params", "settleDelayMs"]);
+          }
+        }
+        if (params?.maxScrolls !== undefined) {
+          if (!Number.isInteger(params.maxScrolls) || params.maxScrolls < 1 || params.maxScrolls > 200) {
+            addIssue(index, "scroll_until params.maxScrolls must be an integer in [1, 200]", ["params", "maxScrolls"]);
+          }
+        }
+        if (params?.maxDurationMs !== undefined) {
+          if (params.maxDurationMs < 0 || params.maxDurationMs > 120000) {
+            addIssue(index, "scroll_until params.maxDurationMs must be in [0, 120000]", ["params", "maxDurationMs"]);
+          }
+        }
+        if (params?.noPositionChangeThreshold !== undefined) {
+          if (!Number.isInteger(params.noPositionChangeThreshold) || params.noPositionChangeThreshold < 1 || params.noPositionChangeThreshold > 20) {
+            addIssue(index, "scroll_until params.noPositionChangeThreshold must be an integer in [1, 20]", ["params", "noPositionChangeThreshold"]);
           }
         }
         break;

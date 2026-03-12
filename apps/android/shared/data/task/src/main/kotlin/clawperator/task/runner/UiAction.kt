@@ -59,8 +59,33 @@ sealed interface UiAction {
         val direction: TaskScrollDirection = TaskScrollDirection.Down,
         val distanceRatio: Float = 0.7f,
         val settleDelayMs: Long = 250,
-        val findFirstScrollableChild: Boolean = false,
+        val findFirstScrollableChild: Boolean = true,
         val retry: TaskRetry = TaskRetry.None,
+    ) : UiAction
+
+    /**
+     * Bounded scroll loop. Scrolls repeatedly until a termination condition fires.
+     * Always applies safety caps - a scroll loop with no bound is unsafe.
+     *
+     * Termination conditions (in priority order):
+     * 1. [maxScrolls] cap reached
+     * 2. [maxDurationMs] cap reached
+     * 3. Edge detected (leading-child signature unchanged across successive scrolls)
+     * 4. No position change across [noPositionChangeThreshold] consecutive scrolls
+     *
+     * Returns a [TaskScrollUntilResult] with the number of scrolls executed
+     * and the reason termination occurred.
+     */
+    data class ScrollUntil(
+        override val id: String,
+        val container: NodeMatcher? = null,
+        val direction: TaskScrollDirection = TaskScrollDirection.Down,
+        val distanceRatio: Float = 0.7f,
+        val settleDelayMs: Long = 250,
+        val maxScrolls: Int = 20,
+        val maxDurationMs: Long = 10_000,
+        val noPositionChangeThreshold: Int = 3,
+        val findFirstScrollableChild: Boolean = true,
     ) : UiAction
 
     data class ReadText(

@@ -57,6 +57,7 @@ class UiActionEngineDefault(
                 is UiAction.Click -> executeClick(taskScope, action)
                 is UiAction.ScrollAndClick -> executeScrollAndClick(taskScope, action)
                 is UiAction.Scroll -> executeScroll(taskScope, action)
+                is UiAction.ScrollUntil -> executeScrollUntil(taskScope, action)
                 is UiAction.ReadText -> executeReadText(taskScope, action)
                 is UiAction.SnapshotUi -> executeSnapshotUi(taskScope, action)
                 is UiAction.TakeScreenshot -> executeTakeScreenshot(taskScope, action)
@@ -249,6 +250,43 @@ class UiActionEngineDefault(
         }
     }
 
+    private suspend fun executeScrollUntil(
+        taskScope: TaskScope,
+        action: UiAction.ScrollUntil,
+    ): UiActionStepResult {
+        val result =
+            taskScope.ui {
+                scrollLoop(
+                    container = action.container,
+                    direction = action.direction,
+                    distanceRatio = action.distanceRatio,
+                    settleDelay = action.settleDelayMs.milliseconds,
+                    maxScrolls = action.maxScrolls,
+                    maxDuration = action.maxDurationMs.milliseconds,
+                    noPositionChangeThreshold = action.noPositionChangeThreshold,
+                    findFirstScrollableChild = action.findFirstScrollableChild,
+                )
+            }
+
+        val isError = result.terminationReason == TaskScrollTerminationReason.ContainerNotFound ||
+            result.terminationReason == TaskScrollTerminationReason.ContainerNotScrollable
+
+        val data = buildMap<String, String> {
+            put("termination_reason", result.terminationReason.toWireValue())
+            put("scrolls_executed", result.scrollsExecuted.toString())
+            put("direction", action.direction.name.lowercase())
+            result.resolvedContainerId?.let { put("resolved_container", it) }
+            if (isError) put("error", result.terminationReason.toWireValue())
+        }
+
+        return UiActionStepResult(
+            id = action.id,
+            actionType = "scroll_until",
+            success = !isError,
+            data = data,
+        )
+    }
+
     private suspend fun executeReadText(
         taskScope: TaskScope,
         action: UiAction.ReadText,
@@ -408,4 +446,14 @@ private fun TaskScrollOutcome.toWireValue(): String =
         TaskScrollOutcome.Moved -> "moved"
         TaskScrollOutcome.EdgeReached -> "edge_reached"
         TaskScrollOutcome.GestureFailed -> "gesture_failed"
+    }
+
+private fun TaskScrollTerminationReason.toWireValue(): String =
+    when (this) {
+        TaskScrollTerminationReason.EdgeReached -> "EDGE_REACHED"
+        TaskScrollTerminationReason.MaxScrollsReached -> "MAX_SCROLLS_REACHED"
+        TaskScrollTerminationReason.MaxDurationReached -> "MAX_DURATION_REACHED"
+        TaskScrollTerminationReason.NoPositionChange -> "NO_POSITION_CHANGE"
+        TaskScrollTerminationReason.ContainerNotFound -> "CONTAINER_NOT_FOUND"
+        TaskScrollTerminationReason.ContainerNotScrollable -> "CONTAINER_NOT_SCROLLABLE"
     }

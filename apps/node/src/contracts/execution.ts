@@ -21,6 +21,10 @@ export interface ActionParams {
   maxSwipes?: number;
   distanceRatio?: number;
   settleDelayMs?: number;
+  /** scroll_until */
+  maxScrolls?: number;
+  maxDurationMs?: number;
+  noPositionChangeThreshold?: number;
   findFirstScrollableChild?: boolean;
   validator?: string;
   /** press_key: back | home | recents */

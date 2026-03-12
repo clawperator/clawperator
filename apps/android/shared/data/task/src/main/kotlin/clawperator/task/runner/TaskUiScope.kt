@@ -4,6 +4,7 @@ import clawperator.uitree.ToggleState
 import clawperator.uitree.UiTreeClickTypes
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * DSL entry point for UI operations inside TaskScope.
@@ -146,8 +147,33 @@ interface TaskUiScope {
         distanceRatio: Float = 0.7f,
         settleDelay: Duration = 250.milliseconds,
         retry: TaskRetry = TaskRetry.None,
-        findFirstScrollableChild: Boolean = false,
+        findFirstScrollableChild: Boolean = true,
     ): TaskScrollOnceResult
+
+    /**
+     * Bounded scroll loop. Scrolls repeatedly until a termination condition fires.
+     * Always applies safety caps - no unbounded scroll is possible.
+     *
+     * @param container              Optional matcher for the scrollable container. Auto-detects if null.
+     * @param direction              Scroll direction (default Down).
+     * @param distanceRatio          Swipe distance ratio [0.0, 1.0] (default 0.7).
+     * @param settleDelay            Delay after each swipe before signature check.
+     * @param maxScrolls             Maximum number of scroll steps (hard cap, always applied).
+     * @param maxDuration            Wall-clock time cap for the entire loop.
+     * @param noPositionChangeThreshold  Number of consecutive no-movement scrolls before stopping.
+     * @param findFirstScrollableChild   Walk one level down if matched container is not scrollable.
+     * @return [TaskScrollLoopResult] with termination reason and scrolls executed.
+     */
+    suspend fun scrollLoop(
+        container: NodeMatcher? = null,
+        direction: TaskScrollDirection = TaskScrollDirection.Down,
+        distanceRatio: Float = 0.7f,
+        settleDelay: Duration = 250.milliseconds,
+        maxScrolls: Int = 20,
+        maxDuration: Duration = 10.seconds,
+        noPositionChangeThreshold: Int = 3,
+        findFirstScrollableChild: Boolean = true,
+    ): TaskScrollLoopResult
 
     /**
      * Convenience method that scrolls to find a target element and then clicks it.
