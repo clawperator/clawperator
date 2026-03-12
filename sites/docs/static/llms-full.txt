@@ -156,27 +156,29 @@ Even on an emulator, the user still needs to:
 
 ## Installing the Clawperator Operator Android app
 
-The [Clawperator Operator Android app](android-operator-apk.md) installs the same way on both environments:
+Use the canonical install command to install the [Clawperator Operator Android app](android-operator-apk.md) and grant required permissions in one step:
 
 ```bash
-adb install -r ~/.clawperator/downloads/operator.apk
+clawperator operator setup --apk ~/.clawperator/downloads/operator.apk
 ```
 
 If multiple devices are connected, target one explicitly:
 
 ```bash
-adb -s <device_id> install -r ~/.clawperator/downloads/operator.apk
+clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id <device_id>
 ```
 
-## Granting permissions
+This command installs the APK, grants the accessibility service and notification listener permissions, and verifies the package is ready.
 
-Clawperator uses Android Accessibility to observe and operate the UI. After the [Clawperator Operator Android app](android-operator-apk.md) is installed, enable the required permissions from the host:
+> Do not use raw `adb install` for normal setup. It installs the APK but leaves the device in an unusable state without required permissions.
+
+If the Operator APK crashes after initial setup and Android revokes its permissions, run the remediation command:
 
 ```bash
 clawperator grant-device-permissions
 ```
 
-This works for both physical devices and emulators. If multiple devices are connected, pass `--device-id <id>`.
+Do not use this as part of normal setup. The normal setup path is always `clawperator operator setup` (`clawperator operator install` remains an alias).
 
 ## Verifying setup
 
@@ -367,39 +369,43 @@ If both a physical device and an emulator are connected, you will need to pass `
 
 ## Step 3 - Install the Clawperator Operator Android app
 
-Install the [Clawperator Operator Android app](android-operator-apk.md) onto the connected device or emulator:
+Use the canonical install command to install the [Clawperator Operator Android app](android-operator-apk.md) and grant required permissions in one step:
 
 ```bash
-adb install -r ~/.clawperator/downloads/operator.apk
+clawperator operator setup --apk ~/.clawperator/downloads/operator.apk
 ```
 
-If you have multiple devices connected, specify the target:
+If you have multiple devices connected, specify the target device:
 
 ```bash
-adb -s <device_id> install -r ~/.clawperator/downloads/operator.apk
+clawperator operator setup \
+  --apk ~/.clawperator/downloads/operator.apk \
+  --device-id <device_id>
 ```
+
+For local debug builds, specify the receiver package:
+
+```bash
+clawperator operator setup \
+  --apk ~/.clawperator/downloads/operator-debug.apk \
+  --receiver-package com.clawperator.operator.dev
+```
+
+This command runs three phases in order:
+
+1. Installs the APK onto the device via `adb`.
+2. Grants required device permissions (accessibility service, notification listener).
+3. Verifies the package is accessible after install.
+
+The command fails with a structured error if any phase fails. The error includes which phase failed and why, so agents and users can diagnose and recover.
+
+> Do not use raw `adb install` for normal setup. It copies the APK but leaves the device in a partial state without required permissions. Use `clawperator operator setup` instead.
+
+> Always use `clawperator operator setup` for setup. `clawperator operator install` remains an alias. Only run `clawperator grant-device-permissions` after the Operator APK crashes and Android revokes the accessibility or notification permissions.
 
 ---
 
-## Step 4 - Enable the Accessibility Service
-
-Clawperator uses Android's Accessibility API to observe and interact with UI elements. You must enable the service before it can accept commands.
-
-**From the host machine (recommended for remote and agent-driven setups):**
-
-```bash
-clawperator grant-device-permissions
-```
-
-This uses `adb` to enable the accessibility service without touching the device screen. Works identically for physical devices and emulators. Optionally pass `--device-id <id>` if multiple devices are connected.
-
-For a standard public install, the default receiver package is `com.clawperator.operator`. For local debug builds, pass `--receiver-package com.clawperator.operator.dev`.
-
-> The accessibility service must remain enabled. If it is disabled, executions will time out.
-
----
-
-## Step 5 - Verify Setup
+## Step 4 - Verify Setup
 
 Run the diagnostic check:
 
@@ -412,14 +418,14 @@ A fully configured device will show all checks passing. Common warnings:
 | Warning | Fix |
 | :--- | :--- |
 | `DEVICE_UNAUTHORIZED` | Tap "Allow" on the device USB debugging dialog |
-| `RECEIVER_NOT_INSTALLED` | Complete Step 3 (install the [Clawperator Operator Android app](android-operator-apk.md)) |
-| `DEVICE_ACCESSIBILITY_NOT_RUNNING` | Complete Step 4 (enable accessibility service) |
+| `RECEIVER_NOT_INSTALLED` | Complete Step 3 (run `clawperator operator setup`) |
+| `DEVICE_ACCESSIBILITY_NOT_RUNNING` | If the Operator APK crashed after setup, run `clawperator grant-device-permissions` to restore the revoked permissions |
 | `DEVICE_DEV_OPTIONS_DISABLED` | Enable Developer options (physical device only) |
 | `DEVICE_USB_DEBUGGING_DISABLED` | Enable USB debugging (physical device only) |
 
 ---
 
-## Step 6 - Run Your First Command
+## Step 5 - Run Your First Command
 
 Observe the current UI state:
 
@@ -562,33 +568,29 @@ Capture the returned serial and use it as `--device-id` in later commands.
 
 The [Clawperator Operator Android app](android-operator-apk.md) must be installed on the Android device.
 
-The installer usually handles this automatically. If needed, install it manually:
+The installer usually handles this automatically. If needed, install it with the canonical command:
 
 ```bash
-adb install -r ~/.clawperator/downloads/operator.apk
+clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id <device_id>
 ```
 
-With multiple devices connected:
+If only one device is connected, `--device-id` can be omitted:
 
 ```bash
-adb -s <device_id> install -r ~/.clawperator/downloads/operator.apk
+clawperator operator setup --apk ~/.clawperator/downloads/operator.apk
 ```
 
-## Step 4 - Grant permissions
-
-Grant Android Accessibility permissions from the host:
+For a local debug build of the [Clawperator Operator Android app](android-operator-apk.md):
 
 ```bash
-clawperator grant-device-permissions --device-id <device_id>
+clawperator operator setup \
+  --apk ~/.clawperator/downloads/operator-debug.apk \
+  --receiver-package com.clawperator.operator.dev
 ```
 
-If only one device is connected, `--device-id` can be omitted.
+This command is the normal path for agents and operators. It installs the APK and grants required permissions (accessibility, notification listener) in one step. `clawperator operator install` remains a compatibility alias.
 
-For a local debug build of the [Clawperator Operator Android app](android-operator-apk.md), add:
-
-```bash
---receiver-package com.clawperator.operator.dev
-```
+Do not split initial setup into separate `adb install` and `grant-device-permissions` calls. Reserve `clawperator grant-device-permissions` for recovery after the Operator APK crashes and Android revokes the previously granted permissions.
 
 ## Step 5 - Run doctor
 
@@ -702,7 +704,7 @@ For agents that need one deterministic sequence, the normal path is:
 curl -fsSL https://clawperator.com/install.sh | bash
 clawperator --version
 clawperator devices
-clawperator grant-device-permissions --device-id <device_id>
+clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id <device_id>
 clawperator doctor --device-id <device_id> --output pretty
 echo $CLAWPERATOR_SKILLS_REGISTRY
 clawperator skills list
@@ -728,7 +730,7 @@ When an agent is asked to "set this up for me", it should record:
 - whether a physical Android device or emulator was chosen
 - the selected device serial
 - whether the [Clawperator Operator Android app](android-operator-apk.md) was installed automatically or manually
-- whether `grant-device-permissions` succeeded
+- whether `operator setup` succeeded (or which phase failed)
 - whether `doctor` passed
 - whether skills installed cleanly
 - the value of `CLAWPERATOR_SKILLS_REGISTRY`
@@ -874,10 +876,14 @@ This downloads the latest app package and installs it to your connected device.
 To install manually:
 1. Download the latest app package from [clawperator.com/operator.apk](https://clawperator.com/operator.apk).
 2. Connect your device via USB.
-3. Run:
+3. Run the canonical install command:
    ```bash
-   adb install -r operator.apk
+   clawperator operator setup --apk operator.apk
    ```
+
+This command installs the APK and grants all required permissions in one step. See [First-Time Setup](first-time-setup.md) for full details.
+
+> Do not use raw `adb install` for normal setup. It installs the APK but does not grant the permissions required for the app to operate.
 
 ### Historical Versions
 Historical versions can be downloaded from `downloads.clawperator.com`. The URL structure follows the versioning pattern:
@@ -886,12 +892,30 @@ Historical versions can be downloaded from `downloads.clawperator.com`. The URL 
 Example for v0.2.5:
 - [https://downloads.clawperator.com/operator/v0.2.5/operator-v0.2.5.apk](https://downloads.clawperator.com/operator/v0.2.5/operator-v0.2.5.apk)
 
-## Granting Permissions
-After installation, grant accessibility permissions so the app can inspect the screen and interact with the UI:
+## Required Permissions
+The app requires three permissions to operate:
+
+```bash
+clawperator operator setup --apk <path>
+```
+
+This command grants all three permissions automatically during install. The permissions are:
+
+| Permission | ADB mechanism | Purpose |
+|---|---|---|
+| Accessibility service | `settings put secure enabled_accessibility_services` | Read UI tree and dispatch gestures |
+| Post notifications (`POST_NOTIFICATIONS`) | `pm grant android.permission.POST_NOTIFICATIONS` | Show foreground service status notification (Android 13+) |
+| Notification listener | `settings put secure enabled_notification_listeners` | Observe notifications from all apps on the device |
+
+The accessibility service and notification listener permissions are enabled by appending the Clawperator service component to the relevant secure setting, matching the format Android uses internally. The `POST_NOTIFICATIONS` grant is a standard runtime permission grant; on Android 12 and below it is silently skipped.
+
+If the Operator APK crashes after setup and Android revokes the granted permissions, use the remediation command:
 
 ```bash
 clawperator grant-device-permissions
 ```
+
+This re-grants the same permissions without reinstalling the APK. Do not use it for normal setup - agents should use `clawperator operator setup` for the initial install path every time. `clawperator operator install` remains an alias.
 
 ## Logging and Debugging
 
@@ -1049,6 +1073,7 @@ Clawperator provides a deterministic execution layer for LLM agents to control A
 
 | Command | Description |
 | :--- | :--- |
+| `operator setup --apk <path>` | Install the Operator APK and grant required device permissions (canonical setup command, with `operator install` kept as an alias) |
 | `devices` | List connected Android serials and states |
 | `emulator list` | List configured Android Virtual Devices with compatibility metadata |
 | `emulator inspect <name>` | Show normalized metadata for one Android Virtual Device |
@@ -1074,7 +1099,7 @@ Clawperator provides a deterministic execution layer for LLM agents to control A
 | `skills run <skill_id> [--device-id <id>]` | Invoke a skill script (convenience wrapper) |
 | `skills install` | Clone skills repo to `~/.clawperator/skills/` |
 | `skills update [--ref <git-ref>]` | Pull latest skills (optionally pin to a ref) |
-| `grant-device-permissions` | Enable accessibility and notification permissions on the connected device via adb |
+| `grant-device-permissions` | Re-grant Operator permissions only after an Operator APK crash causes Android to revoke them |
 | `serve` | Start HTTP/SSE server |
 | `doctor` | Run environment diagnostics |
 | `version` | Print the CLI version or check CLI / Clawperator Operator Android app compatibility |
@@ -1248,6 +1273,7 @@ Combine fields to increase specificity when a single field is ambiguous:
 | Action | Required params | Optional params |
 | :--- | :--- | :--- |
 | `open_app` | `applicationId: string` | - |
+| `open_uri` | `uri: string` | `retry: object` |
 | `close_app` | `applicationId: string` | - |
 | `click` | `matcher: NodeMatcher` | `clickType: "default" \| "long_click" \| "focus"` (default: `"default"`) |
 | `enter_text` | `matcher: NodeMatcher`, `text: string` | `submit: boolean` (default: `false`), `clear: boolean` (accepted by Node contract, currently ignored by Android runtime) |
@@ -1267,6 +1293,7 @@ Combine fields to increase specificity when a single field is ambiguous:
 | `action read --selector <json>` | `read_text` |
 | `action wait --selector <json>` | `wait_for_node` |
 | `action open-app --app <id>` | `open_app` |
+| `action open-uri --uri <value>` | `open_uri` |
 | `observe snapshot` | `snapshot_ui` |
 
 ### Action behavior notes
@@ -1285,7 +1312,9 @@ Combine fields to increase specificity when a single field is ambiguous:
 ```
 `maxAttempts` is capped at 10. `initialDelayMs` and `maxDelayMs` are capped at 30,000 and 60,000 ms respectively. Omit the `retry` field to use the action's default preset. For `wait_for_node`, the default is `UiReadiness` (`maxAttempts=5`, `initialDelayMs=500`, `maxDelayMs=3000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`).
 
-**`open_app`:** Opens the app's default launch activity by `applicationId`. There is no `open_uri` action for deep links or content-addressed pages (such as `market://details?id=...` or arbitrary `https://` URLs). To open a specific URI, use `adb shell am start -a android.intent.action.VIEW -d "<uri>"` outside the execution payload. This is a known capability gap - see FAQ.
+**`open_app`:** Opens the app's default launch activity by `applicationId`.
+
+**`open_uri`:** Opens a URI using the Clawperator Android app's implicit `ACTION_VIEW` intent - no adb shortcut is used. The Android device's registered handler for the URI scheme is invoked directly. Any URI scheme is supported: deep links (`market://details?id=com.actionlauncher.playstore`), standard URLs (`https://example.com`), and custom app schemes. If no application is registered for the URI scheme, the action fails with `URI_NOT_HANDLED`. A chooser dialog may appear on devices with multiple handlers for a scheme; follow the `open_uri` step with a `snapshot_ui` to verify the expected app is in the foreground. The alias `open_url` is also accepted and normalized to `open_uri`.
 
 **`close_app`:** The Node layer intercepts `close_app` actions and runs `adb shell am force-stop <applicationId>` before dispatching to Android. The Android step always returns `success: false` with `data.error: "UNSUPPORTED_RUNTIME_CLOSE"` - this is expected. The overall execution `status` remains `"success"` and the app is force-stopped. Do not treat this step result as a recoverable failure.
 
@@ -1336,6 +1365,7 @@ Typical `data` keys by action type:
 | Action | Typical `data` keys |
 | :--- | :--- |
 | `open_app` | `application_id` |
+| `open_uri` | `uri` |
 | `close_app` | `application_id`, `error` (`"UNSUPPORTED_RUNTIME_CLOSE"`), `message` |
 | `click` | `click_types` |
 | `enter_text` | `text` (text typed), `submit` (`"true"` or `"false"`) |
@@ -1571,14 +1601,19 @@ Single-flight per device. A second overlapping execution returns `EXECUTION_CONF
 **When should I use direct `adb` instead?**
 Use `adb` directly for operations not covered by the execution payload API:
 
-- **Opening specific URIs or deep links** - there is no `open_uri` action type. Use `adb shell am start -a android.intent.action.VIEW -d "<uri>"` to open a Play Store app page, a web URL, or a custom deep link. On devices with multiple apps registered for a URI scheme, this may trigger an "Open with" picker that your automation must handle.
 - **Diagnostics** when you need to inspect raw device state (logcat, package list, window focus).
 - **Pre-flight setup** outside the automation loop (granting permissions, installing APKs, checking installed packages).
 
 For routine UI automation, use Clawperator so result/error semantics stay consistent.
 
 **Can Clawperator open a specific URL or deep link?**
-Not directly. The `open_app` action only supports launching an app by its `applicationId`. To open a URI (such as a Play Store app page at `market://details?id=com.example.app`, a web URL, or a custom deep link), use `adb shell am start` outside the Clawperator execution payload. See "When to use adb directly" above.
+Yes. Use the `open_uri` action with any URI scheme - `market://`, `https://`, or a custom app deep link. The Clawperator Android app issues an `ACTION_VIEW` intent directly on the device; no adb command is needed. Example:
+
+```json
+{ "id": "nav1", "type": "open_uri", "params": { "uri": "market://details?id=com.actionlauncher.playstore" } }
+```
+
+If multiple apps are registered for the URI scheme, a system chooser may appear. Follow the `open_uri` step with `snapshot_ui` to confirm the expected app opened.
 
 **Does Clawperator run skills?**
 Skills are standalone programs that agents can invoke directly. The Node API provides discovery (`skills list`, `skills search`), metadata (`skills get`), and a convenience `skills run` wrapper. Skills do not need the Node API to execute - agents can call skill scripts directly.
@@ -1622,6 +1657,43 @@ Default receiver package: `com.clawperator.operator`. Use `--receiver-package co
 ---
 
 ## Commands
+
+### `operator setup`
+
+Install the Clawperator Operator APK and grant required device permissions in one step.
+
+```
+clawperator operator setup --apk <path> [--device-id <id>] [--receiver-package <package>] [--output <json|pretty>]
+```
+
+| Flag | Description |
+|------|-------------|
+| `--apk <path>` | Local path to the Operator APK file (required) |
+| `--device-id <id>` | Target Android device serial (required when multiple devices are connected) |
+| `--receiver-package <package>` | Operator package identifier (required when both release and debug variants are installed) |
+
+This is the canonical setup command. `clawperator operator install` remains a compatibility alias. It runs three phases in sequence:
+
+1. **Install**: Copies the APK onto the device via `adb install -r`.
+2. **Permissions**: Grants the accessibility service, notification posting, and notification listener permissions.
+3. **Verification**: Confirms the package is visible via `pm list packages`.
+
+If `--receiver-package` is omitted, setup auto-detects the package only when exactly one known Operator variant is installed. If both release and debug variants are installed, pass `--receiver-package` explicitly.
+
+If any phase fails, the command exits with a structured JSON error identifying which phase failed. Error codes:
+
+| Code | Phase | Meaning |
+|------|-------|---------|
+| `OPERATOR_APK_NOT_FOUND` | pre-install | APK path does not exist on disk |
+| `OPERATOR_INSTALL_FAILED` | install | `adb install` returned a non-zero exit code |
+| `OPERATOR_GRANT_FAILED` | permissions | One or more permission grants failed |
+| `OPERATOR_VERIFY_FAILED` | verification | Package not found after install |
+
+Do not use raw `adb install` for normal setup. It installs the APK without granting permissions, leaving the device in an unusable state.
+
+For debug builds, pass `--receiver-package com.clawperator.operator.dev`.
+
+---
 
 ### `emulator list`
 
@@ -1801,6 +1873,20 @@ clawperator inspect ui [--device-id <id>] [--receiver-package <package>] [--time
 ```
 
 `inspect ui` is a wrapper alias over `observe snapshot`.
+
+---
+
+### `action open-uri`
+
+Open a URI on the device using the system default handler.
+
+```
+clawperator action open-uri --uri <uri> [--device-id <id>] [--receiver-package <package>]
+```
+
+| Flag | Description |
+|------|-------------|
+| `--uri <uri>` | URI to open (required). Any scheme: `https://`, `market://`, deep links, etc. |
 
 ---
 
@@ -1997,11 +2083,13 @@ Use `clawperator skills sync --help` when you need the current clone and registr
 
 ### `grant-device-permissions`
 
-Grant accessibility and notification permissions to the Operator APK via adb.
+Re-grant accessibility and notification permissions only after an Operator APK crash causes Android to revoke them.
 
 ```
 clawperator grant-device-permissions [--device-id <id>] [--receiver-package <package>] [--output <json\|pretty>]
 ```
+
+This command is for **crash recovery only**. Use it after a previously working Operator APK crashes and Android revokes the accessibility or notification permissions. For initial setup, always use `clawperator operator setup` instead.
 
 Use the release package by default. Pass `--receiver-package com.clawperator.operator.dev` for local debug builds.
 
@@ -2137,6 +2225,7 @@ The `code` field is always one of the string constants listed below.
 | `EXECUTION_CONFLICT_IN_FLIGHT` | Another execution is already running on this device |
 | `RESULT_ENVELOPE_TIMEOUT` | The device did not emit a `[Clawperator-Result]` envelope within the timeout |
 | `RESULT_ENVELOPE_MALFORMED` | The result envelope emitted by the device could not be parsed |
+| `SNAPSHOT_EXTRACTION_FAILED` | UI hierarchy extraction from device logs failed |
 
 ---
 
@@ -2188,6 +2277,19 @@ These codes are produced by `clawperator doctor` and related checks.
 | `EMULATOR_BOOT_TIMEOUT` | Android boot completion did not finish before timeout |
 | `ANDROID_SYSTEM_IMAGE_INSTALL_FAILED` | Android SDK system image install or license acceptance failed |
 | `ANDROID_AVD_CREATE_FAILED` | `avdmanager` failed to create the AVD |
+
+---
+
+## Operator setup
+
+These codes are produced by `clawperator operator setup` (or the `operator install` alias).
+
+| Code | Description |
+|------|-------------|
+| `OPERATOR_APK_NOT_FOUND` | Local APK file not found |
+| `OPERATOR_INSTALL_FAILED` | `adb install` returned a non-zero exit code |
+| `OPERATOR_GRANT_FAILED` | One or more required device permission grants failed |
+| `OPERATOR_VERIFY_FAILED` | Operator package not visible to package manager after install |
 
 ---
 
@@ -2371,6 +2473,7 @@ The core unit dispatched to the device.
 
 | Type | Required params | Description |
 |------|----------------|-------------|
+| `open_uri` | `uri` | Open a URI via the system default handler |
 | `open_app` | `applicationId` | Launch an app |
 | `close_app` | `applicationId` | Force-stop an app |
 | `click` | `matcher` | Tap a UI node |
@@ -2392,6 +2495,7 @@ The core unit dispatched to the device.
 | `snapshot` | `snapshot_ui` |
 | `screenshot`, `capture_screenshot` | `take_screenshot` |
 | `type_text`, `text_entry`, `input_text` | `enter_text` |
+| `open_url` | `open_uri` |
 
 ---
 
@@ -2418,6 +2522,7 @@ All fields are optional but at least one must be non-empty. Values are ORed inte
 
 | Param | Type | Used by |
 |-------|------|---------|
+| `uri` | string | `open_uri` |
 | `applicationId` | string | `open_app`, `close_app` |
 | `matcher` | NodeMatcher | `click`, `read_text`, `enter_text`, `wait_for_node` |
 | `text` | string | `enter_text` |
@@ -2740,7 +2845,7 @@ Default receiver package:
 - release app package: `com.clawperator.operator`
 - local debug app package: `com.clawperator.operator.dev`
 
-If you use a local debug build of the [Clawperator Operator Android app](../getting-started/android-operator-apk.md), pass `--receiver-package com.clawperator.operator.dev` consistently to `doctor`, `grant-device-permissions`, `version --check-compat`, and `observe snapshot`.
+If you use a local debug build of the [Clawperator Operator Android app](../getting-started/android-operator-apk.md), pass `--receiver-package com.clawperator.operator.dev` consistently to `doctor`, `operator setup`, `grant-device-permissions`, `version --check-compat`, and `observe snapshot`.
 
 ## What Doctor Checks
 
@@ -2856,7 +2961,7 @@ Each `DoctorCheckResult` can also include:
 Today that can include actions such as:
 
 - restarting the adb server
-- running `clawperator grant-device-permissions`
+- running `clawperator grant-device-permissions` after an Operator APK crash revoked permissions
 - running follow-up diagnostic commands suggested by handshake failures
 
 Manual steps and on-device guidance are still reported in `nextActions`; they are not automated.
@@ -2877,7 +2982,7 @@ On handshake timeout, the report includes:
 - broadcast dispatch status
 - receiver package
 - device id when available
-- follow-up commands such as `clawperator grant-device-permissions` and `clawperator observe snapshot --timeout-ms 5000`
+- follow-up commands such as `clawperator grant-device-permissions` after a crash-revocation event and `clawperator observe snapshot --timeout-ms 5000`
 
 ## Common Usage
 
@@ -2917,7 +3022,7 @@ clawperator doctor --full
 ## Related Commands
 
 - `clawperator version --check-compat` - version compatibility check without the full doctor report
-- `clawperator grant-device-permissions` - enable Accessibility and related app ops via adb
+- `clawperator grant-device-permissions` - restore Accessibility and related app ops after an Operator APK crash causes Android to revoke them
 - `clawperator observe snapshot` - direct runtime check once doctor reports the environment is ready
 
 For initial installation and device setup, see [First-Time Setup](../getting-started/first-time-setup.md) and [OpenClaw First Run](../getting-started/openclaw-first-run.md).
@@ -2999,7 +3104,7 @@ npm install -g clawperator@latest
 Install a compatible [Clawperator Operator Android app](../getting-started/android-operator-apk.md):
 
 ```bash
-adb install -r <apk_path>
+clawperator operator setup --apk <apk_path>
 ```
 
 If you are using a local debug build, make sure the receiver package matches the installed variant:
@@ -3107,8 +3212,8 @@ If you must use **Wireless Debugging**, be aware that your mileage may vary (YMM
 
 `curl -fsSL https://clawperator.com/install.sh | bash` uses the stable metadata file at `https://downloads.clawperator.com/operator/latest.json`, downloads the immutable package for the [Clawperator Operator Android app](../getting-started/android-operator-apk.md) plus its `.sha256`, verifies the checksum, then handles device install like this:
 
-1. **One connected device** - the installer offers to run `adb install -r ~/.clawperator/downloads/operator.apk`.
-2. **Multiple connected devices** - the installer skips the install and prints `adb -s <device_id> install -r ~/.clawperator/downloads/operator.apk`.
+1. **One connected device** - the installer offers to run `clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id <device_id>`.
+2. **Multiple connected devices** - the installer skips the install and prints `clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id <device_id>`.
 3. **No connected devices** - the installer skips the install and leaves the verified package for the [Clawperator Operator Android app](../getting-started/android-operator-apk.md) at `~/.clawperator/downloads/operator.apk`.
 4. **`adb` missing** - the installer attempts to install `adb` automatically, or stops with a manual install link if it cannot.
 
@@ -3246,6 +3351,57 @@ If the installer finishes but warns that skills setup was skipped, the core CLI 
 ```bash
 git clone https://clawperator.com/install/clawperator-skills.bundle ~/.clawperator/skills
 export CLAWPERATOR_SKILLS_REGISTRY="$HOME/.clawperator/skills/skills/skills-registry.json"
+```
+
+---
+
+## Snapshot UI returns SNAPSHOT_EXTRACTION_FAILED
+
+**Symptom:** A `snapshot_ui` step returns `success: false` with `data.error: "SNAPSHOT_EXTRACTION_FAILED"`. The device is connected and responding, but no UI hierarchy XML appears in `data.text`. The stderr output from the CLI contains a warning like:
+
+```
+[clawperator] WARN: snapshot_ui step "..." UI hierarchy extraction produced no output.
+```
+
+**Most common cause:** The installed `clawperator` npm binary is out of date. The compiled `snapshotHelper.js` in older published packages searches for a logcat marker (`TaskScopeDefault:`) that does not match the marker the Android Operator APK actually emits (`[TaskScope] UI Hierarchy:`). The APK is correct and requires no changes. Other less common causes, such as partial or truncated logcat capture, can also leave a `snapshot_ui` step without extracted text and produce the same error.
+
+**How to confirm:**
+
+```bash
+clawperator version --check-compat --receiver-package com.clawperator.operator
+```
+
+This will report any version mismatch between the CLI and the installed APK.
+
+**How to fix:**
+
+1. Reinstall the npm package to get the current compiled binary:
+
+   ```bash
+   npm install -g clawperator
+   ```
+
+2. Verify the fix by running a snapshot:
+
+   ```bash
+   clawperator observe snapshot --device-id <device_serial> --output json
+   ```
+
+   A working snapshot returns `data.text` containing XML starting with `<hierarchy`.
+
+**Temporary workaround (sibling repo checkout):**
+
+If you have a local checkout of the clawperator repo at the sibling path, skills will automatically prefer the local build over the global binary. You can also set `CLAW_BIN` explicitly:
+
+```bash
+export CLAW_BIN=/path/to/clawperator/apps/node/dist/cli/index.js
+```
+
+Rebuild the local binary first if needed:
+
+```bash
+npm --prefix /path/to/clawperator/apps/node install
+npm --prefix /path/to/clawperator/apps/node run build
 ```
 
 ---

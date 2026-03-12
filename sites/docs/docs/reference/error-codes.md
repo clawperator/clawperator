@@ -45,6 +45,7 @@ The `code` field is always one of the string constants listed below.
 | `EXECUTION_CONFLICT_IN_FLIGHT` | Another execution is already running on this device |
 | `RESULT_ENVELOPE_TIMEOUT` | The device did not emit a `[Clawperator-Result]` envelope within the timeout |
 | `RESULT_ENVELOPE_MALFORMED` | The result envelope emitted by the device could not be parsed |
+| `SNAPSHOT_EXTRACTION_FAILED` | UI hierarchy extraction from device logs failed |
 
 ---
 
@@ -96,6 +97,19 @@ These codes are produced by `clawperator doctor` and related checks.
 | `EMULATOR_BOOT_TIMEOUT` | Android boot completion did not finish before timeout |
 | `ANDROID_SYSTEM_IMAGE_INSTALL_FAILED` | Android SDK system image install or license acceptance failed |
 | `ANDROID_AVD_CREATE_FAILED` | `avdmanager` failed to create the AVD |
+
+---
+
+## Operator setup
+
+These codes are produced by `clawperator operator setup` (or the `operator install` alias).
+
+| Code | Description |
+|------|-------------|
+| `OPERATOR_APK_NOT_FOUND` | Local APK file not found |
+| `OPERATOR_INSTALL_FAILED` | `adb install` returned a non-zero exit code |
+| `OPERATOR_GRANT_FAILED` | One or more required device permission grants failed |
+| `OPERATOR_VERIFY_FAILED` | Operator package not visible to package manager after install |
 
 ---
 

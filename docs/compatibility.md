@@ -69,7 +69,7 @@ npm install -g clawperator@latest
 Install a compatible [Clawperator Operator Android app](../getting-started/android-operator-apk.md):
 
 ```bash
-adb install -r <apk_path>
+clawperator operator setup --apk <apk_path>
 ```
 
 If you are using a local debug build, make sure the receiver package matches the installed variant:
