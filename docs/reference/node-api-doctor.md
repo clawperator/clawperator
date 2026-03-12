@@ -30,7 +30,7 @@ Default receiver package:
 - release app package: `com.clawperator.operator`
 - local debug app package: `com.clawperator.operator.dev`
 
-If you use a local debug build of the [Clawperator Operator Android app](../getting-started/android-operator-apk.md), pass `--receiver-package com.clawperator.operator.dev` consistently to `doctor`, `grant-device-permissions`, `version --check-compat`, and `observe snapshot`.
+If you use a local debug build of the [Clawperator Operator Android app](../getting-started/android-operator-apk.md), pass `--receiver-package com.clawperator.operator.dev` consistently to `doctor`, `operator setup`, `grant-device-permissions`, `version --check-compat`, and `observe snapshot`.
 
 ## What Doctor Checks
 
@@ -146,7 +146,7 @@ Each `DoctorCheckResult` can also include:
 Today that can include actions such as:
 
 - restarting the adb server
-- running `clawperator grant-device-permissions`
+- running `clawperator grant-device-permissions` after an Operator APK crash revoked permissions
 - running follow-up diagnostic commands suggested by handshake failures
 
 Manual steps and on-device guidance are still reported in `nextActions`; they are not automated.
@@ -167,7 +167,7 @@ On handshake timeout, the report includes:
 - broadcast dispatch status
 - receiver package
 - device id when available
-- follow-up commands such as `clawperator grant-device-permissions` and `clawperator observe snapshot --timeout-ms 5000`
+- follow-up commands such as `clawperator grant-device-permissions` after a crash-revocation event and `clawperator observe snapshot --timeout-ms 5000`
 
 ## Common Usage
 
@@ -207,7 +207,7 @@ clawperator doctor --full
 ## Related Commands
 
 - `clawperator version --check-compat` - version compatibility check without the full doctor report
-- `clawperator grant-device-permissions` - enable Accessibility and related app ops via adb
+- `clawperator grant-device-permissions` - restore Accessibility and related app ops after an Operator APK crash causes Android to revoke them
 - `clawperator observe snapshot` - direct runtime check once doctor reports the environment is ready
 
 For initial installation and device setup, see [First-Time Setup](../getting-started/first-time-setup.md) and [OpenClaw First Run](../getting-started/openclaw-first-run.md).

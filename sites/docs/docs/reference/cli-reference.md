@@ -26,6 +26,43 @@ Default receiver package: `com.clawperator.operator`. Use `--receiver-package co
 
 ## Commands
 
+### `operator setup`
+
+Install the Clawperator Operator APK and grant required device permissions in one step.
+
+```
+clawperator operator setup --apk <path> [--device-id <id>] [--receiver-package <package>] [--output <json|pretty>]
+```
+
+| Flag | Description |
+|------|-------------|
+| `--apk <path>` | Local path to the Operator APK file (required) |
+| `--device-id <id>` | Target Android device serial (required when multiple devices are connected) |
+| `--receiver-package <package>` | Operator package identifier (required when both release and debug variants are installed) |
+
+This is the canonical setup command. `clawperator operator install` remains a compatibility alias. It runs three phases in sequence:
+
+1. **Install**: Copies the APK onto the device via `adb install -r`.
+2. **Permissions**: Grants the accessibility service, notification posting, and notification listener permissions.
+3. **Verification**: Confirms the package is visible via `pm list packages`.
+
+If `--receiver-package` is omitted, setup auto-detects the package only when exactly one known Operator variant is installed. If both release and debug variants are installed, pass `--receiver-package` explicitly.
+
+If any phase fails, the command exits with a structured JSON error identifying which phase failed. Error codes:
+
+| Code | Phase | Meaning |
+|------|-------|---------|
+| `OPERATOR_APK_NOT_FOUND` | pre-install | APK path does not exist on disk |
+| `OPERATOR_INSTALL_FAILED` | install | `adb install` returned a non-zero exit code |
+| `OPERATOR_GRANT_FAILED` | permissions | One or more permission grants failed |
+| `OPERATOR_VERIFY_FAILED` | verification | Package not found after install |
+
+Do not use raw `adb install` for normal setup. It installs the APK without granting permissions, leaving the device in an unusable state.
+
+For debug builds, pass `--receiver-package com.clawperator.operator.dev`.
+
+---
+
 ### `emulator list`
 
 List configured Android Virtual Devices and their compatibility metadata.
@@ -414,11 +451,13 @@ Use `clawperator skills sync --help` when you need the current clone and registr
 
 ### `grant-device-permissions`
 
-Grant accessibility and notification permissions to the Operator APK via adb.
+Re-grant accessibility and notification permissions only after an Operator APK crash causes Android to revoke them.
 
 ```
 clawperator grant-device-permissions [--device-id <id>] [--receiver-package <package>] [--output <json\|pretty>]
 ```
+
+This command is for **crash recovery only**. Use it after a previously working Operator APK crashes and Android revokes the accessibility or notification permissions. For initial setup, always use `clawperator operator setup` instead.
 
 Use the release package by default. Pass `--receiver-package com.clawperator.operator.dev` for local debug builds.
 
