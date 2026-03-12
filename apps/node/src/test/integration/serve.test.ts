@@ -69,6 +69,54 @@ describe("serve API integration", () => {
     assert.strictEqual(res.status, 400);
   });
 
+  test("POST /execute rejects press_key without params.key", async () => {
+    const executionInput = {
+      commandId: "test-press-key-missing",
+      taskId: "test-task",
+      source: "test-suite",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 1000,
+      actions: [{ id: "k1", type: "press_key", params: {} }],
+    };
+
+    const res = await fetch(`http://localhost:${port}/execute`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ execution: executionInput }),
+    });
+
+    assert.strictEqual(res.status, 400);
+    const body = await res.json() as {
+      ok: boolean;
+      error: { code: string; details?: { path?: string } };
+    };
+    assert.strictEqual(body.ok, false);
+    assert.strictEqual(body.error.code, "EXECUTION_VALIDATION_FAILED");
+    assert.strictEqual(body.error.details?.path, "actions.0.params.key");
+  });
+
+  test("POST /execute accepts key_press alias and reaches device resolution", async () => {
+    const executionInput = {
+      commandId: "test-key-press-alias",
+      taskId: "test-task",
+      source: "test-suite",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 1000,
+      actions: [{ id: "k1", type: "key_press", params: { key: "home" } }],
+    };
+
+    const res = await fetch(`http://localhost:${port}/execute`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ execution: executionInput, deviceId: "non-existent" }),
+    });
+
+    assert.strictEqual(res.status, 404);
+    const body = await res.json() as { ok: boolean; error: { code: string } };
+    assert.strictEqual(body.ok, false);
+    assert.strictEqual(body.error.code, "DEVICE_NOT_FOUND");
+  });
+
   test("GET /events returns SSE stream", async () => {
     const res = await fetch(`http://localhost:${port}/events`);
     assert.strictEqual(res.status, 200);
