@@ -50,6 +50,11 @@ function normalizeResultEnvelope(raw: unknown): ResultEnvelope {
   if (!(typeof envelope.error === "string" || envelope.error === null)) {
     throw new Error("Invalid envelope error");
   }
+  // errorCode is optional - older APK versions may not emit it
+  const errorCode = envelope.errorCode;
+  if (errorCode !== undefined && !(typeof errorCode === "string" || errorCode === null)) {
+    throw new Error("Invalid envelope errorCode");
+  }
 
   return {
     commandId: envelope.commandId,
@@ -57,6 +62,7 @@ function normalizeResultEnvelope(raw: unknown): ResultEnvelope {
     status: envelope.status,
     stepResults: envelope.stepResults.map(normalizeStepResult),
     error: envelope.error,
+    ...(errorCode !== undefined ? { errorCode } : {}),
   };
 }
 

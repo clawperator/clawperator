@@ -11,6 +11,7 @@ import clawperator.accessibilityservice.closeNotificationPanel
 import clawperator.accessibilityservice.currentAccessibilityService
 import clawperator.operator.agent.AgentCommandExecutor
 import clawperator.operator.agent.AgentCommandParser
+import clawperator.operator.agent.EnvelopeErrorCodes
 import clawperator.operator.agent.buildCanonicalFailureLine
 import clawperator.task.runner.TaskResult
 import kotlinx.coroutines.launch
@@ -54,6 +55,7 @@ class OperatorCommandReceiver :
                                     commandId = command.commandId,
                                     taskId = command.taskId,
                                     reason = reason,
+                                    errorCode = EnvelopeErrorCodes.SERVICE_UNAVAILABLE,
                                 ),
                             )
                         }.onFailure { error ->

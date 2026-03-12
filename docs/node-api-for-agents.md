@@ -497,12 +497,14 @@ Every execution emits exactly one `[Clawperator-Result]` envelope:
       "data": { "key": "value" }
     }
   ],
-  "error": "ERROR_CODE" | null
+  "error": "human-readable reason" | null,
+  "errorCode": "STABLE_CODE" | null
 }
 ```
 
 - `status` is `"success"` when the execution completes (including partial step failures like `close_app`). `status` is `"failed"` only on total execution failure (dispatch error, timeout, validation failure).
-- `error` (top-level) contains an error code on total failure.
+- `error` (top-level) contains a human-readable description of the failure. Do not branch agent logic on this string - it is not a stable contract.
+- `errorCode` (top-level) contains a stable, enumerated code when the failure has a known cause. Branch agent logic on this field. May be absent in envelopes from older APK versions or for unclassified failures.
 - `data.error` on a step result contains the per-step error code when `success` is `false`.
 - All `data` values are strings. `data` is always an object (never `null`), but may be empty.
 - Only one execution may be in flight per device. Concurrent requests for the same device return `EXECUTION_CONFLICT_IN_FLIGHT`.
@@ -637,34 +639,35 @@ Note: `content-desc` values sometimes contain newlines when an element's label s
 
 ## Error Codes
 
-Branch agent logic on codes from `envelope.error` or `stepResults[].data.error`:
+Branch agent logic on codes from `envelope.errorCode` (top-level failures) or `stepResults[].data.error` (per-step failures). The `envelope.error` field contains a human-readable description and is not a stable contract.
 
-| Code | Meaning |
-| :--- | :--- |
-| `EXECUTION_CONFLICT_IN_FLIGHT` | Device is busy with another execution |
-| `ANDROID_SDK_TOOL_MISSING` | A required Android SDK tool such as `adb`, `emulator`, `sdkmanager`, or `avdmanager` is not available |
-| `EMULATOR_NOT_FOUND` | Requested AVD does not exist |
-| `EMULATOR_NOT_RUNNING` | Requested AVD is not currently running |
-| `EMULATOR_ALREADY_RUNNING` | Requested operation requires the AVD to be stopped first |
-| `EMULATOR_UNSUPPORTED` | The AVD exists but does not satisfy Clawperator compatibility rules |
-| `EMULATOR_START_FAILED` | Emulator process failed to register with adb in time |
-| `EMULATOR_BOOT_TIMEOUT` | Emulator registered with adb but Android did not finish booting in time |
-| `ANDROID_AVD_CREATE_FAILED` | AVD creation failed |
-| `ANDROID_SYSTEM_IMAGE_INSTALL_FAILED` | System image install or SDK license acceptance failed |
-| `EMULATOR_STOP_FAILED` | Emulator stop request failed |
-| `EMULATOR_DELETE_FAILED` | Emulator deletion failed |
-| `NODE_NOT_FOUND` | Selector matched no UI element |
-| `RESULT_ENVELOPE_TIMEOUT` | Command dispatched but no result received |
-| `RECEIVER_NOT_INSTALLED` | [Clawperator Operator Android app](../getting-started/android-operator-apk.md) not found on device |
-| `DEVICE_UNAUTHORIZED` | Device not authorized for ADB |
-| `VERSION_INCOMPATIBLE` | CLI and installed [Clawperator Operator Android app](../getting-started/android-operator-apk.md) versions do not share the same `major.minor` |
-| `APK_VERSION_UNREADABLE` | The device package dump did not expose a readable [Clawperator Operator Android app](../getting-started/android-operator-apk.md) version |
-| `EXECUTION_VALIDATION_FAILED` | Payload failed schema validation |
-| `SECURITY_BLOCK_DETECTED` | Android blocked the action (e.g., secure keyboard) |
-| `NODE_NOT_CLICKABLE` | Reserved error code. Intended for "element found but not interactable", but not currently emitted consistently by the Android and Node runtimes. |
-| `UNSUPPORTED_RUNTIME_CLOSE` | Expected per-step result for all `close_app` steps. The Android runtime does not support a force-stop action response - the Node layer handles the close via `adb shell am force-stop` before dispatch. The overall execution `status` remains `"success"`. Treat as non-fatal. |
-| `SNAPSHOT_EXTRACTION_FAILED` | `snapshot_ui` step completed but the Node layer did not attach any snapshot text to the step during post-processing. The most common cause is a Node binary packaging mismatch or other logcat extraction issue. Rebuild or reinstall the npm package and check version compatibility. |
-| `GLOBAL_ACTION_FAILED` | `press_key` step result when the OS reports `performGlobalAction` returned false. Rare soft failure - the accessibility service was running but Android declined to execute the action. |
+| Code | Source | Meaning |
+| :--- | :--- | :--- |
+| `SERVICE_UNAVAILABLE` | `envelope.errorCode` | Clawperator Operator accessibility service is not running on the device. Use `clawperator doctor` to diagnose. |
+| `EXECUTION_CONFLICT_IN_FLIGHT` | `envelope.error` | Device is busy with another execution |
+| `ANDROID_SDK_TOOL_MISSING` | `envelope.error` | A required Android SDK tool such as `adb`, `emulator`, `sdkmanager`, or `avdmanager` is not available |
+| `EMULATOR_NOT_FOUND` | `envelope.error` | Requested AVD does not exist |
+| `EMULATOR_NOT_RUNNING` | `envelope.error` | Requested AVD is not currently running |
+| `EMULATOR_ALREADY_RUNNING` | `envelope.error` | Requested operation requires the AVD to be stopped first |
+| `EMULATOR_UNSUPPORTED` | `envelope.error` | The AVD exists but does not satisfy Clawperator compatibility rules |
+| `EMULATOR_START_FAILED` | `envelope.error` | Emulator process failed to register with adb in time |
+| `EMULATOR_BOOT_TIMEOUT` | `envelope.error` | Emulator registered with adb but Android did not finish booting in time |
+| `ANDROID_AVD_CREATE_FAILED` | `envelope.error` | AVD creation failed |
+| `ANDROID_SYSTEM_IMAGE_INSTALL_FAILED` | `envelope.error` | System image install or SDK license acceptance failed |
+| `EMULATOR_STOP_FAILED` | `envelope.error` | Emulator stop request failed |
+| `EMULATOR_DELETE_FAILED` | `envelope.error` | Emulator deletion failed |
+| `NODE_NOT_FOUND` | `data.error` | Selector matched no UI element |
+| `RESULT_ENVELOPE_TIMEOUT` | `envelope.error` | Command dispatched but no result received |
+| `RECEIVER_NOT_INSTALLED` | `envelope.error` | [Clawperator Operator Android app](../getting-started/android-operator-apk.md) not found on device |
+| `DEVICE_UNAUTHORIZED` | `envelope.error` | Device not authorized for ADB |
+| `VERSION_INCOMPATIBLE` | `envelope.error` | CLI and installed [Clawperator Operator Android app](../getting-started/android-operator-apk.md) versions do not share the same `major.minor` |
+| `APK_VERSION_UNREADABLE` | `envelope.error` | The device package dump did not expose a readable [Clawperator Operator Android app](../getting-started/android-operator-apk.md) version |
+| `EXECUTION_VALIDATION_FAILED` | `envelope.error` | Payload failed schema validation |
+| `SECURITY_BLOCK_DETECTED` | `data.error` | Android blocked the action (e.g., secure keyboard) |
+| `NODE_NOT_CLICKABLE` | `data.error` | Reserved error code. Intended for "element found but not interactable", but not currently emitted consistently by the Android and Node runtimes. |
+| `UNSUPPORTED_RUNTIME_CLOSE` | `data.error` | Expected per-step result for all `close_app` steps. The Android runtime does not support a force-stop action response - the Node layer handles the close via `adb shell am force-stop` before dispatch. The overall execution `status` remains `"success"`. Treat as non-fatal. |
+| `SNAPSHOT_EXTRACTION_FAILED` | `data.error` | `snapshot_ui` step completed but the Node layer did not attach any snapshot text to the step during post-processing. The most common cause is a Node binary packaging mismatch or other logcat extraction issue. Rebuild or reinstall the npm package and check version compatibility. |
+| `GLOBAL_ACTION_FAILED` | `data.error` | `press_key` step result when the OS reports `performGlobalAction` returned false. Rare soft failure - the accessibility service was running but Android declined to execute the action. |
 
 Primary top-level error taxonomy: `apps/node/src/contracts/errors.ts`. This table also includes runtime-only step error strings such as `UNSUPPORTED_RUNTIME_CLOSE`.
 

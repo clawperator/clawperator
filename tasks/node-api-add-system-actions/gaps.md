@@ -52,7 +52,7 @@ Regenerate public docs after.
 
 ## GAP-D: No stable errorCode in the top-level failure envelope
 
-**Status:** Open
+**Status:** Closed (2026-03-12)
 **Effort:** Medium (three layers: Android envelope, Node parsing, docs)
 
 `ClawperatorResultEnvelope.error` is a free-form `String?`. When the accessibility service is
