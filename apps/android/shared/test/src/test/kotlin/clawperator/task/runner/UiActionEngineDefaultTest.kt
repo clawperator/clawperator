@@ -21,7 +21,7 @@ class UiActionEngineDefaultTest : ActionTest {
         actionTest {
             val uiScope = RecordingTaskUiScope()
             val taskScope = RecordingTaskScope(uiScope)
-            val developerOptionsManager = FakeDeveloperOptionsManager()
+            val developerOptionsManager = DeveloperOptionsManagerMock()
             val engine = UiActionEngineDefault(developerOptionsManager, AccessibilityServiceManagerMock())
 
             val result =
@@ -61,7 +61,7 @@ class UiActionEngineDefaultTest : ActionTest {
         actionTest {
             val uiScope = RecordingTaskUiScope()
             val taskScope = RecordingTaskScope(uiScope)
-            val developerOptionsManager = FakeDeveloperOptionsManager()
+            val developerOptionsManager = DeveloperOptionsManagerMock()
             val engine = UiActionEngineDefault(developerOptionsManager, AccessibilityServiceManagerMock())
 
             val result =
@@ -95,7 +95,7 @@ class UiActionEngineDefaultTest : ActionTest {
         actionTest {
             val uiScope = RecordingTaskUiScope()
             val taskScope = RecordingTaskScope(uiScope)
-            val developerOptionsManager = FakeDeveloperOptionsManager()
+            val developerOptionsManager = DeveloperOptionsManagerMock()
             val engine = UiActionEngineDefault(developerOptionsManager, AccessibilityServiceManagerMock())
 
             val result =
@@ -127,7 +127,7 @@ class UiActionEngineDefaultTest : ActionTest {
             val taskScope = RecordingTaskScope(RecordingTaskUiScope())
             // AccessibilityServiceManagerMock is not AccessibilityServiceManagerAndroid,
             // so currentAccessibilityService extension returns null - simulating unavailable service.
-            val engine = UiActionEngineDefault(FakeDeveloperOptionsManager(), AccessibilityServiceManagerMock())
+            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), AccessibilityServiceManagerMock())
 
             assertFailsWith<IllegalStateException> {
                 engine.execute(
@@ -291,7 +291,7 @@ private class RecordingTaskUiScope : TaskUiScope {
     }
 }
 
-private class FakeDeveloperOptionsManager : DeveloperOptionsManager {
+private class DeveloperOptionsManagerMock : DeveloperOptionsManager {
     override val isEnabled: Flow<Boolean> = flowOf(true)
     override val isUsbDebuggingEnabled: Flow<Boolean> = flowOf(true)
 }
