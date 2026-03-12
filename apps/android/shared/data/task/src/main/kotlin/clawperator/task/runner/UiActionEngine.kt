@@ -2,6 +2,8 @@ package clawperator.task.runner
 
 import action.log.Log
 import action.developeroptions.DeveloperOptionsManager
+import clawperator.uitree.UiTreeClickType
+import clawperator.uitree.UiTreeClickTypes
 import kotlinx.coroutines.flow.first
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -149,7 +151,7 @@ class UiActionEngineDefault(
             actionType = "click",
             data =
                 mapOf(
-                    "click_types" to action.clickTypes.toString(),
+                    "click_types" to action.clickTypes.toWireValue(),
                 ),
         )
     }
@@ -180,7 +182,7 @@ class UiActionEngineDefault(
                 mapOf(
                     "max_swipes" to action.maxSwipes.toString(),
                     "direction" to action.direction.toString(),
-                    "click_types" to action.clickTypes.toString(),
+                    "click_types" to action.clickTypes.toWireValue(),
                 ),
         )
     }
@@ -323,3 +325,14 @@ class UiActionEngineDefault(
         }
     }
 }
+
+/**
+ * Returns a stable canonical wire value for the click types (e.g. "click", "long_click", "focus").
+ * Uses the first type in [UiTreeClickTypes.ordered] so multi-type lists are representable in data output.
+ */
+private fun UiTreeClickTypes.toWireValue(): String =
+    when (ordered.firstOrNull()) {
+        UiTreeClickType.LongClick -> "long_click"
+        UiTreeClickType.Focus -> "focus"
+        else -> "click"
+    }
