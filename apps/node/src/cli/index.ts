@@ -216,7 +216,7 @@ class UsageError extends Error {}
 function resolveHelpTopic(rest: string[]): string | undefined {
   if (rest.length === 0) return undefined;
   if (rest[0] === "operator" && (rest[1] === "setup" || rest[1] === "install")) return "operator setup";
-  if (rest[0] === "operator") return "operator setup";
+  if (rest[0] === "operator" && rest.length === 1) return "operator setup";
   if (rest[0] === "setup" || rest[0] === "install") return "operator setup";
   if (rest[0] === "observe" && rest[1] === "snapshot") return "observe snapshot";
   if (rest[0] === "inspect" && rest[1] === "ui") return "observe snapshot";

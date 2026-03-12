@@ -62,6 +62,14 @@ describe("CLI help", () => {
     assert.match(stdout, /operator install remains a compatibility alias/);
   });
 
+  it("falls back to top-level help for operator unknown --help", async () => {
+    const { stdout, code } = await runCli(["operator", "unknown", "--help"]);
+    assert.strictEqual(code, 0);
+    assert.match(stdout, /Clawperator CLI/);
+    assert.match(stdout, /Commands:/);
+    assert.doesNotMatch(stdout, /^clawperator operator setup$/m);
+  });
+
   it("returns structured guidance for bare clawperator install", async () => {
     // USAGE from switch cases exits 0 per CLI convention (not a runtime error).
     const { stdout } = await runCli(["install"]);
