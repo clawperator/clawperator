@@ -9,8 +9,22 @@ import kotlinx.serialization.json.Json
 const val CLAWPERATOR_RESULT_PREFIX = "[Clawperator-Result]"
 
 /**
+ * Stable error codes for top-level envelope failures.
+ * Emitted in [ClawperatorResultEnvelope.errorCode] so agents can branch on them without
+ * string-matching the human-readable [ClawperatorResultEnvelope.error] field.
+ */
+object EnvelopeErrorCodes {
+    /** The Clawperator Operator accessibility service is not running. */
+    const val SERVICE_UNAVAILABLE = "SERVICE_UNAVAILABLE"
+}
+
+/**
  * Canonical terminal envelope shape for Node API strict mode.
  * Emit exactly one line per command: `[Clawperator-Result] <json>`.
+ *
+ * [error] is a human-readable description of the failure reason.
+ * [errorCode] is a stable, enumerated code agents can branch on reliably.
+ * Both are null on success. [errorCode] may be absent in envelopes from older APK versions.
  */
 @Serializable
 data class ClawperatorResultEnvelope(
@@ -19,6 +33,7 @@ data class ClawperatorResultEnvelope(
     val status: String, // "success" | "failed"
     val stepResults: List<CanonicalStepResult>,
     val error: String?,
+    val errorCode: String? = null,
 )
 
 @Serializable
@@ -60,11 +75,15 @@ fun buildCanonicalSuccessLine(
 
 /**
  * Build the single-line canonical terminal log message for a failed result.
+ *
+ * [errorCode] should be a value from [EnvelopeErrorCodes] when the failure has a
+ * well-known cause. Omit (or pass null) for generic or unclassified failures.
  */
 fun buildCanonicalFailureLine(
     commandId: String,
     taskId: String,
     reason: String,
+    errorCode: String? = null,
 ): String {
     val envelope = ClawperatorResultEnvelope(
         commandId = commandId,
@@ -72,6 +91,7 @@ fun buildCanonicalFailureLine(
         status = "failed",
         stepResults = emptyList(),
         error = reason,
+        errorCode = errorCode,
     )
     return CLAWPERATOR_RESULT_PREFIX + " " + json.encodeToString(envelope)
 }

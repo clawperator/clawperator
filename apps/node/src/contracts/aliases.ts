@@ -17,8 +17,11 @@ const ACTION_ALIAS_TO_CANONICAL: Record<string, string> = {
   type_text: "enter_text",
   text_entry: "enter_text",
   input_text: "enter_text",
+  key_press: "press_key",
 };
 
+// NOTE: "doctor_ping" is intentionally absent. It is an internal diagnostic action
+// used only by `clawperator doctor` via broadcastAgentCommand, not the agent-facing API.
 export const CANONICAL_ACTION_TYPES = [
   "open_app",
   "open_uri",
@@ -31,6 +34,7 @@ export const CANONICAL_ACTION_TYPES = [
   "snapshot_ui",
   "take_screenshot",
   "sleep",
+  "press_key",
 ] as const;
 
 export type CanonicalActionType = (typeof CANONICAL_ACTION_TYPES)[number];

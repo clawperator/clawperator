@@ -83,6 +83,7 @@ The core unit dispatched to the device.
 | `snapshot_ui` | - | Capture UI tree as ASCII or JSON |
 | `take_screenshot` | - | Capture screen as PNG |
 | `sleep` | `durationMs` | Pause execution |
+| `press_key` | `key` | Issue a system navigation key via accessibility |
 
 ### Aliases (normalized at input)
 
@@ -95,6 +96,7 @@ The core unit dispatched to the device.
 | `screenshot`, `capture_screenshot` | `take_screenshot` |
 | `type_text`, `text_entry`, `input_text` | `enter_text` |
 | `open_url` | `open_uri` |
+| `key_press` | `press_key` |
 
 ---
 
@@ -133,6 +135,7 @@ All fields are optional but at least one must be non-empty. Values are ORed inte
 | `direction` | string | `scroll_and_click` |
 | `maxSwipes` | number | `scroll_and_click` |
 | `durationMs` | number | `sleep` |
+| `key` | `"back"\|"home"\|"recents"` | `press_key` |
 | `format` | `"ascii"\|"json"` | `snapshot_ui` |
 | `path` | string | `take_screenshot` - output file path |
 | `distanceRatio` | number | `scroll_and_click` |
@@ -184,6 +187,7 @@ All executions return a `ResultEnvelope` via the `[Clawperator-Result]` terminal
 
 For `snapshot_ui`, `data.text` contains the UI tree string.
 For `take_screenshot`, `data.path` contains the local file path of the PNG.
+For `press_key`, `data.key` contains the normalized lowercase key name. If Android rejects the global action, the step returns `success: false` with `data.error: "GLOBAL_ACTION_FAILED"`.
 
 ---
 

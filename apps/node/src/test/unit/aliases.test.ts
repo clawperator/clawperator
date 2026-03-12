@@ -7,6 +7,7 @@ describe("normalizeActionType", () => {
     assert.strictEqual(normalizeActionType("tap"), "click");
     assert.strictEqual(normalizeActionType("type_text"), "enter_text");
     assert.strictEqual(normalizeActionType("wait_for"), "wait_for_node");
+    assert.strictEqual(normalizeActionType("key_press"), "press_key");
   });
 
   it("returns same for already canonical", () => {
@@ -22,5 +23,9 @@ describe("normalizeActionType", () => {
 describe("getCanonicalActionType", () => {
   it("maps type_text to enter_text", () => {
     assert.strictEqual(getCanonicalActionType("type_text"), "enter_text");
+  });
+
+  it("maps key_press to press_key", () => {
+    assert.strictEqual(getCanonicalActionType("key_press"), "press_key");
   });
 });

@@ -1313,6 +1313,7 @@ Combine fields to increase specificity when a single field is ambiguous:
 | `take_screenshot` | - | `path: string`, `retry: object` |
 | `sleep` | `durationMs: number` | - |
 | `scroll_and_click` | `target: NodeMatcher` | `container: NodeMatcher`, `direction: "down" \| "up" \| "left" \| "right"` (default: `"down"`), `maxSwipes: number` (default: `10`, range: 1-50), `distanceRatio: number` (default: `0.7`, range: 0-1), `settleDelayMs: number` (default: `250`, range: 0-10000), `findFirstScrollableChild: boolean` (default: `false`), `scrollRetry: object` (default preset: `maxAttempts=4`, `initialDelayMs=400`, `maxDelayMs=2000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`), `clickRetry: object` (default preset: `maxAttempts=5`, `initialDelayMs=500`, `maxDelayMs=3000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`) |
+| `press_key` | `key: "back" \| "home" \| "recents"` | - |
 
 ### CLI-to-action-type mapping
 
@@ -1324,6 +1325,7 @@ Combine fields to increase specificity when a single field is ambiguous:
 | `action wait --selector <json>` | `wait_for_node` |
 | `action open-app --app <id>` | `open_app` |
 | `action open-uri --uri <value>` | `open_uri` |
+| `action press-key --key <back\|home\|recents>` | `press_key` |
 | `observe snapshot` | `snapshot_ui` |
 
 ### Action behavior notes
@@ -1348,9 +1350,116 @@ Combine fields to increase specificity when a single field is ambiguous:
 
 **`close_app`:** The Node layer intercepts `close_app` actions and runs `adb shell am force-stop <applicationId>` before dispatching to Android. The Android step always returns `success: false` with `data.error: "UNSUPPORTED_RUNTIME_CLOSE"` - this is expected. The overall execution `status` remains `"success"` and the app is force-stopped. Do not treat this step result as a recoverable failure.
 
+**`click`:** Finds the node matching `matcher` and performs the specified `clickType`. The default click type is `"default"` (standard accessibility click with gesture fallback). Use `"long_click"` for long-press targets and `"focus"` to focus without activating.
+
+**`click` example request (`/execute`):**
+```json
+{
+  "deviceId": "<device_id>",
+  "execution": {
+    "commandId": "cmd-click-1",
+    "taskId": "task-click-1",
+    "source": "local-test",
+    "expectedFormat": "android-ui-automator",
+    "timeoutMs": 30000,
+    "actions": [
+      { "id": "click1", "type": "click", "params": { "matcher": { "resourceId": "com.example.app:id/submit_button" }, "clickType": "default" } }
+    ]
+  }
+}
+```
+
+**`click` example success response:**
+```json
+{
+  "ok": true,
+  "envelope": {
+    "commandId": "cmd-click-1",
+    "taskId": "task-click-1",
+    "status": "success",
+    "stepResults": [
+      { "id": "click1", "actionType": "click", "success": true, "data": { "click_types": "click" } }
+    ],
+    "error": null
+  },
+  "deviceId": "<device_id>",
+  "terminalSource": "clawperator_result"
+}
+```
+
 **`enter_text`:** The CLI command is `action type` but the execution payload action type is `enter_text`. The `submit` param triggers a keyboard Enter/submit after typing - use this for search fields and single-field forms where pressing Enter submits. The Node contract still accepts `clear`, but the Android runtime does not implement it yet, so it currently has no effect.
 
+**`enter_text` example request (`/execute`):**
+```json
+{
+  "deviceId": "<device_id>",
+  "execution": {
+    "commandId": "cmd-type-1",
+    "taskId": "task-type-1",
+    "source": "local-test",
+    "expectedFormat": "android-ui-automator",
+    "timeoutMs": 30000,
+    "actions": [
+      { "id": "type1", "type": "enter_text", "params": { "matcher": { "resourceId": "com.example.app:id/search_input" }, "text": "hello world", "submit": true } }
+    ]
+  }
+}
+```
+
+**`enter_text` example success response:**
+```json
+{
+  "ok": true,
+  "envelope": {
+    "commandId": "cmd-type-1",
+    "taskId": "task-type-1",
+    "status": "success",
+    "stepResults": [
+      { "id": "type1", "actionType": "enter_text", "success": true, "data": { "text": "hello world", "submit": "true" } }
+    ],
+    "error": null
+  },
+  "deviceId": "<device_id>",
+  "terminalSource": "clawperator_result"
+}
+```
+
 **`read_text`:** `validator` is not an open-ended string in practice. The Android runtime currently supports only `"temperature"` and rejects any other value.
+
+**`read_text` example request (`/execute`):**
+```json
+{
+  "deviceId": "<device_id>",
+  "execution": {
+    "commandId": "cmd-read-1",
+    "taskId": "task-read-1",
+    "source": "local-test",
+    "expectedFormat": "android-ui-automator",
+    "timeoutMs": 30000,
+    "actions": [
+      { "id": "read1", "type": "read_text", "params": { "matcher": { "resourceId": "com.example.app:id/temperature_label" } } }
+    ]
+  }
+}
+```
+
+**`read_text` example success response:**
+```json
+{
+  "ok": true,
+  "envelope": {
+    "commandId": "cmd-read-1",
+    "taskId": "task-read-1",
+    "status": "success",
+    "stepResults": [
+      { "id": "read1", "actionType": "read_text", "success": true, "data": { "text": "22.5 C", "validator": "none" } }
+    ],
+    "error": null
+  },
+  "deviceId": "<device_id>",
+  "terminalSource": "clawperator_result"
+}
+```
 
 **`snapshot_ui`:** Clawperator returns a single canonical snapshot format: `hierarchy_xml`. The Android runtime writes the hierarchy dump to device logcat, and the Node layer injects that raw XML into `data.text` after execution. `data.actual_format` is always `"hierarchy_xml"` for successful snapshot steps.
 
@@ -1358,7 +1467,106 @@ Combine fields to increase specificity when a single field is ambiguous:
 
 **Failure case - extraction error:** If snapshot post-processing finishes without attaching UI hierarchy text to the step (`data.text` remains absent), the step returns `success: false` with `data.error: "SNAPSHOT_EXTRACTION_FAILED"`. A common cause is that logcat does not contain a matching `[TaskScope] UI Hierarchy:` marker for the step, but partial extraction or other logcat mismatches can also trigger this error. This typically means the installed clawperator binary is out of date with the Android Operator APK. Run `clawperator version --check-compat` and `clawperator doctor` to diagnose. See Troubleshooting for resolution steps.
 
+**`snapshot_ui` example request (`/execute`):**
+```json
+{
+  "deviceId": "<device_id>",
+  "execution": {
+    "commandId": "cmd-snap-1",
+    "taskId": "task-snap-1",
+    "source": "local-test",
+    "expectedFormat": "android-ui-automator",
+    "timeoutMs": 30000,
+    "actions": [
+      { "id": "snap1", "type": "snapshot_ui" }
+    ]
+  }
+}
+```
+
+**`snapshot_ui` example success response:**
+```json
+{
+  "ok": true,
+  "envelope": {
+    "commandId": "cmd-snap-1",
+    "taskId": "task-snap-1",
+    "status": "success",
+    "stepResults": [
+      {
+        "id": "snap1",
+        "actionType": "snapshot_ui",
+        "success": true,
+        "data": {
+          "actual_format": "hierarchy_xml",
+          "text": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><hierarchy rotation=\"0\">...</hierarchy>"
+        }
+      }
+    ],
+    "error": null
+  },
+  "deviceId": "<device_id>",
+  "terminalSource": "clawperator_result"
+}
+```
+
 **`take_screenshot`:** `observe screenshot` uses the same execution contract under the hood. Android reports `UNSUPPORTED_RUNTIME_SCREENSHOT`, then the Node layer captures the screenshot via `adb exec-out screencap -p`, writes it to `data.path`, and normalizes the step result to `success: true` when capture succeeds.
+
+**`press_key`:** Issues a system-level key event via the Android Accessibility Service (`performGlobalAction`). Supported keys: `"back"`, `"home"`, `"recents"`. The alias `key_press` is normalized to `press_key`. No retry - this action is single-attempt by design. Requires the Clawperator Operator accessibility service to be running on the device. If the service is unavailable, the execution returns a top-level failed envelope with `status: "failed"` and no `stepResults`. Use `clawperator doctor` to diagnose accessibility service availability before running executions that include `press_key`. When testing local/debug builds, pass the matching `receiverPackage` (`com.clawperator.operator.dev`) instead of relying on the default release package. Returns `success: false` with `data.error: "GLOBAL_ACTION_FAILED"` if the OS reports the global action could not be performed (rare soft OS failure - accessibility service was running but Android declined the action).
+
+**`press_key` example request (`/execute`):**
+```json
+{
+  "deviceId": "<device_id>",
+  "receiverPackage": "com.clawperator.operator.dev",
+  "execution": {
+    "commandId": "cmd-press-home",
+    "taskId": "task-press-home",
+    "source": "local-test",
+    "expectedFormat": "android-ui-automator",
+    "timeoutMs": 30000,
+    "actions": [
+      { "id": "open1", "type": "open_app", "params": { "applicationId": "com.android.settings" } },
+      { "id": "home1", "type": "press_key", "params": { "key": "home" } },
+      { "id": "snap1", "type": "snapshot_ui" }
+    ]
+  }
+}
+```
+
+**`press_key` example success response:**
+```json
+{
+  "ok": true,
+  "envelope": {
+    "commandId": "cmd-press-home",
+    "taskId": "task-press-home",
+    "status": "success",
+    "stepResults": [
+      { "id": "open1", "actionType": "open_app", "success": true, "data": { "application_id": "com.android.settings" } },
+      { "id": "home1", "actionType": "press_key", "success": true, "data": { "key": "home" } },
+      { "id": "snap1", "actionType": "snapshot_ui", "success": true, "data": { "actual_format": "hierarchy_xml", "text": "<hierarchy ... />" } }
+    ],
+    "error": null
+  },
+  "deviceId": "<device_id>",
+  "terminalSource": "clawperator_result"
+}
+```
+
+**`press_key` example validation failure:**
+```json
+{
+  "ok": false,
+  "error": {
+    "code": "EXECUTION_VALIDATION_FAILED",
+    "message": "press_key params.key must be one of: back, home, recents",
+    "details": {
+      "path": "actions.0.params.key"
+    }
+  }
+}
+```
 
 **`scroll_and_click`:** This action has two separate retry knobs. `scrollRetry` controls the scroll/search loop and defaults to the `UiScroll` preset (`maxAttempts=4`, `initialDelayMs=400`, `maxDelayMs=2000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`). `clickRetry` controls the final click attempt and defaults to the `UiReadiness` preset (`maxAttempts=5`, `initialDelayMs=500`, `maxDelayMs=3000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`).
 
@@ -1379,14 +1587,17 @@ Every execution emits exactly one `[Clawperator-Result]` envelope:
       "data": { "key": "value" }
     }
   ],
-  "error": "ERROR_CODE" | null
+  "error": "human-readable reason" | null,
+  "errorCode": "STABLE_CODE" | null
 }
 ```
 
 - `status` is `"success"` when the execution completes (including partial step failures like `close_app`). `status` is `"failed"` only on total execution failure (dispatch error, timeout, validation failure).
-- `error` (top-level) contains an error code on total failure.
+- `error` (top-level) contains a human-readable description of the failure. Do not branch agent logic on this string - it is not a stable contract.
+- `errorCode` (top-level) contains a stable, enumerated code when the failure has a known cause. Branch agent logic on this field. May be absent in envelopes from older APK versions or for unclassified failures.
 - `data.error` on a step result contains the per-step error code when `success` is `false`.
 - All `data` values are strings. `data` is always an object (never `null`), but may be empty.
+- Only one execution may be in flight per device. Concurrent requests for the same device return `EXECUTION_CONFLICT_IN_FLIGHT`.
 
 ### Per-action result data
 
@@ -1405,6 +1616,7 @@ Typical `data` keys by action type:
 | `wait_for_node` | `resource_id`, `label` (matched node details) |
 | `scroll_and_click` | `max_swipes`, `direction`, `click_types` |
 | `sleep` | `duration_ms` |
+| `press_key` | `key` (`"back"`, `"home"`, or `"recents"`) |
 
 For any failed step: `success: false` and `data.error` contains the error code string.
 
@@ -1517,33 +1729,35 @@ Note: `content-desc` values sometimes contain newlines when an element's label s
 
 ## Error Codes
 
-Branch agent logic on codes from `envelope.error` or `stepResults[].data.error`:
+Branch agent logic on codes from `envelope.errorCode` (top-level failures) or `stepResults[].data.error` (per-step failures). The `envelope.error` field contains a human-readable description and is not a stable contract.
 
-| Code | Meaning |
-| :--- | :--- |
-| `EXECUTION_CONFLICT_IN_FLIGHT` | Device is busy with another execution |
-| `ANDROID_SDK_TOOL_MISSING` | A required Android SDK tool such as `adb`, `emulator`, `sdkmanager`, or `avdmanager` is not available |
-| `EMULATOR_NOT_FOUND` | Requested AVD does not exist |
-| `EMULATOR_NOT_RUNNING` | Requested AVD is not currently running |
-| `EMULATOR_ALREADY_RUNNING` | Requested operation requires the AVD to be stopped first |
-| `EMULATOR_UNSUPPORTED` | The AVD exists but does not satisfy Clawperator compatibility rules |
-| `EMULATOR_START_FAILED` | Emulator process failed to register with adb in time |
-| `EMULATOR_BOOT_TIMEOUT` | Emulator registered with adb but Android did not finish booting in time |
-| `ANDROID_AVD_CREATE_FAILED` | AVD creation failed |
-| `ANDROID_SYSTEM_IMAGE_INSTALL_FAILED` | System image install or SDK license acceptance failed |
-| `EMULATOR_STOP_FAILED` | Emulator stop request failed |
-| `EMULATOR_DELETE_FAILED` | Emulator deletion failed |
-| `NODE_NOT_FOUND` | Selector matched no UI element |
-| `RESULT_ENVELOPE_TIMEOUT` | Command dispatched but no result received |
-| `RECEIVER_NOT_INSTALLED` | [Clawperator Operator Android app](../getting-started/android-operator-apk.md) not found on device |
-| `DEVICE_UNAUTHORIZED` | Device not authorized for ADB |
-| `VERSION_INCOMPATIBLE` | CLI and installed [Clawperator Operator Android app](../getting-started/android-operator-apk.md) versions do not share the same `major.minor` |
-| `APK_VERSION_UNREADABLE` | The device package dump did not expose a readable [Clawperator Operator Android app](../getting-started/android-operator-apk.md) version |
-| `EXECUTION_VALIDATION_FAILED` | Payload failed schema validation |
-| `SECURITY_BLOCK_DETECTED` | Android blocked the action (e.g., secure keyboard) |
-| `NODE_NOT_CLICKABLE` | Reserved error code. Intended for "element found but not interactable", but not currently emitted consistently by the Android and Node runtimes. |
-| `UNSUPPORTED_RUNTIME_CLOSE` | Expected per-step result for all `close_app` steps. The Android runtime does not support a force-stop action response - the Node layer handles the close via `adb shell am force-stop` before dispatch. The overall execution `status` remains `"success"`. Treat as non-fatal. |
-| `SNAPSHOT_EXTRACTION_FAILED` | `snapshot_ui` step completed but the Node layer did not attach any snapshot text to the step during post-processing. The most common cause is a Node binary packaging mismatch or other logcat extraction issue. Rebuild or reinstall the npm package and check version compatibility. |
+| Code | Source | Meaning |
+| :--- | :--- | :--- |
+| `SERVICE_UNAVAILABLE` | `envelope.errorCode` | Clawperator Operator accessibility service is not running on the device. Use `clawperator doctor` to diagnose. |
+| `EXECUTION_CONFLICT_IN_FLIGHT` | `envelope.error` | Device is busy with another execution |
+| `ANDROID_SDK_TOOL_MISSING` | `envelope.error` | A required Android SDK tool such as `adb`, `emulator`, `sdkmanager`, or `avdmanager` is not available |
+| `EMULATOR_NOT_FOUND` | `envelope.error` | Requested AVD does not exist |
+| `EMULATOR_NOT_RUNNING` | `envelope.error` | Requested AVD is not currently running |
+| `EMULATOR_ALREADY_RUNNING` | `envelope.error` | Requested operation requires the AVD to be stopped first |
+| `EMULATOR_UNSUPPORTED` | `envelope.error` | The AVD exists but does not satisfy Clawperator compatibility rules |
+| `EMULATOR_START_FAILED` | `envelope.error` | Emulator process failed to register with adb in time |
+| `EMULATOR_BOOT_TIMEOUT` | `envelope.error` | Emulator registered with adb but Android did not finish booting in time |
+| `ANDROID_AVD_CREATE_FAILED` | `envelope.error` | AVD creation failed |
+| `ANDROID_SYSTEM_IMAGE_INSTALL_FAILED` | `envelope.error` | System image install or SDK license acceptance failed |
+| `EMULATOR_STOP_FAILED` | `envelope.error` | Emulator stop request failed |
+| `EMULATOR_DELETE_FAILED` | `envelope.error` | Emulator deletion failed |
+| `NODE_NOT_FOUND` | `data.error` | Selector matched no UI element |
+| `RESULT_ENVELOPE_TIMEOUT` | `envelope.error` | Command dispatched but no result received |
+| `RECEIVER_NOT_INSTALLED` | `envelope.error` | [Clawperator Operator Android app](../getting-started/android-operator-apk.md) not found on device |
+| `DEVICE_UNAUTHORIZED` | `envelope.error` | Device not authorized for ADB |
+| `VERSION_INCOMPATIBLE` | `envelope.error` | CLI and installed [Clawperator Operator Android app](../getting-started/android-operator-apk.md) versions do not share the same `major.minor` |
+| `APK_VERSION_UNREADABLE` | `envelope.error` | The device package dump did not expose a readable [Clawperator Operator Android app](../getting-started/android-operator-apk.md) version |
+| `EXECUTION_VALIDATION_FAILED` | `envelope.error` | Payload failed schema validation |
+| `SECURITY_BLOCK_DETECTED` | `data.error` | Android blocked the action (e.g., secure keyboard) |
+| `NODE_NOT_CLICKABLE` | `data.error` | Reserved error code. Intended for "element found but not interactable", but not currently emitted consistently by the Android and Node runtimes. |
+| `UNSUPPORTED_RUNTIME_CLOSE` | `data.error` | Expected per-step result for all `close_app` steps. The Android runtime does not support a force-stop action response - the Node layer handles the close via `adb shell am force-stop` before dispatch. The overall execution `status` remains `"success"`. Treat as non-fatal. |
+| `SNAPSHOT_EXTRACTION_FAILED` | `data.error` | `snapshot_ui` step completed but the Node layer did not attach any snapshot text to the step during post-processing. The most common cause is a Node binary packaging mismatch or other logcat extraction issue. Rebuild or reinstall the npm package and check version compatibility. |
+| `GLOBAL_ACTION_FAILED` | `data.error` | `press_key` step result when the OS reports `performGlobalAction` returned false. Rare soft failure - the accessibility service was running but Android declined to execute the action. |
 
 Primary top-level error taxonomy: `apps/node/src/contracts/errors.ts`. This table also includes runtime-only step error strings such as `UNSUPPORTED_RUNTIME_CLOSE`.
 
@@ -2514,6 +2728,7 @@ The core unit dispatched to the device.
 | `snapshot_ui` | - | Capture UI tree as ASCII or JSON |
 | `take_screenshot` | - | Capture screen as PNG |
 | `sleep` | `durationMs` | Pause execution |
+| `press_key` | `key` | Issue a system navigation key via accessibility |
 
 ### Aliases (normalized at input)
 
@@ -2526,6 +2741,7 @@ The core unit dispatched to the device.
 | `screenshot`, `capture_screenshot` | `take_screenshot` |
 | `type_text`, `text_entry`, `input_text` | `enter_text` |
 | `open_url` | `open_uri` |
+| `key_press` | `press_key` |
 
 ---
 
@@ -2564,6 +2780,7 @@ All fields are optional but at least one must be non-empty. Values are ORed inte
 | `direction` | string | `scroll_and_click` |
 | `maxSwipes` | number | `scroll_and_click` |
 | `durationMs` | number | `sleep` |
+| `key` | `"back"\|"home"\|"recents"` | `press_key` |
 | `format` | `"ascii"\|"json"` | `snapshot_ui` |
 | `path` | string | `take_screenshot` - output file path |
 | `distanceRatio` | number | `scroll_and_click` |
@@ -2615,6 +2832,7 @@ All executions return a `ResultEnvelope` via the `[Clawperator-Result]` terminal
 
 For `snapshot_ui`, `data.text` contains the UI tree string.
 For `take_screenshot`, `data.path` contains the local file path of the PNG.
+For `press_key`, `data.key` contains the normalized lowercase key name. If Android rejects the global action, the step returns `success: false` with `data.error: "GLOBAL_ACTION_FAILED"`.
 
 ---
 

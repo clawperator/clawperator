@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import kotlin.time.Duration
 
@@ -19,8 +20,8 @@ class UiActionEngineDefaultTest : ActionTest {
         actionTest {
             val uiScope = RecordingTaskUiScope()
             val taskScope = RecordingTaskScope(uiScope)
-            val developerOptionsManager = FakeDeveloperOptionsManager()
-            val engine = UiActionEngineDefault(developerOptionsManager)
+            val developerOptionsManager = DeveloperOptionsManagerMock()
+            val engine = UiActionEngineDefault(developerOptionsManager, UiGlobalActionDispatcherMock())
 
             val result =
                 engine.execute(
@@ -59,8 +60,8 @@ class UiActionEngineDefaultTest : ActionTest {
         actionTest {
             val uiScope = RecordingTaskUiScope()
             val taskScope = RecordingTaskScope(uiScope)
-            val developerOptionsManager = FakeDeveloperOptionsManager()
-            val engine = UiActionEngineDefault(developerOptionsManager)
+            val developerOptionsManager = DeveloperOptionsManagerMock()
+            val engine = UiActionEngineDefault(developerOptionsManager, UiGlobalActionDispatcherMock())
 
             val result =
                 engine.execute(
@@ -93,8 +94,8 @@ class UiActionEngineDefaultTest : ActionTest {
         actionTest {
             val uiScope = RecordingTaskUiScope()
             val taskScope = RecordingTaskScope(uiScope)
-            val developerOptionsManager = FakeDeveloperOptionsManager()
-            val engine = UiActionEngineDefault(developerOptionsManager)
+            val developerOptionsManager = DeveloperOptionsManagerMock()
+            val engine = UiActionEngineDefault(developerOptionsManager, UiGlobalActionDispatcherMock())
 
             val result =
                 engine.execute(
@@ -117,6 +118,84 @@ class UiActionEngineDefaultTest : ActionTest {
             assertEquals(false, stepResult.success)
             assertEquals("UNSUPPORTED_RUNTIME_CLOSE", stepResult.data["error"])
             assertTrue(stepResult.data["message"]?.contains("Android runtime cannot reliably close apps") == true)
+        }
+
+    @Test
+    fun `execute press_key throws when accessibility service is unavailable`() =
+        actionTest {
+            val taskScope = RecordingTaskScope(RecordingTaskUiScope())
+            val engine =
+                UiActionEngineDefault(
+                    DeveloperOptionsManagerMock(),
+                    UiGlobalActionDispatcherMock(error = IllegalStateException("OperatorAccessibilityService is not running - cannot execute press_key")),
+                )
+
+            assertFailsWith<IllegalStateException> {
+                engine.execute(
+                    taskScope = taskScope,
+                    plan = UiActionPlan(
+                        commandId = "cmd-key",
+                        taskId = "task-key",
+                        source = "test",
+                        actions = listOf(UiAction.PressKey(id = "k1", key = UiSystemKey.BACK)),
+                    ),
+                )
+            }
+        }
+
+    @Test
+    fun `execute press_key returns success result when global action succeeds`() =
+        actionTest {
+            val taskScope = RecordingTaskScope(RecordingTaskUiScope())
+            val engine =
+                UiActionEngineDefault(
+                    DeveloperOptionsManagerMock(),
+                    UiGlobalActionDispatcherMock(result = true),
+                )
+
+            val result =
+                engine.execute(
+                    taskScope = taskScope,
+                    plan = UiActionPlan(
+                        commandId = "cmd-key-success",
+                        taskId = "task-key-success",
+                        source = "test",
+                        actions = listOf(UiAction.PressKey(id = "k1", key = UiSystemKey.HOME)),
+                    ),
+                )
+
+            val stepResult = result.stepResults.single()
+            assertEquals("press_key", stepResult.actionType)
+            assertEquals(true, stepResult.success)
+            assertEquals("home", stepResult.data["key"])
+        }
+
+    @Test
+    fun `execute press_key returns failed step result when global action is rejected`() =
+        actionTest {
+            val taskScope = RecordingTaskScope(RecordingTaskUiScope())
+            val engine =
+                UiActionEngineDefault(
+                    DeveloperOptionsManagerMock(),
+                    UiGlobalActionDispatcherMock(result = false),
+                )
+
+            val result =
+                engine.execute(
+                    taskScope = taskScope,
+                    plan = UiActionPlan(
+                        commandId = "cmd-key-failed",
+                        taskId = "task-key-failed",
+                        source = "test",
+                        actions = listOf(UiAction.PressKey(id = "k1", key = UiSystemKey.RECENTS)),
+                    ),
+                )
+
+            val stepResult = result.stepResults.single()
+            assertEquals("press_key", stepResult.actionType)
+            assertEquals(false, stepResult.success)
+            assertEquals("recents", stepResult.data["key"])
+            assertEquals("GLOBAL_ACTION_FAILED", stepResult.data["error"])
         }
 }
 
@@ -268,7 +347,17 @@ private class RecordingTaskUiScope : TaskUiScope {
     }
 }
 
-private class FakeDeveloperOptionsManager : DeveloperOptionsManager {
+private class DeveloperOptionsManagerMock : DeveloperOptionsManager {
     override val isEnabled: Flow<Boolean> = flowOf(true)
     override val isUsbDebuggingEnabled: Flow<Boolean> = flowOf(true)
+}
+
+private class UiGlobalActionDispatcherMock(
+    private val result: Boolean = true,
+    private val error: IllegalStateException? = null,
+) : UiGlobalActionDispatcher {
+    override fun perform(key: UiSystemKey): Boolean {
+        error?.let { throw it }
+        return result
+    }
 }
