@@ -38,6 +38,8 @@ Optional overrides:
 
 1. Run the helper:
    - `python3 .agents/skills/geo-crawl-browser-rendering/scripts/browser_rendering_geo_audit.py`
+   - optional rendered comparison:
+     - `python3 .agents/skills/geo-crawl-browser-rendering/scripts/browser_rendering_geo_audit.py --include-rendered-comparison`
 2. Let it attempt static crawl coverage first.
 3. Let it run point probes even if crawl result lookup fails.
 4. Read the summary and findings.
@@ -51,6 +53,8 @@ Optional overrides:
 
 - This skill is intentionally opinionated toward static, obvious, agent-friendly
   publishing.
+- Browser Rendering rate limits can end a run early. Treat that as a tooling
+  blocker, not automatically as a site-quality failure.
 - If the helper reports a Cloudflare crawl job lookup failure after successful
   job creation, mention it as a tooling blocker and continue using the point
   probe findings.
