@@ -1,6 +1,13 @@
 # Clawperator for Agents
 
-Clawperator is a deterministic Android automation runtime designed specifically for AI agents. It serves as the "hand" (actuator layer) for an LLM "brain" (reasoning layer). The agent performs planning and decision-making, while Clawperator executes validated Android actions and returns structured, machine-readable results.
+Clawperator is a deterministic Android automation runtime designed specifically for AI agents. It provides open-source infrastructure for **Android automation by AI agents**, serving as the "hand" (actuator layer) for an LLM "brain" (reasoning layer). The agent performs planning and decision-making, while Clawperator executes validated Android actions and returns structured, machine-readable results.
+
+Clawperator is typically installed on a host machine via the CLI and connected to a dedicated Android device or emulator.
+
+**Example installation:**
+```bash
+curl -fsSL https://clawperator.com/install.sh | bash
+```
 
 Clawperator is an actuator, not an autonomous planner. It focuses on reliable, predictable execution of UI-driven workflows on real Android devices or emulators.
 
@@ -19,11 +26,11 @@ Clawperator is most effective when the primary interface for a service exists on
 Clawperator operates as a coordinated stack from the reasoning layer down to the hardware:
 
 1. **AI Agent / LLM**: The "brain" that reasons about state and decides which actions to take.
-2. **Node API / CLI**: The canonical interface for agents to send commands and receive results.
+2. **Node API / CLI (agent integration surfaces)**: The canonical interface for agents to send commands and receive results.
 3. **Skills**: Reusable app workflows that sit above the core runtime to package reliable UI paths.
 4. **Clawperator Runtime**: The host-side execution engine that translates API requests into device actions.
 5. **ADB (Android Debug Bridge)**: The transport layer used to communicate with the target device.
-6. **Operator Android App**: A lightweight agent-resident app on the device that performs local UI inspection and action execution.
+6. **Operator Android App**: A lightweight companion app installed on the Android device that performs UI inspection and action execution.
 7. **Android Device / Emulator**: The target environment (preferred: dedicated burner phone; alternative: local emulator).
 
 **System Hierarchy**: 
@@ -31,9 +38,9 @@ Agent → Node API / CLI / Skills → Clawperator Runtime → ADB → Android De
 
 ## Execution model
 
-Clawperator implements a strict, deterministic command loop that allows agents to branch on results with confidence:
+Clawperator implements a strict, deterministic command loop that allows agents to branch on results with confidence. Each command performs exactly one action and returns exactly one result; Clawperator never hides retries or implicit behavior from the agent.
 
-1. **Observe**: Capture the current Android UI as structured state (JSON) so the agent can reason on a real snapshot of the app.
+1. **Observe**: Capture the current Android UI as structured state (JSON) so the agent can reason on a real snapshot of the app. UI state is returned as structured data that agents can parse programmatically rather than relying on visual scraping.
 2. **Decide**: The agent chooses the next action or runs a skill based on the observation.
 3. **Execute**: Clawperator performs the requested action (tap, type, scroll, etc.) on the connected device.
 4. **Return**: Clawperator returns exactly one machine-readable result per command, including explicit error codes if the action failed.
@@ -54,7 +61,7 @@ Skills are reusable, app-specific workflows that simplify agent interaction:
 
 ## Why Clawperator exists
 
-Clawperator solves the "mobile-only" accessibility gap for AI agents:
+Clawperator solves the "mobile-only" accessibility gap for AI agents. For many services, the mobile app effectively **is the API**. Clawperator allows agents to treat the app UI as a programmable interface.
 
 - **Playwright automates websites**: It is the industry standard for web-based agents.
 - **Clawperator automates Android apps**: It is the equivalent layer for the millions of services that only exist as high-quality mobile applications.
