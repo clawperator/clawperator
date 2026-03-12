@@ -8,13 +8,22 @@ from pathlib import Path
 def main():
     parser = argparse.ArgumentParser(description='Export local landing page build to markdown.')
     parser.add_argument('--input', help='Path to index.html (default: sites/landing/out/index.html)')
-    parser.add_argument('--output', default='landing-local.md', help='Output MD file (default: landing-local.md)')
+    parser.add_argument('--output', help='Output MD file')
     args = parser.parse_args()
 
     # Determine paths
     script_dir = Path(__file__).parent.resolve()
     repo_root = script_dir.parents[3]
     
+    output_path = args.output
+    if not output_path:
+        output_path = repo_root / "sites/landing" / "export" / "landing-export-local.md"
+    else:
+        output_path = Path(output_path)
+
+    # Ensure parent directory exists
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
     html_path = args.input
     if not html_path:
         html_path = repo_root / "sites/landing" / "out" / "index.html"
@@ -71,10 +80,10 @@ def main():
     
     final_md = "\n".join(clean_lines).strip()
 
-    with open(args.output, 'w', encoding='utf-8') as f:
+    with open(output_path, 'w', encoding='utf-8') as f:
         f.write(final_md)
     
-    print(f"SUCCESS: Exported landing page to {args.output}")
+    print(f"SUCCESS: Exported landing page to {output_path}")
 
 if __name__ == "__main__":
     main()

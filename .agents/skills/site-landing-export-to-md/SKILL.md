@@ -20,7 +20,7 @@ Generate a markdown representation of the `clawperator.com` landing page from th
     ```
 
 2.  **Export to Markdown**:
-    Run the helper script to convert the local `index.html` to `landing-local.md`:
+    Run the helper script to convert the local `index.html` to `sites/landing/export/landing-export-local.md`:
     ```bash
     python3 .agents/skills/site-landing-export-to-md/scripts/export_landing_to_md.py
     ```
