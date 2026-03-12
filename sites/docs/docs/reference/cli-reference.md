@@ -38,13 +38,15 @@ clawperator operator setup --apk <path> [--device-id <id>] [--receiver-package <
 |------|-------------|
 | `--apk <path>` | Local path to the Operator APK file (required) |
 | `--device-id <id>` | Target Android device serial (required when multiple devices are connected) |
-| `--receiver-package <package>` | Operator package identifier (auto-detected if omitted) |
+| `--receiver-package <package>` | Operator package identifier (required when both release and debug variants are installed) |
 
 This is the canonical setup command. `clawperator operator install` remains a compatibility alias. It runs three phases in sequence:
 
 1. **Install**: Copies the APK onto the device via `adb install -r`.
 2. **Permissions**: Grants the accessibility service, notification posting, and notification listener permissions.
 3. **Verification**: Confirms the package is visible via `pm list packages`.
+
+If `--receiver-package` is omitted, setup auto-detects the package only when exactly one known Operator variant is installed. If both release and debug variants are installed, pass `--receiver-package` explicitly.
 
 If any phase fails, the command exits with a structured JSON error identifying which phase failed. Error codes:
 

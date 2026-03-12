@@ -96,6 +96,24 @@ describe("installOperator - domain", () => {
     assert.match(result.verification?.error ?? "", /Could not detect installed Operator package after install/);
   });
 
+  it("reports verification failure when both operator variants are installed", async () => {
+    const runner = new FakeProcessRunner();
+    const config = makeConfig(runner);
+
+    runner.queueResult({ code: 0, stdout: "Success", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "package:com.clawperator.operator", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "package:com.clawperator.operator.dev", stderr: "" });
+
+    const result = await installOperator(config, TEST_APK_PATH);
+
+    assert.strictEqual(result.install.ok, true);
+    assert.strictEqual(result.permissions, undefined);
+    assert.ok(result.verification);
+    assert.strictEqual(result.verification?.ok, false);
+    assert.strictEqual(result.verification?.packageInstalled, false);
+    assert.match(result.verification?.error ?? "", /Multiple Operator package variants are installed/);
+  });
+
   it("does not mistake the debug package for the release package during auto-detect", async () => {
     const runner = new FakeProcessRunner();
     const config = makeConfig(runner);

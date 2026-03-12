@@ -108,7 +108,7 @@ Required:
 
 Optional:
   --device-id <id>          Target Android device serial (required when multiple devices are connected)
-  --receiver-package <pkg>  Operator package identifier (auto-detected if omitted)
+  --receiver-package <pkg>  Operator package identifier (required when both release and debug variants are installed)
 
 Notes:
   - This is the canonical setup command for the Clawperator Operator APK.
@@ -117,7 +117,8 @@ Notes:
   - Permission grant phase: enables the accessibility service and notification listener.
   - Verification phase: confirms the package is visible to the package manager.
   - Fails with a structured error if any phase fails. The error code identifies which phase failed.
-  - Default receiver package (auto-detected): com.clawperator.operator (release) or com.clawperator.operator.dev (debug).
+  - If omitted, setup auto-detects the package only when exactly one known Operator variant is installed.
+  - If both release and debug variants are installed, pass --receiver-package explicitly.
   - Do not use raw adb install for normal setup. It leaves the device in a partial state without required permissions.
   - operator install remains a compatibility alias for operator setup.
   - Use clawperator grant-device-permissions only after the Operator APK crashes and Android revokes permissions.
@@ -216,7 +217,7 @@ class UsageError extends Error {}
 function resolveHelpTopic(rest: string[]): string | undefined {
   if (rest.length === 0) return undefined;
   if (rest[0] === "operator" && (rest[1] === "setup" || rest[1] === "install")) return "operator setup";
-  if (rest[0] === "operator" && rest.length === 1) return "operator setup";
+  if (rest[0] === "operator" && (rest.length === 1 || rest[1] === "--help")) return "operator setup";
   if (rest[0] === "setup" || rest[0] === "install") return "operator setup";
   if (rest[0] === "observe" && rest[1] === "snapshot") return "observe snapshot";
   if (rest[0] === "inspect" && rest[1] === "ui") return "observe snapshot";

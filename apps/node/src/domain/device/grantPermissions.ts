@@ -40,14 +40,20 @@ export function hasListedPackage(packageListOutput: string, packageName: string)
     .some(line => line === `package:${packageName}`);
 }
 
-export async function detectReceiverPackage(config: RuntimeConfig): Promise<string | undefined> {
+export async function listInstalledReceiverPackages(config: RuntimeConfig): Promise<string[]> {
+  const installedPackages: string[] = [];
   for (const pkg of [DEFAULT_RELEASE_PACKAGE, DEFAULT_DEBUG_PACKAGE]) {
     const result = await runAdb(config, ["shell", "pm", "list", "packages", pkg]);
     if (result.code === 0 && hasListedPackage(result.stdout, pkg)) {
-      return pkg;
+      installedPackages.push(pkg);
     }
   }
-  return undefined;
+  return installedPackages;
+}
+
+export async function detectReceiverPackage(config: RuntimeConfig): Promise<string | undefined> {
+  const installedPackages = await listInstalledReceiverPackages(config);
+  return installedPackages[0];
 }
 
 export async function grantAccessibilityPermission(

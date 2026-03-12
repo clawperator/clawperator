@@ -2,9 +2,9 @@ import { existsSync } from "node:fs";
 import { runAdb } from "../../adapters/android-bridge/adbClient.js";
 import { type RuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 import {
-  detectReceiverPackage,
   grantDevicePermissions,
   hasListedPackage,
+  listInstalledReceiverPackages,
   type PermissionGrantResult,
 } from "./grantPermissions.js";
 
@@ -70,15 +70,20 @@ export async function installOperator(
   const install: InstallPhaseResult = { ok: true };
 
   // Step 3: Resolve receiver package.
-  const pkg = receiverPackage ?? (await detectReceiverPackage(config));
+  const installedPackages = receiverPackage ? [receiverPackage] : await listInstalledReceiverPackages(config);
+  const pkg = installedPackages.length === 1 ? installedPackages[0] : undefined;
   if (!pkg) {
+    const error =
+      installedPackages.length > 1
+        ? "Multiple Operator package variants are installed after setup. Use --receiver-package to specify the package explicitly."
+        : "Could not detect installed Operator package after install. Use --receiver-package to specify the package explicitly.";
     return {
       receiverPackage: "<unknown>",
       install,
       verification: {
         ok: false,
         packageInstalled: false,
-        error: "Could not detect installed Operator package after install. Use --receiver-package to specify the package explicitly.",
+        error,
       },
     };
   }
