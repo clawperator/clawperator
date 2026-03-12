@@ -77,6 +77,8 @@ The core unit dispatched to the device.
 | `close_app` | `applicationId` | Force-stop an app |
 | `click` | `matcher` | Tap a UI node |
 | `scroll_and_click` | `target` | Scroll to and tap a node |
+| `scroll` | - | Single scroll gesture with outcome reporting |
+| `scroll_until` | - | Bounded scroll loop with machine-readable termination reason |
 | `read_text` | `matcher` | Read text from a UI node |
 | `enter_text` | `matcher`, `text` | Type text into a UI node |
 | `wait_for_node` | `matcher` | Wait for a node to appear |
@@ -131,15 +133,20 @@ All fields are optional but at least one must be non-empty. Values are ORed inte
 | `clear` | boolean | `enter_text` - clear field before typing |
 | `clickType` | string | `click` - `default`, `long_click`, or `focus` |
 | `target` | NodeMatcher | `scroll_and_click` |
-| `container` | NodeMatcher | `scroll_and_click` |
-| `direction` | string | `scroll_and_click` |
+| `container` | NodeMatcher | `scroll_and_click`, `scroll`, `scroll_until` |
+| `direction` | string | `scroll_and_click`, `scroll`, `scroll_until` |
 | `maxSwipes` | number | `scroll_and_click` |
+| `clickAfter` | boolean | `scroll_and_click` - when `false`, scroll to target without clicking |
+| `maxScrolls` | number | `scroll_until` - maximum scroll iterations (default: 20) |
+| `maxDurationMs` | number | `scroll_until` - wall-clock cap in ms (default: 10000) |
+| `noPositionChangeThreshold` | number | `scroll_until` - consecutive no-movement scrolls before stopping (default: 3) |
 | `durationMs` | number | `sleep` |
 | `key` | `"back"\|"home"\|"recents"` | `press_key` |
 | `format` | `"ascii"\|"json"` | `snapshot_ui` |
 | `path` | string | `take_screenshot` - output file path |
-| `distanceRatio` | number | `scroll_and_click` |
-| `settleDelayMs` | number | `scroll_and_click` |
+| `distanceRatio` | number | `scroll_and_click`, `scroll`, `scroll_until` |
+| `settleDelayMs` | number | `scroll_and_click`, `scroll`, `scroll_until` |
+| `findFirstScrollableChild` | boolean | `scroll_and_click`, `scroll`, `scroll_until` - auto-use first scrollable descendant (default: `true`) |
 | `retry` | object | per-step retry config |
 
 ---
