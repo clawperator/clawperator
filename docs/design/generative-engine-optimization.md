@@ -215,10 +215,15 @@ Current implementation note:
 
 - Browser Rendering rate limits may constrain how much of the audit can be
   completed in one run
-- successful crawl job creation does not currently guarantee that job lookup
-  will succeed in this environment
-- treat these as Cloudflare-side blockers, not proof that the websites are not
-  crawl-friendly
+- Browser Rendering crawl jobs may not be readable immediately after creation
+- observed behavior with both Clawperator URLs and Cloudflare's own docs URLs:
+  - `POST /crawl` succeeds immediately
+  - early `GET /crawl/<job_id>` calls can return `404 Crawl job not found`
+  - the same job can become readable several seconds later
+- agents should treat this as Cloudflare-side eventual consistency and poll for
+  a reasonable window before declaring crawl lookup failure
+- only after that polling window is exhausted should it be reported as a
+  Cloudflare-side blocker rather than a site crawlability defect
 
 ## Cloudflare caveat
 

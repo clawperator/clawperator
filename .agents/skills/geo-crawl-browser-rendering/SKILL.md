@@ -55,7 +55,13 @@ Optional overrides:
   publishing.
 - Browser Rendering rate limits can end a run early. Treat that as a tooling
   blocker, not automatically as a site-quality failure.
-- If the helper reports a Cloudflare crawl job lookup failure after successful
-  job creation, mention it as a tooling blocker and continue using the point
-  probe findings.
+- Cloudflare crawl jobs may not be readable immediately after creation.
+  Observed behavior in this repo:
+  - `POST /crawl` succeeds immediately
+  - early `GET /crawl/<job_id>` calls can return `404 Crawl job not found`
+  - the same job can become readable several seconds later
+- Treat early `404 Crawl job not found` responses as eventual consistency, not
+  immediate proof of a bad URL or bad site behavior.
+- Only treat crawl lookup as a tooling blocker after a reasonable polling
+  window is exhausted.
 - Prefer concise summaries over dumping large extracted markdown blobs.

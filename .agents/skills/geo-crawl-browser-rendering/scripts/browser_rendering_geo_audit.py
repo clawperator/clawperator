@@ -4,12 +4,14 @@ import argparse
 import json
 import os
 import re
+import socket
 import sys
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
+from urllib.parse import urljoin
 
 
 ACCOUNT_ENV = "CLAWPERATOR_CLOUDFLARE_ACCOUNT_ID"
@@ -27,7 +29,7 @@ def parse_args():
     parser.add_argument("--rendered-limit", type=int, default=5)
     parser.add_argument("--crawl-depth", type=int, default=2)
     parser.add_argument("--poll-attempts", type=int, default=8)
-    parser.add_argument("--poll-interval-seconds", type=float, default=2.0)
+    parser.add_argument("--poll-interval-seconds", type=float, default=3.0)
     parser.add_argument("--request-timeout-seconds", type=float, default=20.0)
     parser.add_argument("--request-spacing-seconds", type=float, default=0.5)
     parser.add_argument("--include-rendered-comparison", action="store_true")
@@ -53,6 +55,23 @@ def critical_urls(landing_base_url, docs_base_url):
             f"{docs_base_url}/llms.txt",
             f"{docs_base_url}/llms-full.txt",
             f"{docs_base_url}/sitemap.xml",
+            f"{docs_base_url}/ai-agents/node-api-for-agents/",
+            f"{docs_base_url}/reference/cli-reference/",
+        ],
+    }
+
+
+def crawl_expected_urls(landing_base_url, docs_base_url):
+    return {
+        "landing": [
+            landing_base_url,
+            f"{landing_base_url}/",
+            f"{landing_base_url}/agents",
+            f"{landing_base_url}/index.md",
+        ],
+        "docs": [
+            docs_base_url,
+            f"{docs_base_url}/",
             f"{docs_base_url}/ai-agents/node-api-for-agents/",
             f"{docs_base_url}/reference/cli-reference/",
         ],
@@ -258,6 +277,26 @@ class CloudflareClient:
                         "errors": [{"message": str(exc.reason)}],
                     },
                 }
+            except TimeoutError:
+                return {
+                    "ok": False,
+                    "status_code": None,
+                    "headers": {},
+                    "data": {
+                        "success": False,
+                        "errors": [{"message": "request timed out"}],
+                    },
+                }
+            except socket.timeout:
+                return {
+                    "ok": False,
+                    "status_code": None,
+                    "headers": {},
+                    "data": {
+                        "success": False,
+                        "errors": [{"message": "request timed out"}],
+                    },
+                }
         return {
             "ok": False,
             "status_code": None,
@@ -315,7 +354,6 @@ def poll_crawl_job(client, crawl_result, poll_attempts, poll_interval_seconds):
         }
         return crawl_result
 
-    not_found_attempts = 0
     for attempt in range(1, poll_attempts + 1):
         response = client.api_request("GET", f"crawl/{job_id}", query={"limit": 1})
         if response["ok"] and response["data"].get("success"):
@@ -328,13 +366,16 @@ def poll_crawl_job(client, crawl_result, poll_attempts, poll_interval_seconds):
                 "attempts": attempt,
             }
             if status and status != "running":
+                records, record_errors = fetch_crawl_records(client, job_id)
                 crawl_result["summary"] = {
                     "status": status,
                     "total": result.get("total"),
                     "finished": result.get("finished"),
                     "browserSecondsUsed": result.get("browserSecondsUsed"),
                 }
-                crawl_result["records"] = fetch_crawl_records(client, job_id)
+                if record_errors:
+                    crawl_result["summary"]["recordFetchErrors"] = record_errors
+                crawl_result["records"] = records
                 return crawl_result
         else:
             messages = safe_error_messages(response)
@@ -345,10 +386,13 @@ def poll_crawl_job(client, crawl_result, poll_attempts, poll_interval_seconds):
                 "attempts": attempt,
             }
             if response["status_code"] == 404 and any("Crawl job not found" in message for message in messages):
-                not_found_attempts += 1
+                crawl_result["poll"] = {
+                    "ok": False,
+                    "status": "eventual_consistency_wait",
+                    "message": "; ".join(messages) or "crawl job not visible yet",
+                    "attempts": attempt,
+                }
             else:
-                not_found_attempts = 0
-            if not_found_attempts >= 3:
                 crawl_result["poll"] = {
                     "ok": False,
                     "status": "job_lookup_failed",
@@ -371,18 +415,20 @@ def poll_crawl_job(client, crawl_result, poll_attempts, poll_interval_seconds):
 def fetch_crawl_records(client, job_id):
     records = []
     cursor = None
+    errors = []
     while True:
-        query = {}
+        query = {"limit": 100}
         if cursor is not None:
             query["cursor"] = cursor
         response = client.api_request("GET", f"crawl/{job_id}", query=query)
         if not (response["ok"] and response["data"].get("success")):
-            return records
+            errors.extend(safe_error_messages(response))
+            return records, errors
         result = response["data"].get("result") or {}
         records.extend(result.get("records") or [])
         cursor = result.get("cursor")
         if cursor in (None, "", 0):
-            return records
+            return records, errors
 
 
 def run_markdown_probe(client, spec):
@@ -418,7 +464,10 @@ def run_links_probe(client, spec):
         },
     )
     links = response["data"].get("result") if response["ok"] else []
-    found_links = set(links or [])
+    normalized_links = []
+    for link in links or []:
+        normalized_links.append(urljoin(spec["url"].rstrip("/") + "/", link))
+    found_links = set(normalized_links)
     missing_links = [expected for expected in spec["expected_links"] if expected not in found_links]
     return {
         "label": spec["label"],
@@ -429,6 +478,7 @@ def run_links_probe(client, spec):
         "missing_links": missing_links,
         "errors": safe_error_messages(response) if not response["ok"] else [],
         "links": links or [],
+        "normalizedLinks": normalized_links,
     }
 
 
@@ -438,6 +488,10 @@ def record_status_map(records):
         url = record.get("url") or record.get("metadata", {}).get("url")
         if url:
             mapping[url] = record.get("status")
+            normalized = url.rstrip("/")
+            if normalized:
+                mapping[normalized] = record.get("status")
+                mapping[normalized + "/"] = record.get("status")
     return mapping
 
 
@@ -455,6 +509,7 @@ def add_finding(findings, severity, category, summary, detail):
 def evaluate(args, crawls, markdown_probes, links_probes):
     findings = []
     critical = critical_urls(args.landing_base_url.rstrip("/"), args.docs_base_url.rstrip("/"))
+    crawl_expected = crawl_expected_urls(args.landing_base_url.rstrip("/"), args.docs_base_url.rstrip("/"))
 
     for crawl in crawls:
         if not crawl["created"]:
@@ -489,16 +544,16 @@ def evaluate(args, crawls, markdown_probes, links_probes):
             continue
 
         if crawl["records"]:
-            expected_urls = critical["landing"] if crawl["label"].startswith("landing") else critical["docs"]
+            expected_urls = crawl_expected["landing"] if crawl["label"].startswith("landing") else crawl_expected["docs"]
             status_by_url = record_status_map(crawl["records"])
-            missing = [url for url in expected_urls if url not in status_by_url]
+            missing = [url for url in expected_urls if status_by_url.get(url) is None]
             if missing:
                 add_finding(
                     findings,
-                    "high",
+                    "medium",
                     "discoverability",
-                    f"{crawl['label']} did not report all critical URLs",
-                    "Missing critical URLs: " + ", ".join(missing),
+                    f"{crawl['label']} did not report all expected page URLs",
+                    "Missing expected page URLs: " + ", ".join(missing),
                 )
             bad_statuses = []
             for url in expected_urls:
@@ -508,9 +563,9 @@ def evaluate(args, crawls, markdown_probes, links_probes):
             if bad_statuses:
                 add_finding(
                     findings,
-                    "high",
+                    "medium",
                     "fetchability",
-                    f"{crawl['label']} reported blocked or failed critical URLs",
+                    f"{crawl['label']} reported blocked or failed expected page URLs",
                     ", ".join(bad_statuses),
                 )
 

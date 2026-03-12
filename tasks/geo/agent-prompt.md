@@ -27,6 +27,16 @@ areas that need to be hidden from agents.
    limits or missing crawl-job lookup results.
 6. Prefer concise findings and recommendations over raw payload dumps.
 
+Important Cloudflare API quirk:
+
+- After a successful `POST /crawl`, early `GET /crawl/<job_id>` calls may return
+  `404 Crawl job not found`.
+- This has been observed both on Clawperator URLs and on Cloudflare's own docs
+  URLs.
+- Treat this as eventual consistency in the Cloudflare service.
+- Poll for a reasonable window before concluding that crawl lookup is truly
+  broken.
+
 ## What to evaluate
 
 ### Discoverability
