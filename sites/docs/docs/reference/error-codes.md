@@ -56,6 +56,9 @@ The `code` field is always one of the string constants listed below.
 | `NODE_NOT_FOUND` | No UI node matched the provided `NodeMatcher` |
 | `NODE_NOT_CLICKABLE` | The matched node is not interactable |
 | `SECURITY_BLOCK_DETECTED` | A security overlay or lock screen blocked the action |
+| `CONTAINER_NOT_FOUND` | `scroll` step could not locate a scrollable container. Either no scrollable node is present on screen, or the provided `container` matcher matched nothing. |
+| `CONTAINER_NOT_SCROLLABLE` | `scroll` step found the matched container but it is not scrollable, and `findFirstScrollableChild` is false (or no scrollable descendant was found). |
+| `GESTURE_FAILED` | `scroll` step: the OS rejected the gesture dispatch. The accessibility service was running but Android declined to execute the swipe gesture. Step returns `success: false`. |
 
 ---
 
