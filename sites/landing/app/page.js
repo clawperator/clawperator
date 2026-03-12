@@ -273,9 +273,6 @@ export default function Home() {
           <p className="hero-summary hero-summary-secondary">
             Connect your claw to a dedicated Android burner phone, run your own private skills and get answers your agent can trust.
           </p>
-          <p className="hero-summary hero-summary-secondary">
-            Don't have an Android device? No problem. Clawperator will create a Google Play equipped Android emulator on your Mac mini or OpenClaw box for you.
-          </p>
 
           <div className="hero-image-panel">
             <img
@@ -287,6 +284,11 @@ export default function Home() {
               className="hero-diagram"
             />
           </div>
+
+          <p className="hero-summary hero-summary-secondary">
+            Don't have an Android device? No problem. Clawperator will create a Google Play equipped Android emulator on your Mac mini or OpenClaw box for you.
+          </p>
+
           </div>
 
       <section id="workflows" className="content-section">
