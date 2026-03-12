@@ -272,7 +272,61 @@ Combine fields to increase specificity when a single field is ambiguous:
 
 **`take_screenshot`:** `observe screenshot` uses the same execution contract under the hood. Android reports `UNSUPPORTED_RUNTIME_SCREENSHOT`, then the Node layer captures the screenshot via `adb exec-out screencap -p`, writes it to `data.path`, and normalizes the step result to `success: true` when capture succeeds.
 
-**`press_key`:** Issues a system-level key event via the Android Accessibility Service (`performGlobalAction`). Supported keys: `"back"`, `"home"`, `"recents"`. The alias `key_press` is normalized to `press_key`. No retry - this action is single-attempt by design. Requires the Clawperator Operator accessibility service to be running on the device. If the service is unavailable, the entire execution fails with `status: "failed"` at the envelope level - no `stepResults` are returned and the failure cannot be caught as a per-step `success: false`. Use `clawperator doctor` to diagnose accessibility service availability before running executions that include `press_key`. Returns `success: false` with `data.error: "GLOBAL_ACTION_FAILED"` if the OS reports the global action could not be performed (rare soft OS failure - accessibility service was running but Android declined the action).
+**`press_key`:** Issues a system-level key event via the Android Accessibility Service (`performGlobalAction`). Supported keys: `"back"`, `"home"`, `"recents"`. The alias `key_press` is normalized to `press_key`. No retry - this action is single-attempt by design. Requires the Clawperator Operator accessibility service to be running on the device. If the service is unavailable, the execution returns a top-level failed envelope with `status: "failed"` and no `stepResults`. Use `clawperator doctor` to diagnose accessibility service availability before running executions that include `press_key`. When testing local/debug builds, pass the matching `receiverPackage` (`com.clawperator.operator.dev`) instead of relying on the default release package. Returns `success: false` with `data.error: "GLOBAL_ACTION_FAILED"` if the OS reports the global action could not be performed (rare soft OS failure - accessibility service was running but Android declined the action).
+
+**`press_key` example request (`/execute`):**
+```json
+{
+  "deviceId": "<device_id>",
+  "receiverPackage": "com.clawperator.operator.dev",
+  "execution": {
+    "commandId": "cmd-press-home",
+    "taskId": "task-press-home",
+    "source": "local-test",
+    "expectedFormat": "android-ui-automator",
+    "timeoutMs": 30000,
+    "actions": [
+      { "id": "open1", "type": "open_app", "params": { "applicationId": "com.android.settings" } },
+      { "id": "home1", "type": "press_key", "params": { "key": "home" } },
+      { "id": "snap1", "type": "snapshot_ui" }
+    ]
+  }
+}
+```
+
+**`press_key` example success response:**
+```json
+{
+  "ok": true,
+  "envelope": {
+    "commandId": "cmd-press-home",
+    "taskId": "task-press-home",
+    "status": "success",
+    "stepResults": [
+      { "id": "open1", "actionType": "open_app", "success": true, "data": { "application_id": "com.android.settings" } },
+      { "id": "home1", "actionType": "press_key", "success": true, "data": { "key": "home" } },
+      { "id": "snap1", "actionType": "snapshot_ui", "success": true, "data": { "actual_format": "hierarchy_xml", "text": "<hierarchy ... />" } }
+    ],
+    "error": null
+  },
+  "deviceId": "<device_id>",
+  "terminalSource": "clawperator_result"
+}
+```
+
+**`press_key` example validation failure:**
+```json
+{
+  "ok": false,
+  "error": {
+    "code": "EXECUTION_VALIDATION_FAILED",
+    "message": "press_key params.key must be one of: back, home, recents",
+    "details": {
+      "path": "actions.0.params.key"
+    }
+  }
+}
+```
 
 **`scroll_and_click`:** This action has two separate retry knobs. `scrollRetry` controls the scroll/search loop and defaults to the `UiScroll` preset (`maxAttempts=4`, `initialDelayMs=400`, `maxDelayMs=2000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`). `clickRetry` controls the final click attempt and defaults to the `UiReadiness` preset (`maxAttempts=5`, `initialDelayMs=500`, `maxDelayMs=3000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`).
 
@@ -301,6 +355,7 @@ Every execution emits exactly one `[Clawperator-Result]` envelope:
 - `error` (top-level) contains an error code on total failure.
 - `data.error` on a step result contains the per-step error code when `success` is `false`.
 - All `data` values are strings. `data` is always an object (never `null`), but may be empty.
+- Only one execution may be in flight per device. Concurrent requests for the same device return `EXECUTION_CONFLICT_IN_FLIGHT`.
 
 ### Per-action result data
 
