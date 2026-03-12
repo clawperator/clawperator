@@ -4,17 +4,69 @@ Audience: agents and the humans who build for them. Written after completing the
 
 ---
 
-## 1. Missing: scroll-to-edge convenience actions
+## 1. Missing: bounded scroll loop action (NOT `scroll_to_edge`)
 
 **Gap:** Reaching the top or bottom of a scrollable list currently requires a polling loop - send one scroll, check `scroll_outcome`, repeat. For a pagination task that's a fundamental workflow, this generates N round trips where N is the length of the list / scroll step size.
 
 **Impact on agents:** High latency tasks with long lists. A 50-item Settings list on a slow device with 300ms settle delay can take 15+ seconds just to reach the bottom.
 
-**Proposed fix:** Add `scroll_to_edge` action with a `direction` param. Single round trip, device executes the loop. Returns the number of scrolls executed and the final `scroll_outcome`.
+**Why `scroll_to_edge` is the wrong name:**
+
+The originally suggested name `scroll_to_edge` is semantically incorrect and should not be used. Many real-world Android views do not have a reachable edge:
+
+- Social feeds (Instagram, Play Store recommendations)
+- Lazy-loaded lists with server pagination
+- Any `RecyclerView` backed by infinite data
+
+For these, "scroll to the edge" is either impossible or means "scroll until we give up." An API named `scroll_to_edge` implies a contract the runtime cannot guarantee. The name would mislead agents into assuming `EDGE_REACHED` is always the success terminal, when it is in fact only sometimes the terminal.
+
+**The right framing:** This is a *bounded scroll loop* - it scrolls repeatedly until some termination condition fires, and it honestly reports *which condition* stopped it. The edge is one possible termination reason, not the guaranteed outcome.
+
+**Proposed name and contract:**
+
+`scroll_until_done` or `scroll_max` - names that describe mechanism, not a presumed destination.
 
 ```json
-{ "id": "go-bottom", "type": "scroll_to_edge", "params": { "direction": "down" } }
+{
+  "id": "go-bottom",
+  "type": "scroll_until_done",
+  "params": {
+    "direction": "down",
+    "container": { "resourceId": "com.android.settings:id/recycler_view" },
+    "maxScrolls": 25,
+    "maxDurationMs": 10000,
+    "settleDelayMs": 250
+  }
+}
 ```
+
+Result:
+```json
+{
+  "id": "go-bottom",
+  "status": "completed",
+  "data": {
+    "scrolls_executed": 12,
+    "termination_reason": "EDGE_REACHED",
+    "position_changed": true
+  }
+}
+```
+
+**`termination_reason` values:**
+- `EDGE_REACHED` - content ended naturally (finite list)
+- `MAX_SCROLLS_REACHED` - hit `maxScrolls` cap (normal for infinite feeds)
+- `MAX_DURATION_REACHED` - hit `maxDurationMs` cap
+- `NO_POSITION_CHANGE` - repeated scrolls produced no movement (stalled/bounced)
+- `CONTAINER_NOT_FOUND` - container resolution failed before any scroll
+- `CONTAINER_NOT_SCROLLABLE` - resolved container is not scrollable
+
+**Key design rules:**
+- `MAX_SCROLLS_REACHED` and `MAX_DURATION_REACHED` are not errors - they are clean terminal states. Agents writing to paginate an infinite feed expect them.
+- Defaults must always be applied even when not user-specified. Suggested defaults: `maxScrolls: 20`, `maxDurationMs: 10000`. A scroll loop with no bound is unsafe.
+- `EDGE_REACHED` should use `edge_reached` from the existing `scroll` primitive as its detection signal - no new edge heuristic needed.
+
+**Relationship to `scroll` primitive:** `scroll_until_done` is a convenience loop built entirely on top of `scroll`. It is a higher-level action, not a replacement.
 
 ---
 
@@ -53,8 +105,19 @@ This is best-effort (Android does not always expose exact scroll position) but t
 
 **Proposed fix:** Add a `scroll_until_visible` action (or a `clickAfter: false` option on `scroll_and_click`):
 ```json
-{ "id": "find", "type": "scroll_until_visible", "params": { "target": { "textContains": "Privacy" }, "direction": "down" } }
+{
+  "id": "find",
+  "type": "scroll_until_visible",
+  "params": {
+    "target": { "textContains": "Privacy" },
+    "direction": "down",
+    "maxScrolls": 20,
+    "maxDurationMs": 8000
+  }
+}
 ```
+
+**Termination policy note:** The same reasoning from Gap #1 applies here. If the target element does not exist and there is no `maxScrolls` or `maxDurationMs` cap, this action runs forever on infinite feeds. Termination caps must be required (with sensible defaults) and the result must return a `termination_reason` - either `TARGET_FOUND`, `EDGE_REACHED`, `MAX_SCROLLS_REACHED`, `MAX_DURATION_REACHED`, or `NO_POSITION_CHANGE`. `scroll_until_visible` is also a bounded scroll loop; it just adds a second early-exit condition (target found).
 
 ---
 
@@ -87,7 +150,7 @@ direction: "down" = reveal more content below (swipe finger up). Default: "down"
 
 **Impact on agents:** Every agent that needs to enumerate a list will independently rediscover the loop pattern and likely make mistakes (no max-steps guard, no `edge_reached` check, unnecessary re-scrolling).
 
-**Proposed fix:** Add a "Pagination Recipe" section to the docs with a full pseudo-code loop showing the correct terminal condition and a note on `scroll_to_edge` when it exists.
+**Proposed fix:** Add a "Pagination Recipe" section to the docs with a full pseudo-code loop showing the correct terminal condition and a note on `scroll_until_done` once Gap #1 is implemented. The recipe should also show the manual loop as the v1 pattern so agents have something to follow before the convenience action exists. Critically, the recipe must include a `maxScrolls` guard even in the manual loop - any agent-side loop without a step cap is fragile on infinite feeds.
 
 ---
 
