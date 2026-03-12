@@ -263,7 +263,7 @@ export default function Home() {
           </h1>
           <p className="hero-category-line">Clawperator makes Android apps programmable - think Playwright for mobile apps.</p>
           <p className="hero-summary">
-          Clawperator is a deterministic execution layer that lets agents/Claws operate real Android apps to read data and take actions on behalf of users.
+            Clawperator is a deterministic execution layer that lets agents run skills on real Android apps to read data and take action on behalf of users.
           </p>
           <p className="hero-brain-hand">
             🧠 Your agent/Claw is the brain.
@@ -271,7 +271,7 @@ export default function Home() {
             ✋ Clawperator is the hand.
           </p>
           <p className="hero-summary hero-summary-secondary">
-            Connect your claw to a dedicated Android burner phone, run your own private skills and get answers your agent can trust.
+            Connect a dedicated Android burner phone, run your own private skills, and get answers your agent can trust.
           </p>
 
           <div className="hero-image-panel">
@@ -286,10 +286,10 @@ export default function Home() {
           </div>
 
           <p className="hero-summary hero-summary-secondary">
-            Any cheap Android phone works. Plug your burner into your Claw box, log in to the accounts you care about and forget about it. You don’t need to switch from iPhone to Android.
+            Any cheap Android phone works. Log in to the accounts you care about and leave your burner ready for your agent. You do not need to switch from iPhone to Android.
           </p>
           <p className="hero-summary hero-summary-secondary">
-            Don't have an Android device? No problem. Clawperator will create a Google Play equipped Android emulator on your Mac mini or OpenClaw box for you.
+            Don&apos;t have an Android device? No problem. Clawperator can create a Google Play-equipped Android emulator for you.
           </p>
 
           </div>
@@ -588,8 +588,8 @@ if <hvac_state> == "Off":
           The runtime includes the CLI on your host machine and the Clawperator Operator Android app on the Android
           device. The agent decides what to do next. Skills give the agent reusable ways to handle app-specific
           workflows it already understands, whether those come from the open source skills repository or from private
-          skills the agent created for you. Clawperator executes validated actions against user-installed Android apps
-          and returns machine-readable state.
+          skills the agent created for you. Clawperator executes the Android side of the workflow and returns data your
+          agent can use.
         </p>
         <div className="grid-2-col">
           <div>
