@@ -578,6 +578,47 @@ Direction semantics are the same as `scroll`. `container`, `distanceRatio`, `set
 { "id": "su1", "actionType": "scroll_until", "success": true, "data": { "termination_reason": "MAX_SCROLLS_REACHED", "scrolls_executed": "20", "direction": "down" } }
 ```
 
+## Pagination Recipe
+
+When an agent needs to read all content from a scrollable list, the correct approach depends on whether the list is finite or infinite.
+
+### Finite lists (settings screens, contact lists, search results)
+
+Use a manual scroll loop: issue `scroll` actions one at a time, snapshot after each, and stop when `scroll_outcome` is `"edge_reached"`. This gives full control over when to stop and what to extract.
+
+```
+while true:
+  snapshot_ui  -> extract visible items
+  scroll down  -> if edge_reached: break
+```
+
+`maxScrolls` is not required here because the agent controls the loop and `edge_reached` is the natural termination condition.
+
+### Infinite feeds (social media, Play Store, news feeds)
+
+Use `scroll_until` with an explicit `maxScrolls` cap. There is no true "bottom" on infinite-scroll lists - lazy loading means the edge is never definitively reached. `scroll_until` is designed for this case: it scrolls as far as the agent wants and returns a machine-readable `termination_reason`.
+
+```json
+{ "id": "feed1", "type": "scroll_until", "params": { "direction": "down", "maxScrolls": 30 } }
+```
+
+After this action, `termination_reason` will be one of:
+- `MAX_SCROLLS_REACHED` - agent hit its own cap (normal for infinite feeds)
+- `EDGE_REACHED` - list actually ended (finite list reached bottom)
+- `NO_POSITION_CHANGE` - content stopped moving (stale list or true bottom)
+
+Both `MAX_SCROLLS_REACHED` and `NO_POSITION_CHANGE` are clean terminal states. Do not treat them as errors.
+
+**Required: always set `maxScrolls`.** Without an explicit cap, the default is 20 scrolls. For feeds where you want more coverage, pass a larger value. Never omit `maxScrolls` or rely on `NO_POSITION_CHANGE` alone as the termination condition for infinite feeds - a slow network load can pause position change temporarily and cause early exit.
+
+### Returning to top
+
+After scrolling down a feed, use `scroll_until` with `direction: "up"` to return to the top. On finite lists, `EDGE_REACHED` signals the top. On infinite feeds, `NO_POSITION_CHANGE` or `MAX_SCROLLS_REACHED` signals that position has stabilized near the top.
+
+```json
+{ "id": "top1", "type": "scroll_until", "params": { "direction": "up", "maxScrolls": 50, "noPositionChangeThreshold": 3 } }
+```
+
 ## Result Envelope
 
 Every execution emits exactly one `[Clawperator-Result]` envelope:
