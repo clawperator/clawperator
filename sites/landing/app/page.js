@@ -263,12 +263,11 @@ export default function Home() {
           </h1>
           <p className="hero-category-line">Clawperator makes Android apps programmable - think Playwright for mobile apps.</p>
           <p className="hero-summary">
-            Clawperator is a deterministic execution layer that lets agents operate real Android apps and get
-            structured results back.
+            Clawperator is a deterministic execution layer that lets agents run skills on real Android apps.
           </p>
           <p className="hero-summary hero-summary-secondary">
             Your agent is the brain. Clawperator is the hand. Connect it to a dedicated Android burner phone or local
-            Google Play-equipped emulator, execute validated actions, and get reliable results your agent can trust.
+            Google Play-equipped emulator, run your own private skills, and get answers your agent can trust.
           </p>
 
           <div className="hero-image-panel">

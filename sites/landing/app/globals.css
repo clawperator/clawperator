@@ -338,6 +338,10 @@ body {
   text-wrap: balance;
 }
 
+.hero-category-line-secondary {
+  margin-top: 0.35rem;
+}
+
 .hero-summary {
   margin: 1rem 0 0;
   max-width: 640px;
