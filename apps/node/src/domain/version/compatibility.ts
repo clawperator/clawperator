@@ -2,8 +2,11 @@ import { createRequire } from "node:module";
 import { runAdb } from "../../adapters/android-bridge/adbClient.js";
 import { type RuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 import { ERROR_CODES, type ClawperatorError } from "../../contracts/errors.js";
+import { hasListedPackage } from "../device/grantPermissions.js";
 
 const require = createRequire(import.meta.url);
+
+export { hasListedPackage } from "../device/grantPermissions.js";
 
 const COMPATIBILITY_VERSION_REGEX = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z]+)(?:\.(\d+))?)?$/;
 
@@ -34,13 +37,6 @@ export interface VersionCompatibilityProbe {
 
 interface CliPackageMetadata {
   version?: string;
-}
-
-export function hasListedPackage(packageListOutput: string, packageName: string): boolean {
-  return packageListOutput
-    .split("\n")
-    .map(line => line.trim())
-    .some(line => line === `package:${packageName}`);
 }
 
 export function getAlternateReceiverVariant(receiverPackage: string): string {

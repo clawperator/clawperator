@@ -8,6 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- `clawperator operator install` command for one-step APK installation and permission grant.
+- Guidance for users trying `clawperator install`.
+- Better package detection in CLI and domain logic (matches exact package IDs).
 - Release automation plan for synchronized Node and Android versioning.
 
 ## [0.1.0] - 2026-03-06

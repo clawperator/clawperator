@@ -6,11 +6,15 @@ import { fileURLToPath } from "node:url";
 
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "../../..");
 
-function runCli(args: string[]): Promise<{ stdout: string; stderr: string; code: number }> {
+function runCli(
+  args: string[],
+  env?: NodeJS.ProcessEnv
+): Promise<{ stdout: string; stderr: string; code: number }> {
   const cliPath = join(packageRoot, "dist", "cli", "index.js");
   return new Promise((resolve) => {
     const proc = spawn(process.execPath, [cliPath, ...args], {
       cwd: packageRoot,
+      env: { ...process.env, ...env },
       stdio: ["ignore", "pipe", "pipe"],
     });
     let stdout = "";
@@ -146,6 +150,15 @@ describe("operator install CLI output", () => {
       "--apk", NONEXISTENT_APK,
       "--receiver-package", "com.clawperator.operator.dev",
     ]);
+    const obj = JSON.parse(stdout);
+    assert.strictEqual(obj.receiverPackage, "com.clawperator.operator.dev");
+  });
+
+  it("uses CLAWPERATOR_RECEIVER_PACKAGE on failure when --receiver-package is omitted", async () => {
+    const { stdout } = await runCli(
+      ["operator", "install", "--apk", NONEXISTENT_APK],
+      { CLAWPERATOR_RECEIVER_PACKAGE: "com.clawperator.operator.dev" }
+    );
     const obj = JSON.parse(stdout);
     assert.strictEqual(obj.receiverPackage, "com.clawperator.operator.dev");
   });

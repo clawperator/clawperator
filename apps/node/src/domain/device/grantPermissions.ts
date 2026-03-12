@@ -33,10 +33,17 @@ export interface PermissionGrantResult {
   notificationListener: NotificationListenerGrantResult;
 }
 
+export function hasListedPackage(packageListOutput: string, packageName: string): boolean {
+  return packageListOutput
+    .split("\n")
+    .map(line => line.trim())
+    .some(line => line === `package:${packageName}`);
+}
+
 export async function detectReceiverPackage(config: RuntimeConfig): Promise<string | undefined> {
   for (const pkg of [DEFAULT_RELEASE_PACKAGE, DEFAULT_DEBUG_PACKAGE]) {
     const result = await runAdb(config, ["shell", "pm", "list", "packages", pkg]);
-    if (result.code === 0 && result.stdout.trim().includes(`package:${pkg}`)) {
+    if (result.code === 0 && hasListedPackage(result.stdout, pkg)) {
       return pkg;
     }
   }

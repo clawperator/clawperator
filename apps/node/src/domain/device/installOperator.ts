@@ -4,6 +4,7 @@ import { type RuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.
 import {
   detectReceiverPackage,
   grantDevicePermissions,
+  hasListedPackage,
   type PermissionGrantResult,
 } from "./grantPermissions.js";
 
@@ -69,7 +70,7 @@ export async function installOperator(
   const install: InstallPhaseResult = { ok: true };
 
   // Step 3: Resolve receiver package.
-  const pkg = receiverPackage ?? (await detectReceiverPackage(config));
+  const pkg = receiverPackage ?? config.receiverPackage ?? (await detectReceiverPackage(config));
   if (!pkg) {
     return {
       receiverPackage: "<unknown>",
@@ -105,7 +106,7 @@ export async function installOperator(
   // Step 5: Lightweight post-install verification.
   const pkgCheck = await runAdb(config, ["shell", "pm", "list", "packages", pkg]);
   const packageInstalled =
-    pkgCheck.code === 0 && pkgCheck.stdout.includes(`package:${pkg}`);
+    pkgCheck.code === 0 && hasListedPackage(pkgCheck.stdout, pkg);
 
   const verification: VerifyPhaseResult = {
     ok: packageInstalled,
