@@ -82,7 +82,7 @@ The core unit dispatched to the device.
 | `read_text` | `matcher` | Read text from a UI node |
 | `enter_text` | `matcher`, `text` | Type text into a UI node |
 | `wait_for_node` | `matcher` | Wait for a node to appear |
-| `snapshot_ui` | - | Capture UI tree as ASCII or JSON |
+| `snapshot_ui` | - | Capture the canonical `hierarchy_xml` UI tree |
 | `take_screenshot` | - | Capture screen as PNG |
 | `sleep` | `durationMs` | Pause execution |
 | `press_key` | `key` | Issue a system navigation key via accessibility |
@@ -142,12 +142,13 @@ All fields are optional but at least one must be non-empty. Values are ORed inte
 | `noPositionChangeThreshold` | number | `scroll_until` - consecutive no-movement scrolls before stopping (default: 3) |
 | `durationMs` | number | `sleep` |
 | `key` | `"back"\|"home"\|"recents"` | `press_key` |
-| `format` | `"ascii"\|"json"` | `snapshot_ui` |
 | `path` | string | `take_screenshot` - output file path |
 | `distanceRatio` | number | `scroll_and_click`, `scroll`, `scroll_until` |
 | `settleDelayMs` | number | `scroll_and_click`, `scroll`, `scroll_until` |
 | `findFirstScrollableChild` | boolean | `scroll_and_click`, `scroll`, `scroll_until` - auto-use first scrollable descendant (default: `true`) |
 | `retry` | object | per-step retry config |
+
+For `scroll` and `scroll_until`, omitting `container` uses the first visible `scrollable="true"` node. That is convenient on simple screens, but on nested-scroll layouts agents should prefer an explicit `container.resourceId` taken from `snapshot_ui`.
 
 ---
 
