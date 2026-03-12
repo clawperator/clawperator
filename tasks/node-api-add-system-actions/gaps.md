@@ -36,7 +36,7 @@ This is a display-only change - no behavior changes, just making an implicit def
 
 ## GAP-C: No machine-readable examples for high-use actions in the API docs
 
-**Status:** Open
+**Status:** Closed (2026-03-12)
 **Effort:** Editorial (no code changes)
 
 The `press_key` examples added in this branch showed that concrete request/response pairs

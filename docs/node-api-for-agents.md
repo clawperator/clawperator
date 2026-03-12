@@ -260,15 +260,165 @@ Combine fields to increase specificity when a single field is ambiguous:
 
 **`close_app`:** The Node layer intercepts `close_app` actions and runs `adb shell am force-stop <applicationId>` before dispatching to Android. The Android step always returns `success: false` with `data.error: "UNSUPPORTED_RUNTIME_CLOSE"` - this is expected. The overall execution `status` remains `"success"` and the app is force-stopped. Do not treat this step result as a recoverable failure.
 
+**`click`:** Finds the node matching `matcher` and performs the specified `clickType`. The default click type is `"default"` (standard accessibility click with gesture fallback). Use `"long_click"` for long-press targets and `"focus"` to focus without activating.
+
+**`click` example request (`/execute`):**
+```json
+{
+  "deviceId": "<device_id>",
+  "execution": {
+    "commandId": "cmd-click-1",
+    "taskId": "task-click-1",
+    "source": "local-test",
+    "expectedFormat": "android-ui-automator",
+    "timeoutMs": 30000,
+    "actions": [
+      { "id": "click1", "type": "click", "params": { "matcher": { "resourceId": "com.example.app:id/submit_button" }, "clickType": "default" } }
+    ]
+  }
+}
+```
+
+**`click` example success response:**
+```json
+{
+  "ok": true,
+  "envelope": {
+    "commandId": "cmd-click-1",
+    "taskId": "task-click-1",
+    "status": "success",
+    "stepResults": [
+      { "id": "click1", "actionType": "click", "success": true, "data": { "click_types": "click" } }
+    ],
+    "error": null
+  },
+  "deviceId": "<device_id>",
+  "terminalSource": "clawperator_result"
+}
+```
+
 **`enter_text`:** The CLI command is `action type` but the execution payload action type is `enter_text`. The `submit` param triggers a keyboard Enter/submit after typing - use this for search fields and single-field forms where pressing Enter submits. The Node contract still accepts `clear`, but the Android runtime does not implement it yet, so it currently has no effect.
 
+**`enter_text` example request (`/execute`):**
+```json
+{
+  "deviceId": "<device_id>",
+  "execution": {
+    "commandId": "cmd-type-1",
+    "taskId": "task-type-1",
+    "source": "local-test",
+    "expectedFormat": "android-ui-automator",
+    "timeoutMs": 30000,
+    "actions": [
+      { "id": "type1", "type": "enter_text", "params": { "matcher": { "resourceId": "com.example.app:id/search_input" }, "text": "hello world", "submit": true } }
+    ]
+  }
+}
+```
+
+**`enter_text` example success response:**
+```json
+{
+  "ok": true,
+  "envelope": {
+    "commandId": "cmd-type-1",
+    "taskId": "task-type-1",
+    "status": "success",
+    "stepResults": [
+      { "id": "type1", "actionType": "enter_text", "success": true, "data": { "text": "hello world", "submit": "true" } }
+    ],
+    "error": null
+  },
+  "deviceId": "<device_id>",
+  "terminalSource": "clawperator_result"
+}
+```
+
 **`read_text`:** `validator` is not an open-ended string in practice. The Android runtime currently supports only `"temperature"` and rejects any other value.
+
+**`read_text` example request (`/execute`):**
+```json
+{
+  "deviceId": "<device_id>",
+  "execution": {
+    "commandId": "cmd-read-1",
+    "taskId": "task-read-1",
+    "source": "local-test",
+    "expectedFormat": "android-ui-automator",
+    "timeoutMs": 30000,
+    "actions": [
+      { "id": "read1", "type": "read_text", "params": { "matcher": { "resourceId": "com.example.app:id/temperature_label" } } }
+    ]
+  }
+}
+```
+
+**`read_text` example success response:**
+```json
+{
+  "ok": true,
+  "envelope": {
+    "commandId": "cmd-read-1",
+    "taskId": "task-read-1",
+    "status": "success",
+    "stepResults": [
+      { "id": "read1", "actionType": "read_text", "success": true, "data": { "text": "22.5 C", "validator": "none" } }
+    ],
+    "error": null
+  },
+  "deviceId": "<device_id>",
+  "terminalSource": "clawperator_result"
+}
+```
 
 **`snapshot_ui`:** Clawperator returns a single canonical snapshot format: `hierarchy_xml`. The Android runtime writes the hierarchy dump to device logcat, and the Node layer injects that raw XML into `data.text` after execution. `data.actual_format` is always `"hierarchy_xml"` for successful snapshot steps.
 
 `observe snapshot` (CLI subcommand) and `snapshot_ui` (execution action type) use the same internal pipeline and produce identical output. `observe snapshot` builds a single-action execution internally and calls `runExecution`. Use `observe snapshot` for ad-hoc inspection from the command line. Use `snapshot_ui` as a step within a multi-action execution payload.
 
 **Failure case - extraction error:** If snapshot post-processing finishes without attaching UI hierarchy text to the step (`data.text` remains absent), the step returns `success: false` with `data.error: "SNAPSHOT_EXTRACTION_FAILED"`. A common cause is that logcat does not contain a matching `[TaskScope] UI Hierarchy:` marker for the step, but partial extraction or other logcat mismatches can also trigger this error. This typically means the installed clawperator binary is out of date with the Android Operator APK. Run `clawperator version --check-compat` and `clawperator doctor` to diagnose. See Troubleshooting for resolution steps.
+
+**`snapshot_ui` example request (`/execute`):**
+```json
+{
+  "deviceId": "<device_id>",
+  "execution": {
+    "commandId": "cmd-snap-1",
+    "taskId": "task-snap-1",
+    "source": "local-test",
+    "expectedFormat": "android-ui-automator",
+    "timeoutMs": 30000,
+    "actions": [
+      { "id": "snap1", "type": "snapshot_ui" }
+    ]
+  }
+}
+```
+
+**`snapshot_ui` example success response:**
+```json
+{
+  "ok": true,
+  "envelope": {
+    "commandId": "cmd-snap-1",
+    "taskId": "task-snap-1",
+    "status": "success",
+    "stepResults": [
+      {
+        "id": "snap1",
+        "actionType": "snapshot_ui",
+        "success": true,
+        "data": {
+          "actual_format": "hierarchy_xml",
+          "text": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><hierarchy rotation=\"0\">...</hierarchy>"
+        }
+      }
+    ],
+    "error": null
+  },
+  "deviceId": "<device_id>",
+  "terminalSource": "clawperator_result"
+}
+```
 
 **`take_screenshot`:** `observe screenshot` uses the same execution contract under the hood. Android reports `UNSUPPORTED_RUNTIME_SCREENSHOT`, then the Node layer captures the screenshot via `adb exec-out screencap -p`, writes it to `data.path`, and normalizes the step result to `success: true` when capture succeeds.
 
