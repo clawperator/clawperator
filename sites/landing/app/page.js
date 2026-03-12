@@ -286,6 +286,9 @@ export default function Home() {
           </div>
 
           <p className="hero-summary hero-summary-secondary">
+            Any cheap Android phone works. Plug your burner into your Claw box, log in to the accounts you care about and forget about it. You don’t need to switch from iPhone to Android.
+          </p>
+          <p className="hero-summary hero-summary-secondary">
             Don't have an Android device? No problem. Clawperator will create a Google Play equipped Android emulator on your Mac mini or OpenClaw box for you.
           </p>
 
@@ -312,11 +315,6 @@ export default function Home() {
           <p>
             One command installs the CLI, fetches the latest Clawperator Operator Android app, verifies it, and helps
             prepare an Android device for your agent.
-          </p>
-          <p>
-            A cheap burner Android phone is still the preferred setup for compatibility and long-running reliability.
-            You do not need to switch from iPhone to Android. If you do not have an Android device handy, Clawperator
-            can provision a local Google Play-equipped emulator and walk you through the same setup flow.
           </p>
         </div>
 
