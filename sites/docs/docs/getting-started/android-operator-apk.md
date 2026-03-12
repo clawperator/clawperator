@@ -32,7 +32,7 @@ To install manually:
 2. Connect your device via USB.
 3. Run the canonical install command:
    ```bash
-   clawperator operator install --apk operator.apk
+   clawperator operator setup --apk operator.apk
    ```
 
 This command installs the APK and grants all required permissions in one step. See [First-Time Setup](first-time-setup.md) for full details.
@@ -50,7 +50,7 @@ Example for v0.2.5:
 The app requires three permissions to operate:
 
 ```bash
-clawperator operator install --apk <path>
+clawperator operator setup --apk <path>
 ```
 
 This command grants all three permissions automatically during install. The permissions are:
@@ -69,7 +69,7 @@ If the Operator APK crashes after setup and Android revokes the granted permissi
 clawperator grant-device-permissions
 ```
 
-This re-grants the same permissions without reinstalling the APK. Do not use it for normal setup - agents should use `clawperator operator install` for the initial install path every time.
+This re-grants the same permissions without reinstalling the APK. Do not use it for normal setup - agents should use `clawperator operator setup` for the initial install path every time. `clawperator operator install` remains an alias.
 
 ## Logging and Debugging
 

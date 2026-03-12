@@ -485,7 +485,7 @@ maybe_install_operator_apk() {
             [ -n "$device_id" ] || continue
             echo -e "${YELLOW} - ${device_id}${NC}"
         done < <(list_connected_devices)
-        echo -e "${YELLOW}Install manually with: clawperator operator install --apk ${APK_LOCAL_PATH} --device-id <device_id>${NC}"
+        echo -e "${YELLOW}Install manually with: clawperator operator setup --apk ${APK_LOCAL_PATH} --device-id <device_id>${NC}"
         return 0
     fi
 
@@ -508,17 +508,17 @@ maybe_install_operator_apk() {
             echo -e "${BLUE}Installing operator APK on connected device...${NC}"
             if [ -n "$CLAWPERATOR_BIN_PATH" ]; then
                 # Use the canonical install command: installs APK and grants permissions in one step.
-                if "$CLAWPERATOR_BIN_PATH" operator install --apk "$APK_LOCAL_PATH" --device-id "$DEVICE_ID" --receiver-package "$DEFAULT_RECEIVER_PACKAGE" > /dev/null 2>&1; then
+                if "$CLAWPERATOR_BIN_PATH" operator setup --apk "$APK_LOCAL_PATH" --device-id "$DEVICE_ID" --receiver-package "$DEFAULT_RECEIVER_PACKAGE" > /dev/null 2>&1; then
                     echo -e "${GREEN}✅ Operator APK installed and permissions granted.${NC}"
                 else
-                    echo -e "${RED}❌ operator install failed. Run: clawperator operator install --apk ${APK_LOCAL_PATH}${NC}"
+                    echo -e "${RED}❌ operator setup failed. Run: clawperator operator setup --apk ${APK_LOCAL_PATH}${NC}"
                     return 1
                 fi
             else
                 # CLI not available - fall back to direct adb install (no auto-grant).
                 if adb install -r "$APK_LOCAL_PATH"; then
                     echo -e "${GREEN}✅ Operator APK installed.${NC}"
-                    echo -e "${YELLOW}⚠️  CLI not available for permission grant. Run once CLI is ready: clawperator operator install --apk ${APK_LOCAL_PATH}${NC}"
+                    echo -e "${YELLOW}⚠️  CLI not available for permission grant. Run once CLI is ready: clawperator operator setup --apk ${APK_LOCAL_PATH}${NC}"
                 else
                     echo -e "${RED}❌ Failed to install operator APK via adb.${NC}"
                     return 1
@@ -526,7 +526,7 @@ maybe_install_operator_apk() {
             fi
             ;;
         *)
-            echo -e "${YELLOW}⚠️  Skipped APK installation. Manual command: clawperator operator install --apk ${APK_LOCAL_PATH}${NC}"
+            echo -e "${YELLOW}⚠️  Skipped APK installation. Manual command: clawperator operator setup --apk ${APK_LOCAL_PATH}${NC}"
             ;;
     esac
 }

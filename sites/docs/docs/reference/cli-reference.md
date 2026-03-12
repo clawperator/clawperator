@@ -26,12 +26,12 @@ Default receiver package: `com.clawperator.operator`. Use `--receiver-package co
 
 ## Commands
 
-### `operator install`
+### `operator setup`
 
 Install the Clawperator Operator APK and grant required device permissions in one step.
 
 ```
-clawperator operator install --apk <path> [--device-id <id>] [--receiver-package <package>] [--output <json|pretty>]
+clawperator operator setup --apk <path> [--device-id <id>] [--receiver-package <package>] [--output <json|pretty>]
 ```
 
 | Flag | Description |
@@ -40,7 +40,7 @@ clawperator operator install --apk <path> [--device-id <id>] [--receiver-package
 | `--device-id <id>` | Target Android device serial (required when multiple devices are connected) |
 | `--receiver-package <package>` | Operator package identifier (auto-detected if omitted) |
 
-This is the canonical setup command. It runs three phases in sequence:
+This is the canonical setup command. `clawperator operator install` remains a compatibility alias. It runs three phases in sequence:
 
 1. **Install**: Copies the APK onto the device via `adb install -r`.
 2. **Permissions**: Grants the accessibility service, notification posting, and notification listener permissions.
@@ -455,7 +455,7 @@ Re-grant accessibility and notification permissions only after an Operator APK c
 clawperator grant-device-permissions [--device-id <id>] [--receiver-package <package>] [--output <json\|pretty>]
 ```
 
-This command is for **crash recovery only**. Use it after a previously working Operator APK crashes and Android revokes the accessibility or notification permissions. For initial setup, always use `clawperator operator install` instead.
+This command is for **crash recovery only**. Use it after a previously working Operator APK crashes and Android revokes the accessibility or notification permissions. For initial setup, always use `clawperator operator setup` instead.
 
 Use the release package by default. Pass `--receiver-package com.clawperator.operator.dev` for local debug builds.
 

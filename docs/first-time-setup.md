@@ -85,13 +85,13 @@ If both a physical device and an emulator are connected, you will need to pass `
 Use the canonical install command to install the [Clawperator Operator Android app](android-operator-apk.md) and grant required permissions in one step:
 
 ```bash
-clawperator operator install --apk ~/.clawperator/downloads/operator.apk
+clawperator operator setup --apk ~/.clawperator/downloads/operator.apk
 ```
 
 If you have multiple devices connected, specify the target device:
 
 ```bash
-clawperator operator install \
+clawperator operator setup \
   --apk ~/.clawperator/downloads/operator.apk \
   --device-id <device_id>
 ```
@@ -99,7 +99,7 @@ clawperator operator install \
 For local debug builds, specify the receiver package:
 
 ```bash
-clawperator operator install \
+clawperator operator setup \
   --apk ~/.clawperator/downloads/operator-debug.apk \
   --receiver-package com.clawperator.operator.dev
 ```
@@ -112,9 +112,9 @@ This command runs three phases in order:
 
 The command fails with a structured error if any phase fails. The error includes which phase failed and why, so agents and users can diagnose and recover.
 
-> Do not use raw `adb install` for normal setup. It copies the APK but leaves the device in a partial state without required permissions. Use `clawperator operator install` instead.
+> Do not use raw `adb install` for normal setup. It copies the APK but leaves the device in a partial state without required permissions. Use `clawperator operator setup` instead.
 
-> Always use `clawperator operator install` for setup. Only run `clawperator grant-device-permissions` after the Operator APK crashes and Android revokes the accessibility or notification permissions.
+> Always use `clawperator operator setup` for setup. `clawperator operator install` remains an alias. Only run `clawperator grant-device-permissions` after the Operator APK crashes and Android revokes the accessibility or notification permissions.
 
 ---
 
@@ -131,7 +131,7 @@ A fully configured device will show all checks passing. Common warnings:
 | Warning | Fix |
 | :--- | :--- |
 | `DEVICE_UNAUTHORIZED` | Tap "Allow" on the device USB debugging dialog |
-| `RECEIVER_NOT_INSTALLED` | Complete Step 3 (run `clawperator operator install`) |
+| `RECEIVER_NOT_INSTALLED` | Complete Step 3 (run `clawperator operator setup`) |
 | `DEVICE_ACCESSIBILITY_NOT_RUNNING` | If the Operator APK crashed after setup, run `clawperator grant-device-permissions` to restore the revoked permissions |
 | `DEVICE_DEV_OPTIONS_DISABLED` | Enable Developer options (physical device only) |
 | `DEVICE_USB_DEBUGGING_DISABLED` | Enable USB debugging (physical device only) |

@@ -100,9 +100,9 @@ These codes are produced by `clawperator doctor` and related checks.
 
 ---
 
-## Operator install
+## Operator setup
 
-These codes are produced by `clawperator operator install`.
+These codes are produced by `clawperator operator setup` (or the `operator install` alias).
 
 | Code | Description |
 |------|-------------|

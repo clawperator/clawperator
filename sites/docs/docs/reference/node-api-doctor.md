@@ -30,7 +30,7 @@ Default receiver package:
 - release app package: `com.clawperator.operator`
 - local debug app package: `com.clawperator.operator.dev`
 
-If you use a local debug build of the [Clawperator Operator Android app](../getting-started/android-operator-apk.md), pass `--receiver-package com.clawperator.operator.dev` consistently to `doctor`, `operator install`, `grant-device-permissions`, `version --check-compat`, and `observe snapshot`.
+If you use a local debug build of the [Clawperator Operator Android app](../getting-started/android-operator-apk.md), pass `--receiver-package com.clawperator.operator.dev` consistently to `doctor`, `operator setup`, `grant-device-permissions`, `version --check-compat`, and `observe snapshot`.
 
 ## What Doctor Checks
 

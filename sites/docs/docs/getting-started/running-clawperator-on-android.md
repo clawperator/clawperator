@@ -98,13 +98,13 @@ Even on an emulator, the user still needs to:
 Use the canonical install command to install the [Clawperator Operator Android app](android-operator-apk.md) and grant required permissions in one step:
 
 ```bash
-clawperator operator install --apk ~/.clawperator/downloads/operator.apk
+clawperator operator setup --apk ~/.clawperator/downloads/operator.apk
 ```
 
 If multiple devices are connected, target one explicitly:
 
 ```bash
-clawperator operator install --apk ~/.clawperator/downloads/operator.apk --device-id <device_id>
+clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id <device_id>
 ```
 
 This command installs the APK, grants the accessibility service and notification listener permissions, and verifies the package is ready.
@@ -117,7 +117,7 @@ If the Operator APK crashes after initial setup and Android revokes its permissi
 clawperator grant-device-permissions
 ```
 
-Do not use this as part of normal setup. The normal setup path is always `clawperator operator install`.
+Do not use this as part of normal setup. The normal setup path is always `clawperator operator setup` (`clawperator operator install` remains an alias).
 
 ## Verifying setup
 
