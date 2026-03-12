@@ -2,7 +2,6 @@ package clawperator.task.runner
 
 import action.developeroptions.DeveloperOptionsManager
 import action.math.geometry.Rect
-import clawperator.accessibilityservice.AccessibilityServiceManager
 import clawperator.test.ActionTest
 import clawperator.test.actionTest
 import clawperator.uitree.ToggleState
@@ -22,7 +21,7 @@ class UiActionEngineDefaultTest : ActionTest {
             val uiScope = RecordingTaskUiScope()
             val taskScope = RecordingTaskScope(uiScope)
             val developerOptionsManager = DeveloperOptionsManagerMock()
-            val engine = UiActionEngineDefault(developerOptionsManager, AccessibilityServiceManagerMock())
+            val engine = UiActionEngineDefault(developerOptionsManager, UiGlobalActionDispatcherMock())
 
             val result =
                 engine.execute(
@@ -62,7 +61,7 @@ class UiActionEngineDefaultTest : ActionTest {
             val uiScope = RecordingTaskUiScope()
             val taskScope = RecordingTaskScope(uiScope)
             val developerOptionsManager = DeveloperOptionsManagerMock()
-            val engine = UiActionEngineDefault(developerOptionsManager, AccessibilityServiceManagerMock())
+            val engine = UiActionEngineDefault(developerOptionsManager, UiGlobalActionDispatcherMock())
 
             val result =
                 engine.execute(
@@ -96,7 +95,7 @@ class UiActionEngineDefaultTest : ActionTest {
             val uiScope = RecordingTaskUiScope()
             val taskScope = RecordingTaskScope(uiScope)
             val developerOptionsManager = DeveloperOptionsManagerMock()
-            val engine = UiActionEngineDefault(developerOptionsManager, AccessibilityServiceManagerMock())
+            val engine = UiActionEngineDefault(developerOptionsManager, UiGlobalActionDispatcherMock())
 
             val result =
                 engine.execute(
@@ -125,9 +124,11 @@ class UiActionEngineDefaultTest : ActionTest {
     fun `execute press_key throws when accessibility service is unavailable`() =
         actionTest {
             val taskScope = RecordingTaskScope(RecordingTaskUiScope())
-            // AccessibilityServiceManagerMock is not AccessibilityServiceManagerAndroid,
-            // so currentAccessibilityService extension returns null - simulating unavailable service.
-            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), AccessibilityServiceManagerMock())
+            val engine =
+                UiActionEngineDefault(
+                    DeveloperOptionsManagerMock(),
+                    UiGlobalActionDispatcherMock(error = IllegalStateException("OperatorAccessibilityService is not running - cannot execute press_key")),
+                )
 
             assertFailsWith<IllegalStateException> {
                 engine.execute(
@@ -140,6 +141,61 @@ class UiActionEngineDefaultTest : ActionTest {
                     ),
                 )
             }
+        }
+
+    @Test
+    fun `execute press_key returns success result when global action succeeds`() =
+        actionTest {
+            val taskScope = RecordingTaskScope(RecordingTaskUiScope())
+            val engine =
+                UiActionEngineDefault(
+                    DeveloperOptionsManagerMock(),
+                    UiGlobalActionDispatcherMock(result = true),
+                )
+
+            val result =
+                engine.execute(
+                    taskScope = taskScope,
+                    plan = UiActionPlan(
+                        commandId = "cmd-key-success",
+                        taskId = "task-key-success",
+                        source = "test",
+                        actions = listOf(UiAction.PressKey(id = "k1", key = UiSystemKey.HOME)),
+                    ),
+                )
+
+            val stepResult = result.stepResults.single()
+            assertEquals("press_key", stepResult.actionType)
+            assertEquals(true, stepResult.success)
+            assertEquals("home", stepResult.data["key"])
+        }
+
+    @Test
+    fun `execute press_key returns failed step result when global action is rejected`() =
+        actionTest {
+            val taskScope = RecordingTaskScope(RecordingTaskUiScope())
+            val engine =
+                UiActionEngineDefault(
+                    DeveloperOptionsManagerMock(),
+                    UiGlobalActionDispatcherMock(result = false),
+                )
+
+            val result =
+                engine.execute(
+                    taskScope = taskScope,
+                    plan = UiActionPlan(
+                        commandId = "cmd-key-failed",
+                        taskId = "task-key-failed",
+                        source = "test",
+                        actions = listOf(UiAction.PressKey(id = "k1", key = UiSystemKey.RECENTS)),
+                    ),
+                )
+
+            val stepResult = result.stepResults.single()
+            assertEquals("press_key", stepResult.actionType)
+            assertEquals(false, stepResult.success)
+            assertEquals("recents", stepResult.data["key"])
+            assertEquals("GLOBAL_ACTION_FAILED", stepResult.data["error"])
         }
 }
 
@@ -296,7 +352,12 @@ private class DeveloperOptionsManagerMock : DeveloperOptionsManager {
     override val isUsbDebuggingEnabled: Flow<Boolean> = flowOf(true)
 }
 
-// Not AccessibilityServiceManagerAndroid, so currentAccessibilityService extension returns null.
-private class AccessibilityServiceManagerMock : AccessibilityServiceManager {
-    override val isRunning: Flow<Boolean> = flowOf(false)
+private class UiGlobalActionDispatcherMock(
+    private val result: Boolean = true,
+    private val error: IllegalStateException? = null,
+) : UiGlobalActionDispatcher {
+    override fun perform(key: UiSystemKey): Boolean {
+        error?.let { throw it }
+        return result
+    }
 }

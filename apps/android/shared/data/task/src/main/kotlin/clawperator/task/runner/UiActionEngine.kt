@@ -2,9 +2,6 @@ package clawperator.task.runner
 
 import action.log.Log
 import action.developeroptions.DeveloperOptionsManager
-import android.accessibilityservice.AccessibilityService
-import clawperator.accessibilityservice.AccessibilityServiceManager
-import clawperator.accessibilityservice.currentAccessibilityService
 import kotlinx.coroutines.flow.first
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -17,7 +14,7 @@ interface UiActionEngine {
 
 class UiActionEngineDefault(
     private val developerOptionsManager: DeveloperOptionsManager,
-    private val accessibilityServiceManager: AccessibilityServiceManager,
+    private val globalActionDispatcher: UiGlobalActionDispatcher,
 ) : UiActionEngine {
     companion object {
         private const val TAG = "[UiActionEngine]"
@@ -303,17 +300,8 @@ class UiActionEngineDefault(
     }
 
     private fun executePressKey(action: UiAction.PressKey): UiActionStepResult {
-        val service = accessibilityServiceManager.currentAccessibilityService
-            ?: error("OperatorAccessibilityService is not running - cannot execute press_key")
-
-        val globalAction = when (action.key) {
-            UiSystemKey.BACK -> AccessibilityService.GLOBAL_ACTION_BACK
-            UiSystemKey.HOME -> AccessibilityService.GLOBAL_ACTION_HOME
-            UiSystemKey.RECENTS -> AccessibilityService.GLOBAL_ACTION_RECENTS
-        }
-
         val keyName = action.key.name.lowercase()
-        val success = service.performGlobalAction(globalAction)
+        val success = globalActionDispatcher.perform(action.key)
 
         return if (success) {
             UiActionStepResult(

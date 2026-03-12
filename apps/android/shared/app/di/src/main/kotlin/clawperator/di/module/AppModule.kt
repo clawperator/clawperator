@@ -162,6 +162,8 @@ import clawperator.task.runner.TaskUiScope
 import clawperator.task.runner.TaskUiScopeDefault
 import clawperator.task.runner.UiActionEngine
 import clawperator.task.runner.UiActionEngineDefault
+import clawperator.task.runner.UiGlobalActionDispatcher
+import clawperator.task.runner.UiGlobalActionDispatcherAndroid
 import clawperator.trigger.TriggerManager
 import clawperator.trigger.TriggerManagerDefault
 import clawperator.uitree.UiTreeFilterer
@@ -255,6 +257,8 @@ val AppModule: Module = module {
     single<TaskUiScopeDefault> { TaskUiScopeDefault(get(), get(), get(), get(), get(NamedScope.CoroutineScopeIo)) }
     single<UiActionEngine> { get<UiActionEngineDefault>() }
     single<UiActionEngineDefault> { UiActionEngineDefault(get(), get()) }
+    single<UiGlobalActionDispatcher> { get<UiGlobalActionDispatcherAndroid>() }
+    single<UiGlobalActionDispatcherAndroid> { UiGlobalActionDispatcherAndroid(get()) }
     single<TriggerManager> { TriggerManagerDefault(get(), get(), get(), get(), get(), get(NamedScope.CoroutineScopeMain), get(NamedScope.CoroutineScopeIo)) }
     single<action.system.window.WindowManager> { WindowManagerDefault(get()) }
     single<WorkflowFactory> { get<WorkflowFactoryDefault>() }
