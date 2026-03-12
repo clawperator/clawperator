@@ -3,13 +3,49 @@
 import os
 import sys
 
-try:
-    import yaml
-except ImportError as exc:
-    raise ImportError(
-        "PyYAML is required to run generate_llms_full.py. "
-        "Please install it (e.g., 'pip install PyYAML') or add it to sites/docs/requirements.txt."
-    ) from exc
+def parse_source_map(path):
+    """
+    Simplistic YAML parser for source-map.yaml that avoids external dependencies.
+    It specifically handles the 'sections' and 'pages' structure.
+    """
+    sections = []
+    current_section = None
+    current_page = None
+    in_pages = False
+    
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            
+            # Identify sections starting with '  - id:'
+            if stripped.startswith("- id:"):
+                current_section = {"pages": [], "id": stripped.split(":", 1)[1].strip()}
+                sections.append(current_section)
+                in_pages = False
+                current_page = None
+                continue
+            
+            if stripped.startswith("title:") and current_section and not in_pages:
+                current_section["title"] = stripped.split(":", 1)[1].strip()
+                continue
+                
+            if stripped == "pages:":
+                in_pages = True
+                continue
+                
+            # Identify pages starting with '      - output:'
+            if stripped.startswith("- output:") and in_pages:
+                current_page = {"output": stripped.split(":", 1)[1].strip()}
+                current_section["pages"].append(current_page)
+                continue
+                
+            if stripped.startswith("title:") and current_page:
+                current_page["title"] = stripped.split(":", 1)[1].strip()
+                continue
+                
+    return {"sections": sections}
 
 def main():
     # Locate the repository root (and sites/docs) relative to this script's path,
@@ -26,11 +62,11 @@ def main():
         os.path.join(repo_root, "sites", "landing", "public", "llms-full.txt"),
     ]
     
-    with open(source_map_path, "r", encoding="utf-8") as f:
-        source_map = yaml.safe_load(f)
+    if not os.path.exists(source_map_path):
+        print(f"Error: Source map not found at {source_map_path}")
+        sys.exit(1)
         
-    if not isinstance(source_map, dict):
-        raise ValueError(f"Failed to load a valid dictionary from {source_map_path}")
+    source_map = parse_source_map(source_map_path)
         
     compiled_content = []
     

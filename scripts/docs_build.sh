@@ -24,34 +24,38 @@ fi
 
 cd "$DOCS_DIR"
 
-# Install dependencies if not already installed
-if [ ! -d "$VENV_DIR" ]; then
-    echo "Setting up Python virtual environment..."
-    python3 -m venv "$VENV_DIR"
+# Setup Python environment
+if [ -z "${CI:-}" ]; then
+    # Local: use venv
+    if [ ! -d "$VENV_DIR" ]; then
+        echo "Setting up Python virtual environment..."
+        python3 -m venv "$VENV_DIR"
+    fi
+    source "$VENV_DIR/bin/activate"
+    echo "Installing MkDocs dependencies..."
+    pip install -r "$REQUIREMENTS_FILE"
+    PYTHON_EXEC="$VENV_DIR/bin/python"
+else
+    # CI: skip venv, assume environment is set up via requirements.txt or build preset
+    echo "CI environment detected, skipping venv creation."
+    # Cloudflare Pages might have requirements already installed via requirements.txt
+    # but we'll try to ensure they are available just in case.
+    pip install -r "$REQUIREMENTS_FILE" || echo "Warning: pip install failed, continuing..."
+    PYTHON_EXEC="python3"
 fi
-
-source "$VENV_DIR/bin/activate"
-
-if [ ! -f "$REQUIREMENTS_FILE" ]; then
-    echo "Error: requirements file not found at $REQUIREMENTS_FILE"
-    exit 1
-fi
-
-echo "Installing MkDocs dependencies..."
-pip install -r "$REQUIREMENTS_FILE"
 
 # Run the build
 echo "Running MkDocs build..."
 mkdocs build
 
 echo "Patching docs sitemap metadata..."
-"$VENV_DIR/bin/python" "$REPO_ROOT/.agents/skills/sitemaps-generate/scripts/generate_sitemap_metadata.py" docs \
+"$PYTHON_EXEC" "$REPO_ROOT/.agents/skills/sitemaps-generate/scripts/generate_sitemap_metadata.py" docs \
   --repo-root "$REPO_ROOT" \
   --sitemap-path "$DOCS_DIR/site/sitemap.xml" \
   --source-map-path "$DOCS_DIR/source-map.yaml"
 
 echo "Generating llms-full.txt..."
-"$VENV_DIR/bin/python" "$REPO_ROOT/.agents/skills/docs-generate/scripts/generate_llms_full.py"
+"$PYTHON_EXEC" "$REPO_ROOT/.agents/skills/docs-generate/scripts/generate_llms_full.py"
 
 STATIC_DIR="$DOCS_DIR/static"
 if [ -d "$STATIC_DIR" ]; then

@@ -1,3 +1,2 @@
 mkdocs>=1.5,<2.0
 mkdocs-terminal>=0.1.0,<5.0
-PyYAML>=5.1,<7.0
