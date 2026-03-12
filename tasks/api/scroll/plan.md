@@ -239,16 +239,43 @@ Post-scroll stabilization is the caller's responsibility in the multi-step sense
 ### Phase 5 - Validation skill / demo
 
 **Scope:**
-- Write a soak validation script (~60 seconds): open Android Settings, issue 10 `scroll` actions in a loop, verify `scroll_outcome` transitions from `"moved"` to `"edge_reached"` as the list exhausts
-- Add a snapshot-scroll-snapshot-verify loop: take snapshot, scroll, take snapshot, verify top-of-list node label changed
-- Place in `scripts/` or as a local skill artifact
 
-**Suggested script location:** `scripts/clawperator_smoke_scroll.sh`
+Implement `scripts/clawperator_smoke_scroll.sh` - a deterministic, device-independent smoke test using Android Settings.
+
+Android Settings is chosen deliberately:
+- Guaranteed present on every Android device
+- Finite, non-infinite-loading list
+- OEM customization of Settings content does not matter - the test never asserts on any specific menu item
+- Provides a clean `edge_reached` signal in both directions
+
+**Test flow:**
+
+1. Launch Android Settings via `adb shell am start`
+2. `snapshot_ui` - capture initial leading-child signature of the Settings RecyclerView
+3. **Scroll to bottom in stages:**
+   - Issue `scroll` with `direction: "down"` (one action at a time, not `maxSwipes`)
+   - After each scroll, `snapshot_ui` and check `scroll_outcome`
+   - Continue until `scroll_outcome == "edge_reached"`
+   - Assert `edge_reached` was received within a reasonable step budget (not a timeout or error)
+4. **Scroll back to top in stages:**
+   - Issue `scroll` with `direction: "up"` (one action at a time)
+   - After each scroll, `snapshot_ui` and check `scroll_outcome`
+   - Continue until `scroll_outcome == "edge_reached"`
+   - Assert `edge_reached` was received
+5. **Verify position reset:**
+   - Take a final `snapshot_ui`
+   - Assert the leading-child signature of the RecyclerView matches the signature captured in step 2
+   - This confirms the list is back at the top, using the same mechanism the action uses internally
+
+The signature comparison in step 5 avoids depending on any OEM-specific node (such as a search bar or a top-level Settings label). It is purely structural.
 
 **Validation criteria:**
-- At least one `"moved"` result before any `"edge_reached"` result
+- At least one `"moved"` result before the first `"edge_reached"` in each direction
 - No `"gesture_failed"` results on a normal device
-- Total execution time under 90 seconds
+- Final snapshot signature matches initial snapshot signature
+- Total execution time under 120 seconds
+
+**Suggested script location:** `scripts/clawperator_smoke_scroll.sh`
 
 ---
 
@@ -256,9 +283,9 @@ Post-scroll stabilization is the caller's responsibility in the multi-step sense
 
 | Scenario | Expected outcome | How to verify |
 |----------|-----------------|---------------|
-| Android Settings RecyclerView, first scroll down from top | `scroll_outcome: "moved"` | `data.scroll_outcome == "moved"` |
-| Android Settings RecyclerView, scroll up at top | `scroll_outcome: "edge_reached"` | `data.scroll_outcome == "edge_reached"` |
-| Android Settings RecyclerView, repeat scroll down until exhausted | Last N results `"edge_reached"` | Loop until edge, check all tail results |
+| Android Settings: first scroll down from top | `scroll_outcome: "moved"` | `data.scroll_outcome == "moved"` |
+| Android Settings: scroll up when already at top | `scroll_outcome: "edge_reached"` | `data.scroll_outcome == "edge_reached"` |
+| Android Settings: scroll down in stages to bottom, then up in stages to top | Final signature matches initial signature | `clawperator_smoke_scroll.sh` |
 | Container not present on screen | `success: false`, `data.error: "CONTAINER_NOT_FOUND"` | Use non-existent resourceId |
 | Google Play (lazy-loading list) | `scroll_outcome: "moved"` repeatedly until new content loads | Soak test |
 | Horizontal carousel (e.g., category chips) | `scroll_outcome: "moved"` with `direction: "left"` | Manual with Google Home app |
