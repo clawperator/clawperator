@@ -268,7 +268,7 @@ export default function Home() {
           <p className="hero-brain-hand">
             🧠 Your agent/Claw is the brain.
             <br />
-            🤚 Clawperator is the hand.
+            ✋ Clawperator is the hand.
           </p>
           <p className="hero-summary hero-summary-secondary">
             Connect your claw to a dedicated Android burner phone, run your own private skills and get answers your agent can trust.
