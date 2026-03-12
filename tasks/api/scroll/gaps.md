@@ -22,14 +22,21 @@ For these, "scroll to the edge" is either impossible or means "scroll until we g
 
 **The right framing:** This is a *bounded scroll loop* - it scrolls repeatedly until some termination condition fires, and it honestly reports *which condition* stopped it. The edge is one possible termination reason, not the guaranteed outcome.
 
-**Proposed name and contract:**
+**Proposed name:** `scroll_until`
 
-`scroll_until_done` or `scroll_max` - names that describe mechanism, not a presumed destination.
+This name was chosen over `scroll_loop` and `scroll_max` for reasons specific to this API:
+
+- It pairs with `wait_for_node` - both are condition-based polling actions. Agents already understand "keep doing X until a condition fires" from `wait_for_node`; `scroll_until` arrives pre-explained.
+- It enables unification with Gap #4 (`scroll_until_visible`) through an optional `until` param (see below), reducing total API surface.
+- `scroll_max` implies hitting the cap is the primary outcome. For finite lists (Settings, preferences screens), the agent wants `EDGE_REACHED`. `scroll_max` anchors the wrong termination reason.
+- `scroll_loop` describes a runtime mechanism, not an agent intent. Other action names (`tap`, `scroll`, `type`, `wait_for_node`) describe what the agent is asking for, not how the runtime implements it.
+
+**Basic contract (bounded loop, no target):**
 
 ```json
 {
   "id": "go-bottom",
-  "type": "scroll_until_done",
+  "type": "scroll_until",
   "params": {
     "direction": "down",
     "container": { "resourceId": "com.android.settings:id/recycler_view" },
@@ -64,9 +71,28 @@ Result:
 **Key design rules:**
 - `MAX_SCROLLS_REACHED` and `MAX_DURATION_REACHED` are not errors - they are clean terminal states. Agents writing to paginate an infinite feed expect them.
 - Defaults must always be applied even when not user-specified. Suggested defaults: `maxScrolls: 20`, `maxDurationMs: 10000`. A scroll loop with no bound is unsafe.
-- `EDGE_REACHED` should use `edge_reached` from the existing `scroll` primitive as its detection signal - no new edge heuristic needed.
+- `EDGE_REACHED` should reuse `edge_reached` from the existing `scroll` primitive as its detection signal - no new edge heuristic needed.
 
-**Relationship to `scroll` primitive:** `scroll_until_done` is a convenience loop built entirely on top of `scroll`. It is a higher-level action, not a replacement.
+**Unification with Gap #4 via `until` param (future extension):**
+
+`scroll_until` can absorb `scroll_until_visible` (Gap #4) without a separate action type. An optional `until` field selects the primary early-exit condition:
+
+```json
+{
+  "type": "scroll_until",
+  "params": {
+    "direction": "down",
+    "until": "ELEMENT_VISIBLE",
+    "target": { "textContains": "Privacy" },
+    "maxScrolls": 20,
+    "maxDurationMs": 8000
+  }
+}
+```
+
+This gives `termination_reason: "TARGET_FOUND"` when successful, and falls back to cap-based termination if the element is never found. One action type covers both use cases.
+
+**Relationship to `scroll` primitive:** `scroll_until` is a convenience loop built entirely on top of `scroll`. It is a higher-level action, not a replacement.
 
 ---
 
@@ -103,12 +129,14 @@ This is best-effort (Android does not always expose exact scroll position) but t
 
 **Impact on agents:** A common pattern is "scroll down until I see the Privacy section header, then read its content." Currently requires either: (a) using `scroll_and_click` on a dummy element (wrong semantic, confusing), or (b) scroll-snap-check loop (multiple round trips).
 
-**Proposed fix:** Add a `scroll_until_visible` action (or a `clickAfter: false` option on `scroll_and_click`):
+**Proposed fix:** If `scroll_until` (Gap #1) is implemented with the `until` param extension, this gap is resolved without a separate action type:
+
 ```json
 {
   "id": "find",
-  "type": "scroll_until_visible",
+  "type": "scroll_until",
   "params": {
+    "until": "ELEMENT_VISIBLE",
     "target": { "textContains": "Privacy" },
     "direction": "down",
     "maxScrolls": 20,
@@ -117,7 +145,9 @@ This is best-effort (Android does not always expose exact scroll position) but t
 }
 ```
 
-**Termination policy note:** The same reasoning from Gap #1 applies here. If the target element does not exist and there is no `maxScrolls` or `maxDurationMs` cap, this action runs forever on infinite feeds. Termination caps must be required (with sensible defaults) and the result must return a `termination_reason` - either `TARGET_FOUND`, `EDGE_REACHED`, `MAX_SCROLLS_REACHED`, `MAX_DURATION_REACHED`, or `NO_POSITION_CHANGE`. `scroll_until_visible` is also a bounded scroll loop; it just adds a second early-exit condition (target found).
+If `scroll_until` is shipped without the `until` param in v1, the interim fix is a `clickAfter: false` option on the existing `scroll_and_click` action. This is lower-risk than a new action type and unblocks the use case immediately.
+
+**Termination policy note:** Whether implemented as `scroll_until` with `until: "ELEMENT_VISIBLE"` or as a standalone action, termination caps are required. If the target does not exist on a finite list, `EDGE_REACHED` terminates cleanly. If the target does not exist on an infinite feed, `MAX_SCROLLS_REACHED` or `MAX_DURATION_REACHED` terminates cleanly. `TARGET_NOT_FOUND` should not be an error code - it is a normal `termination_reason` that the agent handles.
 
 ---
 
@@ -150,7 +180,7 @@ direction: "down" = reveal more content below (swipe finger up). Default: "down"
 
 **Impact on agents:** Every agent that needs to enumerate a list will independently rediscover the loop pattern and likely make mistakes (no max-steps guard, no `edge_reached` check, unnecessary re-scrolling).
 
-**Proposed fix:** Add a "Pagination Recipe" section to the docs with a full pseudo-code loop showing the correct terminal condition and a note on `scroll_until_done` once Gap #1 is implemented. The recipe should also show the manual loop as the v1 pattern so agents have something to follow before the convenience action exists. Critically, the recipe must include a `maxScrolls` guard even in the manual loop - any agent-side loop without a step cap is fragile on infinite feeds.
+**Proposed fix:** Add a "Pagination Recipe" section to the docs with a full pseudo-code loop showing the correct terminal condition and a note on `scroll_until` once Gap #1 is implemented. The recipe should also show the manual loop as the v1 pattern so agents have something to follow before the convenience action exists. Critically, the recipe must include a `maxScrolls` guard even in the manual loop - any agent-side loop without a step cap is fragile on infinite feeds.
 
 ---
 
