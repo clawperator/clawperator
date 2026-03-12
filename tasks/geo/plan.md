@@ -48,8 +48,8 @@ Create or confirm:
 Use local environment variables, not committed files:
 
 ```sh
-export CLOUDFLARE_ACCOUNT_ID="<account_id>"
-export CLOUDFLARE_BROWSER_RENDERING_API_TOKEN="<api_token>"
+export CLAWPERATOR_CLOUDFLARE_ACCOUNT_ID="<account_id>"
+export CLAWPERATOR_CLOUDFLARE_DOCS_WRANGLER_API_TOKEN="<api_token>"
 ```
 
 Optional local convenience variables:
@@ -73,13 +73,13 @@ First test a minimal crawl creation request:
 
 ```sh
 curl -X POST \
-  "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/browser-rendering/crawl" \
-  -H "Authorization: Bearer ${CLOUDFLARE_BROWSER_RENDERING_API_TOKEN}" \
+  "https://api.cloudflare.com/client/v4/accounts/${CLAWPERATOR_CLOUDFLARE_ACCOUNT_ID}/browser-rendering/crawl" \
+  -H "Authorization: Bearer ${CLAWPERATOR_CLOUDFLARE_DOCS_WRANGLER_API_TOKEN}" \
   -H "Content-Type: application/json" \
   -d '{
     "url": "https://clawperator.com",
     "limit": 1,
-    "depth": 0,
+    "depth": 1,
     "formats": ["markdown"],
     "render": false
   }'
@@ -95,8 +95,8 @@ Then poll the created job:
 
 ```sh
 curl -X GET \
-  "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/browser-rendering/crawl/<job_id>?limit=1" \
-  -H "Authorization: Bearer ${CLOUDFLARE_BROWSER_RENDERING_API_TOKEN}"
+  "https://api.cloudflare.com/client/v4/accounts/${CLAWPERATOR_CLOUDFLARE_ACCOUNT_ID}/browser-rendering/crawl/<job_id>?limit=1" \
+  -H "Authorization: Bearer ${CLAWPERATOR_CLOUDFLARE_DOCS_WRANGLER_API_TOKEN}"
 ```
 
 Expected result:
@@ -183,8 +183,8 @@ Suggested location:
 
 Suggested helper behavior:
 
-- read `CLOUDFLARE_ACCOUNT_ID`
-- read `CLOUDFLARE_BROWSER_RENDERING_API_TOKEN`
+- read `CLAWPERATOR_CLOUDFLARE_ACCOUNT_ID`
+- read `CLAWPERATOR_CLOUDFLARE_DOCS_WRANGLER_API_TOKEN`
 - create crawl jobs
 - poll for completion
 - paginate through results when a cursor is returned
