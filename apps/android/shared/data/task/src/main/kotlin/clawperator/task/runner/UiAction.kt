@@ -53,6 +53,16 @@ sealed interface UiAction {
         val findFirstScrollableChild: Boolean = false,
     ) : UiAction
 
+    data class Scroll(
+        override val id: String,
+        val container: NodeMatcher? = null,
+        val direction: TaskScrollDirection = TaskScrollDirection.Down,
+        val distanceRatio: Float = 0.7f,
+        val settleDelayMs: Long = 250,
+        val findFirstScrollableChild: Boolean = false,
+        val retry: TaskRetry = TaskRetry.None,
+    ) : UiAction
+
     data class ReadText(
         override val id: String,
         val matcher: NodeMatcher,

@@ -13,6 +13,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 
 class UiActionEngineDefaultTest : ActionTest {
     @Test
@@ -197,6 +198,130 @@ class UiActionEngineDefaultTest : ActionTest {
             assertEquals("recents", stepResult.data["key"])
             assertEquals("GLOBAL_ACTION_FAILED", stepResult.data["error"])
         }
+
+    @Test
+    fun `execute scroll returns moved when scrollOnce returns Moved`() =
+        actionTest {
+            val uiScope = RecordingTaskUiScope(scrollOnceOutcome = TaskScrollOutcome.Moved)
+            val taskScope = RecordingTaskScope(uiScope)
+            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+
+            val result =
+                engine.execute(
+                    taskScope = taskScope,
+                    plan = UiActionPlan(
+                        commandId = "cmd-scroll-moved",
+                        taskId = "task-scroll-moved",
+                        source = "test",
+                        actions = listOf(UiAction.Scroll(id = "s1", direction = TaskScrollDirection.Down)),
+                    ),
+                )
+
+            val stepResult = result.stepResults.single()
+            assertEquals("scroll", stepResult.actionType)
+            assertEquals(true, stepResult.success)
+            assertEquals("moved", stepResult.data["scroll_outcome"])
+            assertEquals("down", stepResult.data["direction"])
+            assertTrue(uiScope.scrollOnceCalled)
+        }
+
+    @Test
+    fun `execute scroll returns edge_reached when scrollOnce returns EdgeReached`() =
+        actionTest {
+            val uiScope = RecordingTaskUiScope(scrollOnceOutcome = TaskScrollOutcome.EdgeReached)
+            val taskScope = RecordingTaskScope(uiScope)
+            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+
+            val result =
+                engine.execute(
+                    taskScope = taskScope,
+                    plan = UiActionPlan(
+                        commandId = "cmd-scroll-edge",
+                        taskId = "task-scroll-edge",
+                        source = "test",
+                        actions = listOf(UiAction.Scroll(id = "s2", direction = TaskScrollDirection.Up)),
+                    ),
+                )
+
+            val stepResult = result.stepResults.single()
+            assertEquals("scroll", stepResult.actionType)
+            assertEquals(true, stepResult.success)
+            assertEquals("edge_reached", stepResult.data["scroll_outcome"])
+            assertEquals("up", stepResult.data["direction"])
+        }
+
+    @Test
+    fun `execute scroll returns failure when scrollOnce returns GestureFailed`() =
+        actionTest {
+            val uiScope = RecordingTaskUiScope(scrollOnceOutcome = TaskScrollOutcome.GestureFailed)
+            val taskScope = RecordingTaskScope(uiScope)
+            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+
+            val result =
+                engine.execute(
+                    taskScope = taskScope,
+                    plan = UiActionPlan(
+                        commandId = "cmd-scroll-gesture-failed",
+                        taskId = "task-scroll-gesture-failed",
+                        source = "test",
+                        actions = listOf(UiAction.Scroll(id = "s3")),
+                    ),
+                )
+
+            val stepResult = result.stepResults.single()
+            assertEquals("scroll", stepResult.actionType)
+            assertEquals(false, stepResult.success)
+            assertEquals("gesture_failed", stepResult.data["scroll_outcome"])
+            assertEquals("GESTURE_FAILED", stepResult.data["error"])
+        }
+
+    @Test
+    fun `execute scroll returns container_not_found when scrollOnce throws no scrollable container`() =
+        actionTest {
+            val uiScope = RecordingTaskUiScope(scrollOnceThrows = IllegalStateException("No scrollable container visible"))
+            val taskScope = RecordingTaskScope(uiScope)
+            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+
+            val result =
+                engine.execute(
+                    taskScope = taskScope,
+                    plan = UiActionPlan(
+                        commandId = "cmd-scroll-no-container",
+                        taskId = "task-scroll-no-container",
+                        source = "test",
+                        actions = listOf(UiAction.Scroll(id = "s4")),
+                    ),
+                )
+
+            val stepResult = result.stepResults.single()
+            assertEquals("scroll", stepResult.actionType)
+            assertEquals(false, stepResult.success)
+            assertEquals("CONTAINER_NOT_FOUND", stepResult.data["error"])
+        }
+
+    @Test
+    fun `execute scroll returns container_not_scrollable when scrollOnce throws not scrollable`() =
+        actionTest {
+            val uiScope = RecordingTaskUiScope(scrollOnceThrows = IllegalStateException("Scrollable container not found for matcher"))
+            val taskScope = RecordingTaskScope(uiScope)
+            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+
+            val result =
+                engine.execute(
+                    taskScope = taskScope,
+                    plan = UiActionPlan(
+                        commandId = "cmd-scroll-not-scrollable",
+                        taskId = "task-scroll-not-scrollable",
+                        source = "test",
+                        actions = listOf(UiAction.Scroll(id = "s5")),
+                    ),
+                )
+
+            val stepResult = result.stepResults.single()
+            assertEquals("scroll", stepResult.actionType)
+            assertEquals(false, stepResult.success)
+            assertEquals("CONTAINER_NOT_SCROLLABLE", stepResult.data["error"])
+        }
 }
 
 private class RecordingTaskScope(
@@ -240,8 +365,12 @@ private class RecordingTaskScope(
     override suspend fun <T> ui(block: suspend TaskUiScope.() -> T): T = uiScope.block()
 }
 
-private class RecordingTaskUiScope : TaskUiScope {
+private class RecordingTaskUiScope(
+    private val scrollOnceOutcome: TaskScrollOutcome = TaskScrollOutcome.Moved,
+    private val scrollOnceThrows: IllegalStateException? = null,
+) : TaskUiScope {
     var scrollIntoViewCalled: Boolean = false
+    var scrollOnceCalled: Boolean = false
     var clickCalled: Boolean = false
 
     override suspend fun getValidatedText(
@@ -280,6 +409,19 @@ private class RecordingTaskUiScope : TaskUiScope {
         retry: TaskRetry,
     ) {
         clickCalled = true
+    }
+
+    override suspend fun scrollOnce(
+        container: NodeMatcher?,
+        direction: TaskScrollDirection,
+        distanceRatio: Float,
+        settleDelay: Duration,
+        retry: TaskRetry,
+        findFirstScrollableChild: Boolean,
+    ): TaskScrollOutcome {
+        scrollOnceCalled = true
+        scrollOnceThrows?.let { throw it }
+        return scrollOnceOutcome
     }
 
     override suspend fun scrollUntil(

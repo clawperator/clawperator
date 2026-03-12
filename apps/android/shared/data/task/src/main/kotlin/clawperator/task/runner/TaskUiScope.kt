@@ -122,6 +122,32 @@ interface TaskUiScope {
     ): TaskUiNode
 
     /**
+     * Performs a single scroll gesture within a container and reports the outcome.
+     *
+     * Unlike [scrollUntil], this does not search for a target element. It performs exactly one
+     * swipe and reports whether content actually moved.
+     *
+     * @param container     Optional matcher for the scrollable container. If null, the first on-screen scrollable is used.
+     * @param direction     Direction of scrolling: Down/Up for vertical, Left/Right for horizontal (default Down).
+     * @param distanceRatio Swipe distance as a ratio of the container height/width (must be in [0.0, 1.0], default 0.7f).
+     * @param settleDelay   Delay after the swipe before comparing signatures (default 250ms).
+     * @param retry         Retry policy for container resolution (default no retry).
+     * @param findFirstScrollableChild If true and the matched container itself isn't scrollable,
+     *        use its first scrollable descendant.
+     * @return [TaskScrollOutcome.Moved] if content shifted, [TaskScrollOutcome.EdgeReached] if at limit,
+     *         [TaskScrollOutcome.GestureFailed] if the gesture was rejected.
+     * @throws Exception if the container cannot be found or is not scrollable.
+     */
+    suspend fun scrollOnce(
+        container: NodeMatcher? = null,
+        direction: TaskScrollDirection = TaskScrollDirection.Down,
+        distanceRatio: Float = 0.7f,
+        settleDelay: Duration = 250.milliseconds,
+        retry: TaskRetry = TaskRetry.None,
+        findFirstScrollableChild: Boolean = false,
+    ): TaskScrollOutcome
+
+    /**
      * Convenience method that scrolls to find a target element and then clicks it.
      * This reduces matcher resolution churn by reusing the same target matcher.
      *

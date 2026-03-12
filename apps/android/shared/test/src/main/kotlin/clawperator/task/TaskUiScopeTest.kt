@@ -4,6 +4,7 @@ import action.log.Log
 import clawperator.task.runner.NodeMatcher
 import clawperator.task.runner.TaskRetry
 import clawperator.task.runner.TaskScrollDirection
+import clawperator.task.runner.TaskScrollOutcome
 import clawperator.task.runner.TaskScrollResult
 import clawperator.task.runner.TaskUiNode
 import clawperator.task.runner.TaskUiScope
@@ -102,6 +103,15 @@ class TaskUiScopeTest(
         // In a real test, you might update the UI tree state here to simulate the click result
         println("[TaskUiScopeTest] Clicked node: ${node.label}")
     }
+
+    override suspend fun scrollOnce(
+        container: NodeMatcher?,
+        direction: TaskScrollDirection,
+        distanceRatio: Float,
+        settleDelay: Duration,
+        retry: TaskRetry,
+        findFirstScrollableChild: Boolean,
+    ): TaskScrollOutcome = TaskScrollOutcome.Moved
 
     override suspend fun scrollUntil(
         target: NodeMatcher,

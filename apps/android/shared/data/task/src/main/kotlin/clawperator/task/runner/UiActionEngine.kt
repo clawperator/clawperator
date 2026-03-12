@@ -56,6 +56,7 @@ class UiActionEngineDefault(
                 is UiAction.WaitForNode -> executeWaitForNode(taskScope, action)
                 is UiAction.Click -> executeClick(taskScope, action)
                 is UiAction.ScrollAndClick -> executeScrollAndClick(taskScope, action)
+                is UiAction.Scroll -> executeScroll(taskScope, action)
                 is UiAction.ReadText -> executeReadText(taskScope, action)
                 is UiAction.SnapshotUi -> executeSnapshotUi(taskScope, action)
                 is UiAction.TakeScreenshot -> executeTakeScreenshot(taskScope, action)
@@ -185,6 +186,70 @@ class UiActionEngineDefault(
                     "click_types" to action.clickTypes.toWireValue(),
                 ),
         )
+    }
+
+    private suspend fun executeScroll(
+        taskScope: TaskScope,
+        action: UiAction.Scroll,
+    ): UiActionStepResult {
+        return try {
+            val outcome =
+                taskScope.ui {
+                    scrollOnce(
+                        container = action.container,
+                        direction = action.direction,
+                        distanceRatio = action.distanceRatio,
+                        settleDelay = action.settleDelayMs.milliseconds,
+                        retry = action.retry,
+                        findFirstScrollableChild = action.findFirstScrollableChild,
+                    )
+                }
+            when (outcome) {
+                TaskScrollOutcome.Moved, TaskScrollOutcome.EdgeReached ->
+                    UiActionStepResult(
+                        id = action.id,
+                        actionType = "scroll",
+                        success = true,
+                        data =
+                            mapOf(
+                                "scroll_outcome" to outcome.toWireValue(),
+                                "direction" to action.direction.name.lowercase(),
+                                "distance_ratio" to action.distanceRatio.toString(),
+                            ),
+                    )
+                TaskScrollOutcome.GestureFailed ->
+                    UiActionStepResult(
+                        id = action.id,
+                        actionType = "scroll",
+                        success = false,
+                        data =
+                            mapOf(
+                                "scroll_outcome" to outcome.toWireValue(),
+                                "direction" to action.direction.name.lowercase(),
+                                "distance_ratio" to action.distanceRatio.toString(),
+                                "error" to "GESTURE_FAILED",
+                            ),
+                    )
+            }
+        } catch (e: IllegalStateException) {
+            val message = e.message ?: ""
+            val errorCode =
+                when {
+                    message.contains("Scrollable container not found") -> "CONTAINER_NOT_SCROLLABLE"
+                    else -> "CONTAINER_NOT_FOUND"
+                }
+            Log.w("$TAG executeScroll: $errorCode - ${e.message}")
+            UiActionStepResult(
+                id = action.id,
+                actionType = "scroll",
+                success = false,
+                data =
+                    mapOf(
+                        "error" to errorCode,
+                        "direction" to action.direction.name.lowercase(),
+                    ),
+            )
+        }
     }
 
     private suspend fun executeReadText(
@@ -335,4 +400,15 @@ private fun UiTreeClickTypes.toWireValue(): String =
         UiTreeClickType.LongClick -> "long_click"
         UiTreeClickType.Focus -> "focus"
         else -> "click"
+    }
+
+/**
+ * Returns the stable canonical wire value for a scroll outcome.
+ * Enum names use camel case; wire values use snake_case for consistency with the rest of the API.
+ */
+private fun TaskScrollOutcome.toWireValue(): String =
+    when (this) {
+        TaskScrollOutcome.Moved -> "moved"
+        TaskScrollOutcome.EdgeReached -> "edge_reached"
+        TaskScrollOutcome.GestureFailed -> "gesture_failed"
     }

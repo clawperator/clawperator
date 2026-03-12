@@ -12,3 +12,20 @@ sealed interface TaskScrollResult {
     /** Scrolling was exhausted without finding the target */
     data object NotFoundExhausted : TaskScrollResult
 }
+
+/**
+ * Outcome of a single standalone scroll gesture (see [TaskUiScope.scrollOnce]).
+ *
+ * Distinguishes between three states:
+ * - [Moved]: the gesture was dispatched and leading-child signature changed - content moved.
+ * - [EdgeReached]: the gesture was dispatched but signature was unchanged - container is at its limit.
+ * - [GestureFailed]: the accessibility service rejected the gesture dispatch.
+ *
+ * [EdgeReached] is not an error condition. It is the expected terminal state when paginating
+ * a finite list and should be treated as a successful no-op result in agent loops.
+ */
+enum class TaskScrollOutcome {
+    Moved,
+    EdgeReached,
+    GestureFailed,
+}
