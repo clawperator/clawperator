@@ -152,7 +152,7 @@ def crawl_specs(args):
             "label": "landing-static-crawl",
             "url": landing_base_url,
             "body": {
-                "url": landing_base_url,
+                "url": f"{landing_base_url}/landing-sitemap.xml",
                 "limit": args.static_limit,
                 "depth": args.crawl_depth,
                 "formats": ["markdown"],

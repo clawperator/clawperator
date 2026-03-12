@@ -18,6 +18,8 @@ live-edge header and route verification pass.
 - Browser Rendering `/links` extraction for landing and docs entry pages
 - comparison of static-friendly versus rendered extraction
 - findings focused on agent-ingestibility, not generic SEO boilerplate
+- landing-host crawl isolation using `https://clawperator.com/landing-sitemap.xml`
+  to avoid mixed-host sitemap-index noise
 
 ## Required environment
 
@@ -64,4 +66,9 @@ Optional overrides:
   immediate proof of a bad URL or bad site behavior.
 - Only treat crawl lookup as a tooling blocker after a reasonable polling
   window is exhausted.
+- For the landing host, use `https://clawperator.com/landing-sitemap.xml` as
+  the crawl entrypoint instead of the root host when testing sitemap-led
+  landing coverage. The root host sitemap index also advertises the docs host,
+  which causes noisy `skipped` and `cancelled` records in Cloudflare crawl
+  results even though the landing pages themselves are fetchable.
 - Prefer concise summaries over dumping large extracted markdown blobs.

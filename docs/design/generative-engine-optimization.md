@@ -210,6 +210,8 @@ This helper uses Browser Rendering REST APIs to:
 - inspect extracted markdown for critical pages
 - inspect extracted links for landing and docs entrypoints
 - separate Cloudflare API blockers from site-behavior findings
+- isolate landing-host sitemap crawl coverage via
+  `https://clawperator.com/landing-sitemap.xml`
 
 Current implementation note:
 
@@ -224,6 +226,11 @@ Current implementation note:
   a reasonable window before declaring crawl lookup failure
 - only after that polling window is exhausted should it be reported as a
   Cloudflare-side blocker rather than a site crawlability defect
+- for the landing host, `source: "sitemaps"` against the root host can produce
+  misleading `skipped` and `cancelled` records because the root sitemap index
+  also advertises the docs host
+- use `https://clawperator.com/landing-sitemap.xml` when the goal is to audit
+  landing-surface sitemap coverage specifically
 
 ## Cloudflare caveat
 
