@@ -75,7 +75,7 @@ extract_step_field() {
   local json="$1" action_id="$2" field="$3"
   echo "$json" | node -e "
     const d = JSON.parse(require('fs').readFileSync(0,'utf8'));
-    const steps = d.steps || d.stepResults || [];
+    const steps = d.steps || d.stepResults || (d.envelope && d.envelope.stepResults) || [];
     const step = steps.find(s => s.id === '$action_id');
     if (!step) { process.exit(1); }
     console.log((step.data && step.data['$field']) || '');
@@ -89,10 +89,10 @@ extract_snapshot() {
   local json="$1" action_id="$2"
   echo "$json" | node -e "
     const d = JSON.parse(require('fs').readFileSync(0,'utf8'));
-    const steps = d.steps || d.stepResults || [];
+    const steps = d.steps || d.stepResults || (d.envelope && d.envelope.stepResults) || [];
     const step = steps.find(s => s.id === '$action_id');
     if (!step) { process.exit(1); }
-    console.log((step.data && step.data.snapshot) || '');
+    console.log((step.data && step.data.text) || '');
   " 2>/dev/null || echo ""
 }
 
