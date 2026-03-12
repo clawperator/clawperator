@@ -247,6 +247,7 @@ class CloudflareClient:
             data = json.dumps(payload).encode("utf-8")
         request = urllib.request.Request(url, data=data, method=method, headers=headers)
 
+        last_error = None
         for attempt in range(MAX_RETRIES):
             try:
                 with urllib.request.urlopen(request, timeout=self.timeout_seconds) as response:
@@ -261,14 +262,20 @@ class CloudflareClient:
             except urllib.error.HTTPError as exc:
                 body = exc.read().decode("utf-8", "replace")
                 parsed = json.loads(body) if body else {}
-                return {
+                last_error = {
                     "ok": False,
                     "status_code": exc.code,
                     "headers": dict(exc.headers.items()),
                     "data": parsed,
                 }
+                # Retry only on server error (5xx) or rate limit (429)
+                if exc.code is not None and (exc.code >= 500 or exc.code == 429):
+                    if attempt < MAX_RETRIES - 1:
+                        time.sleep(self.spacing_seconds)
+                        continue
+                return last_error
             except urllib.error.URLError as exc:
-                return {
+                last_error = {
                     "ok": False,
                     "status_code": None,
                     "headers": {},
@@ -277,27 +284,25 @@ class CloudflareClient:
                         "errors": [{"message": str(exc.reason)}],
                     },
                 }
-            except TimeoutError:
-                return {
+                if attempt < MAX_RETRIES - 1:
+                    time.sleep(self.spacing_seconds)
+                    continue
+                return last_error
+            except (TimeoutError, socket.timeout, OSError) as exc:
+                last_error = {
                     "ok": False,
                     "status_code": None,
                     "headers": {},
                     "data": {
                         "success": False,
-                        "errors": [{"message": "request timed out"}],
+                        "errors": [{"message": getattr(exc, "strerror", None) or "request timed out"}],
                     },
                 }
-            except socket.timeout:
-                return {
-                    "ok": False,
-                    "status_code": None,
-                    "headers": {},
-                    "data": {
-                        "success": False,
-                        "errors": [{"message": "request timed out"}],
-                    },
-                }
-        return {
+                if attempt < MAX_RETRIES - 1:
+                    time.sleep(self.spacing_seconds)
+                    continue
+                return last_error
+        return last_error or {
             "ok": False,
             "status_code": None,
             "headers": {},
