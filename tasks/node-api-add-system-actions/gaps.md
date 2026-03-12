@@ -20,7 +20,7 @@ key case with `.toLowerCase()` before matching, so `BACK` is accepted.
 
 ## GAP-B: Doctor output does not show which receiver package it targeted
 
-**Status:** Open
+**Status:** Closed (2026-03-12)
 **Effort:** Low
 
 `clawperator doctor` silently defaults to the release receiver package
