@@ -222,8 +222,8 @@ Combine fields to increase specificity when a single field is ambiguous:
 | `snapshot_ui` | - | `retry: object` |
 | `take_screenshot` | - | `path: string`, `retry: object` |
 | `sleep` | `durationMs: number` | - |
-| `scroll_and_click` | `target: NodeMatcher` | `container: NodeMatcher`, `direction: "down" \| "up" \| "left" \| "right"` (default: `"down"`), `maxSwipes: number` (default: `10`, range: 1-50), `distanceRatio: number` (default: `0.7`, range: 0-1), `settleDelayMs: number` (default: `250`, range: 0-10000), `findFirstScrollableChild: boolean` (default: `false`), `scrollRetry: object` (default preset: `maxAttempts=4`, `initialDelayMs=400`, `maxDelayMs=2000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`), `clickRetry: object` (default preset: `maxAttempts=5`, `initialDelayMs=500`, `maxDelayMs=3000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`) |
-| `scroll` | - | `container: NodeMatcher` (default: auto-detect first scrollable), `direction: "down" \| "up" \| "left" \| "right"` (default: `"down"` - reveals content further down, finger swipes up), `distanceRatio: number` (default: `0.7`, range: 0-1), `settleDelayMs: number` (default: `250`, range: 0-10000), `findFirstScrollableChild: boolean` (default: `false`), `retry: object` (default: no retry - see scroll behavior note) |
+| `scroll_and_click` | `target: NodeMatcher` | `container: NodeMatcher`, `direction: "down" \| "up" \| "left" \| "right"` (default: `"down"`), `maxSwipes: number` (default: `10`, range: 1-50), `distanceRatio: number` (default: `0.7`, range: 0-1), `settleDelayMs: number` (default: `250`, range: 0-10000), `findFirstScrollableChild: boolean` (default: `true`), `scrollRetry: object` (default preset: `maxAttempts=4`, `initialDelayMs=400`, `maxDelayMs=2000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`), `clickRetry: object` (default preset: `maxAttempts=5`, `initialDelayMs=500`, `maxDelayMs=3000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`) |
+| `scroll` | - | `container: NodeMatcher` (default: auto-detect first scrollable), `direction: "down" \| "up" \| "left" \| "right"` (default: `"down"` - reveals content further down, finger swipes up), `distanceRatio: number` (default: `0.7`, range: 0-1), `settleDelayMs: number` (default: `250`, range: 0-10000), `findFirstScrollableChild: boolean` (default: `true`), `retry: object` (default: no retry - see scroll behavior note) |
 | `press_key` | `key: "back" \| "home" \| "recents"` | - |
 
 ### CLI-to-action-type mapping
@@ -497,7 +497,7 @@ The action always reports one of three outcomes in `data.scroll_outcome`:
 
 **Retry behavior:** `scroll` defaults to no retry (`retry` param defaults to a single attempt). This differs from most UI actions, which default to `UiReadiness` retry (3 attempts with backoff). The reason: retrying a scroll that returned `edge_reached` is wasteful. If the container may not have loaded yet, pass an explicit `retry` object or send a `wait_for_node` first.
 
-`container` targeting and the `findFirstScrollableChild` flag work the same way as `scroll_and_click`. If no `container` is provided, the first `scrollable="true"` node on screen is used.
+`container` targeting and the `findFirstScrollableChild` flag work the same way as `scroll_and_click`. If no `container` is provided, the first `scrollable="true"` node on screen is used. `findFirstScrollableChild` defaults to `true` - when the matched container itself is not scrollable, the runtime automatically uses its first scrollable descendant. Set to `false` only if you need strict container matching.
 
 Typical observe-decide-act loop using `scroll`:
 ```json
@@ -728,7 +728,7 @@ Branch agent logic on codes from `envelope.errorCode` (top-level Android result 
 | `SNAPSHOT_EXTRACTION_FAILED` | `data.error` | `snapshot_ui` step completed but the Node layer did not attach any snapshot text to the step during post-processing. The most common cause is a Node binary packaging mismatch or other logcat extraction issue. Rebuild or reinstall the npm package and check version compatibility. |
 | `GLOBAL_ACTION_FAILED` | `data.error` | `press_key` step result when the OS reports `performGlobalAction` returned false. Rare soft failure - the accessibility service was running but Android declined to execute the action. |
 | `CONTAINER_NOT_FOUND` | `data.error` | `scroll` step could not locate a scrollable container. Either no scrollable node is present on screen, or the provided `container` matcher matched nothing. |
-| `CONTAINER_NOT_SCROLLABLE` | `data.error` | `scroll` step found the matched container but it is not scrollable, and `findFirstScrollableChild` is false (or no scrollable descendant was found). |
+| `CONTAINER_NOT_SCROLLABLE` | `data.error` | `scroll` step found the matched container but it is not scrollable and no scrollable descendant was found. With the default `findFirstScrollableChild: true`, the runtime already walks one level down before raising this error. |
 | `GESTURE_FAILED` | `data.error` | `scroll` step: the OS rejected the gesture dispatch. The accessibility service was running but Android declined to execute the swipe gesture. Step returns `success: false`. |
 
 Primary top-level error taxonomy: `apps/node/src/contracts/errors.ts`. This table also includes runtime-only step error strings such as `UNSUPPORTED_RUNTIME_CLOSE`.

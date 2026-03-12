@@ -50,7 +50,7 @@ sealed interface UiAction {
         val settleDelayMs: Long = 250,
         val scrollRetry: TaskRetry = TaskRetryPresets.UiScroll,
         val clickRetry: TaskRetry = TaskRetryPresets.UiReadiness,
-        val findFirstScrollableChild: Boolean = false,
+        val findFirstScrollableChild: Boolean = true,
     ) : UiAction
 
     data class Scroll(
