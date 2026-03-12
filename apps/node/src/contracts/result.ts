@@ -21,6 +21,12 @@ export interface ResultEnvelope {
   status: "success" | "failed";
   stepResults: StepResult[];
   error?: string | null;
+  /**
+   * Stable enumerated error code for top-level failures. Present when the Android APK emits
+   * a known error code (e.g. "SERVICE_UNAVAILABLE"). May be absent for older APK versions or
+   * unclassified failures. Agents should branch on this field rather than string-matching `error`.
+   */
+  errorCode?: string | null;
 }
 
 export const RESULT_ENVELOPE_PREFIX = "[Clawperator-Result]";

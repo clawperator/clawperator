@@ -49,6 +49,9 @@ function renderPrettyDoctorReport(report: DoctorReport): string {
   lines.push("");
   lines.push("Clawperator Doctor Diagnostics");
   lines.push("");
+  lines.push(`  Device:           ${report.deviceId ?? "(auto-detect)"}`);
+  lines.push(`  Receiver package: ${report.receiverPackage ?? "(default)"}`);
+  lines.push("");
 
   if (criticalChecks.length > 0) {
     lines.push("Critical checks:");

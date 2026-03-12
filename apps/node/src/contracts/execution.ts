@@ -23,6 +23,8 @@ export interface ActionParams {
   settleDelayMs?: number;
   findFirstScrollableChild?: boolean;
   validator?: string;
+  /** press_key: back | home | recents */
+  key?: string;
   retry?: Record<string, unknown>;
   scrollRetry?: Record<string, unknown>;
   clickRetry?: Record<string, unknown>;
