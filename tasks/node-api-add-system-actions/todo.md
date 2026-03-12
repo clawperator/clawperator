@@ -7,16 +7,17 @@ actionability.
 
 ## ITEM-01: Document press_key service-unavailable failure mode in node-api-for-agents.md
 
-**Status:** Open
+**Status:** Closed (2026-03-12)
 
-**Gap:** The existing `press_key` behavior note says it "throws a hard config error if the
-service is unavailable" but does not explain what that means for the agent at the envelope
+**Gap:** The existing `press_key` behavior note said it "throws a hard config error if the
+service is unavailable" but did not explain what that means for the agent at the envelope
 level. An agent submitting `[click, press_key back, snapshot_ui]` gets `status: "failed"`
 with zero step results - not a per-step `success: false` it can branch on.
 
-**Fix:** Add a sentence to the `press_key` behavior note clarifying that an unavailable
-accessibility service produces a top-level `status: "failed"` envelope (not a per-step
-failure), so agents know they cannot recover from it within the same execution.
+**Resolution:** Updated `press_key` behavior note in `docs/node-api-for-agents.md` to
+explicitly state that an unavailable accessibility service produces a top-level
+`status: "failed"` envelope with no `stepResults`, and directs agents to
+`clawperator doctor` for diagnosis.
 
 ---
 
