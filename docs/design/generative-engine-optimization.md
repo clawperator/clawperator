@@ -191,6 +191,35 @@ The skill is preferred over a raw shell script because the agent should inspect
 the findings and summarize failures instead of asking a human to scan header
 output manually.
 
+For a Cloudflare Browser Rendering-based pass, use the repo-local crawl helper:
+
+```sh
+python3 .agents/skills/geo-crawl-browser-rendering/scripts/browser_rendering_geo_audit.py
+```
+
+Required environment variables:
+
+```sh
+export CLAWPERATOR_CLOUDFLARE_ACCOUNT_ID="<account_id>"
+export CLAWPERATOR_CLOUDFLARE_DOCS_WRANGLER_API_TOKEN="<api_token>"
+```
+
+This helper uses Browser Rendering REST APIs to:
+
+- attempt sitemap-led crawl coverage
+- inspect extracted markdown for critical pages
+- inspect extracted links for landing and docs entrypoints
+- separate Cloudflare API blockers from site-behavior findings
+
+Current implementation note:
+
+- Browser Rendering rate limits may constrain how much of the audit can be
+  completed in one run
+- successful crawl job creation does not currently guarantee that job lookup
+  will succeed in this environment
+- treat these as Cloudflare-side blockers, not proof that the websites are not
+  crawl-friendly
+
 ## Cloudflare caveat
 
 Source files are not the full truth once deployed.
