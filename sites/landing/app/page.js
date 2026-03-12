@@ -242,7 +242,7 @@ export default function Home() {
             <a href="https://docs.clawperator.com" target="_blank" rel="noreferrer">
               Docs
             </a>
-            <a href="https://github.com/clawpilled/clawperator" target="_blank" rel="noreferrer" className="toolbar-cta">
+            <a href="https://github.com/clawperator/clawperator" target="_blank" rel="noreferrer" className="toolbar-cta">
               GitHub
             </a>
           </nav>
@@ -664,7 +664,7 @@ if <hvac_state> == "Off":
             <a href="https://docs.clawperator.com" target="_blank" rel="noreferrer">
               docs
             </a>
-            <a href="https://github.com/clawpilled/clawperator" target="_blank" rel="noreferrer">
+            <a href="https://github.com/clawperator/clawperator" target="_blank" rel="noreferrer">
               github
             </a>
             <a href="https://www.npmjs.com/package/clawperator" target="_blank" rel="noreferrer">

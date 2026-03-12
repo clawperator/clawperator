@@ -30,8 +30,8 @@ and not resolvable on PATH), it should:
    skip installation entirely.
 2. Check if tools are resolvable on PATH - if they are, skip installation.
 3. Only if both checks fail: download and install the Android command-line tools
-   to a well-known Clawperator-managed location (e.g. `~/.clawpilled/android-sdk/`).
-4. After install, export `ANDROID_HOME=~/.clawpilled/android-sdk/` into the
+   to a well-known Clawperator-managed location (e.g. `~/.clawperator/android-sdk/`).
+4. After install, export `ANDROID_HOME=~/.clawperator/android-sdk/` into the
    user's shell RC (same pattern as `CLAWPERATOR_SKILLS_REGISTRY` in `install.sh`).
 
 ## Contract for any doctor SDK install implementation

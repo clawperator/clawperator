@@ -1,6 +1,6 @@
 # Usage Model
 
-Related runtime/API repository: [clawperator](https://github.com/clawpilled/clawperator)
+Related runtime/API repository: [clawperator](https://github.com/clawperator/clawperator)
 
 ## Core Principle
 
@@ -63,7 +63,8 @@ which together are useful for multimodal LLM interpretation before moving to app
 You can run the packaged baseline skill directly:
 
 ```bash
-./skills/com.android.settings.capture-overview/scripts/capture_settings_overview.sh app.actiontask.operator.development
+DEVICE_ID="$(adb devices | awk 'NR>1 && $2==\"device\" {print $1; exit}')"
+./skills/com.android.settings.capture-overview/scripts/capture_settings_overview.sh "$DEVICE_ID" app.actiontask.operator.development
 ```
 
 ## Anti-Patterns

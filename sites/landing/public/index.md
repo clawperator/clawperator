@@ -86,4 +86,4 @@ For many services, the mobile app effectively **is the API**. Clawperator allows
 - **Crash Recovery (Permissions)**: https://docs.clawperator.com/reference/cli-reference/#grant-device-permissions
 - **First-Time Setup**: https://docs.clawperator.com/getting-started/first-time-setup/
 - **Full Compiled Docs**: https://clawperator.com/llms-full.txt
-- **GitHub Repository**: https://github.com/clawpilled/clawperator
+- **GitHub Repository**: https://github.com/clawperator/clawperator

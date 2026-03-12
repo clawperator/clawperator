@@ -653,7 +653,7 @@ main() {
     echo -e "4. Stable download URL:"
     echo -e "   ${BLUE}https://clawperator.com/operator.apk${NC}"
     echo -e "5. Historical releases and artifacts remain at:"
-    echo -e "   ${BLUE}https://github.com/clawpilled/clawperator/releases${NC}"
+    echo -e "   ${BLUE}https://github.com/clawperator/clawperator/releases${NC}"
     echo ""
     
     if [ "$SKILLS_SETUP_STATUS" = "configured" ]; then

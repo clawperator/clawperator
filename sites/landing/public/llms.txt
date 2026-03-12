@@ -18,7 +18,7 @@ Clawperator operates an Android device on behalf of a user. That Android device 
 - API overview: https://docs.clawperator.com/reference/api-overview/
 - CLI reference: https://docs.clawperator.com/reference/cli-reference/
 - Full compiled docs: https://clawperator.com/llms-full.txt
-- GitHub: https://github.com/clawpilled/clawperator
+- GitHub: https://github.com/clawperator/clawperator
 
 ## Notes for agents
 

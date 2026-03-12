@@ -70,7 +70,7 @@ clawperator execute \
 - Node.js >= 22
 - `adb` in PATH
 - Android device with USB debugging enabled
-- Clawperator APK installed ([stable download](https://clawperator.com/operator.apk), [historical releases](https://github.com/clawpilled/clawperator/releases))
+- Clawperator APK installed ([stable download](https://clawperator.com/operator.apk), [historical releases](https://github.com/clawperator/clawperator/releases))
 
 ## For AI Agents
 
@@ -101,7 +101,7 @@ Both public sites deploy automatically to Cloudflare after changes are merged to
 ## For Developers
 
 ```bash
-git clone https://github.com/clawpilled/clawperator.git
+git clone https://github.com/clawperator/clawperator.git
 cd clawperator
 npm --prefix apps/node ci && npm --prefix apps/node run build && npm --prefix apps/node link
 ```

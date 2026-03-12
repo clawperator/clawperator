@@ -69,7 +69,7 @@ export async function checkApkPresence(config: RuntimeConfig): Promise<DoctorChe
         title: "Install Operator APK",
         platform: "any",
         steps: [
-          { kind: "manual", value: "Download and install the APK from https://github.com/clawpilled/clawperator/releases/latest" }
+          { kind: "manual", value: "Download and install the APK from https://github.com/clawperator/clawperator/releases/latest" }
         ],
       },
     };

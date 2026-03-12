@@ -26,7 +26,7 @@ const structuredData = {
       name: "Clawperator",
       url: "https://clawperator.com/",
       description: "Deterministic Android automation for AI agents.",
-      sameAs: ["https://github.com/clawpilled/clawperator"]
+      sameAs: ["https://github.com/clawperator/clawperator"]
     },
     {
       "@type": "WebSite",

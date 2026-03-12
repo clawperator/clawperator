@@ -56,7 +56,7 @@ For every tagged release, GitHub Actions should:
 
 ### npm publishing
 
-- npm Trusted Publisher configured for `clawpilled/clawperator`
+- npm Trusted Publisher configured for `clawperator/clawperator`
 - workflow filename on npm must exactly match `publish-npm.yml`
 
 ## Versioning Rules
@@ -105,7 +105,7 @@ git push origin v0.1.0
 
 After the workflows finish, verify:
 
-- GitHub Release exists at `https://github.com/clawpilled/clawperator/releases`
+- GitHub Release exists at `https://github.com/clawperator/clawperator/releases`
 - npm package version exists at `https://www.npmjs.com/package/clawperator`
 - stable metadata file exists at `https://downloads.clawperator.com/operator/latest.json`
 - APK URL in metadata resolves

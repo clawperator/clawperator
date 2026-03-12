@@ -35,7 +35,7 @@ describe("DoctorService", () => {
     assert.strictEqual(apkPresence.code, ERROR_CODES.RECEIVER_NOT_INSTALLED);
 
     assert.ok(!report.checks.some(check => check.id === "readiness.handshake"));
-    assert.ok(report.nextActions?.includes("Download and install the APK from https://github.com/clawpilled/clawperator/releases/latest"));
+    assert.ok(report.nextActions?.includes("Download and install the APK from https://github.com/clawperator/clawperator/releases/latest"));
   });
 
   it("fails when the installed APK is version-incompatible and skips the handshake", async () => {
