@@ -27,6 +27,52 @@ Rendering GEO audit reached `PASS`.
 
 ## Gaps discovered
 
+### 0. Sitemap best-practice gaps are concentrated on the landing host
+
+Compared against Cloudflare's Browser Rendering guidance on February 25, 2026:
+
+- both `robots.txt` files already reference their sitemap surfaces correctly
+- the landing host correctly uses a sitemap index
+- live sitemap responses already include cache validators via `ETag`
+
+The remaining gaps are mostly about sitemap metadata quality, not discoverability
+breakage.
+
+Observed gaps:
+
+- `sites/landing/public/landing-sitemap.xml` includes only `<loc>` entries
+  without `<lastmod>`
+- `sites/landing/public/landing-sitemap.xml` does not include `<priority>` for
+  important landing routes
+- `sites/landing/public/sitemap.xml` is a sitemap index without `<lastmod>` on
+  its child sitemap entries
+- the docs sitemap includes `<lastmod>` but does not include `<priority>`
+
+Impact:
+
+- crawlers can still discover the URLs, but they get less signal about freshness
+  and relative importance than Cloudflare recommends
+- landing-host incremental crawl decisions are less informed than they could be
+- the docs sitemap is in better shape than the landing sitemap, but it still
+  omits optional importance hints
+
+Recommended follow-up:
+
+- add ISO 8601 `<lastmod>` values to `sites/landing/public/landing-sitemap.xml`
+- add `<priority>` values to the most important landing routes in
+  `sites/landing/public/landing-sitemap.xml`
+- add `<lastmod>` to child `<sitemap>` entries in
+  `sites/landing/public/sitemap.xml`
+- optionally add `<priority>` to the docs sitemap if you want to express clear
+  relative importance for key technical pages
+
+Not a gap:
+
+- live sitemap responses already serve `ETag`, which satisfies Cloudflare's
+  caching-header recommendation
+- the public sitemap files are tiny, so gzip and 50k/50 MB concerns do not
+  apply here
+
 ### 1. Cloudflare crawl-job visibility is eventually consistent
 
 Observed behavior:
