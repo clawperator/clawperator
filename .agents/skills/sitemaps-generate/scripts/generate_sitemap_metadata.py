@@ -42,6 +42,9 @@ def parse_git_iso(value):
 
 def run_git_last_modified(repo_root, relative_path):
     git_root, git_path = resolve_git_target(repo_root, relative_path)
+    absolute_path = git_root / git_path
+    if not absolute_path.exists():
+        raise FileNotFoundError(str(absolute_path))
     if has_local_changes(git_root, git_path):
         return datetime.now(timezone.utc).replace(microsecond=0)
     result = subprocess.run(
@@ -60,7 +63,12 @@ def run_git_last_modified(repo_root, relative_path):
 def max_git_last_modified(repo_root, relative_paths):
     timestamps = []
     for relative_path in relative_paths:
-        timestamps.append(run_git_last_modified(repo_root, relative_path))
+        try:
+            timestamps.append(run_git_last_modified(repo_root, relative_path))
+        except FileNotFoundError:
+            continue
+    if not timestamps:
+        raise RuntimeError(f"no usable timestamp sources found for {relative_paths}")
     return max(timestamps)
 
 
@@ -263,6 +271,10 @@ def docs_sources_by_output(source_map_path):
     return mapping
 
 
+def generated_docs_fallback(output_path):
+    return f"sites/docs/docs/{output_path}"
+
+
 def patch_docs_sitemap(repo_root, sitemap_path, source_map_path):
     tree = ET.parse(sitemap_path)
     root = tree.getroot()
@@ -276,7 +288,11 @@ def patch_docs_sitemap(repo_root, sitemap_path, source_map_path):
         sources = source_mapping.get(output)
         if not sources:
             continue
-        lastmod = max_git_last_modified(repo_root, sources)
+        usable_sources = list(sources)
+        fallback_path = generated_docs_fallback(output)
+        if fallback_path not in usable_sources:
+            usable_sources.append(fallback_path)
+        lastmod = max_git_last_modified(repo_root, usable_sources)
         set_child_text(url_node, "lastmod", format_iso(lastmod))
         set_child_text(url_node, "priority", docs_priority_for_output(output))
 
