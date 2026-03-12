@@ -193,7 +193,7 @@ class UiActionEngineDefault(
         action: UiAction.Scroll,
     ): UiActionStepResult {
         return try {
-            val outcome =
+            val result =
                 taskScope.ui {
                     scrollOnce(
                         container = action.container,
@@ -204,31 +204,27 @@ class UiActionEngineDefault(
                         findFirstScrollableChild = action.findFirstScrollableChild,
                     )
                 }
-            when (outcome) {
+            val baseData = buildMap<String, String> {
+                put("scroll_outcome", result.outcome.toWireValue())
+                put("direction", action.direction.name.lowercase())
+                put("distance_ratio", action.distanceRatio.toString())
+                put("settle_delay_ms", action.settleDelayMs.toString())
+                result.resolvedContainerId?.let { put("resolved_container", it) }
+            }
+            when (result.outcome) {
                 TaskScrollOutcome.Moved, TaskScrollOutcome.EdgeReached ->
                     UiActionStepResult(
                         id = action.id,
                         actionType = "scroll",
                         success = true,
-                        data =
-                            mapOf(
-                                "scroll_outcome" to outcome.toWireValue(),
-                                "direction" to action.direction.name.lowercase(),
-                                "distance_ratio" to action.distanceRatio.toString(),
-                            ),
+                        data = baseData,
                     )
                 TaskScrollOutcome.GestureFailed ->
                     UiActionStepResult(
                         id = action.id,
                         actionType = "scroll",
                         success = false,
-                        data =
-                            mapOf(
-                                "scroll_outcome" to outcome.toWireValue(),
-                                "direction" to action.direction.name.lowercase(),
-                                "distance_ratio" to action.distanceRatio.toString(),
-                                "error" to "GESTURE_FAILED",
-                            ),
+                        data = baseData + mapOf("error" to "GESTURE_FAILED"),
                     )
             }
         } catch (e: IllegalStateException) {
@@ -247,6 +243,7 @@ class UiActionEngineDefault(
                     mapOf(
                         "error" to errorCode,
                         "direction" to action.direction.name.lowercase(),
+                        "settle_delay_ms" to action.settleDelayMs.toString(),
                     ),
             )
         }

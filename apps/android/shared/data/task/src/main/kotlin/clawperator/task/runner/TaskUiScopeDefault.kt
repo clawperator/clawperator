@@ -574,14 +574,14 @@ class TaskUiScopeDefault(
         settleDelay: Duration,
         retry: TaskRetry,
         findFirstScrollableChild: Boolean,
-    ): TaskScrollOutcome =
+    ): TaskScrollOnceResult =
         withRetry(
             retry = retry,
             operation = "scrollOnce(dir=$direction)",
-            successPayload = { outcome, elapsedMs, attempt ->
+            successPayload = { result, elapsedMs, attempt ->
                 payload(
                     "direction" to direction.toString(),
-                    "outcome" to outcome.name.lowercase(),
+                    "outcome" to result.outcome.name.lowercase(),
                     "elapsed_ms" to elapsedMs,
                     "attempt" to attempt,
                 )
@@ -626,6 +626,8 @@ class TaskUiScopeDefault(
                     }
                 }
 
+            val resolvedContainerId = scrollNode.resourceId
+
             // Capture signature before gesture
             val sigBefore = leadingChildSignature(scrollNode, direction)
 
@@ -633,7 +635,7 @@ class TaskUiScopeDefault(
             val gestureOk = gestureSwipeWithin(scrollNode, direction, distanceRatio)
             if (!gestureOk) {
                 Log.d("$TAG scrollOnce: gesture rejected by OS")
-                return@withRetry TaskScrollOutcome.GestureFailed
+                return@withRetry TaskScrollOnceResult(TaskScrollOutcome.GestureFailed, resolvedContainerId)
             }
 
             // Wait for settle
@@ -657,17 +659,17 @@ class TaskUiScopeDefault(
             if (scrollNodeAfter == null) {
                 // Container disappeared after gesture; treat as edge_reached since we cannot compare
                 Log.d("$TAG scrollOnce: container lost after gesture; treating as edge_reached")
-                return@withRetry TaskScrollOutcome.EdgeReached
+                return@withRetry TaskScrollOnceResult(TaskScrollOutcome.EdgeReached, resolvedContainerId)
             }
 
             val sigAfter = leadingChildSignature(scrollNodeAfter, direction)
 
             if (sigBefore != null && sigAfter == sigBefore) {
                 Log.d("$TAG scrollOnce: signature unchanged - edge_reached")
-                TaskScrollOutcome.EdgeReached
+                TaskScrollOnceResult(TaskScrollOutcome.EdgeReached, resolvedContainerId)
             } else {
                 Log.d("$TAG scrollOnce: signature changed - moved")
-                TaskScrollOutcome.Moved
+                TaskScrollOnceResult(TaskScrollOutcome.Moved, resolvedContainerId)
             }
         }
 

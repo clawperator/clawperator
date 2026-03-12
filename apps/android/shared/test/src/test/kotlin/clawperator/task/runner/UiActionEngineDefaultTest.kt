@@ -368,6 +368,7 @@ private class RecordingTaskScope(
 private class RecordingTaskUiScope(
     private val scrollOnceOutcome: TaskScrollOutcome = TaskScrollOutcome.Moved,
     private val scrollOnceThrows: IllegalStateException? = null,
+    private val scrollOnceContainerId: String? = null,
 ) : TaskUiScope {
     var scrollIntoViewCalled: Boolean = false
     var scrollOnceCalled: Boolean = false
@@ -418,10 +419,10 @@ private class RecordingTaskUiScope(
         settleDelay: Duration,
         retry: TaskRetry,
         findFirstScrollableChild: Boolean,
-    ): TaskScrollOutcome {
+    ): TaskScrollOnceResult {
         scrollOnceCalled = true
         scrollOnceThrows?.let { throw it }
-        return scrollOnceOutcome
+        return TaskScrollOnceResult(scrollOnceOutcome, scrollOnceContainerId)
     }
 
     override suspend fun scrollUntil(

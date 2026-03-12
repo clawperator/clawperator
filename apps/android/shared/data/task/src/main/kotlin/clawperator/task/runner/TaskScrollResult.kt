@@ -29,3 +29,15 @@ enum class TaskScrollOutcome {
     EdgeReached,
     GestureFailed,
 }
+
+/**
+ * Full result of a single standalone scroll gesture (see [TaskUiScope.scrollOnce]).
+ *
+ * Extends [TaskScrollOutcome] with observability fields:
+ * - [resolvedContainerId]: the resourceId of the container that was scrolled. Populated
+ *   when auto-detection is used so callers can confirm which container was selected.
+ */
+data class TaskScrollOnceResult(
+    val outcome: TaskScrollOutcome,
+    val resolvedContainerId: String? = null,
+)

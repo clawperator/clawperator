@@ -4,6 +4,7 @@ import action.log.Log
 import clawperator.task.runner.NodeMatcher
 import clawperator.task.runner.TaskRetry
 import clawperator.task.runner.TaskScrollDirection
+import clawperator.task.runner.TaskScrollOnceResult
 import clawperator.task.runner.TaskScrollOutcome
 import clawperator.task.runner.TaskScrollResult
 import clawperator.task.runner.TaskUiNode
@@ -111,7 +112,7 @@ class TaskUiScopeTest(
         settleDelay: Duration,
         retry: TaskRetry,
         findFirstScrollableChild: Boolean,
-    ): TaskScrollOutcome = TaskScrollOutcome.Moved
+    ): TaskScrollOnceResult = TaskScrollOnceResult(TaskScrollOutcome.Moved)
 
     override suspend fun scrollUntil(
         target: NodeMatcher,
