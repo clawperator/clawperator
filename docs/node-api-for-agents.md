@@ -222,7 +222,9 @@ Combine fields to increase specificity when a single field is ambiguous:
 | `snapshot_ui` | - | `retry: object` |
 | `take_screenshot` | - | `path: string`, `retry: object` |
 | `sleep` | `durationMs: number` | - |
-| `scroll_and_click` | `target: NodeMatcher` | `container: NodeMatcher`, `direction: "down" \| "up" \| "left" \| "right"` (default: `"down"`), `maxSwipes: number` (default: `10`, range: 1-50), `distanceRatio: number` (default: `0.7`, range: 0-1), `settleDelayMs: number` (default: `250`, range: 0-10000), `findFirstScrollableChild: boolean` (default: `false`), `scrollRetry: object` (default preset: `maxAttempts=4`, `initialDelayMs=400`, `maxDelayMs=2000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`), `clickRetry: object` (default preset: `maxAttempts=5`, `initialDelayMs=500`, `maxDelayMs=3000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`) |
+| `scroll_and_click` | `target: NodeMatcher` | `container: NodeMatcher`, `direction: "down" \| "up" \| "left" \| "right"` (default: `"down"`), `maxSwipes: number` (default: `10`, range: 1-50), `distanceRatio: number` (default: `0.7`, range: 0-1), `settleDelayMs: number` (default: `250`, range: 0-10000), `findFirstScrollableChild: boolean` (default: `true`), `clickAfter: boolean` (default: `true`), `scrollRetry: object` (default preset: `maxAttempts=4`, `initialDelayMs=400`, `maxDelayMs=2000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`), `clickRetry: object` (default preset: `maxAttempts=5`, `initialDelayMs=500`, `maxDelayMs=3000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`) |
+| `scroll` | - | `container: NodeMatcher` (default: auto-detect first scrollable), `direction: "down" \| "up" \| "left" \| "right"` (default: `"down"` - reveals content further down, finger swipes up), `distanceRatio: number` (default: `0.7`, range: 0-1), `settleDelayMs: number` (default: `250`, range: 0-10000), `findFirstScrollableChild: boolean` (default: `true`), `retry: object` (default: no retry - see scroll behavior note) |
+| `scroll_until` | - | `container: NodeMatcher` (default: auto-detect), `direction: "down" \| "up" \| "left" \| "right"` (default: `"down"`), `distanceRatio: number` (default: `0.7`, range: 0-1), `settleDelayMs: number` (default: `250`, range: 0-10000), `maxScrolls: number` (default: `20`, range: 1-200), `maxDurationMs: number` (default: `10000`, range: 0-120000), `noPositionChangeThreshold: number` (default: `3`, range: 1-20), `findFirstScrollableChild: boolean` (default: `true`) |
 | `press_key` | `key: "back" \| "home" \| "recents"` | - |
 
 ### CLI-to-action-type mapping
@@ -482,6 +484,145 @@ Combine fields to increase specificity when a single field is ambiguous:
 
 **`scroll_and_click`:** This action has two separate retry knobs. `scrollRetry` controls the scroll/search loop and defaults to the `UiScroll` preset (`maxAttempts=4`, `initialDelayMs=400`, `maxDelayMs=2000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`). `clickRetry` controls the final click attempt and defaults to the `UiReadiness` preset (`maxAttempts=5`, `initialDelayMs=500`, `maxDelayMs=3000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`).
 
+**`clickAfter` flag:** When `clickAfter: false`, the action scrolls until the target is visible but does not click it. This is useful when you need to bring an element into view before a separate `snapshot_ui` or `read_text` action, or when you want to confirm presence before committing a click.
+
+**`scroll`:** Performs a single scroll gesture and reports whether content actually moved. Unlike `scroll_and_click`, this action has no target element and does not click. It is designed for exploratory navigation - panning through a list to observe content before deciding what to do next.
+
+**Direction semantics (content direction, not finger direction):**
+- `"down"` - reveals content further down the list. Finger swipes up. Default.
+- `"up"` - reveals content further up the list. Finger swipes down.
+- `"left"` / `"right"` - horizontal carousel navigation. Direction refers to the content movement, not the swipe direction.
+
+The action always reports one of three outcomes in `data.scroll_outcome`:
+- `"moved"` - gesture was dispatched and the list position changed.
+- `"edge_reached"` - gesture was dispatched but the container was already at its limit. This is `success: true`, not an error. It is the expected terminal state when paginating a finite list.
+- `"gesture_failed"` - the OS rejected the gesture dispatch (`success: false`).
+
+**Retry behavior:** `scroll` defaults to no retry (`retry` param defaults to a single attempt). This differs from most UI actions, which default to `UiReadiness` retry (3 attempts with backoff). The reason: retrying a scroll that returned `edge_reached` is wasteful. If the container may not have loaded yet, pass an explicit `retry` object or send a `wait_for_node` first.
+
+`container` targeting and the `findFirstScrollableChild` flag work the same way as `scroll_and_click`. If no `container` is provided, the first `scrollable="true"` node on screen is used. `findFirstScrollableChild` defaults to `true` - when the matched container itself is not scrollable, the runtime automatically uses its first scrollable descendant. Set to `false` only if you need strict container matching.
+
+**Auto-detect caveat:** On nested-scroll layouts, the first visible `scrollable="true"` node may be an outer wrapper rather than the content list you actually want. When the screen contains more than one plausible scroll surface, prefer an explicit `container` matcher using the list's `resource-id` from `snapshot_ui` rather than relying on auto-detect.
+
+Typical observe-decide-act loop using `scroll`:
+```json
+[
+  { "id": "snap1", "type": "snapshot_ui" },
+  { "id": "scr1", "type": "scroll", "params": { "direction": "down" } },
+  { "id": "snap2", "type": "snapshot_ui" }
+]
+```
+After receiving `snap2`, the agent compares it to `snap1`. If `scr1.data.scroll_outcome` is `"edge_reached"`, no further scrolling is possible in that direction.
+
+**`scroll` example request:**
+```json
+{
+  "deviceId": "<device_id>",
+  "execution": {
+    "commandId": "cmd-scroll-1",
+    "taskId": "task-explore",
+    "source": "agent",
+    "expectedFormat": "android-ui-automator",
+    "timeoutMs": 30000,
+    "actions": [
+      { "id": "snap1", "type": "snapshot_ui" },
+      { "id": "scr1", "type": "scroll", "params": { "direction": "down" } },
+      { "id": "snap2", "type": "snapshot_ui" }
+    ]
+  }
+}
+```
+
+**`scroll` example step result (content moved):**
+```json
+{ "id": "scr1", "actionType": "scroll", "success": true, "data": { "scroll_outcome": "moved", "direction": "down", "distance_ratio": "0.7" } }
+```
+
+**`scroll` example step result (at bottom of list):**
+```json
+{ "id": "scr1", "actionType": "scroll", "success": true, "data": { "scroll_outcome": "edge_reached", "direction": "down", "distance_ratio": "0.7" } }
+```
+
+**`scroll_until`:** Bounded scroll loop. Scrolls repeatedly until a termination condition fires and returns `termination_reason` so the agent knows why it stopped. Always applies caps even when not specified.
+
+Direction semantics are the same as `scroll`. `container`, `distanceRatio`, `settleDelayMs`, and `findFirstScrollableChild` behave identically to `scroll`.
+
+**Termination reasons (`data.termination_reason`):**
+- `EDGE_REACHED` - content ended naturally (finite list). `success: true`.
+- `MAX_SCROLLS_REACHED` - hit `maxScrolls` cap. `success: true`. Normal for infinite feeds.
+- `MAX_DURATION_REACHED` - hit `maxDurationMs` cap. `success: true`. Normal for infinite feeds.
+- `NO_POSITION_CHANGE` - no content movement across `noPositionChangeThreshold` consecutive scrolls. `success: true`.
+- `CONTAINER_NOT_FOUND` - container resolution failed. `success: false`.
+- `CONTAINER_NOT_SCROLLABLE` - container is not scrollable. `success: false`.
+
+`MAX_SCROLLS_REACHED`, `MAX_DURATION_REACHED`, and `NO_POSITION_CHANGE` are clean terminal states, not errors. Agents scrolling infinite feeds should expect these and handle them without treating the action as failed.
+
+**Current runtime caveat:** If the resolved container disappears mid-loop because the app navigated away or rebuilt the view tree unexpectedly, the current Android runtime can collapse that case into `EDGE_REACHED`. When a scroll loop might trigger navigation or heavy UI re-layout, follow it with `snapshot_ui` or `wait_for_node` before assuming the list truly ended.
+
+**`scroll_until` example request:**
+```json
+{
+  "commandId": "cmd-su-1",
+  "taskId": "task-paginate",
+  "expectedFormat": "android-ui-automator",
+  "timeoutMs": 30000,
+  "actions": [
+    { "id": "su1", "type": "scroll_until", "params": { "direction": "down", "maxScrolls": 25 } }
+  ]
+}
+```
+
+**`scroll_until` example step result (finite list, reached bottom):**
+```json
+{ "id": "su1", "actionType": "scroll_until", "success": true, "data": { "termination_reason": "EDGE_REACHED", "scrolls_executed": "12", "direction": "down" } }
+```
+
+**`scroll_until` example step result (infinite feed, hit cap):**
+```json
+{ "id": "su1", "actionType": "scroll_until", "success": true, "data": { "termination_reason": "MAX_SCROLLS_REACHED", "scrolls_executed": "20", "direction": "down" } }
+```
+
+## Pagination Recipe
+
+When an agent needs to read all content from a scrollable list, the correct approach depends on whether the list is finite or infinite.
+
+### Finite lists (settings screens, contact lists, search results)
+
+Use a manual scroll loop: issue `scroll` actions one at a time, snapshot after each, and stop when `scroll_outcome` is `"edge_reached"`. This gives full control over when to stop and what to extract.
+
+```
+while true:
+  snapshot_ui  -> extract visible items
+  scroll down  -> if edge_reached: break
+```
+
+`maxScrolls` is not required here because the agent controls the loop and `edge_reached` is the natural termination condition.
+
+### Infinite feeds (social media, Play Store, news feeds)
+
+Use `scroll_until` with an explicit `maxScrolls` cap. There is no true "bottom" on infinite-scroll lists - lazy loading means the edge is never definitively reached. `scroll_until` is designed for this case: it scrolls as far as the agent wants and returns a machine-readable `termination_reason`.
+
+```json
+{ "id": "feed1", "type": "scroll_until", "params": { "direction": "down", "maxScrolls": 30 } }
+```
+
+After this action, `termination_reason` will be one of:
+- `MAX_SCROLLS_REACHED` - agent hit its own cap (normal for infinite feeds)
+- `EDGE_REACHED` - list actually ended (finite list reached bottom)
+- `NO_POSITION_CHANGE` - content stopped moving (stale list or true bottom)
+
+Both `MAX_SCROLLS_REACHED` and `NO_POSITION_CHANGE` are clean terminal states. Do not treat them as errors.
+
+**Required: always set `maxScrolls`.** Without an explicit cap, the default is 20 scrolls. For feeds where you want more coverage, pass a larger value. Never omit `maxScrolls` or rely on `NO_POSITION_CHANGE` alone as the termination condition for infinite feeds - a slow network load can pause position change temporarily and cause early exit.
+
+### Returning to top
+
+After scrolling down a feed, use `scroll_until` with `direction: "up"` to return to the top. On finite lists, `EDGE_REACHED` signals the top. On infinite feeds, `NO_POSITION_CHANGE` or `MAX_SCROLLS_REACHED` signals that position has stabilized near the top.
+
+```json
+{ "id": "top1", "type": "scroll_until", "params": { "direction": "up", "maxScrolls": 50, "noPositionChangeThreshold": 3 } }
+```
+
 ## Result Envelope
 
 Every execution emits exactly one `[Clawperator-Result]` envelope:
@@ -526,7 +667,9 @@ Typical `data` keys by action type:
 | `snapshot_ui` | `actual_format`, `text` (snapshot content - see note below) |
 | `take_screenshot` | `path` (local screenshot file path after Node capture) |
 | `wait_for_node` | `resource_id`, `label` (matched node details) |
-| `scroll_and_click` | `max_swipes`, `direction`, `click_types` |
+| `scroll_and_click` | `max_swipes`, `direction`, `click_types`, `click_after` (`"true"` or `"false"`) |
+| `scroll` | `scroll_outcome` (`"moved"`, `"edge_reached"`, or `"gesture_failed"`), `direction`, `distance_ratio`, `settle_delay_ms`, `resolved_container` (resourceId of auto-detected container, when present) |
+| `scroll_until` | `termination_reason` (see behavior note), `scrolls_executed`, `direction`, `resolved_container` (when present) |
 | `sleep` | `duration_ms` |
 | `press_key` | `key` (`"back"`, `"home"`, or `"recents"`) |
 
@@ -551,7 +694,7 @@ Structured XML produced by UIAutomator. Each `<node>` represents one UI element.
 | `content-desc` | `contentDescEquals` / `contentDescContains` | Accessibility label. Empty string if none. |
 | `class` | - | Java widget class name, e.g., `"android.widget.Button"`. Informational only - `NodeMatcher.role` uses Clawperator semantic role names such as `button`, `textfield`, `text`, or `switch`, not the raw `class` attribute. |
 | `clickable` | - | `"true"` if the element accepts tap events. |
-| `scrollable` | - | `"true"` marks a scroll container. Use as `container` in `scroll_and_click`. |
+| `scrollable` | - | `"true"` marks a scroll container. Use as `container` in `scroll_and_click`, `scroll`, or `scroll_until`. |
 | `bounds` | - | `"[x1,y1][x2,y2]"` pixel rectangle. Useful for understanding spatial layout. |
 | `enabled` | - | `"false"` means the element is visible but not interactable. |
 | `long-clickable` | - | `"true"` if the element accepts long-press. Use `clickType: "long_click"`. |
@@ -571,7 +714,7 @@ Example: for a node with `content-desc="Search for &apos;vlc&apos;"`:
         clickable="false" enabled="true" scrollable="false"
         bounds="[0,0][1080,2340]">
     ...
-        <!-- Scrollable list - use as 'container' in scroll_and_click -->
+        <!-- Scrollable list - use as 'container' in scroll_and_click, scroll, or scroll_until -->
         <node index="0" text="" resource-id="com.android.settings:id/recycler_view"
               class="androidx.recyclerview.widget.RecyclerView"
               package="com.android.settings" content-desc=""
@@ -627,7 +770,7 @@ Example: for a node with `content-desc="Search for &apos;vlc&apos;"`:
 
 - **Tap targets** are `clickable="true"` nodes. In list UIs these are often container (`LinearLayout`) nodes whose text-bearing children hold the visible label while the container itself has `text=""`. When you match any node, Clawperator first attempts `ACTION_CLICK` on the first `clickable="true"` ancestor it finds while walking up the tree from the matched node. If that accessibility click does not succeed, Clawperator falls back to a gesture tap at the center of the matched node's bounding box. This means matching a non-clickable label node (for example, `textEquals: "Connections"`) works correctly as long as it is visually inside a clickable parent tap target. If both mechanisms fail, the execution currently terminates with a failed envelope and empty `stepResults` rather than a per-step `NODE_NOT_CLICKABLE` code.
 - **Icon-only buttons** (no `text`) use `content-desc` for their label. Target with `contentDescEquals`.
-- **Scroll containers** have `scrollable="true"`. Pass their `resource-id` as the `container` matcher in `scroll_and_click`.
+- **Scroll containers** have `scrollable="true"`. Pass their `resource-id` as the `container` matcher in `scroll_and_click` or `scroll`. If `container` is omitted from `scroll`, the first `scrollable="true"` node on screen is used automatically.
 - **Disabled elements** have `enabled="false"`. They cannot be interacted with - scrolling or waiting for a state change is required first.
 
 **Apps with obfuscated or missing resource-ids:** Many production apps (Google Play Store, social media apps, banking apps) set `resource-id=""` on all or most nodes. In this case, fall back to content-desc and text matchers. The fallback priority for these apps is:
@@ -670,6 +813,9 @@ Branch agent logic on codes from `envelope.errorCode` (top-level Android result 
 | `UNSUPPORTED_RUNTIME_CLOSE` | `data.error` | Expected per-step result for all `close_app` steps. The Android runtime does not support a force-stop action response - the Node layer handles the close via `adb shell am force-stop` before dispatch. The overall execution `status` remains `"success"`. Treat as non-fatal. |
 | `SNAPSHOT_EXTRACTION_FAILED` | `data.error` | `snapshot_ui` step completed but the Node layer did not attach any snapshot text to the step during post-processing. The most common cause is a Node binary packaging mismatch or other logcat extraction issue. Rebuild or reinstall the npm package and check version compatibility. |
 | `GLOBAL_ACTION_FAILED` | `data.error` | `press_key` step result when the OS reports `performGlobalAction` returned false. Rare soft failure - the accessibility service was running but Android declined to execute the action. |
+| `CONTAINER_NOT_FOUND` | `data.error` | `scroll` step could not locate a scrollable container. Either no scrollable node is present on screen, or the provided `container` matcher matched nothing. |
+| `CONTAINER_NOT_SCROLLABLE` | `data.error` | `scroll` step found the matched container but it is not scrollable and no scrollable descendant was found. With the default `findFirstScrollableChild: true`, the runtime already walks one level down before raising this error. |
+| `GESTURE_FAILED` | `data.error` | `scroll` step: the OS rejected the gesture dispatch. The accessibility service was running but Android declined to execute the swipe gesture. Step returns `success: false`. |
 
 Primary top-level error taxonomy: `apps/node/src/contracts/errors.ts`. This table also includes runtime-only step error strings such as `UNSUPPORTED_RUNTIME_CLOSE`.
 

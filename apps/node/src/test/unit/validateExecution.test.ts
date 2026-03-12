@@ -366,6 +366,212 @@ describe("validateExecution", () => {
     assert.strictEqual(ex.actions[0].type, "press_key");
     assert.strictEqual(ex.actions[0].params?.key, "BACK");
   });
+
+  it("accepts scroll with no params", () => {
+    const ex = validateExecution({
+      commandId: "c",
+      taskId: "t",
+      source: "s",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 5000,
+      actions: [{ id: "x", type: "scroll" }],
+    });
+    assert.strictEqual(ex.actions[0].type, "scroll");
+  });
+
+  it("accepts scroll with all optional params", () => {
+    const ex = validateExecution({
+      commandId: "c",
+      taskId: "t",
+      source: "s",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 5000,
+      actions: [{
+        id: "x",
+        type: "scroll",
+        params: {
+          container: { resourceId: "com.android.settings:id/list" },
+          direction: "down",
+          distanceRatio: 0.7,
+          settleDelayMs: 250,
+          findFirstScrollableChild: false,
+        },
+      }],
+    });
+    assert.strictEqual(ex.actions[0].type, "scroll");
+    assert.strictEqual(ex.actions[0].params?.direction, "down");
+    assert.strictEqual(ex.actions[0].params?.distanceRatio, 0.7);
+  });
+
+  it("accepts scroll with direction up", () => {
+    const ex = validateExecution({
+      commandId: "c",
+      taskId: "t",
+      source: "s",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 5000,
+      actions: [{ id: "x", type: "scroll", params: { direction: "up" } }],
+    });
+    assert.strictEqual(ex.actions[0].params?.direction, "up");
+  });
+
+  it("accepts scroll with horizontal directions", () => {
+    for (const dir of ["left", "right"]) {
+      const ex = validateExecution({
+        commandId: "c",
+        taskId: "t",
+        source: "s",
+        expectedFormat: "android-ui-automator",
+        timeoutMs: 5000,
+        actions: [{ id: "x", type: "scroll", params: { direction: dir } }],
+      });
+      assert.strictEqual(ex.actions[0].params?.direction, dir);
+    }
+  });
+
+  it("rejects scroll with unsupported direction", () => {
+    assert.throws(
+      () =>
+        validateExecution({
+          commandId: "c",
+          taskId: "t",
+          source: "s",
+          expectedFormat: "android-ui-automator",
+          timeoutMs: 5000,
+          actions: [{ id: "x", type: "scroll", params: { direction: "diagonal" } }],
+        }),
+      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
+    );
+  });
+
+  it("rejects scroll with distanceRatio below 0", () => {
+    assert.throws(
+      () =>
+        validateExecution({
+          commandId: "c",
+          taskId: "t",
+          source: "s",
+          expectedFormat: "android-ui-automator",
+          timeoutMs: 5000,
+          actions: [{ id: "x", type: "scroll", params: { distanceRatio: -0.1 } }],
+        }),
+      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
+    );
+  });
+
+  it("rejects scroll with distanceRatio above 1", () => {
+    assert.throws(
+      () =>
+        validateExecution({
+          commandId: "c",
+          taskId: "t",
+          source: "s",
+          expectedFormat: "android-ui-automator",
+          timeoutMs: 5000,
+          actions: [{ id: "x", type: "scroll", params: { distanceRatio: 1.1 } }],
+        }),
+      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
+    );
+  });
+
+  it("rejects scroll with settleDelayMs below 0", () => {
+    assert.throws(
+      () =>
+        validateExecution({
+          commandId: "c",
+          taskId: "t",
+          source: "s",
+          expectedFormat: "android-ui-automator",
+          timeoutMs: 5000,
+          actions: [{ id: "x", type: "scroll", params: { settleDelayMs: -1 } }],
+        }),
+      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
+    );
+  });
+
+  it("rejects scroll with settleDelayMs above 10000", () => {
+    assert.throws(
+      () =>
+        validateExecution({
+          commandId: "c",
+          taskId: "t",
+          source: "s",
+          expectedFormat: "android-ui-automator",
+          timeoutMs: 5000,
+          actions: [{ id: "x", type: "scroll", params: { settleDelayMs: 10001 } }],
+        }),
+      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
+    );
+  });
+
+  it("accepts scroll_until with no params", () => {
+    const result = validateExecution({
+      commandId: "c", taskId: "t", source: "s",
+      expectedFormat: "android-ui-automator", timeoutMs: 5000,
+      actions: [{ id: "x", type: "scroll_until" }],
+    });
+    assert.equal(result.actions[0].type, "scroll_until");
+  });
+
+  it("accepts scroll_until with all params", () => {
+    const result = validateExecution({
+      commandId: "c", taskId: "t", source: "s",
+      expectedFormat: "android-ui-automator", timeoutMs: 5000,
+      actions: [{
+        id: "x", type: "scroll_until",
+        params: { direction: "down", distanceRatio: 0.7, settleDelayMs: 250, maxScrolls: 25, maxDurationMs: 10000, noPositionChangeThreshold: 3 },
+      }],
+    });
+    assert.equal(result.actions[0].type, "scroll_until");
+  });
+
+  it("rejects scroll_until with invalid direction", () => {
+    assert.throws(
+      () =>
+        validateExecution({
+          commandId: "c", taskId: "t", source: "s",
+          expectedFormat: "android-ui-automator", timeoutMs: 5000,
+          actions: [{ id: "x", type: "scroll_until", params: { direction: "diagonal" } }],
+        }),
+      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
+    );
+  });
+
+  it("rejects scroll_until with maxScrolls out of range", () => {
+    assert.throws(
+      () =>
+        validateExecution({
+          commandId: "c", taskId: "t", source: "s",
+          expectedFormat: "android-ui-automator", timeoutMs: 5000,
+          actions: [{ id: "x", type: "scroll_until", params: { maxScrolls: 0 } }],
+        }),
+      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
+    );
+  });
+
+  it("rejects scroll_until with maxDurationMs out of range", () => {
+    assert.throws(
+      () =>
+        validateExecution({
+          commandId: "c", taskId: "t", source: "s",
+          expectedFormat: "android-ui-automator", timeoutMs: 5000,
+          actions: [{ id: "x", type: "scroll_until", params: { maxDurationMs: 120001 } }],
+        }),
+      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
+    );
+  });
+
+  it("rejects scroll_until with noPositionChangeThreshold out of range", () => {
+    assert.throws(
+      () =>
+        validateExecution({
+          commandId: "c", taskId: "t", source: "s",
+          expectedFormat: "android-ui-automator", timeoutMs: 5000,
+          actions: [{ id: "x", type: "scroll_until", params: { noPositionChangeThreshold: 21 } }],
+        }),
+      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
+    );
+  });
 });
 
 describe("validatePayloadSize", () => {

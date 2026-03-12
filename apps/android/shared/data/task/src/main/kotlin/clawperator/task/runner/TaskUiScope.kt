@@ -4,6 +4,7 @@ import clawperator.uitree.ToggleState
 import clawperator.uitree.UiTreeClickTypes
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * DSL entry point for UI operations inside TaskScope.
@@ -122,6 +123,59 @@ interface TaskUiScope {
     ): TaskUiNode
 
     /**
+     * Performs a single scroll gesture within a container and reports the outcome.
+     *
+     * Unlike [scrollUntil], this does not search for a target element. It performs exactly one
+     * swipe and reports whether content actually moved.
+     *
+     * @param container     Optional matcher for the scrollable container. If null, the first on-screen scrollable is used.
+     * @param direction     Direction of scrolling: Down/Up for vertical, Left/Right for horizontal (default Down).
+     * @param distanceRatio Swipe distance as a ratio of the container height/width (must be in [0.0, 1.0], default 0.7f).
+     * @param settleDelay   Delay after the swipe before comparing signatures (default 250ms).
+     * @param retry         Retry policy for container resolution (default no retry).
+     * @param findFirstScrollableChild If true and the matched container itself isn't scrollable,
+     *        use its first scrollable descendant.
+     * @return [TaskScrollOnceResult] containing the [TaskScrollOutcome] and the resolved container's
+     *         resourceId (when available). Outcome is [TaskScrollOutcome.Moved] if content shifted,
+     *         [TaskScrollOutcome.EdgeReached] if at limit, [TaskScrollOutcome.GestureFailed] if the
+     *         gesture was rejected.
+     * @throws Exception if the container cannot be found or is not scrollable.
+     */
+    suspend fun scrollOnce(
+        container: NodeMatcher? = null,
+        direction: TaskScrollDirection = TaskScrollDirection.Down,
+        distanceRatio: Float = 0.7f,
+        settleDelay: Duration = 250.milliseconds,
+        retry: TaskRetry = TaskRetry.None,
+        findFirstScrollableChild: Boolean = true,
+    ): TaskScrollOnceResult
+
+    /**
+     * Bounded scroll loop. Scrolls repeatedly until a termination condition fires.
+     * Always applies safety caps - no unbounded scroll is possible.
+     *
+     * @param container              Optional matcher for the scrollable container. Auto-detects if null.
+     * @param direction              Scroll direction (default Down).
+     * @param distanceRatio          Swipe distance ratio [0.0, 1.0] (default 0.7).
+     * @param settleDelay            Delay after each swipe before signature check.
+     * @param maxScrolls             Maximum number of scroll steps (hard cap, always applied).
+     * @param maxDuration            Wall-clock time cap for the entire loop.
+     * @param noPositionChangeThreshold  Number of consecutive no-movement scrolls before stopping.
+     * @param findFirstScrollableChild   Walk one level down if matched container is not scrollable.
+     * @return [TaskScrollLoopResult] with termination reason and scrolls executed.
+     */
+    suspend fun scrollLoop(
+        container: NodeMatcher? = null,
+        direction: TaskScrollDirection = TaskScrollDirection.Down,
+        distanceRatio: Float = 0.7f,
+        settleDelay: Duration = 250.milliseconds,
+        maxScrolls: Int = 20,
+        maxDuration: Duration = 10.seconds,
+        noPositionChangeThreshold: Int = 3,
+        findFirstScrollableChild: Boolean = true,
+    ): TaskScrollLoopResult
+
+    /**
      * Convenience method that scrolls to find a target element and then clicks it.
      * This reduces matcher resolution churn by reusing the same target matcher.
      *
@@ -136,6 +190,7 @@ interface TaskUiScope {
      * @param findFirstScrollableChild If true and the matched container itself isn't scrollable,
      *        use its first scrollable descendant (useful for wrappers like GH "category_chips").
      * @param clickTypes    The types of clicks to attempt (defaults to regular Click).
+     * @param clickAfter    When false, scrolls until visible but does not click (default true).
      * @throws Exception    if the target node is not found after scrolling or if clicking fails.
      */
     suspend fun clickAfterScroll(
@@ -148,10 +203,13 @@ interface TaskUiScope {
         settleDelay: Duration = 250.milliseconds,
         scrollRetry: TaskRetry = TaskRetryPresets.UiScroll,
         clickRetry: TaskRetry = TaskRetryPresets.UiReadiness,
-        findFirstScrollableChild: Boolean = false,
+        findFirstScrollableChild: Boolean = true,
+        clickAfter: Boolean = true,
     ) {
         scrollIntoView(target, container, direction, maxSwipes, distanceRatio, settleDelay, scrollRetry, findFirstScrollableChild)
-        click(target, clickTypes, clickRetry)
+        if (clickAfter) {
+            click(target, clickTypes, clickRetry)
+        }
     }
 
     /**

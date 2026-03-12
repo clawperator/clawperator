@@ -20,6 +20,8 @@ import kotlinx.coroutines.withContext
 import kotlin.random.Random
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TimeSource
 
 class TaskUiScopeDefault(
     private val uiTreeInspector: UiTreeInspector,
@@ -566,6 +568,242 @@ class TaskUiScopeDefault(
             is TaskScrollResult.Found -> result.node
             TaskScrollResult.NotFoundExhausted -> throw IllegalStateException("Target node not found after scrolling: $target")
         }
+
+    override suspend fun scrollOnce(
+        container: NodeMatcher?,
+        direction: TaskScrollDirection,
+        distanceRatio: Float,
+        settleDelay: Duration,
+        retry: TaskRetry,
+        findFirstScrollableChild: Boolean,
+    ): TaskScrollOnceResult =
+        withRetry(
+            retry = retry,
+            operation = "scrollOnce(dir=$direction)",
+            successPayload = { result, elapsedMs, attempt ->
+                payload(
+                    "direction" to direction.toString(),
+                    "outcome" to result.outcome.name.lowercase(),
+                    "elapsed_ms" to elapsedMs,
+                    "attempt" to attempt,
+                )
+            },
+            failurePayload = { throwable, attempt ->
+                val failurePoint =
+                    when {
+                        throwable.message?.contains("No scrollable container") == true ||
+                            throwable.message?.contains("Container not found") == true -> "container_not_found"
+                        throwable.message?.contains("Scrollable container not found") == true -> "container_not_scrollable"
+                        else -> "unknown"
+                    }
+                payload(
+                    "direction" to direction.toString(),
+                    "failure_point" to failurePoint,
+                    "attempt" to attempt,
+                )
+            },
+        ) {
+            require(distanceRatio in 0f..1f) { "distanceRatio must be in [0,1], got $distanceRatio" }
+
+            val uiTree = currentUiTreeFiltered()
+
+            // Resolve container
+            val scrollNode =
+                when (container) {
+                    null ->
+                        findFirstScrollable(uiTree)
+                            ?: throw IllegalStateException("No scrollable container visible")
+                    else -> {
+                        val matchedNode =
+                            findNodeByMatcher(container, uiTree)
+                                ?: throw IllegalStateException("Container not found for $container")
+                        if (isScrollable(matchedNode)) {
+                            matchedNode
+                        } else if (findFirstScrollableChild) {
+                            findFirstScrollableDescendant(matchedNode)
+                                ?: throw IllegalStateException("Scrollable container not found for $container")
+                        } else {
+                            throw IllegalStateException("Scrollable container not found for $container")
+                        }
+                    }
+                }
+
+            val resolvedContainerId = scrollNode.resourceId
+
+            // Capture signature before gesture
+            val sigBefore = leadingChildSignature(scrollNode, direction)
+
+            // Dispatch gesture
+            val gestureOk = gestureSwipeWithin(scrollNode, direction, distanceRatio)
+            if (!gestureOk) {
+                Log.d("$TAG scrollOnce: gesture rejected by OS")
+                return@withRetry TaskScrollOnceResult(TaskScrollOutcome.GestureFailed, resolvedContainerId)
+            }
+
+            // Wait for settle
+            delay(settleDelay)
+
+            // Re-read tree and re-resolve container for signature comparison
+            val uiTreeAfter = currentUiTreeFiltered()
+            val scrollNodeAfter =
+                when (container) {
+                    null -> findFirstScrollable(uiTreeAfter)
+                    else -> {
+                        val matchedNode = findNodeByMatcher(container, uiTreeAfter)
+                        when {
+                            matchedNode != null && isScrollable(matchedNode) -> matchedNode
+                            matchedNode != null && findFirstScrollableChild -> findFirstScrollableDescendant(matchedNode)
+                            else -> null
+                        }
+                    }
+                }
+
+            if (scrollNodeAfter == null) {
+                // Container disappeared after gesture; treat as edge_reached since we cannot compare
+                Log.d("$TAG scrollOnce: container lost after gesture; treating as edge_reached")
+                return@withRetry TaskScrollOnceResult(TaskScrollOutcome.EdgeReached, resolvedContainerId)
+            }
+
+            val sigAfter = leadingChildSignature(scrollNodeAfter, direction)
+
+            if (sigBefore == null || sigAfter == null || sigAfter == sigBefore) {
+                Log.d("$TAG scrollOnce: signature unchanged - edge_reached")
+                TaskScrollOnceResult(TaskScrollOutcome.EdgeReached, resolvedContainerId)
+            } else {
+                Log.d("$TAG scrollOnce: signature changed - moved")
+                TaskScrollOnceResult(TaskScrollOutcome.Moved, resolvedContainerId)
+            }
+        }
+
+    override suspend fun scrollLoop(
+        container: NodeMatcher?,
+        direction: TaskScrollDirection,
+        distanceRatio: Float,
+        settleDelay: Duration,
+        maxScrolls: Int,
+        maxDuration: Duration,
+        noPositionChangeThreshold: Int,
+        findFirstScrollableChild: Boolean,
+    ): TaskScrollLoopResult {
+        require(maxScrolls > 0) { "maxScrolls must be > 0, got $maxScrolls" }
+        require(distanceRatio in 0f..1f) { "distanceRatio must be in [0,1], got $distanceRatio" }
+
+        Log.d("$TAG scrollLoop: dir=$direction maxScrolls=$maxScrolls maxDuration=$maxDuration")
+
+        // Resolve container once upfront; fail fast if not found
+        val uiTree = currentUiTreeFiltered()
+        val resolvedContainerId: String?
+        try {
+            val scrollNode = when (container) {
+                null ->
+                    findFirstScrollable(uiTree)
+                        ?: throw IllegalStateException("No scrollable container visible")
+                else -> {
+                    val matchedNode =
+                        findNodeByMatcher(container, uiTree)
+                            ?: throw IllegalStateException("Container not found for $container")
+                    if (isScrollable(matchedNode)) {
+                        matchedNode
+                    } else if (findFirstScrollableChild) {
+                        findFirstScrollableDescendant(matchedNode)
+                            ?: throw IllegalStateException("Scrollable container not found for $container")
+                    } else {
+                        throw IllegalStateException("Scrollable container not found for $container")
+                    }
+                }
+            }
+            resolvedContainerId = scrollNode.resourceId
+        } catch (e: IllegalStateException) {
+            val reason = when {
+                e.message?.contains("Scrollable container not found") == true ->
+                    TaskScrollTerminationReason.ContainerNotScrollable
+                else -> TaskScrollTerminationReason.ContainerNotFound
+            }
+            Log.w("$TAG scrollLoop: $reason - ${e.message}")
+            return TaskScrollLoopResult(
+                terminationReason = reason,
+                scrollsExecuted = 0,
+                resolvedContainerId = null,
+            )
+        }
+
+        val mark = TimeSource.Monotonic.markNow()
+        var scrollsExecuted = 0
+        var noMovementCount = 0
+
+        while (true) {
+            // Duration cap
+            if (mark.elapsedNow() >= maxDuration) {
+                Log.d("$TAG scrollLoop: MAX_DURATION_REACHED after $scrollsExecuted scrolls")
+                return TaskScrollLoopResult(
+                    terminationReason = TaskScrollTerminationReason.MaxDurationReached,
+                    scrollsExecuted = scrollsExecuted,
+                    resolvedContainerId = resolvedContainerId,
+                )
+            }
+
+            // Scroll cap
+            if (scrollsExecuted >= maxScrolls) {
+                Log.d("$TAG scrollLoop: MAX_SCROLLS_REACHED ($maxScrolls)")
+                return TaskScrollLoopResult(
+                    terminationReason = TaskScrollTerminationReason.MaxScrollsReached,
+                    scrollsExecuted = scrollsExecuted,
+                    resolvedContainerId = resolvedContainerId,
+                )
+            }
+
+            // Execute one scroll step
+            val stepResult = try {
+                scrollOnce(
+                    container = container,
+                    direction = direction,
+                    distanceRatio = distanceRatio,
+                    settleDelay = settleDelay,
+                    retry = TaskRetry.None,
+                    findFirstScrollableChild = findFirstScrollableChild,
+                )
+            } catch (e: IllegalStateException) {
+                // Container lost mid-loop (app navigated away etc.) - treat as edge
+                Log.d("$TAG scrollLoop: container lost mid-loop, treating as edge_reached")
+                return TaskScrollLoopResult(
+                    terminationReason = TaskScrollTerminationReason.EdgeReached,
+                    scrollsExecuted = scrollsExecuted,
+                    resolvedContainerId = resolvedContainerId,
+                )
+            }
+
+            scrollsExecuted++
+
+            when (stepResult.outcome) {
+                TaskScrollOutcome.EdgeReached -> {
+                    Log.d("$TAG scrollLoop: EDGE_REACHED after $scrollsExecuted scrolls")
+                    return TaskScrollLoopResult(
+                        terminationReason = TaskScrollTerminationReason.EdgeReached,
+                        scrollsExecuted = scrollsExecuted,
+                        resolvedContainerId = resolvedContainerId,
+                    )
+                }
+                TaskScrollOutcome.GestureFailed -> {
+                    // Gesture failures count as no movement
+                    noMovementCount++
+                    Log.d("$TAG scrollLoop: gesture_failed (noMovement=$noMovementCount)")
+                }
+                TaskScrollOutcome.Moved -> {
+                    noMovementCount = 0
+                }
+            }
+
+            // No-movement threshold
+            if (noMovementCount >= noPositionChangeThreshold) {
+                Log.d("$TAG scrollLoop: NO_POSITION_CHANGE after $scrollsExecuted scrolls (threshold=$noPositionChangeThreshold)")
+                return TaskScrollLoopResult(
+                    terminationReason = TaskScrollTerminationReason.NoPositionChange,
+                    scrollsExecuted = scrollsExecuted,
+                    resolvedContainerId = resolvedContainerId,
+                )
+            }
+        }
+    }
 
     private suspend fun currentUiTreeFiltered(): UiTree {
         val uiTreeRaw =
