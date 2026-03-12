@@ -89,8 +89,8 @@ If you must use **Wireless Debugging**, be aware that your mileage may vary (YMM
 
 `curl -fsSL https://clawperator.com/install.sh | bash` uses the stable metadata file at `https://downloads.clawperator.com/operator/latest.json`, downloads the immutable package for the [Clawperator Operator Android app](../getting-started/android-operator-apk.md) plus its `.sha256`, verifies the checksum, then handles device install like this:
 
-1. **One connected device** - the installer offers to run `adb install -r ~/.clawperator/downloads/operator.apk`.
-2. **Multiple connected devices** - the installer skips the install and prints `adb -s <device_id> install -r ~/.clawperator/downloads/operator.apk`.
+1. **One connected device** - the installer offers to run `clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id <device_id>`.
+2. **Multiple connected devices** - the installer skips the install and prints `clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id <device_id>`.
 3. **No connected devices** - the installer skips the install and leaves the verified package for the [Clawperator Operator Android app](../getting-started/android-operator-apk.md) at `~/.clawperator/downloads/operator.apk`.
 4. **`adb` missing** - the installer attempts to install `adb` automatically, or stops with a manual install link if it cannot.
 
@@ -228,6 +228,57 @@ If the installer finishes but warns that skills setup was skipped, the core CLI 
 ```bash
 git clone https://clawperator.com/install/clawperator-skills.bundle ~/.clawperator/skills
 export CLAWPERATOR_SKILLS_REGISTRY="$HOME/.clawperator/skills/skills/skills-registry.json"
+```
+
+---
+
+## Snapshot UI returns SNAPSHOT_EXTRACTION_FAILED
+
+**Symptom:** A `snapshot_ui` step returns `success: false` with `data.error: "SNAPSHOT_EXTRACTION_FAILED"`. The device is connected and responding, but no UI hierarchy XML appears in `data.text`. The stderr output from the CLI contains a warning like:
+
+```
+[clawperator] WARN: snapshot_ui step "..." UI hierarchy extraction produced no output.
+```
+
+**Most common cause:** The installed `clawperator` npm binary is out of date. The compiled `snapshotHelper.js` in older published packages searches for a logcat marker (`TaskScopeDefault:`) that does not match the marker the Android Operator APK actually emits (`[TaskScope] UI Hierarchy:`). The APK is correct and requires no changes. Other less common causes, such as partial or truncated logcat capture, can also leave a `snapshot_ui` step without extracted text and produce the same error.
+
+**How to confirm:**
+
+```bash
+clawperator version --check-compat --receiver-package com.clawperator.operator
+```
+
+This will report any version mismatch between the CLI and the installed APK.
+
+**How to fix:**
+
+1. Reinstall the npm package to get the current compiled binary:
+
+   ```bash
+   npm install -g clawperator
+   ```
+
+2. Verify the fix by running a snapshot:
+
+   ```bash
+   clawperator observe snapshot --device-id <device_serial> --output json
+   ```
+
+   A working snapshot returns `data.text` containing XML starting with `<hierarchy`.
+
+**Temporary workaround (sibling repo checkout):**
+
+If you have a local checkout of the clawperator repo at the sibling path, skills will automatically prefer the local build over the global binary. You can also set `CLAW_BIN` explicitly:
+
+```bash
+export CLAW_BIN=/path/to/clawperator/apps/node/dist/cli/index.js
+```
+
+Rebuild the local binary first if needed:
+
+```bash
+npm --prefix /path/to/clawperator/apps/node install
+npm --prefix /path/to/clawperator/apps/node run build
 ```
 
 ---

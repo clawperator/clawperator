@@ -33,14 +33,27 @@ export interface PermissionGrantResult {
   notificationListener: NotificationListenerGrantResult;
 }
 
-export async function detectReceiverPackage(config: RuntimeConfig): Promise<string | undefined> {
+export function hasListedPackage(packageListOutput: string, packageName: string): boolean {
+  return packageListOutput
+    .split("\n")
+    .map(line => line.trim())
+    .some(line => line === `package:${packageName}`);
+}
+
+export async function listInstalledReceiverPackages(config: RuntimeConfig): Promise<string[]> {
+  const installedPackages: string[] = [];
   for (const pkg of [DEFAULT_RELEASE_PACKAGE, DEFAULT_DEBUG_PACKAGE]) {
     const result = await runAdb(config, ["shell", "pm", "list", "packages", pkg]);
-    if (result.code === 0 && result.stdout.trim().includes(`package:${pkg}`)) {
-      return pkg;
+    if (result.code === 0 && hasListedPackage(result.stdout, pkg)) {
+      installedPackages.push(pkg);
     }
   }
-  return undefined;
+  return installedPackages;
+}
+
+export async function detectReceiverPackage(config: RuntimeConfig): Promise<string | undefined> {
+  const installedPackages = await listInstalledReceiverPackages(config);
+  return installedPackages[0];
 }
 
 export async function grantAccessibilityPermission(

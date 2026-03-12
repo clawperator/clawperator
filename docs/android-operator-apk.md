@@ -30,10 +30,14 @@ This downloads the latest app package and installs it to your connected device.
 To install manually:
 1. Download the latest app package from [clawperator.com/operator.apk](https://clawperator.com/operator.apk).
 2. Connect your device via USB.
-3. Run:
+3. Run the canonical install command:
    ```bash
-   adb install -r operator.apk
+   clawperator operator setup --apk operator.apk
    ```
+
+This command installs the APK and grants all required permissions in one step. See [First-Time Setup](first-time-setup.md) for full details.
+
+> Do not use raw `adb install` for normal setup. It installs the APK but does not grant the permissions required for the app to operate.
 
 ### Historical Versions
 Historical versions can be downloaded from `downloads.clawperator.com`. The URL structure follows the versioning pattern:
@@ -42,14 +46,14 @@ Historical versions can be downloaded from `downloads.clawperator.com`. The URL 
 Example for v0.2.5:
 - [https://downloads.clawperator.com/operator/v0.2.5/operator-v0.2.5.apk](https://downloads.clawperator.com/operator/v0.2.5/operator-v0.2.5.apk)
 
-## Granting Permissions
-After installation, grant the required permissions so the app can inspect the screen, interact with the UI, and observe device notifications:
+## Required Permissions
+The app requires three permissions to operate:
 
 ```bash
-clawperator grant-device-permissions
+clawperator operator setup --apk <path>
 ```
 
-This command grants three permissions via ADB:
+This command grants all three permissions automatically during install. The permissions are:
 
 | Permission | ADB mechanism | Purpose |
 |---|---|---|
@@ -58,6 +62,14 @@ This command grants three permissions via ADB:
 | Notification listener | `settings put secure enabled_notification_listeners` | Observe notifications from all apps on the device |
 
 The accessibility service and notification listener permissions are enabled by appending the Clawperator service component to the relevant secure setting, matching the format Android uses internally. The `POST_NOTIFICATIONS` grant is a standard runtime permission grant; on Android 12 and below it is silently skipped.
+
+If the Operator APK crashes after setup and Android revokes the granted permissions, use the remediation command:
+
+```bash
+clawperator grant-device-permissions
+```
+
+This re-grants the same permissions without reinstalling the APK. Do not use it for normal setup - agents should use `clawperator operator setup` for the initial install path every time. `clawperator operator install` remains an alias.
 
 ## Logging and Debugging
 

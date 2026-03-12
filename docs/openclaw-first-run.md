@@ -92,33 +92,29 @@ Capture the returned serial and use it as `--device-id` in later commands.
 
 The [Clawperator Operator Android app](android-operator-apk.md) must be installed on the Android device.
 
-The installer usually handles this automatically. If needed, install it manually:
+The installer usually handles this automatically. If needed, install it with the canonical command:
 
 ```bash
-adb install -r ~/.clawperator/downloads/operator.apk
+clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id <device_id>
 ```
 
-With multiple devices connected:
+If only one device is connected, `--device-id` can be omitted:
 
 ```bash
-adb -s <device_id> install -r ~/.clawperator/downloads/operator.apk
+clawperator operator setup --apk ~/.clawperator/downloads/operator.apk
 ```
 
-## Step 4 - Grant permissions
-
-Grant Android Accessibility permissions from the host:
+For a local debug build of the [Clawperator Operator Android app](android-operator-apk.md):
 
 ```bash
-clawperator grant-device-permissions --device-id <device_id>
+clawperator operator setup \
+  --apk ~/.clawperator/downloads/operator-debug.apk \
+  --receiver-package com.clawperator.operator.dev
 ```
 
-If only one device is connected, `--device-id` can be omitted.
+This command is the normal path for agents and operators. It installs the APK and grants required permissions (accessibility, notification listener) in one step. `clawperator operator install` remains a compatibility alias.
 
-For a local debug build of the [Clawperator Operator Android app](android-operator-apk.md), add:
-
-```bash
---receiver-package com.clawperator.operator.dev
-```
+Do not split initial setup into separate `adb install` and `grant-device-permissions` calls. Reserve `clawperator grant-device-permissions` for recovery after the Operator APK crashes and Android revokes the previously granted permissions.
 
 ## Step 5 - Run doctor
 
@@ -232,7 +228,7 @@ For agents that need one deterministic sequence, the normal path is:
 curl -fsSL https://clawperator.com/install.sh | bash
 clawperator --version
 clawperator devices
-clawperator grant-device-permissions --device-id <device_id>
+clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id <device_id>
 clawperator doctor --device-id <device_id> --output pretty
 echo $CLAWPERATOR_SKILLS_REGISTRY
 clawperator skills list
@@ -258,7 +254,7 @@ When an agent is asked to "set this up for me", it should record:
 - whether a physical Android device or emulator was chosen
 - the selected device serial
 - whether the [Clawperator Operator Android app](android-operator-apk.md) was installed automatically or manually
-- whether `grant-device-permissions` succeeded
+- whether `operator setup` succeeded (or which phase failed)
 - whether `doctor` passed
 - whether skills installed cleanly
 - the value of `CLAWPERATOR_SKILLS_REGISTRY`
