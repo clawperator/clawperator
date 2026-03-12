@@ -59,12 +59,16 @@ For app automation commands, default to:
 | `wait_for_node` | `matcher: NodeMatcher`, `retry?: object` | CLI: `action wait`. Waits with internal retry |
 | `snapshot_ui` | `retry?: object` | CLI: `observe snapshot`. Snapshot content in `data.text` as `hierarchy_xml` |
 | `take_screenshot` | `path?: string`, `retry?: object` | Node captures screenshot via ADB and returns local file path |
-| `scroll_and_click` | `target: NodeMatcher`, `container?: NodeMatcher`, `direction?`, `maxSwipes?`, `distanceRatio?`, `settleDelayMs?`, `findFirstScrollableChild?`, `scrollRetry?: object`, `clickRetry?: object` | Scrolls until target is visible, then clicks. `scrollRetry` defaults to UiScroll; `clickRetry` defaults to UiReadiness |
+| `scroll_and_click` | `target: NodeMatcher`, `container?: NodeMatcher`, `direction?`, `maxSwipes?`, `distanceRatio?`, `settleDelayMs?`, `findFirstScrollableChild?`, `clickAfter?: boolean`, `scrollRetry?: object`, `clickRetry?: object` | Scrolls until target is visible, then clicks by default. Set `clickAfter: false` to reveal the target without tapping it. `scrollRetry` defaults to UiScroll; `clickRetry` defaults to UiReadiness |
+| `scroll` | `container?: NodeMatcher`, `direction?`, `distanceRatio?`, `settleDelayMs?`, `findFirstScrollableChild?`, `retry?: object` | Performs exactly one scroll gesture and reports `scroll_outcome` as `moved`, `edge_reached`, or `gesture_failed` |
+| `scroll_until` | `container?: NodeMatcher`, `direction?`, `distanceRatio?`, `settleDelayMs?`, `maxScrolls?`, `maxDurationMs?`, `noPositionChangeThreshold?`, `findFirstScrollableChild?` | Bounded scroll loop that returns `termination_reason`. Use for feed pagination with explicit caps |
 | `sleep` | `durationMs: number` | Pause between steps. Must fit within the execution `timeoutMs` budget |
 
 **`enter_text` vs CLI `action type`:** The CLI command is `action type` but the action type field in execution payloads is `enter_text`. These map to the same runtime action. When building execution payloads directly, always use `enter_text`.
 
 **NodeMatcher fields:** `resourceId`, `contentDescEquals`, `textEquals`, `textContains`, `contentDescContains`, `role`. All fields are AND-combined. Prefer `resourceId` when available. Full reference in `docs/node-api-for-agents.md`.
+
+**Scroll targeting rule:** If a screen contains nested or multiple scrollable containers, do not rely on auto-detect. Capture `snapshot_ui`, identify the intended list's `resource-id`, and pass it as `params.container`.
 
 ### Visual verification with ADB screenshots (recommended)
 Use screenshots alongside UI-tree logs when building/debugging skills.

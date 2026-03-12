@@ -9,7 +9,9 @@ Items are roughly ordered by impact.
 
 ---
 
-## GAP-01: No standalone `scroll` action
+## GAP-01: No standalone `scroll` action is now implemented
+
+**Status:** Done.
 
 **Problem:** `scroll_and_click` is the only scroll mechanism. There is no action that
 scrolls a container without also clicking a target. This forces awkward patterns:
