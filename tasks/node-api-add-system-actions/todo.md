@@ -23,7 +23,7 @@ explicitly state that an unavailable accessibility service produces a top-level
 
 ## ITEM-02: Add explicit comment in validateExecution.ts explaining doctor_ping exclusion
 
-**Status:** Open
+**Status:** Closed (2026-03-12)
 
 **Gap:** `UiAction.DoctorPing` exists in the Android sealed interface and is parseable
 by `AgentCommandParser`, but `doctor_ping` is absent from `supportedTypes` in
@@ -36,9 +36,9 @@ through the Node API, not realizing the design intent.
 `broadcastAgentCommand` directly. Agents submitting via `execute` correctly get
 `EXECUTION_ACTION_UNSUPPORTED`. This is by design.
 
-**Fix:** Add a short comment in `validateExecution.ts`'s `supportedTypes` array
-(and optionally in `aliases.ts`) marking `doctor_ping` as intentionally excluded from
-the public agent API, and explaining which internal path uses it.
+**Resolution:** Added explanatory comments above `supportedTypes` in
+`validateExecution.ts` and above `CANONICAL_ACTION_TYPES` in `aliases.ts` documenting
+the intentional exclusion and the internal path that uses `doctor_ping`.
 
 ---
 
