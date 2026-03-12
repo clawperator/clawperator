@@ -13,7 +13,6 @@ Use this page as a technical map:
 - [llms.txt](https://docs.clawperator.com/llms.txt) - compact machine-oriented docs entrypoint
 - [llms-full.txt](https://docs.clawperator.com/llms-full.txt) - compiled full docs corpus on the docs host
 - [sitemap.xml](https://docs.clawperator.com/sitemap.xml) - canonical crawl map for this docs host
-- [GEO Status](geo.md) - current crawl, sitemap, and bot-support status
 
 ## Recommended paths
 

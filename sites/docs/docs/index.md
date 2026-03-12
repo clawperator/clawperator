@@ -2,35 +2,6 @@
 
 Clawperator is a deterministic actuator tool for LLM-driven Android automation. It acts as the "hand" for an LLM "brain," allowing agents to automate device control on a dedicated Android device.
 
-Use this page as a technical map:
-
-- start with setup if you are preparing a device or emulator
-- start with the Node API guide if you are integrating an agent
-- use the reference section for exact command, payload, and error semantics
-
-## Machine-facing routes
-
-- [llms.txt](https://docs.clawperator.com/llms.txt) - compact machine-oriented docs entrypoint
-- [llms-full.txt](https://docs.clawperator.com/llms-full.txt) - compiled full docs corpus on the docs host
-- [sitemap.xml](https://docs.clawperator.com/sitemap.xml) - canonical crawl map for this docs host
-- [GEO Status](geo.md) - current crawl, sitemap, and bot-support status
-
-## Recommended paths
-
-### Start here if you are integrating an agent
-
-- [Node API - Agent Guide](ai-agents/node-api-for-agents.md) - Canonical CLI and HTTP API contract for agent builders
-- [Operator LLM Playbook](design/operator-llm-playbook.md) - Practical operating rules for observation, action loops, and skill execution
-- [API Overview](reference/api-overview.md) - Execution payload, action types, result envelope shape, and snapshot semantics
-- [CLI Reference](reference/cli-reference.md) - Command-line entrypoints and flags
-
-### Start here if you are preparing runtime infrastructure
-
-- [First-Time Setup](getting-started/first-time-setup.md) - Install the CLI, choose an Android environment, and prepare the [Clawperator Operator Android app](getting-started/android-operator-apk.md)
-- [Running Clawperator on Android](getting-started/running-clawperator-on-android.md) - Canonical actuator model, physical device vs emulator, and user responsibilities
-- [OpenClaw First Run](getting-started/openclaw-first-run.md) - Task-oriented runbook for installing Clawperator, preparing Android, and completing a first real skill run
-- [Clawperator Operator Android app](getting-started/android-operator-apk.md) - Package variants, installation, and permissions for Clawperator's Android app
-
 ## Getting Started
 
 - [Running Clawperator on Android](getting-started/running-clawperator-on-android.md) - Canonical actuator model, physical device vs emulator, and user responsibilities
@@ -42,22 +13,20 @@ Use this page as a technical map:
 
 ## For AI Agents
 
-- [Node API - Agent Guide](ai-agents/node-api-for-agents.md) - Canonical CLI and HTTP API reference for agents
-- [Operator LLM Playbook](design/operator-llm-playbook.md) - Action contracts, runtime conventions, and skill packaging
-- [API Overview](reference/api-overview.md) - Execution payload, action types, result envelopes, and snapshot delivery
-- [CLI Reference](reference/cli-reference.md) - Exact command surface for local and scripted integrations
+- [Node API - Agent Guide](ai-agents/node-api-for-agents.md) - CLI and HTTP API reference for agents
+- [Operator LLM Playbook](design/operator-llm-playbook.md) - Action contracts, skill packaging, and runtime conventions
 
 ## Reference
 
-- [CLI Reference](reference/cli-reference.md) - Command-line usage and flags
-- [API Overview](reference/api-overview.md) - Execution payload, action types, result envelopes, and snapshot semantics
-- [Error Codes](reference/error-codes.md) - Structured runtime and API error code reference
+- [CLI Reference](reference/cli-reference.md) - Command-line usage
+- [API Overview](reference/api-overview.md) - Execution payload, action types, and result envelopes
+- [Error Codes](reference/error-codes.md) - Error code reference
 - [Doctor](reference/node-api-doctor.md) - Runtime readiness checks, exit behavior, and JSON report shape
 
 ## Architecture
 
-- [System Overview](architecture/architecture.md) - High-level architecture and execution flow
-- [Node Runtime and API Design](design/node-api-design.md) - Detailed Node contract and runtime design
+- [System Overview](architecture/architecture.md)
+- [Node Runtime and API Design](design/node-api-design.md)
 
 
 ## Troubleshooting
