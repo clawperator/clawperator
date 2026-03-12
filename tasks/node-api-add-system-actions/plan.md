@@ -9,12 +9,12 @@ input keyevent` calls.
 
 The first shipping slice should prioritize:
 
-- `BACK`
-- `HOME`
+- `back`
+- `home`
 
 The next supported key can be:
 
-- `RECENTS`
+- `recents`
 
 The runtime path should use the active
 `OperatorAccessibilityService` and Android accessibility global actions. Do not
@@ -23,13 +23,13 @@ executions.
 
 ## Why This Slice
 
-`BACK` and `HOME` cover the highest-frequency navigation gaps and both map
+`back` and `home` cover the highest-frequency navigation gaps and both map
 cleanly to `AccessibilityService.performGlobalAction(...)`.
 
-`RECENTS` is also a good fit for the same mechanism, but it is lower priority
-than `BACK` and `HOME`.
+`recents` is also a good fit for the same mechanism, but it is lower priority
+than `back` and `home`.
 
-`ENTER`, `SEARCH`, `VOLUME_UP`, and `VOLUME_DOWN` do **not** fit the same
+`enter`, `search`, `volume_up`, and `volume_down` do **not** fit the same
 implementation path cleanly:
 
 - Android accessibility global actions cover back/home/recents directly
@@ -50,22 +50,28 @@ Canonical payload:
   "id": "back1",
   "type": "press_key",
   "params": {
-    "key": "BACK"
+    "key": "back"
   }
 }
 ```
 
-Initial key enum:
+Initial key enum (lowercase, consistent with existing param conventions):
 
-- `BACK`
-- `HOME`
-- `RECENTS`
+- `back`
+- `home`
+- `recents`
+
+Key names follow the existing lowercase-on-the-wire convention used by all other
+string enum params in this API (`"direction": "down"`, `"clickType": "long_click"`,
+`"validator": "temperature"`). The Android-side enum uses uppercase identifiers
+(`BACK`, `HOME`, `RECENTS`) per Kotlin convention, but the wire value is lowercase.
+The Android parser normalizes via `.lowercase()` before matching.
 
 Recommended rollout rule:
 
-1. Land `BACK` + `HOME` end to end first.
-2. Include `RECENTS` in the same change only if device validation is clean.
-3. Do not include `ENTER`, `SEARCH`, or volume keys in this task.
+1. Land `back` + `home` end to end first.
+2. Include `recents` in the same change only if device validation is clean.
+3. Do not include `enter`, `search`, or volume keys in this task.
 
 ## Technical Design
 
@@ -89,17 +95,16 @@ Implementation notes:
   such as `key_press -> press_key`.
 - Extend validation so:
   - `press_key` requires `params.key`
-  - `params.key` must be one of the documented enum values
+  - `params.key` must be one of the documented lowercase enum values
   - validation errors point to `actions.<n>.params.key`
 
-Suggested Node enum values:
+Supported Node key values (lowercase):
 
-- `BACK`
-- `HOME`
-- `RECENTS`
+- `back`
+- `home`
+- `recents`
 
-Keep the validation enum uppercase and explicit. Do not accept raw integers or
-Android keycode names in this task.
+Do not accept uppercase variants or raw integers in this task.
 
 ### Workgroup 2: Android parser and typed action model
 
@@ -115,23 +120,36 @@ Expected touch points:
 
 Implementation notes:
 
-- Add a new typed action such as `UiAction.PressKey`.
-- Model the key as a narrow enum, not a free-form string.
-- Parse `press_key` in `AgentCommandParserDefault`.
+- Add a new typed action `UiAction.PressKey`.
+- Model the key as a narrow enum, not a free-form string. Define it alongside
+  `UiAction` in the `task` module.
+- Parse `press_key` in `AgentCommandParserDefault` using `.lowercase()` matching,
+  consistent with all other string enum params in the parser.
 - Reject unknown keys during parse with a deterministic error.
 
-Recommended Android-side enum shape:
+Android-side enum shape (Kotlin convention: uppercase identifiers, lowercase wire
+values):
 
 ```kotlin
 enum class UiSystemKey {
     BACK,
     HOME,
-    RECENTS,
+    RECENTS;
+
+    companion object {
+        fun fromWire(value: String): UiSystemKey =
+            when (value.lowercase()) {
+                "back" -> BACK
+                "home" -> HOME
+                "recents" -> RECENTS
+                else -> error("unsupported key: $value")
+            }
+    }
 }
 ```
 
-Keep the enum local to the operator/task runner surface unless there is already
-a better existing home for agent-execution action types.
+Keep the enum in the `task` module alongside `UiAction.kt`. Do not place it in
+`toolkit` - the enum is a task-layer concept, not a toolkit-layer concept.
 
 ### Workgroup 3: Android execution path via OperatorAccessibilityService
 
@@ -141,44 +159,59 @@ instance tracked by `AccessibilityServiceManagerAndroid`.
 Expected touch points:
 
 - `apps/android/shared/data/task/src/main/kotlin/clawperator/task/runner/UiActionEngine.kt`
-- `apps/android/shared/data/toolkit/src/main/kotlin/clawperator/accessibilityservice/AccessibilityServiceExtAndroid.kt`
-- possibly a small new mapper file if the key-to-global-action mapping should be
-  isolated
+- `apps/android/shared/app/di/src/main/kotlin/clawperator/di/module/AppModule.kt`
+  (to inject `AccessibilityServiceManager` into `UiActionEngineDefault`)
 
 Implementation notes:
 
 - Do **not** route agent `press_key` through `MainAccessibilityService` or
   `SystemAccessibilityServiceManagerAndroid`.
-- Use `taskScope` only where needed, but the actual global action should be
-  performed on the active accessibility service instance already used by the
-  UI-tree path.
-- Add a mapper from the new `UiSystemKey` enum to:
-  - `AccessibilityService.GLOBAL_ACTION_BACK`
-  - `AccessibilityService.GLOBAL_ACTION_HOME`
-  - `AccessibilityService.GLOBAL_ACTION_RECENTS`
+- Inject `AccessibilityServiceManager` into `UiActionEngineDefault` alongside
+  the existing `DeveloperOptionsManager`. This is the smallest clean seam.
+- Do **not** add a new `pressGlobalKey` extension to
+  `AccessibilityServiceExtAndroid.kt`. The `UiSystemKey` enum lives in the
+  `task` module; `AccessibilityServiceExtAndroid.kt` is in `toolkit`. Crossing
+  that module boundary for a five-line mapping creates an awkward dependency.
+  Instead, put the `UiSystemKey -> GLOBAL_ACTION_*` mapping inline in
+  `executePressKey` as a private `when` expression.
+- The inline mapping is:
+  - `UiSystemKey.BACK -> AccessibilityService.GLOBAL_ACTION_BACK`
+  - `UiSystemKey.HOME -> AccessibilityService.GLOBAL_ACTION_HOME`
+  - `UiSystemKey.RECENTS -> AccessibilityService.GLOBAL_ACTION_RECENTS`
 - Return a normal `UiActionStepResult` with:
   - `actionType = "press_key"`
-  - `data.key = <enum value>`
+  - `data["key"] = action.key.name.lowercase()`
 
-Failure behavior:
+Failure behavior (two distinct cases):
 
-- If the operator accessibility service is unavailable, fail deterministically.
-- If `performGlobalAction(...)` returns `false`, return a failed step result with
-  a stable error code such as `GLOBAL_ACTION_FAILED`.
-- Avoid silent success. This action changes global UI state and needs clear
-  diagnostics.
+- If the operator accessibility service is **unavailable** (null from the
+  manager), throw an `IllegalStateException`. This is a hard configuration
+  error - the service should always be running when agent commands are dispatched.
+  Throwing terminates the plan and surfaces clearly in the execution result, the
+  same way a missing node terminates a `click` action. Do not swallow this.
+- If the service is available but `performGlobalAction(...)` returns **false**,
+  return a failed step result with a stable error code. This is a soft OS-level
+  failure - the service was present but Android rejected the global action (e.g.
+  OEM restriction, transient system state). Returning a step result (rather than
+  throwing) preserves the rest of the diagnostic envelope and lets the agent
+  observe and recover.
 
-One reasonable implementation pattern is:
+Expected failure shape for `performGlobalAction` returning false:
 
-1. Add a helper on `AccessibilityService` like `pressGlobalKey(UiSystemKey):
-   Boolean`.
-2. Have `UiActionEngine` fetch the current service from
-   `AccessibilityServiceManager`.
-3. Execute the global action and convert the boolean result into a step result.
+```json
+{
+  "id": "back1",
+  "actionType": "press_key",
+  "success": false,
+  "data": {
+    "key": "back",
+    "error": "GLOBAL_ACTION_FAILED"
+  }
+}
+```
 
-If injecting `AccessibilityServiceManager` into `UiActionEngineDefault` is the
-smallest clean seam, that is preferable to forcing this through older
-system-action abstractions that are not part of the operator execution path.
+Do not add hidden retries for this action in the first version. Keep it
+deterministic and single-attempt like the rest of the execution contract.
 
 ### Workgroup 4: Result envelope and compatibility behavior
 
@@ -192,12 +225,12 @@ Expected success shape:
   "actionType": "press_key",
   "success": true,
   "data": {
-    "key": "BACK"
+    "key": "back"
   }
 }
 ```
 
-Expected failure shape:
+Expected failure shape (soft OS failure):
 
 ```json
 {
@@ -205,15 +238,14 @@ Expected failure shape:
   "actionType": "press_key",
   "success": false,
   "data": {
-    "key": "BACK",
+    "key": "back",
     "error": "GLOBAL_ACTION_FAILED"
   }
 }
 ```
 
-Do not add hidden retries for this action in the first version. Keep it
-deterministic and single-attempt like the rest of the execution contract unless
-there is a clear existing retry primitive already used for global actions.
+Note: service-unavailable failures throw and do not produce a step result. They
+surface as an execution-level error in the outer result envelope.
 
 ### Workgroup 5: Tests
 
@@ -221,18 +253,18 @@ Add coverage across both Node and Android layers.
 
 Node tests:
 
-- validation accepts `press_key` with a supported key
+- validation accepts `press_key` with a supported key (`"back"`, `"home"`, `"recents"`)
 - validation rejects missing `params.key`
 - validation rejects unsupported keys
 - alias tests if any alias is added
 
 Android tests:
 
-- parser accepts `press_key`
+- parser accepts `press_key` and normalizes key via `.lowercase()`
 - parser rejects unsupported key names
 - `UiActionEngine` returns success when the service reports `true`
-- `UiActionEngine` returns failed step results when service is missing or
-  `performGlobalAction(...)` returns `false`
+- `UiActionEngine` returns failed step result when `performGlobalAction(...)` returns `false`
+- `UiActionEngine` throws when the accessibility service is null
 
 If there is no convenient unit seam for `AccessibilityService`, add a small
 adapter interface rather than leaving the action untested.
@@ -255,8 +287,9 @@ Docs should clearly say:
 
 - `press_key` is supported
 - initial key enum is intentionally narrow
-- `BACK` and `HOME` are the guaranteed first-class keys
-- `ENTER` / volume keys are not part of the first implementation
+- `back` and `home` are the guaranteed first-class keys
+- `enter` / volume keys are not part of the first implementation
+- key values are lowercase on the wire, consistent with other string enum params
 
 ## Suggested File-Level Implementation Order
 
@@ -266,9 +299,10 @@ Docs should clearly say:
 4. Extend `AgentCommandParser`.
 5. Extend `UiActionEngine` to execute global actions through
    `OperatorAccessibilityService`.
-6. Add Android unit tests.
-7. Update docs.
-8. Run full validation and device smoke checks.
+6. Update DI wiring in `AppModule.kt`.
+7. Add Android unit tests.
+8. Update docs.
+9. Run full validation and device smoke checks.
 
 This order keeps the external contract and the runtime implementation aligned
 and makes failures easy to localize.
@@ -305,7 +339,7 @@ Minimum manual verification payloads:
   "expectedFormat": "android-ui-automator",
   "timeoutMs": 30000,
   "actions": [
-    { "id": "back1", "type": "press_key", "params": { "key": "BACK" } },
+    { "id": "back1", "type": "press_key", "params": { "key": "back" } },
     { "id": "snap1", "type": "snapshot_ui" }
   ]
 }
@@ -327,7 +361,7 @@ screen.
   "expectedFormat": "android-ui-automator",
   "timeoutMs": 30000,
   "actions": [
-    { "id": "home1", "type": "press_key", "params": { "key": "HOME" } },
+    { "id": "home1", "type": "press_key", "params": { "key": "home" } },
     { "id": "snap1", "type": "snapshot_ui" }
   ]
 }
@@ -347,14 +381,14 @@ Only if included in the same change:
   "expectedFormat": "android-ui-automator",
   "timeoutMs": 30000,
   "actions": [
-    { "id": "recents1", "type": "press_key", "params": { "key": "RECENTS" } },
+    { "id": "recents1", "type": "press_key", "params": { "key": "recents" } },
     { "id": "snap1", "type": "snapshot_ui" }
   ]
 }
 ```
 
 Expected result: success on stock Android and a snapshot that reflects the
-overview screen. If OEM behavior is unstable, keep `RECENTS` out of the first
+overview screen. If OEM behavior is unstable, keep `recents` out of the first
 ship.
 
 ## Risks and Decisions
@@ -387,16 +421,34 @@ path if `performGlobalAction(...)` fails.
 
 Decision:
 
-- fail with a stable step-level error and let the agent decide how to recover
+- service-unavailable: throw (hard error, terminates plan)
+- `performGlobalAction` returns false: return failed step result with
+  `GLOBAL_ACTION_FAILED` (soft OS failure, agent can observe and recover)
+
+### 4. Wire format is lowercase, Kotlin enum is uppercase
+
+Key values follow the lowercase-on-the-wire convention (`"back"`, `"home"`,
+`"recents"`) consistent with `direction`, `clickType`, and `validator` params.
+The Android enum uses `BACK`, `HOME`, `RECENTS` per Kotlin convention and the
+parser bridges the two via `.lowercase()` matching. No `pressGlobalKey` extension
+in `toolkit` - mapping is inline in `UiActionEngine.executePressKey`.
+
+### 5. `UiSystemKey` stays in the `task` module
+
+`UiSystemKey` is a task-layer concept. Placing it in `toolkit` to support a
+typed extension function would create an inappropriate dependency between modules.
+The `GLOBAL_ACTION_*` mapping is a private five-line `when` expression inside
+`UiActionEngineDefault`.
 
 ## Definition of Done
 
-- `press_key` is accepted by Node validation with documented enum values
+- `press_key` is accepted by Node validation with documented lowercase enum values
 - Android parser accepts and types the action
-- Android runtime executes `BACK` and `HOME` through
+- Android runtime executes `back` and `home` through
   `OperatorAccessibilityService.performGlobalAction(...)`
-- success and failure are reflected in canonical `stepResults`
-- unit tests cover parsing and validation
+- service-unavailable throws; `performGlobalAction` returning false returns a
+  failed step result with `GLOBAL_ACTION_FAILED`
+- unit tests cover parsing, validation, success, soft failure, and hard failure
 - device verification is completed on the attached Android device
 - authored docs are updated in the same change
 - the implementing agent creates a local commit when the logical unit of work is
