@@ -10,13 +10,15 @@ export async function cmdOperatorInstall(options: {
   deviceId?: string;
   receiverPackage?: string;
 }): Promise<string> {
+  const receiverPackage =
+    options.receiverPackage ?? process.env.CLAWPERATOR_RECEIVER_PACKAGE;
   const config = getDefaultRuntimeConfig({
     deviceId: options.deviceId,
-    receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_RECEIVER_PACKAGE,
+    receiverPackage,
     adbPath: process.env.ADB_PATH,
   });
 
-  const result = await installOperator(config, options.apkPath, options.receiverPackage);
+  const result = await installOperator(config, options.apkPath, receiverPackage);
 
   // Install phase failure.
   if (!result.install.ok) {

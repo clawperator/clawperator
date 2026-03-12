@@ -165,33 +165,6 @@ describe("installOperator - domain", () => {
     assert.ok(detectCalls.length === 0, "Should not auto-detect when explicit package provided");
   });
 
-  it("uses config.receiverPackage when no explicit receiver package is provided", async () => {
-    const runner = new FakeProcessRunner();
-    const config = getDefaultRuntimeConfig({
-      runner,
-      deviceId: "test-device",
-      receiverPackage: "com.clawperator.operator.dev",
-    });
-
-    runner.queueResult({ code: 0, stdout: "Success", stderr: "" });
-    runner.queueResult({ code: 0, stdout: "com.clawperator.operator.dev/clawperator.operator.accessibilityservice.OperatorAccessibilityService", stderr: "" });
-    runner.queueResult({ code: 1, stdout: "", stderr: "Not a changeable permission type" });
-    runner.queueResult({ code: 0, stdout: "com.clawperator.operator.dev/action.notification.NotificationListenerService", stderr: "" });
-    runner.queueResult({ code: 0, stdout: "package:com.clawperator.operator.dev", stderr: "" });
-
-    const result = await installOperator(config, TEST_APK_PATH);
-
-    assert.strictEqual(result.receiverPackage, "com.clawperator.operator.dev");
-    assert.strictEqual(result.verification?.ok, true);
-
-    const detectCalls = runner.calls.filter(c =>
-      c.args.includes("pm") &&
-      c.args.includes("list") &&
-      (c.args.includes("com.clawperator.operator") || c.args.includes("com.clawperator.operator.dev"))
-    );
-    assert.strictEqual(detectCalls.length, 1, "Should only query pm list once for final verification");
-  });
-
   it("fails verification gracefully when pm list does not find package", async () => {
     const runner = new FakeProcessRunner();
     const config = makeConfig(runner);

@@ -70,7 +70,7 @@ export async function installOperator(
   const install: InstallPhaseResult = { ok: true };
 
   // Step 3: Resolve receiver package.
-  const pkg = receiverPackage ?? config.receiverPackage ?? (await detectReceiverPackage(config));
+  const pkg = receiverPackage ?? (await detectReceiverPackage(config));
   if (!pkg) {
     return {
       receiverPackage: "<unknown>",
