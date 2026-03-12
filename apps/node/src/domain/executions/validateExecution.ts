@@ -59,6 +59,7 @@ const supportedTypes = [
   "wait_for_node",
   "click",
   "scroll_and_click",
+  "scroll",
   "read_text",
   "enter_text",
   "snapshot_ui",
@@ -153,6 +154,30 @@ const executionSchema = z.object({
           addIssue(index, "scroll_and_click requires params.target", ["params", "target"]);
         }
         break;
+      case "scroll": {
+        const SUPPORTED_DIRECTIONS = ["down", "up", "left", "right"] as const;
+        if (params?.direction !== undefined) {
+          const normalizedDir = params.direction.trim().toLowerCase();
+          if (!(SUPPORTED_DIRECTIONS as readonly string[]).includes(normalizedDir)) {
+            addIssue(
+              index,
+              `scroll params.direction must be one of: ${SUPPORTED_DIRECTIONS.join(", ")}`,
+              ["params", "direction"]
+            );
+          }
+        }
+        if (params?.distanceRatio !== undefined) {
+          if (params.distanceRatio < 0 || params.distanceRatio > 1) {
+            addIssue(index, "scroll params.distanceRatio must be in [0.0, 1.0]", ["params", "distanceRatio"]);
+          }
+        }
+        if (params?.settleDelayMs !== undefined) {
+          if (params.settleDelayMs < 0 || params.settleDelayMs > 10000) {
+            addIssue(index, "scroll params.settleDelayMs must be in [0, 10000]", ["params", "settleDelayMs"]);
+          }
+        }
+        break;
+      }
       case "press_key": {
         const SUPPORTED_KEYS = ["back", "home", "recents"] as const;
         const normalizedKey = params?.key?.trim().toLowerCase();
