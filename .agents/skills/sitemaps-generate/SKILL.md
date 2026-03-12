@@ -16,6 +16,7 @@ This skill is for repo maintenance. It is not a live GEO audit.
 - sitemap index `<lastmod>` values based on child sitemap source changes
 - docs sitemap `<lastmod>` and `<priority>` patching after MkDocs build
 - git-based timestamps using each source file's own last commit time
+- pre-commit freshness for locally modified source files
 
 ## Workflow
 
@@ -33,5 +34,7 @@ This skill is for repo maintenance. It is not a live GEO audit.
 - Do not use the most recent repo commit as a blanket timestamp.
 - Each sitemap entry should use the last git commit time of the file or files
   that actually define that URL.
+- If a source file has local uncommitted changes, treat it as changed now and
+  use the current UTC time for that file's sitemap freshness signal.
 - For docs pages, use the source files listed in `sites/docs/source-map.yaml`,
   not the generated files under `sites/docs/site/`.

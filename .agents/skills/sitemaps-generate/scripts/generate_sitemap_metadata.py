@@ -42,6 +42,8 @@ def parse_git_iso(value):
 
 def run_git_last_modified(repo_root, relative_path):
     git_root, git_path = resolve_git_target(repo_root, relative_path)
+    if has_local_changes(git_root, git_path):
+        return datetime.now(timezone.utc).replace(microsecond=0)
     result = subprocess.run(
         ["git", "log", "-1", "--format=%cI", "--", git_path],
         cwd=git_root,
@@ -60,6 +62,17 @@ def max_git_last_modified(repo_root, relative_paths):
     for relative_path in relative_paths:
         timestamps.append(run_git_last_modified(repo_root, relative_path))
     return max(timestamps)
+
+
+def has_local_changes(git_root, git_path):
+    result = subprocess.run(
+        ["git", "status", "--short", "--", git_path],
+        cwd=git_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return bool(result.stdout.strip())
 
 
 def resolve_git_target(repo_root, relative_path):
