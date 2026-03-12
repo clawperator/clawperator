@@ -88,6 +88,11 @@ sealed interface UiAction {
         val durationMs: Long,
         val retry: TaskRetry = TaskRetry.None,
     ) : UiAction
+
+    data class PressKey(
+        override val id: String,
+        val key: UiSystemKey,
+    ) : UiAction
 }
 
 enum class UiSnapshotActualFormat(
@@ -98,6 +103,22 @@ enum class UiSnapshotActualFormat(
 
 enum class UiTextValidator {
     Temperature,
+}
+
+enum class UiSystemKey {
+    BACK,
+    HOME,
+    RECENTS;
+
+    companion object {
+        fun fromWire(value: String): UiSystemKey =
+            when (value.lowercase()) {
+                "back" -> BACK
+                "home" -> HOME
+                "recents" -> RECENTS
+                else -> error("unsupported key: $value")
+            }
+    }
 }
 
 data class UiActionPlan(

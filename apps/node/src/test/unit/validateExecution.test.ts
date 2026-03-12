@@ -259,6 +259,113 @@ describe("validateExecution", () => {
       (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
     );
   });
+
+  it("accepts press_key with key back", () => {
+    const ex = validateExecution({
+      commandId: "c",
+      taskId: "t",
+      source: "s",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 5000,
+      actions: [{ id: "x", type: "press_key", params: { key: "back" } }],
+    });
+    assert.strictEqual(ex.actions[0].type, "press_key");
+    assert.strictEqual(ex.actions[0].params?.key, "back");
+  });
+
+  it("accepts press_key with key home", () => {
+    const ex = validateExecution({
+      commandId: "c",
+      taskId: "t",
+      source: "s",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 5000,
+      actions: [{ id: "x", type: "press_key", params: { key: "home" } }],
+    });
+    assert.strictEqual(ex.actions[0].params?.key, "home");
+  });
+
+  it("accepts press_key with key recents", () => {
+    const ex = validateExecution({
+      commandId: "c",
+      taskId: "t",
+      source: "s",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 5000,
+      actions: [{ id: "x", type: "press_key", params: { key: "recents" } }],
+    });
+    assert.strictEqual(ex.actions[0].params?.key, "recents");
+  });
+
+  it("normalizes key_press alias to press_key", () => {
+    const ex = validateExecution({
+      commandId: "c",
+      taskId: "t",
+      source: "s",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 5000,
+      actions: [{ id: "x", type: "key_press", params: { key: "back" } }],
+    });
+    assert.strictEqual(ex.actions[0].type, "press_key");
+  });
+
+  it("rejects press_key without params.key", () => {
+    assert.throws(
+      () =>
+        validateExecution({
+          commandId: "c",
+          taskId: "t",
+          source: "s",
+          expectedFormat: "android-ui-automator",
+          timeoutMs: 5000,
+          actions: [{ id: "x", type: "press_key", params: {} }],
+        }),
+      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
+    );
+  });
+
+  it("rejects press_key with unsupported key", () => {
+    assert.throws(
+      () =>
+        validateExecution({
+          commandId: "c",
+          taskId: "t",
+          source: "s",
+          expectedFormat: "android-ui-automator",
+          timeoutMs: 5000,
+          actions: [{ id: "x", type: "press_key", params: { key: "volume_up" } }],
+        }),
+      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
+    );
+  });
+
+  it("rejects press_key with blank key", () => {
+    assert.throws(
+      () =>
+        validateExecution({
+          commandId: "c",
+          taskId: "t",
+          source: "s",
+          expectedFormat: "android-ui-automator",
+          timeoutMs: 5000,
+          actions: [{ id: "x", type: "press_key", params: { key: "  " } }],
+        }),
+      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
+    );
+  });
+
+  it("accepts press_key with uppercase key (case-insensitive)", () => {
+    const ex = validateExecution({
+      commandId: "c",
+      taskId: "t",
+      source: "s",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 5000,
+      actions: [{ id: "x", type: "press_key", params: { key: "BACK" } }],
+    });
+    assert.strictEqual(ex.actions[0].type, "press_key");
+    assert.strictEqual(ex.actions[0].params?.key, "BACK");
+  });
 });
 
 describe("validatePayloadSize", () => {

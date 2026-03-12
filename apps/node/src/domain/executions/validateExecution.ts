@@ -43,11 +43,15 @@ const actionParamsSchema = z.object({
   settleDelayMs: z.number().optional(),
   findFirstScrollableChild: z.boolean().optional(),
   validator: z.string().optional(),
+  key: z.string().optional(),
   retry: z.record(z.unknown()).optional(),
   scrollRetry: z.record(z.unknown()).optional(),
   clickRetry: z.record(z.unknown()).optional(),
 }).strict();
 
+// NOTE: "doctor_ping" is intentionally excluded. It is an internal diagnostic action
+// used only by `clawperator doctor`, which bypasses validateExecution and dispatches
+// directly via broadcastAgentCommand. It is not part of the public agent-facing API.
 const supportedTypes = [
   "open_app",
   "open_uri",
@@ -60,6 +64,7 @@ const supportedTypes = [
   "snapshot_ui",
   "take_screenshot",
   "sleep",
+  "press_key",
 ] as const;
 
 const actionSchema = z.object({
@@ -148,6 +153,20 @@ const executionSchema = z.object({
           addIssue(index, "scroll_and_click requires params.target", ["params", "target"]);
         }
         break;
+      case "press_key": {
+        const SUPPORTED_KEYS = ["back", "home", "recents"] as const;
+        const normalizedKey = params?.key?.trim().toLowerCase();
+        if (!normalizedKey) {
+          addIssue(index, "press_key requires params.key", ["params", "key"]);
+        } else if (!(SUPPORTED_KEYS as readonly string[]).includes(normalizedKey)) {
+          addIssue(
+            index,
+            `press_key params.key must be one of: ${SUPPORTED_KEYS.join(", ")}`,
+            ["params", "key"]
+          );
+        }
+        break;
+      }
       default:
         break;
     }

@@ -45,6 +45,8 @@ Commands:
                                             Build and run single wait_for_node action via execute path
   action type --selector <json> --text <value> [--submit] [--clear] [--device-id <id>] [--receiver-package <package>]
                                             Build and run single enter_text action via execute path
+  action press-key --key <back|home|recents> [--device-id <id>] [--receiver-package <package>]
+                                            Build and run single press_key action via execute path
   skills list
                                             List available skills from local indexes/cache
   skills get <skill_id>
@@ -498,8 +500,13 @@ async function main(): Promise<void> {
         result = uri
           ? await (await import("./commands/action.js")).cmdActionOpenUri({ ...out, uri, ...runOpts })
           : JSON.stringify({ code: "USAGE", message: "action open-uri --uri <value>" });
+      } else if (sub === "press-key") {
+        const key = getOpt(rest, "--key");
+        result = key
+          ? await (await import("./commands/action.js")).cmdActionPressKey({ ...out, key, ...runOpts })
+          : JSON.stringify({ code: "USAGE", message: "action press-key --key <back|home|recents>" });
       } else {
-        const validSubs = "open-app|open-uri|click|read|wait|type";
+        const validSubs = "open-app|open-uri|click|read|wait|type|press-key";
         const unknownPart = sub ? `Unknown action subcommand '${sub}'. Valid: ` : "";
         result = JSON.stringify({ code: "USAGE", message: `${unknownPart}action ${validSubs} [options]` });
       }

@@ -145,4 +145,42 @@ describe("parseTerminalEnvelope", () => {
     const line = `${RESULT_ENVELOPE_PREFIX} ${json}`;
     assert.strictEqual(parseTerminalEnvelope(line, CMD_ID), "malformed");
   });
+
+  it("passes errorCode through when present in failed envelope", () => {
+    const json = `{"commandId":"${CMD_ID}","taskId":"t1","status":"failed","stepResults":[],"error":"Accessibility service is not available","errorCode":"SERVICE_UNAVAILABLE"}`;
+    const line = `${RESULT_ENVELOPE_PREFIX} ${json}`;
+    const parsed = parseTerminalEnvelope(line, CMD_ID);
+    assert.ok(parsed && typeof parsed === "object");
+    if (typeof parsed === "object") {
+      assert.strictEqual(parsed.envelope.status, "failed");
+      assert.strictEqual(parsed.envelope.errorCode, "SERVICE_UNAVAILABLE");
+      assert.strictEqual(parsed.envelope.error, "Accessibility service is not available");
+    }
+  });
+
+  it("omits errorCode when not present (older APK backward compat)", () => {
+    const json = `{"commandId":"${CMD_ID}","taskId":"t1","status":"failed","stepResults":[],"error":"Something went wrong"}`;
+    const line = `${RESULT_ENVELOPE_PREFIX} ${json}`;
+    const parsed = parseTerminalEnvelope(line, CMD_ID);
+    assert.ok(parsed && typeof parsed === "object");
+    if (typeof parsed === "object") {
+      assert.strictEqual("errorCode" in parsed.envelope, false);
+    }
+  });
+
+  it("returns malformed when errorCode is not a string or null", () => {
+    const json = `{"commandId":"${CMD_ID}","taskId":"t1","status":"failed","stepResults":[],"error":"oops","errorCode":42}`;
+    const line = `${RESULT_ENVELOPE_PREFIX} ${json}`;
+    assert.strictEqual(parseTerminalEnvelope(line, CMD_ID), "malformed");
+  });
+
+  it("accepts errorCode: null (no enumerated code for this failure)", () => {
+    const json = `{"commandId":"${CMD_ID}","taskId":"t1","status":"failed","stepResults":[],"error":"Unknown failure","errorCode":null}`;
+    const line = `${RESULT_ENVELOPE_PREFIX} ${json}`;
+    const parsed = parseTerminalEnvelope(line, CMD_ID);
+    assert.ok(parsed && typeof parsed === "object");
+    if (typeof parsed === "object") {
+      assert.strictEqual(parsed.envelope.errorCode, null);
+    }
+  });
 });

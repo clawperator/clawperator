@@ -2,6 +2,8 @@ package clawperator.task.runner
 
 import action.log.Log
 import action.developeroptions.DeveloperOptionsManager
+import clawperator.uitree.UiTreeClickType
+import clawperator.uitree.UiTreeClickTypes
 import kotlinx.coroutines.flow.first
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -14,6 +16,7 @@ interface UiActionEngine {
 
 class UiActionEngineDefault(
     private val developerOptionsManager: DeveloperOptionsManager,
+    private val globalActionDispatcher: UiGlobalActionDispatcher,
 ) : UiActionEngine {
     companion object {
         private const val TAG = "[UiActionEngine]"
@@ -59,6 +62,7 @@ class UiActionEngineDefault(
                 is UiAction.EnterText -> executeEnterText(taskScope, action)
                 is UiAction.Sleep -> executeSleep(taskScope, action)
                 is UiAction.DoctorPing -> executeDoctorPing(taskScope, action)
+                is UiAction.PressKey -> executePressKey(action)
             }
 
         Log.d(
@@ -147,7 +151,7 @@ class UiActionEngineDefault(
             actionType = "click",
             data =
                 mapOf(
-                    "click_types" to action.clickTypes.toString(),
+                    "click_types" to action.clickTypes.toWireValue(),
                 ),
         )
     }
@@ -178,7 +182,7 @@ class UiActionEngineDefault(
                 mapOf(
                     "max_swipes" to action.maxSwipes.toString(),
                     "direction" to action.direction.toString(),
-                    "click_types" to action.clickTypes.toString(),
+                    "click_types" to action.clickTypes.toWireValue(),
                 ),
         )
     }
@@ -296,4 +300,39 @@ class UiActionEngineDefault(
             ),
         )
     }
+
+    private fun executePressKey(action: UiAction.PressKey): UiActionStepResult {
+        val keyName = action.key.name.lowercase()
+        val success = globalActionDispatcher.perform(action.key)
+
+        return if (success) {
+            UiActionStepResult(
+                id = action.id,
+                actionType = "press_key",
+                data = mapOf("key" to keyName),
+            )
+        } else {
+            Log.w("$TAG executePressKey: performGlobalAction returned false for key=$keyName")
+            UiActionStepResult(
+                id = action.id,
+                actionType = "press_key",
+                success = false,
+                data = mapOf(
+                    "key" to keyName,
+                    "error" to "GLOBAL_ACTION_FAILED",
+                ),
+            )
+        }
+    }
 }
+
+/**
+ * Returns a stable canonical wire value for the click types (e.g. "click", "long_click", "focus").
+ * Uses the first type in [UiTreeClickTypes.ordered] so multi-type lists are representable in data output.
+ */
+private fun UiTreeClickTypes.toWireValue(): String =
+    when (ordered.firstOrNull()) {
+        UiTreeClickType.LongClick -> "long_click"
+        UiTreeClickType.Focus -> "focus"
+        else -> "click"
+    }
