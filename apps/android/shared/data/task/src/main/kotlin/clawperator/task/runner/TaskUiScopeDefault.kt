@@ -666,7 +666,7 @@ class TaskUiScopeDefault(
 
             val sigAfter = leadingChildSignature(scrollNodeAfter, direction)
 
-            if (sigBefore != null && sigAfter == sigBefore) {
+            if (sigBefore == null || sigAfter == null || sigAfter == sigBefore) {
                 Log.d("$TAG scrollOnce: signature unchanged - edge_reached")
                 TaskScrollOnceResult(TaskScrollOutcome.EdgeReached, resolvedContainerId)
             } else {

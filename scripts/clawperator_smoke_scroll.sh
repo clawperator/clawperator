@@ -97,18 +97,26 @@ extract_snapshot() {
 }
 
 # ---------------------------------------------------------------------------
-# Helper: extract first N non-whitespace content lines from an ASCII UI tree.
-# Used as a proxy for the leading-child signature: stable top-level nodes.
-# Strips coordinates and resource-ids, keeping only label content.
+# Helper: extract the first N non-empty XML text attributes from a hierarchy dump.
+# This gives us a stable "what is visible near the top" signature without relying
+# on brittle grep/head pipelines or the old unsupported snapshot format param.
 # ---------------------------------------------------------------------------
 leading_signature() {
   local snapshot="$1"
   local n="${2:-5}"
-  echo "$snapshot" \
-    | grep -oE '"[^"]{2,}"' \
-    | head -n "$n" \
-    | tr '\n' '|' \
-    | sed 's/|$//'
+  printf '%s' "$snapshot" | node -e "
+    const xml = require('fs').readFileSync(0, 'utf8');
+    const limit = Number(process.argv[1]);
+    const texts = [];
+    const regex = /\\btext=\"([^\"]+)\"/g;
+    let match;
+    while ((match = regex.exec(xml)) !== null) {
+      const value = match[1].trim();
+      if (value) texts.push(value);
+      if (texts.length >= limit) break;
+    }
+    console.log(texts.join('|'));
+  " "$n"
 }
 
 PAYLOAD_FILE=$(mktemp /tmp/clawperator-scroll-smoke-XXXXXX.json)
@@ -168,7 +176,16 @@ while [ "$DOWN_STEPS" -lt "$SCROLL_MAX_STEPS" ]; do
   "expectedFormat": "android-ui-automator",
   "timeoutMs": 30000,
   "actions": [
-    { "id": "scr", "type": "scroll", "params": { "direction": "down", "distanceRatio": 0.7, "settleDelayMs": 300 } }
+    {
+      "id": "scr",
+      "type": "scroll",
+      "params": {
+        "container": { "resourceId": "com.android.settings:id/recycler_view" },
+        "direction": "down",
+        "distanceRatio": 0.7,
+        "settleDelayMs": 300
+      }
+    }
   ]
 }
 JSON
@@ -219,6 +236,7 @@ cat > "$PAYLOAD_FILE" <<JSON
       "id": "scr",
       "type": "scroll_until",
       "params": {
+        "container": { "resourceId": "com.android.settings:id/recycler_view" },
         "direction": "up",
         "distanceRatio": 0.7,
         "settleDelayMs": 300,
