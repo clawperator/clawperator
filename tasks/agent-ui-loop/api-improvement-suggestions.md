@@ -113,6 +113,12 @@ element" primitive.
 
 ## GAP-05: No hardware/system key press action
 
+**Status:** Completed on 2026-03-12. `press_key` action added with keys `back`, `home`,
+and `recents`. Wire format uses lowercase strings consistent with other action params.
+Alias `key_press` is normalized to `press_key`. Validated in the Node layer with
+`EXECUTION_VALIDATION_FAILED` for unsupported keys. Android runtime uses
+`performGlobalAction` via the Operator accessibility service.
+
 **Problem:** There is no action for pressing Android hardware or system keys. Common
 automation needs include:
 
@@ -127,19 +133,6 @@ All of these require falling outside the execution payload to `adb shell input k
 **Impact:** Medium. Back-navigation is extremely common. Many UI flows are expressed
 as "tap X, then tap Back, then observe." Without a `press_key` action, agents cannot
 express this as a single atomic execution.
-
-**Suggested improvement:** Add a `press_key` action:
-```json
-{
-  "id": "back1",
-  "type": "press_key",
-  "params": {
-    "key": "BACK"
-  }
-}
-```
-A small well-documented enum of key names (`BACK`, `HOME`, `RECENTS`, `ENTER`,
-`VOLUME_UP`, `VOLUME_DOWN`) would cover the common cases without exposing raw keycodes.
 
 ---
 
@@ -280,7 +273,7 @@ version-skew diagnosis.
 | GAP-02 | `enter_text` `clear` silently no-ops | High | Silent failure |
 | GAP-03 | `open_uri` deep link action implemented | Done | Closed |
 | GAP-04 | `wait_for_node` no total-time semantic | Medium | Ergonomics |
-| GAP-05 | No hardware/system key press | Medium | Missing feature |
+| GAP-05 | No hardware/system key press | Medium | Done |
 | GAP-06 | `sleep.durationMs` silently clamped | Low-medium | Completed |
 | GAP-07 | `MAX_ACTIONS` mismatch (50 vs 64) | Low | Contract drift |
 | GAP-08 | Undocumented action type aliases | Low | Docs gap |

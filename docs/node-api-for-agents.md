@@ -223,6 +223,7 @@ Combine fields to increase specificity when a single field is ambiguous:
 | `take_screenshot` | - | `path: string`, `retry: object` |
 | `sleep` | `durationMs: number` | - |
 | `scroll_and_click` | `target: NodeMatcher` | `container: NodeMatcher`, `direction: "down" \| "up" \| "left" \| "right"` (default: `"down"`), `maxSwipes: number` (default: `10`, range: 1-50), `distanceRatio: number` (default: `0.7`, range: 0-1), `settleDelayMs: number` (default: `250`, range: 0-10000), `findFirstScrollableChild: boolean` (default: `false`), `scrollRetry: object` (default preset: `maxAttempts=4`, `initialDelayMs=400`, `maxDelayMs=2000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`), `clickRetry: object` (default preset: `maxAttempts=5`, `initialDelayMs=500`, `maxDelayMs=3000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`) |
+| `press_key` | `key: "back" \| "home" \| "recents"` | - |
 
 ### CLI-to-action-type mapping
 
@@ -270,6 +271,8 @@ Combine fields to increase specificity when a single field is ambiguous:
 
 **`take_screenshot`:** `observe screenshot` uses the same execution contract under the hood. Android reports `UNSUPPORTED_RUNTIME_SCREENSHOT`, then the Node layer captures the screenshot via `adb exec-out screencap -p`, writes it to `data.path`, and normalizes the step result to `success: true` when capture succeeds.
 
+**`press_key`:** Issues a system-level key event via the Android Accessibility Service (`performGlobalAction`). Supported keys: `"back"`, `"home"`, `"recents"`. The alias `key_press` is normalized to `press_key`. No retry - this action is single-attempt by design. Requires the Clawperator Operator accessibility service to be running on the device; throws a hard config error if the service is unavailable. Returns `success: false` with `data.error: "GLOBAL_ACTION_FAILED"` if the OS reports the global action could not be performed (rare soft OS failure).
+
 **`scroll_and_click`:** This action has two separate retry knobs. `scrollRetry` controls the scroll/search loop and defaults to the `UiScroll` preset (`maxAttempts=4`, `initialDelayMs=400`, `maxDelayMs=2000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`). `clickRetry` controls the final click attempt and defaults to the `UiReadiness` preset (`maxAttempts=5`, `initialDelayMs=500`, `maxDelayMs=3000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`).
 
 ## Result Envelope
@@ -315,6 +318,7 @@ Typical `data` keys by action type:
 | `wait_for_node` | `resource_id`, `label` (matched node details) |
 | `scroll_and_click` | `max_swipes`, `direction`, `click_types` |
 | `sleep` | `duration_ms` |
+| `press_key` | `key` (`"back"`, `"home"`, or `"recents"`) |
 
 For any failed step: `success: false` and `data.error` contains the error code string.
 
@@ -454,6 +458,7 @@ Branch agent logic on codes from `envelope.error` or `stepResults[].data.error`:
 | `NODE_NOT_CLICKABLE` | Reserved error code. Intended for "element found but not interactable", but not currently emitted consistently by the Android and Node runtimes. |
 | `UNSUPPORTED_RUNTIME_CLOSE` | Expected per-step result for all `close_app` steps. The Android runtime does not support a force-stop action response - the Node layer handles the close via `adb shell am force-stop` before dispatch. The overall execution `status` remains `"success"`. Treat as non-fatal. |
 | `SNAPSHOT_EXTRACTION_FAILED` | `snapshot_ui` step completed but the Node layer did not attach any snapshot text to the step during post-processing. The most common cause is a Node binary packaging mismatch or other logcat extraction issue. Rebuild or reinstall the npm package and check version compatibility. |
+| `GLOBAL_ACTION_FAILED` | `press_key` step result when the OS reports `performGlobalAction` returned false. Rare soft failure - the accessibility service was running but Android declined to execute the action. |
 
 Primary top-level error taxonomy: `apps/node/src/contracts/errors.ts`. This table also includes runtime-only step error strings such as `UNSUPPORTED_RUNTIME_CLOSE`.
 
