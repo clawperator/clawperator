@@ -9,6 +9,12 @@ Clawperator is typically installed on a host machine via the CLI and connected t
 curl -fsSL https://clawperator.com/install.sh | bash
 ```
 
+**Canonical device setup:**
+To prepare an Android device, use the one-step setup command which installs the [Clawperator Operator Android app](https://docs.clawperator.com/getting-started/android-operator-apk/) and grants all required device permissions:
+```bash
+clawperator operator setup --apk <path_to_operator.apk>
+```
+
 Clawperator is an actuator, not an autonomous planner. It focuses on reliable, predictable execution of UI-driven workflows on real **Android devices**.
 
 ## What Clawperator is best used for
@@ -73,6 +79,7 @@ Clawperator solves the "mobile-only" accessibility gap for AI agents. For many s
 - **Operator LLM Playbook**: https://docs.clawperator.com/design/operator-llm-playbook/
 - **API Overview**: https://docs.clawperator.com/reference/api-overview/
 - **CLI Reference**: https://docs.clawperator.com/reference/cli-reference/
+- **Crash Recovery (Permissions)**: https://docs.clawperator.com/reference/cli-reference/#grant-device-permissions
 - **First-Time Setup**: https://docs.clawperator.com/getting-started/first-time-setup/
 - **Full Compiled Docs**: https://clawperator.com/llms-full.txt
 - **GitHub Repository**: https://github.com/clawpilled/clawperator
