@@ -315,7 +315,7 @@ async function main(): Promise<void> {
         if (!apkPath) {
           result = JSON.stringify({ code: "USAGE", message: `operator ${sub ?? "setup"} requires --apk <path>. Use clawperator operator setup --help for details.` });
         } else {
-          result = await (await import("./commands/operatorInstall.js")).cmdOperatorInstall({
+          result = await (await import("./commands/operatorSetup.js")).cmdOperatorSetup({
             ...out,
             apkPath,
             deviceId: global.deviceId ?? getOpt(rest, "--device-id"),

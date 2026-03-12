@@ -3,7 +3,7 @@ import assert from "node:assert";
 import { writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { installOperator } from "../../domain/device/installOperator.js";
+import { setupOperator } from "../../domain/device/setupOperator.js";
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 import { FakeProcessRunner } from "./fakes/FakeProcessRunner.js";
 
@@ -16,7 +16,7 @@ function makeConfig(runner: FakeProcessRunner) {
   });
 }
 
-describe("installOperator - domain", () => {
+describe("setupOperator - domain", () => {
   before(() => {
     // Create a dummy APK file so existsSync passes.
     writeFileSync(TEST_APK_PATH, "fake-apk-content");
@@ -30,7 +30,7 @@ describe("installOperator - domain", () => {
     const runner = new FakeProcessRunner();
     const config = makeConfig(runner);
 
-    const result = await installOperator(config, "/nonexistent/operator.apk");
+    const result = await setupOperator(config, "/nonexistent/operator.apk");
 
     assert.strictEqual(result.install.ok, false);
     assert.match(result.install.error ?? "", /APK file not found/);
@@ -45,7 +45,7 @@ describe("installOperator - domain", () => {
     // adb install fails
     runner.queueResult({ code: 1, stdout: "", stderr: "INSTALL_FAILED_ALREADY_EXISTS" });
 
-    const result = await installOperator(config, TEST_APK_PATH);
+    const result = await setupOperator(config, TEST_APK_PATH);
 
     assert.strictEqual(result.install.ok, false);
     assert.match(result.install.error ?? "", /INSTALL_FAILED_ALREADY_EXISTS/);
@@ -74,7 +74,7 @@ describe("installOperator - domain", () => {
     // grantDevicePermissions completes without verification after permission failure
     runner.queueResult({ code: 0, stdout: "", stderr: "" });
 
-    const result = await installOperator(config, TEST_APK_PATH);
+    const result = await setupOperator(config, TEST_APK_PATH);
 
     assert.strictEqual(result.install.ok, true);
     assert.ok(result.permissions);
@@ -90,7 +90,7 @@ describe("installOperator - domain", () => {
     runner.queueResult({ code: 0, stdout: "", stderr: "" });
     runner.queueResult({ code: 0, stdout: "", stderr: "" });
 
-    const result = await installOperator(config, TEST_APK_PATH);
+    const result = await setupOperator(config, TEST_APK_PATH);
 
     assert.strictEqual(result.install.ok, true);
     assert.strictEqual(result.permissions, undefined);
@@ -108,7 +108,7 @@ describe("installOperator - domain", () => {
     runner.queueResult({ code: 0, stdout: "package:com.clawperator.operator", stderr: "" });
     runner.queueResult({ code: 0, stdout: "package:com.clawperator.operator.dev", stderr: "" });
 
-    const result = await installOperator(config, TEST_APK_PATH);
+    const result = await setupOperator(config, TEST_APK_PATH);
 
     assert.strictEqual(result.install.ok, true);
     assert.strictEqual(result.permissions, undefined);
@@ -133,7 +133,7 @@ describe("installOperator - domain", () => {
     runner.queueResult({ code: 0, stdout: "", stderr: "" });
     runner.queueResult({ code: 0, stdout: "package:com.clawperator.operator.dev", stderr: "" });
 
-    const result = await installOperator(config, TEST_APK_PATH);
+    const result = await setupOperator(config, TEST_APK_PATH);
 
     assert.strictEqual(result.receiverPackage, "com.clawperator.operator.dev");
     assert.strictEqual(result.verification?.ok, true);
@@ -164,7 +164,7 @@ describe("installOperator - domain", () => {
     // verification: pm list packages
     runner.queueResult({ code: 0, stdout: "package:com.clawperator.operator", stderr: "" });
 
-    const result = await installOperator(config, TEST_APK_PATH);
+    const result = await setupOperator(config, TEST_APK_PATH);
 
     assert.strictEqual(result.install.ok, true);
     assert.strictEqual(result.receiverPackage, "com.clawperator.operator");
@@ -192,7 +192,7 @@ describe("installOperator - domain", () => {
     // verification: pm list packages
     runner.queueResult({ code: 0, stdout: "package:com.clawperator.operator.dev", stderr: "" });
 
-    const result = await installOperator(config, TEST_APK_PATH, "com.clawperator.operator.dev");
+    const result = await setupOperator(config, TEST_APK_PATH, "com.clawperator.operator.dev");
 
     assert.strictEqual(result.receiverPackage, "com.clawperator.operator.dev");
     assert.strictEqual(result.install.ok, true);
@@ -232,7 +232,7 @@ describe("installOperator - domain", () => {
     // verification: pm list returns nothing
     runner.queueResult({ code: 0, stdout: "", stderr: "" });
 
-    const result = await installOperator(config, TEST_APK_PATH);
+    const result = await setupOperator(config, TEST_APK_PATH);
 
     assert.strictEqual(result.install.ok, true);
     assert.ok(result.verification);

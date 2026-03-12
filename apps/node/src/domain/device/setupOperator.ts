@@ -37,7 +37,7 @@ export interface OperatorInstallResult {
  *   4. Grant required device permissions (accessibility, notification listener).
  *   5. Verify the package is installed and accessible via pm list.
  */
-export async function installOperator(
+export async function setupOperator(
   config: RuntimeConfig,
   apkPath: string,
   receiverPackage?: string

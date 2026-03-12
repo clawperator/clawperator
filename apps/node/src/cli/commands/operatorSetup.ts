@@ -1,10 +1,10 @@
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
-import { installOperator } from "../../domain/device/installOperator.js";
+import { setupOperator } from "../../domain/device/setupOperator.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
 import type { OutputOptions } from "../output.js";
 import { formatSuccess, formatError } from "../output.js";
 
-export async function cmdOperatorInstall(options: {
+export async function cmdOperatorSetup(options: {
   format: OutputOptions["format"];
   apkPath: string;
   deviceId?: string;
@@ -18,7 +18,7 @@ export async function cmdOperatorInstall(options: {
     adbPath: process.env.ADB_PATH,
   });
 
-  const result = await installOperator(config, options.apkPath, receiverPackage);
+  const result = await setupOperator(config, options.apkPath, receiverPackage);
 
   // Install phase failure.
   if (!result.install.ok) {
