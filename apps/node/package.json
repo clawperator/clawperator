@@ -6,11 +6,11 @@
   "main": "dist/cli/index.js",
   "repository": {
     "type": "git",
-    "url": "https://github.com/clawpilled/clawperator.git",
+    "url": "https://github.com/clawperator/clawperator.git",
     "directory": "apps/node"
   },
   "homepage": "https://clawperator.com",
-  "bugs": "https://github.com/clawpilled/clawperator/issues",
+  "bugs": "https://github.com/clawperator/clawperator/issues",
   "bin": "dist/cli/index.js",
   "publishConfig": {
     "access": "public",

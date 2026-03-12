@@ -10,20 +10,20 @@ This repository supports a local pre-commit guard to reduce accidental commits o
 
 ## Shared local config path
 
-`clawperator` and `clawperator-skills` share the convention of a user-scoped config directory at:
+`clawperator` and `clawperator-skills` both look for an optional user-scoped config directory at:
 
-- `~/.clawpilled/`
+- `~/.clawperator/`
 
 Expected files:
 
-- `~/.clawpilled/blocked-terms.txt`
-- `~/.clawpilled/pre-commit-blocked-terms.sh`
+- `~/.clawperator/blocked-terms.txt`
+- `~/.clawperator/pre-commit-blocked-terms.sh`
 
 Bootstrap:
 
 ```bash
-mkdir -p ~/.clawpilled
-cp ./blocked-terms.txt.example ~/.clawpilled/blocked-terms.txt
+mkdir -p ~/.clawperator
+cp ./blocked-terms.txt.example ~/.clawperator/blocked-terms.txt
 ```
 
 ## `blocked-terms.txt` format
@@ -52,10 +52,10 @@ If a repo includes the helper installer script, run it from that repo root:
 ```
 
 Today that helper lives in `clawperator-skills/scripts/install_blocked_terms_hook.sh`.
-For repos that do not ship the helper, create `.git/hooks/pre-commit` to exec `~/.clawpilled/pre-commit-blocked-terms.sh`.
+For repos that do not ship the helper, create `.git/hooks/pre-commit` to exec `~/.clawperator/pre-commit-blocked-terms.sh`.
 
 The helper writes `.git/hooks/pre-commit` to call the shared hook script.
-If `~/.clawpilled/` is missing, the hook will warn and skip checks (non-blocking).
+If `~/.clawperator/` is missing, the hook will warn and skip checks (non-blocking).
 
 ## What the hook checks
 

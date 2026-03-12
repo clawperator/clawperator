@@ -25,7 +25,7 @@ curl -fsSL https://clawperator.com/install.sh | bash
 
 The installer installs the CLI, downloads the latest stable [Clawperator Operator Android app](android-operator-apk.md) package locally, and runs `clawperator doctor` to detect missing setup.
 
-Historical versions and release notes remain available on [GitHub Releases](https://github.com/clawpilled/clawperator/releases).
+Historical versions and release notes remain available on [GitHub Releases](https://github.com/clawperator/clawperator/releases).
 
 ---
 

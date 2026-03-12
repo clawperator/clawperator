@@ -1,6 +1,6 @@
 # Device Prep and Runtime Tips
 
-Related runtime/API repository: [clawperator](https://github.com/clawpilled/clawperator)
+Related runtime/API repository: [clawperator](https://github.com/clawperator/clawperator)
 
 ## Why This Matters
 

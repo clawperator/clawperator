@@ -342,7 +342,7 @@ curl -fsSL https://clawperator.com/install.sh | bash
 
 The installer installs the CLI, downloads the latest stable [Clawperator Operator Android app](android-operator-apk.md) package locally, and runs `clawperator doctor` to detect missing setup.
 
-Historical versions and release notes remain available on [GitHub Releases](https://github.com/clawpilled/clawperator/releases).
+Historical versions and release notes remain available on [GitHub Releases](https://github.com/clawperator/clawperator/releases).
 
 ---
 
@@ -3742,7 +3742,7 @@ adb shell run-as <package> cp files/crash-log.txt /sdcard/Download/crash-log.txt
 
 # Usage Model
 
-Related runtime/API repository: [clawperator](https://github.com/clawpilled/clawperator)
+Related runtime/API repository: [clawperator](https://github.com/clawperator/clawperator)
 
 ## Core Principle
 
@@ -3910,7 +3910,7 @@ Every Execution payload sent by a skill MUST include:
 
 # Device Prep and Runtime Tips
 
-Related runtime/API repository: [clawperator](https://github.com/clawpilled/clawperator)
+Related runtime/API repository: [clawperator](https://github.com/clawperator/clawperator)
 
 ## Why This Matters
 
@@ -3998,18 +3998,18 @@ This repository supports a local pre-commit guard to reduce accidental commits o
 
 `clawperator` and `clawperator-skills` share the convention of a user-scoped config directory at:
 
-- `~/.clawpilled/`
+- `~/.clawperator/`
 
 Expected files:
 
-- `~/.clawpilled/blocked-terms.txt`
-- `~/.clawpilled/pre-commit-blocked-terms.sh`
+- `~/.clawperator/blocked-terms.txt`
+- `~/.clawperator/pre-commit-blocked-terms.sh`
 
 Bootstrap:
 
 ```bash
-mkdir -p ~/.clawpilled
-cp ./blocked-terms.txt.example ~/.clawpilled/blocked-terms.txt
+mkdir -p ~/.clawperator
+cp ./blocked-terms.txt.example ~/.clawperator/blocked-terms.txt
 ```
 
 ## `blocked-terms.txt` format
@@ -4038,10 +4038,10 @@ If a repo includes the helper installer script, run it from that repo root:
 ```
 
 Today that helper lives in `clawperator-skills/scripts/install_blocked_terms_hook.sh`.
-For repos that do not ship the helper, create `.git/hooks/pre-commit` to exec `~/.clawpilled/pre-commit-blocked-terms.sh`.
+For repos that do not ship the helper, create `.git/hooks/pre-commit` to exec `~/.clawperator/pre-commit-blocked-terms.sh`.
 
 The helper writes `.git/hooks/pre-commit` to call the shared hook script.
-If `~/.clawpilled/` is missing, the hook will warn and skip checks (non-blocking).
+If `~/.clawperator/` is missing, the hook will warn and skip checks (non-blocking).
 
 ## What the hook checks
 

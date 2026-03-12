@@ -138,7 +138,7 @@ Tests and smoke scripts should prove the intended behavior, not just exercise co
 - Use placeholders in examples:
   - `<device_id>`, `<device_serial>`, `<person_name>`, `<local_user>`
 - If local blocked-terms policy is enabled, keep it in the user-scoped config dir:
-  - `~/.clawpilled/blocked-terms.txt`
+  - `~/.clawperator/blocked-terms.txt`
 - Before release or force-push events, run a blocked-term scan and verify clean history.
 
 ## Coding and Commit Conventions

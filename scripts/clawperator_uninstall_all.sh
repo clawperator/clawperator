@@ -16,7 +16,7 @@
 # What this does NOT remove (not owned by Clawperator):
 #   - Node.js / nvm
 #   - adb / git
-#   - ~/.clawpilled/ (user-managed config)
+#   - ~/.clawperator/ (user-managed config)
 
 set -uo pipefail
 
