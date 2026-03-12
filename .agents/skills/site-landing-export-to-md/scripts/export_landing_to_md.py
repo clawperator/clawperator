@@ -1,0 +1,80 @@
+#!/usr/bin/env python3
+
+import os
+import sys
+import argparse
+from pathlib import Path
+
+def main():
+    parser = argparse.ArgumentParser(description='Export local landing page build to markdown.')
+    parser.add_argument('--input', help='Path to index.html (default: sites/landing/out/index.html)')
+    parser.add_argument('--output', default='landing-local.md', help='Output MD file (default: landing-local.md)')
+    args = parser.parse_args()
+
+    # Determine paths
+    script_dir = Path(__file__).parent.resolve()
+    repo_root = script_dir.parents[3]
+    
+    html_path = args.input
+    if not html_path:
+        html_path = repo_root / "sites/landing" / "out" / "index.html"
+    else:
+        html_path = Path(html_path)
+
+    if not html_path.exists():
+        print(f"Error: Landing page build not found at {html_path}")
+        print("Please run ./scripts/site_build.sh first.")
+        sys.exit(1)
+
+    try:
+        from bs4 import BeautifulSoup
+        from markdownify import markdownify as md
+    except ImportError:
+        print("Error: Missing dependencies (beautifulsoup4, markdownify).")
+        print(f"Please install them: pip install -r {script_dir.parent}/requirements.txt")
+        sys.exit(1)
+
+    print(f"Reading {html_path}...")
+    with open(html_path, 'r', encoding='utf-8') as f:
+        soup = BeautifulSoup(f, 'html.parser')
+
+    # Find the main content
+    # Next.js usually wraps content in a main tag or a specific div
+    main_content = soup.find('main')
+    if not main_content:
+        # Fallback to body if main not found
+        main_content = soup.find('body')
+
+    if not main_content:
+        print("Error: Could not find main content in HTML.")
+        sys.exit(1)
+
+    # Basic cleanup
+    # Remove script tags
+    for s in main_content.select('script'):
+        s.decompose()
+    # Remove style tags
+    for s in main_content.select('style'):
+        s.decompose()
+
+    # Convert to markdown
+    # We want to keep some structure but remove complex layout divs
+    content_md = md(str(main_content), heading_style="ATX")
+
+    # Final cleanup of the markdown
+    lines = content_md.splitlines()
+    clean_lines = []
+    for line in lines:
+        # Remove lines that are just whitespace or very short noise from layout
+        if line.strip() or not clean_lines or clean_lines[-1].strip():
+            clean_lines.append(line)
+    
+    final_md = "\n".join(clean_lines).strip()
+
+    with open(args.output, 'w', encoding='utf-8') as f:
+        f.write(final_md)
+    
+    print(f"SUCCESS: Exported landing page to {args.output}")
+
+if __name__ == "__main__":
+    main()
