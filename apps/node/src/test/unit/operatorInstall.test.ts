@@ -199,12 +199,16 @@ describe("installOperator - domain", () => {
     assert.strictEqual(result.permissions?.accessibility.alreadyEnabled, true);
     assert.strictEqual(result.verification?.ok, true);
 
-    // Should not have called detectReceiverPackage (no extra pm list call needed)
+    // Explicit receiver-package should avoid the release/debug auto-detect probes.
     const detectCalls = runner.calls.filter(c =>
-      c.args.includes("pm") && c.args.includes("list") && c.args.includes("com.clawperator.operator")
+      c.args.length >= 6 &&
+      c.args[2] === "shell" &&
+      c.args[3] === "pm" &&
+      c.args[4] === "list" &&
+      c.args[5] === "packages" &&
+      c.args[6] === "com.clawperator.operator"
     );
-    // Only the final verification pm list should have been called for the dev package
-    assert.ok(detectCalls.length === 0, "Should not auto-detect when explicit package provided");
+    assert.strictEqual(detectCalls.length, 0, "Should not probe the release package when receiver-package is explicit");
   });
 
   it("fails verification gracefully when pm list does not find package", async () => {
