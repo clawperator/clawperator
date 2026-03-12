@@ -111,11 +111,13 @@ This command installs the APK, grants the accessibility service and notification
 
 > Do not use raw `adb install` for normal setup. It installs the APK but leaves the device in an unusable state without required permissions.
 
-If permissions are lost after initial setup (for example after a crash that disables the accessibility service), run the remediation command:
+If the Operator APK crashes after initial setup and Android revokes its permissions, run the remediation command:
 
 ```bash
 clawperator grant-device-permissions
 ```
+
+Do not use this as part of normal setup. The normal setup path is always `clawperator operator install`.
 
 ## Verifying setup
 

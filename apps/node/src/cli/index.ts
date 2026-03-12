@@ -119,7 +119,7 @@ Notes:
   - Fails with a structured error if any phase fails. The error code identifies which phase failed.
   - Default receiver package (auto-detected): com.clawperator.operator (release) or com.clawperator.operator.dev (debug).
   - Do not use raw adb install for normal setup. It leaves the device in a partial state without required permissions.
-  - Use clawperator grant-device-permissions for remediation after permission drift, not for initial setup.
+  - Use clawperator grant-device-permissions only after the Operator APK crashes and Android revokes permissions.
 `,
   "observe snapshot": `clawperator observe snapshot
 
@@ -187,7 +187,8 @@ Notes:
   - Default receiver package: com.clawperator.operator
   - Use --receiver-package com.clawperator.operator.dev for local debug APKs.
   - Grants accessibility, notification posting, and notification listener permissions via adb.
-  - This command is for remediation after permission drift. For normal setup, use clawperator operator install instead.
+  - This command is for crash recovery only. Use it when the Operator APK crashes and Android revokes permissions.
+  - For normal setup, always use clawperator operator install instead.
 `,
   "emulator": `clawperator emulator
 

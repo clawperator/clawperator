@@ -39,7 +39,7 @@ Clawperator provides a deterministic execution layer for LLM agents to control A
 | `skills run <skill_id> [--device-id <id>]` | Invoke a skill script (convenience wrapper) |
 | `skills install` | Clone skills repo to `~/.clawperator/skills/` |
 | `skills update [--ref <git-ref>]` | Pull latest skills (optionally pin to a ref) |
-| `grant-device-permissions` | Re-grant Operator permissions after permission drift (remediation only - use `operator install` for initial setup) |
+| `grant-device-permissions` | Re-grant Operator permissions only after an Operator APK crash causes Android to revoke them |
 | `serve` | Start HTTP/SSE server |
 | `doctor` | Run environment diagnostics |
 | `version` | Print the CLI version or check CLI / Clawperator Operator Android app compatibility |

@@ -114,7 +114,7 @@ The command fails with a structured error if any phase fails. The error includes
 
 > Do not use raw `adb install` for normal setup. It copies the APK but leaves the device in a partial state without required permissions. Use `clawperator operator install` instead.
 
-> The accessibility service must remain enabled. If it is ever disabled after setup, run `clawperator grant-device-permissions` to re-enable it.
+> Always use `clawperator operator install` for setup. Only run `clawperator grant-device-permissions` after the Operator APK crashes and Android revokes the accessibility or notification permissions.
 
 ---
 
@@ -132,7 +132,7 @@ A fully configured device will show all checks passing. Common warnings:
 | :--- | :--- |
 | `DEVICE_UNAUTHORIZED` | Tap "Allow" on the device USB debugging dialog |
 | `RECEIVER_NOT_INSTALLED` | Complete Step 3 (run `clawperator operator install`) |
-| `DEVICE_ACCESSIBILITY_NOT_RUNNING` | Run `clawperator grant-device-permissions` to re-grant accessibility access |
+| `DEVICE_ACCESSIBILITY_NOT_RUNNING` | If the Operator APK crashed after setup, run `clawperator grant-device-permissions` to restore the revoked permissions |
 | `DEVICE_DEV_OPTIONS_DISABLED` | Enable Developer options (physical device only) |
 | `DEVICE_USB_DEBUGGING_DISABLED` | Enable USB debugging (physical device only) |
 

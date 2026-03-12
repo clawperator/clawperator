@@ -112,7 +112,9 @@ clawperator operator install \
   --receiver-package com.clawperator.operator.dev
 ```
 
-This command installs the APK and grants required permissions (accessibility, notification listener) in one step.
+This command is the normal path for agents and operators. It installs the APK and grants required permissions (accessibility, notification listener) in one step.
+
+Do not split initial setup into separate `adb install` and `grant-device-permissions` calls. Reserve `clawperator grant-device-permissions` for recovery after the Operator APK crashes and Android revokes the previously granted permissions.
 
 ## Step 5 - Run doctor
 

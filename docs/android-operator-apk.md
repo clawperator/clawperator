@@ -63,13 +63,13 @@ This command grants all three permissions automatically during install. The perm
 
 The accessibility service and notification listener permissions are enabled by appending the Clawperator service component to the relevant secure setting, matching the format Android uses internally. The `POST_NOTIFICATIONS` grant is a standard runtime permission grant; on Android 12 and below it is silently skipped.
 
-If permissions are lost after setup (for example, after an app crash that disables the accessibility service), use the remediation command:
+If the Operator APK crashes after setup and Android revokes the granted permissions, use the remediation command:
 
 ```bash
 clawperator grant-device-permissions
 ```
 
-This re-grants the same permissions without reinstalling the APK.
+This re-grants the same permissions without reinstalling the APK. Do not use it for normal setup - agents should use `clawperator operator install` for the initial install path every time.
 
 ## Logging and Debugging
 

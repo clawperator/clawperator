@@ -449,13 +449,13 @@ Use `clawperator skills sync --help` when you need the current clone and registr
 
 ### `grant-device-permissions`
 
-Re-grant accessibility and notification permissions after permission drift.
+Re-grant accessibility and notification permissions only after an Operator APK crash causes Android to revoke them.
 
 ```
 clawperator grant-device-permissions [--device-id <id>] [--receiver-package <package>] [--output <json\|pretty>]
 ```
 
-This command is for **remediation only** - use it when permissions have been lost after a previous successful install (for example, after the accessibility service is disabled by an app crash). For initial setup, use `clawperator operator install` instead.
+This command is for **crash recovery only**. Use it after a previously working Operator APK crashes and Android revokes the accessibility or notification permissions. For initial setup, always use `clawperator operator install` instead.
 
 Use the release package by default. Pass `--receiver-package com.clawperator.operator.dev` for local debug builds.
 
