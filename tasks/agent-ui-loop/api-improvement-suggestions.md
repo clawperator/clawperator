@@ -113,11 +113,15 @@ element" primitive.
 
 ## GAP-05: No hardware/system key press action
 
-**Status:** Completed on 2026-03-12. `press_key` action added with keys `back`, `home`,
-and `recents`. Wire format uses lowercase strings consistent with other action params.
-Alias `key_press` is normalized to `press_key`. Validated in the Node layer with
+**Status:** Partially completed on 2026-03-12. `press_key` action added with keys `back`,
+`home`, and `recents`. Wire format uses lowercase strings consistent with other action
+params. Alias `key_press` is normalized to `press_key`. Validated in the Node layer with
 `EXECUTION_VALIDATION_FAILED` for unsupported keys. Android runtime uses
 `performGlobalAction` via the Operator accessibility service.
+
+Volume keys and `enter`/`search` are still not covered - they require `adb shell input
+keyevent` and a separate raw-key primitive (different Android mechanism, not yet
+implemented).
 
 **Problem:** There is no action for pressing Android hardware or system keys. Common
 automation needs include:
@@ -218,10 +222,12 @@ action. Workarounds:
 `NODE_NOT_CLICKABLE` errors after text input. The failure mode is opaque without a
 screenshot to correlate.
 
-**Suggested improvement:** Either add a `press_key` action (see GAP-05, which would
-cover this via `KEYCODE_BACK` or `KEYCODE_ESCAPE`), or implement a specific
-`dismiss_keyboard` action that calls
-`InputMethodManager.hideSoftInputFromWindow` via accessibility service.
+**Suggested improvement:** `press_key back` (GAP-05, now implemented) will dismiss
+the keyboard on most devices, but it also triggers Android back-navigation which may
+have side effects. `KEYCODE_ESCAPE` is a raw key event and is not available via
+`press_key`. The cleanest path is a dedicated `dismiss_keyboard` action that calls
+`InputMethodManager.hideSoftInputFromWindow` via the accessibility service, with no
+navigation side-effect.
 
 ---
 

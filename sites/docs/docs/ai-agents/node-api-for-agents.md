@@ -424,6 +424,8 @@ Combine fields to increase specificity when a single field is ambiguous:
 
 **`press_key`:** Issues a system-level key event via the Android Accessibility Service (`performGlobalAction`). Supported keys: `"back"`, `"home"`, `"recents"`. The alias `key_press` is normalized to `press_key`. No retry - this action is single-attempt by design. Requires the Clawperator Operator accessibility service to be running on the device. If the service is unavailable, the execution returns a top-level failed envelope with `status: "failed"` and no `stepResults`. Use `clawperator doctor` to diagnose accessibility service availability before running executions that include `press_key`. When testing local/debug builds, pass the matching `receiverPackage` (`com.clawperator.operator.dev`) instead of relying on the default release package. Returns `success: false` with `data.error: "GLOBAL_ACTION_FAILED"` if the OS reports the global action could not be performed (rare soft OS failure - accessibility service was running but Android declined the action).
 
+**`press_key` key scope:** This action covers only Android accessibility global actions. Non-global keys - `enter`, `search`, `volume_up`, `volume_down`, `escape`, and raw keycodes - are not supported by `press_key`. They use a different Android mechanism (`input keyevent`) that is not routed through the Operator accessibility service. Use `adb shell input keyevent <keycode>` outside the execution payload for those keys until a dedicated raw-key primitive is added.
+
 **`press_key` example request (`/execute`):**
 ```json
 {
@@ -639,30 +641,30 @@ Note: `content-desc` values sometimes contain newlines when an element's label s
 
 ## Error Codes
 
-Branch agent logic on codes from `envelope.errorCode` (top-level failures) or `stepResults[].data.error` (per-step failures). The `envelope.error` field contains a human-readable description and is not a stable contract.
+Branch agent logic on codes from `envelope.errorCode` (top-level Android result envelopes), `error.code` (Node API / CLI structured errors), or `stepResults[].data.error` (per-step failures). The `envelope.error` field contains a human-readable description and is not a stable contract.
 
 | Code | Source | Meaning |
 | :--- | :--- | :--- |
 | `SERVICE_UNAVAILABLE` | `envelope.errorCode` | Clawperator Operator accessibility service is not running on the device. Use `clawperator doctor` to diagnose. |
-| `EXECUTION_CONFLICT_IN_FLIGHT` | `envelope.error` | Device is busy with another execution |
-| `ANDROID_SDK_TOOL_MISSING` | `envelope.error` | A required Android SDK tool such as `adb`, `emulator`, `sdkmanager`, or `avdmanager` is not available |
-| `EMULATOR_NOT_FOUND` | `envelope.error` | Requested AVD does not exist |
-| `EMULATOR_NOT_RUNNING` | `envelope.error` | Requested AVD is not currently running |
-| `EMULATOR_ALREADY_RUNNING` | `envelope.error` | Requested operation requires the AVD to be stopped first |
-| `EMULATOR_UNSUPPORTED` | `envelope.error` | The AVD exists but does not satisfy Clawperator compatibility rules |
-| `EMULATOR_START_FAILED` | `envelope.error` | Emulator process failed to register with adb in time |
-| `EMULATOR_BOOT_TIMEOUT` | `envelope.error` | Emulator registered with adb but Android did not finish booting in time |
-| `ANDROID_AVD_CREATE_FAILED` | `envelope.error` | AVD creation failed |
-| `ANDROID_SYSTEM_IMAGE_INSTALL_FAILED` | `envelope.error` | System image install or SDK license acceptance failed |
-| `EMULATOR_STOP_FAILED` | `envelope.error` | Emulator stop request failed |
-| `EMULATOR_DELETE_FAILED` | `envelope.error` | Emulator deletion failed |
+| `EXECUTION_CONFLICT_IN_FLIGHT` | `error.code` | Device is busy with another execution |
+| `ANDROID_SDK_TOOL_MISSING` | `error.code` | A required Android SDK tool such as `adb`, `emulator`, `sdkmanager`, or `avdmanager` is not available |
+| `EMULATOR_NOT_FOUND` | `error.code` | Requested AVD does not exist |
+| `EMULATOR_NOT_RUNNING` | `error.code` | Requested AVD is not currently running |
+| `EMULATOR_ALREADY_RUNNING` | `error.code` | Requested operation requires the AVD to be stopped first |
+| `EMULATOR_UNSUPPORTED` | `error.code` | The AVD exists but does not satisfy Clawperator compatibility rules |
+| `EMULATOR_START_FAILED` | `error.code` | Emulator process failed to register with adb in time |
+| `EMULATOR_BOOT_TIMEOUT` | `error.code` | Emulator registered with adb but Android did not finish booting in time |
+| `ANDROID_AVD_CREATE_FAILED` | `error.code` | AVD creation failed |
+| `ANDROID_SYSTEM_IMAGE_INSTALL_FAILED` | `error.code` | System image install or SDK license acceptance failed |
+| `EMULATOR_STOP_FAILED` | `error.code` | Emulator stop request failed |
+| `EMULATOR_DELETE_FAILED` | `error.code` | Emulator deletion failed |
 | `NODE_NOT_FOUND` | `data.error` | Selector matched no UI element |
-| `RESULT_ENVELOPE_TIMEOUT` | `envelope.error` | Command dispatched but no result received |
-| `RECEIVER_NOT_INSTALLED` | `envelope.error` | [Clawperator Operator Android app](../getting-started/android-operator-apk.md) not found on device |
-| `DEVICE_UNAUTHORIZED` | `envelope.error` | Device not authorized for ADB |
-| `VERSION_INCOMPATIBLE` | `envelope.error` | CLI and installed [Clawperator Operator Android app](../getting-started/android-operator-apk.md) versions do not share the same `major.minor` |
-| `APK_VERSION_UNREADABLE` | `envelope.error` | The device package dump did not expose a readable [Clawperator Operator Android app](../getting-started/android-operator-apk.md) version |
-| `EXECUTION_VALIDATION_FAILED` | `envelope.error` | Payload failed schema validation |
+| `RESULT_ENVELOPE_TIMEOUT` | `error.code` | Command dispatched but no result received |
+| `RECEIVER_NOT_INSTALLED` | `error.code` | [Clawperator Operator Android app](../getting-started/android-operator-apk.md) not found on device |
+| `DEVICE_UNAUTHORIZED` | `error.code` | Device not authorized for ADB |
+| `VERSION_INCOMPATIBLE` | `error.code` | CLI and installed [Clawperator Operator Android app](../getting-started/android-operator-apk.md) versions do not share the same `major.minor` |
+| `APK_VERSION_UNREADABLE` | `error.code` | The device package dump did not expose a readable [Clawperator Operator Android app](../getting-started/android-operator-apk.md) version |
+| `EXECUTION_VALIDATION_FAILED` | `error.code` | Payload failed schema validation |
 | `SECURITY_BLOCK_DETECTED` | `data.error` | Android blocked the action (e.g., secure keyboard) |
 | `NODE_NOT_CLICKABLE` | `data.error` | Reserved error code. Intended for "element found but not interactable", but not currently emitted consistently by the Android and Node runtimes. |
 | `UNSUPPORTED_RUNTIME_CLOSE` | `data.error` | Expected per-step result for all `close_app` steps. The Android runtime does not support a force-stop action response - the Node layer handles the close via `adb shell am force-stop` before dispatch. The overall execution `status` remains `"success"`. Treat as non-fatal. |
