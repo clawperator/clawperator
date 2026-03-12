@@ -235,6 +235,7 @@ Combine fields to increase specificity when a single field is ambiguous:
 | `action wait --selector <json>` | `wait_for_node` |
 | `action open-app --app <id>` | `open_app` |
 | `action open-uri --uri <value>` | `open_uri` |
+| `action press-key --key <back\|home\|recents>` | `press_key` |
 | `observe snapshot` | `snapshot_ui` |
 
 ### Action behavior notes

@@ -58,12 +58,15 @@ was fixed as part of this PR.
 
 ## ITEM-04: CLI shorthand for press_key
 
-**Status:** Future / low priority
+**Status:** Closed (2026-03-12)
 
 **Gap:** The `action` CLI subcommand family (`action open-app`, `action click`,
-`action type`, etc.) has no shorthand for `press_key`. Agents using the CLI
-interactively must fall back to `execute --execution` for navigation actions.
+`action type`, etc.) had no shorthand for `press_key`. Agents using the CLI
+interactively had to fall back to `execute --execution` for navigation actions.
 
-**Deferred:** Adding a new `action press-key --key <back|home|recents>` subcommand
-requires changes to the CLI command registry and help text. Low urgency since the
-`execute` path works. Revisit when adding other `action` shorthands.
+**Resolution:** Added `action press-key --key <back|home|recents>` subcommand.
+Changes:
+- `apps/node/src/domain/actions/pressKey.ts` - execution builder
+- `apps/node/src/cli/commands/action.ts` - `cmdActionPressKey` handler
+- `apps/node/src/cli/index.ts` - routing, help text, valid-subs list
+- `docs/node-api-for-agents.md` - CLI-to-action-type mapping table
