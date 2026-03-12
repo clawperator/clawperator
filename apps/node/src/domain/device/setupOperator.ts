@@ -27,6 +27,8 @@ export interface OperatorInstallResult {
   verification?: VerifyPhaseResult;
 }
 
+export type { PermissionGrantResult } from "./grantPermissions.js";
+
 /**
  * Install the Clawperator Operator APK and bring the device to a ready state.
  *

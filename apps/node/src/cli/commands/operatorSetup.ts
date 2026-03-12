@@ -3,6 +3,19 @@ import { setupOperator } from "../../domain/device/setupOperator.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
 import type { OutputOptions } from "../output.js";
 import { formatSuccess, formatError } from "../output.js";
+import type { PermissionGrantResult } from "../../domain/device/setupOperator.js";
+
+export function didAllPermissionsAlreadyExist(permissions?: PermissionGrantResult): boolean {
+  if (!permissions) {
+    return false;
+  }
+
+  return Boolean(
+    permissions.accessibility.alreadyEnabled &&
+    permissions.notificationListener.alreadyEnabled &&
+    !permissions.notification.skipped
+  );
+}
 
 export async function cmdOperatorSetup(options: {
   format: OutputOptions["format"];
@@ -83,9 +96,7 @@ export async function cmdOperatorSetup(options: {
   }
 
   // All phases succeeded.
-  const permissionsAlreadyEnabled =
-    result.permissions?.accessibility.alreadyEnabled &&
-    result.permissions?.notificationListener.alreadyEnabled;
+  const permissionsAlreadyEnabled = didAllPermissionsAlreadyExist(result.permissions);
 
   return formatSuccess(
     {
