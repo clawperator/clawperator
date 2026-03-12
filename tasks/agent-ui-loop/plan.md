@@ -341,7 +341,7 @@ Section outline:
 
 - Add `agent-ui-loop.md` to `source-map.yaml` under `ai-agents` section
 - Add nav entry to `mkdocs.yml` under "For AI Agents"
-- Regenerate `sites/docs/docs/` via the `clawperator-generate-docs` skill
+- Regenerate `sites/docs/docs/` via the `docs-generate` skill
 
 ---
 
