@@ -253,7 +253,7 @@ export default function Home() {
       {/* Hero Section */}
       <section id="top" className="hero-card">
         <div className="hero-waterfall">
-          <p className="hero-problem">Many services don&apos;t have APIs…<br />But they do have apps.</p>
+          <p className="hero-problem">Many services don&apos;t have APIs…<br />But they do have apps!</p>
           <img src="/clawperator-logo.png" alt="" aria-hidden="true" className="hero-logo" />
           <p className="hero-product-name">Clawperator</p>
           <h1 className="hero-catchphrase">
@@ -265,9 +265,16 @@ export default function Home() {
           <p className="hero-summary">
           Clawperator is a deterministic execution layer that lets agents/Claws operate real Android apps to read data and take actions on behalf of users.
           </p>
+          <p className="hero-brain-hand">
+            Your agent or LLM is the brain.
+            <br />
+            Clawperator is the hand.
+          </p>
           <p className="hero-summary hero-summary-secondary">
-            Your agent is the brain. Clawperator is the hand. Connect it to a dedicated Android burner phone or local
-            Google Play-equipped emulator, run your own private skills, and get answers your agent can trust.
+            Connect your claw to a dedicated Android burner phone, run your own private skills and get answers your agent can trust.
+          </p>
+          <p className="hero-summary hero-summary-secondary">
+            Don't have an Android device? No problem. Clawperator will create a Google Play equipped Android emulator on your Mac mini or OpenClaw box for you.
           </p>
 
           <div className="hero-image-panel">

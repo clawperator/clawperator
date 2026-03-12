@@ -356,6 +356,18 @@ body {
   max-width: 700px;
 }
 
+.hero-brain-hand {
+  margin: 1.15rem 0 0;
+  max-width: 640px;
+  font-size: 1rem;
+  line-height: 1.75;
+  color: var(--text-muted);
+}
+
+.hero-summary.hero-summary-secondary {
+  margin-top: 1.15rem;
+}
+
 .hero-image-panel {
   margin-top: 2.2rem;
   background-color: #f7f4ee;
