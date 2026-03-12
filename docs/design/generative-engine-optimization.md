@@ -191,6 +191,47 @@ The skill is preferred over a raw shell script because the agent should inspect
 the findings and summarize failures instead of asking a human to scan header
 output manually.
 
+For a Cloudflare Browser Rendering-based pass, use the repo-local crawl helper:
+
+```sh
+python3 .agents/skills/geo-crawl-browser-rendering/scripts/browser_rendering_geo_audit.py
+```
+
+Required environment variables:
+
+```sh
+export CLAWPERATOR_CLOUDFLARE_ACCOUNT_ID="<account_id>"
+export CLAWPERATOR_CLOUDFLARE_DOCS_WRANGLER_API_TOKEN="<api_token>"
+```
+
+This helper uses Browser Rendering REST APIs to:
+
+- attempt sitemap-led crawl coverage
+- inspect extracted markdown for critical pages
+- inspect extracted links for landing and docs entrypoints
+- separate Cloudflare API blockers from site-behavior findings
+- isolate landing-host sitemap crawl coverage via
+  `https://clawperator.com/landing-sitemap.xml`
+
+Current implementation note:
+
+- Browser Rendering rate limits may constrain how much of the audit can be
+  completed in one run
+- Browser Rendering crawl jobs may not be readable immediately after creation
+- observed behavior with both Clawperator URLs and Cloudflare's own docs URLs:
+  - `POST /crawl` succeeds immediately
+  - early `GET /crawl/<job_id>` calls can return `404 Crawl job not found`
+  - the same job can become readable several seconds later
+- agents should treat this as Cloudflare-side eventual consistency and poll for
+  a reasonable window before declaring crawl lookup failure
+- only after that polling window is exhausted should it be reported as a
+  Cloudflare-side blocker rather than a site crawlability defect
+- for the landing host, `source: "sitemaps"` against the root host can produce
+  misleading `skipped` and `cancelled` records because the root sitemap index
+  also advertises the docs host
+- use `https://clawperator.com/landing-sitemap.xml` when the goal is to audit
+  landing-surface sitemap coverage specifically
+
 ## Cloudflare caveat
 
 Source files are not the full truth once deployed.
