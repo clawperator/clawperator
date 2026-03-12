@@ -129,6 +129,7 @@ class AgentCommandParserDefault : AgentCommandParser {
                     scrollRetry = params.parseRetryOrDefault(key = "scrollRetry", defaultRetry = TaskRetryPresets.UiScroll),
                     clickRetry = params.parseRetryOrDefault(key = "clickRetry", defaultRetry = TaskRetryPresets.UiReadiness),
                     findFirstScrollableChild = params.booleanOrDefault("findFirstScrollableChild", true),
+                    clickAfter = params.booleanOrDefault("clickAfter", true),
                 )
             "scroll" ->
                 UiAction.Scroll(

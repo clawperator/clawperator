@@ -51,6 +51,8 @@ sealed interface UiAction {
         val scrollRetry: TaskRetry = TaskRetryPresets.UiScroll,
         val clickRetry: TaskRetry = TaskRetryPresets.UiReadiness,
         val findFirstScrollableChild: Boolean = true,
+        /** When false, scrolls until the target is visible but does not click it. */
+        val clickAfter: Boolean = true,
     ) : UiAction
 
     data class Scroll(

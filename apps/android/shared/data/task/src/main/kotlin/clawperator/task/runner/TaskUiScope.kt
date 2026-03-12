@@ -190,6 +190,7 @@ interface TaskUiScope {
      * @param findFirstScrollableChild If true and the matched container itself isn't scrollable,
      *        use its first scrollable descendant (useful for wrappers like GH "category_chips").
      * @param clickTypes    The types of clicks to attempt (defaults to regular Click).
+     * @param clickAfter    When false, scrolls until visible but does not click (default true).
      * @throws Exception    if the target node is not found after scrolling or if clicking fails.
      */
     suspend fun clickAfterScroll(
@@ -202,10 +203,13 @@ interface TaskUiScope {
         settleDelay: Duration = 250.milliseconds,
         scrollRetry: TaskRetry = TaskRetryPresets.UiScroll,
         clickRetry: TaskRetry = TaskRetryPresets.UiReadiness,
-        findFirstScrollableChild: Boolean = false,
+        findFirstScrollableChild: Boolean = true,
+        clickAfter: Boolean = true,
     ) {
         scrollIntoView(target, container, direction, maxSwipes, distanceRatio, settleDelay, scrollRetry, findFirstScrollableChild)
-        click(target, clickTypes, clickRetry)
+        if (clickAfter) {
+            click(target, clickTypes, clickRetry)
+        }
     }
 
     /**

@@ -174,6 +174,7 @@ class UiActionEngineDefault(
                 scrollRetry = action.scrollRetry,
                 clickRetry = action.clickRetry,
                 findFirstScrollableChild = action.findFirstScrollableChild,
+                clickAfter = action.clickAfter,
             )
         }
 
@@ -185,6 +186,7 @@ class UiActionEngineDefault(
                     "max_swipes" to action.maxSwipes.toString(),
                     "direction" to action.direction.toString(),
                     "click_types" to action.clickTypes.toWireValue(),
+                    "click_after" to action.clickAfter.toString(),
                 ),
         )
     }

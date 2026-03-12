@@ -484,6 +484,8 @@ Combine fields to increase specificity when a single field is ambiguous:
 
 **`scroll_and_click`:** This action has two separate retry knobs. `scrollRetry` controls the scroll/search loop and defaults to the `UiScroll` preset (`maxAttempts=4`, `initialDelayMs=400`, `maxDelayMs=2000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`). `clickRetry` controls the final click attempt and defaults to the `UiReadiness` preset (`maxAttempts=5`, `initialDelayMs=500`, `maxDelayMs=3000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`).
 
+**`clickAfter` flag:** When `clickAfter: false`, the action scrolls until the target is visible but does not click it. This is useful when you need to bring an element into view before a separate `snapshot_ui` or `read_text` action, or when you want to confirm presence before committing a click.
+
 **`scroll`:** Performs a single scroll gesture and reports whether content actually moved. Unlike `scroll_and_click`, this action has no target element and does not click. It is designed for exploratory navigation - panning through a list to observe content before deciding what to do next.
 
 **Direction semantics (content direction, not finger direction):**
@@ -620,7 +622,7 @@ Typical `data` keys by action type:
 | `snapshot_ui` | `actual_format`, `text` (snapshot content - see note below) |
 | `take_screenshot` | `path` (local screenshot file path after Node capture) |
 | `wait_for_node` | `resource_id`, `label` (matched node details) |
-| `scroll_and_click` | `max_swipes`, `direction`, `click_types` |
+| `scroll_and_click` | `max_swipes`, `direction`, `click_types`, `click_after` (`"true"` or `"false"`) |
 | `scroll` | `scroll_outcome` (`"moved"`, `"edge_reached"`, or `"gesture_failed"`), `direction`, `distance_ratio`, `settle_delay_ms`, `resolved_container` (resourceId of auto-detected container, when present) |
 | `scroll_until` | `termination_reason` (see behavior note), `scrolls_executed`, `direction`, `resolved_container` (when present) |
 | `sleep` | `duration_ms` |

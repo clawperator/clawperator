@@ -45,6 +45,7 @@ const actionParamsSchema = z.object({
   maxDurationMs: z.number().optional(),
   noPositionChangeThreshold: z.number().optional(),
   findFirstScrollableChild: z.boolean().optional(),
+  clickAfter: z.boolean().optional(),
   validator: z.string().optional(),
   key: z.string().optional(),
   retry: z.record(z.unknown()).optional(),
