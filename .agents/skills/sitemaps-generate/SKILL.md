@@ -1,9 +1,9 @@
 ---
-name: generate-sitemaps
+name: sitemaps-generate
 description: Regenerate Clawperator landing and docs sitemap metadata from per-URL source files using each file's last git commit timestamp, then validate the resulting XML and build integration.
 ---
 
-# Generate Sitemaps
+# Sitemaps Generate
 
 Use this skill when sitemap metadata needs to be regenerated from source-of-truth
 files rather than edited by hand.
@@ -20,7 +20,7 @@ This skill is for repo maintenance. It is not a live GEO audit.
 ## Workflow
 
 1. Regenerate landing sitemap source files:
-   - `python3 scripts/generate_sitemap_metadata.py landing --repo-root .`
+   - `python3 .agents/skills/sitemaps-generate/scripts/generate_sitemap_metadata.py landing --repo-root .`
 2. Build the landing site if needed:
    - `./scripts/site_build.sh`
 3. Build the docs site:

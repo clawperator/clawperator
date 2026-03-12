@@ -23,7 +23,7 @@ fi
 cd "$LANDING_DIR"
 
 echo "Generating landing sitemap metadata..."
-python3 "$REPO_ROOT/scripts/generate_sitemap_metadata.py" landing --repo-root "$REPO_ROOT"
+python3 "$REPO_ROOT/.agents/skills/sitemaps-generate/scripts/generate_sitemap_metadata.py" landing --repo-root "$REPO_ROOT"
 
 # Install dependencies if node_modules is missing.
 # Prefer npm ci for deterministic installs when lockfile exists.

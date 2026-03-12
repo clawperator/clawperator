@@ -45,7 +45,7 @@ echo "Running MkDocs build..."
 mkdocs build
 
 echo "Patching docs sitemap metadata..."
-"$VENV_DIR/bin/python" "$REPO_ROOT/scripts/generate_sitemap_metadata.py" docs \
+"$VENV_DIR/bin/python" "$REPO_ROOT/.agents/skills/sitemaps-generate/scripts/generate_sitemap_metadata.py" docs \
   --repo-root "$REPO_ROOT" \
   --sitemap-path "$DOCS_DIR/site/sitemap.xml" \
   --source-map-path "$DOCS_DIR/source-map.yaml"
