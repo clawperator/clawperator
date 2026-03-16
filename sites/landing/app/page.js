@@ -499,7 +499,11 @@ if <hvac_state> == "Off":
           Clawperator automations are unlocked through skills.
         </p>
         <p>
-          Clawperator includes an open source, ever-expanding skills repository for common Android workflows.
+          Clawperator includes an{" "}
+          <a href="https://github.com/clawperator/clawperator-skills" target="_blank" rel="noreferrer">
+            open source, ever-expanding skills repository
+          </a>{" "}
+          for common Android workflows.
         </p>
         <p>
           But you are not blocked waiting for an official skill. Agents do not need a prebuilt skill to automate your

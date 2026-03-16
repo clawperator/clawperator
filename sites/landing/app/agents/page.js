@@ -12,7 +12,8 @@ const links = [
   { href: "https://docs.clawperator.com/getting-started/first-time-setup/", label: "First-time setup" },
   { href: "https://clawperator.com/install.sh", label: "Install script" },
   { href: "https://clawperator.com/llms-full.txt", label: "Full docs text corpus" },
-  { href: "https://github.com/clawperator/clawperator", label: "GitHub repository" }
+  { href: "https://github.com/clawperator/clawperator", label: "GitHub repository" },
+  { href: "https://github.com/clawperator/clawperator-skills", label: "Skills repository" }
 ];
 
 const isExternalLink = (href) => href.startsWith("http://") || href.startsWith("https://");
