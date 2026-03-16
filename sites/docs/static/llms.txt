@@ -16,6 +16,11 @@ This site contains the canonical technical documentation for Clawperator, a dete
 - Troubleshooting: https://docs.clawperator.com/troubleshooting/troubleshooting/
 - Architecture: https://docs.clawperator.com/architecture/architecture/
 
+## GitHub
+
+- Main repository: https://github.com/clawperator/clawperator
+- Skills repository: https://github.com/clawperator/clawperator-skills
+
 ## Guidance for agents
 
 - Prefer this docs site over the marketing homepage for technical behavior.
