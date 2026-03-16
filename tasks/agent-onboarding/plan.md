@@ -39,6 +39,8 @@ the public website and docs, without hidden tribal knowledge:
 - Fix broken entrypoints before adding new sophistication.
 - Distinguish operational docs from design/rationale docs so primary agent
   paths do not sound internal or architecture-heavy.
+- Preserve the brain/hand boundary: Clawperator is a neutral actuator, not a
+  policy engine for what user inputs are acceptable to enter.
 - Reduce trial-and-error where a concrete example or explicit caveat would
   remove it.
 - Separate "document current behavior accurately" from "change the runtime to
@@ -227,6 +229,20 @@ reading source or discovering behavior by failed execution.
 
 ### Scope
 
+- Review all public docs for language that implies Clawperator itself decides
+  whether certain user inputs, such as usernames, passwords, email addresses,
+  or other credentials, are acceptable to enter.
+- Correct any wording that turns the actuator into a policy-maker. The intended
+  contract is:
+  - the brain agent decides what workflow to perform on the user's behalf
+  - Clawperator provides deterministic UI interaction primitives to carry out
+    those decisions
+  - credential entry is neither specially endorsed nor specially forbidden by
+    Clawperator itself
+- Keep the security/privacy guidance focused on repository hygiene,
+  documentation examples, and safe defaults for this codebase, without
+  overstating product-level restrictions on what an agent may ask the actuator
+  to type on a user's own device.
 - Review titles and nav placement for internal-sounding docs so agents are not
   nudged toward architecture/rationale material before operational docs.
 - Rename or reposition documents whose current titles imply internal design
@@ -298,6 +314,8 @@ reading source or discovering behavior by failed execution.
 - No duplicated authored long-form snapshot spec spread across multiple docs
 - Clear doc naming and placement that distinguishes how to use the product from
   why the product is designed the way it is
+- Brain/hand wording that makes Clawperator's neutral actuator role explicit,
+  including around credential entry and other user-provided inputs
 - Fewer hidden requirements and fewer "discover by failure" moments
 
 ### Validation
