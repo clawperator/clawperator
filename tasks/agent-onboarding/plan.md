@@ -37,6 +37,8 @@ the public website and docs, without hidden tribal knowledge:
 - Optimize for cold-start agent success, not insider familiarity.
 - Prefer authoritative docs and contract clarity over aspirational copy.
 - Fix broken entrypoints before adding new sophistication.
+- Distinguish operational docs from design/rationale docs so primary agent
+  paths do not sound internal or architecture-heavy.
 - Reduce trial-and-error where a concrete example or explicit caveat would
   remove it.
 - Separate "document current behavior accurately" from "change the runtime to
@@ -116,6 +118,8 @@ Fix the practical "agents cannot self-onboard from the website" problem first.
 - Verify that the landing-site links point to working docs-host URLs.
 - Verify that `llms.txt` and `llms-full.txt` point to valid, intended
   resources.
+- Audit the public information architecture so operational docs are the primary
+  linked entrypoints for agents and design/rationale docs are clearly secondary.
 - Add deployment-surface validation so future broken doc links are caught
   before merge or immediately after deploy.
 
@@ -132,6 +136,8 @@ Fix the practical "agents cannot self-onboard from the website" problem first.
 
 - Working docs paths on `docs.clawperator.com`
 - Link audit fixes on public surfaces
+- Clear separation between primary operational entrypoints and secondary
+  design/rationale material
 - A repeatable validation step for docs reachability
 
 ### Validation
@@ -221,6 +227,13 @@ reading source or discovering behavior by failed execution.
 
 ### Scope
 
+- Review titles and nav placement for internal-sounding docs so agents are not
+  nudged toward architecture/rationale material before operational docs.
+- Rename or reposition documents whose current titles imply internal design
+  notes more than agent-usable guidance. A likely candidate is the current
+  `Clawperator Node Runtime and API Design` document, which may belong as
+  secondary rationale material under a clearer title such as runtime
+  architecture or execution-model rationale.
 - Add a dedicated snapshot-format reference page covering the structure returned
   by snapshot surfaces, especially `snapshot_ui`.
 - Move the existing long-form snapshot-output material and real-device example
@@ -241,6 +254,8 @@ reading source or discovering behavior by failed execution.
   - API overview links to the dedicated snapshot page
   - playbook keeps only operational guidance and short reminders
   - troubleshooting keeps only failure-mode guidance
+- Ensure design/rationale docs remain available for deeper context, but are not
+  presented as the default docs path for first-time agent use.
 - Expand action reference coverage and caveats:
   - `clickType`
   - `scroll_until` parameters and termination semantics
@@ -281,6 +296,8 @@ reading source or discovering behavior by failed execution.
 - Contract-complete public docs for current shipped behavior
 - Dedicated snapshot-format documentation that agents can rely on directly
 - No duplicated authored long-form snapshot spec spread across multiple docs
+- Clear doc naming and placement that distinguishes how to use the product from
+  why the product is designed the way it is
 - Fewer hidden requirements and fewer "discover by failure" moments
 
 ### Validation
