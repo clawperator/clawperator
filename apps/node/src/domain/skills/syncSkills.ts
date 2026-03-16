@@ -1,8 +1,7 @@
 import { execFile } from "node:child_process";
-import { access, readFile, mkdir, unlink, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { access, readFile, mkdir } from "node:fs/promises";
 import { join, dirname } from "node:path";
-import { SKILLS_BUNDLE_URL, DEFAULT_SKILLS_DIR, DEFAULT_SKILLS_REGISTRY_SUBPATH } from "./skillsConfig.js";
+import { SKILLS_REPO_URL, DEFAULT_SKILLS_DIR, DEFAULT_SKILLS_REGISTRY_SUBPATH } from "./skillsConfig.js";
 import { SKILLS_SYNC_FAILED, SKILLS_GIT_NOT_FOUND } from "../../contracts/skills.js";
 
 export interface SyncSkillsResult {
@@ -63,79 +62,34 @@ export async function syncSkills(
 
   try {
     if (await dirExists(join(dir, ".git"))) {
-      // Migrate remote URL if it still points to an old location
+      // Migrate remote URL if it still points to an old location (e.g. the old bundle URL)
       try {
         const { stdout } = await exec("git", ["-C", dir, "remote", "get-url", "origin"]);
-        if (stdout.trim() !== SKILLS_BUNDLE_URL) {
-          await exec("git", ["-C", dir, "remote", "set-url", "origin", SKILLS_BUNDLE_URL]);
+        if (stdout.trim() !== SKILLS_REPO_URL) {
+          await exec("git", ["-C", dir, "remote", "set-url", "origin", SKILLS_REPO_URL]);
         }
       } catch {
         // No remote configured - add one
-        await exec("git", ["-C", dir, "remote", "add", "origin", SKILLS_BUNDLE_URL]);
+        await exec("git", ["-C", dir, "remote", "add", "origin", SKILLS_REPO_URL]);
       }
-      // Download bundle to a temporary file since git cannot fetch/clone directly from a remote HTTP bundle file
-      const tmpBundle = join(tmpdir(), `clawperator-skills-${Date.now()}.bundle`);
+      await exec("git", ["-C", dir, "fetch", "origin", "--quiet"]);
+      await exec("git", ["-C", dir, "checkout", ref]);
+      // Only fast-forward merge if on a branch (not detached HEAD from a tag/commit).
+      let onBranch = false;
       try {
-        const response = await fetch(SKILLS_BUNDLE_URL);
-        if (!response.ok) {
-          let statusInfo = `HTTP ${response.status}`;
-          if (response.statusText) {
-            statusInfo += ` ${response.statusText}`;
-          }
-          throw new Error(`Failed to download skills bundle from ${SKILLS_BUNDLE_URL}: ${statusInfo}`);
-        }
-        const buffer = await response.arrayBuffer();
-        await writeFile(tmpBundle, Buffer.from(buffer));
-
-        // NOTE: HTTP-served git bundles are static files - git re-downloads the
-        // entire bundle on every fetch (no incremental delta like a live git server).
-        await exec("git", [
-          "-C",
-          dir,
-          "fetch",
-          tmpBundle,
-          "+refs/heads/*:refs/remotes/origin/*",
-          "+refs/tags/*:refs/tags/*",
-          "--quiet",
-        ]);
-        await exec("git", ["-C", dir, "checkout", ref]);
-        // Only fast-forward merge if on a branch (not detached HEAD from a tag/commit).
-        // Check symbolic-ref separately so a merge failure is not silently swallowed.
-        let onBranch = false;
-        try {
-          await exec("git", ["-C", dir, "symbolic-ref", "HEAD"], 5_000);
-          onBranch = true;
-        } catch {
-          // Detached HEAD - fetch+checkout is sufficient
-        }
-        if (onBranch) {
-          await exec("git", ["-C", dir, "merge", "--ff-only", "--quiet", `origin/${ref}`]);
-        }
-      } finally {
-        try { await unlink(tmpBundle); } catch { /* ignore */ }
+        await exec("git", ["-C", dir, "symbolic-ref", "HEAD"], 5_000);
+        onBranch = true;
+      } catch {
+        // Detached HEAD - fetch+checkout is sufficient
+      }
+      if (onBranch) {
+        await exec("git", ["-C", dir, "merge", "--ff-only", "--quiet", `origin/${ref}`]);
       }
     } else {
       await mkdir(dirname(dir), { recursive: true });
-      const tmpBundle = join(tmpdir(), `clawperator-skills-${Date.now()}.bundle`);
-      try {
-        const response = await fetch(SKILLS_BUNDLE_URL);
-        if (!response.ok) {
-          let statusInfo = `HTTP ${response.status}`;
-          if (response.statusText) {
-            statusInfo += ` ${response.statusText}`;
-          }
-          throw new Error(`Failed to download skills bundle from ${SKILLS_BUNDLE_URL}: ${statusInfo}`);
-        }
-        const buffer = await response.arrayBuffer();
-        await writeFile(tmpBundle, Buffer.from(buffer));
-        await exec("git", ["clone", tmpBundle, dir]);
-        // Set origin to the remote URL instead of the temporary file
-        await exec("git", ["-C", dir, "remote", "set-url", "origin", SKILLS_BUNDLE_URL]);
-        if (ref !== "main") {
-          await exec("git", ["-C", dir, "checkout", ref]);
-        }
-      } finally {
-        try { await unlink(tmpBundle); } catch { /* ignore */ }
+      await exec("git", ["clone", SKILLS_REPO_URL, dir]);
+      if (ref !== "main") {
+        await exec("git", ["-C", dir, "checkout", ref]);
       }
     }
   } catch (e) {
