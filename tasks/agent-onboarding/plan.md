@@ -156,6 +156,8 @@ successful command and know what to do next."
 ### Scope
 
 - Add a dedicated agent quickstart authored for cold-start use.
+- Add or reserve a dedicated snapshot-format page as a first-class companion
+  entrypoint for agents, not just a subsection inside broader API docs.
 - Include a complete worked example with:
   - snapshot
   - execution payload
@@ -191,6 +193,7 @@ successful command and know what to do next."
 ### Deliverables
 
 - New quickstart page
+- Snapshot-format page linked directly from the quickstart
 - Updated docs index and machine-readable entrypoints
 - Complete runnable examples visible in both rendered docs and `llms-full.txt`
 
@@ -215,6 +218,18 @@ reading source or discovering behavior by failed execution.
 
 ### Scope
 
+- Add a dedicated snapshot-format reference page covering the structure returned
+  by snapshot surfaces, especially `snapshot_ui`.
+- Document that the hierarchy is modeled after Android UI Automator output, but
+  is not a byte-for-byte copy, and call out where agents must not assume exact
+  upstream parity.
+- Document the snapshot envelope placement and the fields agents should rely on
+  most when parsing and matching.
+- Include an annotated real snapshot example with field-by-field guidance on:
+  - what is familiar from UI Automator
+  - what Clawperator normalizes or changes
+  - what is stable enough for selectors
+  - what is auxiliary or unstable
 - Expand action reference coverage and caveats:
   - `clickType`
   - `scroll_until` parameters and termination semantics
@@ -253,6 +268,7 @@ reading source or discovering behavior by failed execution.
 ### Deliverables
 
 - Contract-complete public docs for current shipped behavior
+- Dedicated snapshot-format documentation that agents can rely on directly
 - Fewer hidden requirements and fewer "discover by failure" moments
 
 ### Validation
