@@ -1,0 +1,6 @@
+#!/bin/bash
+set -x
+
+./gradlew --no-configuration-cache testDebugUnitTest
+
+echo -en '\a'
