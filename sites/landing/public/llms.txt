@@ -28,7 +28,7 @@ Clawperator operates an Android device on behalf of a user. That Android device 
 - A physical Android burner device is the preferred actuator environment for compatibility and long-running reliability.
 - If no physical Android device is available, install Clawperator first, then provision an emulator with `clawperator provision emulator`.
 - Clawperator does not configure user accounts or app login state. The user must prepare the Android device or emulator with the required apps and sign-ins.
-- Skills are distributed as a bundle at https://clawperator.com/install/clawperator-skills.bundle
+- Skills repository: https://github.com/clawperator/clawperator-skills
 - Install skills: run `clawperator skills install` after setup
 - Skills registry: `~/.clawperator/skills/skills/skills-registry.json` (set via CLAWPERATOR_SKILLS_REGISTRY)
 - Skill scripts are authored in Node.js; invoke with: `node ~/.clawperator/skills/skills/<id>/scripts/<name>.js <deviceId> [args]`

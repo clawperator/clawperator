@@ -1312,7 +1312,9 @@ Combine fields to increase specificity when a single field is ambiguous:
 | `snapshot_ui` | - | `retry: object` |
 | `take_screenshot` | - | `path: string`, `retry: object` |
 | `sleep` | `durationMs: number` | - |
-| `scroll_and_click` | `target: NodeMatcher` | `container: NodeMatcher`, `direction: "down" \| "up" \| "left" \| "right"` (default: `"down"`), `maxSwipes: number` (default: `10`, range: 1-50), `distanceRatio: number` (default: `0.7`, range: 0-1), `settleDelayMs: number` (default: `250`, range: 0-10000), `findFirstScrollableChild: boolean` (default: `false`), `scrollRetry: object` (default preset: `maxAttempts=4`, `initialDelayMs=400`, `maxDelayMs=2000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`), `clickRetry: object` (default preset: `maxAttempts=5`, `initialDelayMs=500`, `maxDelayMs=3000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`) |
+| `scroll_and_click` | `target: NodeMatcher` | `container: NodeMatcher`, `direction: "down" \| "up" \| "left" \| "right"` (default: `"down"`), `maxSwipes: number` (default: `10`, range: 1-50), `distanceRatio: number` (default: `0.7`, range: 0-1), `settleDelayMs: number` (default: `250`, range: 0-10000), `findFirstScrollableChild: boolean` (default: `true`), `clickAfter: boolean` (default: `true`), `scrollRetry: object` (default preset: `maxAttempts=4`, `initialDelayMs=400`, `maxDelayMs=2000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`), `clickRetry: object` (default preset: `maxAttempts=5`, `initialDelayMs=500`, `maxDelayMs=3000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`) |
+| `scroll` | - | `container: NodeMatcher` (default: auto-detect first scrollable), `direction: "down" \| "up" \| "left" \| "right"` (default: `"down"` - reveals content further down, finger swipes up), `distanceRatio: number` (default: `0.7`, range: 0-1), `settleDelayMs: number` (default: `250`, range: 0-10000), `findFirstScrollableChild: boolean` (default: `true`), `retry: object` (default: no retry - see scroll behavior note) |
+| `scroll_until` | - | `container: NodeMatcher` (default: auto-detect), `direction: "down" \| "up" \| "left" \| "right"` (default: `"down"`), `distanceRatio: number` (default: `0.7`, range: 0-1), `settleDelayMs: number` (default: `250`, range: 0-10000), `maxScrolls: number` (default: `20`, range: 1-200), `maxDurationMs: number` (default: `10000`, range: 0-120000), `noPositionChangeThreshold: number` (default: `3`, range: 1-20), `findFirstScrollableChild: boolean` (default: `true`) |
 | `press_key` | `key: "back" \| "home" \| "recents"` | - |
 
 ### CLI-to-action-type mapping
@@ -1514,6 +1516,8 @@ Combine fields to increase specificity when a single field is ambiguous:
 
 **`press_key`:** Issues a system-level key event via the Android Accessibility Service (`performGlobalAction`). Supported keys: `"back"`, `"home"`, `"recents"`. The alias `key_press` is normalized to `press_key`. No retry - this action is single-attempt by design. Requires the Clawperator Operator accessibility service to be running on the device. If the service is unavailable, the execution returns a top-level failed envelope with `status: "failed"` and no `stepResults`. Use `clawperator doctor` to diagnose accessibility service availability before running executions that include `press_key`. When testing local/debug builds, pass the matching `receiverPackage` (`com.clawperator.operator.dev`) instead of relying on the default release package. Returns `success: false` with `data.error: "GLOBAL_ACTION_FAILED"` if the OS reports the global action could not be performed (rare soft OS failure - accessibility service was running but Android declined the action).
 
+**`press_key` key scope:** This action covers only Android accessibility global actions. Non-global keys - `enter`, `search`, `volume_up`, `volume_down`, `escape`, and raw keycodes - are not supported by `press_key`. They use a different Android mechanism (`input keyevent`) that is not routed through the Operator accessibility service. Use `adb shell input keyevent <keycode>` outside the execution payload for those keys until a dedicated raw-key primitive is added.
+
 **`press_key` example request (`/execute`):**
 ```json
 {
@@ -1570,6 +1574,145 @@ Combine fields to increase specificity when a single field is ambiguous:
 
 **`scroll_and_click`:** This action has two separate retry knobs. `scrollRetry` controls the scroll/search loop and defaults to the `UiScroll` preset (`maxAttempts=4`, `initialDelayMs=400`, `maxDelayMs=2000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`). `clickRetry` controls the final click attempt and defaults to the `UiReadiness` preset (`maxAttempts=5`, `initialDelayMs=500`, `maxDelayMs=3000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`).
 
+**`clickAfter` flag:** When `clickAfter: false`, the action scrolls until the target is visible but does not click it. This is useful when you need to bring an element into view before a separate `snapshot_ui` or `read_text` action, or when you want to confirm presence before committing a click.
+
+**`scroll`:** Performs a single scroll gesture and reports whether content actually moved. Unlike `scroll_and_click`, this action has no target element and does not click. It is designed for exploratory navigation - panning through a list to observe content before deciding what to do next.
+
+**Direction semantics (content direction, not finger direction):**
+- `"down"` - reveals content further down the list. Finger swipes up. Default.
+- `"up"` - reveals content further up the list. Finger swipes down.
+- `"left"` / `"right"` - horizontal carousel navigation. Direction refers to the content movement, not the swipe direction.
+
+The action always reports one of three outcomes in `data.scroll_outcome`:
+- `"moved"` - gesture was dispatched and the list position changed.
+- `"edge_reached"` - gesture was dispatched but the container was already at its limit. This is `success: true`, not an error. It is the expected terminal state when paginating a finite list.
+- `"gesture_failed"` - the OS rejected the gesture dispatch (`success: false`).
+
+**Retry behavior:** `scroll` defaults to no retry (`retry` param defaults to a single attempt). This differs from most UI actions, which default to `UiReadiness` retry (3 attempts with backoff). The reason: retrying a scroll that returned `edge_reached` is wasteful. If the container may not have loaded yet, pass an explicit `retry` object or send a `wait_for_node` first.
+
+`container` targeting and the `findFirstScrollableChild` flag work the same way as `scroll_and_click`. If no `container` is provided, the first `scrollable="true"` node on screen is used. `findFirstScrollableChild` defaults to `true` - when the matched container itself is not scrollable, the runtime automatically uses its first scrollable descendant. Set to `false` only if you need strict container matching.
+
+**Auto-detect caveat:** On nested-scroll layouts, the first visible `scrollable="true"` node may be an outer wrapper rather than the content list you actually want. When the screen contains more than one plausible scroll surface, prefer an explicit `container` matcher using the list's `resource-id` from `snapshot_ui` rather than relying on auto-detect.
+
+Typical observe-decide-act loop using `scroll`:
+```json
+[
+  { "id": "snap1", "type": "snapshot_ui" },
+  { "id": "scr1", "type": "scroll", "params": { "direction": "down" } },
+  { "id": "snap2", "type": "snapshot_ui" }
+]
+```
+After receiving `snap2`, the agent compares it to `snap1`. If `scr1.data.scroll_outcome` is `"edge_reached"`, no further scrolling is possible in that direction.
+
+**`scroll` example request:**
+```json
+{
+  "deviceId": "<device_id>",
+  "execution": {
+    "commandId": "cmd-scroll-1",
+    "taskId": "task-explore",
+    "source": "agent",
+    "expectedFormat": "android-ui-automator",
+    "timeoutMs": 30000,
+    "actions": [
+      { "id": "snap1", "type": "snapshot_ui" },
+      { "id": "scr1", "type": "scroll", "params": { "direction": "down" } },
+      { "id": "snap2", "type": "snapshot_ui" }
+    ]
+  }
+}
+```
+
+**`scroll` example step result (content moved):**
+```json
+{ "id": "scr1", "actionType": "scroll", "success": true, "data": { "scroll_outcome": "moved", "direction": "down", "distance_ratio": "0.7" } }
+```
+
+**`scroll` example step result (at bottom of list):**
+```json
+{ "id": "scr1", "actionType": "scroll", "success": true, "data": { "scroll_outcome": "edge_reached", "direction": "down", "distance_ratio": "0.7" } }
+```
+
+**`scroll_until`:** Bounded scroll loop. Scrolls repeatedly until a termination condition fires and returns `termination_reason` so the agent knows why it stopped. Always applies caps even when not specified.
+
+Direction semantics are the same as `scroll`. `container`, `distanceRatio`, `settleDelayMs`, and `findFirstScrollableChild` behave identically to `scroll`.
+
+**Termination reasons (`data.termination_reason`):**
+- `EDGE_REACHED` - content ended naturally (finite list). `success: true`.
+- `MAX_SCROLLS_REACHED` - hit `maxScrolls` cap. `success: true`. Normal for infinite feeds.
+- `MAX_DURATION_REACHED` - hit `maxDurationMs` cap. `success: true`. Normal for infinite feeds.
+- `NO_POSITION_CHANGE` - no content movement across `noPositionChangeThreshold` consecutive scrolls. `success: true`.
+- `CONTAINER_NOT_FOUND` - container resolution failed. `success: false`.
+- `CONTAINER_NOT_SCROLLABLE` - container is not scrollable. `success: false`.
+
+`MAX_SCROLLS_REACHED`, `MAX_DURATION_REACHED`, and `NO_POSITION_CHANGE` are clean terminal states, not errors. Agents scrolling infinite feeds should expect these and handle them without treating the action as failed.
+
+**Current runtime caveat:** If the resolved container disappears mid-loop because the app navigated away or rebuilt the view tree unexpectedly, the current Android runtime can collapse that case into `EDGE_REACHED`. When a scroll loop might trigger navigation or heavy UI re-layout, follow it with `snapshot_ui` or `wait_for_node` before assuming the list truly ended.
+
+**`scroll_until` example request:**
+```json
+{
+  "commandId": "cmd-su-1",
+  "taskId": "task-paginate",
+  "expectedFormat": "android-ui-automator",
+  "timeoutMs": 30000,
+  "actions": [
+    { "id": "su1", "type": "scroll_until", "params": { "direction": "down", "maxScrolls": 25 } }
+  ]
+}
+```
+
+**`scroll_until` example step result (finite list, reached bottom):**
+```json
+{ "id": "su1", "actionType": "scroll_until", "success": true, "data": { "termination_reason": "EDGE_REACHED", "scrolls_executed": "12", "direction": "down" } }
+```
+
+**`scroll_until` example step result (infinite feed, hit cap):**
+```json
+{ "id": "su1", "actionType": "scroll_until", "success": true, "data": { "termination_reason": "MAX_SCROLLS_REACHED", "scrolls_executed": "20", "direction": "down" } }
+```
+
+## Pagination Recipe
+
+When an agent needs to read all content from a scrollable list, the correct approach depends on whether the list is finite or infinite.
+
+### Finite lists (settings screens, contact lists, search results)
+
+Use a manual scroll loop: issue `scroll` actions one at a time, snapshot after each, and stop when `scroll_outcome` is `"edge_reached"`. This gives full control over when to stop and what to extract.
+
+```
+while true:
+  snapshot_ui  -> extract visible items
+  scroll down  -> if edge_reached: break
+```
+
+`maxScrolls` is not required here because the agent controls the loop and `edge_reached` is the natural termination condition.
+
+### Infinite feeds (social media, Play Store, news feeds)
+
+Use `scroll_until` with an explicit `maxScrolls` cap. There is no true "bottom" on infinite-scroll lists - lazy loading means the edge is never definitively reached. `scroll_until` is designed for this case: it scrolls as far as the agent wants and returns a machine-readable `termination_reason`.
+
+```json
+{ "id": "feed1", "type": "scroll_until", "params": { "direction": "down", "maxScrolls": 30 } }
+```
+
+After this action, `termination_reason` will be one of:
+- `MAX_SCROLLS_REACHED` - agent hit its own cap (normal for infinite feeds)
+- `EDGE_REACHED` - list actually ended (finite list reached bottom)
+- `NO_POSITION_CHANGE` - content stopped moving (stale list or true bottom)
+
+Both `MAX_SCROLLS_REACHED` and `NO_POSITION_CHANGE` are clean terminal states. Do not treat them as errors.
+
+**Required: always set `maxScrolls`.** Without an explicit cap, the default is 20 scrolls. For feeds where you want more coverage, pass a larger value. Never omit `maxScrolls` or rely on `NO_POSITION_CHANGE` alone as the termination condition for infinite feeds - a slow network load can pause position change temporarily and cause early exit.
+
+### Returning to top
+
+After scrolling down a feed, use `scroll_until` with `direction: "up"` to return to the top. On finite lists, `EDGE_REACHED` signals the top. On infinite feeds, `NO_POSITION_CHANGE` or `MAX_SCROLLS_REACHED` signals that position has stabilized near the top.
+
+```json
+{ "id": "top1", "type": "scroll_until", "params": { "direction": "up", "maxScrolls": 50, "noPositionChangeThreshold": 3 } }
+```
+
 ## Result Envelope
 
 Every execution emits exactly one `[Clawperator-Result]` envelope:
@@ -1614,7 +1757,9 @@ Typical `data` keys by action type:
 | `snapshot_ui` | `actual_format`, `text` (snapshot content - see note below) |
 | `take_screenshot` | `path` (local screenshot file path after Node capture) |
 | `wait_for_node` | `resource_id`, `label` (matched node details) |
-| `scroll_and_click` | `max_swipes`, `direction`, `click_types` |
+| `scroll_and_click` | `max_swipes`, `direction`, `click_types`, `click_after` (`"true"` or `"false"`) |
+| `scroll` | `scroll_outcome` (`"moved"`, `"edge_reached"`, or `"gesture_failed"`), `direction`, `distance_ratio`, `settle_delay_ms`, `resolved_container` (resourceId of auto-detected container, when present) |
+| `scroll_until` | `termination_reason` (see behavior note), `scrolls_executed`, `direction`, `resolved_container` (when present) |
 | `sleep` | `duration_ms` |
 | `press_key` | `key` (`"back"`, `"home"`, or `"recents"`) |
 
@@ -1639,7 +1784,7 @@ Structured XML produced by UIAutomator. Each `<node>` represents one UI element.
 | `content-desc` | `contentDescEquals` / `contentDescContains` | Accessibility label. Empty string if none. |
 | `class` | - | Java widget class name, e.g., `"android.widget.Button"`. Informational only - `NodeMatcher.role` uses Clawperator semantic role names such as `button`, `textfield`, `text`, or `switch`, not the raw `class` attribute. |
 | `clickable` | - | `"true"` if the element accepts tap events. |
-| `scrollable` | - | `"true"` marks a scroll container. Use as `container` in `scroll_and_click`. |
+| `scrollable` | - | `"true"` marks a scroll container. Use as `container` in `scroll_and_click`, `scroll`, or `scroll_until`. |
 | `bounds` | - | `"[x1,y1][x2,y2]"` pixel rectangle. Useful for understanding spatial layout. |
 | `enabled` | - | `"false"` means the element is visible but not interactable. |
 | `long-clickable` | - | `"true"` if the element accepts long-press. Use `clickType: "long_click"`. |
@@ -1659,7 +1804,7 @@ Example: for a node with `content-desc="Search for &apos;vlc&apos;"`:
         clickable="false" enabled="true" scrollable="false"
         bounds="[0,0][1080,2340]">
     ...
-        <!-- Scrollable list - use as 'container' in scroll_and_click -->
+        <!-- Scrollable list - use as 'container' in scroll_and_click, scroll, or scroll_until -->
         <node index="0" text="" resource-id="com.android.settings:id/recycler_view"
               class="androidx.recyclerview.widget.RecyclerView"
               package="com.android.settings" content-desc=""
@@ -1715,7 +1860,7 @@ Example: for a node with `content-desc="Search for &apos;vlc&apos;"`:
 
 - **Tap targets** are `clickable="true"` nodes. In list UIs these are often container (`LinearLayout`) nodes whose text-bearing children hold the visible label while the container itself has `text=""`. When you match any node, Clawperator first attempts `ACTION_CLICK` on the first `clickable="true"` ancestor it finds while walking up the tree from the matched node. If that accessibility click does not succeed, Clawperator falls back to a gesture tap at the center of the matched node's bounding box. This means matching a non-clickable label node (for example, `textEquals: "Connections"`) works correctly as long as it is visually inside a clickable parent tap target. If both mechanisms fail, the execution currently terminates with a failed envelope and empty `stepResults` rather than a per-step `NODE_NOT_CLICKABLE` code.
 - **Icon-only buttons** (no `text`) use `content-desc` for their label. Target with `contentDescEquals`.
-- **Scroll containers** have `scrollable="true"`. Pass their `resource-id` as the `container` matcher in `scroll_and_click`.
+- **Scroll containers** have `scrollable="true"`. Pass their `resource-id` as the `container` matcher in `scroll_and_click` or `scroll`. If `container` is omitted from `scroll`, the first `scrollable="true"` node on screen is used automatically.
 - **Disabled elements** have `enabled="false"`. They cannot be interacted with - scrolling or waiting for a state change is required first.
 
 **Apps with obfuscated or missing resource-ids:** Many production apps (Google Play Store, social media apps, banking apps) set `resource-id=""` on all or most nodes. In this case, fall back to content-desc and text matchers. The fallback priority for these apps is:
@@ -1729,35 +1874,38 @@ Note: `content-desc` values sometimes contain newlines when an element's label s
 
 ## Error Codes
 
-Branch agent logic on codes from `envelope.errorCode` (top-level failures) or `stepResults[].data.error` (per-step failures). The `envelope.error` field contains a human-readable description and is not a stable contract.
+Branch agent logic on codes from `envelope.errorCode` (top-level Android result envelopes), `error.code` (Node API / CLI structured errors), or `stepResults[].data.error` (per-step failures). The `envelope.error` field contains a human-readable description and is not a stable contract.
 
 | Code | Source | Meaning |
 | :--- | :--- | :--- |
 | `SERVICE_UNAVAILABLE` | `envelope.errorCode` | Clawperator Operator accessibility service is not running on the device. Use `clawperator doctor` to diagnose. |
-| `EXECUTION_CONFLICT_IN_FLIGHT` | `envelope.error` | Device is busy with another execution |
-| `ANDROID_SDK_TOOL_MISSING` | `envelope.error` | A required Android SDK tool such as `adb`, `emulator`, `sdkmanager`, or `avdmanager` is not available |
-| `EMULATOR_NOT_FOUND` | `envelope.error` | Requested AVD does not exist |
-| `EMULATOR_NOT_RUNNING` | `envelope.error` | Requested AVD is not currently running |
-| `EMULATOR_ALREADY_RUNNING` | `envelope.error` | Requested operation requires the AVD to be stopped first |
-| `EMULATOR_UNSUPPORTED` | `envelope.error` | The AVD exists but does not satisfy Clawperator compatibility rules |
-| `EMULATOR_START_FAILED` | `envelope.error` | Emulator process failed to register with adb in time |
-| `EMULATOR_BOOT_TIMEOUT` | `envelope.error` | Emulator registered with adb but Android did not finish booting in time |
-| `ANDROID_AVD_CREATE_FAILED` | `envelope.error` | AVD creation failed |
-| `ANDROID_SYSTEM_IMAGE_INSTALL_FAILED` | `envelope.error` | System image install or SDK license acceptance failed |
-| `EMULATOR_STOP_FAILED` | `envelope.error` | Emulator stop request failed |
-| `EMULATOR_DELETE_FAILED` | `envelope.error` | Emulator deletion failed |
+| `EXECUTION_CONFLICT_IN_FLIGHT` | `error.code` | Device is busy with another execution |
+| `ANDROID_SDK_TOOL_MISSING` | `error.code` | A required Android SDK tool such as `adb`, `emulator`, `sdkmanager`, or `avdmanager` is not available |
+| `EMULATOR_NOT_FOUND` | `error.code` | Requested AVD does not exist |
+| `EMULATOR_NOT_RUNNING` | `error.code` | Requested AVD is not currently running |
+| `EMULATOR_ALREADY_RUNNING` | `error.code` | Requested operation requires the AVD to be stopped first |
+| `EMULATOR_UNSUPPORTED` | `error.code` | The AVD exists but does not satisfy Clawperator compatibility rules |
+| `EMULATOR_START_FAILED` | `error.code` | Emulator process failed to register with adb in time |
+| `EMULATOR_BOOT_TIMEOUT` | `error.code` | Emulator registered with adb but Android did not finish booting in time |
+| `ANDROID_AVD_CREATE_FAILED` | `error.code` | AVD creation failed |
+| `ANDROID_SYSTEM_IMAGE_INSTALL_FAILED` | `error.code` | System image install or SDK license acceptance failed |
+| `EMULATOR_STOP_FAILED` | `error.code` | Emulator stop request failed |
+| `EMULATOR_DELETE_FAILED` | `error.code` | Emulator deletion failed |
 | `NODE_NOT_FOUND` | `data.error` | Selector matched no UI element |
-| `RESULT_ENVELOPE_TIMEOUT` | `envelope.error` | Command dispatched but no result received |
-| `RECEIVER_NOT_INSTALLED` | `envelope.error` | [Clawperator Operator Android app](../getting-started/android-operator-apk.md) not found on device |
-| `DEVICE_UNAUTHORIZED` | `envelope.error` | Device not authorized for ADB |
-| `VERSION_INCOMPATIBLE` | `envelope.error` | CLI and installed [Clawperator Operator Android app](../getting-started/android-operator-apk.md) versions do not share the same `major.minor` |
-| `APK_VERSION_UNREADABLE` | `envelope.error` | The device package dump did not expose a readable [Clawperator Operator Android app](../getting-started/android-operator-apk.md) version |
-| `EXECUTION_VALIDATION_FAILED` | `envelope.error` | Payload failed schema validation |
+| `RESULT_ENVELOPE_TIMEOUT` | `error.code` | Command dispatched but no result received |
+| `RECEIVER_NOT_INSTALLED` | `error.code` | [Clawperator Operator Android app](../getting-started/android-operator-apk.md) not found on device |
+| `DEVICE_UNAUTHORIZED` | `error.code` | Device not authorized for ADB |
+| `VERSION_INCOMPATIBLE` | `error.code` | CLI and installed [Clawperator Operator Android app](../getting-started/android-operator-apk.md) versions do not share the same `major.minor` |
+| `APK_VERSION_UNREADABLE` | `error.code` | The device package dump did not expose a readable [Clawperator Operator Android app](../getting-started/android-operator-apk.md) version |
+| `EXECUTION_VALIDATION_FAILED` | `error.code` | Payload failed schema validation |
 | `SECURITY_BLOCK_DETECTED` | `data.error` | Android blocked the action (e.g., secure keyboard) |
 | `NODE_NOT_CLICKABLE` | `data.error` | Reserved error code. Intended for "element found but not interactable", but not currently emitted consistently by the Android and Node runtimes. |
 | `UNSUPPORTED_RUNTIME_CLOSE` | `data.error` | Expected per-step result for all `close_app` steps. The Android runtime does not support a force-stop action response - the Node layer handles the close via `adb shell am force-stop` before dispatch. The overall execution `status` remains `"success"`. Treat as non-fatal. |
 | `SNAPSHOT_EXTRACTION_FAILED` | `data.error` | `snapshot_ui` step completed but the Node layer did not attach any snapshot text to the step during post-processing. The most common cause is a Node binary packaging mismatch or other logcat extraction issue. Rebuild or reinstall the npm package and check version compatibility. |
 | `GLOBAL_ACTION_FAILED` | `data.error` | `press_key` step result when the OS reports `performGlobalAction` returned false. Rare soft failure - the accessibility service was running but Android declined to execute the action. |
+| `CONTAINER_NOT_FOUND` | `data.error` | `scroll` step could not locate a scrollable container. Either no scrollable node is present on screen, or the provided `container` matcher matched nothing. |
+| `CONTAINER_NOT_SCROLLABLE` | `data.error` | `scroll` step found the matched container but it is not scrollable and no scrollable descendant was found. With the default `findFirstScrollableChild: true`, the runtime already walks one level down before raising this error. |
+| `GESTURE_FAILED` | `data.error` | `scroll` step: the OS rejected the gesture dispatch. The accessibility service was running but Android declined to execute the swipe gesture. Step returns `success: false`. |
 
 Primary top-level error taxonomy: `apps/node/src/contracts/errors.ts`. This table also includes runtime-only step error strings such as `UNSUPPORTED_RUNTIME_CLOSE`.
 
@@ -1774,7 +1922,7 @@ Primary top-level error taxonomy: `apps/node/src/contracts/errors.ts`. This tabl
 
 ## Skills
 
-Skills are packaged Android automation scripts distributed via the clawperator-skills bundle at `https://clawperator.com/install/clawperator-skills.bundle`. The Node API provides discovery and metadata - skills are standalone and can be invoked directly by agents without the Node API.
+Skills are packaged Android automation scripts distributed via the public GitHub repository at `https://github.com/clawperator/clawperator-skills`. The Node API provides discovery and metadata - skills are standalone and can be invoked directly by agents without the Node API.
 
 ### Setup
 
@@ -2480,6 +2628,9 @@ The `code` field is always one of the string constants listed below.
 | `NODE_NOT_FOUND` | No UI node matched the provided `NodeMatcher` |
 | `NODE_NOT_CLICKABLE` | The matched node is not interactable |
 | `SECURITY_BLOCK_DETECTED` | A security overlay or lock screen blocked the action |
+| `CONTAINER_NOT_FOUND` | `scroll` or `scroll_until` could not locate a scrollable container. Either no scrollable node is present on screen, or the provided `container` matcher matched nothing. |
+| `CONTAINER_NOT_SCROLLABLE` | `scroll` or `scroll_until` found the matched container but it is not scrollable, and `findFirstScrollableChild` is false (or no scrollable descendant was found). |
+| `GESTURE_FAILED` | `scroll` step: the OS rejected the gesture dispatch. The accessibility service was running but Android declined to execute the swipe gesture. Step returns `success: false`. |
 
 ---
 
@@ -2722,10 +2873,12 @@ The core unit dispatched to the device.
 | `close_app` | `applicationId` | Force-stop an app |
 | `click` | `matcher` | Tap a UI node |
 | `scroll_and_click` | `target` | Scroll to and tap a node |
+| `scroll` | - | Single scroll gesture with outcome reporting |
+| `scroll_until` | - | Bounded scroll loop with machine-readable termination reason |
 | `read_text` | `matcher` | Read text from a UI node |
 | `enter_text` | `matcher`, `text` | Type text into a UI node |
 | `wait_for_node` | `matcher` | Wait for a node to appear |
-| `snapshot_ui` | - | Capture UI tree as ASCII or JSON |
+| `snapshot_ui` | - | Capture the canonical `hierarchy_xml` UI tree |
 | `take_screenshot` | - | Capture screen as PNG |
 | `sleep` | `durationMs` | Pause execution |
 | `press_key` | `key` | Issue a system navigation key via accessibility |
@@ -2776,16 +2929,22 @@ All fields are optional but at least one must be non-empty. Values are ORed inte
 | `clear` | boolean | `enter_text` - clear field before typing |
 | `clickType` | string | `click` - `default`, `long_click`, or `focus` |
 | `target` | NodeMatcher | `scroll_and_click` |
-| `container` | NodeMatcher | `scroll_and_click` |
-| `direction` | string | `scroll_and_click` |
+| `container` | NodeMatcher | `scroll_and_click`, `scroll`, `scroll_until` |
+| `direction` | string | `scroll_and_click`, `scroll`, `scroll_until` |
 | `maxSwipes` | number | `scroll_and_click` |
+| `clickAfter` | boolean | `scroll_and_click` - when `false`, scroll to target without clicking |
+| `maxScrolls` | number | `scroll_until` - maximum scroll iterations (default: 20) |
+| `maxDurationMs` | number | `scroll_until` - wall-clock cap in ms (default: 10000) |
+| `noPositionChangeThreshold` | number | `scroll_until` - consecutive no-movement scrolls before stopping (default: 3) |
 | `durationMs` | number | `sleep` |
 | `key` | `"back"\|"home"\|"recents"` | `press_key` |
-| `format` | `"ascii"\|"json"` | `snapshot_ui` |
 | `path` | string | `take_screenshot` - output file path |
-| `distanceRatio` | number | `scroll_and_click` |
-| `settleDelayMs` | number | `scroll_and_click` |
+| `distanceRatio` | number | `scroll_and_click`, `scroll`, `scroll_until` |
+| `settleDelayMs` | number | `scroll_and_click`, `scroll`, `scroll_until` |
+| `findFirstScrollableChild` | boolean | `scroll_and_click`, `scroll`, `scroll_until` - auto-use first scrollable descendant (default: `true`) |
 | `retry` | object | per-step retry config |
+
+For `scroll` and `scroll_until`, omitting `container` uses the first visible `scrollable="true"` node. That is convenient on simple screens, but on nested-scroll layouts agents should prefer an explicit `container.resourceId` taken from `snapshot_ui`.
 
 ---
 
@@ -3597,7 +3756,7 @@ Once an emulator is provisioned, you may have both a physical device and an emul
 If the installer finishes but warns that skills setup was skipped, the core CLI and [Clawperator Operator Android app](../getting-started/android-operator-apk.md) are still installed. This does not block `clawperator doctor`, device discovery, or direct command execution. To set up skills manually:
 
 ```bash
-git clone https://clawperator.com/install/clawperator-skills.bundle ~/.clawperator/skills
+clawperator skills install
 export CLAWPERATOR_SKILLS_REGISTRY="$HOME/.clawperator/skills/skills/skills-registry.json"
 ```
 
@@ -3805,7 +3964,8 @@ which together are useful for multimodal LLM interpretation before moving to app
 You can run the packaged baseline skill directly:
 
 ```bash
-./skills/com.android.settings.capture-overview/scripts/capture_settings_overview.sh app.actiontask.operator.development
+DEVICE_ID="$(adb devices | awk 'NR>1 && $2==\"device\" {print $1; exit}')"
+./skills/com.android.settings.capture-overview/scripts/capture_settings_overview.sh "$DEVICE_ID" app.actiontask.operator.development
 ```
 
 ## Anti-Patterns
@@ -3996,7 +4156,7 @@ This repository supports a local pre-commit guard to reduce accidental commits o
 
 ## Shared local config path
 
-`clawperator` and `clawperator-skills` share the convention of a user-scoped config directory at:
+`clawperator` and `clawperator-skills` both look for an optional user-scoped config directory at:
 
 - `~/.clawperator/`
 
@@ -4619,12 +4779,16 @@ For app automation commands, default to:
 | `wait_for_node` | `matcher: NodeMatcher`, `retry?: object` | CLI: `action wait`. Waits with internal retry |
 | `snapshot_ui` | `retry?: object` | CLI: `observe snapshot`. Snapshot content in `data.text` as `hierarchy_xml` |
 | `take_screenshot` | `path?: string`, `retry?: object` | Node captures screenshot via ADB and returns local file path |
-| `scroll_and_click` | `target: NodeMatcher`, `container?: NodeMatcher`, `direction?`, `maxSwipes?`, `distanceRatio?`, `settleDelayMs?`, `findFirstScrollableChild?`, `scrollRetry?: object`, `clickRetry?: object` | Scrolls until target is visible, then clicks. `scrollRetry` defaults to UiScroll; `clickRetry` defaults to UiReadiness |
+| `scroll_and_click` | `target: NodeMatcher`, `container?: NodeMatcher`, `direction?`, `maxSwipes?`, `distanceRatio?`, `settleDelayMs?`, `findFirstScrollableChild?`, `clickAfter?: boolean`, `scrollRetry?: object`, `clickRetry?: object` | Scrolls until target is visible, then clicks by default. Set `clickAfter: false` to reveal the target without tapping it. `scrollRetry` defaults to UiScroll; `clickRetry` defaults to UiReadiness |
+| `scroll` | `container?: NodeMatcher`, `direction?`, `distanceRatio?`, `settleDelayMs?`, `findFirstScrollableChild?`, `retry?: object` | Performs exactly one scroll gesture and reports `scroll_outcome` as `moved`, `edge_reached`, or `gesture_failed` |
+| `scroll_until` | `container?: NodeMatcher`, `direction?`, `distanceRatio?`, `settleDelayMs?`, `maxScrolls?`, `maxDurationMs?`, `noPositionChangeThreshold?`, `findFirstScrollableChild?` | Bounded scroll loop that returns `termination_reason`. Use for feed pagination with explicit caps |
 | `sleep` | `durationMs: number` | Pause between steps. Must fit within the execution `timeoutMs` budget |
 
 **`enter_text` vs CLI `action type`:** The CLI command is `action type` but the action type field in execution payloads is `enter_text`. These map to the same runtime action. When building execution payloads directly, always use `enter_text`.
 
 **NodeMatcher fields:** `resourceId`, `contentDescEquals`, `textEquals`, `textContains`, `contentDescContains`, `role`. All fields are AND-combined. Prefer `resourceId` when available. Full reference in `docs/node-api-for-agents.md`.
+
+**Scroll targeting rule:** If a screen contains nested or multiple scrollable containers, do not rely on auto-detect. Capture `snapshot_ui`, identify the intended list's `resource-id`, and pass it as `params.container`.
 
 ### Visual verification with ADB screenshots (recommended)
 Use screenshots alongside UI-tree logs when building/debugging skills.

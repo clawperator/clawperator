@@ -832,7 +832,7 @@ Primary top-level error taxonomy: `apps/node/src/contracts/errors.ts`. This tabl
 
 ## Skills
 
-Skills are packaged Android automation scripts distributed via the clawperator-skills bundle at `https://clawperator.com/install/clawperator-skills.bundle`. The Node API provides discovery and metadata - skills are standalone and can be invoked directly by agents without the Node API.
+Skills are packaged Android automation scripts distributed via the public GitHub repository at `https://github.com/clawperator/clawperator-skills`. The Node API provides discovery and metadata - skills are standalone and can be invoked directly by agents without the Node API.
 
 ### Setup
 
