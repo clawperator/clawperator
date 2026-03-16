@@ -226,7 +226,7 @@ Once an emulator is provisioned, you may have both a physical device and an emul
 If the installer finishes but warns that skills setup was skipped, the core CLI and [Clawperator Operator Android app](../getting-started/android-operator-apk.md) are still installed. This does not block `clawperator doctor`, device discovery, or direct command execution. To set up skills manually:
 
 ```bash
-git clone https://clawperator.com/install/clawperator-skills.bundle ~/.clawperator/skills
+clawperator skills install
 export CLAWPERATOR_SKILLS_REGISTRY="$HOME/.clawperator/skills/skills/skills-registry.json"
 ```
 
