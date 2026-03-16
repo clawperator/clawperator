@@ -158,6 +158,9 @@ successful command and know what to do next."
 - Add a dedicated agent quickstart authored for cold-start use.
 - Add or reserve a dedicated snapshot-format page as a first-class companion
   entrypoint for agents, not just a subsection inside broader API docs.
+- Make that snapshot-format page the single authored source of truth for
+  snapshot structure and parsing guidance, with all other docs linking to it
+  instead of carrying competing long-form copies.
 - Include a complete worked example with:
   - snapshot
   - execution payload
@@ -220,6 +223,9 @@ reading source or discovering behavior by failed execution.
 
 - Add a dedicated snapshot-format reference page covering the structure returned
   by snapshot surfaces, especially `snapshot_ui`.
+- Move the existing long-form snapshot-output material and real-device example
+  captures out of the general API doc into that dedicated page, preserving the
+  examples rather than rewriting them from scratch.
 - Document that the hierarchy is modeled after Android UI Automator output, but
   is not a byte-for-byte copy, and call out where agents must not assume exact
   upstream parity.
@@ -230,6 +236,11 @@ reading source or discovering behavior by failed execution.
   - what Clawperator normalizes or changes
   - what is stable enough for selectors
   - what is auxiliary or unstable
+- Reduce other docs to concise summaries plus links:
+  - quickstart links to the dedicated snapshot page
+  - API overview links to the dedicated snapshot page
+  - playbook keeps only operational guidance and short reminders
+  - troubleshooting keeps only failure-mode guidance
 - Expand action reference coverage and caveats:
   - `clickType`
   - `scroll_until` parameters and termination semantics
@@ -269,6 +280,7 @@ reading source or discovering behavior by failed execution.
 
 - Contract-complete public docs for current shipped behavior
 - Dedicated snapshot-format documentation that agents can rely on directly
+- No duplicated authored long-form snapshot spec spread across multiple docs
 - Fewer hidden requirements and fewer "discover by failure" moments
 
 ### Validation
