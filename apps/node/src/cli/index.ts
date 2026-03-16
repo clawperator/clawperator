@@ -52,7 +52,8 @@ Commands:
   skills get <skill_id>
                                             Show skill metadata
   skills search --app <package_id> [--intent <intent>] [--keyword <text>]
-                                            Search skills by app package, intent, or keyword
+  skills search <keyword>                   Search skills by app package, intent, or keyword
+                                            (bare keyword is shorthand for --keyword)
   skills compile-artifact <skill_id> --artifact <name> [--vars <json>]
   skills compile-artifact --skill-id <id> --artifact <name> [--vars <json>]
                                             Compile from a skill artifact (skill: positional or --skill-id; artifact: ac-status or ac-status.recipe.json)
@@ -522,9 +523,15 @@ async function main(): Promise<void> {
       } else if (rest[0] === "search") {
         const app = getOpt(rest, "--app");
         const intent = getOpt(rest, "--intent");
-        const keyword = getOpt(rest, "--keyword");
+        // Treat a bare positional argument as an implicit --keyword value.
+        const positional = rest[1] && !rest[1].startsWith("--") ? rest[1] : undefined;
+        const keyword = getOpt(rest, "--keyword") ?? positional;
         if (!app && !intent && !keyword) {
-          result = JSON.stringify({ code: "USAGE", message: "skills search requires --app <package_id>, --intent <intent>, or --keyword <text>" });
+          result = JSON.stringify({
+            code: "USAGE",
+            message: "skills search requires --app <package_id>, --intent <intent>, or --keyword <text>",
+            example: "clawperator skills search --keyword solax",
+          });
         } else {
           result = await (await import("./commands/skills.js")).cmdSkillsSearch({ app, intent, keyword }, out);
         }

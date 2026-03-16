@@ -1,0 +1,12 @@
+# Cloudflare Pages redirect rules for docs.clawperator.com
+#
+# Format: /old-path /new-path [status-code]
+# Default status code is 302 (temporary). Use 301 for permanent redirects.
+
+# Section index redirect - getting-started has no section index page
+/getting-started/ /getting-started/running-clawperator-on-android/ 301
+
+# Old path redirects (setup/ -> getting-started/)
+/setup/first-time-setup/ /getting-started/first-time-setup/ 301
+/setup/openclaw-first-run/ /getting-started/openclaw-first-run/ 301
+/setup/ /getting-started/ 301

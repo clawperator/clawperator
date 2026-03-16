@@ -129,7 +129,7 @@ export class DoctorService {
 
     const nextActions: string[] = [];
     if (criticalOk && allOk) {
-      nextActions.push("Read the setup guide: https://docs.clawperator.com/getting-started/first-time-setup/");
+      nextActions.push("Docs: https://docs.clawperator.com/getting-started/first-time-setup/");
       nextActions.push(
         config.deviceId
           ? `Try: clawperator observe snapshot --device-id ${config.deviceId}`
