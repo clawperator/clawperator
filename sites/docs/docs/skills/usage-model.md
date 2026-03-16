@@ -60,12 +60,20 @@ This gives:
 
 which together are useful for multimodal LLM interpretation before moving to app-specific skills.
 
-You can run the packaged baseline skill directly:
+You can run the packaged baseline skill via the Node API wrapper:
+
+```bash
+clawperator skills run com.android.settings.capture-overview --device-id <device_id>
+```
+
+Or invoke the script directly (no Node API required):
 
 ```bash
 DEVICE_ID="$(adb devices | awk 'NR>1 && $2==\"device\" {print $1; exit}')"
 ./skills/com.android.settings.capture-overview/scripts/capture_settings_overview.sh "$DEVICE_ID" app.actiontask.operator.development
 ```
+
+Always pass `--device-id` to `skills run` when more than one device is connected. Without it the wrapper will fail if device auto-detection is ambiguous.
 
 ## Anti-Patterns
 
