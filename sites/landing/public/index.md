@@ -87,3 +87,4 @@ For many services, the mobile app effectively **is the API**. Clawperator allows
 - **First-Time Setup**: https://docs.clawperator.com/getting-started/first-time-setup/
 - **Full Compiled Docs**: https://clawperator.com/llms-full.txt
 - **GitHub Repository**: https://github.com/clawperator/clawperator
+- **Skills Repository**: https://github.com/clawperator/clawperator-skills
