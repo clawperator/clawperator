@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { access, readFile, mkdir } from "node:fs/promises";
 import { join, dirname } from "node:path";
-import { SKILLS_REPO_URL, DEFAULT_SKILLS_DIR, DEFAULT_SKILLS_REGISTRY_SUBPATH } from "./skillsConfig.js";
+import { SKILLS_REPO_URL, SKILLS_LEGACY_REMOTE_URLS, DEFAULT_SKILLS_DIR, DEFAULT_SKILLS_REGISTRY_SUBPATH } from "./skillsConfig.js";
 import { SKILLS_SYNC_FAILED, SKILLS_GIT_NOT_FOUND } from "../../contracts/skills.js";
 
 export interface SyncSkillsResult {
@@ -62,10 +62,11 @@ export async function syncSkills(
 
   try {
     if (await dirExists(join(dir, ".git"))) {
-      // Migrate remote URL if it still points to an old location (e.g. the old bundle URL)
+      // Migrate remote URL only if it matches a known legacy location (e.g. the old bundle URL).
+      // User-configured remotes (SSH URLs, forks, mirrors) are left untouched.
       try {
         const { stdout } = await exec("git", ["-C", dir, "remote", "get-url", "origin"]);
-        if (stdout.trim() !== SKILLS_REPO_URL) {
+        if (SKILLS_LEGACY_REMOTE_URLS.includes(stdout.trim())) {
           await exec("git", ["-C", dir, "remote", "set-url", "origin", SKILLS_REPO_URL]);
         }
       } catch {
