@@ -43,8 +43,8 @@ This command installs the APK and grants all required permissions in one step. S
 Historical versions can be downloaded from `downloads.clawperator.com`. The URL structure follows the versioning pattern:
 - `https://downloads.clawperator.com/operator/v<version>/operator-v<version>.apk`
 
-Example for v0.2.5:
-- [https://downloads.clawperator.com/operator/v0.2.5/operator-v0.2.5.apk](https://downloads.clawperator.com/operator/v0.2.5/operator-v0.2.5.apk)
+Example for v0.3.0:
+- [https://downloads.clawperator.com/operator/v0.3.0/operator-v0.3.0.apk](https://downloads.clawperator.com/operator/v0.3.0/operator-v0.3.0.apk)
 
 ## Required Permissions
 The app requires three permissions to operate:
