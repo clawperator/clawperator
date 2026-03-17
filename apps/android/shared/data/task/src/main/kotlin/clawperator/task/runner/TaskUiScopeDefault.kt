@@ -262,47 +262,7 @@ class TaskUiScopeDefault(
                     ?: throw IllegalStateException("UI tree not available")
 
             val uiTreeFiltered = uiTreeFilterer.filterOnScreenOnly(uiTreeRaw)
-            val labelNode = findNodeByMatcher(labelMatcher, uiTreeFiltered)
-                ?: throw IllegalStateException("NODE_NOT_FOUND")
-
-            val path = mutableListOf<UiNode>()
-            fun getPathTo(current: UiNode): Boolean {
-                path.add(current)
-                if (current.id == labelNode.id) return true
-                for (child in current.children) {
-                    if (getPathTo(child)) return true
-                }
-                path.removeAt(path.size - 1)
-                return false
-            }
-            getPathTo(uiTreeFiltered.root)
-
-            val candidates = mutableListOf<UiNode>()
-            for (i in path.size - 2 downTo 0) {
-                val parent = path[i]
-                val childInPath = path[i + 1]
-                val siblingsAfter = parent.children.dropWhile { it.id != childInPath.id }.drop(1)
-                candidates.addAll(siblingsAfter)
-            }
-
-            val textNodes = candidates.flatMap { node ->
-                val list = mutableListOf<UiNode>()
-                fun collect(n: UiNode) {
-                    list.add(n)
-                    n.children.forEach { collect(it) }
-                }
-                collect(node)
-                list
-            }.filter { it.label.isNotBlank() }
-
-            val valueNode = textNodes.find { it.resourceId?.endsWith("/summary") == true }
-                ?: textNodes.firstOrNull()
-
-            if (valueNode == null) {
-                throw IllegalStateException("VALUE_NODE_NOT_FOUND")
-            }
-
-            Pair(labelNode.label.ifBlank { labelNode.contentDescription ?: "" }, valueNode.label)
+            resolveKeyValuePair(uiTreeFiltered, labelMatcher)
         }
 
     override suspend fun getText(
@@ -1263,3 +1223,85 @@ class TaskUiScopeDefault(
         Log.d("$TAG Successfully clicked exact node: ${node.label}")
     }
 }
+
+private fun resolveKeyValuePair(
+    uiTree: UiTree,
+    labelMatcher: NodeMatcher,
+): Pair<String, String> {
+    val labelNode = findNodeByMatcherForKeyValue(labelMatcher, uiTree)
+        ?: throw IllegalStateException("NODE_NOT_FOUND")
+
+    val path = mutableListOf<UiNode>()
+    fun getPathTo(current: UiNode): Boolean {
+        path.add(current)
+        if (current.id == labelNode.id) return true
+        for (child in current.children) {
+            if (getPathTo(child)) return true
+        }
+        path.removeAt(path.size - 1)
+        return false
+    }
+    if (!getPathTo(uiTree.root)) {
+        throw IllegalStateException("NODE_NOT_FOUND")
+    }
+
+    for (i in path.size - 2 downTo 0) {
+        val parent = path[i]
+        val childInPath = path[i + 1]
+        val siblingsAfter = parent.children.dropWhile { it.id != childInPath.id }.drop(1)
+
+        if (parent.role.isKeyValueRowBoundary()) {
+            if (siblingsAfter.isEmpty()) {
+                throw IllegalStateException("VALUE_NODE_NOT_FOUND")
+            }
+            val descendants = siblingsAfter.flatMap(::flattenUiNodeSubtree).filter { it.label.isNotBlank() }
+            val valueNode =
+                descendants.firstOrNull { it.resourceId?.endsWith("/summary") == true } ?: descendants.firstOrNull()
+                    ?: throw IllegalStateException("VALUE_NODE_NOT_FOUND")
+            return labelNode.label.ifBlank { labelNode.contentDescription ?: "" } to valueNode.label
+        }
+
+        if (siblingsAfter.isNotEmpty()) {
+            val descendants = siblingsAfter.flatMap(::flattenUiNodeSubtree).filter { it.label.isNotBlank() }
+            val valueNode =
+                descendants.firstOrNull { it.resourceId?.endsWith("/summary") == true } ?: descendants.firstOrNull()
+                    ?: throw IllegalStateException("VALUE_NODE_NOT_FOUND")
+            return labelNode.label.ifBlank { labelNode.contentDescription ?: "" } to valueNode.label
+        }
+    }
+
+    throw IllegalStateException("VALUE_NODE_NOT_FOUND")
+}
+
+private fun flattenUiNodeSubtree(node: UiNode): List<UiNode> {
+    val nodes = mutableListOf<UiNode>()
+
+    fun collect(current: UiNode) {
+        nodes.add(current)
+        current.children.forEach(::collect)
+    }
+
+    collect(node)
+    return nodes
+}
+
+private fun findNodeByMatcherForKeyValue(
+    matcher: NodeMatcher,
+    uiTree: UiTree,
+): UiNode? =
+    UiTreeTraversal.findAll(uiTree) { uiNode ->
+        val taskUiNode =
+            TaskUiNode(
+                resourceId = uiNode.resourceId,
+                label = uiNode.label,
+                contentDescription = uiNode.contentDescription,
+                clickable = uiNode.isClickable,
+                role = uiNode.role.name.lowercase(),
+                bounds = uiNode.bounds,
+                debugPath = uiNode.id.value,
+            )
+        matcher.matches(taskUiNode)
+    }.firstOrNull()
+
+private fun UiRole.isKeyValueRowBoundary(): Boolean =
+    this == UiRole.Row || this == UiRole.ListItem || this == UiRole.Card

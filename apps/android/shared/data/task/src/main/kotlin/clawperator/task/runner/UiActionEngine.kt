@@ -171,7 +171,7 @@ class UiActionEngineDefault(
             val errorCode = when (e.message) {
                 "NODE_NOT_FOUND" -> "NODE_NOT_FOUND"
                 "VALUE_NODE_NOT_FOUND" -> "VALUE_NODE_NOT_FOUND"
-                else -> "NODE_NOT_FOUND" // fallback
+                else -> throw e
             }
             UiActionStepResult(
                 id = action.id,

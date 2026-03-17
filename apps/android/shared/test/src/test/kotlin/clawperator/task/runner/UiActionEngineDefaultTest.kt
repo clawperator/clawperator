@@ -924,6 +924,36 @@ class UiActionEngineDefaultTest : ActionTest {
         }
 
     @Test
+    fun `execute read_key_value_pair rethrows unexpected runtime failures`() =
+        actionTest {
+            val uiScope = RecordingTaskUiScope().apply {
+                readKeyValuePairThrows = IllegalStateException("UI tree not available")
+            }
+            val taskScope = RecordingTaskScope(uiScope)
+            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+
+            val error =
+                assertFailsWith<IllegalStateException> {
+                    engine.execute(
+                        taskScope = taskScope,
+                        plan = UiActionPlan(
+                            commandId = "cmd",
+                            taskId = "task",
+                            source = "test",
+                            actions = listOf(
+                                UiAction.ReadKeyValuePair(
+                                    id = "kvp-runtime",
+                                    labelMatcher = NodeMatcher(textEquals = "Android version"),
+                                ),
+                            ),
+                        ),
+                    )
+                }
+
+            assertEquals("UI tree not available", error.message)
+        }
+
+    @Test
     fun `execute read_text with version validator succeeds`() =
         actionTest {
             val uiScope = object : RecordingTaskUiScope() {

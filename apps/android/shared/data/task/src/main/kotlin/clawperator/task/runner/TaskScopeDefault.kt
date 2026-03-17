@@ -378,6 +378,8 @@ class TaskScopeDefault(
     ): WaitForNavigationResult {
         val startTime = getCurrentTimeMillis()
         var lastPackage: String? = null
+        val initialPackage = uiTreeInspector.getCurrentWindowMetadata()?.foregroundPackage
+        var observedDifferentPackage = false
         val pollDelay = 200.milliseconds
 
         while (true) {
@@ -392,8 +394,17 @@ class TaskScopeDefault(
 
             val windowMetadata = uiTreeInspector.getCurrentWindowMetadata()
             lastPackage = windowMetadata?.foregroundPackage
+            if (initialPackage != null && lastPackage != null && lastPackage != initialPackage) {
+                observedDifferentPackage = true
+            }
 
-            if (expectedPackage != null && expectedPackage == lastPackage) {
+            if (shouldSatisfyExpectedPackage(
+                    expectedPackage = expectedPackage,
+                    initialPackage = initialPackage,
+                    currentPackage = lastPackage,
+                    observedDifferentPackage = observedDifferentPackage,
+                )
+            ) {
                 return WaitForNavigationResult(
                     success = true,
                     lastPackage = lastPackage,
@@ -424,4 +435,16 @@ class TaskScopeDefault(
         Log.d("$TAG UI operations completed")
         return result
     }
+}
+
+private fun shouldSatisfyExpectedPackage(
+    expectedPackage: String?,
+    initialPackage: String?,
+    currentPackage: String?,
+    observedDifferentPackage: Boolean,
+): Boolean {
+    if (expectedPackage == null || currentPackage != expectedPackage) {
+        return false
+    }
+    return initialPackage != expectedPackage || observedDifferentPackage
 }
