@@ -28,15 +28,13 @@ Documentation relevant to the change is included in the task — not deferred.
 | PR-4 | T-06, T-09 | `node` + `docs` | Payload authoring ergonomics; T-09 dry-run output benefits from T-06 |
 | PR-5 | T-07 | `node` + `docs` | Skills scaffolding; substantial enough to stand alone |
 | PR-6 | T-12 | `install` + `docs` | Installer multi-device awareness |
-| PR-7 | T-13 | `docs` | Link cleanup; unblocks PR-8 |
-| PR-8 | T-14 | `docs` | Action reference page; needs Group A + PR-4 shipped first |
+| PR-7 | T-13, T-14 | `docs` | Link cleanup + action reference page; both docs-only, do together |
 
 **Ordering constraints:**
 - PR-1 before PR-2 (T-01 fixes the click that T-02 waits on)
 - PR-3 before PR-6 (T-12 calls `doctor`; T-05 fixes its exit code)
-- PR-4 before PR-8 (reference page should show `matcher` as canonical from the start)
-- PR-7 before PR-8 (clean link baseline before building new page)
-- PR-2 before PR-8 (reference page should include the new action types)
+- PR-2 before PR-7 (reference page should include the new action types)
+- PR-4 before PR-7 (reference page should show `matcher` as canonical from the start)
 - All other PRs are independent and can be parallelised
 
 ---
@@ -361,10 +359,10 @@ Add a "Multiple devices connected" troubleshooting section to the first-time set
 
 ---
 
-## PR-7 — Docs link cleanup
-**Tasks:** T-13 | **Codebases:** `docs`
+## PR-7 — Docs cleanup and action reference page
+**Tasks:** T-13, T-14 | **Codebases:** `docs`
 
-Pure housekeeping PR. No behavior change. Should be reviewed and merged before PR-8 to give the action reference page a clean link graph to build on.
+Both tasks are docs-only with no behavior change. The link audit (T-13) is done first on the branch — fixing dead links and adding the CI check — then the reference page (T-14) is built on top of that clean baseline. The CI check validates the new page's links immediately. One reviewer context-load for all docs work.
 
 ---
 
@@ -383,14 +381,7 @@ Pure housekeeping PR. No behavior change. Should be reviewed and merged before P
 - All internal links in `ai-agents/` and `reference/` return 200.
 - CI check runs on docs PRs and catches new broken links.
 
-**Dependencies:** None.
-
----
-
-## PR-8 — Action type reference page
-**Tasks:** T-14 | **Codebases:** `docs`
-
-Synthesis PR. Must wait for PR-2 (new action types exist to document), PR-4 (canonical param names are settled), and PR-7 (link graph is clean). Once those are in, this is the highest-leverage single docs change: one page that eliminates the scattered schema hunting that blocked the evaluation.
+**Dependencies:** None (within this PR, do this before T-14).
 
 ---
 
@@ -411,7 +402,7 @@ Create `reference/action-types/` as a single page covering all action types incl
 - Agent quickstart, `llms-full.txt`, and navigation patterns each link to it.
 - `reference/actions` redirects here.
 
-**Dependencies:** PR-2 (new actions), PR-4 (canonical `matcher` param name), PR-7 (clean link baseline).
+**Dependencies:** PR-2 (new action types to document), PR-4 (canonical `matcher` param name).
 
 ---
 
@@ -420,11 +411,9 @@ Create `reference/action-types/` as a single page covering all action types incl
 ```
 PR-1 ──► PR-2         (T-01 click fix before T-02 navigation wait; recommended, not hard gate)
 PR-3 ──► PR-6         (T-05 doctor exit code before T-12 installer uses doctor)
-PR-4 ──► PR-8         (canonical matcher name before reference page is written)
-PR-2 ──► PR-8         (new action types exist before reference page is written)
-PR-7 ──► PR-8         (clean link baseline before new page is added)
+PR-2 ──► PR-7         (new action types exist before reference page is written)
+PR-4 ──► PR-7         (canonical matcher name before reference page is written)
 
-PR-3, PR-4, PR-5 are independent of each other and of PR-1/PR-2.
-PR-6 can run in parallel with PR-1/PR-2/PR-4/PR-5.
-PR-7 can run immediately — no dependencies.
+PR-3, PR-4, PR-5, PR-6 are independent of each other and of PR-1/PR-2.
+PR-7 is the only PR with multiple upstream dependencies — work on it last.
 ```
