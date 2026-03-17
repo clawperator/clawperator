@@ -59,6 +59,13 @@ if [ -d "$STATIC_DIR" ]; then
     cp -R "$STATIC_DIR"/. "$DOCS_DIR/site/"
 fi
 
+echo "Validating docs routes and machine-facing files..."
+python3 "$REPO_ROOT/scripts/validate_docs_routes.py" \
+  --site-dir "$DOCS_DIR/site" \
+  --source-map "$DOCS_DIR/source-map.yaml" \
+  --docs-index "$REPO_ROOT/docs/index.md" \
+  --llms-txt "$DOCS_DIR/static/llms.txt"
+
 # Verify build output
 if [ -d "site" ] && [ -f "site/index.html" ]; then
     echo "--- Successfully built documentation site to $DOCS_DIR/site ---"
