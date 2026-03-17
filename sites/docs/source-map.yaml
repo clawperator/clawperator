@@ -90,6 +90,11 @@ sections:
         mode: copy
         sources:
           - docs/navigation-patterns.md
+      - output: ai-agents/multi-device-workflows.md
+        title: Multi-Device Workflows for Agents
+        mode: copy
+        sources:
+          - docs/multi-device-workflows.md
 
   - id: reference
     title: Reference

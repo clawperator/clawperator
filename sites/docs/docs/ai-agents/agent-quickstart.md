@@ -10,6 +10,8 @@ Use this page first, then branch into:
 - [Clawperator Node API - Agent Guide](node-api-for-agents.md) for the full
   contract
 - [API Overview](../reference/api-overview.md) for a shorter reference path
+- [Multi-Device Workflows for Agents](multi-device-workflows.md) if more than
+  one Android target is connected
 
 ## What Clawperator is
 
@@ -164,6 +166,7 @@ only after the UI path is already known.
 - [Clawperator Snapshot Format](../reference/snapshot-format.md)
 - [Execution Model](../reference/execution-model.md)
 - [Device and Package Model](../reference/device-and-package-model.md)
+- [Multi-Device Workflows for Agents](multi-device-workflows.md)
 - [Clawperator Node API - Agent Guide](node-api-for-agents.md)
 - [API Overview](../reference/api-overview.md)
 - [CLI Reference](../reference/cli-reference.md)

@@ -9,6 +9,7 @@ This site contains the canonical technical documentation for Clawperator, a dete
 - Docs home: https://docs.clawperator.com/
 - Agent quickstart: https://docs.clawperator.com/ai-agents/agent-quickstart/
 - Node API agent guide: https://docs.clawperator.com/ai-agents/node-api-for-agents/
+- Multi-device workflows: https://docs.clawperator.com/ai-agents/multi-device-workflows/
 - Execution model: https://docs.clawperator.com/reference/execution-model/
 - Device and package model: https://docs.clawperator.com/reference/device-and-package-model/
 - Snapshot format: https://docs.clawperator.com/reference/snapshot-format/

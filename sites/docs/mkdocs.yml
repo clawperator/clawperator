@@ -22,6 +22,7 @@ nav:
     - Agent Quickstart: ai-agents/agent-quickstart.md
     - Node API - Agent Guide: ai-agents/node-api-for-agents.md
     - Navigation Patterns for Agents: ai-agents/navigation-patterns.md
+    - Multi-Device Workflows for Agents: ai-agents/multi-device-workflows.md
     - Execution Model: reference/execution-model.md
     - Timeout Budgeting: reference/timeout-budgeting.md
     - Device and Package Model: reference/device-and-package-model.md

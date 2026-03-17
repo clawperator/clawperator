@@ -33,6 +33,7 @@ Use this page as a technical map:
 - [Device and Package Model](reference/device-and-package-model.md) - What `deviceId` and `receiverPackage` mean in practice
 - [Clawperator Snapshot Format](reference/snapshot-format.md) - Canonical `snapshot_ui` and `observe snapshot` output contract
 - [Navigation Patterns for Agents](ai-agents/navigation-patterns.md) - Practical patterns for scrolls, overlays, and OEM variation
+- [Multi-Device Workflows for Agents](ai-agents/multi-device-workflows.md) - Deterministic targeting, per-device queues, and install recovery
 - [Operator LLM Playbook](design/operator-llm-playbook.md) - Practical operating rules for observation, action loops, and skill execution
 - [API Overview](reference/api-overview.md) - Execution payload, action types, result envelope shape, and snapshot semantics
 - [CLI Reference](reference/cli-reference.md) - Command-line entrypoints and flags
@@ -63,6 +64,7 @@ Use this page as a technical map:
 - [Device and Package Model](reference/device-and-package-model.md) - Device IDs, receiver packages, and multi-device rules
 - [Clawperator Snapshot Format](reference/snapshot-format.md) - Canonical snapshot output and parsing contract
 - [Navigation Patterns for Agents](ai-agents/navigation-patterns.md) - Scroll, overlay, and OEM-variation tactics
+- [Multi-Device Workflows for Agents](ai-agents/multi-device-workflows.md) - How to keep targeting explicit when more than one device is connected
 - [Operator LLM Playbook](design/operator-llm-playbook.md) - Action contracts, runtime conventions, and skill packaging
 - [API Overview](reference/api-overview.md) - Execution payload, action types, result envelopes, and snapshot delivery
 - [CLI Reference](reference/cli-reference.md) - Exact command surface for local and scripted integrations
@@ -1147,6 +1149,8 @@ Use this page first, then branch into:
 - [Clawperator Node API - Agent Guide](node-api-for-agents.md) for the full
   contract
 - [API Overview](../reference/api-overview.md) for a shorter reference path
+- [Multi-Device Workflows for Agents](multi-device-workflows.md) if more than
+  one Android target is connected
 
 ## What Clawperator is
 
@@ -1301,6 +1305,7 @@ only after the UI path is already known.
 - [Clawperator Snapshot Format](../reference/snapshot-format.md)
 - [Execution Model](../reference/execution-model.md)
 - [Device and Package Model](../reference/device-and-package-model.md)
+- [Multi-Device Workflows for Agents](multi-device-workflows.md)
 - [Clawperator Node API - Agent Guide](node-api-for-agents.md)
 - [API Overview](../reference/api-overview.md)
 - [CLI Reference](../reference/cli-reference.md)
@@ -2491,6 +2496,223 @@ If a step fails:
 - [Execution Model](../reference/execution-model.md)
 - [Error Handling Guide](../reference/error-handling.md)
 - [Operator LLM Playbook](../design/operator-llm-playbook.md)
+
+---
+
+
+# Multi-Device Workflows for Agents
+
+Use this page when more than one Android target is connected and you need
+deterministic per-device behavior.
+
+This is the practical companion to
+[Device and Package Model](../reference/device-and-package-model.md).
+
+## Core rule
+
+When more than one Android target is visible in adb, always pass:
+
+```bash
+--device-id <device_id>
+```
+
+Do not rely on auto-resolution in multi-device environments. Clawperator will
+fail with `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED` instead of guessing.
+
+## What counts as a separate target
+
+A target is any adb-connected Android runtime in `device` state, including:
+
+- a physical Android phone
+- a physical Android tablet
+- an emulator such as `emulator-5554`
+
+`deviceId` is just the adb serial.
+
+Examples:
+
+- `<device_serial>`
+- `emulator-5554`
+
+List the currently visible targets with:
+
+```bash
+clawperator devices --output json
+```
+
+## Recommended cold-start loop
+
+For each target device:
+
+1. identify the serial with `clawperator devices --output json`
+2. run `clawperator doctor --device-id <device_id> --output json`
+3. run `clawperator version --check-compat --device-id <device_id> --output json`
+4. keep using that same `--device-id` on every later command
+
+This is the safest default after:
+
+- emulator provisioning
+- USB reconnects
+- installer runs with multiple devices attached
+- any local setup where both release testing and debug testing happen at once
+
+## Commands that should stay explicit
+
+In multi-device environments, keep `--device-id` explicit on:
+
+- `operator setup`
+- `doctor`
+- `version --check-compat`
+- `execute`
+- `observe snapshot`
+- `observe screenshot`
+- `inspect ui`
+- every `action ...` wrapper
+- `grant-device-permissions`
+- `skills run`
+
+Example:
+
+```bash
+clawperator observe snapshot --device-id <device_id> --output json
+clawperator execute --device-id <device_id> --execution /path/to/execution.json --output json
+clawperator skills run com.android.settings.capture-overview --device-id <device_id>
+```
+
+## Per-device work queues
+
+Clawperator enforces single-flight execution per target device. Treat each
+device as its own serialized queue.
+
+Practical guidance:
+
+- keep one work queue per device
+- never overlap two executions on the same device
+- it is fine to run different queues against different devices
+- keep `--receiver-package` consistent within the same device queue
+
+If you see `EXECUTION_CONFLICT_IN_FLIGHT`, do not immediately retry in
+parallel. Wait for the earlier execution to finish or explicitly serialize the
+queue.
+
+## Receiver package still matters
+
+`--device-id` and `--receiver-package` solve different problems:
+
+- `--device-id` selects the Android runtime
+- `--receiver-package` selects which Operator APK on that runtime receives the
+  command
+
+Examples:
+
+- release package: `com.clawperator.operator`
+- debug package: `com.clawperator.operator.dev`
+
+On a local workstation it is common to have:
+
+- one physical device running the release APK
+- one emulator running the debug APK
+
+In that case, keep both flags explicit:
+
+```bash
+clawperator doctor \
+  --device-id emulator-5554 \
+  --receiver-package com.clawperator.operator.dev \
+  --output json
+```
+
+## Recovery after installer or setup runs
+
+If `install.sh` ran while multiple devices were connected, host-side setup can
+still complete successfully, but Android setup must be finished per device.
+
+Use:
+
+```bash
+clawperator operator setup \
+  --apk ~/.clawperator/downloads/operator.apk \
+  --device-id <device_id>
+```
+
+Then confirm readiness:
+
+```bash
+clawperator doctor --device-id <device_id> --output json
+```
+
+## Emulator plus physical device
+
+This is the most common ambiguous setup.
+
+Typical pattern:
+
+1. provision or start the emulator
+2. run `clawperator devices --output json`
+3. choose the emulator serial for emulator work
+4. choose the physical-device serial for phone work
+5. keep those serials explicit in every later command
+
+Do not assume the emulator will remain the only device after provisioning.
+
+## Suggested shell pattern
+
+A practical shell setup is to bind one environment variable per active target:
+
+```bash
+export CLAWPERATOR_PHONE_ID="<device_serial>"
+export CLAWPERATOR_EMULATOR_ID="emulator-5554"
+```
+
+Then run:
+
+```bash
+clawperator doctor --device-id "$CLAWPERATOR_PHONE_ID" --output json
+clawperator doctor --device-id "$CLAWPERATOR_EMULATOR_ID" --output json
+```
+
+This keeps command history readable and avoids copy-paste mistakes.
+
+## Artifact and screenshot hygiene
+
+When the same agent operates multiple devices, keep outputs separated by device
+ID.
+
+Good pattern:
+
+- one output directory per device
+- include the device ID in filenames
+- do not reuse a single screenshot path across different targets
+
+Example:
+
+```bash
+clawperator observe screenshot \
+  --device-id <device_id> \
+  --path "/tmp/clawperator-<device_id>-settings.png" \
+  --output json
+```
+
+## Failure triage
+
+If a command fails in a multi-device environment:
+
+1. run `clawperator devices --output json`
+2. confirm the intended target is still present in `device` state
+3. rerun with explicit `--device-id <device_id>`
+4. rerun `clawperator doctor --device-id <device_id> --output json` if the
+   device state changed
+
+Most common multi-device errors:
+
+- `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED`
+- `NO_DEVICES`
+- `DEVICE_NOT_FOUND`
+- `DEVICE_UNAUTHORIZED`
+
+For broader recovery guidance, see
+[Error Handling Guide](../reference/error-handling.md) and
+[Clawperator Doctor](../reference/node-api-doctor.md).
 
 ---
 
