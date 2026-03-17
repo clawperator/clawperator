@@ -430,6 +430,38 @@ class UiActionEngineDefaultTest : ActionTest {
             assertEquals("CONTAINER_NOT_FOUND", stepResult.data["error"])
             assertEquals("CONTAINER_NOT_FOUND", stepResult.data["termination_reason"])
         }
+
+    @Test
+    fun `execute scroll_until returns target_found termination`() =
+        actionTest {
+            val uiScope = RecordingTaskUiScope(
+                scrollLoopResult = TaskScrollLoopResult(TaskScrollTerminationReason.TargetFound, scrollsExecuted = 3),
+            )
+            val taskScope = RecordingTaskScope(uiScope)
+            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+
+            val result =
+                engine.execute(
+                    taskScope = taskScope,
+                    plan = UiActionPlan(
+                        commandId = "cmd-su-target",
+                        taskId = "task-su-target",
+                        source = "test",
+                        actions = listOf(
+                            UiAction.ScrollUntil(
+                                id = "su-target",
+                                target = NodeMatcher(textContains = "About phone"),
+                            ),
+                        ),
+                    ),
+                )
+
+            val stepResult = result.stepResults.single()
+            assertEquals("scroll_until", stepResult.actionType)
+            assertEquals(true, stepResult.success)
+            assertEquals("TARGET_FOUND", stepResult.data["termination_reason"])
+            assertEquals("3", stepResult.data["scrolls_executed"])
+        }
 }
 
 private class RecordingTaskScope(
@@ -535,6 +567,7 @@ private class RecordingTaskUiScope(
     }
 
     override suspend fun scrollLoop(
+        target: NodeMatcher?,
         container: NodeMatcher?,
         direction: TaskScrollDirection,
         distanceRatio: Float,

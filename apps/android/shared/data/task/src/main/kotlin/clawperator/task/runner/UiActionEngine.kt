@@ -259,6 +259,7 @@ class UiActionEngineDefault(
         val result =
             taskScope.ui {
                 scrollLoop(
+                    target = action.target,
                     container = action.container,
                     direction = action.direction,
                     distanceRatio = action.distanceRatio,
@@ -452,6 +453,7 @@ private fun TaskScrollOutcome.toWireValue(): String =
 
 private fun TaskScrollTerminationReason.toWireValue(): String =
     when (this) {
+        TaskScrollTerminationReason.TargetFound -> "TARGET_FOUND"
         TaskScrollTerminationReason.EdgeReached -> "EDGE_REACHED"
         TaskScrollTerminationReason.MaxScrollsReached -> "MAX_SCROLLS_REACHED"
         TaskScrollTerminationReason.MaxDurationReached -> "MAX_DURATION_REACHED"

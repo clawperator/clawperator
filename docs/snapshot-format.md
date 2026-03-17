@@ -23,6 +23,10 @@ On success:
 The Android runtime emits the hierarchy dump, and the Node layer attaches that
 raw XML into the result envelope after execution.
 
+Important: raw snapshot presence does not always mean the node is currently
+fully on-screen. Some Android views include clipped or off-screen descendants
+in the hierarchy dump, especially inside large scroll containers.
+
 ## Relationship to Android UI Automator
 
 Clawperator's snapshot structure is modeled after Android UI Automator output,
@@ -135,6 +139,10 @@ When building selectors, prefer:
   a standalone dump file.
 - Agents should reason over both the XML tree and the execution envelope, not
   just the XML alone.
+- Some screens include descendants that are technically present in the raw XML
+  but are still clipped outside the current viewport. Treat `bounds`,
+  clickability, and follow-up actions such as `wait_for_node` or
+  `scroll_until` as the operational truth for what is actually reachable.
 
 ### XML escaping
 

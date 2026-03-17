@@ -46,6 +46,8 @@ data class TaskScrollOnceResult(
  * Reason a [TaskUiScope.scrollLoop] bounded scroll loop terminated.
  */
 enum class TaskScrollTerminationReason {
+    /** Target matcher became visible in the current UI tree */
+    TargetFound,
     /** Content ended naturally - leading-child signature unchanged at the boundary */
     EdgeReached,
     /** Hit the [UiAction.ScrollUntil.maxScrolls] safety cap */

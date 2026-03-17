@@ -165,6 +165,7 @@ interface TaskUiScope {
      * @return [TaskScrollLoopResult] with termination reason and scrolls executed.
      */
     suspend fun scrollLoop(
+        target: NodeMatcher? = null,
         container: NodeMatcher? = null,
         direction: TaskScrollDirection = TaskScrollDirection.Down,
         distanceRatio: Float = 0.7f,

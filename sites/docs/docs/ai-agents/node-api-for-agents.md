@@ -228,7 +228,7 @@ Combine fields to increase specificity when a single field is ambiguous:
 | `sleep` | `durationMs: number` | - |
 | `scroll_and_click` | `target: NodeMatcher` | `container: NodeMatcher`, `direction: "down" \| "up" \| "left" \| "right"` (default: `"down"`), `maxSwipes: number` (default: `10`, range: 1-50), `distanceRatio: number` (default: `0.7`, range: 0-1), `settleDelayMs: number` (default: `250`, range: 0-10000), `findFirstScrollableChild: boolean` (default: `true`), `clickAfter: boolean` (default: `true`), `scrollRetry: object` (default preset: `maxAttempts=4`, `initialDelayMs=400`, `maxDelayMs=2000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`), `clickRetry: object` (default preset: `maxAttempts=5`, `initialDelayMs=500`, `maxDelayMs=3000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`) |
 | `scroll` | - | `container: NodeMatcher` (default: auto-detect first scrollable), `direction: "down" \| "up" \| "left" \| "right"` (default: `"down"` - reveals content further down, finger swipes up), `distanceRatio: number` (default: `0.7`, range: 0-1), `settleDelayMs: number` (default: `250`, range: 0-10000), `findFirstScrollableChild: boolean` (default: `true`), `retry: object` (default: no retry - see scroll behavior note) |
-| `scroll_until` | - | `container: NodeMatcher` (default: auto-detect), `direction: "down" \| "up" \| "left" \| "right"` (default: `"down"`), `distanceRatio: number` (default: `0.7`, range: 0-1), `settleDelayMs: number` (default: `250`, range: 0-10000), `maxScrolls: number` (default: `20`, range: 1-200), `maxDurationMs: number` (default: `10000`, range: 0-120000), `noPositionChangeThreshold: number` (default: `3`, range: 1-20), `findFirstScrollableChild: boolean` (default: `true`) |
+| `scroll_until` | - | `target: NodeMatcher` (optional, emits `TARGET_FOUND` when the target becomes visible), `container: NodeMatcher` (default: auto-detect), `direction: "down" \| "up" \| "left" \| "right"` (default: `"down"`), `distanceRatio: number` (default: `0.7`, range: 0-1), `settleDelayMs: number` (default: `250`, range: 0-10000), `maxScrolls: number` (default: `20`, range: 1-200), `maxDurationMs: number` (default: `10000`, range: 0-120000), `noPositionChangeThreshold: number` (default: `3`, range: 1-20), `findFirstScrollableChild: boolean` (default: `true`) |
 | `press_key` | `key: "back" \| "home" \| "recents"` | - |
 
 ### CLI-to-action-type mapping
@@ -565,7 +565,14 @@ After receiving `snap2`, the agent compares it to `snap1`. If `scr1.data.scroll_
 
 Direction semantics are the same as `scroll`. `container`, `distanceRatio`, `settleDelayMs`, and `findFirstScrollableChild` behave identically to `scroll`.
 
+If `params.target` is provided, the runtime checks for that matcher before the
+first scroll and after each successful movement. When the target becomes
+visible in Clawperator's on-screen filtered UI tree, the step returns
+`termination_reason: "TARGET_FOUND"`. This removes the extra "scroll, then
+snapshot to verify" round-trip for many navigation tasks.
+
 **Termination reasons (`data.termination_reason`):**
+- `TARGET_FOUND` - the provided `target` matcher became visible in the current UI tree. `success: true`.
 - `EDGE_REACHED` - scrolling stopped because no further movement was detected. `success: true`.
 - `MAX_SCROLLS_REACHED` - hit `maxScrolls` cap. `success: true`. Normal for infinite feeds.
 - `MAX_DURATION_REACHED` - hit `maxDurationMs` cap. `success: true`. Normal for infinite feeds.
@@ -575,27 +582,40 @@ Direction semantics are the same as `scroll`. `container`, `distanceRatio`, `set
 
 `MAX_SCROLLS_REACHED`, `MAX_DURATION_REACHED`, and `NO_POSITION_CHANGE` are clean terminal states, not errors. Agents scrolling infinite feeds should expect these and handle them without treating the action as failed.
 
-Important current limitation:
+When no `target` matcher is provided, `scroll_until` behaves as a pure bounded
+pagination loop and returns one of the non-target terminal reasons above.
 
-- there is no `TARGET_FOUND` termination reason today
-- when a target becomes visible during the loop, the runtime can still return
-  `EDGE_REACHED`
-- after targeted `scroll_until`, take a follow-up `snapshot_ui` or
-  `wait_for_node` before deciding whether the target was actually found
+**Current runtime caveats:**
+- If the resolved container disappears mid-loop because the app navigated away or rebuilt the view tree unexpectedly, the current Android runtime can collapse that case into `EDGE_REACHED`.
+- Some Android screens expose off-screen descendants in the raw `snapshot_ui` XML. `scroll_until.target` does not use raw XML presence alone; it checks Clawperator's on-screen filtered tree. On heavily clipped or nested layouts, a target may appear in the raw snapshot near the bottom edge but still finish as `EDGE_REACHED` until it is more fully on-screen.
 
-**Current runtime caveat:** If the resolved container disappears mid-loop because the app navigated away or rebuilt the view tree unexpectedly, the current Android runtime can collapse that case into `EDGE_REACHED`. When a scroll loop might trigger navigation or heavy UI re-layout, follow it with `snapshot_ui` or `wait_for_node` before assuming the list truly ended.
+When a scroll loop might trigger navigation, heavy UI re-layout, or clipped list rows near the viewport edge, follow it with `snapshot_ui` or `wait_for_node` before assuming the list truly ended.
 
 **`scroll_until` example request:**
 ```json
 {
-  "commandId": "cmd-su-1",
-  "taskId": "task-paginate",
-  "expectedFormat": "android-ui-automator",
-  "timeoutMs": 30000,
-  "actions": [
-    { "id": "su1", "type": "scroll_until", "params": { "direction": "down", "maxScrolls": 25 } }
-  ]
+    "commandId": "cmd-su-1",
+    "taskId": "task-paginate",
+    "expectedFormat": "android-ui-automator",
+    "timeoutMs": 30000,
+    "actions": [
+      {
+        "id": "su1",
+        "type": "scroll_until",
+        "params": {
+          "target": { "textContains": "About phone" },
+          "container": { "resourceId": "com.android.settings:id/recycler_view" },
+          "direction": "down",
+          "maxScrolls": 25
+        }
+      }
+    ]
 }
+```
+
+**`scroll_until` example step result (target became visible):**
+```json
+{ "id": "su1", "actionType": "scroll_until", "success": true, "data": { "termination_reason": "TARGET_FOUND", "scrolls_executed": "5", "direction": "down", "resolved_container": "com.android.settings:id/recycler_view" } }
 ```
 
 **`scroll_until` example step result (finite list, reached bottom):**

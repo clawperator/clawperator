@@ -144,6 +144,7 @@ class AgentCommandParserDefault : AgentCommandParser {
             "scroll_until" ->
                 UiAction.ScrollUntil(
                     id = id,
+                    target = params.parseMatcherOrNull("target"),
                     container = params.parseMatcherOrNull("container"),
                     direction = params.parseDirection(),
                     distanceRatio = params.doubleOrDefault("distanceRatio", 0.7).toFloat().coerceIn(0f, 1f),

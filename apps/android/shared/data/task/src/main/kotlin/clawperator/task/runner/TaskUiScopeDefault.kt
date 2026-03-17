@@ -676,6 +676,7 @@ class TaskUiScopeDefault(
         }
 
     override suspend fun scrollLoop(
+        target: NodeMatcher?,
         container: NodeMatcher?,
         direction: TaskScrollDirection,
         distanceRatio: Float,
@@ -690,8 +691,21 @@ class TaskUiScopeDefault(
 
         Log.d("$TAG scrollLoop: dir=$direction maxScrolls=$maxScrolls maxDuration=$maxDuration")
 
-        // Resolve container once upfront; fail fast if not found
         val uiTree = currentUiTreeFiltered()
+
+        if (target != null) {
+            val visibleTarget = findNodeByMatcher(target, uiTree)
+            if (visibleTarget != null) {
+                Log.d("$TAG scrollLoop: TARGET_FOUND before scrolling")
+                return TaskScrollLoopResult(
+                    terminationReason = TaskScrollTerminationReason.TargetFound,
+                    scrollsExecuted = 0,
+                    resolvedContainerId = null,
+                )
+            }
+        }
+
+        // Resolve container once upfront; fail fast if not found
         val resolvedContainerId: String?
         try {
             val scrollNode = when (container) {
@@ -776,6 +790,16 @@ class TaskUiScopeDefault(
 
             when (stepResult.outcome) {
                 TaskScrollOutcome.EdgeReached -> {
+                    if (target != null) {
+                        if (findVisibleTargetWithGracePeriod(target, settleDelay) != null) {
+                            Log.d("$TAG scrollLoop: TARGET_FOUND at edge after $scrollsExecuted scrolls")
+                            return TaskScrollLoopResult(
+                                terminationReason = TaskScrollTerminationReason.TargetFound,
+                                scrollsExecuted = scrollsExecuted,
+                                resolvedContainerId = resolvedContainerId,
+                            )
+                        }
+                    }
                     Log.d("$TAG scrollLoop: EDGE_REACHED after $scrollsExecuted scrolls")
                     return TaskScrollLoopResult(
                         terminationReason = TaskScrollTerminationReason.EdgeReached,
@@ -790,6 +814,16 @@ class TaskUiScopeDefault(
                 }
                 TaskScrollOutcome.Moved -> {
                     noMovementCount = 0
+                    if (target != null) {
+                        if (findVisibleTargetWithGracePeriod(target, settleDelay) != null) {
+                            Log.d("$TAG scrollLoop: TARGET_FOUND after $scrollsExecuted scrolls")
+                            return TaskScrollLoopResult(
+                                terminationReason = TaskScrollTerminationReason.TargetFound,
+                                scrollsExecuted = scrollsExecuted,
+                                resolvedContainerId = resolvedContainerId,
+                            )
+                        }
+                    }
                 }
             }
 
@@ -810,6 +844,27 @@ class TaskUiScopeDefault(
             uiTreeInspector.getCurrentUiTree()
                 ?: throw IllegalStateException("UI tree not available")
         return uiTreeFilterer.filterOnScreenOnly(uiTreeRaw)
+    }
+
+    private suspend fun findVisibleTargetWithGracePeriod(
+        target: NodeMatcher,
+        settleDelay: Duration,
+    ): UiNode? {
+        val initialTree = currentUiTreeFiltered()
+        findNodeByMatcher(target, initialTree)?.let { return it }
+
+        val pollDelay =
+            (settleDelay / 2)
+                .coerceAtLeast(100.milliseconds)
+                .coerceAtMost(500.milliseconds)
+
+        repeat(3) {
+            delay(pollDelay)
+            val uiTree = currentUiTreeFiltered()
+            findNodeByMatcher(target, uiTree)?.let { return it }
+        }
+
+        return null
     }
 
     private fun findFirstScrollable(uiTree: UiTree): UiNode? =

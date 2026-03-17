@@ -80,6 +80,7 @@ sealed interface UiAction {
      */
     data class ScrollUntil(
         override val id: String,
+        val target: NodeMatcher? = null,
         val container: NodeMatcher? = null,
         val direction: TaskScrollDirection = TaskScrollDirection.Down,
         val distanceRatio: Float = 0.7f,
