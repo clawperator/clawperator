@@ -1626,7 +1626,7 @@ What this action does not promise:
 Treat `open_uri` as an `ACTION_VIEW` URI launcher, not a general-purpose
 Android intent builder.
 
-**`close_app`:** The Node layer intercepts `close_app` actions and runs `adb shell am force-stop <applicationId>` before dispatching to Android. When that pre-flight close succeeds, the Node layer normalizes the resulting `close_app` step into a successful step result so the envelope reflects the real observed outcome. In practice, treat `close_app` as a supported force-stop action through the Node interface.
+**`close_app`:** The Node layer intercepts `close_app` actions and runs `adb shell am force-stop <applicationId>` before dispatching to Android. When that pre-flight close succeeds, the Node layer normalizes the resulting `close_app` step into a successful step result so the envelope reflects the real observed outcome. If the pre-flight `force-stop` fails, the execution now fails with a structured error instead of pretending the app was closed. In practice, treat `close_app` as a supported force-stop action through the Node interface.
 
 **`click`:** Finds the node matching `matcher` and performs the specified `clickType`. The default click type is `"default"` (standard accessibility click with gesture fallback). Use `"long_click"` for long-press targets and `"focus"` to focus without activating.
 
@@ -6270,6 +6270,8 @@ close-sleep-open sequence:
   searches, or half-completed flows.
 - **How it works today:** The Clawperator Node CLI intercepts `close_app` and
   issues `adb shell am force-stop` before dispatching the execution to Android.
+  If that pre-flight close fails, the execution fails instead of reporting a
+  false successful close.
 - **Why the short sleep:** Android needs a moment to finish process teardown
   before the reopen is reliable.
 - **Why the longer open sleep:** Cold app startup is often the slowest part of
@@ -6826,7 +6828,8 @@ When a step fails but the runtime continues (or fails fast), the `stepResults` e
 `close_app` is executed pre-flight in the Node layer via `adb shell am force-stop`.
 When that force-stop succeeds, the Node layer normalizes the step result to a
 successful `close_app` outcome so the envelope matches what actually happened on
-the device.
+the device. If the pre-flight force-stop fails, the execution fails instead of
+rewriting the step to success.
 
 ```json
 {
@@ -7236,7 +7239,7 @@ For app automation commands, default to:
 | Action type | Key params | Notes |
 | :--- | :--- | :--- |
 | `open_app` | `applicationId: string` | Launches app by package ID |
-| `close_app` | `applicationId: string` | Node runs `adb shell am force-stop` pre-flight and normalizes the step result to success when the close succeeds |
+| `close_app` | `applicationId: string` | Node runs `adb shell am force-stop` pre-flight, normalizes the step result only when that close succeeds, and otherwise returns a structured execution failure |
 | `enter_text` | `matcher: NodeMatcher`, `text: string`, `submit?: boolean`, `clear?: boolean` | CLI: `action type`. `submit: true` presses Enter after typing. `clear` is accepted by Node but currently ignored by Android |
 | `click` | `matcher: NodeMatcher`, `clickType?: "default"\|"long_click"\|"focus"` | CLI: `action click` |
 | `read_text` | `matcher: NodeMatcher`, `validator?: "temperature"`, `retry?: object` | CLI: `action read`. Result in `data.text`. Other validator values are rejected by the runtime |
