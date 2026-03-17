@@ -655,6 +655,18 @@ describe("validateExecution", () => {
     );
   });
 
+  it("rejects wait_for_navigation with blank expectedPackage", () => {
+    assert.throws(
+      () =>
+        validateExecution({
+          commandId: "c", taskId: "t", source: "s",
+          expectedFormat: "android-ui-automator", timeoutMs: 5000,
+          actions: [{ id: "x", type: "wait_for_navigation", params: { expectedPackage: "   ", timeoutMs: 5000 } }],
+        }),
+      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
+    );
+  });
+
   // read_key_value_pair validation tests
   it("accepts read_key_value_pair with labelMatcher", () => {
     const ex = validateExecution({

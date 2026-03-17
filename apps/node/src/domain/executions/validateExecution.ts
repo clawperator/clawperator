@@ -271,7 +271,9 @@ const executionSchema = z.object({
         }
         break;
       case "wait_for_navigation": {
-        if (!params?.expectedPackage && !params?.expectedNode) {
+        const hasExpectedPackage = params?.expectedPackage !== undefined && params.expectedPackage.trim() !== "";
+        const hasExpectedNode = params?.expectedNode !== undefined;
+        if (!hasExpectedPackage && !hasExpectedNode) {
           addIssue(index, "wait_for_navigation requires at least one of params.expectedPackage or params.expectedNode", ["params"]);
         }
         if (typeof params?.timeoutMs !== "number" || params.timeoutMs <= 0) {
