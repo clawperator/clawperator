@@ -100,8 +100,8 @@ If both a physical device and an emulator are connected, you will need to pass `
 
 If multiple devices are connected during install, the installer does not guess
 which device should receive the APK. It leaves the downloaded APK in
-`~/.clawperator/downloads/operator.apk` and prints the manual completion
-command.
+`~/.clawperator/downloads/operator.apk`, completes the host-side CLI setup, and
+prints the manual completion command for each connected device.
 
 ---
 
@@ -122,7 +122,7 @@ clawperator operator setup \
 ```
 
 This is also the recovery command to use after a multi-device installer run
-that intentionally skipped APK installation.
+that completed host setup but intentionally skipped device selection.
 
 For local debug builds, specify the receiver package:
 
