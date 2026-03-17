@@ -434,10 +434,10 @@ body {
     var(--surface);
   color: var(--text);
   text-decoration: none;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  display: grid;
+  grid-template-rows: 3rem auto minmax(3rem, auto);
+  justify-items: center;
+  align-content: center;
   text-align: center;
   gap: 0.95rem;
   box-shadow: 0 18px 40px rgba(100, 72, 37, 0.08);
@@ -480,12 +480,14 @@ body {
   line-height: 1.2;
   font-weight: 700;
   color: var(--text);
+  align-self: end;
 }
 
 .resource-copy {
   font-size: 0.98rem;
   line-height: 1.5;
   color: var(--text-muted);
+  align-self: start;
 }
 
 .hero-image-panel {
