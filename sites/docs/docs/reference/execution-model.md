@@ -138,10 +138,17 @@ Payloads are schema-validated before any device action is dispatched.
 Current behavior:
 
 - invalid payloads fail fast with `EXECUTION_VALIDATION_FAILED`
-- there is no `execute --validate-only` mode today
+- `clawperator execute --execution <json-or-file> --validate-only` validates and
+  normalizes the payload without dispatching to any device
 
-If you want a low-risk contract smoke check on a live device, run a minimal
-payload such as one `snapshot_ui` or `sleep` step.
+Example:
+
+```bash
+clawperator execute --execution /path/to/execution.json --validate-only --output json
+```
+
+Use a live-device smoke payload only when you want to validate both the
+contract and the target environment.
 
 ## Recommended agent loop
 

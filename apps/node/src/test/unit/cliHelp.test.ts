@@ -120,6 +120,12 @@ describe("CLI help", () => {
     assert.doesNotMatch(stdout, /skills compile-artifact/);
   });
 
+  it("shows validate-only in top-level execute help", async () => {
+    const { stdout, code } = await runCli(["--help"]);
+    assert.strictEqual(code, 0);
+    assert.match(stdout, /execute --execution <json-or-file> \[--validate-only\]/);
+  });
+
   it("shows skills sync help instead of top-level help", async () => {
     const { stdout, code } = await runCli(["skills", "sync", "--help"]);
     assert.strictEqual(code, 0);

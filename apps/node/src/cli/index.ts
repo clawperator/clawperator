@@ -23,7 +23,7 @@ Commands:
   provision emulator                        Alias of emulator provision
   packages list [--device-id <id>] [--third-party]
                                             List installed package IDs on a device
-  execute --execution <json-or-file> [--device-id <id>] [--receiver-package <package>]
+  execute --execution <json-or-file> [--validate-only] [--device-id <id>] [--receiver-package <package>]
                                             Execute a validated command payload
   execute best-effort --goal <text> [--device-id <id>] [--receiver-package <package>]
                                             Produce deterministic next-action suggestion from current UI
@@ -438,6 +438,7 @@ async function main(): Promise<void> {
             deviceId: global.deviceId ?? getOpt(rest, "--device-id"),
             receiverPackage: global.receiverPackage ?? getOpt(rest, "--receiver-package"),
             timeoutMs: global.timeoutMs,
+            validateOnly: hasFlag(rest, "--validate-only"),
           });
         }
       }

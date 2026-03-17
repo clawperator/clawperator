@@ -819,9 +819,10 @@ For agent-side recovery strategy, use
 
 ## Validation and current non-features
 
-- There is no `clawperator execute --validate-only` mode today.
 - Payload validation happens automatically at execution time. Invalid payloads
   fail fast with `EXECUTION_VALIDATION_FAILED` before any device action runs.
+- `clawperator execute --execution <json-or-file> --validate-only` validates
+  and normalizes a payload without dispatching it to any device.
 - If you want the lowest-risk contract check on a live device, use a minimal
   payload such as a single `sleep` or `snapshot_ui` action.
 
