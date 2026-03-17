@@ -426,8 +426,10 @@ async function main(): Promise<void> {
   const out = { format: global.output as "json" | "pretty", verbose: global.verbose };
 
   let result: string;
+  let usageParseError = false;
 
-  switch (cmd) {
+  try {
+    switch (cmd) {
     case "operator": {
       const sub = rest[0];
       if (sub === "setup" || sub === "install") {
@@ -777,9 +779,21 @@ async function main(): Promise<void> {
       break;
     default:
       result = JSON.stringify({ code: "USAGE", message: `Unknown command: ${cmd}. Use --help.` });
+    }
+  } catch (error) {
+    if (error instanceof UsageError) {
+      usageParseError = true;
+      result = JSON.stringify({ code: "USAGE", message: error.message });
+    } else {
+      throw error;
+    }
   }
 
   console.log(result);
+  if (usageParseError) {
+    process.exitCode = 1;
+    return;
+  }
   if (result.startsWith("{") && result.includes('"code"') && !result.includes('"envelope"')) {
     const obj = JSON.parse(result) as { code?: string };
     if (obj.code && obj.code !== "USAGE" && obj.code !== "NOT_IMPLEMENTED") {

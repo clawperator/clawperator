@@ -824,6 +824,16 @@ describe("runSkill", () => {
     assert.strictEqual(parsed.message, "timeoutMs must be a finite number");
   });
 
+  it("CLI skills run returns USAGE when local --timeout-ms is missing a value", async () => {
+    const { stdout, code } = await runCli([
+      "skills", "run", "com.test.echo", "--timeout-ms",
+    ]);
+    assert.strictEqual(code, 1, stdout);
+    const parsed = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(parsed.code, "USAGE");
+    assert.strictEqual(parsed.message, "--timeout-ms requires a value");
+  });
+
   it("CLI skills run returns usage when skill_id is missing even with --timeout-ms", async () => {
     const { stdout } = await runCli(["skills", "run", "--timeout-ms", "5000", "--output", "json"]);
     const parsed = JSON.parse(stdout) as { code?: string; message?: string };
