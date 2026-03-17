@@ -29,7 +29,7 @@ Commands:
                                             Produce deterministic next-action suggestion from current UI
   observe snapshot [--device-id <id>] [--receiver-package <package>]
                                             Capture current UI snapshot output
-  observe screenshot [--device-id <id>] [--receiver-package <package>]
+  observe screenshot [--device-id <id>] [--receiver-package <package>] [--path <file>]
                                             Capture current device screenshot (png)
   inspect ui [--device-id <id>] [--receiver-package <package>]
                                             Alias of observe snapshot with formatted output
@@ -139,6 +139,19 @@ Notes:
   - Use --receiver-package com.clawperator.operator.dev for local debug APKs.
   - --timeout-ms overrides the execution timeout within policy limits.
 `,
+  "observe screenshot": `clawperator observe screenshot
+
+Usage:
+  clawperator observe screenshot [--device-id <id>] [--receiver-package <package>] [--path <file>] [--timeout-ms <number>] [--output <json|pretty>] [--verbose]
+
+Notes:
+  - Captures a PNG screenshot via the canonical execution path.
+  - Default receiver package: com.clawperator.operator
+  - Use --receiver-package com.clawperator.operator.dev for local debug APKs.
+  - --path writes the screenshot to the provided local filesystem path.
+  - If --path is omitted, Clawperator writes to a generated temp file and returns that path in the result envelope.
+  - --timeout-ms overrides the execution timeout within policy limits.
+`,
   "skills install": `clawperator skills install
 
 Usage:
@@ -236,6 +249,7 @@ function resolveHelpTopic(rest: string[]): string | undefined {
   if (rest[0] === "operator" && (rest.length === 1 || rest[1] === "--help")) return "operator setup";
   if (rest[0] === "setup" || rest[0] === "install") return "operator setup";
   if (rest[0] === "observe" && rest[1] === "snapshot") return "observe snapshot";
+  if (rest[0] === "observe" && rest[1] === "screenshot") return "observe screenshot";
   if (rest[0] === "inspect" && rest[1] === "ui") return "observe snapshot";
   if (rest[0] === "skills" && rest[1] === "install") return "skills install";
   if (rest[0] === "skills" && rest[1] === "sync") return "skills sync";
@@ -457,6 +471,7 @@ async function main(): Promise<void> {
           deviceId: global.deviceId ?? getOpt(rest, "--device-id"),
           receiverPackage: global.receiverPackage ?? getOpt(rest, "--receiver-package"),
           timeoutMs: global.timeoutMs,
+          path: getOpt(rest, "--path"),
         });
       } else {
         result = JSON.stringify({ code: "USAGE", message: "observe snapshot|screenshot [options]" });

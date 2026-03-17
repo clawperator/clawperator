@@ -5,7 +5,7 @@ import type { RunExecutionOptions } from "../executions/runExecution.js";
 /**
  * Build execution that runs a single take_screenshot and run it.
  */
-export function buildScreenshotExecution(options?: { timeoutMs?: number }): Execution {
+export function buildScreenshotExecution(options?: { timeoutMs?: number; path?: string }): Execution {
   const commandId = `screenshot-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
   return {
     commandId,
@@ -17,13 +17,18 @@ export function buildScreenshotExecution(options?: { timeoutMs?: number }): Exec
       {
         id: "snap",
         type: "take_screenshot",
-        params: {},
+        params: options?.path ? { path: options.path } : {},
       },
     ],
   };
 }
 
-export async function observeScreenshot(runOptions?: RunExecutionOptions) {
-  const execution = buildScreenshotExecution();
-  return runExecution(execution, runOptions);
+export async function observeScreenshot(
+  options?: RunExecutionOptions & { path?: string }
+) {
+  const execution = buildScreenshotExecution({
+    timeoutMs: options?.timeoutMs,
+    path: options?.path,
+  });
+  return runExecution(execution, options);
 }

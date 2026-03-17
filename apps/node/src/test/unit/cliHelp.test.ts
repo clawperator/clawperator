@@ -120,6 +120,14 @@ describe("CLI help", () => {
     assert.doesNotMatch(stdout, /skills compile-artifact/);
   });
 
+  it("shows observe screenshot help with path option", async () => {
+    const { stdout, code } = await runCli(["observe", "screenshot", "--help"]);
+    assert.strictEqual(code, 0);
+    assert.match(stdout, /clawperator observe screenshot/);
+    assert.match(stdout, /--path <file>/);
+    assert.doesNotMatch(stdout, /skills compile-artifact/);
+  });
+
   it("shows validate-only in top-level execute help", async () => {
     const { stdout, code } = await runCli(["--help"]);
     assert.strictEqual(code, 0);

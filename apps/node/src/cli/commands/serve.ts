@@ -183,7 +183,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       return;
     }
 
-    const { deviceId, receiverPackage } = req.body;
+    const { deviceId, receiverPackage, path } = req.body;
 
     if (deviceId !== undefined && typeof deviceId !== "string") {
       res.status(400).json({ ok: false, error: { code: "INVALID_DEVICE_ID", message: "'deviceId' must be a string" } });
@@ -195,6 +195,11 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       return;
     }
 
+    if (path !== undefined && typeof path !== "string") {
+      res.status(400).json({ ok: false, error: { code: "INVALID_PATH", message: "'path' must be a string" } });
+      return;
+    }
+
     const ts = Date.now();
     const executionInput = {
       commandId: `serve-shot-${ts}`,
@@ -202,7 +207,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       source: "serve-api",
       expectedFormat: "android-ui-automator",
       timeoutMs: 30000,
-      actions: [{ id: "shot", type: "take_screenshot" }],
+      actions: [{ id: "shot", type: "take_screenshot", params: path ? { path } : {} }],
     };
 
     try {

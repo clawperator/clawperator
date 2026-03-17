@@ -170,6 +170,19 @@ describe("serve API integration", () => {
     assert.ok(body.error.code !== undefined);
   });
 
+  test("POST /observe/screenshot rejects non-string path", async () => {
+    const res = await fetch(`http://localhost:${port}/observe/screenshot`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: 123 }),
+    });
+
+    assert.strictEqual(res.status, 400);
+    const body = await res.json() as { ok: boolean; error: { code: string } };
+    assert.strictEqual(body.ok, false);
+    assert.strictEqual(body.error.code, "INVALID_PATH");
+  });
+
   test("POST /skills/:skillId/run preserves partial output on failure", async () => {
     const res = await fetch(`http://localhost:${port}/skills/com.test.fail/run`, {
       method: "POST",

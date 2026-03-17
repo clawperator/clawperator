@@ -36,6 +36,11 @@ describe("observe executions", () => {
     assert.strictEqual(execution.timeoutMs, 7000);
   });
 
+  it("passes through explicit screenshot output path", () => {
+    const execution = buildScreenshotExecution({ path: "/tmp/example.png" });
+    assert.deepStrictEqual(execution.actions[0]?.params, { path: "/tmp/example.png" });
+  });
+
   it("uses the centralized execution validation code for invalid timeout overrides", async () => {
     const result = await runExecution(buildSnapshotExecution(), { timeoutMs: Number.NaN });
     assert.ok(!result.ok);
