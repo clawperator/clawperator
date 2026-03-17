@@ -49,6 +49,33 @@ const workflowCards = [
   }
 ];
 
+const resourceCards = [
+  {
+    title: "Discord",
+    body: "Join the community",
+    icon: "discord",
+    disabled: true
+  },
+  {
+    title: "Documentation",
+    body: "Learn the ropes",
+    href: "https://docs.clawperator.com",
+    icon: "docs"
+  },
+  {
+    title: "GitHub",
+    body: "View the source",
+    href: "https://github.com/clawperator",
+    icon: "github"
+  },
+  {
+    title: "Skills",
+    body: "Browse the skills section",
+    href: "#skills",
+    icon: "skills"
+  }
+];
+
 const faqs = [
   {
     question: "Can I use this if I have an iPhone?",
@@ -98,6 +125,57 @@ export default function Home() {
   const emulatorCopyTimeoutRef = useRef(null);
   const toggleMobileMenu = () => setMobileMenuOpen((open) => !open);
   const closeMobileMenu = () => setMobileMenuOpen(false);
+  const renderResourceIcon = (icon) => {
+    switch (icon) {
+      case "discord":
+        return (
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M18.2 6.8a14 14 0 0 0-3.5-1.1l-.2.4a10.7 10.7 0 0 1 3.1 1.5 11.9 11.9 0 0 0-3.8-1.2 13.5 13.5 0 0 0-4 0A11.8 11.8 0 0 0 6 7.6a10.7 10.7 0 0 1 3.1-1.5l-.2-.4a14 14 0 0 0-3.5 1.1C3.2 10 2.6 13 2.8 15.9a14.2 14.2 0 0 0 4.3 2.2l.9-1.5a9.2 9.2 0 0 1-1.4-.7l.4-.3c2.6 1.2 5.4 1.2 7.9 0l.4.3c-.5.3-1 .5-1.4.7l.9 1.5a14.2 14.2 0 0 0 4.3-2.2c.3-3.3-.6-6.2-2-9.1ZM9.5 14.1c-.8 0-1.5-.8-1.5-1.7s.6-1.7 1.5-1.7 1.5.8 1.5 1.7-.7 1.7-1.5 1.7Zm5 0c-.8 0-1.5-.8-1.5-1.7s.6-1.7 1.5-1.7 1.5.8 1.5 1.7-.7 1.7-1.5 1.7Z"
+              fill="currentColor"
+            />
+          </svg>
+        );
+      case "docs":
+        return (
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M7 4.5h7.5L18 8v11.5a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1v-14a1 1 0 0 1 1-1Z"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinejoin="round"
+            />
+            <path d="M14.5 4.5V8H18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+            <path d="M9 11h6M9 14h6M9 17h4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+          </svg>
+        );
+      case "github":
+        return (
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M12 2.5a9.5 9.5 0 0 0-3 18.5c.5.1.7-.2.7-.5v-1.8c-2.9.6-3.5-1.2-3.5-1.2-.4-1-.9-1.3-.9-1.3-.8-.5.1-.5.1-.5.9.1 1.4.9 1.4.9.8 1.4 2.1 1 2.6.8.1-.6.3-1 .6-1.3-2.3-.3-4.7-1.2-4.7-5.1 0-1.1.4-2.1 1-2.8-.1-.3-.4-1.4.1-2.9 0 0 .8-.3 3 .9a10 10 0 0 1 5.4 0c2.2-1.2 3-.9 3-.9.5 1.5.2 2.6.1 2.9.7.8 1 1.7 1 2.8 0 4-2.4 4.8-4.8 5.1.4.3.7.9.7 1.9v2.8c0 .3.2.6.7.5A9.5 9.5 0 0 0 12 2.5Z"
+              fill="currentColor"
+            />
+          </svg>
+        );
+      case "skills":
+        return (
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M12 3.5 4.5 7.3v5.4c0 4.3 3 7.3 7.5 7.8 4.5-.5 7.5-3.5 7.5-7.8V7.3L12 3.5Z"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinejoin="round"
+            />
+            <path d="m9.5 12 1.5 1.5 3.5-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        );
+      default:
+        return null;
+    }
+  };
 
   const copyToClipboard = async (text, setCopiedState, timeoutRef) => {
     const fallbackCopy = () => {
@@ -343,7 +421,33 @@ export default function Home() {
             Don&apos;t have an Android device? No problem. Clawperator can create a Google Play-equipped Android emulator for you.
           </p>
 
+          <div className="resource-grid" aria-label="Primary resources">
+            {resourceCards.map((card) => {
+              const classes = card.disabled ? "resource-card disabled" : "resource-card";
+              const content = (
+                <>
+                  <span className="resource-icon">{renderResourceIcon(card.icon)}</span>
+                  <span className="resource-title">{card.title}</span>
+                  <span className="resource-copy">{card.body}</span>
+                </>
+              );
+
+              if (card.disabled) {
+                return (
+                  <div key={card.title} className={classes} aria-disabled="true">
+                    {content}
+                  </div>
+                );
+              }
+
+              return (
+                <a key={card.title} href={card.href} className={classes} target={card.href.startsWith("http") ? "_blank" : undefined} rel={card.href.startsWith("http") ? "noreferrer" : undefined}>
+                  {content}
+                </a>
+              );
+            })}
           </div>
+        </div>
 
       <section id="workflows" className="content-section">
         <h2>What you can do with Clawperator</h2>
@@ -722,7 +826,10 @@ if <hvac_state> == "Off":
               docs
             </a>
             <a href="https://github.com/clawperator/clawperator" target="_blank" rel="noreferrer">
-              github
+              repo
+            </a>
+            <a href="https://github.com/clawperator/clawperator-skills" target="_blank" rel="noreferrer">
+              skills
             </a>
             <a href="https://www.npmjs.com/package/clawperator" target="_blank" rel="noreferrer">
               npm
