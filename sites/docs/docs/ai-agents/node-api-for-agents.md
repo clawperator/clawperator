@@ -234,7 +234,7 @@ Combine fields to increase specificity when a single field is ambiguous:
 | `close_app` | `applicationId: string` | - |
 | `click` | `matcher: NodeMatcher` | `clickType: "default" \| "long_click" \| "focus"` (default: `"default"`) |
 | `enter_text` | `matcher: NodeMatcher`, `text: string` | `submit: boolean` (default: `false`), `clear: boolean` (accepted by Node contract, currently ignored by Android runtime) |
-| `read_text` | `matcher: NodeMatcher` | `validator: "temperature"` (only supported validator today), `retry: object` |
+| `read_text` | `matcher: NodeMatcher` | `validator: "temperature" \| "version" \| "regex"`, `validatorPattern: string` (required when `validator` is `"regex"`), `retry: object` |
 | `wait_for_node` | `matcher: NodeMatcher` | `retry: object` - controls polling attempts and backoff delays (see `retry` object shape below). There is no per-action `timeoutMs`; the outer execution `timeoutMs` is the only wall-clock limit. |
 | `snapshot_ui` | - | `retry: object` |
 | `take_screenshot` | - | `path: string`, `retry: object` |
@@ -243,6 +243,8 @@ Combine fields to increase specificity when a single field is ambiguous:
 | `scroll` | - | `container: NodeMatcher` (default: auto-detect first scrollable), `direction: "down" \| "up" \| "left" \| "right"` (default: `"down"` - reveals content further down, finger swipes up), `distanceRatio: number` (default: `0.7`, range: 0-1), `settleDelayMs: number` (default: `250`, range: 0-10000), `findFirstScrollableChild: boolean` (default: `true`), `retry: object` (default: no retry - see scroll behavior note) |
 | `scroll_until` | - | `target: NodeMatcher` (optional, emits `TARGET_FOUND` when the target becomes visible), `container: NodeMatcher` (default: auto-detect), `clickType: "default" \| "long_click" \| "focus"` (used only when `clickAfter: true`), `clickAfter: boolean` (default: `false`, requires `target`), `direction: "down" \| "up" \| "left" \| "right"` (default: `"down"`), `distanceRatio: number` (default: `0.7`, range: 0-1), `settleDelayMs: number` (default: `250`, range: 0-10000), `maxScrolls: number` (default: `20`, range: 1-200), `maxDurationMs: number` (default: `10000`, range: 0-120000), `noPositionChangeThreshold: number` (default: `3`, range: 1-20), `findFirstScrollableChild: boolean` (default: `true`) |
 | `press_key` | `key: "back" \| "home" \| "recents"` | - |
+| `wait_for_navigation` | `timeoutMs: number` | `expectedPackage: string`, `expectedNode: NodeMatcher` - at least one of `expectedPackage` or `expectedNode` is required |
+| `read_key_value_pair` | `labelMatcher: NodeMatcher` | - |
 
 ### CLI-to-action-type mapping
 
@@ -367,7 +369,19 @@ Android intent builder.
 }
 ```
 
-**`read_text`:** `validator` is not an open-ended string in practice. The Android runtime currently supports only `"temperature"` and rejects any other value.
+**`read_text`:** Validates extracted text using optional validators.
+
+Supported validators:
+
+| Validator | Pattern | Example valid text |
+| :--- | :--- | :--- |
+| `temperature` | Parsed as temperature value | `"20.7°C"`, `"25°C"`, `"75°F"`, `"23.7"` |
+| `version` | `/^\d+(\.\d+)*$/` | `"16"`, `"14.1.2"`, `"1.0.0.0"` |
+| `regex` | Custom pattern via `validatorPattern` | Depends on pattern |
+
+For `regex` validator, `validatorPattern` is required and must be a valid regex pattern. Invalid patterns are rejected at parse time with `EXECUTION_VALIDATION_FAILED`.
+
+On validator mismatch, the step returns `success: false` with `data.error: "VALIDATOR_MISMATCH"` and `data.raw_text` containing the extracted value.
 
 **`read_text` example request (`/execute`):**
 ```json
@@ -402,6 +416,21 @@ Android intent builder.
   "deviceId": "<device_id>",
   "terminalSource": "clawperator_result"
 }
+```
+
+**`read_text` with version validator example:**
+```json
+{ "id": "version_check", "type": "read_text", "params": { "matcher": { "textContains": "Android version" }, "validator": "version" } }
+```
+
+**`read_text` with regex validator example:**
+```json
+{ "id": "regex_check", "type": "read_text", "params": { "matcher": { "resourceId": "com.example:id/order_id" }, "validator": "regex", "validatorPattern": "^ORD-[0-9]{6}$" } }
+```
+
+**`read_text` validator mismatch response:**
+```json
+{ "id": "version_check", "actionType": "read_text", "success": false, "data": { "error": "VALIDATOR_MISMATCH", "raw_text": "Settings" } }
 ```
 
 **`snapshot_ui`:** Clawperator returns a single canonical snapshot format: `hierarchy_xml`. The Android runtime writes the hierarchy dump to device logcat, and the Node layer injects that raw XML into `data.text` after execution. `data.actual_format` is always `"hierarchy_xml"` for successful snapshot steps.
@@ -529,6 +558,61 @@ unusable, and `window_count > 1` alone is normal on some Android builds.
 }
 ```
 
+**`wait_for_navigation`:** Polls until the expected package or node is detected, or the timeout is reached. Use this after a click that triggers a screen transition to confirm navigation completed without using a fixed sleep.
+
+Requires at least one of:
+- `expectedPackage: string` - polls until `foreground_package` matches this value
+- `expectedNode: NodeMatcher` - polls until this node is present in the UI tree
+
+Polls at ~200ms intervals. Returns `success: true` with `data.resolved_package` and `data.elapsed_ms` on success. Returns `success: false` with `data.error: "NAVIGATION_TIMEOUT"` and `data.last_package` on timeout.
+
+**Before (using sleep):**
+```json
+[
+  { "id": "click", "type": "click", "params": { "matcher": { "textContains": "About phone" } } },
+  { "id": "sleep", "type": "sleep", "params": { "durationMs": 1500 } },
+  { "id": "snap", "type": "snapshot_ui" }
+]
+```
+
+**After (using wait_for_navigation):**
+```json
+[
+  { "id": "click", "type": "click", "params": { "matcher": { "textContains": "About phone" } } },
+  { "id": "wait", "type": "wait_for_navigation", "params": { "expectedPackage": "com.android.settings", "timeoutMs": 5000 } }
+]
+```
+
+**`wait_for_navigation` success response:**
+```json
+{ "id": "wait", "actionType": "wait_for_navigation", "success": true, "data": { "resolved_package": "com.android.settings", "elapsed_ms": "245" } }
+```
+
+**`wait_for_navigation` timeout response:**
+```json
+{ "id": "wait", "actionType": "wait_for_navigation", "success": false, "data": { "error": "NAVIGATION_TIMEOUT", "last_package": "com.example.app" } }
+```
+
+**`read_key_value_pair`:** Reads a Settings-style label and its adjacent value. Finds the node matching `labelMatcher`, then searches for the nearest sibling with a `/summary` resource ID suffix and non-empty text.
+
+Returns `success: true` with `data.label` and `data.value` on success.
+
+Error codes:
+- `NODE_NOT_FOUND` - the label node matching `labelMatcher` was not found
+- `VALUE_NODE_NOT_FOUND` - the label was found but no adjacent summary value node was detected
+
+**Limitation:** The sibling traversal only searches nodes that appear *after* the label in the parent's children list. If a value node appears before its label in the hierarchy, it will not be found. This matches Samsung Settings layout but may not work for all OEM layouts.
+
+**`read_key_value_pair` example request:**
+```json
+{ "id": "read_version", "type": "read_key_value_pair", "params": { "labelMatcher": { "textEquals": "Android version" } } }
+```
+
+**`read_key_value_pair` success response:**
+```json
+{ "id": "read_version", "actionType": "read_key_value_pair", "success": true, "data": { "label": "Android version", "value": "16" } }
+```
+
 **`scroll_and_click`:** This action has two separate retry knobs. `scrollRetry` controls the scroll/search loop and defaults to the `UiScroll` preset (`maxAttempts=4`, `initialDelayMs=400`, `maxDelayMs=2000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`). `clickRetry` controls the final click attempt and defaults to the `UiReadiness` preset (`maxAttempts=5`, `initialDelayMs=500`, `maxDelayMs=3000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`).
 
 **`clickAfter` flag:** When `clickAfter: false`, the action scrolls until the target is visible but does not click it. This is useful when you need to bring an element into view before a separate `snapshot_ui` or `read_text` action, or when you want to confirm presence before committing a click.
@@ -603,6 +687,7 @@ snapshot to verify" round-trip for many navigation tasks.
 If `clickAfter: true`, `scroll_until` clicks the target immediately after it
 becomes visible. This gives agents a one-step "scroll top-level list until
 visible, then click" path without switching to `scroll_and_click`.
+*Note on `clickAfter` firing:* The click only fires if the loop terminates with `TARGET_FOUND`.
 
 **Termination reasons (`data.termination_reason`):**
 - `TARGET_FOUND` - the provided `target` matcher became visible in the current UI tree. `success: true`.
@@ -612,6 +697,7 @@ visible, then click" path without switching to `scroll_and_click`.
 - `NO_POSITION_CHANGE` - no content movement across `noPositionChangeThreshold` consecutive scrolls. `success: true`.
 - `CONTAINER_NOT_FOUND` - container resolution failed. `success: false`.
 - `CONTAINER_NOT_SCROLLABLE` - container is not scrollable. `success: false`.
+- `CONTAINER_LOST` - container disappeared mid-loop (e.g., app navigated away). `success: false`.
 
 `MAX_SCROLLS_REACHED`, `MAX_DURATION_REACHED`, and `NO_POSITION_CHANGE` are clean terminal states, not errors. Agents scrolling infinite feeds should expect these and handle them without treating the action as failed.
 
@@ -619,7 +705,6 @@ When no `target` matcher is provided, `scroll_until` behaves as a pure bounded
 pagination loop and returns one of the non-target terminal reasons above.
 
 **Current runtime caveats:**
-- If the resolved container disappears mid-loop because the app navigated away or rebuilt the view tree unexpectedly, the current Android runtime can collapse that case into `EDGE_REACHED`.
 - Some Android screens expose off-screen descendants in the raw `snapshot_ui` XML. `scroll_until.target` does not use raw XML presence alone; it checks Clawperator's on-screen filtered tree. On heavily clipped or nested layouts, a target may appear in the raw snapshot near the bottom edge but still finish as `EDGE_REACHED` until it is more fully on-screen.
 
 When a scroll loop might trigger navigation, heavy UI re-layout, or clipped list rows near the viewport edge, follow it with `snapshot_ui` or `wait_for_node` before assuming the list truly ended.
@@ -752,6 +837,8 @@ Typical `data` keys by action type:
 | `scroll_until` | `termination_reason` (see behavior note), `scrolls_executed`, `direction`, `click_after`, `click_types`, `resolved_container` (when present) |
 | `sleep` | `duration_ms` |
 | `press_key` | `key` (`"back"`, `"home"`, or `"recents"`) |
+| `wait_for_navigation` | `resolved_package` (on success), `elapsed_ms` (on success), `error`, `last_package` (on timeout) |
+| `read_key_value_pair` | `label`, `value` (on success), `error` (on failure: `NODE_NOT_FOUND` or `VALUE_NODE_NOT_FOUND`) |
 
 For any failed step: `success: false` and `data.error` contains the error code string.
 
