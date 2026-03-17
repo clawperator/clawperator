@@ -1283,7 +1283,7 @@ body {
 
 .site-footer {
   min-height: 180px;
-  max-width: 560px;
+  width: 100%;
   margin-top: 6rem;
   border-top: 1px solid var(--border);
   padding: 3rem 0 3.4rem;
@@ -1308,6 +1308,7 @@ body {
   color: var(--text-muted);
   font-size: 0.96rem;
   line-height: 1.6;
+  max-width: 560px;
 }
 
 .footer-links {
@@ -1345,6 +1346,7 @@ body {
   opacity: 0.9;
   font-size: 0.88rem;
   line-height: 1.6;
+  max-width: 560px;
 }
 
 .footer-tagline a {
@@ -1364,6 +1366,7 @@ body {
   opacity: 0.72;
   font-size: 0.78rem;
   line-height: 1.4;
+  max-width: 560px;
 }
 
 @keyframes rise {
