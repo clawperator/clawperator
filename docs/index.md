@@ -20,10 +20,13 @@ Use this page as a technical map:
 
 - [Agent Quickstart](ai-agents/agent-quickstart.md) - Fastest path from first install to first successful execution
 - [Node API - Agent Guide](ai-agents/node-api-for-agents.md) - Canonical CLI and HTTP API contract for agent builders
+- [Execution Model](reference/execution-model.md) - Required payload fields, status vs step success, timeout, and error surfaces
+- [Device and Package Model](reference/device-and-package-model.md) - What `deviceId` and `receiverPackage` mean in practice
 - [Clawperator Snapshot Format](reference/snapshot-format.md) - Canonical `snapshot_ui` and `observe snapshot` output contract
 - [Operator LLM Playbook](design/operator-llm-playbook.md) - Practical operating rules for observation, action loops, and skill execution
 - [API Overview](reference/api-overview.md) - Execution payload, action types, result envelope shape, and snapshot semantics
 - [CLI Reference](reference/cli-reference.md) - Command-line entrypoints and flags
+- [Environment Variables](reference/environment-variables.md) - Central reference for installer and runtime env vars
 
 ### Start here if you are preparing runtime infrastructure
 
@@ -45,6 +48,8 @@ Use this page as a technical map:
 
 - [Agent Quickstart](ai-agents/agent-quickstart.md) - Fastest path for a cold-start agent
 - [Node API - Agent Guide](ai-agents/node-api-for-agents.md) - Canonical CLI and HTTP API reference for agents
+- [Execution Model](reference/execution-model.md) - Envelope semantics, timeout policy, and validation behavior
+- [Device and Package Model](reference/device-and-package-model.md) - Device IDs, receiver packages, and multi-device rules
 - [Clawperator Snapshot Format](reference/snapshot-format.md) - Canonical snapshot output and parsing contract
 - [Operator LLM Playbook](design/operator-llm-playbook.md) - Action contracts, runtime conventions, and skill packaging
 - [API Overview](reference/api-overview.md) - Execution payload, action types, result envelopes, and snapshot delivery
@@ -54,9 +59,12 @@ Use this page as a technical map:
 
 - [CLI Reference](reference/cli-reference.md) - Command-line usage and flags
 - [API Overview](reference/api-overview.md) - Execution payload, action types, result envelopes, and snapshot semantics
+- [Execution Model](reference/execution-model.md) - Required execution fields, status semantics, and timeout behavior
+- [Device and Package Model](reference/device-and-package-model.md) - Device targeting, package targeting, and multi-device behavior
 - [Clawperator Snapshot Format](reference/snapshot-format.md) - Canonical `hierarchy_xml` contract and parsing guidance
 - [Error Codes](reference/error-codes.md) - Structured runtime and API error code reference
 - [Doctor](reference/node-api-doctor.md) - Runtime readiness checks, exit behavior, and JSON report shape
+- [Environment Variables](reference/environment-variables.md) - Central reference for supported installer and runtime variables
 
 ## Architecture
 

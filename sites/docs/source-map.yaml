@@ -110,6 +110,16 @@ sections:
           - docs/node-api-for-agents.md
           - apps/node/src/contracts
         notes: Keep narrative short. Reference code-derived details instead of duplicating them.
+      - output: reference/execution-model.md
+        title: Clawperator Execution Model
+        mode: copy
+        sources:
+          - docs/reference/execution-model.md
+      - output: reference/device-and-package-model.md
+        title: Device and Package Model
+        mode: copy
+        sources:
+          - docs/reference/device-and-package-model.md
       - output: reference/snapshot-format.md
         title: Clawperator Snapshot Format
         mode: copy
@@ -120,6 +130,11 @@ sections:
         mode: copy
         sources:
           - docs/reference/node-api-doctor.md
+      - output: reference/environment-variables.md
+        title: Environment Variables
+        mode: copy
+        sources:
+          - docs/reference/environment-variables.md
 
   - id: troubleshooting
     title: Troubleshooting

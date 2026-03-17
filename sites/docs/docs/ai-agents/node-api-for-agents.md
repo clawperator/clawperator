@@ -757,6 +757,16 @@ canonical source for:
 - real-device annotated examples
 - parsing guidance for agents
 
+## Execution Model
+
+Use [Clawperator Execution Model](../reference/execution-model.md) for the
+canonical explanation of:
+
+- required execution payload fields
+- `status` vs `stepResults[].success`
+- timeout policy and single-flight behavior
+- stable error-code surfaces
+
 ## Error Codes
 
 Branch agent logic on codes from `envelope.errorCode` (top-level Android result envelopes), `error.code` (Node API / CLI structured errors), or `stepResults[].data.error` (per-step failures). The `envelope.error` field contains a human-readable description and is not a stable contract.
@@ -817,6 +827,12 @@ Primary top-level error taxonomy: `apps/node/src/contracts/errors.ts`. This tabl
 Skills are packaged Android automation scripts distributed via the public GitHub repository at `https://github.com/clawperator/clawperator-skills`. The Node API provides discovery and metadata - skills are standalone and can be invoked directly by agents without the Node API.
 
 ## Environment Variables and Device Targeting
+
+Use these dedicated references when you need the focused contract instead of
+the summary below:
+
+- [Device and Package Model](../reference/device-and-package-model.md)
+- [Environment Variables](../reference/environment-variables.md)
 
 The most important environment variables surfaced by the current CLI and
 installer are:

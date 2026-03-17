@@ -28,10 +28,13 @@ Use this page as a technical map:
 
 - [Agent Quickstart](ai-agents/agent-quickstart.md) - Fastest path from first install to first successful execution
 - [Node API - Agent Guide](ai-agents/node-api-for-agents.md) - Canonical CLI and HTTP API contract for agent builders
+- [Execution Model](reference/execution-model.md) - Required payload fields, status vs step success, timeout, and error surfaces
+- [Device and Package Model](reference/device-and-package-model.md) - What `deviceId` and `receiverPackage` mean in practice
 - [Clawperator Snapshot Format](reference/snapshot-format.md) - Canonical `snapshot_ui` and `observe snapshot` output contract
 - [Operator LLM Playbook](design/operator-llm-playbook.md) - Practical operating rules for observation, action loops, and skill execution
 - [API Overview](reference/api-overview.md) - Execution payload, action types, result envelope shape, and snapshot semantics
 - [CLI Reference](reference/cli-reference.md) - Command-line entrypoints and flags
+- [Environment Variables](reference/environment-variables.md) - Central reference for installer and runtime env vars
 
 ### Start here if you are preparing runtime infrastructure
 
@@ -53,6 +56,8 @@ Use this page as a technical map:
 
 - [Agent Quickstart](ai-agents/agent-quickstart.md) - Fastest path for a cold-start agent
 - [Node API - Agent Guide](ai-agents/node-api-for-agents.md) - Canonical CLI and HTTP API reference for agents
+- [Execution Model](reference/execution-model.md) - Envelope semantics, timeout policy, and validation behavior
+- [Device and Package Model](reference/device-and-package-model.md) - Device IDs, receiver packages, and multi-device rules
 - [Clawperator Snapshot Format](reference/snapshot-format.md) - Canonical snapshot output and parsing contract
 - [Operator LLM Playbook](design/operator-llm-playbook.md) - Action contracts, runtime conventions, and skill packaging
 - [API Overview](reference/api-overview.md) - Execution payload, action types, result envelopes, and snapshot delivery
@@ -62,9 +67,12 @@ Use this page as a technical map:
 
 - [CLI Reference](reference/cli-reference.md) - Command-line usage and flags
 - [API Overview](reference/api-overview.md) - Execution payload, action types, result envelopes, and snapshot semantics
+- [Execution Model](reference/execution-model.md) - Required execution fields, status semantics, and timeout behavior
+- [Device and Package Model](reference/device-and-package-model.md) - Device targeting, package targeting, and multi-device behavior
 - [Clawperator Snapshot Format](reference/snapshot-format.md) - Canonical `hierarchy_xml` contract and parsing guidance
 - [Error Codes](reference/error-codes.md) - Structured runtime and API error code reference
 - [Doctor](reference/node-api-doctor.md) - Runtime readiness checks, exit behavior, and JSON report shape
+- [Environment Variables](reference/environment-variables.md) - Central reference for supported installer and runtime variables
 
 ## Architecture
 
@@ -1285,6 +1293,8 @@ only after the UI path is already known.
 ## What to read next
 
 - [Clawperator Snapshot Format](../reference/snapshot-format.md)
+- [Execution Model](../reference/execution-model.md)
+- [Device and Package Model](../reference/device-and-package-model.md)
 - [Clawperator Node API - Agent Guide](node-api-for-agents.md)
 - [API Overview](../reference/api-overview.md)
 - [CLI Reference](../reference/cli-reference.md)
@@ -2051,6 +2061,16 @@ canonical source for:
 - real-device annotated examples
 - parsing guidance for agents
 
+## Execution Model
+
+Use [Clawperator Execution Model](../reference/execution-model.md) for the
+canonical explanation of:
+
+- required execution payload fields
+- `status` vs `stepResults[].success`
+- timeout policy and single-flight behavior
+- stable error-code surfaces
+
 ## Error Codes
 
 Branch agent logic on codes from `envelope.errorCode` (top-level Android result envelopes), `error.code` (Node API / CLI structured errors), or `stepResults[].data.error` (per-step failures). The `envelope.error` field contains a human-readable description and is not a stable contract.
@@ -2111,6 +2131,12 @@ Primary top-level error taxonomy: `apps/node/src/contracts/errors.ts`. This tabl
 Skills are packaged Android automation scripts distributed via the public GitHub repository at `https://github.com/clawperator/clawperator-skills`. The Node API provides discovery and metadata - skills are standalone and can be invoked directly by agents without the Node API.
 
 ## Environment Variables and Device Targeting
+
+Use these dedicated references when you need the focused contract instead of
+the summary below:
+
+- [Device and Package Model](../reference/device-and-package-model.md)
+- [Environment Variables](../reference/environment-variables.md)
 
 The most important environment variables surfaced by the current CLI and
 installer are:
@@ -3474,6 +3500,311 @@ Server-Sent Events stream. Emits two event types:
 ---
 
 
+# Clawperator Execution Model
+
+This page explains how to read and construct Clawperator executions without
+guessing from validation errors.
+
+Use it when you need to understand:
+
+- what fields are required in an execution payload
+- how `envelope.status` differs from `stepResults[].success`
+- where to branch on error codes
+- how timeout and single-flight behavior affect agent loops
+
+## Required execution fields
+
+Every execution payload must include:
+
+| Field | Type | Meaning |
+| :--- | :--- | :--- |
+| `commandId` | string | Correlation ID for the whole execution. Must remain stable end to end. |
+| `taskId` | string | Task-level correlation ID. Often matches a larger agent task or subtask. |
+| `source` | string | Caller identifier such as the agent, skill, or workflow name. |
+| `expectedFormat` | string | Must be `"android-ui-automator"` today. |
+| `timeoutMs` | number | Execution-wide timeout budget in milliseconds. |
+| `actions` | array | Ordered list of action steps to run. |
+
+Minimal example:
+
+```json
+{
+  "commandId": "quickstart-001",
+  "taskId": "quickstart-001",
+  "source": "my-agent",
+  "expectedFormat": "android-ui-automator",
+  "timeoutMs": 15000,
+  "actions": [
+    { "id": "snap1", "type": "snapshot_ui" }
+  ]
+}
+```
+
+## Result envelope model
+
+Clawperator returns one terminal result envelope per execution.
+
+Successful example shape:
+
+```json
+{
+  "ok": true,
+  "envelope": {
+    "commandId": "quickstart-001",
+    "taskId": "quickstart-001",
+    "status": "success",
+    "stepResults": [
+      {
+        "id": "snap1",
+        "actionType": "snapshot_ui",
+        "success": true,
+        "data": {
+          "actual_format": "hierarchy_xml",
+          "text": "<hierarchy ... />"
+        }
+      }
+    ],
+    "error": null
+  },
+  "deviceId": "<device_id>",
+  "terminalSource": "clawperator_result"
+}
+```
+
+## `status` vs `stepResults[].success`
+
+These mean different things and agents must check both.
+
+| Field | What it means |
+| :--- | :--- |
+| `envelope.status = "success"` | The execution completed and returned a terminal result envelope. |
+| `envelope.status = "failed"` | The execution failed as a whole, for example dispatch failure, timeout, or another top-level runtime failure. |
+| `stepResults[n].success = true` | That individual step succeeded. |
+| `stepResults[n].success = false` | That individual step failed, even if the overall execution still completed. |
+
+Important consequences:
+
+- A step can fail while the overall execution still has `status: "success"`.
+- Top-level failures usually return no useful later steps because the runtime
+  could not continue cleanly.
+- A reliable agent loop checks `envelope.status` first, then inspects each step.
+
+## Error surfaces
+
+Clawperator exposes stable codes from more than one place:
+
+| Location | Typical use |
+| :--- | :--- |
+| `error.code` | Node CLI or API structured errors such as validation, device resolution, or timeout failures |
+| `envelope.errorCode` | Android-side top-level envelope failures when present |
+| `stepResults[n].data.error` | Per-step runtime failures such as `NODE_NOT_FOUND` |
+
+Do not branch on `envelope.error` text alone. That text is descriptive, not the
+stable machine contract.
+
+## Timeout semantics
+
+`timeoutMs` is an execution-wide budget, not a per-step budget.
+
+Current validation policy:
+
+- minimum: `1000`
+- maximum: `120000`
+
+Practical guidance:
+
+- simple one-step observe or click flows often fit in `5000` to `15000`
+- multi-scroll discovery flows usually need more headroom
+- `sleep.durationMs` also consumes from the same outer timeout budget
+
+When the timeout is exceeded, the Node layer returns
+`RESULT_ENVELOPE_TIMEOUT`.
+
+## Single-flight behavior
+
+Clawperator allows only one execution in flight per device at a time.
+
+If a second execution targets the same device while one is still running, the
+caller gets `EXECUTION_CONFLICT_IN_FLIGHT`.
+
+This is why agents should:
+
+- serialize work per device
+- avoid overlapping retries on the same target
+- keep multi-action payloads tight and intentional
+
+## Validation behavior
+
+Payloads are schema-validated before any device action is dispatched.
+
+Current behavior:
+
+- invalid payloads fail fast with `EXECUTION_VALIDATION_FAILED`
+- there is no `execute --validate-only` mode today
+
+If you want a low-risk contract smoke check on a live device, run a minimal
+payload such as one `snapshot_ui` or `sleep` step.
+
+## Recommended agent loop
+
+For unknown apps or UI drift:
+
+1. Capture `snapshot_ui`.
+2. Decide one action or one short action sequence.
+3. Execute it.
+4. Re-read the envelope and step results.
+5. Snapshot again before making the next major decision.
+
+For action-specific caveats, use
+[Clawperator Node API - Agent Guide](../ai-agents/node-api-for-agents.md) and
+[Clawperator Snapshot Format](snapshot-format.md).
+
+---
+
+
+# Device and Package Model
+
+This page explains how Clawperator targets Android devices and how the
+receiver-package concept fits into execution dispatch.
+
+Use it when you need to understand:
+
+- what a `deviceId` really is
+- when `--device-id` is required
+- what `--receiver-package` targets
+- how release and debug Operator APK variants differ
+
+## `deviceId` means ADB serial
+
+Clawperator uses the Android Debug Bridge device serial as the `deviceId`.
+
+Examples:
+
+- physical device serials such as `<device_serial>`
+- emulator serials such as `emulator-5554`
+
+List visible devices with:
+
+```bash
+clawperator devices --output json
+```
+
+## Device resolution rules
+
+When you run a command without `--device-id`, Clawperator resolves the target
+using the currently connected ADB devices.
+
+Current behavior:
+
+- if exactly one connected device is in `device` state, Clawperator uses it
+- if no connected devices are available, the command fails with `NO_DEVICES`
+- if more than one connected device is available, the command fails with
+  `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED`
+
+When multiple devices are connected, always pass:
+
+```bash
+--device-id <device_id>
+```
+
+## Commands that should use `--device-id`
+
+In multi-device environments, keep `--device-id` explicit on:
+
+- `execute`
+- `observe snapshot`
+- `observe screenshot`
+- `inspect ui`
+- `action ...`
+- `doctor`
+- `version --check-compat`
+- `operator setup`
+- `grant-device-permissions`
+- `skills run`
+
+## Multi-device recovery after install
+
+The installer can complete host-side setup even when more than one Android
+device is connected, but it will not guess which target should receive the APK.
+
+Use the printed recovery command, or run:
+
+```bash
+clawperator operator setup \
+  --apk ~/.clawperator/downloads/operator.apk \
+  --device-id <device_id>
+```
+
+Then verify with:
+
+```bash
+clawperator doctor --device-id <device_id> --output json
+```
+
+## Receiver package model
+
+The receiver package is the installed Android Operator APK that receives the
+broadcast command.
+
+Current defaults:
+
+- release package: `com.clawperator.operator`
+- local debug package: `com.clawperator.operator.dev`
+
+Most public docs assume the release package by default.
+
+## When to pass `--receiver-package`
+
+Pass `--receiver-package` when:
+
+- you are using a local debug APK
+- both release and debug variants are installed
+- your automation or local workflow is intentionally targeting a non-default
+  Operator variant
+
+Example:
+
+```bash
+clawperator observe snapshot \
+  --device-id <device_id> \
+  --receiver-package com.clawperator.operator.dev \
+  --output json
+```
+
+## Device and package targeting are separate
+
+These two flags solve different problems:
+
+- `--device-id` picks the Android device
+- `--receiver-package` picks which Operator APK on that device receives the
+  command
+
+You sometimes need both, especially during local development.
+
+## Execution isolation
+
+Clawperator enforces single-flight per target device. Do not assume a second
+execution can overlap safely on the same device.
+
+A practical pattern for multiple devices is:
+
+- run one serialized work queue per device
+- keep `--device-id` explicit in every command
+- keep the receiver package consistent per queue
+
+## Quick checks
+
+Use these commands when you are unsure what Clawperator is targeting:
+
+```bash
+clawperator devices --output json
+clawperator doctor --device-id <device_id> --output json
+clawperator version --check-compat --device-id <device_id> --output json
+```
+
+---
+
+
 # Clawperator Snapshot Format
 
 This is the canonical reference for the structure returned by Clawperator
@@ -3977,6 +4308,161 @@ clawperator doctor --full
 - `clawperator observe snapshot` - direct runtime check once doctor reports the environment is ready
 
 For initial installation and device setup, see [First-Time Setup](../getting-started/first-time-setup.md) and [OpenClaw First Run](../getting-started/openclaw-first-run.md).
+
+---
+
+
+# Environment Variables
+
+This page is the central reference for the most important environment variables
+used by the current Clawperator CLI, installer, and local runtime tooling.
+
+It focuses on variables that are useful or observable for operators and agents,
+not every internal shell temporary used by validation scripts.
+
+## Commonly useful variables
+
+| Variable | Used by | Meaning |
+| :--- | :--- | :--- |
+| `CLAWPERATOR_SKILLS_REGISTRY` | CLI, installer | Path to the local skills registry JSON |
+| `CLAWPERATOR_RECEIVER_PACKAGE` | CLI, installer | Default Android Operator package to target when `--receiver-package` is omitted |
+| `CLAWPERATOR_INSTALL_APK` | installer | Pre-seeds the installer's APK install prompt |
+| `CLAWPERATOR_INSTALL_SKIP_SKILLS` | installer | Skips `skills install` during installer setup when set to `1` |
+| `CLAWPERATOR_APK_METADATA_URL` | installer | Overrides the metadata endpoint used to discover the latest downloadable Operator APK |
+| `ADB_PATH` | CLI | Overrides the `adb` binary path |
+| `ANDROID_HOME` | CLI runtime config | Android SDK root used to locate emulator and SDK tools |
+| `ANDROID_SDK_ROOT` | CLI runtime config | Fallback Android SDK root if `ANDROID_HOME` is unset |
+| `EMULATOR_PATH` | emulator commands, `serve` | Overrides the emulator binary path |
+| `SDKMANAGER_PATH` | emulator commands, `serve` | Overrides the `sdkmanager` binary path |
+| `AVDMANAGER_PATH` | emulator commands, `serve` | Overrides the `avdmanager` binary path |
+
+## `CLAWPERATOR_SKILLS_REGISTRY`
+
+Points Clawperator at one local registry JSON for skills discovery.
+
+Typical value:
+
+```bash
+export CLAWPERATOR_SKILLS_REGISTRY="$HOME/.clawperator/skills/skills/skills-registry.json"
+```
+
+Use it when:
+
+- the installer has not yet updated your shell profile
+- you are switching between local skill registries
+- you want `skills list`, `skills get`, `skills run`, and `skills new` to use
+  a specific local repo
+
+## `CLAWPERATOR_RECEIVER_PACKAGE`
+
+Sets the default receiver package for commands that dispatch to the Android
+Operator APK.
+
+Typical values:
+
+- `com.clawperator.operator`
+- `com.clawperator.operator.dev`
+
+Example:
+
+```bash
+export CLAWPERATOR_RECEIVER_PACKAGE="com.clawperator.operator.dev"
+```
+
+CLI flags still win over the environment variable. Use an explicit
+`--receiver-package` when you want one command to differ from your shell
+default.
+
+## `CLAWPERATOR_INSTALL_APK`
+
+Controls the installer's "install APK now?" prompt.
+
+Current behavior in `scripts/install.sh`:
+
+- `Y`, `y`, `yes`, `YES` mean proceed with APK install
+- any other non-empty value means skip APK install
+- if unset, the installer prompts interactively
+
+Example:
+
+```bash
+CLAWPERATOR_INSTALL_APK=Y curl -fsSL https://clawperator.com/install.sh | bash
+```
+
+## `CLAWPERATOR_INSTALL_SKIP_SKILLS`
+
+Skips the installer's skills bootstrap phase when set to `1`.
+
+Example:
+
+```bash
+CLAWPERATOR_INSTALL_SKIP_SKILLS=1 curl -fsSL https://clawperator.com/install.sh | bash
+```
+
+This is mainly useful for constrained or staged setups where you want the CLI
+without immediately cloning the skills repository.
+
+## `CLAWPERATOR_APK_METADATA_URL`
+
+Overrides the metadata document used by the installer to find the latest
+downloadable Operator APK and checksum.
+
+This is an advanced override, mainly useful for testing alternate download
+surfaces or release-candidate flows.
+
+## Android tool path variables
+
+Clawperator can use environment variables to find Android host tools.
+
+### `ADB_PATH`
+
+Overrides the `adb` binary path used by CLI commands such as `devices`,
+`doctor`, `execute`, and `operator setup`.
+
+Example:
+
+```bash
+export ADB_PATH="/opt/android/platform-tools/adb"
+```
+
+### `ANDROID_HOME` and `ANDROID_SDK_ROOT`
+
+These point to the Android SDK root. Clawperator uses them to derive default
+paths for:
+
+- `emulator`
+- `sdkmanager`
+- `avdmanager`
+
+If both are set, `ANDROID_HOME` wins.
+
+### `EMULATOR_PATH`, `SDKMANAGER_PATH`, `AVDMANAGER_PATH`
+
+These override the individual binaries directly.
+
+Use them when:
+
+- your SDK is installed in a non-standard location
+- you want emulator commands to use a specific toolchain
+- you are debugging path resolution on CI or a custom workstation
+
+## Recommended shell profile baseline
+
+For a typical local setup, these are the most useful persistent exports:
+
+```bash
+export CLAWPERATOR_SKILLS_REGISTRY="$HOME/.clawperator/skills/skills/skills-registry.json"
+export CLAWPERATOR_RECEIVER_PACKAGE="com.clawperator.operator"
+```
+
+Then override `--device-id` per command when more than one Android target is
+connected.
+
+## Related docs
+
+- [Device and Package Model](device-and-package-model.md)
+- [Clawperator Doctor](node-api-doctor.md)
+- [First-Time Setup](../getting-started/first-time-setup.md)
 
 ---
 

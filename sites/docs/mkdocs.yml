@@ -21,13 +21,18 @@ nav:
   - For AI Agents:
     - Agent Quickstart: ai-agents/agent-quickstart.md
     - Node API - Agent Guide: ai-agents/node-api-for-agents.md
+    - Execution Model: reference/execution-model.md
+    - Device and Package Model: reference/device-and-package-model.md
     - Operator LLM Playbook: design/operator-llm-playbook.md
   - Reference:
     - CLI Reference: reference/cli-reference.md
     - API Overview: reference/api-overview.md
+    - Execution Model: reference/execution-model.md
+    - Device and Package Model: reference/device-and-package-model.md
     - Clawperator Snapshot Format: reference/snapshot-format.md
     - Error Codes: reference/error-codes.md
     - Doctor: reference/node-api-doctor.md
+    - Environment Variables: reference/environment-variables.md
   - Design and Rationale:
     - System Overview: architecture/architecture.md
     - Runtime Architecture and API Rationale: design/node-api-design.md

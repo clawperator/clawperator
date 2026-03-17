@@ -162,6 +162,8 @@ only after the UI path is already known.
 ## What to read next
 
 - [Clawperator Snapshot Format](../reference/snapshot-format.md)
+- [Execution Model](../reference/execution-model.md)
+- [Device and Package Model](../reference/device-and-package-model.md)
 - [Clawperator Node API - Agent Guide](node-api-for-agents.md)
 - [API Overview](../reference/api-overview.md)
 - [CLI Reference](../reference/cli-reference.md)
