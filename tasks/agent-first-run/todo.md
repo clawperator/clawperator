@@ -64,6 +64,9 @@ In the `scroll_until` action reference entry, add an explicit note documenting w
 - Existing tests for `TARGET_FOUND` and `MAX_SCROLLS_REACHED` pass unchanged.
 - Docs note for `clickAfter` is present and accurate for the shipped behavior.
 
+**Note — companion issue (`tasks/api/scroll/todo.md` item 2):**
+The scroll task file identifies a related but distinct issue: when a container disappears mid-loop (e.g. the RecyclerView is replaced during a settings navigation), the current implementation returns `EDGE_REACHED` when the correct reason is `CONTAINER_LOST`. This needs to be resolved in the same PR, because the corrected `clickAfter` logic must distinguish "edge reached with target visible" from "container disappeared" — conflating them would cause a false click. Implementors must read `tasks/api/scroll/todo.md` before starting T-01 and treat `CONTAINER_LOST` as in-scope for this PR.
+
 **Dependencies:** None.
 
 ---
@@ -375,11 +378,16 @@ Both tasks are docs-only with no behavior change. The link audit (T-13) is done 
 **Change:**
 1. Audit all internal links in `ai-agents/` and `reference/` sections.
 2. Fix or redirect each 404 to the correct current URL.
-3. Add a CI check (e.g. `lychee`) that fails the docs build on broken internal links going forward.
+3. Add CI link validation using the approach specified in `tasks/docs/validate/todo.md`:
+   - Extend `scripts/validate_docs_routes.py` with a `check_inner_page_links()` function that follows relative `../` links inside authored markdown pages (the current validator checks source-map routes and absolute URLs but does not follow relative cross-page links).
+   - Enable MkDocs `strict: true` so any remaining broken reference raises a build error.
+   - Do not introduce a separate `lychee` dependency — the Python validator + MkDocs strict is the chosen implementation path.
 
 **Acceptance criteria:**
 - All internal links in `ai-agents/` and `reference/` return 200.
-- CI check runs on docs PRs and catches new broken links.
+- `validate_docs_routes.py` catches broken relative `../` links and fails CI.
+- MkDocs `strict: true` is enabled; build fails on any broken mkdocs reference.
+- CI check runs on docs PRs and catches new broken links introduced by T-14 immediately.
 
 **Dependencies:** None (within this PR, do this before T-14).
 
