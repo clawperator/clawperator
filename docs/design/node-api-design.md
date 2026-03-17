@@ -128,7 +128,8 @@ When a step fails but the runtime continues (or fails fast), the `stepResults` e
 `close_app` is executed pre-flight in the Node layer via `adb shell am force-stop`.
 When that force-stop succeeds, the Node layer normalizes the step result to a
 successful `close_app` outcome so the envelope matches what actually happened on
-the device.
+the device. If the pre-flight force-stop fails, the execution fails instead of
+rewriting the step to success.
 
 ```json
 {

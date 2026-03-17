@@ -33,6 +33,8 @@ close-sleep-open sequence:
   searches, or half-completed flows.
 - **How it works today:** The Clawperator Node CLI intercepts `close_app` and
   issues `adb shell am force-stop` before dispatching the execution to Android.
+  If that pre-flight close fails, the execution fails instead of reporting a
+  false successful close.
 - **Why the short sleep:** Android needs a moment to finish process teardown
   before the reopen is reliable.
 - **Why the longer open sleep:** Cold app startup is often the slowest part of
