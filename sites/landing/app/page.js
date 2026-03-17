@@ -49,6 +49,33 @@ const workflowCards = [
   }
 ];
 
+const resourceCards = [
+  {
+    title: "Discord",
+    body: "Join the community",
+    icon: "discord",
+    disabled: true
+  },
+  {
+    title: "Documentation",
+    body: "Learn the ropes",
+    href: "https://docs.clawperator.com",
+    icon: "docs"
+  },
+  {
+    title: "GitHub",
+    body: "View the source",
+    href: "https://github.com/clawperator/clawperator",
+    icon: "github"
+  },
+  {
+    title: "Skills",
+    body: "Browse the skills section",
+    href: "#skills",
+    icon: "skills"
+  }
+];
+
 const faqs = [
   {
     question: "Can I use this if I have an iPhone?",
@@ -82,6 +109,7 @@ export default function Home() {
   const [copied, setCopied] = useState(false);
   const [emulatorCommandCopied, setEmulatorCommandCopied] = useState(false);
   const [activeSection, setActiveSection] = useState(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const activeCommand = mode === "npm" ? installCommands.npm : installCommands.oneLiner;
   const emulatorCommand = "clawperator provision emulator";
 
@@ -95,6 +123,59 @@ export default function Home() {
 
   const copyTimeoutRef = useRef(null);
   const emulatorCopyTimeoutRef = useRef(null);
+  const toggleMobileMenu = () => setMobileMenuOpen((open) => !open);
+  const closeMobileMenu = () => setMobileMenuOpen(false);
+  const renderResourceIcon = (icon) => {
+    switch (icon) {
+      case "discord":
+        return (
+          <svg viewBox="0 0 64 48" aria-hidden="true">
+            <path
+              d="M40.575 0C39.9562 1.09866 39.4006 2.2352 38.8954 3.397C34.0967 2.67719 29.2096 2.67719 24.3982 3.397C23.9057 2.2352 23.3374 1.09866 22.7186 0C18.2104 0.770324 13.8157 2.12155 9.64839 4.02841C1.38951 16.2652 -0.845688 28.1863 0.265599 39.9432C5.10222 43.517 10.5197 46.2447 16.2909 47.9874C17.5916 46.2447 18.7407 44.3883 19.7257 42.4562C17.8568 41.7616 16.0509 40.8903 14.3208 39.88C14.7755 39.5517 15.2175 39.2107 15.6468 38.8824C25.7873 43.6559 37.5316 43.6559 47.6847 38.8824C48.1141 39.236 48.5561 39.577 49.0107 39.88C47.2806 40.9029 45.4748 41.7616 43.5931 42.4688C44.5781 44.4009 45.7273 46.2573 47.028 48C52.7991 46.2573 58.2167 43.5422 63.0533 39.9684C64.3666 26.3299 60.8055 14.5099 53.6452 4.04104C49.4905 2.13418 45.0959 0.782952 40.5876 0.0252565L40.575 0ZM21.1401 32.7072C18.0209 32.7072 15.4321 29.8785 15.4321 26.3804C15.4321 22.8824 17.9199 20.041 21.1275 20.041C24.3351 20.041 26.886 22.895 26.8354 26.3804C26.7849 29.8658 24.3224 32.7072 21.1401 32.7072ZM42.1788 32.7072C39.047 32.7072 36.4834 29.8785 36.4834 26.3804C36.4834 22.8824 38.9712 20.041 42.1788 20.041C45.3864 20.041 47.9246 22.895 47.8741 26.3804C47.8236 29.8658 45.3611 32.7072 42.1788 32.7072Z"
+              fill="currentColor"
+            />
+          </svg>
+        );
+      case "docs":
+        return (
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M7 4.5h7.5L18 8v11.5a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1v-14a1 1 0 0 1 1-1Z"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinejoin="round"
+            />
+            <path d="M14.5 4.5V8H18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+            <path d="M9 11h6M9 14h6M9 17h4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+          </svg>
+        );
+      case "github":
+        return (
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <path
+              d="M6.766 11.695C4.703 11.437 3.25 9.904 3.25 7.92c0-.806.281-1.677.75-2.258-.203-.532-.172-1.662.062-2.129.626-.081 1.469.258 1.969.726.594-.194 1.219-.291 1.985-.291.765 0 1.39.097 1.953.274.484-.451 1.343-.79 1.969-.709.218.435.25 1.564.046 2.113.5.613.766 1.436.766 2.274 0 1.984-1.453 3.485-3.547 3.759.531.355.891 1.129.891 2.016v1.678c0 .484.39.758.859.564C13.781 14.824 16 11.905 16 8.291 16 3.726 12.406 0 7.984 0 3.562 0 0 3.726 0 8.291c0 3.581 2.203 6.55 5.172 7.663A.595.595 0 0 0 6 15.389v-1.291c-.219.097-.5.162-.75.162-1.031 0-1.641-.581-2.078-1.662-.172-.435-.36-.693-.719-.742-.187-.016-.25-.097-.25-.193 0-.194.313-.339.625-.339.453 0 .844.29 1.25.887.313.468.641.678 1.031.678.391 0 .641-.146 1-.516.266-.275.469-.517.657-.678Z"
+              fill="currentColor"
+            />
+          </svg>
+        );
+      case "skills":
+        return (
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M12 3.5 4.5 7.3v5.4c0 4.3 3 7.3 7.5 7.8 4.5-.5 7.5-3.5 7.5-7.8V7.3L12 3.5Z"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinejoin="round"
+            />
+            <path d="m9.5 12 1.5 1.5 3.5-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        );
+      default:
+        return null;
+    }
+  };
 
   const copyToClipboard = async (text, setCopiedState, timeoutRef) => {
     const fallbackCopy = () => {
@@ -148,6 +229,34 @@ export default function Home() {
       if (emulatorCopyTimeoutRef.current) window.clearTimeout(emulatorCopyTimeoutRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+
+    const previousBodyOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const handleResize = () => {
+      if (window.innerWidth > 840) {
+        setMobileMenuOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        setMobileMenuOpen(false);
+      }
+    };
+
+    window.addEventListener("resize", handleResize);
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousBodyOverflow;
+      window.removeEventListener("resize", handleResize);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [mobileMenuOpen]);
 
   const toolbarRef = useRef(null);
 
@@ -229,25 +338,57 @@ export default function Home() {
             </span>
           </a>
 
-          <nav className="toolbar-links" aria-label="Page sections">
+          <button
+            type="button"
+            className={mobileMenuOpen ? "mobile-menu-btn active" : "mobile-menu-btn"}
+            aria-expanded={mobileMenuOpen}
+            aria-controls="toolbar-menu"
+            aria-label={mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
+            onClick={toggleMobileMenu}
+          >
+            <span />
+            <span />
+            <span />
+          </button>
+
+          <nav
+            id="toolbar-menu"
+            className={mobileMenuOpen ? "toolbar-links mobile-open" : "toolbar-links"}
+            aria-label="Page sections"
+          >
             {sectionIds.map((id) => (
               <a
                 key={id}
                 href={`#${id}`}
                 className={activeSection === id ? "toolbar-section-link active" : "toolbar-section-link"}
+                onClick={closeMobileMenu}
               >
                 {sectionLabels[id] || id}
               </a>
             ))}
-            <a href="https://docs.clawperator.com" target="_blank" rel="noreferrer">
+            <a href="https://docs.clawperator.com" target="_blank" rel="noreferrer" onClick={closeMobileMenu}>
               Docs
             </a>
-            <a href="https://github.com/clawperator/clawperator" target="_blank" rel="noreferrer" className="toolbar-cta">
+            <a
+              href="https://github.com/clawperator/clawperator"
+              target="_blank"
+              rel="noreferrer"
+              className="toolbar-cta"
+              onClick={closeMobileMenu}
+            >
               GitHub
             </a>
           </nav>
         </div>
       </header>
+      <button
+        type="button"
+        className={mobileMenuOpen ? "mobile-menu-scrim open" : "mobile-menu-scrim"}
+        aria-label="Close navigation menu"
+        aria-hidden={!mobileMenuOpen}
+        tabIndex={mobileMenuOpen ? 0 : -1}
+        onClick={closeMobileMenu}
+      />
 
       <main className="page-shell">
       {/* Hero Section */}
@@ -292,7 +433,33 @@ export default function Home() {
             Don&apos;t have an Android device? No problem. Clawperator can create a Google Play-equipped Android emulator for you.
           </p>
 
+          <div className="resource-grid" aria-label="Primary resources">
+            {resourceCards.map((card) => {
+              const classes = card.disabled ? "resource-card disabled" : "resource-card";
+              const content = (
+                <>
+                  <span className="resource-icon">{renderResourceIcon(card.icon)}</span>
+                  <span className="resource-title">{card.title}</span>
+                  <span className="resource-copy">{card.body}</span>
+                </>
+              );
+
+              if (card.disabled) {
+                return (
+                  <div key={card.title} className={classes} aria-disabled="true">
+                    {content}
+                  </div>
+                );
+              }
+
+              return (
+                <a key={card.title} href={card.href} className={classes} target={card.href.startsWith("http") ? "_blank" : undefined} rel={card.href.startsWith("http") ? "noreferrer" : undefined}>
+                  {content}
+                </a>
+              );
+            })}
           </div>
+        </div>
 
       <section id="workflows" className="content-section">
         <h2>What you can do with Clawperator</h2>
@@ -663,18 +830,34 @@ if <hvac_state> == "Off":
 
         <footer className="site-footer">
           <p className="footer-title">Clawperator</p>
-          <p className="footer-copy">Open source execution infrastructure for agent-driven Android burner-device workflows.</p>
+          <p className="footer-copy">
+            Open source execution infrastructure for agent-driven Android burner-device workflows.
+          </p>
           <nav className="footer-links" aria-label="Footer links">
             <a href="https://docs.clawperator.com" target="_blank" rel="noreferrer">
               docs
             </a>
+            <span className="dot" aria-hidden="true">
+              ·
+            </span>
             <a href="https://github.com/clawperator/clawperator" target="_blank" rel="noreferrer">
               github
             </a>
+            <span className="dot" aria-hidden="true">
+              ·
+            </span>
             <a href="https://www.npmjs.com/package/clawperator" target="_blank" rel="noreferrer">
               npm
             </a>
           </nav>
+          <p className="footer-tagline">
+            Built with human claws by{" "}
+            <a href="https://x.com/chrismlacy" target="_blank" rel="noreferrer">
+              @chrismlacy
+            </a>
+            {" "}and a scrappy crew of bots.
+          </p>
+          <p className="footer-copyright">© 2026 Action Launcher Pty Ltd</p>
         </footer>
       </main>
     </>
