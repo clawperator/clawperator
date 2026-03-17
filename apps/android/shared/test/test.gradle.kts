@@ -22,6 +22,12 @@ android {
         jvmTarget = "11"
     }
 
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+        }
+    }
+
     buildFeatures {
         buildConfig = true
         compose = true
