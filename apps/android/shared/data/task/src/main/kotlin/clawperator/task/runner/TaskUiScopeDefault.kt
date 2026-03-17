@@ -777,10 +777,10 @@ class TaskUiScopeDefault(
                     findFirstScrollableChild = findFirstScrollableChild,
                 )
             } catch (e: IllegalStateException) {
-                // Container lost mid-loop (app navigated away etc.) - treat as edge
-                Log.d("$TAG scrollLoop: container lost mid-loop, treating as edge_reached")
+                // Container lost mid-loop (app navigated away etc.) - treat as container lost
+                Log.d("$TAG scrollLoop: container lost mid-loop, returning ContainerLost")
                 return TaskScrollLoopResult(
-                    terminationReason = TaskScrollTerminationReason.EdgeReached,
+                    terminationReason = TaskScrollTerminationReason.ContainerLost,
                     scrollsExecuted = scrollsExecuted,
                     resolvedContainerId = resolvedContainerId,
                 )

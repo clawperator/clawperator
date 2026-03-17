@@ -274,16 +274,17 @@ class UiActionEngineDefault(
         val result =
             if (
                 action.target != null &&
-                initialResult.terminationReason != TaskScrollTerminationReason.TargetFound &&
-                initialResult.terminationReason != TaskScrollTerminationReason.ContainerNotFound &&
-                initialResult.terminationReason != TaskScrollTerminationReason.ContainerNotScrollable
+                (initialResult.terminationReason == TaskScrollTerminationReason.EdgeReached ||
+                    initialResult.terminationReason == TaskScrollTerminationReason.MaxScrollsReached ||
+                    initialResult.terminationReason == TaskScrollTerminationReason.MaxDurationReached ||
+                    initialResult.terminationReason == TaskScrollTerminationReason.NoPositionChange)
             ) {
                 val targetVisibleAfterLoop =
                     try {
                         taskScope.ui {
                             waitForNode(
                                 matcher = action.target,
-                                retry = TaskRetry.None,
+                                retry = TaskRetryPresets.UiReadiness,
                             )
                         }
                         true
@@ -301,7 +302,8 @@ class UiActionEngineDefault(
             }
 
         val isError = result.terminationReason == TaskScrollTerminationReason.ContainerNotFound ||
-            result.terminationReason == TaskScrollTerminationReason.ContainerNotScrollable
+            result.terminationReason == TaskScrollTerminationReason.ContainerNotScrollable ||
+            result.terminationReason == TaskScrollTerminationReason.ContainerLost
 
         if (!isError &&
             action.clickAfter &&
@@ -513,4 +515,5 @@ private fun TaskScrollTerminationReason.toWireValue(): String =
         TaskScrollTerminationReason.NoPositionChange -> "NO_POSITION_CHANGE"
         TaskScrollTerminationReason.ContainerNotFound -> "CONTAINER_NOT_FOUND"
         TaskScrollTerminationReason.ContainerNotScrollable -> "CONTAINER_NOT_SCROLLABLE"
+        TaskScrollTerminationReason.ContainerLost -> "CONTAINER_LOST"
     }

@@ -60,6 +60,8 @@ enum class TaskScrollTerminationReason {
     ContainerNotFound,
     /** Container matched but is not scrollable */
     ContainerNotScrollable,
+    /** Container disappeared mid-loop (e.g. app navigated away) */
+    ContainerLost,
 }
 
 /**
