@@ -87,7 +87,7 @@ cat > "$SMOKE_JSON" <<JSON
     { "id": "close", "type": "close_app", "params": { "applicationId": "$BASELINE_APP_PACKAGE" } },
     { "id": "open", "type": "open_app", "params": { "applicationId": "$BASELINE_APP_PACKAGE" } },
     { "id": "wait", "type": "sleep", "params": { "durationMs": 3000 } },
-    { "id": "snap", "type": "snapshot_ui", "params": { "format": "ascii" } }
+    { "id": "snap", "type": "snapshot_ui" }
   ]
 }
 JSON
