@@ -145,6 +145,7 @@ sealed interface UiAction {
     data class ReadKeyValuePair(
         override val id: String,
         val labelMatcher: NodeMatcher,
+        val retry: TaskRetry = TaskRetryPresets.UiReadiness,
     ) : UiAction
 }
 
