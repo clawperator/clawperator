@@ -30,6 +30,12 @@ Design consequence:
   - `com.clawperator.operator` (Release)
   - `com.clawperator.operator.dev` (Local/Debug)
 - **Clawperator is an actuator:** It does not own strategy, planning, or autonomous reasoning. These live in the Agent.
+- Treat optional API strings carefully:
+  - use explicit `undefined` checks when `""` and omitted mean different things
+  - do not use truthy/falsy checks like `value || fallback` on contract fields such as file paths
+  - reject blank strings at validation boundaries when they are not valid values
+- If Node performs a pre-flight or fallback outside the Android runtime, only normalize the result to success when that pre-flight or fallback actually succeeded.
+- CLI parsing changes must preserve both the structured JSON contract and the exit-code contract. Test valid, invalid, and missing-value cases for any new flag.
 
 ## Key Docs
 - `docs/node-api-for-agents.md` - API contract, CLI reference, error codes
@@ -124,6 +130,17 @@ For non-trivial changes, do all steps before commit:
 Testing is part of the default definition of done. Agents should assume they are expected to run unit/integration validation for the areas they touched, and when the change affects real device behavior they should also verify on a physical device or emulator when appropriate. Do not rely solely on static inspection for changes involving gestures, accessibility, app navigation, screenshots, snapshots, skills, or device/runtime contracts if a runnable verification path exists.
 
 Tests and smoke scripts should prove the intended behavior, not just exercise code paths. Be alert for false-confidence checks, especially around scrolling, container selection, snapshot extraction, screenshots, and skill wrappers that can succeed while validating the wrong thing.
+
+When Node tests execute built `dist/` artifacts, run build before test and avoid parallel build/test runs that could leave tests exercising stale compiled output.
+
+For CLI option work, add regression coverage for:
+- valid values
+- invalid values
+- missing values
+- global vs command-local placement when both forms exist
+- exit code and structured JSON output
+
+For runtime behavior changes, prefer reproducing a real user-visible scenario on a physical device or emulator before declaring the change safe. If live testing finds a bug, add a focused regression test for that exact failure mode.
 
 ## Validation Commands
 - Permissions/bootstrap: `./scripts/clawperator_grant_android_permissions.sh`
