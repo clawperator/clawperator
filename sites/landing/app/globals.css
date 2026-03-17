@@ -1394,10 +1394,11 @@ body {
 
 @media (max-width: 840px) {
   :root {
-    --toolbar-height: 76px;
+    --toolbar-height: 88px;
   }
 
   .top-toolbar {
+    position: fixed;
     min-height: var(--toolbar-height);
   }
 
@@ -1421,7 +1422,13 @@ body {
   }
 
   .toolbar-subtitle {
-    display: none;
+    display: block;
+    font-size: 0.78rem;
+    line-height: 1.1;
+  }
+
+  .page-shell {
+    padding-top: calc(var(--toolbar-height) + 1.2rem);
   }
 
   .mobile-menu-btn {
