@@ -63,6 +63,7 @@ Use this page as a technical map:
 - [Device and Package Model](reference/device-and-package-model.md) - Device targeting, package targeting, and multi-device behavior
 - [Clawperator Snapshot Format](reference/snapshot-format.md) - Canonical `hierarchy_xml` contract and parsing guidance
 - [Error Codes](reference/error-codes.md) - Structured runtime and API error code reference
+- [Error Handling Guide](reference/error-handling.md) - Recoverable vs fatal patterns and recommended agent responses
 - [Doctor](reference/node-api-doctor.md) - Runtime readiness checks, exit behavior, and JSON report shape
 - [Environment Variables](reference/environment-variables.md) - Central reference for supported installer and runtime variables
 

@@ -15,10 +15,14 @@ Clawperator operates an Android device on behalf of a user. That Android device 
 - Docs: https://docs.clawperator.com/
 - Agent quickstart: https://docs.clawperator.com/ai-agents/agent-quickstart/
 - Agent guide: https://docs.clawperator.com/ai-agents/node-api-for-agents/
+- Execution model: https://docs.clawperator.com/reference/execution-model/
+- Device and package model: https://docs.clawperator.com/reference/device-and-package-model/
 - Snapshot format: https://docs.clawperator.com/reference/snapshot-format/
 - Operator LLM playbook: https://docs.clawperator.com/design/operator-llm-playbook/
 - API overview: https://docs.clawperator.com/reference/api-overview/
 - CLI reference: https://docs.clawperator.com/reference/cli-reference/
+- Error handling guide: https://docs.clawperator.com/reference/error-handling/
+- Environment variables: https://docs.clawperator.com/reference/environment-variables/
 - Full compiled docs: https://clawperator.com/llms-full.txt
 - GitHub: https://github.com/clawperator/clawperator
 

@@ -125,6 +125,11 @@ sections:
         mode: copy
         sources:
           - docs/snapshot-format.md
+      - output: reference/error-handling.md
+        title: Error Handling Guide
+        mode: copy
+        sources:
+          - docs/reference/error-handling.md
       - output: reference/node-api-doctor.md
         title: Clawperator Doctor
         mode: copy

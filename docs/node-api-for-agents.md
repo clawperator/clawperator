@@ -803,6 +803,9 @@ Branch agent logic on codes from `envelope.errorCode` (top-level Android result 
 
 Primary top-level error taxonomy: `apps/node/src/contracts/errors.ts`. This table also includes runtime-only step error strings where they are still surfaced directly by callers.
 
+For agent-side recovery strategy, use
+[Error Handling Guide](../reference/error-handling.md).
+
 ## Key Behaviors
 
 - **Single-flight:** One execution per device at a time. Concurrent requests return `EXECUTION_CONFLICT_IN_FLIGHT`.

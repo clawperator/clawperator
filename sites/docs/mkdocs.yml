@@ -31,6 +31,7 @@ nav:
     - Device and Package Model: reference/device-and-package-model.md
     - Clawperator Snapshot Format: reference/snapshot-format.md
     - Error Codes: reference/error-codes.md
+    - Error Handling Guide: reference/error-handling.md
     - Doctor: reference/node-api-doctor.md
     - Environment Variables: reference/environment-variables.md
   - Design and Rationale:
