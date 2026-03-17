@@ -173,6 +173,7 @@ class AgentCommandParserDefault : AgentCommandParser {
                 UiAction.ReadKeyValuePair(
                     id = id,
                     labelMatcher = params.parseMatcherRequired("labelMatcher"),
+                    retry = params.parseRetryOrDefault(defaultRetry = TaskRetryPresets.UiReadiness),
                 )
             "read_text" -> {
                 val validator = params.parseValidator()

@@ -157,7 +157,7 @@ class UiActionEngineDefault(
     ): UiActionStepResult {
         return try {
             val (label, value) = taskScope.ui {
-                readKeyValuePair(action.labelMatcher)
+                readKeyValuePair(action.labelMatcher, action.retry)
             }
             UiActionStepResult(
                 id = action.id,
@@ -445,7 +445,10 @@ class UiActionEngineDefault(
             )
         } catch (e: IllegalStateException) {
             val msg = e.message ?: ""
-            // All validators should return VALIDATOR_MISMATCH on validation failure
+            // All validators should return VALIDATOR_MISMATCH on validation failure.
+            // NOTE: This extraction depends on the exact message format from getValidatedText.
+            // If that message changes, rawText extraction will silently fail (empty string).
+            // Consider throwing a typed wrapper exception from getValidatedText to decouple.
             if (msg.contains("Validation failed for text") && action.validator != null) {
                 val match = Regex("Validation failed for text '(.*)' from").find(msg)
                 val rawText = match?.groupValues?.get(1) ?: ""
