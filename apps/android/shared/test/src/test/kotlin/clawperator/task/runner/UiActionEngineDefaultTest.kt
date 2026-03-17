@@ -1009,6 +1009,49 @@ class UiActionEngineDefaultTest : ActionTest {
         }
 
     @Test
+    fun `execute read_text with temperature validator fails`() =
+        actionTest {
+            val uiScope = object : RecordingTaskUiScope() {
+                override suspend fun getValidatedText(
+                    matcher: NodeMatcher,
+                    retry: TaskRetry,
+                    validator: (String) -> Boolean,
+                ): String {
+                    val value = "not a temperature"
+                    if (!validator(value)) {
+                        throw IllegalStateException("Validation failed for text '$value' from matching UI node")
+                    }
+                    return value
+                }
+            }
+            val taskScope = RecordingTaskScope(uiScope)
+            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+
+            val result =
+                engine.execute(
+                    taskScope = taskScope,
+                    plan = UiActionPlan(
+                        commandId = "cmd",
+                        taskId = "task",
+                        source = "test",
+                        actions = listOf(
+                            UiAction.ReadText(
+                                id = "rt-temp",
+                                matcher = NodeMatcher(textContains = "Temp"),
+                                validator = UiTextValidator.Temperature,
+                            ),
+                        ),
+                    ),
+                )
+
+            val stepResult = result.stepResults.single()
+            assertEquals("read_text", stepResult.actionType)
+            assertEquals(false, stepResult.success)
+            assertEquals("VALIDATOR_MISMATCH", stepResult.data["error"])
+            assertEquals("not a temperature", stepResult.data["raw_text"])
+        }
+
+    @Test
     fun `execute read_text with regex validator succeeds`() =
         actionTest {
             val uiScope = object : RecordingTaskUiScope() {
