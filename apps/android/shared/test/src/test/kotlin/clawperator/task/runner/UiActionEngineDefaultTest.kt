@@ -564,6 +564,41 @@ class UiActionEngineDefaultTest : ActionTest {
         }
 
     @Test
+    fun `execute scroll_until returns edge_reached when target genuinely absent`() =
+        actionTest {
+            val uiScope = RecordingTaskUiScope(
+                scrollLoopResult = TaskScrollLoopResult(TaskScrollTerminationReason.EdgeReached, scrollsExecuted = 3),
+                waitForNodeThrows = IllegalStateException("Node not found"),
+            )
+            val taskScope = RecordingTaskScope(uiScope)
+            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+
+            val result =
+                engine.execute(
+                    taskScope = taskScope,
+                    plan = UiActionPlan(
+                        commandId = "cmd-su-absent-click",
+                        taskId = "task-su-absent-click",
+                        source = "test",
+                        actions = listOf(
+                            UiAction.ScrollUntil(
+                                id = "su-absent-click",
+                                target = NodeMatcher(textContains = "Missing Target"),
+                                clickAfter = true,
+                            ),
+                        ),
+                    ),
+                )
+
+            val stepResult = result.stepResults.single()
+            assertEquals("scroll_until", stepResult.actionType)
+            assertEquals(true, stepResult.success)
+            assertEquals("EDGE_REACHED", stepResult.data["termination_reason"])
+            assertEquals("true", stepResult.data["click_after"])
+            assertEquals(false, uiScope.clickCalled)
+        }
+
+    @Test
     fun `execute scroll_until normalizes to target_found when target is visible after loop`() =
         actionTest {
             val uiScope = RecordingTaskUiScope(
@@ -645,6 +680,7 @@ private class RecordingTaskUiScope(
     private val scrollOnceThrows: IllegalStateException? = null,
     private val scrollOnceContainerId: String? = null,
     private val scrollLoopResult: TaskScrollLoopResult = TaskScrollLoopResult(TaskScrollTerminationReason.EdgeReached, scrollsExecuted = 3),
+    private val waitForNodeThrows: Exception? = null,
 ) : TaskUiScope {
     var scrollIntoViewCalled: Boolean = false
     var scrollOnceCalled: Boolean = false
@@ -665,8 +701,11 @@ private class RecordingTaskUiScope(
     override suspend fun waitForNode(
         matcher: NodeMatcher,
         retry: TaskRetry,
-    ): TaskUiNode =
-        TaskUiNode(
+    ): TaskUiNode {
+        if (waitForNodeThrows != null) {
+            throw waitForNodeThrows
+        }
+        return TaskUiNode(
             resourceId = "com.example:id/title",
             label = "Title Text",
             clickable = true,
@@ -674,6 +713,7 @@ private class RecordingTaskUiScope(
             bounds = Rect.Zero,
             debugPath = "0/0",
         )
+    }
 
     override suspend fun getText(
         matcher: NodeMatcher,

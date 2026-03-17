@@ -621,7 +621,7 @@ When no `target` matcher is provided, `scroll_until` behaves as a pure bounded
 pagination loop and returns one of the non-target terminal reasons above.
 
 **Current runtime caveats:**
-- If the resolved container disappears mid-loop because the app navigated away or rebuilt the view tree unexpectedly, the current Android runtime can collapse that case into `EDGE_REACHED`.
+- On older APKs (pre-PR-1), if the resolved container disappeared mid-loop because the app navigated away or rebuilt the view tree unexpectedly, the Android runtime collapsed that case into `EDGE_REACHED`. This is fixed in current versions, which return `CONTAINER_LOST`.
 - Some Android screens expose off-screen descendants in the raw `snapshot_ui` XML. `scroll_until.target` does not use raw XML presence alone; it checks Clawperator's on-screen filtered tree. On heavily clipped or nested layouts, a target may appear in the raw snapshot near the bottom edge but still finish as `EDGE_REACHED` until it is more fully on-screen.
 
 When a scroll loop might trigger navigation, heavy UI re-layout, or clipped list rows near the viewport edge, follow it with `snapshot_ui` or `wait_for_node` before assuming the list truly ended.
