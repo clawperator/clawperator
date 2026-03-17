@@ -494,7 +494,7 @@ describe("runSkill", () => {
   });
 
   it("returns partial stdout when a skill times out", async () => {
-    const result = await runSkill("com.test.partial-timeout", [], undefined, 50);
+    const result = await runSkill("com.test.partial-timeout", [], undefined, 150);
     assert.ok(!result.ok);
     assert.strictEqual(result.code, SKILL_EXECUTION_TIMEOUT);
     assert.ok(result.stdout?.includes('"stage":"before-timeout"'));

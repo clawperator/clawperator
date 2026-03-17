@@ -101,6 +101,10 @@ Start with `clawperator serve [--port <n>] [--host <ip>]`. Default: `127.0.0.1:3
 
 See `apps/node/examples/basic-api-usage.js` for a complete SSE + REST example.
 
+For `POST /skills/:skillId/run`, error responses may include partial `stdout`
+and `stderr` when the wrapped script already emitted useful output before
+failing or timing out.
+
 ## Android Emulator Support
 
 Note: Clawperator does not configure accounts, install the Android apps the user wants Clawperator to operate, or complete first-run app setup inside the emulator.

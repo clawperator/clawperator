@@ -2,12 +2,18 @@ import { test, describe, after, before } from "node:test";
 import assert from "node:assert";
 import { startServer } from "../../cli/commands/serve.js";
 import { Server } from "node:http";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 describe("serve API integration", () => {
   let server: Server;
   let port: number;
+  const previousRegistryPath = process.env.CLAWPERATOR_SKILLS_REGISTRY;
+  const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "../../..");
+  const testRegistryPath = join(packageRoot, "src", "test", "fixtures", "skills", "skills-registry.json");
 
   before(async () => {
+    process.env.CLAWPERATOR_SKILLS_REGISTRY = testRegistryPath;
     server = await startServer({ port: 0, host: "localhost", verbose: false });
     const addr = server.address();
     if (addr && typeof addr === "object") {
@@ -22,6 +28,11 @@ describe("serve API integration", () => {
       await new Promise<void>((resolve, reject) => {
         server.close((err) => (err ? reject(err) : resolve()));
       });
+    }
+    if (previousRegistryPath === undefined) {
+      delete process.env.CLAWPERATOR_SKILLS_REGISTRY;
+    } else {
+      process.env.CLAWPERATOR_SKILLS_REGISTRY = previousRegistryPath;
     }
   });
 
@@ -157,6 +168,24 @@ describe("serve API integration", () => {
     const body = await res.json() as { ok: boolean; error: { code: string } };
     assert.strictEqual(body.ok, false);
     assert.ok(body.error.code !== undefined);
+  });
+
+  test("POST /skills/:skillId/run preserves partial output on failure", async () => {
+    const res = await fetch(`http://localhost:${port}/skills/com.test.fail/run`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+
+    assert.strictEqual(res.status, 400);
+    const body = await res.json() as {
+      ok: boolean;
+      error: { code: string; stdout?: string; stderr?: string };
+    };
+    assert.strictEqual(body.ok, false);
+    assert.strictEqual(body.error.code, "SKILL_EXECUTION_FAILED");
+    assert.ok(body.error.stdout?.includes('"stage":"before-failure"'));
+    assert.ok(body.error.stderr?.includes("FAIL_OUTPUT:intentional"));
   });
 
   test("Execution emits SSE events", async () => {
