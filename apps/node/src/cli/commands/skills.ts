@@ -4,6 +4,7 @@ import { compileArtifact } from "../../domain/skills/compileArtifact.js";
 import { syncSkills } from "../../domain/skills/syncSkills.js";
 import { searchSkills } from "../../domain/skills/searchSkills.js";
 import { runSkill } from "../../domain/skills/runSkill.js";
+import { scaffoldSkill } from "../../domain/skills/scaffoldSkill.js";
 import type { OutputOptions } from "../output.js";
 import { formatSuccess, formatError } from "../output.js";
 
@@ -111,4 +112,21 @@ export async function cmdSkillsRun(
     exitCode: result.exitCode,
     stderr: result.stderr,
   }, options);
+}
+
+export async function cmdSkillsNew(
+  skillId: string,
+  options: { format: OutputOptions["format"] }
+): Promise<string> {
+  const result = await scaffoldSkill(skillId);
+  if (result.ok) {
+    return formatSuccess({
+      created: true,
+      skillId: result.skillId,
+      registryPath: result.registryPath,
+      skillPath: result.skillPath,
+      files: result.files,
+    }, options);
+  }
+  return formatError({ code: result.code, message: result.message }, options);
 }

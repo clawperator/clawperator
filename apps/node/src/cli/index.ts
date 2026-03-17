@@ -57,6 +57,8 @@ Commands:
   skills compile-artifact <skill_id> --artifact <name> [--vars <json>]
   skills compile-artifact --skill-id <id> --artifact <name> [--vars <json>]
                                             Compile from a skill artifact (skill: positional or --skill-id; artifact: ac-status or ac-status.recipe.json)
+  skills new <skill_id>
+                                            Scaffold a new local skill folder and registry entry
   skills run <skill_id> [--device-id <id>] [-- <extra_args>]
                                             Invoke a skill script (convenience wrapper)
   skills install
@@ -159,6 +161,17 @@ Notes:
   - Registry path after sync:
       $HOME/.clawperator/skills/skills/skills-registry.json
 `,
+  "skills new": `clawperator skills new
+
+Usage:
+  clawperator skills new <skill_id> [--output <json|pretty>]
+
+Notes:
+  - Scaffolds a new local skill in the currently configured skills registry repo.
+  - Derives applicationId and intent by splitting <skill_id> on the final dot.
+  - Creates: SKILL.md, skill.json, and scripts/run.js
+  - Updates the configured registry JSON so the new skill appears in skills list.
+`,
   "doctor": `clawperator doctor
 
 Usage:
@@ -226,6 +239,7 @@ function resolveHelpTopic(rest: string[]): string | undefined {
   if (rest[0] === "inspect" && rest[1] === "ui") return "observe snapshot";
   if (rest[0] === "skills" && rest[1] === "install") return "skills install";
   if (rest[0] === "skills" && rest[1] === "sync") return "skills sync";
+  if (rest[0] === "skills" && rest[1] === "new") return "skills new";
   if (rest[0] === "doctor") return "doctor";
   if (rest[0] === "version") return "version";
   if (rest[0] === "grant-device-permissions") return "grant-device-permissions";
@@ -548,6 +562,12 @@ async function main(): Promise<void> {
         } else {
           result = await (await import("./commands/skills.js")).cmdSkillsCompileArtifact(skillId, artifact, vars, out);
         }
+      } else if (rest[0] === "new") {
+        if (!rest[1]) {
+          result = JSON.stringify({ code: "USAGE", message: "skills new <skill_id>" });
+        } else {
+          result = await (await import("./commands/skills.js")).cmdSkillsNew(rest[1], out);
+        }
       } else if (rest[0] === "run") {
         const skillId = rest[1];
         if (!skillId) {
@@ -577,7 +597,7 @@ async function main(): Promise<void> {
           ? await (await import("./commands/skills.js")).cmdSkillsSync(ref, out)
           : JSON.stringify({ code: "USAGE", message: "skills sync --ref <git-ref>" });
       } else {
-        result = JSON.stringify({ code: "USAGE", message: "skills list|get|search|compile-artifact|run|install|update|sync ..." });
+        result = JSON.stringify({ code: "USAGE", message: "skills list|get|search|compile-artifact|new|run|install|update|sync ..." });
       }
       break;
     case "serve":

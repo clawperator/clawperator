@@ -45,8 +45,10 @@ preserving user state.
 
 ## 2. Skill folder layout
 
-There is no `clawperator skills new` scaffold command yet. Today, a skill is
-created manually as a folder plus registry entry.
+Use `clawperator skills new <skill_id>` for the fastest path to a valid starter
+skill. It creates the folder, starter files, and registry entry for you.
+
+You can still create a skill manually if needed.
 
 Minimal layout:
 

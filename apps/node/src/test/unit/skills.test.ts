@@ -1,7 +1,7 @@
 import { describe, it, before, after } from "node:test";
 import assert from "node:assert";
 import { spawn } from "node:child_process";
-import { mkdtemp, mkdir, copyFile, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, copyFile, readFile, rm } from "node:fs/promises";
 import { dirname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
@@ -12,9 +12,18 @@ import { getSkill } from "../../domain/skills/getSkill.js";
 import { compileArtifact } from "../../domain/skills/compileArtifact.js";
 import { searchSkills } from "../../domain/skills/searchSkills.js";
 import { runSkill } from "../../domain/skills/runSkill.js";
+import { scaffoldSkill } from "../../domain/skills/scaffoldSkill.js";
 import { loadRegistry } from "../../adapters/skills-repo/localSkillsRegistry.js";
 import { validateExecution, validatePayloadSize } from "../../domain/executions/validateExecution.js";
-import { SKILL_NOT_FOUND, ARTIFACT_NOT_FOUND, COMPILE_VAR_MISSING, SKILL_SCRIPT_NOT_FOUND, SKILL_EXECUTION_FAILED } from "../../contracts/skills.js";
+import {
+  SKILL_NOT_FOUND,
+  ARTIFACT_NOT_FOUND,
+  COMPILE_VAR_MISSING,
+  SKILL_SCRIPT_NOT_FOUND,
+  SKILL_EXECUTION_FAILED,
+  SKILL_ALREADY_EXISTS,
+  SKILL_ID_INVALID,
+} from "../../contracts/skills.js";
 
 const TEST_REGISTRY_PATH = join(packageRoot, "src", "test", "fixtures", "skills", "skills-registry.json");
 const ORIGINAL_REGISTRY_PATH = process.env.CLAWPERATOR_SKILLS_REGISTRY;
@@ -31,12 +40,15 @@ after(() => {
   }
 });
 
-function runCli(args: string[]): Promise<{ stdout: string; stderr: string; code: number }> {
+function runCli(
+  args: string[],
+  options?: { env?: NodeJS.ProcessEnv }
+): Promise<{ stdout: string; stderr: string; code: number }> {
   const cliPath = join(packageRoot, "dist", "cli", "index.js");
   return new Promise((resolve) => {
     const proc = spawn(process.execPath, [cliPath, ...args], {
       cwd: packageRoot,
-      env: {
+      env: options?.env ?? {
         ...process.env,
         CLAWPERATOR_SKILLS_REGISTRY: TEST_REGISTRY_PATH,
       },
@@ -329,6 +341,82 @@ describe("compileArtifact", () => {
     assert.strictEqual(validated.commandId, execution.commandId);
     assert.ok(Array.isArray(validated.actions) && validated.actions.length > 0);
     validatePayloadSize(JSON.stringify(execution));
+  });
+});
+
+describe("scaffoldSkill", () => {
+  it("creates a new skill folder and registry entry", async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-skill-scaffold-"));
+    const registryDir = join(tempRoot, "skills");
+    const registryPath = join(registryDir, "skills-registry.json");
+    await mkdir(registryDir, { recursive: true });
+    await copyFile(TEST_REGISTRY_PATH, registryPath);
+
+    try {
+      const skillId = "com.example.demo.capture-state";
+      const result = await scaffoldSkill(skillId, registryPath);
+      if (!result.ok) assert.fail(result.message);
+
+      assert.strictEqual(result.skillId, skillId);
+      assert.ok(result.files.some((file) => file.endsWith("/skill.json")));
+      assert.ok(result.files.some((file) => file.endsWith("/SKILL.md")));
+      assert.ok(result.files.some((file) => file.endsWith("/scripts/run.js")));
+
+      const registryRaw = await readFile(registryPath, "utf8");
+      const registry = JSON.parse(registryRaw);
+      const entry = registry.skills.find((skill: { id: string }) => skill.id === skillId);
+      assert.ok(entry);
+      assert.strictEqual(entry.applicationId, "com.example.demo");
+      assert.strictEqual(entry.intent, "capture-state");
+      assert.deepStrictEqual(entry.artifacts, []);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects invalid skill ids", async () => {
+    const result = await scaffoldSkill("invalid-skill-id", TEST_REGISTRY_PATH);
+    assert.ok(!result.ok);
+    assert.strictEqual(result.code, SKILL_ID_INVALID);
+  });
+
+  it("rejects duplicate skill ids", async () => {
+    const result = await scaffoldSkill("com.android.settings.capture-overview", TEST_REGISTRY_PATH);
+    assert.ok(!result.ok);
+    assert.strictEqual(result.code, SKILL_ALREADY_EXISTS);
+  });
+
+  it("CLI skills new scaffolds a local skill into the configured registry", async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-skill-cli-"));
+    const registryDir = join(tempRoot, "skills");
+    const registryPath = join(registryDir, "skills-registry.json");
+    await mkdir(registryDir, { recursive: true });
+    await copyFile(TEST_REGISTRY_PATH, registryPath);
+
+    try {
+      const skillId = "com.example.weather.read-summary";
+      const { stdout, code } = await runCli(
+        ["skills", "new", skillId, "--output", "json"],
+        {
+          env: {
+            ...process.env,
+            CLAWPERATOR_SKILLS_REGISTRY: registryPath,
+          },
+        }
+      );
+
+      assert.strictEqual(code, 0, stdout);
+      const parsed = JSON.parse(stdout) as { created?: boolean; skillId?: string; skillPath?: string };
+      assert.strictEqual(parsed.created, true);
+      assert.strictEqual(parsed.skillId, skillId);
+      assert.ok(parsed.skillPath?.endsWith(`/skills/${skillId}`));
+
+      const registryRaw = await readFile(registryPath, "utf8");
+      const registry = JSON.parse(registryRaw);
+      assert.ok(registry.skills.some((skill: { id: string }) => skill.id === skillId));
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
   });
 });
 
