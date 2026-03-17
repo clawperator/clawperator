@@ -6,6 +6,7 @@ import { searchSkills } from "../../domain/skills/searchSkills.js";
 import { runSkill } from "../../domain/skills/runSkill.js";
 import { scaffoldSkill } from "../../domain/skills/scaffoldSkill.js";
 import { validateAllSkills, validateSkill } from "../../domain/skills/validateSkill.js";
+import { SKILL_OUTPUT_ASSERTION_FAILED } from "../../contracts/skills.js";
 import type { OutputOptions } from "../output.js";
 import { formatSuccess, formatError } from "../output.js";
 
@@ -96,16 +97,28 @@ export async function cmdSkillsRun(
   skillId: string,
   args: string[],
   timeoutMs: number | undefined,
+  expectContains: string | undefined,
   options: { format: OutputOptions["format"] }
 ): Promise<string> {
   const result = await runSkill(skillId, args, undefined, timeoutMs);
   if (result.ok) {
+    if (expectContains && !result.output.includes(expectContains)) {
+      return formatError({
+        code: SKILL_OUTPUT_ASSERTION_FAILED,
+        message: `Skill ${skillId} output did not include expected text`,
+        skillId,
+        output: result.output,
+        expectedSubstring: expectContains,
+        timeoutMs: timeoutMs ?? undefined,
+      }, options);
+    }
     return formatSuccess({
       skillId: result.skillId,
       output: result.output,
       exitCode: result.exitCode,
       durationMs: result.durationMs,
       timeoutMs: timeoutMs ?? undefined,
+      expectedSubstring: expectContains ?? undefined,
     }, options);
   }
   return formatError({
@@ -116,6 +129,7 @@ export async function cmdSkillsRun(
     stdout: result.stdout,
     stderr: result.stderr,
     timeoutMs: timeoutMs ?? undefined,
+    expectedSubstring: expectContains ?? undefined,
   }, options);
 }
 

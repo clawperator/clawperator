@@ -235,6 +235,48 @@ describe("serve API integration", () => {
     assert.strictEqual(body.error.code, "INVALID_TIMEOUT_MS");
   });
 
+  test("POST /skills/:skillId/run can assert output content", async () => {
+    const res = await fetch(`http://localhost:${port}/skills/com.test.echo/run`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        args: ["hello"],
+        expectContains: "TEST_OUTPUT:hello",
+      }),
+    });
+
+    assert.strictEqual(res.status, 200);
+    const body = await res.json() as {
+      ok: boolean;
+      expectedSubstring?: string;
+      output?: string;
+    };
+    assert.strictEqual(body.ok, true);
+    assert.strictEqual(body.expectedSubstring, "TEST_OUTPUT:hello");
+    assert.ok(body.output?.includes("TEST_OUTPUT:hello"));
+  });
+
+  test("POST /skills/:skillId/run returns assertion failure when expected text is missing", async () => {
+    const res = await fetch(`http://localhost:${port}/skills/com.test.echo/run`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        args: ["hello"],
+        expectContains: "missing-value",
+      }),
+    });
+
+    assert.strictEqual(res.status, 400);
+    const body = await res.json() as {
+      ok: boolean;
+      error: { code: string; expectedSubstring?: string; output?: string };
+    };
+    assert.strictEqual(body.ok, false);
+    assert.strictEqual(body.error.code, "SKILL_OUTPUT_ASSERTION_FAILED");
+    assert.strictEqual(body.error.expectedSubstring, "missing-value");
+    assert.ok(body.error.output?.includes("TEST_OUTPUT:hello"));
+  });
+
   test("Execution emits SSE events", async () => {
     // 1. Connect to SSE
     const sseRes = await fetch(`http://localhost:${port}/events`);

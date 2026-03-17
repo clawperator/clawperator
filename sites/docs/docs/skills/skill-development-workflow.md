@@ -158,6 +158,9 @@ This keeps failures local:
 - validate-only failure means the execution contract is wrong
 - live-run failure usually means runtime state, selectors, timing, or parsing
 
+For lightweight smoke checks on expected markers, add
+`--expect-contains <text>` to the live run.
+
 ## 8. Inspect partial output on script failures
 
 When `clawperator skills run` fails or times out, do not assume the run

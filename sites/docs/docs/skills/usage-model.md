@@ -86,6 +86,12 @@ When a particular device or workflow needs a different wrapper budget, use:
 clawperator skills run <skill_id> --device-id <device_id> --timeout-ms 90000
 ```
 
+When you want a lightweight smoke check for expected output markers, use:
+
+```bash
+clawperator skills run <skill_id> --device-id <device_id> --expect-contains TEXT_BEGIN
+```
+
 ## Private skills
 
 Private skills are not discovered by scanning folders automatically. The

@@ -62,7 +62,7 @@ Commands:
   skills validate <skill_id>
   skills validate --all
                                             Validate one local skill or the entire configured registry
-  skills run <skill_id> [--device-id <id>] [--timeout-ms <n>] [-- <extra_args>]
+  skills run <skill_id> [--device-id <id>] [--timeout-ms <n>] [--expect-contains <text>] [-- <extra_args>]
                                             Invoke a skill script (convenience wrapper)
   skills install
                                             Clone skills repository to ~/.clawperator/skills/
@@ -612,7 +612,7 @@ async function main(): Promise<void> {
       } else if (rest[0] === "run") {
         const skillId = rest[1];
         if (!skillId) {
-          result = JSON.stringify({ code: "USAGE", message: "skills run <skill_id> [--device-id <id>] [--timeout-ms <n>] [-- <extra_args>]" });
+          result = JSON.stringify({ code: "USAGE", message: "skills run <skill_id> [--device-id <id>] [--timeout-ms <n>] [--expect-contains <text>] [-- <extra_args>]" });
         } else {
           // Build args to pass to the skill script
           // Only parse options from args before "--" to avoid double-counting
@@ -620,6 +620,7 @@ async function main(): Promise<void> {
           const optSegment = dashDash >= 0 ? rest.slice(0, dashDash) : rest;
           const scriptArgs: string[] = [];
           const deviceId = global.deviceId ?? getOpt(optSegment, "--device-id");
+          const expectContains = getOpt(optSegment, "--expect-contains");
           if (deviceId) scriptArgs.push(deviceId);
           // Pass anything after "--" as extra args
           if (dashDash >= 0) {
@@ -629,6 +630,7 @@ async function main(): Promise<void> {
             skillId,
             scriptArgs,
             global.timeoutMs,
+            expectContains,
             out
           );
         }

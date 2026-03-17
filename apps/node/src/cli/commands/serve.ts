@@ -8,7 +8,7 @@ import { searchSkills } from "../../domain/skills/searchSkills.js";
 import { runSkill } from "../../domain/skills/runSkill.js";
 import { clawperatorEvents, CLAW_EVENT_TYPES } from "../../domain/observe/events.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
-import { SKILL_NOT_FOUND } from "../../contracts/skills.js";
+import { SKILL_NOT_FOUND, SKILL_OUTPUT_ASSERTION_FAILED } from "../../contracts/skills.js";
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 import { listConfiguredAvds, inspectConfiguredAvd } from "../../domain/android-emulators/configuredAvds.js";
 import { listRunningEmulators } from "../../domain/android-emulators/runningEmulators.js";
@@ -396,7 +396,8 @@ export async function startServer(options: ServeOptions): Promise<Server> {
         deviceId,
         args,
         timeoutMs,
-      } = req.body as { deviceId?: unknown; args?: unknown; timeoutMs?: unknown };
+        expectContains,
+      } = req.body as { deviceId?: unknown; args?: unknown; timeoutMs?: unknown; expectContains?: unknown };
 
       if (deviceId !== undefined && typeof deviceId !== "string") {
         res.status(400).json({ ok: false, error: { code: "INVALID_DEVICE_ID", message: "'deviceId' must be a string" } });
@@ -413,6 +414,11 @@ export async function startServer(options: ServeOptions): Promise<Server> {
         return;
       }
 
+      if (expectContains !== undefined && typeof expectContains !== "string") {
+        res.status(400).json({ ok: false, error: { code: "INVALID_EXPECT_CONTAINS", message: "'expectContains' must be a string" } });
+        return;
+      }
+
       const scriptArgs: string[] = [];
       if (typeof deviceId === "string" && deviceId.length > 0) scriptArgs.push(deviceId);
       if (Array.isArray(args)) scriptArgs.push(...args.map(String));
@@ -424,6 +430,20 @@ export async function startServer(options: ServeOptions): Promise<Server> {
         typeof timeoutMs === "number" ? timeoutMs : undefined
       );
       if (result.ok) {
+        if (typeof expectContains === "string" && !result.output.includes(expectContains)) {
+          res.status(400).json({
+            ok: false,
+            error: {
+              code: SKILL_OUTPUT_ASSERTION_FAILED,
+              message: `Skill ${req.params.skillId} output did not include expected text`,
+              skillId: req.params.skillId,
+              output: result.output,
+              expectedSubstring: expectContains,
+              timeoutMs: typeof timeoutMs === "number" ? timeoutMs : undefined,
+            },
+          });
+          return;
+        }
         res.json({
           ok: true,
           skillId: result.skillId,
@@ -431,6 +451,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
           exitCode: result.exitCode,
           durationMs: result.durationMs,
           timeoutMs: typeof timeoutMs === "number" ? timeoutMs : undefined,
+          expectedSubstring: typeof expectContains === "string" ? expectContains : undefined,
         });
       } else {
         const status = result.code === SKILL_NOT_FOUND ? 404
@@ -446,6 +467,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
             stdout: result.stdout,
             stderr: result.stderr,
             timeoutMs: typeof timeoutMs === "number" ? timeoutMs : undefined,
+            expectedSubstring: typeof expectContains === "string" ? expectContains : undefined,
           },
         });
       }

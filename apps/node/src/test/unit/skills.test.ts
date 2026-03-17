@@ -23,6 +23,7 @@ import {
   SKILL_SCRIPT_NOT_FOUND,
   SKILL_EXECUTION_FAILED,
   SKILL_EXECUTION_TIMEOUT,
+  SKILL_OUTPUT_ASSERTION_FAILED,
   SKILL_ALREADY_EXISTS,
   SKILL_ID_INVALID,
   SKILL_VALIDATION_FAILED,
@@ -796,5 +797,26 @@ describe("runSkill", () => {
     const parsed = JSON.parse(stdout) as { code?: string; message?: string };
     assert.strictEqual(parsed.code, "USAGE");
     assert.ok(parsed.message?.includes("--timeout-ms"));
+  });
+
+  it("CLI skills run can assert output content", async () => {
+    const { stdout, code } = await runCli([
+      "skills", "run", "com.test.echo", "--expect-contains", "TEST_OUTPUT:hello", "--output", "json", "--", "hello",
+    ]);
+    assert.strictEqual(code, 0, stdout);
+    const parsed = JSON.parse(stdout) as { expectedSubstring?: string; output?: string };
+    assert.strictEqual(parsed.expectedSubstring, "TEST_OUTPUT:hello");
+    assert.ok(parsed.output?.includes("TEST_OUTPUT:hello"));
+  });
+
+  it("CLI skills run returns assertion failure when expected text is missing", async () => {
+    const { stdout, code } = await runCli([
+      "skills", "run", "com.test.echo", "--expect-contains", "missing-value", "--output", "json", "--", "hello",
+    ]);
+    assert.strictEqual(code, 1, stdout);
+    const parsed = JSON.parse(stdout) as { code?: string; expectedSubstring?: string; output?: string };
+    assert.strictEqual(parsed.code, SKILL_OUTPUT_ASSERTION_FAILED);
+    assert.strictEqual(parsed.expectedSubstring, "missing-value");
+    assert.ok(parsed.output?.includes("TEST_OUTPUT:hello"));
   });
 });
