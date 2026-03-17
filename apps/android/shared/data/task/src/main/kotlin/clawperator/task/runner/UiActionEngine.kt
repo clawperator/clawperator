@@ -274,7 +274,10 @@ class UiActionEngineDefault(
         val result =
             if (
                 action.target != null &&
-                initialResult.terminationReason == TaskScrollTerminationReason.EdgeReached
+                (initialResult.terminationReason == TaskScrollTerminationReason.EdgeReached ||
+                    initialResult.terminationReason == TaskScrollTerminationReason.MaxScrollsReached ||
+                    initialResult.terminationReason == TaskScrollTerminationReason.MaxDurationReached ||
+                    initialResult.terminationReason == TaskScrollTerminationReason.NoPositionChange)
             ) {
                 val targetVisibleAfterLoop =
                     try {

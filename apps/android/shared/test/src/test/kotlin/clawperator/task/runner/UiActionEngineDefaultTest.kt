@@ -631,6 +631,105 @@ class UiActionEngineDefaultTest : ActionTest {
             assertEquals("2", stepResult.data["scrolls_executed"])
             assertEquals(true, uiScope.clickCalled)
         }
+
+    @Test
+    fun `execute scroll_until normalizes to target_found when target visible after max_scrolls_reached`() =
+        actionTest {
+            val uiScope = RecordingTaskUiScope(
+                scrollLoopResult = TaskScrollLoopResult(TaskScrollTerminationReason.MaxScrollsReached, scrollsExecuted = 20),
+            )
+            val taskScope = RecordingTaskScope(uiScope)
+            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+
+            val result =
+                engine.execute(
+                    taskScope = taskScope,
+                    plan = UiActionPlan(
+                        commandId = "cmd-su-maxscrolls-visible",
+                        taskId = "task-su-maxscrolls-visible",
+                        source = "test",
+                        actions = listOf(
+                            UiAction.ScrollUntil(
+                                id = "su-maxscrolls-visible",
+                                target = NodeMatcher(textEquals = "About phone"),
+                                clickAfter = true,
+                            ),
+                        ),
+                    ),
+                )
+
+            val stepResult = result.stepResults.single()
+            assertEquals("scroll_until", stepResult.actionType)
+            assertEquals(true, stepResult.success)
+            assertEquals("TARGET_FOUND", stepResult.data["termination_reason"])
+            assertEquals(true, uiScope.clickCalled)
+        }
+
+    @Test
+    fun `execute scroll_until normalizes to target_found when target visible after max_duration_reached`() =
+        actionTest {
+            val uiScope = RecordingTaskUiScope(
+                scrollLoopResult = TaskScrollLoopResult(TaskScrollTerminationReason.MaxDurationReached, scrollsExecuted = 10),
+            )
+            val taskScope = RecordingTaskScope(uiScope)
+            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+
+            val result =
+                engine.execute(
+                    taskScope = taskScope,
+                    plan = UiActionPlan(
+                        commandId = "cmd-su-maxduration-visible",
+                        taskId = "task-su-maxduration-visible",
+                        source = "test",
+                        actions = listOf(
+                            UiAction.ScrollUntil(
+                                id = "su-maxduration-visible",
+                                target = NodeMatcher(textEquals = "About phone"),
+                                clickAfter = true,
+                            ),
+                        ),
+                    ),
+                )
+
+            val stepResult = result.stepResults.single()
+            assertEquals("scroll_until", stepResult.actionType)
+            assertEquals(true, stepResult.success)
+            assertEquals("TARGET_FOUND", stepResult.data["termination_reason"])
+            assertEquals(true, uiScope.clickCalled)
+        }
+
+    @Test
+    fun `execute scroll_until normalizes to target_found when target visible after no_position_change`() =
+        actionTest {
+            val uiScope = RecordingTaskUiScope(
+                scrollLoopResult = TaskScrollLoopResult(TaskScrollTerminationReason.NoPositionChange, scrollsExecuted = 5),
+            )
+            val taskScope = RecordingTaskScope(uiScope)
+            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+
+            val result =
+                engine.execute(
+                    taskScope = taskScope,
+                    plan = UiActionPlan(
+                        commandId = "cmd-su-noposchange-visible",
+                        taskId = "task-su-noposchange-visible",
+                        source = "test",
+                        actions = listOf(
+                            UiAction.ScrollUntil(
+                                id = "su-noposchange-visible",
+                                target = NodeMatcher(textEquals = "About phone"),
+                                clickAfter = true,
+                            ),
+                        ),
+                    ),
+                )
+
+            val stepResult = result.stepResults.single()
+            assertEquals("scroll_until", stepResult.actionType)
+            assertEquals(true, stepResult.success)
+            assertEquals("TARGET_FOUND", stepResult.data["termination_reason"])
+            assertEquals(true, uiScope.clickCalled)
+        }
 }
 
 private class RecordingTaskScope(
