@@ -215,7 +215,7 @@ Allowed values:
 - `navigate`
 - `click`
 - `long_click`
-- `type_text`
+- `enter_text`
 - `toggle`
 - `purchase_risk`
 
@@ -342,7 +342,7 @@ Minimum validation checks:
 4. Every step has a valid YAML block.
 5. Step action types are supported.
 6. Selector DSL uses only allowed keys.
-7. For `recipe_type=action` or capabilities containing `toggle|type_text|purchase_risk`, a verification requirement must exist after each side-effecting step.
+7. For `recipe_type=action` or capabilities containing `toggle|enter_text|purchase_risk`, a verification requirement must exist after each side-effecting step.
 8. User-specific literals are not present in frontmatter, selectors, or step blocks.
 9. Required input variables used by selectors are declared in `inputs`.
 
