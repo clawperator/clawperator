@@ -4310,6 +4310,7 @@ That ordering matters because the same execution can:
 | Concurrency / timing | `EXECUTION_CONFLICT_IN_FLIGHT`, `RESULT_ENVELOPE_TIMEOUT`, `SNAPSHOT_EXTRACTION_FAILED` | Retry only after a short wait or after reducing contention. |
 | UI state / selector | `NODE_NOT_FOUND`, `CONTAINER_NOT_FOUND`, `CONTAINER_NOT_SCROLLABLE` | Re-observe the UI, then adjust selectors or navigation. |
 | Runtime refusal | `GESTURE_FAILED`, `GLOBAL_ACTION_FAILED`, `SECURITY_BLOCK_DETECTED` | Inspect current state, then choose a different action or recovery path. |
+| Skills wrapper | `SKILL_EXECUTION_FAILED`, `SKILL_EXECUTION_TIMEOUT`, `REGISTRY_READ_FAILED` | Inspect partial `stdout` and `stderr`, then decide whether the problem is script logic, timeout budget, or local registry setup. |
 
 ## Recommended agent responses
 
@@ -4501,6 +4502,49 @@ Recommended next action:
 - if the action is blocked by design, escalate that limitation to the user or
   outer agent
 
+### `REGISTRY_READ_FAILED`
+
+Meaning:
+- the local skills registry could not be read, found, or parsed
+
+Usually recoverable:
+- yes
+
+Recommended next action:
+- verify `CLAWPERATOR_SKILLS_REGISTRY`
+- confirm the registry file exists and contains valid JSON
+- rerun `clawperator skills list --output json` before retrying the workflow
+
+### `SKILL_EXECUTION_FAILED`
+
+Meaning:
+- the skill wrapper launched the script, but the script exited non-zero
+
+Usually recoverable:
+- sometimes
+
+Recommended next action:
+- inspect both `error.stdout` and `error.stderr`
+- treat partial `stdout` as potentially useful structured output, not noise
+- if `stdout` already contains enough result data, recover from that before
+  rerunning the skill
+- if the failure is real, fix the skill inputs or script logic before retrying
+
+### `SKILL_EXECUTION_TIMEOUT`
+
+Meaning:
+- the script exceeded the wrapper timeout before it exited cleanly
+
+Usually recoverable:
+- often
+
+Recommended next action:
+- inspect `error.stdout` and `error.stderr` for partial progress or partial
+  JSON
+- increase the skill-side timeout only if the flow genuinely needs more wall
+  clock time
+- split long observe-decide-act flows into smaller steps when practical
+
 ## Retry guidance
 
 Safe to retry after a short delay:
@@ -4508,6 +4552,7 @@ Safe to retry after a short delay:
 - `EXECUTION_CONFLICT_IN_FLIGHT`
 - `SNAPSHOT_EXTRACTION_FAILED`
 - some `RESULT_ENVELOPE_TIMEOUT` cases
+- some `SKILL_EXECUTION_TIMEOUT` cases after checking partial output
 
 Usually wrong to retry unchanged:
 
@@ -4515,6 +4560,8 @@ Usually wrong to retry unchanged:
 - `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED`
 - `RECEIVER_NOT_INSTALLED`
 - `NODE_NOT_FOUND` when the agent has not re-observed the UI
+- `REGISTRY_READ_FAILED`
+- `SKILL_EXECUTION_FAILED` when the script already returned a real error signal
 
 ## Recommended recovery loop
 
