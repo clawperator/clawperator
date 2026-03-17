@@ -141,6 +141,36 @@ Main gaps still worth addressing:
 - higher-level runtime ergonomics that reduce round-trips further without
   weakening determinism
 
+Viable cleanup items for the remainder of this branch:
+
+- Do one final docs-accuracy sweep against the shipped CLI and API surfaces so
+  usage strings, option names, examples, and error semantics match current
+  behavior exactly.
+- Collapse smaller duplicated skill-workflow guidance where practical so there
+  is one clear canonical path for:
+  - discovering skills
+  - scaffolding a local skill
+  - validating a skill or registry
+  - running a skill with timeout and output assertions
+- Review cross-links from the main agent entrypoints so the most important
+  pages always point to the current canonical references:
+  - quickstart
+  - snapshot format
+  - execution model
+  - error handling
+  - skill development workflow
+  - multi-device workflows
+- Add any missing CLI help topics for commands that now have meaningful agent
+  workflow options, so agents do not need to infer current flags only from the
+  top-level help text or source.
+- Trim or rewrite any remaining internal-sounding or over-architected wording
+  in primary operational docs when a more direct task-oriented title or intro
+  would help cold-start agents.
+- Remove or shorten any stale duplicate caveats once the dedicated reference
+  page exists, rather than preserving the same explanation in several places.
+- Before PR creation, delete or reduce temporary task-only notes whose durable
+  content has already been migrated into the real docs.
+
 ---
 
 ## Phase 0: Baseline audit and source-of-truth alignment
