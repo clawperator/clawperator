@@ -26,7 +26,6 @@ nav:
     - Execution Model: reference/execution-model.md
     - Timeout Budgeting: reference/timeout-budgeting.md
     - Device and Package Model: reference/device-and-package-model.md
-    - Operator Automation Playbook: design/operator-llm-playbook.md
   - Reference:
     - CLI Reference: reference/cli-reference.md
     - API Overview: reference/api-overview.md
@@ -41,6 +40,7 @@ nav:
   - Design and Rationale:
     - System Overview: architecture/architecture.md
     - Runtime Architecture and API Rationale: design/node-api-design.md
+    - Operator Automation Playbook: design/operator-llm-playbook.md
 
   - Troubleshooting:
     - Version Compatibility: troubleshooting/compatibility.md
