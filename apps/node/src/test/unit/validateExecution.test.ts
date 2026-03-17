@@ -695,6 +695,42 @@ describe("validateExecution", () => {
     });
     assert.strictEqual(ex.actions[0].type, "read_text");
   });
+
+  it("rejects read_text with regex validator but missing validatorPattern", () => {
+    assert.throws(
+      () =>
+        validateExecution({
+          commandId: "c", taskId: "t", source: "s",
+          expectedFormat: "android-ui-automator", timeoutMs: 5000,
+          actions: [{ id: "x", type: "read_text", params: { matcher: { textContains: "Order" }, validator: "regex" } }],
+        }),
+      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
+    );
+  });
+
+  it("rejects read_text with regex validator and blank validatorPattern", () => {
+    assert.throws(
+      () =>
+        validateExecution({
+          commandId: "c", taskId: "t", source: "s",
+          expectedFormat: "android-ui-automator", timeoutMs: 5000,
+          actions: [{ id: "x", type: "read_text", params: { matcher: { textContains: "Order" }, validator: "regex", validatorPattern: "" } }],
+        }),
+      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
+    );
+  });
+
+  it("rejects read_text with regex validator and invalid regex pattern", () => {
+    assert.throws(
+      () =>
+        validateExecution({
+          commandId: "c", taskId: "t", source: "s",
+          expectedFormat: "android-ui-automator", timeoutMs: 5000,
+          actions: [{ id: "x", type: "read_text", params: { matcher: { textContains: "Order" }, validator: "regex", validatorPattern: "[invalid(" } }],
+        }),
+      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
+    );
+  });
 });
 
 describe("validatePayloadSize", () => {
