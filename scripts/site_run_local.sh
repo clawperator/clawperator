@@ -31,4 +31,20 @@ echo "--- Starting local server at http://localhost:8080 ---"
 echo "Serving from: $OUT_DIR"
 echo "Press Ctrl+C to stop the server."
 
-python3 -m http.server 8080
+python3 - <<'PY'
+import http.server
+import socketserver
+
+PORT = 8080
+
+class NoCacheHandler(http.server.SimpleHTTPRequestHandler):
+    def end_headers(self):
+        self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+        self.send_header("Pragma", "no-cache")
+        self.send_header("Expires", "0")
+        super().end_headers()
+
+with socketserver.TCPServer(("", PORT), NoCacheHandler) as httpd:
+    print(f"Serving HTTP on :: port {PORT} (http://[::]:{PORT}/) ...")
+    httpd.serve_forever()
+PY
