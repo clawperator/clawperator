@@ -23,6 +23,7 @@ Use this page as a technical map:
 - [Execution Model](reference/execution-model.md) - Required payload fields, status vs step success, timeout, and error surfaces
 - [Device and Package Model](reference/device-and-package-model.md) - What `deviceId` and `receiverPackage` mean in practice
 - [Clawperator Snapshot Format](reference/snapshot-format.md) - Canonical `snapshot_ui` and `observe snapshot` output contract
+- [Navigation Patterns for Agents](ai-agents/navigation-patterns.md) - Practical patterns for scrolls, overlays, and OEM variation
 - [Operator LLM Playbook](design/operator-llm-playbook.md) - Practical operating rules for observation, action loops, and skill execution
 - [API Overview](reference/api-overview.md) - Execution payload, action types, result envelope shape, and snapshot semantics
 - [CLI Reference](reference/cli-reference.md) - Command-line entrypoints and flags
@@ -51,6 +52,7 @@ Use this page as a technical map:
 - [Execution Model](reference/execution-model.md) - Envelope semantics, timeout policy, and validation behavior
 - [Device and Package Model](reference/device-and-package-model.md) - Device IDs, receiver packages, and multi-device rules
 - [Clawperator Snapshot Format](reference/snapshot-format.md) - Canonical snapshot output and parsing contract
+- [Navigation Patterns for Agents](ai-agents/navigation-patterns.md) - Scroll, overlay, and OEM-variation tactics
 - [Operator LLM Playbook](design/operator-llm-playbook.md) - Action contracts, runtime conventions, and skill packaging
 - [API Overview](reference/api-overview.md) - Execution payload, action types, result envelopes, and snapshot delivery
 - [CLI Reference](reference/cli-reference.md) - Exact command surface for local and scripted integrations

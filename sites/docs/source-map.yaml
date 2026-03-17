@@ -85,6 +85,11 @@ sections:
         mode: copy
         sources:
           - docs/node-api-for-agents.md
+      - output: ai-agents/navigation-patterns.md
+        title: Navigation Patterns for Agents
+        mode: copy
+        sources:
+          - docs/navigation-patterns.md
 
   - id: reference
     title: Reference
