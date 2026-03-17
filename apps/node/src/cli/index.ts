@@ -349,6 +349,33 @@ function getOpt(rest: string[], flag: string): string | undefined {
   return i >= 0 && rest[i + 1] ? rest[i + 1] : undefined;
 }
 
+function getCommandArgs(argv: string[], commandPath: string[]): string[] | undefined {
+  for (let i = 0; i <= argv.length - commandPath.length; i++) {
+    let matches = true;
+    for (let j = 0; j < commandPath.length; j++) {
+      if (argv[i + j] !== commandPath[j]) {
+        matches = false;
+        break;
+      }
+    }
+    if (matches) {
+      return argv.slice(i + commandPath.length);
+    }
+  }
+  return undefined;
+}
+
+function getNumberOpt(rest: string[], flag: string): number | undefined {
+  const i = rest.indexOf(flag);
+  if (i < 0) {
+    return undefined;
+  }
+  if (!rest[i + 1]) {
+    throw new UsageError(`${flag} requires a value`);
+  }
+  return Number(rest[i + 1]);
+}
+
 function hasFlag(rest: string[], flag: string): boolean {
   return rest.includes(flag);
 }
@@ -648,8 +675,12 @@ async function main(): Promise<void> {
           // Only parse options from args before "--" to avoid double-counting
           const dashDash = rest.indexOf("--");
           const optSegment = dashDash >= 0 ? rest.slice(0, dashDash) : rest;
+          const rawSkillsRunArgs = getCommandArgs(argv, ["skills", "run"]) ?? [];
+          const rawDashDash = rawSkillsRunArgs.indexOf("--");
+          const rawOptSegment = rawDashDash >= 0 ? rawSkillsRunArgs.slice(0, rawDashDash) : rawSkillsRunArgs;
           const scriptArgs: string[] = [];
           const deviceId = global.deviceId ?? getOpt(optSegment, "--device-id");
+          const localTimeoutMs = getNumberOpt(rawOptSegment, "--timeout-ms");
           const expectContains = getOpt(optSegment, "--expect-contains");
           if (deviceId) scriptArgs.push(deviceId);
           // Pass anything after "--" as extra args
@@ -659,7 +690,7 @@ async function main(): Promise<void> {
           result = await (await import("./commands/skills.js")).cmdSkillsRun(
             skillId,
             scriptArgs,
-            global.timeoutMs,
+            localTimeoutMs ?? global.timeoutMs,
             expectContains,
             out
           );

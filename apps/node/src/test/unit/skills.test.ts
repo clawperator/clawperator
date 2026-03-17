@@ -792,6 +792,17 @@ describe("runSkill", () => {
     assert.ok(parsed.output?.includes("TEST_OUTPUT:hello"));
   });
 
+  it("CLI skills run prefers local --timeout-ms over the global flag", async () => {
+    const { stdout, code } = await runCli([
+      "--timeout-ms", "9000",
+      "skills", "run", "com.test.echo", "--timeout-ms", "3210", "--output", "json", "--", "hello",
+    ]);
+    assert.strictEqual(code, 0, stdout);
+    const parsed = JSON.parse(stdout) as { skillId?: string; timeoutMs?: number };
+    assert.strictEqual(parsed.skillId, "com.test.echo");
+    assert.strictEqual(parsed.timeoutMs, 3210);
+  });
+
   it("CLI skills run returns usage when skill_id is missing even with --timeout-ms", async () => {
     const { stdout } = await runCli(["skills", "run", "--timeout-ms", "5000", "--output", "json"]);
     const parsed = JSON.parse(stdout) as { code?: string; message?: string };
