@@ -603,6 +603,7 @@ snapshot to verify" round-trip for many navigation tasks.
 If `clickAfter: true`, `scroll_until` clicks the target immediately after it
 becomes visible. This gives agents a one-step "scroll top-level list until
 visible, then click" path without switching to `scroll_and_click`.
+*Note on `clickAfter` firing:* The click only fires if the loop terminates with `TARGET_FOUND`. On older Clawperator APKs (pre-PR-1), if the target was found exactly at the edge of the list, the termination reason was sometimes reported as `EDGE_REACHED` and the click was silently skipped. As a safety net for older APKs, you can follow an `EDGE_REACHED` termination with an explicit `click` step.
 
 **Termination reasons (`data.termination_reason`):**
 - `TARGET_FOUND` - the provided `target` matcher became visible in the current UI tree. `success: true`.
@@ -612,6 +613,7 @@ visible, then click" path without switching to `scroll_and_click`.
 - `NO_POSITION_CHANGE` - no content movement across `noPositionChangeThreshold` consecutive scrolls. `success: true`.
 - `CONTAINER_NOT_FOUND` - container resolution failed. `success: false`.
 - `CONTAINER_NOT_SCROLLABLE` - container is not scrollable. `success: false`.
+- `CONTAINER_LOST` - container disappeared mid-loop (e.g., app navigated away). `success: false`.
 
 `MAX_SCROLLS_REACHED`, `MAX_DURATION_REACHED`, and `NO_POSITION_CHANGE` are clean terminal states, not errors. Agents scrolling infinite feeds should expect these and handle them without treating the action as failed.
 

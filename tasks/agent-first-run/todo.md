@@ -46,7 +46,7 @@ Isolated because this is a correctness bug. Reviewers need to verify the termina
 
 ---
 
-### T-01 · Fix `scroll_until` + `clickAfter` miss on EDGE_REACHED
+### [DONE] T-01 · Fix `scroll_until` + `clickAfter` miss on EDGE_REACHED
 **Priority:** Blocker
 
 **Problem:**

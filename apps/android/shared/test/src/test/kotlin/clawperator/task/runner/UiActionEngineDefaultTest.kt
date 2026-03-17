@@ -471,6 +471,33 @@ class UiActionEngineDefaultTest : ActionTest {
         }
 
     @Test
+    fun `execute scroll_until returns failure for container_lost`() =
+        actionTest {
+            val uiScope = RecordingTaskUiScope(
+                scrollLoopResult = TaskScrollLoopResult(TaskScrollTerminationReason.ContainerLost, scrollsExecuted = 3),
+            )
+            val taskScope = RecordingTaskScope(uiScope)
+            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+
+            val result =
+                engine.execute(
+                    taskScope = taskScope,
+                    plan = UiActionPlan(
+                        commandId = "cmd-su-cl",
+                        taskId = "task-su-cl",
+                        source = "test",
+                        actions = listOf(UiAction.ScrollUntil(id = "su5")),
+                    ),
+                )
+
+            val stepResult = result.stepResults.single()
+            assertEquals("scroll_until", stepResult.actionType)
+            assertEquals(false, stepResult.success)
+            assertEquals("CONTAINER_LOST", stepResult.data["error"])
+            assertEquals("CONTAINER_LOST", stepResult.data["termination_reason"])
+        }
+
+    @Test
     fun `execute scroll_until returns target_found termination`() =
         actionTest {
             val uiScope = RecordingTaskUiScope(
