@@ -797,6 +797,39 @@ class UiActionEngineDefaultTest : ActionTest {
         }
 
     @Test
+    fun `execute wait_for_navigation succeeds with expectedNode`() =
+        actionTest {
+            val uiScope = RecordingTaskUiScope()
+            val taskScope = RecordingTaskScope(uiScope).apply {
+                waitForNavigationResult = WaitForNavigationResult(success = true, lastPackage = "com.example", elapsedMs = 320)
+            }
+            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+
+            val result =
+                engine.execute(
+                    taskScope = taskScope,
+                    plan = UiActionPlan(
+                        commandId = "cmd",
+                        taskId = "task",
+                        source = "test",
+                        actions = listOf(
+                            UiAction.WaitForNavigation(
+                                id = "wait3",
+                                expectedNode = NodeMatcher(textEquals = "Success"),
+                                timeoutMs = 5000,
+                            ),
+                        ),
+                    ),
+                )
+
+            val stepResult = result.stepResults.single()
+            assertEquals("wait_for_navigation", stepResult.actionType)
+            assertEquals(true, stepResult.success)
+            assertEquals("com.example", stepResult.data["resolved_package"])
+            assertEquals("320", stepResult.data["elapsed_ms"])
+        }
+
+    @Test
     fun `execute read_key_value_pair returns label and value on success`() =
         actionTest {
             val uiScope = RecordingTaskUiScope().apply {
