@@ -4,6 +4,7 @@ import argparse
 import re
 import sys
 from pathlib import Path
+from posixpath import normpath
 from urllib.parse import urlparse
 
 
@@ -24,7 +25,11 @@ def parse_args():
     )
     parser.add_argument("--site-dir", required=True, help="Built docs site directory, usually sites/docs/site")
     parser.add_argument("--source-map", required=True, help="Path to sites/docs/source-map.yaml")
-    parser.add_argument("--docs-index", required=True, help="Path to docs/index.md")
+    parser.add_argument(
+        "--generated-docs-dir",
+        required=True,
+        help="Path to generated markdown docs, usually sites/docs/docs",
+    )
     parser.add_argument("--llms-txt", required=True, help="Path to sites/docs/static/llms.txt")
     return parser.parse_args()
 
@@ -63,17 +68,30 @@ def parse_markdown_links(markdown_path: Path) -> list[str]:
     links: list[str] = []
     for match in pattern.finditer(markdown_path.read_text(encoding="utf-8")):
         href = match.group(1).strip()
-        if not href or href.startswith("#") or "://" in href:
-            continue
-        if href.startswith("../"):
+        if (
+            not href
+            or href.startswith("#")
+            or "://" in href
+            or href.startswith("mailto:")
+            or href.startswith("tel:")
+        ):
             continue
         links.append(href)
     return links
 
 
-def relative_doc_link_to_site_path(href: str) -> str | None:
-    if href.endswith(".md"):
-        return markdown_output_to_site_path(href)
+def generated_doc_link_to_site_path(page_path: Path, generated_docs_dir: Path, href: str) -> str | None:
+    clean_href = href.split("#", 1)[0].split("?", 1)[0].strip()
+    if not clean_href:
+        return None
+
+    if clean_href.startswith("/"):
+        return clean_href.lstrip("/")
+
+    if clean_href.endswith(".md"):
+        relative_page = page_path.relative_to(generated_docs_dir)
+        resolved_doc = normpath(str(relative_page.parent / clean_href))
+        return markdown_output_to_site_path(resolved_doc)
     return None
 
 
@@ -89,7 +107,7 @@ def main() -> int:
     args = parse_args()
     site_dir = Path(args.site_dir).resolve()
     source_map_path = Path(args.source_map).resolve()
-    docs_index_path = Path(args.docs_index).resolve()
+    generated_docs_dir = Path(args.generated_docs_dir).resolve()
     llms_txt_path = Path(args.llms_txt).resolve()
 
     failures: list[str] = []
@@ -100,12 +118,13 @@ def main() -> int:
     expected_page_paths = [markdown_output_to_site_path(output) for output in source_map_outputs]
     failures.extend(validate_existing_paths(site_dir, expected_page_paths, "source-map page"))
 
-    docs_index_links = parse_markdown_links(docs_index_path)
-    docs_index_targets = [
-        target for href in docs_index_links
-        if (target := relative_doc_link_to_site_path(href)) is not None
-    ]
-    failures.extend(validate_existing_paths(site_dir, docs_index_targets, "docs index link"))
+    generated_doc_targets: list[str] = []
+    for markdown_path in sorted(generated_docs_dir.rglob("*.md")):
+        for href in parse_markdown_links(markdown_path):
+            target = generated_doc_link_to_site_path(markdown_path, generated_docs_dir, href)
+            if target is not None:
+                generated_doc_targets.append(target)
+    failures.extend(validate_existing_paths(site_dir, generated_doc_targets, "generated docs link"))
 
     llms_urls = re.findall(r"https://[^\s)]+", llms_txt_path.read_text(encoding="utf-8"))
     llms_targets = [
@@ -122,7 +141,7 @@ def main() -> int:
 
     print(
         f"Docs route validation passed: {len(expected_page_paths)} source-map pages, "
-        f"{len(docs_index_targets)} docs-index links, {len(llms_targets)} llms.txt routes."
+        f"{len(generated_doc_targets)} generated-doc links, {len(llms_targets)} llms.txt routes."
     )
     return 0
 

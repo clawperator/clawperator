@@ -63,7 +63,7 @@ echo "Validating docs routes and machine-facing files..."
 python3 "$REPO_ROOT/scripts/validate_docs_routes.py" \
   --site-dir "$DOCS_DIR/site" \
   --source-map "$DOCS_DIR/source-map.yaml" \
-  --docs-index "$REPO_ROOT/docs/index.md" \
+  --generated-docs-dir "$DOCS_DIR/docs" \
   --llms-txt "$DOCS_DIR/static/llms.txt"
 
 # Verify build output
