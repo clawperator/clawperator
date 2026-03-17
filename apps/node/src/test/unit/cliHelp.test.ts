@@ -151,6 +151,16 @@ describe("CLI help", () => {
     assert.doesNotMatch(stdout, /action open-app/);
   });
 
+  it("shows skills run help instead of top-level help", async () => {
+    const { stdout, code } = await runCli(["skills", "run", "--help"]);
+    assert.strictEqual(code, 0);
+    assert.match(stdout, /clawperator skills run/);
+    assert.match(stdout, /--timeout-ms <n>/);
+    assert.match(stdout, /--expect-contains <text>/);
+    assert.match(stdout, /SKILL_OUTPUT_ASSERTION_FAILED/);
+    assert.doesNotMatch(stdout, /action open-app/);
+  });
+
   it("shows inspect ui help instead of top-level help", async () => {
     const { stdout, code } = await runCli(["inspect", "ui", "--help"]);
     assert.strictEqual(code, 0);

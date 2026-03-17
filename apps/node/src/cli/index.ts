@@ -201,6 +201,20 @@ Notes:
   - Confirms that the parsed skill.json metadata matches the registry entry.
   - This is an integrity check, not a live device test.
 `,
+  "skills run": `clawperator skills run
+
+Usage:
+  clawperator skills run <skill_id> [--device-id <id>] [--timeout-ms <n>] [--expect-contains <text>] [--output <json|pretty>] [-- <extra_args>]
+
+Notes:
+  - Runs the selected skill script through the local skill wrapper.
+  - Use --device-id explicitly when more than one Android device is connected.
+  - --timeout-ms overrides the wrapper timeout for this run only.
+  - --expect-contains turns the run into a lightweight output assertion.
+  - If the assertion text is missing, the wrapper fails with SKILL_OUTPUT_ASSERTION_FAILED.
+  - Arguments after -- are forwarded to the underlying skill script unchanged.
+  - This wrapper does not replace live validation of screenshots, artifacts, or app state.
+`,
   "doctor": `clawperator doctor
 
 Usage:
@@ -271,6 +285,7 @@ function resolveHelpTopic(rest: string[]): string | undefined {
   if (rest[0] === "skills" && rest[1] === "sync") return "skills sync";
   if (rest[0] === "skills" && rest[1] === "new") return "skills new";
   if (rest[0] === "skills" && rest[1] === "validate") return "skills validate";
+  if (rest[0] === "skills" && rest[1] === "run") return "skills run";
   if (rest[0] === "doctor") return "doctor";
   if (rest[0] === "version") return "version";
   if (rest[0] === "grant-device-permissions") return "grant-device-permissions";
