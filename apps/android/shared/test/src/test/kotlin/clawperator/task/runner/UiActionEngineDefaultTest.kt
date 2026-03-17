@@ -535,6 +535,40 @@ class UiActionEngineDefaultTest : ActionTest {
             assertEquals("true", stepResult.data["click_after"])
             assertEquals(true, uiScope.clickCalled)
         }
+
+    @Test
+    fun `execute scroll_until normalizes to target_found when target is visible after loop`() =
+        actionTest {
+            val uiScope = RecordingTaskUiScope(
+                scrollLoopResult = TaskScrollLoopResult(TaskScrollTerminationReason.EdgeReached, scrollsExecuted = 2),
+            )
+            val taskScope = RecordingTaskScope(uiScope)
+            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+
+            val result =
+                engine.execute(
+                    taskScope = taskScope,
+                    plan = UiActionPlan(
+                        commandId = "cmd-su-post-loop-target",
+                        taskId = "task-su-post-loop-target",
+                        source = "test",
+                        actions = listOf(
+                            UiAction.ScrollUntil(
+                                id = "su-post-loop-target",
+                                target = NodeMatcher(textEquals = "Battery"),
+                                clickAfter = true,
+                            ),
+                        ),
+                    ),
+                )
+
+            val stepResult = result.stepResults.single()
+            assertEquals("scroll_until", stepResult.actionType)
+            assertEquals(true, stepResult.success)
+            assertEquals("TARGET_FOUND", stepResult.data["termination_reason"])
+            assertEquals("2", stepResult.data["scrolls_executed"])
+            assertEquals(true, uiScope.clickCalled)
+        }
 }
 
 private class RecordingTaskScope(

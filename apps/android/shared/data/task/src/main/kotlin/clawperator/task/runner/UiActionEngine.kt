@@ -256,7 +256,7 @@ class UiActionEngineDefault(
         taskScope: TaskScope,
         action: UiAction.ScrollUntil,
     ): UiActionStepResult {
-        val result =
+        val initialResult =
             taskScope.ui {
                 scrollLoop(
                     target = action.target,
@@ -269,6 +269,35 @@ class UiActionEngineDefault(
                     noPositionChangeThreshold = action.noPositionChangeThreshold,
                     findFirstScrollableChild = action.findFirstScrollableChild,
                 )
+            }
+
+        val result =
+            if (
+                action.target != null &&
+                initialResult.terminationReason != TaskScrollTerminationReason.TargetFound &&
+                initialResult.terminationReason != TaskScrollTerminationReason.ContainerNotFound &&
+                initialResult.terminationReason != TaskScrollTerminationReason.ContainerNotScrollable
+            ) {
+                val targetVisibleAfterLoop =
+                    try {
+                        taskScope.ui {
+                            waitForNode(
+                                matcher = action.target,
+                                retry = TaskRetry.None,
+                            )
+                        }
+                        true
+                    } catch (_: IllegalStateException) {
+                        false
+                    }
+
+                if (targetVisibleAfterLoop) {
+                    initialResult.copy(terminationReason = TaskScrollTerminationReason.TargetFound)
+                } else {
+                    initialResult
+                }
+            } else {
+                initialResult
             }
 
         val isError = result.terminationReason == TaskScrollTerminationReason.ContainerNotFound ||
