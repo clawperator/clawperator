@@ -5,6 +5,7 @@ import { syncSkills } from "../../domain/skills/syncSkills.js";
 import { searchSkills } from "../../domain/skills/searchSkills.js";
 import { runSkill } from "../../domain/skills/runSkill.js";
 import { scaffoldSkill } from "../../domain/skills/scaffoldSkill.js";
+import { validateSkill } from "../../domain/skills/validateSkill.js";
 import type { OutputOptions } from "../output.js";
 import { formatSuccess, formatError } from "../output.js";
 
@@ -130,4 +131,24 @@ export async function cmdSkillsNew(
     }, options);
   }
   return formatError({ code: result.code, message: result.message }, options);
+}
+
+export async function cmdSkillsValidate(
+  skillId: string,
+  options: { format: OutputOptions["format"] }
+): Promise<string> {
+  const result = await validateSkill(skillId);
+  if (result.ok) {
+    return formatSuccess({
+      valid: true,
+      skill: result.skill,
+      registryPath: result.registryPath,
+      checks: result.checks,
+    }, options);
+  }
+  return formatError({
+    code: result.code,
+    message: result.message,
+    details: result.details,
+  }, options);
 }

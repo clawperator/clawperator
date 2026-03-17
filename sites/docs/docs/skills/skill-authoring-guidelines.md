@@ -119,8 +119,8 @@ Example:
 
 ## 4. Registry and private skill discovery
 
-`clawperator skills list`, `skills get`, `skills search`, and `skills run` all
-read from one local registry JSON file.
+`clawperator skills list`, `skills get`, `skills search`, `skills validate`,
+and `skills run` all read from one local registry JSON file.
 
 Current runtime behavior:
 
@@ -142,6 +142,15 @@ If `clawperator skills list` cannot see your new skill, verify:
 - the registry file exists at that path
 - the `skills[]` entry uses the correct relative `path`
 - `skillFile`, `scripts`, and `artifacts` point at real files
+
+Before a live device run, use:
+
+```bash
+clawperator skills validate <skill_id>
+```
+
+This is an integrity check for the registry entry and on-disk files. It does
+not exercise the target Android app.
 
 ---
 

@@ -1,7 +1,7 @@
 import { describe, it, before, after } from "node:test";
 import assert from "node:assert";
 import { spawn } from "node:child_process";
-import { mkdtemp, mkdir, copyFile, readFile, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, copyFile, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
@@ -13,6 +13,7 @@ import { compileArtifact } from "../../domain/skills/compileArtifact.js";
 import { searchSkills } from "../../domain/skills/searchSkills.js";
 import { runSkill } from "../../domain/skills/runSkill.js";
 import { scaffoldSkill } from "../../domain/skills/scaffoldSkill.js";
+import { validateSkill } from "../../domain/skills/validateSkill.js";
 import { loadRegistry } from "../../adapters/skills-repo/localSkillsRegistry.js";
 import { validateExecution, validatePayloadSize } from "../../domain/executions/validateExecution.js";
 import {
@@ -24,6 +25,7 @@ import {
   SKILL_EXECUTION_TIMEOUT,
   SKILL_ALREADY_EXISTS,
   SKILL_ID_INVALID,
+  SKILL_VALIDATION_FAILED,
 } from "../../contracts/skills.js";
 
 const TEST_REGISTRY_PATH = join(packageRoot, "src", "test", "fixtures", "skills", "skills-registry.json");
@@ -164,6 +166,50 @@ describe("getSkill", () => {
     const result = await getSkill("nonexistent.skill.id");
     assert.ok(!result.ok);
     assert.strictEqual(result.code, SKILL_NOT_FOUND);
+  });
+});
+
+describe("validateSkill", () => {
+  it("returns validation details for a known valid skill", async () => {
+    const result = await validateSkill("com.google.android.apps.chromecast.app.get-aircon-status");
+    if (!result.ok) assert.fail(result.message);
+    assert.ok(result.checks.skillJsonPath.endsWith("/skill.json"));
+    assert.ok(result.checks.skillFilePath.endsWith("/SKILL.md"));
+    assert.ok(result.checks.scriptPaths.some((file) => file.endsWith(".sh")));
+  });
+
+  it("returns SKILL_VALIDATION_FAILED when a referenced file is missing", async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-skill-validate-"));
+    const skillsDir = join(tempRoot, "skills");
+    const skillDir = join(skillsDir, "com.test.invalid");
+    const registryPath = join(skillsDir, "skills-registry.json");
+    const entry = {
+      id: "com.test.invalid",
+      applicationId: "com.test",
+      intent: "invalid",
+      summary: "Broken skill",
+      path: "skills/com.test.invalid",
+      skillFile: "skills/com.test.invalid/SKILL.md",
+      scripts: ["skills/com.test.invalid/scripts/run.js"],
+      artifacts: [],
+    };
+
+    await mkdir(join(skillDir, "scripts"), { recursive: true });
+    await copyFile(
+      join(packageRoot, "src", "test", "fixtures", "skills", "com.test.echo", "scripts", "echo.js"),
+      join(skillDir, "scripts", "run.js")
+    );
+    await writeFile(registryPath, `${JSON.stringify({ skills: [entry] }, null, 2)}\n`, "utf8");
+    await writeFile(join(skillDir, "skill.json"), `${JSON.stringify(entry, null, 2)}\n`, "utf8");
+
+    try {
+      const result = await validateSkill("com.test.invalid", registryPath);
+      assert.ok(!result.ok);
+      assert.strictEqual(result.code, SKILL_VALIDATION_FAILED);
+      assert.ok(result.details?.missingFiles?.some((file) => file.endsWith("/SKILL.md")));
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
   });
 });
 
@@ -415,6 +461,42 @@ describe("scaffoldSkill", () => {
       const registryRaw = await readFile(registryPath, "utf8");
       const registry = JSON.parse(registryRaw);
       assert.ok(registry.skills.some((skill: { id: string }) => skill.id === skillId));
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("CLI skills validate reports a valid scaffolded skill", async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-skill-validate-cli-"));
+    const registryDir = join(tempRoot, "skills");
+    const registryPath = join(registryDir, "skills-registry.json");
+    await mkdir(registryDir, { recursive: true });
+    await writeFile(registryPath, `${JSON.stringify({ schemaVersion: "1", skills: [] }, null, 2)}\n`, "utf8");
+
+    try {
+      const skillId = "com.example.capture-overview";
+      const createResult = await runCli(["skills", "new", skillId, "--output", "json"], {
+        env: {
+          ...process.env,
+          CLAWPERATOR_SKILLS_REGISTRY: registryPath,
+        },
+      });
+      assert.strictEqual(createResult.code, 0, createResult.stderr);
+
+      const validateResult = await runCli(["skills", "validate", skillId, "--output", "json"], {
+        env: {
+          ...process.env,
+          CLAWPERATOR_SKILLS_REGISTRY: registryPath,
+        },
+      });
+      assert.strictEqual(validateResult.code, 0, validateResult.stderr);
+
+      const parsed = JSON.parse(validateResult.stdout) as {
+        valid?: boolean;
+        skill?: { id?: string };
+      };
+      assert.strictEqual(parsed.valid, true);
+      assert.strictEqual(parsed.skill?.id, skillId);
     } finally {
       await rm(tempRoot, { recursive: true, force: true });
     }

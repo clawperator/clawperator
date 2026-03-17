@@ -59,6 +59,8 @@ Commands:
                                             Compile from a skill artifact (skill: positional or --skill-id; artifact: ac-status or ac-status.recipe.json)
   skills new <skill_id>
                                             Scaffold a new local skill folder and registry entry
+  skills validate <skill_id>
+                                            Validate local skill metadata and required files
   skills run <skill_id> [--device-id <id>] [-- <extra_args>]
                                             Invoke a skill script (convenience wrapper)
   skills install
@@ -185,6 +187,17 @@ Notes:
   - Creates: SKILL.md, skill.json, and scripts/run.js
   - Updates the configured registry JSON so the new skill appears in skills list.
 `,
+  "skills validate": `clawperator skills validate
+
+Usage:
+  clawperator skills validate <skill_id> [--output <json|pretty>]
+
+Notes:
+  - Verifies that the registry entry exists for the requested skill.
+  - Checks that skill.json, SKILL.md, script files, and artifact files exist on disk.
+  - Confirms that the parsed skill.json metadata matches the registry entry.
+  - This is an integrity check, not a live device test.
+`,
   "doctor": `clawperator doctor
 
 Usage:
@@ -254,6 +267,7 @@ function resolveHelpTopic(rest: string[]): string | undefined {
   if (rest[0] === "skills" && rest[1] === "install") return "skills install";
   if (rest[0] === "skills" && rest[1] === "sync") return "skills sync";
   if (rest[0] === "skills" && rest[1] === "new") return "skills new";
+  if (rest[0] === "skills" && rest[1] === "validate") return "skills validate";
   if (rest[0] === "doctor") return "doctor";
   if (rest[0] === "version") return "version";
   if (rest[0] === "grant-device-permissions") return "grant-device-permissions";
@@ -584,6 +598,12 @@ async function main(): Promise<void> {
         } else {
           result = await (await import("./commands/skills.js")).cmdSkillsNew(rest[1], out);
         }
+      } else if (rest[0] === "validate") {
+        if (!rest[1]) {
+          result = JSON.stringify({ code: "USAGE", message: "skills validate <skill_id>" });
+        } else {
+          result = await (await import("./commands/skills.js")).cmdSkillsValidate(rest[1], out);
+        }
       } else if (rest[0] === "run") {
         const skillId = rest[1];
         if (!skillId) {
@@ -613,7 +633,7 @@ async function main(): Promise<void> {
           ? await (await import("./commands/skills.js")).cmdSkillsSync(ref, out)
           : JSON.stringify({ code: "USAGE", message: "skills sync --ref <git-ref>" });
       } else {
-        result = JSON.stringify({ code: "USAGE", message: "skills list|get|search|compile-artifact|new|run|install|update|sync ..." });
+        result = JSON.stringify({ code: "USAGE", message: "skills list|get|search|compile-artifact|new|validate|run|install|update|sync ..." });
       }
       break;
     case "serve":

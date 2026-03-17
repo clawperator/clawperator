@@ -142,6 +142,14 @@ describe("CLI help", () => {
     assert.doesNotMatch(stdout, /action open-app/);
   });
 
+  it("shows skills validate help instead of top-level help", async () => {
+    const { stdout, code } = await runCli(["skills", "validate", "--help"]);
+    assert.strictEqual(code, 0);
+    assert.match(stdout, /clawperator skills validate/);
+    assert.match(stdout, /integrity check, not a live device test/i);
+    assert.doesNotMatch(stdout, /action open-app/);
+  });
+
   it("shows inspect ui help instead of top-level help", async () => {
     const { stdout, code } = await runCli(["inspect", "ui", "--help"]);
     assert.strictEqual(code, 0);

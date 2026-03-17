@@ -40,6 +40,7 @@ For the exact `snapshot_ui` structure, use
 | `skills get <skill_id>` | Show skill metadata |
 | `skills search [--app <pkg>] [--intent <i>] [--keyword <k>]` | Search skills by app, intent, or keyword (at least one filter required) |
 | `skills new <skill_id>` | Scaffold a new local skill folder and registry entry |
+| `skills validate <skill_id>` | Verify local skill metadata and required files before runtime testing |
 | `skills compile-artifact <id> --artifact <name>` | Compile skill to execution payload |
 | `skills run <skill_id> [--device-id <id>]` | Invoke a skill script (convenience wrapper) |
 | `skills install` | Clone skills repo to `~/.clawperator/skills/` |
@@ -993,6 +994,9 @@ Current skills model:
 - `CLAWPERATOR_SKILLS_REGISTRY` points at one local registry JSON
 - a private skill becomes visible only after it is added to that registry
 - `skills new <skill_id>` scaffolds the starter folder and updates that local registry automatically
+- `skills validate <skill_id>` checks that the registry entry, `skill.json`,
+  `SKILL.md`, script paths, and artifact paths line up before you spend time on
+  a live device run
 
 For the concrete `skill.json` contract and private-skill authoring model, see
 [Skill Authoring Guidelines](../skills/skill-authoring-guidelines.md) and
