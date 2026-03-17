@@ -210,6 +210,48 @@ body {
   justify-content: flex-end;
 }
 
+.mobile-menu-btn {
+  display: none;
+  width: 2.85rem;
+  height: 2.85rem;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 0.28rem;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.mobile-menu-btn:hover {
+  border-color: var(--border-strong);
+}
+
+.mobile-menu-btn span {
+  display: block;
+  width: 1.1rem;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+  transition: transform 150ms ease, opacity 150ms ease;
+}
+
+.mobile-menu-btn.active span:nth-child(1) {
+  transform: translateY(6px) rotate(45deg);
+}
+
+.mobile-menu-btn.active span:nth-child(2) {
+  opacity: 0;
+}
+
+.mobile-menu-btn.active span:nth-child(3) {
+  transform: translateY(-6px) rotate(-45deg);
+}
+
 .toolbar-links a {
   color: var(--text-muted);
   text-decoration: none;
@@ -1267,7 +1309,7 @@ body {
 
 @media (max-width: 840px) {
   :root {
-    --toolbar-height: 124px;
+    --toolbar-height: 76px;
   }
 
   .top-toolbar {
@@ -1275,15 +1317,72 @@ body {
   }
 
   .top-toolbar-inner {
-    flex-direction: column;
-    align-items: flex-start;
-    justify-content: center;
-    padding: 0.55rem 0;
+    position: relative;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.7rem 0;
+  }
+
+  .toolbar-brand {
+    min-width: 0;
+  }
+
+  .toolbar-logo {
+    width: 2.35rem;
+  }
+
+  .toolbar-brand-text {
+    font-size: 0.98rem;
+  }
+
+  .toolbar-subtitle {
+    display: none;
+  }
+
+  .mobile-menu-btn {
+    display: inline-flex;
   }
 
   .toolbar-links {
+    display: none;
+    position: absolute;
+    top: calc(100% + 0.55rem);
+    left: 0;
+    right: 0;
+    z-index: 40;
     width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    background: var(--toolbar-bg);
+    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(16px);
+    box-shadow: 0 18px 40px rgba(100, 72, 37, 0.12);
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.35rem;
     justify-content: flex-start;
+    flex-wrap: nowrap;
+  }
+
+  .toolbar-links.mobile-open {
+    display: flex;
+  }
+
+  .toolbar-links a {
+    display: block;
+    width: 100%;
+    padding: 0.8rem 0.9rem;
+    border-radius: 12px;
+    font-size: 1rem;
+  }
+
+  .toolbar-section-link::after {
+    display: none;
+  }
+
+  .toolbar-links .toolbar-cta {
+    text-align: center;
   }
 
   .feature-grid {

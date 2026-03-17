@@ -82,6 +82,7 @@ export default function Home() {
   const [copied, setCopied] = useState(false);
   const [emulatorCommandCopied, setEmulatorCommandCopied] = useState(false);
   const [activeSection, setActiveSection] = useState(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const activeCommand = mode === "npm" ? installCommands.npm : installCommands.oneLiner;
   const emulatorCommand = "clawperator provision emulator";
 
@@ -95,6 +96,8 @@ export default function Home() {
 
   const copyTimeoutRef = useRef(null);
   const emulatorCopyTimeoutRef = useRef(null);
+  const toggleMobileMenu = () => setMobileMenuOpen((open) => !open);
+  const closeMobileMenu = () => setMobileMenuOpen(false);
 
   const copyToClipboard = async (text, setCopiedState, timeoutRef) => {
     const fallbackCopy = () => {
@@ -148,6 +151,30 @@ export default function Home() {
       if (emulatorCopyTimeoutRef.current) window.clearTimeout(emulatorCopyTimeoutRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+
+    const handleResize = () => {
+      if (window.innerWidth > 840) {
+        setMobileMenuOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        setMobileMenuOpen(false);
+      }
+    };
+
+    window.addEventListener("resize", handleResize);
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [mobileMenuOpen]);
 
   const toolbarRef = useRef(null);
 
@@ -229,20 +256,44 @@ export default function Home() {
             </span>
           </a>
 
-          <nav className="toolbar-links" aria-label="Page sections">
+          <button
+            type="button"
+            className={mobileMenuOpen ? "mobile-menu-btn active" : "mobile-menu-btn"}
+            aria-expanded={mobileMenuOpen}
+            aria-controls="toolbar-menu"
+            aria-label={mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
+            onClick={toggleMobileMenu}
+          >
+            <span />
+            <span />
+            <span />
+          </button>
+
+          <nav
+            id="toolbar-menu"
+            className={mobileMenuOpen ? "toolbar-links mobile-open" : "toolbar-links"}
+            aria-label="Page sections"
+          >
             {sectionIds.map((id) => (
               <a
                 key={id}
                 href={`#${id}`}
                 className={activeSection === id ? "toolbar-section-link active" : "toolbar-section-link"}
+                onClick={closeMobileMenu}
               >
                 {sectionLabels[id] || id}
               </a>
             ))}
-            <a href="https://docs.clawperator.com" target="_blank" rel="noreferrer">
+            <a href="https://docs.clawperator.com" target="_blank" rel="noreferrer" onClick={closeMobileMenu}>
               Docs
             </a>
-            <a href="https://github.com/clawperator/clawperator" target="_blank" rel="noreferrer" className="toolbar-cta">
+            <a
+              href="https://github.com/clawperator/clawperator"
+              target="_blank"
+              rel="noreferrer"
+              className="toolbar-cta"
+              onClick={closeMobileMenu}
+            >
               GitHub
             </a>
           </nav>
