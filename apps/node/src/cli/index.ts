@@ -2,6 +2,8 @@
 
 import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
+import { ERROR_CODES } from "../contracts/errors.js";
+import { formatError } from "./output.js";
 
 const HELP = `Clawperator CLI
 
@@ -376,6 +378,19 @@ function getNumberOpt(rest: string[], flag: string): number | undefined {
   return Number(rest[i + 1]);
 }
 
+function getInvalidTimeoutResult(timeoutMs: number | undefined, options: { format: "json" | "pretty" }): string | undefined {
+  if (timeoutMs !== undefined && !Number.isFinite(timeoutMs)) {
+    return formatError(
+      {
+        code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+        message: "timeoutMs must be a finite number",
+      },
+      options
+    );
+  }
+  return undefined;
+}
+
 function hasFlag(rest: string[], flag: string): boolean {
   return rest.includes(flag);
 }
@@ -681,6 +696,12 @@ async function main(): Promise<void> {
           const scriptArgs: string[] = [];
           const deviceId = global.deviceId ?? getOpt(optSegment, "--device-id");
           const localTimeoutMs = getNumberOpt(rawOptSegment, "--timeout-ms");
+          const effectiveTimeoutMs = localTimeoutMs ?? global.timeoutMs;
+          const invalidTimeoutResult = getInvalidTimeoutResult(effectiveTimeoutMs, out);
+          if (invalidTimeoutResult) {
+            result = invalidTimeoutResult;
+            break;
+          }
           const expectContains = getOpt(optSegment, "--expect-contains");
           if (deviceId) scriptArgs.push(deviceId);
           // Pass anything after "--" as extra args
@@ -690,7 +711,7 @@ async function main(): Promise<void> {
           result = await (await import("./commands/skills.js")).cmdSkillsRun(
             skillId,
             scriptArgs,
-            localTimeoutMs ?? global.timeoutMs,
+            effectiveTimeoutMs,
             expectContains,
             out
           );

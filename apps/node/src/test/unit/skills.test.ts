@@ -803,6 +803,27 @@ describe("runSkill", () => {
     assert.strictEqual(parsed.timeoutMs, 3210);
   });
 
+  it("CLI skills run rejects a non-numeric local --timeout-ms", async () => {
+    const { stdout, code } = await runCli([
+      "skills", "run", "com.test.echo", "--timeout-ms", "abc", "--output", "json", "--", "hello",
+    ]);
+    assert.strictEqual(code, 1, stdout);
+    const parsed = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(parsed.code, "EXECUTION_VALIDATION_FAILED");
+    assert.strictEqual(parsed.message, "timeoutMs must be a finite number");
+  });
+
+  it("CLI skills run rejects a non-numeric global --timeout-ms", async () => {
+    const { stdout, code } = await runCli([
+      "--timeout-ms", "abc",
+      "skills", "run", "com.test.echo", "--output", "json", "--", "hello",
+    ]);
+    assert.strictEqual(code, 1, stdout);
+    const parsed = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(parsed.code, "EXECUTION_VALIDATION_FAILED");
+    assert.strictEqual(parsed.message, "timeoutMs must be a finite number");
+  });
+
   it("CLI skills run returns usage when skill_id is missing even with --timeout-ms", async () => {
     const { stdout } = await runCli(["skills", "run", "--timeout-ms", "5000", "--output", "json"]);
     const parsed = JSON.parse(stdout) as { code?: string; message?: string };
