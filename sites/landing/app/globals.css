@@ -1371,6 +1371,12 @@ body {
   }
 }
 
+@media (min-width: 841px) {
+  .top-toolbar {
+    position: sticky;
+  }
+}
+
 @media (max-width: 900px) {
   .hero-logo {
     width: 156px;
