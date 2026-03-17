@@ -381,14 +381,14 @@ export default function Home() {
           </nav>
         </div>
       </header>
-      {mobileMenuOpen ? (
-        <button
-          type="button"
-          className="mobile-menu-scrim"
-          aria-label="Close navigation menu"
-          onClick={closeMobileMenu}
-        />
-      ) : null}
+      <button
+        type="button"
+        className={mobileMenuOpen ? "mobile-menu-scrim open" : "mobile-menu-scrim"}
+        aria-label="Close navigation menu"
+        aria-hidden={!mobileMenuOpen}
+        tabIndex={mobileMenuOpen ? 0 : -1}
+        onClick={closeMobileMenu}
+      />
 
       <main className="page-shell">
       {/* Hero Section */}
