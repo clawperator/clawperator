@@ -19,6 +19,12 @@ On success:
 
 - `data.actual_format` is always `"hierarchy_xml"`
 - `data.text` contains the XML hierarchy as a string
+- `data.foreground_package` may identify the active app package
+- `data.has_overlay` reports whether Clawperator detected a higher-priority
+  accessibility window above the foreground app
+- `data.overlay_package` may identify that overlay window's package when known
+- `data.window_count` reports how many accessibility windows were visible during
+  capture
 
 The Android runtime emits the hierarchy dump, and the Node layer attaches that
 raw XML into the result envelope after execution.
@@ -26,6 +32,10 @@ raw XML into the result envelope after execution.
 Important: raw snapshot presence does not always mean the node is currently
 fully on-screen. Some Android views include clipped or off-screen descendants
 in the hierarchy dump, especially inside large scroll containers.
+
+Important: overlay metadata is best-effort accessibility-window metadata, not a
+guaranteed modal detector. Agents should use it as an operational hint, then
+confirm with the XML tree, screenshots, or a follow-up action.
 
 ## Relationship to Android UI Automator
 
@@ -81,6 +91,9 @@ Example success response:
         "success": true,
         "data": {
           "actual_format": "hierarchy_xml",
+          "foreground_package": "com.android.settings",
+          "has_overlay": "false",
+          "window_count": "2",
           "text": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><hierarchy rotation=\"0\">...</hierarchy>"
         }
       }
@@ -119,6 +132,19 @@ define how agents should interpret the fields for this product.
 | `enabled` | - | `"false"` means visible but not interactable. |
 | `long-clickable` | - | `"true"` if the element accepts long-press. |
 
+## Snapshot metadata fields
+
+These fields live alongside `data.text` in successful `snapshot_ui` step data.
+
+| Envelope field | Meaning | Notes |
+| :--- | :--- | :--- |
+| `actual_format` | Snapshot format identifier | Always `"hierarchy_xml"` today. |
+| `foreground_package` | Package name of the active root window | Best-effort. Usually the app the agent is currently operating. |
+| `has_overlay` | Whether Clawperator detected another meaningful accessibility window above the foreground app | String value `"true"` or `"false"`. Treat as a hint, not a hard blocker verdict. |
+| `overlay_package` | Package name of the detected overlay window | Present only when Clawperator can identify it. |
+| `window_count` | Number of accessibility windows visible at capture time | Informational. Android can report more than one window during normal operation. |
+| `text` | Raw XML hierarchy dump | The canonical tree content. |
+
 ## Parsing guidance
 
 ### What to rely on most
@@ -143,6 +169,12 @@ When building selectors, prefer:
   but are still clipped outside the current viewport. Treat `bounds`,
   clickability, and follow-up actions such as `wait_for_node` or
   `scroll_until` as the operational truth for what is actually reachable.
+- `has_overlay: "true"` means Clawperator saw another meaningful accessibility
+  window, not necessarily that interaction is impossible. System dialogs,
+  permission prompts, chooser sheets, keyboards, and OEM overlays may all
+  surface this signal.
+- `window_count > 1` does not by itself mean an overlay is blocking progress.
+  Android often reports multiple windows even on healthy screens.
 
 ### XML escaping
 

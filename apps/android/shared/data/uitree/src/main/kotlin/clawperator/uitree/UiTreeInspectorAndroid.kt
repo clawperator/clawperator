@@ -2,6 +2,7 @@ package clawperator.uitree
 
 import action.log.Log
 import android.accessibilityservice.AccessibilityService
+import android.view.accessibility.AccessibilityWindowInfo
 import clawperator.accessibilityservice.AccessibilityServiceManager
 import clawperator.accessibilityservice.buildUiTree
 import clawperator.accessibilityservice.currentAccessibilityService
@@ -40,6 +41,48 @@ class UiTreeInspectorAndroid(
                 // Enhanced logging with role information
 //            logTreeSummary(tree)
             }
+    }
+
+    override suspend fun getCurrentWindowMetadata(): UiWindowMetadata? {
+        val service = accessibilityServiceManager.currentAccessibilityService ?: return null
+        val activeRoot = service.rootInActiveWindow ?: return null
+        val foregroundPackage = activeRoot.packageName?.toString()?.takeIf { it.isNotBlank() }
+        val windows =
+            try {
+                service.windows ?: emptyList()
+            } catch (e: Exception) {
+                emptyList()
+            }
+
+        var overlayPackage: String? = null
+        for (window in windows) {
+            val root = try {
+                window.root
+            } catch (e: Exception) {
+                null
+            }
+            val packageName = root?.packageName?.toString()?.takeIf { it.isNotBlank() }
+            val benignSystemUi =
+                window.type == AccessibilityWindowInfo.TYPE_SYSTEM &&
+                    packageName == "com.android.systemui" &&
+                    !window.isActive
+            if (benignSystemUi) {
+                continue
+            }
+            val packageDiffers = foregroundPackage != null && packageName != null && packageName != foregroundPackage
+            val nonAppWindow = window.type != AccessibilityWindowInfo.TYPE_APPLICATION
+
+            if (overlayPackage == null && (packageDiffers || nonAppWindow)) {
+                overlayPackage = packageName ?: foregroundPackage
+            }
+        }
+
+        return UiWindowMetadata(
+            foregroundPackage = foregroundPackage,
+            hasOverlay = overlayPackage != null,
+            overlayPackage = overlayPackage,
+            windowCount = windows.size,
+        )
     }
 
     override suspend fun getCurrentUiHierarchyDump(): String? {

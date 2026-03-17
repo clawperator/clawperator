@@ -139,6 +139,14 @@ enum class UiSnapshotActualFormat(
     HierarchyXml("hierarchy_xml"),
 }
 
+data class UiSnapshotResult(
+    val actualFormat: UiSnapshotActualFormat,
+    val foregroundPackage: String? = null,
+    val hasOverlay: Boolean = false,
+    val overlayPackage: String? = null,
+    val windowCount: Int? = null,
+)
+
 enum class UiTextValidator {
     Temperature,
 }

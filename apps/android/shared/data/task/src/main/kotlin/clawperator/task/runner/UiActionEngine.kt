@@ -323,15 +323,23 @@ class UiActionEngineDefault(
         action: UiAction.SnapshotUi,
     ): UiActionStepResult {
         // Snapshot action routes through TaskScope.logUiTree, the same core path used for UI hierarchy dumps.
-        val actualFormat = taskScope.logUiTree(retry = action.retry)
+        val snapshotResult = taskScope.logUiTree(retry = action.retry)
 
         return UiActionStepResult(
             id = action.id,
             actionType = "snapshot_ui",
             data =
                 mapOf(
-                    "actual_format" to actualFormat.wireValue,
-                ),
+                    "actual_format" to snapshotResult.actualFormat.wireValue,
+                ).let { base ->
+                    buildMap {
+                        putAll(base)
+                        snapshotResult.foregroundPackage?.let { put("foreground_package", it) }
+                        put("has_overlay", snapshotResult.hasOverlay.toString())
+                        snapshotResult.overlayPackage?.let { put("overlay_package", it) }
+                        snapshotResult.windowCount?.let { put("window_count", it.toString()) }
+                    }
+                },
         )
     }
 

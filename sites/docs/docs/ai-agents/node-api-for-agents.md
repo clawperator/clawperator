@@ -394,6 +394,19 @@ Android intent builder.
 
 **`snapshot_ui`:** Clawperator returns a single canonical snapshot format: `hierarchy_xml`. The Android runtime writes the hierarchy dump to device logcat, and the Node layer injects that raw XML into `data.text` after execution. `data.actual_format` is always `"hierarchy_xml"` for successful snapshot steps.
 
+Successful snapshot steps may also include best-effort accessibility-window
+metadata:
+
+- `data.foreground_package`
+- `data.has_overlay`
+- `data.overlay_package`
+- `data.window_count`
+
+Treat those fields as operational hints, not as a strict modal-dialog
+guarantee. `has_overlay: "true"` means Clawperator detected another meaningful
+accessibility window above the foreground app. It does not prove the screen is
+unusable, and `window_count > 1` alone is normal on some Android builds.
+
 `observe snapshot` (CLI subcommand) and `snapshot_ui` (execution action type) use the same internal pipeline and produce identical output. `observe snapshot` builds a single-action execution internally and calls `runExecution`. Use `observe snapshot` for ad-hoc inspection from the command line. Use `snapshot_ui` as a step within a multi-action execution payload.
 
 **Failure case - extraction error:** If snapshot post-processing finishes without attaching UI hierarchy text to the step (`data.text` remains absent), the step returns `success: false` with `data.error: "SNAPSHOT_EXTRACTION_FAILED"`. A common cause is that logcat does not contain a matching `[TaskScope] UI Hierarchy:` marker for the step, but partial extraction or other logcat mismatches can also trigger this error. This typically means the installed clawperator binary is out of date with the Android Operator APK. Run `clawperator version --check-compat` and `clawperator doctor` to diagnose. See Troubleshooting for resolution steps.
@@ -430,6 +443,9 @@ Android intent builder.
         "success": true,
         "data": {
           "actual_format": "hierarchy_xml",
+          "foreground_package": "com.android.settings",
+          "has_overlay": "false",
+          "window_count": "2",
           "text": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><hierarchy rotation=\"0\">...</hierarchy>"
         }
       }
@@ -711,7 +727,7 @@ Typical `data` keys by action type:
 | `click` | `click_types` |
 | `enter_text` | `text` (text typed), `submit` (`"true"` or `"false"`) |
 | `read_text` | `text` (extracted text value), `validator` (`"none"` or validator type) |
-| `snapshot_ui` | `actual_format`, `text` (snapshot content - see note below) |
+| `snapshot_ui` | `actual_format`, `foreground_package` (when available), `has_overlay`, `overlay_package` (when available), `window_count`, `text` (snapshot content - see note below) |
 | `take_screenshot` | `path` (local screenshot file path after Node capture) |
 | `wait_for_node` | `resource_id`, `label` (matched node details) |
 | `scroll_and_click` | `max_swipes`, `direction`, `click_types`, `click_after` (`"true"` or `"false"`) |
@@ -722,7 +738,7 @@ Typical `data` keys by action type:
 
 For any failed step: `success: false` and `data.error` contains the error code string.
 
-**Snapshot content delivery:** The UI hierarchy is produced by the Android runtime and written to device logcat. The Node layer reads logcat after execution and injects the raw XML into `data.text`. `data.actual_format` is `"hierarchy_xml"` on successful snapshot steps.
+**Snapshot content delivery:** The UI hierarchy is produced by the Android runtime and written to device logcat. The Node layer reads logcat after execution and injects the raw XML into `data.text`. `data.actual_format` is `"hierarchy_xml"` on successful snapshot steps. Snapshot steps may also include best-effort accessibility-window metadata such as `foreground_package`, `has_overlay`, `overlay_package`, and `window_count`.
 
 **`read_text` value:** The extracted text value is in `data.text`.
 

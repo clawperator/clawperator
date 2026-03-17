@@ -57,7 +57,7 @@ For app automation commands, default to:
 | `click` | `matcher: NodeMatcher`, `clickType?: "default"\|"long_click"\|"focus"` | CLI: `action click` |
 | `read_text` | `matcher: NodeMatcher`, `validator?: "temperature"`, `retry?: object` | CLI: `action read`. Result in `data.text`. Other validator values are rejected by the runtime |
 | `wait_for_node` | `matcher: NodeMatcher`, `retry?: object` | CLI: `action wait`. Waits with internal retry |
-| `snapshot_ui` | `retry?: object` | CLI: `observe snapshot`. Snapshot content in `data.text` as `hierarchy_xml` |
+| `snapshot_ui` | `retry?: object` | CLI: `observe snapshot`. Snapshot content in `data.text` as `hierarchy_xml`, plus best-effort `foreground_package` / `has_overlay` metadata |
 | `take_screenshot` | `path?: string`, `retry?: object` | Node captures screenshot via ADB and returns local file path |
 | `scroll_and_click` | `target: NodeMatcher`, `container?: NodeMatcher`, `direction?`, `maxSwipes?`, `distanceRatio?`, `settleDelayMs?`, `findFirstScrollableChild?`, `clickAfter?: boolean`, `scrollRetry?: object`, `clickRetry?: object` | Scrolls until target is visible, then clicks by default. Set `clickAfter: false` to reveal the target without tapping it. `scrollRetry` defaults to UiScroll; `clickRetry` defaults to UiReadiness |
 | `scroll` | `container?: NodeMatcher`, `direction?`, `distanceRatio?`, `settleDelayMs?`, `findFirstScrollableChild?`, `retry?: object` | Performs exactly one scroll gesture and reports `scroll_outcome` as `moved`, `edge_reached`, or `gesture_failed` |

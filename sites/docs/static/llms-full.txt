@@ -1170,6 +1170,8 @@ Successful snapshot output includes:
 - one result envelope
 - `stepResults[0].actionType = "snapshot_ui"`
 - `stepResults[0].data.actual_format = "hierarchy_xml"`
+- optional snapshot metadata such as `foreground_package`, `has_overlay`, and
+  `window_count`
 - `stepResults[0].data.text` containing the XML hierarchy
 
 Example response shape:
@@ -1188,6 +1190,9 @@ Example response shape:
         "success": true,
         "data": {
           "actual_format": "hierarchy_xml",
+          "foreground_package": "com.android.settings",
+          "has_overlay": "false",
+          "window_count": "2",
           "text": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><hierarchy rotation=\"0\">...</hierarchy>"
         }
       }
@@ -1683,6 +1688,19 @@ Android intent builder.
 
 **`snapshot_ui`:** Clawperator returns a single canonical snapshot format: `hierarchy_xml`. The Android runtime writes the hierarchy dump to device logcat, and the Node layer injects that raw XML into `data.text` after execution. `data.actual_format` is always `"hierarchy_xml"` for successful snapshot steps.
 
+Successful snapshot steps may also include best-effort accessibility-window
+metadata:
+
+- `data.foreground_package`
+- `data.has_overlay`
+- `data.overlay_package`
+- `data.window_count`
+
+Treat those fields as operational hints, not as a strict modal-dialog
+guarantee. `has_overlay: "true"` means Clawperator detected another meaningful
+accessibility window above the foreground app. It does not prove the screen is
+unusable, and `window_count > 1` alone is normal on some Android builds.
+
 `observe snapshot` (CLI subcommand) and `snapshot_ui` (execution action type) use the same internal pipeline and produce identical output. `observe snapshot` builds a single-action execution internally and calls `runExecution`. Use `observe snapshot` for ad-hoc inspection from the command line. Use `snapshot_ui` as a step within a multi-action execution payload.
 
 **Failure case - extraction error:** If snapshot post-processing finishes without attaching UI hierarchy text to the step (`data.text` remains absent), the step returns `success: false` with `data.error: "SNAPSHOT_EXTRACTION_FAILED"`. A common cause is that logcat does not contain a matching `[TaskScope] UI Hierarchy:` marker for the step, but partial extraction or other logcat mismatches can also trigger this error. This typically means the installed clawperator binary is out of date with the Android Operator APK. Run `clawperator version --check-compat` and `clawperator doctor` to diagnose. See Troubleshooting for resolution steps.
@@ -1719,6 +1737,9 @@ Android intent builder.
         "success": true,
         "data": {
           "actual_format": "hierarchy_xml",
+          "foreground_package": "com.android.settings",
+          "has_overlay": "false",
+          "window_count": "2",
           "text": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><hierarchy rotation=\"0\">...</hierarchy>"
         }
       }
@@ -2000,7 +2021,7 @@ Typical `data` keys by action type:
 | `click` | `click_types` |
 | `enter_text` | `text` (text typed), `submit` (`"true"` or `"false"`) |
 | `read_text` | `text` (extracted text value), `validator` (`"none"` or validator type) |
-| `snapshot_ui` | `actual_format`, `text` (snapshot content - see note below) |
+| `snapshot_ui` | `actual_format`, `foreground_package` (when available), `has_overlay`, `overlay_package` (when available), `window_count`, `text` (snapshot content - see note below) |
 | `take_screenshot` | `path` (local screenshot file path after Node capture) |
 | `wait_for_node` | `resource_id`, `label` (matched node details) |
 | `scroll_and_click` | `max_swipes`, `direction`, `click_types`, `click_after` (`"true"` or `"false"`) |
@@ -2011,7 +2032,7 @@ Typical `data` keys by action type:
 
 For any failed step: `success: false` and `data.error` contains the error code string.
 
-**Snapshot content delivery:** The UI hierarchy is produced by the Android runtime and written to device logcat. The Node layer reads logcat after execution and injects the raw XML into `data.text`. `data.actual_format` is `"hierarchy_xml"` on successful snapshot steps.
+**Snapshot content delivery:** The UI hierarchy is produced by the Android runtime and written to device logcat. The Node layer reads logcat after execution and injects the raw XML into `data.text`. `data.actual_format` is `"hierarchy_xml"` on successful snapshot steps. Snapshot steps may also include best-effort accessibility-window metadata such as `foreground_package`, `has_overlay`, `overlay_package`, and `window_count`.
 
 **`read_text` value:** The extracted text value is in `data.text`.
 
@@ -3474,6 +3495,12 @@ On success:
 
 - `data.actual_format` is always `"hierarchy_xml"`
 - `data.text` contains the XML hierarchy as a string
+- `data.foreground_package` may identify the active app package
+- `data.has_overlay` reports whether Clawperator detected a higher-priority
+  accessibility window above the foreground app
+- `data.overlay_package` may identify that overlay window's package when known
+- `data.window_count` reports how many accessibility windows were visible during
+  capture
 
 The Android runtime emits the hierarchy dump, and the Node layer attaches that
 raw XML into the result envelope after execution.
@@ -3481,6 +3508,10 @@ raw XML into the result envelope after execution.
 Important: raw snapshot presence does not always mean the node is currently
 fully on-screen. Some Android views include clipped or off-screen descendants
 in the hierarchy dump, especially inside large scroll containers.
+
+Important: overlay metadata is best-effort accessibility-window metadata, not a
+guaranteed modal detector. Agents should use it as an operational hint, then
+confirm with the XML tree, screenshots, or a follow-up action.
 
 ## Relationship to Android UI Automator
 
@@ -3536,6 +3567,9 @@ Example success response:
         "success": true,
         "data": {
           "actual_format": "hierarchy_xml",
+          "foreground_package": "com.android.settings",
+          "has_overlay": "false",
+          "window_count": "2",
           "text": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><hierarchy rotation=\"0\">...</hierarchy>"
         }
       }
@@ -3574,6 +3608,19 @@ define how agents should interpret the fields for this product.
 | `enabled` | - | `"false"` means visible but not interactable. |
 | `long-clickable` | - | `"true"` if the element accepts long-press. |
 
+## Snapshot metadata fields
+
+These fields live alongside `data.text` in successful `snapshot_ui` step data.
+
+| Envelope field | Meaning | Notes |
+| :--- | :--- | :--- |
+| `actual_format` | Snapshot format identifier | Always `"hierarchy_xml"` today. |
+| `foreground_package` | Package name of the active root window | Best-effort. Usually the app the agent is currently operating. |
+| `has_overlay` | Whether Clawperator detected another meaningful accessibility window above the foreground app | String value `"true"` or `"false"`. Treat as a hint, not a hard blocker verdict. |
+| `overlay_package` | Package name of the detected overlay window | Present only when Clawperator can identify it. |
+| `window_count` | Number of accessibility windows visible at capture time | Informational. Android can report more than one window during normal operation. |
+| `text` | Raw XML hierarchy dump | The canonical tree content. |
+
 ## Parsing guidance
 
 ### What to rely on most
@@ -3598,6 +3645,12 @@ When building selectors, prefer:
   but are still clipped outside the current viewport. Treat `bounds`,
   clickability, and follow-up actions such as `wait_for_node` or
   `scroll_until` as the operational truth for what is actually reachable.
+- `has_overlay: "true"` means Clawperator saw another meaningful accessibility
+  window, not necessarily that interaction is impossible. System dialogs,
+  permission prompts, chooser sheets, keyboards, and OEM overlays may all
+  surface this signal.
+- `window_count > 1` does not by itself mean an overlay is blocking progress.
+  Android often reports multiple windows even on healthy screens.
 
 ### XML escaping
 
@@ -5506,7 +5559,7 @@ For app automation commands, default to:
 | `click` | `matcher: NodeMatcher`, `clickType?: "default"\|"long_click"\|"focus"` | CLI: `action click` |
 | `read_text` | `matcher: NodeMatcher`, `validator?: "temperature"`, `retry?: object` | CLI: `action read`. Result in `data.text`. Other validator values are rejected by the runtime |
 | `wait_for_node` | `matcher: NodeMatcher`, `retry?: object` | CLI: `action wait`. Waits with internal retry |
-| `snapshot_ui` | `retry?: object` | CLI: `observe snapshot`. Snapshot content in `data.text` as `hierarchy_xml` |
+| `snapshot_ui` | `retry?: object` | CLI: `observe snapshot`. Snapshot content in `data.text` as `hierarchy_xml`, plus best-effort `foreground_package` / `has_overlay` metadata |
 | `take_screenshot` | `path?: string`, `retry?: object` | Node captures screenshot via ADB and returns local file path |
 | `scroll_and_click` | `target: NodeMatcher`, `container?: NodeMatcher`, `direction?`, `maxSwipes?`, `distanceRatio?`, `settleDelayMs?`, `findFirstScrollableChild?`, `clickAfter?: boolean`, `scrollRetry?: object`, `clickRetry?: object` | Scrolls until target is visible, then clicks by default. Set `clickAfter: false` to reveal the target without tapping it. `scrollRetry` defaults to UiScroll; `clickRetry` defaults to UiReadiness |
 | `scroll` | `container?: NodeMatcher`, `direction?`, `distanceRatio?`, `settleDelayMs?`, `findFirstScrollableChild?`, `retry?: object` | Performs exactly one scroll gesture and reports `scroll_outcome` as `moved`, `edge_reached`, or `gesture_failed` |

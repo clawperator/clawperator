@@ -5,5 +5,7 @@ class UiTreeInspectorNoOp : UiTreeInspector {
 
     override suspend fun getCurrentUiTree(): UiTree? = null
 
+    override suspend fun getCurrentWindowMetadata(): UiWindowMetadata? = null
+
     override suspend fun getCurrentUiHierarchyDump(): String? = null
 }

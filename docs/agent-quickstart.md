@@ -47,6 +47,8 @@ Successful snapshot output includes:
 - one result envelope
 - `stepResults[0].actionType = "snapshot_ui"`
 - `stepResults[0].data.actual_format = "hierarchy_xml"`
+- optional snapshot metadata such as `foreground_package`, `has_overlay`, and
+  `window_count`
 - `stepResults[0].data.text` containing the XML hierarchy
 
 Example response shape:
@@ -65,6 +67,9 @@ Example response shape:
         "success": true,
         "data": {
           "actual_format": "hierarchy_xml",
+          "foreground_package": "com.android.settings",
+          "has_overlay": "false",
+          "window_count": "2",
           "text": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><hierarchy rotation=\"0\">...</hierarchy>"
         }
       }
