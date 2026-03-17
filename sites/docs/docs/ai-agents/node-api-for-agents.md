@@ -933,6 +933,16 @@ If multiple apps are registered for the URI scheme, a system chooser may appear.
 **Does Clawperator run skills?**
 Skills are standalone programs that agents can invoke directly. The Node API provides discovery (`skills list`, `skills search`), metadata (`skills get`), and a convenience `skills run` wrapper. Skills do not need the Node API to execute - agents can call skill scripts directly.
 
+Current skills model:
+
+- discovery is registry-driven, not folder-scan-driven
+- `CLAWPERATOR_SKILLS_REGISTRY` points at one local registry JSON
+- a private skill becomes visible only after it is added to that registry
+
+For the concrete `skill.json` contract and private-skill authoring model, see
+[Skill Authoring Guidelines](../skills/skill-authoring-guidelines.md) and
+[Usage Model](../skills/usage-model.md).
+
 **Does Clawperator configure accounts or app settings?**
 Clawperator is a neutral actuator. It does not decide whether entering a
 username, password, email address, or other user-provided input is appropriate.

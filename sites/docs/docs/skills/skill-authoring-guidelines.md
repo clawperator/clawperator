@@ -1,19 +1,24 @@
-# Skill Authoring Guidelines (v0.1 PoC)
+# Skill Authoring Guidelines
 
-## Core Doctrine: Generic Actuator
+## Core doctrine
 
-**Clawperator is the Hand; the Agent is the Brain.**
+**Clawperator is the hand. The agent is the brain.**
 
-1.  **Generic Interface:** The clawperator CLI/Node API knows nothing about specific apps. It only executes Execution JSON payloads.
-2.  **External Logic:** All app-specific logic (selectors, navigation flows, data parsing) MUST live in this clawperator-skills repository.
-3.  **Plain Node.js (.js):** Skills should primarily be authored in Plain Node.js (.js scripts). This ensures a lightweight, high-performance environment with zero compilation overhead.
-4.  **Migrating from Bash:** New skills MUST be authored in Node.js. Existing Bash-based skills SHOULD be migrated when they require significant updates or grow in complexity. Prefer opportunistic migration over big-bang rewrites.
+1. **Generic interface:** The Clawperator CLI and Node API know nothing about
+   specific apps. They execute structured Clawperator payloads.
+2. **External logic:** App-specific selectors, navigation flows, parsing, and
+   fallback logic belong in skills.
+3. **Prefer plain Node.js:** New skills should usually be authored in plain
+   `.js` scripts. This keeps setup light and avoids a build step.
+4. **Bash is legacy-compatible:** Existing shell skills are still valid, but
+   prefer Node.js when creating new skills or doing major rewrites.
 
 ---
 
-## 1. The Deterministic Lifecycle (Close-Sleep-Open)
+## 1. Deterministic baseline state
 
-To ensure a predictable starting state, every skill MUST follow this sequence as its first set of actions:
+To ensure a predictable starting state, most app skills should begin with a
+close-sleep-open sequence:
 
 ```json
 [
@@ -24,59 +29,255 @@ To ensure a predictable starting state, every skill MUST follow this sequence as
 ]
 ```
 
-*   **Why Close?** Apps often cache state (previous searches, deep-linked tabs). Force-closing ensures the app starts on its true Home screen.
-*   **How it works:** The **Clawperator Node CLI** automatically intercepts close_app actions and performs a genuine adb shell am force-stop **before** dispatching the command to the device.
-*   **Why the 1.5s Sleep?** Android needs a moment to fully clean up the process after a force-stop before it can be reliably reopened.
-*   **Why the 8s Sleep?** 8 seconds is a conservative default for slow-to-initialize apps (e.g. retail). Treat this as a guideline: tune `durationMs` per app for reliability, keeping it consistent across that app's skills.
+- **Why close first:** Apps often preserve prior navigation state, cached
+  searches, or half-completed flows.
+- **How it works today:** The Clawperator Node CLI intercepts `close_app` and
+  issues `adb shell am force-stop` before dispatching the execution to Android.
+- **Why the short sleep:** Android needs a moment to finish process teardown
+  before the reopen is reliable.
+- **Why the longer open sleep:** Cold app startup is often the slowest part of
+  a flow. Tune `durationMs` per app for reliability.
+
+Use judgment. Some skills should not force-close if the intent depends on
+preserving user state.
 
 ---
 
-## 2. Navigating Decoy UI Elements
+## 2. Skill folder layout
 
-Many apps use fake UI elements on the home screen that act as triggers for the real interaction.
+There is no `clawperator skills new` scaffold command yet. Today, a skill is
+created manually as a folder plus registry entry.
 
-*   **The Search Bar Trap:** Often, the search bar on a home screen is just a TextView or Button styled to look like a field. Clicking it navigates to a new screen or opens an overlay with the real EditText.
-*   **Strategy:** 
-    1.  click the decoy bar (often identifiable by textContains: Search).
-    2.  sleep for 1-2s.
-    3.  enter_text into the real field (identifiable by role: textfield or a specific resourceId).
+Minimal layout:
+
+```text
+skills/<skill_id>/
+  SKILL.md
+  skill.json
+  scripts/
+    run.js
+```
+
+Optional layout:
+
+```text
+skills/<skill_id>/
+  SKILL.md
+  skill.json
+  scripts/
+    run.js
+  artifacts/
+    example.recipe.json
+```
+
+Recommended conventions:
+
+- Use one folder per reusable intent.
+- Keep selectors, parsing logic, and output formatting inside the skill folder.
+- Keep helper modules local to the skill unless they are broadly reusable.
 
 ---
 
-## 3. Selector Strategy
+## 3. `skill.json` contract
 
-1.  **resourceId is King:** Always prefer resourceId (e.g., com.woolworths:id/search_src_text). It is the most stable selector across device locales.
-2.  **textEquals for Buttons:** Use textEquals for precise matches on menu items or specific labels.
-3.  **Avoid Coordinates:** Never use raw x,y coordinates. They break across different screen resolutions and aspect ratios.
+Each skill should have a `skill.json` file and a matching entry in the local
+skills registry.
+
+Current fields:
+
+| Field | Required | Meaning |
+| :--- | :--- | :--- |
+| `id` | Yes | Globally unique skill identifier. Usually `<applicationId>.<intent>`. |
+| `applicationId` | Yes | Android package primarily targeted by the skill. |
+| `intent` | Yes | Short action label such as `capture-overview` or `get-aircon-status`. |
+| `summary` | Yes | One-sentence description shown in discovery output. |
+| `path` | Yes | Skill folder path relative to the skills repo root. |
+| `skillFile` | Yes | Human-readable doc path, usually `skills/<skill_id>/SKILL.md`. |
+| `scripts` | Yes | Script entrypoints relative to the skills repo root. `clawperator skills run` prefers `.js`, then `.sh`, then the first listed script. |
+| `artifacts` | Yes | Optional deterministic `.recipe.json` templates relative to the skills repo root. Use `[]` when none exist. |
+
+Example:
+
+```json
+{
+  "id": "com.android.settings.capture-overview",
+  "applicationId": "com.android.settings",
+  "intent": "capture-overview",
+  "summary": "Open Android Settings, capture a UI snapshot, and save an ADB screenshot path.",
+  "path": "skills/com.android.settings.capture-overview",
+  "skillFile": "skills/com.android.settings.capture-overview/SKILL.md",
+  "scripts": [
+    "skills/com.android.settings.capture-overview/scripts/capture_settings_overview.sh"
+  ],
+  "artifacts": []
+}
+```
 
 ---
 
-## 4. Reliable Node.js Patterns
+## 4. Registry and private skill discovery
 
-*   **Safe Payloads:** Use Node.js to build Execution objects as native literals and JSON.stringify() them to avoid shell escaping issues.
-*   **Robust Parsing:** Never assume XML attribute order in UI snapshots. Use attribute-independent regex: 
-    `const match = line.match(/^(?=[^>]*\bresource-id="[^"]*target_id")(?=[^>]*\btext="([^"]*)")[^>]*>/);`
-*   **Error Handling:** Check `execFileSync` errors for `e.stdout` and `e.stderr` (converted from Buffers to strings) to provide meaningful failure messages.
+`clawperator skills list`, `skills get`, `skills search`, and `skills run` all
+read from one local registry JSON file.
+
+Current runtime behavior:
+
+- The registry path comes from `CLAWPERATOR_SKILLS_REGISTRY` when set.
+- If the env var is unset, the CLI falls back to the local
+  `skills/skills-registry.json` path for the current checkout or install.
+- The runtime currently supports one registry path at a time.
+- The runtime does not currently support multiple registries or a remote URL as
+  the registry source.
+
+A private skill becomes discoverable only after:
+
+1. Its folder exists.
+2. The configured registry JSON includes an entry for it.
+
+If `clawperator skills list` cannot see your new skill, verify:
+
+- `echo $CLAWPERATOR_SKILLS_REGISTRY`
+- the registry file exists at that path
+- the `skills[]` entry uses the correct relative `path`
+- `skillFile`, `scripts`, and `artifacts` point at real files
 
 ---
 
-## 5. Compliance and Security (Blocked Terms)
+## 5. Scripts vs. artifacts
 
-**CRITICAL:** To protect user privacy and project integrity, the following must NEVER be hardcoded in scripts or documentation:
+Scripts and artifacts solve different problems.
 
-1.  **Personal Paths:** Never include /Users/name/. Use relative paths or temporary directories.
-2.  **Device Serials:** Never hardcode your physical device ID. Pass the device ID as a command-line argument.
-3.  **PII:** Use placeholders like Person or AC_TILE_NAME for any user-specific data.
+Use a script when the skill needs:
 
-**Validation Command:**
+- branching logic
+- retries or fallback behavior
+- `snapshot_ui` parsing
+- extra host-side steps such as screenshots or file writes
+- custom output formatting
 
+Use an artifact when the skill is mostly a deterministic execution template and
+you only need variable substitution.
+
+An artifact is a `.recipe.json` file that compiles into a Clawperator execution
+payload through `clawperator skills compile-artifact`.
+
+Artifacts are a good fit for:
+
+- stable navigation templates
+- fixed execution recipes with a few variables
+- deterministic observe or execute flows
+
+Scripts remain the better fit for full workflows.
+
+---
+
+## 6. Navigating decoy UI elements
+
+Many apps use fake home-screen controls that only open the real interaction.
+
+- **Search bar trap:** A home-screen "search bar" is often just a button or
+  text view that opens a separate screen with the real text field.
+- **Reliable pattern:**
+  1. click the decoy
+  2. sleep briefly
+  3. target the real field by `resourceId` or semantic role
+
+---
+
+## 7. Selector strategy
+
+1. **`resourceId` is best:** Prefer `resourceId` whenever available. It is
+   usually the most stable selector across locale changes.
+2. **Use exact text selectively:** `textEquals` is useful for stable menu items
+   or obvious labels.
+3. **Use substring text when needed:** `textContains` is useful for dynamic or
+   truncated labels.
+4. **Avoid coordinates:** Raw `x,y` targeting is fragile across devices and
+   layouts.
+
+---
+
+## 8. Reliable Node.js patterns
+
+- **Safe payloads:** Build execution objects as native JavaScript objects and
+  `JSON.stringify()` them.
+- **Robust parsing:** Do not assume XML attribute order in snapshots.
+- **Structured error handling:** Parse `stdout` and `stderr` from failed
+  Clawperator subprocesses before throwing away useful diagnostics.
+
+Recommended pattern:
+
+```js
+import { execFileSync } from "node:child_process";
+
+function runClawperator(args, timeoutMs = 120000) {
+  try {
+    const stdout = execFileSync("clawperator", args, {
+      encoding: "utf8",
+      timeout: timeoutMs,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    return JSON.parse(stdout);
+  } catch (err) {
+    const stdout = err?.stdout?.toString?.("utf8") ?? "";
+    const stderr = err?.stderr?.toString?.("utf8") ?? "";
+
+    if (stdout) {
+      try {
+        return JSON.parse(stdout);
+      } catch {
+        // Keep falling through to the explicit error below.
+      }
+    }
+
+    throw new Error(stderr || err.message || "clawperator command failed");
+  }
+}
+```
+
+Why this matters:
+
+- Long-running scroll or install flows can exceed an overly aggressive
+  script-level timeout.
+- `execFileSync` may throw even when Clawperator already emitted useful JSON to
+  `stdout`.
+- Recovering `err.stdout` often preserves the best available structured result.
+
+`clawperator skills run` currently applies a 120000 ms wrapper timeout. Keep
+your own script timeout at or above the expected flow duration so the wrapper
+can return structured output.
+
+---
+
+## 9. Compliance and security
+
+Never hardcode:
+
+1. personal local paths
+2. device serials
+3. user PII
+
+Use placeholders such as `<device_id>`, `<person_name>`, or `AC_TILE_NAME`.
+
+Validation command:
+
+```bash
 grep -rE "Users/|[0-9A-Fa-f]{16}" .
-
+```
 
 ---
 
-## 6. Mandatory Metadata
+## 10. Mandatory execution metadata
 
-Every Execution payload sent by a skill MUST include:
-*   **expectedFormat**: Must be "android-ui-automator".
-*   **timeoutMs**: Set a realistic timeout (e.g., 90000 for complex flows).
+Every execution payload sent by a skill must include:
+
+- `expectedFormat`: must be `"android-ui-automator"`
+- `timeoutMs`: set a realistic timeout, for example `90000` for complex flows
+
+Also remember:
+
+- `timeoutMs` is execution-wide, not per action.
+- The public API currently validates `timeoutMs` in the 1000 to 120000 ms
+  range.
+- Split very long workflows into multiple executions rather than relying on one
+  oversized timeout.

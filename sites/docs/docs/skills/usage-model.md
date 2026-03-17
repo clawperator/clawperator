@@ -50,7 +50,7 @@ Use Android Settings (`com.android.settings`) as a universal baseline probe:
 1. `close_app` Settings
 2. `open_app` Settings
 3. short settle delay
-4. `snapshot_ui` (`ascii`)
+4. `snapshot_ui` (`hierarchy_xml`)
 5. capture an ADB screenshot and persist absolute file path
 
 This gives:
@@ -74,6 +74,26 @@ DEVICE_ID="$(adb devices | awk 'NR>1 && $2==\"device\" {print $1; exit}')"
 ```
 
 Always pass `--device-id` to `skills run` when more than one device is connected. Without it the wrapper will fail if device auto-detection is ambiguous.
+
+## Private skills
+
+Private skills are not discovered by scanning folders automatically. The
+current model is registry-driven:
+
+1. create the skill folder
+2. add `skill.json`
+3. add a matching entry to the local registry JSON pointed to by
+   `CLAWPERATOR_SKILLS_REGISTRY`
+
+Once that registry entry exists, the skill becomes visible to:
+
+- `clawperator skills list`
+- `clawperator skills get`
+- `clawperator skills search`
+- `clawperator skills run`
+
+For the current metadata contract and authoring details, see
+`skills/skill-authoring-guidelines.md`.
 
 ## Anti-Patterns
 
