@@ -41,7 +41,7 @@ describe("observe executions", () => {
     assert.deepStrictEqual(execution.actions[0]?.params, { path: "/tmp/example.png" });
   });
 
-  it("preserves explicit empty screenshot path for downstream validation", () => {
+  it("does not silently drop empty screenshot path so validateExecution can reject it", () => {
     const execution = buildScreenshotExecution({ path: "" });
     assert.deepStrictEqual(execution.actions[0]?.params, { path: "" });
   });
