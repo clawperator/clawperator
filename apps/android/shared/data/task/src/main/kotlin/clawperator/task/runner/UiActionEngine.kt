@@ -445,9 +445,8 @@ class UiActionEngineDefault(
             )
         } catch (e: IllegalStateException) {
             val msg = e.message ?: ""
-            if (msg.contains("Validation failed for text") &&
-                (action.validator == UiTextValidator.Version || action.validator == UiTextValidator.Regex)
-            ) {
+            // All validators should return VALIDATOR_MISMATCH on validation failure
+            if (msg.contains("Validation failed for text") && action.validator != null) {
                 val match = Regex("Validation failed for text '(.*)' from").find(msg)
                 val rawText = match?.groupValues?.get(1) ?: ""
                 return UiActionStepResult(
