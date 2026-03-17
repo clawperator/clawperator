@@ -24,7 +24,7 @@ Clawperator operates an Android device on behalf of a user. That Android device 
 - Error handling guide: https://docs.clawperator.com/reference/error-handling/
 - Environment variables: https://docs.clawperator.com/reference/environment-variables/
 - Full compiled docs: https://clawperator.com/llms-full.txt
-- GitHub: https://github.com/clawperator/clawperator
+- Main repository: https://github.com/clawperator/clawperator
 
 ## Notes for agents
 
