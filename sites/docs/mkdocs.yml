@@ -19,16 +19,18 @@ nav:
     - Project Overview: getting-started/project-overview.md
     - Clawperator Operator Android app: getting-started/android-operator-apk.md
   - For AI Agents:
+    - Agent Quickstart: ai-agents/agent-quickstart.md
     - Node API - Agent Guide: ai-agents/node-api-for-agents.md
     - Operator LLM Playbook: design/operator-llm-playbook.md
   - Reference:
     - CLI Reference: reference/cli-reference.md
     - API Overview: reference/api-overview.md
+    - Clawperator Snapshot Format: reference/snapshot-format.md
     - Error Codes: reference/error-codes.md
     - Doctor: reference/node-api-doctor.md
-  - Architecture:
+  - Design and Rationale:
     - System Overview: architecture/architecture.md
-    - Node Runtime and API Design: design/node-api-design.md
+    - Runtime Architecture and API Rationale: design/node-api-design.md
 
   - Troubleshooting:
     - Version Compatibility: troubleshooting/compatibility.md

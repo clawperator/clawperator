@@ -75,6 +75,11 @@ sections:
   - id: ai-agents
     title: For AI Agents
     pages:
+      - output: ai-agents/agent-quickstart.md
+        title: Agent Quickstart
+        mode: copy
+        sources:
+          - docs/agent-quickstart.md
       - output: ai-agents/node-api-for-agents.md
         title: Clawperator Node API - Agent Guide
         mode: copy
@@ -105,6 +110,11 @@ sections:
           - docs/node-api-for-agents.md
           - apps/node/src/contracts
         notes: Keep narrative short. Reference code-derived details instead of duplicating them.
+      - output: reference/snapshot-format.md
+        title: Clawperator Snapshot Format
+        mode: copy
+        sources:
+          - docs/snapshot-format.md
       - output: reference/node-api-doctor.md
         title: Clawperator Doctor
         mode: copy
@@ -168,7 +178,7 @@ sections:
     title: Design
     pages:
       - output: design/node-api-design.md
-        title: Clawperator Node Runtime and API Design
+        title: Clawperator Runtime Architecture and API Rationale
         mode: copy
         sources:
           - docs/design/node-api-design.md

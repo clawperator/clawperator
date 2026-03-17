@@ -1,4 +1,4 @@
-# Clawperator Node Runtime and API Design
+# Clawperator Runtime Architecture and API Rationale
 
 Product naming:
 

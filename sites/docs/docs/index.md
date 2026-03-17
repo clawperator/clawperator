@@ -18,7 +18,9 @@ Use this page as a technical map:
 
 ### Start here if you are integrating an agent
 
+- [Agent Quickstart](ai-agents/agent-quickstart.md) - Fastest path from first install to first successful execution
 - [Node API - Agent Guide](ai-agents/node-api-for-agents.md) - Canonical CLI and HTTP API contract for agent builders
+- [Clawperator Snapshot Format](reference/snapshot-format.md) - Canonical `snapshot_ui` and `observe snapshot` output contract
 - [Operator LLM Playbook](design/operator-llm-playbook.md) - Practical operating rules for observation, action loops, and skill execution
 - [API Overview](reference/api-overview.md) - Execution payload, action types, result envelope shape, and snapshot semantics
 - [CLI Reference](reference/cli-reference.md) - Command-line entrypoints and flags
@@ -41,7 +43,9 @@ Use this page as a technical map:
 
 ## For AI Agents
 
+- [Agent Quickstart](ai-agents/agent-quickstart.md) - Fastest path for a cold-start agent
 - [Node API - Agent Guide](ai-agents/node-api-for-agents.md) - Canonical CLI and HTTP API reference for agents
+- [Clawperator Snapshot Format](reference/snapshot-format.md) - Canonical snapshot output and parsing contract
 - [Operator LLM Playbook](design/operator-llm-playbook.md) - Action contracts, runtime conventions, and skill packaging
 - [API Overview](reference/api-overview.md) - Execution payload, action types, result envelopes, and snapshot delivery
 - [CLI Reference](reference/cli-reference.md) - Exact command surface for local and scripted integrations
@@ -50,13 +54,14 @@ Use this page as a technical map:
 
 - [CLI Reference](reference/cli-reference.md) - Command-line usage and flags
 - [API Overview](reference/api-overview.md) - Execution payload, action types, result envelopes, and snapshot semantics
+- [Clawperator Snapshot Format](reference/snapshot-format.md) - Canonical `hierarchy_xml` contract and parsing guidance
 - [Error Codes](reference/error-codes.md) - Structured runtime and API error code reference
 - [Doctor](reference/node-api-doctor.md) - Runtime readiness checks, exit behavior, and JSON report shape
 
 ## Architecture
 
 - [System Overview](architecture/architecture.md) - High-level architecture and execution flow
-- [Node Runtime and API Design](design/node-api-design.md) - Detailed Node contract and runtime design
+- [Runtime Architecture and API Rationale](design/node-api-design.md) - Why the runtime and API are shaped the way they are
 
 
 ## Troubleshooting

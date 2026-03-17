@@ -7,9 +7,12 @@ This device may be:
 * a physical Android phone
 * an Android emulator
 
-In both cases, the device must be configured with the apps and user logins required by the automation.
+In both cases, the device must be configured with the apps and any account
+state required by the automation.
 
-Clawperator operates the UI on that device. It does not create accounts, sign into apps, or complete app configuration on behalf of the user.
+Clawperator operates the UI on that device. It does not decide what inputs are
+appropriate to enter. The external brain agent decides the workflow, and
+Clawperator provides the interaction primitives to carry it out.
 
 For an overview of the actuator model and user responsibilities, see [Running Clawperator on Android](running-clawperator-on-android.md).
 

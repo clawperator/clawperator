@@ -19,7 +19,9 @@ Clawperator Node Runtime
 Android Device (physical or emulator)
 ```
 
-Clawperator operates the device UI. It does not own account setup, app configuration, or user credentials.
+Clawperator operates the device UI. It does not own planning or policy
+decisions about what should be entered. Those belong to the external agent and
+the user workflow it is carrying out.
 
 ## User responsibilities
 
@@ -33,11 +35,12 @@ Before automation starts, the user is responsible for preparing the Android devi
 Clawperator does not:
 
 - create accounts
-- sign into accounts
-- configure apps on the user's behalf
+- decide what credentials or other user-provided inputs are appropriate to use
 - bypass authentication or anti-abuse gates
 
-Agents should assume the device already contains the required apps, logins, and configuration.
+Agents should assume the device already contains the required apps and
+configuration, unless the intended workflow explicitly includes entering those
+details through the normal UI.
 
 ## Choosing an Android environment
 

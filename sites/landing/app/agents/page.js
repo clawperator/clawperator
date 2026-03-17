@@ -5,7 +5,9 @@ export const metadata = {
 
 const links = [
   { href: "https://docs.clawperator.com/", label: "Technical docs home" },
+  { href: "https://docs.clawperator.com/ai-agents/agent-quickstart/", label: "Agent quickstart" },
   { href: "https://docs.clawperator.com/ai-agents/node-api-for-agents/", label: "Node API guide" },
+  { href: "https://docs.clawperator.com/reference/snapshot-format/", label: "Snapshot format" },
   { href: "https://docs.clawperator.com/design/operator-llm-playbook/", label: "Operator LLM playbook" },
   { href: "https://docs.clawperator.com/reference/api-overview/", label: "API overview" },
   { href: "https://docs.clawperator.com/reference/cli-reference/", label: "CLI reference" },

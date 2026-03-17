@@ -26,7 +26,9 @@ Use this page as a technical map:
 
 ### Start here if you are integrating an agent
 
+- [Agent Quickstart](ai-agents/agent-quickstart.md) - Fastest path from first install to first successful execution
 - [Node API - Agent Guide](ai-agents/node-api-for-agents.md) - Canonical CLI and HTTP API contract for agent builders
+- [Clawperator Snapshot Format](reference/snapshot-format.md) - Canonical `snapshot_ui` and `observe snapshot` output contract
 - [Operator LLM Playbook](design/operator-llm-playbook.md) - Practical operating rules for observation, action loops, and skill execution
 - [API Overview](reference/api-overview.md) - Execution payload, action types, result envelope shape, and snapshot semantics
 - [CLI Reference](reference/cli-reference.md) - Command-line entrypoints and flags
@@ -49,7 +51,9 @@ Use this page as a technical map:
 
 ## For AI Agents
 
+- [Agent Quickstart](ai-agents/agent-quickstart.md) - Fastest path for a cold-start agent
 - [Node API - Agent Guide](ai-agents/node-api-for-agents.md) - Canonical CLI and HTTP API reference for agents
+- [Clawperator Snapshot Format](reference/snapshot-format.md) - Canonical snapshot output and parsing contract
 - [Operator LLM Playbook](design/operator-llm-playbook.md) - Action contracts, runtime conventions, and skill packaging
 - [API Overview](reference/api-overview.md) - Execution payload, action types, result envelopes, and snapshot delivery
 - [CLI Reference](reference/cli-reference.md) - Exact command surface for local and scripted integrations
@@ -58,13 +62,14 @@ Use this page as a technical map:
 
 - [CLI Reference](reference/cli-reference.md) - Command-line usage and flags
 - [API Overview](reference/api-overview.md) - Execution payload, action types, result envelopes, and snapshot semantics
+- [Clawperator Snapshot Format](reference/snapshot-format.md) - Canonical `hierarchy_xml` contract and parsing guidance
 - [Error Codes](reference/error-codes.md) - Structured runtime and API error code reference
 - [Doctor](reference/node-api-doctor.md) - Runtime readiness checks, exit behavior, and JSON report shape
 
 ## Architecture
 
 - [System Overview](architecture/architecture.md) - High-level architecture and execution flow
-- [Node Runtime and API Design](design/node-api-design.md) - Detailed Node contract and runtime design
+- [Runtime Architecture and API Rationale](design/node-api-design.md) - Why the runtime and API are shaped the way they are
 
 
 ## Troubleshooting
@@ -1088,9 +1093,179 @@ Skills are packaged app-specific automation recipes maintained in a sibling repo
 
 
 
+# Agent Quickstart
+
+This is the fastest path for a cold-start agent to go from "Clawperator is
+installed" to "I ran a real command and know how to inspect the result."
+
+Use this page first, then branch into:
+
+- [Clawperator Snapshot Format](../reference/snapshot-format.md) for the exact
+  `snapshot_ui` output structure
+- [Clawperator Node API - Agent Guide](node-api-for-agents.md) for the full
+  contract
+- [API Overview](../reference/api-overview.md) for a shorter reference path
+
+## What Clawperator is
+
+Clawperator is the hand. Your external agent is the brain.
+
+- the brain decides what to do on the user's behalf
+- Clawperator executes validated Android UI actions deterministically
+- Clawperator returns structured results that the brain can reason over
+
+Clawperator is not a planner or a policy engine. It does not decide which user
+inputs are appropriate. It just provides the interaction primitives.
+
+## Before you start
+
+Make sure the runtime is ready:
+
+```bash
+clawperator doctor --output json
+clawperator devices --output json
+```
+
+If multiple devices are connected, always pass `--device-id <device_id>` so
+targeting stays explicit.
+
+## Step 1 - Take a snapshot
+
+The quickest way to inspect the current UI is:
+
+```bash
+clawperator observe snapshot --device-id <device_id> --output json
+```
+
+Successful snapshot output includes:
+
+- one result envelope
+- `stepResults[0].actionType = "snapshot_ui"`
+- `stepResults[0].data.actual_format = "hierarchy_xml"`
+- `stepResults[0].data.text` containing the XML hierarchy
+
+Example response shape:
+
+```json
+{
+  "ok": true,
+  "envelope": {
+    "commandId": "cmd-snap-1",
+    "taskId": "task-snap-1",
+    "status": "success",
+    "stepResults": [
+      {
+        "id": "snap1",
+        "actionType": "snapshot_ui",
+        "success": true,
+        "data": {
+          "actual_format": "hierarchy_xml",
+          "text": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><hierarchy rotation=\"0\">...</hierarchy>"
+        }
+      }
+    ],
+    "error": null
+  },
+  "deviceId": "<device_id>",
+  "terminalSource": "clawperator_result"
+}
+```
+
+Read the XML in `data.text` to identify:
+
+- stable `resource-id` values
+- visible labels in `text`
+- icon labels in `content-desc`
+- scroll containers via `scrollable="true"`
+
+The full parsing contract lives in
+[Clawperator Snapshot Format](../reference/snapshot-format.md).
+
+## Step 2 - Run a first execution payload
+
+The smallest useful first execution usually opens an app, gives it a moment to
+settle, then snapshots the result.
+
+Example payload:
+
+```json
+{
+  "commandId": "quickstart-001",
+  "taskId": "quickstart-001",
+  "source": "cold-start-agent",
+  "expectedFormat": "android-ui-automator",
+  "timeoutMs": 15000,
+  "actions": [
+    {
+      "id": "open-settings",
+      "type": "open_app",
+      "params": { "applicationId": "com.android.settings" }
+    },
+    {
+      "id": "settle",
+      "type": "sleep",
+      "params": { "durationMs": 1000 }
+    },
+    {
+      "id": "snap-settings",
+      "type": "snapshot_ui"
+    }
+  ]
+}
+```
+
+Run it with:
+
+```bash
+clawperator execute --device-id <device_id> --execution /path/to/execution.json --output json
+```
+
+## Step 3 - Read the result envelope correctly
+
+Always check both:
+
+1. `envelope.status`
+2. each `stepResults[n].success`
+
+Those mean different things:
+
+- `envelope.status = "failed"` means the execution as a whole failed
+- `stepResults[n].success = false` means one step failed, even if the overall
+  execution still completed
+
+That distinction matters for actions like `close_app`, where the overall
+execution may complete even though the step reports a per-step failure.
+
+## Step 4 - Use the default agent loop
+
+For unknown apps, use a single-action plus re-observe loop:
+
+1. snapshot
+2. decide what to press or read
+3. execute one action or one tight sequence
+4. snapshot again
+5. repeat
+
+This is the safe default for cold-start usage. Use larger multi-action payloads
+only after the UI path is already known.
+
+## What to read next
+
+- [Clawperator Snapshot Format](../reference/snapshot-format.md)
+- [Clawperator Node API - Agent Guide](node-api-for-agents.md)
+- [API Overview](../reference/api-overview.md)
+- [CLI Reference](../reference/cli-reference.md)
+
+---
+
+
 # Clawperator Node API - Agent Guide
 
 Clawperator provides a deterministic execution layer for LLM agents to control Android devices. This guide covers the CLI and HTTP API contracts.
+
+If you are starting cold, begin with [Agent Quickstart](agent-quickstart.md).
+For the exact `snapshot_ui` structure, use
+[Clawperator Snapshot Format](../reference/snapshot-format.md).
 
 ## Concepts
 
@@ -1771,106 +1946,18 @@ For any failed step: `success: false` and `data.error` contains the error code s
 
 ## Snapshot Output Format
 
-`snapshot_ui` and `clawperator observe snapshot` produce the canonical `hierarchy_xml` format. `data.actual_format` reports `"hierarchy_xml"` on success.
+`snapshot_ui` and `clawperator observe snapshot` produce the canonical
+`hierarchy_xml` format. `data.actual_format` reports `"hierarchy_xml"` on
+success.
 
-### `hierarchy_xml`
+Use [Clawperator Snapshot Format](../reference/snapshot-format.md) as the
+canonical source for:
 
-Structured XML produced by UIAutomator. Each `<node>` represents one UI element. Attributes map directly to NodeMatcher fields:
-
-| XML attribute | NodeMatcher field | Notes |
-| :--- | :--- | :--- |
-| `resource-id` | `resourceId` | `"com.example.app:id/name"`. Empty string when not set by developer. |
-| `text` | `textEquals` / `textContains` | Visible text content. Empty string if none. |
-| `content-desc` | `contentDescEquals` / `contentDescContains` | Accessibility label. Empty string if none. |
-| `class` | - | Java widget class name, e.g., `"android.widget.Button"`. Informational only - `NodeMatcher.role` uses Clawperator semantic role names such as `button`, `textfield`, `text`, or `switch`, not the raw `class` attribute. |
-| `clickable` | - | `"true"` if the element accepts tap events. |
-| `scrollable` | - | `"true"` marks a scroll container. Use as `container` in `scroll_and_click`, `scroll`, or `scroll_until`. |
-| `bounds` | - | `"[x1,y1][x2,y2]"` pixel rectangle. Useful for understanding spatial layout. |
-| `enabled` | - | `"false"` means the element is visible but not interactable. |
-| `long-clickable` | - | `"true"` if the element accepts long-press. Use `clickType: "long_click"`. |
-
-**XML attribute escaping:** Snapshot output is XML, so special characters in attribute values are escaped when the hierarchy is serialized. For example, an apostrophe appears as `&apos;`, an ampersand as `&amp;`. These escaped sequences are returned as-is in `data.text` - they are not decoded after extraction. When targeting elements with special characters in their labels, use `contentDescContains` or `textContains` with a substring that avoids the escaped characters rather than an exact match requiring the full escaped form.
-
-Example: for a node with `content-desc="Search for &apos;vlc&apos;"`:
-- `contentDescContains: "Search for"` -- works
-- `contentDescEquals: "Search for 'vlc'"` -- fails (apostrophe is not decoded)
-
-**Annotated example from Android Settings main screen (live device capture):**
-
-```xml
-<hierarchy rotation="0">
-  <node index="0" text="" resource-id="" class="android.widget.FrameLayout"
-        package="com.android.settings" content-desc=""
-        clickable="false" enabled="true" scrollable="false"
-        bounds="[0,0][1080,2340]">
-    ...
-        <!-- Scrollable list - use as 'container' in scroll_and_click, scroll, or scroll_until -->
-        <node index="0" text="" resource-id="com.android.settings:id/recycler_view"
-              class="androidx.recyclerview.widget.RecyclerView"
-              package="com.android.settings" content-desc=""
-              clickable="false" enabled="true" focusable="true" scrollable="true"
-              bounds="[0,884][1080,2196]">
-
-          <!-- Icon-only button: no text, target via content-desc -->
-          <node index="0" text="" resource-id="" class="android.widget.Button"
-                package="com.android.settings" content-desc="Search settings"
-                clickable="true" enabled="true" focusable="true"
-                bounds="[912,692][1080,884]" />
-
-          <!-- Clickable row: the LinearLayout is the tap target -->
-          <node index="2" text="" resource-id="" class="android.widget.LinearLayout"
-                package="com.android.settings" content-desc=""
-                clickable="true" enabled="true" scrollable="false"
-                bounds="[30,1252][1050,1461]">
-            <!-- Title label with stable resource-id -->
-            <node index="0" text="Connections" resource-id="android:id/title"
-                  class="android.widget.TextView" package="com.android.settings"
-                  content-desc="" clickable="false" enabled="true"
-                  bounds="[216,1294][507,1364]" />
-            <!-- Subtitle label -->
-            <node index="1" text="Wi-Fi  •  Bluetooth  •  SIM manager"
-                  resource-id="android:id/summary" class="android.widget.TextView"
-                  package="com.android.settings" content-desc=""
-                  clickable="false" enabled="true"
-                  bounds="[216,1364][816,1419]" />
-          </node>
-
-          <node index="3" text="" resource-id="" class="android.widget.LinearLayout"
-                package="com.android.settings" content-desc=""
-                clickable="true" enabled="true" scrollable="false"
-                bounds="[30,1461][1050,1721]">
-            <node index="0" text="Connected devices" resource-id="android:id/title"
-                  class="android.widget.TextView" package="com.android.settings"
-                  content-desc="" clickable="false" enabled="true"
-                  bounds="[216,1503][661,1573]" />
-            <node index="1" text="Quick Share  •  Samsung DeX  •  Android Auto"
-                  resource-id="android:id/summary" class="android.widget.TextView"
-                  package="com.android.settings" content-desc=""
-                  clickable="false" enabled="true"
-                  bounds="[216,1573][996,1679]" />
-          </node>
-
-        </node>
-    ...
-  </node>
-</hierarchy>
-```
-
-**Reading patterns:**
-
-- **Tap targets** are `clickable="true"` nodes. In list UIs these are often container (`LinearLayout`) nodes whose text-bearing children hold the visible label while the container itself has `text=""`. When you match any node, Clawperator first attempts `ACTION_CLICK` on the first `clickable="true"` ancestor it finds while walking up the tree from the matched node. If that accessibility click does not succeed, Clawperator falls back to a gesture tap at the center of the matched node's bounding box. This means matching a non-clickable label node (for example, `textEquals: "Connections"`) works correctly as long as it is visually inside a clickable parent tap target. If both mechanisms fail, the execution currently terminates with a failed envelope and empty `stepResults` rather than a per-step `NODE_NOT_CLICKABLE` code.
-- **Icon-only buttons** (no `text`) use `content-desc` for their label. Target with `contentDescEquals`.
-- **Scroll containers** have `scrollable="true"`. Pass their `resource-id` as the `container` matcher in `scroll_and_click` or `scroll`. If `container` is omitted from `scroll`, the first `scrollable="true"` node on screen is used automatically.
-- **Disabled elements** have `enabled="false"`. They cannot be interacted with - scrolling or waiting for a state change is required first.
-
-**Apps with obfuscated or missing resource-ids:** Many production apps (Google Play Store, social media apps, banking apps) set `resource-id=""` on all or most nodes. In this case, fall back to content-desc and text matchers. The fallback priority for these apps is:
-
-1. `contentDescEquals` - for elements with stable accessibility labels (icon buttons, tabs)
-2. `textEquals` - for elements with stable visible text (button labels, section headers)
-3. `contentDescContains` / `textContains` - when the value may include dynamic content, counts, or special characters (including HTML entities - see note above)
-4. `role: "textfield"` - for text inputs when no `resource-id` is present
-
-Note: `content-desc` values sometimes contain newlines when an element's label spans multiple pieces of information (for example, an app name followed by developer name in Play Store results). Use `contentDescContains` with a known stable substring rather than a full exact match.
+- the exact snapshot envelope placement
+- the relationship to Android UI Automator output
+- XML attribute meanings and escaping
+- real-device annotated examples
+- parsing guidance for agents
 
 ## Error Codes
 
@@ -2011,7 +2098,16 @@ If multiple apps are registered for the URI scheme, a system chooser may appear.
 Skills are standalone programs that agents can invoke directly. The Node API provides discovery (`skills list`, `skills search`), metadata (`skills get`), and a convenience `skills run` wrapper. Skills do not need the Node API to execute - agents can call skill scripts directly.
 
 **Does Clawperator configure accounts or app settings?**
-No. Clawperator automates the UI on whatever user-installed Android apps are already installed and signed in on the device. It does not log in to apps, create accounts, or configure device settings on behalf of the user. If an automation targets an app that requires authentication, the user must sign in to that app manually on the device before the agent runs. For emulators using a Google Play system image, the user must also sign in to a Google account before Play Store-gated apps are accessible.
+Clawperator is a neutral actuator. It does not decide whether entering a
+username, password, email address, or other user-provided input is appropriate.
+That decision belongs to the external brain agent and the user workflow it is
+carrying out.
+
+In practice, the device still needs to be in a usable state for the automation
+the agent is attempting. Many setups prepare account state and app
+configuration before automation begins. When an agent chooses to enter login or
+credential fields through the normal UI, Clawperator can provide the same
+interaction primitives it uses for any other text entry or click flow.
 
 **How should agents handle sensitive text in results?**
 Default behavior is full-fidelity results for agent reasoning. PII redaction (`--safe-logs`) is a planned feature.
@@ -3220,6 +3316,249 @@ Server-Sent Events stream. Emits two event types:
 ---
 
 
+# Clawperator Snapshot Format
+
+This is the canonical reference for the structure returned by Clawperator
+snapshot surfaces.
+
+Use this page as the source of truth for:
+
+- `snapshot_ui` result payloads
+- `clawperator observe snapshot`
+- the `hierarchy_xml` UI tree format
+- how snapshot fields relate to `NodeMatcher`
+
+## Contract summary
+
+`snapshot_ui` and `clawperator observe snapshot` use the same internal
+pipeline and return the same canonical snapshot format: `hierarchy_xml`.
+
+On success:
+
+- `data.actual_format` is always `"hierarchy_xml"`
+- `data.text` contains the XML hierarchy as a string
+
+The Android runtime emits the hierarchy dump, and the Node layer attaches that
+raw XML into the result envelope after execution.
+
+## Relationship to Android UI Automator
+
+Clawperator's snapshot structure is modeled after Android UI Automator output,
+so the overall shape should feel familiar to agents and developers who have
+used UI Automator dumps before.
+
+It is not a byte-for-byte copy.
+
+Agents should assume:
+
+- the high-level hierarchy and common node attributes are intentionally similar
+- Clawperator wraps the snapshot inside its own execution result envelope
+- Clawperator may normalize surrounding metadata and matching guidance
+- Clawperator-specific semantics such as `NodeMatcher.role` are not direct
+  copies of raw UI Automator fields
+
+Use UI Automator knowledge as a mental model, not as an exact parser contract.
+
+## Envelope placement
+
+Example request:
+
+```json
+{
+  "deviceId": "<device_id>",
+  "execution": {
+    "commandId": "cmd-snap-1",
+    "taskId": "task-snap-1",
+    "source": "local-test",
+    "expectedFormat": "android-ui-automator",
+    "timeoutMs": 30000,
+    "actions": [
+      { "id": "snap1", "type": "snapshot_ui" }
+    ]
+  }
+}
+```
+
+Example success response:
+
+```json
+{
+  "ok": true,
+  "envelope": {
+    "commandId": "cmd-snap-1",
+    "taskId": "task-snap-1",
+    "status": "success",
+    "stepResults": [
+      {
+        "id": "snap1",
+        "actionType": "snapshot_ui",
+        "success": true,
+        "data": {
+          "actual_format": "hierarchy_xml",
+          "text": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><hierarchy rotation=\"0\">...</hierarchy>"
+        }
+      }
+    ],
+    "error": null
+  },
+  "deviceId": "<device_id>",
+  "terminalSource": "clawperator_result"
+}
+```
+
+Failure case:
+
+- if post-processing completes without attached hierarchy text, the step returns
+  `success: false` with `data.error: "SNAPSHOT_EXTRACTION_FAILED"`
+
+Troubleshooting for that case lives in
+[Troubleshooting the Operator App](../troubleshooting/troubleshooting.md).
+
+## hierarchy_xml
+
+Each `<node>` represents one UI element.
+
+The XML is close to Android UI Automator hierarchy output, but Clawperator docs
+define how agents should interpret the fields for this product.
+
+| XML attribute | NodeMatcher field | Notes |
+| :--- | :--- | :--- |
+| `resource-id` | `resourceId` | `"com.example.app:id/name"`. Empty string when not set by developer. |
+| `text` | `textEquals` / `textContains` | Visible text content. Empty string if none. |
+| `content-desc` | `contentDescEquals` / `contentDescContains` | Accessibility label. Empty string if none. |
+| `class` | - | Java widget class name. Informational only. `NodeMatcher.role` uses Clawperator semantic role names, not the raw `class` string. |
+| `clickable` | - | `"true"` if the element accepts tap events. |
+| `scrollable` | - | `"true"` marks a scroll container. |
+| `bounds` | - | `"[x1,y1][x2,y2]"` pixel rectangle. Useful for spatial layout. |
+| `enabled` | - | `"false"` means visible but not interactable. |
+| `long-clickable` | - | `"true"` if the element accepts long-press. |
+
+## Parsing guidance
+
+### What to rely on most
+
+When building selectors, prefer:
+
+1. `resource-id`
+2. `content-desc`
+3. exact `text`
+4. substring matching
+5. semantic `role`
+
+### Important differences from raw UI Automator assumptions
+
+- `NodeMatcher.role` is a Clawperator semantic layer, not the raw `class`
+  attribute.
+- Snapshot content is carried in `data.text` inside the result envelope, not as
+  a standalone dump file.
+- Agents should reason over both the XML tree and the execution envelope, not
+  just the XML alone.
+
+### XML escaping
+
+Snapshot output is XML, so special characters in attribute values are escaped.
+For example:
+
+- apostrophe becomes `&apos;`
+- ampersand becomes `&amp;`
+
+These escaped sequences are returned as-is in `data.text`.
+
+For a node with `content-desc="Search for &apos;vlc&apos;"`:
+
+- `contentDescContains: "Search for"` works
+- `contentDescEquals: "Search for 'vlc'"` fails because the apostrophe is not
+  decoded after extraction
+
+## Annotated live-device example
+
+The example below is preserved from a real Android Settings capture and should
+remain the canonical example unless replaced with a better real-device sample.
+
+```xml
+<hierarchy rotation="0">
+  <node index="0" text="" resource-id="" class="android.widget.FrameLayout"
+        package="com.android.settings" content-desc=""
+        clickable="false" enabled="true" scrollable="false"
+        bounds="[0,0][1080,2340]">
+    ...
+        <!-- Scrollable list. Use as 'container' in scroll_and_click, scroll, or scroll_until -->
+        <node index="0" text="" resource-id="com.android.settings:id/recycler_view"
+              class="androidx.recyclerview.widget.RecyclerView"
+              package="com.android.settings" content-desc=""
+              clickable="false" enabled="true" focusable="true" scrollable="true"
+              bounds="[0,884][1080,2196]">
+
+          <!-- Icon-only button. No text, so target via content-desc -->
+          <node index="0" text="" resource-id="" class="android.widget.Button"
+                package="com.android.settings" content-desc="Search settings"
+                clickable="true" enabled="true" focusable="true"
+                bounds="[912,692][1080,884]" />
+
+          <!-- Clickable row. The LinearLayout is the tap target -->
+          <node index="2" text="" resource-id="" class="android.widget.LinearLayout"
+                package="com.android.settings" content-desc=""
+                clickable="true" enabled="true" scrollable="false"
+                bounds="[30,1252][1050,1461]">
+            <!-- Title label with stable resource-id -->
+            <node index="0" text="Connections" resource-id="android:id/title"
+                  class="android.widget.TextView" package="com.android.settings"
+                  content-desc="" clickable="false" enabled="true"
+                  bounds="[216,1294][507,1364]" />
+            <!-- Subtitle label -->
+            <node index="1" text="Wi-Fi  •  Bluetooth  •  SIM manager"
+                  resource-id="android:id/summary" class="android.widget.TextView"
+                  package="com.android.settings" content-desc=""
+                  clickable="false" enabled="true"
+                  bounds="[216,1364][816,1419]" />
+          </node>
+
+          <node index="3" text="" resource-id="" class="android.widget.LinearLayout"
+                package="com.android.settings" content-desc=""
+                clickable="true" enabled="true" scrollable="false"
+                bounds="[30,1461][1050,1721]">
+            <node index="0" text="Connected devices" resource-id="android:id/title"
+                  class="android.widget.TextView" package="com.android.settings"
+                  content-desc="" clickable="false" enabled="true"
+                  bounds="[216,1503][661,1573]" />
+            <node index="1" text="Quick Share  •  Samsung DeX  •  Android Auto"
+                  resource-id="android:id/summary" class="android.widget.TextView"
+                  package="com.android.settings" content-desc=""
+                  clickable="false" enabled="true"
+                  bounds="[216,1573][996,1679]" />
+          </node>
+
+        </node>
+    ...
+  </node>
+</hierarchy>
+```
+
+## Reading patterns
+
+- Tap targets are often `clickable="true"` container nodes whose child labels
+  hold the visible text.
+- Icon-only buttons often have empty `text` and rely on `content-desc`.
+- Scroll containers expose `scrollable="true"`.
+- Disabled elements have `enabled="false"` and usually require state change
+  before interaction.
+
+## Apps with weak or missing resource IDs
+
+Many production apps leave `resource-id=""` on most nodes. In those cases,
+fallback priority is:
+
+1. `contentDescEquals`
+2. `textEquals`
+3. `contentDescContains` or `textContains`
+4. `role: "textfield"` for text inputs without stable IDs
+
+When labels contain dynamic values, counts, or escaped characters, prefer
+substring matching over exact equality.
+
+---
+
+
 # Clawperator Doctor
 
 `clawperator doctor` is the runtime readiness check for the Node CLI. It verifies that the host environment, connected device, and installed [Clawperator Operator Android app](../getting-started/android-operator-apk.md) are in a usable state, and that the end-to-end command path is functional, before an agent relies on the device.
@@ -4249,7 +4588,7 @@ Modes:
 
 
 
-# Clawperator Node Runtime and API Design
+# Clawperator Runtime Architecture and API Rationale
 
 Product naming:
 

@@ -2,6 +2,10 @@
 
 Clawperator provides a deterministic execution layer for LLM agents to control Android devices. This guide covers the CLI and HTTP API contracts.
 
+If you are starting cold, begin with [Agent Quickstart](agent-quickstart.md).
+For the exact `snapshot_ui` structure, use
+[Clawperator Snapshot Format](../reference/snapshot-format.md).
+
 ## Concepts
 
 - **Execution**: A payload of one or more actions dispatched to the device. Every execution produces exactly one `[Clawperator-Result]` envelope.
@@ -681,106 +685,18 @@ For any failed step: `success: false` and `data.error` contains the error code s
 
 ## Snapshot Output Format
 
-`snapshot_ui` and `clawperator observe snapshot` produce the canonical `hierarchy_xml` format. `data.actual_format` reports `"hierarchy_xml"` on success.
+`snapshot_ui` and `clawperator observe snapshot` produce the canonical
+`hierarchy_xml` format. `data.actual_format` reports `"hierarchy_xml"` on
+success.
 
-### `hierarchy_xml`
+Use [Clawperator Snapshot Format](../reference/snapshot-format.md) as the
+canonical source for:
 
-Structured XML produced by UIAutomator. Each `<node>` represents one UI element. Attributes map directly to NodeMatcher fields:
-
-| XML attribute | NodeMatcher field | Notes |
-| :--- | :--- | :--- |
-| `resource-id` | `resourceId` | `"com.example.app:id/name"`. Empty string when not set by developer. |
-| `text` | `textEquals` / `textContains` | Visible text content. Empty string if none. |
-| `content-desc` | `contentDescEquals` / `contentDescContains` | Accessibility label. Empty string if none. |
-| `class` | - | Java widget class name, e.g., `"android.widget.Button"`. Informational only - `NodeMatcher.role` uses Clawperator semantic role names such as `button`, `textfield`, `text`, or `switch`, not the raw `class` attribute. |
-| `clickable` | - | `"true"` if the element accepts tap events. |
-| `scrollable` | - | `"true"` marks a scroll container. Use as `container` in `scroll_and_click`, `scroll`, or `scroll_until`. |
-| `bounds` | - | `"[x1,y1][x2,y2]"` pixel rectangle. Useful for understanding spatial layout. |
-| `enabled` | - | `"false"` means the element is visible but not interactable. |
-| `long-clickable` | - | `"true"` if the element accepts long-press. Use `clickType: "long_click"`. |
-
-**XML attribute escaping:** Snapshot output is XML, so special characters in attribute values are escaped when the hierarchy is serialized. For example, an apostrophe appears as `&apos;`, an ampersand as `&amp;`. These escaped sequences are returned as-is in `data.text` - they are not decoded after extraction. When targeting elements with special characters in their labels, use `contentDescContains` or `textContains` with a substring that avoids the escaped characters rather than an exact match requiring the full escaped form.
-
-Example: for a node with `content-desc="Search for &apos;vlc&apos;"`:
-- `contentDescContains: "Search for"` -- works
-- `contentDescEquals: "Search for 'vlc'"` -- fails (apostrophe is not decoded)
-
-**Annotated example from Android Settings main screen (live device capture):**
-
-```xml
-<hierarchy rotation="0">
-  <node index="0" text="" resource-id="" class="android.widget.FrameLayout"
-        package="com.android.settings" content-desc=""
-        clickable="false" enabled="true" scrollable="false"
-        bounds="[0,0][1080,2340]">
-    ...
-        <!-- Scrollable list - use as 'container' in scroll_and_click, scroll, or scroll_until -->
-        <node index="0" text="" resource-id="com.android.settings:id/recycler_view"
-              class="androidx.recyclerview.widget.RecyclerView"
-              package="com.android.settings" content-desc=""
-              clickable="false" enabled="true" focusable="true" scrollable="true"
-              bounds="[0,884][1080,2196]">
-
-          <!-- Icon-only button: no text, target via content-desc -->
-          <node index="0" text="" resource-id="" class="android.widget.Button"
-                package="com.android.settings" content-desc="Search settings"
-                clickable="true" enabled="true" focusable="true"
-                bounds="[912,692][1080,884]" />
-
-          <!-- Clickable row: the LinearLayout is the tap target -->
-          <node index="2" text="" resource-id="" class="android.widget.LinearLayout"
-                package="com.android.settings" content-desc=""
-                clickable="true" enabled="true" scrollable="false"
-                bounds="[30,1252][1050,1461]">
-            <!-- Title label with stable resource-id -->
-            <node index="0" text="Connections" resource-id="android:id/title"
-                  class="android.widget.TextView" package="com.android.settings"
-                  content-desc="" clickable="false" enabled="true"
-                  bounds="[216,1294][507,1364]" />
-            <!-- Subtitle label -->
-            <node index="1" text="Wi-Fi  •  Bluetooth  •  SIM manager"
-                  resource-id="android:id/summary" class="android.widget.TextView"
-                  package="com.android.settings" content-desc=""
-                  clickable="false" enabled="true"
-                  bounds="[216,1364][816,1419]" />
-          </node>
-
-          <node index="3" text="" resource-id="" class="android.widget.LinearLayout"
-                package="com.android.settings" content-desc=""
-                clickable="true" enabled="true" scrollable="false"
-                bounds="[30,1461][1050,1721]">
-            <node index="0" text="Connected devices" resource-id="android:id/title"
-                  class="android.widget.TextView" package="com.android.settings"
-                  content-desc="" clickable="false" enabled="true"
-                  bounds="[216,1503][661,1573]" />
-            <node index="1" text="Quick Share  •  Samsung DeX  •  Android Auto"
-                  resource-id="android:id/summary" class="android.widget.TextView"
-                  package="com.android.settings" content-desc=""
-                  clickable="false" enabled="true"
-                  bounds="[216,1573][996,1679]" />
-          </node>
-
-        </node>
-    ...
-  </node>
-</hierarchy>
-```
-
-**Reading patterns:**
-
-- **Tap targets** are `clickable="true"` nodes. In list UIs these are often container (`LinearLayout`) nodes whose text-bearing children hold the visible label while the container itself has `text=""`. When you match any node, Clawperator first attempts `ACTION_CLICK` on the first `clickable="true"` ancestor it finds while walking up the tree from the matched node. If that accessibility click does not succeed, Clawperator falls back to a gesture tap at the center of the matched node's bounding box. This means matching a non-clickable label node (for example, `textEquals: "Connections"`) works correctly as long as it is visually inside a clickable parent tap target. If both mechanisms fail, the execution currently terminates with a failed envelope and empty `stepResults` rather than a per-step `NODE_NOT_CLICKABLE` code.
-- **Icon-only buttons** (no `text`) use `content-desc` for their label. Target with `contentDescEquals`.
-- **Scroll containers** have `scrollable="true"`. Pass their `resource-id` as the `container` matcher in `scroll_and_click` or `scroll`. If `container` is omitted from `scroll`, the first `scrollable="true"` node on screen is used automatically.
-- **Disabled elements** have `enabled="false"`. They cannot be interacted with - scrolling or waiting for a state change is required first.
-
-**Apps with obfuscated or missing resource-ids:** Many production apps (Google Play Store, social media apps, banking apps) set `resource-id=""` on all or most nodes. In this case, fall back to content-desc and text matchers. The fallback priority for these apps is:
-
-1. `contentDescEquals` - for elements with stable accessibility labels (icon buttons, tabs)
-2. `textEquals` - for elements with stable visible text (button labels, section headers)
-3. `contentDescContains` / `textContains` - when the value may include dynamic content, counts, or special characters (including HTML entities - see note above)
-4. `role: "textfield"` - for text inputs when no `resource-id` is present
-
-Note: `content-desc` values sometimes contain newlines when an element's label spans multiple pieces of information (for example, an app name followed by developer name in Play Store results). Use `contentDescContains` with a known stable substring rather than a full exact match.
+- the exact snapshot envelope placement
+- the relationship to Android UI Automator output
+- XML attribute meanings and escaping
+- real-device annotated examples
+- parsing guidance for agents
 
 ## Error Codes
 
@@ -921,7 +837,16 @@ If multiple apps are registered for the URI scheme, a system chooser may appear.
 Skills are standalone programs that agents can invoke directly. The Node API provides discovery (`skills list`, `skills search`), metadata (`skills get`), and a convenience `skills run` wrapper. Skills do not need the Node API to execute - agents can call skill scripts directly.
 
 **Does Clawperator configure accounts or app settings?**
-No. Clawperator automates the UI on whatever user-installed Android apps are already installed and signed in on the device. It does not log in to apps, create accounts, or configure device settings on behalf of the user. If an automation targets an app that requires authentication, the user must sign in to that app manually on the device before the agent runs. For emulators using a Google Play system image, the user must also sign in to a Google account before Play Store-gated apps are accessible.
+Clawperator is a neutral actuator. It does not decide whether entering a
+username, password, email address, or other user-provided input is appropriate.
+That decision belongs to the external brain agent and the user workflow it is
+carrying out.
+
+In practice, the device still needs to be in a usable state for the automation
+the agent is attempting. Many setups prepare account state and app
+configuration before automation begins. When an agent chooses to enter login or
+credential fields through the normal UI, Clawperator can provide the same
+interaction primitives it uses for any other text entry or click flow.
 
 **How should agents handle sensitive text in results?**
 Default behavior is full-fidelity results for agent reasoning. PII redaction (`--safe-logs`) is a planned feature.
