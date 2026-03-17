@@ -50,7 +50,7 @@ Use Android Settings (`com.android.settings`) as a universal baseline probe:
 1. `close_app` Settings
 2. `open_app` Settings
 3. short settle delay
-4. `snapshot_ui` (`ascii`)
+4. `snapshot_ui` (`hierarchy_xml`)
 5. capture an ADB screenshot and persist absolute file path
 
 This gives:
@@ -74,6 +74,46 @@ DEVICE_ID="$(adb devices | awk 'NR>1 && $2==\"device\" {print $1; exit}')"
 ```
 
 Always pass `--device-id` to `skills run` when more than one device is connected. Without it the wrapper will fail if device auto-detection is ambiguous.
+
+If a wrapped script exits non-zero or times out, `clawperator skills run`
+preserves partial `stdout` and `stderr` in the structured error output when
+they exist. Agents should inspect those fields before discarding the run as an
+opaque failure.
+
+When a particular device or workflow needs a different wrapper budget, use:
+
+```bash
+clawperator skills run <skill_id> --device-id <device_id> --timeout-ms 90000
+```
+
+When you want a lightweight smoke check for expected output markers, use:
+
+```bash
+clawperator skills run <skill_id> --device-id <device_id> --expect-contains TEXT_BEGIN
+```
+
+## Private skills
+
+Private skills are not discovered by scanning folders automatically. The
+current model is registry-driven:
+
+1. create the skill folder
+2. add `skill.json`
+3. add a matching entry to the local registry JSON pointed to by
+   `CLAWPERATOR_SKILLS_REGISTRY`
+
+Once that registry entry exists, the skill becomes visible to:
+
+- `clawperator skills list`
+- `clawperator skills get`
+- `clawperator skills search`
+- `clawperator skills run`
+
+For the current metadata contract and authoring details, see
+`skills/skill-authoring-guidelines.md`.
+
+For the full path from ad hoc exploration to a validated reusable skill, see
+`skills/skill-development-workflow.md`.
 
 ## Anti-Patterns
 

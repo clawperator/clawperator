@@ -17,6 +17,7 @@ export type ScrollOutcome = "moved" | "edge_reached" | "gesture_failed";
 /**
  * Reason a `scroll_until` loop terminated.
  *
+ * - `TARGET_FOUND`          - target matcher became visible in the current UI tree
  * - `EDGE_REACHED`          - content ended naturally (finite list)
  * - `MAX_SCROLLS_REACHED`   - hit the maxScrolls cap (expected on infinite feeds)
  * - `MAX_DURATION_REACHED`  - hit the maxDurationMs cap
@@ -25,6 +26,7 @@ export type ScrollOutcome = "moved" | "edge_reached" | "gesture_failed";
  * - `CONTAINER_NOT_SCROLLABLE` - resolved container is not scrollable
  */
 export type ScrollTerminationReason =
+  | "TARGET_FOUND"
   | "EDGE_REACHED"
   | "MAX_SCROLLS_REACHED"
   | "MAX_DURATION_REACHED"

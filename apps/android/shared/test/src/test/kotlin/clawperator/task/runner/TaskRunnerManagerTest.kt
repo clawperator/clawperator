@@ -96,9 +96,9 @@ class TaskRunnerManagerTest : ActionTest {
 
         override suspend fun logUiTree(
             retry: TaskRetry,
-        ): UiSnapshotActualFormat {
+        ): UiSnapshotResult {
             // No-op for testing
-            return UiSnapshotActualFormat.HierarchyXml
+            return UiSnapshotResult(actualFormat = UiSnapshotActualFormat.HierarchyXml)
         }
 
         override suspend fun closeApp(

@@ -1,7 +1,16 @@
 import { describe, it } from "node:test";
 import assert from "node:assert";
-import { attachSnapshotsToStepResults, finalizeSuccessfulScreenshotCapture, markExtractionFailedSnapshotSteps } from "../../domain/executions/runExecution.js";
+import {
+  attachSnapshotsToStepResults,
+  finalizeSuccessfulCloseAppSteps,
+  finalizeSuccessfulScreenshotCapture,
+  markExtractionFailedSnapshotSteps,
+  runCloseAppPreflight,
+} from "../../domain/executions/runExecution.js";
+import type { Execution } from "../../contracts/execution.js";
 import type { StepResult } from "../../contracts/result.js";
+import { ERROR_CODES } from "../../contracts/errors.js";
+import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 
 describe("attachSnapshotsToStepResults", () => {
   it("aligns fewer snapshots to the last snapshot_ui steps", () => {
@@ -159,5 +168,154 @@ describe("finalizeSuccessfulScreenshotCapture", () => {
       source: "adb-fallback",
       path: "/tmp/capture.png",
     });
+  });
+});
+
+describe("finalizeSuccessfulCloseAppSteps", () => {
+  it("normalizes unsupported runtime close steps into success when the Node pre-flight close ran", () => {
+    const execution: Execution = {
+      commandId: "cmd-close",
+      taskId: "task-close",
+      source: "test",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 5000,
+      actions: [
+        { id: "close-1", type: "close_app", params: { applicationId: "com.example.app" } },
+      ],
+    };
+    const stepResults: StepResult[] = [
+      {
+        id: "close-1",
+        actionType: "close_app",
+        success: false,
+        data: {
+          error: "UNSUPPORTED_RUNTIME_CLOSE",
+          message: "Android runtime cannot reliably close apps.",
+        },
+      },
+    ];
+
+    finalizeSuccessfulCloseAppSteps(stepResults, execution, new Set(["close-1"]));
+
+    assert.strictEqual(stepResults[0].success, true);
+    assert.deepStrictEqual(stepResults[0].data, { application_id: "com.example.app" });
+  });
+
+  it("does not modify unrelated or already-successful close_app steps", () => {
+    const execution: Execution = {
+      commandId: "cmd-close",
+      taskId: "task-close",
+      source: "test",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 5000,
+      actions: [
+        { id: "close-1", type: "close_app", params: { applicationId: "com.example.app" } },
+      ],
+    };
+    const stepResults: StepResult[] = [
+      { id: "close-1", actionType: "close_app", success: true, data: { application_id: "com.example.app" } },
+      { id: "click-1", actionType: "click", success: true, data: {} },
+    ];
+
+    finalizeSuccessfulCloseAppSteps(stepResults, execution, new Set(["close-1"]));
+
+    assert.strictEqual(stepResults[0].success, true);
+    assert.deepStrictEqual(stepResults[0].data, { application_id: "com.example.app" });
+    assert.deepStrictEqual(stepResults[1].data, {});
+  });
+
+  it("does not normalize unsupported runtime close when the pre-flight close did not succeed", () => {
+    const execution: Execution = {
+      commandId: "cmd-close",
+      taskId: "task-close",
+      source: "test",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 5000,
+      actions: [
+        { id: "close-1", type: "close_app", params: { applicationId: "com.example.app" } },
+      ],
+    };
+    const stepResults: StepResult[] = [
+      {
+        id: "close-1",
+        actionType: "close_app",
+        success: false,
+        data: {
+          error: "UNSUPPORTED_RUNTIME_CLOSE",
+          message: "Android runtime cannot reliably close apps.",
+        },
+      },
+    ];
+
+    finalizeSuccessfulCloseAppSteps(stepResults, execution, new Set());
+
+    assert.strictEqual(stepResults[0].success, false);
+    assert.deepStrictEqual(stepResults[0].data, {
+      error: "UNSUPPORTED_RUNTIME_CLOSE",
+      message: "Android runtime cannot reliably close apps.",
+    });
+  });
+});
+
+describe("runCloseAppPreflight", () => {
+  it("tracks successful close_app pre-flight steps", async () => {
+    const execution: Execution = {
+      commandId: "cmd-close",
+      taskId: "task-close",
+      source: "test",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 5000,
+      actions: [
+        { id: "close-1", type: "close_app", params: { applicationId: "com.example.app" } },
+      ],
+    };
+    const config = getDefaultRuntimeConfig({
+      runner: {
+        run: async () => ({ stdout: "", stderr: "", code: 0 }),
+        runShell: async () => ({ stdout: "", stderr: "", code: 0 }),
+        spawn: () => { throw new Error("not used"); },
+      },
+    });
+
+    const result = await runCloseAppPreflight(execution, config);
+
+    assert.strictEqual(result.ok, true);
+    if (result.ok) {
+      assert.deepStrictEqual([...result.successfulCloseActionIds], ["close-1"]);
+    }
+  });
+
+  it("returns a structured failure when adb force-stop exits non-zero", async () => {
+    const execution: Execution = {
+      commandId: "cmd-close",
+      taskId: "task-close",
+      source: "test",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 5000,
+      actions: [
+        { id: "close-1", type: "close_app", params: { applicationId: "com.example.app" } },
+      ],
+    };
+    const config = getDefaultRuntimeConfig({
+      runner: {
+        run: async () => ({ stdout: "", stderr: "shell failed", code: 1 }),
+        runShell: async () => ({ stdout: "", stderr: "", code: 0 }),
+        spawn: () => { throw new Error("not used"); },
+      },
+    });
+
+    const result = await runCloseAppPreflight(execution, config);
+
+    assert.strictEqual(result.ok, false);
+    if (!result.ok) {
+      assert.strictEqual(result.error.code, ERROR_CODES.DEVICE_SHELL_UNAVAILABLE);
+      assert.match(result.error.message, /close_app pre-flight force-stop failed/);
+      assert.deepStrictEqual(result.error.details, {
+        applicationId: "com.example.app",
+        adbExitCode: 1,
+        stdout: "",
+        stderr: "shell failed",
+      });
+    }
   });
 });

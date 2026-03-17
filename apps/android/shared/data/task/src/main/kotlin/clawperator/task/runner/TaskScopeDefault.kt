@@ -229,7 +229,7 @@ class TaskScopeDefault(
 
     override suspend fun logUiTree(
         retry: TaskRetry,
-    ): UiSnapshotActualFormat {
+    ): UiSnapshotResult {
         val sink = currentTaskStatus()
         sink.emit(TaskEvent.StageStart("logUiTree", "Logging UI tree"))
 
@@ -249,6 +249,7 @@ class TaskScopeDefault(
                 val nodeCount = countNodesInHierarchyDump(hierarchyDump)
                 val maxDepth = maxDepthInHierarchyDump(hierarchyDump)
                 val actualFormat = UiSnapshotActualFormat.HierarchyXml
+                val windowMetadata = uiTreeInspector.getCurrentWindowMetadata()
 
                 val totalElapsedMs = getCurrentTimeMillis() - stageStartTime
 
@@ -258,12 +259,22 @@ class TaskScopeDefault(
                         "node_count" to nodeCount,
                         "max_depth" to maxDepth,
                         "actual_format" to actualFormat.wireValue,
+                        "foreground_package" to windowMetadata?.foregroundPackage,
+                        "has_overlay" to windowMetadata?.hasOverlay,
+                        "overlay_package" to windowMetadata?.overlayPackage,
+                        "window_count" to windowMetadata?.windowCount,
                         "truncated" to "false", // TODO: Implement truncation detection
                         "elapsed_ms" to totalElapsedMs,
                         "attempt" to attempt,
                     )
                 sink.emit(TaskEvent.StageSuccess("logUiTree", successPayload))
-                return actualFormat
+                return UiSnapshotResult(
+                    actualFormat = actualFormat,
+                    foregroundPackage = windowMetadata?.foregroundPackage,
+                    hasOverlay = windowMetadata?.hasOverlay ?: false,
+                    overlayPackage = windowMetadata?.overlayPackage,
+                    windowCount = windowMetadata?.windowCount,
+                )
             } catch (t: Throwable) {
                 if (t is kotlinx.coroutines.CancellationException) throw t
                 if (attempt >= retry.maxAttempts) {

@@ -4,6 +4,9 @@ import { compileArtifact } from "../../domain/skills/compileArtifact.js";
 import { syncSkills } from "../../domain/skills/syncSkills.js";
 import { searchSkills } from "../../domain/skills/searchSkills.js";
 import { runSkill } from "../../domain/skills/runSkill.js";
+import { scaffoldSkill } from "../../domain/skills/scaffoldSkill.js";
+import { validateAllSkills, validateSkill } from "../../domain/skills/validateSkill.js";
+import { SKILL_OUTPUT_ASSERTION_FAILED } from "../../contracts/skills.js";
 import type { OutputOptions } from "../output.js";
 import { formatSuccess, formatError } from "../output.js";
 
@@ -93,15 +96,29 @@ export async function cmdSkillsSearch(
 export async function cmdSkillsRun(
   skillId: string,
   args: string[],
+  timeoutMs: number | undefined,
+  expectContains: string | undefined,
   options: { format: OutputOptions["format"] }
 ): Promise<string> {
-  const result = await runSkill(skillId, args);
+  const result = await runSkill(skillId, args, undefined, timeoutMs);
   if (result.ok) {
+    if (expectContains && !result.output.includes(expectContains)) {
+      return formatError({
+        code: SKILL_OUTPUT_ASSERTION_FAILED,
+        message: `Skill ${skillId} output did not include expected text`,
+        skillId,
+        output: result.output,
+        expectedSubstring: expectContains,
+        timeoutMs: timeoutMs ?? undefined,
+      }, options);
+    }
     return formatSuccess({
       skillId: result.skillId,
       output: result.output,
       exitCode: result.exitCode,
       durationMs: result.durationMs,
+      timeoutMs: timeoutMs ?? undefined,
+      expectedSubstring: expectContains ?? undefined,
     }, options);
   }
   return formatError({
@@ -109,6 +126,66 @@ export async function cmdSkillsRun(
     message: result.message,
     skillId: result.skillId,
     exitCode: result.exitCode,
+    stdout: result.stdout,
     stderr: result.stderr,
+    timeoutMs: timeoutMs ?? undefined,
+    expectedSubstring: expectContains ?? undefined,
+  }, options);
+}
+
+export async function cmdSkillsNew(
+  skillId: string,
+  options: { format: OutputOptions["format"] }
+): Promise<string> {
+  const result = await scaffoldSkill(skillId);
+  if (result.ok) {
+    return formatSuccess({
+      created: true,
+      skillId: result.skillId,
+      registryPath: result.registryPath,
+      skillPath: result.skillPath,
+      files: result.files,
+    }, options);
+  }
+  return formatError({ code: result.code, message: result.message }, options);
+}
+
+export async function cmdSkillsValidate(
+  skillId: string,
+  options: { format: OutputOptions["format"] }
+): Promise<string> {
+  const result = await validateSkill(skillId);
+  if (result.ok) {
+    return formatSuccess({
+      valid: true,
+      skill: result.skill,
+      registryPath: result.registryPath,
+      checks: result.checks,
+    }, options);
+  }
+  return formatError({
+    code: result.code,
+    message: result.message,
+    details: result.details,
+  }, options);
+}
+
+export async function cmdSkillsValidateAll(
+  options: { format: OutputOptions["format"] }
+): Promise<string> {
+  const result = await validateAllSkills();
+  if (result.ok) {
+    return formatSuccess({
+      valid: true,
+      totalSkills: result.totalSkills,
+      registryPath: result.registryPath,
+      validSkills: result.validSkills,
+    }, options);
+  }
+  return formatError({
+    code: result.code,
+    message: result.message,
+    registryPath: result.registryPath,
+    details: result.details,
   }, options);
 }

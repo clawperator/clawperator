@@ -19,16 +19,28 @@ nav:
     - Project Overview: getting-started/project-overview.md
     - Clawperator Operator Android app: getting-started/android-operator-apk.md
   - For AI Agents:
+    - Agent Quickstart: ai-agents/agent-quickstart.md
     - Node API - Agent Guide: ai-agents/node-api-for-agents.md
-    - Operator LLM Playbook: design/operator-llm-playbook.md
+    - Navigation Patterns for Agents: ai-agents/navigation-patterns.md
+    - Multi-Device Workflows for Agents: ai-agents/multi-device-workflows.md
+    - Execution Model: reference/execution-model.md
+    - Timeout Budgeting: reference/timeout-budgeting.md
+    - Device and Package Model: reference/device-and-package-model.md
   - Reference:
     - CLI Reference: reference/cli-reference.md
     - API Overview: reference/api-overview.md
+    - Execution Model: reference/execution-model.md
+    - Timeout Budgeting: reference/timeout-budgeting.md
+    - Device and Package Model: reference/device-and-package-model.md
+    - Clawperator Snapshot Format: reference/snapshot-format.md
     - Error Codes: reference/error-codes.md
+    - Error Handling Guide: reference/error-handling.md
     - Doctor: reference/node-api-doctor.md
-  - Architecture:
+    - Environment Variables: reference/environment-variables.md
+  - Design and Rationale:
     - System Overview: architecture/architecture.md
-    - Node Runtime and API Design: design/node-api-design.md
+    - Runtime Architecture and API Rationale: design/node-api-design.md
+    - Operator Automation Playbook: design/operator-llm-playbook.md
 
   - Troubleshooting:
     - Version Compatibility: troubleshooting/compatibility.md
@@ -37,8 +49,8 @@ nav:
     - Crash Logs: troubleshooting/crash-logs.md
   - Skills:
     - Usage Model: skills/usage-model.md
+    - Skill Development Workflow: skills/skill-development-workflow.md
     - Skill Authoring Guidelines: skills/skill-authoring-guidelines.md
     - Skill Design: design/skill-design.md
     - Device Prep and Runtime Tips: skills/device-prep-and-runtime-tips.md
-    - Skills Verification: skills/skills-verification.md
     - Blocked Terms Policy: skills/blocked-terms-policy.md

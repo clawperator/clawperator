@@ -5,7 +5,9 @@ Clawperator operates an Android device on behalf of a user. In these docs, "Andr
 - a physical Android phone connected over `adb`
 - a local Android emulator provisioned through the Node CLI
 
-This is the canonical actuator model for Clawperator. The Node runtime talks to an Android device, and the Android device runs the [Clawperator Operator Android app](android-operator-apk.md).
+This is Clawperator's current actuator model. The Node runtime talks to an
+Android device, and the Android device runs the
+[Clawperator Operator Android app](android-operator-apk.md).
 
 Canonical definitions for terms such as "Android device", "[Clawperator Operator Android app](android-operator-apk.md)", and "user-installed Android apps" live in [Clawperator Terminology](terminology.md).
 
@@ -19,7 +21,9 @@ Clawperator Node Runtime
 Android Device (physical or emulator)
 ```
 
-Clawperator operates the device UI. It does not own account setup, app configuration, or user credentials.
+Clawperator operates the device UI. It does not own planning or policy
+decisions about what should be entered. Those belong to the external agent and
+the user workflow it is carrying out.
 
 ## User responsibilities
 
@@ -33,11 +37,12 @@ Before automation starts, the user is responsible for preparing the Android devi
 Clawperator does not:
 
 - create accounts
-- sign into accounts
-- configure apps on the user's behalf
+- decide what credentials or other user-provided inputs are appropriate to use
 - bypass authentication or anti-abuse gates
 
-Agents should assume the device already contains the required apps, logins, and configuration.
+Agents should assume the device already contains the required apps and
+configuration, unless the intended workflow explicitly includes entering those
+details through the normal UI.
 
 ## Choosing an Android environment
 

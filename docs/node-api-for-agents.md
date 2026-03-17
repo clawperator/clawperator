@@ -2,6 +2,10 @@
 
 Clawperator provides a deterministic execution layer for LLM agents to control Android devices. This guide covers the CLI and HTTP API contracts.
 
+If you are starting cold, begin with [Agent Quickstart](agent-quickstart.md).
+For the exact `snapshot_ui` structure, use
+[Clawperator Snapshot Format](../reference/snapshot-format.md).
+
 ## Concepts
 
 - **Execution**: A payload of one or more actions dispatched to the device. Every execution produces exactly one `[Clawperator-Result]` envelope.
@@ -26,7 +30,7 @@ Clawperator provides a deterministic execution layer for LLM agents to control A
 | `provision emulator` | Alias of `emulator provision` |
 | `execute --execution <json\|file>` | Run a full execution payload |
 | `observe snapshot` | Capture UI hierarchy dump (`hierarchy_xml`) |
-| `observe screenshot` | Capture device screen as PNG |
+| `observe screenshot` | Capture device screen as PNG and return the local file path |
 | `action open-app --app <id>` | Open an application |
 | `action click --selector <json>` | Click a UI element |
 | `action read --selector <json>` | Read text from element |
@@ -35,8 +39,11 @@ Clawperator provides a deterministic execution layer for LLM agents to control A
 | `skills list` | List available skills |
 | `skills get <skill_id>` | Show skill metadata |
 | `skills search [--app <pkg>] [--intent <i>] [--keyword <k>]` | Search skills by app, intent, or keyword (at least one filter required) |
+| `skills new <skill_id>` | Scaffold a new local skill folder and registry entry |
+| `skills validate <skill_id>` | Verify one local skill's metadata and required files before runtime testing |
+| `skills validate --all` | Validate the entire configured skills registry in one pass |
 | `skills compile-artifact <id> --artifact <name>` | Compile skill to execution payload |
-| `skills run <skill_id> [--device-id <id>]` | Invoke a skill script (convenience wrapper) |
+| `skills run <skill_id> [--device-id <id>] [--timeout-ms <n>] [--expect-contains <text>]` | Invoke a skill script (convenience wrapper) |
 | `skills install` | Clone skills repo to `~/.clawperator/skills/` |
 | `skills update [--ref <git-ref>]` | Pull latest skills (optionally pin to a ref) |
 | `grant-device-permissions` | Re-grant Operator permissions only after an Operator APK crash causes Android to revoke them |
@@ -57,6 +64,9 @@ Use subcommand help when the docs and the current CLI differ:
 
 ```bash
 clawperator observe snapshot --help
+clawperator observe screenshot --help
+clawperator skills compile-artifact --help
+clawperator skills run --help
 clawperator skills sync --help
 clawperator doctor --help
 ```
@@ -91,10 +101,14 @@ Start with `clawperator serve [--port <n>] [--host <ip>]`. Default: `127.0.0.1:3
 | `POST /observe/screenshot` | Capture screenshot |
 | `GET /skills` | List skills. Query params: `?app=<pkg>&intent=<i>&keyword=<k>` |
 | `GET /skills/:skillId` | Get skill metadata |
-| `POST /skills/:skillId/run` | Run skill. Body: `{"deviceId": "...", "args": [...]}` |
+| `POST /skills/:skillId/run` | Run skill. Body: `{"deviceId": "...", "args": [...], "timeoutMs": 90000, "expectContains": "TEXT_BEGIN"}` |
 | `GET /events` | SSE stream: `clawperator:result`, `clawperator:execution`, `heartbeat` |
 
 See `apps/node/examples/basic-api-usage.js` for a complete SSE + REST example.
+
+For `POST /skills/:skillId/run`, error responses may include partial `stdout`
+and `stderr` when the wrapped script already emitted useful output before
+failing or timing out.
 
 ## Android Emulator Support
 
@@ -181,6 +195,9 @@ Every execution requires `expectedFormat: "android-ui-automator"`.
 
 **Execution timeout limit:** `timeoutMs` is schema-validated. The allowed range is 1,000-120,000 ms (1 second to 2 minutes). Submitting a value outside this range causes `EXECUTION_VALIDATION_FAILED` - the execution is rejected before any action runs. Operations that require longer running time must be split across multiple execution payloads. For install or download flows, use `wait_for_node` polling within the 120-second window rather than a single long sleep.
 
+For practical timeout sizing guidance by workflow type, see
+[Clawperator Timeout Budgeting](../reference/timeout-budgeting.md).
+
 **Result envelope:** Exactly one `[Clawperator-Result]` JSON block is emitted to logcat on completion. Node reads and returns it. See the Result Envelope section for the full shape and per-action `data` contents.
 
 ## NodeMatcher Reference
@@ -224,7 +241,7 @@ Combine fields to increase specificity when a single field is ambiguous:
 | `sleep` | `durationMs: number` | - |
 | `scroll_and_click` | `target: NodeMatcher` | `container: NodeMatcher`, `direction: "down" \| "up" \| "left" \| "right"` (default: `"down"`), `maxSwipes: number` (default: `10`, range: 1-50), `distanceRatio: number` (default: `0.7`, range: 0-1), `settleDelayMs: number` (default: `250`, range: 0-10000), `findFirstScrollableChild: boolean` (default: `true`), `clickAfter: boolean` (default: `true`), `scrollRetry: object` (default preset: `maxAttempts=4`, `initialDelayMs=400`, `maxDelayMs=2000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`), `clickRetry: object` (default preset: `maxAttempts=5`, `initialDelayMs=500`, `maxDelayMs=3000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`) |
 | `scroll` | - | `container: NodeMatcher` (default: auto-detect first scrollable), `direction: "down" \| "up" \| "left" \| "right"` (default: `"down"` - reveals content further down, finger swipes up), `distanceRatio: number` (default: `0.7`, range: 0-1), `settleDelayMs: number` (default: `250`, range: 0-10000), `findFirstScrollableChild: boolean` (default: `true`), `retry: object` (default: no retry - see scroll behavior note) |
-| `scroll_until` | - | `container: NodeMatcher` (default: auto-detect), `direction: "down" \| "up" \| "left" \| "right"` (default: `"down"`), `distanceRatio: number` (default: `0.7`, range: 0-1), `settleDelayMs: number` (default: `250`, range: 0-10000), `maxScrolls: number` (default: `20`, range: 1-200), `maxDurationMs: number` (default: `10000`, range: 0-120000), `noPositionChangeThreshold: number` (default: `3`, range: 1-20), `findFirstScrollableChild: boolean` (default: `true`) |
+| `scroll_until` | - | `target: NodeMatcher` (optional, emits `TARGET_FOUND` when the target becomes visible), `container: NodeMatcher` (default: auto-detect), `clickType: "default" \| "long_click" \| "focus"` (used only when `clickAfter: true`), `clickAfter: boolean` (default: `false`, requires `target`), `direction: "down" \| "up" \| "left" \| "right"` (default: `"down"`), `distanceRatio: number` (default: `0.7`, range: 0-1), `settleDelayMs: number` (default: `250`, range: 0-10000), `maxScrolls: number` (default: `20`, range: 1-200), `maxDurationMs: number` (default: `10000`, range: 0-120000), `noPositionChangeThreshold: number` (default: `3`, range: 1-20), `findFirstScrollableChild: boolean` (default: `true`) |
 | `press_key` | `key: "back" \| "home" \| "recents"` | - |
 
 ### CLI-to-action-type mapping
@@ -260,7 +277,21 @@ Combine fields to increase specificity when a single field is ambiguous:
 
 **`open_uri`:** Opens a URI using the Clawperator Android app's implicit `ACTION_VIEW` intent - no adb shortcut is used. The Android device's registered handler for the URI scheme is invoked directly. Any URI scheme is supported: deep links (`market://details?id=com.actionlauncher.playstore`), standard URLs (`https://example.com`), and custom app schemes. If no application is registered for the URI scheme, the action fails with `URI_NOT_HANDLED`. A chooser dialog may appear on devices with multiple handlers for a scheme; follow the `open_uri` step with a `snapshot_ui` to verify the expected app is in the foreground. The alias `open_url` is also accepted and normalized to `open_uri`.
 
-**`close_app`:** The Node layer intercepts `close_app` actions and runs `adb shell am force-stop <applicationId>` before dispatching to Android. The Android step always returns `success: false` with `data.error: "UNSUPPORTED_RUNTIME_CLOSE"` - this is expected. The overall execution `status` remains `"success"` and the app is force-stopped. Do not treat this step result as a recoverable failure.
+Documented and tested inputs include:
+
+- `https://...`
+- `market://...`
+- app-specific deep-link URIs handled by a device app
+
+What this action does not promise:
+
+- support for bare Android intent action strings such as `android.settings.DEVICE_INFO_SETTINGS`
+- support for pseudo-formats such as `ACTION:android.settings.DEVICE_INFO_SETTINGS`
+
+Treat `open_uri` as an `ACTION_VIEW` URI launcher, not a general-purpose
+Android intent builder.
+
+**`close_app`:** The Node layer intercepts `close_app` actions and runs `adb shell am force-stop <applicationId>` before dispatching to Android. When that pre-flight close succeeds, the Node layer normalizes the resulting `close_app` step into a successful step result so the envelope reflects the real observed outcome. If the pre-flight `force-stop` fails, the execution now fails with a structured error instead of pretending the app was closed. In practice, treat `close_app` as a supported force-stop action through the Node interface.
 
 **`click`:** Finds the node matching `matcher` and performs the specified `clickType`. The default click type is `"default"` (standard accessibility click with gesture fallback). Use `"long_click"` for long-press targets and `"focus"` to focus without activating.
 
@@ -375,6 +406,19 @@ Combine fields to increase specificity when a single field is ambiguous:
 
 **`snapshot_ui`:** Clawperator returns a single canonical snapshot format: `hierarchy_xml`. The Android runtime writes the hierarchy dump to device logcat, and the Node layer injects that raw XML into `data.text` after execution. `data.actual_format` is always `"hierarchy_xml"` for successful snapshot steps.
 
+Successful snapshot steps may also include best-effort accessibility-window
+metadata:
+
+- `data.foreground_package`
+- `data.has_overlay`
+- `data.overlay_package`
+- `data.window_count`
+
+Treat those fields as operational hints, not as a strict modal-dialog
+guarantee. `has_overlay: "true"` means Clawperator detected another meaningful
+accessibility window above the foreground app. It does not prove the screen is
+unusable, and `window_count > 1` alone is normal on some Android builds.
+
 `observe snapshot` (CLI subcommand) and `snapshot_ui` (execution action type) use the same internal pipeline and produce identical output. `observe snapshot` builds a single-action execution internally and calls `runExecution`. Use `observe snapshot` for ad-hoc inspection from the command line. Use `snapshot_ui` as a step within a multi-action execution payload.
 
 **Failure case - extraction error:** If snapshot post-processing finishes without attaching UI hierarchy text to the step (`data.text` remains absent), the step returns `success: false` with `data.error: "SNAPSHOT_EXTRACTION_FAILED"`. A common cause is that logcat does not contain a matching `[TaskScope] UI Hierarchy:` marker for the step, but partial extraction or other logcat mismatches can also trigger this error. This typically means the installed clawperator binary is out of date with the Android Operator APK. Run `clawperator version --check-compat` and `clawperator doctor` to diagnose. See Troubleshooting for resolution steps.
@@ -411,6 +455,9 @@ Combine fields to increase specificity when a single field is ambiguous:
         "success": true,
         "data": {
           "actual_format": "hierarchy_xml",
+          "foreground_package": "com.android.settings",
+          "has_overlay": "false",
+          "window_count": "2",
           "text": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><hierarchy rotation=\"0\">...</hierarchy>"
         }
       }
@@ -422,7 +469,7 @@ Combine fields to increase specificity when a single field is ambiguous:
 }
 ```
 
-**`take_screenshot`:** `observe screenshot` uses the same execution contract under the hood. Android reports `UNSUPPORTED_RUNTIME_SCREENSHOT`, then the Node layer captures the screenshot via `adb exec-out screencap -p`, writes it to `data.path`, and normalizes the step result to `success: true` when capture succeeds.
+**`take_screenshot`:** `observe screenshot` uses the same execution contract under the hood. Android reports `UNSUPPORTED_RUNTIME_SCREENSHOT`, then the Node layer captures the screenshot via `adb exec-out screencap -p`, writes it to `data.path`, and normalizes the step result to `success: true` when capture succeeds. Pass `observe screenshot --path <file>` when you want a deterministic local filename instead of the default temp path.
 
 **`press_key`:** Issues a system-level key event via the Android Accessibility Service (`performGlobalAction`). Supported keys: `"back"`, `"home"`, `"recents"`. The alias `key_press` is normalized to `press_key`. No retry - this action is single-attempt by design. Requires the Clawperator Operator accessibility service to be running on the device. If the service is unavailable, the execution returns a top-level failed envelope with `status: "failed"` and no `stepResults`. Use `clawperator doctor` to diagnose accessibility service availability before running executions that include `press_key`. When testing local/debug builds, pass the matching `receiverPackage` (`com.clawperator.operator.dev`) instead of relying on the default release package. Returns `success: false` with `data.error: "GLOBAL_ACTION_FAILED"` if the OS reports the global action could not be performed (rare soft OS failure - accessibility service was running but Android declined the action).
 
@@ -547,8 +594,19 @@ After receiving `snap2`, the agent compares it to `snap1`. If `scr1.data.scroll_
 
 Direction semantics are the same as `scroll`. `container`, `distanceRatio`, `settleDelayMs`, and `findFirstScrollableChild` behave identically to `scroll`.
 
+If `params.target` is provided, the runtime checks for that matcher before the
+first scroll and after each successful movement. When the target becomes
+visible in Clawperator's on-screen filtered UI tree, the step returns
+`termination_reason: "TARGET_FOUND"`. This removes the extra "scroll, then
+snapshot to verify" round-trip for many navigation tasks.
+
+If `clickAfter: true`, `scroll_until` clicks the target immediately after it
+becomes visible. This gives agents a one-step "scroll top-level list until
+visible, then click" path without switching to `scroll_and_click`.
+
 **Termination reasons (`data.termination_reason`):**
-- `EDGE_REACHED` - content ended naturally (finite list). `success: true`.
+- `TARGET_FOUND` - the provided `target` matcher became visible in the current UI tree. `success: true`.
+- `EDGE_REACHED` - scrolling stopped because no further movement was detected. `success: true`.
 - `MAX_SCROLLS_REACHED` - hit `maxScrolls` cap. `success: true`. Normal for infinite feeds.
 - `MAX_DURATION_REACHED` - hit `maxDurationMs` cap. `success: true`. Normal for infinite feeds.
 - `NO_POSITION_CHANGE` - no content movement across `noPositionChangeThreshold` consecutive scrolls. `success: true`.
@@ -557,19 +615,41 @@ Direction semantics are the same as `scroll`. `container`, `distanceRatio`, `set
 
 `MAX_SCROLLS_REACHED`, `MAX_DURATION_REACHED`, and `NO_POSITION_CHANGE` are clean terminal states, not errors. Agents scrolling infinite feeds should expect these and handle them without treating the action as failed.
 
-**Current runtime caveat:** If the resolved container disappears mid-loop because the app navigated away or rebuilt the view tree unexpectedly, the current Android runtime can collapse that case into `EDGE_REACHED`. When a scroll loop might trigger navigation or heavy UI re-layout, follow it with `snapshot_ui` or `wait_for_node` before assuming the list truly ended.
+When no `target` matcher is provided, `scroll_until` behaves as a pure bounded
+pagination loop and returns one of the non-target terminal reasons above.
+
+**Current runtime caveats:**
+- If the resolved container disappears mid-loop because the app navigated away or rebuilt the view tree unexpectedly, the current Android runtime can collapse that case into `EDGE_REACHED`.
+- Some Android screens expose off-screen descendants in the raw `snapshot_ui` XML. `scroll_until.target` does not use raw XML presence alone; it checks Clawperator's on-screen filtered tree. On heavily clipped or nested layouts, a target may appear in the raw snapshot near the bottom edge but still finish as `EDGE_REACHED` until it is more fully on-screen.
+
+When a scroll loop might trigger navigation, heavy UI re-layout, or clipped list rows near the viewport edge, follow it with `snapshot_ui` or `wait_for_node` before assuming the list truly ended.
 
 **`scroll_until` example request:**
 ```json
 {
-  "commandId": "cmd-su-1",
-  "taskId": "task-paginate",
-  "expectedFormat": "android-ui-automator",
-  "timeoutMs": 30000,
-  "actions": [
-    { "id": "su1", "type": "scroll_until", "params": { "direction": "down", "maxScrolls": 25 } }
-  ]
+    "commandId": "cmd-su-1",
+    "taskId": "task-paginate",
+    "expectedFormat": "android-ui-automator",
+    "timeoutMs": 30000,
+    "actions": [
+      {
+        "id": "su1",
+        "type": "scroll_until",
+        "params": {
+          "target": { "textContains": "About phone" },
+          "container": { "resourceId": "com.android.settings:id/recycler_view" },
+          "clickAfter": true,
+          "direction": "down",
+          "maxScrolls": 25
+        }
+      }
+    ]
 }
+```
+
+**`scroll_until` example step result (target became visible and clicked):**
+```json
+{ "id": "su1", "actionType": "scroll_until", "success": true, "data": { "termination_reason": "TARGET_FOUND", "scrolls_executed": "5", "direction": "down", "click_after": "true", "click_types": "default", "resolved_container": "com.android.settings:id/recycler_view" } }
 ```
 
 **`scroll_until` example step result (finite list, reached bottom):**
@@ -645,7 +725,7 @@ Every execution emits exactly one `[Clawperator-Result]` envelope:
 }
 ```
 
-- `status` is `"success"` when the execution completes (including partial step failures like `close_app`). `status` is `"failed"` only on total execution failure (dispatch error, timeout, validation failure).
+- `status` is `"success"` when the execution completes. `status` is `"failed"` only on total execution failure (dispatch error, timeout, validation failure).
 - `error` (top-level) contains a human-readable description of the failure. Do not branch agent logic on this string - it is not a stable contract.
 - `errorCode` (top-level) contains a stable, enumerated code when the failure has a known cause. Branch agent logic on this field. May be absent in envelopes from older APK versions or for unclassified failures.
 - `data.error` on a step result contains the per-step error code when `success` is `false`.
@@ -660,127 +740,49 @@ Typical `data` keys by action type:
 | :--- | :--- |
 | `open_app` | `application_id` |
 | `open_uri` | `uri` |
-| `close_app` | `application_id`, `error` (`"UNSUPPORTED_RUNTIME_CLOSE"`), `message` |
+| `close_app` | `application_id` |
 | `click` | `click_types` |
 | `enter_text` | `text` (text typed), `submit` (`"true"` or `"false"`) |
 | `read_text` | `text` (extracted text value), `validator` (`"none"` or validator type) |
-| `snapshot_ui` | `actual_format`, `text` (snapshot content - see note below) |
+| `snapshot_ui` | `actual_format`, `foreground_package` (when available), `has_overlay`, `overlay_package` (when available), `window_count`, `text` (snapshot content - see note below) |
 | `take_screenshot` | `path` (local screenshot file path after Node capture) |
 | `wait_for_node` | `resource_id`, `label` (matched node details) |
 | `scroll_and_click` | `max_swipes`, `direction`, `click_types`, `click_after` (`"true"` or `"false"`) |
 | `scroll` | `scroll_outcome` (`"moved"`, `"edge_reached"`, or `"gesture_failed"`), `direction`, `distance_ratio`, `settle_delay_ms`, `resolved_container` (resourceId of auto-detected container, when present) |
-| `scroll_until` | `termination_reason` (see behavior note), `scrolls_executed`, `direction`, `resolved_container` (when present) |
+| `scroll_until` | `termination_reason` (see behavior note), `scrolls_executed`, `direction`, `click_after`, `click_types`, `resolved_container` (when present) |
 | `sleep` | `duration_ms` |
 | `press_key` | `key` (`"back"`, `"home"`, or `"recents"`) |
 
 For any failed step: `success: false` and `data.error` contains the error code string.
 
-**Snapshot content delivery:** The UI hierarchy is produced by the Android runtime and written to device logcat. The Node layer reads logcat after execution and injects the raw XML into `data.text`. `data.actual_format` is `"hierarchy_xml"` on successful snapshot steps.
+**Snapshot content delivery:** The UI hierarchy is produced by the Android runtime and written to device logcat. The Node layer reads logcat after execution and injects the raw XML into `data.text`. `data.actual_format` is `"hierarchy_xml"` on successful snapshot steps. Snapshot steps may also include best-effort accessibility-window metadata such as `foreground_package`, `has_overlay`, `overlay_package`, and `window_count`.
 
 **`read_text` value:** The extracted text value is in `data.text`.
 
 ## Snapshot Output Format
 
-`snapshot_ui` and `clawperator observe snapshot` produce the canonical `hierarchy_xml` format. `data.actual_format` reports `"hierarchy_xml"` on success.
+`snapshot_ui` and `clawperator observe snapshot` produce the canonical
+`hierarchy_xml` format. `data.actual_format` reports `"hierarchy_xml"` on
+success.
 
-### `hierarchy_xml`
+Use [Clawperator Snapshot Format](../reference/snapshot-format.md) as the
+dedicated reference for:
 
-Structured XML produced by UIAutomator. Each `<node>` represents one UI element. Attributes map directly to NodeMatcher fields:
+- the exact snapshot envelope placement
+- the relationship to Android UI Automator output
+- XML attribute meanings and escaping
+- real-device annotated examples
+- parsing guidance for agents
 
-| XML attribute | NodeMatcher field | Notes |
-| :--- | :--- | :--- |
-| `resource-id` | `resourceId` | `"com.example.app:id/name"`. Empty string when not set by developer. |
-| `text` | `textEquals` / `textContains` | Visible text content. Empty string if none. |
-| `content-desc` | `contentDescEquals` / `contentDescContains` | Accessibility label. Empty string if none. |
-| `class` | - | Java widget class name, e.g., `"android.widget.Button"`. Informational only - `NodeMatcher.role` uses Clawperator semantic role names such as `button`, `textfield`, `text`, or `switch`, not the raw `class` attribute. |
-| `clickable` | - | `"true"` if the element accepts tap events. |
-| `scrollable` | - | `"true"` marks a scroll container. Use as `container` in `scroll_and_click`, `scroll`, or `scroll_until`. |
-| `bounds` | - | `"[x1,y1][x2,y2]"` pixel rectangle. Useful for understanding spatial layout. |
-| `enabled` | - | `"false"` means the element is visible but not interactable. |
-| `long-clickable` | - | `"true"` if the element accepts long-press. Use `clickType: "long_click"`. |
+## Execution Model
 
-**XML attribute escaping:** Snapshot output is XML, so special characters in attribute values are escaped when the hierarchy is serialized. For example, an apostrophe appears as `&apos;`, an ampersand as `&amp;`. These escaped sequences are returned as-is in `data.text` - they are not decoded after extraction. When targeting elements with special characters in their labels, use `contentDescContains` or `textContains` with a substring that avoids the escaped characters rather than an exact match requiring the full escaped form.
+Use [Clawperator Execution Model](../reference/execution-model.md) for the
+current reference explanation of:
 
-Example: for a node with `content-desc="Search for &apos;vlc&apos;"`:
-- `contentDescContains: "Search for"` -- works
-- `contentDescEquals: "Search for 'vlc'"` -- fails (apostrophe is not decoded)
-
-**Annotated example from Android Settings main screen (live device capture):**
-
-```xml
-<hierarchy rotation="0">
-  <node index="0" text="" resource-id="" class="android.widget.FrameLayout"
-        package="com.android.settings" content-desc=""
-        clickable="false" enabled="true" scrollable="false"
-        bounds="[0,0][1080,2340]">
-    ...
-        <!-- Scrollable list - use as 'container' in scroll_and_click, scroll, or scroll_until -->
-        <node index="0" text="" resource-id="com.android.settings:id/recycler_view"
-              class="androidx.recyclerview.widget.RecyclerView"
-              package="com.android.settings" content-desc=""
-              clickable="false" enabled="true" focusable="true" scrollable="true"
-              bounds="[0,884][1080,2196]">
-
-          <!-- Icon-only button: no text, target via content-desc -->
-          <node index="0" text="" resource-id="" class="android.widget.Button"
-                package="com.android.settings" content-desc="Search settings"
-                clickable="true" enabled="true" focusable="true"
-                bounds="[912,692][1080,884]" />
-
-          <!-- Clickable row: the LinearLayout is the tap target -->
-          <node index="2" text="" resource-id="" class="android.widget.LinearLayout"
-                package="com.android.settings" content-desc=""
-                clickable="true" enabled="true" scrollable="false"
-                bounds="[30,1252][1050,1461]">
-            <!-- Title label with stable resource-id -->
-            <node index="0" text="Connections" resource-id="android:id/title"
-                  class="android.widget.TextView" package="com.android.settings"
-                  content-desc="" clickable="false" enabled="true"
-                  bounds="[216,1294][507,1364]" />
-            <!-- Subtitle label -->
-            <node index="1" text="Wi-Fi  •  Bluetooth  •  SIM manager"
-                  resource-id="android:id/summary" class="android.widget.TextView"
-                  package="com.android.settings" content-desc=""
-                  clickable="false" enabled="true"
-                  bounds="[216,1364][816,1419]" />
-          </node>
-
-          <node index="3" text="" resource-id="" class="android.widget.LinearLayout"
-                package="com.android.settings" content-desc=""
-                clickable="true" enabled="true" scrollable="false"
-                bounds="[30,1461][1050,1721]">
-            <node index="0" text="Connected devices" resource-id="android:id/title"
-                  class="android.widget.TextView" package="com.android.settings"
-                  content-desc="" clickable="false" enabled="true"
-                  bounds="[216,1503][661,1573]" />
-            <node index="1" text="Quick Share  •  Samsung DeX  •  Android Auto"
-                  resource-id="android:id/summary" class="android.widget.TextView"
-                  package="com.android.settings" content-desc=""
-                  clickable="false" enabled="true"
-                  bounds="[216,1573][996,1679]" />
-          </node>
-
-        </node>
-    ...
-  </node>
-</hierarchy>
-```
-
-**Reading patterns:**
-
-- **Tap targets** are `clickable="true"` nodes. In list UIs these are often container (`LinearLayout`) nodes whose text-bearing children hold the visible label while the container itself has `text=""`. When you match any node, Clawperator first attempts `ACTION_CLICK` on the first `clickable="true"` ancestor it finds while walking up the tree from the matched node. If that accessibility click does not succeed, Clawperator falls back to a gesture tap at the center of the matched node's bounding box. This means matching a non-clickable label node (for example, `textEquals: "Connections"`) works correctly as long as it is visually inside a clickable parent tap target. If both mechanisms fail, the execution currently terminates with a failed envelope and empty `stepResults` rather than a per-step `NODE_NOT_CLICKABLE` code.
-- **Icon-only buttons** (no `text`) use `content-desc` for their label. Target with `contentDescEquals`.
-- **Scroll containers** have `scrollable="true"`. Pass their `resource-id` as the `container` matcher in `scroll_and_click` or `scroll`. If `container` is omitted from `scroll`, the first `scrollable="true"` node on screen is used automatically.
-- **Disabled elements** have `enabled="false"`. They cannot be interacted with - scrolling or waiting for a state change is required first.
-
-**Apps with obfuscated or missing resource-ids:** Many production apps (Google Play Store, social media apps, banking apps) set `resource-id=""` on all or most nodes. In this case, fall back to content-desc and text matchers. The fallback priority for these apps is:
-
-1. `contentDescEquals` - for elements with stable accessibility labels (icon buttons, tabs)
-2. `textEquals` - for elements with stable visible text (button labels, section headers)
-3. `contentDescContains` / `textContains` - when the value may include dynamic content, counts, or special characters (including HTML entities - see note above)
-4. `role: "textfield"` - for text inputs when no `resource-id` is present
-
-Note: `content-desc` values sometimes contain newlines when an element's label spans multiple pieces of information (for example, an app name followed by developer name in Play Store results). Use `contentDescContains` with a known stable substring rather than a full exact match.
+- required execution payload fields
+- `status` vs `stepResults[].success`
+- timeout policy and single-flight behavior
+- stable error-code surfaces
 
 ## Error Codes
 
@@ -810,14 +812,16 @@ Branch agent logic on codes from `envelope.errorCode` (top-level Android result 
 | `EXECUTION_VALIDATION_FAILED` | `error.code` | Payload failed schema validation |
 | `SECURITY_BLOCK_DETECTED` | `data.error` | Android blocked the action (e.g., secure keyboard) |
 | `NODE_NOT_CLICKABLE` | `data.error` | Reserved error code. Intended for "element found but not interactable", but not currently emitted consistently by the Android and Node runtimes. |
-| `UNSUPPORTED_RUNTIME_CLOSE` | `data.error` | Expected per-step result for all `close_app` steps. The Android runtime does not support a force-stop action response - the Node layer handles the close via `adb shell am force-stop` before dispatch. The overall execution `status` remains `"success"`. Treat as non-fatal. |
 | `SNAPSHOT_EXTRACTION_FAILED` | `data.error` | `snapshot_ui` step completed but the Node layer did not attach any snapshot text to the step during post-processing. The most common cause is a Node binary packaging mismatch or other logcat extraction issue. Rebuild or reinstall the npm package and check version compatibility. |
 | `GLOBAL_ACTION_FAILED` | `data.error` | `press_key` step result when the OS reports `performGlobalAction` returned false. Rare soft failure - the accessibility service was running but Android declined to execute the action. |
 | `CONTAINER_NOT_FOUND` | `data.error` | `scroll` step could not locate a scrollable container. Either no scrollable node is present on screen, or the provided `container` matcher matched nothing. |
 | `CONTAINER_NOT_SCROLLABLE` | `data.error` | `scroll` step found the matched container but it is not scrollable and no scrollable descendant was found. With the default `findFirstScrollableChild: true`, the runtime already walks one level down before raising this error. |
 | `GESTURE_FAILED` | `data.error` | `scroll` step: the OS rejected the gesture dispatch. The accessibility service was running but Android declined to execute the swipe gesture. Step returns `success: false`. |
 
-Primary top-level error taxonomy: `apps/node/src/contracts/errors.ts`. This table also includes runtime-only step error strings such as `UNSUPPORTED_RUNTIME_CLOSE`.
+Primary top-level error taxonomy: `apps/node/src/contracts/errors.ts`. This table also includes runtime-only step error strings where they are still surfaced directly by callers.
+
+For agent-side recovery strategy, use
+[Error Handling Guide](../reference/error-handling.md).
 
 ## Key Behaviors
 
@@ -825,14 +829,78 @@ Primary top-level error taxonomy: `apps/node/src/contracts/errors.ts`. This tabl
 - **No hidden retries:** If an action fails, the error is returned immediately. Retry logic belongs in the agent.
 - **Deterministic results:** Exactly one terminal envelope per `commandId`. Timeouts return `RESULT_ENVELOPE_TIMEOUT` with diagnostics.
 - **Timeout override:** `--timeout-ms <n>` overrides the execution timeout for `execute`, `observe snapshot`, and `observe screenshot` within policy limits.
+- **Screenshot output path:** `observe screenshot --path <file>` writes the PNG to the requested local path and still returns the final `data.path` in the result envelope. `<file>` must be a non-empty local filesystem path.
 - **Device targeting:** Specify `--device-id` when multiple devices are connected. Omit for single-device setups.
 - **Emulator reuse over creation:** Provisioning never creates duplicate AVDs when a supported running or stopped emulator already exists.
 - **Deterministic emulator boots:** Emulator starts use `-no-snapshot-load` and wait for both `sys.boot_completed` and `dev.bootcomplete`.
 - **Validation before dispatch:** Every payload is schema-validated before any ADB command is issued.
 
+## Validation and current non-features
+
+- Payload validation happens automatically at execution time. Invalid payloads
+  fail fast with `EXECUTION_VALIDATION_FAILED` before any device action runs.
+- `clawperator execute --execution <json-or-file> --validate-only` validates
+  and normalizes a payload without dispatching it to any device.
+- If you want the lowest-risk contract check on a live device, use a minimal
+  payload such as a single `sleep` or `snapshot_ui` action.
+
 ## Skills
 
 Skills are packaged Android automation scripts distributed via the public GitHub repository at `https://github.com/clawperator/clawperator-skills`. The Node API provides discovery and metadata - skills are standalone and can be invoked directly by agents without the Node API.
+
+## Environment Variables and Device Targeting
+
+Use these dedicated references when you need the focused contract instead of
+the summary below:
+
+- [Device and Package Model](../reference/device-and-package-model.md)
+- [Environment Variables](../reference/environment-variables.md)
+
+The most important environment variables surfaced by the current CLI and
+installer are:
+
+| Variable | Where used | Current meaning |
+| :--- | :--- | :--- |
+| `CLAWPERATOR_SKILLS_REGISTRY` | CLI and installer | Overrides the path to the local skills registry JSON |
+| `CLAWPERATOR_INSTALL_APK` | installer | Pre-seeds the installer's "install APK now?" decision for non-interactive runs |
+| `CLAWPERATOR_RECEIVER_PACKAGE` | installer | Overrides the default receiver package used during installer setup |
+
+### `CLAWPERATOR_INSTALL_APK`
+
+`scripts/install.sh` reads `CLAWPERATOR_INSTALL_APK` before prompting whether to
+install the Operator APK on the connected device.
+
+Useful values:
+
+- `Y`, `y`, `yes`, `YES` - proceed with APK install
+- any other non-empty value - skip APK install
+
+Example:
+
+```bash
+CLAWPERATOR_INSTALL_APK=Y curl -fsSL https://clawperator.com/install.sh | bash
+```
+
+### `CLAWPERATOR_SKILLS_REGISTRY`
+
+This points the CLI at a specific skills registry path.
+
+Example:
+
+```bash
+export CLAWPERATOR_SKILLS_REGISTRY="$HOME/.clawperator/skills/skills/skills-registry.json"
+```
+
+### Multiple devices
+
+If more than one device is connected, pass `--device-id <id>` on execute,
+observe, action, doctor, version, operator setup, and skills-run commands.
+
+When multiple devices are present:
+
+- the installer skips automatic APK install rather than guessing
+- it prints the manual recovery command
+- later automation should keep using explicit `--device-id`
 
 ### Setup
 
@@ -865,7 +933,7 @@ Skills can be invoked three ways:
 
 2. **Convenience wrapper** via Node API:
    ```bash
-   clawperator skills run com.android.settings.capture-overview --device-id <device_id>
+   clawperator skills run com.android.settings.capture-overview --device-id <device_id> --timeout-ms 90000
    ```
 
 3. **Artifact compile + execute** (for skills with `.recipe.json` artifacts):
@@ -920,8 +988,44 @@ If multiple apps are registered for the URI scheme, a system chooser may appear.
 **Does Clawperator run skills?**
 Skills are standalone programs that agents can invoke directly. The Node API provides discovery (`skills list`, `skills search`), metadata (`skills get`), and a convenience `skills run` wrapper. Skills do not need the Node API to execute - agents can call skill scripts directly.
 
+When `skills run` fails or times out, the CLI preserves partial script
+`stdout` and `stderr` in the structured error output when available. Inspect
+those fields before assuming the run produced no useful result.
+
+Current skills model:
+
+- discovery is registry-driven, not folder-scan-driven
+- `CLAWPERATOR_SKILLS_REGISTRY` points at one local registry JSON
+- a private skill becomes visible only after it is added to that registry
+- `skills new <skill_id>` scaffolds the starter folder and updates that local registry automatically
+- `skills validate <skill_id>` checks that one registry entry, its
+  `skill.json`, `SKILL.md`, script paths, and artifact paths line up before you
+  spend time on a live device run
+- `skills validate --all` runs the same integrity checks across every entry in
+  the configured registry and returns a failure summary if any skills are
+  broken
+- `skills run --timeout-ms <n>` overrides the wrapper timeout for one run when
+  the default `120000` ms budget is not the right fit for the current flow
+- `skills run --expect-contains <text>` turns the wrapper into a lightweight
+  smoke check by failing if the script output does not contain the expected
+  substring
+
+For the concrete `skill.json` contract and private-skill authoring model, see
+[Skill Authoring Guidelines](../skills/skill-authoring-guidelines.md),
+[Skill Development Workflow](../skills/skill-development-workflow.md), and
+[Usage Model](../skills/usage-model.md).
+
 **Does Clawperator configure accounts or app settings?**
-No. Clawperator automates the UI on whatever user-installed Android apps are already installed and signed in on the device. It does not log in to apps, create accounts, or configure device settings on behalf of the user. If an automation targets an app that requires authentication, the user must sign in to that app manually on the device before the agent runs. For emulators using a Google Play system image, the user must also sign in to a Google account before Play Store-gated apps are accessible.
+Clawperator is a neutral actuator. It does not decide whether entering a
+username, password, email address, or other user-provided input is appropriate.
+That decision belongs to the external brain agent and the user workflow it is
+carrying out.
+
+In practice, the device still needs to be in a usable state for the automation
+the agent is attempting. Many setups prepare account state and app
+configuration before automation begins. When an agent chooses to enter login or
+credential fields through the normal UI, Clawperator can provide the same
+interaction primitives it uses for any other text entry or click flow.
 
 **How should agents handle sensitive text in results?**
 Default behavior is full-fidelity results for agent reasoning. PII redaction (`--safe-logs`) is a planned feature.

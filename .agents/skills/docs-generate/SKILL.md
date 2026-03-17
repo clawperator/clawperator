@@ -61,6 +61,10 @@ When this file refers to `scripts/...`, resolve that path relative to the skill 
 8. Emit build metadata after a successful regeneration:
    - Run `.agents/skills/docs-generate/scripts/write_build_metadata.py --repo-root <clawperator> --skills-root <clawperator-skills> --output <clawperator>/sites/docs/docs_build.json`
    - This is the docs build identifier. Do not hand-bump a docs version.
+9. Validate built docs reachability with the normal site build:
+   - Run `./scripts/docs_build.sh`
+   - This now verifies that source-map pages, docs-home links, and docs-host
+     routes listed in `sites/docs/static/llms.txt` resolve to built artifacts.
 
 ### Removing Docs
 

@@ -120,11 +120,54 @@ describe("CLI help", () => {
     assert.doesNotMatch(stdout, /skills compile-artifact/);
   });
 
+  it("shows observe screenshot help with path option", async () => {
+    const { stdout, code } = await runCli(["observe", "screenshot", "--help"]);
+    assert.strictEqual(code, 0);
+    assert.match(stdout, /clawperator observe screenshot/);
+    assert.match(stdout, /--path <file>/);
+    assert.doesNotMatch(stdout, /skills compile-artifact/);
+  });
+
+  it("shows validate-only in top-level execute help", async () => {
+    const { stdout, code } = await runCli(["--help"]);
+    assert.strictEqual(code, 0);
+    assert.match(stdout, /execute --execution <json-or-file> \[--validate-only\]/);
+  });
+
   it("shows skills sync help instead of top-level help", async () => {
     const { stdout, code } = await runCli(["skills", "sync", "--help"]);
     assert.strictEqual(code, 0);
     assert.match(stdout, /clawperator skills sync/);
     assert.match(stdout, /--ref <git-ref>/);
+    assert.doesNotMatch(stdout, /action open-app/);
+  });
+
+  it("shows skills validate help instead of top-level help", async () => {
+    const { stdout, code } = await runCli(["skills", "validate", "--help"]);
+    assert.strictEqual(code, 0);
+    assert.match(stdout, /clawperator skills validate/);
+    assert.match(stdout, /skills validate --all/);
+    assert.match(stdout, /integrity check, not a live device test/i);
+    assert.doesNotMatch(stdout, /action open-app/);
+  });
+
+  it("shows skills compile-artifact help instead of top-level help", async () => {
+    const { stdout, code } = await runCli(["skills", "compile-artifact", "--help"]);
+    assert.strictEqual(code, 0);
+    assert.match(stdout, /clawperator skills compile-artifact/);
+    assert.match(stdout, /--artifact <name>/);
+    assert.match(stdout, /--skill-id <id>/);
+    assert.match(stdout, /--vars <json>/);
+    assert.doesNotMatch(stdout, /action open-app/);
+  });
+
+  it("shows skills run help instead of top-level help", async () => {
+    const { stdout, code } = await runCli(["skills", "run", "--help"]);
+    assert.strictEqual(code, 0);
+    assert.match(stdout, /clawperator skills run/);
+    assert.match(stdout, /--timeout-ms <n>/);
+    assert.match(stdout, /--expect-contains <text>/);
+    assert.match(stdout, /SKILL_OUTPUT_ASSERTION_FAILED/);
     assert.doesNotMatch(stdout, /action open-app/);
   });
 
@@ -217,5 +260,13 @@ describe("operator setup CLI output", () => {
     assert.notStrictEqual(code, 0);
     const obj = JSON.parse(stdout);
     assert.strictEqual(obj.code, "OPERATOR_APK_NOT_FOUND");
+  });
+
+  it("observe screenshot returns USAGE when --path is missing a value", async () => {
+    const { stdout, code } = await runCli(["observe", "screenshot", "--path"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "USAGE");
+    assert.strictEqual(obj.message, "--path requires a value");
   });
 });

@@ -183,6 +183,13 @@ Machine-readable installer or automation check:
 clawperator doctor --format json
 ```
 
+Equivalent JSON modes:
+
+```bash
+clawperator doctor --output json
+clawperator doctor --json
+```
+
 Target a specific device and debug build of the [Clawperator Operator Android app](../getting-started/android-operator-apk.md):
 
 ```bash

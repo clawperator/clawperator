@@ -13,10 +13,16 @@ Clawperator operates an Android device on behalf of a user. That Android device 
 - For agents: https://clawperator.com/agents
 - Markdown index: https://clawperator.com/index.md
 - Docs: https://docs.clawperator.com/
+- Agent quickstart: https://docs.clawperator.com/ai-agents/agent-quickstart/
 - Agent guide: https://docs.clawperator.com/ai-agents/node-api-for-agents/
+- Execution model: https://docs.clawperator.com/reference/execution-model/
+- Device and package model: https://docs.clawperator.com/reference/device-and-package-model/
+- Snapshot format: https://docs.clawperator.com/reference/snapshot-format/
 - Operator LLM playbook: https://docs.clawperator.com/design/operator-llm-playbook/
 - API overview: https://docs.clawperator.com/reference/api-overview/
 - CLI reference: https://docs.clawperator.com/reference/cli-reference/
+- Error handling guide: https://docs.clawperator.com/reference/error-handling/
+- Environment variables: https://docs.clawperator.com/reference/environment-variables/
 - Full compiled docs: https://clawperator.com/llms-full.txt
 - Main repository: https://github.com/clawperator/clawperator
 
@@ -27,7 +33,7 @@ Clawperator operates an Android device on behalf of a user. That Android device 
 - Clawperator is an actuator, not an autonomous planner.
 - A physical Android burner device is the preferred actuator environment for compatibility and long-running reliability.
 - If no physical Android device is available, install Clawperator first, then provision an emulator with `clawperator provision emulator`.
-- Clawperator does not configure user accounts or app login state. The user must prepare the Android device or emulator with the required apps and sign-ins.
+- Clawperator is a neutral actuator. The external agent decides the workflow, and Clawperator provides the UI interaction primitives.
 - Skills repository: https://github.com/clawperator/clawperator-skills
 - Install skills: run `clawperator skills install` after setup
 - Skills registry: `~/.clawperator/skills/skills/skills-registry.json` (set via CLAWPERATOR_SKILLS_REGISTRY)

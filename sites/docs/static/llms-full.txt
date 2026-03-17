@@ -26,10 +26,19 @@ Use this page as a technical map:
 
 ### Start here if you are integrating an agent
 
+- [Agent Quickstart](ai-agents/agent-quickstart.md) - Fastest path from first install to first successful execution
 - [Node API - Agent Guide](ai-agents/node-api-for-agents.md) - Canonical CLI and HTTP API contract for agent builders
-- [Operator LLM Playbook](design/operator-llm-playbook.md) - Practical operating rules for observation, action loops, and skill execution
+- [Execution Model](reference/execution-model.md) - Required payload fields, status vs step success, timeout, and error surfaces
+- [Timeout Budgeting](reference/timeout-budgeting.md) - Practical `timeoutMs` sizing for snapshots, scroll loops, and skill flows
+- [Device and Package Model](reference/device-and-package-model.md) - What `deviceId` and `receiverPackage` mean in practice
+- [Clawperator Snapshot Format](reference/snapshot-format.md) - Canonical `snapshot_ui` and `observe snapshot` output contract
+- [Navigation Patterns for Agents](ai-agents/navigation-patterns.md) - Practical patterns for scrolls, overlays, and OEM variation
+- [Multi-Device Workflows for Agents](ai-agents/multi-device-workflows.md) - Deterministic targeting, per-device queues, and install recovery
+- [Error Handling Guide](reference/error-handling.md) - Recoverable vs fatal patterns and what an agent should do next
 - [API Overview](reference/api-overview.md) - Execution payload, action types, result envelope shape, and snapshot semantics
 - [CLI Reference](reference/cli-reference.md) - Command-line entrypoints and flags
+- [Environment Variables](reference/environment-variables.md) - Central reference for installer and runtime env vars
+- [Skill Development Workflow](skills/skill-development-workflow.md) - Shortest path from exploration to a reusable private skill
 
 ### Start here if you are preparing runtime infrastructure
 
@@ -49,22 +58,37 @@ Use this page as a technical map:
 
 ## For AI Agents
 
+- [Agent Quickstart](ai-agents/agent-quickstart.md) - Fastest path for a cold-start agent
 - [Node API - Agent Guide](ai-agents/node-api-for-agents.md) - Canonical CLI and HTTP API reference for agents
-- [Operator LLM Playbook](design/operator-llm-playbook.md) - Action contracts, runtime conventions, and skill packaging
+- [Execution Model](reference/execution-model.md) - Envelope semantics, timeout policy, and validation behavior
+- [Timeout Budgeting](reference/timeout-budgeting.md) - Practical timeout sizing for common agent workflows
+- [Device and Package Model](reference/device-and-package-model.md) - Device IDs, receiver packages, and multi-device rules
+- [Clawperator Snapshot Format](reference/snapshot-format.md) - Canonical snapshot output and parsing contract
+- [Navigation Patterns for Agents](ai-agents/navigation-patterns.md) - Scroll, overlay, and OEM-variation tactics
+- [Multi-Device Workflows for Agents](ai-agents/multi-device-workflows.md) - How to keep targeting explicit when more than one device is connected
 - [API Overview](reference/api-overview.md) - Execution payload, action types, result envelopes, and snapshot delivery
 - [CLI Reference](reference/cli-reference.md) - Exact command surface for local and scripted integrations
+- [Error Handling Guide](reference/error-handling.md) - What to retry, what to fix, and what to surface to the caller
+- [Skill Development Workflow](skills/skill-development-workflow.md) - How to turn exploration into a reusable skill
 
 ## Reference
 
 - [CLI Reference](reference/cli-reference.md) - Command-line usage and flags
 - [API Overview](reference/api-overview.md) - Execution payload, action types, result envelopes, and snapshot semantics
+- [Execution Model](reference/execution-model.md) - Required execution fields, status semantics, and timeout behavior
+- [Timeout Budgeting](reference/timeout-budgeting.md) - Practical timeout sizing and workflow-splitting guidance
+- [Device and Package Model](reference/device-and-package-model.md) - Device targeting, package targeting, and multi-device behavior
+- [Clawperator Snapshot Format](reference/snapshot-format.md) - Canonical `hierarchy_xml` contract and parsing guidance
 - [Error Codes](reference/error-codes.md) - Structured runtime and API error code reference
+- [Error Handling Guide](reference/error-handling.md) - Recoverable vs fatal patterns and recommended agent responses
 - [Doctor](reference/node-api-doctor.md) - Runtime readiness checks, exit behavior, and JSON report shape
+- [Environment Variables](reference/environment-variables.md) - Central reference for supported installer and runtime variables
 
 ## Architecture
 
 - [System Overview](architecture/architecture.md) - High-level architecture and execution flow
-- [Node Runtime and API Design](design/node-api-design.md) - Detailed Node contract and runtime design
+- [Runtime Architecture and API Rationale](design/node-api-design.md) - Why the runtime and API are shaped the way they are
+- [Skill Design](design/skill-design.md) - Background design reference for how skills fit the broader system
 
 
 ## Troubleshooting
@@ -77,10 +101,9 @@ Use this page as a technical map:
 ## Skills
 
 - [Usage Model](skills/usage-model.md)
+- [Skill Development Workflow](skills/skill-development-workflow.md)
 - [Skill Authoring Guidelines](skills/skill-authoring-guidelines.md)
-- [Skill Design](design/skill-design.md)
 - [Device Prep and Runtime Tips](skills/device-prep-and-runtime-tips.md)
-- [Skills Verification](skills/skills-verification.md)
 - [Blocked Terms Policy](skills/blocked-terms-policy.md)
 
 ---
@@ -96,7 +119,9 @@ Clawperator operates an Android device on behalf of a user. In these docs, "Andr
 - a physical Android phone connected over `adb`
 - a local Android emulator provisioned through the Node CLI
 
-This is the canonical actuator model for Clawperator. The Node runtime talks to an Android device, and the Android device runs the [Clawperator Operator Android app](android-operator-apk.md).
+This is Clawperator's current actuator model. The Node runtime talks to an
+Android device, and the Android device runs the
+[Clawperator Operator Android app](android-operator-apk.md).
 
 Canonical definitions for terms such as "Android device", "[Clawperator Operator Android app](android-operator-apk.md)", and "user-installed Android apps" live in [Clawperator Terminology](terminology.md).
 
@@ -110,7 +135,9 @@ Clawperator Node Runtime
 Android Device (physical or emulator)
 ```
 
-Clawperator operates the device UI. It does not own account setup, app configuration, or user credentials.
+Clawperator operates the device UI. It does not own planning or policy
+decisions about what should be entered. Those belong to the external agent and
+the user workflow it is carrying out.
 
 ## User responsibilities
 
@@ -124,11 +151,12 @@ Before automation starts, the user is responsible for preparing the Android devi
 Clawperator does not:
 
 - create accounts
-- sign into accounts
-- configure apps on the user's behalf
+- decide what credentials or other user-provided inputs are appropriate to use
 - bypass authentication or anti-abuse gates
 
-Agents should assume the device already contains the required apps, logins, and configuration.
+Agents should assume the device already contains the required apps and
+configuration, unless the intended workflow explicitly includes entering those
+details through the normal UI.
 
 ## Choosing an Android environment
 
@@ -324,9 +352,12 @@ This device may be:
 * a physical Android phone
 * an Android emulator
 
-In both cases, the device must be configured with the apps and user logins required by the automation.
+In both cases, the device must be configured with the apps and any account
+state required by the automation.
 
-Clawperator operates the UI on that device. It does not create accounts, sign into apps, or complete app configuration on behalf of the user.
+Clawperator operates the UI on that device. It does not decide what inputs are
+appropriate to enter. The external brain agent decides the workflow, and
+Clawperator provides the interaction primitives to carry it out.
 
 For an overview of the actuator model and user responsibilities, see [Running Clawperator on Android](running-clawperator-on-android.md).
 
@@ -343,6 +374,23 @@ curl -fsSL https://clawperator.com/install.sh | bash
 The installer installs the CLI, downloads the latest stable [Clawperator Operator Android app](android-operator-apk.md) package locally, and runs `clawperator doctor` to detect missing setup.
 
 Historical versions and release notes remain available on [GitHub Releases](https://github.com/clawperator/clawperator/releases).
+
+Installer notes:
+
+- the installer uses `clawperator doctor --format json` internally for
+  machine-readable checks
+- it finishes with `clawperator doctor --output pretty` for the final human
+  summary
+- `clawperator doctor --json` is also supported as a shorthand for
+  `--output json`
+- `CLAWPERATOR_INSTALL_APK` can be set before running the installer to control
+  the APK-install prompt in non-interactive environments
+
+Example:
+
+```bash
+CLAWPERATOR_INSTALL_APK=Y curl -fsSL https://clawperator.com/install.sh | bash
+```
 
 ---
 
@@ -395,6 +443,11 @@ clawperator emulator inspect clawperator-pixel --output json
 
 If both a physical device and an emulator are connected, you will need to pass `--device-id <serial>` to later commands.
 
+If multiple devices are connected during install, the installer does not guess
+which device should receive the APK. It leaves the downloaded APK in
+`~/.clawperator/downloads/operator.apk` and prints the manual completion
+command.
+
 ---
 
 ## Step 3 - Install the Clawperator Operator Android app
@@ -412,6 +465,9 @@ clawperator operator setup \
   --apk ~/.clawperator/downloads/operator.apk \
   --device-id <device_id>
 ```
+
+This is also the recovery command to use after a multi-device installer run
+that intentionally skipped APK installation.
 
 For local debug builds, specify the receiver package:
 
@@ -1088,9 +1144,202 @@ Skills are packaged app-specific automation recipes maintained in a sibling repo
 
 
 
+# Agent Quickstart
+
+This is the fastest path for a cold-start agent to go from "Clawperator is
+installed" to "I ran a real command and know how to inspect the result."
+
+Use this page first, then branch into:
+
+- [Clawperator Snapshot Format](../reference/snapshot-format.md) for the exact
+  `snapshot_ui` output structure
+- [Clawperator Node API - Agent Guide](node-api-for-agents.md) for the full
+  contract
+- [API Overview](../reference/api-overview.md) for a shorter reference path
+- [Multi-Device Workflows for Agents](multi-device-workflows.md) if more than
+  one Android target is connected
+
+## What Clawperator is
+
+Clawperator is the hand. Your external agent is the brain.
+
+- the brain decides what to do on the user's behalf
+- Clawperator executes validated Android UI actions deterministically
+- Clawperator returns structured results that the brain can reason over
+
+Clawperator is not a planner or a policy engine. It does not decide which user
+inputs are appropriate. It just provides the interaction primitives.
+
+## Before you start
+
+Make sure the runtime is ready:
+
+```bash
+clawperator doctor --output json
+clawperator devices --output json
+```
+
+If multiple devices are connected, always pass `--device-id <device_id>` so
+targeting stays explicit.
+
+If the current CLI behavior and a narrative doc ever seem to disagree, prefer
+subcommand help for the exact shipped flags and usage:
+
+```bash
+clawperator observe snapshot --help
+clawperator observe screenshot --help
+clawperator skills compile-artifact --help
+clawperator skills run --help
+clawperator doctor --help
+```
+
+## Step 1 - Take a snapshot
+
+The quickest way to inspect the current UI is:
+
+```bash
+clawperator observe snapshot --device-id <device_id> --output json
+```
+
+Successful snapshot output includes:
+
+- one result envelope
+- `stepResults[0].actionType = "snapshot_ui"`
+- `stepResults[0].data.actual_format = "hierarchy_xml"`
+- optional snapshot metadata such as `foreground_package`, `has_overlay`, and
+  `window_count`
+- `stepResults[0].data.text` containing the XML hierarchy
+
+Example response shape:
+
+```json
+{
+  "ok": true,
+  "envelope": {
+    "commandId": "cmd-snap-1",
+    "taskId": "task-snap-1",
+    "status": "success",
+    "stepResults": [
+      {
+        "id": "snap1",
+        "actionType": "snapshot_ui",
+        "success": true,
+        "data": {
+          "actual_format": "hierarchy_xml",
+          "foreground_package": "com.android.settings",
+          "has_overlay": "false",
+          "window_count": "2",
+          "text": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><hierarchy rotation=\"0\">...</hierarchy>"
+        }
+      }
+    ],
+    "error": null
+  },
+  "deviceId": "<device_id>",
+  "terminalSource": "clawperator_result"
+}
+```
+
+Read the XML in `data.text` to identify:
+
+- stable `resource-id` values
+- visible labels in `text`
+- icon labels in `content-desc`
+- scroll containers via `scrollable="true"`
+
+The full parsing contract lives in
+[Clawperator Snapshot Format](../reference/snapshot-format.md).
+
+## Step 2 - Run a first execution payload
+
+The smallest useful first execution usually opens an app, gives it a moment to
+settle, then snapshots the result.
+
+Example payload:
+
+```json
+{
+  "commandId": "quickstart-001",
+  "taskId": "quickstart-001",
+  "source": "cold-start-agent",
+  "expectedFormat": "android-ui-automator",
+  "timeoutMs": 15000,
+  "actions": [
+    {
+      "id": "open-settings",
+      "type": "open_app",
+      "params": { "applicationId": "com.android.settings" }
+    },
+    {
+      "id": "settle",
+      "type": "sleep",
+      "params": { "durationMs": 1000 }
+    },
+    {
+      "id": "snap-settings",
+      "type": "snapshot_ui"
+    }
+  ]
+}
+```
+
+Run it with:
+
+```bash
+clawperator execute --device-id <device_id> --execution /path/to/execution.json --output json
+```
+
+## Step 3 - Read the result envelope correctly
+
+Always check both:
+
+1. `envelope.status`
+2. each `stepResults[n].success`
+
+Those mean different things:
+
+- `envelope.status = "failed"` means the execution as a whole failed
+- `stepResults[n].success = false` means one step failed, even if the overall
+  execution still completed
+
+That distinction matters for actions like `close_app`, where the overall
+execution may complete even though the step reports a per-step failure.
+
+## Step 4 - Use the default agent loop
+
+For unknown apps, use a single-action plus re-observe loop:
+
+1. snapshot
+2. decide what to press or read
+3. execute one action or one tight sequence
+4. snapshot again
+5. repeat
+
+This is the safe default for cold-start usage. Use larger multi-action payloads
+only after the UI path is already known.
+
+## What to read next
+
+- [Clawperator Snapshot Format](../reference/snapshot-format.md)
+- [Execution Model](../reference/execution-model.md)
+- [Error Handling Guide](../reference/error-handling.md)
+- [Device and Package Model](../reference/device-and-package-model.md)
+- [Multi-Device Workflows for Agents](multi-device-workflows.md)
+- [Skill Development Workflow](../skills/skill-development-workflow.md)
+- [Clawperator Node API - Agent Guide](node-api-for-agents.md)
+- [API Overview](../reference/api-overview.md)
+- [CLI Reference](../reference/cli-reference.md)
+
+---
+
+
 # Clawperator Node API - Agent Guide
 
 Clawperator provides a deterministic execution layer for LLM agents to control Android devices. This guide covers the CLI and HTTP API contracts.
+
+If you are starting cold, begin with [Agent Quickstart](agent-quickstart.md).
+For the exact `snapshot_ui` structure, use
+[Clawperator Snapshot Format](../reference/snapshot-format.md).
 
 ## Concepts
 
@@ -1116,7 +1365,7 @@ Clawperator provides a deterministic execution layer for LLM agents to control A
 | `provision emulator` | Alias of `emulator provision` |
 | `execute --execution <json\|file>` | Run a full execution payload |
 | `observe snapshot` | Capture UI hierarchy dump (`hierarchy_xml`) |
-| `observe screenshot` | Capture device screen as PNG |
+| `observe screenshot` | Capture device screen as PNG and return the local file path |
 | `action open-app --app <id>` | Open an application |
 | `action click --selector <json>` | Click a UI element |
 | `action read --selector <json>` | Read text from element |
@@ -1125,8 +1374,11 @@ Clawperator provides a deterministic execution layer for LLM agents to control A
 | `skills list` | List available skills |
 | `skills get <skill_id>` | Show skill metadata |
 | `skills search [--app <pkg>] [--intent <i>] [--keyword <k>]` | Search skills by app, intent, or keyword (at least one filter required) |
+| `skills new <skill_id>` | Scaffold a new local skill folder and registry entry |
+| `skills validate <skill_id>` | Verify one local skill's metadata and required files before runtime testing |
+| `skills validate --all` | Validate the entire configured skills registry in one pass |
 | `skills compile-artifact <id> --artifact <name>` | Compile skill to execution payload |
-| `skills run <skill_id> [--device-id <id>]` | Invoke a skill script (convenience wrapper) |
+| `skills run <skill_id> [--device-id <id>] [--timeout-ms <n>] [--expect-contains <text>]` | Invoke a skill script (convenience wrapper) |
 | `skills install` | Clone skills repo to `~/.clawperator/skills/` |
 | `skills update [--ref <git-ref>]` | Pull latest skills (optionally pin to a ref) |
 | `grant-device-permissions` | Re-grant Operator permissions only after an Operator APK crash causes Android to revoke them |
@@ -1147,6 +1399,9 @@ Use subcommand help when the docs and the current CLI differ:
 
 ```bash
 clawperator observe snapshot --help
+clawperator observe screenshot --help
+clawperator skills compile-artifact --help
+clawperator skills run --help
 clawperator skills sync --help
 clawperator doctor --help
 ```
@@ -1181,10 +1436,14 @@ Start with `clawperator serve [--port <n>] [--host <ip>]`. Default: `127.0.0.1:3
 | `POST /observe/screenshot` | Capture screenshot |
 | `GET /skills` | List skills. Query params: `?app=<pkg>&intent=<i>&keyword=<k>` |
 | `GET /skills/:skillId` | Get skill metadata |
-| `POST /skills/:skillId/run` | Run skill. Body: `{"deviceId": "...", "args": [...]}` |
+| `POST /skills/:skillId/run` | Run skill. Body: `{"deviceId": "...", "args": [...], "timeoutMs": 90000, "expectContains": "TEXT_BEGIN"}` |
 | `GET /events` | SSE stream: `clawperator:result`, `clawperator:execution`, `heartbeat` |
 
 See `apps/node/examples/basic-api-usage.js` for a complete SSE + REST example.
+
+For `POST /skills/:skillId/run`, error responses may include partial `stdout`
+and `stderr` when the wrapped script already emitted useful output before
+failing or timing out.
 
 ## Android Emulator Support
 
@@ -1271,6 +1530,9 @@ Every execution requires `expectedFormat: "android-ui-automator"`.
 
 **Execution timeout limit:** `timeoutMs` is schema-validated. The allowed range is 1,000-120,000 ms (1 second to 2 minutes). Submitting a value outside this range causes `EXECUTION_VALIDATION_FAILED` - the execution is rejected before any action runs. Operations that require longer running time must be split across multiple execution payloads. For install or download flows, use `wait_for_node` polling within the 120-second window rather than a single long sleep.
 
+For practical timeout sizing guidance by workflow type, see
+[Clawperator Timeout Budgeting](../reference/timeout-budgeting.md).
+
 **Result envelope:** Exactly one `[Clawperator-Result]` JSON block is emitted to logcat on completion. Node reads and returns it. See the Result Envelope section for the full shape and per-action `data` contents.
 
 ## NodeMatcher Reference
@@ -1314,7 +1576,7 @@ Combine fields to increase specificity when a single field is ambiguous:
 | `sleep` | `durationMs: number` | - |
 | `scroll_and_click` | `target: NodeMatcher` | `container: NodeMatcher`, `direction: "down" \| "up" \| "left" \| "right"` (default: `"down"`), `maxSwipes: number` (default: `10`, range: 1-50), `distanceRatio: number` (default: `0.7`, range: 0-1), `settleDelayMs: number` (default: `250`, range: 0-10000), `findFirstScrollableChild: boolean` (default: `true`), `clickAfter: boolean` (default: `true`), `scrollRetry: object` (default preset: `maxAttempts=4`, `initialDelayMs=400`, `maxDelayMs=2000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`), `clickRetry: object` (default preset: `maxAttempts=5`, `initialDelayMs=500`, `maxDelayMs=3000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`) |
 | `scroll` | - | `container: NodeMatcher` (default: auto-detect first scrollable), `direction: "down" \| "up" \| "left" \| "right"` (default: `"down"` - reveals content further down, finger swipes up), `distanceRatio: number` (default: `0.7`, range: 0-1), `settleDelayMs: number` (default: `250`, range: 0-10000), `findFirstScrollableChild: boolean` (default: `true`), `retry: object` (default: no retry - see scroll behavior note) |
-| `scroll_until` | - | `container: NodeMatcher` (default: auto-detect), `direction: "down" \| "up" \| "left" \| "right"` (default: `"down"`), `distanceRatio: number` (default: `0.7`, range: 0-1), `settleDelayMs: number` (default: `250`, range: 0-10000), `maxScrolls: number` (default: `20`, range: 1-200), `maxDurationMs: number` (default: `10000`, range: 0-120000), `noPositionChangeThreshold: number` (default: `3`, range: 1-20), `findFirstScrollableChild: boolean` (default: `true`) |
+| `scroll_until` | - | `target: NodeMatcher` (optional, emits `TARGET_FOUND` when the target becomes visible), `container: NodeMatcher` (default: auto-detect), `clickType: "default" \| "long_click" \| "focus"` (used only when `clickAfter: true`), `clickAfter: boolean` (default: `false`, requires `target`), `direction: "down" \| "up" \| "left" \| "right"` (default: `"down"`), `distanceRatio: number` (default: `0.7`, range: 0-1), `settleDelayMs: number` (default: `250`, range: 0-10000), `maxScrolls: number` (default: `20`, range: 1-200), `maxDurationMs: number` (default: `10000`, range: 0-120000), `noPositionChangeThreshold: number` (default: `3`, range: 1-20), `findFirstScrollableChild: boolean` (default: `true`) |
 | `press_key` | `key: "back" \| "home" \| "recents"` | - |
 
 ### CLI-to-action-type mapping
@@ -1350,7 +1612,21 @@ Combine fields to increase specificity when a single field is ambiguous:
 
 **`open_uri`:** Opens a URI using the Clawperator Android app's implicit `ACTION_VIEW` intent - no adb shortcut is used. The Android device's registered handler for the URI scheme is invoked directly. Any URI scheme is supported: deep links (`market://details?id=com.actionlauncher.playstore`), standard URLs (`https://example.com`), and custom app schemes. If no application is registered for the URI scheme, the action fails with `URI_NOT_HANDLED`. A chooser dialog may appear on devices with multiple handlers for a scheme; follow the `open_uri` step with a `snapshot_ui` to verify the expected app is in the foreground. The alias `open_url` is also accepted and normalized to `open_uri`.
 
-**`close_app`:** The Node layer intercepts `close_app` actions and runs `adb shell am force-stop <applicationId>` before dispatching to Android. The Android step always returns `success: false` with `data.error: "UNSUPPORTED_RUNTIME_CLOSE"` - this is expected. The overall execution `status` remains `"success"` and the app is force-stopped. Do not treat this step result as a recoverable failure.
+Documented and tested inputs include:
+
+- `https://...`
+- `market://...`
+- app-specific deep-link URIs handled by a device app
+
+What this action does not promise:
+
+- support for bare Android intent action strings such as `android.settings.DEVICE_INFO_SETTINGS`
+- support for pseudo-formats such as `ACTION:android.settings.DEVICE_INFO_SETTINGS`
+
+Treat `open_uri` as an `ACTION_VIEW` URI launcher, not a general-purpose
+Android intent builder.
+
+**`close_app`:** The Node layer intercepts `close_app` actions and runs `adb shell am force-stop <applicationId>` before dispatching to Android. When that pre-flight close succeeds, the Node layer normalizes the resulting `close_app` step into a successful step result so the envelope reflects the real observed outcome. If the pre-flight `force-stop` fails, the execution now fails with a structured error instead of pretending the app was closed. In practice, treat `close_app` as a supported force-stop action through the Node interface.
 
 **`click`:** Finds the node matching `matcher` and performs the specified `clickType`. The default click type is `"default"` (standard accessibility click with gesture fallback). Use `"long_click"` for long-press targets and `"focus"` to focus without activating.
 
@@ -1465,6 +1741,19 @@ Combine fields to increase specificity when a single field is ambiguous:
 
 **`snapshot_ui`:** Clawperator returns a single canonical snapshot format: `hierarchy_xml`. The Android runtime writes the hierarchy dump to device logcat, and the Node layer injects that raw XML into `data.text` after execution. `data.actual_format` is always `"hierarchy_xml"` for successful snapshot steps.
 
+Successful snapshot steps may also include best-effort accessibility-window
+metadata:
+
+- `data.foreground_package`
+- `data.has_overlay`
+- `data.overlay_package`
+- `data.window_count`
+
+Treat those fields as operational hints, not as a strict modal-dialog
+guarantee. `has_overlay: "true"` means Clawperator detected another meaningful
+accessibility window above the foreground app. It does not prove the screen is
+unusable, and `window_count > 1` alone is normal on some Android builds.
+
 `observe snapshot` (CLI subcommand) and `snapshot_ui` (execution action type) use the same internal pipeline and produce identical output. `observe snapshot` builds a single-action execution internally and calls `runExecution`. Use `observe snapshot` for ad-hoc inspection from the command line. Use `snapshot_ui` as a step within a multi-action execution payload.
 
 **Failure case - extraction error:** If snapshot post-processing finishes without attaching UI hierarchy text to the step (`data.text` remains absent), the step returns `success: false` with `data.error: "SNAPSHOT_EXTRACTION_FAILED"`. A common cause is that logcat does not contain a matching `[TaskScope] UI Hierarchy:` marker for the step, but partial extraction or other logcat mismatches can also trigger this error. This typically means the installed clawperator binary is out of date with the Android Operator APK. Run `clawperator version --check-compat` and `clawperator doctor` to diagnose. See Troubleshooting for resolution steps.
@@ -1501,6 +1790,9 @@ Combine fields to increase specificity when a single field is ambiguous:
         "success": true,
         "data": {
           "actual_format": "hierarchy_xml",
+          "foreground_package": "com.android.settings",
+          "has_overlay": "false",
+          "window_count": "2",
           "text": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><hierarchy rotation=\"0\">...</hierarchy>"
         }
       }
@@ -1512,7 +1804,7 @@ Combine fields to increase specificity when a single field is ambiguous:
 }
 ```
 
-**`take_screenshot`:** `observe screenshot` uses the same execution contract under the hood. Android reports `UNSUPPORTED_RUNTIME_SCREENSHOT`, then the Node layer captures the screenshot via `adb exec-out screencap -p`, writes it to `data.path`, and normalizes the step result to `success: true` when capture succeeds.
+**`take_screenshot`:** `observe screenshot` uses the same execution contract under the hood. Android reports `UNSUPPORTED_RUNTIME_SCREENSHOT`, then the Node layer captures the screenshot via `adb exec-out screencap -p`, writes it to `data.path`, and normalizes the step result to `success: true` when capture succeeds. Pass `observe screenshot --path <file>` when you want a deterministic local filename instead of the default temp path.
 
 **`press_key`:** Issues a system-level key event via the Android Accessibility Service (`performGlobalAction`). Supported keys: `"back"`, `"home"`, `"recents"`. The alias `key_press` is normalized to `press_key`. No retry - this action is single-attempt by design. Requires the Clawperator Operator accessibility service to be running on the device. If the service is unavailable, the execution returns a top-level failed envelope with `status: "failed"` and no `stepResults`. Use `clawperator doctor` to diagnose accessibility service availability before running executions that include `press_key`. When testing local/debug builds, pass the matching `receiverPackage` (`com.clawperator.operator.dev`) instead of relying on the default release package. Returns `success: false` with `data.error: "GLOBAL_ACTION_FAILED"` if the OS reports the global action could not be performed (rare soft OS failure - accessibility service was running but Android declined the action).
 
@@ -1637,8 +1929,19 @@ After receiving `snap2`, the agent compares it to `snap1`. If `scr1.data.scroll_
 
 Direction semantics are the same as `scroll`. `container`, `distanceRatio`, `settleDelayMs`, and `findFirstScrollableChild` behave identically to `scroll`.
 
+If `params.target` is provided, the runtime checks for that matcher before the
+first scroll and after each successful movement. When the target becomes
+visible in Clawperator's on-screen filtered UI tree, the step returns
+`termination_reason: "TARGET_FOUND"`. This removes the extra "scroll, then
+snapshot to verify" round-trip for many navigation tasks.
+
+If `clickAfter: true`, `scroll_until` clicks the target immediately after it
+becomes visible. This gives agents a one-step "scroll top-level list until
+visible, then click" path without switching to `scroll_and_click`.
+
 **Termination reasons (`data.termination_reason`):**
-- `EDGE_REACHED` - content ended naturally (finite list). `success: true`.
+- `TARGET_FOUND` - the provided `target` matcher became visible in the current UI tree. `success: true`.
+- `EDGE_REACHED` - scrolling stopped because no further movement was detected. `success: true`.
 - `MAX_SCROLLS_REACHED` - hit `maxScrolls` cap. `success: true`. Normal for infinite feeds.
 - `MAX_DURATION_REACHED` - hit `maxDurationMs` cap. `success: true`. Normal for infinite feeds.
 - `NO_POSITION_CHANGE` - no content movement across `noPositionChangeThreshold` consecutive scrolls. `success: true`.
@@ -1647,19 +1950,41 @@ Direction semantics are the same as `scroll`. `container`, `distanceRatio`, `set
 
 `MAX_SCROLLS_REACHED`, `MAX_DURATION_REACHED`, and `NO_POSITION_CHANGE` are clean terminal states, not errors. Agents scrolling infinite feeds should expect these and handle them without treating the action as failed.
 
-**Current runtime caveat:** If the resolved container disappears mid-loop because the app navigated away or rebuilt the view tree unexpectedly, the current Android runtime can collapse that case into `EDGE_REACHED`. When a scroll loop might trigger navigation or heavy UI re-layout, follow it with `snapshot_ui` or `wait_for_node` before assuming the list truly ended.
+When no `target` matcher is provided, `scroll_until` behaves as a pure bounded
+pagination loop and returns one of the non-target terminal reasons above.
+
+**Current runtime caveats:**
+- If the resolved container disappears mid-loop because the app navigated away or rebuilt the view tree unexpectedly, the current Android runtime can collapse that case into `EDGE_REACHED`.
+- Some Android screens expose off-screen descendants in the raw `snapshot_ui` XML. `scroll_until.target` does not use raw XML presence alone; it checks Clawperator's on-screen filtered tree. On heavily clipped or nested layouts, a target may appear in the raw snapshot near the bottom edge but still finish as `EDGE_REACHED` until it is more fully on-screen.
+
+When a scroll loop might trigger navigation, heavy UI re-layout, or clipped list rows near the viewport edge, follow it with `snapshot_ui` or `wait_for_node` before assuming the list truly ended.
 
 **`scroll_until` example request:**
 ```json
 {
-  "commandId": "cmd-su-1",
-  "taskId": "task-paginate",
-  "expectedFormat": "android-ui-automator",
-  "timeoutMs": 30000,
-  "actions": [
-    { "id": "su1", "type": "scroll_until", "params": { "direction": "down", "maxScrolls": 25 } }
-  ]
+    "commandId": "cmd-su-1",
+    "taskId": "task-paginate",
+    "expectedFormat": "android-ui-automator",
+    "timeoutMs": 30000,
+    "actions": [
+      {
+        "id": "su1",
+        "type": "scroll_until",
+        "params": {
+          "target": { "textContains": "About phone" },
+          "container": { "resourceId": "com.android.settings:id/recycler_view" },
+          "clickAfter": true,
+          "direction": "down",
+          "maxScrolls": 25
+        }
+      }
+    ]
 }
+```
+
+**`scroll_until` example step result (target became visible and clicked):**
+```json
+{ "id": "su1", "actionType": "scroll_until", "success": true, "data": { "termination_reason": "TARGET_FOUND", "scrolls_executed": "5", "direction": "down", "click_after": "true", "click_types": "default", "resolved_container": "com.android.settings:id/recycler_view" } }
 ```
 
 **`scroll_until` example step result (finite list, reached bottom):**
@@ -1735,7 +2060,7 @@ Every execution emits exactly one `[Clawperator-Result]` envelope:
 }
 ```
 
-- `status` is `"success"` when the execution completes (including partial step failures like `close_app`). `status` is `"failed"` only on total execution failure (dispatch error, timeout, validation failure).
+- `status` is `"success"` when the execution completes. `status` is `"failed"` only on total execution failure (dispatch error, timeout, validation failure).
 - `error` (top-level) contains a human-readable description of the failure. Do not branch agent logic on this string - it is not a stable contract.
 - `errorCode` (top-level) contains a stable, enumerated code when the failure has a known cause. Branch agent logic on this field. May be absent in envelopes from older APK versions or for unclassified failures.
 - `data.error` on a step result contains the per-step error code when `success` is `false`.
@@ -1750,127 +2075,49 @@ Typical `data` keys by action type:
 | :--- | :--- |
 | `open_app` | `application_id` |
 | `open_uri` | `uri` |
-| `close_app` | `application_id`, `error` (`"UNSUPPORTED_RUNTIME_CLOSE"`), `message` |
+| `close_app` | `application_id` |
 | `click` | `click_types` |
 | `enter_text` | `text` (text typed), `submit` (`"true"` or `"false"`) |
 | `read_text` | `text` (extracted text value), `validator` (`"none"` or validator type) |
-| `snapshot_ui` | `actual_format`, `text` (snapshot content - see note below) |
+| `snapshot_ui` | `actual_format`, `foreground_package` (when available), `has_overlay`, `overlay_package` (when available), `window_count`, `text` (snapshot content - see note below) |
 | `take_screenshot` | `path` (local screenshot file path after Node capture) |
 | `wait_for_node` | `resource_id`, `label` (matched node details) |
 | `scroll_and_click` | `max_swipes`, `direction`, `click_types`, `click_after` (`"true"` or `"false"`) |
 | `scroll` | `scroll_outcome` (`"moved"`, `"edge_reached"`, or `"gesture_failed"`), `direction`, `distance_ratio`, `settle_delay_ms`, `resolved_container` (resourceId of auto-detected container, when present) |
-| `scroll_until` | `termination_reason` (see behavior note), `scrolls_executed`, `direction`, `resolved_container` (when present) |
+| `scroll_until` | `termination_reason` (see behavior note), `scrolls_executed`, `direction`, `click_after`, `click_types`, `resolved_container` (when present) |
 | `sleep` | `duration_ms` |
 | `press_key` | `key` (`"back"`, `"home"`, or `"recents"`) |
 
 For any failed step: `success: false` and `data.error` contains the error code string.
 
-**Snapshot content delivery:** The UI hierarchy is produced by the Android runtime and written to device logcat. The Node layer reads logcat after execution and injects the raw XML into `data.text`. `data.actual_format` is `"hierarchy_xml"` on successful snapshot steps.
+**Snapshot content delivery:** The UI hierarchy is produced by the Android runtime and written to device logcat. The Node layer reads logcat after execution and injects the raw XML into `data.text`. `data.actual_format` is `"hierarchy_xml"` on successful snapshot steps. Snapshot steps may also include best-effort accessibility-window metadata such as `foreground_package`, `has_overlay`, `overlay_package`, and `window_count`.
 
 **`read_text` value:** The extracted text value is in `data.text`.
 
 ## Snapshot Output Format
 
-`snapshot_ui` and `clawperator observe snapshot` produce the canonical `hierarchy_xml` format. `data.actual_format` reports `"hierarchy_xml"` on success.
+`snapshot_ui` and `clawperator observe snapshot` produce the canonical
+`hierarchy_xml` format. `data.actual_format` reports `"hierarchy_xml"` on
+success.
 
-### `hierarchy_xml`
+Use [Clawperator Snapshot Format](../reference/snapshot-format.md) as the
+dedicated reference for:
 
-Structured XML produced by UIAutomator. Each `<node>` represents one UI element. Attributes map directly to NodeMatcher fields:
+- the exact snapshot envelope placement
+- the relationship to Android UI Automator output
+- XML attribute meanings and escaping
+- real-device annotated examples
+- parsing guidance for agents
 
-| XML attribute | NodeMatcher field | Notes |
-| :--- | :--- | :--- |
-| `resource-id` | `resourceId` | `"com.example.app:id/name"`. Empty string when not set by developer. |
-| `text` | `textEquals` / `textContains` | Visible text content. Empty string if none. |
-| `content-desc` | `contentDescEquals` / `contentDescContains` | Accessibility label. Empty string if none. |
-| `class` | - | Java widget class name, e.g., `"android.widget.Button"`. Informational only - `NodeMatcher.role` uses Clawperator semantic role names such as `button`, `textfield`, `text`, or `switch`, not the raw `class` attribute. |
-| `clickable` | - | `"true"` if the element accepts tap events. |
-| `scrollable` | - | `"true"` marks a scroll container. Use as `container` in `scroll_and_click`, `scroll`, or `scroll_until`. |
-| `bounds` | - | `"[x1,y1][x2,y2]"` pixel rectangle. Useful for understanding spatial layout. |
-| `enabled` | - | `"false"` means the element is visible but not interactable. |
-| `long-clickable` | - | `"true"` if the element accepts long-press. Use `clickType: "long_click"`. |
+## Execution Model
 
-**XML attribute escaping:** Snapshot output is XML, so special characters in attribute values are escaped when the hierarchy is serialized. For example, an apostrophe appears as `&apos;`, an ampersand as `&amp;`. These escaped sequences are returned as-is in `data.text` - they are not decoded after extraction. When targeting elements with special characters in their labels, use `contentDescContains` or `textContains` with a substring that avoids the escaped characters rather than an exact match requiring the full escaped form.
+Use [Clawperator Execution Model](../reference/execution-model.md) for the
+current reference explanation of:
 
-Example: for a node with `content-desc="Search for &apos;vlc&apos;"`:
-- `contentDescContains: "Search for"` -- works
-- `contentDescEquals: "Search for 'vlc'"` -- fails (apostrophe is not decoded)
-
-**Annotated example from Android Settings main screen (live device capture):**
-
-```xml
-<hierarchy rotation="0">
-  <node index="0" text="" resource-id="" class="android.widget.FrameLayout"
-        package="com.android.settings" content-desc=""
-        clickable="false" enabled="true" scrollable="false"
-        bounds="[0,0][1080,2340]">
-    ...
-        <!-- Scrollable list - use as 'container' in scroll_and_click, scroll, or scroll_until -->
-        <node index="0" text="" resource-id="com.android.settings:id/recycler_view"
-              class="androidx.recyclerview.widget.RecyclerView"
-              package="com.android.settings" content-desc=""
-              clickable="false" enabled="true" focusable="true" scrollable="true"
-              bounds="[0,884][1080,2196]">
-
-          <!-- Icon-only button: no text, target via content-desc -->
-          <node index="0" text="" resource-id="" class="android.widget.Button"
-                package="com.android.settings" content-desc="Search settings"
-                clickable="true" enabled="true" focusable="true"
-                bounds="[912,692][1080,884]" />
-
-          <!-- Clickable row: the LinearLayout is the tap target -->
-          <node index="2" text="" resource-id="" class="android.widget.LinearLayout"
-                package="com.android.settings" content-desc=""
-                clickable="true" enabled="true" scrollable="false"
-                bounds="[30,1252][1050,1461]">
-            <!-- Title label with stable resource-id -->
-            <node index="0" text="Connections" resource-id="android:id/title"
-                  class="android.widget.TextView" package="com.android.settings"
-                  content-desc="" clickable="false" enabled="true"
-                  bounds="[216,1294][507,1364]" />
-            <!-- Subtitle label -->
-            <node index="1" text="Wi-Fi  •  Bluetooth  •  SIM manager"
-                  resource-id="android:id/summary" class="android.widget.TextView"
-                  package="com.android.settings" content-desc=""
-                  clickable="false" enabled="true"
-                  bounds="[216,1364][816,1419]" />
-          </node>
-
-          <node index="3" text="" resource-id="" class="android.widget.LinearLayout"
-                package="com.android.settings" content-desc=""
-                clickable="true" enabled="true" scrollable="false"
-                bounds="[30,1461][1050,1721]">
-            <node index="0" text="Connected devices" resource-id="android:id/title"
-                  class="android.widget.TextView" package="com.android.settings"
-                  content-desc="" clickable="false" enabled="true"
-                  bounds="[216,1503][661,1573]" />
-            <node index="1" text="Quick Share  •  Samsung DeX  •  Android Auto"
-                  resource-id="android:id/summary" class="android.widget.TextView"
-                  package="com.android.settings" content-desc=""
-                  clickable="false" enabled="true"
-                  bounds="[216,1573][996,1679]" />
-          </node>
-
-        </node>
-    ...
-  </node>
-</hierarchy>
-```
-
-**Reading patterns:**
-
-- **Tap targets** are `clickable="true"` nodes. In list UIs these are often container (`LinearLayout`) nodes whose text-bearing children hold the visible label while the container itself has `text=""`. When you match any node, Clawperator first attempts `ACTION_CLICK` on the first `clickable="true"` ancestor it finds while walking up the tree from the matched node. If that accessibility click does not succeed, Clawperator falls back to a gesture tap at the center of the matched node's bounding box. This means matching a non-clickable label node (for example, `textEquals: "Connections"`) works correctly as long as it is visually inside a clickable parent tap target. If both mechanisms fail, the execution currently terminates with a failed envelope and empty `stepResults` rather than a per-step `NODE_NOT_CLICKABLE` code.
-- **Icon-only buttons** (no `text`) use `content-desc` for their label. Target with `contentDescEquals`.
-- **Scroll containers** have `scrollable="true"`. Pass their `resource-id` as the `container` matcher in `scroll_and_click` or `scroll`. If `container` is omitted from `scroll`, the first `scrollable="true"` node on screen is used automatically.
-- **Disabled elements** have `enabled="false"`. They cannot be interacted with - scrolling or waiting for a state change is required first.
-
-**Apps with obfuscated or missing resource-ids:** Many production apps (Google Play Store, social media apps, banking apps) set `resource-id=""` on all or most nodes. In this case, fall back to content-desc and text matchers. The fallback priority for these apps is:
-
-1. `contentDescEquals` - for elements with stable accessibility labels (icon buttons, tabs)
-2. `textEquals` - for elements with stable visible text (button labels, section headers)
-3. `contentDescContains` / `textContains` - when the value may include dynamic content, counts, or special characters (including HTML entities - see note above)
-4. `role: "textfield"` - for text inputs when no `resource-id` is present
-
-Note: `content-desc` values sometimes contain newlines when an element's label spans multiple pieces of information (for example, an app name followed by developer name in Play Store results). Use `contentDescContains` with a known stable substring rather than a full exact match.
+- required execution payload fields
+- `status` vs `stepResults[].success`
+- timeout policy and single-flight behavior
+- stable error-code surfaces
 
 ## Error Codes
 
@@ -1900,14 +2147,16 @@ Branch agent logic on codes from `envelope.errorCode` (top-level Android result 
 | `EXECUTION_VALIDATION_FAILED` | `error.code` | Payload failed schema validation |
 | `SECURITY_BLOCK_DETECTED` | `data.error` | Android blocked the action (e.g., secure keyboard) |
 | `NODE_NOT_CLICKABLE` | `data.error` | Reserved error code. Intended for "element found but not interactable", but not currently emitted consistently by the Android and Node runtimes. |
-| `UNSUPPORTED_RUNTIME_CLOSE` | `data.error` | Expected per-step result for all `close_app` steps. The Android runtime does not support a force-stop action response - the Node layer handles the close via `adb shell am force-stop` before dispatch. The overall execution `status` remains `"success"`. Treat as non-fatal. |
 | `SNAPSHOT_EXTRACTION_FAILED` | `data.error` | `snapshot_ui` step completed but the Node layer did not attach any snapshot text to the step during post-processing. The most common cause is a Node binary packaging mismatch or other logcat extraction issue. Rebuild or reinstall the npm package and check version compatibility. |
 | `GLOBAL_ACTION_FAILED` | `data.error` | `press_key` step result when the OS reports `performGlobalAction` returned false. Rare soft failure - the accessibility service was running but Android declined to execute the action. |
 | `CONTAINER_NOT_FOUND` | `data.error` | `scroll` step could not locate a scrollable container. Either no scrollable node is present on screen, or the provided `container` matcher matched nothing. |
 | `CONTAINER_NOT_SCROLLABLE` | `data.error` | `scroll` step found the matched container but it is not scrollable and no scrollable descendant was found. With the default `findFirstScrollableChild: true`, the runtime already walks one level down before raising this error. |
 | `GESTURE_FAILED` | `data.error` | `scroll` step: the OS rejected the gesture dispatch. The accessibility service was running but Android declined to execute the swipe gesture. Step returns `success: false`. |
 
-Primary top-level error taxonomy: `apps/node/src/contracts/errors.ts`. This table also includes runtime-only step error strings such as `UNSUPPORTED_RUNTIME_CLOSE`.
+Primary top-level error taxonomy: `apps/node/src/contracts/errors.ts`. This table also includes runtime-only step error strings where they are still surfaced directly by callers.
+
+For agent-side recovery strategy, use
+[Error Handling Guide](../reference/error-handling.md).
 
 ## Key Behaviors
 
@@ -1915,14 +2164,78 @@ Primary top-level error taxonomy: `apps/node/src/contracts/errors.ts`. This tabl
 - **No hidden retries:** If an action fails, the error is returned immediately. Retry logic belongs in the agent.
 - **Deterministic results:** Exactly one terminal envelope per `commandId`. Timeouts return `RESULT_ENVELOPE_TIMEOUT` with diagnostics.
 - **Timeout override:** `--timeout-ms <n>` overrides the execution timeout for `execute`, `observe snapshot`, and `observe screenshot` within policy limits.
+- **Screenshot output path:** `observe screenshot --path <file>` writes the PNG to the requested local path and still returns the final `data.path` in the result envelope. `<file>` must be a non-empty local filesystem path.
 - **Device targeting:** Specify `--device-id` when multiple devices are connected. Omit for single-device setups.
 - **Emulator reuse over creation:** Provisioning never creates duplicate AVDs when a supported running or stopped emulator already exists.
 - **Deterministic emulator boots:** Emulator starts use `-no-snapshot-load` and wait for both `sys.boot_completed` and `dev.bootcomplete`.
 - **Validation before dispatch:** Every payload is schema-validated before any ADB command is issued.
 
+## Validation and current non-features
+
+- Payload validation happens automatically at execution time. Invalid payloads
+  fail fast with `EXECUTION_VALIDATION_FAILED` before any device action runs.
+- `clawperator execute --execution <json-or-file> --validate-only` validates
+  and normalizes a payload without dispatching it to any device.
+- If you want the lowest-risk contract check on a live device, use a minimal
+  payload such as a single `sleep` or `snapshot_ui` action.
+
 ## Skills
 
 Skills are packaged Android automation scripts distributed via the public GitHub repository at `https://github.com/clawperator/clawperator-skills`. The Node API provides discovery and metadata - skills are standalone and can be invoked directly by agents without the Node API.
+
+## Environment Variables and Device Targeting
+
+Use these dedicated references when you need the focused contract instead of
+the summary below:
+
+- [Device and Package Model](../reference/device-and-package-model.md)
+- [Environment Variables](../reference/environment-variables.md)
+
+The most important environment variables surfaced by the current CLI and
+installer are:
+
+| Variable | Where used | Current meaning |
+| :--- | :--- | :--- |
+| `CLAWPERATOR_SKILLS_REGISTRY` | CLI and installer | Overrides the path to the local skills registry JSON |
+| `CLAWPERATOR_INSTALL_APK` | installer | Pre-seeds the installer's "install APK now?" decision for non-interactive runs |
+| `CLAWPERATOR_RECEIVER_PACKAGE` | installer | Overrides the default receiver package used during installer setup |
+
+### `CLAWPERATOR_INSTALL_APK`
+
+`scripts/install.sh` reads `CLAWPERATOR_INSTALL_APK` before prompting whether to
+install the Operator APK on the connected device.
+
+Useful values:
+
+- `Y`, `y`, `yes`, `YES` - proceed with APK install
+- any other non-empty value - skip APK install
+
+Example:
+
+```bash
+CLAWPERATOR_INSTALL_APK=Y curl -fsSL https://clawperator.com/install.sh | bash
+```
+
+### `CLAWPERATOR_SKILLS_REGISTRY`
+
+This points the CLI at a specific skills registry path.
+
+Example:
+
+```bash
+export CLAWPERATOR_SKILLS_REGISTRY="$HOME/.clawperator/skills/skills/skills-registry.json"
+```
+
+### Multiple devices
+
+If more than one device is connected, pass `--device-id <id>` on execute,
+observe, action, doctor, version, operator setup, and skills-run commands.
+
+When multiple devices are present:
+
+- the installer skips automatic APK install rather than guessing
+- it prints the manual recovery command
+- later automation should keep using explicit `--device-id`
 
 ### Setup
 
@@ -1955,7 +2268,7 @@ Skills can be invoked three ways:
 
 2. **Convenience wrapper** via Node API:
    ```bash
-   clawperator skills run com.android.settings.capture-overview --device-id <device_id>
+   clawperator skills run com.android.settings.capture-overview --device-id <device_id> --timeout-ms 90000
    ```
 
 3. **Artifact compile + execute** (for skills with `.recipe.json` artifacts):
@@ -2010,11 +2323,425 @@ If multiple apps are registered for the URI scheme, a system chooser may appear.
 **Does Clawperator run skills?**
 Skills are standalone programs that agents can invoke directly. The Node API provides discovery (`skills list`, `skills search`), metadata (`skills get`), and a convenience `skills run` wrapper. Skills do not need the Node API to execute - agents can call skill scripts directly.
 
+When `skills run` fails or times out, the CLI preserves partial script
+`stdout` and `stderr` in the structured error output when available. Inspect
+those fields before assuming the run produced no useful result.
+
+Current skills model:
+
+- discovery is registry-driven, not folder-scan-driven
+- `CLAWPERATOR_SKILLS_REGISTRY` points at one local registry JSON
+- a private skill becomes visible only after it is added to that registry
+- `skills new <skill_id>` scaffolds the starter folder and updates that local registry automatically
+- `skills validate <skill_id>` checks that one registry entry, its
+  `skill.json`, `SKILL.md`, script paths, and artifact paths line up before you
+  spend time on a live device run
+- `skills validate --all` runs the same integrity checks across every entry in
+  the configured registry and returns a failure summary if any skills are
+  broken
+- `skills run --timeout-ms <n>` overrides the wrapper timeout for one run when
+  the default `120000` ms budget is not the right fit for the current flow
+- `skills run --expect-contains <text>` turns the wrapper into a lightweight
+  smoke check by failing if the script output does not contain the expected
+  substring
+
+For the concrete `skill.json` contract and private-skill authoring model, see
+[Skill Authoring Guidelines](../skills/skill-authoring-guidelines.md),
+[Skill Development Workflow](../skills/skill-development-workflow.md), and
+[Usage Model](../skills/usage-model.md).
+
 **Does Clawperator configure accounts or app settings?**
-No. Clawperator automates the UI on whatever user-installed Android apps are already installed and signed in on the device. It does not log in to apps, create accounts, or configure device settings on behalf of the user. If an automation targets an app that requires authentication, the user must sign in to that app manually on the device before the agent runs. For emulators using a Google Play system image, the user must also sign in to a Google account before Play Store-gated apps are accessible.
+Clawperator is a neutral actuator. It does not decide whether entering a
+username, password, email address, or other user-provided input is appropriate.
+That decision belongs to the external brain agent and the user workflow it is
+carrying out.
+
+In practice, the device still needs to be in a usable state for the automation
+the agent is attempting. Many setups prepare account state and app
+configuration before automation begins. When an agent chooses to enter login or
+credential fields through the normal UI, Clawperator can provide the same
+interaction primitives it uses for any other text entry or click flow.
 
 **How should agents handle sensitive text in results?**
 Default behavior is full-fidelity results for agent reasoning. PII redaction (`--safe-logs`) is a planned feature.
+
+---
+
+
+# Navigation Patterns for Agents
+
+This page collects the practical operating patterns that help a cold-start
+agent succeed on unknown Android screens.
+
+Use it for:
+
+- scrolling through unfamiliar layouts
+- handling overlays and dialogs safely
+- dealing with OEM-specific Settings differences
+- minimizing wasted round trips
+
+## Default loop for unknown apps
+
+Use a tight observe-decide-act loop:
+
+1. `snapshot_ui`
+2. choose one action or one short action sequence
+3. execute
+4. `snapshot_ui` again
+5. reassess before continuing
+
+This is slower than long optimistic macros, but it is the safest default when
+you have not yet learned the app's structure.
+
+## Prefer explicit containers for scrolling
+
+When a screen has more than one scrollable node, auto-detection can pick an
+outer wrapper instead of the content list you really want.
+
+Recommended pattern:
+
+1. take a snapshot
+2. identify the true content list by `resource-id`
+3. pass that node as `params.container`
+
+This is especially important for:
+
+- Settings screens
+- nested recycler views
+- drawers and tabbed layouts
+- OEM-modified system apps
+
+## Treat targeted scrolls as "reveal, then verify"
+
+Even with `TARGET_FOUND` support, a scrolling action should not be your final
+source of truth about the whole screen state.
+
+Good pattern:
+
+1. `scroll_until` with explicit `container` and `target`
+2. capture a fresh `snapshot_ui`
+3. confirm the target is visible and still the intended node
+4. click or read only after that confirmation when the workflow is sensitive
+
+This matters because some Android layouts expose clipped descendants in raw XML
+near the viewport edge.
+
+## Use snapshot metadata as a hint, not a verdict
+
+Successful snapshots may include:
+
+- `foreground_package`
+- `has_overlay`
+- `overlay_package`
+- `window_count`
+
+Interpret them like this:
+
+- `has_overlay: "true"` means another meaningful accessibility window was
+  detected
+- it does not guarantee the screen is blocked
+- `window_count > 1` alone is normal on some Android builds
+
+When overlay metadata appears, the safest next move is usually another
+observation step rather than an immediate destructive action.
+
+## Overlay and dialog handling
+
+Unexpected dialogs are one of the biggest sources of agent confusion.
+
+Recommended order of operations:
+
+1. confirm whether the dialog is the current foreground problem
+2. prefer an explicit dismiss action only if the button meaning is clear
+3. avoid reflexively sending `press_key: back` unless you are willing to lose
+   current navigation context
+4. if the underlying content is still actionable and you know the correct
+   scroll container, continue carefully with an explicit container selector
+
+Good dialog selectors often use:
+
+- `textEquals`
+- `textContains`
+- `contentDescEquals`
+
+because many system dialogs have weak or missing `resource-id` values.
+
+## OEM variation strategy
+
+Assume system apps differ across vendors.
+
+Examples:
+
+- stock Android may place Android version directly in `About phone`
+- Samsung may place it inside `Software information`
+
+Recommended pattern:
+
+1. identify the current package with `foreground_package` or snapshot XML
+2. branch on visible labels, not assumptions about one vendor layout
+3. keep selectors descriptive and local to the current screen
+4. preserve fallback paths when a known OEM split exists
+
+## Stable selector order
+
+When choosing a selector for navigation, prefer:
+
+1. `resourceId`
+2. `contentDescEquals`
+3. `textEquals`
+4. `contentDescContains`
+5. `textContains`
+
+Use `role` as a semantic narrowing field, not the primary anchor, unless the
+screen gives you no stronger handle.
+
+## When to split across multiple executions
+
+Split the workflow when:
+
+- the next decision depends on newly revealed UI
+- a dialog or overlay may appear
+- the screen is known to re-layout heavily after clicks
+- you are exploring a new app for the first time
+
+Combine actions into one execution only when the path is already known and the
+steps are tightly coupled.
+
+## Quick recovery heuristics
+
+If a step fails:
+
+- `NODE_NOT_FOUND`: re-observe before changing selectors
+- `CONTAINER_NOT_FOUND`: inspect the scrollable nodes and pass `container`
+  explicitly
+- `SNAPSHOT_EXTRACTION_FAILED`: retry snapshot briefly, then check
+  compatibility and doctor output
+- `EXECUTION_CONFLICT_IN_FLIGHT`: wait and serialize work per device
+
+## Related docs
+
+- [Agent Quickstart](agent-quickstart.md)
+- [Clawperator Snapshot Format](../reference/snapshot-format.md)
+- [Execution Model](../reference/execution-model.md)
+- [Error Handling Guide](../reference/error-handling.md)
+- [Operator Automation Playbook](../design/operator-llm-playbook.md)
+
+---
+
+
+# Multi-Device Workflows for Agents
+
+Use this page when more than one Android target is connected and you need
+deterministic per-device behavior.
+
+This is the practical companion to
+[Device and Package Model](../reference/device-and-package-model.md).
+
+## Core rule
+
+When more than one Android target is visible in adb, always pass:
+
+```bash
+--device-id <device_id>
+```
+
+Do not rely on auto-resolution in multi-device environments. Clawperator will
+fail with `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED` instead of guessing.
+
+## What counts as a separate target
+
+A target is any adb-connected Android runtime in `device` state, including:
+
+- a physical Android phone
+- a physical Android tablet
+- an emulator such as `emulator-5554`
+
+`deviceId` is just the adb serial.
+
+Examples:
+
+- `<device_serial>`
+- `emulator-5554`
+
+List the currently visible targets with:
+
+```bash
+clawperator devices --output json
+```
+
+## Recommended cold-start loop
+
+For each target device:
+
+1. identify the serial with `clawperator devices --output json`
+2. run `clawperator doctor --device-id <device_id> --output json`
+3. run `clawperator version --check-compat --device-id <device_id> --output json`
+4. keep using that same `--device-id` on every later command
+
+This is the safest default after:
+
+- emulator provisioning
+- USB reconnects
+- installer runs with multiple devices attached
+- any local setup where both release testing and debug testing happen at once
+
+## Commands that should stay explicit
+
+In multi-device environments, keep `--device-id` explicit on:
+
+- `operator setup`
+- `doctor`
+- `version --check-compat`
+- `execute`
+- `observe snapshot`
+- `observe screenshot`
+- `inspect ui`
+- every `action ...` wrapper
+- `grant-device-permissions`
+- `skills run`
+
+Example:
+
+```bash
+clawperator observe snapshot --device-id <device_id> --output json
+clawperator execute --device-id <device_id> --execution /path/to/execution.json --output json
+clawperator skills run com.android.settings.capture-overview --device-id <device_id>
+```
+
+## Per-device work queues
+
+Clawperator enforces single-flight execution per target device. Treat each
+device as its own serialized queue.
+
+Practical guidance:
+
+- keep one work queue per device
+- never overlap two executions on the same device
+- it is fine to run different queues against different devices
+- keep `--receiver-package` consistent within the same device queue
+
+If you see `EXECUTION_CONFLICT_IN_FLIGHT`, do not immediately retry in
+parallel. Wait for the earlier execution to finish or explicitly serialize the
+queue.
+
+## Receiver package still matters
+
+`--device-id` and `--receiver-package` solve different problems:
+
+- `--device-id` selects the Android runtime
+- `--receiver-package` selects which Operator APK on that runtime receives the
+  command
+
+Examples:
+
+- release package: `com.clawperator.operator`
+- debug package: `com.clawperator.operator.dev`
+
+On a local workstation it is common to have:
+
+- one physical device running the release APK
+- one emulator running the debug APK
+
+In that case, keep both flags explicit:
+
+```bash
+clawperator doctor \
+  --device-id emulator-5554 \
+  --receiver-package com.clawperator.operator.dev \
+  --output json
+```
+
+## Recovery after installer or setup runs
+
+If `install.sh` ran while multiple devices were connected, host-side setup can
+still complete successfully, but Android setup must be finished per device.
+
+Use:
+
+```bash
+clawperator operator setup \
+  --apk ~/.clawperator/downloads/operator.apk \
+  --device-id <device_id>
+```
+
+Then confirm readiness:
+
+```bash
+clawperator doctor --device-id <device_id> --output json
+```
+
+## Emulator plus physical device
+
+This is the most common ambiguous setup.
+
+Typical pattern:
+
+1. provision or start the emulator
+2. run `clawperator devices --output json`
+3. choose the emulator serial for emulator work
+4. choose the physical-device serial for phone work
+5. keep those serials explicit in every later command
+
+Do not assume the emulator will remain the only device after provisioning.
+
+## Suggested shell pattern
+
+A practical shell setup is to bind one environment variable per active target:
+
+```bash
+export CLAWPERATOR_PHONE_ID="<device_serial>"
+export CLAWPERATOR_EMULATOR_ID="emulator-5554"
+```
+
+Then run:
+
+```bash
+clawperator doctor --device-id "$CLAWPERATOR_PHONE_ID" --output json
+clawperator doctor --device-id "$CLAWPERATOR_EMULATOR_ID" --output json
+```
+
+This keeps command history readable and avoids copy-paste mistakes.
+
+## Artifact and screenshot hygiene
+
+When the same agent operates multiple devices, keep outputs separated by device
+ID.
+
+Good pattern:
+
+- one output directory per device
+- include the device ID in filenames
+- do not reuse a single screenshot path across different targets
+
+Example:
+
+```bash
+clawperator observe screenshot \
+  --device-id <device_id> \
+  --path "/tmp/clawperator-<device_id>-settings.png" \
+  --output json
+```
+
+## Failure triage
+
+If a command fails in a multi-device environment:
+
+1. run `clawperator devices --output json`
+2. confirm the intended target is still present in `device` state
+3. rerun with explicit `--device-id <device_id>`
+4. rerun `clawperator doctor --device-id <device_id> --output json` if the
+   device state changed
+
+Most common multi-device errors:
+
+- `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED`
+- `NO_DEVICES`
+- `DEVICE_NOT_FOUND`
+- `DEVICE_UNAUTHORIZED`
+
+For broader recovery guidance, see
+[Error Handling Guide](../reference/error-handling.md) and
+[Clawperator Doctor](../reference/node-api-doctor.md).
 
 ---
 
@@ -2216,17 +2943,22 @@ clawperator packages list [--device-id <id>] [--third-party]
 Execute a validated command payload.
 
 ```
-clawperator execute --execution <json-or-file> [--device-id <id>] [--receiver-package <package>] [--timeout-ms <number>]
+clawperator execute --execution <json-or-file> [--validate-only] [--device-id <id>] [--receiver-package <package>] [--timeout-ms <number>]
 ```
 
 | Flag | Description |
 |------|-------------|
 | `--execution <json-or-file>` | Execution payload as inline JSON or a path to a JSON file (required) |
+| `--validate-only` | Validate and normalize the payload without dispatching to any device |
 | `--device-id <id>` | Target device serial |
 | `--receiver-package <package>` | Target Operator package |
 | `--timeout-ms <number>` | Override execution timeout within policy limits |
 
 The `--execution` value must conform to the `Execution` contract (see [api-overview.md](./api-overview.md)).
+
+With `--validate-only`, Clawperator validates the payload, applies any
+`--timeout-ms` override, and returns the normalized execution without touching
+adb or resolving a device.
 
 **Note:** `execute best-effort` is not implemented in this stage. Use `observe snapshot` + agent reasoning instead.
 
@@ -3220,6 +3952,1084 @@ Server-Sent Events stream. Emits two event types:
 ---
 
 
+# Clawperator Execution Model
+
+This page explains how to read and construct Clawperator executions without
+guessing from validation errors.
+
+Use it when you need to understand:
+
+- what fields are required in an execution payload
+- how `envelope.status` differs from `stepResults[].success`
+- where to branch on error codes
+- how timeout and single-flight behavior affect agent loops
+
+## Required execution fields
+
+Every execution payload must include:
+
+| Field | Type | Meaning |
+| :--- | :--- | :--- |
+| `commandId` | string | Correlation ID for the whole execution. Must remain stable end to end. |
+| `taskId` | string | Task-level correlation ID. Often matches a larger agent task or subtask. |
+| `source` | string | Caller identifier such as the agent, skill, or workflow name. |
+| `expectedFormat` | string | Must be `"android-ui-automator"` today. |
+| `timeoutMs` | number | Execution-wide timeout budget in milliseconds. |
+| `actions` | array | Ordered list of action steps to run. |
+
+Minimal example:
+
+```json
+{
+  "commandId": "quickstart-001",
+  "taskId": "quickstart-001",
+  "source": "my-agent",
+  "expectedFormat": "android-ui-automator",
+  "timeoutMs": 15000,
+  "actions": [
+    { "id": "snap1", "type": "snapshot_ui" }
+  ]
+}
+```
+
+## Result envelope model
+
+Clawperator returns one terminal result envelope per execution.
+
+Successful example shape:
+
+```json
+{
+  "ok": true,
+  "envelope": {
+    "commandId": "quickstart-001",
+    "taskId": "quickstart-001",
+    "status": "success",
+    "stepResults": [
+      {
+        "id": "snap1",
+        "actionType": "snapshot_ui",
+        "success": true,
+        "data": {
+          "actual_format": "hierarchy_xml",
+          "text": "<hierarchy ... />"
+        }
+      }
+    ],
+    "error": null
+  },
+  "deviceId": "<device_id>",
+  "terminalSource": "clawperator_result"
+}
+```
+
+## `status` vs `stepResults[].success`
+
+These mean different things and agents must check both.
+
+| Field | What it means |
+| :--- | :--- |
+| `envelope.status = "success"` | The execution completed and returned a terminal result envelope. |
+| `envelope.status = "failed"` | The execution failed as a whole, for example dispatch failure, timeout, or another top-level runtime failure. |
+| `stepResults[n].success = true` | That individual step succeeded. |
+| `stepResults[n].success = false` | That individual step failed, even if the overall execution still completed. |
+
+Important consequences:
+
+- A step can fail while the overall execution still has `status: "success"`.
+- Top-level failures usually return no useful later steps because the runtime
+  could not continue cleanly.
+- A reliable agent loop checks `envelope.status` first, then inspects each step.
+
+## Error surfaces
+
+Clawperator exposes stable codes from more than one place:
+
+| Location | Typical use |
+| :--- | :--- |
+| `error.code` | Node CLI or API structured errors such as validation, device resolution, or timeout failures |
+| `envelope.errorCode` | Android-side top-level envelope failures when present |
+| `stepResults[n].data.error` | Per-step runtime failures such as `NODE_NOT_FOUND` |
+
+Do not branch on `envelope.error` text alone. That text is descriptive, not the
+stable machine contract.
+
+## Timeout semantics
+
+`timeoutMs` is an execution-wide budget, not a per-step budget.
+
+For practical starting values by workflow type, see
+[Clawperator Timeout Budgeting](timeout-budgeting.md).
+
+Current validation policy:
+
+- minimum: `1000`
+- maximum: `120000`
+
+Practical guidance:
+
+- simple one-step observe or click flows often fit in `5000` to `15000`
+- multi-scroll discovery flows usually need more headroom
+- `sleep.durationMs` also consumes from the same outer timeout budget
+
+When the timeout is exceeded, the Node layer returns
+`RESULT_ENVELOPE_TIMEOUT`.
+
+## Single-flight behavior
+
+Clawperator allows only one execution in flight per device at a time.
+
+If a second execution targets the same device while one is still running, the
+caller gets `EXECUTION_CONFLICT_IN_FLIGHT`.
+
+This is why agents should:
+
+- serialize work per device
+- avoid overlapping retries on the same target
+- keep multi-action payloads tight and intentional
+
+## Validation behavior
+
+Payloads are schema-validated before any device action is dispatched.
+
+Current behavior:
+
+- invalid payloads fail fast with `EXECUTION_VALIDATION_FAILED`
+- `clawperator execute --execution <json-or-file> --validate-only` validates and
+  normalizes the payload without dispatching to any device
+
+Example:
+
+```bash
+clawperator execute --execution /path/to/execution.json --validate-only --output json
+```
+
+Use a live-device smoke payload only when you want to validate both the
+contract and the target environment.
+
+## Recommended agent loop
+
+For unknown apps or UI drift:
+
+1. Capture `snapshot_ui`.
+2. Decide one action or one short action sequence.
+3. Execute it.
+4. Re-read the envelope and step results.
+5. Snapshot again before making the next major decision.
+
+For action-specific caveats, use
+[Clawperator Node API - Agent Guide](../ai-agents/node-api-for-agents.md) and
+[Clawperator Snapshot Format](snapshot-format.md).
+
+---
+
+
+# Clawperator Timeout Budgeting
+
+Clawperator validates `execution.timeoutMs` in the range `1000` to `120000`
+milliseconds.
+
+That timeout is an execution-wide wall-clock budget, not a per-step budget.
+Every action in the payload consumes from the same clock:
+
+- app launches
+- scroll loops
+- retries
+- sleeps
+- snapshots
+- result-envelope delivery
+
+Use this page to choose a realistic timeout before you start guessing upward by
+trial and error.
+
+## Core rules
+
+1. Budget for the whole sequence, not the slowest single action.
+2. Keep one execution focused on one short navigation goal.
+3. Split very long workflows into multiple executions instead of pinning
+   everything to `120000`.
+4. If a flow is device-sensitive or OEM-sensitive, leave extra headroom.
+5. Prefer `wait_for_node` over large fixed `sleep` values when the UI can
+   become ready early.
+
+## Recommended starting budgets
+
+These are practical starting points, not guarantees.
+
+| Workflow shape | Suggested `timeoutMs` |
+|---|---:|
+| Single `snapshot_ui` or `observe snapshot` | `10000`-`15000` |
+| `open_app` + brief settle + snapshot | `15000`-`25000` |
+| One click or text-entry step plus verification snapshot | `15000`-`30000` |
+| Short deterministic sequence in one screen | `20000`-`30000` |
+| Targeted `scroll_until` in a known finite list | `30000`-`60000` |
+| Multi-screen navigation with one or two long scroll loops | `60000`-`90000` |
+| Complex skill flow on a slower physical device | `90000`-`120000` |
+
+## Action-specific guidance
+
+### `snapshot_ui`
+
+Start with `10000` to `15000` ms for a plain observation pass.
+
+If the app is in motion, on first launch, or opening a heavy screen, treat the
+snapshot as part of a larger flow and budget that larger flow instead of only
+the snapshot step.
+
+### `open_app`
+
+For a warm app launch, `15000` ms is usually enough.
+
+If this is the app's first launch after install, after force-stop, or after a
+permission change, prefer `20000` to `30000` ms and follow it with a snapshot.
+
+### `click`, `enter_text`, `press_key`, `read_text`
+
+For a single interaction in an already-settled screen, `15000` to `30000` ms
+is usually sufficient when paired with a verification snapshot.
+
+If the action is expected to trigger navigation, loading, or a dialog, budget
+the post-click transition too.
+
+### `scroll`
+
+A single bounded scroll usually fits comfortably inside `15000` to `30000` ms.
+
+If you are chaining several `scroll` actions in one execution, add time for
+each gesture and settle period rather than assuming one default budget still
+holds.
+
+### `scroll_until`
+
+This is usually the action that dominates the execution budget.
+
+Good starting points:
+
+- `30000` to `45000` ms for a short known list
+- `45000` to `90000` ms for Settings-style navigation or OEM-heavy screens
+- `90000` to `120000` ms only when a skill really needs one long bounded pass
+
+Practical budgeting rule:
+
+`scroll_until` often needs about 2 to 3 seconds per scroll on a real device
+once gesture time, settling, and matching are included. For example:
+
+- `maxScrolls: 10` -> start around `30000` to `40000`
+- `maxScrolls: 20` -> start around `50000` to `70000`
+- `maxScrolls: 30` -> consider splitting the workflow unless you truly need one
+  long execution
+
+Also budget for the rest of the payload:
+
+- `open_app`
+- any pre-scroll click
+- any post-scroll click
+- any verification snapshot
+
+### `sleep`
+
+Use `sleep` sparingly. It spends budget without learning anything.
+
+If you need a deliberate pause, keep it short and explicit. Large fixed sleeps
+are usually a sign that `wait_for_node` or an extra snapshot would produce a
+more reliable flow.
+
+### `wait_for_node`
+
+Prefer this over long sleeps when the screen may become ready earlier than the
+worst case.
+
+Still remember that all waiting happens inside the same outer `timeoutMs`
+budget.
+
+## How to size one execution
+
+If you are unsure, estimate from the slowest likely path:
+
+1. Start with the known expensive action, usually `scroll_until`.
+2. Add launch or transition time before it.
+3. Add one verification snapshot after it.
+4. Add a small buffer for retries or slower device response.
+
+Example:
+
+- `open_app` + settle: ~10s
+- `scroll_until` with `maxScrolls: 12`: ~25s to 35s
+- verification snapshot: ~5s
+- buffer: ~10s
+
+Suggested `timeoutMs`: `60000`
+
+## When to split the workflow
+
+Split into multiple executions when:
+
+- the flow is likely to exceed `90000` ms
+- you are crossing several screens with branching logic
+- you need to inspect the UI after a major navigation step anyway
+- a timeout would otherwise discard too much progress at once
+
+This usually matches the recommended agent loop better:
+
+1. observe
+2. decide
+3. execute one short sequence
+4. inspect the result
+5. continue
+
+## Timeout failure semantics
+
+When the execution-wide budget expires, Clawperator returns an execution error.
+Treat that as "the whole bounded command exceeded its wall-clock budget", not
+"the last action alone was invalid."
+
+Recommended agent response:
+
+1. inspect any returned partial step results
+2. decide whether the flow was genuinely too long or merely under-budgeted
+3. retry with a larger `timeoutMs` only if the same bounded workflow still
+   makes sense
+4. otherwise split the workflow into smaller executions
+
+For skill wrappers that use `execFileSync`, keep the wrapper timeout at or
+above the Clawperator execution timeout so the wrapper does not abort before
+structured output can be captured.
+
+See also:
+
+- [Execution Model](execution-model.md)
+- [Clawperator Node API - Agent Guide](../ai-agents/node-api-for-agents.md)
+- [Skill Authoring Guidelines](../skills/skill-authoring-guidelines.md)
+
+---
+
+
+# Device and Package Model
+
+This page explains how Clawperator targets Android devices and how the
+receiver-package concept fits into execution dispatch.
+
+Use it when you need to understand:
+
+- what a `deviceId` really is
+- when `--device-id` is required
+- what `--receiver-package` targets
+- how release and debug Operator APK variants differ
+
+## `deviceId` means ADB serial
+
+Clawperator uses the Android Debug Bridge device serial as the `deviceId`.
+
+Examples:
+
+- physical device serials such as `<device_serial>`
+- emulator serials such as `emulator-5554`
+
+List visible devices with:
+
+```bash
+clawperator devices --output json
+```
+
+## Device resolution rules
+
+When you run a command without `--device-id`, Clawperator resolves the target
+using the currently connected ADB devices.
+
+Current behavior:
+
+- if exactly one connected device is in `device` state, Clawperator uses it
+- if no connected devices are available, the command fails with `NO_DEVICES`
+- if more than one connected device is available, the command fails with
+  `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED`
+
+When multiple devices are connected, always pass:
+
+```bash
+--device-id <device_id>
+```
+
+## Commands that should use `--device-id`
+
+In multi-device environments, keep `--device-id` explicit on:
+
+- `execute`
+- `observe snapshot`
+- `observe screenshot`
+- `inspect ui`
+- `action ...`
+- `doctor`
+- `version --check-compat`
+- `operator setup`
+- `grant-device-permissions`
+- `skills run`
+
+## Multi-device recovery after install
+
+The installer can complete host-side setup even when more than one Android
+device is connected, but it will not guess which target should receive the APK.
+
+Use the printed recovery command, or run:
+
+```bash
+clawperator operator setup \
+  --apk ~/.clawperator/downloads/operator.apk \
+  --device-id <device_id>
+```
+
+Then verify with:
+
+```bash
+clawperator doctor --device-id <device_id> --output json
+```
+
+## Receiver package model
+
+The receiver package is the installed Android Operator APK that receives the
+broadcast command.
+
+Current defaults:
+
+- release package: `com.clawperator.operator`
+- local debug package: `com.clawperator.operator.dev`
+
+Most public docs assume the release package by default.
+
+## When to pass `--receiver-package`
+
+Pass `--receiver-package` when:
+
+- you are using a local debug APK
+- both release and debug variants are installed
+- your automation or local workflow is intentionally targeting a non-default
+  Operator variant
+
+Example:
+
+```bash
+clawperator observe snapshot \
+  --device-id <device_id> \
+  --receiver-package com.clawperator.operator.dev \
+  --output json
+```
+
+## Device and package targeting are separate
+
+These two flags solve different problems:
+
+- `--device-id` picks the Android device
+- `--receiver-package` picks which Operator APK on that device receives the
+  command
+
+You sometimes need both, especially during local development.
+
+## Execution isolation
+
+Clawperator enforces single-flight per target device. Do not assume a second
+execution can overlap safely on the same device.
+
+A practical pattern for multiple devices is:
+
+- run one serialized work queue per device
+- keep `--device-id` explicit in every command
+- keep the receiver package consistent per queue
+
+## Quick checks
+
+Use these commands when you are unsure what Clawperator is targeting:
+
+```bash
+clawperator devices --output json
+clawperator doctor --device-id <device_id> --output json
+clawperator version --check-compat --device-id <device_id> --output json
+```
+
+---
+
+
+# Clawperator Snapshot Format
+
+This is the dedicated reference page for the structure returned by Clawperator
+snapshot surfaces.
+
+Use this page as the source of truth for:
+
+- `snapshot_ui` result payloads
+- `clawperator observe snapshot`
+- the `hierarchy_xml` UI tree format
+- how snapshot fields relate to `NodeMatcher`
+
+## Contract summary
+
+`snapshot_ui` and `clawperator observe snapshot` use the same internal
+pipeline and return the same canonical snapshot format: `hierarchy_xml`.
+
+On success:
+
+- `data.actual_format` is always `"hierarchy_xml"`
+- `data.text` contains the XML hierarchy as a string
+- `data.foreground_package` may identify the active app package
+- `data.has_overlay` reports whether Clawperator detected a higher-priority
+  accessibility window above the foreground app
+- `data.overlay_package` may identify that overlay window's package when known
+- `data.window_count` reports how many accessibility windows were visible during
+  capture
+
+The Android runtime emits the hierarchy dump, and the Node layer attaches that
+raw XML into the result envelope after execution.
+
+Important: raw snapshot presence does not always mean the node is currently
+fully on-screen. Some Android views include clipped or off-screen descendants
+in the hierarchy dump, especially inside large scroll containers.
+
+Important: overlay metadata is best-effort accessibility-window metadata, not a
+guaranteed modal detector. Agents should use it as an operational hint, then
+confirm with the XML tree, screenshots, or a follow-up action.
+
+## Relationship to Android UI Automator
+
+Clawperator's snapshot structure is modeled after Android UI Automator output,
+so the overall shape should feel familiar to agents and developers who have
+used UI Automator dumps before.
+
+It is not a byte-for-byte copy.
+
+Agents should assume:
+
+- the high-level hierarchy and common node attributes are intentionally similar
+- Clawperator wraps the snapshot inside its own execution result envelope
+- Clawperator may normalize surrounding metadata and matching guidance
+- Clawperator-specific semantics such as `NodeMatcher.role` are not direct
+  copies of raw UI Automator fields
+
+Use UI Automator knowledge as a mental model, not as an exact parser contract.
+
+## Envelope placement
+
+Example request:
+
+```json
+{
+  "deviceId": "<device_id>",
+  "execution": {
+    "commandId": "cmd-snap-1",
+    "taskId": "task-snap-1",
+    "source": "local-test",
+    "expectedFormat": "android-ui-automator",
+    "timeoutMs": 30000,
+    "actions": [
+      { "id": "snap1", "type": "snapshot_ui" }
+    ]
+  }
+}
+```
+
+Example success response:
+
+```json
+{
+  "ok": true,
+  "envelope": {
+    "commandId": "cmd-snap-1",
+    "taskId": "task-snap-1",
+    "status": "success",
+    "stepResults": [
+      {
+        "id": "snap1",
+        "actionType": "snapshot_ui",
+        "success": true,
+        "data": {
+          "actual_format": "hierarchy_xml",
+          "foreground_package": "com.android.settings",
+          "has_overlay": "false",
+          "window_count": "2",
+          "text": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><hierarchy rotation=\"0\">...</hierarchy>"
+        }
+      }
+    ],
+    "error": null
+  },
+  "deviceId": "<device_id>",
+  "terminalSource": "clawperator_result"
+}
+```
+
+Failure case:
+
+- if post-processing completes without attached hierarchy text, the step returns
+  `success: false` with `data.error: "SNAPSHOT_EXTRACTION_FAILED"`
+
+Troubleshooting for that case lives in
+[Troubleshooting the Operator App](../troubleshooting/troubleshooting.md).
+
+## hierarchy_xml
+
+Each `<node>` represents one UI element.
+
+The XML is close to Android UI Automator hierarchy output, but Clawperator docs
+define how agents should interpret the fields for this product.
+
+| XML attribute | NodeMatcher field | Notes |
+| :--- | :--- | :--- |
+| `resource-id` | `resourceId` | `"com.example.app:id/name"`. Empty string when not set by developer. |
+| `text` | `textEquals` / `textContains` | Visible text content. Empty string if none. |
+| `content-desc` | `contentDescEquals` / `contentDescContains` | Accessibility label. Empty string if none. |
+| `class` | - | Java widget class name. Informational only. `NodeMatcher.role` uses Clawperator semantic role names, not the raw `class` string. |
+| `clickable` | - | `"true"` if the element accepts tap events. |
+| `scrollable` | - | `"true"` marks a scroll container. |
+| `bounds` | - | `"[x1,y1][x2,y2]"` pixel rectangle. Useful for spatial layout. |
+| `enabled` | - | `"false"` means visible but not interactable. |
+| `long-clickable` | - | `"true"` if the element accepts long-press. |
+
+## Snapshot metadata fields
+
+These fields live alongside `data.text` in successful `snapshot_ui` step data.
+
+| Envelope field | Meaning | Notes |
+| :--- | :--- | :--- |
+| `actual_format` | Snapshot format identifier | Always `"hierarchy_xml"` today. |
+| `foreground_package` | Package name of the active root window | Best-effort. Usually the app the agent is currently operating. |
+| `has_overlay` | Whether Clawperator detected another meaningful accessibility window above the foreground app | String value `"true"` or `"false"`. Treat as a hint, not a hard blocker verdict. |
+| `overlay_package` | Package name of the detected overlay window | Present only when Clawperator can identify it. |
+| `window_count` | Number of accessibility windows visible at capture time | Informational. Android can report more than one window during normal operation. |
+| `text` | Raw XML hierarchy dump | The canonical tree content. |
+
+## Parsing guidance
+
+### What to rely on most
+
+When building selectors, prefer:
+
+1. `resource-id`
+2. `content-desc`
+3. exact `text`
+4. substring matching
+5. semantic `role`
+
+### Important differences from raw UI Automator assumptions
+
+- `NodeMatcher.role` is a Clawperator semantic layer, not the raw `class`
+  attribute.
+- Snapshot content is carried in `data.text` inside the result envelope, not as
+  a standalone dump file.
+- Agents should reason over both the XML tree and the execution envelope, not
+  just the XML alone.
+- Some screens include descendants that are technically present in the raw XML
+  but are still clipped outside the current viewport. Treat `bounds`,
+  clickability, and follow-up actions such as `wait_for_node` or
+  `scroll_until` as the operational truth for what is actually reachable.
+- `has_overlay: "true"` means Clawperator saw another meaningful accessibility
+  window, not necessarily that interaction is impossible. System dialogs,
+  permission prompts, chooser sheets, keyboards, and OEM overlays may all
+  surface this signal.
+- `window_count > 1` does not by itself mean an overlay is blocking progress.
+  Android often reports multiple windows even on healthy screens.
+
+### XML escaping
+
+Snapshot output is XML, so special characters in attribute values are escaped.
+For example:
+
+- apostrophe becomes `&apos;`
+- ampersand becomes `&amp;`
+
+These escaped sequences are returned as-is in `data.text`.
+
+For a node with `content-desc="Search for &apos;vlc&apos;"`:
+
+- `contentDescContains: "Search for"` works
+- `contentDescEquals: "Search for 'vlc'"` fails because the apostrophe is not
+  decoded after extraction
+
+## Annotated live-device example
+
+The example below is preserved from a real Android Settings capture and should
+remain the canonical example unless replaced with a better real-device sample.
+
+```xml
+<hierarchy rotation="0">
+  <node index="0" text="" resource-id="" class="android.widget.FrameLayout"
+        package="com.android.settings" content-desc=""
+        clickable="false" enabled="true" scrollable="false"
+        bounds="[0,0][1080,2340]">
+    ...
+        <!-- Scrollable list. Use as 'container' in scroll_and_click, scroll, or scroll_until -->
+        <node index="0" text="" resource-id="com.android.settings:id/recycler_view"
+              class="androidx.recyclerview.widget.RecyclerView"
+              package="com.android.settings" content-desc=""
+              clickable="false" enabled="true" focusable="true" scrollable="true"
+              bounds="[0,884][1080,2196]">
+
+          <!-- Icon-only button. No text, so target via content-desc -->
+          <node index="0" text="" resource-id="" class="android.widget.Button"
+                package="com.android.settings" content-desc="Search settings"
+                clickable="true" enabled="true" focusable="true"
+                bounds="[912,692][1080,884]" />
+
+          <!-- Clickable row. The LinearLayout is the tap target -->
+          <node index="2" text="" resource-id="" class="android.widget.LinearLayout"
+                package="com.android.settings" content-desc=""
+                clickable="true" enabled="true" scrollable="false"
+                bounds="[30,1252][1050,1461]">
+            <!-- Title label with stable resource-id -->
+            <node index="0" text="Connections" resource-id="android:id/title"
+                  class="android.widget.TextView" package="com.android.settings"
+                  content-desc="" clickable="false" enabled="true"
+                  bounds="[216,1294][507,1364]" />
+            <!-- Subtitle label -->
+            <node index="1" text="Wi-Fi  •  Bluetooth  •  SIM manager"
+                  resource-id="android:id/summary" class="android.widget.TextView"
+                  package="com.android.settings" content-desc=""
+                  clickable="false" enabled="true"
+                  bounds="[216,1364][816,1419]" />
+          </node>
+
+          <node index="3" text="" resource-id="" class="android.widget.LinearLayout"
+                package="com.android.settings" content-desc=""
+                clickable="true" enabled="true" scrollable="false"
+                bounds="[30,1461][1050,1721]">
+            <node index="0" text="Connected devices" resource-id="android:id/title"
+                  class="android.widget.TextView" package="com.android.settings"
+                  content-desc="" clickable="false" enabled="true"
+                  bounds="[216,1503][661,1573]" />
+            <node index="1" text="Quick Share  •  Samsung DeX  •  Android Auto"
+                  resource-id="android:id/summary" class="android.widget.TextView"
+                  package="com.android.settings" content-desc=""
+                  clickable="false" enabled="true"
+                  bounds="[216,1573][996,1679]" />
+          </node>
+
+        </node>
+    ...
+  </node>
+</hierarchy>
+```
+
+## Reading patterns
+
+- Tap targets are often `clickable="true"` container nodes whose child labels
+  hold the visible text.
+- Icon-only buttons often have empty `text` and rely on `content-desc`.
+- Scroll containers expose `scrollable="true"`.
+- Disabled elements have `enabled="false"` and usually require state change
+  before interaction.
+
+## Apps with weak or missing resource IDs
+
+Many production apps leave `resource-id=""` on most nodes. In those cases,
+fallback priority is:
+
+1. `contentDescEquals`
+2. `textEquals`
+3. `contentDescContains` or `textContains`
+4. `role: "textfield"` for text inputs without stable IDs
+
+When labels contain dynamic values, counts, or escaped characters, prefer
+substring matching over exact equality.
+
+---
+
+
+# Error Handling Guide
+
+This page is the agent-oriented companion to the structured
+[Error Codes](error-codes.md) reference.
+
+Use it when you need to decide:
+
+- whether a failure is top-level or step-level
+- whether retrying is reasonable
+- what the next recovery action should be
+
+## First classify the failure surface
+
+Always check failures in this order:
+
+1. `error.code` for Node CLI or API failures
+2. `envelope.errorCode` for Android-side top-level execution failures
+3. `stepResults[n].data.error` for per-step runtime failures
+
+That ordering matters because the same execution can:
+
+- fail before any step runs
+- complete overall but still contain failed steps
+
+## Fast triage model
+
+| Failure class | Typical examples | Agent response |
+| :--- | :--- | :--- |
+| Targeting / environment | `NO_DEVICES`, `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED`, `DEVICE_UNAUTHORIZED`, `RECEIVER_NOT_INSTALLED` | Fix environment first. Do not blindly retry the same execution. |
+| Payload / contract | `EXECUTION_VALIDATION_FAILED` | Fix the payload shape. Retrying unchanged is wasted work. |
+| Concurrency / timing | `EXECUTION_CONFLICT_IN_FLIGHT`, `RESULT_ENVELOPE_TIMEOUT`, `SNAPSHOT_EXTRACTION_FAILED` | Retry only after a short wait or after reducing contention. |
+| UI state / selector | `NODE_NOT_FOUND`, `CONTAINER_NOT_FOUND`, `CONTAINER_NOT_SCROLLABLE` | Re-observe the UI, then adjust selectors or navigation. |
+| Runtime refusal | `GESTURE_FAILED`, `GLOBAL_ACTION_FAILED`, `SECURITY_BLOCK_DETECTED` | Inspect current state, then choose a different action or recovery path. |
+| Skills wrapper | `SKILL_EXECUTION_FAILED`, `SKILL_EXECUTION_TIMEOUT`, `REGISTRY_READ_FAILED` | Inspect partial `stdout` and `stderr`, then decide whether the problem is script logic, timeout budget, or local registry setup. |
+
+## Recommended agent responses
+
+### `NO_DEVICES`
+
+Meaning:
+- No connected Android device is currently reachable in adb `device` state.
+
+Usually recoverable:
+- yes, but only after the environment changes
+
+Recommended next action:
+- check `clawperator devices --output json`
+- reconnect USB or start the emulator
+- do not retry the same execution until a device appears
+
+### `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED`
+
+Meaning:
+- More than one reachable Android target is connected and the command did not
+  specify `--device-id`.
+
+Usually recoverable:
+- yes
+
+Recommended next action:
+- run `clawperator devices --output json`
+- choose one serial
+- rerun the same command with `--device-id <device_id>`
+
+### `DEVICE_UNAUTHORIZED`
+
+Meaning:
+- adb can see the device, but Android has not authorized the host.
+
+Usually recoverable:
+- yes
+
+Recommended next action:
+- unlock the device
+- accept the USB debugging prompt
+- rerun `clawperator doctor --device-id <device_id> --output json`
+
+### `RECEIVER_NOT_INSTALLED`
+
+Meaning:
+- the targeted Clawperator Operator APK package is not installed on the device
+
+Usually recoverable:
+- yes
+
+Recommended next action:
+- run `clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id <device_id>`
+- if using a local debug APK, also pass `--receiver-package com.clawperator.operator.dev`
+
+### `EXECUTION_VALIDATION_FAILED`
+
+Meaning:
+- the execution payload failed schema validation before dispatch
+
+Usually recoverable:
+- yes, after fixing the payload
+
+Recommended next action:
+- inspect the reported path and message
+- correct required fields such as `taskId`, `source`, `expectedFormat`, or
+  action params
+- do not retry unchanged payloads
+
+### `EXECUTION_CONFLICT_IN_FLIGHT`
+
+Meaning:
+- another execution is still running on the same device
+
+Usually recoverable:
+- yes
+
+Recommended next action:
+- wait briefly
+- avoid parallel retries on the same device
+- serialize the work queue per target device
+
+### `RESULT_ENVELOPE_TIMEOUT`
+
+Meaning:
+- the command was dispatched, but the Node layer did not receive a terminal
+  envelope before the timeout budget expired
+
+Usually recoverable:
+- sometimes
+
+Recommended next action:
+- inspect whether the device is mid-transition or overloaded
+- retry with a larger `timeoutMs` only if the workflow genuinely needs it
+- if repeated, run `clawperator doctor --device-id <device_id> --output json`
+
+### `SNAPSHOT_EXTRACTION_FAILED`
+
+Meaning:
+- the Android step completed, but the Node layer failed to attach snapshot XML
+
+Usually recoverable:
+- often
+
+Recommended next action:
+- retry the snapshot once or twice after a short delay
+- if repeated, check CLI and APK compatibility with
+  `clawperator version --check-compat`
+- then run `clawperator doctor`
+
+### `NODE_NOT_FOUND`
+
+Meaning:
+- the selector did not match any current UI node
+
+Usually recoverable:
+- often
+
+Recommended next action:
+- capture a fresh `snapshot_ui`
+- confirm the current screen really matches the agent's assumption
+- prefer `resourceId` selectors when available
+
+### `CONTAINER_NOT_FOUND`
+
+Meaning:
+- the requested or auto-detected scroll container could not be resolved
+
+Usually recoverable:
+- often
+
+Recommended next action:
+- snapshot the screen
+- identify the actual scrollable node and pass it explicitly as `container`
+- do not keep retrying the same auto-detect path on nested layouts
+
+### `CONTAINER_NOT_SCROLLABLE`
+
+Meaning:
+- the matched container exists but is not scrollable, and no suitable
+  scrollable child was found
+
+Usually recoverable:
+- often
+
+Recommended next action:
+- inspect the snapshot again
+- choose the real list or scroll view node instead
+- on complex layouts, rely on explicit `resourceId` rather than heuristic
+  auto-detection
+
+### `GESTURE_FAILED`
+
+Meaning:
+- Android declined to execute the swipe gesture
+
+Usually recoverable:
+- sometimes
+
+Recommended next action:
+- re-observe before retrying
+- if a popup or transition is present, resolve that first
+- if the same gesture fails repeatedly, choose another navigation tactic
+
+### `GLOBAL_ACTION_FAILED`
+
+Meaning:
+- Android declined the requested global accessibility action such as `back` or
+  `home`
+
+Usually recoverable:
+- sometimes
+
+Recommended next action:
+- verify the accessibility service is still running with `clawperator doctor`
+- inspect current UI state before issuing another global action
+
+### `SECURITY_BLOCK_DETECTED`
+
+Meaning:
+- Android blocked the requested action because of a system security boundary
+
+Usually recoverable:
+- sometimes, but not always within the same workflow
+
+Recommended next action:
+- do not spam retries
+- inspect the current screen and choose a different path
+- if the action is blocked by design, escalate that limitation to the user or
+  outer agent
+
+### `REGISTRY_READ_FAILED`
+
+Meaning:
+- the local skills registry could not be read, found, or parsed
+
+Usually recoverable:
+- yes
+
+Recommended next action:
+- verify `CLAWPERATOR_SKILLS_REGISTRY`
+- confirm the registry file exists and contains valid JSON
+- rerun `clawperator skills list --output json` before retrying the workflow
+
+### `SKILL_EXECUTION_FAILED`
+
+Meaning:
+- the skill wrapper launched the script, but the script exited non-zero
+
+Usually recoverable:
+- sometimes
+
+Recommended next action:
+- inspect both `error.stdout` and `error.stderr`
+- treat partial `stdout` as potentially useful structured output, not noise
+- if `stdout` already contains enough result data, recover from that before
+  rerunning the skill
+- if the failure is real, fix the skill inputs or script logic before retrying
+
+### `SKILL_EXECUTION_TIMEOUT`
+
+Meaning:
+- the script exceeded the wrapper timeout before it exited cleanly
+
+Usually recoverable:
+- often
+
+Recommended next action:
+- inspect `error.stdout` and `error.stderr` for partial progress or partial
+  JSON
+- increase the skill-side timeout only if the flow genuinely needs more wall
+  clock time
+- split long observe-decide-act flows into smaller steps when practical
+
+## Retry guidance
+
+Safe to retry after a short delay:
+
+- `EXECUTION_CONFLICT_IN_FLIGHT`
+- `SNAPSHOT_EXTRACTION_FAILED`
+- some `RESULT_ENVELOPE_TIMEOUT` cases
+- some `SKILL_EXECUTION_TIMEOUT` cases after checking partial output
+
+Usually wrong to retry unchanged:
+
+- `EXECUTION_VALIDATION_FAILED`
+- `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED`
+- `RECEIVER_NOT_INSTALLED`
+- `NODE_NOT_FOUND` when the agent has not re-observed the UI
+- `REGISTRY_READ_FAILED`
+- `SKILL_EXECUTION_FAILED` when the script already returned a real error signal
+
+## Recommended recovery loop
+
+For most UI failures:
+
+1. capture a fresh snapshot
+2. classify whether the problem is environment, payload, or UI state
+3. change one thing
+4. retry once with intent
+
+For the full structured code list, use [Error Codes](error-codes.md).
+
+---
+
+
 # Clawperator Doctor
 
 `clawperator doctor` is the runtime readiness check for the Node CLI. It verifies that the host environment, connected device, and installed [Clawperator Operator Android app](../getting-started/android-operator-apk.md) are in a usable state, and that the end-to-end command path is functional, before an agent relies on the device.
@@ -3405,6 +5215,13 @@ Machine-readable installer or automation check:
 clawperator doctor --format json
 ```
 
+Equivalent JSON modes:
+
+```bash
+clawperator doctor --output json
+clawperator doctor --json
+```
+
 Target a specific device and debug build of the [Clawperator Operator Android app](../getting-started/android-operator-apk.md):
 
 ```bash
@@ -3433,6 +5250,161 @@ clawperator doctor --full
 - `clawperator observe snapshot` - direct runtime check once doctor reports the environment is ready
 
 For initial installation and device setup, see [First-Time Setup](../getting-started/first-time-setup.md) and [OpenClaw First Run](../getting-started/openclaw-first-run.md).
+
+---
+
+
+# Environment Variables
+
+This page is the central reference for the most important environment variables
+used by the current Clawperator CLI, installer, and local runtime tooling.
+
+It focuses on variables that are useful or observable for operators and agents,
+not every internal shell temporary used by validation scripts.
+
+## Commonly useful variables
+
+| Variable | Used by | Meaning |
+| :--- | :--- | :--- |
+| `CLAWPERATOR_SKILLS_REGISTRY` | CLI, installer | Path to the local skills registry JSON |
+| `CLAWPERATOR_RECEIVER_PACKAGE` | CLI, installer | Default Android Operator package to target when `--receiver-package` is omitted |
+| `CLAWPERATOR_INSTALL_APK` | installer | Pre-seeds the installer's APK install prompt |
+| `CLAWPERATOR_INSTALL_SKIP_SKILLS` | installer | Skips `skills install` during installer setup when set to `1` |
+| `CLAWPERATOR_APK_METADATA_URL` | installer | Overrides the metadata endpoint used to discover the latest downloadable Operator APK |
+| `ADB_PATH` | CLI | Overrides the `adb` binary path |
+| `ANDROID_HOME` | CLI runtime config | Android SDK root used to locate emulator and SDK tools |
+| `ANDROID_SDK_ROOT` | CLI runtime config | Fallback Android SDK root if `ANDROID_HOME` is unset |
+| `EMULATOR_PATH` | emulator commands, `serve` | Overrides the emulator binary path |
+| `SDKMANAGER_PATH` | emulator commands, `serve` | Overrides the `sdkmanager` binary path |
+| `AVDMANAGER_PATH` | emulator commands, `serve` | Overrides the `avdmanager` binary path |
+
+## `CLAWPERATOR_SKILLS_REGISTRY`
+
+Points Clawperator at one local registry JSON for skills discovery.
+
+Typical value:
+
+```bash
+export CLAWPERATOR_SKILLS_REGISTRY="$HOME/.clawperator/skills/skills/skills-registry.json"
+```
+
+Use it when:
+
+- the installer has not yet updated your shell profile
+- you are switching between local skill registries
+- you want `skills list`, `skills get`, `skills run`, and `skills new` to use
+  a specific local repo
+
+## `CLAWPERATOR_RECEIVER_PACKAGE`
+
+Sets the default receiver package for commands that dispatch to the Android
+Operator APK.
+
+Typical values:
+
+- `com.clawperator.operator`
+- `com.clawperator.operator.dev`
+
+Example:
+
+```bash
+export CLAWPERATOR_RECEIVER_PACKAGE="com.clawperator.operator.dev"
+```
+
+CLI flags still win over the environment variable. Use an explicit
+`--receiver-package` when you want one command to differ from your shell
+default.
+
+## `CLAWPERATOR_INSTALL_APK`
+
+Controls the installer's "install APK now?" prompt.
+
+Current behavior in `scripts/install.sh`:
+
+- `Y`, `y`, `yes`, `YES` mean proceed with APK install
+- any other non-empty value means skip APK install
+- if unset, the installer prompts interactively
+
+Example:
+
+```bash
+CLAWPERATOR_INSTALL_APK=Y curl -fsSL https://clawperator.com/install.sh | bash
+```
+
+## `CLAWPERATOR_INSTALL_SKIP_SKILLS`
+
+Skips the installer's skills bootstrap phase when set to `1`.
+
+Example:
+
+```bash
+CLAWPERATOR_INSTALL_SKIP_SKILLS=1 curl -fsSL https://clawperator.com/install.sh | bash
+```
+
+This is mainly useful for constrained or staged setups where you want the CLI
+without immediately cloning the skills repository.
+
+## `CLAWPERATOR_APK_METADATA_URL`
+
+Overrides the metadata document used by the installer to find the latest
+downloadable Operator APK and checksum.
+
+This is an advanced override, mainly useful for testing alternate download
+surfaces or release-candidate flows.
+
+## Android tool path variables
+
+Clawperator can use environment variables to find Android host tools.
+
+### `ADB_PATH`
+
+Overrides the `adb` binary path used by CLI commands such as `devices`,
+`doctor`, `execute`, and `operator setup`.
+
+Example:
+
+```bash
+export ADB_PATH="/opt/android/platform-tools/adb"
+```
+
+### `ANDROID_HOME` and `ANDROID_SDK_ROOT`
+
+These point to the Android SDK root. Clawperator uses them to derive default
+paths for:
+
+- `emulator`
+- `sdkmanager`
+- `avdmanager`
+
+If both are set, `ANDROID_HOME` wins.
+
+### `EMULATOR_PATH`, `SDKMANAGER_PATH`, `AVDMANAGER_PATH`
+
+These override the individual binaries directly.
+
+Use them when:
+
+- your SDK is installed in a non-standard location
+- you want emulator commands to use a specific toolchain
+- you are debugging path resolution on CI or a custom workstation
+
+## Recommended shell profile baseline
+
+For a typical local setup, these are the most useful persistent exports:
+
+```bash
+export CLAWPERATOR_SKILLS_REGISTRY="$HOME/.clawperator/skills/skills/skills-registry.json"
+export CLAWPERATOR_RECEIVER_PACKAGE="com.clawperator.operator"
+```
+
+Then override `--device-id` per command when more than one Android target is
+connected.
+
+## Related docs
+
+- [Device and Package Model](device-and-package-model.md)
+- [Clawperator Doctor](node-api-doctor.md)
+- [First-Time Setup](../getting-started/first-time-setup.md)
 
 ---
 
@@ -3626,6 +5598,10 @@ If you must use **Wireless Debugging**, be aware that your mileage may vary (YMM
 3. **No connected devices** - the installer skips the install and leaves the verified package for the [Clawperator Operator Android app](../getting-started/android-operator-apk.md) at `~/.clawperator/downloads/operator.apk`.
 4. **`adb` missing** - the installer attempts to install `adb` automatically, or stops with a manual install link if it cannot.
 
+For non-interactive environments, the installer also reads
+`CLAWPERATOR_INSTALL_APK` before prompting whether to install the APK on the
+connected device.
+
 ## Emulator-Specific Issues
 
 Clawperator can provision a local Android emulator through the Node CLI and API. If provisioning fails, use the checks below.
@@ -3752,6 +5728,8 @@ If the emulator is consistently slow, consider using a physical device instead.
 ### Multiple devices connected
 
 Once an emulator is provisioned, you may have both a physical device and an emulator connected at the same time. In that state, continue to pass `--device-id <serial>` to `execute`, `observe`, `action`, and `skills run` commands.
+
+If you omit it, the CLI returns `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED`.
 
 ### Installer cloned everything except skills
 
@@ -3953,7 +5931,7 @@ Use Android Settings (`com.android.settings`) as a universal baseline probe:
 1. `close_app` Settings
 2. `open_app` Settings
 3. short settle delay
-4. `snapshot_ui` (`ascii`)
+4. `snapshot_ui` (`hierarchy_xml`)
 5. capture an ADB screenshot and persist absolute file path
 
 This gives:
@@ -3978,6 +5956,46 @@ DEVICE_ID="$(adb devices | awk 'NR>1 && $2==\"device\" {print $1; exit}')"
 
 Always pass `--device-id` to `skills run` when more than one device is connected. Without it the wrapper will fail if device auto-detection is ambiguous.
 
+If a wrapped script exits non-zero or times out, `clawperator skills run`
+preserves partial `stdout` and `stderr` in the structured error output when
+they exist. Agents should inspect those fields before discarding the run as an
+opaque failure.
+
+When a particular device or workflow needs a different wrapper budget, use:
+
+```bash
+clawperator skills run <skill_id> --device-id <device_id> --timeout-ms 90000
+```
+
+When you want a lightweight smoke check for expected output markers, use:
+
+```bash
+clawperator skills run <skill_id> --device-id <device_id> --expect-contains TEXT_BEGIN
+```
+
+## Private skills
+
+Private skills are not discovered by scanning folders automatically. The
+current model is registry-driven:
+
+1. create the skill folder
+2. add `skill.json`
+3. add a matching entry to the local registry JSON pointed to by
+   `CLAWPERATOR_SKILLS_REGISTRY`
+
+Once that registry entry exists, the skill becomes visible to:
+
+- `clawperator skills list`
+- `clawperator skills get`
+- `clawperator skills search`
+- `clawperator skills run`
+
+For the current metadata contract and authoring details, see
+`skills/skill-authoring-guidelines.md`.
+
+For the full path from ad hoc exploration to a validated reusable skill, see
+`skills/skill-development-workflow.md`.
+
 ## Anti-Patterns
 
 - Blindly trusting first result line.
@@ -3992,22 +6010,252 @@ These skills reduce execution friction. The LLM/agent remains responsible for co
 ---
 
 
-# Skill Authoring Guidelines (v0.1 PoC)
+# Skill Development Workflow
 
-## Core Doctrine: Generic Actuator
+This page is the shortest path from "I explored an app manually" to "I have a
+reusable skill with a repeatable validation loop."
 
-**Clawperator is the Hand; the Agent is the Brain.**
+Clawperator stays neutral in this process:
 
-1.  **Generic Interface:** The clawperator CLI/Node API knows nothing about specific apps. It only executes Execution JSON payloads.
-2.  **External Logic:** All app-specific logic (selectors, navigation flows, data parsing) MUST live in this clawperator-skills repository.
-3.  **Plain Node.js (.js):** Skills should primarily be authored in Plain Node.js (.js scripts). This ensures a lightweight, high-performance environment with zero compilation overhead.
-4.  **Migrating from Bash:** New skills MUST be authored in Node.js. Existing Bash-based skills SHOULD be migrated when they require significant updates or grow in complexity. Prefer opportunistic migration over big-bang rewrites.
+- the external agent decides what the workflow should do
+- Clawperator provides deterministic UI actions and structured results
+- the skill packages selectors, parsing, and app-specific behavior
+
+## 1. Explore the UI first
+
+Start with the generic runtime, not a skill.
+
+For unknown apps, use the default observe-act-observe loop:
+
+1. take a snapshot
+2. decide on one action
+3. execute one small step or one tight sequence
+4. snapshot again
+5. repeat until the path is understood
+
+Useful commands:
+
+```bash
+clawperator observe snapshot --device-id <device_id> --output json
+clawperator observe screenshot --device-id <device_id> --path /tmp/example.png --output json
+clawperator execute --device-id <device_id> --execution /path/to/execution.json --output json
+```
+
+During exploration, record:
+
+- stable `resourceId` selectors
+- text labels that are stable enough to match
+- whether the real control is hidden behind a decoy control
+- overlays, permission dialogs, or OEM-specific variations
+- realistic timeout needs for the slowest steps
+
+## 2. Decide whether the skill should be a script or an artifact
+
+Use a script when the workflow needs:
+
+- branching logic
+- snapshot parsing
+- custom output formatting
+- retries or fallback logic
+- host-side work such as screenshot file management
+
+Use an artifact when the workflow is mostly a deterministic execution template
+with variable substitution.
+
+Rule of thumb:
+
+- artifact for stable "do these actions" flows
+- script for "observe, decide, parse, and report" flows
+
+## 3. Scaffold the skill
+
+Use the scaffold command so the folder layout and registry entry start in a
+known-good state:
+
+```bash
+clawperator skills new <skill_id>
+```
+
+This creates:
+
+- a skill folder
+- `SKILL.md`
+- `skill.json`
+- `scripts/run.js`
+- a registry entry in the configured local skills registry
+
+If the registry location is unclear, check:
+
+```bash
+echo "$CLAWPERATOR_SKILLS_REGISTRY"
+```
+
+## 4. Encode the flow
+
+After scaffolding:
+
+1. update `skill.json`
+2. replace the starter script with the real workflow
+3. add `artifacts/*.recipe.json` if deterministic compile-time templates help
+4. document required inputs and outputs in `SKILL.md`
+
+Keep the skill narrow. A skill should package one reusable intent, not a
+general planner.
+
+## 5. Run structural validation before touching a device
+
+Use structural validation every time the skill layout or registry entry
+changes:
+
+```bash
+clawperator skills validate <skill_id>
+clawperator skills validate --all
+```
+
+What this proves:
+
+- the registry entry exists
+- `skill.json` matches the registry metadata
+- `SKILL.md` exists
+- listed scripts exist
+- listed artifacts exist
+
+What this does not prove:
+
+- that the Android app is in the expected state
+- that selectors still match live UI
+- that script logic produces the intended output
+
+## 6. Validate artifacts without a device
+
+For artifact-backed skills, compile the artifact before any live run:
+
+```bash
+clawperator skills compile-artifact <skill_id> --artifact <name> --vars '{"KEY":"value"}' --output json
+```
+
+This catches:
+
+- missing artifact files
+- missing required template variables
+- invalid `--vars` JSON
+- execution payloads that fail Clawperator's execution validator
+
+If you want to check the compiled payload again through the execution validator
+without sending it to a device, use:
+
+```bash
+clawperator execute --validate-only --execution /path/to/compiled-execution.json --output json
+```
+
+This is the closest current workflow to a dry run for artifact-backed skills.
+
+## 7. Use a layered test loop
+
+Treat skill verification as four distinct layers:
+
+1. **Registry integrity**
+   `clawperator skills validate <skill_id>`
+2. **Artifact compile validity**
+   `clawperator skills compile-artifact ...`
+3. **Execution payload validity**
+   `clawperator execute --validate-only ...`
+4. **Live device behavior**
+   `clawperator skills run <skill_id> --device-id <device_id> [--timeout-ms <n>]`
+
+This keeps failures local:
+
+- registry failure means metadata or paths are wrong
+- compile failure means template variables or payload shape are wrong
+- validate-only failure means the execution contract is wrong
+- live-run failure usually means runtime state, selectors, timing, or parsing
+
+For lightweight smoke checks on expected markers, add
+`--expect-contains <text>` to the live run.
+
+When wrapper flags or output behavior matter, check the shipped CLI help
+instead of guessing from memory:
+
+```bash
+clawperator skills compile-artifact --help
+clawperator skills run --help
+```
+
+## 8. Inspect partial output on script failures
+
+When `clawperator skills run` fails or times out, do not assume the run
+produced no useful information. The wrapper now preserves partial `stdout` and
+`stderr` when available.
+
+Agents should inspect those fields before retrying blindly. A timeout often
+still contains:
+
+- the last completed step
+- a partial parse result
+- enough context to distinguish a slow device from a selector failure
+
+## 9. Promote from exploration to reusable automation
+
+A workflow is ready to become a reusable skill when:
+
+- the navigation path is understood
+- the selector choices are intentional
+- timeout budgets are documented
+- expected output format is stable
+- failure messages help the caller recover
+
+At that point, update `SKILL.md` so another agent can understand:
+
+- required inputs
+- expected outputs
+- known failure modes
+- whether credentials, account state, or app setup are assumed
+
+## 10. Recommended development checklist
+
+For a new skill, this is the practical order:
+
+1. explore with `observe snapshot`, `observe screenshot`, and small executions
+2. scaffold with `clawperator skills new <skill_id>`
+3. encode the skill script or artifact
+4. run `clawperator skills validate <skill_id>`
+5. if artifacts exist, run `clawperator skills compile-artifact ...`
+6. run `clawperator execute --validate-only ...` on candidate payloads
+7. run `clawperator skills run <skill_id> --device-id <device_id>`
+8. harden selectors, timeout budgets, and output formatting
+9. run `clawperator skills validate --all` before wider use
+
+## Related pages
+
+- [Agent Quickstart](../ai-agents/agent-quickstart.md)
+- [Clawperator Snapshot Format](../reference/snapshot-format.md)
+- [Usage Model](usage-model.md)
+- [Skill Authoring Guidelines](skill-authoring-guidelines.md)
 
 ---
 
-## 1. The Deterministic Lifecycle (Close-Sleep-Open)
 
-To ensure a predictable starting state, every skill MUST follow this sequence as its first set of actions:
+# Skill Authoring Guidelines
+
+## Core doctrine
+
+**Clawperator is the hand. The agent is the brain.**
+
+1. **Generic interface:** The Clawperator CLI and Node API know nothing about
+   specific apps. They execute structured Clawperator payloads.
+2. **External logic:** App-specific selectors, navigation flows, parsing, and
+   fallback logic belong in skills.
+3. **Prefer plain Node.js:** New skills should usually be authored in plain
+   `.js` scripts. This keeps setup light and avoids a build step.
+4. **Bash is legacy-compatible:** Existing shell skills are still valid, but
+   prefer Node.js when creating new skills or doing major rewrites.
+
+---
+
+## 1. Deterministic baseline state
+
+To ensure a predictable starting state, most app skills should begin with a
+close-sleep-open sequence:
 
 ```json
 [
@@ -4018,62 +6266,300 @@ To ensure a predictable starting state, every skill MUST follow this sequence as
 ]
 ```
 
-*   **Why Close?** Apps often cache state (previous searches, deep-linked tabs). Force-closing ensures the app starts on its true Home screen.
-*   **How it works:** The **Clawperator Node CLI** automatically intercepts close_app actions and performs a genuine adb shell am force-stop **before** dispatching the command to the device.
-*   **Why the 1.5s Sleep?** Android needs a moment to fully clean up the process after a force-stop before it can be reliably reopened.
-*   **Why the 8s Sleep?** 8 seconds is a conservative default for slow-to-initialize apps (e.g. retail). Treat this as a guideline: tune `durationMs` per app for reliability, keeping it consistent across that app's skills.
+- **Why close first:** Apps often preserve prior navigation state, cached
+  searches, or half-completed flows.
+- **How it works today:** The Clawperator Node CLI intercepts `close_app` and
+  issues `adb shell am force-stop` before dispatching the execution to Android.
+  If that pre-flight close fails, the execution fails instead of reporting a
+  false successful close.
+- **Why the short sleep:** Android needs a moment to finish process teardown
+  before the reopen is reliable.
+- **Why the longer open sleep:** Cold app startup is often the slowest part of
+  a flow. Tune `durationMs` per app for reliability.
+
+Use judgment. Some skills should not force-close if the intent depends on
+preserving user state.
 
 ---
 
-## 2. Navigating Decoy UI Elements
+## 2. Skill folder layout
 
-Many apps use fake UI elements on the home screen that act as triggers for the real interaction.
+Use `clawperator skills new <skill_id>` for the fastest path to a valid starter
+skill. It creates the folder, starter files, and registry entry for you.
 
-*   **The Search Bar Trap:** Often, the search bar on a home screen is just a TextView or Button styled to look like a field. Clicking it navigates to a new screen or opens an overlay with the real EditText.
-*   **Strategy:** 
-    1.  click the decoy bar (often identifiable by textContains: Search).
-    2.  sleep for 1-2s.
-    3.  enter_text into the real field (identifiable by role: textfield or a specific resourceId).
+You can still create a skill manually if needed.
+
+Minimal layout:
+
+```text
+skills/<skill_id>/
+  SKILL.md
+  skill.json
+  scripts/
+    run.js
+```
+
+Optional layout:
+
+```text
+skills/<skill_id>/
+  SKILL.md
+  skill.json
+  scripts/
+    run.js
+  artifacts/
+    example.recipe.json
+```
+
+Recommended conventions:
+
+- Use one folder per reusable intent.
+- Keep selectors, parsing logic, and output formatting inside the skill folder.
+- Keep helper modules local to the skill unless they are broadly reusable.
 
 ---
 
-## 3. Selector Strategy
+## 3. `skill.json` contract
 
-1.  **resourceId is King:** Always prefer resourceId (e.g., com.woolworths:id/search_src_text). It is the most stable selector across device locales.
-2.  **textEquals for Buttons:** Use textEquals for precise matches on menu items or specific labels.
-3.  **Avoid Coordinates:** Never use raw x,y coordinates. They break across different screen resolutions and aspect ratios.
+Each skill should have a `skill.json` file and a matching entry in the local
+skills registry.
+
+Current fields:
+
+| Field | Required | Meaning |
+| :--- | :--- | :--- |
+| `id` | Yes | Globally unique skill identifier. Usually `<applicationId>.<intent>`. |
+| `applicationId` | Yes | Android package primarily targeted by the skill. |
+| `intent` | Yes | Short action label such as `capture-overview` or `get-aircon-status`. |
+| `summary` | Yes | One-sentence description shown in discovery output. |
+| `path` | Yes | Skill folder path relative to the skills repo root. |
+| `skillFile` | Yes | Human-readable doc path, usually `skills/<skill_id>/SKILL.md`. |
+| `scripts` | Yes | Script entrypoints relative to the skills repo root. `clawperator skills run` prefers `.js`, then `.sh`, then the first listed script. |
+| `artifacts` | Yes | Optional deterministic `.recipe.json` templates relative to the skills repo root. Use `[]` when none exist. |
+
+Example:
+
+```json
+{
+  "id": "com.android.settings.capture-overview",
+  "applicationId": "com.android.settings",
+  "intent": "capture-overview",
+  "summary": "Open Android Settings, capture a UI snapshot, and save an ADB screenshot path.",
+  "path": "skills/com.android.settings.capture-overview",
+  "skillFile": "skills/com.android.settings.capture-overview/SKILL.md",
+  "scripts": [
+    "skills/com.android.settings.capture-overview/scripts/capture_settings_overview.sh"
+  ],
+  "artifacts": []
+}
+```
 
 ---
 
-## 4. Reliable Node.js Patterns
+## 4. Registry and private skill discovery
 
-*   **Safe Payloads:** Use Node.js to build Execution objects as native literals and JSON.stringify() them to avoid shell escaping issues.
-*   **Robust Parsing:** Never assume XML attribute order in UI snapshots. Use attribute-independent regex: 
-    `const match = line.match(/^(?=[^>]*\bresource-id="[^"]*target_id")(?=[^>]*\btext="([^"]*)")[^>]*>/);`
-*   **Error Handling:** Check `execFileSync` errors for `e.stdout` and `e.stderr` (converted from Buffers to strings) to provide meaningful failure messages.
+`clawperator skills list`, `skills get`, `skills search`, `skills validate`,
+and `skills run` all read from one local registry JSON file.
+
+Current runtime behavior:
+
+- The registry path comes from `CLAWPERATOR_SKILLS_REGISTRY` when set.
+- If the env var is unset, the CLI falls back to the local
+  `skills/skills-registry.json` path for the current checkout or install.
+- The runtime currently supports one registry path at a time.
+- The runtime does not currently support multiple registries or a remote URL as
+  the registry source.
+
+A private skill becomes discoverable only after:
+
+1. Its folder exists.
+2. The configured registry JSON includes an entry for it.
+
+If `clawperator skills list` cannot see your new skill, verify:
+
+- `echo $CLAWPERATOR_SKILLS_REGISTRY`
+- the registry file exists at that path
+- the `skills[]` entry uses the correct relative `path`
+- `skillFile`, `scripts`, and `artifacts` point at real files
+
+Before a live device run, use:
+
+```bash
+clawperator skills validate <skill_id>
+```
+
+This is an integrity check for the registry entry and on-disk files. It does
+not exercise the target Android app.
+
+When you want a registry-wide sanity check, use:
+
+```bash
+clawperator skills validate --all
+```
+
+This validates every configured skill entry in one pass and returns a summary
+of any broken paths or metadata mismatches.
+
+For the full explore -> scaffold -> validate -> live-run workflow, see
+`skill-development-workflow.md`.
 
 ---
 
-## 5. Compliance and Security (Blocked Terms)
+## 5. Scripts vs. artifacts
 
-**CRITICAL:** To protect user privacy and project integrity, the following must NEVER be hardcoded in scripts or documentation:
+Scripts and artifacts solve different problems.
 
-1.  **Personal Paths:** Never include /Users/name/. Use relative paths or temporary directories.
-2.  **Device Serials:** Never hardcode your physical device ID. Pass the device ID as a command-line argument.
-3.  **PII:** Use placeholders like Person or AC_TILE_NAME for any user-specific data.
+Use a script when the skill needs:
 
-**Validation Command:**
+- branching logic
+- retries or fallback behavior
+- `snapshot_ui` parsing
+- extra host-side steps such as screenshots or file writes
+- custom output formatting
 
+Use an artifact when the skill is mostly a deterministic execution template and
+you only need variable substitution.
+
+An artifact is a `.recipe.json` file that compiles into a Clawperator execution
+payload through `clawperator skills compile-artifact`.
+
+Artifacts are a good fit for:
+
+- stable navigation templates
+- fixed execution recipes with a few variables
+- deterministic observe or execute flows
+
+Scripts remain the better fit for full workflows.
+
+---
+
+## 6. Navigating decoy UI elements
+
+Many apps use fake home-screen controls that only open the real interaction.
+
+- **Search bar trap:** A home-screen "search bar" is often just a button or
+  text view that opens a separate screen with the real text field.
+- **Reliable pattern:**
+  1. click the decoy
+  2. sleep briefly
+  3. target the real field by `resourceId` or semantic role
+
+---
+
+## 7. Selector strategy
+
+1. **`resourceId` is best:** Prefer `resourceId` whenever available. It is
+   usually the most stable selector across locale changes.
+2. **Use exact text selectively:** `textEquals` is useful for stable menu items
+   or obvious labels.
+3. **Use substring text when needed:** `textContains` is useful for dynamic or
+   truncated labels.
+4. **Avoid coordinates:** Raw `x,y` targeting is fragile across devices and
+   layouts.
+
+---
+
+## 8. Reliable Node.js patterns
+
+- **Safe payloads:** Build execution objects as native JavaScript objects and
+  `JSON.stringify()` them.
+- **Robust parsing:** Do not assume XML attribute order in snapshots.
+- **Structured error handling:** Parse `stdout` and `stderr` from failed
+  Clawperator subprocesses before throwing away useful diagnostics.
+
+Recommended pattern:
+
+```js
+import { execFileSync } from "node:child_process";
+
+function runClawperator(args, timeoutMs = 120000) {
+  try {
+    const stdout = execFileSync("clawperator", args, {
+      encoding: "utf8",
+      timeout: timeoutMs,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    return JSON.parse(stdout);
+  } catch (err) {
+    const stdout = err?.stdout?.toString?.("utf8") ?? "";
+    const stderr = err?.stderr?.toString?.("utf8") ?? "";
+
+    if (stdout) {
+      try {
+        return JSON.parse(stdout);
+      } catch {
+        // Keep falling through to the explicit error below.
+      }
+    }
+
+    throw new Error(stderr || err.message || "clawperator command failed");
+  }
+}
+```
+
+Why this matters:
+
+- Long-running scroll or install flows can exceed an overly aggressive
+  script-level timeout.
+- `execFileSync` may throw even when Clawperator already emitted useful JSON to
+  `stdout`.
+- Recovering `err.stdout` often preserves the best available structured result.
+
+`clawperator skills run` currently applies a 120000 ms wrapper timeout by
+default. Use `--timeout-ms <n>` when a specific run needs a tighter or looser
+wrapper budget. Keep your own script timeout at or above the expected flow
+duration so the wrapper can return structured output. When the wrapper does fail or time out,
+Clawperator preserves partial script `stdout` and `stderr` in the structured
+error payload when available.
+
+Start with these rough execution budgets when choosing `timeoutMs` inside a
+skill:
+
+- `15000`-`30000` for short single-screen work
+- `30000`-`60000` for targeted Settings-style scroll flows
+- `60000`-`90000` for multi-screen navigation on real devices
+- `90000`-`120000` only for genuinely long bounded flows
+
+When a flow keeps drifting toward the ceiling, split it into multiple
+observe-decide-execute rounds instead of pushing every skill toward one large
+monolithic execution.
+
+---
+
+## 9. Compliance and security
+
+Never hardcode:
+
+1. personal local paths
+2. device serials
+3. user PII
+
+Use placeholders such as `<device_id>`, `<person_name>`, or `AC_TILE_NAME`.
+
+Validation command:
+
+```bash
 grep -rE "Users/|[0-9A-Fa-f]{16}" .
-
+```
 
 ---
 
-## 6. Mandatory Metadata
+## 10. Mandatory execution metadata
 
-Every Execution payload sent by a skill MUST include:
-*   **expectedFormat**: Must be "android-ui-automator".
-*   **timeoutMs**: Set a realistic timeout (e.g., 90000 for complex flows).
+Every execution payload sent by a skill must include:
+
+- `expectedFormat`: must be `"android-ui-automator"`
+- `timeoutMs`: set a realistic timeout, for example `90000` for complex flows
+
+Also remember:
+
+- `timeoutMs` is execution-wide, not per action.
+- The public API currently validates `timeoutMs` in the 1000 to 120000 ms
+  range.
+- Split very long workflows into multiple executions rather than relying on one
+  oversized timeout.
+- Use the public timeout budgeting guide when calibrating new skills:
+  [Clawperator Timeout Budgeting](https://docs.clawperator.com/reference/timeout-budgeting/).
 
 ---
 
@@ -4113,43 +6599,6 @@ Most skill failures are environment/state issues, not script syntax issues.
 - Verify expected text/fields exist before trusting value extraction.
 - If critical fields are missing, re-observe and retry with bounded attempts.
 - Return explicit uncertainty to the user when signal quality is degraded.
-
----
-
-
-# Skills Verification
-
-Date: 2026-02-19
-
-## Structural checks
-
-- Registry/index regeneration: `./scripts/generate_skill_indexes.sh` -> OK
-- Shell syntax: `find skills -type f -path '*/scripts/*.sh' -print0 | xargs -0 -n1 bash -n` -> OK
-- Node API registry integration check:
-  - `CLAWPERATOR_SKILLS_REGISTRY=<clawperator_repo>-skills/skills/skills-registry.json node <clawperator_repo>/apps/node/dist/cli/index.js skills list --output json` -> 10 skills
-
-## Artifact compile checks (via Node API)
-
-- `com.globird.energy.get-usage / usage` -> OK
-- `com.google.android.apps.chromecast.app.get-aircon-status / ac-status` (with `AC_TILE_NAME=Master`) -> OK
-- `com.solaxcloud.starter.get-battery / battery` -> OK
-- `com.theswitchbot.switchbot.get-bedroom-temperature / bedroom-temperature` -> OK
-
-## Live script checks (connected device: `<device_serial>`)
-
-- `get_bedroom_temperature.sh` -> PASS (`Bedroom temperature: 23.7°C`)
-- `get_solax_battery.sh` -> PASS (`SolaX battery level: 61.0%`)
-- `get_globird_usage.sh` -> PARTIAL (`Could not parse GloBird usage values`, script exit 0)
-- `search_woolworths_products.sh "Coke Zero"` -> FAIL (`stage=navigation`, could not focus search)
-- `search_coles_products.sh "Coke Zero"` -> FAIL (`stage=navigation`, could not focus search)
-- `get_life360_location.sh "Person"` -> FAIL (`person not found`; script listed discovered members)
-- `launch_scrcpy_readonly.sh INVALID_SERIAL` -> PASS expected failure (`device not connected/authorized`)
-- `capture_settings_overview.sh` -> PASS (`TEXT_BEGIN...TEXT_END` emitted plus `SCREENSHOT|path=...`)
-
-## Notes
-
-- Failures above are runtime-state/app-navigation dependent, not metadata/layout failures.
-- Coles/Woolworths and Life360 scripts should be run with app state ready and target person/query values that exist.
 
 ---
 
@@ -4249,7 +6698,7 @@ Modes:
 
 
 
-# Clawperator Node Runtime and API Design
+# Clawperator Runtime Architecture and API Rationale
 
 Product naming:
 
@@ -4375,20 +6824,20 @@ When a step fails but the runtime continues (or fails fast), the `stepResults` e
 - `data.error`: A stable machine-readable error code.
 - `data.message`: A human-readable (and LLM-readable) explanation.
 
-### Example: `UNSUPPORTED_RUNTIME_CLOSE`
-This error occurs when a `close_app` action is dispatched to the Android runtime. Because of sandbox restrictions, the runtime cannot reliably close other apps.
-
-**Desired Outcome:** The agent should see this error and know that the 'Hand' (Node CLI) is responsible for pre-flight closure via ADB.
+### Example: normalized `close_app`
+`close_app` is executed pre-flight in the Node layer via `adb shell am force-stop`.
+When that force-stop succeeds, the Node layer normalizes the step result to a
+successful `close_app` outcome so the envelope matches what actually happened on
+the device. If the pre-flight force-stop fails, the execution fails instead of
+rewriting the step to success.
 
 ```json
 {
   "id": "step-1",
   "actionType": "close_app",
-  "success": false,
+  "success": true,
   "data": {
-    "application_id": "com.example.app",
-    "error": "UNSUPPORTED_RUNTIME_CLOSE",
-    "message": "Android runtime cannot reliably close apps. Use the Clawperator Node API or 'adb shell am force-stop' directly for this action."
+    "application_id": "com.example.app"
   }
 }
 ```
@@ -4565,11 +7014,13 @@ Supported action types (v1):
 - `wait_for_node`
 - `click`
 - `scroll_and_click`
+- `scroll`
+- `scroll_until`
 - `read_text`
 - `snapshot_ui`
+- `take_screenshot`
+- `enter_text`
 - `sleep`
-- `type_text`
-- `doctor_ping`
 
 ## Doctor and Dependency Management
 
@@ -4728,11 +7179,17 @@ Clawperator follows Semantic Versioning (SemVer) for the Node SDK/CLI and its AP
 ---
 
 
-# Operator LLM Playbook (Definitive)
+# Operator Automation Playbook
 
-This is the canonical reference for LLM-driven automation in Clawperator.
+This is a secondary background document for Clawperator runtime conventions.
 
-Use this doc for:
+If you are starting cold, begin with the operational docs first:
+
+- `docs/agent-quickstart.md`
+- `docs/node-api-for-agents.md`
+- `docs/reference/execution-model.md`
+
+Use this playbook after that, when you need deeper context for:
 - running the app through `ACTION_AGENT_COMMAND`
 - authoring/maintaining skill packages
 - integrating skill scripts with OpenClaw
@@ -4782,16 +7239,16 @@ For app automation commands, default to:
 | Action type | Key params | Notes |
 | :--- | :--- | :--- |
 | `open_app` | `applicationId: string` | Launches app by package ID |
-| `close_app` | `applicationId: string` | Node runs `adb shell am force-stop` pre-flight; Android step always returns `success: false` (expected) |
+| `close_app` | `applicationId: string` | Node runs `adb shell am force-stop` pre-flight, normalizes the step result only when that close succeeds, and otherwise returns a structured execution failure |
 | `enter_text` | `matcher: NodeMatcher`, `text: string`, `submit?: boolean`, `clear?: boolean` | CLI: `action type`. `submit: true` presses Enter after typing. `clear` is accepted by Node but currently ignored by Android |
 | `click` | `matcher: NodeMatcher`, `clickType?: "default"\|"long_click"\|"focus"` | CLI: `action click` |
 | `read_text` | `matcher: NodeMatcher`, `validator?: "temperature"`, `retry?: object` | CLI: `action read`. Result in `data.text`. Other validator values are rejected by the runtime |
 | `wait_for_node` | `matcher: NodeMatcher`, `retry?: object` | CLI: `action wait`. Waits with internal retry |
-| `snapshot_ui` | `retry?: object` | CLI: `observe snapshot`. Snapshot content in `data.text` as `hierarchy_xml` |
+| `snapshot_ui` | `retry?: object` | CLI: `observe snapshot`. Snapshot content in `data.text` as `hierarchy_xml`, plus best-effort `foreground_package` / `has_overlay` metadata |
 | `take_screenshot` | `path?: string`, `retry?: object` | Node captures screenshot via ADB and returns local file path |
 | `scroll_and_click` | `target: NodeMatcher`, `container?: NodeMatcher`, `direction?`, `maxSwipes?`, `distanceRatio?`, `settleDelayMs?`, `findFirstScrollableChild?`, `clickAfter?: boolean`, `scrollRetry?: object`, `clickRetry?: object` | Scrolls until target is visible, then clicks by default. Set `clickAfter: false` to reveal the target without tapping it. `scrollRetry` defaults to UiScroll; `clickRetry` defaults to UiReadiness |
 | `scroll` | `container?: NodeMatcher`, `direction?`, `distanceRatio?`, `settleDelayMs?`, `findFirstScrollableChild?`, `retry?: object` | Performs exactly one scroll gesture and reports `scroll_outcome` as `moved`, `edge_reached`, or `gesture_failed` |
-| `scroll_until` | `container?: NodeMatcher`, `direction?`, `distanceRatio?`, `settleDelayMs?`, `maxScrolls?`, `maxDurationMs?`, `noPositionChangeThreshold?`, `findFirstScrollableChild?` | Bounded scroll loop that returns `termination_reason`. Use for feed pagination with explicit caps |
+| `scroll_until` | `target?: NodeMatcher`, `container?: NodeMatcher`, `clickType?: "default"\|"long_click"\|"focus"`, `clickAfter?: boolean`, `direction?`, `distanceRatio?`, `settleDelayMs?`, `maxScrolls?`, `maxDurationMs?`, `noPositionChangeThreshold?`, `findFirstScrollableChild?` | Bounded scroll loop that returns `termination_reason`. With `target`, the runtime emits `TARGET_FOUND` when the matcher becomes visible in the on-screen filtered tree. Set `clickAfter: true` to click immediately once visible. Some Android screens keep off-screen descendants in raw snapshots, so clipped edge cases can still end as `EDGE_REACHED`. Without `target`, use it for feed pagination with explicit caps |
 | `sleep` | `durationMs: number` | Pause between steps. Must fit within the execution `timeoutMs` budget |
 
 **`enter_text` vs CLI `action type`:** The CLI command is `action type` but the action type field in execution payloads is `enter_text`. These map to the same runtime action. When building execution payloads directly, always use `enter_text`.
@@ -4858,7 +7315,7 @@ Due to the dynamic nature of mobile apps (A/B tests, server-side flags, unexpect
 ## 6) Where to update docs
 
 - Skill model/design: `docs/design/skill-design.md`
-- Canonical LLM/operator usage: `docs/design/operator-llm-playbook.md` (this file)
+- Secondary runtime playbook and conventions: `docs/design/operator-llm-playbook.md` (this file)
 - App-specific skill packages: `skills/<applicationId>.<intent>/...`
 
 ---
@@ -5081,7 +7538,7 @@ Allowed values:
 - `navigate`
 - `click`
 - `long_click`
-- `type_text`
+- `enter_text`
 - `toggle`
 - `purchase_risk`
 
@@ -5208,7 +7665,7 @@ Minimum validation checks:
 4. Every step has a valid YAML block.
 5. Step action types are supported.
 6. Selector DSL uses only allowed keys.
-7. For `recipe_type=action` or capabilities containing `toggle|type_text|purchase_risk`, a verification requirement must exist after each side-effecting step.
+7. For `recipe_type=action` or capabilities containing `toggle|enter_text|purchase_risk`, a verification requirement must exist after each side-effecting step.
 8. User-specific literals are not present in frontmatter, selectors, or step blocks.
 9. Required input variables used by selectors are declared in `inputs`.
 

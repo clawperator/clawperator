@@ -256,9 +256,10 @@ class UiActionEngineDefault(
         taskScope: TaskScope,
         action: UiAction.ScrollUntil,
     ): UiActionStepResult {
-        val result =
+        val initialResult =
             taskScope.ui {
                 scrollLoop(
+                    target = action.target,
                     container = action.container,
                     direction = action.direction,
                     distanceRatio = action.distanceRatio,
@@ -270,13 +271,58 @@ class UiActionEngineDefault(
                 )
             }
 
+        val result =
+            if (
+                action.target != null &&
+                initialResult.terminationReason != TaskScrollTerminationReason.TargetFound &&
+                initialResult.terminationReason != TaskScrollTerminationReason.ContainerNotFound &&
+                initialResult.terminationReason != TaskScrollTerminationReason.ContainerNotScrollable
+            ) {
+                val targetVisibleAfterLoop =
+                    try {
+                        taskScope.ui {
+                            waitForNode(
+                                matcher = action.target,
+                                retry = TaskRetry.None,
+                            )
+                        }
+                        true
+                    } catch (_: IllegalStateException) {
+                        false
+                    }
+
+                if (targetVisibleAfterLoop) {
+                    initialResult.copy(terminationReason = TaskScrollTerminationReason.TargetFound)
+                } else {
+                    initialResult
+                }
+            } else {
+                initialResult
+            }
+
         val isError = result.terminationReason == TaskScrollTerminationReason.ContainerNotFound ||
             result.terminationReason == TaskScrollTerminationReason.ContainerNotScrollable
+
+        if (!isError &&
+            action.clickAfter &&
+            result.terminationReason == TaskScrollTerminationReason.TargetFound &&
+            action.target != null
+        ) {
+            taskScope.ui {
+                click(
+                    matcher = action.target,
+                    clickTypes = action.clickTypes,
+                    retry = TaskRetryPresets.UiReadiness,
+                )
+            }
+        }
 
         val data = buildMap<String, String> {
             put("termination_reason", result.terminationReason.toWireValue())
             put("scrolls_executed", result.scrollsExecuted.toString())
             put("direction", action.direction.name.lowercase())
+            put("click_after", action.clickAfter.toString())
+            put("click_types", action.clickTypes.toWireValue())
             result.resolvedContainerId?.let { put("resolved_container", it) }
             if (isError) put("error", result.terminationReason.toWireValue())
         }
@@ -322,15 +368,23 @@ class UiActionEngineDefault(
         action: UiAction.SnapshotUi,
     ): UiActionStepResult {
         // Snapshot action routes through TaskScope.logUiTree, the same core path used for UI hierarchy dumps.
-        val actualFormat = taskScope.logUiTree(retry = action.retry)
+        val snapshotResult = taskScope.logUiTree(retry = action.retry)
 
         return UiActionStepResult(
             id = action.id,
             actionType = "snapshot_ui",
             data =
                 mapOf(
-                    "actual_format" to actualFormat.wireValue,
-                ),
+                    "actual_format" to snapshotResult.actualFormat.wireValue,
+                ).let { base ->
+                    buildMap {
+                        putAll(base)
+                        snapshotResult.foregroundPackage?.let { put("foreground_package", it) }
+                        put("has_overlay", snapshotResult.hasOverlay.toString())
+                        snapshotResult.overlayPackage?.let { put("overlay_package", it) }
+                        snapshotResult.windowCount?.let { put("window_count", it.toString()) }
+                    }
+                },
         )
     }
 
@@ -452,6 +506,7 @@ private fun TaskScrollOutcome.toWireValue(): String =
 
 private fun TaskScrollTerminationReason.toWireValue(): String =
     when (this) {
+        TaskScrollTerminationReason.TargetFound -> "TARGET_FOUND"
         TaskScrollTerminationReason.EdgeReached -> "EDGE_REACHED"
         TaskScrollTerminationReason.MaxScrollsReached -> "MAX_SCROLLS_REACHED"
         TaskScrollTerminationReason.MaxDurationReached -> "MAX_DURATION_REACHED"

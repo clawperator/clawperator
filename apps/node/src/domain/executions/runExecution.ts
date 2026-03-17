@@ -15,6 +15,7 @@ import { extractSnapshotsFromLogs } from "./snapshotHelper.js";
 import { emitResult, emitExecution } from "../observe/events.js";
 import { LIMITS } from "../../contracts/limits.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
+import type { RuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 
 export interface RunExecutionOptions {
   deviceId?: string;
@@ -95,6 +96,80 @@ export function finalizeSuccessfulScreenshotCapture(
 }
 
 /**
+ * close_app is executed pre-flight via adb force-stop in the Node layer.
+ * When that succeeds, normalize the Android runtime's expected
+ * UNSUPPORTED_RUNTIME_CLOSE step into a successful close_app result so the
+ * envelope matches the real outcome observed by callers.
+ */
+export function finalizeSuccessfulCloseAppSteps(
+  stepResults: ResultEnvelope["stepResults"],
+  execution: Execution,
+  successfulCloseActionIds?: ReadonlySet<string>
+): void {
+  const closeActions = new Map(
+    execution.actions
+      .filter(action => action.type === "close_app" && action.params?.applicationId)
+      .map(action => [action.id, action.params?.applicationId as string])
+  );
+
+  if (closeActions.size === 0) {
+    return;
+  }
+
+  for (const step of stepResults) {
+    if (step.actionType !== "close_app") {
+      continue;
+    }
+    const applicationId = closeActions.get(step.id);
+    if (!applicationId) {
+      continue;
+    }
+    if (successfulCloseActionIds && !successfulCloseActionIds.has(step.id)) {
+      continue;
+    }
+    if (step.success === false && step.data.error === "UNSUPPORTED_RUNTIME_CLOSE") {
+      step.success = true;
+      step.data = { application_id: applicationId };
+    }
+  }
+}
+
+export async function runCloseAppPreflight(
+  execution: Execution,
+  config: RuntimeConfig
+): Promise<{ ok: true; successfulCloseActionIds: Set<string> } | { ok: false; error: { code: string; message: string; [k: string]: unknown } }> {
+  const successfulCloseActionIds = new Set<string>();
+
+  for (const action of execution.actions) {
+    if (action.type !== "close_app" || !action.params?.applicationId) {
+      continue;
+    }
+
+    const applicationId = action.params.applicationId;
+    const adbResult = await runAdb(config, ["shell", "am", "force-stop", applicationId]);
+    if (adbResult.code !== 0) {
+      return {
+        ok: false,
+        error: {
+          code: adbResult.code === 127 ? ERROR_CODES.ADB_NOT_FOUND : ERROR_CODES.DEVICE_SHELL_UNAVAILABLE,
+          message: `close_app pre-flight force-stop failed for ${applicationId}`,
+          details: {
+            applicationId,
+            adbExitCode: adbResult.code,
+            stdout: adbResult.stdout,
+            stderr: adbResult.stderr,
+          },
+        },
+      };
+    }
+
+    successfulCloseActionIds.add(action.id);
+  }
+
+  return { ok: true, successfulCloseActionIds };
+}
+
+/**
  * Internal helper to validate, resolve device, and perform actual execution.
  */
 async function performExecution(
@@ -163,10 +238,9 @@ async function performExecution(
 
   try {
     // 1. Handle pre-flight side effects (e.g., force-close apps via adb)
-    for (const action of execution.actions) {
-      if (action.type === "close_app" && action.params?.applicationId) {
-        await runAdb(config, ["shell", "am", "force-stop", action.params.applicationId]);
-      }
+    const closeAppPreflight = await runCloseAppPreflight(execution, config);
+    if (!closeAppPreflight.ok) {
+      return { execution, result: { ok: false, error: closeAppPreflight.error, deviceId } };
     }
 
     // 2. Clear logcat so we only see this command's output
@@ -187,6 +261,8 @@ async function performExecution(
     );
 
     if (result.ok) {
+      finalizeSuccessfulCloseAppSteps(result.envelope.stepResults, execution, closeAppPreflight.successfulCloseActionIds);
+
       // Post-process to retrieve snapshot text from logcat
       const hasSnapshot = result.envelope.stepResults.some(s => s.actionType === "snapshot_ui");
       if (hasSnapshot) {
@@ -200,7 +276,7 @@ async function performExecution(
       const screenAction = execution.actions.find(a => a.type === "take_screenshot");
       if (hasScreenshot) {
         try {
-          const screenshotPath = screenAction?.params?.path || join(tmpdir(), `clawperator-screenshot-${execution.commandId}-${Date.now()}.png`);
+          const screenshotPath = screenAction?.params?.path ?? join(tmpdir(), `clawperator-screenshot-${execution.commandId}-${Date.now()}.png`);
           const screenStep = result.envelope.stepResults.find(s => s.actionType === "take_screenshot");
 
           const deviceArgs = config.deviceId ? ["-s", config.deviceId] : [];

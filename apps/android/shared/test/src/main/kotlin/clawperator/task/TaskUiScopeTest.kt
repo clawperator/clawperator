@@ -117,6 +117,7 @@ class TaskUiScopeTest(
     ): TaskScrollOnceResult = TaskScrollOnceResult(TaskScrollOutcome.Moved)
 
     override suspend fun scrollLoop(
+        target: NodeMatcher?,
         container: NodeMatcher?,
         direction: TaskScrollDirection,
         distanceRatio: Float,

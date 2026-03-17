@@ -57,7 +57,7 @@ cat > "$VALIDATE_JSON" <<JSON
   "expectedFormat": "android-ui-automator",
   "timeoutMs": 20000,
   "actions": [
-    { "id": "snap", "type": "snapshot_ui", "params": { "format": "ascii" } }
+    { "id": "snap", "type": "snapshot_ui" }
   ]
 }
 JSON

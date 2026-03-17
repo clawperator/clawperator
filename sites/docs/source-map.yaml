@@ -75,11 +75,26 @@ sections:
   - id: ai-agents
     title: For AI Agents
     pages:
+      - output: ai-agents/agent-quickstart.md
+        title: Agent Quickstart
+        mode: copy
+        sources:
+          - docs/agent-quickstart.md
       - output: ai-agents/node-api-for-agents.md
         title: Clawperator Node API - Agent Guide
         mode: copy
         sources:
           - docs/node-api-for-agents.md
+      - output: ai-agents/navigation-patterns.md
+        title: Navigation Patterns for Agents
+        mode: copy
+        sources:
+          - docs/navigation-patterns.md
+      - output: ai-agents/multi-device-workflows.md
+        title: Multi-Device Workflows for Agents
+        mode: copy
+        sources:
+          - docs/multi-device-workflows.md
 
   - id: reference
     title: Reference
@@ -105,11 +120,41 @@ sections:
           - docs/node-api-for-agents.md
           - apps/node/src/contracts
         notes: Keep narrative short. Reference code-derived details instead of duplicating them.
+      - output: reference/execution-model.md
+        title: Clawperator Execution Model
+        mode: copy
+        sources:
+          - docs/reference/execution-model.md
+      - output: reference/timeout-budgeting.md
+        title: Clawperator Timeout Budgeting
+        mode: copy
+        sources:
+          - docs/reference/timeout-budgeting.md
+      - output: reference/device-and-package-model.md
+        title: Device and Package Model
+        mode: copy
+        sources:
+          - docs/reference/device-and-package-model.md
+      - output: reference/snapshot-format.md
+        title: Clawperator Snapshot Format
+        mode: copy
+        sources:
+          - docs/snapshot-format.md
+      - output: reference/error-handling.md
+        title: Error Handling Guide
+        mode: copy
+        sources:
+          - docs/reference/error-handling.md
       - output: reference/node-api-doctor.md
         title: Clawperator Doctor
         mode: copy
         sources:
           - docs/reference/node-api-doctor.md
+      - output: reference/environment-variables.md
+        title: Environment Variables
+        mode: copy
+        sources:
+          - docs/reference/environment-variables.md
 
   - id: troubleshooting
     title: Troubleshooting
@@ -143,6 +188,11 @@ sections:
         mode: copy
         sources:
           - ../clawperator-skills/docs/usage-model.md
+      - output: skills/skill-development-workflow.md
+        title: Skill Development Workflow
+        mode: copy
+        sources:
+          - ../clawperator-skills/docs/skill-development-workflow.md
       - output: skills/skill-authoring-guidelines.md
         title: Skill Authoring Guidelines
         mode: copy
@@ -153,11 +203,6 @@ sections:
         mode: copy
         sources:
           - ../clawperator-skills/docs/device-prep-and-runtime-tips.md
-      - output: skills/skills-verification.md
-        title: Skills Verification
-        mode: copy
-        sources:
-          - ../clawperator-skills/docs/skills-verification.md
       - output: skills/blocked-terms-policy.md
         title: Blocked Terms Policy
         mode: copy
@@ -168,12 +213,12 @@ sections:
     title: Design
     pages:
       - output: design/node-api-design.md
-        title: Clawperator Node Runtime and API Design
+        title: Clawperator Runtime Architecture and API Rationale
         mode: copy
         sources:
           - docs/design/node-api-design.md
       - output: design/operator-llm-playbook.md
-        title: Operator LLM Playbook
+        title: Operator Automation Playbook
         mode: copy
         sources:
           - docs/design/operator-llm-playbook.md

@@ -80,7 +80,9 @@ sealed interface UiAction {
      */
     data class ScrollUntil(
         override val id: String,
+        val target: NodeMatcher? = null,
         val container: NodeMatcher? = null,
+        val clickTypes: UiTreeClickTypes = UiTreeClickTypes.Default,
         val direction: TaskScrollDirection = TaskScrollDirection.Down,
         val distanceRatio: Float = 0.7f,
         val settleDelayMs: Long = 250,
@@ -88,6 +90,7 @@ sealed interface UiAction {
         val maxDurationMs: Long = 10_000,
         val noPositionChangeThreshold: Int = 3,
         val findFirstScrollableChild: Boolean = true,
+        val clickAfter: Boolean = false,
     ) : UiAction
 
     data class ReadText(
@@ -137,6 +140,14 @@ enum class UiSnapshotActualFormat(
 ) {
     HierarchyXml("hierarchy_xml"),
 }
+
+data class UiSnapshotResult(
+    val actualFormat: UiSnapshotActualFormat,
+    val foregroundPackage: String? = null,
+    val hasOverlay: Boolean = false,
+    val overlayPackage: String? = null,
+    val windowCount: Int? = null,
+)
 
 enum class UiTextValidator {
     Temperature,

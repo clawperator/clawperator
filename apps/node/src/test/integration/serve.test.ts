@@ -2,12 +2,18 @@ import { test, describe, after, before } from "node:test";
 import assert from "node:assert";
 import { startServer } from "../../cli/commands/serve.js";
 import { Server } from "node:http";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 describe("serve API integration", () => {
   let server: Server;
   let port: number;
+  const previousRegistryPath = process.env.CLAWPERATOR_SKILLS_REGISTRY;
+  const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "../../..");
+  const testRegistryPath = join(packageRoot, "src", "test", "fixtures", "skills", "skills-registry.json");
 
   before(async () => {
+    process.env.CLAWPERATOR_SKILLS_REGISTRY = testRegistryPath;
     server = await startServer({ port: 0, host: "localhost", verbose: false });
     const addr = server.address();
     if (addr && typeof addr === "object") {
@@ -22,6 +28,11 @@ describe("serve API integration", () => {
       await new Promise<void>((resolve, reject) => {
         server.close((err) => (err ? reject(err) : resolve()));
       });
+    }
+    if (previousRegistryPath === undefined) {
+      delete process.env.CLAWPERATOR_SKILLS_REGISTRY;
+    } else {
+      process.env.CLAWPERATOR_SKILLS_REGISTRY = previousRegistryPath;
     }
   });
 
@@ -157,6 +168,127 @@ describe("serve API integration", () => {
     const body = await res.json() as { ok: boolean; error: { code: string } };
     assert.strictEqual(body.ok, false);
     assert.ok(body.error.code !== undefined);
+  });
+
+  test("POST /observe/screenshot rejects non-string path", async () => {
+    const res = await fetch(`http://localhost:${port}/observe/screenshot`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: 123 }),
+    });
+
+    assert.strictEqual(res.status, 400);
+    const body = await res.json() as { ok: boolean; error: { code: string } };
+    assert.strictEqual(body.ok, false);
+    assert.strictEqual(body.error.code, "INVALID_PATH");
+  });
+
+  test("POST /observe/screenshot rejects empty path", async () => {
+    const res = await fetch(`http://localhost:${port}/observe/screenshot`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: "" }),
+    });
+
+    assert.strictEqual(res.status, 400);
+    const body = await res.json() as { ok: boolean; error: { code: string; message: string } };
+    assert.strictEqual(body.ok, false);
+    assert.strictEqual(body.error.code, "INVALID_PATH");
+    assert.strictEqual(body.error.message, "'path' must be a non-empty string");
+  });
+
+  test("POST /skills/:skillId/run preserves partial output on failure", async () => {
+    const res = await fetch(`http://localhost:${port}/skills/com.test.fail/run`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+
+    assert.strictEqual(res.status, 400);
+    const body = await res.json() as {
+      ok: boolean;
+      error: { code: string; stdout?: string; stderr?: string };
+    };
+    assert.strictEqual(body.ok, false);
+    assert.strictEqual(body.error.code, "SKILL_EXECUTION_FAILED");
+    assert.ok(body.error.stdout?.includes('"stage":"before-failure"'));
+    assert.ok(body.error.stderr?.includes("FAIL_OUTPUT:intentional"));
+  });
+
+  test("POST /skills/:skillId/run accepts timeoutMs override", async () => {
+    const res = await fetch(`http://localhost:${port}/skills/com.test.echo/run`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        args: ["hello", "api"],
+        timeoutMs: 4321,
+      }),
+    });
+
+    assert.strictEqual(res.status, 200);
+    const body = await res.json() as {
+      ok: boolean;
+      output?: string;
+      timeoutMs?: number;
+    };
+    assert.strictEqual(body.ok, true);
+    assert.strictEqual(body.timeoutMs, 4321);
+    assert.ok(body.output?.includes("TEST_OUTPUT:hello"));
+  });
+
+  test("POST /skills/:skillId/run rejects invalid timeoutMs", async () => {
+    const res = await fetch(`http://localhost:${port}/skills/com.test.echo/run`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ timeoutMs: "slow" }),
+    });
+
+    assert.strictEqual(res.status, 400);
+    const body = await res.json() as { ok: boolean; error: { code: string } };
+    assert.strictEqual(body.ok, false);
+    assert.strictEqual(body.error.code, "INVALID_TIMEOUT_MS");
+  });
+
+  test("POST /skills/:skillId/run can assert output content", async () => {
+    const res = await fetch(`http://localhost:${port}/skills/com.test.echo/run`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        args: ["hello"],
+        expectContains: "TEST_OUTPUT:hello",
+      }),
+    });
+
+    assert.strictEqual(res.status, 200);
+    const body = await res.json() as {
+      ok: boolean;
+      expectedSubstring?: string;
+      output?: string;
+    };
+    assert.strictEqual(body.ok, true);
+    assert.strictEqual(body.expectedSubstring, "TEST_OUTPUT:hello");
+    assert.ok(body.output?.includes("TEST_OUTPUT:hello"));
+  });
+
+  test("POST /skills/:skillId/run returns assertion failure when expected text is missing", async () => {
+    const res = await fetch(`http://localhost:${port}/skills/com.test.echo/run`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        args: ["hello"],
+        expectContains: "missing-value",
+      }),
+    });
+
+    assert.strictEqual(res.status, 400);
+    const body = await res.json() as {
+      ok: boolean;
+      error: { code: string; expectedSubstring?: string; output?: string };
+    };
+    assert.strictEqual(body.ok, false);
+    assert.strictEqual(body.error.code, "SKILL_OUTPUT_ASSERTION_FAILED");
+    assert.strictEqual(body.error.expectedSubstring, "missing-value");
+    assert.ok(body.error.output?.includes("TEST_OUTPUT:hello"));
   });
 
   test("Execution emits SSE events", async () => {

@@ -5,6 +5,8 @@ interface UiTreeInspector {
 
     suspend fun getCurrentUiTree(): UiTree?
 
+    suspend fun getCurrentWindowMetadata(): UiWindowMetadata?
+
     /**
      * Returns a UI hierarchy dump that mirrors Android's `uiautomator dump` node structure.
      */

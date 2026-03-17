@@ -2,6 +2,8 @@
 
 import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
+import { ERROR_CODES } from "../contracts/errors.js";
+import { formatError } from "./output.js";
 
 const HELP = `Clawperator CLI
 
@@ -23,13 +25,13 @@ Commands:
   provision emulator                        Alias of emulator provision
   packages list [--device-id <id>] [--third-party]
                                             List installed package IDs on a device
-  execute --execution <json-or-file> [--device-id <id>] [--receiver-package <package>]
+  execute --execution <json-or-file> [--validate-only] [--device-id <id>] [--receiver-package <package>]
                                             Execute a validated command payload
   execute best-effort --goal <text> [--device-id <id>] [--receiver-package <package>]
                                             Produce deterministic next-action suggestion from current UI
   observe snapshot [--device-id <id>] [--receiver-package <package>]
                                             Capture current UI snapshot output
-  observe screenshot [--device-id <id>] [--receiver-package <package>]
+  observe screenshot [--device-id <id>] [--receiver-package <package>] [--path <file>]
                                             Capture current device screenshot (png)
   inspect ui [--device-id <id>] [--receiver-package <package>]
                                             Alias of observe snapshot with formatted output
@@ -57,7 +59,12 @@ Commands:
   skills compile-artifact <skill_id> --artifact <name> [--vars <json>]
   skills compile-artifact --skill-id <id> --artifact <name> [--vars <json>]
                                             Compile from a skill artifact (skill: positional or --skill-id; artifact: ac-status or ac-status.recipe.json)
-  skills run <skill_id> [--device-id <id>] [-- <extra_args>]
+  skills new <skill_id>
+                                            Scaffold a new local skill folder and registry entry
+  skills validate <skill_id>
+  skills validate --all
+                                            Validate one local skill or the entire configured registry
+  skills run <skill_id> [--device-id <id>] [--timeout-ms <n>] [--expect-contains <text>] [-- <extra_args>]
                                             Invoke a skill script (convenience wrapper)
   skills install
                                             Clone skills repository to ~/.clawperator/skills/
@@ -137,6 +144,19 @@ Notes:
   - Use --receiver-package com.clawperator.operator.dev for local debug APKs.
   - --timeout-ms overrides the execution timeout within policy limits.
 `,
+  "observe screenshot": `clawperator observe screenshot
+
+Usage:
+  clawperator observe screenshot [--device-id <id>] [--receiver-package <package>] [--path <file>] [--timeout-ms <number>] [--output <json|pretty>] [--verbose]
+
+Notes:
+  - Captures a PNG screenshot via the canonical execution path.
+  - Default receiver package: com.clawperator.operator
+  - Use --receiver-package com.clawperator.operator.dev for local debug APKs.
+  - --path writes the screenshot to the provided local filesystem path.
+  - If --path is omitted, Clawperator writes to a generated temp file and returns that path in the result envelope.
+  - --timeout-ms overrides the execution timeout within policy limits.
+`,
   "skills install": `clawperator skills install
 
 Usage:
@@ -158,6 +178,58 @@ Notes:
   - Requires git access to the configured skills repository.
   - Registry path after sync:
       $HOME/.clawperator/skills/skills/skills-registry.json
+`,
+  "skills new": `clawperator skills new
+
+Usage:
+  clawperator skills new <skill_id> [--output <json|pretty>]
+
+Notes:
+  - Scaffolds a new local skill in the currently configured skills registry repo.
+  - Derives applicationId and intent by splitting <skill_id> on the final dot.
+  - Creates: SKILL.md, skill.json, and scripts/run.js
+  - Updates the configured registry JSON so the new skill appears in skills list.
+`,
+  "skills validate": `clawperator skills validate
+
+Usage:
+  clawperator skills validate <skill_id> [--output <json|pretty>]
+  clawperator skills validate --all [--output <json|pretty>]
+
+Notes:
+  - Use <skill_id> to validate one skill, or --all to validate every registry entry in one pass.
+  - Verifies that the registry entry exists for the requested skill.
+  - Checks that skill.json, SKILL.md, script files, and artifact files exist on disk.
+  - Confirms that the parsed skill.json metadata matches the registry entry.
+  - This is an integrity check, not a live device test.
+`,
+  "skills compile-artifact": `clawperator skills compile-artifact
+
+Usage:
+  clawperator skills compile-artifact <skill_id> --artifact <name> [--vars <json>] [--output <json|pretty>]
+  clawperator skills compile-artifact --skill-id <id> --artifact <name> [--vars <json>] [--output <json|pretty>]
+
+Notes:
+  - Compiles a deterministic skill artifact into a validated execution payload.
+  - Use either the positional <skill_id> or --skill-id <id>.
+  - --artifact accepts either the bare artifact name or the full .recipe.json filename.
+  - --vars must be a JSON object string used for template substitution.
+  - Compile failure usually means a missing artifact, missing required vars, or an invalid execution shape.
+  - Use clawperator execute --validate-only for an extra contract-only check before a live device run.
+`,
+  "skills run": `clawperator skills run
+
+Usage:
+  clawperator skills run <skill_id> [--device-id <id>] [--timeout-ms <n>] [--expect-contains <text>] [--output <json|pretty>] [-- <extra_args>]
+
+Notes:
+  - Runs the selected skill script through the local skill wrapper.
+  - Use --device-id explicitly when more than one Android device is connected.
+  - --timeout-ms overrides the wrapper timeout for this run only.
+  - --expect-contains turns the run into a lightweight output assertion.
+  - If the assertion text is missing, the wrapper fails with SKILL_OUTPUT_ASSERTION_FAILED.
+  - Arguments after -- are forwarded to the underlying skill script unchanged.
+  - This wrapper does not replace live validation of screenshots, artifacts, or app state.
 `,
   "doctor": `clawperator doctor
 
@@ -223,9 +295,14 @@ function resolveHelpTopic(rest: string[]): string | undefined {
   if (rest[0] === "operator" && (rest.length === 1 || rest[1] === "--help")) return "operator setup";
   if (rest[0] === "setup" || rest[0] === "install") return "operator setup";
   if (rest[0] === "observe" && rest[1] === "snapshot") return "observe snapshot";
+  if (rest[0] === "observe" && rest[1] === "screenshot") return "observe screenshot";
   if (rest[0] === "inspect" && rest[1] === "ui") return "observe snapshot";
   if (rest[0] === "skills" && rest[1] === "install") return "skills install";
   if (rest[0] === "skills" && rest[1] === "sync") return "skills sync";
+  if (rest[0] === "skills" && rest[1] === "new") return "skills new";
+  if (rest[0] === "skills" && rest[1] === "validate") return "skills validate";
+  if (rest[0] === "skills" && rest[1] === "compile-artifact") return "skills compile-artifact";
+  if (rest[0] === "skills" && rest[1] === "run") return "skills run";
   if (rest[0] === "doctor") return "doctor";
   if (rest[0] === "version") return "version";
   if (rest[0] === "grant-device-permissions") return "grant-device-permissions";
@@ -274,6 +351,57 @@ function getOpt(rest: string[], flag: string): string | undefined {
   return i >= 0 && rest[i + 1] ? rest[i + 1] : undefined;
 }
 
+function getCommandArgs(argv: string[], commandPath: string[]): string[] | undefined {
+  for (let i = 0; i <= argv.length - commandPath.length; i++) {
+    let matches = true;
+    for (let j = 0; j < commandPath.length; j++) {
+      if (argv[i + j] !== commandPath[j]) {
+        matches = false;
+        break;
+      }
+    }
+    if (matches) {
+      return argv.slice(i + commandPath.length);
+    }
+  }
+  return undefined;
+}
+
+function getStringOpt(rest: string[], flag: string): string | undefined {
+  const i = rest.indexOf(flag);
+  if (i < 0) {
+    return undefined;
+  }
+  if (!rest[i + 1]) {
+    throw new UsageError(`${flag} requires a value`);
+  }
+  return rest[i + 1];
+}
+
+function getNumberOpt(rest: string[], flag: string): number | undefined {
+  const i = rest.indexOf(flag);
+  if (i < 0) {
+    return undefined;
+  }
+  if (!rest[i + 1]) {
+    throw new UsageError(`${flag} requires a value`);
+  }
+  return Number(rest[i + 1]);
+}
+
+function getInvalidTimeoutResult(timeoutMs: number | undefined, options: { format: "json" | "pretty" }): string | undefined {
+  if (timeoutMs !== undefined && !Number.isFinite(timeoutMs)) {
+    return formatError(
+      {
+        code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+        message: "timeoutMs must be a finite number",
+      },
+      options
+    );
+  }
+  return undefined;
+}
+
 function hasFlag(rest: string[], flag: string): boolean {
   return rest.includes(flag);
 }
@@ -309,8 +437,10 @@ async function main(): Promise<void> {
   const out = { format: global.output as "json" | "pretty", verbose: global.verbose };
 
   let result: string;
+  let usageParseError = false;
 
-  switch (cmd) {
+  try {
+    switch (cmd) {
     case "operator": {
       const sub = rest[0];
       if (sub === "setup" || sub === "install") {
@@ -424,6 +554,7 @@ async function main(): Promise<void> {
             deviceId: global.deviceId ?? getOpt(rest, "--device-id"),
             receiverPackage: global.receiverPackage ?? getOpt(rest, "--receiver-package"),
             timeoutMs: global.timeoutMs,
+            validateOnly: hasFlag(rest, "--validate-only"),
           });
         }
       }
@@ -442,6 +573,7 @@ async function main(): Promise<void> {
           deviceId: global.deviceId ?? getOpt(rest, "--device-id"),
           receiverPackage: global.receiverPackage ?? getOpt(rest, "--receiver-package"),
           timeoutMs: global.timeoutMs,
+          path: getStringOpt(rest, "--path"),
         });
       } else {
         result = JSON.stringify({ code: "USAGE", message: "observe snapshot|screenshot [options]" });
@@ -548,23 +680,54 @@ async function main(): Promise<void> {
         } else {
           result = await (await import("./commands/skills.js")).cmdSkillsCompileArtifact(skillId, artifact, vars, out);
         }
+      } else if (rest[0] === "new") {
+        if (!rest[1]) {
+          result = JSON.stringify({ code: "USAGE", message: "skills new <skill_id>" });
+        } else {
+          result = await (await import("./commands/skills.js")).cmdSkillsNew(rest[1], out);
+        }
+      } else if (rest[0] === "validate") {
+        if (hasFlag(rest, "--all")) {
+          result = await (await import("./commands/skills.js")).cmdSkillsValidateAll(out);
+        } else if (!rest[1]) {
+          result = JSON.stringify({ code: "USAGE", message: "skills validate <skill_id> | skills validate --all" });
+        } else {
+          result = await (await import("./commands/skills.js")).cmdSkillsValidate(rest[1], out);
+        }
       } else if (rest[0] === "run") {
         const skillId = rest[1];
         if (!skillId) {
-          result = JSON.stringify({ code: "USAGE", message: "skills run <skill_id> [--device-id <id>] [-- <extra_args>]" });
+          result = JSON.stringify({ code: "USAGE", message: "skills run <skill_id> [--device-id <id>] [--timeout-ms <n>] [--expect-contains <text>] [-- <extra_args>]" });
         } else {
           // Build args to pass to the skill script
           // Only parse options from args before "--" to avoid double-counting
           const dashDash = rest.indexOf("--");
           const optSegment = dashDash >= 0 ? rest.slice(0, dashDash) : rest;
+          const rawSkillsRunArgs = getCommandArgs(argv, ["skills", "run"]) ?? [];
+          const rawDashDash = rawSkillsRunArgs.indexOf("--");
+          const rawOptSegment = rawDashDash >= 0 ? rawSkillsRunArgs.slice(0, rawDashDash) : rawSkillsRunArgs;
           const scriptArgs: string[] = [];
           const deviceId = global.deviceId ?? getOpt(optSegment, "--device-id");
+          const localTimeoutMs = getNumberOpt(rawOptSegment, "--timeout-ms");
+          const effectiveTimeoutMs = localTimeoutMs ?? global.timeoutMs;
+          const invalidTimeoutResult = getInvalidTimeoutResult(effectiveTimeoutMs, out);
+          if (invalidTimeoutResult) {
+            result = invalidTimeoutResult;
+            break;
+          }
+          const expectContains = getStringOpt(optSegment, "--expect-contains");
           if (deviceId) scriptArgs.push(deviceId);
           // Pass anything after "--" as extra args
           if (dashDash >= 0) {
             scriptArgs.push(...rest.slice(dashDash + 1));
           }
-          result = await (await import("./commands/skills.js")).cmdSkillsRun(skillId, scriptArgs, out);
+          result = await (await import("./commands/skills.js")).cmdSkillsRun(
+            skillId,
+            scriptArgs,
+            effectiveTimeoutMs,
+            expectContains,
+            out
+          );
         }
       } else if (rest[0] === "install") {
         result = await (await import("./commands/skills.js")).cmdSkillsInstall(out);
@@ -577,7 +740,7 @@ async function main(): Promise<void> {
           ? await (await import("./commands/skills.js")).cmdSkillsSync(ref, out)
           : JSON.stringify({ code: "USAGE", message: "skills sync --ref <git-ref>" });
       } else {
-        result = JSON.stringify({ code: "USAGE", message: "skills list|get|search|compile-artifact|run|install|update|sync ..." });
+        result = JSON.stringify({ code: "USAGE", message: "skills list|get|search|compile-artifact|new|validate|run|install|update|sync ..." });
       }
       break;
     case "serve":
@@ -627,9 +790,21 @@ async function main(): Promise<void> {
       break;
     default:
       result = JSON.stringify({ code: "USAGE", message: `Unknown command: ${cmd}. Use --help.` });
+    }
+  } catch (error) {
+    if (error instanceof UsageError) {
+      usageParseError = true;
+      result = JSON.stringify({ code: "USAGE", message: error.message });
+    } else {
+      throw error;
+    }
   }
 
   console.log(result);
+  if (usageParseError) {
+    process.exitCode = 1;
+    return;
+  }
   if (result.startsWith("{") && result.includes('"code"') && !result.includes('"envelope"')) {
     const obj = JSON.parse(result) as { code?: string };
     if (obj.code && obj.code !== "USAGE" && obj.code !== "NOT_IMPLEMENTED") {

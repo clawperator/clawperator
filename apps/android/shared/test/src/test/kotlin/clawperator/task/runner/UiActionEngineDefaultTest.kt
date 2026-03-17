@@ -57,6 +57,45 @@ class UiActionEngineDefaultTest : ActionTest {
         }
 
     @Test
+    fun `execute snapshot_ui returns overlay metadata when available`() =
+        actionTest {
+            val uiScope = RecordingTaskUiScope()
+            val taskScope =
+                RecordingTaskScope(
+                    uiScope = uiScope,
+                    snapshotResult =
+                        UiSnapshotResult(
+                            actualFormat = UiSnapshotActualFormat.HierarchyXml,
+                            foregroundPackage = "com.android.permissioncontroller",
+                            hasOverlay = true,
+                            overlayPackage = "com.android.permissioncontroller",
+                            windowCount = 2,
+                        ),
+                )
+            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+
+            val result =
+                engine.execute(
+                    taskScope = taskScope,
+                    plan =
+                        UiActionPlan(
+                            commandId = "cmd-snapshot-overlay",
+                            taskId = "task-snapshot-overlay",
+                            source = "test",
+                            actions = listOf(UiAction.SnapshotUi(id = "snap-1")),
+                        ),
+                )
+
+            val stepResult = result.stepResults.single()
+            assertEquals("snapshot_ui", stepResult.actionType)
+            assertEquals("hierarchy_xml", stepResult.data["actual_format"])
+            assertEquals("com.android.permissioncontroller", stepResult.data["foreground_package"])
+            assertEquals("true", stepResult.data["has_overlay"])
+            assertEquals("com.android.permissioncontroller", stepResult.data["overlay_package"])
+            assertEquals("2", stepResult.data["window_count"])
+        }
+
+    @Test
     fun `execute scroll_and_click uses TaskUiScope primitives`() =
         actionTest {
             val uiScope = RecordingTaskUiScope()
@@ -430,10 +469,111 @@ class UiActionEngineDefaultTest : ActionTest {
             assertEquals("CONTAINER_NOT_FOUND", stepResult.data["error"])
             assertEquals("CONTAINER_NOT_FOUND", stepResult.data["termination_reason"])
         }
+
+    @Test
+    fun `execute scroll_until returns target_found termination`() =
+        actionTest {
+            val uiScope = RecordingTaskUiScope(
+                scrollLoopResult = TaskScrollLoopResult(TaskScrollTerminationReason.TargetFound, scrollsExecuted = 3),
+            )
+            val taskScope = RecordingTaskScope(uiScope)
+            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+
+            val result =
+                engine.execute(
+                    taskScope = taskScope,
+                    plan = UiActionPlan(
+                        commandId = "cmd-su-target",
+                        taskId = "task-su-target",
+                        source = "test",
+                        actions = listOf(
+                            UiAction.ScrollUntil(
+                                id = "su-target",
+                                target = NodeMatcher(textContains = "About phone"),
+                            ),
+                        ),
+                    ),
+                )
+
+            val stepResult = result.stepResults.single()
+            assertEquals("scroll_until", stepResult.actionType)
+            assertEquals(true, stepResult.success)
+            assertEquals("TARGET_FOUND", stepResult.data["termination_reason"])
+            assertEquals("3", stepResult.data["scrolls_executed"])
+        }
+
+    @Test
+    fun `execute scroll_until clicks target when clickAfter is true`() =
+        actionTest {
+            val uiScope = RecordingTaskUiScope(
+                scrollLoopResult = TaskScrollLoopResult(TaskScrollTerminationReason.TargetFound, scrollsExecuted = 3),
+            )
+            val taskScope = RecordingTaskScope(uiScope)
+            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+
+            val result =
+                engine.execute(
+                    taskScope = taskScope,
+                    plan = UiActionPlan(
+                        commandId = "cmd-su-target-click",
+                        taskId = "task-su-target-click",
+                        source = "test",
+                        actions = listOf(
+                            UiAction.ScrollUntil(
+                                id = "su-target-click",
+                                target = NodeMatcher(textContains = "About phone"),
+                                clickAfter = true,
+                            ),
+                        ),
+                    ),
+                )
+
+            val stepResult = result.stepResults.single()
+            assertEquals("scroll_until", stepResult.actionType)
+            assertEquals(true, stepResult.success)
+            assertEquals("TARGET_FOUND", stepResult.data["termination_reason"])
+            assertEquals("true", stepResult.data["click_after"])
+            assertEquals(true, uiScope.clickCalled)
+        }
+
+    @Test
+    fun `execute scroll_until normalizes to target_found when target is visible after loop`() =
+        actionTest {
+            val uiScope = RecordingTaskUiScope(
+                scrollLoopResult = TaskScrollLoopResult(TaskScrollTerminationReason.EdgeReached, scrollsExecuted = 2),
+            )
+            val taskScope = RecordingTaskScope(uiScope)
+            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+
+            val result =
+                engine.execute(
+                    taskScope = taskScope,
+                    plan = UiActionPlan(
+                        commandId = "cmd-su-post-loop-target",
+                        taskId = "task-su-post-loop-target",
+                        source = "test",
+                        actions = listOf(
+                            UiAction.ScrollUntil(
+                                id = "su-post-loop-target",
+                                target = NodeMatcher(textEquals = "Battery"),
+                                clickAfter = true,
+                            ),
+                        ),
+                    ),
+                )
+
+            val stepResult = result.stepResults.single()
+            assertEquals("scroll_until", stepResult.actionType)
+            assertEquals(true, stepResult.success)
+            assertEquals("TARGET_FOUND", stepResult.data["termination_reason"])
+            assertEquals("2", stepResult.data["scrolls_executed"])
+            assertEquals(true, uiScope.clickCalled)
+        }
 }
 
 private class RecordingTaskScope(
     private val uiScope: RecordingTaskUiScope,
+    private val snapshotResult: UiSnapshotResult = UiSnapshotResult(actualFormat = UiSnapshotActualFormat.HierarchyXml),
 ) : TaskScope {
     val openedApps = mutableListOf<String>()
     var logUiTreeCount: Int = 0
@@ -459,9 +599,9 @@ private class RecordingTaskScope(
 
     override suspend fun logUiTree(
         retry: TaskRetry,
-    ): UiSnapshotActualFormat {
+    ): UiSnapshotResult {
         logUiTreeCount++
-        return UiSnapshotActualFormat.HierarchyXml
+        return snapshotResult
     }
 
     override suspend fun closeApp(
@@ -535,6 +675,7 @@ private class RecordingTaskUiScope(
     }
 
     override suspend fun scrollLoop(
+        target: NodeMatcher?,
         container: NodeMatcher?,
         direction: TaskScrollDirection,
         distanceRatio: Float,

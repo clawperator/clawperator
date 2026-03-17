@@ -76,8 +76,10 @@ clawperator execute \
 
 Clawperator is an actuator, not an autonomous planner. Use these entrypoints first:
 
-- [Node API for Agents](https://docs.clawperator.com/ai-agents/node-api-for-agents/) - canonical action contracts, result envelopes, and error codes
-- [Operator LLM Playbook](https://docs.clawperator.com/design/operator-llm-playbook/) - guidance for agent loops and runtime usage
+- [Agent Quickstart](https://docs.clawperator.com/ai-agents/agent-quickstart/) - fastest path from install to first successful execution
+- [Node API for Agents](https://docs.clawperator.com/ai-agents/node-api-for-agents/) - action contracts, result envelopes, and error codes
+- [Execution Model](https://docs.clawperator.com/reference/execution-model/) - required fields, timeout policy, and status semantics
+- [Operator Automation Playbook](https://docs.clawperator.com/design/operator-llm-playbook/) - background runtime conventions and deeper rationale
 - [llms.txt](https://clawperator.com/llms.txt) - root machine-readable index
 - [llms-full.txt](https://clawperator.com/llms-full.txt) - full compiled technical corpus in one fetch
 

@@ -1,5 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { runExecution } from "../../domain/executions/runExecution.js";
+import { validateExecution, validatePayloadSize } from "../../domain/executions/validateExecution.js";
+import { LIMITS } from "../../contracts/limits.js";
 import type { OutputOptions } from "../output.js";
 import { formatSuccess, formatError } from "../output.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
@@ -10,6 +12,7 @@ export async function cmdExecute(options: {
   deviceId?: string;
   receiverPackage?: string;
   timeoutMs?: number;
+  validateOnly?: boolean;
 }): Promise<string> {
   let payload: unknown;
   const raw = options.execution.trim();
@@ -32,6 +35,33 @@ export async function cmdExecute(options: {
   }
 
   try {
+    if (options.validateOnly) {
+      let execution = validateExecution(payload);
+      if (options.timeoutMs !== undefined) {
+        if (!Number.isFinite(options.timeoutMs)) {
+          return formatError(
+            {
+              code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+              message: "timeoutMs must be a finite number",
+            },
+            options
+          );
+        }
+        if (options.timeoutMs < LIMITS.MIN_EXECUTION_TIMEOUT_MS || options.timeoutMs > LIMITS.MAX_EXECUTION_TIMEOUT_MS) {
+          return formatError(
+            {
+              code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+              message: `timeoutMs must be between ${LIMITS.MIN_EXECUTION_TIMEOUT_MS} and ${LIMITS.MAX_EXECUTION_TIMEOUT_MS}`,
+            },
+            options
+          );
+        }
+        execution = { ...execution, timeoutMs: options.timeoutMs };
+      }
+      validatePayloadSize(JSON.stringify(execution));
+      return formatSuccess({ ok: true, validated: true, execution }, options);
+    }
+
     const result = await runExecution(payload, {
       deviceId: options.deviceId,
       receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_RECEIVER_PACKAGE,

@@ -485,7 +485,7 @@ maybe_install_operator_apk() {
             [ -n "$device_id" ] || continue
             echo -e "${YELLOW} - ${device_id}${NC}"
         done < <(list_connected_devices)
-        echo -e "${YELLOW}Install manually with: clawperator operator setup --apk ${APK_LOCAL_PATH} --device-id <device_id>${NC}"
+        print_manual_operator_setup_commands
         return 0
     fi
 
@@ -564,6 +564,30 @@ process.stdin.on('data', c => d += c).on('end', () => {
 " 2>/dev/null
 }
 
+doctor_check_code() {
+    local json="$1"
+    local check_id="$2"
+    local expected_code="$3"
+    printf '%s' "$json" | node -e "
+let d='';
+process.stdin.on('data', c => d += c).on('end', () => {
+  try {
+    const r = JSON.parse(d);
+    const c = (r.checks || []).find(x => x.id === '$check_id');
+    process.exitCode = (c && c.code === '$expected_code') ? 0 : 1;
+  } catch { process.exitCode = 1; }
+});
+" 2>/dev/null
+}
+
+print_manual_operator_setup_commands() {
+    echo -e "${YELLOW}Complete Android setup on one target device with one of:${NC}"
+    while IFS= read -r device_id; do
+        [ -n "$device_id" ] || continue
+        echo -e "${YELLOW}  clawperator operator setup --apk ${APK_LOCAL_PATH} --device-id ${device_id}${NC}"
+    done < <(list_connected_devices)
+}
+
 # 8. Run Doctor and Apply Fixes
 run_doctor_and_fix() {
     echo -e "${BLUE}Running Clawperator Doctor to verify environment...${NC}"
@@ -633,6 +657,18 @@ main() {
     local FINAL_DOCTOR_JSON
     FINAL_DOCTOR_JSON="$("$CLAWPERATOR_BIN_PATH" doctor --format json || true)"
     if ! doctor_report_ok "$FINAL_DOCTOR_JSON"; then
+        if doctor_check_code "$FINAL_DOCTOR_JSON" "device.discovery" "MULTIPLE_DEVICES_DEVICE_ID_REQUIRED"; then
+            echo -e "${YELLOW}⚠️  Host install completed, but Android setup is still pending because more than one device is connected.${NC}"
+            print_manual_operator_setup_commands
+            echo ""
+            echo -e "${YELLOW}After setup, verify one device explicitly with:${NC}"
+            echo -e "${YELLOW}  clawperator doctor --device-id <device_id> --output pretty${NC}"
+            echo ""
+            echo -e "${GREEN}════════════════════════════════════════════════════════════════${NC}"
+            echo -e "${GREEN}  Installation Complete (Device Selection Required)${NC}"
+            echo -e "${GREEN}════════════════════════════════════════════════════════════════${NC}"
+            return 0
+        fi
         echo -e "${RED}❌ Final doctor check failed.${NC}"
         "$CLAWPERATOR_BIN_PATH" doctor --output pretty || true
         return 1

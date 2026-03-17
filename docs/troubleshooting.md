@@ -90,9 +90,13 @@ If you must use **Wireless Debugging**, be aware that your mileage may vary (YMM
 `curl -fsSL https://clawperator.com/install.sh | bash` uses the stable metadata file at `https://downloads.clawperator.com/operator/latest.json`, downloads the immutable package for the [Clawperator Operator Android app](../getting-started/android-operator-apk.md) plus its `.sha256`, verifies the checksum, then handles device install like this:
 
 1. **One connected device** - the installer offers to run `clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id <device_id>`.
-2. **Multiple connected devices** - the installer skips the install and prints `clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id <device_id>`.
+2. **Multiple connected devices** - the installer completes host-side setup, skips the Android setup step, and prints one `clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id <device_id>` command per connected device.
 3. **No connected devices** - the installer skips the install and leaves the verified package for the [Clawperator Operator Android app](../getting-started/android-operator-apk.md) at `~/.clawperator/downloads/operator.apk`.
 4. **`adb` missing** - the installer attempts to install `adb` automatically, or stops with a manual install link if it cannot.
+
+For non-interactive environments, the installer also reads
+`CLAWPERATOR_INSTALL_APK` before prompting whether to install the APK on the
+connected device.
 
 ## Emulator-Specific Issues
 
@@ -220,6 +224,8 @@ If the emulator is consistently slow, consider using a physical device instead.
 ### Multiple devices connected
 
 Once an emulator is provisioned, you may have both a physical device and an emulator connected at the same time. In that state, continue to pass `--device-id <serial>` to `execute`, `observe`, `action`, and `skills run` commands.
+
+If you omit it, the CLI returns `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED`.
 
 ### Installer cloned everything except skills
 

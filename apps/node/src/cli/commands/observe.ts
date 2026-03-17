@@ -38,12 +38,14 @@ export async function cmdObserveScreenshot(options: {
   deviceId?: string;
   receiverPackage?: string;
   timeoutMs?: number;
+  path?: string;
 }): Promise<string> {
   try {
     const result = await observeScreenshot({
       deviceId: options.deviceId,
       receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_RECEIVER_PACKAGE,
       timeoutMs: options.timeoutMs,
+      path: options.path,
       warn: message => process.stderr.write(message),
     });
     if (result.ok) {

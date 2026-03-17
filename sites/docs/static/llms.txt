@@ -7,13 +7,23 @@ This site contains the canonical technical documentation for Clawperator, a dete
 - Full compiled docs on docs host: https://docs.clawperator.com/llms-full.txt
 - Full compiled docs on landing host: https://clawperator.com/llms-full.txt
 - Docs home: https://docs.clawperator.com/
+- Agent quickstart: https://docs.clawperator.com/ai-agents/agent-quickstart/
 - Node API agent guide: https://docs.clawperator.com/ai-agents/node-api-for-agents/
-- Operator LLM playbook: https://docs.clawperator.com/design/operator-llm-playbook/
+- Navigation patterns: https://docs.clawperator.com/ai-agents/navigation-patterns/
+- Multi-device workflows: https://docs.clawperator.com/ai-agents/multi-device-workflows/
+- Execution model: https://docs.clawperator.com/reference/execution-model/
+- Timeout budgeting: https://docs.clawperator.com/reference/timeout-budgeting/
+- Device and package model: https://docs.clawperator.com/reference/device-and-package-model/
+- Snapshot format: https://docs.clawperator.com/reference/snapshot-format/
 - API overview: https://docs.clawperator.com/reference/api-overview/
 - CLI reference: https://docs.clawperator.com/reference/cli-reference/
 - Error codes: https://docs.clawperator.com/reference/error-codes/
+- Error handling guide: https://docs.clawperator.com/reference/error-handling/
+- Environment variables: https://docs.clawperator.com/reference/environment-variables/
 - First-time setup: https://docs.clawperator.com/getting-started/first-time-setup/
 - Troubleshooting: https://docs.clawperator.com/troubleshooting/troubleshooting/
+- Skill development workflow: https://docs.clawperator.com/skills/skill-development-workflow/
+- Skill authoring guidelines: https://docs.clawperator.com/skills/skill-authoring-guidelines/
 - Architecture: https://docs.clawperator.com/architecture/architecture/
 
 ## GitHub

@@ -192,17 +192,22 @@ clawperator packages list [--device-id <id>] [--third-party]
 Execute a validated command payload.
 
 ```
-clawperator execute --execution <json-or-file> [--device-id <id>] [--receiver-package <package>] [--timeout-ms <number>]
+clawperator execute --execution <json-or-file> [--validate-only] [--device-id <id>] [--receiver-package <package>] [--timeout-ms <number>]
 ```
 
 | Flag | Description |
 |------|-------------|
 | `--execution <json-or-file>` | Execution payload as inline JSON or a path to a JSON file (required) |
+| `--validate-only` | Validate and normalize the payload without dispatching to any device |
 | `--device-id <id>` | Target device serial |
 | `--receiver-package <package>` | Target Operator package |
 | `--timeout-ms <number>` | Override execution timeout within policy limits |
 
 The `--execution` value must conform to the `Execution` contract (see [api-overview.md](./api-overview.md)).
+
+With `--validate-only`, Clawperator validates the payload, applies any
+`--timeout-ms` override, and returns the normalized execution without touching
+adb or resolving a device.
 
 **Note:** `execute best-effort` is not implemented in this stage. Use `observe snapshot` + agent reasoning instead.
 

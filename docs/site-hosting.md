@@ -17,12 +17,23 @@ Why:
 - `mkdocs build` alone does not publish the required root text assets
 - the build script also generates `llms-full.txt`
 - the build script also copies `sites/docs/static/` into `sites/docs/site/`
+- the build script now validates expected docs routes and machine-facing files
+  before declaring the build successful
 
 Without that script, the deployed docs site will miss root files such as:
 
 - `robots.txt`
 - `llms.txt`
 - `llms-full.txt`
+
+The build script also acts as the local reachability guardrail for the docs
+repair work done in this branch:
+
+- it checks the built site contains every page declared in
+  `sites/docs/source-map.yaml`
+- it checks key docs-home links still resolve to built pages
+- it checks docs-host URLs listed in `sites/docs/static/llms.txt` map to real
+  build artifacts
 
 ## Current Cloudflare split
 

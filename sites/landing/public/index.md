@@ -79,8 +79,10 @@ For many services, the mobile app effectively **is the API**. Clawperator allows
 ## Start here
 
 - **Docs Home**: https://docs.clawperator.com/
+- **Agent Quickstart**: https://docs.clawperator.com/ai-agents/agent-quickstart/
 - **Node API Guide**: https://docs.clawperator.com/ai-agents/node-api-for-agents/
-- **Operator LLM Playbook**: https://docs.clawperator.com/design/operator-llm-playbook/
+- **Execution Model**: https://docs.clawperator.com/reference/execution-model/
+- **Operator Automation Playbook**: https://docs.clawperator.com/design/operator-llm-playbook/
 - **API Overview**: https://docs.clawperator.com/reference/api-overview/
 - **CLI Reference**: https://docs.clawperator.com/reference/cli-reference/
 - **Crash Recovery (Permissions)**: https://docs.clawperator.com/reference/cli-reference/#grant-device-permissions

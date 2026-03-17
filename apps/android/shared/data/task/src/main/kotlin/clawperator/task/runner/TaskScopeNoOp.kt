@@ -27,9 +27,9 @@ class TaskScopeNoOp : TaskScope {
 
     override suspend fun logUiTree(
         retry: TaskRetry,
-    ): UiSnapshotActualFormat {
+    ): UiSnapshotResult {
         // No-op implementation
-        return UiSnapshotActualFormat.HierarchyXml
+        return UiSnapshotResult(actualFormat = UiSnapshotActualFormat.HierarchyXml)
     }
 
     override suspend fun <T> ui(block: suspend TaskUiScope.() -> T): T {

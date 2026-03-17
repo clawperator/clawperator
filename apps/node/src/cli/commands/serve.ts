@@ -8,7 +8,7 @@ import { searchSkills } from "../../domain/skills/searchSkills.js";
 import { runSkill } from "../../domain/skills/runSkill.js";
 import { clawperatorEvents, CLAW_EVENT_TYPES } from "../../domain/observe/events.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
-import { SKILL_NOT_FOUND } from "../../contracts/skills.js";
+import { SKILL_NOT_FOUND, SKILL_OUTPUT_ASSERTION_FAILED } from "../../contracts/skills.js";
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 import { listConfiguredAvds, inspectConfiguredAvd } from "../../domain/android-emulators/configuredAvds.js";
 import { listRunningEmulators } from "../../domain/android-emulators/runningEmulators.js";
@@ -183,7 +183,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       return;
     }
 
-    const { deviceId, receiverPackage } = req.body;
+    const { deviceId, receiverPackage, path } = req.body;
 
     if (deviceId !== undefined && typeof deviceId !== "string") {
       res.status(400).json({ ok: false, error: { code: "INVALID_DEVICE_ID", message: "'deviceId' must be a string" } });
@@ -195,6 +195,11 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       return;
     }
 
+    if (path !== undefined && (typeof path !== "string" || path.trim() === "")) {
+      res.status(400).json({ ok: false, error: { code: "INVALID_PATH", message: "'path' must be a non-empty string" } });
+      return;
+    }
+
     const ts = Date.now();
     const executionInput = {
       commandId: `serve-shot-${ts}`,
@@ -202,7 +207,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       source: "serve-api",
       expectedFormat: "android-ui-automator",
       timeoutMs: 30000,
-      actions: [{ id: "shot", type: "take_screenshot" }],
+      actions: [{ id: "shot", type: "take_screenshot", params: path !== undefined ? { path } : {} }],
     };
 
     try {
@@ -387,7 +392,12 @@ export async function startServer(options: ServeOptions): Promise<Server> {
         return;
       }
 
-      const { deviceId, args } = req.body as { deviceId?: unknown; args?: unknown };
+      const {
+        deviceId,
+        args,
+        timeoutMs,
+        expectContains,
+      } = req.body as { deviceId?: unknown; args?: unknown; timeoutMs?: unknown; expectContains?: unknown };
 
       if (deviceId !== undefined && typeof deviceId !== "string") {
         res.status(400).json({ ok: false, error: { code: "INVALID_DEVICE_ID", message: "'deviceId' must be a string" } });
@@ -399,18 +409,49 @@ export async function startServer(options: ServeOptions): Promise<Server> {
         return;
       }
 
+      if (timeoutMs !== undefined && (!Number.isInteger(timeoutMs) || Number(timeoutMs) <= 0)) {
+        res.status(400).json({ ok: false, error: { code: "INVALID_TIMEOUT_MS", message: "'timeoutMs' must be a positive integer" } });
+        return;
+      }
+
+      if (expectContains !== undefined && typeof expectContains !== "string") {
+        res.status(400).json({ ok: false, error: { code: "INVALID_EXPECT_CONTAINS", message: "'expectContains' must be a string" } });
+        return;
+      }
+
       const scriptArgs: string[] = [];
       if (typeof deviceId === "string" && deviceId.length > 0) scriptArgs.push(deviceId);
       if (Array.isArray(args)) scriptArgs.push(...args.map(String));
 
-      const result = await runSkill(req.params.skillId, scriptArgs);
+      const result = await runSkill(
+        req.params.skillId,
+        scriptArgs,
+        undefined,
+        typeof timeoutMs === "number" ? timeoutMs : undefined
+      );
       if (result.ok) {
+        if (typeof expectContains === "string" && !result.output.includes(expectContains)) {
+          res.status(400).json({
+            ok: false,
+            error: {
+              code: SKILL_OUTPUT_ASSERTION_FAILED,
+              message: `Skill ${req.params.skillId} output did not include expected text`,
+              skillId: req.params.skillId,
+              output: result.output,
+              expectedSubstring: expectContains,
+              timeoutMs: typeof timeoutMs === "number" ? timeoutMs : undefined,
+            },
+          });
+          return;
+        }
         res.json({
           ok: true,
           skillId: result.skillId,
           output: result.output,
           exitCode: result.exitCode,
           durationMs: result.durationMs,
+          timeoutMs: typeof timeoutMs === "number" ? timeoutMs : undefined,
+          expectedSubstring: typeof expectContains === "string" ? expectContains : undefined,
         });
       } else {
         const status = result.code === SKILL_NOT_FOUND ? 404
@@ -423,7 +464,10 @@ export async function startServer(options: ServeOptions): Promise<Server> {
             message: result.message,
             skillId: result.skillId,
             exitCode: result.exitCode,
+            stdout: result.stdout,
             stderr: result.stderr,
+            timeoutMs: typeof timeoutMs === "number" ? timeoutMs : undefined,
+            expectedSubstring: typeof expectContains === "string" ? expectContains : undefined,
           },
         });
       }
