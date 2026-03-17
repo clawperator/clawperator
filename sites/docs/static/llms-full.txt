@@ -1188,6 +1188,7 @@ subcommand help for the exact shipped flags and usage:
 ```bash
 clawperator observe snapshot --help
 clawperator observe screenshot --help
+clawperator skills compile-artifact --help
 clawperator skills run --help
 clawperator doctor --help
 ```
@@ -1399,6 +1400,7 @@ Use subcommand help when the docs and the current CLI differ:
 ```bash
 clawperator observe snapshot --help
 clawperator observe screenshot --help
+clawperator skills compile-artifact --help
 clawperator skills run --help
 clawperator skills sync --help
 clawperator doctor --help
@@ -6175,6 +6177,7 @@ When wrapper flags or output behavior matter, check the shipped CLI help
 instead of guessing from memory:
 
 ```bash
+clawperator skills compile-artifact --help
 clawperator skills run --help
 ```
 

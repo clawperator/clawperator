@@ -65,6 +65,7 @@ Use subcommand help when the docs and the current CLI differ:
 ```bash
 clawperator observe snapshot --help
 clawperator observe screenshot --help
+clawperator skills compile-artifact --help
 clawperator skills run --help
 clawperator skills sync --help
 clawperator doctor --help

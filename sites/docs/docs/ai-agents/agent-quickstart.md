@@ -42,6 +42,7 @@ subcommand help for the exact shipped flags and usage:
 ```bash
 clawperator observe snapshot --help
 clawperator observe screenshot --help
+clawperator skills compile-artifact --help
 clawperator skills run --help
 clawperator doctor --help
 ```

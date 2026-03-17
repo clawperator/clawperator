@@ -165,6 +165,7 @@ When wrapper flags or output behavior matter, check the shipped CLI help
 instead of guessing from memory:
 
 ```bash
+clawperator skills compile-artifact --help
 clawperator skills run --help
 ```
 
