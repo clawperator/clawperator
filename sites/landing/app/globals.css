@@ -1456,6 +1456,7 @@ body {
   .top-toolbar {
     position: fixed;
     min-height: var(--toolbar-height);
+    z-index: 60;
   }
 
   .top-toolbar-inner {
@@ -1526,7 +1527,7 @@ body {
     display: block;
     position: fixed;
     inset: var(--toolbar-height) 0 0;
-    z-index: 45;
+    z-index: 40;
     border: 0;
     padding: 0;
     background: rgba(30, 36, 48, 0.26);
