@@ -1,5 +1,10 @@
 {% extends "base.html" %}
 
+{% block favicon %}
+  <link rel="icon" href="{{ 'favicon.png' | url }}" sizes="32x32" type="image/png" />
+  <link rel="icon" href="{{ 'favicon.png' | url }}" sizes="16x16" type="image/png" />
+{% endblock %}
+
 {% block extrahead %}
   {{ super() }}
   <style>
