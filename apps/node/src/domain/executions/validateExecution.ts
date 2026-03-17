@@ -47,10 +47,17 @@ const actionParamsSchema = z.object({
   findFirstScrollableChild: z.boolean().optional(),
   clickAfter: z.boolean().optional(),
   validator: z.string().optional(),
+  validatorPattern: z.string().optional(),
   key: z.string().optional(),
   retry: z.record(z.unknown()).optional(),
   scrollRetry: z.record(z.unknown()).optional(),
   clickRetry: z.record(z.unknown()).optional(),
+  // wait_for_navigation params
+  expectedPackage: z.string().max(LIMITS.MAX_MATCHER_VALUE_LENGTH).optional(),
+  expectedNode: nodeMatcherSchema.optional(),
+  timeoutMs: z.number().optional(),
+  // read_key_value_pair params
+  labelMatcher: nodeMatcherSchema.optional(),
 }).strict();
 
 // NOTE: "doctor_ping" is intentionally excluded. It is an internal diagnostic action
@@ -71,6 +78,8 @@ const supportedTypes = [
   "take_screenshot",
   "sleep",
   "press_key",
+  "wait_for_navigation",
+  "read_key_value_pair",
 ] as const;
 
 const actionSchema = z.object({
@@ -242,6 +251,22 @@ const executionSchema = z.object({
       case "take_screenshot":
         if (params?.path !== undefined && params.path.trim() === "") {
           addIssue(index, "take_screenshot params.path must be a non-empty string", ["params", "path"]);
+        }
+        break;
+      case "wait_for_navigation": {
+        if (!params?.expectedPackage && !params?.expectedNode) {
+          addIssue(index, "wait_for_navigation requires at least one of params.expectedPackage or params.expectedNode", ["params"]);
+        }
+        if (typeof params?.timeoutMs !== "number" || params.timeoutMs <= 0) {
+          addIssue(index, "wait_for_navigation requires params.timeoutMs > 0", ["params", "timeoutMs"]);
+        } else if (params.timeoutMs > 30000) {
+          addIssue(index, "wait_for_navigation params.timeoutMs must not exceed 30000", ["params", "timeoutMs"]);
+        }
+        break;
+      }
+      case "read_key_value_pair":
+        if (!params?.labelMatcher) {
+          addIssue(index, "read_key_value_pair requires params.labelMatcher", ["params", "labelMatcher"]);
         }
         break;
       default:
