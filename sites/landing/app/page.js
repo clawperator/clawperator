@@ -233,6 +233,9 @@ export default function Home() {
   useEffect(() => {
     if (!mobileMenuOpen) return;
 
+    const previousBodyOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
     const handleResize = () => {
       if (window.innerWidth > 840) {
         setMobileMenuOpen(false);
@@ -249,6 +252,7 @@ export default function Home() {
     window.addEventListener("keydown", handleKeyDown);
 
     return () => {
+      document.body.style.overflow = previousBodyOverflow;
       window.removeEventListener("resize", handleResize);
       window.removeEventListener("keydown", handleKeyDown);
     };
@@ -377,6 +381,14 @@ export default function Home() {
           </nav>
         </div>
       </header>
+      {mobileMenuOpen ? (
+        <button
+          type="button"
+          className="mobile-menu-scrim"
+          aria-label="Close navigation menu"
+          onClick={closeMobileMenu}
+        />
+      ) : null}
 
       <main className="page-shell">
       {/* Hero Section */}
