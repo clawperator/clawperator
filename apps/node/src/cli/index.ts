@@ -367,6 +367,17 @@ function getCommandArgs(argv: string[], commandPath: string[]): string[] | undef
   return undefined;
 }
 
+function getStringOpt(rest: string[], flag: string): string | undefined {
+  const i = rest.indexOf(flag);
+  if (i < 0) {
+    return undefined;
+  }
+  if (!rest[i + 1]) {
+    throw new UsageError(`${flag} requires a value`);
+  }
+  return rest[i + 1];
+}
+
 function getNumberOpt(rest: string[], flag: string): number | undefined {
   const i = rest.indexOf(flag);
   if (i < 0) {
@@ -562,7 +573,7 @@ async function main(): Promise<void> {
           deviceId: global.deviceId ?? getOpt(rest, "--device-id"),
           receiverPackage: global.receiverPackage ?? getOpt(rest, "--receiver-package"),
           timeoutMs: global.timeoutMs,
-          path: getOpt(rest, "--path"),
+          path: getStringOpt(rest, "--path"),
         });
       } else {
         result = JSON.stringify({ code: "USAGE", message: "observe snapshot|screenshot [options]" });
@@ -704,7 +715,7 @@ async function main(): Promise<void> {
             result = invalidTimeoutResult;
             break;
           }
-          const expectContains = getOpt(optSegment, "--expect-contains");
+          const expectContains = getStringOpt(optSegment, "--expect-contains");
           if (deviceId) scriptArgs.push(deviceId);
           // Pass anything after "--" as extra args
           if (dashDash >= 0) {

@@ -261,4 +261,12 @@ describe("operator setup CLI output", () => {
     const obj = JSON.parse(stdout);
     assert.strictEqual(obj.code, "OPERATOR_APK_NOT_FOUND");
   });
+
+  it("observe screenshot returns USAGE when --path is missing a value", async () => {
+    const { stdout, code } = await runCli(["observe", "screenshot", "--path"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "USAGE");
+    assert.strictEqual(obj.message, "--path requires a value");
+  });
 });
