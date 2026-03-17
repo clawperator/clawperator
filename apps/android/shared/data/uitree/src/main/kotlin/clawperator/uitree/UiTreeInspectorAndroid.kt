@@ -2,6 +2,10 @@ package clawperator.uitree
 
 import action.log.Log
 import android.accessibilityservice.AccessibilityService
+import android.content.Context
+import android.os.Build
+import android.util.DisplayMetrics
+import android.view.WindowManager
 import android.view.accessibility.AccessibilityWindowInfo
 import clawperator.accessibilityservice.AccessibilityServiceManager
 import clawperator.accessibilityservice.buildUiTree
@@ -113,14 +117,42 @@ class UiTreeInspectorAndroid(
         }
 
     private fun getScreenDimensions(service: AccessibilityService): Pair<Int, Int> =
-        try {
-            // For now, return 0,0 as screen dimensions are not easily accessible
-            // from AccessibilityService. This can be enhanced later if needed.
-            Pair(0, 0)
-        } catch (e: Exception) {
-            // Fallback to 0,0 if screen dimensions can't be determined
-            Pair(0, 0)
-        }
+        getScreenDimensionsFromService(service)
+
+    companion object {
+        /**
+         * Returns the screen dimensions from an AccessibilityService.
+         * Falls back to (0, 0) if dimensions cannot be determined.
+         *
+         * For API 30+: Uses WindowMetrics.currentWindowMetrics.bounds
+         * For pre-API 30: Uses DisplayMetrics with defaultDisplay.getRealMetrics()
+         */
+        fun getScreenDimensionsFromService(service: AccessibilityService): Pair<Int, Int> =
+            try {
+                val windowManager = service.getSystemService(Context.WINDOW_SERVICE) as? WindowManager
+                if (windowManager == null) {
+                    Log.d("[Operator-UxInspector] WindowManager not available")
+                    Pair(0, 0)
+                } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    // API 30+: Use WindowMetrics
+                    val windowMetrics = windowManager.currentWindowMetrics
+                    val bounds = windowMetrics.bounds
+                    Pair(bounds.width(), bounds.height())
+                } else {
+                    // Pre-API 30: Use DisplayMetrics with defaultDisplay
+                    @Suppress("DEPRECATION")
+                    val display = windowManager.defaultDisplay
+                    val metrics = DisplayMetrics()
+                    @Suppress("DEPRECATION")
+                    display.getRealMetrics(metrics)
+                    Pair(metrics.widthPixels, metrics.heightPixels)
+                }
+            } catch (e: Exception) {
+                Log.d("[Operator-UxInspector] Failed to get screen dimensions: ${e.message}")
+                // Fallback to 0,0 if screen dimensions can't be determined
+                Pair(0, 0)
+            }
+    }
 
     private fun logTreeSummary(tree: UiTree) {
         val allNodes = collectAllNodes(tree.root)
