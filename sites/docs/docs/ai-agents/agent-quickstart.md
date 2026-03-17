@@ -36,6 +36,16 @@ clawperator devices --output json
 If multiple devices are connected, always pass `--device-id <device_id>` so
 targeting stays explicit.
 
+If the current CLI behavior and a narrative doc ever seem to disagree, prefer
+subcommand help for the exact shipped flags and usage:
+
+```bash
+clawperator observe snapshot --help
+clawperator observe screenshot --help
+clawperator skills run --help
+clawperator doctor --help
+```
+
 ## Step 1 - Take a snapshot
 
 The quickest way to inspect the current UI is:
@@ -165,6 +175,7 @@ only after the UI path is already known.
 
 - [Clawperator Snapshot Format](../reference/snapshot-format.md)
 - [Execution Model](../reference/execution-model.md)
+- [Error Handling Guide](../reference/error-handling.md)
 - [Device and Package Model](../reference/device-and-package-model.md)
 - [Multi-Device Workflows for Agents](multi-device-workflows.md)
 - [Skill Development Workflow](../skills/skill-development-workflow.md)

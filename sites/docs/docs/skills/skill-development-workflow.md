@@ -161,6 +161,13 @@ This keeps failures local:
 For lightweight smoke checks on expected markers, add
 `--expect-contains <text>` to the live run.
 
+When wrapper flags or output behavior matter, check the shipped CLI help
+instead of guessing from memory:
+
+```bash
+clawperator skills run --help
+```
+
 ## 8. Inspect partial output on script failures
 
 When `clawperator skills run` fails or times out, do not assume the run
@@ -207,6 +214,8 @@ For a new skill, this is the practical order:
 
 ## Related pages
 
+- [Agent Quickstart](../ai-agents/agent-quickstart.md)
+- [Clawperator Snapshot Format](../reference/snapshot-format.md)
 - [Usage Model](usage-model.md)
 - [Skill Authoring Guidelines](skill-authoring-guidelines.md)
 - [Skills Verification](skills-verification.md)
