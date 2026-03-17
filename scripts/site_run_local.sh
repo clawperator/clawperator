@@ -33,7 +33,6 @@ echo "Press Ctrl+C to stop the server."
 
 python3 - <<'PY'
 import http.server
-import socketserver
 
 PORT = 8080
 
@@ -44,7 +43,7 @@ class NoCacheHandler(http.server.SimpleHTTPRequestHandler):
         self.send_header("Expires", "0")
         super().end_headers()
 
-with socketserver.TCPServer(("", PORT), NoCacheHandler) as httpd:
+with http.server.ThreadingHTTPServer(("", PORT), NoCacheHandler) as httpd:
     print(f"Serving HTTP on :: port {PORT} (http://[::]:{PORT}/) ...")
     httpd.serve_forever()
 PY
