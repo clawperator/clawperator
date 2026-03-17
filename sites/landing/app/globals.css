@@ -1283,54 +1283,87 @@ body {
 
 .site-footer {
   min-height: 180px;
+  max-width: 560px;
   margin-top: 6rem;
   border-top: 1px solid var(--border);
-  padding-top: 3rem;
+  padding: 3rem 0 3.4rem;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
-  gap: 0.55rem;
 }
 
 .footer-title {
   margin: 0;
-  font-size: 1.1rem;
-  font-weight: 700;
-  letter-spacing: 0.03em;
+  font-size: 1.18rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
   color: var(--text);
 }
 
 .footer-copy {
   margin: 0;
+  margin-top: 0.5rem;
   color: var(--text-muted);
+  font-size: 0.96rem;
+  line-height: 1.6;
 }
 
 .footer-links {
+  margin-top: 1rem;
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 0.55rem;
   align-items: center;
+  color: var(--text-muted);
+  font-size: 0.94rem;
 }
 
-.footer-links a + a::before {
-  content: "•";
+.footer-links .dot {
   color: var(--text-muted);
-  margin-right: 0.55rem;
+  margin: 0 6px;
 }
 
 .footer-links a {
-  color: var(--text-muted);
+  color: var(--text);
+  opacity: 0.84;
   text-decoration: none;
   border-bottom: 1px solid transparent;
-  font-weight: 600;
+  font-weight: 550;
 }
 
 .footer-links a:hover {
   color: var(--accent);
+  opacity: 1;
   border-bottom-color: var(--accent);
+}
+
+.footer-tagline {
+  margin: 1.35rem 0 0;
+  color: var(--text-muted);
+  opacity: 0.9;
+  font-size: 0.88rem;
+  line-height: 1.6;
+}
+
+.footer-tagline a {
+  color: inherit;
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+}
+
+.footer-tagline a:hover {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.footer-copyright {
+  margin: 0.55rem 0 0;
+  color: var(--text-muted);
+  opacity: 0.72;
+  font-size: 0.78rem;
+  line-height: 1.4;
 }
 
 @keyframes rise {

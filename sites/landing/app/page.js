@@ -818,23 +818,34 @@ if <hvac_state> == "Off":
 
         <footer className="site-footer">
           <p className="footer-title">Clawperator</p>
-          <p className="footer-copy">Open source execution infrastructure for agent-driven Android burner-device workflows.</p>
-          <p className="footer-copy">Built with human claws by @chrismlacy and a scrappy crew of bots.</p>
-          <p className="footer-copy">© 2026 Action Launcher Pty Ltd</p>
+          <p className="footer-copy">
+            Open source execution infrastructure for agent-driven Android burner-device workflows.
+          </p>
           <nav className="footer-links" aria-label="Footer links">
             <a href="https://docs.clawperator.com" target="_blank" rel="noreferrer">
               docs
             </a>
-            <a href="https://github.com/clawperator/clawperator" target="_blank" rel="noreferrer">
-              repo
+            <span className="dot" aria-hidden="true">
+              ·
+            </span>
+            <a href="https://github.com/clawpilled/clawperator" target="_blank" rel="noreferrer">
+              github
             </a>
-            <a href="https://github.com/clawperator/clawperator-skills" target="_blank" rel="noreferrer">
-              skills
-            </a>
+            <span className="dot" aria-hidden="true">
+              ·
+            </span>
             <a href="https://www.npmjs.com/package/clawperator" target="_blank" rel="noreferrer">
               npm
             </a>
           </nav>
+          <p className="footer-tagline">
+            Built with human claws by{" "}
+            <a href="https://x.com/chrismlacy" target="_blank" rel="noreferrer">
+              @chrismlacy
+            </a>
+            {" "}and a scrappy crew of bots.
+          </p>
+          <p className="footer-copyright">© 2026 Action Launcher Pty Ltd</p>
         </footer>
       </main>
     </>
