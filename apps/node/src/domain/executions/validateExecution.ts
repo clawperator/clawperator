@@ -149,10 +149,27 @@ const executionSchema = z.object({
         }
         break;
       case "click":
-      case "read_text":
       case "wait_for_node":
         if (!params?.matcher) {
           addIssue(index, `${action.type} requires params.matcher`, ["params", "matcher"]);
+        }
+        break;
+      case "read_text":
+        if (!params?.matcher) {
+          addIssue(index, "read_text requires params.matcher", ["params", "matcher"]);
+        }
+        // T-04: regex validator requires validatorPattern
+        if (params?.validator === "regex") {
+          if (!params?.validatorPattern || params.validatorPattern.trim() === "") {
+            addIssue(index, "read_text with validator='regex' requires params.validatorPattern", ["params", "validatorPattern"]);
+          } else {
+            // Validate that validatorPattern is a valid regex
+            try {
+              new RegExp(params.validatorPattern);
+            } catch {
+              addIssue(index, "read_text params.validatorPattern is not a valid regex pattern", ["params", "validatorPattern"]);
+            }
+          }
         }
         break;
       case "enter_text":
