@@ -66,7 +66,86 @@ incrementally and keep commits reviewable.
 
 ---
 
+## Progress snapshot
+
+Status as of `2026-03-17`:
+
+- Phase 0: complete
+- Phase 1: complete
+- Phase 2: complete
+- Phase 3: mostly complete
+- Phase 4: mostly complete
+- Phase 5: mostly complete
+- Phase 6: partially complete
+
+Major work already landed:
+
+- Restored the docs information architecture and public entrypoints so the core
+  agent docs are reachable and linked correctly.
+- Added a cold-start [Agent Quickstart](../../docs/agent-quickstart.md) and a
+  dedicated canonical [Snapshot Format](../../docs/snapshot-format.md) page.
+- Preserved and relocated the real-device snapshot examples into the dedicated
+  snapshot page, then reduced duplicate long-form snapshot prose elsewhere.
+- Renamed and repositioned internal-sounding design material so operational
+  docs are the primary entrypoint.
+- Clarified the neutral actuator model, including around usernames, passwords,
+  and other user-provided inputs.
+- Expanded contract docs for selectors, execution status, error handling,
+  environment variables, timeout budgeting, device/package targeting, and
+  Android navigation patterns.
+- Fixed `close_app` semantics in the Node execution path so successful
+  force-stop behavior is reflected as a successful step result.
+- Added `TARGET_FOUND` semantics for `scroll_until` and support for
+  `clickAfter` when a target becomes visible.
+- Added best-effort overlay metadata to snapshot results.
+- Added `clawperator execute --validate-only`.
+- Softened the install flow for multi-device environments so host setup can
+  complete before per-device finish commands are printed.
+- Added `clawperator skills new <skill_id>`.
+- Added `clawperator skills validate <skill_id>` and
+  `clawperator skills validate --all`.
+- Added explicit screenshot path support with
+  `clawperator observe screenshot --path <file>`.
+- Improved skill-wrapper failure handling so partial stdout and stderr are
+  preserved on timeouts and non-zero exits.
+
+Recent implementation commits in this repo:
+
+- `4faa8bf` `docs(onboarding): add quickstart and snapshot reference`
+- `4d4d984` `docs(api): clarify runtime caveats and setup guidance`
+- `abbcf08` `fix(runtime): normalize close app results`
+- `b4dbb00` `fix(scroll): add target-found termination support`
+- `23cbbb6` `docs(skills): surface skill authoring contract`
+- `a8fb8f6` `feat(skills): scaffold local skill templates`
+- `2961b47` `feat(snapshot): surface overlay metadata`
+- `980bda9` `docs(reference): add execution and device model guides`
+- `c353a77` `fix(install): soften multi-device completion flow`
+- `a262f85` `docs(reference): add agent error handling guide`
+- `c3c4c6d` `feat(cli): add execute validate-only mode`
+- `e8246f1` `docs(ai): add navigation patterns guide`
+- `3c507e9` `feat(scroll): allow scroll_until to click visible targets`
+- `84e1b72` `fix(skills): preserve partial output on wrapper failures`
+- `79ac4c0` `docs(reference): add skill wrapper recovery guidance`
+- `a831d0d` `docs(reference): add timeout budgeting guide`
+- `8a5b650` `feat(observe): support explicit screenshot paths`
+- `a7916c6` `feat(skills): add validate command`
+- `ae303b2` `feat(skills): add registry-wide validation`
+
+Matching docs-only progress also landed in the sibling
+`../clawperator-skills` repository for skill authoring guidance.
+
+Main gaps still worth addressing:
+
+- deeper exploration-to-skill ergonomics beyond scaffolding and validation
+- any remaining docs rough edges or drift discovered during broader review
+- higher-level runtime ergonomics that reduce round-trips further without
+  weakening determinism
+
+---
+
 ## Phase 0: Baseline audit and source-of-truth alignment
+
+**Status:** Complete
 
 ### Why first
 
@@ -103,6 +182,8 @@ public surface affected.
 ---
 
 ## Phase 1: Restore public docs as a trustworthy entrypoint
+
+**Status:** Complete
 
 ### Objective
 
@@ -155,6 +236,8 @@ Fix the practical "agents cannot self-onboard from the website" problem first.
 ---
 
 ## Phase 2: Create a true cold-start agent quickstart
+
+**Status:** Complete
 
 ### Objective
 
@@ -221,6 +304,8 @@ successful command and know what to do next."
 ---
 
 ## Phase 3: Close the documentation contract gaps
+
+**Status:** Mostly complete
 
 ### Objective
 
@@ -328,9 +413,28 @@ reading source or discovering behavior by failed execution.
 
 - `docs(api): document current runtime contracts for cold-start agents`
 
+### Progress notes
+
+- Completed:
+  - dedicated snapshot-format reference page
+  - quickstart and API cross-linking to the snapshot page
+  - clearer distinction between operational docs and design/rationale docs
+  - neutral actuator wording across the key docs
+  - selector, timeout, execution-model, environment-variable, and
+    error-handling references
+  - `open_uri`, `scroll_until`, `close_app`, and snapshot metadata caveats in
+    public docs
+  - skill authoring and validation guidance in both repos
+- Remaining:
+  - continue broad doc review for any smaller contract gaps or stale wording
+  - decide whether any additional reference pages should be split out as the
+    docs corpus grows
+
 ---
 
 ## Phase 4: Fix trust-breaking runtime behavior and missing diagnostics
+
+**Status:** Mostly complete
 
 ### Objective
 
@@ -385,9 +489,25 @@ behavior is misleading, incomplete, or silently broken.
 - `feat(api): improve targeted scroll diagnostics`
 - `fix(install): improve multi-device recovery guidance`
 
+### Progress notes
+
+- Completed:
+  - `close_app` now normalizes successful Node-side force-stop behavior into a
+    successful step result
+  - `scroll_until` emits `TARGET_FOUND`
+  - `scroll_until` can optionally click the target once visible
+  - snapshot overlay metadata is surfaced
+  - `execute --validate-only` exists
+  - install flow now handles multi-device end states more gracefully
+- Remaining:
+  - evaluate whether any more overlay or dialog diagnostics should be surfaced
+  - continue reviewing for any other trust-breaking result-shape mismatches
+
 ---
 
 ## Phase 5: Improve the skill-authoring path from exploration to reuse
+
+**Status:** Mostly complete
 
 ### Objective
 
@@ -435,9 +555,25 @@ convention-discovery exercise.
 - `docs(skills): document private skill authoring`
 - `feat(skills): add scaffolding for private skills`
 
+### Progress notes
+
+- Completed:
+  - dedicated skill authoring documentation in `../clawperator-skills/docs/`
+  - documented `skill.json`, registry model, artifacts, wrapper behavior, and
+    timeout guidance
+  - `skills new <skill_id>`
+  - `skills validate <skill_id>`
+  - `skills validate --all`
+- Remaining:
+  - evaluate whether artifact or script dry-run tooling is worth adding
+  - evaluate whether exploration-to-skill capture tooling belongs in this
+    effort or a later roadmap item
+
 ---
 
 ## Phase 6: Agent productivity optimizations and higher-level ergonomics
+
+**Status:** Partially complete
 
 ### Objective
 
@@ -469,6 +605,18 @@ reduce round-trips and friction for real agent workflows.
 ### Suggested commit boundaries
 
 - separate per capability; do not bundle with baseline docs repair
+
+### Progress notes
+
+- Completed:
+  - top-level `scroll_until` now supports immediate click-on-visible-target
+  - snapshot overlay metadata reduces some unknown-UI recovery ambiguity
+  - explicit screenshot output paths reduce file-handling friction
+- Remaining:
+  - determine whether a broader top-level scroll-to-and-click primitive is
+    still needed beyond the current `clickAfter` support
+  - determine whether streaming or recorder-style ergonomics justify the
+    implementation cost
 
 ---
 
