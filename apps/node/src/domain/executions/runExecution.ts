@@ -276,7 +276,7 @@ async function performExecution(
       const screenAction = execution.actions.find(a => a.type === "take_screenshot");
       if (hasScreenshot) {
         try {
-          const screenshotPath = screenAction?.params?.path || join(tmpdir(), `clawperator-screenshot-${execution.commandId}-${Date.now()}.png`);
+          const screenshotPath = screenAction?.params?.path ?? join(tmpdir(), `clawperator-screenshot-${execution.commandId}-${Date.now()}.png`);
           const screenStep = result.envelope.stepResults.find(s => s.actionType === "take_screenshot");
 
           const deviceArgs = config.deviceId ? ["-s", config.deviceId] : [];

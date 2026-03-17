@@ -17,7 +17,7 @@ export function buildScreenshotExecution(options?: { timeoutMs?: number; path?: 
       {
         id: "snap",
         type: "take_screenshot",
-        params: options?.path ? { path: options.path } : {},
+        params: options?.path !== undefined ? { path: options.path } : {},
       },
     ],
   };

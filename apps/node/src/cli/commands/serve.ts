@@ -195,8 +195,8 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       return;
     }
 
-    if (path !== undefined && typeof path !== "string") {
-      res.status(400).json({ ok: false, error: { code: "INVALID_PATH", message: "'path' must be a string" } });
+    if (path !== undefined && (typeof path !== "string" || path.trim() === "")) {
+      res.status(400).json({ ok: false, error: { code: "INVALID_PATH", message: "'path' must be a non-empty string" } });
       return;
     }
 
@@ -207,7 +207,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       source: "serve-api",
       expectedFormat: "android-ui-automator",
       timeoutMs: 30000,
-      actions: [{ id: "shot", type: "take_screenshot", params: path ? { path } : {} }],
+      actions: [{ id: "shot", type: "take_screenshot", params: path !== undefined ? { path } : {} }],
     };
 
     try {

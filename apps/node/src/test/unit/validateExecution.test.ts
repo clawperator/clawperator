@@ -367,6 +367,21 @@ describe("validateExecution", () => {
     assert.strictEqual(ex.actions[0].params?.key, "BACK");
   });
 
+  it("rejects take_screenshot with blank path", () => {
+    assert.throws(
+      () =>
+        validateExecution({
+          commandId: "c",
+          taskId: "t",
+          source: "s",
+          expectedFormat: "android-ui-automator",
+          timeoutMs: 5000,
+          actions: [{ id: "x", type: "take_screenshot", params: { path: "   " } }],
+        }),
+      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
+    );
+  });
+
   it("accepts scroll with no params", () => {
     const ex = validateExecution({
       commandId: "c",

@@ -239,6 +239,11 @@ const executionSchema = z.object({
         }
         break;
       }
+      case "take_screenshot":
+        if (params?.path !== undefined && params.path.trim() === "") {
+          addIssue(index, "take_screenshot params.path must be a non-empty string", ["params", "path"]);
+        }
+        break;
       default:
         break;
     }

@@ -183,6 +183,20 @@ describe("serve API integration", () => {
     assert.strictEqual(body.error.code, "INVALID_PATH");
   });
 
+  test("POST /observe/screenshot rejects empty path", async () => {
+    const res = await fetch(`http://localhost:${port}/observe/screenshot`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: "" }),
+    });
+
+    assert.strictEqual(res.status, 400);
+    const body = await res.json() as { ok: boolean; error: { code: string; message: string } };
+    assert.strictEqual(body.ok, false);
+    assert.strictEqual(body.error.code, "INVALID_PATH");
+    assert.strictEqual(body.error.message, "'path' must be a non-empty string");
+  });
+
   test("POST /skills/:skillId/run preserves partial output on failure", async () => {
     const res = await fetch(`http://localhost:${port}/skills/com.test.fail/run`, {
       method: "POST",
