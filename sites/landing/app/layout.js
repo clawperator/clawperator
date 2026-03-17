@@ -14,7 +14,13 @@ const monoFont = IBM_Plex_Mono({
 
 export const metadata = {
   title: "Clawperator",
-  description: "Deterministic Android Automation for AI Agents"
+  description: "Deterministic Android Automation for AI Agents",
+  icons: {
+    icon: [
+      { url: "/favicon.png", sizes: "32x32", type: "image/png" },
+      { url: "/favicon.png", sizes: "16x16", type: "image/png" }
+    ]
+  }
 };
 
 const structuredData = {
