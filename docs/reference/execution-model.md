@@ -104,6 +104,9 @@ stable machine contract.
 
 `timeoutMs` is an execution-wide budget, not a per-step budget.
 
+For practical starting values by workflow type, see
+[Clawperator Timeout Budgeting](timeout-budgeting.md).
+
 Current validation policy:
 
 - minimum: `1000`

@@ -23,12 +23,14 @@ nav:
     - Node API - Agent Guide: ai-agents/node-api-for-agents.md
     - Navigation Patterns for Agents: ai-agents/navigation-patterns.md
     - Execution Model: reference/execution-model.md
+    - Timeout Budgeting: reference/timeout-budgeting.md
     - Device and Package Model: reference/device-and-package-model.md
     - Operator LLM Playbook: design/operator-llm-playbook.md
   - Reference:
     - CLI Reference: reference/cli-reference.md
     - API Overview: reference/api-overview.md
     - Execution Model: reference/execution-model.md
+    - Timeout Budgeting: reference/timeout-budgeting.md
     - Device and Package Model: reference/device-and-package-model.md
     - Clawperator Snapshot Format: reference/snapshot-format.md
     - Error Codes: reference/error-codes.md

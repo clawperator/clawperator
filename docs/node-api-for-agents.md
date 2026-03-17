@@ -190,6 +190,9 @@ Every execution requires `expectedFormat: "android-ui-automator"`.
 
 **Execution timeout limit:** `timeoutMs` is schema-validated. The allowed range is 1,000-120,000 ms (1 second to 2 minutes). Submitting a value outside this range causes `EXECUTION_VALIDATION_FAILED` - the execution is rejected before any action runs. Operations that require longer running time must be split across multiple execution payloads. For install or download flows, use `wait_for_node` polling within the 120-second window rather than a single long sleep.
 
+For practical timeout sizing guidance by workflow type, see
+[Clawperator Timeout Budgeting](../reference/timeout-budgeting.md).
+
 **Result envelope:** Exactly one `[Clawperator-Result]` JSON block is emitted to logcat on completion. Node reads and returns it. See the Result Envelope section for the full shape and per-action `data` contents.
 
 ## NodeMatcher Reference

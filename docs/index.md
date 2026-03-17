@@ -21,6 +21,7 @@ Use this page as a technical map:
 - [Agent Quickstart](ai-agents/agent-quickstart.md) - Fastest path from first install to first successful execution
 - [Node API - Agent Guide](ai-agents/node-api-for-agents.md) - Canonical CLI and HTTP API contract for agent builders
 - [Execution Model](reference/execution-model.md) - Required payload fields, status vs step success, timeout, and error surfaces
+- [Timeout Budgeting](reference/timeout-budgeting.md) - Practical `timeoutMs` sizing for snapshots, scroll loops, and skill flows
 - [Device and Package Model](reference/device-and-package-model.md) - What `deviceId` and `receiverPackage` mean in practice
 - [Clawperator Snapshot Format](reference/snapshot-format.md) - Canonical `snapshot_ui` and `observe snapshot` output contract
 - [Navigation Patterns for Agents](ai-agents/navigation-patterns.md) - Practical patterns for scrolls, overlays, and OEM variation
@@ -50,6 +51,7 @@ Use this page as a technical map:
 - [Agent Quickstart](ai-agents/agent-quickstart.md) - Fastest path for a cold-start agent
 - [Node API - Agent Guide](ai-agents/node-api-for-agents.md) - Canonical CLI and HTTP API reference for agents
 - [Execution Model](reference/execution-model.md) - Envelope semantics, timeout policy, and validation behavior
+- [Timeout Budgeting](reference/timeout-budgeting.md) - Practical timeout sizing for common agent workflows
 - [Device and Package Model](reference/device-and-package-model.md) - Device IDs, receiver packages, and multi-device rules
 - [Clawperator Snapshot Format](reference/snapshot-format.md) - Canonical snapshot output and parsing contract
 - [Navigation Patterns for Agents](ai-agents/navigation-patterns.md) - Scroll, overlay, and OEM-variation tactics
@@ -62,6 +64,7 @@ Use this page as a technical map:
 - [CLI Reference](reference/cli-reference.md) - Command-line usage and flags
 - [API Overview](reference/api-overview.md) - Execution payload, action types, result envelopes, and snapshot semantics
 - [Execution Model](reference/execution-model.md) - Required execution fields, status semantics, and timeout behavior
+- [Timeout Budgeting](reference/timeout-budgeting.md) - Practical timeout sizing and workflow-splitting guidance
 - [Device and Package Model](reference/device-and-package-model.md) - Device targeting, package targeting, and multi-device behavior
 - [Clawperator Snapshot Format](reference/snapshot-format.md) - Canonical `hierarchy_xml` contract and parsing guidance
 - [Error Codes](reference/error-codes.md) - Structured runtime and API error code reference

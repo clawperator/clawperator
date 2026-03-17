@@ -251,6 +251,18 @@ can return structured output. When the wrapper does fail or time out,
 Clawperator preserves partial script `stdout` and `stderr` in the structured
 error payload when available.
 
+Start with these rough execution budgets when choosing `timeoutMs` inside a
+skill:
+
+- `15000`-`30000` for short single-screen work
+- `30000`-`60000` for targeted Settings-style scroll flows
+- `60000`-`90000` for multi-screen navigation on real devices
+- `90000`-`120000` only for genuinely long bounded flows
+
+When a flow keeps drifting toward the ceiling, split it into multiple
+observe-decide-execute rounds instead of pushing every skill toward one large
+monolithic execution.
+
 ---
 
 ## 9. Compliance and security
@@ -285,3 +297,5 @@ Also remember:
   range.
 - Split very long workflows into multiple executions rather than relying on one
   oversized timeout.
+- Use the public timeout budgeting guide when calibrating new skills:
+  [Clawperator Timeout Budgeting](https://docs.clawperator.com/reference/timeout-budgeting/).

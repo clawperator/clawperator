@@ -120,6 +120,11 @@ sections:
         mode: copy
         sources:
           - docs/reference/execution-model.md
+      - output: reference/timeout-budgeting.md
+        title: Clawperator Timeout Budgeting
+        mode: copy
+        sources:
+          - docs/reference/timeout-budgeting.md
       - output: reference/device-and-package-model.md
         title: Device and Package Model
         mode: copy
