@@ -715,6 +715,8 @@ if <hvac_state> == "Off":
         <footer className="site-footer">
           <p className="footer-title">Clawperator</p>
           <p className="footer-copy">Open source execution infrastructure for agent-driven Android burner-device workflows.</p>
+          <p className="footer-copy">Built with human claws by @chrismlacy and a scrappy crew of bots.</p>
+          <p className="footer-copy">© 2026 Action Launcher Pty Ltd</p>
           <nav className="footer-links" aria-label="Footer links">
             <a href="https://docs.clawperator.com" target="_blank" rel="noreferrer">
               docs
