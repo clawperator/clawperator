@@ -603,7 +603,7 @@ snapshot to verify" round-trip for many navigation tasks.
 If `clickAfter: true`, `scroll_until` clicks the target immediately after it
 becomes visible. This gives agents a one-step "scroll top-level list until
 visible, then click" path without switching to `scroll_and_click`.
-*Note on `clickAfter` firing:* The click only fires if the loop terminates with `TARGET_FOUND`. On older Clawperator APKs (pre-PR-1), if the target was found exactly at the edge of the list, the termination reason was sometimes reported as `EDGE_REACHED` and the click was silently skipped. As a safety net for older APKs, you can follow an `EDGE_REACHED` termination with an explicit `click` step.
+*Note on `clickAfter` firing:* The click only fires if the loop terminates with `TARGET_FOUND`.
 
 **Termination reasons (`data.termination_reason`):**
 - `TARGET_FOUND` - the provided `target` matcher became visible in the current UI tree. `success: true`.
@@ -621,7 +621,6 @@ When no `target` matcher is provided, `scroll_until` behaves as a pure bounded
 pagination loop and returns one of the non-target terminal reasons above.
 
 **Current runtime caveats:**
-- On older APKs (pre-PR-1), if the resolved container disappeared mid-loop because the app navigated away or rebuilt the view tree unexpectedly, the Android runtime collapsed that case into `EDGE_REACHED`. This is fixed in current versions, which return `CONTAINER_LOST`.
 - Some Android screens expose off-screen descendants in the raw `snapshot_ui` XML. `scroll_until.target` does not use raw XML presence alone; it checks Clawperator's on-screen filtered tree. On heavily clipped or nested layouts, a target may appear in the raw snapshot near the bottom edge but still finish as `EDGE_REACHED` until it is more fully on-screen.
 
 When a scroll loop might trigger navigation, heavy UI re-layout, or clipped list rows near the viewport edge, follow it with `snapshot_ui` or `wait_for_node` before assuming the list truly ended.
