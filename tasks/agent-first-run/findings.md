@@ -1,5 +1,19 @@
 # Clawperator Evaluation: Cold-Start Agent Findings
 
+## What this document is
+
+This is a first-principles evaluation of Clawperator — an Android UI automation runtime that uses a brain/hand model (LLM = brain, Clawperator = hand). A cold-start agent was given a connected Samsung Galaxy S22, no prior knowledge of the product, and a single task: install Clawperator from scratch and retrieve the Android OS version using only the documented UI automation API (no `adb shell getprop`).
+
+The agent followed the full install path, learned the execution model through runtime observation, navigated Android Settings to find the Android version, and built a reusable private skill. Every finding below came from direct experience — not from assumptions or prior knowledge.
+
+**Why it exists:** The output of this evaluation is the source of truth for `tasks/agent-first-run/todo.md`, which breaks the findings into 14 concrete tasks across 7 PRs. An agent implementing any of those tasks should read the relevant section here to understand the context, the exact failure mode, and the rationale behind the proposed fix.
+
+**Key outcome:** Android version = **16** on SM-S901E. Skill `com.android.settings.get-android-version` runs end to end. The path had 5 notable friction points, all documented below.
+
+**Date:** 2026-03-18
+
+---
+
 **Device:** Samsung Galaxy S22 (SM-S901E)
 **Result:** Android version **16** (confirmed from raw UI snapshot XML)
 **Skill:** `com.android.settings.get-android-version` — runs end to end, first attempt
