@@ -104,7 +104,6 @@ Use this page as a technical map:
 - [Skill Authoring Guidelines](skills/skill-authoring-guidelines.md)
 - [Skill Design](design/skill-design.md)
 - [Device Prep and Runtime Tips](skills/device-prep-and-runtime-tips.md)
-- [Skills Verification](skills/skills-verification.md)
 - [Blocked Terms Policy](skills/blocked-terms-policy.md)
 
 ---
@@ -6229,7 +6228,6 @@ For a new skill, this is the practical order:
 - [Clawperator Snapshot Format](../reference/snapshot-format.md)
 - [Usage Model](usage-model.md)
 - [Skill Authoring Guidelines](skill-authoring-guidelines.md)
-- [Skills Verification](skills-verification.md)
 
 ---
 
@@ -6600,7 +6598,16 @@ Most skill failures are environment/state issues, not script syntax issues.
 ---
 
 
-# Skills Verification
+# Skills Verification Snapshot
+
+This page is a dated verification snapshot, not the primary authoring or
+runtime guide.
+
+Use these pages first for current workflow guidance:
+
+- `skill-development-workflow.md`
+- `skill-authoring-guidelines.md`
+- `usage-model.md`
 
 Date: 2026-02-19
 

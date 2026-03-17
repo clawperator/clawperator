@@ -1,4 +1,13 @@
-# Skills Verification
+# Skills Verification Snapshot
+
+This page is a dated verification snapshot, not the primary authoring or
+runtime guide.
+
+Use these pages first for current workflow guidance:
+
+- `skill-development-workflow.md`
+- `skill-authoring-guidelines.md`
+- `usage-model.md`
 
 Date: 2026-02-19
 

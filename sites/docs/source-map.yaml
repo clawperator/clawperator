@@ -204,7 +204,7 @@ sections:
         sources:
           - ../clawperator-skills/docs/device-prep-and-runtime-tips.md
       - output: skills/skills-verification.md
-        title: Skills Verification
+        title: Skills Verification Snapshot
         mode: copy
         sources:
           - ../clawperator-skills/docs/skills-verification.md

@@ -96,5 +96,4 @@ Use this page as a technical map:
 - [Skill Authoring Guidelines](skills/skill-authoring-guidelines.md)
 - [Skill Design](design/skill-design.md)
 - [Device Prep and Runtime Tips](skills/device-prep-and-runtime-tips.md)
-- [Skills Verification](skills/skills-verification.md)
 - [Blocked Terms Policy](skills/blocked-terms-policy.md)

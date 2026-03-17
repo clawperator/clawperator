@@ -218,4 +218,3 @@ For a new skill, this is the practical order:
 - [Clawperator Snapshot Format](../reference/snapshot-format.md)
 - [Usage Model](usage-model.md)
 - [Skill Authoring Guidelines](skill-authoring-guidelines.md)
-- [Skills Verification](skills-verification.md)
