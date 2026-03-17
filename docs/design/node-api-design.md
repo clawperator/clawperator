@@ -124,20 +124,19 @@ When a step fails but the runtime continues (or fails fast), the `stepResults` e
 - `data.error`: A stable machine-readable error code.
 - `data.message`: A human-readable (and LLM-readable) explanation.
 
-### Example: `UNSUPPORTED_RUNTIME_CLOSE`
-This error occurs when a `close_app` action is dispatched to the Android runtime. Because of sandbox restrictions, the runtime cannot reliably close other apps.
-
-**Desired Outcome:** The agent should see this error and know that the 'Hand' (Node CLI) is responsible for pre-flight closure via ADB.
+### Example: normalized `close_app`
+`close_app` is executed pre-flight in the Node layer via `adb shell am force-stop`.
+When that force-stop succeeds, the Node layer normalizes the step result to a
+successful `close_app` outcome so the envelope matches what actually happened on
+the device.
 
 ```json
 {
   "id": "step-1",
   "actionType": "close_app",
-  "success": false,
+  "success": true,
   "data": {
-    "application_id": "com.example.app",
-    "error": "UNSUPPORTED_RUNTIME_CLOSE",
-    "message": "Android runtime cannot reliably close apps. Use the Clawperator Node API or 'adb shell am force-stop' directly for this action."
+    "application_id": "com.example.app"
   }
 }
 ```

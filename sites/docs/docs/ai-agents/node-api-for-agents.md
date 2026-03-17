@@ -278,7 +278,7 @@ What this action does not promise:
 Treat `open_uri` as an `ACTION_VIEW` URI launcher, not a general-purpose
 Android intent builder.
 
-**`close_app`:** The Node layer intercepts `close_app` actions and runs `adb shell am force-stop <applicationId>` before dispatching to Android. The Android step always returns `success: false` with `data.error: "UNSUPPORTED_RUNTIME_CLOSE"` - this is expected. The overall execution `status` remains `"success"` and the app is force-stopped. Do not treat this step result as a recoverable failure.
+**`close_app`:** The Node layer intercepts `close_app` actions and runs `adb shell am force-stop <applicationId>` before dispatching to Android. When that pre-flight close succeeds, the Node layer normalizes the resulting `close_app` step into a successful step result so the envelope reflects the real observed outcome. In practice, treat `close_app` as a supported force-stop action through the Node interface.
 
 **`click`:** Finds the node matching `matcher` and performs the specified `clickType`. The default click type is `"default"` (standard accessibility click with gesture fallback). Use `"long_click"` for long-press targets and `"focus"` to focus without activating.
 
@@ -671,7 +671,7 @@ Every execution emits exactly one `[Clawperator-Result]` envelope:
 }
 ```
 
-- `status` is `"success"` when the execution completes (including partial step failures like `close_app`). `status` is `"failed"` only on total execution failure (dispatch error, timeout, validation failure).
+- `status` is `"success"` when the execution completes. `status` is `"failed"` only on total execution failure (dispatch error, timeout, validation failure).
 - `error` (top-level) contains a human-readable description of the failure. Do not branch agent logic on this string - it is not a stable contract.
 - `errorCode` (top-level) contains a stable, enumerated code when the failure has a known cause. Branch agent logic on this field. May be absent in envelopes from older APK versions or for unclassified failures.
 - `data.error` on a step result contains the per-step error code when `success` is `false`.
@@ -686,7 +686,7 @@ Typical `data` keys by action type:
 | :--- | :--- |
 | `open_app` | `application_id` |
 | `open_uri` | `uri` |
-| `close_app` | `application_id`, `error` (`"UNSUPPORTED_RUNTIME_CLOSE"`), `message` |
+| `close_app` | `application_id` |
 | `click` | `click_types` |
 | `enter_text` | `text` (text typed), `submit` (`"true"` or `"false"`) |
 | `read_text` | `text` (extracted text value), `validator` (`"none"` or validator type) |
@@ -748,14 +748,13 @@ Branch agent logic on codes from `envelope.errorCode` (top-level Android result 
 | `EXECUTION_VALIDATION_FAILED` | `error.code` | Payload failed schema validation |
 | `SECURITY_BLOCK_DETECTED` | `data.error` | Android blocked the action (e.g., secure keyboard) |
 | `NODE_NOT_CLICKABLE` | `data.error` | Reserved error code. Intended for "element found but not interactable", but not currently emitted consistently by the Android and Node runtimes. |
-| `UNSUPPORTED_RUNTIME_CLOSE` | `data.error` | Expected per-step result for all `close_app` steps. The Android runtime does not support a force-stop action response - the Node layer handles the close via `adb shell am force-stop` before dispatch. The overall execution `status` remains `"success"`. Treat as non-fatal. |
 | `SNAPSHOT_EXTRACTION_FAILED` | `data.error` | `snapshot_ui` step completed but the Node layer did not attach any snapshot text to the step during post-processing. The most common cause is a Node binary packaging mismatch or other logcat extraction issue. Rebuild or reinstall the npm package and check version compatibility. |
 | `GLOBAL_ACTION_FAILED` | `data.error` | `press_key` step result when the OS reports `performGlobalAction` returned false. Rare soft failure - the accessibility service was running but Android declined to execute the action. |
 | `CONTAINER_NOT_FOUND` | `data.error` | `scroll` step could not locate a scrollable container. Either no scrollable node is present on screen, or the provided `container` matcher matched nothing. |
 | `CONTAINER_NOT_SCROLLABLE` | `data.error` | `scroll` step found the matched container but it is not scrollable and no scrollable descendant was found. With the default `findFirstScrollableChild: true`, the runtime already walks one level down before raising this error. |
 | `GESTURE_FAILED` | `data.error` | `scroll` step: the OS rejected the gesture dispatch. The accessibility service was running but Android declined to execute the swipe gesture. Step returns `success: false`. |
 
-Primary top-level error taxonomy: `apps/node/src/contracts/errors.ts`. This table also includes runtime-only step error strings such as `UNSUPPORTED_RUNTIME_CLOSE`.
+Primary top-level error taxonomy: `apps/node/src/contracts/errors.ts`. This table also includes runtime-only step error strings where they are still surfaced directly by callers.
 
 ## Key Behaviors
 

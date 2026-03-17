@@ -1,6 +1,12 @@
 import { describe, it } from "node:test";
 import assert from "node:assert";
-import { attachSnapshotsToStepResults, finalizeSuccessfulScreenshotCapture, markExtractionFailedSnapshotSteps } from "../../domain/executions/runExecution.js";
+import {
+  attachSnapshotsToStepResults,
+  finalizeSuccessfulCloseAppSteps,
+  finalizeSuccessfulScreenshotCapture,
+  markExtractionFailedSnapshotSteps,
+} from "../../domain/executions/runExecution.js";
+import type { Execution } from "../../contracts/execution.js";
 import type { StepResult } from "../../contracts/result.js";
 
 describe("attachSnapshotsToStepResults", () => {
@@ -159,5 +165,59 @@ describe("finalizeSuccessfulScreenshotCapture", () => {
       source: "adb-fallback",
       path: "/tmp/capture.png",
     });
+  });
+});
+
+describe("finalizeSuccessfulCloseAppSteps", () => {
+  it("normalizes unsupported runtime close steps into success when the Node pre-flight close ran", () => {
+    const execution: Execution = {
+      commandId: "cmd-close",
+      taskId: "task-close",
+      source: "test",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 5000,
+      actions: [
+        { id: "close-1", type: "close_app", params: { applicationId: "com.example.app" } },
+      ],
+    };
+    const stepResults: StepResult[] = [
+      {
+        id: "close-1",
+        actionType: "close_app",
+        success: false,
+        data: {
+          error: "UNSUPPORTED_RUNTIME_CLOSE",
+          message: "Android runtime cannot reliably close apps.",
+        },
+      },
+    ];
+
+    finalizeSuccessfulCloseAppSteps(stepResults, execution);
+
+    assert.strictEqual(stepResults[0].success, true);
+    assert.deepStrictEqual(stepResults[0].data, { application_id: "com.example.app" });
+  });
+
+  it("does not modify unrelated or already-successful close_app steps", () => {
+    const execution: Execution = {
+      commandId: "cmd-close",
+      taskId: "task-close",
+      source: "test",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 5000,
+      actions: [
+        { id: "close-1", type: "close_app", params: { applicationId: "com.example.app" } },
+      ],
+    };
+    const stepResults: StepResult[] = [
+      { id: "close-1", actionType: "close_app", success: true, data: { application_id: "com.example.app" } },
+      { id: "click-1", actionType: "click", success: true, data: {} },
+    ];
+
+    finalizeSuccessfulCloseAppSteps(stepResults, execution);
+
+    assert.strictEqual(stepResults[0].success, true);
+    assert.deepStrictEqual(stepResults[0].data, { application_id: "com.example.app" });
+    assert.deepStrictEqual(stepResults[1].data, {});
   });
 });

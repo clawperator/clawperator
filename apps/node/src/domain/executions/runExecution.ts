@@ -95,6 +95,41 @@ export function finalizeSuccessfulScreenshotCapture(
 }
 
 /**
+ * close_app is executed pre-flight via adb force-stop in the Node layer.
+ * When that succeeds, normalize the Android runtime's expected
+ * UNSUPPORTED_RUNTIME_CLOSE step into a successful close_app result so the
+ * envelope matches the real outcome observed by callers.
+ */
+export function finalizeSuccessfulCloseAppSteps(
+  stepResults: ResultEnvelope["stepResults"],
+  execution: Execution
+): void {
+  const closeActions = new Map(
+    execution.actions
+      .filter(action => action.type === "close_app" && action.params?.applicationId)
+      .map(action => [action.id, action.params?.applicationId as string])
+  );
+
+  if (closeActions.size === 0) {
+    return;
+  }
+
+  for (const step of stepResults) {
+    if (step.actionType !== "close_app") {
+      continue;
+    }
+    const applicationId = closeActions.get(step.id);
+    if (!applicationId) {
+      continue;
+    }
+    if (step.success === false && step.data.error === "UNSUPPORTED_RUNTIME_CLOSE") {
+      step.success = true;
+      step.data = { application_id: applicationId };
+    }
+  }
+}
+
+/**
  * Internal helper to validate, resolve device, and perform actual execution.
  */
 async function performExecution(
@@ -187,6 +222,8 @@ async function performExecution(
     );
 
     if (result.ok) {
+      finalizeSuccessfulCloseAppSteps(result.envelope.stepResults, execution);
+
       // Post-process to retrieve snapshot text from logcat
       const hasSnapshot = result.envelope.stepResults.some(s => s.actionType === "snapshot_ui");
       if (hasSnapshot) {
