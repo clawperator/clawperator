@@ -166,7 +166,7 @@ class AgentCommandParserDefault : AgentCommandParser {
                     id = id,
                     expectedPackage = expectedPackage,
                     expectedNode = expectedNode,
-                    timeoutMs = params.longRequired("timeoutMs").coerceIn(0L, 30_000L),
+                    timeoutMs = params.longRequired("timeoutMs").coerceIn(1L, 30_000L),
                 )
             }
             "read_key_value_pair" ->
