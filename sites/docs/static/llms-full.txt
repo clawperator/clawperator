@@ -34,10 +34,11 @@ Use this page as a technical map:
 - [Clawperator Snapshot Format](reference/snapshot-format.md) - Canonical `snapshot_ui` and `observe snapshot` output contract
 - [Navigation Patterns for Agents](ai-agents/navigation-patterns.md) - Practical patterns for scrolls, overlays, and OEM variation
 - [Multi-Device Workflows for Agents](ai-agents/multi-device-workflows.md) - Deterministic targeting, per-device queues, and install recovery
-- [Operator LLM Playbook](design/operator-llm-playbook.md) - Practical operating rules for observation, action loops, and skill execution
+- [Error Handling Guide](reference/error-handling.md) - Recoverable vs fatal patterns and what an agent should do next
 - [API Overview](reference/api-overview.md) - Execution payload, action types, result envelope shape, and snapshot semantics
 - [CLI Reference](reference/cli-reference.md) - Command-line entrypoints and flags
 - [Environment Variables](reference/environment-variables.md) - Central reference for installer and runtime env vars
+- [Skill Development Workflow](skills/skill-development-workflow.md) - Shortest path from exploration to a reusable private skill
 
 ### Start here if you are preparing runtime infrastructure
 
@@ -65,9 +66,10 @@ Use this page as a technical map:
 - [Clawperator Snapshot Format](reference/snapshot-format.md) - Canonical snapshot output and parsing contract
 - [Navigation Patterns for Agents](ai-agents/navigation-patterns.md) - Scroll, overlay, and OEM-variation tactics
 - [Multi-Device Workflows for Agents](ai-agents/multi-device-workflows.md) - How to keep targeting explicit when more than one device is connected
-- [Operator LLM Playbook](design/operator-llm-playbook.md) - Action contracts, runtime conventions, and skill packaging
 - [API Overview](reference/api-overview.md) - Execution payload, action types, result envelopes, and snapshot delivery
 - [CLI Reference](reference/cli-reference.md) - Exact command surface for local and scripted integrations
+- [Error Handling Guide](reference/error-handling.md) - What to retry, what to fix, and what to surface to the caller
+- [Skill Development Workflow](skills/skill-development-workflow.md) - How to turn exploration into a reusable skill
 
 ## Reference
 
@@ -1176,6 +1178,16 @@ clawperator devices --output json
 If multiple devices are connected, always pass `--device-id <device_id>` so
 targeting stays explicit.
 
+If the current CLI behavior and a narrative doc ever seem to disagree, prefer
+subcommand help for the exact shipped flags and usage:
+
+```bash
+clawperator observe snapshot --help
+clawperator observe screenshot --help
+clawperator skills run --help
+clawperator doctor --help
+```
+
 ## Step 1 - Take a snapshot
 
 The quickest way to inspect the current UI is:
@@ -1305,6 +1317,7 @@ only after the UI path is already known.
 
 - [Clawperator Snapshot Format](../reference/snapshot-format.md)
 - [Execution Model](../reference/execution-model.md)
+- [Error Handling Guide](../reference/error-handling.md)
 - [Device and Package Model](../reference/device-and-package-model.md)
 - [Multi-Device Workflows for Agents](multi-device-workflows.md)
 - [Skill Development Workflow](../skills/skill-development-workflow.md)
@@ -1381,6 +1394,8 @@ Use subcommand help when the docs and the current CLI differ:
 
 ```bash
 clawperator observe snapshot --help
+clawperator observe screenshot --help
+clawperator skills run --help
 clawperator skills sync --help
 clawperator doctor --help
 ```
@@ -6152,6 +6167,13 @@ This keeps failures local:
 For lightweight smoke checks on expected markers, add
 `--expect-contains <text>` to the live run.
 
+When wrapper flags or output behavior matter, check the shipped CLI help
+instead of guessing from memory:
+
+```bash
+clawperator skills run --help
+```
+
 ## 8. Inspect partial output on script failures
 
 When `clawperator skills run` fails or times out, do not assume the run
@@ -6198,6 +6220,8 @@ For a new skill, this is the practical order:
 
 ## Related pages
 
+- [Agent Quickstart](../ai-agents/agent-quickstart.md)
+- [Clawperator Snapshot Format](../reference/snapshot-format.md)
 - [Usage Model](usage-model.md)
 - [Skill Authoring Guidelines](skill-authoring-guidelines.md)
 - [Skills Verification](skills-verification.md)
