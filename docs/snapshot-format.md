@@ -1,6 +1,6 @@
 # Clawperator Snapshot Format
 
-This is the canonical reference for the structure returned by Clawperator
+This is the dedicated reference page for the structure returned by Clawperator
 snapshot surfaces.
 
 Use this page as the source of truth for:

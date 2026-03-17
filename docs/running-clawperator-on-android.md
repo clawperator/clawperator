@@ -5,7 +5,9 @@ Clawperator operates an Android device on behalf of a user. In these docs, "Andr
 - a physical Android phone connected over `adb`
 - a local Android emulator provisioned through the Node CLI
 
-This is the canonical actuator model for Clawperator. The Node runtime talks to an Android device, and the Android device runs the [Clawperator Operator Android app](android-operator-apk.md).
+This is Clawperator's current actuator model. The Node runtime talks to an
+Android device, and the Android device runs the
+[Clawperator Operator Android app](android-operator-apk.md).
 
 Canonical definitions for terms such as "Android device", "[Clawperator Operator Android app](android-operator-apk.md)", and "user-installed Android apps" live in [Clawperator Terminology](terminology.md).
 

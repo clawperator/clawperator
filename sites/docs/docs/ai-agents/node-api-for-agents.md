@@ -765,7 +765,7 @@ For any failed step: `success: false` and `data.error` contains the error code s
 success.
 
 Use [Clawperator Snapshot Format](../reference/snapshot-format.md) as the
-canonical source for:
+dedicated reference for:
 
 - the exact snapshot envelope placement
 - the relationship to Android UI Automator output
@@ -776,7 +776,7 @@ canonical source for:
 ## Execution Model
 
 Use [Clawperator Execution Model](../reference/execution-model.md) for the
-canonical explanation of:
+current reference explanation of:
 
 - required execution payload fields
 - `status` vs `stepResults[].success`
