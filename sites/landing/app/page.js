@@ -65,7 +65,7 @@ const resourceCards = [
   {
     title: "GitHub",
     body: "View the source",
-    href: "https://github.com/clawperator",
+    href: "https://github.com/clawperator/clawperator",
     icon: "github"
   },
   {
@@ -840,7 +840,7 @@ if <hvac_state> == "Off":
             <span className="dot" aria-hidden="true">
               ·
             </span>
-            <a href="https://github.com/clawpilled/clawperator" target="_blank" rel="noreferrer">
+            <a href="https://github.com/clawperator/clawperator" target="_blank" rel="noreferrer">
               github
             </a>
             <span className="dot" aria-hidden="true">
