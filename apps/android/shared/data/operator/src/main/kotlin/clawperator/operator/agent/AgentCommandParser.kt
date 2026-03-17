@@ -159,7 +159,9 @@ class AgentCommandParserDefault : AgentCommandParser {
             "wait_for_navigation" -> {
                 val expectedPackage = params.stringOrNullWithMax("expectedPackage", MAX_MATCHER_VALUE_LENGTH)
                 val expectedNode = params.parseMatcherOrNull("expectedNode")
-                require(expectedPackage != null || expectedNode != null) {
+                // Reject blank strings at validation boundary per codebase guidelines
+                val hasExpectedPackage = expectedPackage != null && expectedPackage.isNotBlank()
+                require(hasExpectedPackage || expectedNode != null) {
                     "wait_for_navigation requires at least one of expectedPackage or expectedNode"
                 }
                 UiAction.WaitForNavigation(
