@@ -274,10 +274,26 @@ class UiActionEngineDefault(
         val isError = result.terminationReason == TaskScrollTerminationReason.ContainerNotFound ||
             result.terminationReason == TaskScrollTerminationReason.ContainerNotScrollable
 
+        if (!isError &&
+            action.clickAfter &&
+            result.terminationReason == TaskScrollTerminationReason.TargetFound &&
+            action.target != null
+        ) {
+            taskScope.ui {
+                click(
+                    matcher = action.target,
+                    clickTypes = action.clickTypes,
+                    retry = TaskRetryPresets.UiReadiness,
+                )
+            }
+        }
+
         val data = buildMap<String, String> {
             put("termination_reason", result.terminationReason.toWireValue())
             put("scrolls_executed", result.scrollsExecuted.toString())
             put("direction", action.direction.name.lowercase())
+            put("click_after", action.clickAfter.toString())
+            put("click_types", action.clickTypes.toWireValue())
             result.resolvedContainerId?.let { put("resolved_container", it) }
             if (isError) put("error", result.terminationReason.toWireValue())
         }

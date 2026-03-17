@@ -229,7 +229,7 @@ Combine fields to increase specificity when a single field is ambiguous:
 | `sleep` | `durationMs: number` | - |
 | `scroll_and_click` | `target: NodeMatcher` | `container: NodeMatcher`, `direction: "down" \| "up" \| "left" \| "right"` (default: `"down"`), `maxSwipes: number` (default: `10`, range: 1-50), `distanceRatio: number` (default: `0.7`, range: 0-1), `settleDelayMs: number` (default: `250`, range: 0-10000), `findFirstScrollableChild: boolean` (default: `true`), `clickAfter: boolean` (default: `true`), `scrollRetry: object` (default preset: `maxAttempts=4`, `initialDelayMs=400`, `maxDelayMs=2000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`), `clickRetry: object` (default preset: `maxAttempts=5`, `initialDelayMs=500`, `maxDelayMs=3000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`) |
 | `scroll` | - | `container: NodeMatcher` (default: auto-detect first scrollable), `direction: "down" \| "up" \| "left" \| "right"` (default: `"down"` - reveals content further down, finger swipes up), `distanceRatio: number` (default: `0.7`, range: 0-1), `settleDelayMs: number` (default: `250`, range: 0-10000), `findFirstScrollableChild: boolean` (default: `true`), `retry: object` (default: no retry - see scroll behavior note) |
-| `scroll_until` | - | `target: NodeMatcher` (optional, emits `TARGET_FOUND` when the target becomes visible), `container: NodeMatcher` (default: auto-detect), `direction: "down" \| "up" \| "left" \| "right"` (default: `"down"`), `distanceRatio: number` (default: `0.7`, range: 0-1), `settleDelayMs: number` (default: `250`, range: 0-10000), `maxScrolls: number` (default: `20`, range: 1-200), `maxDurationMs: number` (default: `10000`, range: 0-120000), `noPositionChangeThreshold: number` (default: `3`, range: 1-20), `findFirstScrollableChild: boolean` (default: `true`) |
+| `scroll_until` | - | `target: NodeMatcher` (optional, emits `TARGET_FOUND` when the target becomes visible), `container: NodeMatcher` (default: auto-detect), `clickType: "default" \| "long_click" \| "focus"` (used only when `clickAfter: true`), `clickAfter: boolean` (default: `false`, requires `target`), `direction: "down" \| "up" \| "left" \| "right"` (default: `"down"`), `distanceRatio: number` (default: `0.7`, range: 0-1), `settleDelayMs: number` (default: `250`, range: 0-10000), `maxScrolls: number` (default: `20`, range: 1-200), `maxDurationMs: number` (default: `10000`, range: 0-120000), `noPositionChangeThreshold: number` (default: `3`, range: 1-20), `findFirstScrollableChild: boolean` (default: `true`) |
 | `press_key` | `key: "back" \| "home" \| "recents"` | - |
 
 ### CLI-to-action-type mapping
@@ -588,6 +588,10 @@ visible in Clawperator's on-screen filtered UI tree, the step returns
 `termination_reason: "TARGET_FOUND"`. This removes the extra "scroll, then
 snapshot to verify" round-trip for many navigation tasks.
 
+If `clickAfter: true`, `scroll_until` clicks the target immediately after it
+becomes visible. This gives agents a one-step "scroll top-level list until
+visible, then click" path without switching to `scroll_and_click`.
+
 **Termination reasons (`data.termination_reason`):**
 - `TARGET_FOUND` - the provided `target` matcher became visible in the current UI tree. `success: true`.
 - `EDGE_REACHED` - scrolling stopped because no further movement was detected. `success: true`.
@@ -622,6 +626,7 @@ When a scroll loop might trigger navigation, heavy UI re-layout, or clipped list
         "params": {
           "target": { "textContains": "About phone" },
           "container": { "resourceId": "com.android.settings:id/recycler_view" },
+          "clickAfter": true,
           "direction": "down",
           "maxScrolls": 25
         }
@@ -630,9 +635,9 @@ When a scroll loop might trigger navigation, heavy UI re-layout, or clipped list
 }
 ```
 
-**`scroll_until` example step result (target became visible):**
+**`scroll_until` example step result (target became visible and clicked):**
 ```json
-{ "id": "su1", "actionType": "scroll_until", "success": true, "data": { "termination_reason": "TARGET_FOUND", "scrolls_executed": "5", "direction": "down", "resolved_container": "com.android.settings:id/recycler_view" } }
+{ "id": "su1", "actionType": "scroll_until", "success": true, "data": { "termination_reason": "TARGET_FOUND", "scrolls_executed": "5", "direction": "down", "click_after": "true", "click_types": "default", "resolved_container": "com.android.settings:id/recycler_view" } }
 ```
 
 **`scroll_until` example step result (finite list, reached bottom):**
@@ -732,7 +737,7 @@ Typical `data` keys by action type:
 | `wait_for_node` | `resource_id`, `label` (matched node details) |
 | `scroll_and_click` | `max_swipes`, `direction`, `click_types`, `click_after` (`"true"` or `"false"`) |
 | `scroll` | `scroll_outcome` (`"moved"`, `"edge_reached"`, or `"gesture_failed"`), `direction`, `distance_ratio`, `settle_delay_ms`, `resolved_container` (resourceId of auto-detected container, when present) |
-| `scroll_until` | `termination_reason` (see behavior note), `scrolls_executed`, `direction`, `resolved_container` (when present) |
+| `scroll_until` | `termination_reason` (see behavior note), `scrolls_executed`, `direction`, `click_after`, `click_types`, `resolved_container` (when present) |
 | `sleep` | `duration_ms` |
 | `press_key` | `key` (`"back"`, `"home"`, or `"recents"`) |
 

@@ -184,6 +184,9 @@ const executionSchema = z.object({
         break;
       }
       case "scroll_until": {
+        if (params?.clickAfter === true && !params?.target) {
+          addIssue(index, "scroll_until params.clickAfter=true requires params.target", ["params", "target"]);
+        }
         const SUPPORTED_DIRECTIONS_SU = ["down", "up", "left", "right"] as const;
         if (params?.direction !== undefined) {
           const normalizedDir = params.direction.trim().toLowerCase();

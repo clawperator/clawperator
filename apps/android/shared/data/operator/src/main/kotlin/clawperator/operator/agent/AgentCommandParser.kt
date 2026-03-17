@@ -146,6 +146,7 @@ class AgentCommandParserDefault : AgentCommandParser {
                     id = id,
                     target = params.parseMatcherOrNull("target"),
                     container = params.parseMatcherOrNull("container"),
+                    clickTypes = params.parseClickTypes(),
                     direction = params.parseDirection(),
                     distanceRatio = params.doubleOrDefault("distanceRatio", 0.7).toFloat().coerceIn(0f, 1f),
                     settleDelayMs = params.longOrDefault("settleDelayMs", 250L).coerceIn(0L, 10_000L),
@@ -153,6 +154,7 @@ class AgentCommandParserDefault : AgentCommandParser {
                     maxDurationMs = params.longOrDefault("maxDurationMs", 10_000L).coerceIn(0L, 120_000L),
                     noPositionChangeThreshold = params.intOrDefault("noPositionChangeThreshold", 3).coerceIn(1, 20),
                     findFirstScrollableChild = params.booleanOrDefault("findFirstScrollableChild", true),
+                    clickAfter = params.booleanOrDefault("clickAfter", false),
                 )
             "read_text" ->
                 UiAction.ReadText(

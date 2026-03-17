@@ -501,6 +501,40 @@ class UiActionEngineDefaultTest : ActionTest {
             assertEquals("TARGET_FOUND", stepResult.data["termination_reason"])
             assertEquals("3", stepResult.data["scrolls_executed"])
         }
+
+    @Test
+    fun `execute scroll_until clicks target when clickAfter is true`() =
+        actionTest {
+            val uiScope = RecordingTaskUiScope(
+                scrollLoopResult = TaskScrollLoopResult(TaskScrollTerminationReason.TargetFound, scrollsExecuted = 3),
+            )
+            val taskScope = RecordingTaskScope(uiScope)
+            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+
+            val result =
+                engine.execute(
+                    taskScope = taskScope,
+                    plan = UiActionPlan(
+                        commandId = "cmd-su-target-click",
+                        taskId = "task-su-target-click",
+                        source = "test",
+                        actions = listOf(
+                            UiAction.ScrollUntil(
+                                id = "su-target-click",
+                                target = NodeMatcher(textContains = "About phone"),
+                                clickAfter = true,
+                            ),
+                        ),
+                    ),
+                )
+
+            val stepResult = result.stepResults.single()
+            assertEquals("scroll_until", stepResult.actionType)
+            assertEquals(true, stepResult.success)
+            assertEquals("TARGET_FOUND", stepResult.data["termination_reason"])
+            assertEquals("true", stepResult.data["click_after"])
+            assertEquals(true, uiScope.clickCalled)
+        }
 }
 
 private class RecordingTaskScope(

@@ -519,10 +519,22 @@ describe("validateExecution", () => {
       expectedFormat: "android-ui-automator", timeoutMs: 5000,
       actions: [{
         id: "x", type: "scroll_until",
-        params: { direction: "down", distanceRatio: 0.7, settleDelayMs: 250, maxScrolls: 25, maxDurationMs: 10000, noPositionChangeThreshold: 3 },
+        params: { direction: "down", distanceRatio: 0.7, settleDelayMs: 250, maxScrolls: 25, maxDurationMs: 10000, noPositionChangeThreshold: 3, clickAfter: true, target: { textEquals: "About phone" } },
       }],
     });
     assert.equal(result.actions[0].type, "scroll_until");
+  });
+
+  it("rejects scroll_until clickAfter without target", () => {
+    assert.throws(
+      () =>
+        validateExecution({
+          commandId: "c", taskId: "t", source: "s",
+          expectedFormat: "android-ui-automator", timeoutMs: 5000,
+          actions: [{ id: "x", type: "scroll_until", params: { clickAfter: true } }],
+        }),
+      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
+    );
   });
 
   it("rejects scroll_until with invalid direction", () => {
