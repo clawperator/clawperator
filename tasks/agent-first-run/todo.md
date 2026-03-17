@@ -22,7 +22,7 @@ Documentation relevant to the change is included in the task — not deferred.
 
 | PR | Tasks | Codebases | Rationale |
 |----|-------|-----------|-----------|
-| PR-1 | T-01 | `operator` + `docs` | Correctness bug; ship fast and alone |
+| [DONE] PR-1 | T-01 | `operator` + `docs` | Correctness bug; ship fast and alone |
 | PR-2 | T-02, T-03, T-04 | `operator` + `docs` | New action primitives; one APK release |
 | PR-3 | T-05, T-08, T-10, T-11 | `node` + `docs` | Small, independent diagnostics and warning fixes |
 | PR-4 | T-06, T-09 | `node` + `docs` | Payload authoring ergonomics; T-09 dry-run output benefits from T-06 |
