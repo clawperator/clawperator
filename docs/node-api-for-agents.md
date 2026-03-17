@@ -601,6 +601,8 @@ Error codes:
 - `NODE_NOT_FOUND` - the label node matching `labelMatcher` was not found
 - `VALUE_NODE_NOT_FOUND` - the label was found but no adjacent summary value node was detected
 
+**Limitation:** The sibling traversal only searches nodes that appear *after* the label in the parent's children list. If a value node appears before its label in the hierarchy, it will not be found. This matches Samsung Settings layout but may not work for all OEM layouts.
+
 **`read_key_value_pair` example request:**
 ```json
 { "id": "read_version", "type": "read_key_value_pair", "params": { "labelMatcher": { "textEquals": "Android version" } } }
