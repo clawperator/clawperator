@@ -151,6 +151,16 @@ describe("CLI help", () => {
     assert.doesNotMatch(stdout, /action open-app/);
   });
 
+  it("shows skills compile-artifact help instead of top-level help", async () => {
+    const { stdout, code } = await runCli(["skills", "compile-artifact", "--help"]);
+    assert.strictEqual(code, 0);
+    assert.match(stdout, /clawperator skills compile-artifact/);
+    assert.match(stdout, /--artifact <name>/);
+    assert.match(stdout, /--skill-id <id>/);
+    assert.match(stdout, /--vars <json>/);
+    assert.doesNotMatch(stdout, /action open-app/);
+  });
+
   it("shows skills run help instead of top-level help", async () => {
     const { stdout, code } = await runCli(["skills", "run", "--help"]);
     assert.strictEqual(code, 0);

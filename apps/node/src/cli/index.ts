@@ -201,6 +201,20 @@ Notes:
   - Confirms that the parsed skill.json metadata matches the registry entry.
   - This is an integrity check, not a live device test.
 `,
+  "skills compile-artifact": `clawperator skills compile-artifact
+
+Usage:
+  clawperator skills compile-artifact <skill_id> --artifact <name> [--vars <json>] [--output <json|pretty>]
+  clawperator skills compile-artifact --skill-id <id> --artifact <name> [--vars <json>] [--output <json|pretty>]
+
+Notes:
+  - Compiles a deterministic skill artifact into a validated execution payload.
+  - Use either the positional <skill_id> or --skill-id <id>.
+  - --artifact accepts either the bare artifact name or the full .recipe.json filename.
+  - --vars must be a JSON object string used for template substitution.
+  - Compile failure usually means a missing artifact, missing required vars, or an invalid execution shape.
+  - Use clawperator execute --validate-only for an extra contract-only check before a live device run.
+`,
   "skills run": `clawperator skills run
 
 Usage:
@@ -285,6 +299,7 @@ function resolveHelpTopic(rest: string[]): string | undefined {
   if (rest[0] === "skills" && rest[1] === "sync") return "skills sync";
   if (rest[0] === "skills" && rest[1] === "new") return "skills new";
   if (rest[0] === "skills" && rest[1] === "validate") return "skills validate";
+  if (rest[0] === "skills" && rest[1] === "compile-artifact") return "skills compile-artifact";
   if (rest[0] === "skills" && rest[1] === "run") return "skills run";
   if (rest[0] === "doctor") return "doctor";
   if (rest[0] === "version") return "version";
