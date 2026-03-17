@@ -313,11 +313,13 @@ Supported action types (v1):
 - `wait_for_node`
 - `click`
 - `scroll_and_click`
+- `scroll`
+- `scroll_until`
 - `read_text`
 - `snapshot_ui`
+- `take_screenshot`
+- `enter_text`
 - `sleep`
-- `type_text`
-- `doctor_ping`
 
 ## Doctor and Dependency Management
 
