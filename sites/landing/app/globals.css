@@ -145,6 +145,7 @@ body {
 .top-toolbar {
   width: 100%;
   min-height: var(--toolbar-height);
+  position: -webkit-sticky;
   position: sticky;
   top: 0;
   left: 0;
@@ -1373,6 +1374,7 @@ body {
 
 @media (min-width: 841px) {
   .top-toolbar {
+    position: -webkit-sticky;
     position: sticky;
   }
 }
