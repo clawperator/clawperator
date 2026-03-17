@@ -424,7 +424,7 @@ class UiActionEngineDefault(
                                 validator = TaskValidators.VersionValidator,
                             )
                         UiTextValidator.Regex -> {
-                            val regex = Regex(requireNotNull(action.validatorPattern) { "validatorPattern required for Regex validator" })
+                            val regex = Regex(checkNotNull(action.validatorPattern) { "validatorPattern required for Regex validator" })
                             getValidatedText(
                                 matcher = action.matcher,
                                 retry = action.retry,

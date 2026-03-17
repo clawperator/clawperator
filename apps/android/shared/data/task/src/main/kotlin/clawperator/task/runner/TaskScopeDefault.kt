@@ -446,5 +446,10 @@ private fun shouldSatisfyExpectedPackage(
     if (expectedPackage == null || currentPackage != expectedPackage) {
         return false
     }
+    // If initial package metadata was unavailable we cannot confirm a transition
+    // occurred; require observing a package change as evidence.
+    if (initialPackage == null) {
+        return observedDifferentPackage
+    }
     return initialPackage != expectedPackage || observedDifferentPackage
 }

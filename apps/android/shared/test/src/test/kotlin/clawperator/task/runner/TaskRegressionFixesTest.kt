@@ -219,6 +219,47 @@ class TaskRegressionFixesTest : ActionTest {
 
             assertEquals("VALUE_NODE_NOT_FOUND", error.message)
         }
+
+    @Test
+    fun `wait_for_navigation times out when initial package metadata is null and target is already current`() =
+        actionTest {
+            // Bug: when initialPackage is null, shouldSatisfyExpectedPackage would
+            // evaluate `null != expectedPackage` as true and return success immediately.
+            // Correct behaviour: require a confirmed package change (observedDifferentPackage).
+            val taskScope =
+                TaskScopeDefault(
+                    appsRepository = unusedProxy(),
+                    triggerManager = unusedProxy(),
+                    appCloseManager = unusedProxy(),
+                    uiTreeInspector =
+                        SequenceUiTreeInspector(
+                            listOf(
+                                // First poll: metadata unavailable (null)
+                                null,
+                                // Subsequent polls: package matches target but no transition observed
+                                UiWindowMetadata(foregroundPackage = "com.android.settings"),
+                                UiWindowMetadata(foregroundPackage = "com.android.settings"),
+                            ),
+                        ),
+                    uiTreeFilterer = IdentityUiTreeFilterer,
+                    uiTreeFormatter = unusedProxy(),
+                    taskUiScope = unusedProxy(),
+                    urlNavigator = unusedProxy(),
+                    coroutineScopeIo = backgroundScope,
+                )
+
+            val result = async {
+                taskScope.waitForNavigation(
+                    expectedPackage = "com.android.settings",
+                    expectedNode = null,
+                    timeoutMs = 500,
+                )
+            }
+
+            advanceUntilIdle()
+
+            assertFalse(result.await().success)
+        }
 }
 
 private object IdentityUiTreeFilterer : UiTreeFilterer {
@@ -238,7 +279,7 @@ private class StaticUiTreeInspector(
 }
 
 private class SequenceUiTreeInspector(
-    private val metadataSequence: List<UiWindowMetadata>,
+    private val metadataSequence: List<UiWindowMetadata?>,
 ) : UiTreeInspector {
     private var index = 0
 
