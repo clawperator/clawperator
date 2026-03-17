@@ -158,7 +158,7 @@ const executionSchema = z.object({
         if (!params?.matcher) {
           addIssue(index, "read_text requires params.matcher", ["params", "matcher"]);
         }
-        // T-04: regex validator requires validatorPattern
+        // regex validator requires validatorPattern
         if (params?.validator === "regex") {
           if (!params?.validatorPattern || params.validatorPattern.trim() === "") {
             addIssue(index, "read_text with validator='regex' requires params.validatorPattern", ["params", "validatorPattern"]);

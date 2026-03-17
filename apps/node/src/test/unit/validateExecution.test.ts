@@ -600,7 +600,7 @@ describe("validateExecution", () => {
     );
   });
 
-  // T-02: wait_for_navigation validation tests
+  // wait_for_navigation validation tests
   it("accepts wait_for_navigation with expectedPackage", () => {
     const ex = validateExecution({
       commandId: "c", taskId: "t", source: "s",
@@ -655,7 +655,7 @@ describe("validateExecution", () => {
     );
   });
 
-  // T-03: read_key_value_pair validation tests
+  // read_key_value_pair validation tests
   it("accepts read_key_value_pair with labelMatcher", () => {
     const ex = validateExecution({
       commandId: "c", taskId: "t", source: "s",
@@ -677,7 +677,7 @@ describe("validateExecution", () => {
     );
   });
 
-  // T-04: read_text with regex validator tests
+  // read_text with regex validator tests
   it("accepts read_text with version validator", () => {
     const ex = validateExecution({
       commandId: "c", taskId: "t", source: "s",
