@@ -1350,7 +1350,8 @@ For the exact `snapshot_ui` structure, use
 | `skills get <skill_id>` | Show skill metadata |
 | `skills search [--app <pkg>] [--intent <i>] [--keyword <k>]` | Search skills by app, intent, or keyword (at least one filter required) |
 | `skills new <skill_id>` | Scaffold a new local skill folder and registry entry |
-| `skills validate <skill_id>` | Verify local skill metadata and required files before runtime testing |
+| `skills validate <skill_id>` | Verify one local skill's metadata and required files before runtime testing |
+| `skills validate --all` | Validate the entire configured skills registry in one pass |
 | `skills compile-artifact <id> --artifact <name>` | Compile skill to execution payload |
 | `skills run <skill_id> [--device-id <id>]` | Invoke a skill script (convenience wrapper) |
 | `skills install` | Clone skills repo to `~/.clawperator/skills/` |
@@ -2304,9 +2305,12 @@ Current skills model:
 - `CLAWPERATOR_SKILLS_REGISTRY` points at one local registry JSON
 - a private skill becomes visible only after it is added to that registry
 - `skills new <skill_id>` scaffolds the starter folder and updates that local registry automatically
-- `skills validate <skill_id>` checks that the registry entry, `skill.json`,
-  `SKILL.md`, script paths, and artifact paths line up before you spend time on
-  a live device run
+- `skills validate <skill_id>` checks that one registry entry, its
+  `skill.json`, `SKILL.md`, script paths, and artifact paths line up before you
+  spend time on a live device run
+- `skills validate --all` runs the same integrity checks across every entry in
+  the configured registry and returns a failure summary if any skills are
+  broken
 
 For the concrete `skill.json` contract and private-skill authoring model, see
 [Skill Authoring Guidelines](../skills/skill-authoring-guidelines.md) and
@@ -5893,6 +5897,15 @@ clawperator skills validate <skill_id>
 
 This is an integrity check for the registry entry and on-disk files. It does
 not exercise the target Android app.
+
+When you want a registry-wide sanity check, use:
+
+```bash
+clawperator skills validate --all
+```
+
+This validates every configured skill entry in one pass and returns a summary
+of any broken paths or metadata mismatches.
 
 ---
 

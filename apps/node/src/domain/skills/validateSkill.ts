@@ -35,6 +35,34 @@ export interface ValidateSkillError {
   };
 }
 
+export interface ValidateAllSkillsResult {
+  ok: true;
+  registryPath: string;
+  totalSkills: number;
+  validSkills: Array<{
+    skill: SkillEntry;
+    checks: ValidateSkillResult["checks"];
+  }>;
+}
+
+export interface ValidateAllSkillsError {
+  ok: false;
+  code: string;
+  message: string;
+  registryPath?: string;
+  details?: {
+    totalSkills: number;
+    validCount: number;
+    invalidCount: number;
+    failures: Array<{
+      skillId: string;
+      code: string;
+      message: string;
+      details?: ValidateSkillError["details"];
+    }>;
+  };
+}
+
 function getSkillJsonRelativePath(skill: SkillEntry): string {
   return join(skill.path, "skill.json");
 }
@@ -52,6 +80,65 @@ function findMismatchFields(skill: SkillEntry, parsed: Partial<SkillEntry>): str
   return mismatches;
 }
 
+async function validateLoadedSkill(
+  skill: SkillEntry,
+  resolvedRegistryPath: string
+): Promise<ValidateSkillResult | ValidateSkillError> {
+  const repoRoot = getRepoRoot(resolvedRegistryPath);
+  const skillJsonPath = join(repoRoot, getSkillJsonRelativePath(skill));
+  const skillFilePath = join(repoRoot, skill.skillFile);
+  const scriptPaths = skill.scripts.map((file) => join(repoRoot, file));
+  const artifactPaths = skill.artifacts.map((file) => join(repoRoot, file));
+  const missingFiles: string[] = [];
+
+  for (const file of [skillJsonPath, skillFilePath, ...scriptPaths, ...artifactPaths]) {
+    try {
+      await access(file);
+    } catch {
+      missingFiles.push(file);
+    }
+  }
+
+  if (missingFiles.length > 0) {
+    return {
+      ok: false,
+      code: SKILL_VALIDATION_FAILED,
+      message: `Skill ${skill.id} is missing required files`,
+      details: {
+        skillJsonPath,
+        missingFiles,
+      },
+    };
+  }
+
+  const raw = await readFile(skillJsonPath, "utf8");
+  const parsed = JSON.parse(raw) as Partial<SkillEntry>;
+  const mismatchFields = findMismatchFields(skill, parsed);
+  if (mismatchFields.length > 0) {
+    return {
+      ok: false,
+      code: SKILL_VALIDATION_FAILED,
+      message: `Skill ${skill.id} metadata does not match the registry entry`,
+      details: {
+        skillJsonPath,
+        mismatchFields,
+      },
+    };
+  }
+
+  return {
+    ok: true,
+    skill,
+    registryPath: resolvedRegistryPath,
+    checks: {
+      skillJsonPath,
+      skillFilePath,
+      scriptPaths,
+      artifactPaths,
+    },
+  };
+}
+
 export async function validateSkill(
   skillId: string,
   registryPath?: string
@@ -62,59 +149,58 @@ export async function validateSkill(
     if (!skill) {
       return { ok: false, code: SKILL_NOT_FOUND, message: `Skill not found: ${skillId}` };
     }
+    return await validateLoadedSkill(skill, loaded.resolvedPath);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    return { ok: false, code: REGISTRY_READ_FAILED, message };
+  }
+}
 
-    const repoRoot = getRepoRoot(loaded.resolvedPath);
-    const skillJsonPath = join(repoRoot, getSkillJsonRelativePath(skill));
-    const skillFilePath = join(repoRoot, skill.skillFile);
-    const scriptPaths = skill.scripts.map((file) => join(repoRoot, file));
-    const artifactPaths = skill.artifacts.map((file) => join(repoRoot, file));
-    const missingFiles: string[] = [];
+export async function validateAllSkills(
+  registryPath?: string
+): Promise<ValidateAllSkillsResult | ValidateAllSkillsError> {
+  try {
+    const loaded = await loadRegistry(registryPath);
+    const validSkills: ValidateAllSkillsResult["validSkills"] = [];
+    const failures: NonNullable<ValidateAllSkillsError["details"]>["failures"] = [];
 
-    for (const file of [skillJsonPath, skillFilePath, ...scriptPaths, ...artifactPaths]) {
-      try {
-        await access(file);
-      } catch {
-        missingFiles.push(file);
+    for (const skill of loaded.registry.skills) {
+      const result = await validateLoadedSkill(skill, loaded.resolvedPath);
+      if (result.ok) {
+        validSkills.push({
+          skill: result.skill,
+          checks: result.checks,
+        });
+      } else {
+        failures.push({
+          skillId: skill.id,
+          code: result.code,
+          message: result.message,
+          details: result.details,
+        });
       }
     }
 
-    if (missingFiles.length > 0) {
+    if (failures.length > 0) {
       return {
         ok: false,
         code: SKILL_VALIDATION_FAILED,
-        message: `Skill ${skillId} is missing required files`,
+        message: `${failures.length} of ${loaded.registry.skills.length} registered skills failed validation`,
+        registryPath: loaded.resolvedPath,
         details: {
-          skillJsonPath,
-          missingFiles,
-        },
-      };
-    }
-
-    const raw = await readFile(skillJsonPath, "utf8");
-    const parsed = JSON.parse(raw) as Partial<SkillEntry>;
-    const mismatchFields = findMismatchFields(skill, parsed);
-    if (mismatchFields.length > 0) {
-      return {
-        ok: false,
-        code: SKILL_VALIDATION_FAILED,
-        message: `Skill ${skillId} metadata does not match the registry entry`,
-        details: {
-          skillJsonPath,
-          mismatchFields,
+          totalSkills: loaded.registry.skills.length,
+          validCount: validSkills.length,
+          invalidCount: failures.length,
+          failures,
         },
       };
     }
 
     return {
       ok: true,
-      skill,
       registryPath: loaded.resolvedPath,
-      checks: {
-        skillJsonPath,
-        skillFilePath,
-        scriptPaths,
-        artifactPaths,
-      },
+      totalSkills: loaded.registry.skills.length,
+      validSkills,
     };
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);

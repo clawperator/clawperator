@@ -60,7 +60,8 @@ Commands:
   skills new <skill_id>
                                             Scaffold a new local skill folder and registry entry
   skills validate <skill_id>
-                                            Validate local skill metadata and required files
+  skills validate --all
+                                            Validate one local skill or the entire configured registry
   skills run <skill_id> [--device-id <id>] [-- <extra_args>]
                                             Invoke a skill script (convenience wrapper)
   skills install
@@ -191,8 +192,10 @@ Notes:
 
 Usage:
   clawperator skills validate <skill_id> [--output <json|pretty>]
+  clawperator skills validate --all [--output <json|pretty>]
 
 Notes:
+  - Use <skill_id> to validate one skill, or --all to validate every registry entry in one pass.
   - Verifies that the registry entry exists for the requested skill.
   - Checks that skill.json, SKILL.md, script files, and artifact files exist on disk.
   - Confirms that the parsed skill.json metadata matches the registry entry.
@@ -599,8 +602,10 @@ async function main(): Promise<void> {
           result = await (await import("./commands/skills.js")).cmdSkillsNew(rest[1], out);
         }
       } else if (rest[0] === "validate") {
-        if (!rest[1]) {
-          result = JSON.stringify({ code: "USAGE", message: "skills validate <skill_id>" });
+        if (hasFlag(rest, "--all")) {
+          result = await (await import("./commands/skills.js")).cmdSkillsValidateAll(out);
+        } else if (!rest[1]) {
+          result = JSON.stringify({ code: "USAGE", message: "skills validate <skill_id> | skills validate --all" });
         } else {
           result = await (await import("./commands/skills.js")).cmdSkillsValidate(rest[1], out);
         }

@@ -146,6 +146,7 @@ describe("CLI help", () => {
     const { stdout, code } = await runCli(["skills", "validate", "--help"]);
     assert.strictEqual(code, 0);
     assert.match(stdout, /clawperator skills validate/);
+    assert.match(stdout, /skills validate --all/);
     assert.match(stdout, /integrity check, not a live device test/i);
     assert.doesNotMatch(stdout, /action open-app/);
   });

@@ -152,6 +152,15 @@ clawperator skills validate <skill_id>
 This is an integrity check for the registry entry and on-disk files. It does
 not exercise the target Android app.
 
+When you want a registry-wide sanity check, use:
+
+```bash
+clawperator skills validate --all
+```
+
+This validates every configured skill entry in one pass and returns a summary
+of any broken paths or metadata mismatches.
+
 ---
 
 ## 5. Scripts vs. artifacts
