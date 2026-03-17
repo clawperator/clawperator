@@ -1,19 +1,17 @@
 package clawperator.uitree
 
 import android.accessibilityservice.AccessibilityService
+import android.app.Application
 import android.content.Context
-import android.graphics.Rect
 import android.os.Build
 import android.view.WindowManager
-import android.view.WindowMetrics
 import androidx.test.core.app.ApplicationProvider
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
-import org.robolectric.shadows.ShadowDisplay
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import android.app.Application
+import kotlin.test.assertTrue
 
 @RunWith(RobolectricTestRunner::class)
 @Config(manifest = Config.NONE, application = Application::class)
@@ -35,8 +33,8 @@ class UiTreeInspectorAndroidTest {
         
         val (width, height) = UiTreeInspectorAndroid.getScreenDimensionsFromService(service)
         
-        kotlin.test.assertTrue(width > 0)
-        kotlin.test.assertTrue(height > 0)
+        assertTrue(width > 0)
+        assertTrue(height > 0)
     }
 
     @Test
@@ -46,8 +44,8 @@ class UiTreeInspectorAndroidTest {
         
         val (width, height) = UiTreeInspectorAndroid.getScreenDimensionsFromService(service)
         
-        kotlin.test.assertTrue(width > 0)
-        kotlin.test.assertTrue(height > 0)
+        assertTrue(width > 0)
+        assertTrue(height > 0)
     }
 
     @Test
