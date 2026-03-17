@@ -154,4 +154,4 @@ If a step fails:
 - [Clawperator Snapshot Format](../reference/snapshot-format.md)
 - [Execution Model](../reference/execution-model.md)
 - [Error Handling Guide](../reference/error-handling.md)
-- [Operator LLM Playbook](../design/operator-llm-playbook.md)
+- [Operator Automation Playbook](../design/operator-llm-playbook.md)

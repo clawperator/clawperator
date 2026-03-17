@@ -223,7 +223,7 @@ sections:
         sources:
           - docs/design/node-api-design.md
       - output: design/operator-llm-playbook.md
-        title: Operator LLM Playbook
+        title: Operator Automation Playbook
         mode: copy
         sources:
           - docs/design/operator-llm-playbook.md

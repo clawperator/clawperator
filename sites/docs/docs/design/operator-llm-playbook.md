@@ -1,8 +1,14 @@
-# Operator LLM Playbook (Definitive)
+# Operator Automation Playbook
 
-This is the canonical reference for LLM-driven automation in Clawperator.
+This is a secondary background document for Clawperator runtime conventions.
 
-Use this doc for:
+If you are starting cold, begin with the operational docs first:
+
+- `docs/agent-quickstart.md`
+- `docs/node-api-for-agents.md`
+- `docs/reference/execution-model.md`
+
+Use this playbook after that, when you need deeper context for:
 - running the app through `ACTION_AGENT_COMMAND`
 - authoring/maintaining skill packages
 - integrating skill scripts with OpenClaw
@@ -61,7 +67,7 @@ For app automation commands, default to:
 | `take_screenshot` | `path?: string`, `retry?: object` | Node captures screenshot via ADB and returns local file path |
 | `scroll_and_click` | `target: NodeMatcher`, `container?: NodeMatcher`, `direction?`, `maxSwipes?`, `distanceRatio?`, `settleDelayMs?`, `findFirstScrollableChild?`, `clickAfter?: boolean`, `scrollRetry?: object`, `clickRetry?: object` | Scrolls until target is visible, then clicks by default. Set `clickAfter: false` to reveal the target without tapping it. `scrollRetry` defaults to UiScroll; `clickRetry` defaults to UiReadiness |
 | `scroll` | `container?: NodeMatcher`, `direction?`, `distanceRatio?`, `settleDelayMs?`, `findFirstScrollableChild?`, `retry?: object` | Performs exactly one scroll gesture and reports `scroll_outcome` as `moved`, `edge_reached`, or `gesture_failed` |
-| `scroll_until` | `target?: NodeMatcher`, `container?: NodeMatcher`, `direction?`, `distanceRatio?`, `settleDelayMs?`, `maxScrolls?`, `maxDurationMs?`, `noPositionChangeThreshold?`, `findFirstScrollableChild?` | Bounded scroll loop that returns `termination_reason`. With `target`, the runtime emits `TARGET_FOUND` when the matcher becomes visible in the on-screen filtered tree. Some Android screens keep off-screen descendants in raw snapshots, so clipped edge cases can still end as `EDGE_REACHED`. Without `target`, use it for feed pagination with explicit caps |
+| `scroll_until` | `target?: NodeMatcher`, `container?: NodeMatcher`, `clickType?: "default"\|"long_click"\|"focus"`, `clickAfter?: boolean`, `direction?`, `distanceRatio?`, `settleDelayMs?`, `maxScrolls?`, `maxDurationMs?`, `noPositionChangeThreshold?`, `findFirstScrollableChild?` | Bounded scroll loop that returns `termination_reason`. With `target`, the runtime emits `TARGET_FOUND` when the matcher becomes visible in the on-screen filtered tree. Set `clickAfter: true` to click immediately once visible. Some Android screens keep off-screen descendants in raw snapshots, so clipped edge cases can still end as `EDGE_REACHED`. Without `target`, use it for feed pagination with explicit caps |
 | `sleep` | `durationMs: number` | Pause between steps. Must fit within the execution `timeoutMs` budget |
 
 **`enter_text` vs CLI `action type`:** The CLI command is `action type` but the action type field in execution payloads is `enter_text`. These map to the same runtime action. When building execution payloads directly, always use `enter_text`.
@@ -128,5 +134,5 @@ Due to the dynamic nature of mobile apps (A/B tests, server-side flags, unexpect
 ## 6) Where to update docs
 
 - Skill model/design: `docs/design/skill-design.md`
-- Canonical LLM/operator usage: `docs/design/operator-llm-playbook.md` (this file)
+- Secondary runtime playbook and conventions: `docs/design/operator-llm-playbook.md` (this file)
 - App-specific skill packages: `skills/<applicationId>.<intent>/...`

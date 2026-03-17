@@ -1,8 +1,14 @@
-# Operator LLM Playbook (Definitive)
+# Operator Automation Playbook
 
-This is the canonical reference for LLM-driven automation in Clawperator.
+This is a secondary background document for Clawperator runtime conventions.
 
-Use this doc for:
+If you are starting cold, begin with the operational docs first:
+
+- `docs/agent-quickstart.md`
+- `docs/node-api-for-agents.md`
+- `docs/reference/execution-model.md`
+
+Use this playbook after that, when you need deeper context for:
 - running the app through `ACTION_AGENT_COMMAND`
 - authoring/maintaining skill packages
 - integrating skill scripts with OpenClaw
@@ -128,5 +134,5 @@ Due to the dynamic nature of mobile apps (A/B tests, server-side flags, unexpect
 ## 6) Where to update docs
 
 - Skill model/design: `docs/design/skill-design.md`
-- Canonical LLM/operator usage: `docs/design/operator-llm-playbook.md` (this file)
+- Secondary runtime playbook and conventions: `docs/design/operator-llm-playbook.md` (this file)
 - App-specific skill packages: `skills/<applicationId>.<intent>/...`
