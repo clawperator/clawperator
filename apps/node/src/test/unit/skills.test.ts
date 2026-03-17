@@ -21,6 +21,7 @@ import {
   COMPILE_VAR_MISSING,
   SKILL_SCRIPT_NOT_FOUND,
   SKILL_EXECUTION_FAILED,
+  SKILL_EXECUTION_TIMEOUT,
   SKILL_ALREADY_EXISTS,
   SKILL_ID_INVALID,
 } from "../../contracts/skills.js";
@@ -488,6 +489,23 @@ describe("runSkill", () => {
     const result = await runSkill("com.test.fail", []);
     assert.ok(!result.ok);
     assert.strictEqual(result.code, SKILL_EXECUTION_FAILED);
+    assert.ok(result.stdout?.includes('"stage":"before-failure"'));
     assert.ok(result.stderr?.includes("FAIL_OUTPUT:intentional"));
+  });
+
+  it("returns partial stdout when a skill times out", async () => {
+    const result = await runSkill("com.test.partial-timeout", [], undefined, 50);
+    assert.ok(!result.ok);
+    assert.strictEqual(result.code, SKILL_EXECUTION_TIMEOUT);
+    assert.ok(result.stdout?.includes('"stage":"before-timeout"'));
+  });
+
+  it("CLI skills run includes partial stdout on failure", async () => {
+    const { stdout, code } = await runCli(["skills", "run", "com.test.fail", "--output", "json"]);
+    assert.strictEqual(code, 1, stdout);
+    const parsed = JSON.parse(stdout) as { code?: string; stdout?: string; stderr?: string };
+    assert.strictEqual(parsed.code, SKILL_EXECUTION_FAILED);
+    assert.ok(parsed.stdout?.includes('"stage":"before-failure"'));
+    assert.ok(parsed.stderr?.includes("FAIL_OUTPUT:intentional"));
   });
 });

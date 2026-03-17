@@ -110,6 +110,7 @@ export async function cmdSkillsRun(
     message: result.message,
     skillId: result.skillId,
     exitCode: result.exitCode,
+    stdout: result.stdout,
     stderr: result.stderr,
   }, options);
 }

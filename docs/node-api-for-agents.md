@@ -975,6 +975,10 @@ If multiple apps are registered for the URI scheme, a system chooser may appear.
 **Does Clawperator run skills?**
 Skills are standalone programs that agents can invoke directly. The Node API provides discovery (`skills list`, `skills search`), metadata (`skills get`), and a convenience `skills run` wrapper. Skills do not need the Node API to execute - agents can call skill scripts directly.
 
+When `skills run` fails or times out, the CLI preserves partial script
+`stdout` and `stderr` in the structured error output when available. Inspect
+those fields before assuming the run produced no useful result.
+
 Current skills model:
 
 - discovery is registry-driven, not folder-scan-driven

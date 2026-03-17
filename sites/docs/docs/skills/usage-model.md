@@ -75,6 +75,11 @@ DEVICE_ID="$(adb devices | awk 'NR>1 && $2==\"device\" {print $1; exit}')"
 
 Always pass `--device-id` to `skills run` when more than one device is connected. Without it the wrapper will fail if device auto-detection is ambiguous.
 
+If a wrapped script exits non-zero or times out, `clawperator skills run`
+preserves partial `stdout` and `stderr` in the structured error output when
+they exist. Agents should inspect those fields before discarding the run as an
+opaque failure.
+
 ## Private skills
 
 Private skills are not discovered by scanning folders automatically. The

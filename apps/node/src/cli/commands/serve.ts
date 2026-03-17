@@ -423,6 +423,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
             message: result.message,
             skillId: result.skillId,
             exitCode: result.exitCode,
+            stdout: result.stdout,
             stderr: result.stderr,
           },
         });

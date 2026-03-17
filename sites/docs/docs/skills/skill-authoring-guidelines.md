@@ -247,7 +247,9 @@ Why this matters:
 
 `clawperator skills run` currently applies a 120000 ms wrapper timeout. Keep
 your own script timeout at or above the expected flow duration so the wrapper
-can return structured output.
+can return structured output. When the wrapper does fail or time out,
+Clawperator preserves partial script `stdout` and `stderr` in the structured
+error payload when available.
 
 ---
 

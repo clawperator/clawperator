@@ -1,4 +1,4 @@
-import { execFile } from "node:child_process";
+import { spawn } from "node:child_process";
 import { access } from "node:fs/promises";
 import { join, extname } from "node:path";
 import { loadRegistry, findSkillById, getRepoRoot } from "../../adapters/skills-repo/localSkillsRegistry.js";
@@ -26,6 +26,7 @@ export interface SkillRunError {
   message: string;
   skillId?: string;
   exitCode?: number;
+  stdout?: string;
   stderr?: string;
 }
 
@@ -83,40 +84,74 @@ export async function runSkill(
 
   const start = Date.now();
   return new Promise((resolve) => {
-    execFile(cmd, cmdArgs, { timeout, maxBuffer: 1024 * 1024 }, (err, stdout, stderr) => {
+    const child = spawn(cmd, cmdArgs, {
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    let stdout = "";
+    let stderr = "";
+    let settled = false;
+    let timedOut = false;
+
+    const finish = (result: SkillRunResult | SkillRunError) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeoutId);
+      resolve(result);
+    };
+
+    child.stdout?.on("data", (chunk) => {
+      stdout += chunk.toString();
+    });
+
+    child.stderr?.on("data", (chunk) => {
+      stderr += chunk.toString();
+    });
+
+    child.on("error", (err) => {
+      const errCode =
+        typeof (err as { code?: unknown }).code === "string"
+          ? (err as { code?: string }).code
+          : "SPAWN_FAILED";
+      finish({
+        ok: false,
+        code: SKILL_EXECUTION_FAILED,
+        message: `Skill ${skillId} ${errCode}: ${err.message}`,
+        skillId,
+        stdout: stdout || undefined,
+        stderr: stderr || undefined,
+      });
+    });
+
+    child.on("close", (code) => {
       const durationMs = Date.now() - start;
-
-      if (err) {
-        const isTimeout = "killed" in err && err.killed && err.signal === "SIGTERM";
-        if (isTimeout) {
-          resolve({
-            ok: false,
-            code: SKILL_EXECUTION_TIMEOUT,
-            message: `Skill ${skillId} timed out after ${timeout}ms`,
-            skillId,
-            stderr: stderr || undefined,
-          });
-          return;
-        }
-
-        // err.code is a string for spawn errors (ENOENT, EACCES) and a number for exit codes
-        const errCode = "code" in err ? err.code : undefined;
-        const exitCode = typeof errCode === "number" ? errCode : 1;
-        const detail = typeof errCode === "string"
-          ? `${errCode}: ${err.message}`
-          : `exited with code ${exitCode}`;
-        resolve({
+      if (timedOut) {
+        finish({
           ok: false,
-          code: SKILL_EXECUTION_FAILED,
-          message: `Skill ${skillId} ${detail}`,
+          code: SKILL_EXECUTION_TIMEOUT,
+          message: `Skill ${skillId} timed out after ${timeout}ms`,
           skillId,
-          exitCode,
+          stdout: stdout || undefined,
           stderr: stderr || undefined,
         });
         return;
       }
 
-      resolve({
+      if (code !== 0) {
+        const exitCode = code ?? 1;
+        finish({
+          ok: false,
+          code: SKILL_EXECUTION_FAILED,
+          message: `Skill ${skillId} exited with code ${exitCode}`,
+          skillId,
+          exitCode,
+          stdout: stdout || undefined,
+          stderr: stderr || undefined,
+        });
+        return;
+      }
+
+      finish({
         ok: true,
         skillId,
         output: stdout,
@@ -124,5 +159,10 @@ export async function runSkill(
         durationMs,
       });
     });
+
+    const timeoutId = setTimeout(() => {
+      timedOut = true;
+      child.kill("SIGTERM");
+    }, timeout);
   });
 }

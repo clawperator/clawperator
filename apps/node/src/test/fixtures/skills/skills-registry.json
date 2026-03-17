@@ -51,6 +51,18 @@
         "skills/com.test.echo/scripts/exit_fail.js"
       ],
       "artifacts": []
+    },
+    {
+      "id": "com.test.partial-timeout",
+      "applicationId": "com.test",
+      "intent": "partial-timeout",
+      "summary": "Test skill that emits partial stdout before timing out.",
+      "path": "skills/com.test.echo",
+      "skillFile": "skills/com.test.echo/SKILL.md",
+      "scripts": [
+        "skills/com.test.echo/scripts/partial_timeout.js"
+      ],
+      "artifacts": []
     }
   ]
 }
