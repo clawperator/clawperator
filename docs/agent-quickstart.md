@@ -167,6 +167,7 @@ only after the UI path is already known.
 - [Execution Model](../reference/execution-model.md)
 - [Device and Package Model](../reference/device-and-package-model.md)
 - [Multi-Device Workflows for Agents](multi-device-workflows.md)
+- [Skill Development Workflow](../skills/skill-development-workflow.md)
 - [Clawperator Node API - Agent Guide](node-api-for-agents.md)
 - [API Overview](../reference/api-overview.md)
 - [CLI Reference](../reference/cli-reference.md)

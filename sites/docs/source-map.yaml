@@ -188,6 +188,11 @@ sections:
         mode: copy
         sources:
           - ../clawperator-skills/docs/usage-model.md
+      - output: skills/skill-development-workflow.md
+        title: Skill Development Workflow
+        mode: copy
+        sources:
+          - ../clawperator-skills/docs/skill-development-workflow.md
       - output: skills/skill-authoring-guidelines.md
         title: Skill Authoring Guidelines
         mode: copy

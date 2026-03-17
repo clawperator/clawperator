@@ -100,6 +100,9 @@ Once that registry entry exists, the skill becomes visible to:
 For the current metadata contract and authoring details, see
 `skills/skill-authoring-guidelines.md`.
 
+For the full path from ad hoc exploration to a validated reusable skill, see
+`skills/skill-development-workflow.md`.
+
 ## Anti-Patterns
 
 - Blindly trusting first result line.

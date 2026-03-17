@@ -161,6 +161,9 @@ clawperator skills validate --all
 This validates every configured skill entry in one pass and returns a summary
 of any broken paths or metadata mismatches.
 
+For the full explore -> scaffold -> validate -> live-run workflow, see
+`skill-development-workflow.md`.
+
 ---
 
 ## 5. Scripts vs. artifacts

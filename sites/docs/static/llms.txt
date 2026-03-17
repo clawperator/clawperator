@@ -21,6 +21,7 @@ This site contains the canonical technical documentation for Clawperator, a dete
 - Environment variables: https://docs.clawperator.com/reference/environment-variables/
 - First-time setup: https://docs.clawperator.com/getting-started/first-time-setup/
 - Troubleshooting: https://docs.clawperator.com/troubleshooting/troubleshooting/
+- Skill development workflow: https://docs.clawperator.com/skills/skill-development-workflow/
 - Architecture: https://docs.clawperator.com/architecture/architecture/
 
 ## GitHub

@@ -1003,7 +1003,8 @@ Current skills model:
   broken
 
 For the concrete `skill.json` contract and private-skill authoring model, see
-[Skill Authoring Guidelines](../skills/skill-authoring-guidelines.md) and
+[Skill Authoring Guidelines](../skills/skill-authoring-guidelines.md),
+[Skill Development Workflow](../skills/skill-development-workflow.md), and
 [Usage Model](../skills/usage-model.md).
 
 **Does Clawperator configure accounts or app settings?**

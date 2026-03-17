@@ -90,6 +90,7 @@ Use this page as a technical map:
 ## Skills
 
 - [Usage Model](skills/usage-model.md)
+- [Skill Development Workflow](skills/skill-development-workflow.md)
 - [Skill Authoring Guidelines](skills/skill-authoring-guidelines.md)
 - [Skill Design](design/skill-design.md)
 - [Device Prep and Runtime Tips](skills/device-prep-and-runtime-tips.md)
