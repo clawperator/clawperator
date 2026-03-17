@@ -92,11 +92,14 @@ export async function runSkill(
     let stderr = "";
     let settled = false;
     let timedOut = false;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
     const finish = (result: SkillRunResult | SkillRunError) => {
       if (settled) return;
       settled = true;
-      clearTimeout(timeoutId);
+      if (timeoutId !== undefined) {
+        clearTimeout(timeoutId);
+      }
       resolve(result);
     };
 
@@ -160,7 +163,7 @@ export async function runSkill(
       });
     });
 
-    const timeoutId = setTimeout(() => {
+    timeoutId = setTimeout(() => {
       timedOut = true;
       child.kill("SIGTERM");
     }, timeout);
