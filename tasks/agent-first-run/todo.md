@@ -3,6 +3,7 @@
 Source: `tasks/agent-first-run/findings.md` (cold-start agent evaluation, 2026-03-18)
 
 Each task is scoped to a single codebase, has a concrete change, and has verifiable acceptance criteria.
+Documentation relevant to the change is included in the task — not deferred.
 Tasks are ordered so that dependencies are satisfied top-to-bottom within each group.
 
 ---
@@ -18,321 +19,333 @@ Tasks are ordered so that dependencies are satisfied top-to-bottom within each g
 
 ---
 
-## Group A — Android Operator: correctness and new primitives
+## Group A — Android Operator
 
-Tasks in this group require a new APK build and release. Ship together where possible to justify one release cycle. T-01 is the exception — it is a correctness bug and should ship alone as soon as it is ready.
+Requires a new APK build and release. T-01 is a correctness bug and should ship alone as soon as it is ready. T-02 through T-04 can travel together in one release.
 
 ---
 
 ### T-01 · Fix `scroll_until` + `clickAfter` miss on EDGE_REACHED
-**Codebase:** `operator`
+**Codebase:** `operator` + `docs`
 **Priority:** Blocker
 
 **Problem:**
-`scroll_until` with `clickAfter: true` does not click when termination is `EDGE_REACHED`, even if the target node is visible on screen at that moment. This causes silent navigation failures when the target item sits at the very bottom of a scrollable list — the most common real-world case (e.g. "About phone" in Samsung Settings).
+`scroll_until` with `clickAfter: true` does not click when termination is `EDGE_REACHED`, even if the target node is visible on screen at that moment. Agents using `scroll_until` + `clickAfter` for last-item-in-list targets (e.g. "About phone" in Samsung Settings) silently navigate nowhere.
 
-**Change:**
-In the `scroll_until` termination handler, before setting `termination_reason = EDGE_REACHED` and returning, query the accessibility tree for the target matcher. If the node is found and visible:
-- Execute the click.
-- Set `termination_reason = TARGET_FOUND`.
-- Return normally.
+**Change — operator:**
+In the `scroll_until` termination handler, before returning `EDGE_REACHED`, query the accessibility tree for the target matcher. If the node is found and visible: execute the click, set `termination_reason = TARGET_FOUND`, return normally. If not found at the edge, return `EDGE_REACHED` as before. No change to any other termination path.
 
-If the node is not found at the edge, return `EDGE_REACHED` as before. No change to any other termination path.
+**Change — docs:**
+In the `scroll_until` action reference entry, add an explicit note documenting when `clickAfter` fires: currently only on `TARGET_FOUND`; not on `EDGE_REACHED` or any other termination condition. Include the workaround (follow with an explicit `click` step) for anyone running the old APK. Update this note once T-01 ships to reflect the corrected behavior.
 
 **Acceptance criteria:**
 - `scroll_until` with a target that is the last item in a RecyclerView and `clickAfter: true` → click fires, result shows `termination_reason: TARGET_FOUND`.
-- `scroll_until` with a target that is genuinely absent and `clickAfter: true` → no click, result shows `termination_reason: EDGE_REACHED`.
+- `scroll_until` with a genuinely absent target and `clickAfter: true` → no click, `termination_reason: EDGE_REACHED`.
 - Existing tests for `TARGET_FOUND` and `MAX_SCROLLS_REACHED` pass unchanged.
+- Docs note for `clickAfter` is present and accurate for the shipped behavior.
 
 **Dependencies:** None.
 
 ---
 
 ### T-02 · Add `wait_for_navigation` action
-**Codebase:** `operator`
+**Codebase:** `operator` + `docs`
 **Priority:** High
 
 **Problem:**
-After clicking a list item that triggers a screen transition, there is no built-in way to confirm the navigation happened. Agents must use a fixed `sleep` (900–1500ms) followed by a `snapshot_ui`, which is both slow and unreliable on low-end devices.
+After clicking an item that triggers a screen transition, there is no built-in confirmation primitive. Agents must use a fixed `sleep` (900–1500ms) followed by `snapshot_ui` — slow and unreliable on low-end devices.
 
-**Change:**
-Implement a new action type `wait_for_navigation` with params:
+**Change — operator:**
+Implement action type `wait_for_navigation`:
 ```
-{
-  expectedPackage?: string,   // poll until foreground package matches
-  expectedNode?: NodeMatcher, // poll until this node is present (alternative to package)
-  timeoutMs: number           // required; max 30000
+params: {
+  expectedPackage?: string,    // poll until foreground package matches
+  expectedNode?: NodeMatcher,  // poll until node is present (alternative)
+  timeoutMs: number            // required; max 30000
 }
 ```
-Poll the accessibility tree at ~200ms intervals. On success: `success: true`, `data.resolved_package: <string>`, `data.elapsed_ms: <number>`. On timeout: `success: false`, `data.error: "NAVIGATION_TIMEOUT"`, `data.last_package: <string>`.
+Poll at ~200ms intervals. On success: `success: true`, `data.resolved_package`, `data.elapsed_ms`. On timeout: `success: false`, `data.error: "NAVIGATION_TIMEOUT"`, `data.last_package`. Require at least one of `expectedPackage` or `expectedNode`; fail validation if both absent.
 
-At least one of `expectedPackage` or `expectedNode` is required; fail validation if both are absent.
+**Change — docs:**
+Add `wait_for_navigation` to the action type reference with full params schema, result shape, and a before/after example showing it replacing a `sleep` + `snapshot_ui` pattern.
 
 **Acceptance criteria:**
-- After clicking an item that navigates to a new Activity, `wait_for_navigation` with correct `expectedPackage` resolves within actual transition time (not a fixed sleep).
-- With wrong `expectedPackage`, times out and returns `NAVIGATION_TIMEOUT`.
-- With neither param, returns `EXECUTION_VALIDATION_FAILED`.
+- `wait_for_navigation` with correct `expectedPackage` resolves within actual transition time after a click.
+- Wrong `expectedPackage` → times out, returns `NAVIGATION_TIMEOUT`.
+- Neither param → `EXECUTION_VALIDATION_FAILED`.
+- Docs entry exists and matches shipped behavior.
 
 **Dependencies:** T-01 recommended first so click reliably fires before this wait is needed.
 
 ---
 
 ### T-03 · Add `read_key_value_pair` action
-**Codebase:** `operator`
+**Codebase:** `operator` + `docs`
 **Priority:** High
 
 **Problem:**
-Reading a label + adjacent value from a Settings-style list (e.g. `"Android version"` → `"16"`) requires a full `snapshot_ui` followed by manual XML parsing with index-based adjacency. This is fragile and duplicated across every settings-reading skill.
+Reading a Settings-style label + adjacent value (e.g. `"Android version"` → `"16"`) requires a full `snapshot_ui` then manual XML parsing using index-based adjacency. Fragile and duplicated across every settings-reading skill.
 
-**Change:**
-Implement a new action type `read_key_value_pair` with params:
+**Change — operator:**
+Implement action type `read_key_value_pair`:
 ```
-{
-  labelMatcher: NodeMatcher  // required; matches the label node
+params: {
+  labelMatcher: NodeMatcher  // required
 }
 ```
-Implementation: find the node matching `labelMatcher`; traverse to the nearest sibling or parent-adjacent node that carries a non-empty text value and has a resource-id ending in `/summary` or equivalent OEM pattern. Return:
-```
-{
-  label: string,
-  value: string
-}
-```
-If no value node is found adjacent to the label: `success: false`, `data.error: "VALUE_NODE_NOT_FOUND"`.
+Find the node matching `labelMatcher`; traverse to the nearest sibling or parent-adjacent node with a non-empty text value and resource-id ending in `/summary` (or OEM equivalent). Return `{ label: string, value: string }`. If no value node found: `success: false`, `data.error: "VALUE_NODE_NOT_FOUND"`.
+
+**Change — docs:**
+Add `read_key_value_pair` to the action type reference with params schema, result shape, both error codes (`NODE_NOT_FOUND`, `VALUE_NODE_NOT_FOUND`), and a Settings screen example.
 
 **Acceptance criteria:**
-- On a Samsung Settings Software information screen: `read_key_value_pair({labelMatcher: {textEquals: "Android version"}})` → `{label: "Android version", value: "16"}`.
+- `read_key_value_pair({labelMatcher: {textEquals: "Android version"}})` on a Samsung Software information screen → `{label: "Android version", value: "16"}`.
 - Label not found → `NODE_NOT_FOUND`.
-- Label found but no adjacent summary → `VALUE_NODE_NOT_FOUND`.
+- Label found, no adjacent summary → `VALUE_NODE_NOT_FOUND`.
+- Docs entry exists and matches shipped behavior.
 
 **Dependencies:** None.
 
 ---
 
 ### T-04 · Extend `read_text` validators
-**Codebase:** `operator`
+**Codebase:** `operator` + `docs`
 **Priority:** Medium
 
 **Problem:**
-`read_text` supports only `"temperature"` as a validator. An agent reading a version number, IP address, or other structured value has no way to validate the extracted text at the primitive level.
+`read_text` supports only `"temperature"` as a validator. An agent reading a version number or other structured value cannot validate the extracted text at the primitive level.
 
-**Change:**
+**Change — operator:**
 Add two new validator forms:
-1. `"validator": "version"` — passes for strings matching `/^\d+(\.\d+)*$/` (e.g. `"16"`, `"14.1.2"`). Fails for anything else.
-2. `"validator": "regex"` combined with `"validatorPattern": "<pattern>"` — compiles the pattern and tests the extracted text against it.
+1. `"validator": "version"` — passes for `/^\d+(\.\d+)*$/` (e.g. `"16"`, `"14.1.2"`).
+2. `"validator": "regex"` with `"validatorPattern": "<pattern>"` — compiles and tests the pattern.
 
-On validator failure: `success: false`, `data.error: "VALIDATOR_MISMATCH"`, `data.raw_text: <extracted string>` so the agent can inspect the actual value.
+On validator failure: `success: false`, `data.error: "VALIDATOR_MISMATCH"`, `data.raw_text: <extracted>`. Invalid regex pattern → `EXECUTION_VALIDATION_FAILED` at parse time.
+
+**Change — docs:**
+Update the `read_text` action reference entry to list all supported validators including the new forms, with examples and the `VALIDATOR_MISMATCH` error shape.
 
 **Acceptance criteria:**
-- `read_text` with `validator: "version"` on a node containing `"16"` → `success: true`, `data.text: "16"`.
-- Same on a node containing `"Settings"` → `success: false`, `data.error: "VALIDATOR_MISMATCH"`, `data.raw_text: "Settings"`.
-- `validator: "regex"`, `validatorPattern: "^\\d+"` on `"16"` → `success: true`.
-- Invalid regex pattern → `EXECUTION_VALIDATION_FAILED` at payload parse time.
+- `validator: "version"` on `"16"` → success. On `"Settings"` → `VALIDATOR_MISMATCH` with `raw_text`.
+- `validator: "regex"`, `validatorPattern: "^\\d+"` on `"16"` → success.
+- Invalid pattern → `EXECUTION_VALIDATION_FAILED`.
+- Docs validator table updated.
 
 **Dependencies:** None.
 
 ---
 
-## Group B — Node CLI: correctness and new commands
+## Group B — Node CLI
 
-Tasks in this group are Node/TypeScript only. No APK change required. Can ship as a single npm release.
+Node/TypeScript only. No APK change required. Can ship as a single npm release.
 
 ---
 
 ### T-05 · Fix `doctor` exit code for multi-device ambiguity
-**Codebase:** `node`
+**Codebase:** `node` + `docs`
 **Priority:** Blocker
 
 **Problem:**
-`clawperator doctor` without `--device-id` when multiple devices are connected exits 1 (`MULTIPLE_DEVICES_DEVICE_ID_REQUIRED`), even when all devices are healthy. This breaks CI pipelines that run doctor as a preflight check on developer machines.
+`clawperator doctor` without `--device-id` exits 1 when multiple devices are connected, even if all devices are healthy. Breaks CI preflight checks on developer machines.
 
-**Change:**
-`MULTIPLE_DEVICES_DEVICE_ID_REQUIRED` is an ambiguity condition, not a failure. Change the exit code for this specific case to 0 (or introduce exit code 2 as "ambiguous/requires action" if a distinct code is preferred). The existing exit 1 path should be reserved for genuine failures: APK not installed, handshake failed, adb unreachable.
+**Change — node:**
+`MULTIPLE_DEVICES_DEVICE_ID_REQUIRED` is ambiguity, not failure. Change its exit code to 0 (or a new distinct code 2 if preferred). Reserve exit 1 for genuine failures: APK not installed, handshake failed, adb unreachable.
+
+**Change — docs:**
+Update the CLI reference entry for `doctor` to document exit code semantics explicitly: 0 = healthy or ambiguous, 1 = genuine failure. Note the multi-device case.
 
 **Acceptance criteria:**
-- `clawperator doctor` with 2 healthy connected devices → exits 0, warning message printed to stderr.
-- `clawperator doctor` with 1 device where APK is not installed → exits 1.
-- `clawperator doctor --device-id <serial>` with healthy device → exits 0 (unchanged).
+- `doctor` with 2 healthy devices → exits 0, warning to stderr.
+- `doctor` with device where APK not installed → exits 1.
+- `doctor --device-id <serial>` healthy → exits 0 (unchanged).
+- CLI reference documents exit code semantics.
 
 **Dependencies:** None.
 
 ---
 
 ### T-06 · Add `execute --dry-run` flag
-**Codebase:** `node`
+**Codebase:** `node` + `docs`
 **Priority:** High
 
 **Problem:**
-Validating a JSON execution payload requires sending it to the device. A payload with a schema error (wrong key name, missing required field) only fails after the device receives it. There is no local validation path.
+Payload schema errors only surface after sending to the device. No local validation path exists. The `params` nesting error during the evaluation cost 2 round-trips before the correct structure was found.
 
-**Change:**
-Add `--dry-run` to `clawperator execute`. When set:
-1. Parse and validate the payload against the full action schema.
-2. Print the validated execution plan: commandId, timeoutMs, and per-action summary (id, type, key params).
-3. Exit 0 on valid payload, exit 1 on schema error with the validation error details.
-4. Do not open any device connection.
+**Change — node:**
+Add `--dry-run` to `clawperator execute`. When set: parse and validate payload against full action schema, print validated execution plan (commandId, timeoutMs, per-action summary), exit 0 on valid / exit 1 on schema error. No device connection opened.
+
+**Change — docs:**
+Add `--dry-run` to the CLI reference `execute` entry with usage example and output format.
 
 **Acceptance criteria:**
-- `clawperator execute --execution valid.json --dry-run` → prints plan, exits 0, no adb activity.
-- `clawperator execute --execution invalid.json --dry-run` (e.g. action with wrong param key) → prints validation error with the offending path (same format as `EXECUTION_VALIDATION_FAILED`), exits 1, no adb activity.
-- `--dry-run` without `--device-id` works (no device required).
+- `execute --execution valid.json --dry-run` → prints plan, exits 0, no adb activity.
+- `execute --execution invalid.json --dry-run` → prints validation error with offending path, exits 1, no adb activity.
+- `--dry-run` works without `--device-id`.
+- CLI reference documents the flag.
 
 **Dependencies:** None.
 
 ---
 
-### T-07 · Add `skills new` scaffolding command
-**Codebase:** `node`
+### T-07 · Add `skills new` scaffolding command; document `skills run` output envelope
+**Codebase:** `node` + `docs`
 **Priority:** High
 
 **Problem:**
-Creating a new skill requires manually replicating file structure from an existing skill. There is no `skills new` command. The invocation contract (args, env vars, exit codes) is only learned by reading another skill's source.
+Creating a new skill requires manually replicating file structure from an existing skill — no `skills new` command exists. Separately: the `{ skillId, output, exitCode, durationMs }` wrapper returned by `skills run` is undocumented; its contract can only be discovered by running an existing skill.
 
-**Change:**
-Add `clawperator skills new <skill_id> --app <packageId> --intent <intent> [--summary <text>]`:
-1. Create `<skills_root>/<skill_id>/` directory.
-2. Write `SKILL.md` with frontmatter (`name`, `description`) and usage stub.
-3. Write `skill.json` with all required fields populated from flags.
-4. Write `scripts/run.sh` (bash shim: `node "$DIR/run.js" "$@"`).
-5. Write `scripts/run.js` with the standard `runClawperator` boilerplate, device arg parsing, and a `// TODO: implement` stub for the execution payload.
-6. Append the entry to `CLAWPERATOR_SKILLS_REGISTRY`.
-7. Print the created paths and a pointer to the authoring guide.
+**Change — node:**
+Add `clawperator skills new <skill_id> --app <packageId> --intent <intent> [--summary <text>]`. Creates: skill directory, `SKILL.md` with frontmatter + usage stub, `skill.json` with all required fields, `scripts/run.sh` shim, `scripts/run.js` with `runClawperator` boilerplate and `// TODO: implement` stub, registry entry in `CLAWPERATOR_SKILLS_REGISTRY`. Prints created paths and pointer to authoring guide.
+
+**Change — docs:**
+1. Add `skills new` to CLI reference with flag documentation.
+2. Add `skills run` output schema to the Skills Usage Model page and CLI reference: `{ skillId, output, exitCode, durationMs }` field definitions, that `output` is raw stdout, that stdout conventions are skill-defined not runner-enforced, example of successful and failed run output.
 
 **Acceptance criteria:**
-- `clawperator skills new com.example.test-skill --app com.example --intent test` creates all 4 files with correct content and a valid registry entry.
-- `clawperator skills list` shows the new skill immediately after.
-- `clawperator skills run com.example.test-skill --device-id <id>` fails with a clear "not implemented" message from the stub (not a runtime crash).
+- `skills new com.example.test --app com.example --intent test` creates all files with correct content and a valid registry entry.
+- `skills list` shows the new skill immediately.
+- `skills run com.example.test --device-id <id>` fails with "not implemented" (not a crash).
+- CLI reference documents `skills new` and `skills run` output schema.
 
 **Dependencies:** None.
 
 ---
 
 ### T-08 · Warn on missing or unset `CLAWPERATOR_SKILLS_REGISTRY`
-**Codebase:** `node`
+**Codebase:** `node` + `docs`
 **Priority:** Medium
 
 **Problem:**
-If `CLAWPERATOR_SKILLS_REGISTRY` is not set or points to a missing file, `clawperator skills list` returns empty with no error. The user has no signal that the registry is misconfigured vs. genuinely empty.
+If `CLAWPERATOR_SKILLS_REGISTRY` is unset or points to a missing file, `skills list` returns empty silently. No signal that the registry is misconfigured vs. genuinely empty.
 
-**Change:**
-In the skills registry loader:
-- If `CLAWPERATOR_SKILLS_REGISTRY` is unset: print to stderr `"warning: CLAWPERATOR_SKILLS_REGISTRY is not set; no skills loaded. Set this variable to the path of your skills-registry.json."` Exit 1.
-- If set but the file does not exist: print `"error: CLAWPERATOR_SKILLS_REGISTRY points to a missing file: <path>"`. Exit 1.
-- Apply to `skills list`, `skills get`, `skills search`, and `skills run`.
+**Change — node:**
+In the registry loader: if env var unset → stderr warning + exit 1. If set but file missing → stderr error + exit 1. Apply to `skills list`, `get`, `search`, `run`.
+
+**Change — docs:**
+Add a troubleshooting entry to the Skills Usage Model page: "skills list returns empty — check `CLAWPERATOR_SKILLS_REGISTRY`" with diagnosis steps.
 
 **Acceptance criteria:**
-- `CLAWPERATOR_SKILLS_REGISTRY` unset → warning to stderr, exit 1.
-- `CLAWPERATOR_SKILLS_REGISTRY` set to nonexistent path → error to stderr, exit 1.
-- `CLAWPERATOR_SKILLS_REGISTRY` set and valid → behavior unchanged.
+- Env var unset → warning to stderr, exit 1.
+- Env var set to missing file → error to stderr, exit 1.
+- Valid env var → behavior unchanged.
+- Troubleshooting entry exists in docs.
 
 **Dependencies:** None.
 
 ---
 
 ### T-09 · Normalize `matcher` / `target` param naming; add alias
-**Codebase:** `node`
+**Codebase:** `node` + `docs`
 **Priority:** Medium
 
 **Problem:**
-`click`, `read_text`, `enter_text`, and `wait_for_node` use `matcher` for the node selector. `scroll_and_click` and `scroll_until` use `target`. Same concept, two different key names. This is the proximate cause of payload schema errors during the evaluation.
+`click`, `read_text`, `enter_text`, `wait_for_node` use `matcher`. `scroll_and_click` and `scroll_until` use `target`. Same concept, two names. Directly caused schema errors during the evaluation.
 
-**Change:**
-In the action schema validation layer for `scroll_and_click` and `scroll_until`:
-- Accept `matcher` as the canonical key (same as click/read_text).
-- Accept `target` as a deprecated alias — pass validation but emit a schema-level warning in the execution result: `"data.warn: "'target' is deprecated; use 'matcher'"`.
-- Update generated docs and `--dry-run` output (T-06) to show `matcher`.
+**Change — node:**
+In schema validation for `scroll_and_click` and `scroll_until`: accept `matcher` as canonical; accept `target` as deprecated alias that passes validation but adds `data.warn: "'target' is deprecated; use 'matcher'"` to the result. Both present → `EXECUTION_VALIDATION_FAILED`.
+
+**Change — docs:**
+Update `scroll_and_click` and `scroll_until` entries in the action type reference to show `matcher` as the canonical key. Add a deprecation notice for `target` with migration note.
 
 **Acceptance criteria:**
-- `scroll_until` payload using `matcher` → validates and executes correctly.
-- `scroll_until` payload using `target` → validates, executes correctly, result includes deprecation warning.
-- `scroll_until` payload using both → `EXECUTION_VALIDATION_FAILED` (ambiguous).
+- `scroll_until` with `matcher` → validates and executes correctly.
+- `scroll_until` with `target` → validates, executes, result includes deprecation warning.
+- Both present → `EXECUTION_VALIDATION_FAILED`.
 - `scroll_and_click` same behavior.
+- Docs show `matcher` as canonical.
 
-**Dependencies:** T-06 recommended first so dry-run output reflects the canonical name.
+**Dependencies:** T-06 recommended first so dry-run output reflects canonical name.
 
 ---
 
-### T-10 · Emit snapshot settle warning when `snapshot_ui` immediately follows `click`
-**Codebase:** `node`
+### T-10 · Emit snapshot settle warning; document settle delay pattern
+**Codebase:** `node` + `docs`
 **Priority:** Low
 
 **Problem:**
-A `snapshot_ui` taken within ~500ms of a preceding `click` step captures the pre-navigation UI state. This is an undocumented footgun. The agent gets a successful snapshot of the wrong screen.
+A `snapshot_ui` taken within ~500ms of a preceding `click` captures the pre-navigation UI. This is an undocumented footgun: the agent gets `success: true` with the wrong screen's content. Mentioned only as a "practical tip" in timeout budgeting docs; not in Navigation Patterns.
 
-**Change:**
-In the execution result post-processor, after execution completes: for each `snapshot_ui` step, check the elapsed time since the most recent preceding `click` step in the same execution. If < 500ms, add to the step result: `data.warn: "snapshot captured <N>ms after preceding click; UI may not have settled — consider adding a sleep step"`.
+**Change — node:**
+In the execution result post-processor: for each `snapshot_ui` step, if the preceding `click` step completed < 500ms earlier in the same execution, add `data.warn: "snapshot captured <N>ms after preceding click; UI may not have settled — consider adding a sleep step"`. Warning only; does not affect `success` or `status`.
 
-This is a warning only; it does not change `success` or `status`.
+**Change — docs:**
+Add a "UI settle delay" section to the Navigation Patterns guide: why it's needed, recommended range (500ms min; 1000–1500ms for OEM/slow devices), the canonical pattern (`sleep` between `click` and `snapshot_ui`), note that the runtime warning (above) surfaces violations automatically.
 
 **Acceptance criteria:**
-- Execution with `click` → immediate `snapshot_ui` (no sleep between) → snapshot step result contains `data.warn`.
-- Execution with `click` → `sleep 1000ms` → `snapshot_ui` → no warning.
-- Warning does not affect `success: true` on the snapshot step.
+- `click` → immediate `snapshot_ui` → snapshot step result contains `data.warn`.
+- `click` → `sleep 1000ms` → `snapshot_ui` → no warning.
+- Navigation Patterns guide contains the settle delay section.
 
 **Dependencies:** None.
 
 ---
 
-### T-11 · Add inline recovery hint to `SERVICE_UNAVAILABLE` error output
+### T-11 · Add inline recovery hint to `SERVICE_UNAVAILABLE` error
 **Codebase:** `node`
 **Priority:** Low
 
 **Problem:**
-When the APK is not installed, the runtime returns `SERVICE_UNAVAILABLE`. The correct fix is `clawperator operator setup`, but this is only discoverable via the error-codes docs page. The error output itself gives no recovery path.
+`SERVICE_UNAVAILABLE` (APK not installed) gives no recovery path in the error output. The fix (`operator setup`) is only discoverable via the error-codes docs page.
 
-**Change:**
-In the error formatting layer: when the error code is `SERVICE_UNAVAILABLE` and no receiver package is detected on the target device, append to the error detail: `"Hint: the accessibility service is not running. Run: clawperator operator setup --device-id <deviceId>"`.
+**Change — node:**
+When error code is `SERVICE_UNAVAILABLE` and no receiver package detected on the device, append to error detail: `"Hint: accessibility service not running. Run: clawperator operator setup --device-id <deviceId>"`.
+
+No separate docs change needed — the hint is self-documenting in the output.
 
 **Acceptance criteria:**
-- `clawperator execute` against a device with no APK installed → error output contains the `operator setup` hint with the correct `--device-id` value.
+- `execute` against a device with no APK → error output contains the `operator setup` hint with the correct `--device-id`.
 - Other error codes → no hint appended.
 
 **Dependencies:** None.
 
 ---
 
-## Group C — install.sh: multi-device awareness
+## Group C — install.sh
 
-### T-12 · Detect already-installed APK during multi-device install
-**Codebase:** `install`
+### T-12 · Detect already-installed APK during multi-device install; add setup docs
+**Codebase:** `install` + `docs`
 **Priority:** Medium
 
 **Problem:**
-When multiple devices are connected, the installer prints a generic "setup required" message for all of them. It does not check which devices already have the APK installed, so a user whose device is already configured sees the same message as someone who has never set up.
+When multiple devices are connected, the installer prints the same "setup required" message regardless of whether any device already has the APK installed. A user whose device is already configured gets the same output as someone who has never set up. The first-time setup docs page has no entry for the multi-device case.
 
-**Change:**
-After detecting multiple devices, for each device serial run `clawperator doctor --device-id <serial> --output json` silently and parse the result. For devices where all critical checks pass: print `"✅ <serial> — Operator already installed and ready."` For devices where the APK check fails: print the existing setup instruction. If all devices are ready: print "All devices ready. No setup required."
+**Change — install:**
+After detecting multiple devices, for each serial run `clawperator doctor --device-id <serial> --output json` silently and parse the result. Print per-device status: `✅ <serial> — ready` or `⚠ <serial> — setup required: clawperator operator setup --device-id <serial>`. If all devices ready: print "All devices ready. No setup required."
+
+**Change — docs:**
+Add a "Multiple devices connected" troubleshooting section to the first-time setup page: why the installer stops at device selection, how to proceed with `operator setup --device-id`, how to check if a device is already set up (`doctor --device-id`), expected output for each case.
 
 **Acceptance criteria:**
-- With 2 devices, one with APK installed and one without: installer correctly identifies which is ready and which needs setup.
-- With 2 devices, both ready: installer prints "All devices ready."
-- With 2 devices, neither ready: existing behavior unchanged.
+- 2 devices, one with APK installed → installer correctly labels each.
+- 2 devices, both ready → "All devices ready."
+- 2 devices, neither ready → existing behavior unchanged.
+- First-time setup page contains the multi-device troubleshooting section.
 
 **Dependencies:** T-05 (doctor exit code fix) should ship first so the doctor invocation here exits correctly.
 
 ---
 
-## Group D — Docs
+## Group D — Standalone docs cleanup
 
-Documentation tasks. Should follow Group A and B so the reference material reflects the corrected and extended API.
+These tasks are not tied to a specific feature. They establish foundations that benefit all agent-facing content.
 
 ---
 
-### T-13 · Fix broken internal links
+### T-13 · Fix broken internal links; add CI link check
 **Codebase:** `docs`
-**Priority:** High (do first; establishes clean baseline for all other doc work)
+**Priority:** High — do before T-14
 
 **Problem:**
-`reference/actions` returns 404. Several links in the agent quickstart return 404. Recent reorganization left dead links in agent-facing pages.
+`reference/actions` is a 404. Several links in the agent quickstart return 404. Recent docs reorganization left dead links in agent-facing pages.
 
 **Change:**
 1. Audit all internal links in `ai-agents/` and `reference/` sections.
-2. Fix or redirect each 404 to the correct current URL.
-3. Add a CI check (e.g. `lychee` or `linkcheck`) that fails the docs build on broken internal links.
+2. Fix or redirect each 404.
+3. Add a CI check (e.g. `lychee`) that fails the docs build on broken internal links going forward.
 
 **Acceptance criteria:**
 - All internal links in `ai-agents/` and `reference/` return 200.
-- CI check runs on docs PRs and catches new broken links.
+- CI check runs on docs PRs.
 
 **Dependencies:** None.
 
@@ -340,131 +353,34 @@ Documentation tasks. Should follow Group A and B so the reference material refle
 
 ### T-14 · Create single canonical action type reference page
 **Codebase:** `docs`
-**Priority:** High
+**Priority:** High — do after Group A ships
 
 **Problem:**
-The action params schema is spread across `llms-full.txt`, the agent quickstart, and the Node API guide. A new agent author needs to fetch 4 pages and make 2 invalid API calls before the correct payload structure is clear. `reference/actions` is a 404.
+The action params schema is spread across `llms-full.txt`, the agent quickstart, and the Node API guide. A new agent needs to fetch 4 pages and make 2 failed API calls before the payload structure is clear.
 
 **Change:**
-Create `reference/action-types/` as a single page with, for each of the ~14 action types:
-- Action type name
-- Full params schema (key, type, required/optional, description)
-- Result data shape (key, type, description)
-- Minimal working example payload
-
-Cross-link from: agent quickstart, `llms-full.txt`, navigation patterns guide.
-Remove or redirect the stale `reference/actions` URL to this page.
+Create `reference/action-types/` as a single page covering all action types (including new ones from T-02, T-03, T-04): full params schema, result data shape, minimal example payload per type. Cross-link from agent quickstart, `llms-full.txt`, navigation patterns guide. Redirect the stale `reference/actions` URL to this page.
 
 **Acceptance criteria:**
-- All 14 action types are documented with params, result shape, and example.
-- Page is reachable at a stable URL.
-- Agent quickstart, llms-full.txt, and navigation patterns each link to it.
-- `reference/actions` redirects to the new page (no more 404).
+- All action types documented with params, result shape, example.
+- Page reachable at a stable URL.
+- Agent quickstart, `llms-full.txt`, and navigation patterns each link to it.
+- `reference/actions` redirects here.
 
-**Dependencies:** T-13 (link audit) first. T-09 (matcher normalization) should ship before this so the page documents `matcher` as canonical.
-
----
-
-### T-15 · Document `scroll_until` `clickAfter` semantics
-**Codebase:** `docs`
-**Priority:** High
-
-**Problem:**
-`clickAfter` on `scroll_until` fires only on `TARGET_FOUND`, not on `EDGE_REACHED`. This is undocumented. Every new agent author discovers it the hard way.
-
-**Change:**
-In the action type reference (T-14) and in any existing `scroll_until` content, add an explicit note:
-> "`clickAfter` fires only when `termination_reason` is `TARGET_FOUND`. It does not fire on `EDGE_REACHED` or any other termination condition. If the target may sit at the very bottom of the list, follow `scroll_until` with an explicit `click` step as a fallback."
-
-After T-01 ships, update this note to reflect the new behavior (target visible at EDGE_REACHED → click fires).
-
-**Acceptance criteria:**
-- Action type reference page for `scroll_until` explicitly documents when `clickAfter` fires.
-- Includes the workaround (explicit `click` fallback) until T-01 ships.
-
-**Dependencies:** T-14. Update required after T-01.
-
----
-
-### T-16 · Document snapshot settle delay in Navigation Patterns guide
-**Codebase:** `docs`
-**Priority:** Medium
-
-**Problem:**
-The UI settle delay required between a `click` and a subsequent `snapshot_ui` is mentioned only as a "practical tip" in the timeout budgeting docs. It is not in the navigation patterns guide and is not presented as a required step.
-
-**Change:**
-Add a "UI settle delay" section to the Navigation Patterns guide covering:
-- Why it's needed (accessibility hierarchy lags behind visual rendering)
-- Recommended range: 500ms minimum, 1000–1500ms for slower/OEM devices
-- Pattern: always insert `{ type: "sleep", params: { durationMs: 1000 } }` between a `click` and the next `snapshot_ui`
-- Note that T-10 (runtime warning) will surface violations automatically once shipped
-
-**Acceptance criteria:**
-- Navigation Patterns guide contains a dedicated section on settle delay.
-- Recommended delay values are explicit and attributed to a rationale (not just "add a sleep").
-
-**Dependencies:** T-13.
-
----
-
-### T-17 · Document `skills run` output envelope
-**Codebase:** `docs`
-**Priority:** Medium
-
-**Problem:**
-The `{ skillId, output, exitCode, durationMs }` JSON wrapper returned by `clawperator skills run` is not documented anywhere. An agent invoking a skill and parsing its output must discover this by running an existing skill.
-
-**Change:**
-Add the `skills run` output schema to the Skills Usage Model page and the CLI reference. Cover:
-- The JSON wrapper fields and types
-- That `output` is the raw stdout of the skill script
-- That `exitCode` reflects the script's exit code (0 = success)
-- That stdout conventions (e.g. `RESULT|status=success|...`) are skill-defined, not enforced by the runner
-- Example output from a successful and a failed run
-
-**Acceptance criteria:**
-- Skills usage model page documents the `skills run` output schema.
-- CLI reference documents `skills run` output format.
-
-**Dependencies:** T-13.
-
----
-
-### T-18 · Document multi-device installer scenarios
-**Codebase:** `docs`
-**Priority:** Low
-
-**Problem:**
-The first-time setup page has no entry for the case where multiple devices are connected. Users with a phone + emulator encounter the multi-device warning with no docs guidance.
-
-**Change:**
-Add a "Multiple devices connected" section to the first-time setup troubleshooting page covering:
-- Why the installer stops at device selection
-- How to proceed with `operator setup --device-id`
-- How to check if a device is already set up (`doctor --device-id`)
-- The expected output when one device is ready and one isn't
-
-**Acceptance criteria:**
-- First-time setup page contains a "Multiple devices" troubleshooting entry.
-- Entry covers both the "never set up" and "already set up on one device" cases.
-
-**Dependencies:** T-13.
+**Dependencies:** T-13. Best done after Group A (T-02, T-03, T-04) ships so new action types are included from the start. T-09 should ship first so `matcher` is shown as canonical throughout.
 
 ---
 
 ## Dependency summary
 
 ```
-T-01 ──────────────────────────────────────────► T-02 (ship before, not required)
-T-05 ──────────────────────────────────────────► T-12
-T-06 ──────────────────────────────────────────► T-09 (dry-run output shows canonical names)
-T-13 ──► T-14 ──► T-15
-T-13 ──► T-16
-T-13 ──► T-17
-T-13 ──► T-18
-T-01 (shipped) ──► update T-15 note
-T-09 (shipped) ──► T-14 reflects canonical param names
+T-01 ──────────────────────────────► T-02 (recommended before, not hard gate)
+T-05 ──────────────────────────────► T-12
+T-06 ──────────────────────────────► T-09 (dry-run output reflects canonical name)
+T-13 ──────────────────────────────► T-14
+T-02, T-03, T-04 (shipped) ────────► T-14 (covers complete action set)
+T-09 (shipped) ────────────────────► T-14 (documents matcher as canonical)
+T-01 (shipped) ────────────────────► update T-01 docs note re: clickAfter behavior
 ```
 
 All other tasks are independent.
