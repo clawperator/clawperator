@@ -392,7 +392,11 @@ export async function startServer(options: ServeOptions): Promise<Server> {
         return;
       }
 
-      const { deviceId, args } = req.body as { deviceId?: unknown; args?: unknown };
+      const {
+        deviceId,
+        args,
+        timeoutMs,
+      } = req.body as { deviceId?: unknown; args?: unknown; timeoutMs?: unknown };
 
       if (deviceId !== undefined && typeof deviceId !== "string") {
         res.status(400).json({ ok: false, error: { code: "INVALID_DEVICE_ID", message: "'deviceId' must be a string" } });
@@ -404,11 +408,21 @@ export async function startServer(options: ServeOptions): Promise<Server> {
         return;
       }
 
+      if (timeoutMs !== undefined && (!Number.isInteger(timeoutMs) || Number(timeoutMs) <= 0)) {
+        res.status(400).json({ ok: false, error: { code: "INVALID_TIMEOUT_MS", message: "'timeoutMs' must be a positive integer" } });
+        return;
+      }
+
       const scriptArgs: string[] = [];
       if (typeof deviceId === "string" && deviceId.length > 0) scriptArgs.push(deviceId);
       if (Array.isArray(args)) scriptArgs.push(...args.map(String));
 
-      const result = await runSkill(req.params.skillId, scriptArgs);
+      const result = await runSkill(
+        req.params.skillId,
+        scriptArgs,
+        undefined,
+        typeof timeoutMs === "number" ? timeoutMs : undefined
+      );
       if (result.ok) {
         res.json({
           ok: true,
@@ -416,6 +430,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
           output: result.output,
           exitCode: result.exitCode,
           durationMs: result.durationMs,
+          timeoutMs: typeof timeoutMs === "number" ? timeoutMs : undefined,
         });
       } else {
         const status = result.code === SKILL_NOT_FOUND ? 404
@@ -430,6 +445,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
             exitCode: result.exitCode,
             stdout: result.stdout,
             stderr: result.stderr,
+            timeoutMs: typeof timeoutMs === "number" ? timeoutMs : undefined,
           },
         });
       }

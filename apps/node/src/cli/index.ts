@@ -62,7 +62,7 @@ Commands:
   skills validate <skill_id>
   skills validate --all
                                             Validate one local skill or the entire configured registry
-  skills run <skill_id> [--device-id <id>] [-- <extra_args>]
+  skills run <skill_id> [--device-id <id>] [--timeout-ms <n>] [-- <extra_args>]
                                             Invoke a skill script (convenience wrapper)
   skills install
                                             Clone skills repository to ~/.clawperator/skills/
@@ -612,7 +612,7 @@ async function main(): Promise<void> {
       } else if (rest[0] === "run") {
         const skillId = rest[1];
         if (!skillId) {
-          result = JSON.stringify({ code: "USAGE", message: "skills run <skill_id> [--device-id <id>] [-- <extra_args>]" });
+          result = JSON.stringify({ code: "USAGE", message: "skills run <skill_id> [--device-id <id>] [--timeout-ms <n>] [-- <extra_args>]" });
         } else {
           // Build args to pass to the skill script
           // Only parse options from args before "--" to avoid double-counting
@@ -625,7 +625,12 @@ async function main(): Promise<void> {
           if (dashDash >= 0) {
             scriptArgs.push(...rest.slice(dashDash + 1));
           }
-          result = await (await import("./commands/skills.js")).cmdSkillsRun(skillId, scriptArgs, out);
+          result = await (await import("./commands/skills.js")).cmdSkillsRun(
+            skillId,
+            scriptArgs,
+            global.timeoutMs,
+            out
+          );
         }
       } else if (rest[0] === "install") {
         result = await (await import("./commands/skills.js")).cmdSkillsInstall(out);

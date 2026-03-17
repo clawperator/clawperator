@@ -149,7 +149,7 @@ Treat skill verification as four distinct layers:
 3. **Execution payload validity**
    `clawperator execute --validate-only ...`
 4. **Live device behavior**
-   `clawperator skills run <skill_id> --device-id <device_id>`
+   `clawperator skills run <skill_id> --device-id <device_id> [--timeout-ms <n>]`
 
 This keeps failures local:
 

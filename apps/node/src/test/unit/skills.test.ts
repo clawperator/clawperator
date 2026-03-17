@@ -779,4 +779,22 @@ describe("runSkill", () => {
     assert.ok(parsed.stdout?.includes('"stage":"before-failure"'));
     assert.ok(parsed.stderr?.includes("FAIL_OUTPUT:intentional"));
   });
+
+  it("CLI skills run accepts --timeout-ms and returns it in the success payload", async () => {
+    const { stdout, code } = await runCli([
+      "skills", "run", "com.test.echo", "--timeout-ms", "3210", "--output", "json", "--", "hello", "world",
+    ]);
+    assert.strictEqual(code, 0, stdout);
+    const parsed = JSON.parse(stdout) as { skillId?: string; output?: string; timeoutMs?: number };
+    assert.strictEqual(parsed.skillId, "com.test.echo");
+    assert.strictEqual(parsed.timeoutMs, 3210);
+    assert.ok(parsed.output?.includes("TEST_OUTPUT:hello"));
+  });
+
+  it("CLI skills run returns usage when skill_id is missing even with --timeout-ms", async () => {
+    const { stdout } = await runCli(["skills", "run", "--timeout-ms", "5000", "--output", "json"]);
+    const parsed = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(parsed.code, "USAGE");
+    assert.ok(parsed.message?.includes("--timeout-ms"));
+  });
 });

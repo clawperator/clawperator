@@ -201,6 +201,40 @@ describe("serve API integration", () => {
     assert.ok(body.error.stderr?.includes("FAIL_OUTPUT:intentional"));
   });
 
+  test("POST /skills/:skillId/run accepts timeoutMs override", async () => {
+    const res = await fetch(`http://localhost:${port}/skills/com.test.echo/run`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        args: ["hello", "api"],
+        timeoutMs: 4321,
+      }),
+    });
+
+    assert.strictEqual(res.status, 200);
+    const body = await res.json() as {
+      ok: boolean;
+      output?: string;
+      timeoutMs?: number;
+    };
+    assert.strictEqual(body.ok, true);
+    assert.strictEqual(body.timeoutMs, 4321);
+    assert.ok(body.output?.includes("TEST_OUTPUT:hello"));
+  });
+
+  test("POST /skills/:skillId/run rejects invalid timeoutMs", async () => {
+    const res = await fetch(`http://localhost:${port}/skills/com.test.echo/run`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ timeoutMs: "slow" }),
+    });
+
+    assert.strictEqual(res.status, 400);
+    const body = await res.json() as { ok: boolean; error: { code: string } };
+    assert.strictEqual(body.ok, false);
+    assert.strictEqual(body.error.code, "INVALID_TIMEOUT_MS");
+  });
+
   test("Execution emits SSE events", async () => {
     // 1. Connect to SSE
     const sseRes = await fetch(`http://localhost:${port}/events`);

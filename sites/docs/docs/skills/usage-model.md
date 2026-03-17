@@ -80,6 +80,12 @@ preserves partial `stdout` and `stderr` in the structured error output when
 they exist. Agents should inspect those fields before discarding the run as an
 opaque failure.
 
+When a particular device or workflow needs a different wrapper budget, use:
+
+```bash
+clawperator skills run <skill_id> --device-id <device_id> --timeout-ms 90000
+```
+
 ## Private skills
 
 Private skills are not discovered by scanning folders automatically. The

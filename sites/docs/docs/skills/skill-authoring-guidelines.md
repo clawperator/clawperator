@@ -266,9 +266,10 @@ Why this matters:
   `stdout`.
 - Recovering `err.stdout` often preserves the best available structured result.
 
-`clawperator skills run` currently applies a 120000 ms wrapper timeout. Keep
-your own script timeout at or above the expected flow duration so the wrapper
-can return structured output. When the wrapper does fail or time out,
+`clawperator skills run` currently applies a 120000 ms wrapper timeout by
+default. Use `--timeout-ms <n>` when a specific run needs a tighter or looser
+wrapper budget. Keep your own script timeout at or above the expected flow
+duration so the wrapper can return structured output. When the wrapper does fail or time out,
 Clawperator preserves partial script `stdout` and `stderr` in the structured
 error payload when available.
 

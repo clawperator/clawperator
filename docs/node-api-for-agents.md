@@ -43,7 +43,7 @@ For the exact `snapshot_ui` structure, use
 | `skills validate <skill_id>` | Verify one local skill's metadata and required files before runtime testing |
 | `skills validate --all` | Validate the entire configured skills registry in one pass |
 | `skills compile-artifact <id> --artifact <name>` | Compile skill to execution payload |
-| `skills run <skill_id> [--device-id <id>]` | Invoke a skill script (convenience wrapper) |
+| `skills run <skill_id> [--device-id <id>] [--timeout-ms <n>]` | Invoke a skill script (convenience wrapper) |
 | `skills install` | Clone skills repo to `~/.clawperator/skills/` |
 | `skills update [--ref <git-ref>]` | Pull latest skills (optionally pin to a ref) |
 | `grant-device-permissions` | Re-grant Operator permissions only after an Operator APK crash causes Android to revoke them |
@@ -98,7 +98,7 @@ Start with `clawperator serve [--port <n>] [--host <ip>]`. Default: `127.0.0.1:3
 | `POST /observe/screenshot` | Capture screenshot |
 | `GET /skills` | List skills. Query params: `?app=<pkg>&intent=<i>&keyword=<k>` |
 | `GET /skills/:skillId` | Get skill metadata |
-| `POST /skills/:skillId/run` | Run skill. Body: `{"deviceId": "...", "args": [...]}` |
+| `POST /skills/:skillId/run` | Run skill. Body: `{"deviceId": "...", "args": [...], "timeoutMs": 90000}` |
 | `GET /events` | SSE stream: `clawperator:result`, `clawperator:execution`, `heartbeat` |
 
 See `apps/node/examples/basic-api-usage.js` for a complete SSE + REST example.
@@ -930,7 +930,7 @@ Skills can be invoked three ways:
 
 2. **Convenience wrapper** via Node API:
    ```bash
-   clawperator skills run com.android.settings.capture-overview --device-id <device_id>
+   clawperator skills run com.android.settings.capture-overview --device-id <device_id> --timeout-ms 90000
    ```
 
 3. **Artifact compile + execute** (for skills with `.recipe.json` artifacts):
@@ -1001,6 +1001,8 @@ Current skills model:
 - `skills validate --all` runs the same integrity checks across every entry in
   the configured registry and returns a failure summary if any skills are
   broken
+- `skills run --timeout-ms <n>` overrides the wrapper timeout for one run when
+  the default `120000` ms budget is not the right fit for the current flow
 
 For the concrete `skill.json` contract and private-skill authoring model, see
 [Skill Authoring Guidelines](../skills/skill-authoring-guidelines.md),

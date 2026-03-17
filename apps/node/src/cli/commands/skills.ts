@@ -95,15 +95,17 @@ export async function cmdSkillsSearch(
 export async function cmdSkillsRun(
   skillId: string,
   args: string[],
+  timeoutMs: number | undefined,
   options: { format: OutputOptions["format"] }
 ): Promise<string> {
-  const result = await runSkill(skillId, args);
+  const result = await runSkill(skillId, args, undefined, timeoutMs);
   if (result.ok) {
     return formatSuccess({
       skillId: result.skillId,
       output: result.output,
       exitCode: result.exitCode,
       durationMs: result.durationMs,
+      timeoutMs: timeoutMs ?? undefined,
     }, options);
   }
   return formatError({
@@ -113,6 +115,7 @@ export async function cmdSkillsRun(
     exitCode: result.exitCode,
     stdout: result.stdout,
     stderr: result.stderr,
+    timeoutMs: timeoutMs ?? undefined,
   }, options);
 }
 
