@@ -264,6 +264,20 @@ Combine fields to increase specificity when a single field is ambiguous:
 
 **`open_uri`:** Opens a URI using the Clawperator Android app's implicit `ACTION_VIEW` intent - no adb shortcut is used. The Android device's registered handler for the URI scheme is invoked directly. Any URI scheme is supported: deep links (`market://details?id=com.actionlauncher.playstore`), standard URLs (`https://example.com`), and custom app schemes. If no application is registered for the URI scheme, the action fails with `URI_NOT_HANDLED`. A chooser dialog may appear on devices with multiple handlers for a scheme; follow the `open_uri` step with a `snapshot_ui` to verify the expected app is in the foreground. The alias `open_url` is also accepted and normalized to `open_uri`.
 
+Documented and tested inputs include:
+
+- `https://...`
+- `market://...`
+- app-specific deep-link URIs handled by a device app
+
+What this action does not promise:
+
+- support for bare Android intent action strings such as `android.settings.DEVICE_INFO_SETTINGS`
+- support for pseudo-formats such as `ACTION:android.settings.DEVICE_INFO_SETTINGS`
+
+Treat `open_uri` as an `ACTION_VIEW` URI launcher, not a general-purpose
+Android intent builder.
+
 **`close_app`:** The Node layer intercepts `close_app` actions and runs `adb shell am force-stop <applicationId>` before dispatching to Android. The Android step always returns `success: false` with `data.error: "UNSUPPORTED_RUNTIME_CLOSE"` - this is expected. The overall execution `status` remains `"success"` and the app is force-stopped. Do not treat this step result as a recoverable failure.
 
 **`click`:** Finds the node matching `matcher` and performs the specified `clickType`. The default click type is `"default"` (standard accessibility click with gesture fallback). Use `"long_click"` for long-press targets and `"focus"` to focus without activating.
@@ -552,7 +566,7 @@ After receiving `snap2`, the agent compares it to `snap1`. If `scr1.data.scroll_
 Direction semantics are the same as `scroll`. `container`, `distanceRatio`, `settleDelayMs`, and `findFirstScrollableChild` behave identically to `scroll`.
 
 **Termination reasons (`data.termination_reason`):**
-- `EDGE_REACHED` - content ended naturally (finite list). `success: true`.
+- `EDGE_REACHED` - scrolling stopped because no further movement was detected. `success: true`.
 - `MAX_SCROLLS_REACHED` - hit `maxScrolls` cap. `success: true`. Normal for infinite feeds.
 - `MAX_DURATION_REACHED` - hit `maxDurationMs` cap. `success: true`. Normal for infinite feeds.
 - `NO_POSITION_CHANGE` - no content movement across `noPositionChangeThreshold` consecutive scrolls. `success: true`.
@@ -560,6 +574,14 @@ Direction semantics are the same as `scroll`. `container`, `distanceRatio`, `set
 - `CONTAINER_NOT_SCROLLABLE` - container is not scrollable. `success: false`.
 
 `MAX_SCROLLS_REACHED`, `MAX_DURATION_REACHED`, and `NO_POSITION_CHANGE` are clean terminal states, not errors. Agents scrolling infinite feeds should expect these and handle them without treating the action as failed.
+
+Important current limitation:
+
+- there is no `TARGET_FOUND` termination reason today
+- when a target becomes visible during the loop, the runtime can still return
+  `EDGE_REACHED`
+- after targeted `scroll_until`, take a follow-up `snapshot_ui` or
+  `wait_for_node` before deciding whether the target was actually found
 
 **Current runtime caveat:** If the resolved container disappears mid-loop because the app navigated away or rebuilt the view tree unexpectedly, the current Android runtime can collapse that case into `EDGE_REACHED`. When a scroll loop might trigger navigation or heavy UI re-layout, follow it with `snapshot_ui` or `wait_for_node` before assuming the list truly ended.
 
@@ -746,9 +768,65 @@ Primary top-level error taxonomy: `apps/node/src/contracts/errors.ts`. This tabl
 - **Deterministic emulator boots:** Emulator starts use `-no-snapshot-load` and wait for both `sys.boot_completed` and `dev.bootcomplete`.
 - **Validation before dispatch:** Every payload is schema-validated before any ADB command is issued.
 
+## Validation and current non-features
+
+- There is no `clawperator execute --validate-only` mode today.
+- Payload validation happens automatically at execution time. Invalid payloads
+  fail fast with `EXECUTION_VALIDATION_FAILED` before any device action runs.
+- If you want the lowest-risk contract check on a live device, use a minimal
+  payload such as a single `sleep` or `snapshot_ui` action.
+
 ## Skills
 
 Skills are packaged Android automation scripts distributed via the public GitHub repository at `https://github.com/clawperator/clawperator-skills`. The Node API provides discovery and metadata - skills are standalone and can be invoked directly by agents without the Node API.
+
+## Environment Variables and Device Targeting
+
+The most important environment variables surfaced by the current CLI and
+installer are:
+
+| Variable | Where used | Current meaning |
+| :--- | :--- | :--- |
+| `CLAWPERATOR_SKILLS_REGISTRY` | CLI and installer | Overrides the path to the local skills registry JSON |
+| `CLAWPERATOR_INSTALL_APK` | installer | Pre-seeds the installer's "install APK now?" decision for non-interactive runs |
+| `CLAWPERATOR_RECEIVER_PACKAGE` | installer | Overrides the default receiver package used during installer setup |
+
+### `CLAWPERATOR_INSTALL_APK`
+
+`scripts/install.sh` reads `CLAWPERATOR_INSTALL_APK` before prompting whether to
+install the Operator APK on the connected device.
+
+Useful values:
+
+- `Y`, `y`, `yes`, `YES` - proceed with APK install
+- any other non-empty value - skip APK install
+
+Example:
+
+```bash
+CLAWPERATOR_INSTALL_APK=Y curl -fsSL https://clawperator.com/install.sh | bash
+```
+
+### `CLAWPERATOR_SKILLS_REGISTRY`
+
+This points the CLI at a specific skills registry path.
+
+Example:
+
+```bash
+export CLAWPERATOR_SKILLS_REGISTRY="$HOME/.clawperator/skills/skills/skills-registry.json"
+```
+
+### Multiple devices
+
+If more than one device is connected, pass `--device-id <id>` on execute,
+observe, action, doctor, version, operator setup, and skills-run commands.
+
+When multiple devices are present:
+
+- the installer skips automatic APK install rather than guessing
+- it prints the manual recovery command
+- later automation should keep using explicit `--device-id`
 
 ### Setup
 

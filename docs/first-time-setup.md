@@ -30,6 +30,23 @@ The installer installs the CLI, downloads the latest stable [Clawperator Operato
 
 Historical versions and release notes remain available on [GitHub Releases](https://github.com/clawperator/clawperator/releases).
 
+Installer notes:
+
+- the installer uses `clawperator doctor --format json` internally for
+  machine-readable checks
+- it finishes with `clawperator doctor --output pretty` for the final human
+  summary
+- `clawperator doctor --json` is also supported as a shorthand for
+  `--output json`
+- `CLAWPERATOR_INSTALL_APK` can be set before running the installer to control
+  the APK-install prompt in non-interactive environments
+
+Example:
+
+```bash
+CLAWPERATOR_INSTALL_APK=Y curl -fsSL https://clawperator.com/install.sh | bash
+```
+
 ---
 
 ## Step 2 - Choose Android Environment
@@ -81,6 +98,11 @@ clawperator emulator inspect clawperator-pixel --output json
 
 If both a physical device and an emulator are connected, you will need to pass `--device-id <serial>` to later commands.
 
+If multiple devices are connected during install, the installer does not guess
+which device should receive the APK. It leaves the downloaded APK in
+`~/.clawperator/downloads/operator.apk` and prints the manual completion
+command.
+
 ---
 
 ## Step 3 - Install the Clawperator Operator Android app
@@ -98,6 +120,9 @@ clawperator operator setup \
   --apk ~/.clawperator/downloads/operator.apk \
   --device-id <device_id>
 ```
+
+This is also the recovery command to use after a multi-device installer run
+that intentionally skipped APK installation.
 
 For local debug builds, specify the receiver package:
 
