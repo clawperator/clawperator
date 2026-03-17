@@ -371,6 +371,53 @@ class TaskScopeDefault(
         return maxDepth
     }
 
+    override suspend fun waitForNavigation(
+        expectedPackage: String?,
+        expectedNode: NodeMatcher?,
+        timeoutMs: Long,
+    ): WaitForNavigationResult {
+        val startTime = getCurrentTimeMillis()
+        var lastPackage: String? = null
+        val pollDelay = 200.milliseconds
+
+        while (true) {
+            val elapsedMs = getCurrentTimeMillis() - startTime
+            if (elapsedMs > timeoutMs) {
+                return WaitForNavigationResult(
+                    success = false,
+                    lastPackage = lastPackage,
+                    elapsedMs = elapsedMs,
+                )
+            }
+
+            val windowMetadata = uiTreeInspector.getCurrentWindowMetadata()
+            lastPackage = windowMetadata?.foregroundPackage
+
+            if (expectedPackage != null && expectedPackage == lastPackage) {
+                return WaitForNavigationResult(
+                    success = true,
+                    lastPackage = lastPackage,
+                    elapsedMs = getCurrentTimeMillis() - startTime,
+                )
+            }
+
+            if (expectedNode != null) {
+                try {
+                    taskUiScope.waitForNode(expectedNode, TaskRetry.None)
+                    return WaitForNavigationResult(
+                        success = true,
+                        lastPackage = lastPackage,
+                        elapsedMs = getCurrentTimeMillis() - startTime,
+                    )
+                } catch (_: IllegalStateException) {
+                    // Not yet visible
+                }
+            }
+
+            delay(pollDelay)
+        }
+    }
+
     override suspend fun <T> ui(block: suspend TaskUiScope.() -> T): T {
         Log.d("$TAG Executing UI operations")
         val result = taskUiScope.block()

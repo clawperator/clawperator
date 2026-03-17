@@ -65,6 +65,8 @@ class UiActionEngineDefault(
                 is UiAction.Sleep -> executeSleep(taskScope, action)
                 is UiAction.DoctorPing -> executeDoctorPing(taskScope, action)
                 is UiAction.PressKey -> executePressKey(action)
+                is UiAction.WaitForNavigation -> executeWaitForNavigation(taskScope, action)
+                is UiAction.ReadKeyValuePair -> executeReadKeyValuePair(taskScope, action)
             }
 
         Log.d(
@@ -115,6 +117,69 @@ class UiActionEngineDefault(
                 "message" to "Android runtime cannot reliably close apps. Use the Clawperator Node API or 'adb shell am force-stop' directly for this action."
             ),
         )
+    }
+
+    private suspend fun executeWaitForNavigation(
+        taskScope: TaskScope,
+        action: UiAction.WaitForNavigation,
+    ): UiActionStepResult {
+        val result = taskScope.waitForNavigation(
+            expectedPackage = action.expectedPackage,
+            expectedNode = action.expectedNode,
+            timeoutMs = action.timeoutMs,
+        )
+
+        return if (result.success) {
+            UiActionStepResult(
+                id = action.id,
+                actionType = "wait_for_navigation",
+                data = buildMap {
+                    result.lastPackage?.let { put("resolved_package", it) }
+                    put("elapsed_ms", result.elapsedMs.toString())
+                },
+            )
+        } else {
+            UiActionStepResult(
+                id = action.id,
+                actionType = "wait_for_navigation",
+                success = false,
+                data = buildMap {
+                    put("error", "NAVIGATION_TIMEOUT")
+                    result.lastPackage?.let { put("last_package", it) }
+                },
+            )
+        }
+    }
+
+    private suspend fun executeReadKeyValuePair(
+        taskScope: TaskScope,
+        action: UiAction.ReadKeyValuePair,
+    ): UiActionStepResult {
+        return try {
+            val (label, value) = taskScope.ui {
+                readKeyValuePair(action.labelMatcher)
+            }
+            UiActionStepResult(
+                id = action.id,
+                actionType = "read_key_value_pair",
+                data = mapOf(
+                    "label" to label,
+                    "value" to value,
+                ),
+            )
+        } catch (e: IllegalStateException) {
+            val errorCode = when (e.message) {
+                "NODE_NOT_FOUND" -> "NODE_NOT_FOUND"
+                "VALUE_NODE_NOT_FOUND" -> "VALUE_NODE_NOT_FOUND"
+                else -> "NODE_NOT_FOUND" // fallback
+            }
+            UiActionStepResult(
+                id = action.id,
+                actionType = "read_key_value_pair",
+                success = false,
+                data = mapOf("error" to errorCode),
+            )
+        }
     }
 
     private suspend fun executeWaitForNode(
@@ -341,28 +406,62 @@ class UiActionEngineDefault(
         taskScope: TaskScope,
         action: UiAction.ReadText,
     ): UiActionStepResult {
-        val text =
-            taskScope.ui {
-                when (action.validator) {
-                    null -> getText(matcher = action.matcher, retry = action.retry)
-                    UiTextValidator.Temperature ->
-                        getValidatedText(
-                            matcher = action.matcher,
-                            retry = action.retry,
-                            validator = TaskValidators.TemperatureValidator,
-                        )
+        return try {
+            val text =
+                taskScope.ui {
+                    when (action.validator) {
+                        null -> getText(matcher = action.matcher, retry = action.retry)
+                        UiTextValidator.Temperature ->
+                            getValidatedText(
+                                matcher = action.matcher,
+                                retry = action.retry,
+                                validator = TaskValidators.TemperatureValidator,
+                            )
+                        UiTextValidator.Version ->
+                            getValidatedText(
+                                matcher = action.matcher,
+                                retry = action.retry,
+                                validator = TaskValidators.VersionValidator,
+                            )
+                        UiTextValidator.Regex -> {
+                            val regex = Regex(requireNotNull(action.validatorPattern) { "validatorPattern required for Regex validator" })
+                            getValidatedText(
+                                matcher = action.matcher,
+                                retry = action.retry,
+                                validator = { it.matches(regex) },
+                            )
+                        }
+                    }
                 }
-            }
 
-        return UiActionStepResult(
-            id = action.id,
-            actionType = "read_text",
-            data =
-                mapOf(
-                    "text" to text,
-                    "validator" to (action.validator?.name ?: "none"),
-                ),
-        )
+            UiActionStepResult(
+                id = action.id,
+                actionType = "read_text",
+                data =
+                    mapOf(
+                        "text" to text,
+                        "validator" to (action.validator?.name?.lowercase() ?: "none"),
+                    ),
+            )
+        } catch (e: IllegalStateException) {
+            val msg = e.message ?: ""
+            if (msg.contains("Validation failed for text") &&
+                (action.validator == UiTextValidator.Version || action.validator == UiTextValidator.Regex)
+            ) {
+                val match = Regex("Validation failed for text '(.*)' from").find(msg)
+                val rawText = match?.groupValues?.get(1) ?: ""
+                return UiActionStepResult(
+                    id = action.id,
+                    actionType = "read_text",
+                    success = false,
+                    data = mapOf(
+                        "error" to "VALIDATOR_MISMATCH",
+                        "raw_text" to rawText,
+                    ),
+                )
+            }
+            throw e
+        }
     }
 
     private suspend fun executeSnapshotUi(

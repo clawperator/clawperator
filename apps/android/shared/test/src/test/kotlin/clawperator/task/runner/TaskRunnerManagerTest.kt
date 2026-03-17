@@ -108,6 +108,15 @@ class TaskRunnerManagerTest : ActionTest {
             // No-op for testing
         }
 
+        override suspend fun waitForNavigation(
+            expectedPackage: String?,
+            expectedNode: NodeMatcher?,
+            timeoutMs: Long,
+        ): WaitForNavigationResult {
+            // No-op for testing
+            return WaitForNavigationResult(success = false, lastPackage = null, elapsedMs = 0)
+        }
+
         override suspend fun <T> ui(block: suspend TaskUiScope.() -> T): T {
             // No-op for testing - return Unit cast to T
             @Suppress("UNCHECKED_CAST")

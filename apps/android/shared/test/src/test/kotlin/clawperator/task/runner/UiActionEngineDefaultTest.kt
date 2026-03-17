@@ -730,6 +730,337 @@ class UiActionEngineDefaultTest : ActionTest {
             assertEquals("TARGET_FOUND", stepResult.data["termination_reason"])
             assertEquals(true, uiScope.clickCalled)
         }
+    @Test
+    fun `execute wait_for_navigation returns success on resolution`() =
+        actionTest {
+            val uiScope = RecordingTaskUiScope()
+            val taskScope = RecordingTaskScope(uiScope).apply {
+                waitForNavigationResult = WaitForNavigationResult(success = true, lastPackage = "com.example", elapsedMs = 150)
+            }
+            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+
+            val result =
+                engine.execute(
+                    taskScope = taskScope,
+                    plan = UiActionPlan(
+                        commandId = "cmd",
+                        taskId = "task",
+                        source = "test",
+                        actions = listOf(
+                            UiAction.WaitForNavigation(
+                                id = "wait1",
+                                expectedPackage = "com.example",
+                                timeoutMs = 5000,
+                            ),
+                        ),
+                    ),
+                )
+
+            val stepResult = result.stepResults.single()
+            assertEquals("wait_for_navigation", stepResult.actionType)
+            assertEquals(true, stepResult.success)
+            assertEquals("com.example", stepResult.data["resolved_package"])
+            assertEquals("150", stepResult.data["elapsed_ms"])
+        }
+
+    @Test
+    fun `execute wait_for_navigation returns failure on timeout`() =
+        actionTest {
+            val uiScope = RecordingTaskUiScope()
+            val taskScope = RecordingTaskScope(uiScope).apply {
+                waitForNavigationResult = WaitForNavigationResult(success = false, lastPackage = "com.wrong", elapsedMs = 5000)
+            }
+            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+
+            val result =
+                engine.execute(
+                    taskScope = taskScope,
+                    plan = UiActionPlan(
+                        commandId = "cmd",
+                        taskId = "task",
+                        source = "test",
+                        actions = listOf(
+                            UiAction.WaitForNavigation(
+                                id = "wait2",
+                                expectedPackage = "com.example",
+                                timeoutMs = 5000,
+                            ),
+                        ),
+                    ),
+                )
+
+            val stepResult = result.stepResults.single()
+            assertEquals("wait_for_navigation", stepResult.actionType)
+            assertEquals(false, stepResult.success)
+            assertEquals("NAVIGATION_TIMEOUT", stepResult.data["error"])
+            assertEquals("com.wrong", stepResult.data["last_package"])
+        }
+
+    @Test
+    fun `execute read_key_value_pair returns label and value on success`() =
+        actionTest {
+            val uiScope = RecordingTaskUiScope().apply {
+                readKeyValuePairResult = Pair("Android version", "16")
+            }
+            val taskScope = RecordingTaskScope(uiScope)
+            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+
+            val result =
+                engine.execute(
+                    taskScope = taskScope,
+                    plan = UiActionPlan(
+                        commandId = "cmd",
+                        taskId = "task",
+                        source = "test",
+                        actions = listOf(
+                            UiAction.ReadKeyValuePair(
+                                id = "kvp1",
+                                labelMatcher = NodeMatcher(textEquals = "Android version"),
+                            ),
+                        ),
+                    ),
+                )
+
+            val stepResult = result.stepResults.single()
+            assertEquals("read_key_value_pair", stepResult.actionType)
+            assertEquals(true, stepResult.success)
+            assertEquals("Android version", stepResult.data["label"])
+            assertEquals("16", stepResult.data["value"])
+        }
+
+    @Test
+    fun `execute read_key_value_pair returns failure when label not found`() =
+        actionTest {
+            val uiScope = RecordingTaskUiScope().apply {
+                readKeyValuePairThrows = IllegalStateException("NODE_NOT_FOUND")
+            }
+            val taskScope = RecordingTaskScope(uiScope)
+            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+
+            val result =
+                engine.execute(
+                    taskScope = taskScope,
+                    plan = UiActionPlan(
+                        commandId = "cmd",
+                        taskId = "task",
+                        source = "test",
+                        actions = listOf(
+                            UiAction.ReadKeyValuePair(
+                                id = "kvp2",
+                                labelMatcher = NodeMatcher(textEquals = "Missing"),
+                            ),
+                        ),
+                    ),
+                )
+
+            val stepResult = result.stepResults.single()
+            assertEquals("read_key_value_pair", stepResult.actionType)
+            assertEquals(false, stepResult.success)
+            assertEquals("NODE_NOT_FOUND", stepResult.data["error"])
+        }
+
+    @Test
+    fun `execute read_key_value_pair returns failure when value not found`() =
+        actionTest {
+            val uiScope = RecordingTaskUiScope().apply {
+                readKeyValuePairThrows = IllegalStateException("VALUE_NODE_NOT_FOUND")
+            }
+            val taskScope = RecordingTaskScope(uiScope)
+            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+
+            val result =
+                engine.execute(
+                    taskScope = taskScope,
+                    plan = UiActionPlan(
+                        commandId = "cmd",
+                        taskId = "task",
+                        source = "test",
+                        actions = listOf(
+                            UiAction.ReadKeyValuePair(
+                                id = "kvp3",
+                                labelMatcher = NodeMatcher(textEquals = "Label Only"),
+                            ),
+                        ),
+                    ),
+                )
+
+            val stepResult = result.stepResults.single()
+            assertEquals("read_key_value_pair", stepResult.actionType)
+            assertEquals(false, stepResult.success)
+            assertEquals("VALUE_NODE_NOT_FOUND", stepResult.data["error"])
+        }
+
+    @Test
+    fun `execute read_text with version validator succeeds`() =
+        actionTest {
+            val uiScope = object : RecordingTaskUiScope() {
+                override suspend fun getValidatedText(
+                    matcher: NodeMatcher,
+                    retry: TaskRetry,
+                    validator: (String) -> Boolean,
+                ): String {
+                    val value = "16.0.1"
+                    if (!validator(value)) {
+                        throw IllegalStateException("Validation failed for text '$value' from matching UI node")
+                    }
+                    return value
+                }
+            }
+            val taskScope = RecordingTaskScope(uiScope)
+            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+
+            val result =
+                engine.execute(
+                    taskScope = taskScope,
+                    plan = UiActionPlan(
+                        commandId = "cmd",
+                        taskId = "task",
+                        source = "test",
+                        actions = listOf(
+                            UiAction.ReadText(
+                                id = "rt1",
+                                matcher = NodeMatcher(textContains = "Version"),
+                                validator = UiTextValidator.Version,
+                            ),
+                        ),
+                    ),
+                )
+
+            val stepResult = result.stepResults.single()
+            assertEquals("read_text", stepResult.actionType)
+            assertEquals(true, stepResult.success)
+            assertEquals("16.0.1", stepResult.data["text"])
+        }
+
+    @Test
+    fun `execute read_text with version validator fails`() =
+        actionTest {
+            val uiScope = object : RecordingTaskUiScope() {
+                override suspend fun getValidatedText(
+                    matcher: NodeMatcher,
+                    retry: TaskRetry,
+                    validator: (String) -> Boolean,
+                ): String {
+                    val value = "Settings"
+                    if (!validator(value)) {
+                        throw IllegalStateException("Validation failed for text '$value' from matching UI node")
+                    }
+                    return value
+                }
+            }
+            val taskScope = RecordingTaskScope(uiScope)
+            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+
+            val result =
+                engine.execute(
+                    taskScope = taskScope,
+                    plan = UiActionPlan(
+                        commandId = "cmd",
+                        taskId = "task",
+                        source = "test",
+                        actions = listOf(
+                            UiAction.ReadText(
+                                id = "rt2",
+                                matcher = NodeMatcher(textContains = "Settings"),
+                                validator = UiTextValidator.Version,
+                            ),
+                        ),
+                    ),
+                )
+
+            val stepResult = result.stepResults.single()
+            assertEquals("read_text", stepResult.actionType)
+            assertEquals(false, stepResult.success)
+            assertEquals("VALIDATOR_MISMATCH", stepResult.data["error"])
+            assertEquals("Settings", stepResult.data["raw_text"])
+        }
+
+    @Test
+    fun `execute read_text with regex validator succeeds`() =
+        actionTest {
+            val uiScope = object : RecordingTaskUiScope() {
+                override suspend fun getValidatedText(
+                    matcher: NodeMatcher,
+                    retry: TaskRetry,
+                    validator: (String) -> Boolean,
+                ): String {
+                    val value = "123-456"
+                    if (!validator(value)) {
+                        throw IllegalStateException("Validation failed for text '$value' from matching UI node")
+                    }
+                    return value
+                }
+            }
+            val taskScope = RecordingTaskScope(uiScope)
+            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+
+            val result =
+                engine.execute(
+                    taskScope = taskScope,
+                    plan = UiActionPlan(
+                        commandId = "cmd",
+                        taskId = "task",
+                        source = "test",
+                        actions = listOf(
+                            UiAction.ReadText(
+                                id = "rt3",
+                                matcher = NodeMatcher(resourceId = "id"),
+                                validator = UiTextValidator.Regex,
+                                validatorPattern = "^\\d{3}-\\d{3}$",
+                            ),
+                        ),
+                    ),
+                )
+
+            val stepResult = result.stepResults.single()
+            assertEquals("read_text", stepResult.actionType)
+            assertEquals(true, stepResult.success)
+            assertEquals("123-456", stepResult.data["text"])
+        }
+
+    @Test
+    fun `execute read_text with regex validator fails`() =
+        actionTest {
+            val uiScope = object : RecordingTaskUiScope() {
+                override suspend fun getValidatedText(
+                    matcher: NodeMatcher,
+                    retry: TaskRetry,
+                    validator: (String) -> Boolean,
+                ): String {
+                    val value = "abc"
+                    if (!validator(value)) {
+                        throw IllegalStateException("Validation failed for text '$value' from matching UI node")
+                    }
+                    return value
+                }
+            }
+            val taskScope = RecordingTaskScope(uiScope)
+            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+
+            val result =
+                engine.execute(
+                    taskScope = taskScope,
+                    plan = UiActionPlan(
+                        commandId = "cmd",
+                        taskId = "task",
+                        source = "test",
+                        actions = listOf(
+                            UiAction.ReadText(
+                                id = "rt4",
+                                matcher = NodeMatcher(resourceId = "id"),
+                                validator = UiTextValidator.Regex,
+                                validatorPattern = "^\\d{3}-\\d{3}$",
+                            ),
+                        ),
+                    ),
+                )
+
+            val stepResult = result.stepResults.single()
+            assertEquals("read_text", stepResult.actionType)
+            assertEquals(false, stepResult.success)
+            assertEquals("VALIDATOR_MISMATCH", stepResult.data["error"])
+            assertEquals("abc", stepResult.data["raw_text"])
+        }
 }
 
 private class RecordingTaskScope(
@@ -771,10 +1102,18 @@ private class RecordingTaskScope(
     ) {
     }
 
+    var waitForNavigationResult = WaitForNavigationResult(success = true, lastPackage = "com.example", elapsedMs = 100)
+
+    override suspend fun waitForNavigation(
+        expectedPackage: String?,
+        expectedNode: NodeMatcher?,
+        timeoutMs: Long,
+    ): WaitForNavigationResult = waitForNavigationResult
+
     override suspend fun <T> ui(block: suspend TaskUiScope.() -> T): T = uiScope.block()
 }
 
-private class RecordingTaskUiScope(
+open class RecordingTaskUiScope(
     private val scrollOnceOutcome: TaskScrollOutcome = TaskScrollOutcome.Moved,
     private val scrollOnceThrows: IllegalStateException? = null,
     private val scrollOnceContainerId: String? = null,
@@ -792,7 +1131,7 @@ private class RecordingTaskUiScope(
     ): String {
         val value = "22.5 C"
         if (!validator(value)) {
-            throw IllegalStateException("validator rejected test text")
+            throw IllegalStateException("Validation failed for text '$value' from matching UI node")
         }
         return value
     }
@@ -818,6 +1157,17 @@ private class RecordingTaskUiScope(
         matcher: NodeMatcher,
         retry: TaskRetry,
     ): String = "Title Text"
+
+    var readKeyValuePairResult: Pair<String, String> = Pair("Label", "Value")
+    var readKeyValuePairThrows: IllegalStateException? = null
+
+    override suspend fun readKeyValuePair(
+        labelMatcher: NodeMatcher,
+        retry: TaskRetry,
+    ): Pair<String, String> {
+        if (readKeyValuePairThrows != null) throw readKeyValuePairThrows!!
+        return readKeyValuePairResult
+    }
 
     override suspend fun click(
         matcher: NodeMatcher,

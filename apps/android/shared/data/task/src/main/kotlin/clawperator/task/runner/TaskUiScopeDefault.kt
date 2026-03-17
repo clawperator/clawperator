@@ -250,6 +250,61 @@ class TaskUiScopeDefault(
             taskUiNode
         }
 
+    override suspend fun readKeyValuePair(
+        labelMatcher: NodeMatcher,
+        retry: TaskRetry,
+    ): Pair<String, String> =
+        withRetry(retry, "readKeyValuePair($labelMatcher)") {
+            Log.d("$TAG readKeyValuePair: $labelMatcher")
+
+            val uiTreeRaw =
+                uiTreeInspector.getCurrentUiTree()
+                    ?: throw IllegalStateException("UI tree not available")
+
+            val uiTreeFiltered = uiTreeFilterer.filterOnScreenOnly(uiTreeRaw)
+            val labelNode = findNodeByMatcher(labelMatcher, uiTreeFiltered)
+                ?: throw IllegalStateException("NODE_NOT_FOUND")
+
+            val path = mutableListOf<UiNode>()
+            fun getPathTo(current: UiNode): Boolean {
+                path.add(current)
+                if (current.id == labelNode.id) return true
+                for (child in current.children) {
+                    if (getPathTo(child)) return true
+                }
+                path.removeAt(path.size - 1)
+                return false
+            }
+            getPathTo(uiTreeFiltered.root)
+
+            val candidates = mutableListOf<UiNode>()
+            for (i in path.size - 2 downTo 0) {
+                val parent = path[i]
+                val childInPath = path[i + 1]
+                val siblingsAfter = parent.children.dropWhile { it.id != childInPath.id }.drop(1)
+                candidates.addAll(siblingsAfter)
+            }
+
+            val textNodes = candidates.flatMap { node ->
+                val list = mutableListOf<UiNode>()
+                fun collect(n: UiNode) {
+                    list.add(n)
+                    n.children.forEach { collect(it) }
+                }
+                collect(node)
+                list
+            }.filter { it.label.isNotBlank() }
+
+            val valueNode = textNodes.find { it.resourceId?.endsWith("/summary") == true }
+                ?: textNodes.firstOrNull()
+
+            if (valueNode == null) {
+                throw IllegalStateException("VALUE_NODE_NOT_FOUND")
+            }
+
+            Pair(labelNode.label.ifBlank { labelNode.contentDescription ?: "" }, valueNode.label)
+        }
+
     override suspend fun getText(
         matcher: NodeMatcher,
         retry: TaskRetry,

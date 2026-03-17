@@ -21,4 +21,11 @@ object TaskValidators {
     val TemperatureValidator: (String) -> Boolean = { text ->
         Temperature.parse(text) != null
     }
+
+    /**
+     * Validator for version numbers (e.g. "16", "14.1.2").
+     */
+    val VersionValidator: (String) -> Boolean = { text ->
+        text.matches(Regex("""^\d+(\.\d+)*$"""))
+    }
 }

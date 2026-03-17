@@ -98,6 +98,7 @@ sealed interface UiAction {
         val matcher: NodeMatcher,
         val retry: TaskRetry = TaskRetryPresets.UiReadiness,
         val validator: UiTextValidator? = null,
+        val validatorPattern: String? = null,
     ) : UiAction
 
     data class SnapshotUi(
@@ -133,6 +134,18 @@ sealed interface UiAction {
         override val id: String,
         val key: UiSystemKey,
     ) : UiAction
+
+    data class WaitForNavigation(
+        override val id: String,
+        val expectedPackage: String? = null,
+        val expectedNode: NodeMatcher? = null,
+        val timeoutMs: Long,
+    ) : UiAction
+
+    data class ReadKeyValuePair(
+        override val id: String,
+        val labelMatcher: NodeMatcher,
+    ) : UiAction
 }
 
 enum class UiSnapshotActualFormat(
@@ -151,6 +164,8 @@ data class UiSnapshotResult(
 
 enum class UiTextValidator {
     Temperature,
+    Version,
+    Regex,
 }
 
 enum class UiSystemKey {

@@ -276,4 +276,23 @@ class TaskUiScopeTest(
 
         println("[TaskUiScopeTest] Entered text into node: ${node.label} (len=${text.length}, submit=$submit)")
     }
+
+    /**
+     * Reads a key-value pair from the UI.
+     * Test implementation finds the label node and returns a mock value.
+     */
+    override suspend fun readKeyValuePair(
+        labelMatcher: NodeMatcher,
+        retry: TaskRetry,
+    ): Pair<String, String> {
+        val labelNode =
+            findNodeByMatcher(labelMatcher)
+                ?: throw IllegalStateException("NODE_NOT_FOUND")
+
+        // For test implementation, return the label and a mock value
+        // In a real test scenario, this would look for an adjacent value node
+        val label = labelNode.label.ifBlank { labelNode.contentDescription ?: "" }
+        val value = "test-value"
+        return Pair(label, value)
+    }
 }
