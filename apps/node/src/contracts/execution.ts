@@ -5,6 +5,7 @@ import type { NodeMatcher } from "./selectors.js";
 
 export interface ActionParams {
   applicationId?: string;
+  sessionId?: string;
   uri?: string;
   durationMs?: number;
   path?: string;

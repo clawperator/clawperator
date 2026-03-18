@@ -32,6 +32,46 @@ describe("validateExecution", () => {
     assert.strictEqual(ex.actions[0].type, "enter_text");
   });
 
+  it("accepts start_recording with sessionId", () => {
+    const ex = validateExecution({
+      commandId: "cmd-1",
+      taskId: "task-1",
+      source: "test",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 10000,
+      actions: [{ id: "a1", type: "start_recording", params: { sessionId: "session-1" } }],
+    });
+    assert.strictEqual(ex.actions[0].type, "start_recording");
+    assert.strictEqual(ex.actions[0].params?.sessionId, "session-1");
+  });
+
+  it("accepts stop_recording without params", () => {
+    const ex = validateExecution({
+      commandId: "cmd-1",
+      taskId: "task-1",
+      source: "test",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 10000,
+      actions: [{ id: "a1", type: "stop_recording" }],
+    });
+    assert.strictEqual(ex.actions[0].type, "stop_recording");
+  });
+
+  it("rejects blank sessionId for recording actions", () => {
+    assert.throws(
+      () =>
+        validateExecution({
+          commandId: "cmd-1",
+          taskId: "task-1",
+          source: "test",
+          expectedFormat: "android-ui-automator",
+          timeoutMs: 10000,
+          actions: [{ id: "a1", type: "start_recording", params: { sessionId: "   " } }],
+        }),
+      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
+    );
+  });
+
   it("rejects missing expectedFormat", () => {
     assert.throws(
       () =>
