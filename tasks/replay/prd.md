@@ -43,6 +43,7 @@ Three distinct use cases motivate this feature. All three are served by the same
 - CI integration.
 - Popup handling.
 - Streaming events to host during recording (all events are buffered on device).
+- Lossless capture. Recording is a lossy transformation of user intent. Timing nuances, transient UI state, and intermediate visual frames between gestures are not preserved. The recorded output captures the identifiable moments of interaction, not the full fidelity of what the user did.
 - Deterministic replay guarantees. Accessibility-based replay is best-effort. UI timing, dynamic view IDs, and app state can all cause a replay to diverge from the original recording. The PoC succeeds if it works reliably on a stable, cooperative target app. Robustness against the full range of real-world app behavior is a post-PoC concern.
 - Idempotency. Replays are not guaranteed to produce the same outcome when run multiple times. App state left over from a previous run (e.g. a screen that is already open, a toggle that is already active) can cause subsequent replays to diverge. Handling this is a post-PoC concern.
 - Long recording support. The PoC assumes short recordings of up to roughly 10 user-initiated steps. Behavior on recordings longer than that is undefined for this phase.
@@ -244,7 +245,7 @@ clawperator record replay --input <file> [--device-id <id>]
 - `*.ndjson` - compiles first (runs normalization, injects sleeps), then executes. The compiled `Execution` JSON is not written to disk unless `--out` is provided.
 - `*.execution.json` - skips compilation and executes directly. Use this to replay a previously compiled file, including one that has been manually edited.
 
-This distinction matters for agents: pass a `.ndjson` file when you want the compiler to run, pass a `.execution.json` when you want to replay a known-good artifact without recompiling.
+This distinction matters for agents: pass a `.ndjson` file when re-compilation is desired (e.g. after editing normalization options), pass a `.execution.json` for deterministic replay of a known-good compiled artifact.
 
 Both `record pull` and `record compile` are usable standalone. An agent or developer may pull, inspect, edit, then replay manually. The pipeline does not have to be atomic.
 
@@ -283,7 +284,7 @@ async function compileRecording(
 | Open app at start | First `window_change` event | `open_app` action with `applicationId` |
 | Back navigation | `press_key` with `key: "back"` | `press_key` action, `key: "back"` |
 | Drop consecutive window changes | `window_change` immediately followed by another `window_change` with no intervening user action | Keep only the final one |
-| Deduplicate rapid clicks *(optional, on by default)* | Multiple `click` events on the same element within 100ms | Keep last only (guards against accidental double-tap during recording). Disable with `--no-dedup` flag when debugging to see exact raw events. |
+| Deduplicate rapid clicks *(optional, on by default)* | Multiple `click` events on the same element within 100ms | Keep last only (guards against accidental double-tap during recording). When dedup fires, the step log annotates it: `⚠ deduped 2→1 click on resourceId=...`. Disable with `--no-dedup` to see exact raw events. |
 | Matcher synthesis - preferred | `click` with `resourceId` present | `matcher: { resourceId: "...", textEquals: "..." }` (textEquals omitted if null) |
 | Matcher synthesis - fallback | `click` with no `resourceId`, `text` present | `matcher: { textEquals: "..." }` with a warning in step log |
 | Matcher synthesis - bounds fallback | `click` with no `resourceId` and no `text` | `matcher: { bounds: { ... } }` with a warning; replay may be brittle |
@@ -323,13 +324,21 @@ These are fixed defaults, not derived from the recorded timestamps. Using record
 
 The `--step-delay-ms` flag on `record compile` and `record replay` allows the developer to override the default for all inter-step sleeps, which is useful when targeting a slow device or a particularly heavy app. The per-transition granularity above is the default; the flag overrides all of them uniformly.
 
+**Timeout guard:** The compiler calculates estimated execution time from the injected sleep durations and sets `timeoutMs` on the compiled `Execution` to cover it with a fixed 5-second buffer:
+
+```
+timeoutMs = sum(all injected sleep durations) + (step_count * 2000ms per-step execution allowance) + 5000ms buffer
+```
+
+The result is clamped to `MAX_EXECUTION_TIMEOUT_MS` (120,000ms). If the estimated time exceeds the maximum, the compiler emits a warning and clamps rather than failing - the replay may time out on very long recordings, which is consistent with the PoC's 10-step scope assumption.
+
 ### Success Criteria
 
 - `record pull` retrieves recording file from device without error.
 - `record compile` produces a valid `Execution` JSON that passes `clawperator execute --validate-only`.
 - Step log matches the human's performed actions in order.
 - Compiled file is human-readable and manually editable.
-- Compile fails with a clear error (not a crash) when an event cannot be resolved to a matcher.
+- Compile only fails on structural errors: invalid schema version, missing header, empty recording (`RECORDING_EMPTY`), or malformed NDJSON. Matcher resolution never fails compilation - it degrades to a less precise matcher with a warning in the step log.
 
 ---
 
@@ -375,7 +384,21 @@ When a replay fails it is not always obvious whether the failure was caused by a
 [step-5] press_key back                 → FAILED (NODE_NOT_FOUND)
 ```
 
-This uses the global `--verbose` flag already present on all commands - `record replay` just needs to ensure the per-step results are surfaced in verbose mode rather than only emitting the final envelope. This is the primary debugging tool for timing vs. matcher failures; no additional commands or modes are required for PoC.
+This uses the global `--verbose` flag already present on all commands - `record replay` just needs to ensure the per-step results are surfaced in verbose mode rather than only emitting the final envelope.
+
+For matcher failures specifically, knowing the step failed is often not enough - you need to see what the UI actually looked like at that moment. The `--debug-artifacts` flag captures a `snapshot_ui` on each step failure and saves the hierarchy XML to the output directory alongside the session files:
+
+```
+./recordings/
+  demo-001.ndjson
+  demo-001.execution.json
+  demo-001.debug/
+    step-5-failed-snapshot.xml    (UI hierarchy at point of failure)
+```
+
+This is implemented by injecting a `snapshot_ui` action immediately after any failed step before halting - a one-action supplemental execution dispatched automatically when `--debug-artifacts` is set and a failure is detected. It does not change the primary result envelope.
+
+`--debug-artifacts` is not on by default because it requires a second round-trip to the device on failure. It should be used explicitly when diagnosing matcher issues.
 
 ### PoC Demo Scenario
 
@@ -400,8 +423,8 @@ The replay is considered successful when the device reproduces the flow (Setting
 ### Success Criteria
 
 - `record replay` completes without error.
-- All steps in the returned envelope have `success: true` (objective signal, verifiable from CLI output).
-- Device visually reproduces the recorded flow.
+- Primary signal: all steps in the returned envelope have `success: true` (objective, verifiable from CLI output without inspecting the device).
+- Secondary confirmation: device visually reproduces the recorded flow.
 - Flow succeeds at least twice consecutively.
 - No changes to `runExecution()` or any existing Android action handler are required.
 
@@ -572,7 +595,7 @@ clawperator record start  [--session-id <id>] [--device-id <serial>] [--receiver
 clawperator record stop   [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]
 clawperator record pull   [--session-id <id>|latest] [--out <dir>] [--device-id <serial>]
 clawperator record compile --input <ndjson-file> [--out <execution-json>] [--step-delay-ms <n>] [--no-dedup]
-clawperator record replay  --input <ndjson-file|execution-json> [--device-id <serial>] [--step-delay-ms <n>]
+clawperator record replay  --input <ndjson-file|execution-json> [--device-id <serial>] [--step-delay-ms <n>] [--debug-artifacts]
 ```
 
 All `record` subcommands inherit the global `--output json|pretty` and `--verbose` flags.
