@@ -80,7 +80,6 @@ Use this page as a technical map:
 
 - [System Overview](architecture/architecture.md) - High-level architecture and execution flow
 - [Runtime Architecture and API Rationale](design/node-api-design.md) - Why the runtime and API are shaped the way they are
-- [Skill Design](design/skill-design.md) - Background design reference for how skills fit the broader system
 
 
 ## Troubleshooting
@@ -97,3 +96,4 @@ Use this page as a technical map:
 - [Skill Authoring Guidelines](skills/skill-authoring-guidelines.md)
 - [Device Prep and Runtime Tips](skills/device-prep-and-runtime-tips.md)
 - [Blocked Terms Policy](skills/blocked-terms-policy.md)
+- [Skill Design](design/skill-design.md) - Background design reference for how skills fit the broader system

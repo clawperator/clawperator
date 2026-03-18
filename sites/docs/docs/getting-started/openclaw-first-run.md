@@ -23,9 +23,12 @@ this is the guide an agent should follow.
 - one Android actuator environment will be used:
   - a physical Android device connected over `adb`
   - or a local Android emulator provisioned through Clawperator
-- the user is responsible for app installation, login, and app configuration on that Android device
+- the user is responsible for app installation and base app configuration on
+  that Android device
 
-Clawperator operates the Android UI. It does not create accounts, sign into apps, or complete first-run app setup on behalf of the user.
+Clawperator operates the Android UI. It does not decide what user inputs are
+appropriate to enter. The external brain agent decides the workflow, and
+Clawperator provides the primitives to execute it.
 
 ## Trust boundary
 
