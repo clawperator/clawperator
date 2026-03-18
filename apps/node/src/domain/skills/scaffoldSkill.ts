@@ -71,9 +71,7 @@ node ${scriptPath} <device_id> [receiver_package]
 `;
 }
 
-function buildRunShTemplate(skillId: string, scriptRelativePath: string): string {
-  void skillId;
-  void scriptRelativePath;
+function buildRunShTemplate(): string {
   return `#!/usr/bin/env bash
 set -euo pipefail
 DIR="$(cd "$(dirname "\${BASH_SOURCE[0]}")" && pwd)"
@@ -230,7 +228,7 @@ export async function scaffoldSkill(
     await writeFile(join(skillRoot, "skill.json"), `${JSON.stringify(skillEntry, null, 2)}\n`, "utf8");
     await writeFile(join(skillRoot, "scripts", "run.js"), buildScriptTemplate(skillId, derived.applicationId), "utf8");
     const runShPath = join(skillRoot, "scripts", "run.sh");
-    await writeFile(runShPath, buildRunShTemplate(skillId, shellScriptPathRelative), "utf8");
+    await writeFile(runShPath, buildRunShTemplate(), "utf8");
     await chmod(runShPath, 0o755);
 
     const updatedRegistry: SkillsRegistry = {

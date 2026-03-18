@@ -115,6 +115,8 @@ For the current metadata contract and authoring details, see
 For the full path from ad hoc exploration to a validated reusable skill, see
 `skills/skill-development-workflow.md`.
 
+### Creating a skill scaffold
+
 Create a new private skill scaffold with:
 
 ```bash
