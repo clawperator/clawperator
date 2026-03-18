@@ -41,6 +41,8 @@ This changes who can initiate skill creation. Today it requires an agent capable
 
 The broader opportunity here is what Playwright is for web development - but for Android and with an agent actively in the loop. A developer working on a UI feature can have an agent navigate to any screen, observe what is on it, report what changed, verify that a flow still completes - all on a real device, without instrumentation, without a test framework, without leaving the development environment.
 
+The wedge against Espresso and UIAutomator is sharp: those tools require a build step, build-time instrumentation, and access to source or debug builds. Clawperator works on any APK - debug, release, sideloaded, or production - with no modifications to the app under test. There is no test framework to integrate, no Gradle plugin to configure, no test runner to invoke. An agent with a connected device can automate any app it can observe.
+
 Recording is what makes this practical. Without it, an agent exploring an unfamiliar screen must guess its way through navigation. With a recorded skill, the agent can reliably reach any state the developer has visited before. That changes what the agent can do during a development session: instead of a one-time helper that runs a script, it becomes an active participant in the iteration loop.
 
 Two concrete scenarios:

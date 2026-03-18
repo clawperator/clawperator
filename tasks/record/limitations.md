@@ -63,7 +63,7 @@ Even with an agent in the loop, accessibility-based reproduction is best-effort:
 - UI structure can differ between device OEMs and Android versions.
 - The PoC targets cooperative, stable apps (Android Settings) specifically because they have stable identifiers.
 
-The agent derives matchers from the `uiStateBefore` snapshot using the same reasoning it applies during normal operation. When `resourceId` is absent from the recorded event or the snapshot, the agent falls back to text or bounds - but bounds-based matching is inherently brittle against different screen sizes and densities.
+The agent derives matchers using both `uiStateBefore` and the current device snapshot, with the current snapshot as the authoritative source. `uiStateBefore` identifies what the target element looked like at recording time; the live snapshot confirms whether a matching element is present now and provides the stable selector to act on. When `resourceId` is absent from the recorded event or the snapshot, the agent falls back to text or bounds - but bounds-based matching is inherently brittle against different screen sizes and densities.
 
 Robustness against the full range of real-world app behavior is a post-PoC concern.
 

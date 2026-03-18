@@ -85,7 +85,7 @@ record pull
 
 The recording surface is an extension to the Android Operator app's existing broadcast receiver and Accessibility Service. No new IPC, no streaming, no additional processes.
 
-The parsing step is pure Node-side logic: NDJSON in, step log out. The parser filters and extracts `{uiStateBefore, action}` pairs - no matcher synthesis, no sleep injection. The step log is the agent's map: a structured, inspectable description of what the user did and what the UI looked like at each moment. The agent drives reproduction step by step using existing commands; the step log is context, not a script.
+The parsing step is pure Node-side logic: NDJSON in, step log out. The parser performs light normalization and extraction - no matcher synthesis, no sleep injection, not full compilation. The step log is the agent's map: a structured, inspectable description of what the user did and what the UI looked like at each moment. The agent drives reproduction step by step using existing commands; the step log is context, not a script.
 
 **Why the agent must be in the loop:** Android apps are dynamic. Interstitial dialogs, update prompts, A/B test variants, and loading state differences appear unpredictably and are absent from any recording. A batched execution script has no mechanism to observe or handle them. The agent does. Removing the agent from the playback loop removes the only adaptive layer. `execute --execution-file` is appropriate for stable, validated skills - not for raw recordings. See `tasks/record/limitations.md` for the full treatment.
 
@@ -129,6 +129,7 @@ Instrument a debug build with a `RecordingDiagnosticHook` that:
 - Times each `getRootInActiveWindow()` call and logs min/avg/max per event type
 - Logs total handler wall time per event (enqueue cost, not including disk write - disk write is always async)
 - Monitors for `AccessibilityService.onInterrupt()` and system-level event delivery warnings in logcat
+- For click events: inspects the captured snapshot to verify the clicked element (`resourceId` or `text`) is present in the tree, flagging cases where the snapshot reflects the post-navigation state instead of pre-click state
 
 Run three representative flows:
 
@@ -144,6 +145,7 @@ Run three representative flows:
 | `getRootInActiveWindow()` exceeds 300ms or causes delayed event delivery warnings | Use async capture: enqueue raw event data immediately on the event thread, take snapshot on a background HandlerThread with minimal delay |
 | Scroll event throughput saturates the handler even without snapshots | Add rate-limiting to scroll enqueueing (max 1 event enqueued per 100ms, rest discarded) |
 | TEXT_CHANGED events at realistic typing speed cause measurable handler delay | Add debounce gate: record at most one TEXT_CHANGED event per 150ms, suppress intermediates |
+| For click events, snapshot frequently reflects the post-navigation state rather than the pre-click state (i.e. the clicked element is absent from the snapshot) | Async capture is insufficient for correctness - switch to synchronous capture on the event thread for step-candidate events and accept the latency cost |
 
 ### Output
 
@@ -249,6 +251,8 @@ For step-candidate events (click, press_key, window_change), `RecordingManager` 
 
 The ordering consequence: there is a small window between the user interaction and the snapshot being taken. At human interaction speeds this window is well under the time to the next interaction. If the Phase 0 measurement shows this window causes stale snapshots in practice, the mitigation is to take the snapshot synchronously on the event thread (only for step-candidate events at human speed) and accept the latency - the Phase 0 decision document will record which approach was chosen.
 
+**Snapshot semantics (PoC):** `uiStateBefore` is a best-effort capture of the UI immediately after the accessibility event fires. Due to async capture timing, it may reflect the pre-interaction state (ideal), a partially transitioned state, or in fast transitions, the post-interaction state. Agents must treat `uiStateBefore` as approximate context, not exact ground truth. It identifies what was likely visible at interaction time; the live `observe snapshot` is the authoritative basis for action construction.
+
 `snapshot` is `null` on a step-candidate event only if `getRootInActiveWindow()` returns null (window not yet settled, app in background). This is logged as a warning, not a failure. The agent treats null `uiStateBefore` as reduced context and falls back to event fields (resourceId, text, bounds).
 
 ### Write Path
@@ -286,6 +290,8 @@ The first line of every recording file is a header record. All subsequent lines 
 ```
 
 `snapshot` is present on step-candidate events (click, press_key, window_change) and `null` on high-rate events (scroll, text_change). The `schemaVersion` field in the header allows the Node parser to reject files from an incompatible format version. Event records do not carry per-event versions - the header covers the file.
+
+The `snapshot` field value is opaque: consumers must not rely on it being XML, or on any specific structure within it. The current format is Android UI Automator XML hierarchy, but this may change (e.g. to a JSON tree) in a future schema version. Agents should treat it as a readable but format-agnostic UI description.
 
 All event records include `ts` (epoch ms) and `seq` (monotonic integer). `seq` is the authoritative ordering field.
 
@@ -330,7 +336,7 @@ clawperator record stop    [--session-id <id>] [--device-id <serial>] [--receive
 
 `record pull` without `--session-id` pulls the most recent session (reads `latest` pointer file first, then fetches corresponding NDJSON). Output defaults to `./recordings/`.
 
-`record parse` reads the NDJSON file, filters and compacts events, and writes a step log JSON. Output defaults to `<input_basename>.steps.json` in the same directory.
+`record parse` reads the NDJSON file, normalizes and extracts steps, and writes a step log JSON. Output defaults to `<input_basename>.steps.json` in the same directory.
 
 `record pull` and `record parse` are usable standalone. An agent or developer may pull, inspect the raw NDJSON, then parse it to produce the step log. The pipeline does not have to be atomic.
 
@@ -369,16 +375,19 @@ interface RecordingStepLog {
 }
 ```
 
-**Filtering rules (v1 - PoC scope):**
+**Normalization rules (v1 - PoC scope):**
 
 | Rule | Input | Output |
 |---|---|---|
-| Open app at start | First `window_change` event | `open_app` step with `packageName` |
+| Open app at start | First `window_change` event | `open_app` step with `packageName`. This step is inferred from an event pattern, not captured directly - see note below. |
 | Back navigation | `press_key` with `key: "back"` | `press_key` step, `key: "back"` |
 | Drop consecutive window changes | `window_change` immediately followed by another `window_change` with no intervening user action | Keep only the final one |
-| Deduplicate rapid clicks | Multiple `click` events on the same element within 100ms | Keep last only (guards against accidental double-tap during recording). Annotated in step log: `⚠ deduped 2→1 click on resourceId=...`. |
 
-Scroll events are captured in the NDJSON schema but omitted from the step log in v1. The parser emits a warning when scroll events are dropped. Scroll step extraction is a v2 concern.
+**Note on inferred steps:** Some step types are synthesized from event patterns rather than mapping 1:1 to a single accessibility event. `open_app` is the primary example: it is inferred from the first `window_change` in the session, not from a direct "app launch" event. The step log makes no attempt to hide this - the agent should treat such steps as intent inferences, not exact event records.
+
+Click deduplication (collapsing rapid double-taps) is deliberately out of scope for v1. If a user double-tapped by accident, the step log will contain both clicks. The agent handles this at reproduction time - it observes state after each step and can detect when a click had no visible effect.
+
+Scroll events are captured in the NDJSON schema but omitted from the step log in v1. The parser emits a warning when scroll events are present. Scroll step extraction is a v2 concern.
 
 No matcher synthesis. No sleep injection. The agent constructs matchers from the `uiStateBefore` snapshot and event fields at reproduction time - the same reasoning it applies during normal operation.
 
@@ -462,7 +471,7 @@ The demo is conducted with a standard agent (Claude) receiving `demo-001.steps.j
 - Agent successfully completes the Settings → Display → back flow using the recording as context.
 - Each step is issued as a discrete `clawperator execute` call (not via `--execution-file`).
 - Agent observes device state between steps via `observe snapshot`.
-- Flow succeeds at least twice consecutively.
+- Flow succeeds at least once reliably; a second run may involve minor agent intervention (e.g. waiting for a transition) and still counts. The PoC validates feasibility, not stability.
 - Agent authors a local skill artifact from the validated flow.
 - Agent runs the authored skill via `clawperator skills run` and it completes successfully.
 - No new Clawperator code ships in this phase.
@@ -563,7 +572,6 @@ type RawRecordingEvent =
     }
   ],
   "_warnings": [
-    "seq 4-5: 2 rapid click events on resourceId=com.android.settings:id/dashboard_tile deduped to 1",
     "seq 7: scroll event dropped (not extracted in v1)"
   ]
 }
@@ -572,6 +580,25 @@ type RawRecordingEvent =
 `uiStateBefore` is the UI hierarchy XML captured at the moment of the interaction. The agent reads this alongside the event fields to understand what was visible and what was tapped, then constructs the appropriate `clawperator execute` call for the current device state.
 
 `_warnings` is a top-level array of human-readable strings describing what the parser suppressed or modified. It is present if any warnings were generated during parsing; absent (not `null`, not `[]`) if the parse was clean. The agent may read these to understand where the step log diverges from the raw event stream - useful context when a reproduction diverges unexpectedly.
+
+### Step Log Agent Contract (PoC)
+
+Agents consuming the step log must know which fields are stable and which are best-effort. Overfitting to unstable fields produces brittle agent behavior.
+
+**Guaranteed for every step:**
+
+- `seq` - monotonic ordering, always present
+- `type` - step type string, always present
+- `uiStateBefore` - UI hierarchy XML string, or `null` if the tree read failed
+
+**Best-effort (frequently null across real-world apps):**
+
+- `resourceId` - absent on apps that do not expose stable IDs or use obfuscated IDs
+- `text` - absent on icon-only elements or elements with dynamic labels
+- `contentDesc` - absent on most elements
+- `bounds` - present on click events, may be stale for elements that shifted after recording
+
+Agents must not assume any individual selector field is present. Matcher construction must tolerate partial data: use `uiStateBefore` as the primary context source and treat event fields as hints, not guarantees.
 
 ---
 
@@ -610,7 +637,7 @@ Developer                  Node CLI                     Android / Host FS
 
                            record parse --input demo-001.ndjson
                              parseNdjson()
-                             filterAndExtract()           (dedup, collapse, extract pairs)
+                             normalizeAndExtract()         (collapse, infer open_app, extract pairs)
                              → demo-001.steps.json
                              [step summary to stderr]
 
@@ -687,10 +714,11 @@ Added to `contracts/errors.ts` following existing conventions.
 | Many real apps do not expose stable `resourceId` values, or use dynamic IDs | High | Agent reads `uiStateBefore` snapshot and finds the best available match. Noted in step log when `resourceId` is null. |
 | UI has not settled when agent issues the next action | High | Agent observes device state after each step via `observe snapshot`; it waits or retries based on what it sees rather than relying on fixed timing. |
 | Snapshot capture adds perceptible latency, missed events, or stale trees | High | Phase 0 measures this before Phase 1 code is written. Capture is async by default (background HandlerThread); Phase 0 determines whether synchronous capture is viable as a simpler alternative. High-rate event types (scroll, text-change) never receive snapshots. |
-| Rapid double-tap recorded as two clicks | Medium | 100ms deduplication window in parser. |
+| Rapid double-tap recorded as two clicks | Medium | Out of scope for v1. Agent observes state after each step and can detect when a click had no visible effect. Deduplication can be added as a v2 normalization rule if real recordings show it is needed. |
 | `snapshot` is null on an event (tree read failed during fast transition) | Medium | Agent treats null `uiStateBefore` as reduced context, falls back to event fields (resourceId, text, bounds) to construct the action. |
 | Recording file not accessible via `adb pull` without root | Low | Use `getExternalFilesDir()` - always ADB-accessible on debug builds; release builds require `android:debuggable` or `android:allowBackup`. |
 | `stop_recording` broadcast not sent (e.g. screen locked, process killed) | Low | Session file is intact on device even without a clean stop. Node `record pull` can still retrieve it. Warn if `eventCount: 0`. |
+| Accessibility event stream is not lossless under load | Low (PoC scope) | Android can silently drop events, coalesce scroll events, or deliver them out of order under sustained high load. The PoC assumes correctness on simple, low-rate flows only. Lossless capture is not guaranteed by the platform and is not a PoC requirement. |
 
 ---
 
@@ -715,8 +743,8 @@ Documentation is part of the work for each PR, not a follow-up step. The table b
 
 The parser is pure deterministic logic and is the highest-value test target in the feature. Unit tests for `parseRecording()` follow the existing pattern in `apps/node/src/test/unit/` and require no device. Coverage should include:
 
-- Filtering rules: each rule in the v1 table produces the correct step output
-- Dedup: rapid clicks on the same element within 100ms collapsed to one
+- Normalization rules: each rule in the v1 table produces the correct step output
+- `open_app` inference: first `window_change` produces an `open_app` step, not a `window_change` step
 - `uiStateBefore` passthrough: snapshot field from NDJSON appears on corresponding step
 - Null snapshot handling: `null` snapshot on an event produces a step with `uiStateBefore: null` and a warning (not a failure)
 - Scroll drop: scroll events produce a warning, not a parse failure
@@ -787,7 +815,7 @@ apps/android/shared/data/operator/src/main/kotlin/clawperator/operator/
 | 2 | Step log matches performed actions in order | Developer visual inspection |
 | 3A | Agent completes flow using recording as context | Developer visual inspection |
 | 3A | Each step issued as discrete `execute` call | Agent session log |
-| 3A | Flow succeeds twice consecutively | Repeat agent session |
+| 3A | Flow succeeds at least once; second run may use minor agent intervention | Repeat agent session |
 | 3B | Agent authors a skill from the validated flow | Skill artifact exists on disk |
 | 3B | Skill runs successfully via `clawperator skills run` | CLI exit code 0 |
 | All | No changes to `runExecution()` or existing action handlers | Code review: no diff in those files |
