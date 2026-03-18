@@ -43,4 +43,12 @@ class TaskScopeNoOp : TaskScope {
     ) {
         // No-op implementation
     }
+
+    override suspend fun waitForNavigation(
+        expectedPackage: String?,
+        expectedNode: NodeMatcher?,
+        timeoutMs: Long,
+    ): WaitForNavigationResult {
+        throw UnsupportedOperationException("TaskScopeNoOp does not support waitForNavigation")
+    }
 }

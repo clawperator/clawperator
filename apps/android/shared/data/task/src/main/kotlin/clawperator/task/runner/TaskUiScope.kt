@@ -43,7 +43,16 @@ interface TaskUiScope {
     ): TaskUiNode
 
     /**
+     * Reads a key-value pair from the screen. Finds the label, then finds an adjacent text node.
+     */
+    suspend fun readKeyValuePair(
+        labelMatcher: NodeMatcher,
+        retry: TaskRetry = TaskRetryPresets.UiReadiness,
+    ): Pair<String, String>
+
+    /**
      * Gets the text content of a UI element that matches the specified NodeMatcher criteria.
+
      * Retries according to the retry configuration until a matching element is found and text extracted.
      *
      * @param matcher NodeMatcher containing the criteria to match

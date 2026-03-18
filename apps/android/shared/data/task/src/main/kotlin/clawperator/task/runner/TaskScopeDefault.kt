@@ -371,10 +371,85 @@ class TaskScopeDefault(
         return maxDepth
     }
 
+    override suspend fun waitForNavigation(
+        expectedPackage: String?,
+        expectedNode: NodeMatcher?,
+        timeoutMs: Long,
+    ): WaitForNavigationResult {
+        val startTime = getCurrentTimeMillis()
+        var lastPackage: String? = null
+        val initialPackage = uiTreeInspector.getCurrentWindowMetadata()?.foregroundPackage
+        var observedDifferentPackage = false
+        val pollDelay = 200.milliseconds
+
+        while (true) {
+            val elapsedMs = getCurrentTimeMillis() - startTime
+            if (elapsedMs > timeoutMs) {
+                return WaitForNavigationResult(
+                    success = false,
+                    lastPackage = lastPackage,
+                    elapsedMs = elapsedMs,
+                )
+            }
+
+            val windowMetadata = uiTreeInspector.getCurrentWindowMetadata()
+            lastPackage = windowMetadata?.foregroundPackage
+            if (initialPackage != null && lastPackage != null && lastPackage != initialPackage) {
+                observedDifferentPackage = true
+            }
+
+            if (shouldSatisfyExpectedPackage(
+                    expectedPackage = expectedPackage,
+                    initialPackage = initialPackage,
+                    currentPackage = lastPackage,
+                    observedDifferentPackage = observedDifferentPackage,
+                )
+            ) {
+                return WaitForNavigationResult(
+                    success = true,
+                    lastPackage = lastPackage,
+                    elapsedMs = getCurrentTimeMillis() - startTime,
+                )
+            }
+
+            if (expectedNode != null) {
+                try {
+                    taskUiScope.waitForNode(expectedNode, TaskRetry.None)
+                    return WaitForNavigationResult(
+                        success = true,
+                        lastPackage = lastPackage,
+                        elapsedMs = getCurrentTimeMillis() - startTime,
+                    )
+                } catch (_: IllegalStateException) {
+                    // Not yet visible
+                }
+            }
+
+            delay(pollDelay)
+        }
+    }
+
     override suspend fun <T> ui(block: suspend TaskUiScope.() -> T): T {
         Log.d("$TAG Executing UI operations")
         val result = taskUiScope.block()
         Log.d("$TAG UI operations completed")
         return result
     }
+}
+
+private fun shouldSatisfyExpectedPackage(
+    expectedPackage: String?,
+    initialPackage: String?,
+    currentPackage: String?,
+    observedDifferentPackage: Boolean,
+): Boolean {
+    if (expectedPackage == null || currentPackage != expectedPackage) {
+        return false
+    }
+    // If initial package metadata was unavailable we cannot confirm a transition
+    // occurred; require observing a package change as evidence.
+    if (initialPackage == null) {
+        return observedDifferentPackage
+    }
+    return initialPackage != expectedPackage || observedDifferentPackage
 }

@@ -37,6 +37,8 @@ export const CANONICAL_ACTION_TYPES = [
   "take_screenshot",
   "sleep",
   "press_key",
+  "wait_for_navigation",
+  "read_key_value_pair",
 ] as const;
 
 export type CanonicalActionType = (typeof CANONICAL_ACTION_TYPES)[number];

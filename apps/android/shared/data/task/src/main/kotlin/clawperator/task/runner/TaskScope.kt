@@ -39,6 +39,15 @@ interface TaskScope {
     ): UiSnapshotResult
 
     /**
+     * Polls until the expected package or expected node is found, or the timeout is reached.
+     */
+    suspend fun waitForNavigation(
+        expectedPackage: String?,
+        expectedNode: NodeMatcher?,
+        timeoutMs: Long,
+    ): WaitForNavigationResult
+
+    /**
      * Closes (backgrounds) the specified app by simulating a swipe-up gesture.
      * First ensures the app is in the foreground, then performs the gesture to go home.
      *
@@ -60,3 +69,9 @@ interface TaskScope {
      */
     suspend fun <T> ui(block: suspend TaskUiScope.() -> T): T
 }
+
+data class WaitForNavigationResult(
+    val success: Boolean,
+    val lastPackage: String?,
+    val elapsedMs: Long,
+)

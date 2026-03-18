@@ -23,7 +23,7 @@ Documentation relevant to the change is included in the task — not deferred.
 | PR | Tasks | Codebases | Rationale |
 |----|-------|-----------|-----------|
 | [DONE] PR-1 | T-01 | `operator` + `docs` | Correctness bug; ship fast and alone |
-| PR-2 | T-02, T-03, T-04 | `operator` + `docs` | New action primitives; one APK release |
+| [DONE] PR-2 | T-02, T-03, T-04 | `operator` + `docs` | New action primitives; one APK release |
 | PR-3 | T-05, T-08, T-10, T-11 | `node` + `docs` | Small, independent diagnostics and warning fixes |
 | PR-4 | T-06, T-09 | `node` + `docs` | Payload authoring ergonomics; T-09 dry-run output benefits from T-06 |
 | PR-5 | T-07 | `node` + `docs` | Skills scaffolding; substantial enough to stand alone |
@@ -78,7 +78,7 @@ All three are additive new action types with no behavior change risk to existing
 
 ---
 
-### T-02 · Add `wait_for_navigation` action
+### [DONE] T-02 · Add `wait_for_navigation` action
 **Priority:** High
 
 **Problem:**
@@ -108,7 +108,7 @@ Add `wait_for_navigation` to the action type reference with full params schema, 
 
 ---
 
-### T-03 · Add `read_key_value_pair` action
+### [DONE] T-03 · Add `read_key_value_pair` action
 **Priority:** High
 
 **Problem:**
@@ -136,7 +136,7 @@ Add `read_key_value_pair` to the action type reference with params schema, resul
 
 ---
 
-### T-04 · Extend `read_text` validators
+### [DONE] T-04 · Extend `read_text` validators
 **Priority:** Medium
 
 **Problem:**

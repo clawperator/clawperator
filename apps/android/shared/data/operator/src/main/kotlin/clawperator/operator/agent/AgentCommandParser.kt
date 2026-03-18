@@ -156,13 +156,44 @@ class AgentCommandParserDefault : AgentCommandParser {
                     findFirstScrollableChild = params.booleanOrDefault("findFirstScrollableChild", true),
                     clickAfter = params.booleanOrDefault("clickAfter", false),
                 )
-            "read_text" ->
+            "wait_for_navigation" -> {
+                val expectedPackage = params.stringOrNullWithMax("expectedPackage", MAX_MATCHER_VALUE_LENGTH)
+                val expectedNode = params.parseMatcherOrNull("expectedNode")
+                // Reject blank strings at validation boundary per codebase guidelines
+                val hasExpectedPackage = expectedPackage != null && expectedPackage.isNotBlank()
+                require(hasExpectedPackage || expectedNode != null) {
+                    "wait_for_navigation requires at least one of expectedPackage or expectedNode"
+                }
+                // Normalize blank strings to null per codebase guidelines
+                val normalizedPackage = expectedPackage?.takeIf { it.isNotBlank() }
+                UiAction.WaitForNavigation(
+                    id = id,
+                    expectedPackage = normalizedPackage,
+                    expectedNode = expectedNode,
+                    timeoutMs = params.longRequired("timeoutMs").coerceIn(1L, 30_000L),
+                )
+            }
+            "read_key_value_pair" ->
+                UiAction.ReadKeyValuePair(
+                    id = id,
+                    labelMatcher = params.parseMatcherRequired("labelMatcher"),
+                    retry = params.parseRetryOrDefault(defaultRetry = TaskRetryPresets.UiReadiness),
+                )
+            "read_text" -> {
+                val validator = params.parseValidator()
+                val validatorPattern = params.stringOrNull("validatorPattern")
+                if (validator == UiTextValidator.Regex) {
+                    require(!validatorPattern.isNullOrBlank()) { "validatorPattern is required for regex validator" }
+                    Regex(validatorPattern) // throws if invalid
+                }
                 UiAction.ReadText(
                     id = id,
                     matcher = params.parseMatcherRequired("matcher"),
                     retry = params.parseRetryOrDefault(defaultRetry = TaskRetryPresets.UiReadiness),
-                    validator = params.parseValidator(),
+                    validator = validator,
+                    validatorPattern = validatorPattern,
                 )
+            }
             "enter_text", "type_text" ->
                 UiAction.EnterText(
                     id = id,
@@ -204,6 +235,8 @@ class AgentCommandParserDefault : AgentCommandParser {
         val raw = this.stringOrNull("validator") ?: return null
         return when (raw.lowercase()) {
             "temperature" -> UiTextValidator.Temperature
+            "version" -> UiTextValidator.Version
+            "regex" -> UiTextValidator.Regex
             else -> error("unsupported validator: $raw")
         }
     }
@@ -316,6 +349,10 @@ class AgentCommandParserDefault : AgentCommandParser {
     ): Long = longOrNull(key) ?: default
 
     private fun JsonObject.longOrNull(key: String): Long? = (this[key] as? JsonPrimitive)?.longOrNull
+
+    private fun JsonObject.longRequired(key: String): Long {
+        return longOrNull(key) ?: error("$key is required")
+    }
 
     private fun JsonObject.doubleOrDefault(
         key: String,

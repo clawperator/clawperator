@@ -599,6 +599,150 @@ describe("validateExecution", () => {
       (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
     );
   });
+
+  // wait_for_navigation validation tests
+  it("accepts wait_for_navigation with expectedPackage", () => {
+    const ex = validateExecution({
+      commandId: "c", taskId: "t", source: "s",
+      expectedFormat: "android-ui-automator", timeoutMs: 5000,
+      actions: [{ id: "x", type: "wait_for_navigation", params: { expectedPackage: "com.example.app", timeoutMs: 5000 } }],
+    });
+    assert.strictEqual(ex.actions[0].type, "wait_for_navigation");
+  });
+
+  it("accepts wait_for_navigation with expectedNode", () => {
+    const ex = validateExecution({
+      commandId: "c", taskId: "t", source: "s",
+      expectedFormat: "android-ui-automator", timeoutMs: 5000,
+      actions: [{ id: "x", type: "wait_for_navigation", params: { expectedNode: { textEquals: "Success" }, timeoutMs: 5000 } }],
+    });
+    assert.strictEqual(ex.actions[0].type, "wait_for_navigation");
+  });
+
+  it("rejects wait_for_navigation without expectedPackage or expectedNode", () => {
+    assert.throws(
+      () =>
+        validateExecution({
+          commandId: "c", taskId: "t", source: "s",
+          expectedFormat: "android-ui-automator", timeoutMs: 5000,
+          actions: [{ id: "x", type: "wait_for_navigation", params: { timeoutMs: 5000 } }],
+        }),
+      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
+    );
+  });
+
+  it("rejects wait_for_navigation with timeoutMs = 0", () => {
+    assert.throws(
+      () =>
+        validateExecution({
+          commandId: "c", taskId: "t", source: "s",
+          expectedFormat: "android-ui-automator", timeoutMs: 5000,
+          actions: [{ id: "x", type: "wait_for_navigation", params: { expectedPackage: "com.example", timeoutMs: 0 } }],
+        }),
+      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
+    );
+  });
+
+  it("rejects wait_for_navigation with timeoutMs > 30000", () => {
+    assert.throws(
+      () =>
+        validateExecution({
+          commandId: "c", taskId: "t", source: "s",
+          expectedFormat: "android-ui-automator", timeoutMs: 5000,
+          actions: [{ id: "x", type: "wait_for_navigation", params: { expectedPackage: "com.example", timeoutMs: 30001 } }],
+        }),
+      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
+    );
+  });
+
+  it("rejects wait_for_navigation with blank expectedPackage", () => {
+    assert.throws(
+      () =>
+        validateExecution({
+          commandId: "c", taskId: "t", source: "s",
+          expectedFormat: "android-ui-automator", timeoutMs: 5000,
+          actions: [{ id: "x", type: "wait_for_navigation", params: { expectedPackage: "   ", timeoutMs: 5000 } }],
+        }),
+      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
+    );
+  });
+
+  // read_key_value_pair validation tests
+  it("accepts read_key_value_pair with labelMatcher", () => {
+    const ex = validateExecution({
+      commandId: "c", taskId: "t", source: "s",
+      expectedFormat: "android-ui-automator", timeoutMs: 5000,
+      actions: [{ id: "x", type: "read_key_value_pair", params: { labelMatcher: { textEquals: "Android version" } } }],
+    });
+    assert.strictEqual(ex.actions[0].type, "read_key_value_pair");
+  });
+
+  it("rejects read_key_value_pair without labelMatcher", () => {
+    assert.throws(
+      () =>
+        validateExecution({
+          commandId: "c", taskId: "t", source: "s",
+          expectedFormat: "android-ui-automator", timeoutMs: 5000,
+          actions: [{ id: "x", type: "read_key_value_pair", params: {} }],
+        }),
+      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
+    );
+  });
+
+  // read_text with regex validator tests
+  it("accepts read_text with version validator", () => {
+    const ex = validateExecution({
+      commandId: "c", taskId: "t", source: "s",
+      expectedFormat: "android-ui-automator", timeoutMs: 5000,
+      actions: [{ id: "x", type: "read_text", params: { matcher: { textContains: "Version" }, validator: "version" } }],
+    });
+    assert.strictEqual(ex.actions[0].type, "read_text");
+  });
+
+  it("accepts read_text with regex validator and validatorPattern", () => {
+    const ex = validateExecution({
+      commandId: "c", taskId: "t", source: "s",
+      expectedFormat: "android-ui-automator", timeoutMs: 5000,
+      actions: [{ id: "x", type: "read_text", params: { matcher: { textContains: "Order" }, validator: "regex", validatorPattern: "^ORD-[0-9]{6}$" } }],
+    });
+    assert.strictEqual(ex.actions[0].type, "read_text");
+  });
+
+  it("rejects read_text with regex validator but missing validatorPattern", () => {
+    assert.throws(
+      () =>
+        validateExecution({
+          commandId: "c", taskId: "t", source: "s",
+          expectedFormat: "android-ui-automator", timeoutMs: 5000,
+          actions: [{ id: "x", type: "read_text", params: { matcher: { textContains: "Order" }, validator: "regex" } }],
+        }),
+      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
+    );
+  });
+
+  it("rejects read_text with regex validator and blank validatorPattern", () => {
+    assert.throws(
+      () =>
+        validateExecution({
+          commandId: "c", taskId: "t", source: "s",
+          expectedFormat: "android-ui-automator", timeoutMs: 5000,
+          actions: [{ id: "x", type: "read_text", params: { matcher: { textContains: "Order" }, validator: "regex", validatorPattern: "" } }],
+        }),
+      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
+    );
+  });
+
+  it("rejects read_text with regex validator and invalid regex pattern", () => {
+    assert.throws(
+      () =>
+        validateExecution({
+          commandId: "c", taskId: "t", source: "s",
+          expectedFormat: "android-ui-automator", timeoutMs: 5000,
+          actions: [{ id: "x", type: "read_text", params: { matcher: { textContains: "Order" }, validator: "regex", validatorPattern: "[invalid(" } }],
+        }),
+      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
+    );
+  });
 });
 
 describe("validatePayloadSize", () => {

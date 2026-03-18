@@ -47,10 +47,17 @@ const actionParamsSchema = z.object({
   findFirstScrollableChild: z.boolean().optional(),
   clickAfter: z.boolean().optional(),
   validator: z.string().optional(),
+  validatorPattern: z.string().optional(),
   key: z.string().optional(),
   retry: z.record(z.unknown()).optional(),
   scrollRetry: z.record(z.unknown()).optional(),
   clickRetry: z.record(z.unknown()).optional(),
+  // wait_for_navigation params
+  expectedPackage: z.string().max(LIMITS.MAX_MATCHER_VALUE_LENGTH).optional(),
+  expectedNode: nodeMatcherSchema.optional(),
+  timeoutMs: z.number().optional(),
+  // read_key_value_pair params
+  labelMatcher: nodeMatcherSchema.optional(),
 }).strict();
 
 // NOTE: "doctor_ping" is intentionally excluded. It is an internal diagnostic action
@@ -71,6 +78,8 @@ const supportedTypes = [
   "take_screenshot",
   "sleep",
   "press_key",
+  "wait_for_navigation",
+  "read_key_value_pair",
 ] as const;
 
 const actionSchema = z.object({
@@ -140,10 +149,27 @@ const executionSchema = z.object({
         }
         break;
       case "click":
-      case "read_text":
       case "wait_for_node":
         if (!params?.matcher) {
           addIssue(index, `${action.type} requires params.matcher`, ["params", "matcher"]);
+        }
+        break;
+      case "read_text":
+        if (!params?.matcher) {
+          addIssue(index, "read_text requires params.matcher", ["params", "matcher"]);
+        }
+        // regex validator requires validatorPattern
+        if (params?.validator === "regex") {
+          if (!params?.validatorPattern || params.validatorPattern.trim() === "") {
+            addIssue(index, "read_text with validator='regex' requires params.validatorPattern", ["params", "validatorPattern"]);
+          } else {
+            // Validate that validatorPattern is a valid regex
+            try {
+              new RegExp(params.validatorPattern);
+            } catch {
+              addIssue(index, "read_text params.validatorPattern is not a valid regex pattern", ["params", "validatorPattern"]);
+            }
+          }
         }
         break;
       case "enter_text":
@@ -242,6 +268,24 @@ const executionSchema = z.object({
       case "take_screenshot":
         if (params?.path !== undefined && params.path.trim() === "") {
           addIssue(index, "take_screenshot params.path must be a non-empty string", ["params", "path"]);
+        }
+        break;
+      case "wait_for_navigation": {
+        const hasExpectedPackage = params?.expectedPackage !== undefined && params.expectedPackage.trim() !== "";
+        const hasExpectedNode = params?.expectedNode !== undefined;
+        if (!hasExpectedPackage && !hasExpectedNode) {
+          addIssue(index, "wait_for_navigation requires at least one of params.expectedPackage or params.expectedNode", ["params"]);
+        }
+        if (typeof params?.timeoutMs !== "number" || params.timeoutMs <= 0) {
+          addIssue(index, "wait_for_navigation requires params.timeoutMs > 0", ["params", "timeoutMs"]);
+        } else if (params.timeoutMs > 30000) {
+          addIssue(index, "wait_for_navigation params.timeoutMs must not exceed 30000", ["params", "timeoutMs"]);
+        }
+        break;
+      }
+      case "read_key_value_pair":
+        if (!params?.labelMatcher) {
+          addIssue(index, "read_key_value_pair requires params.labelMatcher", ["params", "labelMatcher"]);
         }
         break;
       default:
