@@ -13,6 +13,18 @@ Record and replay closes this gap: a developer performs a UI flow once, Clawpera
 
 ---
 
+## Background and Intended Uses
+
+Three distinct use cases motivate this feature. All three are served by the same implementation.
+
+**Skill bootstrap for unknown apps.** Clawperator's skills repository covers common apps, but cannot cover every private, regional, or internal tool a user wants to automate. Today, an agent must explore an unfamiliar app's UI from scratch to construct a skill - slow, token-expensive, and error-prone. A recording eliminates that first-encounter cost: the user demonstrates the flow once, and the agent's job shifts from blind exploration to refinement. Even a raw recording used only as input context for an agent constructing a private skill delivers real value, because the agent no longer needs to guess the navigation path.
+
+**Android developer productivity.** Developers working on a UI feature spend a significant fraction of iteration time navigating to the screen they care about - logging in with test credentials, tapping through onboarding, reaching a nested settings panel - before they can observe the change they just made. Replay eliminates that overhead. A developer records the navigation path once and replays it as a single command during their iteration loop. This is closer to a macro system than a test suite: it does not need to be shared, checked in, or maintained. A local recording that lives for the duration of one feature branch has immediate value.
+
+**UI testing and verification.** A recorded happy path is a lightweight smoke test with no test framework, no instrumentation, and no build-time setup required. It runs against a real device or emulator via `clawperator execute`. For agent-driven development work, replay also provides a reliable "get to the state under test" primitive: an agent can replay a known navigation path to reach a target screen, then apply assertions using `snapshot_ui` and `read_text`. This makes Clawperator a practical tool for UI verification on real devices, which no existing lightweight tool handles well.
+
+---
+
 ## Goals
 
 - A human performs a UI flow on a connected Android device.
@@ -75,9 +87,12 @@ The compiler produces a standard `Execution` JSON document, identical in shape t
 - It is the canonical interface. Agents, skills, and humans all converge on `Execution` JSON. Introducing an intermediate "replay" format would create a new abstraction with no payoff.
 - It is immediately runnable. `clawperator execute --execution-file replay.execution.json` works today with no new runtime code.
 - It is inspectable and editable. A developer can open the compiled file, tweak a matcher, and re-run without tooling.
+- It is useful as agent input. An agent tasked with constructing a skill from a recording can read a compiled `Execution` JSON directly. The concrete, ordered steps - with `resourceId` matchers and action types already resolved - give the agent ground truth about what the user did, rather than requiring it to infer intent from raw accessibility events.
 - Skill artifacts (`.recipe.json`) are parameterized templates. A compiled recording has no parameters - it is a concrete flow. Wrapping it as a recipe artifact would add noise.
 
-The compiled file is saved as `<session_id>.execution.json`. If the developer wants to graduate it to a reusable skill, they place it in a skill directory as an artifact - but that step is outside the scope of this PoC.
+The compiled file is saved as `<session_id>.execution.json`. The `source: "clawperator-record"` field distinguishes it from agent-authored and skill-compiled executions, which matters when an agent is processing a batch of executions and needs to know their provenance.
+
+If the developer wants to graduate the compiled output to a reusable skill, they place it in a skill directory as an artifact - but that step is outside the scope of this PoC.
 
 ---
 
@@ -270,7 +285,7 @@ The resulting `Execution` uses `"source": "clawperator-record"` and `"mode": "di
 [3] press_key   back
 ```
 
-This is for developer inspection only. The authoritative output is the JSON file.
+This is for developer inspection and also serves as a concise, readable description of the recorded flow that can be passed as context to an agent tasked with refining or generalizing the recording into a skill. The authoritative output is the JSON file.
 
 ### Success Criteria
 
@@ -327,6 +342,8 @@ This scenario is chosen because:
 - It contains no text input (intentional for PoC scope).
 - It is short enough to execute reliably in under 10 seconds.
 - It exercises open-app, click, and back navigation - the three most important action types.
+
+This scenario also directly represents the developer productivity use case: a developer working on the Display settings screen can replay this flow to return to their target screen after every rebuild, without manually navigating. The same flow, used as a smoke test, verifies that the Display entry point is reachable - a meaningful check in the UI testing use case.
 
 The replay is considered successful when the device reproduces the flow (Settings opens, Display screen appears, returns to Settings) at least twice consecutively without failure.
 
