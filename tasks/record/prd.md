@@ -21,7 +21,7 @@ Two use cases motivate this feature. Both are served by the same implementation.
 
 **Skill bootstrap.** Clawperator's skills repository covers common apps, but cannot cover every private, regional, or internal tool a user wants to automate. Today, an agent must explore an unfamiliar app's UI from scratch to construct a skill - slow, token-expensive, and error-prone. A recording eliminates that first-encounter cost: the user demonstrates the flow once, and the agent's job shifts from blind exploration to refinement. Even a raw recording used only as input context for an agent constructing a private skill delivers real value, because the agent no longer needs to guess the navigation path.
 
-**Android automation.** The broader opportunity is what Playwright is for web development - but for Android, with an agent actively in the loop. A developer can ask an agent to navigate to any previously recorded screen, observe what is on it, report what changed, or verify a flow still works - all on a real device, without instrumentation or a test framework. Recording is what makes this practical: without a validated skill, an agent must explore its way to the target screen on every session. With one, it can get there reliably and do useful work. Two concrete applications: (1) Developer iteration - record the navigation path once, author a skill, and the agent can reach that screen on demand throughout the development cycle rather than manually navigating on every iteration. (2) UI verification - the skill handles "get to the state under test"; the agent handles assertions via `snapshot_ui` and `read_text`. This fills a gap that Espresso and UIAutomator handle poorly - they require build-time instrumentation and produce results only after a full build cycle, not during active development.
+**Android automation.** The broader opportunity is a Playwright-like workflow for Android, but with an agent actively in the loop. A developer can ask an agent to navigate to any previously recorded screen, observe what is on it, report what changed, or verify a flow still works - all on a real device, without instrumentation or a test framework. Recording is what makes this practical: without a validated skill, an agent must explore its way to the target screen on every session. With one, it can get there reliably and do useful work. Two concrete applications: (1) Developer iteration - record the navigation path once, author a skill, and the agent can reach that screen on demand throughout the development cycle rather than manually navigating on every iteration. (2) UI verification - the skill handles "get to the state under test"; the agent handles assertions via `snapshot_ui` and `read_text`. This fills a gap that Espresso and UIAutomator handle poorly - they require build-time instrumentation and produce results only after a full build cycle, not during active development.
 
 ---
 
@@ -156,6 +156,7 @@ A short written note (inline in the Phase 1 PR description or in `tasks/record/`
 - All three flows instrumented and results logged on at least one physical device.
 - `getRootInActiveWindow()` latency documented per step-candidate event type.
 - No AccessibilityService delivery warnings observed during any flow.
+- Snapshot correctness for click events evaluated: for each captured click, verify whether the clicked element (`resourceId` or `text`) is present in the snapshot, and document the outcome (e.g. "present in N of M sampled clicks").
 - Snapshot capture strategy decided and written down.
 
 ---
@@ -581,6 +582,8 @@ type RawRecordingEvent =
 
 `_warnings` is a top-level array of human-readable strings describing what the parser suppressed or modified. It is present if any warnings were generated during parsing; absent (not `null`, not `[]`) if the parse was clean. The agent may read these to understand where the step log diverges from the raw event stream - useful context when a reproduction diverges unexpectedly.
 
+**Schema note:** The step log format is intentionally flat for the PoC - each step carries its own `uiStateBefore` inline. If real agent consumption reveals this is awkward (e.g. large snapshots making the file unwieldy to scan), a future version may normalize it into a `{step, event, uiStateBefore}` grouping with snapshots in a separate map. This is a PoC detail, not a constraint.
+
 ### Step Log Agent Contract (PoC)
 
 Agents consuming the step log must know which fields are stable and which are best-effort. Overfitting to unstable fields produces brittle agent behavior.
@@ -589,7 +592,7 @@ Agents consuming the step log must know which fields are stable and which are be
 
 - `seq` - monotonic ordering, always present
 - `type` - step type string, always present
-- `uiStateBefore` - UI hierarchy XML string, or `null` if the tree read failed
+- `uiStateBefore` - UI hierarchy XML string, or `null` if the tree read failed. Even when non-null, this value is best-effort: due to async capture timing it may reflect the pre-interaction state (ideal), a partially transitioned state, or in fast transitions, the post-interaction state. Treat it as approximate context, not exact ground truth. The live `observe snapshot` is the authoritative source for action construction.
 
 **Best-effort (frequently null across real-world apps):**
 

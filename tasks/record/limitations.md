@@ -22,7 +22,7 @@ A recording is a lossy representation of user intent. The event log captures ide
 
 Clawperator's architecture separates concerns: the agent is the brain; Clawperator is the hand. The agent observes, reasons, and decides what to do next. Clawperator executes one discrete command at a time and reports the result.
 
-A compiled recording looks like an execution script, and it is tempting to dispatch it as one via `execute --execution-file`. For this PoC - and more broadly, for any unfamiliar or dynamic app - this approach will produce brittle results. The primary reason:
+A parsed recording or step log can look script-like, and it is tempting to dispatch it as a batch via `execute --execution-file`. For this PoC - and more broadly, for any unfamiliar or dynamic app - this approach will produce brittle results. The primary reason:
 
 **Android apps are dynamic.** The same flow run twice on the same device can encounter:
 - Interstitial dialogs (permission requests, app review prompts, subscription upsells)

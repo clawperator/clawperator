@@ -88,3 +88,9 @@ Record serves two use cases with a single piece of infrastructure:
 2. **Android automation:** The authored skill becomes a reliable automation primitive - for developer iteration (navigate to the screen under development in one command), for UI verification (run the skill as a smoke test, then apply assertions), or any other agent-driven scenario where a validated navigation path is needed.
 
 Both use cases are served by the same three-phase implementation - record, parse, agent-validate-and-skill - built on top of existing Clawperator infrastructure. The recording and step log are bootstrap artifacts. The skill is the durable output.
+
+---
+
+## Implementation Notes
+
+Agents implementing this feature should log concrete findings - measured latency numbers, plan deviations, cross-phase decisions - to `tasks/record/progress.md`. See that file for the format and rules.
