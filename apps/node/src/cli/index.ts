@@ -242,6 +242,8 @@ Usage:
 Notes:
   - Default receiver package: com.clawperator.operator
   - Use --receiver-package com.clawperator.operator.dev for local debug APKs.
+  - Exit code 0 means all critical checks passed, including the warning-only multi-device ambiguity case.
+  - Exit code 1 means a genuine failure such as no device, APK not installed, or handshake failure.
   - If handshake times out, rerun with --verbose and compare the installed APK package with --receiver-package.
 `,
   "version": `clawperator version
