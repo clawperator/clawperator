@@ -258,7 +258,7 @@ Dry-run and param naming normalization are both about making it easier to write 
 
 ---
 
-### T-06 · Add `execute --dry-run` flag
+### [DONE] T-06 · Add `execute --dry-run` flag
 **Priority:** High
 
 **Problem:**
@@ -280,7 +280,7 @@ Add `--dry-run` to the CLI reference `execute` entry with usage example and outp
 
 ---
 
-### T-09 · Normalize `matcher` / `target` param naming; add alias
+### [DONE] T-09 · Normalize `matcher` / `target` param naming; add alias
 **Priority:** Medium
 
 **Problem:**
