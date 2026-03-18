@@ -12,6 +12,6 @@ Do not hand-edit generated docs or built site files. Fix the real source, then
 regenerate and validate with:
 
 ```bash
-python3 scripts/validate_docs_source_of_truth.py
+.agents/skills/docs-validate/scripts/validate_source_of_truth.py
 ./scripts/docs_build.sh
 ```

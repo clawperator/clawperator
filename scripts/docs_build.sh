@@ -41,10 +41,9 @@ echo "Installing MkDocs dependencies..."
 pip install -r "$REQUIREMENTS_FILE"
 
 echo "Validating generated docs source-of-truth..."
-"$VENV_DIR/bin/python" "$REPO_ROOT/scripts/validate_docs_source_of_truth.py" \
+"$VENV_DIR/bin/python" "$REPO_ROOT/.agents/skills/docs-validate/scripts/validate_source_of_truth.py" \
   --repo-root "$REPO_ROOT" \
   --skills-root "$REPO_ROOT/../clawperator-skills"
-
 # Run the build
 echo "Running MkDocs build..."
 mkdocs build

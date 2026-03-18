@@ -10,7 +10,7 @@ from pathlib import Path
 import yaml
 
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[4]
 SOURCE_MAP_PATH = REPO_ROOT / "sites" / "docs" / "source-map.yaml"
 GENERATED_DOCS_DIR = Path("sites/docs/docs")
 SOURCE_MAP_RELATIVE = Path("sites/docs/source-map.yaml")
@@ -76,7 +76,7 @@ def path_matches_source(changed_path: str, source_path: str) -> bool:
     changed = Path(changed_path)
     source = Path(source_path)
     if changed == source:
-      return True
+        return True
     try:
         changed.relative_to(source)
         return True

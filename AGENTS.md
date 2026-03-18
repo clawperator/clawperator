@@ -102,9 +102,9 @@ If a change affects a public API, CLI command, error code, execution contract, s
 
 When docs need regeneration, use the repo docs-generation workflow rather than hand-editing generated pages. The project-local skill is `.agents/skills/docs-generate/`, and the public docs site build can be validated with `./scripts/docs_build.sh`.
 
-Before treating generated docs changes as valid, run the source-of-truth guard:
-`python3 scripts/validate_docs_source_of_truth.py`. It fails when
-`sites/docs/docs/` changes without a corresponding canonical source change.
+Before treating generated docs changes as valid, run the repo-local
+`.agents/skills/docs-validate/` skill. It fails when `sites/docs/docs/`
+changes without a corresponding canonical source change.
 
 Documentation updates should be considered part of the feature or bug-fix work, not optional follow-up. At minimum, agents should update:
 - `docs/node-api-for-agents.md` for API shape, contract, error code, result-envelope, or agent-behavior changes
