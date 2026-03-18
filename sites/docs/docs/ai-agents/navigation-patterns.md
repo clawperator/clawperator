@@ -172,6 +172,7 @@ If a step fails:
 ## Related docs
 
 - [Agent Quickstart](agent-quickstart.md)
+- [Action Types Reference](../reference/action-types.md) - Action params, result shapes, and examples
 - [Clawperator Snapshot Format](../reference/snapshot-format.md)
 - [Execution Model](../reference/execution-model.md)
 - [Error Handling Guide](../reference/error-handling.md)

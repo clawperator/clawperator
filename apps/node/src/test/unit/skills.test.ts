@@ -626,7 +626,11 @@ describe("scaffoldSkill", () => {
       const skillMarkdown = await readFile(join(tempRoot, "skills", skillId, "SKILL.md"), "utf8");
 
       assert.strictEqual(skillJson.summary, summary);
-      assert.match(skillMarkdown, new RegExp(`description: ${summary.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
+      assert.match(skillMarkdown, /description: \|-\n/);
+      assert.match(
+        skillMarkdown,
+        new RegExp(`\\n  ${summary.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\n---\\n`)
+      );
     } finally {
       await rm(tempRoot, { recursive: true, force: true });
     }
@@ -649,7 +653,84 @@ describe("scaffoldSkill", () => {
       const skillMarkdown = await readFile(join(tempRoot, "skills", skillId, "SKILL.md"), "utf8");
 
       assert.strictEqual(skillJson.summary, expectedSummary);
-      assert.match(skillMarkdown, new RegExp(`description: ${expectedSummary.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
+      assert.match(skillMarkdown, /description: \|-\n/);
+      assert.match(
+        skillMarkdown,
+        new RegExp(`\\n  ${expectedSummary.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\n---\\n`)
+      );
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("supports multi-line summaries without breaking YAML frontmatter", async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-skill-scaffold-multiline-summary-"));
+    const registryDir = join(tempRoot, "skills");
+    const registryPath = join(registryDir, "skills-registry.json");
+    await mkdir(registryDir, { recursive: true });
+    await copyFile(TEST_REGISTRY_PATH, registryPath);
+
+    try {
+      const skillId = "com.example.multiline.capture";
+      const summary = "Line1\nLine2: has colon\n- list-looking line\n# looks like a comment";
+      const result = await scaffoldSkill(skillId, { registryPath, summary });
+      if (!result.ok) assert.fail(result.message);
+
+      const skillMarkdown = await readFile(join(tempRoot, "skills", skillId, "SKILL.md"), "utf8");
+
+      // Ensure YAML uses a block scalar and preserves lines with indentation.
+      assert.match(skillMarkdown, /description: \|-\n/);
+      assert.match(skillMarkdown, /\n  Line1\n  Line2: has colon\n  - list-looking line\n  # looks like a comment\n---\n/);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("does not indent empty lines in YAML block scalars", async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-skill-scaffold-empty-lines-"));
+    const registryDir = join(tempRoot, "skills");
+    const registryPath = join(registryDir, "skills-registry.json");
+    await mkdir(registryDir, { recursive: true });
+    await copyFile(TEST_REGISTRY_PATH, registryPath);
+
+    try {
+      const skillId = "com.example.empty-lines.capture";
+      const summary = "Line1\n\nLine3";
+      const result = await scaffoldSkill(skillId, { registryPath, summary });
+      if (!result.ok) assert.fail(result.message);
+
+      const skillMarkdown = await readFile(join(tempRoot, "skills", skillId, "SKILL.md"), "utf8");
+
+      // Empty line should remain empty, not contain indentation spaces.
+      assert.ok(skillMarkdown.includes("description: |-\n  Line1\n\n  Line3\n---\n"), skillMarkdown);
+      assert.ok(!skillMarkdown.includes("\n  \n"), "Expected no trailing spaces on empty lines");
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("treats null summary like an omitted summary", async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-skill-scaffold-null-summary-"));
+    const registryDir = join(tempRoot, "skills");
+    const registryPath = join(registryDir, "skills-registry.json");
+    await mkdir(registryDir, { recursive: true });
+    await copyFile(TEST_REGISTRY_PATH, registryPath);
+
+    try {
+      const skillId = "com.example.null-summary.capture";
+      const expectedSummary = `TODO: describe ${skillId}`;
+      const result = await scaffoldSkill(skillId, { registryPath, summary: null as unknown as string });
+      if (!result.ok) assert.fail(result.message);
+
+      const skillJson = JSON.parse(await readFile(join(tempRoot, "skills", skillId, "skill.json"), "utf8"));
+      const skillMarkdown = await readFile(join(tempRoot, "skills", skillId, "SKILL.md"), "utf8");
+
+      assert.strictEqual(skillJson.summary, expectedSummary);
+      assert.match(skillMarkdown, /description: \|-\n/);
+      assert.match(
+        skillMarkdown,
+        new RegExp(`\\n  ${expectedSummary.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\n---\\n`)
+      );
     } finally {
       await rm(tempRoot, { recursive: true, force: true });
     }

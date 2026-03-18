@@ -48,10 +48,23 @@ function deriveSkillMetadata(skillId: string): {
   };
 }
 
+function indentYamlBlockScalar(value: string, indentSpaces: number): string {
+  const indent = " ".repeat(indentSpaces);
+  const normalized = value.replaceAll("\r\n", "\n").replaceAll("\r", "\n");
+  if (normalized.includes("\0")) {
+    throw new Error("summary contains a null byte");
+  }
+  return normalized
+    .split("\n")
+    .map((line) => (line.length === 0 ? "" : `${indent}${line}`))
+    .join("\n");
+}
+
 function buildSkillMarkdown(skillId: string, summary: string, scriptPath: string): string {
   return `---
 name: ${skillId}
-description: ${summary}
+description: |-
+${indentYamlBlockScalar(summary, 2)}
 ---
 
 Starter scaffold for \`${skillId}\`.
@@ -168,7 +181,10 @@ export async function scaffoldSkill(
   options: string | ScaffoldSkillOptions = {},
 ): Promise<ScaffoldSkillSuccess | ScaffoldSkillError> {
   const normalizedOptions = typeof options === "string" ? { registryPath: options } : options;
-  const summary = normalizedOptions.summary?.trim() || `TODO: describe ${skillId}`;
+  const rawSummary = (normalizedOptions as { summary?: unknown }).summary;
+  const summaryCandidate =
+    typeof rawSummary === "string" ? rawSummary.trim() : undefined;
+  const summary = summaryCandidate && summaryCandidate.length > 0 ? summaryCandidate : `TODO: describe ${skillId}`;
   const derived = deriveSkillMetadata(skillId);
   if (!derived) {
     return {
@@ -224,7 +240,11 @@ export async function scaffoldSkill(
 
   try {
     await mkdir(join(skillRoot, "scripts"), { recursive: true });
-    await writeFile(join(skillRoot, "SKILL.md"), buildSkillMarkdown(skillId, skillEntry.summary, scriptPathRelative), "utf8");
+    await writeFile(
+      join(skillRoot, "SKILL.md"),
+      buildSkillMarkdown(skillId, skillEntry.summary, scriptPathRelative),
+      "utf8"
+    );
     await writeFile(join(skillRoot, "skill.json"), `${JSON.stringify(skillEntry, null, 2)}\n`, "utf8");
     await writeFile(join(skillRoot, "scripts", "run.js"), buildScriptTemplate(skillId, derived.applicationId), "utf8");
     const runShPath = join(skillRoot, "scripts", "run.sh");
