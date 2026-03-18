@@ -175,6 +175,26 @@ class RecordingEventFilterTest {
         assertEquals(0, manager.enqueuedEvents.size)
     }
 
+    @Test
+    fun `back key event is enqueued as press key when recording is active`() = runTest {
+        val manager = FakeRecordingManager(active = true)
+        val filter =
+            RecordingEventFilterDefault(
+                recordingManager = manager,
+                buildConfig = BuildConfigMock().apply { _debug = true },
+            )
+
+        filter.onKeyEvent(
+            TestAccessibilityService(context),
+            KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_BACK),
+        )
+
+        val recorded = assertIs<RecordingPressKeyEvent>(manager.enqueuedEvents.single())
+        assertEquals("back", recorded.key)
+        assertEquals(0L, recorded.seq)
+        assertEquals(null, recorded.snapshot)
+    }
+
     private class FakeRecordingManager(
         private val active: Boolean,
     ) : RecordingManager, RecordingEventSink {
