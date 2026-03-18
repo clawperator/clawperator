@@ -10,7 +10,7 @@ The Android Accessibility Service captures discrete interaction events: element 
 
 - Visual rendering or animation state between gestures
 - Scroll position within a list (scroll events are captured in the schema but not extracted in v1)
-- Text input (captured in schema but out of PoC scope)
+- Text input (text_change events are captured in the schema but not extracted in v1)
 - Network requests or any app-internal state
 - Timing nuances between gestures (timestamps are recorded but not used for replay timing)
 

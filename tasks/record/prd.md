@@ -599,7 +599,7 @@ Agents consuming the step log must know which fields are stable and which are be
 
 - `seq` - monotonic ordering, always present
 - `type` - step type string, always present
-- `uiStateBefore` - UI hierarchy XML string, or `null` if the tree read failed. Even when non-null, this value is best-effort: due to async capture timing it may reflect the pre-interaction state (ideal), a partially transitioned state, or in fast transitions, the post-interaction state. Treat it as approximate context, not exact ground truth. The live `observe snapshot` is the authoritative source for action construction.
+- `uiStateBefore` - UI hierarchy XML string, or `null` if the tree read failed. Even when non-null, this value is best-effort: depending on capture timing it may reflect the pre-interaction state (ideal), a partially transitioned state, or in fast transitions, the post-interaction state. The name "uiStateBefore" is aspirational - do not take it literally. Treat it as approximate context, not exact ground truth. The live `observe snapshot` is the authoritative source for action construction.
 
 **Best-effort (frequently null across real-world apps):**
 
