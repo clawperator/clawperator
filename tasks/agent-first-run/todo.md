@@ -27,7 +27,7 @@ Documentation relevant to the change is included in the task — not deferred.
 | [DONE] PR-3 | T-05, T-08, T-10, T-11 | `node` + `docs` | Small, independent diagnostics and warning fixes |
 | PR-4 | T-06, T-09 | `node` + `docs` | Payload authoring ergonomics; T-09 dry-run output benefits from T-06 |
 | PR-5 | T-07 | `node` + `docs` | Skills scaffolding; substantial enough to stand alone |
-| PR-6 | T-12 | `install` + `docs` | Installer multi-device awareness |
+| [DONE] PR-6 | T-12 | `install` + `docs` | Installer multi-device awareness |
 | PR-7 | T-13, T-14 | `docs` | Link cleanup + action reference page; both docs-only, do together |
 
 **Ordering constraints:**
@@ -340,7 +340,7 @@ A bash change to install.sh and a first-time setup docs addition. Kept separate 
 
 ---
 
-### T-12 · Detect already-installed APK during multi-device install; add setup docs
+### [DONE] T-12 · Detect already-installed APK during multi-device install; add setup docs
 **Priority:** Medium
 
 **Problem:**

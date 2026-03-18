@@ -211,3 +211,53 @@ Verify the installed CLI and [Clawperator Operator Android app](android-operator
 ```bash
 clawperator version --check-compat --receiver-package com.clawperator.operator
 ```
+
+### Multiple devices connected
+
+**Why the installer stops at device selection**
+
+The installer does not guess which device should receive the APK when more than
+one is connected. Instead, it checks each connected device's readiness and
+prints a per-device status line before returning control to you.
+
+**What the installer output means**
+
+```
+  ✅ <serial> - ready
+  ⚠  <serial> - setup required: clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id <serial>
+```
+
+- `✅ ready` - the APK is installed and the accessibility service is running on
+  that device. No further action needed.
+- `⚠ setup required` - the APK is missing or the accessibility service is not
+  active. Run the printed `operator setup` command to complete setup.
+
+If every device is ready, the installer prints `All devices ready. No setup
+required.` and exits cleanly.
+
+**How to check a device's readiness yourself**
+
+```bash
+clawperator doctor --device-id <serial>
+```
+
+A healthy device shows all checks passing and exits 0. An unhealthy device
+exits 1 with details on which checks failed (for example,
+`RECEIVER_NOT_INSTALLED` or `DEVICE_ACCESSIBILITY_NOT_RUNNING`).
+
+**How to complete setup for a device that needs it**
+
+```bash
+clawperator operator setup \
+  --apk ~/.clawperator/downloads/operator.apk \
+  --device-id <serial>
+```
+
+This installs the APK, grants required permissions, and verifies the handshake
+in one step. Run it once for each device that shows `⚠ setup required`.
+
+**If you only have one device now**
+
+Disconnect the extra devices, then re-run the installer with only the target
+device connected. The installer will handle APK install and permission grant
+automatically without requiring a manual `operator setup` call.
