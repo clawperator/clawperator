@@ -41,7 +41,7 @@ sealed interface UiAction {
 
     data class ScrollAndClick(
         override val id: String,
-        val target: NodeMatcher,
+        val matcher: NodeMatcher,
         val container: NodeMatcher? = null,
         val clickTypes: UiTreeClickTypes = UiTreeClickTypes.Default,
         val direction: TaskScrollDirection = TaskScrollDirection.Down,
@@ -80,7 +80,7 @@ sealed interface UiAction {
      */
     data class ScrollUntil(
         override val id: String,
-        val target: NodeMatcher? = null,
+        val matcher: NodeMatcher? = null,
         val container: NodeMatcher? = null,
         val clickTypes: UiTreeClickTypes = UiTreeClickTypes.Default,
         val direction: TaskScrollDirection = TaskScrollDirection.Down,

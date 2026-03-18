@@ -35,7 +35,6 @@ const actionParamsSchema = z.object({
   submit: z.boolean().optional(),
   clear: z.boolean().optional(),
   clickType: z.string().optional(),
-  target: nodeMatcherSchema.optional(),
   container: nodeMatcherSchema.optional(),
   direction: z.string().optional(),
   maxSwipes: z.number().optional(),
@@ -58,6 +57,7 @@ const actionParamsSchema = z.object({
   timeoutMs: z.number().optional(),
   // read_key_value_pair params
   labelMatcher: nodeMatcherSchema.optional(),
+
 }).strict();
 
 // NOTE: "doctor_ping" is intentionally excluded. It is an internal diagnostic action
@@ -181,8 +181,8 @@ const executionSchema = z.object({
         }
         break;
       case "scroll_and_click":
-        if (!params?.target) {
-          addIssue(index, "scroll_and_click requires params.target", ["params", "target"]);
+        if (!params?.matcher) {
+          addIssue(index, "scroll_and_click requires params.matcher", ["params", "matcher"]);
         }
         break;
       case "scroll": {
@@ -210,8 +210,8 @@ const executionSchema = z.object({
         break;
       }
       case "scroll_until": {
-        if (params?.clickAfter === true && !params?.target) {
-          addIssue(index, "scroll_until params.clickAfter=true requires params.target", ["params", "target"]);
+        if (params?.clickAfter === true && !params?.matcher) {
+          addIssue(index, "scroll_until params.clickAfter=true requires params.matcher", ["params", "matcher"]);
         }
         const SUPPORTED_DIRECTIONS_SU = ["down", "up", "left", "right"] as const;
         if (params?.direction !== undefined) {

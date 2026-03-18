@@ -258,7 +258,7 @@ Dry-run and param naming normalization are both about making it easier to write 
 
 ---
 
-### T-06 · Add `execute --dry-run` flag
+### [DONE] T-06 · Add `execute --dry-run` flag
 **Priority:** High
 
 **Problem:**
@@ -280,24 +280,32 @@ Add `--dry-run` to the CLI reference `execute` entry with usage example and outp
 
 ---
 
-### T-09 · Normalize `matcher` / `target` param naming; add alias
+### [DONE] T-09 · Standardize on `matcher` param for all node-matching actions
 **Priority:** Medium
 
 **Problem:**
 `click`, `read_text`, `enter_text`, `wait_for_node` use `matcher`. `scroll_and_click` and `scroll_until` use `target`. Same concept, two key names. Directly caused schema errors during the evaluation.
 
-**Change — node:**
-In schema validation for `scroll_and_click` and `scroll_until`: accept `matcher` as the canonical key; accept `target` as a deprecated alias that passes validation but adds `data.warn: "'target' is deprecated; use 'matcher'"` to the step result. Both present simultaneously → `EXECUTION_VALIDATION_FAILED`.
+**Decision — clean break (pre-alpha):**
+Since Clawperator is pre-alpha with no external users, we made a **breaking change** rather than maintaining backward compatibility. The `target` param has been **removed entirely**. All actions now consistently use `matcher` for node selection.
+
+**Change — node + android:**
+- `scroll_and_click` and `scroll_until` now require `matcher` (was `target`)
+- Payloads using `target` will fail validation with `EXECUTION_VALIDATION_FAILED`
+- The Node layer no longer performs any normalization; Android receives `matcher` directly
 
 **Change — docs:**
-Update `scroll_and_click` and `scroll_until` entries to show `matcher` as canonical. Add a deprecation notice for `target` with migration note.
+Update `scroll_and_click` and `scroll_until` entries to show `matcher` as the only valid param. No mention of `target` (no deprecation notice - the param is gone).
+
+**Migration for existing code:**
+Replace `target: { ... }` with `matcher: { ... }` in all `scroll_and_click` and `scroll_until` actions.
 
 **Acceptance criteria:**
-- `scroll_until` with `matcher` → validates and executes correctly.
-- `scroll_until` with `target` → validates, executes, result includes deprecation warning.
-- Both present → `EXECUTION_VALIDATION_FAILED`.
+- `scroll_until` with `matcher` → validates and executes correctly on Android.
+- `scroll_until` with `target` → validation fails (`EXECUTION_VALIDATION_FAILED`).
 - `scroll_and_click` same behavior.
-- Docs show `matcher` as canonical.
+- All six node-matching actions use consistent `matcher` naming.
+- Docs show only `matcher` as valid param.
 
 **Dependencies:** T-06 in the same PR so dry-run output reflects canonical name from day one.
 

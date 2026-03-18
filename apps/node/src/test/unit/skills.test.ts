@@ -423,7 +423,7 @@ describe("compileArtifact", () => {
     if (!result.ok) assert.fail(result.message);
     const openController = result.execution.actions.find((a) => a.id === "openController");
     assert.ok(openController);
-    assert.strictEqual(openController.params?.target?.textContains, 'Master "Quoted"');
+    assert.strictEqual(openController.params?.matcher?.textContains, 'Master "Quoted"');
   });
 
   it("returns ARTIFACT_NOT_FOUND for wrong artifact name", async () => {

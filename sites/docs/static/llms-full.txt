@@ -88,7 +88,6 @@ Use this page as a technical map:
 
 - [System Overview](architecture/architecture.md) - High-level architecture and execution flow
 - [Runtime Architecture and API Rationale](design/node-api-design.md) - Why the runtime and API are shaped the way they are
-- [Skill Design](design/skill-design.md) - Background design reference for how skills fit the broader system
 
 
 ## Troubleshooting
@@ -105,6 +104,7 @@ Use this page as a technical map:
 - [Skill Authoring Guidelines](skills/skill-authoring-guidelines.md)
 - [Device Prep and Runtime Tips](skills/device-prep-and-runtime-tips.md)
 - [Blocked Terms Policy](skills/blocked-terms-policy.md)
+- [Skill Design](design/skill-design.md) - Background design reference for how skills fit the broader system
 
 ---
 
@@ -445,8 +445,8 @@ If both a physical device and an emulator are connected, you will need to pass `
 
 If multiple devices are connected during install, the installer does not guess
 which device should receive the APK. It leaves the downloaded APK in
-`~/.clawperator/downloads/operator.apk` and prints the manual completion
-command.
+`~/.clawperator/downloads/operator.apk`, completes the host-side CLI setup, and
+prints the manual completion command for each connected device.
 
 ---
 
@@ -467,7 +467,7 @@ clawperator operator setup \
 ```
 
 This is also the recovery command to use after a multi-device installer run
-that intentionally skipped APK installation.
+that completed host setup but intentionally skipped device selection.
 
 For local debug builds, specify the receiver package:
 
@@ -557,6 +557,56 @@ Verify the installed CLI and [Clawperator Operator Android app](android-operator
 clawperator version --check-compat --receiver-package com.clawperator.operator
 ```
 
+### Multiple devices connected
+
+**Why the installer stops at device selection**
+
+The installer does not guess which device should receive the APK when more than
+one is connected. Instead, it checks each connected device's readiness and
+prints a per-device status line before returning control to you.
+
+**What the installer output means**
+
+```
+  ✅ <serial> - ready
+  ⚠  <serial> - setup required: clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id <serial>
+```
+
+- `✅ ready` - the APK is installed and the accessibility service is running on
+  that device. No further action needed.
+- `⚠ setup required` - the APK is missing or the accessibility service is not
+  active. Run the printed `operator setup` command to complete setup.
+
+If every device is ready, the installer prints `All devices ready. No setup
+required.` and exits cleanly.
+
+**How to check a device's readiness yourself**
+
+```bash
+clawperator doctor --device-id <serial>
+```
+
+A healthy device shows all checks passing and exits 0. An unhealthy device
+exits 1 with details on which checks failed (for example,
+`RECEIVER_NOT_INSTALLED` or `DEVICE_ACCESSIBILITY_NOT_RUNNING`).
+
+**How to complete setup for a device that needs it**
+
+```bash
+clawperator operator setup \
+  --apk ~/.clawperator/downloads/operator.apk \
+  --device-id <serial>
+```
+
+This installs the APK, grants required permissions, and verifies the handshake
+in one step. Run it once for each device that shows `⚠ setup required`.
+
+**If you only have one device now**
+
+Disconnect the extra devices, then re-run the installer with only the target
+device connected. The installer will handle APK install and permission grant
+automatically without requiring a manual `operator setup` call.
+
 ---
 
 
@@ -585,9 +635,12 @@ this is the guide an agent should follow.
 - one Android actuator environment will be used:
   - a physical Android device connected over `adb`
   - or a local Android emulator provisioned through Clawperator
-- the user is responsible for app installation, login, and app configuration on that Android device
+- the user is responsible for app installation and base app configuration on
+  that Android device
 
-Clawperator operates the Android UI. It does not create accounts, sign into apps, or complete first-run app setup on behalf of the user.
+Clawperator operates the Android UI. It does not decide what user inputs are
+appropriate to enter. The external brain agent decides the workflow, and
+Clawperator provides the primitives to execute it.
 
 ## Trust boundary
 
@@ -1363,7 +1416,7 @@ For the exact `snapshot_ui` structure, use
 | `emulator status` | List running Android emulators and boot state |
 | `emulator provision` | Reuse or create a supported Android emulator and return its ADB serial |
 | `provision emulator` | Alias of `emulator provision` |
-| `execute --execution <json\|file>` | Run a full execution payload |
+| `execute --execution <json\|file>` | Run a full execution payload (see `--validate-only` and `--dry-run` below) |
 | `observe snapshot` | Capture UI hierarchy dump (`hierarchy_xml`) |
 | `observe screenshot` | Capture device screen as PNG and return the local file path |
 | `action open-app --app <id>` | Open an application |
@@ -1574,9 +1627,10 @@ Combine fields to increase specificity when a single field is ambiguous:
 | `snapshot_ui` | - | `retry: object` |
 | `take_screenshot` | - | `path: string`, `retry: object` |
 | `sleep` | `durationMs: number` | - |
-| `scroll_and_click` | `target: NodeMatcher` | `container: NodeMatcher`, `direction: "down" \| "up" \| "left" \| "right"` (default: `"down"`), `maxSwipes: number` (default: `10`, range: 1-50), `distanceRatio: number` (default: `0.7`, range: 0-1), `settleDelayMs: number` (default: `250`, range: 0-10000), `findFirstScrollableChild: boolean` (default: `true`), `clickAfter: boolean` (default: `true`), `scrollRetry: object` (default preset: `maxAttempts=4`, `initialDelayMs=400`, `maxDelayMs=2000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`), `clickRetry: object` (default preset: `maxAttempts=5`, `initialDelayMs=500`, `maxDelayMs=3000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`) |
+| `scroll_and_click` | `matcher: NodeMatcher` | `container: NodeMatcher`, `direction: "down" \| "up" \| "left" \| "right"` (default: `"down"`), `maxSwipes: number` (default: `10`, range: 1-50), `distanceRatio: number` (default: `0.7`, range: 0-1), `settleDelayMs: number` (default: `250`, range: 0-10000), `findFirstScrollableChild: boolean` (default: `true`), `clickAfter: boolean` (default: `true`), `scrollRetry: object` (default preset: `maxAttempts=4`, `initialDelayMs=400`, `maxDelayMs=2000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`), `clickRetry: object` (default preset: `maxAttempts=5`, `initialDelayMs=500`, `maxDelayMs=3000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`) |
+| `scroll_until` | - | `matcher: NodeMatcher` (optional, emits `TARGET_FOUND` when the target becomes visible), `container: NodeMatcher` (default: auto-detect), `clickType: "default" \| "long_click" \| "focus"` (used only when `clickAfter: true`), `clickAfter: boolean` (default: `false`, requires `matcher`), `direction: "down" \| "up" \| "left" \| "right"` (default: `"down"`), `distanceRatio: number` (default: `0.7`, range: 0-1), `settleDelayMs: number` (default: `250`, range: 0-10000), `maxScrolls: number` (default: `20`, range: 1-200), `maxDurationMs: number` (default: `10000`, range: 0-120000), `noPositionChangeThreshold: number` (default: `3`, range: 1-20), `findFirstScrollableChild: boolean` (default: `true`) |
 | `scroll` | - | `container: NodeMatcher` (default: auto-detect first scrollable), `direction: "down" \| "up" \| "left" \| "right"` (default: `"down"` - reveals content further down, finger swipes up), `distanceRatio: number` (default: `0.7`, range: 0-1), `settleDelayMs: number` (default: `250`, range: 0-10000), `findFirstScrollableChild: boolean` (default: `true`), `retry: object` (default: no retry - see scroll behavior note) |
-| `scroll_until` | - | `target: NodeMatcher` (optional, emits `TARGET_FOUND` when the target becomes visible), `container: NodeMatcher` (default: auto-detect), `clickType: "default" \| "long_click" \| "focus"` (used only when `clickAfter: true`), `clickAfter: boolean` (default: `false`, requires `target`), `direction: "down" \| "up" \| "left" \| "right"` (default: `"down"`), `distanceRatio: number` (default: `0.7`, range: 0-1), `settleDelayMs: number` (default: `250`, range: 0-10000), `maxScrolls: number` (default: `20`, range: 1-200), `maxDurationMs: number` (default: `10000`, range: 0-120000), `noPositionChangeThreshold: number` (default: `3`, range: 1-20), `findFirstScrollableChild: boolean` (default: `true`) |
+
 | `press_key` | `key: "back" \| "home" \| "recents"` | - |
 | `wait_for_navigation` | `timeoutMs: number` | `expectedPackage: string`, `expectedNode: NodeMatcher` - at least one of `expectedPackage` or `expectedNode` is required |
 | `read_key_value_pair` | `labelMatcher: NodeMatcher` | - |
@@ -2013,7 +2067,7 @@ After receiving `snap2`, the agent compares it to `snap1`. If `scr1.data.scroll_
 
 Direction semantics are the same as `scroll`. `container`, `distanceRatio`, `settleDelayMs`, and `findFirstScrollableChild` behave identically to `scroll`.
 
-If `params.target` is provided, the runtime checks for that matcher before the
+If `params.matcher` is provided, the runtime checks for that matcher before the
 first scroll and after each successful movement. When the target becomes
 visible in Clawperator's on-screen filtered UI tree, the step returns
 `termination_reason: "TARGET_FOUND"`. This removes the extra "scroll, then
@@ -2036,11 +2090,11 @@ visible, then click" path without switching to `scroll_and_click`.
 
 `MAX_SCROLLS_REACHED`, `MAX_DURATION_REACHED`, and `NO_POSITION_CHANGE` are clean terminal states, not errors. Agents scrolling infinite feeds should expect these and handle them without treating the action as failed.
 
-When no `target` matcher is provided, `scroll_until` behaves as a pure bounded
+When no `matcher` is provided, `scroll_until` behaves as a pure bounded
 pagination loop and returns one of the non-target terminal reasons above.
 
 **Current runtime caveats:**
-- Some Android screens expose off-screen descendants in the raw `snapshot_ui` XML. `scroll_until.target` does not use raw XML presence alone; it checks Clawperator's on-screen filtered tree. On heavily clipped or nested layouts, a target may appear in the raw snapshot near the bottom edge but still finish as `EDGE_REACHED` until it is more fully on-screen.
+- Some Android screens expose off-screen descendants in the raw `snapshot_ui` XML. `scroll_until.matcher` does not use raw XML presence alone; it checks Clawperator's on-screen filtered tree. On heavily clipped or nested layouts, a target may appear in the raw snapshot near the bottom edge but still finish as `EDGE_REACHED` until it is more fully on-screen.
 
 When a scroll loop might trigger navigation, heavy UI re-layout, or clipped list rows near the viewport edge, follow it with `snapshot_ui` or `wait_for_node` before assuming the list truly ended.
 
@@ -2056,7 +2110,7 @@ When a scroll loop might trigger navigation, heavy UI re-layout, or clipped list
         "id": "su1",
         "type": "scroll_until",
         "params": {
-          "target": { "textContains": "About phone" },
+          "matcher": { "textContains": "About phone" },
           "container": { "resourceId": "com.android.settings:id/recycler_view" },
           "clickAfter": true,
           "direction": "down",
@@ -2263,8 +2317,44 @@ For agent-side recovery strategy, use
   fail fast with `EXECUTION_VALIDATION_FAILED` before any device action runs.
 - `clawperator execute --execution <json-or-file> --validate-only` validates
   and normalizes a payload without dispatching it to any device.
+- `clawperator execute --execution <json-or-file> --dry-run` validates the
+  payload and prints a plan summary without requiring a device connection.
+  This is useful for local payload development and CI checks.
 - If you want the lowest-risk contract check on a live device, use a minimal
   payload such as a single `sleep` or `snapshot_ui` action.
+
+### `--dry-run` output format
+
+```bash
+clawperator execute --execution '{"commandId":"test","taskId":"task","source":"cli","expectedFormat":"android-ui-automator","timeoutMs":10000,"actions":[{"id":"s1","type":"sleep","params":{"durationMs":500}}]}' --dry-run
+```
+
+**Success response:**
+```json
+{
+  "ok": true,
+  "dryRun": true,
+  "plan": {
+    "commandId": "test",
+    "timeoutMs": 10000,
+    "actionCount": 1,
+    "actions": [
+      { "id": "s1", "type": "sleep", "params": { "durationMs": 500 } }
+    ]
+  }
+}
+```
+
+**Validation error response:**
+```json
+{
+  "code": "EXECUTION_VALIDATION_FAILED",
+  "message": "...",
+  "details": { "path": "actions.0.params.matcher" }
+}
+```
+
+The `--dry-run` flag does not require `--device-id` and performs no ADB activity.
 
 ## Skills
 
@@ -5708,7 +5798,7 @@ If you must use **Wireless Debugging**, be aware that your mileage may vary (YMM
 `curl -fsSL https://clawperator.com/install.sh | bash` uses the stable metadata file at `https://downloads.clawperator.com/operator/latest.json`, downloads the immutable package for the [Clawperator Operator Android app](../getting-started/android-operator-apk.md) plus its `.sha256`, verifies the checksum, then handles device install like this:
 
 1. **One connected device** - the installer offers to run `clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id <device_id>`.
-2. **Multiple connected devices** - the installer skips the install and prints `clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id <device_id>`.
+2. **Multiple connected devices** - the installer completes host-side setup, skips the Android setup step, and prints one `clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id <device_id>` command per connected device.
 3. **No connected devices** - the installer skips the install and leaves the verified package for the [Clawperator Operator Android app](../getting-started/android-operator-apk.md) at `~/.clawperator/downloads/operator.apk`.
 4. **`adb` missing** - the installer attempts to install `adb` automatically, or stops with a manual install link if it cannot.
 

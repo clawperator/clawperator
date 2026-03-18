@@ -534,13 +534,13 @@ describe("validateExecution", () => {
       expectedFormat: "android-ui-automator", timeoutMs: 5000,
       actions: [{
         id: "x", type: "scroll_until",
-        params: { direction: "down", distanceRatio: 0.7, settleDelayMs: 250, maxScrolls: 25, maxDurationMs: 10000, noPositionChangeThreshold: 3, clickAfter: true, target: { textEquals: "About phone" } },
+        params: { direction: "down", distanceRatio: 0.7, settleDelayMs: 250, maxScrolls: 25, maxDurationMs: 10000, noPositionChangeThreshold: 3, clickAfter: true, matcher: { textEquals: "About phone" } },
       }],
     });
     assert.equal(result.actions[0].type, "scroll_until");
   });
 
-  it("rejects scroll_until clickAfter without target", () => {
+  it("rejects scroll_until clickAfter without matcher", () => {
     assert.throws(
       () =>
         validateExecution({
@@ -742,6 +742,84 @@ describe("validateExecution", () => {
         }),
       (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
     );
+  });
+
+  // matcher validation tests for scroll_and_click and scroll_until
+  describe("matcher param validation", () => {
+    it("accepts scroll_and_click with 'matcher' param", () => {
+      const ex = validateExecution({
+        commandId: "c", taskId: "t", source: "s",
+        expectedFormat: "android-ui-automator", timeoutMs: 5000,
+        actions: [{ id: "x", type: "scroll_and_click", params: { matcher: { textEquals: "About phone" } } }],
+      });
+      assert.strictEqual(ex.actions[0].type, "scroll_and_click");
+    });
+
+    it("rejects scroll_and_click without 'matcher' param", () => {
+      assert.throws(
+        () =>
+          validateExecution({
+            commandId: "c", taskId: "t", source: "s",
+            expectedFormat: "android-ui-automator", timeoutMs: 5000,
+            actions: [{ id: "x", type: "scroll_and_click", params: {} }],
+          }),
+        (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
+      );
+    });
+
+    it("rejects scroll_and_click with legacy 'target' param", () => {
+      assert.throws(
+        () =>
+          validateExecution({
+            commandId: "c", taskId: "t", source: "s",
+            expectedFormat: "android-ui-automator", timeoutMs: 5000,
+            actions: [{ id: "x", type: "scroll_and_click", params: { target: { textEquals: "About phone" } } }],
+          }),
+        (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
+      );
+    });
+
+    it("accepts scroll_until with 'matcher' param and clickAfter", () => {
+      const ex = validateExecution({
+        commandId: "c", taskId: "t", source: "s",
+        expectedFormat: "android-ui-automator", timeoutMs: 5000,
+        actions: [{ id: "x", type: "scroll_until", params: { matcher: { textEquals: "About phone" }, clickAfter: true } }],
+      });
+      assert.strictEqual(ex.actions[0].type, "scroll_until");
+    });
+
+    it("rejects scroll_until with legacy 'target' param", () => {
+      assert.throws(
+        () =>
+          validateExecution({
+            commandId: "c", taskId: "t", source: "s",
+            expectedFormat: "android-ui-automator", timeoutMs: 5000,
+            actions: [{ id: "x", type: "scroll_until", params: { target: { textEquals: "About phone" }, clickAfter: true } }],
+          }),
+        (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
+      );
+    });
+
+    it("accepts scroll_until without matcher when clickAfter is not set", () => {
+      const ex = validateExecution({
+        commandId: "c", taskId: "t", source: "s",
+        expectedFormat: "android-ui-automator", timeoutMs: 5000,
+        actions: [{ id: "x", type: "scroll_until", params: { direction: "down" } }],
+      });
+      assert.strictEqual(ex.actions[0].type, "scroll_until");
+    });
+
+    it("rejects scroll_until with clickAfter=true but no matcher", () => {
+      assert.throws(
+        () =>
+          validateExecution({
+            commandId: "c", taskId: "t", source: "s",
+            expectedFormat: "android-ui-automator", timeoutMs: 5000,
+            actions: [{ id: "x", type: "scroll_until", params: { clickAfter: true } }],
+          }),
+        (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
+      );
+    });
   });
 });
 

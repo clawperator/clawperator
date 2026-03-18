@@ -153,6 +153,29 @@ For CLI option work, add regression coverage for:
 
 For runtime behavior changes, prefer reproducing a real user-visible scenario on a physical device or emulator before declaring the change safe. If live testing finds a bug, add a focused regression test for that exact failure mode.
 
+### Device Selection
+
+When multiple devices are connected (physical + emulator), be explicit about which device to target:
+
+1. **Check connected devices first:**
+   ```bash
+   clawperator devices
+   # or
+   adb devices
+   ```
+
+2. **Default to physical device when both exist:** If both a physical device and emulator are connected, prefer the physical device for skill testing unless there's a specific reason to use the emulator. This avoids accidentally testing on the wrong target.
+
+3. **Always use `--device-id` when multiple devices are connected:**
+   ```bash
+   clawperator observe snapshot --device-id <device_serial>
+   clawperator skills run <skill_id> --device-id <device_serial>
+   ```
+
+4. **Do not assume device availability:** The presence of `emulator-5554` does not mean a physical device is unavailable. Check `clawperator devices` output and explicitly select the appropriate device for the test scenario.
+
+5. **Both device types are valid production targets:** Emulators with Google Play can be fully configured with user credentials and provide a complete automation environment. Physical devices offer OEM-specific behaviors and hardware sensors. Choose based on the testing scenario, not assumptions about capability.
+
 ## Validation Commands
 - Permissions/bootstrap: `./scripts/clawperator_grant_android_permissions.sh`
 - Receiver ingress check: `./scripts/clawperator_validate_receiver.sh`

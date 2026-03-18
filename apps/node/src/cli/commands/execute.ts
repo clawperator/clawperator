@@ -13,6 +13,7 @@ export async function cmdExecute(options: {
   receiverPackage?: string;
   timeoutMs?: number;
   validateOnly?: boolean;
+  dryRun?: boolean;
 }): Promise<string> {
   let payload: unknown;
   const raw = options.execution.trim();
@@ -35,6 +36,43 @@ export async function cmdExecute(options: {
   }
 
   try {
+    if (options.dryRun) {
+      let execution = validateExecution(payload);
+      if (options.timeoutMs !== undefined) {
+        if (!Number.isFinite(options.timeoutMs)) {
+          return formatError(
+            {
+              code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+              message: "timeoutMs must be a finite number",
+            },
+            options
+          );
+        }
+        if (options.timeoutMs < LIMITS.MIN_EXECUTION_TIMEOUT_MS || options.timeoutMs > LIMITS.MAX_EXECUTION_TIMEOUT_MS) {
+          return formatError(
+            {
+              code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+              message: `timeoutMs must be between ${LIMITS.MIN_EXECUTION_TIMEOUT_MS} and ${LIMITS.MAX_EXECUTION_TIMEOUT_MS}`,
+            },
+            options
+          );
+        }
+        execution = { ...execution, timeoutMs: options.timeoutMs };
+      }
+      validatePayloadSize(JSON.stringify(execution));
+      const plan = {
+        commandId: execution.commandId,
+        timeoutMs: execution.timeoutMs,
+        actionCount: execution.actions.length,
+        actions: execution.actions.map(action => ({
+          id: action.id,
+          type: action.type,
+          params: action.params,
+        })),
+      };
+      return formatSuccess({ ok: true, dryRun: true, plan }, options);
+    }
+
     if (options.validateOnly) {
       let execution = validateExecution(payload);
       if (options.timeoutMs !== undefined) {

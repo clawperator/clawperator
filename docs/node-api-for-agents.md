@@ -28,7 +28,7 @@ For the exact `snapshot_ui` structure, use
 | `emulator status` | List running Android emulators and boot state |
 | `emulator provision` | Reuse or create a supported Android emulator and return its ADB serial |
 | `provision emulator` | Alias of `emulator provision` |
-| `execute --execution <json\|file>` | Run a full execution payload |
+| `execute --execution <json\|file>` | Run a full execution payload (see `--validate-only` and `--dry-run` below) |
 | `observe snapshot` | Capture UI hierarchy dump (`hierarchy_xml`) |
 | `observe screenshot` | Capture device screen as PNG and return the local file path |
 | `action open-app --app <id>` | Open an application |
@@ -239,9 +239,10 @@ Combine fields to increase specificity when a single field is ambiguous:
 | `snapshot_ui` | - | `retry: object` |
 | `take_screenshot` | - | `path: string`, `retry: object` |
 | `sleep` | `durationMs: number` | - |
-| `scroll_and_click` | `target: NodeMatcher` | `container: NodeMatcher`, `direction: "down" \| "up" \| "left" \| "right"` (default: `"down"`), `maxSwipes: number` (default: `10`, range: 1-50), `distanceRatio: number` (default: `0.7`, range: 0-1), `settleDelayMs: number` (default: `250`, range: 0-10000), `findFirstScrollableChild: boolean` (default: `true`), `clickAfter: boolean` (default: `true`), `scrollRetry: object` (default preset: `maxAttempts=4`, `initialDelayMs=400`, `maxDelayMs=2000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`), `clickRetry: object` (default preset: `maxAttempts=5`, `initialDelayMs=500`, `maxDelayMs=3000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`) |
+| `scroll_and_click` | `matcher: NodeMatcher` | `container: NodeMatcher`, `direction: "down" \| "up" \| "left" \| "right"` (default: `"down"`), `maxSwipes: number` (default: `10`, range: 1-50), `distanceRatio: number` (default: `0.7`, range: 0-1), `settleDelayMs: number` (default: `250`, range: 0-10000), `findFirstScrollableChild: boolean` (default: `true`), `clickAfter: boolean` (default: `true`), `scrollRetry: object` (default preset: `maxAttempts=4`, `initialDelayMs=400`, `maxDelayMs=2000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`), `clickRetry: object` (default preset: `maxAttempts=5`, `initialDelayMs=500`, `maxDelayMs=3000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`) |
+| `scroll_until` | - | `matcher: NodeMatcher` (optional, emits `TARGET_FOUND` when the target becomes visible), `container: NodeMatcher` (default: auto-detect), `clickType: "default" \| "long_click" \| "focus"` (used only when `clickAfter: true`), `clickAfter: boolean` (default: `false`, requires `matcher`), `direction: "down" \| "up" \| "left" \| "right"` (default: `"down"`), `distanceRatio: number` (default: `0.7`, range: 0-1), `settleDelayMs: number` (default: `250`, range: 0-10000), `maxScrolls: number` (default: `20`, range: 1-200), `maxDurationMs: number` (default: `10000`, range: 0-120000), `noPositionChangeThreshold: number` (default: `3`, range: 1-20), `findFirstScrollableChild: boolean` (default: `true`) |
 | `scroll` | - | `container: NodeMatcher` (default: auto-detect first scrollable), `direction: "down" \| "up" \| "left" \| "right"` (default: `"down"` - reveals content further down, finger swipes up), `distanceRatio: number` (default: `0.7`, range: 0-1), `settleDelayMs: number` (default: `250`, range: 0-10000), `findFirstScrollableChild: boolean` (default: `true`), `retry: object` (default: no retry - see scroll behavior note) |
-| `scroll_until` | - | `target: NodeMatcher` (optional, emits `TARGET_FOUND` when the target becomes visible), `container: NodeMatcher` (default: auto-detect), `clickType: "default" \| "long_click" \| "focus"` (used only when `clickAfter: true`), `clickAfter: boolean` (default: `false`, requires `target`), `direction: "down" \| "up" \| "left" \| "right"` (default: `"down"`), `distanceRatio: number` (default: `0.7`, range: 0-1), `settleDelayMs: number` (default: `250`, range: 0-10000), `maxScrolls: number` (default: `20`, range: 1-200), `maxDurationMs: number` (default: `10000`, range: 0-120000), `noPositionChangeThreshold: number` (default: `3`, range: 1-20), `findFirstScrollableChild: boolean` (default: `true`) |
+
 | `press_key` | `key: "back" \| "home" \| "recents"` | - |
 | `wait_for_navigation` | `timeoutMs: number` | `expectedPackage: string`, `expectedNode: NodeMatcher` - at least one of `expectedPackage` or `expectedNode` is required |
 | `read_key_value_pair` | `labelMatcher: NodeMatcher` | - |
@@ -678,7 +679,7 @@ After receiving `snap2`, the agent compares it to `snap1`. If `scr1.data.scroll_
 
 Direction semantics are the same as `scroll`. `container`, `distanceRatio`, `settleDelayMs`, and `findFirstScrollableChild` behave identically to `scroll`.
 
-If `params.target` is provided, the runtime checks for that matcher before the
+If `params.matcher` is provided, the runtime checks for that matcher before the
 first scroll and after each successful movement. When the target becomes
 visible in Clawperator's on-screen filtered UI tree, the step returns
 `termination_reason: "TARGET_FOUND"`. This removes the extra "scroll, then
@@ -701,11 +702,11 @@ visible, then click" path without switching to `scroll_and_click`.
 
 `MAX_SCROLLS_REACHED`, `MAX_DURATION_REACHED`, and `NO_POSITION_CHANGE` are clean terminal states, not errors. Agents scrolling infinite feeds should expect these and handle them without treating the action as failed.
 
-When no `target` matcher is provided, `scroll_until` behaves as a pure bounded
+When no `matcher` is provided, `scroll_until` behaves as a pure bounded
 pagination loop and returns one of the non-target terminal reasons above.
 
 **Current runtime caveats:**
-- Some Android screens expose off-screen descendants in the raw `snapshot_ui` XML. `scroll_until.target` does not use raw XML presence alone; it checks Clawperator's on-screen filtered tree. On heavily clipped or nested layouts, a target may appear in the raw snapshot near the bottom edge but still finish as `EDGE_REACHED` until it is more fully on-screen.
+- Some Android screens expose off-screen descendants in the raw `snapshot_ui` XML. `scroll_until.matcher` does not use raw XML presence alone; it checks Clawperator's on-screen filtered tree. On heavily clipped or nested layouts, a target may appear in the raw snapshot near the bottom edge but still finish as `EDGE_REACHED` until it is more fully on-screen.
 
 When a scroll loop might trigger navigation, heavy UI re-layout, or clipped list rows near the viewport edge, follow it with `snapshot_ui` or `wait_for_node` before assuming the list truly ended.
 
@@ -721,7 +722,7 @@ When a scroll loop might trigger navigation, heavy UI re-layout, or clipped list
         "id": "su1",
         "type": "scroll_until",
         "params": {
-          "target": { "textContains": "About phone" },
+          "matcher": { "textContains": "About phone" },
           "container": { "resourceId": "com.android.settings:id/recycler_view" },
           "clickAfter": true,
           "direction": "down",
@@ -928,8 +929,44 @@ For agent-side recovery strategy, use
   fail fast with `EXECUTION_VALIDATION_FAILED` before any device action runs.
 - `clawperator execute --execution <json-or-file> --validate-only` validates
   and normalizes a payload without dispatching it to any device.
+- `clawperator execute --execution <json-or-file> --dry-run` validates the
+  payload and prints a plan summary without requiring a device connection.
+  This is useful for local payload development and CI checks.
 - If you want the lowest-risk contract check on a live device, use a minimal
   payload such as a single `sleep` or `snapshot_ui` action.
+
+### `--dry-run` output format
+
+```bash
+clawperator execute --execution '{"commandId":"test","taskId":"task","source":"cli","expectedFormat":"android-ui-automator","timeoutMs":10000,"actions":[{"id":"s1","type":"sleep","params":{"durationMs":500}}]}' --dry-run
+```
+
+**Success response:**
+```json
+{
+  "ok": true,
+  "dryRun": true,
+  "plan": {
+    "commandId": "test",
+    "timeoutMs": 10000,
+    "actionCount": 1,
+    "actions": [
+      { "id": "s1", "type": "sleep", "params": { "durationMs": 500 } }
+    ]
+  }
+}
+```
+
+**Validation error response:**
+```json
+{
+  "code": "EXECUTION_VALIDATION_FAILED",
+  "message": "...",
+  "details": { "path": "actions.0.params.matcher" }
+}
+```
+
+The `--dry-run` flag does not require `--device-id` and performs no ADB activity.
 
 ## Skills
 
