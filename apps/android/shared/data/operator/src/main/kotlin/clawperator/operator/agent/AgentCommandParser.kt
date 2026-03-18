@@ -164,9 +164,11 @@ class AgentCommandParserDefault : AgentCommandParser {
                 require(hasExpectedPackage || expectedNode != null) {
                     "wait_for_navigation requires at least one of expectedPackage or expectedNode"
                 }
+                // Normalize blank strings to null per codebase guidelines
+                val normalizedPackage = expectedPackage?.takeIf { it.isNotBlank() }
                 UiAction.WaitForNavigation(
                     id = id,
-                    expectedPackage = expectedPackage,
+                    expectedPackage = normalizedPackage,
                     expectedNode = expectedNode,
                     timeoutMs = params.longRequired("timeoutMs").coerceIn(1L, 30_000L),
                 )
