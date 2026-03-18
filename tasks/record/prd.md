@@ -9,9 +9,9 @@
 
 Clawperator can execute precise UI actions on Android devices, but every flow must currently be authored by hand as a JSON execution or skill artifact. There is no mechanism for a human to demonstrate a workflow and hand that demonstration to an agent.
 
-The Record feature closes this gap: a developer performs a UI flow once, Clawperator captures it, and an agent uses the compiled recording as a map to reproduce and validate the flow - then authors a skill from the result. The goal is an API worth keeping: designed with production viability in mind, cleanly integrated with existing contracts, and not requiring a rewrite when the PoC graduates. Specific details - particularly the compiler's normalization rules - are expected to evolve as we learn what real recordings look like.
+The Record feature closes this gap: a developer performs a UI flow once, Clawperator captures it (each interaction paired with the UI state at that moment), and an agent uses the step log to reproduce and validate the flow - then authors a skill from the result. The goal is an API worth keeping: designed with production viability in mind, cleanly integrated with existing contracts, and not requiring a rewrite when the PoC graduates. Specific details - particularly the compiler's normalization rules - are expected to evolve as we learn what real recordings look like.
 
-**Terminology note:** In this PoC, "replay" does not mean a first-class Clawperator runtime behavior. It means agent-guided stepwise reproduction of a recorded flow. The agent issues individual `clawperator execute` calls, observes device state between each, and decides whether to proceed. The skill authored from that validated flow is the durable, reusable artifact.
+**Terminology note:** In this PoC, "replay" does not mean a first-class Clawperator runtime behavior. It means agent-guided stepwise reproduction using a step log as context. The agent reads what the UI looked like at each recorded step, issues individual `clawperator execute` calls, observes device state between each, and decides whether to proceed. The skill authored from that validated flow is the durable, reusable artifact.
 
 ---
 
@@ -30,10 +30,9 @@ Three distinct use cases motivate this feature. All three are served by the same
 ## Goals
 
 - A human performs a UI flow on a connected Android device.
-- Clawperator records the flow via the existing Accessibility Service.
-- Node pulls the recording from the device.
-- Node compiles the recording into a standard `Execution` payload.
-- An agent uses the compiled recording as context to reproduce the flow, issuing individual commands step by step.
+- Clawperator records the flow via the existing Accessibility Service, capturing each interaction paired with the UI state at the time of that interaction.
+- Node pulls the recording from the device and parses it into an ordered step log: each step paired with the UI snapshot captured at that moment.
+- An agent reads the step log, uses the UI context to reproduce each step on the current device, observes state between steps, and authors a skill from the validated flow.
 - All three phases are independently verifiable.
 
 ## Non-Goals
@@ -62,6 +61,7 @@ Node CLI                       Android (Operator App)
 record start
   → broadcast start_recording  → Accessibility listener activated
                                → Events buffered to NDJSON file on device
+                               → Each interaction captured with UI snapshot
 
   [human performs flow]
 
@@ -70,20 +70,18 @@ record stop
 
 record pull
   → adb pull <session_file>    → File transferred to host
-
-record compile
   → parse NDJSON
-  → normalize/compact events
-  → emit Execution JSON (session.execution.json)
-  → emit step log to stderr
+  → filter/compact events
+  → emit step log (session.steps.json): each step paired with uiStateBefore
 
-  ┌─ agent-driven playback (Phase 3 / production path) ──────────────────────┐
-  │  Agent reads session.execution.json (step log + action sequence)         │
-  │  For each step:                                                           │
-  │    clawperator execute  (single-action)  →  Android                      │
-  │    clawperator observe snapshot          →  verify device state          │
-  │    agent decides: proceed, retry, or halt                                │
-  │  If flow validates: agent authors a skill artifact                       │
+  ┌─ agent-driven reproduction (Phase 3 / production path) ──────────────────┐
+  │  Agent reads session.steps.json                                          │
+  │  For each step:                                                          │
+  │    agent reads uiStateBefore + action description                       │
+  │    clawperator execute  (single-action)  →  Android                     │
+  │    clawperator observe snapshot          →  verify device state         │
+  │    agent decides: proceed, retry, or halt                               │
+  │  After flow validates: agent authors a skill artifact                   │
   └──────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -95,18 +93,16 @@ The compilation step is pure Node-side logic: NDJSON in, standard `Execution` JS
 
 ---
 
-## Output Format Decision: Execution JSON (not skill artifact)
+## Output Format Decision: Step Log (not Execution JSON)
 
-The compiler produces a standard `Execution` JSON document, identical in shape to what any agent would send to `clawperator execute`. This is the right choice for the following reasons:
+The recording output is a step log: an ordered array of `{uiStateBefore, action}` pairs. Each entry describes what the UI looked like at the moment of interaction and what the user did. This is the right choice for the following reasons:
 
-- It is the canonical interface. Agents, skills, and humans all converge on `Execution` JSON. Introducing an intermediate "replay" format would create a new abstraction with no payoff.
-- It is the natural unit of agent input. An agent driving playback reads the compiled steps one at a time, issues individual `clawperator execute` calls, and observes device state between each. The concrete, normalized action sequence - with `resourceId` matchers and action types already resolved - gives the agent ground truth about what the user did, removing the need for UI exploration.
-- It is inspectable and editable. A developer can open the compiled file, adjust a matcher or timing value, and hand it back to an agent without any additional tooling.
-- Skill artifacts (`.recipe.json`) are parameterized templates. A compiled recording has no parameters - it is a concrete flow. Wrapping it as a recipe artifact would add noise before the agent has had a chance to validate and generalize the steps.
+- It is what agents already work with. During normal operation, an agent issues `observe snapshot`, reads the hierarchy, and decides what to do. The step log provides exactly that context for each recorded step - no translation or compilation required. The agent sees what the user saw and what they tapped.
+- It has no API coupling. An Execution JSON output would embed Clawperator-specific matcher syntax, action type names, and contract fields. If those evolve, old recordings silently become wrong. The step log captures device ground truth (UI hierarchy XML + event data) that is stable across API changes.
+- It eliminates the compilation pipeline. No matcher synthesis. No normalization rules. No sleep injection. No timeout calculation. Parsing the NDJSON into step pairs is straightforward extraction, not a logic-heavy transformation. The code surface is small, the test surface is small, and there is nothing that can become stale.
+- Agents derive matchers themselves. Matcher construction from UI context is standard agent reasoning - it is what they do on every normal execute call. Pre-computing matchers in a compilation step adds infrastructure without adding value, and removes the agent from a decision it is better positioned to make.
 
-The compiled file is saved as `<session_id>.execution.json`. The `source: "clawperator-record"` field distinguishes it from agent-authored and skill-compiled executions, which matters when an agent is processing a batch of executions and needs to know their provenance.
-
-Skill authoring is the expected outcome of Phase 3. The agent validates the compiled output step by step and then authors a skill artifact from the validated flow. The compiled Execution JSON is a bootstrap input; the skill is the durable, reusable output.
+The step log is saved as `<session_id>.steps.json`. Skill authoring is the expected outcome of Phase 3. The agent reads the step log, reproduces the flow step by step using the UI context, and authors a skill from the validated flow. The step log is a bootstrap input; the skill is the durable, reusable output.
 
 ---
 
@@ -175,6 +171,8 @@ IDLE
 
 **Event capture** via `AccessibilityService.onAccessibilityEvent()`. The Operator app already requires the Accessibility Service to function, so no new permission is needed. When recording is active, events are routed through a `RecordingEventFilter` before the main action executor.
 
+**UI snapshot capture:** For each recorded interaction event (click, press_key, window_change), the `RecordingManager` reads the current accessibility tree and serializes it as a UI hierarchy XML string, appended to the event record as `snapshot`. This is the same traversal the Accessibility Service performs for `snapshot_ui` actions - no new API calls are needed. The capture adds latency per step (typically 100-400ms) that occurs at human interaction speed and is not perceptible during normal use.
+
 **Self-event filtering:** The `RecordingEventFilter` must discard events whose source package is the Clawperator operator app itself (`com.clawperator.operator` / `com.clawperator.operator.dev`). The `start_recording` and `stop_recording` broadcasts, and any Clawperator-dispatched actions, generate accessibility events that must not be recorded. Without this filter, replaying a recorded flow and then recording that replay would produce a corrupted session containing Clawperator's own synthetic interactions.
 
 **Event types captured:**
@@ -204,10 +202,12 @@ The first line of every recording file is a header record. All subsequent lines 
 
 ```json
 {"type":"recording_header","schemaVersion":1,"sessionId":"demo-001","startedAt":1710000000000,"operatorPackage":"com.clawperator.operator.dev"}
-{"ts":1710000000000,"seq":0,"type":"window_change","packageName":"com.android.settings","className":"com.android.settings.Settings","title":"Settings"}
-{"ts":1710000000800,"seq":1,"type":"click","packageName":"com.android.settings","resourceId":"com.android.settings:id/dashboard_tile","text":"Display","contentDesc":null,"bounds":{"left":0,"top":400,"right":1080,"bottom":560}}
-{"ts":1710000001500,"seq":2,"type":"press_key","key":"back"}
+{"ts":1710000000000,"seq":0,"type":"window_change","packageName":"com.android.settings","className":"com.android.settings.Settings","title":"Settings","snapshot":"<hierarchy .../>"}
+{"ts":1710000000800,"seq":1,"type":"click","packageName":"com.android.settings","resourceId":"com.android.settings:id/dashboard_tile","text":"Display","contentDesc":null,"bounds":{"left":0,"top":400,"right":1080,"bottom":560},"snapshot":"<hierarchy .../>"}
+{"ts":1710000001500,"seq":2,"type":"press_key","key":"back","snapshot":"<hierarchy .../>"}
 ```
+
+Each event record includes a `snapshot` field containing the UI hierarchy XML at the time of the interaction. `snapshot` is `null` for events where a tree read was not possible (e.g. during app launch before the window settles).
 
 The `schemaVersion` field in the header allows the Node compiler to detect and reject (with a clear error) files produced by a future incompatible version of the recording format. The current version is `1`. Event records do not carry a per-event version - the header covers the file.
 
@@ -233,11 +233,11 @@ All event records include `ts` (epoch ms) and `seq` (monotonic integer) for orde
 
 ---
 
-## Phase 2 - Extraction (Node + ADB)
+## Phase 2 - Retrieval (Node + ADB)
 
 ### Goal
 
-Retrieve the recording from the device and compile it into a clean, executable `Execution` JSON.
+Retrieve the recording from the device and parse it into a step log: an ordered array of UI snapshot and action pairs ready for agent consumption.
 
 ### Node CLI
 
@@ -245,16 +245,16 @@ The public `record` command surface covers four subcommands:
 
 ```
 clawperator record pull    [--session-id <id>] [--out <dir>]
-clawperator record compile --input <file> [--out <file>]
+clawperator record parse   --input <file> [--out <file>]
 clawperator record start   [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]
 clawperator record stop    [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]
 ```
 
 `record pull` without `--session-id` pulls the most recent session (reads `latest` pointer file first, then fetches corresponding NDJSON). Output defaults to `./recordings/`.
 
-`record compile` reads the NDJSON file, runs normalization, and writes an `Execution` JSON. Output defaults to `<input_basename>.execution.json` in the same directory.
+`record parse` reads the NDJSON file, filters and compacts events, and writes a step log JSON. Output defaults to `<input_basename>.steps.json` in the same directory.
 
-`record pull` and `record compile` are usable standalone. An agent or developer may pull, inspect, edit the compiled JSON, and then hand it to an agent for step-by-step playback. The pipeline does not have to be atomic.
+`record pull` and `record parse` are usable standalone. An agent or developer may pull, inspect the raw NDJSON, then parse it to produce the step log. The pipeline does not have to be atomic.
 
 ### ADB Pull
 
@@ -274,37 +274,30 @@ Steps:
 
 Errors surface as `RECORDING_PULL_FAILED` or `RECORDING_SESSION_NOT_FOUND` using the existing error contract.
 
-### Compilation and Normalization
+### Parsing and Step Extraction
 
 ```typescript
-// domain/recording/compileRecording.ts
-async function compileRecording(
+// domain/recording/parseRecording.ts
+async function parseRecording(
   rawEvents: RawRecordingEvent[],
-  options: CompileOptions
-): Promise<Execution>
+  options: ParseOptions
+): Promise<RecordingStepLog>
 ```
 
-**Normalization rules (v1 - PoC scope):**
+**Filtering rules (v1 - PoC scope):**
 
 | Rule | Input | Output |
 |---|---|---|
-| Open app at start | First `window_change` event | `open_app` action with `applicationId` |
-| Back navigation | `press_key` with `key: "back"` | `press_key` action, `key: "back"` |
+| Open app at start | First `window_change` event | `open_app` step with `packageName` |
+| Back navigation | `press_key` with `key: "back"` | `press_key` step, `key: "back"` |
 | Drop consecutive window changes | `window_change` immediately followed by another `window_change` with no intervening user action | Keep only the final one |
-| Deduplicate rapid clicks *(optional, on by default)* | Multiple `click` events on the same element within 100ms | Keep last only (guards against accidental double-tap during recording). When dedup fires, the step log annotates it: `⚠ deduped 2→1 click on resourceId=...`. Disable with `--no-dedup` to see exact raw events. |
-| Matcher synthesis - preferred | `click` with `resourceId` present | `matcher: { resourceId: "...", textEquals: "..." }` (textEquals omitted if null) |
-| Matcher synthesis - fallback | `click` with no `resourceId`, `text` present | `matcher: { textEquals: "..." }` with a warning in step log |
-| Matcher synthesis - bounds fallback | `click` with no `resourceId` and no `text` | `matcher: { bounds: { ... } }` with a warning; replay may be brittle |
+| Deduplicate rapid clicks | Multiple `click` events on the same element within 100ms | Keep last only (guards against accidental double-tap during recording). Annotated in step log: `⚠ deduped 2→1 click on resourceId=...`. |
 
-The bounds fallback exists so the PoC loop can complete even against apps that don't expose stable identifiers. A warning is emitted rather than a compile failure - the developer is informed but not blocked.
+Scroll events are captured in the NDJSON schema but omitted from the step log in v1. The parser emits a warning when scroll events are dropped. Scroll step extraction is a v2 concern.
 
-Scroll events are recorded in the NDJSON schema and captured by the Android runtime, but omitted from compiled output in v1 (no scroll compilation logic). The compiler emits a warning when scroll events are dropped so the developer knows the replay may diverge on flows that required scrolling to reach a target. Scroll compilation is a v2 concern.
+No matcher synthesis. No sleep injection. The agent constructs matchers from the `uiStateBefore` snapshot and event fields at reproduction time - the same reasoning it applies during normal operation.
 
-Rules that are deferred to v2: inter-step timing heuristics based on observed event gaps, cross-session deduplication, intent inference beyond open_app.
-
-The resulting `Execution` uses `"source": "clawperator-record"` and `"mode": "direct"` to distinguish it from agent-authored and skill-compiled executions.
-
-**Human-readable step log** emitted to stderr during compile (not part of the JSON output):
+**Human-readable step log** emitted to stderr during parse (not part of the JSON output):
 
 ```
 [1] open_app    com.android.settings
@@ -312,42 +305,15 @@ The resulting `Execution` uses `"source": "clawperator-record"` and `"mode": "di
 [3] press_key   back
 ```
 
-This is for developer inspection and also serves as a concise, readable description of the recorded flow that can be passed as context to an agent tasked with refining or generalizing the recording into a skill. The authoritative output is the JSON file.
-
-### Timing Model
-
-The compiler injects a `sleep` action between every compiled step. Without inter-step delays, the execution pipeline will dispatch actions faster than the device UI can settle, causing clicks to land on the wrong element or on a view that has not yet rendered.
-
-**Important:** These injected sleeps are advisory timing hints for agents, not batch-execution configuration. When an agent drives the flow step by step - issuing individual `clawperator execute` calls with `observe snapshot` between each - it may choose to use, adjust, or skip any given sleep based on observed device state. The sleeps exist to give agents a reasonable starting point; they do not imply that the compiled Execution JSON is meant to be dispatched wholesale.
-
-**v1 timing rules:**
-
-| Transition | Injected sleep |
-|---|---|
-| After `open_app` | 800ms (app launch is the slowest transition) |
-| After any `click` that changes the visible window (detected via next `window_change` in recording) | 500ms |
-| After any other `click` | 300ms |
-| After `press_key back` | 400ms |
-
-These are fixed defaults, not derived from the recorded timestamps. Using recorded timestamps to infer delays is a v2 optimization. Fixed conservative values are sufficient for PoC and easier to reason about when a replay fails.
-
-The `--step-delay-ms` flag on `record compile` allows the developer to override the default for all inter-step sleeps in the compiled output, which is useful when targeting a slow device or a particularly heavy app. The per-transition granularity above is the default; the flag overrides all of them uniformly.
-
-**Timeout guard:** The compiler calculates estimated execution time from the injected sleep durations and sets `timeoutMs` on the compiled `Execution` to cover it with a fixed 5-second buffer:
-
-```
-timeoutMs = sum(all injected sleep durations) + (step_count * 2000ms per-step execution allowance) + 5000ms buffer
-```
-
-The result is clamped to `MAX_EXECUTION_TIMEOUT_MS` (120,000ms). If the estimated time exceeds the maximum, the compiler emits a warning and clamps rather than failing - the replay may time out on very long recordings, which is consistent with the PoC's 10-step scope assumption.
+The authoritative output is the JSON file. The stderr summary is for developer inspection and can be passed as context to an agent.
 
 ### Success Criteria
 
 - `record pull` retrieves recording file from device without error.
-- `record compile` produces a valid `Execution` JSON that passes `clawperator execute --validate-only`.
+- `record parse` produces a valid step log JSON with `uiStateBefore` populated for each step.
 - Step log matches the human's performed actions in order.
-- Compiled file is human-readable and manually editable.
-- Compile only fails on structural errors: invalid schema version, missing header, empty recording (`RECORDING_EMPTY`), or malformed NDJSON. Matcher resolution never fails compilation - it degrades to a less precise matcher with a warning in the step log.
+- Step log is human-readable and manually inspectable.
+- Parse only fails on structural errors: invalid schema version, missing header, empty recording (`RECORDING_EMPTY`), or malformed NDJSON. Missing snapshots on individual events produce a `null` `uiStateBefore` with a warning, not a parse failure.
 
 ---
 
@@ -361,25 +327,26 @@ Phase 3 ships zero new Clawperator code. The deliverable is a validated end-to-e
 
 ### Agent-Driven Execution Model
 
-The agent receives the compiled execution JSON and step log from Phase 2. It uses these as a map - ground truth about the user's intended path - not as a script to execute blindly.
+The agent receives the step log from Phase 2. It uses it as a map - ground truth about the user's intended path - not as a script to execute blindly.
 
 The agent loop:
 
 ```
-For each step in the compiled execution JSON:
-  1. Issue a single-action clawperator execute call
-  2. Observe result envelope (success / failure, step data)
-  3. Call clawperator observe snapshot to verify device state
-  4. If state matches expectation: proceed to next step
-  5. If state diverges: adapt (retry, wait, skip) or halt and report
+For each step in the step log:
+  1. Read uiStateBefore + action description for this step
+  2. Compare current device state (observe snapshot) to uiStateBefore
+  3. Construct and issue a single-action clawperator execute call
+  4. Observe result envelope (success / failure, step data)
+  5. If state matches expectation: proceed to next step
+  6. If state diverges: adapt (retry, wait, skip) or halt and report
 After all steps complete successfully:
   Author a skill artifact from the validated flow
   Run the skill via clawperator skills run to confirm it works
 ```
 
-This is the correct model for Clawperator. The agent is the brain deciding whether to proceed at each step; Clawperator is the hand executing one discrete action at a time. The recording provides the agent with a concrete, pre-resolved description of the flow - it no longer needs to explore the UI to discover what to do.
+This is the correct model for Clawperator. The agent is the brain: it reads the recorded UI context, compares to current device state, constructs the action, and decides whether to proceed. Clawperator is the hand: it executes one discrete action and reports the result.
 
-No new Node code is needed. Each step in the loop uses `clawperator execute` (existing) and `clawperator observe snapshot` (existing). The compiled execution JSON is already on disk from Phase 2.
+No new Node code is needed. Each step in the loop uses `clawperator execute` (existing) and `clawperator observe snapshot` (existing). The step log is already on disk from Phase 2.
 
 ### PoC Demo Scenario
 
@@ -397,7 +364,7 @@ This scenario is chosen because:
 - It is short enough to execute reliably in under 10 seconds.
 - It exercises open-app, click, and back navigation - the three most important action types.
 
-The demo is conducted with a standard agent (Claude) receiving the compiled `demo-001.execution.json` and step log from Phase 2. The agent is instructed to reproduce the flow on the connected device. It issues individual `clawperator execute` calls for each step and verifies device state between them.
+The demo is conducted with a standard agent (Claude) receiving `demo-001.steps.json` from Phase 2. The agent is instructed to reproduce the flow on the connected device. For each step it reads the recorded `uiStateBefore` and action description, constructs the appropriate execute call, issues it, and verifies device state via `observe snapshot` before proceeding.
 
 ### Success Criteria
 
@@ -472,42 +439,42 @@ type RawRecordingEvent =
     };
 ```
 
-### Compiled Execution JSON (Node)
+### Step Log Format (Node)
 
-Standard `Execution` contract (no new fields). Example for the demo scenario:
+`record parse` output. Example for the demo scenario:
 
 ```json
 {
-  "commandId": "rec-compiled-a1b2c3",
-  "taskId": "demo-001",
-  "source": "clawperator-record",
-  "expectedFormat": "android-ui-automator",
-  "timeoutMs": 30000,
-  "mode": "direct",
-  "actions": [
+  "sessionId": "demo-001",
+  "schemaVersion": 1,
+  "steps": [
     {
-      "id": "step-1",
+      "seq": 0,
       "type": "open_app",
-      "params": { "applicationId": "com.android.settings" }
+      "packageName": "com.android.settings",
+      "uiStateBefore": "<hierarchy .../>",
     },
     {
-      "id": "step-2",
+      "seq": 1,
       "type": "click",
-      "params": {
-        "matcher": {
-          "resourceId": "com.android.settings:id/dashboard_tile",
-          "textEquals": "Display"
-        }
-      }
+      "packageName": "com.android.settings",
+      "resourceId": "com.android.settings:id/dashboard_tile",
+      "text": "Display",
+      "contentDesc": null,
+      "bounds": { "left": 0, "top": 400, "right": 1080, "bottom": 560 },
+      "uiStateBefore": "<hierarchy .../>"
     },
     {
-      "id": "step-3",
+      "seq": 2,
       "type": "press_key",
-      "params": { "key": "back" }
+      "key": "back",
+      "uiStateBefore": "<hierarchy .../>"
     }
   ]
 }
 ```
+
+`uiStateBefore` is the UI hierarchy XML captured at the moment of the interaction. The agent reads this alongside the event fields to understand what was visible and what was tapped, then constructs the appropriate `clawperator execute` call for the current device state.
 
 ---
 
@@ -534,8 +501,8 @@ Developer                  Node CLI                     Android
                              [Clawperator-Result] ←─────── { sessionId, eventCount }
 
 
-Phase 2 - Extract
-=================
+Phase 2 - Retrieval
+===================
 
 Developer                  Node CLI                     Android / Host FS
 ---------                  --------                     -----------------
@@ -544,19 +511,19 @@ Developer                  Node CLI                     Android / Host FS
                              runAdb(['pull',...]) ────────→ NDJSON file → host FS
                              → ./recordings/demo-001.ndjson
 
-                           record compile --input demo-001.ndjson
+                           record parse --input demo-001.ndjson
                              parseNdjson()
-                             compileRecording()            (normalize, compact)
-                             → demo-001.execution.json
-                             [step log to stderr]
+                             filterAndExtract()           (dedup, collapse, extract pairs)
+                             → demo-001.steps.json
+                             [step summary to stderr]
 
 
-Phase 3 - Agent-Assisted Playback
-==================================
+Phase 3 - Agent-Assisted Reproduction
+======================================
 
 Agent                      Node CLI                     Android
 -----                      --------                     -------
-reads demo-001.execution.json (step log + action sequence)
+reads demo-001.steps.json (uiStateBefore + action description per step)
 
 [for each step]
   execute single action
@@ -583,12 +550,12 @@ reads demo-001.execution.json (step log + action sequence)
 clawperator record start   [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]
 clawperator record stop    [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]
 clawperator record pull    [--session-id <id>|latest] [--out <dir>] [--device-id <serial>]
-clawperator record compile --input <ndjson-file> [--out <execution-json>] [--step-delay-ms <n>] [--no-dedup]
+clawperator record parse   --input <ndjson-file> [--out <steps-json>]
 ```
 
 All `record` subcommands inherit the global `--output json|pretty` and `--verbose` flags.
 
-`record start` and `record stop` output the same structured JSON envelope as all other commands. `record pull` outputs a JSON object with `{ ok, localPath, sessionId }`. `record compile` outputs `{ ok, steps: string[], executionFile }`.
+`record start` and `record stop` output the same structured JSON envelope as all other commands. `record pull` outputs a JSON object with `{ ok, localPath, sessionId }`. `record parse` outputs `{ ok, steps: string[], stepsFile }`.
 
 ### New Android Action Types
 
@@ -607,7 +574,7 @@ RECORDING_NOT_IN_PROGRESS
 RECORDING_SESSION_NOT_FOUND
 RECORDING_EMPTY
 RECORDING_PULL_FAILED
-RECORDING_COMPILE_FAILED
+RECORDING_PARSE_FAILED
 ```
 
 Added to `contracts/errors.ts` following existing conventions.
@@ -620,13 +587,13 @@ Added to `contracts/errors.ts` following existing conventions.
 
 | Risk | Likelihood | Mitigation |
 |---|---|---|
-| Many real apps do not expose stable `resourceId` values, or use dynamic IDs | High | Compiler falls back to `textEquals`, then bounds. Warns in step log. Agent reproduction may be brittle but will not refuse to run. |
-| UI has not settled when the next action fires | High | Fixed inter-step sleep injection (see timing model). Conservative defaults favor reliability over speed. |
-| Rapid double-tap recorded as two clicks | Medium | 100ms deduplication window in compiler. |
-| `window_change` events fire before UI settles after app launch | Medium | `open_app` step always followed by 800ms sleep before first interaction. |
+| Many real apps do not expose stable `resourceId` values, or use dynamic IDs | High | Agent reads `uiStateBefore` snapshot and finds the best available match. Noted in step log when `resourceId` is null. |
+| UI has not settled when agent issues the next action | High | Agent observes device state after each step via `observe snapshot`; it waits or retries based on what it sees rather than relying on fixed timing. |
+| Snapshot capture adds perceptible latency during recording | Medium | 100-400ms per interaction at human speed is not perceptible in practice. If it is, snapshot capture can be async-buffered in v2. |
+| Rapid double-tap recorded as two clicks | Medium | 100ms deduplication window in parser. |
+| `snapshot` is null on an event (tree read failed during fast transition) | Medium | Agent treats null `uiStateBefore` as reduced context, falls back to event fields (resourceId, text, bounds) to construct the action. |
 | Recording file not accessible via `adb pull` without root | Low | Use `getExternalFilesDir()` - always ADB-accessible on debug builds; release builds require `android:debuggable` or `android:allowBackup`. |
 | `stop_recording` broadcast not sent (e.g. screen locked, process killed) | Low | Session file is intact on device even without a clean stop. Node `record pull` can still retrieve it. Warn if `eventCount: 0`. |
-| Compiled execution exceeds 50-action limit | Very Low | 3-step Settings demo is well within limit. Emit compile warning at 40+ steps (accounting for injected sleep actions). |
 
 ---
 
@@ -637,8 +604,8 @@ Documentation is part of the work for each PR, not a follow-up step. The table b
 | Phase | What ships | Docs updated | Notes |
 |---|---|---|---|
 | 1 | `start_recording` / `stop_recording` action types, Android recording runtime | None | The new action types are not user-accessible without the Phase 2 Node commands. Documenting them in isolation would describe a partial API. Defer to Phase 2. |
-| 2 | `record` CLI command group, ADB pull, compiler, all error codes | `docs/node-api-for-agents.md` | This is the first user-accessible surface. Add a Recording section covering all five subcommands, the NDJSON schema, the compiled Execution format, and the new error codes. Note the API as early-access: contract is intentionally forward-looking but specific details (compiler normalization rules, timing defaults) may evolve. |
-| 3 | Agent-assisted playback validated | `docs/node-api-for-agents.md`, `docs/troubleshooting.md` | Remove the early-access note if Phase 3 validates cleanly. Update troubleshooting with known failure modes from Phase 3 testing: timing issues, apps with no stable resourceIds, screen lock interrupting recording. |
+| 2 | `record` CLI command group, ADB pull, parser, step log format, all error codes | `docs/node-api-for-agents.md` | This is the first user-accessible surface. Add a Recording section covering all four subcommands, the NDJSON schema, the step log format, and the new error codes. Note the API as early-access: contract is intentionally forward-looking but specific details may evolve. |
+| 3 | Agent-assisted reproduction validated | `docs/node-api-for-agents.md`, `docs/troubleshooting.md` | Remove the early-access note if Phase 3 validates cleanly. Update troubleshooting with known failure modes from Phase 3 testing: null snapshots on fast transitions, apps with no stable resourceIds, screen lock interrupting recording. |
 
 `docs/node-api-for-agents.md` is the sole authored source. `sites/docs/docs/` is generated - run the docs-generate skill after authoring and commit the regenerated output alongside the source change.
 
@@ -648,14 +615,14 @@ Documentation is part of the work for each PR, not a follow-up step. The table b
 
 **Phase 2 - Node unit tests (part of the Phase 2 PR):**
 
-The compiler is pure deterministic logic and is the highest-value test target in the feature. Unit tests for `compileRecording()` follow the existing pattern in `apps/node/src/test/unit/` and require no device. Coverage should include:
+The parser is pure deterministic logic and is the highest-value test target in the feature. Unit tests for `parseRecording()` follow the existing pattern in `apps/node/src/test/unit/` and require no device. Coverage should include:
 
-- Normalization rules: each rule in the v1 table produces the correct `ExecutionAction` output
-- Timing injection: correct `sleep` durations injected for each transition type
-- Matcher synthesis: `resourceId` preferred, `textEquals` fallback, bounds fallback with warning
-- Dedup: rapid clicks on the same element within 100ms collapsed to one; `--no-dedup` disables this
-- Scroll drop: scroll events produce a warning, not a compile failure
-- Schema version: compiler rejects a file whose header `schemaVersion` does not match expected
+- Filtering rules: each rule in the v1 table produces the correct step output
+- Dedup: rapid clicks on the same element within 100ms collapsed to one
+- `uiStateBefore` passthrough: snapshot field from NDJSON appears on corresponding step
+- Null snapshot handling: `null` snapshot on an event produces a step with `uiStateBefore: null` and a warning (not a failure)
+- Scroll drop: scroll events produce a warning, not a parse failure
+- Schema version: parser rejects a file whose header `schemaVersion` does not match expected
 - Empty recording: `RECORDING_EMPTY` error returned cleanly
 
 No Android runtime tests are required for Phase 2. The Android recording logic is manually verified against the Phase 1 success criteria.
@@ -665,8 +632,8 @@ No Android runtime tests are required for Phase 2. The Android recording logic i
 Full integration testing is deferred until the prototype is running, validated, and the decision is made to officially pursue record as a production feature. At that point, the right approach is a skill that:
 
 - Starts an Android emulator with a known app installed
-- Uses a committed `.ndjson` fixture to drive an agent through the full record-compile-validate-skill pipeline
-- Asserts the agent successfully completes the flow, the compiled execution JSON is valid, and a skill artifact is produced
+- Uses a committed `.ndjson` fixture to drive an agent through the full record-parse-validate-skill pipeline
+- Asserts the agent successfully completes the flow, the step log is valid, and a skill artifact is produced
 
 This gives the test suite a stable, device-independent way to validate the NDJSON schema, compiler, and execution contract across changes.
 
@@ -687,10 +654,10 @@ apps/node/src/
       stopRecording.ts                (buildStopRecordingExecution)
     recording/
       pullRecording.ts                (adb pull orchestration)
-      compileRecording.ts             (NDJSON → Execution)
-      recordingEventTypes.ts          (RawRecordingEvent types)
+      parseRecording.ts               (NDJSON → step log)
+      recordingEventTypes.ts          (RawRecordingEvent types + RecordingStepLog type)
   cli/commands/
-    record.ts                         (yargs subcommand group: start/stop/pull/compile)
+    record.ts                         (yargs subcommand group: start/stop/pull/parse)
 
 apps/android/shared/data/operator/src/main/kotlin/clawperator/operator/
   recording/
@@ -710,8 +677,8 @@ apps/android/shared/data/operator/src/main/kotlin/clawperator/operator/
 | 1 | Recording file exists on device after stop | `adb shell ls .../recordings/` |
 | 1 | File contains ordered events matching user actions | `adb pull` + manual inspect |
 | 2 | `record pull` retrieves file without error | CLI exit code 0 |
-| 2 | `record compile` produces valid Execution JSON | `clawperator execute --validate-only` on output |
-| 2 | Step log matches performed actions | Developer visual inspection |
+| 2 | `record parse` produces step log with `uiStateBefore` per step | Developer visual inspection |
+| 2 | Step log matches performed actions in order | Developer visual inspection |
 | 3 | Agent completes flow using recording as context | Developer visual inspection |
 | 3 | Each step issued as discrete `execute` call | Agent session log |
 | 3 | Flow succeeds twice consecutively | Repeat agent session |

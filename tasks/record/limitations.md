@@ -41,15 +41,15 @@ None of these appear in a recording. A batched script has no mechanism to notice
 
 ## The Correct Execution Model for Recordings
 
-The agent receives the compiled execution JSON from `record compile`. The agent uses it as a map:
+The agent receives the step log from `record parse`. Each step pairs the UI state at the moment of the interaction with a description of what was done. The agent uses it as a map:
 
-1. Read the next step from the compiled JSON.
-2. Issue a single-action `clawperator execute` call.
-3. Call `clawperator observe snapshot` to verify device state.
+1. Read the next step: `uiStateBefore` snapshot + action description.
+2. Compare current device state (`observe snapshot`) to the recorded `uiStateBefore`.
+3. Construct and issue a single-action `clawperator execute` call.
 4. If state matches expectation: proceed. If not: adapt, retry, or halt and report.
 5. After all steps complete: author a skill artifact from the validated flow and run it to confirm.
 
-This model preserves the brain/hand separation. The recording eliminates the exploration cost - the agent no longer needs to discover the navigation path - but execution control stays with the agent at every step.
+This model preserves the brain/hand separation. The recording eliminates the exploration cost - the agent no longer needs to discover the navigation path - but execution control stays with the agent at every step. The agent derives matchers from the step log context the same way it would from a live `observe snapshot`.
 
 ---
 
@@ -62,7 +62,7 @@ Even with an agent in the loop, accessibility-based reproduction is best-effort:
 - UI structure can differ between device OEMs and Android versions.
 - The PoC targets cooperative, stable apps (Android Settings) specifically because they have stable identifiers.
 
-The compiler's matcher fallback chain (`resourceId` preferred, `textEquals` fallback, `bounds` last resort) handles the common case, but bounds-based matchers are inherently brittle against different screen sizes and densities.
+The agent derives matchers from the `uiStateBefore` snapshot using the same reasoning it applies during normal operation. When `resourceId` is absent from the recorded event or the snapshot, the agent falls back to text or bounds - but bounds-based matching is inherently brittle against different screen sizes and densities.
 
 Robustness against the full range of real-world app behavior is a post-PoC concern.
 
@@ -72,9 +72,9 @@ Robustness against the full range of real-world app behavior is a post-PoC conce
 
 The following behaviors are explicitly out of scope for the PoC:
 
-- **Scroll steps:** Captured in the NDJSON schema but not compiled. The compiler emits a warning when scroll events are dropped. Flows that require scrolling to reach a target element will not reproduce correctly until scroll compilation is implemented (v2).
+- **Scroll steps:** Captured in the NDJSON schema but not extracted. The parser emits a warning when scroll events are dropped. Flows that require scrolling to reach a target element will not reproduce correctly until scroll step extraction is implemented (v2).
 - **Text input:** Captured in the schema but not compiled. The PoC demo scenario is specifically chosen to avoid text input.
-- **Long recordings:** Behavior on recordings longer than roughly 10 user-initiated steps is undefined. The compiler emits a warning at 40+ compiled steps (accounting for injected sleep actions).
+- **Long recordings:** Behavior on recordings longer than roughly 10 user-initiated steps is undefined. The parser emits a warning at 40+ extracted steps.
 - **Cross-device portability:** A recording made on one device may not reproduce successfully on another due to differing screen dimensions, UI structure, or OEM customizations.
 - **Idempotency:** Agent-driven reproductions are not guaranteed to produce the same outcome on consecutive runs if app state differs between runs.
 - **Popup and dialog handling:** Unexpected dialogs, permission requests, and interstitials that were not present during recording are outside PoC scope. The agent must handle these using its general reasoning capabilities.
