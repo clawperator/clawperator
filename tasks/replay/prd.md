@@ -89,7 +89,7 @@ The compilation step is pure Node-side logic: NDJSON in, standard `Execution` JS
 The compiler produces a standard `Execution` JSON document, identical in shape to what any agent would send to `clawperator execute`. This is the right choice for the following reasons:
 
 - It is the canonical interface. Agents, skills, and humans all converge on `Execution` JSON. Introducing an intermediate "replay" format would create a new abstraction with no payoff.
-- It is immediately runnable. `clawperator execute --execution-file replay.execution.json` works today with no new runtime code.
+- It is immediately runnable. `clawperator record replay --input replay.execution.json` skips compilation and dispatches directly. It can also be run via `clawperator execute --execution-file replay.execution.json` for cases where the recording context is not relevant.
 - It is inspectable and editable. A developer can open the compiled file, tweak a matcher, and re-run without tooling.
 - It is useful as agent input. An agent tasked with constructing a skill from a recording can read a compiled `Execution` JSON directly. The concrete, ordered steps - with `resourceId` matchers and action types already resolved - give the agent ground truth about what the user did, rather than requiring it to infer intent from raw accessibility events.
 - Skill artifacts (`.recipe.json`) are parameterized templates. A compiled recording has no parameters - it is a concrete flow. Wrapping it as a recipe artifact would add noise.
