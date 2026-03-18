@@ -1,0 +1,4 @@
+interface:
+  display_name: "Validate Docs"
+  short_description: "Check docs source-of-truth boundaries"
+  default_prompt: "Use $docs-validate to confirm generated docs changes map back to canonical source files and were not edited directly."
