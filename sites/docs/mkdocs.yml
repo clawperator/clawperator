@@ -2,6 +2,7 @@ site_name: Clawperator
 site_description: Deterministic actuator tool for device automation
 docs_dir: docs
 site_url: https://docs.clawperator.com/
+strict: true
 
 theme:
   name: terminal
@@ -29,6 +30,7 @@ nav:
   - Reference:
     - CLI Reference: reference/cli-reference.md
     - API Overview: reference/api-overview.md
+    - Action Types: reference/action-types.md
     - Execution Model: reference/execution-model.md
     - Timeout Budgeting: reference/timeout-budgeting.md
     - Device and Package Model: reference/device-and-package-model.md

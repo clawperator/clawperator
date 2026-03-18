@@ -174,6 +174,7 @@ only after the UI path is already known.
 
 ## What to read next
 
+- [Action Types Reference](../reference/action-types.md) - Complete reference for all action params and result shapes
 - [Clawperator Snapshot Format](../reference/snapshot-format.md)
 - [Execution Model](../reference/execution-model.md)
 - [Error Handling Guide](../reference/error-handling.md)
