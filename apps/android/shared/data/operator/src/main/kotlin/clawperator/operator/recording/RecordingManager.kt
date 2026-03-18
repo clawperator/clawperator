@@ -353,7 +353,13 @@ internal fun nanosToMicros(durationNs: Long): Double = durationNs / 1_000.0
 
 internal fun nowEpochMs(): Long = System.currentTimeMillis()
 
-internal fun nowElapsedNanos(): Long = SystemClock.elapsedRealtimeNanos()
+internal fun nowElapsedNanos(): Long =
+    try {
+        SystemClock.elapsedRealtimeNanos()
+    } catch (_: NoSuchMethodError) {
+        // Robolectric's shadow clock can miss this API even when the runtime SDK level supports it.
+        System.nanoTime()
+    }
 
 private fun HandlerThread.quitCompat() {
     try {
