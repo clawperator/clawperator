@@ -171,6 +171,8 @@ executions with the agent in the loop between them.
 
 ## Execution granularity
 
+Multi-action executions are the preferred form for stable, pre-validated atomic flows and for mature skills - they reduce round trips and are appropriate whenever the agent does not need to observe state between steps. The guidance below is about when to split, not a recommendation to always go single-step.
+
 Group multiple actions in one execution only when they are **atomic** - meaning
 the agent does not need to inspect device state or make a decision between them.
 

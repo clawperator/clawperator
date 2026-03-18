@@ -1,4 +1,4 @@
-# PRD: Clawperator Record and Replay
+# PRD: Clawperator Record
 
 ## Status: Draft
 ## Phase: PoC (3-phase delivery)
@@ -7,9 +7,11 @@
 
 ## Problem Statement
 
-Clawperator can execute precise UI actions on Android devices, but every flow must currently be authored by hand as a JSON execution or skill artifact. There is no mechanism for a human to demonstrate a workflow and then replay it.
+Clawperator can execute precise UI actions on Android devices, but every flow must currently be authored by hand as a JSON execution or skill artifact. There is no mechanism for a human to demonstrate a workflow and hand that demonstration to an agent.
 
-Record and replay closes this gap: a developer performs a UI flow once, Clawperator captures it, and that flow can be replayed deterministically. The goal is an API worth keeping: designed with production viability in mind, cleanly integrated with existing contracts, and not requiring a rewrite when the PoC graduates. Specific details - particularly the compiler's normalization rules - are expected to evolve as we learn what real recordings look like.
+The Record feature closes this gap: a developer performs a UI flow once, Clawperator captures it, and an agent uses the compiled recording as a map to reproduce and validate the flow - then authors a skill from the result. The goal is an API worth keeping: designed with production viability in mind, cleanly integrated with existing contracts, and not requiring a rewrite when the PoC graduates. Specific details - particularly the compiler's normalization rules - are expected to evolve as we learn what real recordings look like.
+
+**Terminology note:** In this PoC, "replay" does not mean a first-class Clawperator runtime behavior. It means agent-guided stepwise reproduction of a recorded flow. The agent issues individual `clawperator execute` calls, observes device state between each, and decides whether to proceed. The skill authored from that validated flow is the durable, reusable artifact.
 
 ---
 
@@ -19,9 +21,9 @@ Three distinct use cases motivate this feature. All three are served by the same
 
 **Skill bootstrap for unknown apps.** Clawperator's skills repository covers common apps, but cannot cover every private, regional, or internal tool a user wants to automate. Today, an agent must explore an unfamiliar app's UI from scratch to construct a skill - slow, token-expensive, and error-prone. A recording eliminates that first-encounter cost: the user demonstrates the flow once, and the agent's job shifts from blind exploration to refinement. Even a raw recording used only as input context for an agent constructing a private skill delivers real value, because the agent no longer needs to guess the navigation path.
 
-**Android developer productivity.** Developers working on a UI feature spend a significant fraction of iteration time navigating to the screen they care about - logging in with test credentials, tapping through onboarding, reaching a nested settings panel - before they can observe the change they just made. Replay eliminates that overhead. A developer records the navigation path once and replays it as a single command during their iteration loop. This is closer to a macro system than a test suite: it does not need to be shared, checked in, or maintained. A local recording that lives for the duration of one feature branch has immediate value.
+**Android developer productivity.** Developers working on a UI feature spend a significant fraction of iteration time navigating to the screen they care about - logging in with test credentials, tapping through onboarding, reaching a nested settings panel - before they can observe the change they just made. A recording eliminates that overhead: the developer records the path once, an agent validates and authors a local skill from it, and from that point on the developer runs the skill as a single `clawperator skills run` command on every iteration. A local skill that lives for the duration of one feature branch has immediate value and is discarded afterward.
 
-**UI testing and verification.** A recorded happy path is a lightweight smoke test with no test framework, no instrumentation, and no build-time setup required. It runs against a real device or emulator via `clawperator execute`. For agent-driven development work, replay also provides a reliable "get to the state under test" primitive: an agent can replay a known navigation path to reach a target screen, then apply assertions using `snapshot_ui` and `read_text`. This makes Clawperator a practical tool for UI verification on real devices - something existing tools like Espresso and UIAutomator handle poorly in interactive development: they are test-framework-centric, require build-time instrumentation, and are not agent-friendly.
+**UI testing and verification.** A skill authored from a validated recording is a lightweight smoke test with no test framework, no instrumentation, and no build-time setup required. It runs against a real device or emulator via `clawperator skills run`. For agent-driven development work, a validated skill provides a reliable "get to the state under test" primitive: an agent runs the skill to reach a target screen, then applies assertions using `snapshot_ui` and `read_text`. This makes Clawperator a practical tool for UI verification on real devices - something existing tools like Espresso and UIAutomator handle poorly in interactive development: they are test-framework-centric, require build-time instrumentation, and are not agent-friendly.
 
 ---
 
@@ -44,15 +46,15 @@ Three distinct use cases motivate this feature. All three are served by the same
 - Popup handling.
 - Streaming events to host during recording (all events are buffered on device).
 - Lossless capture. Recording is a lossy transformation of user intent. Timing nuances, transient UI state, and intermediate visual frames between gestures are not preserved. The recorded output captures the identifiable moments of interaction, not the full fidelity of what the user did.
-- Deterministic replay guarantees. Accessibility-based replay is best-effort. UI timing, dynamic view IDs, and app state can all cause a replay to diverge from the original recording. The PoC succeeds if it works reliably on a stable, cooperative target app. Robustness against the full range of real-world app behavior is a post-PoC concern.
-- Idempotency. Replays are not guaranteed to produce the same outcome when run multiple times. App state left over from a previous run (e.g. a screen that is already open, a toggle that is already active) can cause subsequent replays to diverge. Handling this is a post-PoC concern.
+- Deterministic reproduction guarantees. Accessibility-based agent reproduction is best-effort. UI timing, dynamic view IDs, and app state can all cause a run to diverge from the recording. The PoC succeeds if the agent can reliably reproduce the flow on a stable, cooperative target app. Robustness against the full range of real-world app behavior is a post-PoC concern.
+- Idempotency. Agent-driven reproductions are not guaranteed to produce the same outcome when run multiple times. App state left over from a previous run (e.g. a screen that is already open, a toggle that is already active) can cause subsequent runs to diverge. Handling this is a post-PoC concern.
 - Long recording support. The PoC assumes short recordings of up to roughly 10 user-initiated steps. Behavior on recordings longer than that is undefined for this phase.
 
 ---
 
 ## Architecture Overview
 
-Record and replay extends the existing execution architecture without adding parallel systems.
+The Record feature extends the existing execution architecture without adding parallel systems.
 
 ```
 Node CLI                       Android (Operator App)
@@ -104,7 +106,7 @@ The compiler produces a standard `Execution` JSON document, identical in shape t
 
 The compiled file is saved as `<session_id>.execution.json`. The `source: "clawperator-record"` field distinguishes it from agent-authored and skill-compiled executions, which matters when an agent is processing a batch of executions and needs to know their provenance.
 
-If the developer wants to graduate the compiled output to a reusable skill, they place it in a skill directory as an artifact - but that step is outside the scope of this PoC.
+Skill authoring is the expected outcome of Phase 3. The agent validates the compiled output step by step and then authors a skill artifact from the validated flow. The compiled Execution JSON is a bootstrap input; the skill is the durable, reusable output.
 
 ---
 
@@ -316,6 +318,8 @@ This is for developer inspection and also serves as a concise, readable descript
 
 The compiler injects a `sleep` action between every compiled step. Without inter-step delays, the execution pipeline will dispatch actions faster than the device UI can settle, causing clicks to land on the wrong element or on a view that has not yet rendered.
 
+**Important:** These injected sleeps are advisory timing hints for agents, not batch-execution configuration. When an agent drives the flow step by step - issuing individual `clawperator execute` calls with `observe snapshot` between each - it may choose to use, adjust, or skip any given sleep based on observed device state. The sleeps exist to give agents a reasonable starting point; they do not imply that the compiled Execution JSON is meant to be dispatched wholesale.
+
 **v1 timing rules:**
 
 | Transition | Injected sleep |
@@ -327,7 +331,7 @@ The compiler injects a `sleep` action between every compiled step. Without inter
 
 These are fixed defaults, not derived from the recorded timestamps. Using recorded timestamps to infer delays is a v2 optimization. Fixed conservative values are sufficient for PoC and easier to reason about when a replay fails.
 
-The `--step-delay-ms` flag on `record compile` and `record replay` allows the developer to override the default for all inter-step sleeps, which is useful when targeting a slow device or a particularly heavy app. The per-transition granularity above is the default; the flag overrides all of them uniformly.
+The `--step-delay-ms` flag on `record compile` allows the developer to override the default for all inter-step sleeps in the compiled output, which is useful when targeting a slow device or a particularly heavy app. The per-transition granularity above is the default; the flag overrides all of them uniformly.
 
 **Timeout guard:** The compiler calculates estimated execution time from the injected sleep durations and sets `timeoutMs` on the compiled `Execution` to cover it with a fixed 5-second buffer:
 
@@ -369,7 +373,8 @@ For each step in the compiled execution JSON:
   4. If state matches expectation: proceed to next step
   5. If state diverges: adapt (retry, wait, skip) or halt and report
 After all steps complete successfully:
-  Optionally author a skill artifact from the validated flow
+  Author a skill artifact from the validated flow
+  Run the skill via clawperator skills run to confirm it works
 ```
 
 This is the correct model for Clawperator. The agent is the brain deciding whether to proceed at each step; Clawperator is the hand executing one discrete action at a time. The recording provides the agent with a concrete, pre-resolved description of the flow - it no longer needs to explore the UI to discover what to do.
@@ -400,6 +405,8 @@ The demo is conducted with a standard agent (Claude) receiving the compiled `dem
 - Each step is issued as a discrete `clawperator execute` call (not via `--execution-file`).
 - Agent observes device state between steps via `observe snapshot`.
 - Flow succeeds at least twice consecutively.
+- Agent authors a local skill artifact from the validated flow.
+- Agent runs the authored skill via `clawperator skills run` and it completes successfully.
 - No new Clawperator code ships in this phase.
 
 ---
@@ -471,7 +478,7 @@ Standard `Execution` contract (no new fields). Example for the demo scenario:
 
 ```json
 {
-  "commandId": "rec-replay-a1b2c3",
+  "commandId": "rec-compiled-a1b2c3",
   "taskId": "demo-001",
   "source": "clawperator-record",
   "expectedFormat": "android-ui-automator",
@@ -562,7 +569,8 @@ reads demo-001.execution.json (step log + action sequence)
   agent evaluates state → proceed / adapt / halt
 
 [after all steps succeed]
-  agent optionally authors skill artifact
+  agent authors skill artifact
+  agent runs skill via clawperator skills run
 ```
 
 ---
@@ -608,11 +616,11 @@ Added to `contracts/errors.ts` following existing conventions.
 
 ## Risks and Mitigations
 
-**A note on replay reliability:** Accessibility-based replay is inherently best-effort. Some recordings will not replay successfully on the first attempt, or will replay correctly most of the time but fail occasionally. This is expected and acceptable for PoC. The goal is to prove the loop works on a well-behaved target app, not to produce a robust general-purpose tool in this phase.
+**A note on reproduction reliability:** Accessibility-based agent reproduction is inherently best-effort. Some recordings will not replay successfully on the first attempt, or will replay correctly most of the time but fail occasionally. This is expected and acceptable for PoC. The goal is to prove the loop works on a well-behaved target app, not to produce a robust general-purpose tool in this phase.
 
 | Risk | Likelihood | Mitigation |
 |---|---|---|
-| Many real apps do not expose stable `resourceId` values, or use dynamic IDs | High | Compiler falls back to `textEquals`, then bounds. Warns in step log. Replay may be brittle but will not refuse to run. |
+| Many real apps do not expose stable `resourceId` values, or use dynamic IDs | High | Compiler falls back to `textEquals`, then bounds. Warns in step log. Agent reproduction may be brittle but will not refuse to run. |
 | UI has not settled when the next action fires | High | Fixed inter-step sleep injection (see timing model). Conservative defaults favor reliability over speed. |
 | Rapid double-tap recorded as two clicks | Medium | 100ms deduplication window in compiler. |
 | `window_change` events fire before UI settles after app launch | Medium | `open_app` step always followed by 800ms sleep before first interaction. |
@@ -657,12 +665,12 @@ No Android runtime tests are required for Phase 2. The Android recording logic i
 Full integration testing is deferred until the prototype is running, validated, and the decision is made to officially pursue record as a production feature. At that point, the right approach is a skill that:
 
 - Starts an Android emulator with a known app installed
-- Uses a committed `.ndjson` fixture to drive an agent through the full record-to-playback pipeline
-- Asserts the agent successfully completes the flow and the compiled execution JSON is valid
+- Uses a committed `.ndjson` fixture to drive an agent through the full record-compile-validate-skill pipeline
+- Asserts the agent successfully completes the flow, the compiled execution JSON is valid, and a skill artifact is produced
 
 This gives the test suite a stable, device-independent way to validate the NDJSON schema, compiler, and execution contract across changes.
 
-Until then, Phase 3 manual verification (agent successfully replays the flow twice consecutively) is the acceptance bar.
+Until then, Phase 3 manual verification (agent successfully reproduces the flow twice consecutively and authors a working skill) is the acceptance bar.
 
 ---
 
@@ -707,4 +715,6 @@ apps/android/shared/data/operator/src/main/kotlin/clawperator/operator/
 | 3 | Agent completes flow using recording as context | Developer visual inspection |
 | 3 | Each step issued as discrete `execute` call | Agent session log |
 | 3 | Flow succeeds twice consecutively | Repeat agent session |
+| 3 | Agent authors a skill from the validated flow | Skill artifact exists on disk |
+| 3 | Skill runs successfully via `clawperator skills run` | CLI exit code 0 |
 | All | No changes to `runExecution()` or existing action handlers | Code review: no diff in those files |

@@ -18,11 +18,11 @@ A recording is a lossy representation of user intent. The event log captures ide
 
 ---
 
-## Why Recordings Are Not Directly Executable Scripts
+## Why Raw Recordings Should Not Be Dispatched Wholesale
 
 Clawperator's architecture separates concerns: the agent is the brain; Clawperator is the hand. The agent observes, reasons, and decides what to do next. Clawperator executes one discrete command at a time and reports the result.
 
-A compiled recording looks like an execution script, and it is tempting to dispatch it as one. This inverts the model for recordings specifically, for the following reasons:
+A compiled recording looks like an execution script, and it is tempting to dispatch it as one via `execute --execution-file`. For this PoC - and more broadly, for any unfamiliar or dynamic app - this approach will produce brittle results. The primary reason:
 
 **Android apps are dynamic.** The same flow run twice on the same device can encounter:
 - Interstitial dialogs (permission requests, app review prompts, subscription upsells)
@@ -33,9 +33,9 @@ A compiled recording looks like an execution script, and it is tempting to dispa
 
 None of these appear in a recording. A batched script has no mechanism to notice or handle any of them. The agent does - by calling `observe snapshot` between steps and deciding whether device state matches the expected trajectory.
 
-**A raw recording is not a validated skill.** Skills in the Clawperator skills registry are authored and maintained artifacts. They are expected to handle known variants and have been tested for robustness. A recording is a one-time trace. Running it without agent oversight on anything other than a controlled, stable target app will produce brittle results.
+**A raw recording is not a validated skill.** Skills in the Clawperator skills registry are authored and maintained artifacts. They are expected to handle known variants and have been tested for robustness. A recording is a one-time trace. The path from recording to a reliable automated flow runs through the agent's judgment - step by step validation and, eventually, skill authoring.
 
-**`execute --execution-file` exists for a reason, but not this reason.** The existing `execute --execution-file` command and the underlying `runExecution()` function are appropriate for stable, validated flows - specifically, skills. Skills are the right destination for a recording that has been validated by an agent, generalized, and deemed robust enough to run without oversight. A raw recording is not there yet. The path from recording to reliable automated flow runs through the agent's judgment.
+**`execute --execution-file` is appropriate once the flow has been validated.** For stable, pre-validated flows - specifically, skills - multi-action execution is the right choice. A skill authored from a validated recording can be dispatched without per-step observation because it has already been tested and is known to handle normal variants. The raw recording has not been through that process yet.
 
 ---
 
@@ -47,15 +47,15 @@ The agent receives the compiled execution JSON from `record compile`. The agent 
 2. Issue a single-action `clawperator execute` call.
 3. Call `clawperator observe snapshot` to verify device state.
 4. If state matches expectation: proceed. If not: adapt, retry, or halt and report.
-5. After all steps complete: optionally author a skill artifact from the validated flow.
+5. After all steps complete: author a skill artifact from the validated flow and run it to confirm.
 
 This model preserves the brain/hand separation. The recording eliminates the exploration cost - the agent no longer needs to discover the navigation path - but execution control stays with the agent at every step.
 
 ---
 
-## Replay Reliability
+## Reproduction Reliability
 
-Even with an agent in the loop, accessibility-based playback is best-effort:
+Even with an agent in the loop, accessibility-based reproduction is best-effort:
 
 - `resourceId` values are not stable across all apps or all versions of the same app. Some apps use dynamic, synthetic IDs that change between sessions.
 - Text labels can be localized or changed by the app.
@@ -72,11 +72,11 @@ Robustness against the full range of real-world app behavior is a post-PoC conce
 
 The following behaviors are explicitly out of scope for the PoC:
 
-- **Scroll steps:** Captured in the NDJSON schema but not compiled. The compiler emits a warning when scroll events are dropped. Flows that require scrolling to reach a target element will not replay correctly until scroll compilation is implemented (v2).
+- **Scroll steps:** Captured in the NDJSON schema but not compiled. The compiler emits a warning when scroll events are dropped. Flows that require scrolling to reach a target element will not reproduce correctly until scroll compilation is implemented (v2).
 - **Text input:** Captured in the schema but not compiled. The PoC demo scenario is specifically chosen to avoid text input.
 - **Long recordings:** Behavior on recordings longer than roughly 10 user-initiated steps is undefined. The compiler emits a warning at 40+ compiled steps (accounting for injected sleep actions).
-- **Cross-device portability:** A recording made on one device may not replay successfully on another due to differing screen dimensions, UI structure, or OEM customizations.
-- **Idempotency:** Replays are not guaranteed to produce the same outcome on consecutive runs if app state differs between runs.
+- **Cross-device portability:** A recording made on one device may not reproduce successfully on another due to differing screen dimensions, UI structure, or OEM customizations.
+- **Idempotency:** Agent-driven reproductions are not guaranteed to produce the same outcome on consecutive runs if app state differs between runs.
 - **Popup and dialog handling:** Unexpected dialogs, permission requests, and interstitials that were not present during recording are outside PoC scope. The agent must handle these using its general reasoning capabilities.
 
 ---
