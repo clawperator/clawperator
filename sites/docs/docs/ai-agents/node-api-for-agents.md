@@ -8,7 +8,7 @@ For the exact `snapshot_ui` structure, use
 
 ## Concepts
 
-- **Execution**: A payload of one or more actions dispatched to the device. Every execution produces exactly one `[Clawperator-Result]` envelope.
+- **Execution**: A payload of one or more actions dispatched to the device as a single atomic unit. Every execution produces exactly one `[Clawperator-Result]` envelope. Clawperator executes the action list sequentially and returns the result - it does not observe state between steps or adapt based on intermediate outcomes. The agent inspects the result and decides the next execution.
 - **Action**: A single step (`open_app`, `click`, `read_text`, etc.) within an execution.
 - **Snapshot**: A captured UI hierarchy dump (`hierarchy_xml`) for observing device state.
 - **Skill**: A packaged recipe from the skills repo, compiled into an execution payload.
@@ -916,6 +916,7 @@ For agent-side recovery strategy, use
 - **Single-flight:** One execution per device at a time. Concurrent requests return `EXECUTION_CONFLICT_IN_FLIGHT`.
 - **No hidden retries:** If an action fails, the error is returned immediately. Retry logic belongs in the agent.
 - **Deterministic results:** Exactly one terminal envelope per `commandId`. Timeouts return `RESULT_ENVELOPE_TIMEOUT` with diagnostics.
+- **Execution granularity:** Group multiple actions in one execution only when they are atomic - when the agent does not need to observe state or make a decision between them. For flows where intermediate state matters, use separate executions with `observe snapshot` between each. See [Execution Model](../reference/execution-model.md) for the full guidance.
 - **Timeout override:** `--timeout-ms <n>` overrides the execution timeout for `execute`, `observe snapshot`, and `observe screenshot` within policy limits.
 - **Screenshot output path:** `observe screenshot --path <file>` writes the PNG to the requested local path and still returns the final `data.path` in the result envelope. `<file>` must be a non-empty local filesystem path.
 - **Device targeting:** Specify `--device-id` when multiple devices are connected. Omit for single-device setups.
@@ -1087,7 +1088,13 @@ Skills can be invoked three ways:
 ## FAQ
 
 **Does Clawperator do autonomous planning?**
-No. It executes commands and reports structured results. Reasoning and planning stay in the agent.
+No. Clawperator executes a command and reports what happened. All reasoning and planning stay in the agent. Specifically:
+
+- Clawperator does not retry a failed action automatically - a failure is returned for the agent to handle.
+- Clawperator does not observe state between actions in a multi-step execution and adapt - it executes the list sequentially and returns one result.
+- Clawperator does not know whether a flow succeeded in any business sense - it knows whether each action completed without a runtime error.
+
+The practical implication: for unfamiliar apps, exploratory flows, or any sequence where the agent needs to verify state between steps, prefer single-action executions with `observe snapshot` calls between them. For mature skills and stable, pre-validated atomic sequences, multi-action executions are the right choice - they reduce round trips and are appropriate whenever the agent does not need to observe or adapt mid-flow. Skills are authored with the latter in mind.
 
 **How are concurrent executions handled?**
 Single-flight per device. A second overlapping execution returns `EXECUTION_CONFLICT_IN_FLIGHT`.
