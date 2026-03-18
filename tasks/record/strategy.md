@@ -27,27 +27,7 @@ This path preserves Clawperator's brain/hand separation. The agent makes all dec
 
 ---
 
-## Use Case 1: Android Developer Productivity
-
-Android developers spend a significant fraction of their iteration time on UI navigation that has nothing to do with the code they are writing. A typical loop looks like:
-
-- Make a code change.
-- Build.
-- Launch app.
-- Navigate through login, onboarding, or several menu screens to reach the screen being worked on.
-- Observe behavior.
-- Return to code.
-- Repeat.
-
-The navigation steps in that loop are pure overhead. Deep links reduce it in some cases, but they require explicit setup and do not cover all flows.
-
-Recording addresses this directly. A developer records the navigation path once. The step log is handed to an agent that reproduces the flow step by step with observation between each action. The agent authors a local skill from the validated flow. From that point on, the developer can run the skill via a single `clawperator skills run` command to return to their target screen - rather than navigating manually on every iteration.
-
-This is closest in spirit to Playwright's codegen, but the durable artifact is a Clawperator skill, not a replay script. The skill is the thing the developer runs; the recording and step log are how the skill was bootstrapped. A local, private skill that lives for the duration of a feature branch and is discarded afterward is a valid and intentional use of the skills system.
-
----
-
-## Use Case 2: Skill Bootstrap for Unknown Apps
+## Use Case 1: Skill Bootstrap
 
 The skills repository covers common apps, but cannot cover every private, regional, or internal tool a user wants to automate. Today, an agent must explore an unfamiliar app's UI from scratch to construct a skill - slow, token-expensive, and error-prone.
 
@@ -57,15 +37,15 @@ This changes who can initiate skill creation. Today it requires an agent capable
 
 ---
 
-## Use Case 3: UI Testing and Verification
+## Use Case 2: Android Automation
 
-Recording is also a viable path into functional UI testing.
+Once a skill exists - whether bootstrapped from a recording or authored directly - Clawperator can use it as a reliable automation primitive. Two concrete scenarios illustrate this:
 
-A validated recording - one that an agent has successfully reproduced and authored as a skill - is a lightweight smoke test. Running the skill against a real device or emulator via a single CLI command verifies that the target screen is still reachable. For small teams or individual developers this is often sufficient.
+**Developer iteration.** Android developers spend a significant fraction of their iteration time on UI navigation that has nothing to do with the code they are writing - logging in with test credentials, tapping through onboarding, reaching a nested settings panel. A developer records the path once, an agent validates and authors a local skill, and from that point on the developer runs the skill as a single `clawperator skills run` command on every iteration. A local, private skill that lives for the duration of a feature branch and is discarded afterward is a valid and intentional use of the skills system. This is closest in spirit to Playwright's codegen, but the durable artifact is a Clawperator skill, not a replay script.
 
-For agent-driven development, the value is higher. An agent tasked with verifying UI behavior needs to navigate to the state it is testing. Today that requires either a skill or exploratory navigation. With the record feature, the agent uses a validated skill (authored from a recording) to reach the target state reliably, then applies assertions using `snapshot_ui` and `read_text`. The skill handles the "get there" problem; the agent handles the "check it" problem.
+**UI verification.** A validated skill is a lightweight smoke test with no test framework, no instrumentation, and no build-time setup required. Running it against a real device or emulator via a single CLI command verifies that the target screen is still reachable. For agent-driven development, the value is higher: an agent runs the skill to reach the state under test, then applies assertions using `snapshot_ui` and `read_text`. The skill handles the "get there" problem; the agent handles the "check it" problem. This makes Clawperator a practical tool for UI verification on real devices - something existing tools like Espresso and UIAutomator handle poorly in interactive development, because they are test-framework-centric, require build-time instrumentation, and are not agent-friendly.
 
-The critical distinction: the runnable artifact is a skill that was validated from a recording, not the raw recording itself. The skill has been tested, is expected to handle normal app variants, and can be maintained over time. The recording is a one-time trace that served its purpose as bootstrap input.
+The critical distinction in both scenarios: the runnable artifact is a skill that was validated from a recording, not the raw recording itself. The recording is a one-time trace that served its purpose as bootstrap input.
 
 ---
 
@@ -95,12 +75,10 @@ The immediate goal is a validated agent-assisted bootstrap for simple flows. But
 
 ## Summary
 
-Record serves three audiences with a single piece of infrastructure:
+Record serves two use cases with a single piece of infrastructure:
 
-1. **Android developers** who want to eliminate the navigation overhead of iterative development. They record the path to the screen they are working on; an agent validates and authors a local skill that they run on every iteration.
+1. **Skill bootstrap:** A user records a flow on any app - private, regional, or unfamiliar - and hands the step log to an agent. The agent reproduces the flow with device observation and authors a skill. The recording is the specification; the skill is the durable output.
 
-2. **End users** who want to automate apps that have no skill in the registry. They record the flow themselves; an agent validates it and authors a skill.
+2. **Android automation:** The authored skill becomes a reliable automation primitive - for developer iteration (navigate to the screen under development in one command), for UI verification (run the skill as a smoke test, then apply assertions), or any other agent-driven scenario where a validated navigation path is needed.
 
-3. **Developers and agents** who want lightweight UI verification on real devices. A skill authored from a validated recording is a runnable smoke test with no additional tooling required.
-
-All three use cases are served by the same three-phase implementation - record, parse, agent-validate-and-skill - built on top of existing Clawperator infrastructure. The recording and step log are bootstrap artifacts. The skill is the durable output.
+Both use cases are served by the same three-phase implementation - record, parse, agent-validate-and-skill - built on top of existing Clawperator infrastructure. The recording and step log are bootstrap artifacts. The skill is the durable output.
