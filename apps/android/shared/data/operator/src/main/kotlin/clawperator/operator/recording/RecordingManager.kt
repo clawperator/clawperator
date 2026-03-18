@@ -273,7 +273,6 @@ data class RecordingBounds(
     }
 }
 
-@Serializable
 sealed interface RecordingEvent {
     val ts: Long
     val seq: Long
@@ -370,9 +369,29 @@ private fun HandlerThread.quitCompat() {
 
 private fun serializeEvent(event: RecordingEvent): String =
     when (event) {
-        is RecordingWindowChangeEvent -> recordingJson.encodeToString(RecordingWindowChangeEvent.serializer(), event)
-        is RecordingClickEvent -> recordingJson.encodeToString(RecordingClickEvent.serializer(), event)
-        is RecordingScrollEvent -> recordingJson.encodeToString(RecordingScrollEvent.serializer(), event)
-        is RecordingPressKeyEvent -> recordingJson.encodeToString(RecordingPressKeyEvent.serializer(), event)
-        is RecordingTextChangeEvent -> recordingJson.encodeToString(RecordingTextChangeEvent.serializer(), event)
+        is RecordingWindowChangeEvent ->
+            recordingJson.encodeToString(
+                serializer = RecordingWindowChangeEvent.serializer(),
+                value = event,
+            )
+        is RecordingClickEvent ->
+            recordingJson.encodeToString(
+                serializer = RecordingClickEvent.serializer(),
+                value = event,
+            )
+        is RecordingScrollEvent ->
+            recordingJson.encodeToString(
+                serializer = RecordingScrollEvent.serializer(),
+                value = event,
+            )
+        is RecordingPressKeyEvent ->
+            recordingJson.encodeToString(
+                serializer = RecordingPressKeyEvent.serializer(),
+                value = event,
+            )
+        is RecordingTextChangeEvent ->
+            recordingJson.encodeToString(
+                serializer = RecordingTextChangeEvent.serializer(),
+                value = event,
+            )
     }
