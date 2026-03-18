@@ -633,6 +633,37 @@ Documentation is part of the work for each PR, not a follow-up step. The table b
 
 ---
 
+## Testing Plan
+
+**Phase 2 - Node unit tests (part of the Phase 2 PR):**
+
+The compiler is pure deterministic logic and is the highest-value test target in the feature. Unit tests for `compileRecording()` follow the existing pattern in `apps/node/src/test/unit/` and require no device. Coverage should include:
+
+- Normalization rules: each rule in the v1 table produces the correct `ExecutionAction` output
+- Timing injection: correct `sleep` durations injected for each transition type
+- Matcher synthesis: `resourceId` preferred, `textEquals` fallback, bounds fallback with warning
+- Dedup: rapid clicks on the same element within 100ms collapsed to one; `--no-dedup` disables this
+- Scroll drop: scroll events produce a warning, not a compile failure
+- Schema version: compiler rejects a file whose header `schemaVersion` does not match expected
+- Empty recording: `RECORDING_EMPTY` error returned cleanly
+- `record replay --input` dispatch: `.ndjson` triggers compile path, `.execution.json` skips to execute
+
+No Android runtime tests are required for Phase 2. The Android recording logic is manually verified against the Phase 1 success criteria.
+
+**Deferred - integration and end-to-end tests (post-PoC):**
+
+Full integration testing is deferred until the prototype is running, validated, and the decision is made to officially pursue record and replay as a production feature. At that point, the right approach is a skill that:
+
+- Starts an Android emulator with a known app installed
+- Replays a pre-recorded fixture (a committed `.ndjson` file with a deterministic known-good flow)
+- Asserts the replay envelope contains all `success: true` steps
+
+This gives the test suite a stable, device-independent way to run the full record-to-replay pipeline in CI without relying on physical device availability. It also validates that the NDJSON schema, compiler, and execution contract remain compatible across changes.
+
+Until then, Phase 3 manual verification (two consecutive successful replays on a physical device or emulator) is the acceptance bar.
+
+---
+
 ## File Layout
 
 ```
