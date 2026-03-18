@@ -120,6 +120,11 @@ sections:
           - docs/node-api-for-agents.md
           - apps/node/src/contracts
         notes: Keep narrative short. Reference code-derived details instead of duplicating them.
+      - output: reference/action-types.md
+        title: Action Types Reference
+        mode: copy
+        sources:
+          - docs/reference/action-types.md
       - output: reference/execution-model.md
         title: Clawperator Execution Model
         mode: copy

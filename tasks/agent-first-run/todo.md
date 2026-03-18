@@ -377,7 +377,7 @@ Both tasks are docs-only with no behavior change. The link audit (T-13) is done 
 
 ---
 
-### T-13 · Fix broken internal links; add CI link check
+### [DONE] T-13 · Fix broken internal links; add CI link check
 **Priority:** High
 
 **Problem:**
@@ -401,7 +401,7 @@ Both tasks are docs-only with no behavior change. The link audit (T-13) is done 
 
 ---
 
-### T-14 · Create single canonical action type reference page
+### [DONE] T-14 · Create single canonical action type reference page
 **Priority:** High
 
 **Problem:**

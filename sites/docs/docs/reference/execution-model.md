@@ -163,6 +163,6 @@ For unknown apps or UI drift:
 4. Re-read the envelope and step results.
 5. Snapshot again before making the next major decision.
 
-For action-specific caveats, use
-[Clawperator Node API - Agent Guide](../ai-agents/node-api-for-agents.md) and
-[Clawperator Snapshot Format](snapshot-format.md).
+For action-specific params, result shapes, and examples, use
+[Action Types Reference](action-types.md). For the full agent API contract,
+see [Clawperator Node API - Agent Guide](../ai-agents/node-api-for-agents.md).
