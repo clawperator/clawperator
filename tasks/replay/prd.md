@@ -619,6 +619,20 @@ Added to `contracts/errors.ts` following existing conventions.
 
 ---
 
+## Documentation Plan
+
+Documentation is part of the work for each PR, not a follow-up step. The table below maps what gets documented per phase and where.
+
+| Phase | What ships | Docs updated | Notes |
+|---|---|---|---|
+| 1 | `start_recording` / `stop_recording` action types, Android recording runtime | None | The new action types are not user-accessible without the Phase 2 Node commands. Documenting them in isolation would describe a partial API. Defer to Phase 2. |
+| 2 | `record` CLI command group, ADB pull, compiler, all error codes | `docs/node-api-for-agents.md` | This is the first user-accessible surface. Add a Recording section covering all five subcommands, the NDJSON schema, the compiled Execution format, and the new error codes. Note the API as early-access: contract is intentionally forward-looking but specific details (compiler normalization rules, timing defaults) may evolve. |
+| 3 | End-to-end replay verified | `docs/node-api-for-agents.md`, `docs/troubleshooting.md` | Remove the early-access note if Phase 3 validates cleanly. Update troubleshooting with known failure modes from Phase 3 testing: timing issues, apps with no stable resourceIds, screen lock interrupting recording. |
+
+`docs/node-api-for-agents.md` is the sole authored source. `sites/docs/docs/` is generated - run the docs-generate skill after authoring and commit the regenerated output alongside the source change.
+
+---
+
 ## File Layout
 
 ```
