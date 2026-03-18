@@ -31,7 +31,7 @@ Three distinct use cases motivate this feature. All three are served by the same
 - Clawperator records the flow via the existing Accessibility Service.
 - Node pulls the recording from the device.
 - Node compiles the recording into a standard `Execution` payload.
-- Clawperator replays the flow using the existing execution pipeline.
+- An agent uses the compiled recording as context to reproduce the flow, issuing individual commands step by step.
 - All three phases are independently verifiable.
 
 ## Non-Goals
@@ -73,23 +73,23 @@ record compile
   → parse NDJSON
   → normalize/compact events
   → emit Execution JSON (session.execution.json)
+  → emit step log to stderr
 
-  ┌─ one-off execution ──────────────────────────────────────────────────────┐
-  │  clawperator execute --execution-file session.execution.json             │
-  │    → existing execution pipeline (unchanged)                             │
-  └──────────────────────────────────────────────────────────────────────────┘
-  ┌─ reusable flow (production path) ────────────────────────────────────────┐
-  │  place session.execution.json in a skill directory as an artifact        │
-  │  clawperator skills run <skill-id>                                       │
-  │    → existing skills + execution pipeline (unchanged)                    │
+  ┌─ agent-driven playback (Phase 3 / production path) ──────────────────────┐
+  │  Agent reads session.execution.json (step log + action sequence)         │
+  │  For each step:                                                           │
+  │    clawperator execute  (single-action)  →  Android                      │
+  │    clawperator observe snapshot          →  verify device state          │
+  │    agent decides: proceed, retry, or halt                                │
+  │  If flow validates: agent authors a skill artifact                       │
   └──────────────────────────────────────────────────────────────────────────┘
 ```
 
 The recording surface is an extension to the Android Operator app's existing broadcast receiver and Accessibility Service. No new IPC, no streaming, no additional processes.
 
-The compilation step is pure Node-side logic: NDJSON in, standard `Execution` JSON out. Execution uses `runExecution()` verbatim via the existing `execute` or `skills run` commands - no new execution path.
+The compilation step is pure Node-side logic: NDJSON in, standard `Execution` JSON out. The compiled JSON is the agent's map - a structured, normalized description of the user's intent. The agent drives execution step by step using existing commands; the compiled output is not a script to be dispatched wholesale.
 
-**`record replay` scope note:** A `record replay` convenience command exists as PoC development tooling - it chains `compile + execute` in a single step to make end-to-end validation fast during development. It is not part of the public API and will not be documented as such. The intended production paths for executing a compiled recording are `execute --execution-file` (one-off) and `skills run` (reusable). This is a deliberate choice: if `record replay` were a public API surface, it would compete with the skills system and train users away from graduating recordings into proper skills.
+**Why the agent must be in the loop:** Android apps are dynamic. Interstitial dialogs, update prompts, A/B test variants, and loading state differences appear unpredictably and are absent from any recording. A batched execution script has no mechanism to observe or handle them. The agent does. Removing the agent from the playback loop removes the only adaptive layer. `execute --execution-file` is appropriate for stable, validated skills - not for raw recordings. See `tasks/record/limitations.md` for the full treatment.
 
 ---
 
@@ -98,10 +98,9 @@ The compilation step is pure Node-side logic: NDJSON in, standard `Execution` JS
 The compiler produces a standard `Execution` JSON document, identical in shape to what any agent would send to `clawperator execute`. This is the right choice for the following reasons:
 
 - It is the canonical interface. Agents, skills, and humans all converge on `Execution` JSON. Introducing an intermediate "replay" format would create a new abstraction with no payoff.
-- It is immediately runnable via `clawperator execute --execution-file replay.execution.json`. During PoC development, `record replay --input replay.execution.json` provides the same result in a single step.
-- It is inspectable and editable. A developer can open the compiled file, tweak a matcher, and re-run without tooling.
-- It is useful as agent input. An agent tasked with constructing a skill from a recording can read a compiled `Execution` JSON directly. The concrete, ordered steps - with `resourceId` matchers and action types already resolved - give the agent ground truth about what the user did, rather than requiring it to infer intent from raw accessibility events.
-- Skill artifacts (`.recipe.json`) are parameterized templates. A compiled recording has no parameters - it is a concrete flow. Wrapping it as a recipe artifact would add noise.
+- It is the natural unit of agent input. An agent driving playback reads the compiled steps one at a time, issues individual `clawperator execute` calls, and observes device state between each. The concrete, normalized action sequence - with `resourceId` matchers and action types already resolved - gives the agent ground truth about what the user did, removing the need for UI exploration.
+- It is inspectable and editable. A developer can open the compiled file, adjust a matcher or timing value, and hand it back to an agent without any additional tooling.
+- Skill artifacts (`.recipe.json`) are parameterized templates. A compiled recording has no parameters - it is a concrete flow. Wrapping it as a recipe artifact would add noise before the agent has had a chance to validate and generalize the steps.
 
 The compiled file is saved as `<session_id>.execution.json`. The `source: "clawperator-record"` field distinguishes it from agent-authored and skill-compiled executions, which matters when an agent is processing a batch of executions and needs to know their provenance.
 
@@ -253,9 +252,7 @@ clawperator record stop    [--session-id <id>] [--device-id <serial>] [--receive
 
 `record compile` reads the NDJSON file, runs normalization, and writes an `Execution` JSON. Output defaults to `<input_basename>.execution.json` in the same directory.
 
-`record pull` and `record compile` are usable standalone. An agent or developer may pull, inspect, edit the compiled JSON, then execute it manually. The pipeline does not have to be atomic.
-
-**`record replay` (PoC tooling only):** A `record replay` subcommand is included as a PoC development convenience - it chains `compile + execute` in a single step to make end-to-end validation fast during Phase 3 verification. It is not part of the public API and is not documented in `docs/node-api-for-agents.md`. The production paths for executing a compiled recording are `execute --execution-file` (one-off) and `skills run` (reusable). See the Architecture Overview for rationale.
+`record pull` and `record compile` are usable standalone. An agent or developer may pull, inspect, edit the compiled JSON, and then hand it to an agent for step-by-step playback. The pipeline does not have to be atomic.
 
 ### ADB Pull
 
@@ -350,75 +347,34 @@ The result is clamped to `MAX_EXECUTION_TIMEOUT_MS` (120,000ms). If the estimate
 
 ---
 
-## Phase 3 - Replay (end-to-end)
+## Phase 3 - Agent-Assisted Playback
 
 ### Goal
 
-Execute the compiled recording on device using the existing execution pipeline without modification.
+Demonstrate that the compiled recording can guide an agent to reproduce the recorded flow on device. The agent is in the loop at every step: it reads the compiled execution JSON, issues individual commands, observes device state, and adapts when reality diverges from the recording.
 
-### Implementation
+Phase 3 ships zero new Clawperator code. The deliverable is a validated end-to-end demonstration using existing commands and a standard agent.
 
-Replay is intentionally trivial at this phase. The compiled `Execution` JSON is passed to `runExecution()` unchanged. No new Android runtime code is required.
+### Agent-Driven Execution Model
 
-The canonical execution paths are:
+The agent receives the compiled execution JSON and step log from Phase 2. It uses these as a map - ground truth about the user's intended path - not as a script to execute blindly.
 
-```bash
-# one-off: execute the compiled file directly
-clawperator execute --execution-file demo-001.execution.json
-
-# reusable: place execution JSON in a skill directory, then run via skills
-clawperator skills run <skill-id>
-```
-
-The `record replay` subcommand (PoC tooling only) chains compile and execute as a single step for development convenience. It is not the documented public execution path.
-
-```typescript
-// domain/recording/replayRecording.ts
-async function replayRecording(
-  execution: Execution,
-  config: RuntimeConfig
-): Promise<RunExecutionResult> {
-  // Regenerate commandId to ensure uniqueness
-  const replayExecution = { ...execution, commandId: generateCommandId() };
-  return runExecution(replayExecution, config);
-}
-```
-
-`commandId` regeneration is the only mutation. `taskId` is preserved so correlated replays can be grouped.
-
-### Constraints
-
-- Linear flow only. No branching, no condition checks.
-- Fail fast: if any step returns `success: false`, the execution halts and returns the failed envelope. This is already the behavior of the existing runtime.
-- No agent reasoning. The replay does not inspect intermediate state or adapt.
-
-### Debug Observability
-
-When a replay fails it is not always obvious whether the failure was caused by a bad matcher, insufficient timing, or unexpected app state. Running with `--verbose` emits per-step output to help distinguish these cases:
+The agent loop:
 
 ```
-[step-1] open_app com.android.settings  → success
-[step-2] sleep 800ms                    → success
-[step-3] click resourceId=...id/dashboard_tile text="Display"  → success
-[step-4] sleep 500ms                    → success
-[step-5] press_key back                 → FAILED (NODE_NOT_FOUND)
+For each step in the compiled execution JSON:
+  1. Issue a single-action clawperator execute call
+  2. Observe result envelope (success / failure, step data)
+  3. Call clawperator observe snapshot to verify device state
+  4. If state matches expectation: proceed to next step
+  5. If state diverges: adapt (retry, wait, skip) or halt and report
+After all steps complete successfully:
+  Optionally author a skill artifact from the validated flow
 ```
 
-This uses the global `--verbose` flag already present on all commands. `execute --execution-file` passes per-step results in verbose mode rather than only emitting the final envelope.
+This is the correct model for Clawperator. The agent is the brain deciding whether to proceed at each step; Clawperator is the hand executing one discrete action at a time. The recording provides the agent with a concrete, pre-resolved description of the flow - it no longer needs to explore the UI to discover what to do.
 
-For matcher failures specifically, knowing the step failed is often not enough - you need to see what the UI actually looked like at that moment. The `--debug-artifacts` flag captures a `snapshot_ui` on each step failure and saves the hierarchy XML to the output directory alongside the session files:
-
-```
-./recordings/
-  demo-001.ndjson
-  demo-001.execution.json
-  demo-001.debug/
-    step-5-failed-snapshot.xml    (UI hierarchy at point of failure)
-```
-
-This is implemented by injecting a `snapshot_ui` action immediately after any failed step before halting - a one-action supplemental execution dispatched automatically when `--debug-artifacts` is set and a failure is detected. It does not change the primary result envelope.
-
-`--debug-artifacts` is not on by default because it requires a second round-trip to the device on failure. It should be used explicitly when diagnosing matcher issues. During the PoC, `record replay --debug-artifacts` is the intended invocation; when using the production path, pass `--debug-artifacts` to `execute --execution-file`.
+No new Node code is needed. Each step in the loop uses `clawperator execute` (existing) and `clawperator observe snapshot` (existing). The compiled execution JSON is already on disk from Phase 2.
 
 ### PoC Demo Scenario
 
@@ -436,17 +392,15 @@ This scenario is chosen because:
 - It is short enough to execute reliably in under 10 seconds.
 - It exercises open-app, click, and back navigation - the three most important action types.
 
-This scenario also directly represents the developer productivity use case: a developer working on the Display settings screen can replay this flow to return to their target screen after every rebuild, without manually navigating. The same flow, used as a smoke test, verifies that the Display entry point is reachable - a meaningful check in the UI testing use case.
-
-The replay is considered successful when the device reproduces the flow (Settings opens, Display screen appears, returns to Settings) at least twice consecutively without failure.
+The demo is conducted with a standard agent (Claude) receiving the compiled `demo-001.execution.json` and step log from Phase 2. The agent is instructed to reproduce the flow on the connected device. It issues individual `clawperator execute` calls for each step and verifies device state between them.
 
 ### Success Criteria
 
-- `clawperator execute --execution-file demo-001.execution.json` completes without error.
-- Primary signal: all steps in the returned envelope have `success: true` (objective, verifiable from CLI output without inspecting the device).
-- Secondary confirmation: device visually reproduces the recorded flow.
+- Agent successfully completes the Settings → Display → back flow using the recording as context.
+- Each step is issued as a discrete `clawperator execute` call (not via `--execution-file`).
+- Agent observes device state between steps via `observe snapshot`.
 - Flow succeeds at least twice consecutively.
-- No changes to `runExecution()` or any existing Android action handler are required.
+- No new Clawperator code ships in this phase.
 
 ---
 
@@ -590,20 +544,25 @@ Developer                  Node CLI                     Android / Host FS
                              [step log to stderr]
 
 
-Phase 3 - Replay
-================
+Phase 3 - Agent-Assisted Playback
+==================================
 
-Developer                  Node CLI                     Android
----------                  --------                     -------
-                           execute --execution-file demo-001.execution.json
-                             replayRecording()
-                               regenerate commandId
-                               runExecution() ─────────────→ existing broadcast dispatch
-                                                            tap, scroll, press_key handlers
-                             [Clawperator-Result] ←─────── { status: success, stepResults }
+Agent                      Node CLI                     Android
+-----                      --------                     -------
+reads demo-001.execution.json (step log + action sequence)
 
-  (PoC shortcut: record replay --input demo-001.execution.json
-                   chains compile + execute in one step for dev verification)
+[for each step]
+  execute single action
+                           execute (single-action JSON)
+                             runExecution() ─────────────→ existing broadcast dispatch
+                             [Clawperator-Result] ←─────── { success, stepData }
+  observe snapshot
+                           observe snapshot ────────────→ snapshot_ui
+                             [Clawperator-Result] ←─────── UI hierarchy XML
+  agent evaluates state → proceed / adapt / halt
+
+[after all steps succeed]
+  agent optionally authors skill artifact
 ```
 
 ---
@@ -612,22 +571,12 @@ Developer                  Node CLI                     Android
 
 ### New Node CLI Commands
 
-**Public API:**
-
 ```
 clawperator record start   [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]
 clawperator record stop    [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]
 clawperator record pull    [--session-id <id>|latest] [--out <dir>] [--device-id <serial>]
 clawperator record compile --input <ndjson-file> [--out <execution-json>] [--step-delay-ms <n>] [--no-dedup]
 ```
-
-**PoC development tooling (not public API, not documented in node-api-for-agents.md):**
-
-```
-clawperator record replay  --input <ndjson-file|execution-json> [--device-id <serial>] [--step-delay-ms <n>] [--debug-artifacts]
-```
-
-`record replay` exists to make PoC end-to-end verification fast during Phase 3 development. The production execution paths are `clawperator execute --execution-file <path>` (one-off) and `clawperator skills run <skill-id>` (reusable).
 
 All `record` subcommands inherit the global `--output json|pretty` and `--verbose` flags.
 
@@ -681,7 +630,7 @@ Documentation is part of the work for each PR, not a follow-up step. The table b
 |---|---|---|---|
 | 1 | `start_recording` / `stop_recording` action types, Android recording runtime | None | The new action types are not user-accessible without the Phase 2 Node commands. Documenting them in isolation would describe a partial API. Defer to Phase 2. |
 | 2 | `record` CLI command group, ADB pull, compiler, all error codes | `docs/node-api-for-agents.md` | This is the first user-accessible surface. Add a Recording section covering all five subcommands, the NDJSON schema, the compiled Execution format, and the new error codes. Note the API as early-access: contract is intentionally forward-looking but specific details (compiler normalization rules, timing defaults) may evolve. |
-| 3 | End-to-end replay verified | `docs/node-api-for-agents.md`, `docs/troubleshooting.md` | Remove the early-access note if Phase 3 validates cleanly. Update troubleshooting with known failure modes from Phase 3 testing: timing issues, apps with no stable resourceIds, screen lock interrupting recording. |
+| 3 | Agent-assisted playback validated | `docs/node-api-for-agents.md`, `docs/troubleshooting.md` | Remove the early-access note if Phase 3 validates cleanly. Update troubleshooting with known failure modes from Phase 3 testing: timing issues, apps with no stable resourceIds, screen lock interrupting recording. |
 
 `docs/node-api-for-agents.md` is the sole authored source. `sites/docs/docs/` is generated - run the docs-generate skill after authoring and commit the regenerated output alongside the source change.
 
@@ -700,21 +649,20 @@ The compiler is pure deterministic logic and is the highest-value test target in
 - Scroll drop: scroll events produce a warning, not a compile failure
 - Schema version: compiler rejects a file whose header `schemaVersion` does not match expected
 - Empty recording: `RECORDING_EMPTY` error returned cleanly
-- `record replay` dispatch (PoC tooling): `.ndjson` triggers compile path, `.execution.json` skips to execute
 
 No Android runtime tests are required for Phase 2. The Android recording logic is manually verified against the Phase 1 success criteria.
 
 **Deferred - integration and end-to-end tests (post-PoC):**
 
-Full integration testing is deferred until the prototype is running, validated, and the decision is made to officially pursue record and replay as a production feature. At that point, the right approach is a skill that:
+Full integration testing is deferred until the prototype is running, validated, and the decision is made to officially pursue record as a production feature. At that point, the right approach is a skill that:
 
 - Starts an Android emulator with a known app installed
-- Replays a pre-recorded fixture (a committed `.ndjson` file with a deterministic known-good flow)
-- Asserts the replay envelope contains all `success: true` steps
+- Uses a committed `.ndjson` fixture to drive an agent through the full record-to-playback pipeline
+- Asserts the agent successfully completes the flow and the compiled execution JSON is valid
 
-This gives the test suite a stable, device-independent way to run the full record-to-replay pipeline in CI without relying on physical device availability. It also validates that the NDJSON schema, compiler, and execution contract remain compatible across changes.
+This gives the test suite a stable, device-independent way to validate the NDJSON schema, compiler, and execution contract across changes.
 
-Until then, Phase 3 manual verification (two consecutive successful replays on a physical device or emulator) is the acceptance bar.
+Until then, Phase 3 manual verification (agent successfully replays the flow twice consecutively) is the acceptance bar.
 
 ---
 
@@ -732,10 +680,9 @@ apps/node/src/
     recording/
       pullRecording.ts                (adb pull orchestration)
       compileRecording.ts             (NDJSON → Execution)
-      replayRecording.ts              (thin wrapper around runExecution)
       recordingEventTypes.ts          (RawRecordingEvent types)
   cli/commands/
-    record.ts                         (yargs subcommand group: start/stop/pull/compile/replay)
+    record.ts                         (yargs subcommand group: start/stop/pull/compile)
 
 apps/android/shared/data/operator/src/main/kotlin/clawperator/operator/
   recording/
@@ -757,7 +704,7 @@ apps/android/shared/data/operator/src/main/kotlin/clawperator/operator/
 | 2 | `record pull` retrieves file without error | CLI exit code 0 |
 | 2 | `record compile` produces valid Execution JSON | `clawperator execute --validate-only` on output |
 | 2 | Step log matches performed actions | Developer visual inspection |
-| 3 | `execute --execution-file` completes without error | CLI exit code 0 |
-| 3 | Device reproduces recorded flow | Developer visual inspection |
-| 3 | Flow succeeds twice consecutively | Repeat `execute --execution-file` run |
+| 3 | Agent completes flow using recording as context | Developer visual inspection |
+| 3 | Each step issued as discrete `execute` call | Agent session log |
+| 3 | Flow succeeds twice consecutively | Repeat agent session |
 | All | No changes to `runExecution()` or existing action handlers | Code review: no diff in those files |
