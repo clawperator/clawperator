@@ -104,6 +104,30 @@ export function addSettleWarnings(stepResults: ResultEnvelope["stepResults"], ex
   }
 }
 
+/**
+ * Add deprecation warnings to step results when deprecated 'target' param was used
+ * instead of canonical 'matcher' for scroll_and_click and scroll_until actions.
+ */
+export function addTargetDeprecationWarnings(stepResults: ResultEnvelope["stepResults"], execution: Execution): void {
+  const actionMap = new Map(execution.actions.map((action) => [action.id, action]));
+
+  for (const step of stepResults) {
+    if (step.actionType !== "scroll_and_click" && step.actionType !== "scroll_until") {
+      continue;
+    }
+
+    const action = actionMap.get(step.id);
+    if (!action?.params?._usedDeprecatedTarget) {
+      continue;
+    }
+
+    step.data = {
+      ...step.data,
+      warn: "'target' is deprecated; use 'matcher'",
+    };
+  }
+}
+
 export function injectServiceUnavailableHint(envelope: ResultEnvelope, deviceId: string): void {
   if (envelope.status !== "failed" || envelope.errorCode !== "SERVICE_UNAVAILABLE") {
     return;
@@ -307,6 +331,9 @@ async function performExecution(
         // Attach data.warn to any snapshot_ui immediately following a click with no sleep.
         addSettleWarnings(result.envelope.stepResults, execution);
       }
+
+      // Add deprecation warnings for scroll actions using deprecated 'target' param
+      addTargetDeprecationWarnings(result.envelope.stepResults, execution);
 
       const hasScreenshot = result.envelope.stepResults.some(s => s.actionType === "take_screenshot");
       const screenAction = execution.actions.find(a => a.type === "take_screenshot");

@@ -14,8 +14,10 @@ export interface ActionParams {
   clear?: boolean;
   /** clickType: default | long_click | focus */
   clickType?: string;
-  /** scroll_and_click */
+  /** scroll_and_click - deprecated, use matcher */
   target?: NodeMatcher;
+  /** Transient flag set during validation when deprecated 'target' was used instead of 'matcher' */
+  _usedDeprecatedTarget?: boolean;
   container?: NodeMatcher;
   direction?: string;
   maxSwipes?: number;

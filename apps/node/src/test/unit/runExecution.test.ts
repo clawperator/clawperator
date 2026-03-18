@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert";
 import {
   addSettleWarnings,
+  addTargetDeprecationWarnings,
   attachSnapshotsToStepResults,
   finalizeSuccessfulCloseAppSteps,
   finalizeSuccessfulScreenshotCapture,
@@ -482,5 +483,108 @@ describe("runCloseAppPreflight", () => {
         stderr: "shell failed",
       });
     }
+  });
+});
+
+describe("addTargetDeprecationWarnings", () => {
+  it("adds deprecation warning when scroll_and_click used deprecated 'target' param", () => {
+    const execution: Execution = {
+      commandId: "cmd-dep",
+      taskId: "task-dep",
+      source: "test",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 5000,
+      actions: [
+        { id: "scroll-1", type: "scroll_and_click", params: { _usedDeprecatedTarget: true } },
+      ],
+    };
+    const stepResults: StepResult[] = [
+      { id: "scroll-1", actionType: "scroll_and_click", success: true, data: {} },
+    ];
+
+    addTargetDeprecationWarnings(stepResults, execution);
+
+    assert.strictEqual(stepResults[0].data.warn, "'target' is deprecated; use 'matcher'");
+  });
+
+  it("adds deprecation warning when scroll_until used deprecated 'target' param", () => {
+    const execution: Execution = {
+      commandId: "cmd-dep",
+      taskId: "task-dep",
+      source: "test",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 5000,
+      actions: [
+        { id: "scroll-1", type: "scroll_until", params: { _usedDeprecatedTarget: true } },
+      ],
+    };
+    const stepResults: StepResult[] = [
+      { id: "scroll-1", actionType: "scroll_until", success: true, data: {} },
+    ];
+
+    addTargetDeprecationWarnings(stepResults, execution);
+
+    assert.strictEqual(stepResults[0].data.warn, "'target' is deprecated; use 'matcher'");
+  });
+
+  it("does not add warning when canonical 'matcher' was used (no _usedDeprecatedTarget flag)", () => {
+    const execution: Execution = {
+      commandId: "cmd-dep",
+      taskId: "task-dep",
+      source: "test",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 5000,
+      actions: [
+        { id: "scroll-1", type: "scroll_and_click", params: { _usedDeprecatedTarget: false } },
+      ],
+    };
+    const stepResults: StepResult[] = [
+      { id: "scroll-1", actionType: "scroll_and_click", success: true, data: {} },
+    ];
+
+    addTargetDeprecationWarnings(stepResults, execution);
+
+    assert.ok(!("warn" in stepResults[0].data));
+  });
+
+  it("does not add warning for non-scroll action types", () => {
+    const execution: Execution = {
+      commandId: "cmd-dep",
+      taskId: "task-dep",
+      source: "test",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 5000,
+      actions: [
+        { id: "click-1", type: "click", params: { _usedDeprecatedTarget: true } },
+      ],
+    };
+    const stepResults: StepResult[] = [
+      { id: "click-1", actionType: "click", success: true, data: {} },
+    ];
+
+    addTargetDeprecationWarnings(stepResults, execution);
+
+    assert.ok(!("warn" in stepResults[0].data));
+  });
+
+  it("preserves existing data when adding warning", () => {
+    const execution: Execution = {
+      commandId: "cmd-dep",
+      taskId: "task-dep",
+      source: "test",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 5000,
+      actions: [
+        { id: "scroll-1", type: "scroll_and_click", params: { _usedDeprecatedTarget: true } },
+      ],
+    };
+    const stepResults: StepResult[] = [
+      { id: "scroll-1", actionType: "scroll_and_click", success: true, data: { termination_reason: "TARGET_FOUND" } },
+    ];
+
+    addTargetDeprecationWarnings(stepResults, execution);
+
+    assert.strictEqual(stepResults[0].data.termination_reason, "TARGET_FOUND");
+    assert.strictEqual(stepResults[0].data.warn, "'target' is deprecated; use 'matcher'");
   });
 });

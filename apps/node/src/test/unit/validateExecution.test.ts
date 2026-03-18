@@ -743,6 +743,116 @@ describe("validateExecution", () => {
       (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
     );
   });
+
+  // matcher/target normalization tests for scroll_and_click and scroll_until
+  describe("matcher/target param normalization", () => {
+    it("accepts scroll_and_click with canonical 'matcher' param", () => {
+      const ex = validateExecution({
+        commandId: "c", taskId: "t", source: "s",
+        expectedFormat: "android-ui-automator", timeoutMs: 5000,
+        actions: [{ id: "x", type: "scroll_and_click", params: { matcher: { textEquals: "About phone" } } }],
+      });
+      assert.strictEqual(ex.actions[0].type, "scroll_and_click");
+      // matcher should be copied to target for Android compatibility
+      assert.deepStrictEqual(ex.actions[0].params?.target, { textEquals: "About phone" });
+      assert.strictEqual(ex.actions[0].params?._usedDeprecatedTarget, false);
+    });
+
+    it("accepts scroll_and_click with deprecated 'target' param", () => {
+      const ex = validateExecution({
+        commandId: "c", taskId: "t", source: "s",
+        expectedFormat: "android-ui-automator", timeoutMs: 5000,
+        actions: [{ id: "x", type: "scroll_and_click", params: { target: { textEquals: "About phone" } } }],
+      });
+      assert.strictEqual(ex.actions[0].type, "scroll_and_click");
+      // target should remain
+      assert.deepStrictEqual(ex.actions[0].params?.target, { textEquals: "About phone" });
+      // flag should indicate deprecated usage
+      assert.strictEqual(ex.actions[0].params?._usedDeprecatedTarget, true);
+    });
+
+    it("rejects scroll_and_click with both 'matcher' and 'target' params", () => {
+      assert.throws(
+        () =>
+          validateExecution({
+            commandId: "c", taskId: "t", source: "s",
+            expectedFormat: "android-ui-automator", timeoutMs: 5000,
+            actions: [{ id: "x", type: "scroll_and_click", params: { matcher: { textEquals: "A" }, target: { textEquals: "B" } } }],
+          }),
+        (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
+      );
+    });
+
+    it("rejects scroll_and_click without 'matcher' or 'target' param", () => {
+      assert.throws(
+        () =>
+          validateExecution({
+            commandId: "c", taskId: "t", source: "s",
+            expectedFormat: "android-ui-automator", timeoutMs: 5000,
+            actions: [{ id: "x", type: "scroll_and_click", params: {} }],
+          }),
+        (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
+      );
+    });
+
+    it("accepts scroll_until with canonical 'matcher' param and clickAfter", () => {
+      const ex = validateExecution({
+        commandId: "c", taskId: "t", source: "s",
+        expectedFormat: "android-ui-automator", timeoutMs: 5000,
+        actions: [{ id: "x", type: "scroll_until", params: { matcher: { textEquals: "About phone" }, clickAfter: true } }],
+      });
+      assert.strictEqual(ex.actions[0].type, "scroll_until");
+      // matcher should be copied to target for Android compatibility
+      assert.deepStrictEqual(ex.actions[0].params?.target, { textEquals: "About phone" });
+      assert.strictEqual(ex.actions[0].params?._usedDeprecatedTarget, false);
+    });
+
+    it("accepts scroll_until with deprecated 'target' param and clickAfter", () => {
+      const ex = validateExecution({
+        commandId: "c", taskId: "t", source: "s",
+        expectedFormat: "android-ui-automator", timeoutMs: 5000,
+        actions: [{ id: "x", type: "scroll_until", params: { target: { textEquals: "About phone" }, clickAfter: true } }],
+      });
+      assert.strictEqual(ex.actions[0].type, "scroll_until");
+      // target should remain
+      assert.deepStrictEqual(ex.actions[0].params?.target, { textEquals: "About phone" });
+      // flag should indicate deprecated usage
+      assert.strictEqual(ex.actions[0].params?._usedDeprecatedTarget, true);
+    });
+
+    it("rejects scroll_until with both 'matcher' and 'target' params", () => {
+      assert.throws(
+        () =>
+          validateExecution({
+            commandId: "c", taskId: "t", source: "s",
+            expectedFormat: "android-ui-automator", timeoutMs: 5000,
+            actions: [{ id: "x", type: "scroll_until", params: { matcher: { textEquals: "A" }, target: { textEquals: "B" } } }],
+          }),
+        (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
+      );
+    });
+
+    it("accepts scroll_until without matcher/target when clickAfter is not set", () => {
+      const ex = validateExecution({
+        commandId: "c", taskId: "t", source: "s",
+        expectedFormat: "android-ui-automator", timeoutMs: 5000,
+        actions: [{ id: "x", type: "scroll_until", params: { direction: "down" } }],
+      });
+      assert.strictEqual(ex.actions[0].type, "scroll_until");
+    });
+
+    it("rejects scroll_until with clickAfter=true but no matcher or target", () => {
+      assert.throws(
+        () =>
+          validateExecution({
+            commandId: "c", taskId: "t", source: "s",
+            expectedFormat: "android-ui-automator", timeoutMs: 5000,
+            actions: [{ id: "x", type: "scroll_until", params: { clickAfter: true } }],
+          }),
+        (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
+      );
+    });
+  });
 });
 
 describe("validatePayloadSize", () => {
