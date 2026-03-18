@@ -3,7 +3,6 @@ site:
   scratch_dir: sites/docs/.generated
   inventory_file: sites/docs/docs_inventory.json
   build_metadata_file: sites/docs/docs_build.json
-  # cli-reference updated: added --dry-run to execute, skills new, skills validate
 
 repos:
   clawperator_root: .
