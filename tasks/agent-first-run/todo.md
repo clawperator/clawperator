@@ -25,7 +25,7 @@ Documentation relevant to the change is included in the task — not deferred.
 | [DONE] PR-1 | T-01 | `operator` + `docs` | Correctness bug; ship fast and alone |
 | [DONE] PR-2 | T-02, T-03, T-04 | `operator` + `docs` | New action primitives; one APK release |
 | [DONE] PR-3 | T-05, T-08, T-10, T-11 | `node` + `docs` | Small, independent diagnostics and warning fixes |
-| PR-4 | T-06, T-09 | `node` + `docs` | Payload authoring ergonomics; T-09 dry-run output benefits from T-06 |
+| [DONE] PR-4 | T-06, T-09 | `node` + `docs` | Payload authoring ergonomics; T-09 dry-run output benefits from T-06 |
 | [DONE] PR-5 | T-07 | `node` + `docs` | Skills scaffolding; substantial enough to stand alone |
 | [DONE] PR-6 | T-12 | `install` + `docs` | Installer multi-device awareness |
 | PR-7 | T-13, T-14 | `docs` | Link cleanup + action reference page; both docs-only, do together |
@@ -251,7 +251,7 @@ When error code is `SERVICE_UNAVAILABLE` and no receiver package is detected on 
 
 ---
 
-## PR-4 — Payload authoring ergonomics
+## [DONE] PR-4 — Payload authoring ergonomics
 **Tasks:** T-06, T-09 | **Codebases:** `node` + `docs`
 
 Dry-run and param naming normalization are both about making it easier to write correct payloads without round-tripping to the device. T-09 benefits from T-06 shipping in the same PR: the dry-run output should show `matcher` as canonical from the first release.
