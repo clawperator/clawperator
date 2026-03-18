@@ -4364,7 +4364,7 @@ Bounded scroll loop with machine-readable termination reason. Scrolls repeatedly
 | `CONTAINER_NOT_SCROLLABLE` | Container not scrollable (`success: false`) |
 | `CONTAINER_LOST` | Container disappeared mid-loop (`success: false`) |
 
-**Note on `clickAfter`:** The click only fires if the loop terminates with `TARGET_FOUND`. If termination is `EDGE_REACHED` (even if target is visible), no click occurs.
+**Note on `clickAfter`:** The click fires when `termination_reason` is `TARGET_FOUND`. When the loop would otherwise terminate with `EDGE_REACHED`, `MAX_SCROLLS_REACHED`, `MAX_DURATION_REACHED`, or `NO_POSITION_CHANGE`, the runtime re-queries the accessibility tree for `matcher`. If the target is visible at that point, `termination_reason` is promoted to `TARGET_FOUND` and the click fires normally.
 
 **Result data on success:**
 
