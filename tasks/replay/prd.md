@@ -9,7 +9,7 @@
 
 Clawperator can execute precise UI actions on Android devices, but every flow must currently be authored by hand as a JSON execution or skill artifact. There is no mechanism for a human to demonstrate a workflow and then replay it.
 
-Record and replay closes this gap: a developer performs a UI flow once, Clawperator captures it, and that flow can be replayed deterministically. The end product is not a throw-away demo - it is the canonical path by which most replayable workflows will eventually be authored. The API and data contracts designed here should be suitable for production use.
+Record and replay closes this gap: a developer performs a UI flow once, Clawperator captures it, and that flow can be replayed deterministically. The goal is an API worth keeping: designed with production viability in mind, cleanly integrated with existing contracts, and not requiring a rewrite when the PoC graduates. Specific details - particularly the compiler's normalization rules - are expected to evolve as we learn what real recordings look like.
 
 ---
 
@@ -21,7 +21,7 @@ Three distinct use cases motivate this feature. All three are served by the same
 
 **Android developer productivity.** Developers working on a UI feature spend a significant fraction of iteration time navigating to the screen they care about - logging in with test credentials, tapping through onboarding, reaching a nested settings panel - before they can observe the change they just made. Replay eliminates that overhead. A developer records the navigation path once and replays it as a single command during their iteration loop. This is closer to a macro system than a test suite: it does not need to be shared, checked in, or maintained. A local recording that lives for the duration of one feature branch has immediate value.
 
-**UI testing and verification.** A recorded happy path is a lightweight smoke test with no test framework, no instrumentation, and no build-time setup required. It runs against a real device or emulator via `clawperator execute`. For agent-driven development work, replay also provides a reliable "get to the state under test" primitive: an agent can replay a known navigation path to reach a target screen, then apply assertions using `snapshot_ui` and `read_text`. This makes Clawperator a practical tool for UI verification on real devices, which no existing lightweight tool handles well.
+**UI testing and verification.** A recorded happy path is a lightweight smoke test with no test framework, no instrumentation, and no build-time setup required. It runs against a real device or emulator via `clawperator execute`. For agent-driven development work, replay also provides a reliable "get to the state under test" primitive: an agent can replay a known navigation path to reach a target screen, then apply assertions using `snapshot_ui` and `read_text`. This makes Clawperator a practical tool for UI verification on real devices - something existing tools like Espresso and UIAutomator handle poorly in interactive development: they are test-framework-centric, require build-time instrumentation, and are not agent-friendly.
 
 ---
 
@@ -43,6 +43,7 @@ Three distinct use cases motivate this feature. All three are served by the same
 - CI integration.
 - Popup handling.
 - Streaming events to host during recording (all events are buffered on device).
+- Deterministic replay guarantees. Accessibility-based replay is best-effort. UI timing, dynamic view IDs, and app state can all cause a replay to diverge from the original recording. The PoC succeeds if it works reliably on a stable, cooperative target app. Robustness against the full range of real-world app behavior is a post-PoC concern.
 
 ---
 
@@ -262,18 +263,23 @@ async function compileRecording(
 ): Promise<Execution>
 ```
 
-**Normalization rules:**
+**Normalization rules (v1 - PoC scope):**
 
 | Rule | Input | Output |
 |---|---|---|
 | Open app at start | First `window_change` event | `open_app` action with `applicationId` |
-| Deduplicate rapid clicks | Multiple `click` events on same element within 100ms | Keep last only |
 | Back navigation | `press_key` with `key: "back"` | `press_key` action, `key: "back"` |
-| Skip recording noise | `window_change` → `window_change` without intervening user action | Keep only final |
-| Bounds-to-matcher promotion | `click` with resourceId present | `matcher: { resourceId: "...", textEquals: "..." }` |
-| Bounds-to-matcher fallback | `click` with no resourceId | `matcher: { textEquals: "..." }` if text present, else fail with `RECORDING_COMPILE_FAILED` |
+| Drop consecutive window changes | `window_change` immediately followed by another `window_change` with no intervening user action | Keep only the final one |
+| Deduplicate rapid clicks | Multiple `click` events on the same element within 100ms | Keep last only (guards against accidental double-tap during recording) |
+| Matcher synthesis - preferred | `click` with `resourceId` present | `matcher: { resourceId: "...", textEquals: "..." }` (textEquals omitted if null) |
+| Matcher synthesis - fallback | `click` with no `resourceId`, `text` present | `matcher: { textEquals: "..." }` with a warning in step log |
+| Matcher synthesis - bounds fallback | `click` with no `resourceId` and no `text` | `matcher: { bounds: { ... } }` with a warning; replay may be brittle |
 
-Scroll events are recorded but omitted from the compiled output for the Phase 3 PoC scenario (the demo scenario does not require scroll). The compiler should warn when scroll events are dropped rather than silently discard them, so the developer knows the replay may diverge.
+The bounds fallback exists so the PoC loop can complete even against apps that don't expose stable identifiers. A warning is emitted rather than a compile failure - the developer is informed but not blocked.
+
+Scroll events are recorded in the NDJSON schema and captured by the Android runtime, but omitted from compiled output in v1 (no scroll compilation logic). The compiler emits a warning when scroll events are dropped so the developer knows the replay may diverge on flows that required scrolling to reach a target. Scroll compilation is a v2 concern.
+
+Rules that are deferred to v2: inter-step timing heuristics based on observed event gaps, cross-session deduplication, intent inference beyond open_app.
 
 The resulting `Execution` uses `"source": "clawperator-record"` and `"mode": "direct"` to distinguish it from agent-authored and skill-compiled executions.
 
@@ -286,6 +292,23 @@ The resulting `Execution` uses `"source": "clawperator-record"` and `"mode": "di
 ```
 
 This is for developer inspection and also serves as a concise, readable description of the recorded flow that can be passed as context to an agent tasked with refining or generalizing the recording into a skill. The authoritative output is the JSON file.
+
+### Timing Model
+
+The compiler injects a `sleep` action between every compiled step. Without inter-step delays, the execution pipeline will dispatch actions faster than the device UI can settle, causing clicks to land on the wrong element or on a view that has not yet rendered.
+
+**v1 timing rules:**
+
+| Transition | Injected sleep |
+|---|---|
+| After `open_app` | 800ms (app launch is the slowest transition) |
+| After any `click` that changes the visible window (detected via next `window_change` in recording) | 500ms |
+| After any other `click` | 300ms |
+| After `press_key back` | 400ms |
+
+These are fixed defaults, not derived from the recorded timestamps. Using recorded timestamps to infer delays is a v2 optimization. Fixed conservative values are sufficient for PoC and easier to reason about when a replay fails.
+
+The `--step-delay-ms` flag on `record compile` and `record replay` allows the developer to override the default for all inter-step sleeps, which is useful when targeting a slow device or a particularly heavy app. The per-transition granularity above is the default; the flag overrides all of them uniformly.
 
 ### Success Criteria
 
@@ -509,11 +532,11 @@ Developer                  Node CLI                     Android
 ### New Node CLI Commands
 
 ```
-clawperator record start [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]
-clawperator record stop  [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]
-clawperator record pull  [--session-id <id>|latest] [--out <dir>] [--device-id <serial>]
-clawperator record compile --input <ndjson-file> [--out <execution-json>]
-clawperator record replay  --input <ndjson-file|execution-json> [--device-id <serial>]
+clawperator record start  [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]
+clawperator record stop   [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]
+clawperator record pull   [--session-id <id>|latest] [--out <dir>] [--device-id <serial>]
+clawperator record compile --input <ndjson-file> [--out <execution-json>] [--step-delay-ms <n>]
+clawperator record replay  --input <ndjson-file|execution-json> [--device-id <serial>] [--step-delay-ms <n>]
 ```
 
 All `record` subcommands inherit the global `--output json|pretty` and `--verbose` flags.
@@ -546,14 +569,17 @@ Added to `contracts/errors.ts` following existing conventions.
 
 ## Risks and Mitigations
 
+**A note on replay reliability:** Accessibility-based replay is inherently best-effort. Some recordings will not replay successfully on the first attempt, or will replay correctly most of the time but fail occasionally. This is expected and acceptable for PoC. The goal is to prove the loop works on a well-behaved target app, not to produce a robust general-purpose tool in this phase.
+
 | Risk | Likelihood | Mitigation |
 |---|---|---|
-| Accessibility event IDs are ephemeral and do not survive app restarts | High | Prefer `resourceId` over `viewIdResName`; fall back to `textEquals` when resourceId is absent; warn in compile output when only bounds are available |
-| Rapid double-tap recorded as two clicks | Medium | 100ms deduplication window in compiler |
-| `window_change` events fire before UI settles | Medium | Compiler uses `seq` ordering; Node adds `sleep` action between open_app and first click (configurable, default 500ms) |
-| Recording file not accessible via `adb pull` without root | Low | Use `getExternalFilesDir()` - this path is always ADB-accessible on debug builds; release builds require `android:debuggable` or `android:allowBackup` to be set |
-| `stop_recording` broadcast lost if device screen locked | Low | Accessibility events stop when screen locks; the session file is still intact; Node should warn if `eventCount: 0` |
-| Compiled execution exceeds 50-action limit | Very Low | Settings demo is 3 steps; limit is 50; emit compile warning at 40+ |
+| Many real apps do not expose stable `resourceId` values, or use dynamic IDs | High | Compiler falls back to `textEquals`, then bounds. Warns in step log. Replay may be brittle but will not refuse to run. |
+| UI has not settled when the next action fires | High | Fixed inter-step sleep injection (see timing model). Conservative defaults favor reliability over speed. |
+| Rapid double-tap recorded as two clicks | Medium | 100ms deduplication window in compiler. |
+| `window_change` events fire before UI settles after app launch | Medium | `open_app` step always followed by 800ms sleep before first interaction. |
+| Recording file not accessible via `adb pull` without root | Low | Use `getExternalFilesDir()` - always ADB-accessible on debug builds; release builds require `android:debuggable` or `android:allowBackup`. |
+| `stop_recording` broadcast not sent (e.g. screen locked, process killed) | Low | Session file is intact on device even without a clean stop. Node `record pull` can still retrieve it. Warn if `eventCount: 0`. |
+| Compiled execution exceeds 50-action limit | Very Low | 3-step Settings demo is well within limit. Emit compile warning at 40+ steps (accounting for injected sleep actions). |
 
 ---
 
