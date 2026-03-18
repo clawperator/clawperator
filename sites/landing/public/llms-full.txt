@@ -3143,13 +3143,14 @@ clawperator packages list [--device-id <id>] [--third-party]
 Execute a validated command payload.
 
 ```
-clawperator execute --execution <json-or-file> [--validate-only] [--device-id <id>] [--receiver-package <package>] [--timeout-ms <number>]
+clawperator execute --execution <json-or-file> [--validate-only] [--dry-run] [--device-id <id>] [--receiver-package <package>] [--timeout-ms <number>]
 ```
 
 | Flag | Description |
 |------|-------------|
 | `--execution <json-or-file>` | Execution payload as inline JSON or a path to a JSON file (required) |
 | `--validate-only` | Validate and normalize the payload without dispatching to any device |
+| `--dry-run` | Print the execution plan without dispatching to any device |
 | `--device-id <id>` | Target device serial |
 | `--receiver-package <package>` | Target Operator package |
 | `--timeout-ms <number>` | Override execution timeout within policy limits |
@@ -3324,6 +3325,41 @@ clawperator skills compile-artifact --skill-id <id> --artifact <name> [--vars <j
 | `--skill-id <id>` | Skill ID (named flag, alternative to positional) |
 | `--artifact <name>` | Artifact name, e.g. `ac-status` or `ac-status.recipe.json` (required) |
 | `--vars <json>` | Variable substitution JSON object (default: `{}`) |
+
+---
+
+### `skills new`
+
+Scaffold a new local skill folder and registry entry.
+
+```
+clawperator skills new <skill_id> [--summary <text>] [--output <json|pretty>]
+```
+
+| Flag / Arg | Description |
+|------------|-------------|
+| `<skill_id>` | Skill ID to create (required) |
+| `--summary <text>` | Override the default TODO summary written to `skill.json` and `SKILL.md` |
+
+Derives `applicationId` and `intent` by splitting `<skill_id>` on the final dot. Creates `SKILL.md`, `skill.json`, `scripts/run.js`, and `scripts/run.sh`. Updates the configured registry JSON so the new skill appears in `skills list`.
+
+---
+
+### `skills validate`
+
+Validate one local skill or the entire configured registry.
+
+```
+clawperator skills validate <skill_id> [--output <json|pretty>]
+clawperator skills validate --all [--output <json|pretty>]
+```
+
+| Flag / Arg | Description |
+|------------|-------------|
+| `<skill_id>` | Skill ID to validate |
+| `--all` | Validate every registry entry in one pass |
+
+Verifies that the registry entry exists, checks that `skill.json`, `SKILL.md`, script files, and artifact files exist on disk, and confirms that the parsed `skill.json` metadata matches the registry entry. This is an integrity check, not a live device test.
 
 ---
 
