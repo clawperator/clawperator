@@ -44,6 +44,8 @@ Three distinct use cases motivate this feature. All three are served by the same
 - Popup handling.
 - Streaming events to host during recording (all events are buffered on device).
 - Deterministic replay guarantees. Accessibility-based replay is best-effort. UI timing, dynamic view IDs, and app state can all cause a replay to diverge from the original recording. The PoC succeeds if it works reliably on a stable, cooperative target app. Robustness against the full range of real-world app behavior is a post-PoC concern.
+- Idempotency. Replays are not guaranteed to produce the same outcome when run multiple times. App state left over from a previous run (e.g. a screen that is already open, a toggle that is already active) can cause subsequent replays to diverge. Handling this is a post-PoC concern.
+- Long recording support. The PoC assumes short recordings of up to roughly 10 user-initiated steps. Behavior on recordings longer than that is undefined for this phase.
 
 ---
 
@@ -162,6 +164,8 @@ IDLE
 
 **Event capture** via `AccessibilityService.onAccessibilityEvent()`. The Operator app already requires the Accessibility Service to function, so no new permission is needed. When recording is active, events are routed through a `RecordingEventFilter` before the main action executor.
 
+**Self-event filtering:** The `RecordingEventFilter` must discard events whose source package is the Clawperator operator app itself (`com.clawperator.operator` / `com.clawperator.operator.dev`). The `start_recording` and `stop_recording` broadcasts, and any Clawperator-dispatched actions, generate accessibility events that must not be recorded. Without this filter, replaying a recorded flow and then recording that replay would produce a corrupted session containing Clawperator's own synthetic interactions.
+
 **Event types captured:**
 
 | Accessibility event | Recorded as | Notes |
@@ -185,13 +189,18 @@ Storage in `getExternalFilesDir()` allows direct `adb pull` without root. The `l
 
 **Raw event schema (NDJSON, one JSON object per line):**
 
+The first line of every recording file is a header record. All subsequent lines are event records.
+
 ```json
+{"type":"recording_header","schemaVersion":1,"sessionId":"demo-001","startedAt":1710000000000,"operatorPackage":"com.clawperator.operator.dev"}
 {"ts":1710000000000,"seq":0,"type":"window_change","packageName":"com.android.settings","className":"com.android.settings.Settings","title":"Settings"}
 {"ts":1710000000800,"seq":1,"type":"click","packageName":"com.android.settings","resourceId":"com.android.settings:id/dashboard_tile","text":"Display","contentDesc":null,"bounds":{"left":0,"top":400,"right":1080,"bottom":560}}
 {"ts":1710000001500,"seq":2,"type":"press_key","key":"back"}
 ```
 
-All events include `ts` (epoch ms) and `seq` (monotonic integer) for ordering. `seq` is the authoritative ordering field - do not rely on `ts` alone for ordering.
+The `schemaVersion` field in the header allows the Node compiler to detect and reject (with a clear error) files produced by a future incompatible version of the recording format. The current version is `1`. Event records do not carry a per-event version - the header covers the file.
+
+All event records include `ts` (epoch ms) and `seq` (monotonic integer) for ordering. `seq` is the authoritative ordering field - do not rely on `ts` alone for ordering.
 
 **Error codes added:**
 
@@ -231,7 +240,11 @@ clawperator record replay --input <file> [--device-id <id>]
 
 `record compile` reads the NDJSON file, runs normalization, and writes an `Execution` JSON. Output defaults to `<input_basename>.execution.json` in the same directory.
 
-`record replay` is a convenience wrapper: it calls `compile` internally and then passes the result to `runExecution()`. It does not write an intermediate file unless `--out` is also provided.
+`record replay` dispatches based on the input file type:
+- `*.ndjson` - compiles first (runs normalization, injects sleeps), then executes. The compiled `Execution` JSON is not written to disk unless `--out` is provided.
+- `*.execution.json` - skips compilation and executes directly. Use this to replay a previously compiled file, including one that has been manually edited.
+
+This distinction matters for agents: pass a `.ndjson` file when you want the compiler to run, pass a `.execution.json` when you want to replay a known-good artifact without recompiling.
 
 Both `record pull` and `record compile` are usable standalone. An agent or developer may pull, inspect, edit, then replay manually. The pipeline does not have to be atomic.
 
@@ -270,7 +283,7 @@ async function compileRecording(
 | Open app at start | First `window_change` event | `open_app` action with `applicationId` |
 | Back navigation | `press_key` with `key: "back"` | `press_key` action, `key: "back"` |
 | Drop consecutive window changes | `window_change` immediately followed by another `window_change` with no intervening user action | Keep only the final one |
-| Deduplicate rapid clicks | Multiple `click` events on the same element within 100ms | Keep last only (guards against accidental double-tap during recording) |
+| Deduplicate rapid clicks *(optional, on by default)* | Multiple `click` events on the same element within 100ms | Keep last only (guards against accidental double-tap during recording). Disable with `--no-dedup` flag when debugging to see exact raw events. |
 | Matcher synthesis - preferred | `click` with `resourceId` present | `matcher: { resourceId: "...", textEquals: "..." }` (textEquals omitted if null) |
 | Matcher synthesis - fallback | `click` with no `resourceId`, `text` present | `matcher: { textEquals: "..." }` with a warning in step log |
 | Matcher synthesis - bounds fallback | `click` with no `resourceId` and no `text` | `matcher: { bounds: { ... } }` with a warning; replay may be brittle |
@@ -350,6 +363,20 @@ async function replayRecording(
 - Fail fast: if any step returns `success: false`, the execution halts and returns the failed envelope. This is already the behavior of the existing runtime.
 - No agent reasoning. The replay does not inspect intermediate state or adapt.
 
+### Debug Observability
+
+When a replay fails it is not always obvious whether the failure was caused by a bad matcher, insufficient timing, or unexpected app state. `record replay --verbose` must emit per-step output to help distinguish these cases:
+
+```
+[step-1] open_app com.android.settings  → success
+[step-2] sleep 800ms                    → success
+[step-3] click resourceId=...id/dashboard_tile text="Display"  → success
+[step-4] sleep 500ms                    → success
+[step-5] press_key back                 → FAILED (NODE_NOT_FOUND)
+```
+
+This uses the global `--verbose` flag already present on all commands - `record replay` just needs to ensure the per-step results are surfaced in verbose mode rather than only emitting the final envelope. This is the primary debugging tool for timing vs. matcher failures; no additional commands or modes are required for PoC.
+
 ### PoC Demo Scenario
 
 **Target flow: Android Settings - Display**
@@ -373,6 +400,7 @@ The replay is considered successful when the device reproduces the flow (Setting
 ### Success Criteria
 
 - `record replay` completes without error.
+- All steps in the returned envelope have `success: true` (objective signal, verifiable from CLI output).
 - Device visually reproduces the recorded flow.
 - Flow succeeds at least twice consecutively.
 - No changes to `runExecution()` or any existing Android action handler are required.
@@ -384,8 +412,16 @@ The replay is considered successful when the device reproduces the flow (Setting
 ### Raw Recording Event (Android → NDJSON)
 
 ```typescript
-// Discriminated union of event types
+// First line of the NDJSON file (not an event, parsed separately)
+interface RecordingHeader {
+  type: "recording_header";
+  schemaVersion: number;
+  sessionId: string;
+  startedAt: number;       // epoch ms
+  operatorPackage: string; // package that produced this recording
+}
 
+// Discriminated union of event types (all lines after the header)
 type RawRecordingEvent =
   | {
       ts: number;        // epoch ms
@@ -535,7 +571,7 @@ Developer                  Node CLI                     Android
 clawperator record start  [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]
 clawperator record stop   [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]
 clawperator record pull   [--session-id <id>|latest] [--out <dir>] [--device-id <serial>]
-clawperator record compile --input <ndjson-file> [--out <execution-json>] [--step-delay-ms <n>]
+clawperator record compile --input <ndjson-file> [--out <execution-json>] [--step-delay-ms <n>] [--no-dedup]
 clawperator record replay  --input <ndjson-file|execution-json> [--device-id <serial>] [--step-delay-ms <n>]
 ```
 
