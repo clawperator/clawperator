@@ -57,11 +57,13 @@ When this file refers to `scripts/...`, resolve that path relative to the skill 
    - Run `.agents/skills/docs-generate/scripts/diff_report.py <clawperator>/sites/docs/docs <clawperator>/sites/docs/.generated`
    - Prefer patch edits over full rewrites.
    - Reject reflow-only churn, title churn, or broad page rewrites without a source change that justifies them.
-7. If the diff is acceptable, copy only the changed files from `.generated/` into `sites/docs/docs/`.
-8. Emit build metadata after a successful regeneration:
+7. Run the repo-local `docs-validate` skill:
+   - `.agents/skills/docs-validate/scripts/validate_source_of_truth.py --repo-root <clawperator> --skills-root <clawperator-skills>`
+8. If the diff is acceptable, copy only the changed files from `.generated/` into `sites/docs/docs/`.
+9. Emit build metadata after a successful regeneration:
    - Run `.agents/skills/docs-generate/scripts/write_build_metadata.py --repo-root <clawperator> --skills-root <clawperator-skills> --output <clawperator>/sites/docs/docs_build.json`
    - This is the docs build identifier. Do not hand-bump a docs version.
-9. Validate built docs reachability with the normal site build:
+10. Validate built docs reachability with the normal site build:
    - Run `./scripts/docs_build.sh`
    - This now verifies that source-map pages, docs-home links, and docs-host
      routes listed in `sites/docs/static/llms.txt` resolve to built artifacts.
