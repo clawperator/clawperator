@@ -169,7 +169,7 @@ Four small, independent changes that all make the CLI surface better information
 
 ---
 
-### T-05 · Fix `doctor` exit code for multi-device ambiguity
+### [DONE] T-05 · Fix `doctor` exit code for multi-device ambiguity
 **Priority:** Blocker
 
 **Problem:**
@@ -191,7 +191,7 @@ Update the CLI reference entry for `doctor` to document exit code semantics expl
 
 ---
 
-### T-08 · Warn on missing or unset `CLAWPERATOR_SKILLS_REGISTRY`
+### [DONE] T-08 · Warn on missing or unset `CLAWPERATOR_SKILLS_REGISTRY`
 **Priority:** Medium
 
 **Problem:**
@@ -213,7 +213,7 @@ Add a troubleshooting entry to the Skills Usage Model page: "skills list returns
 
 ---
 
-### T-10 · Emit snapshot settle warning; document settle delay pattern
+### [DONE] T-10 · Emit snapshot settle warning; document settle delay pattern
 **Priority:** Low
 
 **Problem:**
@@ -234,7 +234,7 @@ Add a "UI settle delay" section to the Navigation Patterns guide: why it's neede
 
 ---
 
-### T-11 · Add inline recovery hint to `SERVICE_UNAVAILABLE` error
+### [DONE] T-11 · Add inline recovery hint to `SERVICE_UNAVAILABLE` error
 **Priority:** Low
 
 **Problem:**

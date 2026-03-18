@@ -1,14 +1,16 @@
 import { describe, it } from "node:test";
 import assert from "node:assert";
 import {
+  addSettleWarnings,
   attachSnapshotsToStepResults,
   finalizeSuccessfulCloseAppSteps,
   finalizeSuccessfulScreenshotCapture,
+  injectServiceUnavailableHint,
   markExtractionFailedSnapshotSteps,
   runCloseAppPreflight,
 } from "../../domain/executions/runExecution.js";
 import type { Execution } from "../../contracts/execution.js";
-import type { StepResult } from "../../contracts/result.js";
+import type { ResultEnvelope, StepResult } from "../../contracts/result.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 
@@ -132,6 +134,145 @@ describe("markExtractionFailedSnapshotSteps", () => {
 
     assert.strictEqual(stepResults[0].success, true);
     assert.deepStrictEqual(stepResults[0].data, {});
+  });
+});
+
+describe("addSettleWarnings", () => {
+  it("warns when snapshot_ui follows click without a sleep step", () => {
+    const execution: Execution = {
+      commandId: "cmd-settle",
+      taskId: "task-settle",
+      source: "test",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 5000,
+      actions: [
+        { id: "click-1", type: "click" },
+        { id: "snap-1", type: "snapshot_ui" },
+      ],
+    };
+    const stepResults: StepResult[] = [
+      { id: "click-1", actionType: "click", success: true, data: {} },
+      { id: "snap-1", actionType: "snapshot_ui", success: true, data: {} },
+    ];
+
+    addSettleWarnings(stepResults, execution);
+
+    assert.match(stepResults[1].data.warn ?? "", /snapshot captured without a preceding sleep step/);
+  });
+
+  it("does not warn when a sleep step appears between click and snapshot_ui", () => {
+    const execution: Execution = {
+      commandId: "cmd-settle",
+      taskId: "task-settle",
+      source: "test",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 5000,
+      actions: [
+        { id: "click-1", type: "click" },
+        { id: "sleep-1", type: "sleep" },
+        { id: "snap-1", type: "snapshot_ui" },
+      ],
+    };
+    const stepResults: StepResult[] = [
+      { id: "click-1", actionType: "click", success: true, data: {} },
+      { id: "sleep-1", actionType: "sleep", success: true, data: {} },
+      { id: "snap-1", actionType: "snapshot_ui", success: true, data: {} },
+    ];
+
+    addSettleWarnings(stepResults, execution);
+
+    assert.ok(!("warn" in stepResults[2].data));
+  });
+
+  it("does not warn when no preceding click-like action exists", () => {
+    const execution: Execution = {
+      commandId: "cmd-settle",
+      taskId: "task-settle",
+      source: "test",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 5000,
+      actions: [
+        { id: "open-1", type: "open_app" },
+        { id: "snap-1", type: "snapshot_ui" },
+      ],
+    };
+    const stepResults: StepResult[] = [
+      { id: "open-1", actionType: "open_app", success: true, data: {} },
+      { id: "snap-1", actionType: "snapshot_ui", success: true, data: {} },
+    ];
+
+    addSettleWarnings(stepResults, execution);
+
+    assert.ok(!("warn" in stepResults[1].data));
+  });
+
+  it("warns when snapshot_ui follows scroll_and_click without a sleep step", () => {
+    const execution: Execution = {
+      commandId: "cmd-settle",
+      taskId: "task-settle",
+      source: "test",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 5000,
+      actions: [
+        { id: "scroll-1", type: "scroll_and_click" },
+        { id: "snap-1", type: "snapshot_ui" },
+      ],
+    };
+    const stepResults: StepResult[] = [
+      { id: "scroll-1", actionType: "scroll_and_click", success: true, data: {} },
+      { id: "snap-1", actionType: "snapshot_ui", success: true, data: {} },
+    ];
+
+    addSettleWarnings(stepResults, execution);
+
+    assert.match(stepResults[1].data.warn ?? "", /snapshot captured without a preceding sleep step/);
+  });
+});
+
+describe("injectServiceUnavailableHint", () => {
+  it("adds a recovery hint for SERVICE_UNAVAILABLE envelopes", () => {
+    const envelope: ResultEnvelope = {
+      commandId: "cmd-1",
+      taskId: "task-1",
+      status: "failed",
+      stepResults: [],
+      errorCode: "SERVICE_UNAVAILABLE",
+    };
+
+    injectServiceUnavailableHint(envelope, "device-123");
+
+    assert.strictEqual(
+      envelope.hint,
+      "Accessibility service not running. To set up: clawperator operator setup --device-id device-123"
+    );
+  });
+
+  it("does not add a hint for other error codes", () => {
+    const envelope: ResultEnvelope = {
+      commandId: "cmd-1",
+      taskId: "task-1",
+      status: "failed",
+      stepResults: [],
+      errorCode: "OTHER_ERROR",
+    };
+
+    injectServiceUnavailableHint(envelope, "device-123");
+
+    assert.strictEqual(envelope.hint, undefined);
+  });
+
+  it("does not add a hint for successful envelopes", () => {
+    const envelope: ResultEnvelope = {
+      commandId: "cmd-1",
+      taskId: "task-1",
+      status: "success",
+      stepResults: [],
+      errorCode: "SERVICE_UNAVAILABLE",
+    };
+
+    injectServiceUnavailableHint(envelope, "device-123");
+
+    assert.strictEqual(envelope.hint, undefined);
   });
 });
 

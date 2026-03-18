@@ -78,6 +78,46 @@ export function markExtractionFailedSnapshotSteps(
   }
 }
 
+export function addSettleWarnings(stepResults: ResultEnvelope["stepResults"], execution: Execution): void {
+  const actionIndexes = new Map(execution.actions.map((action, index) => [action.id, index]));
+
+  for (const step of stepResults) {
+    if (step.actionType !== "snapshot_ui" || !step.success) {
+      continue;
+    }
+
+    const snapshotIndex = actionIndexes.get(step.id);
+    if (snapshotIndex === undefined) {
+      continue;
+    }
+
+    for (let index = snapshotIndex - 1; index >= 0; index -= 1) {
+      const action = execution.actions[index];
+      if (!action) {
+        continue;
+      }
+      if (action.type === "sleep") {
+        break;
+      }
+      if (action.type === "click" || action.type === "scroll_and_click") {
+        step.data = {
+          ...step.data,
+          warn: "snapshot captured without a preceding sleep step; UI may not have settled - consider adding a sleep step between click and snapshot_ui",
+        };
+        break;
+      }
+    }
+  }
+}
+
+export function injectServiceUnavailableHint(envelope: ResultEnvelope, deviceId: string): void {
+  if (envelope.status !== "failed" || envelope.errorCode !== "SERVICE_UNAVAILABLE") {
+    return;
+  }
+
+  envelope.hint = `Accessibility service not running. To set up: clawperator operator setup --device-id ${deviceId}`;
+}
+
 export function finalizeSuccessfulScreenshotCapture(
   screenStep: ResultEnvelope["stepResults"][number] | undefined,
   screenshotPath: string
@@ -270,6 +310,7 @@ async function performExecution(
         const snapshots = extractSnapshotsFromLogs(dump.stdout.split("\n"));
         attachSnapshotsToStepResults(result.envelope.stepResults, snapshots);
         markExtractionFailedSnapshotSteps(result.envelope.stepResults, options.warn);
+        addSettleWarnings(result.envelope.stepResults, execution);
       }
 
       const hasScreenshot = result.envelope.stepResults.some(s => s.actionType === "take_screenshot");
@@ -308,6 +349,8 @@ async function performExecution(
           console.warn(`⚠️ Failed to capture screenshot via adb: ${String(e)}`);
         }
       }
+
+      injectServiceUnavailableHint(result.envelope, deviceId);
 
       emitResult(deviceId, result.envelope);
       return {
