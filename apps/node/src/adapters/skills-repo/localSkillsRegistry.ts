@@ -39,6 +39,10 @@ export async function loadRegistry(registryPath?: string): Promise<LoadRegistryR
         "Warning: CLAWPERATOR_SKILLS_REGISTRY is not set. Run 'clawperator skills install' to configure the registry path.\n"
       );
       process.exitCode = 1;
+      throw new Error(
+        `Registry not found at default path: ${path}. ` +
+        "Set CLAWPERATOR_SKILLS_REGISTRY or run clawperator skills install."
+      );
     }
 
     if (!registryPath && configuredPath) {
