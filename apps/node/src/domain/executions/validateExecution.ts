@@ -35,7 +35,6 @@ const actionParamsSchema = z.object({
   submit: z.boolean().optional(),
   clear: z.boolean().optional(),
   clickType: z.string().optional(),
-  target: nodeMatcherSchema.optional(),
   container: nodeMatcherSchema.optional(),
   direction: z.string().optional(),
   maxSwipes: z.number().optional(),

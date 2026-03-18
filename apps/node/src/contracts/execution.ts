@@ -14,8 +14,6 @@ export interface ActionParams {
   clear?: boolean;
   /** clickType: default | long_click | focus */
   clickType?: string;
-  /** scroll_and_click - copied from matcher for Android dispatch */
-  target?: NodeMatcher;
   container?: NodeMatcher;
   direction?: string;
   maxSwipes?: number;
