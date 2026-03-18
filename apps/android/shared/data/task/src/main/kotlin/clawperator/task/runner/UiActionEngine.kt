@@ -463,6 +463,21 @@ class UiActionEngineDefault(
                 )
             }
             throw e
+        } catch (e: IllegalArgumentException) {
+            // Regex constructor throws PatternSyntaxException (extends IllegalArgumentException)
+            // for invalid patterns. Return structured error instead of crashing.
+            if (action.validator == UiTextValidator.Regex) {
+                return UiActionStepResult(
+                    id = action.id,
+                    actionType = "read_text",
+                    success = false,
+                    data = mapOf(
+                        "error" to "INVALID_REGEX_PATTERN",
+                        "message" to (e.message ?: "Invalid regex pattern"),
+                    ),
+                )
+            }
+            throw e
         }
     }
 
