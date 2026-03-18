@@ -56,7 +56,7 @@ function indentYamlBlockScalar(value: string, indentSpaces: number): string {
   }
   return normalized
     .split("\n")
-    .map((line) => `${indent}${line}`)
+    .map((line) => (line.length === 0 ? "" : `${indent}${line}`))
     .join("\n");
 }
 

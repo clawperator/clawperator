@@ -686,6 +686,29 @@ describe("scaffoldSkill", () => {
     }
   });
 
+  it("does not indent empty lines in YAML block scalars", async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-skill-scaffold-empty-lines-"));
+    const registryDir = join(tempRoot, "skills");
+    const registryPath = join(registryDir, "skills-registry.json");
+    await mkdir(registryDir, { recursive: true });
+    await copyFile(TEST_REGISTRY_PATH, registryPath);
+
+    try {
+      const skillId = "com.example.empty-lines.capture";
+      const summary = "Line1\n\nLine3";
+      const result = await scaffoldSkill(skillId, { registryPath, summary });
+      if (!result.ok) assert.fail(result.message);
+
+      const skillMarkdown = await readFile(join(tempRoot, "skills", skillId, "SKILL.md"), "utf8");
+
+      // Empty line should remain empty, not contain indentation spaces.
+      assert.ok(skillMarkdown.includes("description: |-\n  Line1\n\n  Line3\n---\n"), skillMarkdown);
+      assert.ok(!skillMarkdown.includes("\n  \n"), "Expected no trailing spaces on empty lines");
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
   it("treats null summary like an omitted summary", async () => {
     const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-skill-scaffold-null-summary-"));
     const registryDir = join(tempRoot, "skills");
