@@ -103,9 +103,6 @@ export function addSettleWarnings(stepResults: ResultEnvelope["stepResults"], ex
     }
   }
 }
-
-
-
 export function injectServiceUnavailableHint(envelope: ResultEnvelope, deviceId: string): void {
   if (envelope.status !== "failed" || envelope.errorCode !== "SERVICE_UNAVAILABLE") {
     return;

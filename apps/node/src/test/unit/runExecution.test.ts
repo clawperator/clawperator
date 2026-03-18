@@ -484,7 +484,3 @@ describe("runCloseAppPreflight", () => {
     }
   });
 });
-
-
-
-
