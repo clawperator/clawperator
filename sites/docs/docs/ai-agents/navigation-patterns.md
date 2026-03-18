@@ -73,8 +73,8 @@ Canonical pattern:
 2. `sleep`
 3. `snapshot_ui`
 
-The runtime now adds `data.warn` automatically on successful `snapshot_ui`
-steps when it detects a preceding `click` or `scroll_and_click` without an
+The runtime adds `data.warn` automatically on successful `snapshot_ui` steps
+when it detects a preceding `click` or `scroll_and_click` without an
 intervening `sleep` step.
 
 ## Use snapshot metadata as a hint, not a verdict

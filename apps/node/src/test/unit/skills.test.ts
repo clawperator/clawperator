@@ -110,30 +110,48 @@ describe("listSkills", () => {
 });
 
 describe("loadRegistry", () => {
-  it("warns when CLAWPERATOR_SKILLS_REGISTRY is unset and the default path is missing", async () => {
+  it("warns to stderr when CLAWPERATOR_SKILLS_REGISTRY is unset and the default path is missing", async () => {
     const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-registry-unset-"));
     const originalCwd = process.cwd();
     delete process.env.CLAWPERATOR_SKILLS_REGISTRY;
+
+    const stderrOutput: string[] = [];
+    process.stderr.write = (chunk: unknown) => {
+      stderrOutput.push(String(chunk));
+      return true;
+    };
 
     try {
       process.chdir(tempRoot);
 
       await assert.rejects(() => loadRegistry(), /Registry not found at default path:/);
-      assert.strictEqual(process.exitCode, undefined);
+      assert.ok(
+        stderrOutput.some(line => line.includes("CLAWPERATOR_SKILLS_REGISTRY")),
+        `Expected stderr to mention CLAWPERATOR_SKILLS_REGISTRY, got: ${stderrOutput.join("")}`
+      );
     } finally {
       process.chdir(originalCwd);
       await rm(tempRoot, { recursive: true, force: true });
     }
   });
 
-  it("reports the configured registry path when CLAWPERATOR_SKILLS_REGISTRY is invalid", async () => {
+  it("writes the configured path to stderr when CLAWPERATOR_SKILLS_REGISTRY points to a missing file", async () => {
     process.env.CLAWPERATOR_SKILLS_REGISTRY = "/tmp/does-not-exist/skills-registry.json";
+
+    const stderrOutput: string[] = [];
+    process.stderr.write = (chunk: unknown) => {
+      stderrOutput.push(String(chunk));
+      return true;
+    };
 
     await assert.rejects(
       () => loadRegistry(),
       /Registry not found at configured path: \/tmp\/does-not-exist\/skills-registry\.json/
     );
-    assert.strictEqual(process.exitCode, undefined);
+    assert.ok(
+      stderrOutput.some(line => line.includes("/tmp/does-not-exist/skills-registry.json")),
+      `Expected stderr to include the missing path, got: ${stderrOutput.join("")}`
+    );
   });
 
   it("falls back when the caller passes the derived default path", async () => {

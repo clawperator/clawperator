@@ -91,21 +91,15 @@ export function addSettleWarnings(stepResults: ResultEnvelope["stepResults"], ex
       continue;
     }
 
-    for (let index = snapshotIndex - 1; index >= 0; index -= 1) {
-      const action = execution.actions[index];
-      if (!action) {
-        continue;
-      }
-      if (action.type === "sleep") {
-        break;
-      }
-      if (action.type === "click" || action.type === "scroll_and_click") {
-        step.data = {
-          ...step.data,
-          warn: "snapshot captured without a preceding sleep step; UI may not have settled - consider adding a sleep step between click and snapshot_ui",
-        };
-        break;
-      }
+    // Only warn when a click-like action is the immediately preceding action.
+    // Any intervening step (sleep, read_text, wait_for_node, etc.) may itself
+    // introduce settling time, so we don't warn in those cases.
+    const preceding = execution.actions[snapshotIndex - 1];
+    if (preceding?.type === "click" || preceding?.type === "scroll_and_click") {
+      step.data = {
+        ...step.data,
+        warn: "snapshot captured without a preceding sleep step; UI may not have settled - consider adding a sleep step between click and snapshot_ui",
+      };
     }
   }
 }
@@ -115,7 +109,7 @@ export function injectServiceUnavailableHint(envelope: ResultEnvelope, deviceId:
     return;
   }
 
-  envelope.hint = `Accessibility service not running. To set up: clawperator operator setup --device-id ${deviceId}`;
+  envelope.hint = `Accessibility service not running. Run 'clawperator doctor --fix --device-id ${deviceId}' to diagnose and repair, or 'clawperator operator setup --apk <path-to-apk> --device-id ${deviceId}' to reinstall.`;
 }
 
 export function finalizeSuccessfulScreenshotCapture(
@@ -310,6 +304,7 @@ async function performExecution(
         const snapshots = extractSnapshotsFromLogs(dump.stdout.split("\n"));
         attachSnapshotsToStepResults(result.envelope.stepResults, snapshots);
         markExtractionFailedSnapshotSteps(result.envelope.stepResults, options.warn);
+        // Attach data.warn to any snapshot_ui immediately following a click with no sleep.
         addSettleWarnings(result.envelope.stepResults, execution);
       }
 

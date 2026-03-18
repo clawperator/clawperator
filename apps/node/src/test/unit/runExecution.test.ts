@@ -227,6 +227,32 @@ describe("addSettleWarnings", () => {
 
     assert.match(stepResults[1].data.warn ?? "", /snapshot captured without a preceding sleep step/);
   });
+
+  it("does not warn when a non-sleep intermediate step separates click from snapshot_ui", () => {
+    // read_text, wait_for_node, etc. may themselves introduce settling time —
+    // only warn when click is the immediately preceding action.
+    const execution: Execution = {
+      commandId: "cmd-settle",
+      taskId: "task-settle",
+      source: "test",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 5000,
+      actions: [
+        { id: "click-1", type: "click" },
+        { id: "read-1", type: "read_text" },
+        { id: "snap-1", type: "snapshot_ui" },
+      ],
+    };
+    const stepResults: StepResult[] = [
+      { id: "click-1", actionType: "click", success: true, data: {} },
+      { id: "read-1", actionType: "read_text", success: true, data: {} },
+      { id: "snap-1", actionType: "snapshot_ui", success: true, data: {} },
+    ];
+
+    addSettleWarnings(stepResults, execution);
+
+    assert.ok(!("warn" in stepResults[2].data));
+  });
 });
 
 describe("injectServiceUnavailableHint", () => {
@@ -241,10 +267,8 @@ describe("injectServiceUnavailableHint", () => {
 
     injectServiceUnavailableHint(envelope, "device-123");
 
-    assert.strictEqual(
-      envelope.hint,
-      "Accessibility service not running. To set up: clawperator operator setup --device-id device-123"
-    );
+    assert.ok(envelope.hint?.includes("doctor --fix --device-id device-123"), `hint: ${envelope.hint}`);
+    assert.ok(envelope.hint?.includes("operator setup"), `hint should mention operator setup: ${envelope.hint}`);
   });
 
   it("does not add a hint for other error codes", () => {
