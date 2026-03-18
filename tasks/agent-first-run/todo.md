@@ -24,7 +24,7 @@ Documentation relevant to the change is included in the task — not deferred.
 |----|-------|-----------|-----------|
 | [DONE] PR-1 | T-01 | `operator` + `docs` | Correctness bug; ship fast and alone |
 | [DONE] PR-2 | T-02, T-03, T-04 | `operator` + `docs` | New action primitives; one APK release |
-| PR-3 | T-05, T-08, T-10, T-11 | `node` + `docs` | Small, independent diagnostics and warning fixes |
+| [DONE] PR-3 | T-05, T-08, T-10, T-11 | `node` + `docs` | Small, independent diagnostics and warning fixes |
 | PR-4 | T-06, T-09 | `node` + `docs` | Payload authoring ergonomics; T-09 dry-run output benefits from T-06 |
 | PR-5 | T-07 | `node` + `docs` | Skills scaffolding; substantial enough to stand alone |
 | PR-6 | T-12 | `install` + `docs` | Installer multi-device awareness |
@@ -169,7 +169,7 @@ Four small, independent changes that all make the CLI surface better information
 
 ---
 
-### T-05 · Fix `doctor` exit code for multi-device ambiguity
+### [DONE] T-05 · Fix `doctor` exit code for multi-device ambiguity
 **Priority:** Blocker
 
 **Problem:**
@@ -191,7 +191,7 @@ Update the CLI reference entry for `doctor` to document exit code semantics expl
 
 ---
 
-### T-08 · Warn on missing or unset `CLAWPERATOR_SKILLS_REGISTRY`
+### [DONE] T-08 · Warn on missing or unset `CLAWPERATOR_SKILLS_REGISTRY`
 **Priority:** Medium
 
 **Problem:**
@@ -213,7 +213,7 @@ Add a troubleshooting entry to the Skills Usage Model page: "skills list returns
 
 ---
 
-### T-10 · Emit snapshot settle warning; document settle delay pattern
+### [DONE] T-10 · Emit snapshot settle warning; document settle delay pattern
 **Priority:** Low
 
 **Problem:**
@@ -234,7 +234,7 @@ Add a "UI settle delay" section to the Navigation Patterns guide: why it's neede
 
 ---
 
-### T-11 · Add inline recovery hint to `SERVICE_UNAVAILABLE` error
+### [DONE] T-11 · Add inline recovery hint to `SERVICE_UNAVAILABLE` error
 **Priority:** Low
 
 **Problem:**

@@ -27,6 +27,7 @@ export interface ResultEnvelope {
    * unclassified failures. Agents should branch on this field rather than string-matching `error`.
    */
   errorCode?: string | null;
+  hint?: string;
 }
 
 export const RESULT_ENVELOPE_PREFIX = "[Clawperator-Result]";

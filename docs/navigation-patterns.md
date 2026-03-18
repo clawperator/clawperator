@@ -56,6 +56,27 @@ Good pattern:
 This matters because some Android layouts expose clipped descendants in raw XML
 near the viewport edge.
 
+## UI settle delay
+
+After a `click` or `scroll_and_click`, the visible screen can update before the
+accessibility hierarchy catches up. If you call `snapshot_ui` immediately, you
+can get a successful snapshot from the previous screen.
+
+Recommended delay:
+
+- minimum: `500ms`
+- slower or OEM-modified devices: `1000-1500ms`
+
+Canonical pattern:
+
+1. `click` or `scroll_and_click`
+2. `sleep`
+3. `snapshot_ui`
+
+The runtime adds `data.warn` automatically on successful `snapshot_ui` steps
+when it detects a preceding `click` or `scroll_and_click` without an
+intervening `sleep` step.
+
 ## Use snapshot metadata as a hint, not a verdict
 
 Successful snapshots may include:

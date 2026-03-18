@@ -518,6 +518,11 @@ clawperator doctor --check-only
 
 `doctor` checks APK presence before attempting version compatibility and handshake validation. Use `clawperator doctor --help` if you need the current timeout and package-target guidance.
 
+Exit code behavior:
+
+- `0` - all critical checks pass, including the multi-device ambiguity case where `--device-id` is still required
+- `1` - a genuine failure occurred, such as no device found, APK not installed, or handshake failure
+
 ---
 
 ### `version`

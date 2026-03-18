@@ -90,6 +90,8 @@ authored surface.
 
 Items under `tasks/` should be treated as temporary working notes, not durable documentation. It is fine during iterative development to capture in-progress findings, plans, or draft documentation in `tasks/`, but before opening a PR we typically delete that task entry. By that point, any durable knowledge must have been migrated into its proper long-term home in `docs/`, `apps/node/src/`, or `../clawperator-skills/docs/` as appropriate.
 
+**Exception — multi-phase project files:** When a task file covers a sequenced series of PRs (e.g. PR-1 through PR-7), do not delete completed task entries between phases. Keep them in place, marked `[DONE]`, until the final PR in the project ships. An agent working on a later phase benefits from reading the full history: dependency rationale, implementation choices made in earlier phases, and acceptance criteria that later tasks reference. Delete the whole file only when all phases are complete.
+
 Do not rely on `tasks/` as the final home for agent-facing behavior notes, API caveats, validation expectations, or operational guidance. If an agent would need the information after the task folder is deleted, it belongs in the real docs.
 
 If you find an error in a generated page, check `sites/docs/source-map.yaml` to find the source file, fix it there, then re-run the skill to regenerate. Source locations:

@@ -1,4 +1,4 @@
-import { describe, it, before, after } from "node:test";
+import { describe, it, before, after, afterEach } from "node:test";
 import assert from "node:assert";
 import { spawn } from "node:child_process";
 import { mkdtemp, mkdir, copyFile, readFile, rm, writeFile } from "node:fs/promises";
@@ -31,6 +31,7 @@ import {
 
 const TEST_REGISTRY_PATH = join(packageRoot, "src", "test", "fixtures", "skills", "skills-registry.json");
 const ORIGINAL_REGISTRY_PATH = process.env.CLAWPERATOR_SKILLS_REGISTRY;
+const ORIGINAL_STDERR_WRITE = process.stderr.write.bind(process.stderr);
 
 before(() => {
   process.env.CLAWPERATOR_SKILLS_REGISTRY = TEST_REGISTRY_PATH;
@@ -42,6 +43,12 @@ after(() => {
   } else {
     process.env.CLAWPERATOR_SKILLS_REGISTRY = ORIGINAL_REGISTRY_PATH;
   }
+});
+
+afterEach(() => {
+  process.stderr.write = ORIGINAL_STDERR_WRITE;
+  process.exitCode = undefined;
+  process.env.CLAWPERATOR_SKILLS_REGISTRY = TEST_REGISTRY_PATH;
 });
 
 function runCli(
@@ -103,21 +110,48 @@ describe("listSkills", () => {
 });
 
 describe("loadRegistry", () => {
-  it("reports the configured registry path when CLAWPERATOR_SKILLS_REGISTRY is invalid", async () => {
-    const original = process.env.CLAWPERATOR_SKILLS_REGISTRY;
-    process.env.CLAWPERATOR_SKILLS_REGISTRY = "/tmp/does-not-exist/skills-registry.json";
+  it("warns to stderr when CLAWPERATOR_SKILLS_REGISTRY is unset and the default path is missing", async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-registry-unset-"));
+    const originalCwd = process.cwd();
+    delete process.env.CLAWPERATOR_SKILLS_REGISTRY;
+
+    const stderrOutput: string[] = [];
+    process.stderr.write = (chunk: unknown) => {
+      stderrOutput.push(String(chunk));
+      return true;
+    };
+
     try {
-      await assert.rejects(
-        () => loadRegistry(),
-        /Registry not found at configured path: \/tmp\/does-not-exist\/skills-registry\.json/
+      process.chdir(tempRoot);
+
+      await assert.rejects(() => loadRegistry(), /Registry not found at default path:/);
+      assert.ok(
+        stderrOutput.some(line => line.includes("CLAWPERATOR_SKILLS_REGISTRY")),
+        `Expected stderr to mention CLAWPERATOR_SKILLS_REGISTRY, got: ${stderrOutput.join("")}`
       );
     } finally {
-      if (original === undefined) {
-        delete process.env.CLAWPERATOR_SKILLS_REGISTRY;
-      } else {
-        process.env.CLAWPERATOR_SKILLS_REGISTRY = original;
-      }
+      process.chdir(originalCwd);
+      await rm(tempRoot, { recursive: true, force: true });
     }
+  });
+
+  it("writes the configured path to stderr when CLAWPERATOR_SKILLS_REGISTRY points to a missing file", async () => {
+    process.env.CLAWPERATOR_SKILLS_REGISTRY = "/tmp/does-not-exist/skills-registry.json";
+
+    const stderrOutput: string[] = [];
+    process.stderr.write = (chunk: unknown) => {
+      stderrOutput.push(String(chunk));
+      return true;
+    };
+
+    await assert.rejects(
+      () => loadRegistry(),
+      /Registry not found at configured path: \/tmp\/does-not-exist\/skills-registry\.json/
+    );
+    assert.ok(
+      stderrOutput.some(line => line.includes("/tmp/does-not-exist/skills-registry.json")),
+      `Expected stderr to include the missing path, got: ${stderrOutput.join("")}`
+    );
   });
 
   it("falls back when the caller passes the derived default path", async () => {

@@ -34,7 +34,22 @@ export async function loadRegistry(registryPath?: string): Promise<LoadRegistryR
   try {
     raw = await readFile(path, "utf-8");
   } catch {
+    if (!registryPath && !configuredPath) {
+      process.stderr.write(
+        "Warning: CLAWPERATOR_SKILLS_REGISTRY is not set. " +
+        "Run 'clawperator skills install' to configure the registry path.\n"
+      );
+      throw new Error(
+        `Registry not found at default path: ${path}. ` +
+        "Set CLAWPERATOR_SKILLS_REGISTRY or run clawperator skills install."
+      );
+    }
+
     if (!registryPath && configuredPath) {
+      process.stderr.write(
+        `Error: Registry file not found at ${path} (from CLAWPERATOR_SKILLS_REGISTRY). ` +
+        "Check that the path is correct.\n"
+      );
       throw new Error(
         `Registry not found at configured path: ${path}. ` +
         "Update CLAWPERATOR_SKILLS_REGISTRY or run clawperator skills install."

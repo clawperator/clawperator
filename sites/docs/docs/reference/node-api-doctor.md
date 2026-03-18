@@ -84,6 +84,7 @@ Advisory warnings currently include:
 Exit behavior:
 
 - normal mode exits `0` when all critical checks pass
+- normal mode exits `0` when the only non-passing device discovery result is `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED`
 - normal mode exits `1` when any critical check fails
 - `--check-only` always exits `0`
 

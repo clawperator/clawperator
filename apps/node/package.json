@@ -29,8 +29,8 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/cli/index.js",
-    "test": "node --test dist/test/**/*.test.js",
-    "test:unit": "node --test dist/test/unit/**/*.test.js",
+    "test": "node --test dist/test/integration/*.test.js dist/test/unit/*.test.js dist/test/unit/doctor/*.test.js",
+    "test:unit": "node --test dist/test/unit/*.test.js dist/test/unit/doctor/*.test.js",
     "lint": "eslint src --ext .ts"
   },
   "keywords": [

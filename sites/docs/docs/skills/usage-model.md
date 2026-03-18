@@ -115,6 +115,21 @@ For the current metadata contract and authoring details, see
 For the full path from ad hoc exploration to a validated reusable skill, see
 `skills/skill-development-workflow.md`.
 
+## Troubleshooting
+
+### skills list returns empty or fails
+
+If `clawperator skills list` returns no skills or fails immediately, verify that
+`CLAWPERATOR_SKILLS_REGISTRY` is set and points to a valid registry JSON file.
+If you have not configured skills on this machine yet, run:
+
+```bash
+clawperator skills install
+```
+
+That command installs the skills repo locally and prints the export command for
+`CLAWPERATOR_SKILLS_REGISTRY`.
+
 ## Anti-Patterns
 
 - Blindly trusting first result line.

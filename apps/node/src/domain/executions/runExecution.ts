@@ -78,6 +78,40 @@ export function markExtractionFailedSnapshotSteps(
   }
 }
 
+export function addSettleWarnings(stepResults: ResultEnvelope["stepResults"], execution: Execution): void {
+  const actionIndexes = new Map(execution.actions.map((action, index) => [action.id, index]));
+
+  for (const step of stepResults) {
+    if (step.actionType !== "snapshot_ui" || !step.success) {
+      continue;
+    }
+
+    const snapshotIndex = actionIndexes.get(step.id);
+    if (snapshotIndex === undefined) {
+      continue;
+    }
+
+    // Only warn when a click-like action is the immediately preceding action.
+    // Any intervening step (sleep, read_text, wait_for_node, etc.) may itself
+    // introduce settling time, so we don't warn in those cases.
+    const preceding = execution.actions[snapshotIndex - 1];
+    if (preceding?.type === "click" || preceding?.type === "scroll_and_click") {
+      step.data = {
+        ...step.data,
+        warn: "snapshot captured without a preceding sleep step; UI may not have settled - consider adding a sleep step between click and snapshot_ui",
+      };
+    }
+  }
+}
+
+export function injectServiceUnavailableHint(envelope: ResultEnvelope, deviceId: string): void {
+  if (envelope.status !== "failed" || envelope.errorCode !== "SERVICE_UNAVAILABLE") {
+    return;
+  }
+
+  envelope.hint = `Accessibility service not running. Run 'clawperator doctor --fix --device-id ${deviceId}' to diagnose and repair, or 'clawperator operator setup --apk <path-to-apk> --device-id ${deviceId}' to reinstall.`;
+}
+
 export function finalizeSuccessfulScreenshotCapture(
   screenStep: ResultEnvelope["stepResults"][number] | undefined,
   screenshotPath: string
@@ -270,6 +304,8 @@ async function performExecution(
         const snapshots = extractSnapshotsFromLogs(dump.stdout.split("\n"));
         attachSnapshotsToStepResults(result.envelope.stepResults, snapshots);
         markExtractionFailedSnapshotSteps(result.envelope.stepResults, options.warn);
+        // Attach data.warn to any snapshot_ui immediately following a click with no sleep.
+        addSettleWarnings(result.envelope.stepResults, execution);
       }
 
       const hasScreenshot = result.envelope.stepResults.some(s => s.actionType === "take_screenshot");
@@ -308,6 +344,8 @@ async function performExecution(
           console.warn(`⚠️ Failed to capture screenshot via adb: ${String(e)}`);
         }
       }
+
+      injectServiceUnavailableHint(result.envelope, deviceId);
 
       emitResult(deviceId, result.envelope);
       return {

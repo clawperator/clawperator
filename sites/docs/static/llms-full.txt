@@ -2513,6 +2513,27 @@ Good pattern:
 This matters because some Android layouts expose clipped descendants in raw XML
 near the viewport edge.
 
+## UI settle delay
+
+After a `click` or `scroll_and_click`, the visible screen can update before the
+accessibility hierarchy catches up. If you call `snapshot_ui` immediately, you
+can get a successful snapshot from the previous screen.
+
+Recommended delay:
+
+- minimum: `500ms`
+- slower or OEM-modified devices: `1000-1500ms`
+
+Canonical pattern:
+
+1. `click` or `scroll_and_click`
+2. `sleep`
+3. `snapshot_ui`
+
+The runtime adds `data.warn` automatically on successful `snapshot_ui` steps
+when it detects a preceding `click` or `scroll_and_click` without an
+intervening `sleep` step.
+
 ## Use snapshot metadata as a hint, not a verdict
 
 Successful snapshots may include:
@@ -3355,6 +3376,11 @@ clawperator doctor --check-only
 | `--receiver-package <package>` | Target Operator package |
 
 `doctor` checks APK presence before attempting version compatibility and handshake validation. Use `clawperator doctor --help` if you need the current timeout and package-target guidance.
+
+Exit code behavior:
+
+- `0` - all critical checks pass, including the multi-device ambiguity case where `--device-id` is still required
+- `1` - a genuine failure occurred, such as no device found, APK not installed, or handshake failure
 
 ---
 
@@ -5203,6 +5229,7 @@ Advisory warnings currently include:
 Exit behavior:
 
 - normal mode exits `0` when all critical checks pass
+- normal mode exits `0` when the only non-passing device discovery result is `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED`
 - normal mode exits `1` when any critical check fails
 - `--check-only` always exits `0`
 
@@ -6089,6 +6116,21 @@ For the current metadata contract and authoring details, see
 
 For the full path from ad hoc exploration to a validated reusable skill, see
 `skills/skill-development-workflow.md`.
+
+## Troubleshooting
+
+### skills list returns empty or fails
+
+If `clawperator skills list` returns no skills or fails immediately, verify that
+`CLAWPERATOR_SKILLS_REGISTRY` is set and points to a valid registry JSON file.
+If you have not configured skills on this machine yet, run:
+
+```bash
+clawperator skills install
+```
+
+That command installs the skills repo locally and prints the export command for
+`CLAWPERATOR_SKILLS_REGISTRY`.
 
 ## Anti-Patterns
 
