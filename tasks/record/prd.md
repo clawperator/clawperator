@@ -1,7 +1,7 @@
 # PRD: Clawperator Record
 
 ## Status: Draft
-## Phase: PoC (3-phase delivery)
+## Phase: PoC (Phase 0 + 3-phase delivery)
 
 ---
 
@@ -104,13 +104,67 @@ The step log is saved as `<session_id>.steps.json`. Skill authoring is the expec
 
 ---
 
+## Phase 0 - Runtime Instrumentation Spike
+
+### Goal
+
+Measure accessibility event rates and snapshot capture cost under realistic usage conditions. Determine the snapshot capture strategy before writing Phase 1 production code.
+
+### Why This Phase Exists
+
+`onAccessibilityEvent()` runs on the AccessibilityService's main thread - the same thread that delivers subsequent events. Since Clawperator is the service itself (not the app being tested), there is no concern about dropped frames in the target app. The concern is the service's own throughput: a slow handler delays the next event, and under sustained high load the system can drop events from the delivery queue entirely.
+
+Two event types dominate the risk:
+
+- **Scroll events (`TYPE_VIEW_SCROLLED`):** Fire continuously during a list fling - 30-60 events/second on a typical device, more on high-refresh displays. Scroll events will not become steps in v1, so they will not receive snapshots. But they still pass through the handler and must be enqueued and discarded cheaply.
+- **Text input events (`TYPE_VIEW_TEXT_CHANGED`):** Fire on every character and every IME composition step. A fast typist generates 8-12 events/second; an IME doing character-by-character composition generates more. Text input is out of scope for the PoC scenario but the infrastructure will see these events.
+
+`getRootInActiveWindow()` is a synchronous IPC call to the system server. Its latency depends on the app being observed, the depth of the accessibility tree, and whether the window is mid-transition. On a stable screen it typically takes 50-300ms. On a complex or animated screen it can exceed 500ms. This call is the primary cost of snapshot capture and must not be made on the event delivery thread at high frequency.
+
+### Measurement Plan
+
+Instrument a debug build with a `RecordingDiagnosticHook` that:
+
+- Counts events by type and logs rates per second to logcat
+- Times each `getRootInActiveWindow()` call and logs min/avg/max per event type
+- Logs total handler wall time per event (enqueue cost, not including disk write - disk write is always async)
+- Monitors for `AccessibilityService.onInterrupt()` and system-level event delivery warnings in logcat
+
+Run three representative flows:
+
+1. **Baseline (tap navigation):** Open Settings, tap Display, press back. Measures cost for the step-candidate event types the PoC depends on.
+2. **Scroll-heavy:** Open Settings, scroll the list up and down several times at varying speeds. Measures whether scroll event throughput saturates the handler thread even when snapshots are skipped.
+3. **Rapid text input:** Open a text field, type 20-30 characters at normal speed, then at maximum speed. Measures whether TEXT_CHANGED rate causes handler delays even without snapshot capture.
+
+### Decision Criteria
+
+| Finding | Decision |
+|---|---|
+| `getRootInActiveWindow()` consistently under 300ms for step-candidate events at human interaction speed | Synchronous snapshot capture on the event thread is viable for Phase 1 |
+| `getRootInActiveWindow()` exceeds 300ms or causes delayed event delivery warnings | Use async capture: enqueue raw event data immediately on the event thread, take snapshot on a background HandlerThread with minimal delay |
+| Scroll event throughput saturates the handler even without snapshots | Add rate-limiting to scroll enqueueing (max 1 event enqueued per 100ms, rest discarded) |
+| TEXT_CHANGED events at realistic typing speed cause measurable handler delay | Add debounce gate: record at most one TEXT_CHANGED event per 150ms, suppress intermediates |
+
+### Output
+
+A short written note (inline in the Phase 1 PR description or in `tasks/record/`) documenting: measured event rates and `getRootInActiveWindow()` timings, which decision criteria applied, and the snapshot strategy chosen for Phase 1. Phase 1 implementation does not begin until this note exists.
+
+### Success Criteria
+
+- All three flows instrumented and results logged on at least one physical device.
+- `getRootInActiveWindow()` latency documented per step-candidate event type.
+- No AccessibilityService delivery warnings observed during any flow.
+- Snapshot capture strategy decided and written down.
+
+---
+
 ## Phase 1 - Recording (Android runtime)
 
 ### Goal
 
-Capture a usable interaction trace from real user behavior using the existing Accessibility Service.
+Capture a usable interaction trace from real user behavior using the existing Accessibility Service, using the snapshot strategy validated in Phase 0.
 
-### Design
+### Broadcast Integration
 
 Recording is controlled through two new `ExecutionAction` types dispatched via the existing broadcast mechanism. This reuses the entire execution pipeline: validation, dispatch, logcat result collection, and error handling are all unchanged.
 
@@ -150,51 +204,76 @@ The `StepResult` for `start_recording` returns:
 }
 ```
 
-### Android Implementation
+### State Machine
 
-**State machine** inside `OperatorCommandReceiver` (or delegated to a `RecordingManager` singleton):
+`RecordingManager` is a singleton that owns recording state. `OperatorCommandReceiver` delegates `start_recording` and `stop_recording` actions to it.
 
 ```
 IDLE
-  → start_recording received → RECORDING (opens file writer, activates event hook)
+  → start_recording received → RECORDING
+      (allocates session ID if not provided, opens writer, activates event hook)
 
 RECORDING
-  → accessibility events → append to NDJSON file
-  → stop_recording received → IDLE (flushes and closes file)
+  → accessibility events → enqueue to write buffer
+  → stop_recording received → IDLE
+      (drains write buffer, flushes and closes file)
   → start_recording received → error: RECORDING_ALREADY_IN_PROGRESS
 
 IDLE
   → stop_recording received → error: RECORDING_NOT_IN_PROGRESS
 ```
 
-**Event capture** via `AccessibilityService.onAccessibilityEvent()`. The Operator app already requires the Accessibility Service to function, so no new permission is needed. When recording is active, events are routed through a `RecordingEventFilter` before the main action executor.
+### Event Capture and Self-Event Filtering
 
-**UI snapshot capture:** For each recorded interaction event (click, press_key, window_change), the `RecordingManager` reads the current accessibility tree and serializes it as a UI hierarchy XML string, appended to the event record as `snapshot`. This is the same traversal the Accessibility Service performs for `snapshot_ui` actions - no new API calls are needed. The capture adds latency per step (typically 100-400ms) that occurs at human interaction speed and is not perceptible during normal use.
+When recording is active, `onAccessibilityEvent()` routes events through `RecordingEventFilter` before the main action executor. The filter runs on the event delivery thread and must be fast - no IPC, no disk I/O, no blocking calls.
 
-**Self-event filtering:** The `RecordingEventFilter` must discard events whose source package is the Clawperator operator app itself (`com.clawperator.operator` / `com.clawperator.operator.dev`). The `start_recording` and `stop_recording` broadcasts, and any Clawperator-dispatched actions, generate accessibility events that must not be recorded. Without this filter, replaying a recorded flow and then recording that replay would produce a corrupted session containing Clawperator's own synthetic interactions.
+**Self-event filtering:** Events whose source package matches the Clawperator operator app (`com.clawperator.operator` / `com.clawperator.operator.dev`) are discarded immediately. The `start_recording` and `stop_recording` broadcasts, and any Clawperator-dispatched actions, generate accessibility events that must not be recorded. Without this filter, agent-driven reproduction of a recorded flow would corrupt the session with Clawperator's own synthetic interactions.
 
-**Event types captured:**
+**Event type routing:**
 
-| Accessibility event | Recorded as | Notes |
-|---|---|---|
-| `TYPE_WINDOW_STATE_CHANGED` | `window_change` | App/screen transitions |
-| `TYPE_VIEW_CLICKED` | `click` | Taps on UI elements |
-| `TYPE_VIEW_SCROLLED` | `scroll` | Scroll gestures |
-| Key event `KEYCODE_BACK` | `press_key` with `key: "back"` | Back navigation |
+| Accessibility event | Recorded as | Snapshot taken? | Notes |
+|---|---|---|---|
+| `TYPE_WINDOW_STATE_CHANGED` | `window_change` | Yes | App/screen transitions |
+| `TYPE_VIEW_CLICKED` | `click` | Yes | Taps on UI elements |
+| Key event `KEYCODE_BACK` | `press_key` `key: "back"` | Yes | Back navigation |
+| `TYPE_VIEW_SCROLLED` | `scroll` | **No** | Not a step in v1; no snapshot to avoid high-rate IPC |
+| `TYPE_VIEW_TEXT_CHANGED` | `text_change` | **No** | Out of scope for PoC; captured for schema completeness |
 
-Text input (`TYPE_VIEW_TEXT_CHANGED`) is captured in the model but is out of scope for the Phase 3 PoC scenario. The infrastructure should support it to avoid rework.
+Scroll and text-change events are written to the NDJSON without a snapshot field (or with `"snapshot": null`). The parser drops them at extraction time. The no-snapshot decision for these types is deliberate: both can fire at rates where `getRootInActiveWindow()` per event would be harmful, and neither will become a step in v1.
 
-**On-device storage:**
+### Snapshot Capture Strategy
+
+For step-candidate events (click, press_key, window_change), `RecordingManager` reads the current accessibility tree via `getRootInActiveWindow()` and serializes it as UI hierarchy XML. This is the same traversal `snapshot_ui` uses - no new API.
+
+**Capture happens on a background HandlerThread, not the event delivery thread.** The event delivery thread enqueues a lightweight capture request (event data only, no IPC). The background thread dequeues, calls `getRootInActiveWindow()`, and appends the completed record to the write buffer. This keeps the event delivery thread unblocked regardless of how long the tree read takes.
+
+The ordering consequence: there is a small window between the user interaction and the snapshot being taken. At human interaction speeds this window is well under the time to the next interaction. If the Phase 0 measurement shows this window causes stale snapshots in practice, the mitigation is to take the snapshot synchronously on the event thread (only for step-candidate events at human speed) and accept the latency - the Phase 0 decision document will record which approach was chosen.
+
+`snapshot` is `null` on a step-candidate event only if `getRootInActiveWindow()` returns null (window not yet settled, app in background). This is logged as a warning, not a failure. The agent treats null `uiStateBefore` as reduced context and falls back to event fields (resourceId, text, bounds).
+
+### Write Path
+
+**The event delivery thread never performs disk I/O.** Events are enqueued into a `ConcurrentLinkedQueue<RecordingEvent>` from the event thread. A dedicated background `HandlerThread` (`RecordingWriterThread`) drains the queue and writes serialized NDJSON lines to a `BufferedWriter` on the output file.
+
+On `stop_recording`:
+1. Signal the writer thread to drain the queue completely.
+2. Flush and close the `BufferedWriter`.
+3. Write the `latest` pointer file with the session ID.
+4. Return the `stop_recording` result envelope.
+
+The write buffer is purely in-memory. In the unlikely event of a process kill during recording, events not yet written to disk are lost. This is acceptable for a PoC - the session file is still readable up to the last flushed line.
+
+### On-Device Storage
 
 ```
 /sdcard/Android/data/com.clawperator.operator/files/recordings/
   <session_id>.ndjson   (active or complete session)
-  latest               (symlink or file containing most recent session ID)
+  latest                (text file containing most recent session ID)
 ```
 
-Storage in `getExternalFilesDir()` allows direct `adb pull` without root. The `latest` pointer (a text file containing the session ID) allows Node to fetch the most recent recording without knowing the session ID.
+Storage in `getExternalFilesDir()` allows direct `adb pull` without root. The `latest` file allows Node to fetch the most recent recording without knowing the session ID in advance.
 
-**Raw event schema (NDJSON, one JSON object per line):**
+### NDJSON Schema
 
 The first line of every recording file is a header record. All subsequent lines are event records.
 
@@ -203,33 +282,32 @@ The first line of every recording file is a header record. All subsequent lines 
 {"ts":1710000000000,"seq":0,"type":"window_change","packageName":"com.android.settings","className":"com.android.settings.Settings","title":"Settings","snapshot":"<hierarchy .../>"}
 {"ts":1710000000800,"seq":1,"type":"click","packageName":"com.android.settings","resourceId":"com.android.settings:id/dashboard_tile","text":"Display","contentDesc":null,"bounds":{"left":0,"top":400,"right":1080,"bottom":560},"snapshot":"<hierarchy .../>"}
 {"ts":1710000001500,"seq":2,"type":"press_key","key":"back","snapshot":"<hierarchy .../>"}
+{"ts":1710000002100,"seq":3,"type":"scroll","packageName":"com.android.settings","resourceId":null,"scrollX":0,"scrollY":420,"maxScrollX":0,"maxScrollY":2800,"snapshot":null}
 ```
 
-Each event record includes a `snapshot` field containing the UI hierarchy XML at the time of the interaction. `snapshot` is `null` for events where a tree read was not possible (e.g. during app launch before the window settles).
+`snapshot` is present on step-candidate events (click, press_key, window_change) and `null` on high-rate events (scroll, text_change). The `schemaVersion` field in the header allows the Node parser to reject files from an incompatible format version. Event records do not carry per-event versions - the header covers the file.
 
-The `schemaVersion` field in the header allows the Node parser to detect and reject (with a clear error) files produced by a future incompatible version of the recording format. The current version is `1`. Event records do not carry a per-event version - the header covers the file.
+All event records include `ts` (epoch ms) and `seq` (monotonic integer). `seq` is the authoritative ordering field.
 
-All event records include `ts` (epoch ms) and `seq` (monotonic integer) for ordering. `seq` is the authoritative ordering field - do not rely on `ts` alone for ordering.
-
-**Error codes added:**
+### Error Codes
 
 | Code | Meaning |
 |---|---|
 | `RECORDING_ALREADY_IN_PROGRESS` | `start_recording` while already recording |
 | `RECORDING_NOT_IN_PROGRESS` | `stop_recording` with no active session |
-| `RECORDING_SESSION_NOT_FOUND` | Pull/compile of non-existent session ID |
+| `RECORDING_SESSION_NOT_FOUND` | Pull/parse of non-existent session ID |
 | `RECORDING_EMPTY` | Session stopped with zero events captured |
 
 ### Success Criteria
 
+- Phase 0 findings document exists and snapshot strategy is decided before any Phase 1 code is written.
 - `clawperator execute` with `start_recording` action returns success.
-- Human performs a 3-5 step UI flow on device.
+- Human performs a 3-5 step UI flow including at least one scroll.
 - `clawperator execute` with `stop_recording` action returns success.
 - Recording file exists on device at expected path.
-- File contains NDJSON events in correct order matching the performed actions.
-- Each event record includes a `snapshot` field (or explicit `null` if the tree read failed).
+- Step-candidate events include a `snapshot` field (or explicit `null` if tree read failed); scroll and text-change events have `"snapshot": null`.
+- No AccessibilityService delivery warnings in logcat during a normal-paced recording.
 - `adb pull` retrieves the file successfully.
-- **Snapshot capture validation gate:** Phase 1 is not complete until it has been verified on at least one target device that synchronous per-step snapshot capture does not cause noticeable interaction lag, missed events, or stale trees during a normal-paced user flow. If any of these are observed, the capture strategy must be revised (e.g. async-buffered capture) before Phase 2 begins. The 100-400ms latency estimate is an assumption, not a guarantee.
 
 ---
 
@@ -608,7 +686,7 @@ Added to `contracts/errors.ts` following existing conventions.
 |---|---|---|
 | Many real apps do not expose stable `resourceId` values, or use dynamic IDs | High | Agent reads `uiStateBefore` snapshot and finds the best available match. Noted in step log when `resourceId` is null. |
 | UI has not settled when agent issues the next action | High | Agent observes device state after each step via `observe snapshot`; it waits or retries based on what it sees rather than relying on fixed timing. |
-| Snapshot capture adds perceptible latency, missed events, or stale trees | High | Must be validated on device in Phase 1 - this is an unverified assumption. If synchronous capture causes problems, switch to async-buffered capture before proceeding to Phase 2. |
+| Snapshot capture adds perceptible latency, missed events, or stale trees | High | Phase 0 measures this before Phase 1 code is written. Capture is async by default (background HandlerThread); Phase 0 determines whether synchronous capture is viable as a simpler alternative. High-rate event types (scroll, text-change) never receive snapshots. |
 | Rapid double-tap recorded as two clicks | Medium | 100ms deduplication window in parser. |
 | `snapshot` is null on an event (tree read failed during fast transition) | Medium | Agent treats null `uiStateBefore` as reduced context, falls back to event fields (resourceId, text, bounds) to construct the action. |
 | Recording file not accessible via `adb pull` without root | Low | Use `getExternalFilesDir()` - always ADB-accessible on debug builds; release builds require `android:debuggable` or `android:allowBackup`. |
@@ -622,6 +700,7 @@ Documentation is part of the work for each PR, not a follow-up step. The table b
 
 | Phase | What ships | Docs updated | Notes |
 |---|---|---|---|
+| 0 | Findings note (event rates, latency measurements, strategy decision) | None | Internal spike output. Lives in `tasks/record/` or the Phase 1 PR description. Not public-facing. |
 | 1 | `start_recording` / `stop_recording` action types, Android recording runtime | None | The new action types are not user-accessible without the Phase 2 Node commands. Documenting them in isolation would describe a partial API. Defer to Phase 2. |
 | 2 | `record` CLI command group, ADB pull, parser, step log format, all error codes | `docs/node-api-for-agents.md` | This is the first user-accessible surface. Add a Recording section covering all four subcommands, the NDJSON schema, the step log format, and the new error codes. Note the API as early-access: contract is intentionally forward-looking but specific details may evolve. |
 | 3 | Agent-assisted reproduction validated | `docs/node-api-for-agents.md`, `docs/troubleshooting.md` | Remove the early-access note if Phase 3 validates cleanly. Update troubleshooting with known failure modes from Phase 3 testing: null snapshots on fast transitions, apps with no stable resourceIds, screen lock interrupting recording. |
@@ -695,9 +774,14 @@ apps/android/shared/data/operator/src/main/kotlin/clawperator/operator/
 
 | Phase | Criterion | Verification |
 |---|---|---|
+| 0 | Event rates and `getRootInActiveWindow()` latency measured for all three flows | Phase 0 findings note exists |
+| 0 | No AccessibilityService delivery warnings during any measured flow | Logcat inspection |
+| 0 | Snapshot capture strategy decided and written down | Phase 0 findings note exists |
+| 1 | Phase 0 findings note exists before any Phase 1 code is written | Code review gate |
 | 1 | Recording file exists on device after stop | `adb shell ls .../recordings/` |
-| 1 | File contains ordered events matching user actions | `adb pull` + manual inspect |
-| 1 | Synchronous snapshot capture does not cause perceptible lag, missed events, or stale trees | Manual device verification |
+| 1 | File contains ordered events matching user actions including at least one scroll | `adb pull` + manual inspect |
+| 1 | Step-candidate events have snapshots; scroll/text-change events have `null` snapshot | `adb pull` + manual inspect |
+| 1 | No AccessibilityService delivery warnings in logcat during recording | Logcat inspection |
 | 2 | `record pull` retrieves file without error | CLI exit code 0 |
 | 2 | `record parse` produces step log with `uiStateBefore` per step | Developer visual inspection |
 | 2 | Step log matches performed actions in order | Developer visual inspection |
