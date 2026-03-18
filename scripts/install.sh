@@ -502,8 +502,6 @@ maybe_install_operator_apk() {
         done < <(list_connected_devices)
         if [ "$all_ready" = true ]; then
             echo -e "${GREEN}All devices ready. No setup required.${NC}"
-        else
-            print_manual_operator_setup_commands
         fi
         return 0
     fi
