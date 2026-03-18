@@ -206,37 +206,6 @@ export async function runCloseAppPreflight(
 }
 
 /**
- * Normalize scroll actions for Android dispatch: copy canonical `matcher` to `target`
- * for Android runtime compatibility. The Android Operator expects `target` in params.
- */
-export function normalizeScrollActionsForDispatch(execution: Execution): Execution {
-  const needsTransform = execution.actions.some(
-    (a) => (a.type === "scroll_and_click" || a.type === "scroll_until") &&
-           a.params?.matcher !== undefined &&
-           a.params?.target === undefined
-  );
-  if (!needsTransform) return execution;
-
-  return {
-    ...execution,
-    actions: execution.actions.map((action) => {
-      if ((action.type === "scroll_and_click" || action.type === "scroll_until") &&
-          action.params?.matcher !== undefined &&
-          action.params?.target === undefined) {
-        return {
-          ...action,
-          params: {
-            ...action.params,
-            target: action.params.matcher,
-          },
-        };
-      }
-      return action;
-    }),
-  };
-}
-
-/**
  * Internal helper to validate, resolve device, and perform actual execution.
  */
 async function performExecution(
@@ -255,10 +224,6 @@ async function performExecution(
   } catch (e) {
     return { result: { ok: false, error: e as { code: string; message: string; [k: string]: unknown } } };
   }
-
-  // Normalize scroll actions: copy matcher to target for Android runtime compatibility.
-  // The Android Operator expects `target`, but the canonical Node API uses `matcher`.
-  execution = normalizeScrollActionsForDispatch(execution);
 
   if (options.timeoutMs !== undefined) {
     if (!Number.isFinite(options.timeoutMs)) {

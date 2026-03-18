@@ -7,7 +7,6 @@ import {
   finalizeSuccessfulScreenshotCapture,
   injectServiceUnavailableHint,
   markExtractionFailedSnapshotSteps,
-  normalizeScrollActionsForDispatch,
   runCloseAppPreflight,
 } from "../../domain/executions/runExecution.js";
 import type { Execution } from "../../contracts/execution.js";
@@ -486,96 +485,6 @@ describe("runCloseAppPreflight", () => {
   });
 });
 
-describe("normalizeScrollActionsForDispatch", () => {
-  it("copies matcher to target for scroll_and_click actions", () => {
-    const execution: Execution = {
-      commandId: "cmd-norm",
-      taskId: "task-norm",
-      source: "test",
-      expectedFormat: "android-ui-automator",
-      timeoutMs: 5000,
-      actions: [
-        { id: "scroll-1", type: "scroll_and_click", params: { matcher: { textEquals: "Climate" } } },
-      ],
-    };
 
-    const normalized = normalizeScrollActionsForDispatch(execution);
-
-    assert.deepStrictEqual(normalized.actions[0].params?.target, { textEquals: "Climate" });
-    assert.deepStrictEqual(normalized.actions[0].params?.matcher, { textEquals: "Climate" });
-  });
-
-  it("copies matcher to target for scroll_until actions", () => {
-    const execution: Execution = {
-      commandId: "cmd-norm",
-      taskId: "task-norm",
-      source: "test",
-      expectedFormat: "android-ui-automator",
-      timeoutMs: 5000,
-      actions: [
-        { id: "scroll-1", type: "scroll_until", params: { matcher: { textContains: "About" }, clickAfter: true } },
-      ],
-    };
-
-    const normalized = normalizeScrollActionsForDispatch(execution);
-
-    assert.deepStrictEqual(normalized.actions[0].params?.target, { textContains: "About" });
-    assert.deepStrictEqual(normalized.actions[0].params?.matcher, { textContains: "About" });
-  });
-
-  it("does not modify non-scroll actions", () => {
-    const execution: Execution = {
-      commandId: "cmd-norm",
-      taskId: "task-norm",
-      source: "test",
-      expectedFormat: "android-ui-automator",
-      timeoutMs: 5000,
-      actions: [
-        { id: "click-1", type: "click", params: { matcher: { textEquals: "Submit" } } },
-      ],
-    };
-
-    const normalized = normalizeScrollActionsForDispatch(execution);
-
-    assert.strictEqual(normalized.actions[0].params?.target, undefined);
-    assert.deepStrictEqual(normalized.actions[0].params?.matcher, { textEquals: "Submit" });
-  });
-
-  it("preserves existing target if already set", () => {
-    const execution: Execution = {
-      commandId: "cmd-norm",
-      taskId: "task-norm",
-      source: "test",
-      expectedFormat: "android-ui-automator",
-      timeoutMs: 5000,
-      actions: [
-        { id: "scroll-1", type: "scroll_and_click", params: { matcher: { textEquals: "A" }, target: { textEquals: "B" } } },
-      ],
-    };
-
-    const normalized = normalizeScrollActionsForDispatch(execution);
-
-    // If target is already set, leave it as-is (don't overwrite)
-    assert.deepStrictEqual(normalized.actions[0].params?.target, { textEquals: "B" });
-  });
-
-  it("returns same execution object if no transform needed", () => {
-    const execution: Execution = {
-      commandId: "cmd-norm",
-      taskId: "task-norm",
-      source: "test",
-      expectedFormat: "android-ui-automator",
-      timeoutMs: 5000,
-      actions: [
-        { id: "click-1", type: "click", params: { matcher: { textEquals: "Submit" } } },
-      ],
-    };
-
-    const normalized = normalizeScrollActionsForDispatch(execution);
-
-    // Should return same reference when no transform needed
-    assert.strictEqual(normalized, execution);
-  });
-});
 
 

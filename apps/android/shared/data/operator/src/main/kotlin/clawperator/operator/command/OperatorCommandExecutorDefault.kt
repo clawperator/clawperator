@@ -260,7 +260,7 @@ class OperatorCommandExecutorDefault(
                         UiAction.Sleep(id = "wait-open", durationMs = GOOGLE_HOME_WAIT_OPEN_MS),
                         UiAction.ScrollAndClick(
                             id = "open-climate-category",
-                            target = clawperator.task.runner.nodeMatcher { textEquals("Climate") },
+                            matcher = clawperator.task.runner.nodeMatcher { textEquals("Climate") },
                             container = clawperator.task.runner.nodeMatcher { resourceId("com.google.android.apps.chromecast.app:id/category_chips") },
                             direction = clawperator.task.runner.TaskScrollDirection.Right,
                             maxSwipes = 6,
@@ -270,7 +270,7 @@ class OperatorCommandExecutorDefault(
                         UiAction.Sleep(id = "wait-climate", durationMs = GOOGLE_HOME_WAIT_AFTER_CATEGORY_MS),
                         UiAction.ScrollAndClick(
                             id = "open-controller-card",
-                            target = clawperator.task.runner.nodeMatcher { textContains(controllerCardMatcherTextContains) },
+                            matcher = clawperator.task.runner.nodeMatcher { textContains(controllerCardMatcherTextContains) },
                             container = clawperator.task.runner.nodeMatcher { resourceId("com.google.android.apps.chromecast.app:id/pager_home_tab") },
                             maxSwipes = 8,
                             clickTypes = clawperator.uitree.UiTreeClickTypes.LongClick,
@@ -368,7 +368,7 @@ class OperatorCommandExecutorDefault(
                         UiAction.Sleep(id = "wait-open", durationMs = GOOGLE_HOME_WAIT_OPEN_MS),
                         UiAction.ScrollAndClick(
                             id = "open-climate-category",
-                            target = clawperator.task.runner.nodeMatcher { textEquals("Climate") },
+                            matcher = clawperator.task.runner.nodeMatcher { textEquals("Climate") },
                             container = clawperator.task.runner.nodeMatcher { resourceId("com.google.android.apps.chromecast.app:id/category_chips") },
                             direction = clawperator.task.runner.TaskScrollDirection.Right,
                             maxSwipes = 6,
@@ -378,7 +378,7 @@ class OperatorCommandExecutorDefault(
                         UiAction.Sleep(id = "wait-climate", durationMs = GOOGLE_HOME_WAIT_AFTER_CATEGORY_MS),
                         UiAction.ScrollAndClick(
                             id = "open-controller-card",
-                            target = clawperator.task.runner.nodeMatcher { textContains(controllerCardMatcherTextContains) },
+                            matcher = clawperator.task.runner.nodeMatcher { textContains(controllerCardMatcherTextContains) },
                             container = clawperator.task.runner.nodeMatcher { resourceId("com.google.android.apps.chromecast.app:id/pager_home_tab") },
                             maxSwipes = 8,
                             clickTypes = clawperator.uitree.UiTreeClickTypes.LongClick,

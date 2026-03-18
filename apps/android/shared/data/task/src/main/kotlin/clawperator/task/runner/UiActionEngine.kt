@@ -229,7 +229,7 @@ class UiActionEngineDefault(
     ): UiActionStepResult {
         taskScope.ui {
             clickAfterScroll(
-                target = action.target,
+                target = action.matcher,
                 container = action.container,
                 clickTypes = action.clickTypes,
                 direction = action.direction,
@@ -324,7 +324,7 @@ class UiActionEngineDefault(
         val initialResult =
             taskScope.ui {
                 scrollLoop(
-                    target = action.target,
+                    target = action.matcher,
                     container = action.container,
                     direction = action.direction,
                     distanceRatio = action.distanceRatio,
@@ -338,7 +338,7 @@ class UiActionEngineDefault(
 
         val result =
             if (
-                action.target != null &&
+                action.matcher != null &&
                 (initialResult.terminationReason == TaskScrollTerminationReason.EdgeReached ||
                     initialResult.terminationReason == TaskScrollTerminationReason.MaxScrollsReached ||
                     initialResult.terminationReason == TaskScrollTerminationReason.MaxDurationReached ||
@@ -348,7 +348,7 @@ class UiActionEngineDefault(
                     try {
                         taskScope.ui {
                             waitForNode(
-                                matcher = action.target,
+                                matcher = action.matcher,
                                 retry = TaskRetryPresets.UiReadiness,
                             )
                         }
@@ -373,11 +373,11 @@ class UiActionEngineDefault(
         if (!isError &&
             action.clickAfter &&
             result.terminationReason == TaskScrollTerminationReason.TargetFound &&
-            action.target != null
+            action.matcher != null
         ) {
             taskScope.ui {
                 click(
-                    matcher = action.target,
+                    matcher = action.matcher,
                     clickTypes = action.clickTypes,
                     retry = TaskRetryPresets.UiReadiness,
                 )

@@ -115,7 +115,7 @@ class UiActionEngineDefaultTest : ActionTest {
                                 listOf(
                                     UiAction.ScrollAndClick(
                                         id = "step-scroll-click",
-                                        target = nodeMatcher { textContains("Bedroom") },
+                                        matcher = nodeMatcher { textContains("Bedroom") },
                                         direction = TaskScrollDirection.Down,
                                         maxSwipes = 3,
                                         clickTypes = UiTreeClickTypes.Click,
@@ -516,7 +516,7 @@ class UiActionEngineDefaultTest : ActionTest {
                         actions = listOf(
                             UiAction.ScrollUntil(
                                 id = "su-target",
-                                target = NodeMatcher(textContains = "About phone"),
+                                matcher = NodeMatcher(textContains = "About phone"),
                             ),
                         ),
                     ),
@@ -548,7 +548,7 @@ class UiActionEngineDefaultTest : ActionTest {
                         actions = listOf(
                             UiAction.ScrollUntil(
                                 id = "su-target-click",
-                                target = NodeMatcher(textContains = "About phone"),
+                                matcher = NodeMatcher(textContains = "About phone"),
                                 clickAfter = true,
                             ),
                         ),
@@ -583,7 +583,7 @@ class UiActionEngineDefaultTest : ActionTest {
                         actions = listOf(
                             UiAction.ScrollUntil(
                                 id = "su-absent-click",
-                                target = NodeMatcher(textContains = "Missing Target"),
+                                matcher = NodeMatcher(textContains = "Missing Target"),
                                 clickAfter = true,
                             ),
                         ),
@@ -617,7 +617,7 @@ class UiActionEngineDefaultTest : ActionTest {
                         actions = listOf(
                             UiAction.ScrollUntil(
                                 id = "su-post-loop-target",
-                                target = NodeMatcher(textEquals = "Battery"),
+                                matcher = NodeMatcher(textEquals = "Battery"),
                                 clickAfter = true,
                             ),
                         ),
@@ -651,7 +651,7 @@ class UiActionEngineDefaultTest : ActionTest {
                         actions = listOf(
                             UiAction.ScrollUntil(
                                 id = "su-maxscrolls-visible",
-                                target = NodeMatcher(textEquals = "About phone"),
+                                matcher = NodeMatcher(textEquals = "About phone"),
                                 clickAfter = true,
                             ),
                         ),
@@ -684,7 +684,7 @@ class UiActionEngineDefaultTest : ActionTest {
                         actions = listOf(
                             UiAction.ScrollUntil(
                                 id = "su-maxduration-visible",
-                                target = NodeMatcher(textEquals = "About phone"),
+                                matcher = NodeMatcher(textEquals = "About phone"),
                                 clickAfter = true,
                             ),
                         ),
@@ -717,7 +717,7 @@ class UiActionEngineDefaultTest : ActionTest {
                         actions = listOf(
                             UiAction.ScrollUntil(
                                 id = "su-noposchange-visible",
-                                target = NodeMatcher(textEquals = "About phone"),
+                                matcher = NodeMatcher(textEquals = "About phone"),
                                 clickAfter = true,
                             ),
                         ),

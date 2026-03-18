@@ -119,7 +119,7 @@ class AgentCommandParserDefault : AgentCommandParser {
             "scroll_and_click" ->
                 UiAction.ScrollAndClick(
                     id = id,
-                    target = params.parseMatcherRequired("target"),
+                    matcher = params.parseMatcherRequired("matcher"),
                     container = params.parseMatcherOrNull("container"),
                     clickTypes = params.parseClickTypes(),
                     direction = params.parseDirection(),
@@ -144,7 +144,7 @@ class AgentCommandParserDefault : AgentCommandParser {
             "scroll_until" ->
                 UiAction.ScrollUntil(
                     id = id,
-                    target = params.parseMatcherOrNull("target"),
+                    matcher = params.parseMatcherOrNull("matcher"),
                     container = params.parseMatcherOrNull("container"),
                     clickTypes = params.parseClickTypes(),
                     direction = params.parseDirection(),
