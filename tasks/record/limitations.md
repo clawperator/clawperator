@@ -44,12 +44,13 @@ None of these appear in a recording. A batched script has no mechanism to notice
 The agent receives the step log from `record parse`. Each step pairs the UI state at the moment of the interaction with a description of what was done. The agent uses it as a map:
 
 1. Read the next step: `uiStateBefore` snapshot + action description.
-2. Compare current device state (`observe snapshot`) to the recorded `uiStateBefore`.
-3. Construct and issue a single-action `clawperator execute` call.
-4. If state matches expectation: proceed. If not: adapt, retry, or halt and report.
-5. After all steps complete: author a skill artifact from the validated flow and run it to confirm.
+2. Call `observe snapshot` to get current device state.
+3. Construct the action using both the recorded `uiStateBefore` and the current snapshot - the recorded context describes what the user saw; the current snapshot is the authoritative basis for matcher construction.
+4. Issue a single-action `clawperator execute` call.
+5. If state matches expectation: proceed. If not: adapt, retry, or halt and report.
+6. After all steps complete: author a skill artifact from the validated flow and run it to confirm.
 
-This model preserves the brain/hand separation. The recording eliminates the exploration cost - the agent no longer needs to discover the navigation path - but execution control stays with the agent at every step. The agent derives matchers from the step log context the same way it would from a live `observe snapshot`.
+This model preserves the brain/hand separation. The recording eliminates the exploration cost - the agent no longer needs to discover the navigation path - but execution control stays with the agent at every step. The recorded `uiStateBefore` is reference context; the live `observe snapshot` is what the agent actually acts on. Both matter: the recording identifies the target, the current snapshot confirms it is still there and provides the matcher.
 
 ---
 

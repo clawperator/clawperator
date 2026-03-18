@@ -9,7 +9,7 @@
 
 Clawperator can execute precise UI actions on Android devices, but every flow must currently be authored by hand as a JSON execution or skill artifact. There is no mechanism for a human to demonstrate a workflow and hand that demonstration to an agent.
 
-The Record feature closes this gap: a developer performs a UI flow once, Clawperator captures it (each interaction paired with the UI state at that moment), and an agent uses the step log to reproduce and validate the flow - then authors a skill from the result. The goal is an API worth keeping: designed with production viability in mind, cleanly integrated with existing contracts, and not requiring a rewrite when the PoC graduates. Specific details - particularly the compiler's normalization rules - are expected to evolve as we learn what real recordings look like.
+The Record feature closes this gap: a developer performs a UI flow once, Clawperator captures it (each interaction paired with the UI state at that moment), and an agent uses the step log to reproduce and validate the flow - then authors a skill from the result. The goal is an API worth keeping: designed with production viability in mind, cleanly integrated with existing contracts, and not requiring a rewrite when the PoC graduates. Specific details - particularly the parser's filtering rules - are expected to evolve as we learn what real recordings look like.
 
 **Terminology note:** In this PoC, "replay" does not mean a first-class Clawperator runtime behavior. It means agent-guided stepwise reproduction using a step log as context. The agent reads what the UI looked like at each recorded step, issues individual `clawperator execute` calls, observes device state between each, and decides whether to proceed. The skill authored from that validated flow is the durable, reusable artifact.
 
@@ -19,9 +19,9 @@ The Record feature closes this gap: a developer performs a UI flow once, Clawper
 
 Three distinct use cases motivate this feature. All three are served by the same implementation.
 
-**Skill bootstrap for unknown apps.** Clawperator's skills repository covers common apps, but cannot cover every private, regional, or internal tool a user wants to automate. Today, an agent must explore an unfamiliar app's UI from scratch to construct a skill - slow, token-expensive, and error-prone. A recording eliminates that first-encounter cost: the user demonstrates the flow once, and the agent's job shifts from blind exploration to refinement. Even a raw recording used only as input context for an agent constructing a private skill delivers real value, because the agent no longer needs to guess the navigation path.
-
 **Android developer productivity.** Developers working on a UI feature spend a significant fraction of iteration time navigating to the screen they care about - logging in with test credentials, tapping through onboarding, reaching a nested settings panel - before they can observe the change they just made. A recording eliminates that overhead: the developer records the path once, an agent validates and authors a local skill from it, and from that point on the developer runs the skill as a single `clawperator skills run` command on every iteration. A local skill that lives for the duration of one feature branch has immediate value and is discarded afterward.
+
+**Skill bootstrap for unknown apps.** Clawperator's skills repository covers common apps, but cannot cover every private, regional, or internal tool a user wants to automate. Today, an agent must explore an unfamiliar app's UI from scratch to construct a skill - slow, token-expensive, and error-prone. A recording eliminates that first-encounter cost: the user demonstrates the flow once, and the agent's job shifts from blind exploration to refinement. Even a raw recording used only as input context for an agent constructing a private skill delivers real value, because the agent no longer needs to guess the navigation path.
 
 **UI testing and verification.** A skill authored from a validated recording is a lightweight smoke test with no test framework, no instrumentation, and no build-time setup required. It runs against a real device or emulator via `clawperator skills run`. For agent-driven development work, a validated skill provides a reliable "get to the state under test" primitive: an agent runs the skill to reach a target screen, then applies assertions using `snapshot_ui` and `read_text`. This makes Clawperator a practical tool for UI verification on real devices - something existing tools like Espresso and UIAutomator handle poorly in interactive development: they are test-framework-centric, require build-time instrumentation, and are not agent-friendly.
 
@@ -87,7 +87,7 @@ record pull
 
 The recording surface is an extension to the Android Operator app's existing broadcast receiver and Accessibility Service. No new IPC, no streaming, no additional processes.
 
-The compilation step is pure Node-side logic: NDJSON in, standard `Execution` JSON out. The compiled JSON is the agent's map - a structured, normalized description of the user's intent. The agent drives execution step by step using existing commands; the compiled output is not a script to be dispatched wholesale.
+The parsing step is pure Node-side logic: NDJSON in, step log out. The parser filters and extracts `{uiStateBefore, action}` pairs - no matcher synthesis, no sleep injection. The step log is the agent's map: a structured, inspectable description of what the user did and what the UI looked like at each moment. The agent drives reproduction step by step using existing commands; the step log is context, not a script.
 
 **Why the agent must be in the loop:** Android apps are dynamic. Interstitial dialogs, update prompts, A/B test variants, and loading state differences appear unpredictably and are absent from any recording. A batched execution script has no mechanism to observe or handle them. The agent does. Removing the agent from the playback loop removes the only adaptive layer. `execute --execution-file` is appropriate for stable, validated skills - not for raw recordings. See `tasks/record/limitations.md` for the full treatment.
 
@@ -209,7 +209,7 @@ The first line of every recording file is a header record. All subsequent lines 
 
 Each event record includes a `snapshot` field containing the UI hierarchy XML at the time of the interaction. `snapshot` is `null` for events where a tree read was not possible (e.g. during app launch before the window settles).
 
-The `schemaVersion` field in the header allows the Node compiler to detect and reject (with a clear error) files produced by a future incompatible version of the recording format. The current version is `1`. Event records do not carry a per-event version - the header covers the file.
+The `schemaVersion` field in the header allows the Node parser to detect and reject (with a clear error) files produced by a future incompatible version of the recording format. The current version is `1`. Event records do not carry a per-event version - the header covers the file.
 
 All event records include `ts` (epoch ms) and `seq` (monotonic integer) for ordering. `seq` is the authoritative ordering field - do not rely on `ts` alone for ordering.
 
@@ -229,7 +229,9 @@ All event records include `ts` (epoch ms) and `seq` (monotonic integer) for orde
 - `clawperator execute` with `stop_recording` action returns success.
 - Recording file exists on device at expected path.
 - File contains NDJSON events in correct order matching the performed actions.
+- Each event record includes a `snapshot` field (or explicit `null` if the tree read failed).
 - `adb pull` retrieves the file successfully.
+- **Snapshot capture validation gate:** Phase 1 is not complete until it has been verified on at least one target device that synchronous per-step snapshot capture does not cause noticeable interaction lag, missed events, or stale trees during a normal-paced user flow. If any of these are observed, the capture strategy must be revised (e.g. async-buffered capture) before Phase 2 begins. The 100-400ms latency estimate is an assumption, not a guarantee.
 
 ---
 
@@ -282,6 +284,13 @@ async function parseRecording(
   rawEvents: RawRecordingEvent[],
   options: ParseOptions
 ): Promise<RecordingStepLog>
+
+interface RecordingStepLog {
+  sessionId: string;
+  schemaVersion: number;
+  steps: RecordingStep[];
+  _warnings?: string[];  // present only when the parser suppressed or modified events
+}
 ```
 
 **Filtering rules (v1 - PoC scope):**
@@ -317,11 +326,17 @@ The authoritative output is the JSON file. The stderr summary is for developer i
 
 ---
 
-## Phase 3 - Agent-Assisted Playback
+## Phase 3 - Agent-Assisted Reproduction and Skill Authoring
 
 ### Goal
 
-Demonstrate that the compiled recording can guide an agent to reproduce the recorded flow on device. The agent is in the loop at every step: it reads the compiled execution JSON, issues individual commands, observes device state, and adapts when reality diverges from the recording.
+Demonstrate two things, in order:
+
+**Phase 3A:** The step log is sufficient bootstrap context for an agent to reproduce the recorded flow on device, using only existing Clawperator commands.
+
+**Phase 3B:** An agent can author a working skill from the validated flow, using the existing skills system unchanged.
+
+These are sequenced because they test different things: 3A validates the recording feature; 3B validates that skill authoring from a recording works end-to-end. If 3B fails, the diagnosis is clearer when 3A has already passed.
 
 Phase 3 ships zero new Clawperator code. The deliverable is a validated end-to-end demonstration using existing commands and a standard agent.
 
@@ -432,7 +447,7 @@ type RawRecordingEvent =
   | {
       ts: number;
       seq: number;
-      type: "text_change";  // captured but not compiled in PoC scenario
+      type: "text_change";  // captured but not extracted in PoC scenario
       packageName: string;
       resourceId: string | null;
       text: string;
@@ -470,11 +485,17 @@ type RawRecordingEvent =
       "key": "back",
       "uiStateBefore": "<hierarchy .../>"
     }
+  ],
+  "_warnings": [
+    "seq 4-5: 2 rapid click events on resourceId=com.android.settings:id/dashboard_tile deduped to 1",
+    "seq 7: scroll event dropped (not extracted in v1)"
   ]
 }
 ```
 
 `uiStateBefore` is the UI hierarchy XML captured at the moment of the interaction. The agent reads this alongside the event fields to understand what was visible and what was tapped, then constructs the appropriate `clawperator execute` call for the current device state.
+
+`_warnings` is a top-level array of human-readable strings describing what the parser suppressed or modified. It is present if any warnings were generated during parsing; absent (not `null`, not `[]`) if the parse was clean. The agent may read these to understand where the step log diverges from the raw event stream - useful context when a reproduction diverges unexpectedly.
 
 ---
 
@@ -589,7 +610,7 @@ Added to `contracts/errors.ts` following existing conventions.
 |---|---|---|
 | Many real apps do not expose stable `resourceId` values, or use dynamic IDs | High | Agent reads `uiStateBefore` snapshot and finds the best available match. Noted in step log when `resourceId` is null. |
 | UI has not settled when agent issues the next action | High | Agent observes device state after each step via `observe snapshot`; it waits or retries based on what it sees rather than relying on fixed timing. |
-| Snapshot capture adds perceptible latency during recording | Medium | 100-400ms per interaction at human speed is not perceptible in practice. If it is, snapshot capture can be async-buffered in v2. |
+| Snapshot capture adds perceptible latency, missed events, or stale trees | High | Must be validated on device in Phase 1 - this is an unverified assumption. If synchronous capture causes problems, switch to async-buffered capture before proceeding to Phase 2. |
 | Rapid double-tap recorded as two clicks | Medium | 100ms deduplication window in parser. |
 | `snapshot` is null on an event (tree read failed during fast transition) | Medium | Agent treats null `uiStateBefore` as reduced context, falls back to event fields (resourceId, text, bounds) to construct the action. |
 | Recording file not accessible via `adb pull` without root | Low | Use `getExternalFilesDir()` - always ADB-accessible on debug builds; release builds require `android:debuggable` or `android:allowBackup`. |
@@ -635,7 +656,7 @@ Full integration testing is deferred until the prototype is running, validated, 
 - Uses a committed `.ndjson` fixture to drive an agent through the full record-parse-validate-skill pipeline
 - Asserts the agent successfully completes the flow, the step log is valid, and a skill artifact is produced
 
-This gives the test suite a stable, device-independent way to validate the NDJSON schema, compiler, and execution contract across changes.
+This gives the test suite a stable, device-independent way to validate the NDJSON schema, parser, and step log contract across changes.
 
 Until then, Phase 3 manual verification (agent successfully reproduces the flow twice consecutively and authors a working skill) is the acceptance bar.
 
@@ -672,16 +693,20 @@ apps/android/shared/data/operator/src/main/kotlin/clawperator/operator/
 
 ## Success Criteria Summary
 
+**Note on skills:** Phase 3 depends on the existing skills system. No changes to the skills infrastructure are required or planned. The agent authors a skill artifact using the current `clawperator skills` commands exactly as they exist today. If the existing skills system cannot support the authored artifact, that is a Phase 3 failure to diagnose - not a signal to extend the skills system within this PoC.
+
 | Phase | Criterion | Verification |
 |---|---|---|
 | 1 | Recording file exists on device after stop | `adb shell ls .../recordings/` |
 | 1 | File contains ordered events matching user actions | `adb pull` + manual inspect |
+| 1 | Synchronous snapshot capture does not cause perceptible lag, missed events, or stale trees | Manual device verification |
 | 2 | `record pull` retrieves file without error | CLI exit code 0 |
 | 2 | `record parse` produces step log with `uiStateBefore` per step | Developer visual inspection |
 | 2 | Step log matches performed actions in order | Developer visual inspection |
-| 3 | Agent completes flow using recording as context | Developer visual inspection |
-| 3 | Each step issued as discrete `execute` call | Agent session log |
-| 3 | Flow succeeds twice consecutively | Repeat agent session |
-| 3 | Agent authors a skill from the validated flow | Skill artifact exists on disk |
-| 3 | Skill runs successfully via `clawperator skills run` | CLI exit code 0 |
+| 3A | Agent completes flow using recording as context | Developer visual inspection |
+| 3A | Each step issued as discrete `execute` call | Agent session log |
+| 3A | Flow succeeds twice consecutively | Repeat agent session |
+| 3B | Agent authors a skill from the validated flow | Skill artifact exists on disk |
+| 3B | Skill runs successfully via `clawperator skills run` | CLI exit code 0 |
 | All | No changes to `runExecution()` or existing action handlers | Code review: no diff in those files |
+| All | No changes to skills infrastructure | Code review: no diff in skills system files |

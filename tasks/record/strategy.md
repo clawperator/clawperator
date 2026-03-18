@@ -27,17 +27,7 @@ This path preserves Clawperator's brain/hand separation. The agent makes all dec
 
 ---
 
-## Use Case 1: Skill Bootstrap for Unknown Apps
-
-The skills repository covers common apps, but cannot cover every private, regional, or internal tool a user wants to automate. Today, an agent must explore an unfamiliar app's UI from scratch to construct a skill - slow, token-expensive, and error-prone.
-
-A recording eliminates that exploration cost. The user demonstrates the flow once. The step log gives the agent ground truth about what was done: which elements were tapped, in what order, and what the UI looked like at each moment. The agent no longer needs to guess the navigation path or explore the UI structure. It reads the step log, reproduces each step with device observation, and authors a skill from the validated flow.
-
-This changes who can initiate skill creation. Today it requires an agent capable of exploration. With recording, a user with no technical background can record a workflow and hand it to an agent that produces a skill from it. The human's demonstration is the specification; the agent's job is refinement and validation.
-
----
-
-## Use Case 2: Android Developer Productivity
+## Use Case 1: Android Developer Productivity
 
 Android developers spend a significant fraction of their iteration time on UI navigation that has nothing to do with the code they are writing. A typical loop looks like:
 
@@ -54,6 +44,16 @@ The navigation steps in that loop are pure overhead. Deep links reduce it in som
 Recording addresses this directly. A developer records the navigation path once. The step log is handed to an agent that reproduces the flow step by step with observation between each action. The agent authors a local skill from the validated flow. From that point on, the developer can run the skill via a single `clawperator skills run` command to return to their target screen - rather than navigating manually on every iteration.
 
 This is closest in spirit to Playwright's codegen, but the durable artifact is a Clawperator skill, not a replay script. The skill is the thing the developer runs; the recording and step log are how the skill was bootstrapped. A local, private skill that lives for the duration of a feature branch and is discarded afterward is a valid and intentional use of the skills system.
+
+---
+
+## Use Case 2: Skill Bootstrap for Unknown Apps
+
+The skills repository covers common apps, but cannot cover every private, regional, or internal tool a user wants to automate. Today, an agent must explore an unfamiliar app's UI from scratch to construct a skill - slow, token-expensive, and error-prone.
+
+A recording eliminates that exploration cost. The user demonstrates the flow once. The step log gives the agent ground truth about what was done: which elements were tapped, in what order, and what the UI looked like at each moment. The agent no longer needs to guess the navigation path or explore the UI structure. It reads the step log, reproduces each step with device observation, and authors a skill from the validated flow.
+
+This changes who can initiate skill creation. Today it requires an agent capable of exploration. With recording, a user with no technical background can record a workflow and hand it to an agent that produces a skill from it. The human's demonstration is the specification; the agent's job is refinement and validation.
 
 ---
 
@@ -97,9 +97,9 @@ The immediate goal is a validated agent-assisted bootstrap for simple flows. But
 
 Record serves three audiences with a single piece of infrastructure:
 
-1. **End users** who want to automate apps that have no skill in the registry. They record the flow themselves; an agent validates it and authors a skill.
+1. **Android developers** who want to eliminate the navigation overhead of iterative development. They record the path to the screen they are working on; an agent validates and authors a local skill that they run on every iteration.
 
-2. **Android developers** who want to eliminate the navigation overhead of iterative development. They record the path to the screen they are working on; an agent validates and authors a local skill that they run on every iteration.
+2. **End users** who want to automate apps that have no skill in the registry. They record the flow themselves; an agent validates it and authors a skill.
 
 3. **Developers and agents** who want lightweight UI verification on real devices. A skill authored from a validated recording is a runnable smoke test with no additional tooling required.
 

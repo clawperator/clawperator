@@ -1094,7 +1094,7 @@ No. Clawperator executes a command and reports what happened. All reasoning and 
 - Clawperator does not observe state between actions in a multi-step execution and adapt - it executes the list sequentially and returns one result.
 - Clawperator does not know whether a flow succeeded in any business sense - it knows whether each action completed without a runtime error.
 
-The practical implication: prefer many small, single-action executions with agent observation between them over fewer large multi-step executions. Large executions are appropriate only for pre-verified, atomic sequences where the agent does not need to check state between steps. Skills are authored with this in mind; an agent-constructed flow driving an unfamiliar app almost never qualifies.
+The practical implication: for unfamiliar apps, exploratory flows, or any sequence where the agent needs to verify state between steps, prefer single-action executions with `observe snapshot` calls between them. For mature skills and stable, pre-validated atomic sequences, multi-action executions are the right choice - they reduce round trips and are appropriate whenever the agent does not need to observe or adapt mid-flow. Skills are authored with the latter in mind.
 
 **How are concurrent executions handled?**
 Single-flight per device. A second overlapping execution returns `EXECUTION_CONFLICT_IN_FLIGHT`.
