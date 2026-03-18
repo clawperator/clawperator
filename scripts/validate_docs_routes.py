@@ -63,11 +63,35 @@ def docs_url_to_site_path(url: str) -> str | None:
     return path.lstrip("/")
 
 
+def iter_markdown_link_hrefs(text: str) -> list[str]:
+    """
+    Extract markdown link hrefs while supporting URLs that contain parentheses.
+
+    We manually walk from the opening '(' and balance nested parentheses until the
+    matching closing ')', instead of relying on a naive `[^)]` regex.
+    """
+    hrefs: list[str] = []
+    for match in re.finditer(r"\[([^\]]+)\]\(", text):
+        start = match.end()  # position just after '('
+        depth = 1
+        i = start
+        while i < len(text) and depth > 0:
+            c = text[i]
+            if c == "(":
+                depth += 1
+            elif c == ")":
+                depth -= 1
+                if depth == 0:
+                    hrefs.append(text[start:i].strip())
+                    break
+            i += 1
+    return hrefs
+
+
 def parse_markdown_links(markdown_path: Path) -> list[str]:
-    pattern = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
     links: list[str] = []
-    for match in pattern.finditer(markdown_path.read_text(encoding="utf-8")):
-        href = match.group(1).strip()
+    text = markdown_path.read_text(encoding="utf-8")
+    for href in iter_markdown_link_hrefs(text):
         if (
             not href
             or href.startswith("#")
@@ -103,8 +127,8 @@ def check_inner_page_links(generated_docs_dir: Path, site_dir: Path) -> list[str
     errors: list[str] = []
     for md_file in sorted(generated_docs_dir.rglob("*.md")):
         text = md_file.read_text(encoding="utf-8")
-        for match in re.finditer(r"\[.*?\]\(([^)]+)\)", text):
-            raw = match.group(1).split("#")[0].strip()
+        for href in iter_markdown_link_hrefs(text):
+            raw = href.split("#")[0].strip()
             # Skip external URLs, anchors-only, and non-md links
             if not raw or raw.startswith("http") or raw.startswith("mailto:") or raw.startswith("tel:"):
                 continue
