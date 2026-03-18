@@ -8,6 +8,7 @@ import android.accessibilityservice.AccessibilityServiceInfo
 import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent
 import clawperator.accessibilityservice.AccessibilityServiceManagerAndroid
+import clawperator.operator.recording.RecordingEventFilter
 import clawperator.routine.RoutineManager
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -21,6 +22,7 @@ class OperatorAccessibilityService :
     private val buildConfig: BuildConfig by inject()
     private val routineManager: RoutineManager by inject()
     private val coroutineScopes: CoroutineScopes by inject()
+    private val recordingEventFilter: RecordingEventFilter by inject()
     private var routineLoopJob: Job? = null
     private val recordingDiagnosticHook: RecordingDiagnosticHook? by lazy {
         if (buildConfig.debug) {
@@ -43,7 +45,9 @@ class OperatorAccessibilityService :
                     AccessibilityServiceInfo.FLAG_REQUEST_TOUCH_EXPLORATION_MODE or
                     AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS
 
-                // Set event types we want to monitor
+                // Keep TYPE_VIEW_SCROLLED in the production mask because recording mode
+                // needs to observe scroll events and RecordingEventFilter records them
+                // without snapshot capture.
                 eventTypes = AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED or
                     AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED or
                     AccessibilityEvent.TYPE_VIEW_CLICKED or
@@ -85,11 +89,13 @@ class OperatorAccessibilityService :
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        recordingEventFilter.onAccessibilityEvent(this, event)
         recordingDiagnosticHook?.onAccessibilityEvent(this, event)
         Log.d("[Operator-AccessibilityService] onAccessibilityEvent($event)")
     }
 
     override fun onKeyEvent(event: KeyEvent): Boolean {
+        recordingEventFilter.onKeyEvent(this, event)
         recordingDiagnosticHook?.onKeyEvent(this, event)
         return super.onKeyEvent(event)
     }

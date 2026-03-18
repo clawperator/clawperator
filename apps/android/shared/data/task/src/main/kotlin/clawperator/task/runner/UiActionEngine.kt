@@ -17,6 +17,7 @@ interface UiActionEngine {
 class UiActionEngineDefault(
     private val developerOptionsManager: DeveloperOptionsManager,
     private val globalActionDispatcher: UiGlobalActionDispatcher,
+    private val recordingManager: RecordingManager = RecordingManagerNoOp,
 ) : UiActionEngine {
     companion object {
         private const val TAG = "[UiActionEngine]"
@@ -60,6 +61,8 @@ class UiActionEngineDefault(
                 is UiAction.ScrollUntil -> executeScrollUntil(taskScope, action)
                 is UiAction.ReadText -> executeReadText(taskScope, action)
                 is UiAction.SnapshotUi -> executeSnapshotUi(taskScope, action)
+                is UiAction.StartRecording -> executeStartRecording(action)
+                is UiAction.StopRecording -> executeStopRecording(action)
                 is UiAction.TakeScreenshot -> executeTakeScreenshot(taskScope, action)
                 is UiAction.EnterText -> executeEnterText(taskScope, action)
                 is UiAction.Sleep -> executeSleep(taskScope, action)
@@ -505,6 +508,76 @@ class UiActionEngineDefault(
                 },
         )
     }
+
+    private suspend fun executeStartRecording(action: UiAction.StartRecording): UiActionStepResult =
+        when (val outcome = recordingManager.startRecording(action.sessionId)) {
+            is RecordingCommandOutcome.Started ->
+                UiActionStepResult(
+                    id = action.id,
+                    actionType = "start_recording",
+                    data =
+                        buildMap {
+                            put("sessionId", outcome.sessionId)
+                            put("filePath", outcome.filePath)
+                        },
+                )
+            is RecordingCommandOutcome.Error ->
+                UiActionStepResult(
+                    id = action.id,
+                    actionType = "start_recording",
+                    success = false,
+                    data =
+                        buildMap {
+                            put("error", outcome.code)
+                            put("message", outcome.message)
+                            outcome.sessionId?.let { put("sessionId", it) }
+                            outcome.filePath?.let { put("filePath", it) }
+                        },
+                )
+            is RecordingCommandOutcome.Stopped ->
+                UiActionStepResult(
+                    id = action.id,
+                    actionType = "start_recording",
+                    success = false,
+                    data = mapOf("error" to "RECORDING_START_FAILED", "message" to "Unexpected stop result from RecordingManager"),
+                )
+        }
+
+    private suspend fun executeStopRecording(action: UiAction.StopRecording): UiActionStepResult =
+        when (val outcome = recordingManager.stopRecording(action.sessionId)) {
+            is RecordingCommandOutcome.Stopped ->
+                UiActionStepResult(
+                    id = action.id,
+                    actionType = "stop_recording",
+                    data =
+                        buildMap {
+                            put("sessionId", outcome.sessionId)
+                            put("filePath", outcome.filePath)
+                            put("eventCount", outcome.eventCount.toString())
+                        },
+                )
+            is RecordingCommandOutcome.Error ->
+                UiActionStepResult(
+                    id = action.id,
+                    actionType = "stop_recording",
+                    success = false,
+                    data =
+                        buildMap {
+                            put("error", outcome.code)
+                            put("message", outcome.message)
+                            outcome.sessionId?.let { put("sessionId", it) }
+                            outcome.filePath?.let { put("filePath", it) }
+                            outcome.eventCount?.let { put("eventCount", it.toString()) }
+                        },
+                )
+            is RecordingCommandOutcome.Started ->
+                UiActionStepResult(
+                    id = action.id,
+                    actionType = "stop_recording",
+                    success = false,
+                    data = mapOf("error" to "RECORDING_STOP_FAILED", "message" to "Unexpected start result from RecordingManager"),
+                )
+        }
 
     private suspend fun executeTakeScreenshot(
         taskScope: TaskScope,

@@ -128,6 +128,10 @@ import clawperator.operator.agent.AgentCommandExecutor
 import clawperator.operator.agent.AgentCommandExecutorDefault
 import clawperator.operator.agent.AgentCommandParser
 import clawperator.operator.agent.AgentCommandParserDefault
+import clawperator.operator.recording.RecordingEventFilter
+import clawperator.operator.recording.RecordingEventFilterDefault
+import clawperator.operator.recording.RecordingEventSink
+import clawperator.operator.recording.RecordingManagerDefault
 import clawperator.operator.command.OperatorCommandExecutor
 import clawperator.operator.command.OperatorCommandExecutorDefault
 import clawperator.operator.command.OperatorCommandParser
@@ -160,6 +164,7 @@ import clawperator.task.runner.TaskScope
 import clawperator.task.runner.TaskScopeDefault
 import clawperator.task.runner.TaskUiScope
 import clawperator.task.runner.TaskUiScopeDefault
+import clawperator.task.runner.RecordingManager
 import clawperator.task.runner.UiActionEngine
 import clawperator.task.runner.UiActionEngineDefault
 import clawperator.task.runner.UiGlobalActionDispatcher
@@ -231,6 +236,10 @@ val AppModule: Module = module {
     single<OperatorCommandStatusReporter> { OperatorCommandStatusReporterDefault(get()) }
     single<AgentCommandParser> { AgentCommandParserDefault() }
     single<AgentCommandExecutor> { AgentCommandExecutorDefault(get(), get()) }
+    single<RecordingManagerDefault> { RecordingManagerDefault(get(), get()) }
+    single<RecordingManager> { get<RecordingManagerDefault>() }
+    single<RecordingEventSink> { get<RecordingManagerDefault>() }
+    single<RecordingEventFilter> { RecordingEventFilterDefault(get(), get()) }
     single<OperatorRepository> { get<OperatorRepositoryDefault>() }
     single<OperatorRepositoryDefault> { OperatorRepositoryDefault(get(), get(), get(NamedScope.CoroutineScopeMain), get(NamedScope.CoroutineScopeIo)) }
     single<PreferenceDefaults> { PreferenceDefaults(get()) }
@@ -256,7 +265,7 @@ val AppModule: Module = module {
     single<TaskUiScope> { get<TaskUiScopeDefault>() }
     single<TaskUiScopeDefault> { TaskUiScopeDefault(get(), get(), get(), get(), get(NamedScope.CoroutineScopeIo)) }
     single<UiActionEngine> { get<UiActionEngineDefault>() }
-    single<UiActionEngineDefault> { UiActionEngineDefault(get(), get()) }
+    single<UiActionEngineDefault> { UiActionEngineDefault(get(), get(), get()) }
     single<UiGlobalActionDispatcher> { get<UiGlobalActionDispatcherAndroid>() }
     single<UiGlobalActionDispatcherAndroid> { UiGlobalActionDispatcherAndroid(get()) }
     single<TriggerManager> { TriggerManagerDefault(get(), get(), get(), get(), get(), get(NamedScope.CoroutineScopeMain), get(NamedScope.CoroutineScopeIo)) }

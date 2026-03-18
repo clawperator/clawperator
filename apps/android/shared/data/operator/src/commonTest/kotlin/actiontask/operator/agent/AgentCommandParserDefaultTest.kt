@@ -66,6 +66,62 @@ class AgentCommandParserDefaultTest {
     }
 
     @Test
+    fun `parse start and stop recording actions`() {
+        val payload =
+            """
+            {
+              "commandId": "cmd-record-1",
+              "taskId": "task-record-1",
+              "source": "debug",
+              "actions": [
+                {
+                  "id": "start-1",
+                  "type": "start_recording",
+                  "params": { "sessionId": "demo-001" }
+                },
+                {
+                  "id": "stop-1",
+                  "type": "stop_recording",
+                  "params": {}
+                }
+              ]
+            }
+            """.trimIndent()
+
+        val command = parser.parse(payload).getOrThrow()
+        assertEquals(2, command.actions.size)
+
+        assertIs<UiAction.StartRecording>(command.actions[0])
+        assertIs<UiAction.StopRecording>(command.actions[1])
+        val start = command.actions[0] as UiAction.StartRecording
+        val stop = command.actions[1] as UiAction.StopRecording
+        assertEquals("demo-001", start.sessionId)
+        assertEquals(null, stop.sessionId)
+    }
+
+    @Test
+    fun `parse rejects blank recording session id`() {
+        val payload =
+            """
+            {
+              "commandId": "cmd-record-2",
+              "taskId": "task-record-2",
+              "source": "debug",
+              "actions": [
+                {
+                  "id": "start-1",
+                  "type": "start_recording",
+                  "params": { "sessionId": "   " }
+                }
+              ]
+            }
+            """.trimIndent()
+
+        val result = parser.parse(payload)
+        assertTrue(result.isFailure)
+    }
+
+    @Test
     fun `parse rejects missing commandId`() {
         val payload =
             """
