@@ -686,6 +686,33 @@ describe("scaffoldSkill", () => {
     }
   });
 
+  it("treats null summary like an omitted summary", async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-skill-scaffold-null-summary-"));
+    const registryDir = join(tempRoot, "skills");
+    const registryPath = join(registryDir, "skills-registry.json");
+    await mkdir(registryDir, { recursive: true });
+    await copyFile(TEST_REGISTRY_PATH, registryPath);
+
+    try {
+      const skillId = "com.example.null-summary.capture";
+      const expectedSummary = `TODO: describe ${skillId}`;
+      const result = await scaffoldSkill(skillId, { registryPath, summary: null as unknown as string });
+      if (!result.ok) assert.fail(result.message);
+
+      const skillJson = JSON.parse(await readFile(join(tempRoot, "skills", skillId, "skill.json"), "utf8"));
+      const skillMarkdown = await readFile(join(tempRoot, "skills", skillId, "SKILL.md"), "utf8");
+
+      assert.strictEqual(skillJson.summary, expectedSummary);
+      assert.match(skillMarkdown, /description: \|-\n/);
+      assert.match(
+        skillMarkdown,
+        new RegExp(`\\n  ${expectedSummary.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\n---\\n`)
+      );
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
   it("rejects invalid skill ids", async () => {
     const result = await scaffoldSkill("invalid-skill-id", TEST_REGISTRY_PATH);
     assert.ok(!result.ok);

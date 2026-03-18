@@ -181,7 +181,9 @@ export async function scaffoldSkill(
   options: string | ScaffoldSkillOptions = {},
 ): Promise<ScaffoldSkillSuccess | ScaffoldSkillError> {
   const normalizedOptions = typeof options === "string" ? { registryPath: options } : options;
-  const summaryCandidate = normalizedOptions.summary === undefined ? undefined : normalizedOptions.summary.trim();
+  const rawSummary = (normalizedOptions as { summary?: unknown }).summary;
+  const summaryCandidate =
+    typeof rawSummary === "string" ? rawSummary.trim() : undefined;
   const summary = summaryCandidate && summaryCandidate.length > 0 ? summaryCandidate : `TODO: describe ${skillId}`;
   const derived = deriveSkillMetadata(skillId);
   if (!derived) {
