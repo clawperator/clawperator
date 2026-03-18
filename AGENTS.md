@@ -176,14 +176,8 @@ When multiple devices are connected (physical + emulator), be explicit about whi
 
 5. **Both device types are valid production targets:** Emulators with Google Play can be fully configured with user credentials and provide a complete automation environment. Physical devices offer OEM-specific behaviors and hardware sensors. Choose based on the testing scenario, not assumptions about capability.
 
-### Accessibility Instrumentation Notes
-
-- Do not assume adb-driven navigation or text entry reproduces the same accessibility events as real user input. For instrumentation work that depends on `TYPE_VIEW_TEXT_CHANGED`, `TYPE_VIEW_SCROLLED`, back-key delivery, or click timing, verify that the target app and input path actually emit those events before treating the scenario as valid.
-- If the primary target app does not emit the required accessibility events under the available input method, use a substitute app or screen that exercises the same event category and document the substitution plus the reason. Valid measurements are better than forcing the nominal app path when the runtime does not expose the needed signals.
-- For AccessibilityService measurement work, log both the per-event samples and the caveats discovered during collection. Missing event categories are a measurement result, not something to silently smooth over.
-- From the repo root, the Android Gradle app module tasks are exposed as `app:*` tasks such as `./gradlew app:assembleDebug`, `./gradlew app:testDebugUnitTest`, and `./gradlew app:installDebug`. Prefer those working forms over guessing deeper module paths.
-
 ## Validation Commands
+- From the repo root, the Android Gradle app module tasks are typically invoked as `app:*` tasks such as `./gradlew app:assembleDebug`, `./gradlew app:testDebugUnitTest`, and `./gradlew app:installDebug`. Prefer the working task names already used in this file over guessing deeper module paths from the directory layout.
 - Permissions/bootstrap: `./scripts/clawperator_grant_android_permissions.sh`
 - Receiver ingress check: `./scripts/clawperator_validate_receiver.sh`
 - Core smoke: `./scripts/clawperator_smoke_core.sh`
