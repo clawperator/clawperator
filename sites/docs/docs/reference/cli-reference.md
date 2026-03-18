@@ -192,13 +192,14 @@ clawperator packages list [--device-id <id>] [--third-party]
 Execute a validated command payload.
 
 ```
-clawperator execute --execution <json-or-file> [--validate-only] [--device-id <id>] [--receiver-package <package>] [--timeout-ms <number>]
+clawperator execute --execution <json-or-file> [--validate-only] [--dry-run] [--device-id <id>] [--receiver-package <package>] [--timeout-ms <number>]
 ```
 
 | Flag | Description |
 |------|-------------|
 | `--execution <json-or-file>` | Execution payload as inline JSON or a path to a JSON file (required) |
 | `--validate-only` | Validate and normalize the payload without dispatching to any device |
+| `--dry-run` | Validate the payload and print a human-readable execution plan; no device connection opened |
 | `--device-id <id>` | Target device serial |
 | `--receiver-package <package>` | Target Operator package |
 | `--timeout-ms <number>` | Override execution timeout within policy limits |
@@ -208,6 +209,11 @@ The `--execution` value must conform to the `Execution` contract (see [api-overv
 With `--validate-only`, Clawperator validates the payload, applies any
 `--timeout-ms` override, and returns the normalized execution without touching
 adb or resolving a device.
+
+With `--dry-run`, Clawperator validates the payload and prints a structured
+plan (commandId, timeoutMs, per-action summary) without opening any device
+connection. Exits 0 on valid payload, 1 on schema error with the offending
+path. Does not require `--device-id`. See [Node API - Agent Guide](../ai-agents/node-api-for-agents.md#dry-run-output-format) for output format.
 
 **Note:** `execute best-effort` is not implemented in this stage. Use `observe snapshot` + agent reasoning instead.
 
@@ -335,6 +341,39 @@ clawperator action type --selector <json> --text <value> [--submit] [--clear] [-
 | `--text <value>` | Text to type (required) |
 | `--submit` | Send submit/enter after typing |
 | `--clear` | Clear the field before typing |
+
+---
+
+### `skills new`
+
+Scaffold a new local private skill.
+
+```
+clawperator skills new <skill_id> [--summary <text>] [--output <json|pretty>]
+```
+
+| Flag / Arg | Description |
+|------------|-------------|
+| `<skill_id>` | Skill ID in reverse-domain format, e.g. `com.android.settings.get-version` (required) |
+| `--summary <text>` | One-line description written into `skill.json` and `SKILL.md` (default: `TODO: describe <skill_id>`) |
+
+Creates: `SKILL.md`, `skill.json`, `scripts/run.js`, `scripts/run.sh`, and appends a registry entry to `CLAWPERATOR_SKILLS_REGISTRY`. Success output includes a `next` field pointing to `skills validate`.
+
+---
+
+### `skills validate`
+
+Validate a skill's registry entry, file structure, and script syntax.
+
+```
+clawperator skills validate <skill_id> [--output <json|pretty>]
+clawperator skills validate --all [--output <json|pretty>]
+```
+
+| Flag / Arg | Description |
+|------------|-------------|
+| `<skill_id>` | Skill ID to validate (positional) |
+| `--all` | Validate every registry entry in one pass |
 
 ---
 
