@@ -737,6 +737,20 @@ Documentation is part of the work for each PR, not a follow-up step. The table b
 
 ---
 
+## Working Notes
+
+Implementation agents should append concise findings to `tasks/record/progress.md` as they complete milestones, discover deviations from this plan, or encounter constraints that affect later phases. See that file for the format and rules.
+
+This is especially important for:
+- Phase 0 measurement results (actual latency numbers, event rates, which decision criteria applied)
+- Phase 1 snapshot strategy choice (async vs synchronous - whatever Phase 0 decided)
+- Edge cases seen in real recordings that the plan did not anticipate
+- Any place where the plan was right in principle but wrong in specifics
+
+`progress.md` is for operational notes, not final documentation. Anything that permanently changes the design belongs back in this PRD or in `docs/`.
+
+---
+
 ## Testing Plan
 
 **Phase 2 - Node unit tests (part of the Phase 2 PR):**
