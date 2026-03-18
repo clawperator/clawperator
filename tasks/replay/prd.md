@@ -72,15 +72,24 @@ record pull
 record compile
   → parse NDJSON
   → normalize/compact events
-  → emit Execution JSON
+  → emit Execution JSON (session.execution.json)
 
-clawperator execute --execution-file replay.execution.json
-  → existing execution pipeline (unchanged)
+  ┌─ one-off execution ──────────────────────────────────────────────────────┐
+  │  clawperator execute --execution-file session.execution.json             │
+  │    → existing execution pipeline (unchanged)                             │
+  └──────────────────────────────────────────────────────────────────────────┘
+  ┌─ reusable flow (production path) ────────────────────────────────────────┐
+  │  place session.execution.json in a skill directory as an artifact        │
+  │  clawperator skills run <skill-id>                                       │
+  │    → existing skills + execution pipeline (unchanged)                    │
+  └──────────────────────────────────────────────────────────────────────────┘
 ```
 
 The recording surface is an extension to the Android Operator app's existing broadcast receiver and Accessibility Service. No new IPC, no streaming, no additional processes.
 
-The compilation step is pure Node-side logic: NDJSON in, standard `Execution` JSON out. The replay step uses `runExecution()` verbatim - no new execution path.
+The compilation step is pure Node-side logic: NDJSON in, standard `Execution` JSON out. Execution uses `runExecution()` verbatim via the existing `execute` or `skills run` commands - no new execution path.
+
+**`record replay` scope note:** A `record replay` convenience command exists as PoC development tooling - it chains `compile + execute` in a single step to make end-to-end validation fast during development. It is not part of the public API and will not be documented as such. The intended production paths for executing a compiled recording are `execute --execution-file` (one-off) and `skills run` (reusable). This is a deliberate choice: if `record replay` were a public API surface, it would compete with the skills system and train users away from graduating recordings into proper skills.
 
 ---
 
@@ -89,7 +98,7 @@ The compilation step is pure Node-side logic: NDJSON in, standard `Execution` JS
 The compiler produces a standard `Execution` JSON document, identical in shape to what any agent would send to `clawperator execute`. This is the right choice for the following reasons:
 
 - It is the canonical interface. Agents, skills, and humans all converge on `Execution` JSON. Introducing an intermediate "replay" format would create a new abstraction with no payoff.
-- It is immediately runnable. `clawperator record replay --input replay.execution.json` skips compilation and dispatches directly. It can also be run via `clawperator execute --execution-file replay.execution.json` for cases where the recording context is not relevant.
+- It is immediately runnable via `clawperator execute --execution-file replay.execution.json`. During PoC development, `record replay --input replay.execution.json` provides the same result in a single step.
 - It is inspectable and editable. A developer can open the compiled file, tweak a matcher, and re-run without tooling.
 - It is useful as agent input. An agent tasked with constructing a skill from a recording can read a compiled `Execution` JSON directly. The concrete, ordered steps - with `resourceId` matchers and action types already resolved - give the agent ground truth about what the user did, rather than requiring it to infer intent from raw accessibility events.
 - Skill artifacts (`.recipe.json`) are parameterized templates. A compiled recording has no parameters - it is a concrete flow. Wrapping it as a recipe artifact would add noise.
@@ -231,23 +240,22 @@ Retrieve the recording from the device and compile it into a clean, executable `
 
 ### Node CLI
 
+The public `record` command surface covers four subcommands:
+
 ```
-clawperator record pull [--session-id <id>] [--out <dir>]
+clawperator record pull    [--session-id <id>] [--out <dir>]
 clawperator record compile --input <file> [--out <file>]
-clawperator record replay --input <file> [--device-id <id>]
+clawperator record start   [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]
+clawperator record stop    [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]
 ```
 
 `record pull` without `--session-id` pulls the most recent session (reads `latest` pointer file first, then fetches corresponding NDJSON). Output defaults to `./recordings/`.
 
 `record compile` reads the NDJSON file, runs normalization, and writes an `Execution` JSON. Output defaults to `<input_basename>.execution.json` in the same directory.
 
-`record replay` dispatches based on the input file type:
-- `*.ndjson` - compiles first (runs normalization, injects sleeps), then executes. The compiled `Execution` JSON is not written to disk unless `--out` is provided.
-- `*.execution.json` - skips compilation and executes directly. Use this to replay a previously compiled file, including one that has been manually edited.
+`record pull` and `record compile` are usable standalone. An agent or developer may pull, inspect, edit the compiled JSON, then execute it manually. The pipeline does not have to be atomic.
 
-This distinction matters for agents: pass a `.ndjson` file when re-compilation is desired (e.g. after editing normalization options), pass a `.execution.json` for deterministic replay of a known-good compiled artifact.
-
-Both `record pull` and `record compile` are usable standalone. An agent or developer may pull, inspect, edit, then replay manually. The pipeline does not have to be atomic.
+**`record replay` (PoC tooling only):** A `record replay` subcommand is included as a PoC development convenience - it chains `compile + execute` in a single step to make end-to-end validation fast during Phase 3 verification. It is not part of the public API and is not documented in `docs/node-api-for-agents.md`. The production paths for executing a compiled recording are `execute --execution-file` (one-off) and `skills run` (reusable). See the Architecture Overview for rationale.
 
 ### ADB Pull
 
@@ -352,6 +360,18 @@ Execute the compiled recording on device using the existing execution pipeline w
 
 Replay is intentionally trivial at this phase. The compiled `Execution` JSON is passed to `runExecution()` unchanged. No new Android runtime code is required.
 
+The canonical execution paths are:
+
+```bash
+# one-off: execute the compiled file directly
+clawperator execute --execution-file demo-001.execution.json
+
+# reusable: place execution JSON in a skill directory, then run via skills
+clawperator skills run <skill-id>
+```
+
+The `record replay` subcommand (PoC tooling only) chains compile and execute as a single step for development convenience. It is not the documented public execution path.
+
 ```typescript
 // domain/recording/replayRecording.ts
 async function replayRecording(
@@ -374,7 +394,7 @@ async function replayRecording(
 
 ### Debug Observability
 
-When a replay fails it is not always obvious whether the failure was caused by a bad matcher, insufficient timing, or unexpected app state. `record replay --verbose` must emit per-step output to help distinguish these cases:
+When a replay fails it is not always obvious whether the failure was caused by a bad matcher, insufficient timing, or unexpected app state. Running with `--verbose` emits per-step output to help distinguish these cases:
 
 ```
 [step-1] open_app com.android.settings  → success
@@ -384,7 +404,7 @@ When a replay fails it is not always obvious whether the failure was caused by a
 [step-5] press_key back                 → FAILED (NODE_NOT_FOUND)
 ```
 
-This uses the global `--verbose` flag already present on all commands - `record replay` just needs to ensure the per-step results are surfaced in verbose mode rather than only emitting the final envelope.
+This uses the global `--verbose` flag already present on all commands. `execute --execution-file` passes per-step results in verbose mode rather than only emitting the final envelope.
 
 For matcher failures specifically, knowing the step failed is often not enough - you need to see what the UI actually looked like at that moment. The `--debug-artifacts` flag captures a `snapshot_ui` on each step failure and saves the hierarchy XML to the output directory alongside the session files:
 
@@ -398,7 +418,7 @@ For matcher failures specifically, knowing the step failed is often not enough -
 
 This is implemented by injecting a `snapshot_ui` action immediately after any failed step before halting - a one-action supplemental execution dispatched automatically when `--debug-artifacts` is set and a failure is detected. It does not change the primary result envelope.
 
-`--debug-artifacts` is not on by default because it requires a second round-trip to the device on failure. It should be used explicitly when diagnosing matcher issues.
+`--debug-artifacts` is not on by default because it requires a second round-trip to the device on failure. It should be used explicitly when diagnosing matcher issues. During the PoC, `record replay --debug-artifacts` is the intended invocation; when using the production path, pass `--debug-artifacts` to `execute --execution-file`.
 
 ### PoC Demo Scenario
 
@@ -422,7 +442,7 @@ The replay is considered successful when the device reproduces the flow (Setting
 
 ### Success Criteria
 
-- `record replay` completes without error.
+- `clawperator execute --execution-file demo-001.execution.json` completes without error.
 - Primary signal: all steps in the returned envelope have `success: true` (objective, verifiable from CLI output without inspecting the device).
 - Secondary confirmation: device visually reproduces the recorded flow.
 - Flow succeeds at least twice consecutively.
@@ -575,13 +595,15 @@ Phase 3 - Replay
 
 Developer                  Node CLI                     Android
 ---------                  --------                     -------
-                           record replay --input demo-001.execution.json
-                             compileRecording()           (or read pre-compiled file)
+                           execute --execution-file demo-001.execution.json
                              replayRecording()
                                regenerate commandId
                                runExecution() ─────────────→ existing broadcast dispatch
                                                             tap, scroll, press_key handlers
                              [Clawperator-Result] ←─────── { status: success, stepResults }
+
+  (PoC shortcut: record replay --input demo-001.execution.json
+                   chains compile + execute in one step for dev verification)
 ```
 
 ---
@@ -590,13 +612,22 @@ Developer                  Node CLI                     Android
 
 ### New Node CLI Commands
 
+**Public API:**
+
 ```
-clawperator record start  [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]
-clawperator record stop   [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]
-clawperator record pull   [--session-id <id>|latest] [--out <dir>] [--device-id <serial>]
+clawperator record start   [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]
+clawperator record stop    [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]
+clawperator record pull    [--session-id <id>|latest] [--out <dir>] [--device-id <serial>]
 clawperator record compile --input <ndjson-file> [--out <execution-json>] [--step-delay-ms <n>] [--no-dedup]
+```
+
+**PoC development tooling (not public API, not documented in node-api-for-agents.md):**
+
+```
 clawperator record replay  --input <ndjson-file|execution-json> [--device-id <serial>] [--step-delay-ms <n>] [--debug-artifacts]
 ```
+
+`record replay` exists to make PoC end-to-end verification fast during Phase 3 development. The production execution paths are `clawperator execute --execution-file <path>` (one-off) and `clawperator skills run <skill-id>` (reusable).
 
 All `record` subcommands inherit the global `--output json|pretty` and `--verbose` flags.
 
@@ -669,7 +700,7 @@ The compiler is pure deterministic logic and is the highest-value test target in
 - Scroll drop: scroll events produce a warning, not a compile failure
 - Schema version: compiler rejects a file whose header `schemaVersion` does not match expected
 - Empty recording: `RECORDING_EMPTY` error returned cleanly
-- `record replay --input` dispatch: `.ndjson` triggers compile path, `.execution.json` skips to execute
+- `record replay` dispatch (PoC tooling): `.ndjson` triggers compile path, `.execution.json` skips to execute
 
 No Android runtime tests are required for Phase 2. The Android recording logic is manually verified against the Phase 1 success criteria.
 
@@ -726,7 +757,7 @@ apps/android/shared/data/operator/src/main/kotlin/clawperator/operator/
 | 2 | `record pull` retrieves file without error | CLI exit code 0 |
 | 2 | `record compile` produces valid Execution JSON | `clawperator execute --validate-only` on output |
 | 2 | Step log matches performed actions | Developer visual inspection |
-| 3 | `record replay` completes without error | CLI exit code 0 |
+| 3 | `execute --execution-file` completes without error | CLI exit code 0 |
 | 3 | Device reproduces recorded flow | Developer visual inspection |
-| 3 | Flow succeeds twice consecutively | Repeat replay run |
+| 3 | Flow succeeds twice consecutively | Repeat `execute --execution-file` run |
 | All | No changes to `runExecution()` or existing action handlers | Code review: no diff in those files |
