@@ -64,13 +64,18 @@ export class DoctorService {
     checks.push(discovery);
     if (this.shouldHaltOnFailure(discovery)) return this.finalize(checks, config, options.fix);
 
-    // After discovery, ensure we have a deviceId in config for subsequent checks
+    // After discovery, ensure we have a deviceId in config for subsequent checks.
+    // If discovery returned a warn (e.g. MULTIPLE_DEVICES_DEVICE_ID_REQUIRED) rather
+    // than a fail, execution reaches here with config.deviceId still unset. Attempt
+    // to resolve; if that also fails there is no target device and all subsequent
+    // device-specific checks would run without -s, producing adb ambiguity errors.
+    // Finalize early in that case — the discovery warn already tells the user what to do.
     if (!config.deviceId) {
       try {
         const resolved = await resolveDevice(config);
         config.deviceId = resolved.deviceId;
       } catch {
-        // Should have been caught by checkDeviceDiscovery
+        return this.finalize(checks, config, options.fix);
       }
     }
 

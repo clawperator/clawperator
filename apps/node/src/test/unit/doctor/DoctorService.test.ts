@@ -101,6 +101,47 @@ describe("DoctorService", () => {
     assert.ok(!report.checks.some(check => check.id === "readiness.handshake"));
   });
 
+  it("exits cleanly with warn when multiple devices are connected and no --device-id is given", async () => {
+    // Regression: when checkDeviceDiscovery returns "warn" (not "fail") for
+    // MULTIPLE_DEVICES_DEVICE_ID_REQUIRED, shouldHaltOnFailure returns false and
+    // execution continues. resolveDevice then throws due to ambiguity. The catch
+    // block must finalize early; without this fix it would silently swallow the
+    // exception and run all subsequent checks without a -s flag, causing adb errors.
+    const runner = new FakeProcessRunner();
+    const config = getDefaultRuntimeConfig({ runner });
+
+    // checkAdbPresence: isAdbAvailable → adb version
+    runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
+    // checkAdbPresence: runAdb version (evidence)
+    runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
+    // checkAdbServer: adb start-server
+    runner.queueResult({ code: 0, stdout: "", stderr: "" });
+    // checkDeviceDiscovery: adb devices (two devices → warn)
+    runner.queueResult({ code: 0, stdout: "List of devices attached\nserial1\tdevice\nserial2\tdevice\n", stderr: "" });
+    // resolveDevice: adb devices (two devices → throws → caught → early finalize)
+    runner.queueResult({ code: 0, stdout: "List of devices attached\nserial1\tdevice\nserial2\tdevice\n", stderr: "" });
+
+    const report = await new DoctorService().run({ config });
+
+    // Should exit 0: warn is not a failure for criticalOk
+    assert.strictEqual(report.criticalOk, true);
+    assert.strictEqual(report.ok, true);
+
+    // Discovery check must be present as a warn
+    const discovery = report.checks.find(c => c.id === "device.discovery");
+    assert.ok(discovery);
+    assert.strictEqual(discovery.status, "warn");
+    assert.strictEqual(discovery.code, ERROR_CODES.MULTIPLE_DEVICES_DEVICE_ID_REQUIRED);
+
+    // No device-specific checks should have run
+    assert.ok(!report.checks.some(c => c.id === "device.capability"), "device.capability should not run");
+    assert.ok(!report.checks.some(c => c.id === "readiness.apk.presence"), "readiness.apk.presence should not run");
+    assert.ok(!report.checks.some(c => c.id === "readiness.handshake"), "readiness.handshake should not run");
+
+    // deviceId must remain unresolved
+    assert.strictEqual(report.deviceId, undefined);
+  });
+
   it("warns when the release package is requested but only debug is installed", async () => {
     const runner = new FakeProcessRunner();
     const config = getDefaultRuntimeConfig({ runner, receiverPackage: "com.clawperator.operator" });
