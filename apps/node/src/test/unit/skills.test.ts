@@ -626,7 +626,11 @@ describe("scaffoldSkill", () => {
       const skillMarkdown = await readFile(join(tempRoot, "skills", skillId, "SKILL.md"), "utf8");
 
       assert.strictEqual(skillJson.summary, summary);
-      assert.match(skillMarkdown, new RegExp(`description: ${summary.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
+      assert.match(skillMarkdown, /description: \|-\n/);
+      assert.match(
+        skillMarkdown,
+        new RegExp(`\\n  ${summary.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\n---\\n`)
+      );
     } finally {
       await rm(tempRoot, { recursive: true, force: true });
     }
@@ -649,7 +653,34 @@ describe("scaffoldSkill", () => {
       const skillMarkdown = await readFile(join(tempRoot, "skills", skillId, "SKILL.md"), "utf8");
 
       assert.strictEqual(skillJson.summary, expectedSummary);
-      assert.match(skillMarkdown, new RegExp(`description: ${expectedSummary.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
+      assert.match(skillMarkdown, /description: \|-\n/);
+      assert.match(
+        skillMarkdown,
+        new RegExp(`\\n  ${expectedSummary.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\n---\\n`)
+      );
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("supports multi-line summaries without breaking YAML frontmatter", async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-skill-scaffold-multiline-summary-"));
+    const registryDir = join(tempRoot, "skills");
+    const registryPath = join(registryDir, "skills-registry.json");
+    await mkdir(registryDir, { recursive: true });
+    await copyFile(TEST_REGISTRY_PATH, registryPath);
+
+    try {
+      const skillId = "com.example.multiline.capture";
+      const summary = "Line1\nLine2: has colon\n- list-looking line\n# looks like a comment";
+      const result = await scaffoldSkill(skillId, { registryPath, summary });
+      if (!result.ok) assert.fail(result.message);
+
+      const skillMarkdown = await readFile(join(tempRoot, "skills", skillId, "SKILL.md"), "utf8");
+
+      // Ensure YAML uses a block scalar and preserves lines with indentation.
+      assert.match(skillMarkdown, /description: \|-\n/);
+      assert.match(skillMarkdown, /\n  Line1\n  Line2: has colon\n  - list-looking line\n  # looks like a comment\n---\n/);
     } finally {
       await rm(tempRoot, { recursive: true, force: true });
     }
