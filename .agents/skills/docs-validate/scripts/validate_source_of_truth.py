@@ -60,10 +60,14 @@ def load_source_map(source_map_path: Path) -> dict[str, dict[str, object]]:
     with source_map_path.open("r", encoding="utf-8") as handle:
         data = yaml.safe_load(handle)
 
+    if data is None:
+        raise ValueError(
+            f"Invalid source map at {source_map_path}: file is empty or contains only whitespace."
+        )
     if not isinstance(data, dict):
         raise ValueError(
             f"Invalid source map at {source_map_path}: expected a mapping at the top level, "
-            "but the file was empty or malformed."
+            f"got {type(data).__name__}."
         )
 
     pages: dict[str, dict[str, object]] = {}
