@@ -7,7 +7,6 @@ import android.os.HandlerThread
 import android.os.SystemClock
 import android.util.Log
 import clawperator.task.runner.ERROR_RECORDING_ALREADY_IN_PROGRESS
-import clawperator.task.runner.ERROR_RECORDING_EMPTY
 import clawperator.task.runner.ERROR_RECORDING_NOT_IN_PROGRESS
 import clawperator.task.runner.RecordingCommandOutcome
 import clawperator.task.runner.RecordingManager
@@ -119,6 +118,13 @@ class RecordingManagerDefault(
                 currentSession
             }
 
+        if (sessionId != null && sessionId != session.sessionId) {
+            Log.w(
+                LOG_TAG,
+                "SESSION_ID_MISMATCH stopRequestedSessionId=$sessionId activeSessionId=${session.sessionId}",
+            )
+        }
+
         val latch = CountDownLatch(1)
         val resultRef = arrayOfNulls<RecordingCommandOutcome>(1)
         session.handler.post {
@@ -189,21 +195,11 @@ class RecordingManagerDefault(
                 LOG_TAG,
                 "SESSION_STOPPED sessionId=${session.sessionId} file=${session.file.absolutePath} eventCount=$eventCount",
             )
-            if (eventCount == 0) {
-                RecordingCommandOutcome.Error(
-                    code = ERROR_RECORDING_EMPTY,
-                    message = "Recording stopped cleanly but captured no events",
-                    sessionId = session.sessionId,
-                    filePath = session.file.absolutePath,
-                    eventCount = eventCount,
-                )
-            } else {
-                RecordingCommandOutcome.Stopped(
-                    sessionId = session.sessionId,
-                    filePath = session.file.absolutePath,
-                    eventCount = eventCount,
-                )
-            }
+            RecordingCommandOutcome.Stopped(
+                sessionId = session.sessionId,
+                filePath = session.file.absolutePath,
+                eventCount = eventCount,
+            )
         } catch (t: Throwable) {
             try {
                 session.writer.close()

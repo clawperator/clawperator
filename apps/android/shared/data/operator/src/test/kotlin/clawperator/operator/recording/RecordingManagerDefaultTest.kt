@@ -85,4 +85,17 @@ class RecordingManagerDefaultTest {
         assertTrue(lines.first().contains("\"type\":\"recording_header\""))
         assertTrue(lines.last().contains("\"type\":\"press_key\""))
     }
+
+    @Test
+    fun `stop recording with no events succeeds with zero event count`() = runTest {
+        val manager = createManager("/tmp/clawperator-recording-manager-empty")
+
+        val started = assertIs<RecordingCommandOutcome.Started>(manager.startRecording("demo-empty"))
+        val stopped = manager.stopRecording("demo-empty")
+
+        val result = assertIs<RecordingCommandOutcome.Stopped>(stopped)
+        assertEquals("demo-empty", result.sessionId)
+        assertEquals(0, result.eventCount)
+        assertEquals(started.filePath, result.filePath)
+    }
 }

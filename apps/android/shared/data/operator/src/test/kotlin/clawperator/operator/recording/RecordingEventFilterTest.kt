@@ -4,17 +4,19 @@ import action.buildconfig.BuildConfigMock
 import android.accessibilityservice.AccessibilityService
 import android.app.Application
 import android.content.Context
+import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent
 import androidx.test.core.app.ApplicationProvider
+import clawperator.task.runner.RecordingCommandOutcome
+import clawperator.task.runner.RecordingManager
 import kotlinx.coroutines.test.runTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertIs
+import kotlin.test.assertTrue
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
-import clawperator.task.runner.RecordingCommandOutcome
-import clawperator.task.runner.RecordingManager
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 @RunWith(RobolectricTestRunner::class)
 @Config(manifest = Config.NONE, application = Application::class)
@@ -38,6 +40,70 @@ class RecordingEventFilterTest {
         filter.onAccessibilityEvent(TestAccessibilityService(context), event)
 
         assertEquals(0, manager.enqueuedEvents.size)
+    }
+
+    @Test
+    fun `release package self events are filtered before enqueue`() = runTest {
+        val manager = FakeRecordingManager(active = true)
+        val filter =
+            RecordingEventFilterDefault(
+                recordingManager = manager,
+                buildConfig = BuildConfigMock().apply { _debug = true },
+            )
+        val event =
+            AccessibilityEvent.obtain(AccessibilityEvent.TYPE_VIEW_CLICKED).apply {
+                packageName = "com.clawperator.operator"
+                className = "android.widget.Button"
+            }
+
+        filter.onAccessibilityEvent(TestAccessibilityService(context), event)
+
+        assertEquals(0, manager.enqueuedEvents.size)
+    }
+
+    @Test
+    fun `window change event is enqueued when recording is active`() = runTest {
+        val manager = FakeRecordingManager(active = true)
+        val filter =
+            RecordingEventFilterDefault(
+                recordingManager = manager,
+                buildConfig = BuildConfigMock().apply { _debug = true },
+            )
+        val event =
+            AccessibilityEvent.obtain(AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED).apply {
+                packageName = "com.android.settings"
+                className = "com.android.settings.Settings"
+            }
+
+        filter.onAccessibilityEvent(TestAccessibilityService(context), event)
+
+        val recorded = assertIs<RecordingWindowChangeEvent>(manager.enqueuedEvents.single())
+        assertEquals("com.android.settings", recorded.packageName)
+        assertEquals(0L, recorded.seq)
+    }
+
+    @Test
+    fun `click event is enqueued when recording is active`() = runTest {
+        val manager = FakeRecordingManager(active = true)
+        val filter =
+            RecordingEventFilterDefault(
+                recordingManager = manager,
+                buildConfig = BuildConfigMock().apply { _debug = true },
+            )
+        val event =
+            AccessibilityEvent.obtain(AccessibilityEvent.TYPE_VIEW_CLICKED).apply {
+                packageName = "com.android.settings"
+                className = "android.widget.Button"
+                text.add("Display")
+            }
+
+        filter.onAccessibilityEvent(TestAccessibilityService(context), event)
+
+        val recorded = assertIs<RecordingClickEvent>(manager.enqueuedEvents.single())
+        assertEquals("com.android.settings", recorded.packageName)
+        assertEquals(0L, recorded.seq)
+        assertEquals("Display", recorded.text)
+        assertEquals(null, recorded.snapshot)
     }
 
     @Test
@@ -65,6 +131,48 @@ class RecordingEventFilterTest {
         assertEquals(null, recorded.snapshot)
         assertEquals(0L, recorded.seq)
         assertTrue(manager.isRecordingActive())
+    }
+
+    @Test
+    fun `text change event is enqueued with null snapshot`() = runTest {
+        val manager = FakeRecordingManager(active = true)
+        val filter =
+            RecordingEventFilterDefault(
+                recordingManager = manager,
+                buildConfig = BuildConfigMock().apply { _debug = true },
+            )
+        val event =
+            AccessibilityEvent.obtain(AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED).apply {
+                packageName = "com.android.settings"
+                text.add("hello")
+            }
+
+        filter.onAccessibilityEvent(TestAccessibilityService(context), event)
+
+        val recorded = assertIs<RecordingTextChangeEvent>(manager.enqueuedEvents.single())
+        assertEquals("com.android.settings", recorded.packageName)
+        assertEquals("hello", recorded.text)
+        assertEquals(null, recorded.snapshot)
+        assertEquals(0L, recorded.seq)
+    }
+
+    @Test
+    fun `events are ignored when recording is not active`() = runTest {
+        val manager = FakeRecordingManager(active = false)
+        val filter =
+            RecordingEventFilterDefault(
+                recordingManager = manager,
+                buildConfig = BuildConfigMock().apply { _debug = true },
+            )
+        val event =
+            AccessibilityEvent.obtain(AccessibilityEvent.TYPE_VIEW_CLICKED).apply {
+                packageName = "com.android.settings"
+                text.add("Display")
+            }
+
+        filter.onAccessibilityEvent(TestAccessibilityService(context), event)
+
+        assertEquals(0, manager.enqueuedEvents.size)
     }
 
     private class FakeRecordingManager(

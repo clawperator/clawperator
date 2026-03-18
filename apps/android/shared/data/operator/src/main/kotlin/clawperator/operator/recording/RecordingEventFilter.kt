@@ -174,6 +174,7 @@ class RecordingEventFilterDefault(
             try {
                 root.toUiAutomatorHierarchyDump(rotation = resolveRotation(service))
             } finally {
+                @Suppress("DEPRECATION")
                 root.recycle()
             }
         val serializeUs = nanosToMicros(nowElapsedNanos() - serializeStartNs)
@@ -238,6 +239,7 @@ class RecordingEventFilterDefault(
                     },
             )
         } finally {
+            @Suppress("DEPRECATION")
             source?.recycle()
         }
     }
