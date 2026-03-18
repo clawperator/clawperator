@@ -1,7 +1,7 @@
 import { describe, it, before, after, afterEach } from "node:test";
 import assert from "node:assert";
 import { spawn } from "node:child_process";
-import { mkdtemp, mkdir, copyFile, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, copyFile, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
@@ -585,6 +585,7 @@ describe("scaffoldSkill", () => {
       assert.ok(result.files.some((file) => file.endsWith("/skill.json")));
       assert.ok(result.files.some((file) => file.endsWith("/SKILL.md")));
       assert.ok(result.files.some((file) => file.endsWith("/scripts/run.js")));
+      assert.ok(result.files.some((file) => file.endsWith("/scripts/run.sh")));
 
       const registryRaw = await readFile(registryPath, "utf8");
       const registry = JSON.parse(registryRaw);
@@ -592,7 +593,63 @@ describe("scaffoldSkill", () => {
       assert.ok(entry);
       assert.strictEqual(entry.applicationId, "com.example.demo");
       assert.strictEqual(entry.intent, "capture-state");
+      assert.deepStrictEqual(entry.scripts, [
+        `skills/${skillId}/scripts/run.js`,
+        `skills/${skillId}/scripts/run.sh`,
+      ]);
       assert.deepStrictEqual(entry.artifacts, []);
+
+      const runShPath = join(tempRoot, "skills", skillId, "scripts", "run.sh");
+      const runShContent = await readFile(runShPath, "utf8");
+      const runShStats = await stat(runShPath);
+      assert.match(runShContent, /node "\$DIR\/run\.js" "\$@"/);
+      assert.ok((runShStats.mode & 0o111) !== 0, `Expected run.sh to be executable, mode=${runShStats.mode.toString(8)}`);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("uses a provided summary in skill.json and SKILL.md", async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-skill-scaffold-summary-"));
+    const registryDir = join(tempRoot, "skills");
+    const registryPath = join(registryDir, "skills-registry.json");
+    await mkdir(registryDir, { recursive: true });
+    await copyFile(TEST_REGISTRY_PATH, registryPath);
+
+    try {
+      const skillId = "com.example.notes.capture-summary";
+      const summary = "Capture the current Notes screen summary";
+      const result = await scaffoldSkill(skillId, { registryPath, summary });
+      if (!result.ok) assert.fail(result.message);
+
+      const skillJson = JSON.parse(await readFile(join(tempRoot, "skills", skillId, "skill.json"), "utf8"));
+      const skillMarkdown = await readFile(join(tempRoot, "skills", skillId, "SKILL.md"), "utf8");
+
+      assert.strictEqual(skillJson.summary, summary);
+      assert.match(skillMarkdown, new RegExp(`description: ${summary.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("uses the default summary when one is not provided", async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-skill-scaffold-default-summary-"));
+    const registryDir = join(tempRoot, "skills");
+    const registryPath = join(registryDir, "skills-registry.json");
+    await mkdir(registryDir, { recursive: true });
+    await copyFile(TEST_REGISTRY_PATH, registryPath);
+
+    try {
+      const skillId = "com.example.camera.capture-default";
+      const expectedSummary = `TODO: describe ${skillId}`;
+      const result = await scaffoldSkill(skillId, { registryPath });
+      if (!result.ok) assert.fail(result.message);
+
+      const skillJson = JSON.parse(await readFile(join(tempRoot, "skills", skillId, "skill.json"), "utf8"));
+      const skillMarkdown = await readFile(join(tempRoot, "skills", skillId, "SKILL.md"), "utf8");
+
+      assert.strictEqual(skillJson.summary, expectedSummary);
+      assert.match(skillMarkdown, new RegExp(`description: ${expectedSummary.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
     } finally {
       await rm(tempRoot, { recursive: true, force: true });
     }
@@ -620,7 +677,7 @@ describe("scaffoldSkill", () => {
     try {
       const skillId = "com.example.weather.read-summary";
       const { stdout, code } = await runCli(
-        ["skills", "new", skillId, "--output", "json"],
+        ["skills", "new", skillId, "--summary", "Read the current weather summary", "--output", "json"],
         {
           env: {
             ...process.env,
@@ -630,14 +687,21 @@ describe("scaffoldSkill", () => {
       );
 
       assert.strictEqual(code, 0, stdout);
-      const parsed = JSON.parse(stdout) as { created?: boolean; skillId?: string; skillPath?: string };
+      const parsed = JSON.parse(stdout) as { created?: boolean; skillId?: string; skillPath?: string; next?: string; files?: string[] };
       assert.strictEqual(parsed.created, true);
       assert.strictEqual(parsed.skillId, skillId);
       assert.ok(parsed.skillPath?.endsWith(`/skills/${skillId}`));
+      assert.ok(parsed.files?.some((file) => file.endsWith("/scripts/run.sh")));
+      assert.strictEqual(
+        parsed.next,
+        "Edit SKILL.md and scripts/run.js, then verify with: clawperator skills validate <skill_id>"
+      );
 
       const registryRaw = await readFile(registryPath, "utf8");
       const registry = JSON.parse(registryRaw);
-      assert.ok(registry.skills.some((skill: { id: string }) => skill.id === skillId));
+      const entry = registry.skills.find((skill: { id: string }) => skill.id === skillId);
+      assert.ok(entry);
+      assert.strictEqual(entry.summary, "Read the current weather summary");
     } finally {
       await rm(tempRoot, { recursive: true, force: true });
     }

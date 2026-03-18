@@ -59,7 +59,7 @@ Commands:
   skills compile-artifact <skill_id> --artifact <name> [--vars <json>]
   skills compile-artifact --skill-id <id> --artifact <name> [--vars <json>]
                                             Compile from a skill artifact (skill: positional or --skill-id; artifact: ac-status or ac-status.recipe.json)
-  skills new <skill_id>
+  skills new <skill_id> [--summary <text>]
                                             Scaffold a new local skill folder and registry entry
   skills validate <skill_id>
   skills validate --all
@@ -182,12 +182,13 @@ Notes:
   "skills new": `clawperator skills new
 
 Usage:
-  clawperator skills new <skill_id> [--output <json|pretty>]
+  clawperator skills new <skill_id> [--summary <text>] [--output <json|pretty>]
 
 Notes:
   - Scaffolds a new local skill in the currently configured skills registry repo.
   - Derives applicationId and intent by splitting <skill_id> on the final dot.
-  - Creates: SKILL.md, skill.json, and scripts/run.js
+  - Creates: SKILL.md, skill.json, scripts/run.js, and scripts/run.sh
+  - --summary overrides the default TODO summary written to skill.json and SKILL.md.
   - Updates the configured registry JSON so the new skill appears in skills list.
 `,
   "skills validate": `clawperator skills validate
@@ -685,9 +686,10 @@ async function main(): Promise<void> {
         }
       } else if (rest[0] === "new") {
         if (!rest[1]) {
-          result = JSON.stringify({ code: "USAGE", message: "skills new <skill_id>" });
+          result = JSON.stringify({ code: "USAGE", message: "skills new <skill_id> [--summary <text>]" });
         } else {
-          result = await (await import("./commands/skills.js")).cmdSkillsNew(rest[1], out);
+          const summary = getOpt(rest, "--summary");
+          result = await (await import("./commands/skills.js")).cmdSkillsNew(rest[1], { ...out, summary });
         }
       } else if (rest[0] === "validate") {
         if (hasFlag(rest, "--all")) {

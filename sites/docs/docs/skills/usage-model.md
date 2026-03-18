@@ -115,6 +115,57 @@ For the current metadata contract and authoring details, see
 For the full path from ad hoc exploration to a validated reusable skill, see
 `skills/skill-development-workflow.md`.
 
+### Creating a skill scaffold
+
+Create a new private skill scaffold with:
+
+```bash
+clawperator skills new <skill_id> [--summary <text>]
+```
+
+That command creates a local skill folder, starter `SKILL.md`, `skill.json`,
+`scripts/run.js`, and `scripts/run.sh`, then appends the skill to the active
+registry.
+
+### `skills run` response
+
+`clawperator skills run` returns a structured wrapper around the skill script:
+
+- `ok`: whether the wrapper considers the run successful
+- `skillId`: the registry ID that was invoked
+- `output`: raw `stdout` from the skill script on success; its internal format is skill-defined, not runner-enforced
+- `exitCode`: process exit code returned by the script
+- `durationMs`: total wrapper runtime in milliseconds
+
+Minimal success example:
+
+```json
+{
+  "ok": true,
+  "skillId": "com.android.settings.capture-overview",
+  "output": "RESULT|status=success|snapshot=/tmp/settings.xml\n",
+  "exitCode": 0,
+  "durationMs": 15842
+}
+```
+
+Minimal failure example:
+
+```json
+{
+  "ok": false,
+  "code": "SKILL_EXECUTION_FAILED",
+  "message": "Skill com.android.settings.capture-overview exited with code 2",
+  "skillId": "com.android.settings.capture-overview",
+  "exitCode": 2,
+  "stdout": "RESULT|status=partial|snapshot=/tmp/settings.xml\n",
+  "stderr": "Timed out waiting for expected node\n"
+}
+```
+
+On failure, the wrapper preserves any captured `stdout` and `stderr` so agents
+can inspect partial progress instead of treating the run as an opaque error.
+
 ## Troubleshooting
 
 ### skills list returns empty or fails

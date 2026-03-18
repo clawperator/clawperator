@@ -1,4 +1,4 @@
-import { access, mkdir, writeFile } from "node:fs/promises";
+import { access, chmod, mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import {
   loadRegistry,
@@ -26,6 +26,11 @@ export interface ScaffoldSkillError {
   ok: false;
   code: string;
   message: string;
+}
+
+export interface ScaffoldSkillOptions {
+  registryPath?: string;
+  summary?: string;
 }
 
 function deriveSkillMetadata(skillId: string): {
@@ -63,6 +68,14 @@ Usage:
 \`\`\`bash
 node ${scriptPath} <device_id> [receiver_package]
 \`\`\`
+`;
+}
+
+function buildRunShTemplate(): string {
+  return `#!/usr/bin/env bash
+set -euo pipefail
+DIR="$(cd "$(dirname "\${BASH_SOURCE[0]}")" && pwd)"
+node "$DIR/run.js" "$@"
 `;
 }
 
@@ -150,7 +163,12 @@ async function loadCurrentRegistry(registryPath?: string): Promise<LoadRegistryR
   return loadRegistry(registryPath);
 }
 
-export async function scaffoldSkill(skillId: string, registryPath?: string): Promise<ScaffoldSkillSuccess | ScaffoldSkillError> {
+export async function scaffoldSkill(
+  skillId: string,
+  options: string | ScaffoldSkillOptions = {},
+): Promise<ScaffoldSkillSuccess | ScaffoldSkillError> {
+  const normalizedOptions = typeof options === "string" ? { registryPath: options } : options;
+  const summary = normalizedOptions.summary?.trim() || `TODO: describe ${skillId}`;
   const derived = deriveSkillMetadata(skillId);
   if (!derived) {
     return {
@@ -162,7 +180,7 @@ export async function scaffoldSkill(skillId: string, registryPath?: string): Pro
 
   let loaded: LoadRegistryResult;
   try {
-    loaded = await loadCurrentRegistry(registryPath);
+    loaded = await loadCurrentRegistry(normalizedOptions.registryPath);
   } catch (error) {
     return {
       ok: false,
@@ -183,6 +201,7 @@ export async function scaffoldSkill(skillId: string, registryPath?: string): Pro
   const skillPathRelative = join("skills", skillId);
   const skillRoot = join(repoRoot, skillPathRelative);
   const scriptPathRelative = join(skillPathRelative, "scripts", "run.js");
+  const shellScriptPathRelative = join(skillPathRelative, "scripts", "run.sh");
   const skillFileRelative = join(skillPathRelative, "SKILL.md");
   if (await fileExists(skillRoot)) {
     return {
@@ -196,10 +215,10 @@ export async function scaffoldSkill(skillId: string, registryPath?: string): Pro
     id: skillId,
     applicationId: derived.applicationId,
     intent: derived.intent,
-    summary: `TODO: describe ${skillId}`,
+    summary,
     path: skillPathRelative,
     skillFile: skillFileRelative,
-    scripts: [scriptPathRelative],
+    scripts: [scriptPathRelative, shellScriptPathRelative],
     artifacts: [],
   };
 
@@ -208,6 +227,9 @@ export async function scaffoldSkill(skillId: string, registryPath?: string): Pro
     await writeFile(join(skillRoot, "SKILL.md"), buildSkillMarkdown(skillId, skillEntry.summary, scriptPathRelative), "utf8");
     await writeFile(join(skillRoot, "skill.json"), `${JSON.stringify(skillEntry, null, 2)}\n`, "utf8");
     await writeFile(join(skillRoot, "scripts", "run.js"), buildScriptTemplate(skillId, derived.applicationId), "utf8");
+    const runShPath = join(skillRoot, "scripts", "run.sh");
+    await writeFile(runShPath, buildRunShTemplate(), "utf8");
+    await chmod(runShPath, 0o755);
 
     const updatedRegistry: SkillsRegistry = {
       ...loaded.registry,
@@ -232,6 +254,7 @@ export async function scaffoldSkill(skillId: string, registryPath?: string): Pro
       join(skillRoot, "SKILL.md"),
       join(skillRoot, "skill.json"),
       join(skillRoot, "scripts", "run.js"),
+      join(skillRoot, "scripts", "run.sh"),
     ],
   };
 }
