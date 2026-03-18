@@ -4,6 +4,14 @@ This document captures the reasoning behind the record feature: why it matters, 
 
 ---
 
+## What This Feature Is
+
+Recording is not the feature. Skill creation acceleration is the feature.
+
+The recording infrastructure exists to give an agent a concrete, ordered description of a UI workflow it has never seen. Its purpose is to eliminate the exploration cost that precedes skill authoring - not to produce a replayable artifact. The durable output is always the skill. The recording and step log are bootstrap inputs that the skill replaces.
+
+---
+
 ## The Gap This Fills
 
 Clawperator's core loop is: agent observes device state via snapshot, decides what to do, dispatches an action, repeats. This works well when an agent already knows the shape of a workflow - either from a skill in the registry or from prior exploration.

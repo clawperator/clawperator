@@ -9,7 +9,7 @@ This document captures what the record feature does and does not do, and explain
 The Android Accessibility Service captures discrete interaction events: element taps, key presses, and screen transitions. It does not capture:
 
 - Visual rendering or animation state between gestures
-- Scroll position within a list (scroll events are captured in the schema but not compiled in v1)
+- Scroll position within a list (scroll events are captured in the schema but not extracted in v1)
 - Text input (captured in schema but out of PoC scope)
 - Network requests or any app-internal state
 - Timing nuances between gestures (timestamps are recorded but not used for replay timing)

@@ -248,9 +248,13 @@ Scroll and text-change events are written to the NDJSON without a snapshot field
 
 For step-candidate events (click, press_key, window_change), `RecordingManager` reads the current accessibility tree via `getRootInActiveWindow()` and serializes it as UI hierarchy XML. This is the same traversal `snapshot_ui` uses - no new API.
 
-**Capture happens on a background HandlerThread, not the event delivery thread.** The event delivery thread enqueues a lightweight capture request (event data only, no IPC). The background thread dequeues, calls `getRootInActiveWindow()`, and appends the completed record to the write buffer. This keeps the event delivery thread unblocked regardless of how long the tree read takes.
+**Snapshot capture strategy (synchronous vs asynchronous) is determined by Phase 0 findings. The implementation below describes the async path as a reference design, but Phase 0 may change this decision.**
 
-The ordering consequence: there is a small window between the user interaction and the snapshot being taken. At human interaction speeds this window is well under the time to the next interaction. If the Phase 0 measurement shows this window causes stale snapshots in practice, the mitigation is to take the snapshot synchronously on the event thread (only for step-candidate events at human speed) and accept the latency - the Phase 0 decision document will record which approach was chosen.
+The async design: the event delivery thread enqueues a lightweight capture request (event data only, no IPC). A background HandlerThread dequeues, calls `getRootInActiveWindow()`, and appends the completed record to the write buffer. This keeps the event delivery thread unblocked regardless of how long the tree read takes, at the cost of a timing window between the interaction and the snapshot.
+
+The synchronous alternative: call `getRootInActiveWindow()` directly on the event delivery thread for step-candidate events only, accepting the latency. This eliminates the timing window but blocks the handler for the duration of the IPC call.
+
+Phase 0 decides which path to use. The Phase 0 findings document records the choice and the evidence behind it. Phase 1 implementation does not begin until that decision is made.
 
 **Snapshot semantics (PoC):** `uiStateBefore` is a best-effort capture of the UI immediately after the accessibility event fires. Due to async capture timing, it may reflect the pre-interaction state (ideal), a partially transitioned state, or in fast transitions, the post-interaction state. Agents must treat `uiStateBefore` as approximate context, not exact ground truth. It identifies what was likely visible at interaction time; the live `observe snapshot` is the authoritative basis for action construction.
 
@@ -384,7 +388,7 @@ interface RecordingStepLog {
 | Back navigation | `press_key` with `key: "back"` | `press_key` step, `key: "back"` |
 | Drop consecutive window changes | `window_change` immediately followed by another `window_change` with no intervening user action | Keep only the final one |
 
-**Note on inferred steps:** Some step types are synthesized from event patterns rather than mapping 1:1 to a single accessibility event. `open_app` is the primary example: it is inferred from the first `window_change` in the session, not from a direct "app launch" event. The step log makes no attempt to hide this - the agent should treat such steps as intent inferences, not exact event records.
+**Note on inferred steps:** Some step types are synthesized from event patterns rather than mapping 1:1 to a single accessibility event. `open_app` is the primary example: it is inferred from the first `window_change` in the session, not from a direct "app launch" event. It represents "ensure this app is in the foreground", not necessarily a cold launch - if the recording started while the app was already open, the first `window_change` may reflect a navigation rather than an app open. The step log makes no attempt to hide this - the agent should treat `open_app` as a heuristic intent inference, not an exact event record.
 
 Click deduplication (collapsing rapid double-taps) is deliberately out of scope for v1. If a user double-tapped by accident, the step log will contain both clicks. The agent handles this at reproduction time - it observes state after each step and can detect when a click had no visible effect.
 
@@ -472,7 +476,7 @@ The demo is conducted with a standard agent (Claude) receiving `demo-001.steps.j
 - Agent successfully completes the Settings → Display → back flow using the recording as context.
 - Each step is issued as a discrete `clawperator execute` call (not via `--execution-file`).
 - Agent observes device state between steps via `observe snapshot`.
-- Flow succeeds at least once reliably; a second run may involve minor agent intervention (e.g. waiting for a transition) and still counts. The PoC validates feasibility, not stability.
+- Flow succeeds at least once and can be reproduced a second consecutive time with minimal or no agent intervention. One success could be luck; two confirms the step log provides reliable enough context for the agent to navigate the flow without re-exploring. Minor timing waits between steps are acceptable; re-discovering the navigation path is not.
 - Agent authors a local skill artifact from the validated flow.
 - Agent runs the authored skill via `clawperator skills run` and it completes successfully.
 - No new Clawperator code ships in this phase.
@@ -582,7 +586,7 @@ type RawRecordingEvent =
 
 `_warnings` is a top-level array of human-readable strings describing what the parser suppressed or modified. It is present if any warnings were generated during parsing; absent (not `null`, not `[]`) if the parse was clean. The agent may read these to understand where the step log diverges from the raw event stream - useful context when a reproduction diverges unexpectedly.
 
-**Schema note:** The step log format is intentionally flat for the PoC - each step carries its own `uiStateBefore` inline. If real agent consumption reveals this is awkward (e.g. large snapshots making the file unwieldy to scan), a future version may normalize it into a `{step, event, uiStateBefore}` grouping with snapshots in a separate map. This is a PoC detail, not a constraint.
+**Schema note:** The step log format is intentionally flat for the PoC - each step carries its own `uiStateBefore` inline. Step logs may be large: a full UI hierarchy XML snapshot per step, even for a 5-step flow, can run to hundreds of kilobytes. This is acceptable for PoC (the file is read once, not streamed), but agents should not pass the entire file into context naively. Future versions may normalize snapshots into a separate reference structure to make both the file and the agent's working context more manageable. This is a PoC scope decision, not a permanent constraint.
 
 ### Step Log Agent Contract (PoC)
 
@@ -602,6 +606,8 @@ Agents consuming the step log must know which fields are stable and which are be
 - `bounds` - present on click events, may be stale for elements that shifted after recording
 
 Agents must not assume any individual selector field is present. Matcher construction must tolerate partial data: use `uiStateBefore` as the primary context source and treat event fields as hints, not guarantees.
+
+**Agents must not directly reuse recorded selectors as-is.** Every action must be derived from the current device snapshot, using recorded data as context only. The recording identifies what to look for; the live `observe snapshot` confirms it is present and provides the matcher to act on. Treating recorded `resourceId`, `text`, or `bounds` as ready-to-dispatch selectors produces brittle behavior - the same element may have shifted, relabeled, or be absent entirely.
 
 ---
 
@@ -832,7 +838,7 @@ apps/android/shared/data/operator/src/main/kotlin/clawperator/operator/
 | 2 | Step log matches performed actions in order | Developer visual inspection |
 | 3A | Agent completes flow using recording as context | Developer visual inspection |
 | 3A | Each step issued as discrete `execute` call | Agent session log |
-| 3A | Flow succeeds at least once; second run may use minor agent intervention | Repeat agent session |
+| 3A | Flow succeeds at least once and reproduces a second time with minimal or no agent re-exploration | Repeat agent session |
 | 3B | Agent authors a skill from the validated flow | Skill artifact exists on disk |
 | 3B | Skill runs successfully via `clawperator skills run` | CLI exit code 0 |
 | All | No changes to `runExecution()` or existing action handlers | Code review: no diff in those files |
