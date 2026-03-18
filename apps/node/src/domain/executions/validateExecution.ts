@@ -58,8 +58,7 @@ const actionParamsSchema = z.object({
   timeoutMs: z.number().optional(),
   // read_key_value_pair params
   labelMatcher: nodeMatcherSchema.optional(),
-  // Transient flag for deprecated param tracking (not sent to Android)
-  _usedDeprecatedTarget: z.boolean().optional(),
+
 }).strict();
 
 // NOTE: "doctor_ping" is intentionally excluded. It is an internal diagnostic action
@@ -182,16 +181,11 @@ const executionSchema = z.object({
           addIssue(index, "enter_text requires non-empty params.text", ["params", "text"]);
         }
         break;
-      case "scroll_and_click": {
-        const hasMatcher = params?.matcher !== undefined;
-        const hasTarget = params?.target !== undefined;
-        if (hasMatcher && hasTarget) {
-          addIssue(index, "scroll_and_click requires params.matcher or params.target, not both", ["params"]);
-        } else if (!hasMatcher && !hasTarget) {
+      case "scroll_and_click":
+        if (!params?.matcher) {
           addIssue(index, "scroll_and_click requires params.matcher", ["params", "matcher"]);
         }
         break;
-      }
       case "scroll": {
         const SUPPORTED_DIRECTIONS = ["down", "up", "left", "right"] as const;
         if (params?.direction !== undefined) {
@@ -217,13 +211,8 @@ const executionSchema = z.object({
         break;
       }
       case "scroll_until": {
-        const hasMatcher = params?.matcher !== undefined;
-        const hasTarget = params?.target !== undefined;
-        if (params?.clickAfter === true && !hasMatcher && !hasTarget) {
+        if (params?.clickAfter === true && !params?.matcher) {
           addIssue(index, "scroll_until params.clickAfter=true requires params.matcher", ["params", "matcher"]);
-        }
-        if (hasMatcher && hasTarget) {
-          addIssue(index, "scroll_until requires params.matcher or params.target, not both", ["params"]);
         }
         const SUPPORTED_DIRECTIONS_SU = ["down", "up", "left", "right"] as const;
         if (params?.direction !== undefined) {
@@ -313,56 +302,6 @@ export interface ValidationFailure {
 }
 
 /**
- * Normalize scroll actions: copy matcher to target for Android compatibility,
- * and track when deprecated 'target' was used instead of canonical 'matcher'.
- */
-function normalizeScrollActions(execution: Execution): Execution {
-  const normalizedActions = execution.actions.map((action) => {
-    if (action.type !== "scroll_and_click" && action.type !== "scroll_until") {
-      return action;
-    }
-
-    const params = action.params;
-    if (!params) return action;
-
-    const hasMatcher = params.matcher !== undefined;
-    const hasTarget = params.target !== undefined;
-
-    // If matcher is present, copy it to target (canonical form for Android)
-    if (hasMatcher && !hasTarget) {
-      return {
-        ...action,
-        params: {
-          ...params,
-          target: params.matcher,
-          // Not deprecated usage - using canonical matcher
-          _usedDeprecatedTarget: false,
-        },
-      };
-    }
-
-    // If only target is present, mark as deprecated usage
-    if (!hasMatcher && hasTarget) {
-      return {
-        ...action,
-        params: {
-          ...params,
-          _usedDeprecatedTarget: true,
-        },
-      };
-    }
-
-    // Both present or neither - validation will catch this, but default to no flag
-    return action;
-  });
-
-  return {
-    ...execution,
-    actions: normalizedActions,
-  };
-}
-
-/**
  * Validate execution payload. Returns normalized execution or throws ValidationFailure.
  * Call before any adb invocation.
  */
@@ -380,8 +319,7 @@ export function validateExecution(input: unknown): Execution {
     };
     throw err;
   }
-  const execution = parsed.data as Execution;
-  return normalizeScrollActions(execution);
+  return parsed.data as Execution;
 }
 
 /**

@@ -12,7 +12,7 @@
       "id": "climate",
       "type": "scroll_and_click",
       "params": {
-        "target": { "textEquals": "Climate" },
+        "matcher": { "textEquals": "Climate" },
         "container": { "resourceId": "com.google.android.apps.chromecast.app:id/category_chips" },
         "direction": "right",
         "maxSwipes": 6,
@@ -25,7 +25,7 @@
       "id": "openController",
       "type": "scroll_and_click",
       "params": {
-        "target": { "textContains": "{{AC_TILE_NAME}}" },
+        "matcher": { "textContains": "{{AC_TILE_NAME}}" },
         "container": { "resourceId": "com.google.android.apps.chromecast.app:id/pager_home_tab" },
         "direction": "down",
         "maxSwipes": 8,

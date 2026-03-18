@@ -14,10 +14,8 @@ export interface ActionParams {
   clear?: boolean;
   /** clickType: default | long_click | focus */
   clickType?: string;
-  /** scroll_and_click - deprecated, use matcher */
+  /** scroll_and_click - copied from matcher for Android dispatch */
   target?: NodeMatcher;
-  /** Transient flag set during validation when deprecated 'target' was used instead of 'matcher' */
-  _usedDeprecatedTarget?: boolean;
   container?: NodeMatcher;
   direction?: string;
   maxSwipes?: number;

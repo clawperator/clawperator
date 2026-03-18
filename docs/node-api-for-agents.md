@@ -616,8 +616,6 @@ Error codes:
 
 **`scroll_and_click`:** This action has two separate retry knobs. `scrollRetry` controls the scroll/search loop and defaults to the `UiScroll` preset (`maxAttempts=4`, `initialDelayMs=400`, `maxDelayMs=2000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`). `clickRetry` controls the final click attempt and defaults to the `UiReadiness` preset (`maxAttempts=5`, `initialDelayMs=500`, `maxDelayMs=3000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`).
 
-**Deprecation note:** `target` is deprecated; use `matcher` instead. Both params are accepted for backward compatibility, but using `target` will emit a deprecation warning in the step result (`data.warn: "'target' is deprecated; use 'matcher'"`). Specifying both `matcher` and `target` in the same action causes `EXECUTION_VALIDATION_FAILED`.
-
 **`clickAfter` flag:** When `clickAfter: false`, the action scrolls until the target is visible but does not click it. This is useful when you need to bring an element into view before a separate `snapshot_ui` or `read_text` action, or when you want to confirm presence before committing a click.
 
 **`scroll`:** Performs a single scroll gesture and reports whether content actually moved. Unlike `scroll_and_click`, this action has no target element and does not click. It is designed for exploratory navigation - panning through a list to observe content before deciding what to do next.
@@ -691,8 +689,6 @@ If `clickAfter: true`, `scroll_until` clicks the target immediately after it
 becomes visible. This gives agents a one-step "scroll top-level list until
 visible, then click" path without switching to `scroll_and_click`.
 *Note on `clickAfter` firing:* The click only fires if the loop terminates with `TARGET_FOUND`.
-
-**Deprecation note:** `target` is deprecated; use `matcher` instead. Both params are accepted for backward compatibility, but using `target` will emit a deprecation warning in the step result. Specifying both `matcher` and `target` in the same action causes `EXECUTION_VALIDATION_FAILED`.
 
 **Termination reasons (`data.termination_reason`):**
 - `TARGET_FOUND` - the provided `target` matcher became visible in the current UI tree. `success: true`.
