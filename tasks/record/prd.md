@@ -42,6 +42,7 @@ Two use cases motivate this feature. Both are served by the same implementation.
 - CI integration.
 - Popup handling.
 - Streaming events to host during recording (all events are buffered on device).
+- Reproducing recorded timing or gesture pacing. Timestamps are captured for ordering purposes only. The agent does not replay interactions at their original speed, inject waits based on inter-event gaps, or attempt to simulate human-paced input. Timing during reproduction is driven entirely by the agent's state observations, not by anything in the recording.
 - Lossless capture. Recording is a lossy transformation of user intent. Timing nuances, transient UI state, and intermediate visual frames between gestures are not preserved. The recorded output captures the identifiable moments of interaction, not the full fidelity of what the user did.
 - Deterministic reproduction guarantees. Accessibility-based agent reproduction is best-effort. UI timing, dynamic view IDs, and app state can all cause a run to diverge from the recording. The PoC succeeds if the agent can reliably reproduce the flow on a stable, cooperative target app. Robustness against the full range of real-world app behavior is a post-PoC concern.
 - Idempotency. Agent-driven reproductions are not guaranteed to produce the same outcome when run multiple times. App state left over from a previous run (e.g. a screen that is already open, a toggle that is already active) can cause subsequent runs to diverge. Handling this is a post-PoC concern.
@@ -248,13 +249,13 @@ Scroll and text-change events are written to the NDJSON without a snapshot field
 
 For step-candidate events (click, press_key, window_change), `RecordingManager` reads the current accessibility tree via `getRootInActiveWindow()` and serializes it as UI hierarchy XML. This is the same traversal `snapshot_ui` uses - no new API.
 
-**Snapshot capture strategy (synchronous vs asynchronous) is determined by Phase 0 findings. The implementation below describes the async path as a reference design, but Phase 0 may change this decision.**
+**Snapshot capture strategy (synchronous vs asynchronous) is determined by Phase 0 findings. Both paths are viable candidates - neither is assumed. Phase 1 implementation does not begin until Phase 0 has decided.**
 
-The async design: the event delivery thread enqueues a lightweight capture request (event data only, no IPC). A background HandlerThread dequeues, calls `getRootInActiveWindow()`, and appends the completed record to the write buffer. This keeps the event delivery thread unblocked regardless of how long the tree read takes, at the cost of a timing window between the interaction and the snapshot.
+**Candidate A - synchronous capture:** Call `getRootInActiveWindow()` directly on the event delivery thread for step-candidate events only, accepting the latency cost. This is the simpler path: no background thread, no timing window, snapshot is guaranteed to be taken before the next event is processed. The tradeoff is blocking the handler for the duration of the IPC call (typically 50-300ms at human interaction speeds).
 
-The synchronous alternative: call `getRootInActiveWindow()` directly on the event delivery thread for step-candidate events only, accepting the latency. This eliminates the timing window but blocks the handler for the duration of the IPC call.
+**Candidate B - async capture:** The event delivery thread enqueues a lightweight capture request (event data only, no IPC). A background HandlerThread dequeues, calls `getRootInActiveWindow()`, and appends the completed record to the write buffer. This keeps the event delivery thread unblocked, at the cost of a timing window between the interaction and the snapshot - and introduces ordering complexity and harder debugging.
 
-Phase 0 decides which path to use. The Phase 0 findings document records the choice and the evidence behind it. Phase 1 implementation does not begin until that decision is made.
+Phase 0 measures the actual latency cost and snapshot correctness for each candidate and picks one. The Phase 0 findings document records the choice and the evidence behind it.
 
 **Snapshot semantics (PoC):** `uiStateBefore` is a best-effort capture of the UI immediately after the accessibility event fires. Due to async capture timing, it may reflect the pre-interaction state (ideal), a partially transitioned state, or in fast transitions, the post-interaction state. Agents must treat `uiStateBefore` as approximate context, not exact ground truth. It identifies what was likely visible at interaction time; the live `observe snapshot` is the authoritative basis for action construction.
 
@@ -388,13 +389,15 @@ interface RecordingStepLog {
 | Back navigation | `press_key` with `key: "back"` | `press_key` step, `key: "back"` |
 | Drop consecutive window changes | `window_change` immediately followed by another `window_change` with no intervening user action | Keep only the final one |
 
-**Note on inferred steps:** Some step types are synthesized from event patterns rather than mapping 1:1 to a single accessibility event. `open_app` is the primary example: it is inferred from the first `window_change` in the session, not from a direct "app launch" event. It represents "ensure this app is in the foreground", not necessarily a cold launch - if the recording started while the app was already open, the first `window_change` may reflect a navigation rather than an app open. The step log makes no attempt to hide this - the agent should treat `open_app` as a heuristic intent inference, not an exact event record.
+**Note on inferred steps:** Some step types are synthesized from event patterns rather than mapping 1:1 to a single accessibility event. `open_app` is the primary example: it is inferred from the first `window_change` in the session, not from a direct "app launch" event. It represents "ensure this app is in the foreground" - it does not guarantee a cold start and may represent a navigation into an already-running app. If the recording started while the app was already open, the first `window_change` may reflect a screen transition rather than an app launch entirely. The step log makes no attempt to hide this - the agent should treat `open_app` as a heuristic intent inference, not an exact event record, and must not assume it implies a fresh app state.
 
 Click deduplication (collapsing rapid double-taps) is deliberately out of scope for v1. If a user double-tapped by accident, the step log will contain both clicks. The agent handles this at reproduction time - it observes state after each step and can detect when a click had no visible effect.
 
 Scroll events are captured in the NDJSON schema but omitted from the step log in v1. The parser emits a warning when scroll events are present. Scroll step extraction is a v2 concern.
 
 No matcher synthesis. No sleep injection. The agent constructs matchers from the `uiStateBefore` snapshot and event fields at reproduction time - the same reasoning it applies during normal operation.
+
+**Parser scope constraint:** The parser must not infer intent beyond direct event patterns. It transforms raw events into step pairs - it does not reason about what the user was trying to accomplish, generalize across variants, or synthesize steps that have no corresponding event. Any logic that goes beyond pattern-matching against the event stream belongs in the agent, not the parser. This boundary is what keeps the parser simple and prevents it from becoming a "compiler v2".
 
 **Human-readable step log** emitted to stderr during parse (not part of the JSON output):
 
@@ -609,6 +612,8 @@ Agents must not assume any individual selector field is present. Matcher constru
 
 **Agents must not directly reuse recorded selectors as-is.** Every action must be derived from the current device snapshot, using recorded data as context only. The recording identifies what to look for; the live `observe snapshot` confirms it is present and provides the matcher to act on. Treating recorded `resourceId`, `text`, or `bounds` as ready-to-dispatch selectors produces brittle behavior - the same element may have shifted, relabeled, or be absent entirely.
 
+**Agents should extract only the relevant subtree from `uiStateBefore` rather than passing full snapshots into context.** Full UI hierarchy XML for a complex app can easily exceed 50-100KB. Passing entire snapshots verbatim consumes token budget, degrades reasoning quality, and makes logs unwieldy. The agent should identify the portion of the hierarchy relevant to the action being constructed (the target element and its immediate neighbors) and use that excerpt as context.
+
 ---
 
 ## Execution Flow (text diagram)
@@ -722,12 +727,13 @@ Added to `contracts/errors.ts` following existing conventions.
 |---|---|---|
 | Many real apps do not expose stable `resourceId` values, or use dynamic IDs | High | Agent reads `uiStateBefore` snapshot and finds the best available match. Noted in step log when `resourceId` is null. |
 | UI has not settled when agent issues the next action | High | Agent observes device state after each step via `observe snapshot`; it waits or retries based on what it sees rather than relying on fixed timing. |
-| Snapshot capture adds perceptible latency, missed events, or stale trees | High | Phase 0 measures this before Phase 1 code is written. Capture is async by default (background HandlerThread); Phase 0 determines whether synchronous capture is viable as a simpler alternative. High-rate event types (scroll, text-change) never receive snapshots. |
+| Snapshot capture adds perceptible latency, missed events, or stale trees | High | Phase 0 measures this before Phase 1 code is written. Both synchronous and async capture paths are evaluated; Phase 0 picks the one that best balances latency, correctness, and simplicity for this use case. High-rate event types (scroll, text-change) never receive snapshots regardless of strategy. |
 | Rapid double-tap recorded as two clicks | Medium | Out of scope for v1. Agent observes state after each step and can detect when a click had no visible effect. Deduplication can be added as a v2 normalization rule if real recordings show it is needed. |
 | `snapshot` is null on an event (tree read failed during fast transition) | Medium | Agent treats null `uiStateBefore` as reduced context, falls back to event fields (resourceId, text, bounds) to construct the action. |
 | Recording file not accessible via `adb pull` without root | Low | Use `getExternalFilesDir()` - always ADB-accessible on debug builds; release builds require `android:debuggable` or `android:allowBackup`. |
 | `stop_recording` broadcast not sent (e.g. screen locked, process killed) | Low | Session file is intact on device even without a clean stop. Node `record pull` can still retrieve it. Warn if `eventCount: 0`. |
 | Accessibility event stream is not lossless under load | Low (PoC scope) | Android can silently drop events, coalesce scroll events, or deliver them out of order under sustained high load. The PoC assumes correctness on simple, low-rate flows only. Lossless capture is not guaranteed by the platform and is not a PoC requirement. |
+| Recording begins from an arbitrary app state (mid-flow capture) | Medium | If the user starts recording after navigating partway into the app, the step log will not contain the steps needed to reach that starting state from a fresh launch. The agent will be unable to reproduce the flow from scratch. PoC demo scenario avoids this by starting from the home screen. For general use, users must start recording from a known entry point (home screen or app launch). |
 
 ---
 
