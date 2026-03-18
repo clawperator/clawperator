@@ -702,11 +702,11 @@ visible, then click" path without switching to `scroll_and_click`.
 
 `MAX_SCROLLS_REACHED`, `MAX_DURATION_REACHED`, and `NO_POSITION_CHANGE` are clean terminal states, not errors. Agents scrolling infinite feeds should expect these and handle them without treating the action as failed.
 
-When no `target` matcher is provided, `scroll_until` behaves as a pure bounded
+When no `matcher` is provided, `scroll_until` behaves as a pure bounded
 pagination loop and returns one of the non-target terminal reasons above.
 
 **Current runtime caveats:**
-- Some Android screens expose off-screen descendants in the raw `snapshot_ui` XML. `scroll_until.target` does not use raw XML presence alone; it checks Clawperator's on-screen filtered tree. On heavily clipped or nested layouts, a target may appear in the raw snapshot near the bottom edge but still finish as `EDGE_REACHED` until it is more fully on-screen.
+- Some Android screens expose off-screen descendants in the raw `snapshot_ui` XML. `scroll_until.matcher` does not use raw XML presence alone; it checks Clawperator's on-screen filtered tree. On heavily clipped or nested layouts, a target may appear in the raw snapshot near the bottom edge but still finish as `EDGE_REACHED` until it is more fully on-screen.
 
 When a scroll loop might trigger navigation, heavy UI re-layout, or clipped list rows near the viewport edge, follow it with `snapshot_ui` or `wait_for_node` before assuming the list truly ended.
 
