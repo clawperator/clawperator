@@ -68,6 +68,8 @@ The core unit dispatched to the device.
 
 ## Action Types
 
+For full params and result shapes, see [Action Types Reference](action-types.md).
+
 ### Canonical Types
 
 | Type | Required params | Description |
@@ -76,9 +78,11 @@ The core unit dispatched to the device.
 | `open_app` | `applicationId` | Launch an app |
 | `close_app` | `applicationId` | Force-stop an app |
 | `click` | `matcher` | Tap a UI node |
-| `scroll_and_click` | `target` | Scroll to and tap a node |
+| `scroll_and_click` | `matcher` | Scroll to and tap a node |
 | `scroll` | - | Single scroll gesture with outcome reporting |
 | `scroll_until` | - | Bounded scroll loop with machine-readable termination reason |
+| `wait_for_navigation` | `timeoutMs` | Wait for package or node after navigation |
+| `read_key_value_pair` | `labelMatcher` | Read Settings-style label + value pair |
 | `read_text` | `matcher` | Read text from a UI node |
 | `enter_text` | `matcher`, `text` | Type text into a UI node |
 | `wait_for_node` | `matcher` | Wait for a node to appear |
@@ -132,7 +136,7 @@ All fields are optional but at least one must be non-empty. Values are ORed inte
 | `submit` | boolean | `enter_text` - press enter after typing |
 | `clear` | boolean | `enter_text` - clear field before typing |
 | `clickType` | string | `click` - `default`, `long_click`, or `focus` |
-| `target` | NodeMatcher | `scroll_and_click` |
+| `matcher` | NodeMatcher | `scroll_and_click`, `scroll_until` (optional) |
 | `container` | NodeMatcher | `scroll_and_click`, `scroll`, `scroll_until` |
 | `direction` | string | `scroll_and_click`, `scroll`, `scroll_until` |
 | `maxSwipes` | number | `scroll_and_click` |

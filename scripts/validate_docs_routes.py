@@ -95,6 +95,42 @@ def generated_doc_link_to_site_path(page_path: Path, generated_docs_dir: Path, h
     return None
 
 
+def check_inner_page_links(generated_docs_dir: Path, site_dir: Path) -> list[str]:
+    """
+    Check all relative markdown links in authored docs pages.
+    Validates that link targets exist as built HTML files.
+    """
+    errors: list[str] = []
+    for md_file in sorted(generated_docs_dir.rglob("*.md")):
+        text = md_file.read_text(encoding="utf-8")
+        for match in re.finditer(r"\[.*?\]\(([^)]+)\)", text):
+            raw = match.group(1).split("#")[0].strip()
+            # Skip external URLs, anchors-only, and non-md links
+            if not raw or raw.startswith("http") or raw.startswith("mailto:") or raw.startswith("tel:"):
+                continue
+            if raw.startswith("#"):
+                continue
+            # Only check .md relative links
+            if not raw.endswith(".md"):
+                continue
+            # Resolve the link relative to the current file
+            resolved_md = (md_file.parent / raw).resolve()
+            # Convert to site path
+            try:
+                rel_path = resolved_md.relative_to(generated_docs_dir)
+                site_path = markdown_output_to_site_path(str(rel_path))
+                if not (site_dir / site_path).exists():
+                    errors.append(
+                        f"inner-page-link: {md_file.relative_to(generated_docs_dir)} -> {raw}"
+                    )
+            except (ValueError, OSError):
+                # If we can't resolve, the target is outside the docs dir or doesn't exist
+                errors.append(
+                    f"inner-page-link: {md_file.relative_to(generated_docs_dir)} -> {raw} (unresolvable)"
+                )
+    return errors
+
+
 def validate_existing_paths(site_dir: Path, relative_paths: list[str], label: str) -> list[str]:
     missing: list[str] = []
     for relative_path in relative_paths:
@@ -133,6 +169,10 @@ def main() -> int:
     ]
     failures.extend(validate_existing_paths(site_dir, llms_targets, "llms.txt route"))
 
+    # Check inner-page relative links in authored docs
+    inner_page_failures = check_inner_page_links(generated_docs_dir, site_dir)
+    failures.extend(inner_page_failures)
+
     if failures:
         print("Docs route validation failed:", file=sys.stderr)
         for failure in failures:
@@ -141,7 +181,8 @@ def main() -> int:
 
     print(
         f"Docs route validation passed: {len(expected_page_paths)} source-map pages, "
-        f"{len(generated_doc_targets)} generated-doc links, {len(llms_targets)} llms.txt routes."
+        f"{len(generated_doc_targets)} generated-doc links, {len(llms_targets)} llms.txt routes, "
+        f"inner-page links checked."
     )
     return 0
 
