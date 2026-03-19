@@ -84,7 +84,7 @@ sections:
         title: Android Recording Format for Agents
         mode: copy
         sources:
-          - docs/android-recording.md
+          - docs/ai-agents/android-recording.md
       - output: ai-agents/node-api-for-agents.md
         title: Clawperator Node API - Agent Guide
         mode: copy
@@ -202,7 +202,7 @@ sections:
         title: Skill Authoring from Recordings
         mode: copy
         sources:
-          - docs/design/skill-from-recording.md
+          - docs/skills/skill-from-recording.md
       - output: skills/skill-development-workflow.md
         title: Skill Development Workflow
         mode: copy

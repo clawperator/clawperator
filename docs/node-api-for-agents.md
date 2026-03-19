@@ -6,7 +6,7 @@ If you are starting cold, begin with [Agent Quickstart](agent-quickstart.md).
 For the exact `snapshot_ui` structure, use
 [Clawperator Snapshot Format](../reference/snapshot-format.md).
 For raw on-device recording files and the `recording pull` / `recording parse`
-workflow (also available as `record` alias), use [Android Recording Format for Agents](android-recording.md).
+workflow (also available as `record` alias), use [Android Recording Format for Agents](ai-agents/android-recording.md).
 
 ## Concepts
 
