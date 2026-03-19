@@ -65,6 +65,11 @@ terminal-state transition disappears during authoring, stop and explain why.
 That is the difference between a faithful replay skill and a brittle
 best-effort script.
 
+If you need the raw capture contract first, start with [Android Recording
+Format for Agents](../ai-agents/android-recording.md). That page describes
+what the recording contains, while this page explains how to turn it into a
+reusable skill.
+
 ## Recording-derived prompt template
 
 When an agent is authoring a skill from a recording, a useful starting prompt

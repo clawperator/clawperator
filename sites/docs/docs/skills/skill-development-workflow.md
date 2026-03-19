@@ -157,6 +157,10 @@ literally. Normalize it into a stable replay sequence:
   arrived faster than expected
 - keep stdout for the final artifact and use stderr for small progress markers
 
+If you need the raw recording contract before you normalize anything, start
+with [Android Recording Format for Agents](../ai-agents/android-recording.md),
+then return here to turn the trace into a skill.
+
 Do not declare the skill complete until the replay covers every meaningful
 recorded action or documents why a step was normalized away. A click that
 opened a page in the recording, but is missing from the replay, is a bug - not
