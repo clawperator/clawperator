@@ -17,6 +17,7 @@ This document currently covers:
 - Samsung three-button navigation
 - Samsung gesture navigation
 - Google Play emulator gesture navigation
+- Google Play emulator Home gesture navigation
 - successful Back navigation
 - cancelled Back gesture navigation
 - Home / launcher transitions as observed incidentally during those runs
@@ -39,6 +40,7 @@ This document does not yet claim behavior is universal across:
 - Google Play emulator gesture Back matches the Samsung gesture pattern in the current samples.
 - A successful gesture Back and a cancelled gesture Back are distinguishable in the current samples.
 - Home is also observable through accessibility, but not as `press_key`.
+- On the Google Play emulator, Home appears as launcher-owned `window_change` events rather than a `com.android.systemui` transition.
 
 ## Core Conclusion So Far
 
@@ -237,6 +239,38 @@ Interpretation:
 - Like the Samsung cancelled-gesture sample, it did not produce the follow-up app transition back to Play Store.
 - This strengthens the provisional success-vs-cancel discriminator for gesture Back.
 
+### 6. Google Play Emulator Gesture Navigation - Home
+
+Session:
+
+- `emu-mainline-home-20260319-100829`
+
+Manual flow:
+
+1. Start in Play Store.
+2. Perform Home gesture.
+
+Observed event mix:
+
+- `window_change=2`
+- `click=0`
+- `press_key=0`
+
+Key sequence excerpt:
+
+```text
+0 window_change  com.google.android.apps.nexuslauncher  "Recent apps"
+1 window_change  com.google.android.apps.nexuslauncher  "Home screen 1 of 1"
+```
+
+Interpretation:
+
+- Home did not emit `press_key`.
+- Home did not emit a `com.android.systemui` transition in this sample.
+- The gesture stayed entirely within launcher-owned `window_change` events.
+- The launcher briefly exposed `Recent apps` before settling on `Home screen 1 of 1`.
+- This suggests that at least on this emulator surface, a Home gesture may transiently pass through launcher overview state on the way to Home.
+
 ## Working Inference Rules
 
 These rules are provisional and based on the current Samsung samples only.
@@ -267,12 +301,29 @@ Potential cancelled Back gesture:
 - `com.android.systemui` `window_change`
 - no follow-up app `window_change` back to the prior screen
 
+### Home Gesture On Mainline-Style Emulator
+
+Potential semantic Home signal:
+
+- launcher `window_change` to `Recent apps`
+- followed quickly by launcher `window_change` to `Home screen`
+
+Working hack:
+
+- if `Recent apps` appears only briefly and is immediately followed by `Home screen`, treat that sequence as a Home gesture rather than an intentional Recents stop
+
+Important caveat:
+
+- this is a heuristic, not a guaranteed platform contract
+- it should be documented as a best-effort normalization rule
+
 ## What We Can Say With Confidence
 
 - `press_key/back` is not the only possible representation of Back in Android accessibility recordings.
 - System navigation can be recorded even when the dedicated key path does not fire.
 - On Samsung, Back semantics differ between three-button and gesture navigation.
 - Successful and cancelled gesture Back appear distinguishable in the current samples on both Samsung gesture navigation and the Google Play emulator.
+- On the emulator, Home appears distinguishable from Back because it stays in launcher-owned transitions and does not produce the `com.android.systemui` blip seen for gesture Back.
 
 ## What We Cannot Yet Claim
 
@@ -281,6 +332,7 @@ Potential cancelled Back gesture:
 - That every cancelled gesture Back will always omit the follow-up app transition.
 - That replay should directly click observed System UI controls.
 - That a single normalized Back heuristic is ready for production.
+- That a single Home heuristic is ready for production without more intentional Recents testing.
 
 ## Implications For The Record Proof Of Concept
 
@@ -288,12 +340,13 @@ Potential cancelled Back gesture:
 - Non-Back flows are already valid and useful.
 - Back may also be POC-usable if replay or post-processing can infer semantic Back from recorded accessibility evidence.
 - Gesture Back normalization now has evidence from two surfaces: Samsung gesture navigation and a Google Play emulator.
+- Home may also require explicit heuristics, including a documented shortcut that treats a very short-lived `Recent apps` state followed by `Home screen` as Home on surfaces that animate through overview.
 - Any POC claim should currently be phrased as "Back is observable but not normalized."
 
 ## Recommended Near-Term Next Tests
 
-1. Test Home under gesture navigation to determine whether it has a distinct and stable accessibility signature.
-2. Test Recents intentionally, not incidentally, to separate Recents-specific transitions from Home/Back transitions.
+1. Test Recents intentionally, not incidentally, to separate Recents-specific transitions from Home/Back transitions.
+2. Repeat Home on the emulator to see whether the `Recent apps` -> `Home screen` sequence is stable.
 3. Repeat cancelled gesture Back at least once more on the same Samsung device to check pattern stability.
 4. Repeat successful gesture Back on a different screen and app.
 5. Repeat three-button Back with a different app and target screen.
@@ -339,6 +392,7 @@ Cons:
 - Does predictive Back animation change the observed accessibility signal?
 - Does gesture sensitivity or edge region configuration affect the signal?
 - Do Pixel devices expose gesture Back differently from Samsung?
+- Should Home normalization explicitly collapse a short-lived launcher `Recent apps` state into Home on devices that animate through overview?
 
 ## Current Bottom Line
 
@@ -349,5 +403,12 @@ Back is present, but in different accessibility forms depending on navigation mo
 - Samsung three-button Back: `com.android.systemui` `click`
 - Samsung gesture Back: transient `com.android.systemui` `window_change`
 - Google Play emulator gesture Back: transient `com.android.systemui` `window_change`
+
+Home also appears to be observable without `press_key`, and on the emulator it currently looks like:
+
+- launcher `window_change` to `Recent apps`
+- then launcher `window_change` to `Home screen`
+
+That likely means some system-navigation actions will require explicit normalization hacks. That is acceptable for the proof of concept as long as the heuristics are clearly documented, tested against positive and negative samples, and treated as best-effort rather than as a guaranteed Android contract.
 
 The dedicated `press_key` path remains unresolved, but the system-navigation evidence recorded so far is strong enough to justify further testing and likely supports a proof-of-concept path based on inference and normalization.
