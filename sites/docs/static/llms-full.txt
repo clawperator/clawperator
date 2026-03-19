@@ -1586,9 +1586,13 @@ trace into stable runtime actions. For example, a launcher tap is often better
 represented as `open_app`, and a stateful app may need an intentional
 `close_app` before `open_app` so the replay starts from a fresh baseline. That
 normalization is part of skill authoring, not part of the raw recording
-contract. A recording-derived skill is not complete until every meaningful
-recorded action is either replayed literally or deliberately normalized with a
-documented reason. See [Skill Authoring from Recordings](../design/skill-from-recording.md).
+contract. The recordings used for skill authorship must be human-performed,
+not adb-tapped, because the replay skill is meant to encode what the human
+actually did. A recording-derived skill is not complete until every
+meaningful recorded action is either replayed literally or deliberately
+normalized with a documented reason. See [Skill Authoring from
+Recordings](../design/skill-from-recording.md) and [Skill Authoring
+Guidelines](../skills/skill-authoring-guidelines.md).
 
 ## Field reliability guidance
 
@@ -1954,8 +1958,8 @@ Combine fields to increase specificity when a single field is ambiguous:
 | `take_screenshot` | - | `path: string`, `retry: object` |
 | `sleep` | `durationMs: number` | - |
 | `scroll_and_click` | `matcher: NodeMatcher` | `container: NodeMatcher`, `direction: "down" \| "up" \| "left" \| "right"` (default: `"down"`), `maxSwipes: number` (default: `10`, range: 1-50), `distanceRatio: number` (default: `0.7`, range: 0-1), `settleDelayMs: number` (default: `250`, range: 0-10000), `findFirstScrollableChild: boolean` (default: `true`), `clickAfter: boolean` (default: `true`), `scrollRetry: object` (default preset: `maxAttempts=4`, `initialDelayMs=400`, `maxDelayMs=2000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`), `clickRetry: object` (default preset: `maxAttempts=5`, `initialDelayMs=500`, `maxDelayMs=3000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`) |
-| `start_recording` | - | `sessionId: string` (optional; PoC-phase action, no host-side retrieval API yet) |
-| `stop_recording` | - | `sessionId: string` (optional; PoC-phase action, no host-side retrieval API yet) |
+| `start_recording` | - | `sessionId: string` (optional; see the recording pull/parse commands below) |
+| `stop_recording` | - | `sessionId: string` (optional; see the recording pull/parse commands below) |
 | `scroll_until` | - | `matcher: NodeMatcher` (optional, emits `TARGET_FOUND` when the target becomes visible), `container: NodeMatcher` (default: auto-detect), `clickType: "default" \| "long_click" \| "focus"` (used only when `clickAfter: true`), `clickAfter: boolean` (default: `false`, requires `matcher`), `direction: "down" \| "up" \| "left" \| "right"` (default: `"down"`), `distanceRatio: number` (default: `0.7`, range: 0-1), `settleDelayMs: number` (default: `250`, range: 0-10000), `maxScrolls: number` (default: `20`, range: 1-200), `maxDurationMs: number` (default: `10000`, range: 0-120000), `noPositionChangeThreshold: number` (default: `3`, range: 1-20), `findFirstScrollableChild: boolean` (default: `true`) |
 | `scroll` | - | `container: NodeMatcher` (default: auto-detect first scrollable), `direction: "down" \| "up" \| "left" \| "right"` (default: `"down"` - reveals content further down, finger swipes up), `distanceRatio: number` (default: `0.7`, range: 0-1), `settleDelayMs: number` (default: `250`, range: 0-10000), `findFirstScrollableChild: boolean` (default: `true`), `retry: object` (default: no retry - see scroll behavior note) |
 
@@ -5368,8 +5372,8 @@ Starts an on-device recording session and writes NDJSON to app storage.
 | `RECORDING_START_FAILED` | The runtime could not open or initialize the recording session |
 
 **Notes:**
-- PoC-phase action. Host-side pull and parse commands are not part of this page yet.
 - Session IDs must use only letters, numbers, hyphens, or underscores.
+- Host-side pull and parse commands live in the Node API agent guide.
 
 **Example:**
 
@@ -5411,7 +5415,7 @@ Stops the active recording session and finalizes the NDJSON file.
 | `RECORDING_STOP_FAILED` | The runtime could not finalize or flush the recording file |
 
 **Notes:**
-- PoC-phase action. Host-side pull and parse commands are not part of this page yet.
+- Host-side pull and parse commands live in the Node API agent guide.
 
 **Example:**
 
@@ -7851,9 +7855,6 @@ literally. Normalize it into a stable replay sequence:
 - stop immediately when the final screen is visible, even if the screen
   arrived faster than expected
 - keep stdout for the final artifact and use stderr for small progress markers
-- during validation, prefer the branch-local Node CLI build and the dev
-  receiver package so the skill exercises the code that is actually being
-  authored
 
 Do not declare the skill complete until the replay covers every meaningful
 recorded action or documents why a step was normalized away. A click that
@@ -7971,8 +7972,9 @@ For a new skill, this is the practical order:
 
 ## 1. Deterministic baseline state
 
-To ensure a predictable starting state, most app skills should begin with a
-close-sleep-open sequence:
+To ensure a predictable starting state, many app skills benefit from a
+close-sleep-open sequence, especially when the target app is stateful or can
+resume into stale navigation:
 
 ```json
 [
@@ -7995,7 +7997,8 @@ close-sleep-open sequence:
   a flow. Tune `durationMs` per app for reliability.
 
 Use judgment. Some skills should not force-close if the intent depends on
-preserving user state.
+preserving user state or the replay is intentionally meant to resume from the
+current app session.
 
 Recording-derived skills may also need to normalize search entry behavior. If a
 recorded flow stays on a query entry screen after `enter_text`, submit the
@@ -8016,6 +8019,19 @@ explicitly normalized with a documented reason. If a click, submit, or
 terminal-state transition disappears during authoring, stop and explain why.
 That is the difference between a faithful replay skill and a brittle
 best-effort script.
+
+## Recording-derived prompt template
+
+When an agent is authoring a skill from a recording, a useful starting prompt
+is:
+
+> Read the recording as evidence of intent, not as a literal replay script.
+> For every meaningful action, either replay it literally or explain why you
+> normalized it into a stable skill-level action. Normalize launcher taps to
+> `open_app`, use `close_app` only when a fresh baseline is required, prefer
+> settle-then-scroll for long lists, and finish on terminal-state detection
+> instead of fixed sleeps. If a recorded step disappears, stop and justify the
+> change before calling the skill complete.
 
 ---
 
@@ -9080,6 +9096,12 @@ final replay script. A skill is allowed to normalize the trace when that makes
 the flow more reliable, but those normalizations must be deliberate and
 documented.
 
+The Phase 3 skills built from recordings currently live as local
+proof-of-concept artifacts under `~/.clawperator/skills/skills/...` rather
+than as canonical entries in the shared skills repo. This page explains the
+recording-side contract and the durable lessons from the experiment; the
+skills-repo docs cover the general authoring workflow and prompt templates.
+
 In practice, that means the author must be able to answer two questions for
 every step:
 
@@ -9158,6 +9180,43 @@ Typical pattern:
 4. Re-check the device state with live snapshots while validating the flow.
 5. Author the skill from the validated, normalized sequence.
 
+## Common patterns from recording-derived skills
+
+The following patterns came out of the Phase 3 skill work and should be
+preserved because they are the kinds of moves a future agent will need to
+make when turning a recording into a skill.
+
+### Settings-style list navigation
+
+- open the app or parent tab
+- let the screen settle briefly
+- scroll to the target row
+- click the row explicitly
+- wait for the detail page to load
+
+This is the pattern behind the Settings skills we authored. The important
+part is that the skill should click the row that was actually meant to open a
+detail page, not just stop when the row becomes visible.
+
+### Search flows that need a real submit key
+
+- focus the query field
+- enter the text
+- press the IME submit key if the app does not advance on its own
+- continue only when the result screen or suggestion state changes
+
+This was necessary for one of the recording-derived skills because the search
+screen stayed open after text entry until the real IME submit action was sent.
+
+### Terminal-state screens
+
+- trigger the action
+- poll live snapshots until the real result screen is visible
+- stop immediately when the terminal state appears
+
+This avoids the “it looked done, but the last action never actually happened”
+failure mode that kept appearing during skill authorship.
+
 ## Skill authoring lessons
 
 These lessons came out of the first recording-derived skills we built.
@@ -9186,9 +9245,35 @@ These lessons came out of the first recording-derived skills we built.
 - A replay skill should be judged by semantic coverage, not just by whether it
   found a plausible end screen.
 
+## Suggested authoring prompt
+
+When an agent is turning a recording into a skill, a useful starting prompt is:
+
+> Read the recording as bootstrap evidence, not as a literal replay script.
+> For every meaningful action, either replay it literally or explain how it
+> was normalized into a stable skill-level step. Normalize launcher taps to
+> `open_app`, use `close_app` only when a fresh baseline is required, keep
+> scrollable lists in a settle-then-scroll pattern, and finish on terminal-state
+> detection instead of fixed sleeps. If a recorded step disappears, stop and
+> justify the change before calling the skill complete.
+
+## Open follow-ups
+
+These are the future improvements that the skill-authorship work surfaced and
+should be tracked as follow-on tasks rather than forgotten in `tasks/record/`:
+
+- a replay-completeness validator that compares the recording against the
+  authored skill
+- parser metadata that marks whether a step was literal, normalized, or
+  terminal-state related
+- a documented policy for when `close_app` is a reproducibility aid versus an
+  inappropriate mutation of the recording
+- a checklist that requires terminal-state detection for replay-derived skills
+
 ## Related docs
 
 - [Android Recording Format for Agents](../ai-agents/android-recording.md)
+- [Skill Authoring Guidelines](../skills/skill-authoring-guidelines.md)
 - [Clawperator Node API - Agent Guide](../ai-agents/node-api-for-agents.md)
 - [Clawperator Skill Design](../design/skill-design.md)
 

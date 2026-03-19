@@ -17,8 +17,9 @@
 
 ## 1. Deterministic baseline state
 
-To ensure a predictable starting state, most app skills should begin with a
-close-sleep-open sequence:
+To ensure a predictable starting state, many app skills benefit from a
+close-sleep-open sequence, especially when the target app is stateful or can
+resume into stale navigation:
 
 ```json
 [
@@ -41,7 +42,8 @@ close-sleep-open sequence:
   a flow. Tune `durationMs` per app for reliability.
 
 Use judgment. Some skills should not force-close if the intent depends on
-preserving user state.
+preserving user state or the replay is intentionally meant to resume from the
+current app session.
 
 Recording-derived skills may also need to normalize search entry behavior. If a
 recorded flow stays on a query entry screen after `enter_text`, submit the
@@ -62,6 +64,19 @@ explicitly normalized with a documented reason. If a click, submit, or
 terminal-state transition disappears during authoring, stop and explain why.
 That is the difference between a faithful replay skill and a brittle
 best-effort script.
+
+## Recording-derived prompt template
+
+When an agent is authoring a skill from a recording, a useful starting prompt
+is:
+
+> Read the recording as evidence of intent, not as a literal replay script.
+> For every meaningful action, either replay it literally or explain why you
+> normalized it into a stable skill-level action. Normalize launcher taps to
+> `open_app`, use `close_app` only when a fresh baseline is required, prefer
+> settle-then-scroll for long lists, and finish on terminal-state detection
+> instead of fixed sleeps. If a recorded step disappears, stop and justify the
+> change before calling the skill complete.
 
 ---
 

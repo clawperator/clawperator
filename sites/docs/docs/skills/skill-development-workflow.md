@@ -156,9 +156,6 @@ literally. Normalize it into a stable replay sequence:
 - stop immediately when the final screen is visible, even if the screen
   arrived faster than expected
 - keep stdout for the final artifact and use stderr for small progress markers
-- during validation, prefer the branch-local Node CLI build and the dev
-  receiver package so the skill exercises the code that is actually being
-  authored
 
 Do not declare the skill complete until the replay covers every meaningful
 recorded action or documents why a step was normalized away. A click that

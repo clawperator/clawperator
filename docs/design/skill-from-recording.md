@@ -8,6 +8,12 @@ final replay script. A skill is allowed to normalize the trace when that makes
 the flow more reliable, but those normalizations must be deliberate and
 documented.
 
+The Phase 3 skills built from recordings currently live as local
+proof-of-concept artifacts under `~/.clawperator/skills/skills/...` rather
+than as canonical entries in the shared skills repo. This page explains the
+recording-side contract and the durable lessons from the experiment; the
+skills-repo docs cover the general authoring workflow and prompt templates.
+
 In practice, that means the author must be able to answer two questions for
 every step:
 
@@ -86,6 +92,43 @@ Typical pattern:
 4. Re-check the device state with live snapshots while validating the flow.
 5. Author the skill from the validated, normalized sequence.
 
+## Common patterns from recording-derived skills
+
+The following patterns came out of the Phase 3 skill work and should be
+preserved because they are the kinds of moves a future agent will need to
+make when turning a recording into a skill.
+
+### Settings-style list navigation
+
+- open the app or parent tab
+- let the screen settle briefly
+- scroll to the target row
+- click the row explicitly
+- wait for the detail page to load
+
+This is the pattern behind the Settings skills we authored. The important
+part is that the skill should click the row that was actually meant to open a
+detail page, not just stop when the row becomes visible.
+
+### Search flows that need a real submit key
+
+- focus the query field
+- enter the text
+- press the IME submit key if the app does not advance on its own
+- continue only when the result screen or suggestion state changes
+
+This was necessary for one of the recording-derived skills because the search
+screen stayed open after text entry until the real IME submit action was sent.
+
+### Terminal-state screens
+
+- trigger the action
+- poll live snapshots until the real result screen is visible
+- stop immediately when the terminal state appears
+
+This avoids the “it looked done, but the last action never actually happened”
+failure mode that kept appearing during skill authorship.
+
 ## Skill authoring lessons
 
 These lessons came out of the first recording-derived skills we built.
@@ -114,8 +157,34 @@ These lessons came out of the first recording-derived skills we built.
 - A replay skill should be judged by semantic coverage, not just by whether it
   found a plausible end screen.
 
+## Suggested authoring prompt
+
+When an agent is turning a recording into a skill, a useful starting prompt is:
+
+> Read the recording as bootstrap evidence, not as a literal replay script.
+> For every meaningful action, either replay it literally or explain how it
+> was normalized into a stable skill-level step. Normalize launcher taps to
+> `open_app`, use `close_app` only when a fresh baseline is required, keep
+> scrollable lists in a settle-then-scroll pattern, and finish on terminal-state
+> detection instead of fixed sleeps. If a recorded step disappears, stop and
+> justify the change before calling the skill complete.
+
+## Open follow-ups
+
+These are the future improvements that the skill-authorship work surfaced and
+should be tracked as follow-on tasks rather than forgotten in `tasks/record/`:
+
+- a replay-completeness validator that compares the recording against the
+  authored skill
+- parser metadata that marks whether a step was literal, normalized, or
+  terminal-state related
+- a documented policy for when `close_app` is a reproducibility aid versus an
+  inappropriate mutation of the recording
+- a checklist that requires terminal-state detection for replay-derived skills
+
 ## Related docs
 
 - [Android Recording Format for Agents](../ai-agents/android-recording.md)
+- [Skill Authoring Guidelines](../skills/skill-authoring-guidelines.md)
 - [Clawperator Node API - Agent Guide](../ai-agents/node-api-for-agents.md)
 - [Clawperator Skill Design](../design/skill-design.md)

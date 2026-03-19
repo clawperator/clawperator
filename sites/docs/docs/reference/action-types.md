@@ -769,8 +769,8 @@ Starts an on-device recording session and writes NDJSON to app storage.
 | `RECORDING_START_FAILED` | The runtime could not open or initialize the recording session |
 
 **Notes:**
-- PoC-phase action. Host-side pull and parse commands are not part of this page yet.
 - Session IDs must use only letters, numbers, hyphens, or underscores.
+- Host-side pull and parse commands live in the Node API agent guide.
 
 **Example:**
 
@@ -812,7 +812,7 @@ Stops the active recording session and finalizes the NDJSON file.
 | `RECORDING_STOP_FAILED` | The runtime could not finalize or flush the recording file |
 
 **Notes:**
-- PoC-phase action. Host-side pull and parse commands are not part of this page yet.
+- Host-side pull and parse commands live in the Node API agent guide.
 
 **Example:**
 
