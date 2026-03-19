@@ -206,6 +206,64 @@ describe("CLI help", () => {
     assert.strictEqual(pretty.code, "EXECUTION_VALIDATION_FAILED");
     assert.strictEqual(pretty.message, "timeoutMs must be a finite number");
   });
+
+  it("shows recording as canonical command in top-level help", async () => {
+    const { stdout, code } = await runCli(["--help"]);
+    assert.strictEqual(code, 0);
+    assert.match(stdout, /recording start/);
+    assert.match(stdout, /recording stop/);
+    assert.match(stdout, /recording pull/);
+    assert.match(stdout, /recording parse/);
+    assert.match(stdout, /'record' is an alias/);
+  });
+
+  it("returns USAGE for bare recording command", async () => {
+    const { stdout, code } = await runCli(["recording"]);
+    assert.strictEqual(code, 0);
+    const obj = JSON.parse(stdout);
+    assert.strictEqual(obj.code, "USAGE");
+    assert.match(obj.message, /recording start\|stop\|pull\|parse/);
+    assert.match(obj.message, /'record' is an alias/);
+  });
+
+  it("returns USAGE for bare record alias", async () => {
+    const { stdout, code } = await runCli(["record"]);
+    assert.strictEqual(code, 0);
+    const obj = JSON.parse(stdout);
+    assert.strictEqual(obj.code, "USAGE");
+    assert.match(obj.message, /recording start\|stop\|pull\|parse/);
+    assert.match(obj.message, /'record' is an alias/);
+  });
+
+  it("returns USAGE for recording parse without --input", async () => {
+    const { stdout, code } = await runCli(["recording", "parse"]);
+    assert.strictEqual(code, 0);
+    const obj = JSON.parse(stdout);
+    assert.strictEqual(obj.code, "USAGE");
+    assert.match(obj.message, /--input/);
+  });
+
+  it("returns USAGE for record parse without --input", async () => {
+    const { stdout, code } = await runCli(["record", "parse"]);
+    assert.strictEqual(code, 0);
+    const obj = JSON.parse(stdout);
+    assert.strictEqual(obj.code, "USAGE");
+    assert.match(obj.message, /--input/);
+  });
+
+  it("returns USAGE when --out flag has no value for recording pull", async () => {
+    const { stdout, code } = await runCli(["recording", "pull", "--out"]);
+    assert.notStrictEqual(code, 0);
+    assert.match(stdout, /"code":"USAGE"/);
+    assert.match(stdout, /--out requires a value/);
+  });
+
+  it("returns USAGE when --out flag has no value for record pull", async () => {
+    const { stdout, code } = await runCli(["record", "pull", "--out"]);
+    assert.notStrictEqual(code, 0);
+    assert.match(stdout, /"code":"USAGE"/);
+    assert.match(stdout, /--out requires a value/);
+  });
 });
 
 describe("operator setup CLI output", () => {
