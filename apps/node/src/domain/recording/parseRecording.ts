@@ -38,7 +38,8 @@ export function parseRecording(ndjson: string): RecordingStepLog {
       parsed.type !== "recording_header" ||
       typeof parsed.sessionId !== "string" ||
       typeof parsed.startedAt !== "number" ||
-      typeof parsed.operatorPackage !== "string"
+      typeof parsed.operatorPackage !== "string" ||
+      typeof parsed.schemaVersion !== "number"
     ) {
       throw {
         code: ERROR_CODES.RECORDING_PARSE_FAILED,

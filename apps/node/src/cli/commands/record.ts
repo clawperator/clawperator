@@ -120,15 +120,22 @@ export async function cmdRecordParse(options: {
     // Write the step log JSON
     await fs.writeFile(outputFile, JSON.stringify(stepLog, null, 2), "utf-8");
 
-    return formatSuccess(
-      {
-        ok: true,
-        outputFile,
-        stepCount: stepLog.steps.length,
-        warnings: stepLog._warnings,
-      },
-      options
-    );
+    const payload: {
+      ok: true;
+      outputFile: string;
+      stepCount: number;
+      warnings?: string[];
+    } = {
+      ok: true,
+      outputFile,
+      stepCount: stepLog.steps.length,
+    };
+
+    if (stepLog._warnings && stepLog._warnings.length > 0) {
+      payload.warnings = stepLog._warnings;
+    }
+
+    return formatSuccess(payload, options);
   } catch (e) {
     return formatError(e, options);
   }
