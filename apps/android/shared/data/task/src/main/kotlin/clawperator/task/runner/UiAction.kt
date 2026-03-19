@@ -106,6 +106,16 @@ sealed interface UiAction {
         val retry: TaskRetry = TaskRetryPresets.UiReadiness,
     ) : UiAction
 
+    data class StartRecording(
+        override val id: String,
+        val sessionId: String? = null,
+    ) : UiAction
+
+    data class StopRecording(
+        override val id: String,
+        val sessionId: String? = null,
+    ) : UiAction
+
     data class DoctorPing(
         override val id: String,
         val retry: TaskRetry = TaskRetry.None,

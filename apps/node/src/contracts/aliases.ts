@@ -26,6 +26,8 @@ export const CANONICAL_ACTION_TYPES = [
   "open_app",
   "open_uri",
   "close_app",
+  "start_recording",
+  "stop_recording",
   "wait_for_node",
   "click",
   "scroll_and_click",

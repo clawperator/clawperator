@@ -13,6 +13,8 @@ describe("normalizeActionType", () => {
   it("returns same for already canonical", () => {
     assert.strictEqual(normalizeActionType("click"), "click");
     assert.strictEqual(normalizeActionType("enter_text"), "enter_text");
+    assert.strictEqual(normalizeActionType("start_recording"), "start_recording");
+    assert.strictEqual(normalizeActionType("stop_recording"), "stop_recording");
   });
 
   it("throws for unknown type", () => {

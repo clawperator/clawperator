@@ -19,6 +19,6 @@ user privacy by not requesting unnecessary event types or feedback.
     android:notificationTimeout="5000"
     android:canRetrieveWindowContent="true"
     android:canPerformGestures="true"
+    android:canRequestFilterKeyEvents="true"
     android:settingsActivity="clawperator.activity.MainActivity"
   />
-

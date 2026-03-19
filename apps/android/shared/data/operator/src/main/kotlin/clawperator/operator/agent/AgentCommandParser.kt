@@ -207,6 +207,16 @@ class AgentCommandParserDefault : AgentCommandParser {
                     id = id,
                     retry = params.parseRetryOrDefault(defaultRetry = TaskRetryPresets.UiReadiness),
                 )
+            "start_recording" ->
+                UiAction.StartRecording(
+                    id = id,
+                    sessionId = params.optionalNonBlankString("sessionId", MAX_ID_LENGTH),
+                )
+            "stop_recording" ->
+                UiAction.StopRecording(
+                    id = id,
+                    sessionId = params.optionalNonBlankString("sessionId", MAX_ID_LENGTH),
+                )
             "take_screenshot" ->
                 UiAction.TakeScreenshot(
                     id = id,
@@ -333,6 +343,12 @@ class AgentCommandParserDefault : AgentCommandParser {
     private fun JsonObject.stringOrNullWithMax(key: String, maxLen: Int): String? {
         val value = stringOrNull(key) ?: return null
         require(value.length <= maxLen) { "$key exceeds max length of $maxLen" }
+        return value
+    }
+
+    private fun JsonObject.optionalNonBlankString(key: String, maxLen: Int): String? {
+        val value = stringOrNullWithMax(key, maxLen) ?: return null
+        require(value.isNotBlank()) { "$key must not be blank" }
         return value
     }
 

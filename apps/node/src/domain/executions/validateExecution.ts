@@ -27,6 +27,7 @@ const nodeMatcherSchema = z
 
 const actionParamsSchema = z.object({
   applicationId: z.string().optional(),
+  sessionId: z.string().optional(),
   uri: z.string().max(LIMITS.MAX_URI_LENGTH).optional(),
   durationMs: z.number().optional(),
   path: z.string().optional(),
@@ -67,6 +68,8 @@ const supportedTypes = [
   "open_app",
   "open_uri",
   "close_app",
+  "start_recording",
+  "stop_recording",
   "wait_for_node",
   "click",
   "scroll_and_click",
@@ -130,6 +133,12 @@ const executionSchema = z.object({
       case "close_app":
         if (!params?.applicationId || params.applicationId.trim() === "") {
           addIssue(index, `${action.type} requires params.applicationId`, ["params", "applicationId"]);
+        }
+        break;
+      case "start_recording":
+      case "stop_recording":
+        if (params?.sessionId !== undefined && params.sessionId.trim() === "") {
+          addIssue(index, `${action.type} params.sessionId must not be blank`, ["params", "sessionId"]);
         }
         break;
       case "open_uri":

@@ -21,6 +21,7 @@ nav:
     - Clawperator Operator Android app: getting-started/android-operator-apk.md
   - For AI Agents:
     - Agent Quickstart: ai-agents/agent-quickstart.md
+    - Android Recording Format for Agents: ai-agents/android-recording.md
     - Node API - Agent Guide: ai-agents/node-api-for-agents.md
     - Navigation Patterns for Agents: ai-agents/navigation-patterns.md
     - Multi-Device Workflows for Agents: ai-agents/multi-device-workflows.md
