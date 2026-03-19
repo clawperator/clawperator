@@ -40,6 +40,11 @@ What is intentionally deferred:
 - reliable `press_key` `key: "back"` capture as a required contract
 - any parser behavior that depends on system-gesture inference
 
+If a recording is meant to become a reusable skill, it must be human-
+performed. adb-driven input does not produce the same click events as real
+touch interactions, so synthetic traces are not a valid skill-authoring
+input.
+
 System navigation evidence may still appear in raw recordings, but agents
 should not currently assume those events are normalized or portable across
 devices.
