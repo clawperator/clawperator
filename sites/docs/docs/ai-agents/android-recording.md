@@ -200,7 +200,7 @@ not adb-tapped, because the replay skill is meant to encode what the human
 actually did. A recording-derived skill is not complete until every
 meaningful recorded action is either replayed literally or deliberately
 normalized with a documented reason. See [Skill Authoring from
-Recordings](../design/skill-from-recording.md) and [Skill Authoring
+Recordings](../skills/skill-from-recording.md) and [Skill Authoring
 Guidelines](../skills/skill-authoring-guidelines.md).
 
 ## Field reliability guidance

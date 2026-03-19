@@ -198,6 +198,11 @@ sections:
         mode: copy
         sources:
           - ../clawperator-skills/docs/usage-model.md
+      - output: skills/skill-from-recording.md
+        title: Skill Authoring from Recordings
+        mode: copy
+        sources:
+          - docs/design/skill-from-recording.md
       - output: skills/skill-development-workflow.md
         title: Skill Development Workflow
         mode: copy
@@ -232,11 +237,6 @@ sections:
         mode: copy
         sources:
           - docs/design/operator-llm-playbook.md
-      - output: design/skill-from-recording.md
-        title: Skill Authoring from Recordings
-        mode: copy
-        sources:
-          - docs/design/skill-from-recording.md
       - output: design/skill-design.md
         title: Clawperator Skill Design
         mode: copy
