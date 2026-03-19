@@ -1,0 +1,12 @@
+{
+  "id": "com.android.vending.search-app",
+  "applicationId": "com.android.vending",
+  "intent": "search-app",
+  "summary": "Search for an Android app in the Google Play Store and navigate to its details page.",
+  "path": "skills/com.android.vending.search-app",
+  "skillFile": "skills/com.android.vending.search-app/SKILL.md",
+  "scripts": [
+    "skills/com.android.vending.search-app/scripts/search_play_store.sh"
+  ],
+  "artifacts": []
+}

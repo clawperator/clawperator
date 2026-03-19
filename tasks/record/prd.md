@@ -1,7 +1,7 @@
 # PRD: Clawperator Record
 
 ## Status: In Progress
-## Phase: PoC (Phase 0 + 3-phase delivery)
+## Phase: PoC (Phase 0 + 3-phase delivery, Phase 2 Complete)
 
 ---
 
@@ -21,7 +21,7 @@ The Record feature closes this gap: a developer performs a UI flow once, Clawper
 | Phase 1 - Android recording runtime | Complete for the current PoC scope | Recording works end to end for click / scroll / text_change flows with synchronous snapshots on step-candidate accessibility events. |
 | `press_key` `key: "back"` capture | Deferred | True Back-key normalization is deferred until `tasks/android/system-gesture-detection/` is complete. |
 | System gesture detection and normalization | Deferred | Covered by `tasks/android/system-gesture-detection/`. This includes Back / Home / Recents inference work. |
-| Phase 2 - Retrieval and parse | Not started | Must reflect the narrowed PoC scope. |
+| Phase 2 - Retrieval and parse | Complete | Node CLI commands (`recording start/stop/pull/parse`), ADB pull, parser with v1 normalization rules, validation skill. |
 | Phase 3 - Agent-assisted reproduction and skill authoring | Not started | For the current PoC, this should target non-system-navigation flows. |
 
 **Scope clarification:** For the current PoC, recording is considered complete and usable for non-system-navigation capture. System navigation semantics such as Back / Home / Recents are intentionally deferred until the dedicated system-gesture-detection task is implemented. The current recording stream may still contain useful accessibility evidence for those actions, but the PoC must not depend on normalized gesture or hardware-navigation capture.
@@ -347,20 +347,33 @@ Retrieve the recording from the device and parse it into a step log: an ordered 
 
 ### Node CLI
 
-The public `record` command surface covers four subcommands:
+The public command family is `recording`; `record` remains accepted as a
+short alias for ergonomics and backward compatibility with earlier drafts. The
+Phase 2 retrieval surface covers four subcommands:
 
 ```
-clawperator record pull    [--session-id <id>] [--out <dir>]
-clawperator record parse   --input <file> [--out <file>]
-clawperator record start   [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]
-clawperator record stop    [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]
+clawperator recording pull  [--session-id <id>] [--out <dir>]
+clawperator recording parse --input <file> [--out <file>]
+clawperator recording start [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]
+clawperator recording stop  [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]
 ```
 
-`record pull` without `--session-id` pulls the most recent session (reads `latest` pointer file first, then fetches corresponding NDJSON). Output defaults to `./recordings/`.
+`recording pull` without `--session-id` pulls the most recent session (reads
+`latest` pointer file first, then fetches corresponding NDJSON). Output defaults
+to `./recordings/`.
 
-`record parse` reads the NDJSON file, normalizes and extracts steps, and writes a step log JSON. Output defaults to `<input_basename>.steps.json` in the same directory.
+`recording parse` reads the NDJSON file, normalizes and extracts steps, and
+writes a step log JSON. Output defaults to `<input_basename>.steps.json` in the
+same directory.
 
-`record pull` and `record parse` are usable standalone. An agent or developer may pull, inspect the raw NDJSON, then parse it to produce the step log. The pipeline does not have to be atomic.
+`recording pull` and `recording parse` are usable standalone. An agent or
+developer may pull, inspect the raw NDJSON, then parse it to produce the step
+log. The pipeline does not have to be atomic.
+
+**Follow-on command surface:** `recording list` is the likely next retrieval
+command if we need explicit discovery of available sessions. `recording delete`
+is intentionally deferred until there is a proven cleanup or storage-pressure
+need; it is not part of the current Phase 2 scope.
 
 ### ADB Pull
 
@@ -851,9 +864,9 @@ apps/android/shared/data/operator/src/main/kotlin/clawperator/operator/
 | 1 | [DONE] Step-candidate events have snapshots; scroll/text-change events have `null` snapshot | `adb pull` + manual inspect |
 | 1 | [DONE] No AccessibilityService delivery warnings in logcat during recording | Logcat inspection |
 | 1 | [DEFERRED] `press_key` `key: "back"` normalization | `tasks/android/system-gesture-detection/` |
-| 2 | `record pull` retrieves file without error | CLI exit code 0 |
-| 2 | `record parse` produces step log with `uiStateBefore` per step | Developer visual inspection |
-| 2 | Step log matches performed actions in order | Developer visual inspection |
+| 2 | [DONE] `record pull` retrieves file without error | CLI exit code 0 |
+| 2 | [DONE] `record parse` produces step log with `uiStateBefore` per step | Developer visual inspection |
+| 2 | [DONE] Step log matches performed actions in order | Developer visual inspection |
 | 3A | Agent completes flow using recording as context | Developer visual inspection |
 | 3A | Each step issued as discrete `execute` call | Agent session log |
 | 3A | Flow succeeds at least once and reproduces a second time with minimal or no agent re-exploration | Repeat agent session |

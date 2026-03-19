@@ -72,6 +72,14 @@ Commands:
                                             Pull latest skills (optionally pin to a ref)
   skills sync --ref <git-ref>
                                             Sync and pin skills index/cache to a git ref
+  recording start [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]
+                                            Start a recording session on the Operator app ('record' is an alias)
+  recording stop  [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]
+                                            Stop the active recording session and finalize the on-device file ('record' is an alias)
+  recording pull  [--session-id <id>] [--out <dir>] [--device-id <serial>]
+                                            Pull the on-device NDJSON recording to host (default: ./recordings/, 'record' is an alias)
+  recording parse --input <file> [--out <file>]
+                                            Parse a raw NDJSON recording into a step log JSON ('record' is an alias)
   grant-device-permissions [--device-id <id>] [--receiver-package <package>]
                                             Re-grant accessibility and notification permissions (remediation only)
   serve [--port <number>] [--host <string>]
@@ -101,6 +109,7 @@ Global options:
 
 Notes:
   - operator setup is the canonical setup command. operator install remains an alias.
+  - recording is the canonical command family; 'record' is a supported short alias.
   - inspect ui is a wrapper alias over observe snapshot.
   - action commands are thin wrappers that compile to execution and call execute.
   - The default receiver package is com.clawperator.operator. Use --receiver-package com.clawperator.operator.dev for local debug builds.
@@ -748,6 +757,53 @@ async function main(): Promise<void> {
         result = JSON.stringify({ code: "USAGE", message: "skills list|get|search|compile-artifact|new|validate|run|install|update|sync ..." });
       }
       break;
+    case "recording":
+    case "record": {
+      const sub = rest[0];
+      const runOpts = {
+        deviceId: global.deviceId ?? getOpt(rest, "--device-id"),
+        receiverPackage: global.receiverPackage ?? getOpt(rest, "--receiver-package"),
+      };
+      if (sub === "start") {
+        result = await (await import("./commands/record.js")).cmdRecordStart({
+          ...out,
+          sessionId: getOpt(rest, "--session-id"),
+          ...runOpts,
+        });
+      } else if (sub === "stop") {
+        result = await (await import("./commands/record.js")).cmdRecordStop({
+          ...out,
+          sessionId: getOpt(rest, "--session-id"),
+          ...runOpts,
+        });
+      } else if (sub === "pull") {
+        // Use getStringOpt for --out to require a value if the flag is present
+        const outputDirFlag = getStringOpt(rest, "--out");
+        const outputDir = outputDirFlag ?? "./recordings/";
+        result = await (await import("./commands/record.js")).cmdRecordPull({
+          ...out,
+          sessionId: getOpt(rest, "--session-id"),
+          outputDir,
+          ...runOpts,
+        });
+      } else if (sub === "parse") {
+        const inputFile = getStringOpt(rest, "--input");
+        if (!inputFile) {
+          result = JSON.stringify({ code: "USAGE", message: "recording parse --input <file> [--out <file>] ('record' is an alias)" });
+        } else {
+          // Use getStringOpt for --out to require a value if the flag is present
+          const outputFileFlag = getStringOpt(rest, "--out");
+          result = await (await import("./commands/record.js")).cmdRecordParse({
+            ...out,
+            inputFile,
+            outputFile: outputFileFlag,
+          });
+        }
+      } else {
+        result = JSON.stringify({ code: "USAGE", message: "recording start|stop|pull|parse ... ('record' is an alias)" });
+      }
+      break;
+    }
     case "serve":
       {
         const portStr = getOpt(rest, "--port");

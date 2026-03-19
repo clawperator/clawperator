@@ -1402,9 +1402,12 @@ Use it for:
 - understanding current proof-of-concept limits before building replay or
   skill-authoring workflows on top
 
-This page intentionally focuses on the recording data itself. It does not
-document a public host-side retrieval API because that surface is still in
-progress.
+This page intentionally focuses on the recording data itself. For the CLI
+retrieval commands and step-log parser surface, see [Node API for
+Agents](node-api-for-agents.md).
+
+For the exact `hierarchy_xml` snapshot structure used inside `snapshot`
+fields, see [Clawperator Snapshot Format](../reference/snapshot-format.md).
 
 Recordings are started and stopped by dispatching `start_recording` and
 `stop_recording` action types through `clawperator execute`.
@@ -1701,6 +1704,8 @@ Clawperator provides a deterministic execution layer for LLM agents to control A
 If you are starting cold, begin with [Agent Quickstart](agent-quickstart.md).
 For the exact `snapshot_ui` structure, use
 [Clawperator Snapshot Format](../reference/snapshot-format.md).
+For raw on-device recording files and the `recording pull` / `recording parse`
+workflow (also available as `record` alias), use [Android Recording Format for Agents](android-recording.md).
 
 ## Concepts
 
@@ -1743,6 +1748,10 @@ For the exact `snapshot_ui` structure, use
 | `skills install` | Clone skills repo to `~/.clawperator/skills/` |
 | `skills update [--ref <git-ref>]` | Pull latest skills (optionally pin to a ref) |
 | `grant-device-permissions` | Re-grant Operator permissions only after an Operator APK crash causes Android to revoke them |
+| `recording start [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]` | Start a recording session on the operator app and write NDJSON on device (`record` is an alias) |
+| `recording stop [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]` | Stop the active recording session and finalize the recording file (`record` is an alias) |
+| `recording pull [--session-id <id>] [--out <dir>] [--device-id <serial>]` | Pull the on-device NDJSON recording to host storage (`record` is an alias) |
+| `recording parse --input <file> [--out <file>]` | Parse a raw NDJSON recording into a step log JSON (`record` is an alias) |
 | `serve` | Start HTTP/SSE server |
 | `doctor` | Run environment diagnostics |
 | `version` | Print the CLI version or check CLI / Clawperator Operator Android app compatibility |
@@ -3514,6 +3523,70 @@ clawperator inspect ui [--device-id <id>] [--receiver-package <package>] [--time
 ```
 
 `inspect ui` is a wrapper alias over `observe snapshot`.
+
+---
+
+### `recording start`
+
+Start an on-device recording session through the Operator app. `record` is a supported alias.
+
+```
+clawperator recording start [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]
+```
+
+Use `--session-id` to choose the recording name. If omitted, the Operator app
+generates one. This command dispatches the `start_recording` action through
+the normal execution pipeline.
+
+Global `--output` / `--format` options still apply.
+
+---
+
+### `recording stop`
+
+Stop the active recording session and finalize the on-device NDJSON file. `record` is a supported alias.
+
+```
+clawperator recording stop [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]
+```
+
+Use the same `--session-id` you started with if you want to target a specific
+recording. This command dispatches the `stop_recording` action through the
+normal execution pipeline.
+
+Global `--output` / `--format` options still apply.
+
+---
+
+### `recording pull`
+
+Pull a recording from device storage to the host. `record` is a supported alias.
+
+```
+clawperator recording pull [--session-id <id>] [--out <dir>] [--device-id <serial>]
+```
+
+If `--session-id` is omitted, Clawperator reads the device-side `latest`
+pointer first and pulls that recording. Output defaults to `./recordings/`.
+`--receiver-package` is also honored as a global option.
+
+Global `--output` / `--format` options still apply.
+
+---
+
+### `recording parse`
+
+Parse a raw NDJSON recording into a step log JSON file. `record` is a supported alias.
+
+```
+clawperator recording parse --input <file> [--out <file>]
+```
+
+If `--out` is omitted, Clawperator writes `<input>.steps.json` when the input
+ends in `.ndjson`, otherwise it appends `.steps.json`. This command does not
+touch the device; it only parses a local file.
+
+Global `--output` / `--format` options still apply.
 
 ---
 
@@ -5981,6 +6054,10 @@ Use this page as the source of truth for:
 - `clawperator observe snapshot`
 - the `hierarchy_xml` UI tree format
 - how snapshot fields relate to `NodeMatcher`
+
+If you are working from a raw recording file instead of a live snapshot, see
+[Android Recording Format for Agents](../ai-agents/android-recording.md) for
+the NDJSON event schema and step-log parsing contract.
 
 ## Contract summary
 

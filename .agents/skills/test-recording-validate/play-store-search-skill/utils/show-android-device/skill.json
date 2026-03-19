@@ -1,0 +1,12 @@
+{
+  "id": "utils.show-android-device",
+  "applicationId": "utils",
+  "intent": "show-android-device",
+  "summary": "Launch scrcpy in read-only mode for observing connected Android devices.",
+  "path": "skills/utils/show-android-device",
+  "skillFile": "skills/utils/show-android-device/SKILL.md",
+  "scripts": [
+    "skills/utils/show-android-device/scripts/launch_scrcpy_readonly.sh"
+  ],
+  "artifacts": []
+}

@@ -26,9 +26,17 @@ Design consequence:
 - Canonical terminal envelope is required: `[Clawperator-Result]`.
 - Node API should remain strict and contract-driven.
 - Per-command correlation IDs (`commandId`, `taskId`) must remain stable end-to-end.
+- When testing or developing Node API/CLI changes in this repo, use the branch-local
+  build from `apps/node/` and its generated artifacts, not the globally installed
+  `clawperator` binary. The global install may lag behind the checked-out branch and
+  silently hide new or renamed commands.
 - Keep receiver package and action identifiers consistent with current defaults:
   - `com.clawperator.operator` (Release)
   - `com.clawperator.operator.dev` (Local/Debug)
+- For local development, prefer the `.dev` Operator APK and pass
+  `--receiver-package com.clawperator.operator.dev` unless you are explicitly
+  validating the release variant. This keeps local CLI changes aligned with the
+  debug app that is usually installed on a developer device.
 - **Clawperator is an actuator:** It does not own strategy, planning, or autonomous reasoning. These live in the Agent.
 - Treat optional API strings carefully:
   - use explicit `undefined` checks when `""` and omitted mean different things
@@ -166,15 +174,21 @@ When multiple devices are connected (physical + emulator), be explicit about whi
 
 2. **Default to physical device when both exist:** If both a physical device and emulator are connected, prefer the physical device for skill testing unless there's a specific reason to use the emulator. This avoids accidentally testing on the wrong target.
 
-3. **Always use `--device-id` when multiple devices are connected:**
+3. **Prefer the debug Operator APK for local CLI/API work:** When validating branch-local
+   recording, docs, or command-surface changes, use the `.dev` variant and
+   `--receiver-package com.clawperator.operator.dev` unless the change is specifically
+   about the release build. This reduces false negatives caused by a stale release APK
+   or a mismatched global CLI install.
+
+4. **Always use `--device-id` when multiple devices are connected:**
    ```bash
    clawperator observe snapshot --device-id <device_serial>
    clawperator skills run <skill_id> --device-id <device_serial>
    ```
 
-4. **Do not assume device availability:** The presence of `emulator-5554` does not mean a physical device is unavailable. Check `clawperator devices` output and explicitly select the appropriate device for the test scenario.
+5. **Do not assume device availability:** The presence of `emulator-5554` does not mean a physical device is unavailable. Check `clawperator devices` output and explicitly select the appropriate device for the test scenario.
 
-5. **Both device types are valid production targets:** Emulators with Google Play can be fully configured with user credentials and provide a complete automation environment. Physical devices offer OEM-specific behaviors and hardware sensors. Choose based on the testing scenario, not assumptions about capability.
+6. **Both device types are valid production targets:** Emulators with Google Play can be fully configured with user credentials and provide a complete automation environment. Physical devices offer OEM-specific behaviors and hardware sensors. Choose based on the testing scenario, not assumptions about capability.
 
 ### Accessibility Instrumentation Notes
 
