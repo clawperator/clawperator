@@ -10,6 +10,10 @@ Use this page as the source of truth for:
 - the `hierarchy_xml` UI tree format
 - how snapshot fields relate to `NodeMatcher`
 
+If you are working from a raw recording file instead of a live snapshot, see
+[Android Recording Format for Agents](../ai-agents/android-recording.md) for
+the NDJSON event schema and step-log parsing contract.
+
 ## Contract summary
 
 `snapshot_ui` and `clawperator observe snapshot` use the same internal

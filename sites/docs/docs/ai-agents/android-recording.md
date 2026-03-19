@@ -15,6 +15,9 @@ This page intentionally focuses on the recording data itself. It does not
 document a public host-side retrieval API because that surface is still in
 progress.
 
+For the exact `hierarchy_xml` snapshot structure used inside `snapshot`
+fields, see [Clawperator Snapshot Format](../reference/snapshot-format.md).
+
 Recordings are started and stopped by dispatching `start_recording` and
 `stop_recording` action types through `clawperator execute`.
 

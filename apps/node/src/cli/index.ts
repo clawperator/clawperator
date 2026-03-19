@@ -73,11 +73,11 @@ Commands:
   skills sync --ref <git-ref>
                                             Sync and pin skills index/cache to a git ref
   record start  [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]
-                                            Start a recording session on device
+                                            Start a recording session on the Operator app
   record stop   [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]
-                                            Stop the active recording session and finalize the file
+                                            Stop the active recording session and finalize the on-device file
   record pull   [--session-id <id>] [--out <dir>] [--device-id <serial>]
-                                            Pull the NDJSON recording from device to host (default output: ./recordings/)
+                                            Pull the on-device NDJSON recording to host (default output: ./recordings/)
   record parse  --input <file> [--out <file>]
                                             Parse a raw NDJSON recording into a step log JSON
   grant-device-permissions [--device-id <id>] [--receiver-package <package>]

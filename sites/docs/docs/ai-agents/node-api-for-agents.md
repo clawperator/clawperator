@@ -5,6 +5,8 @@ Clawperator provides a deterministic execution layer for LLM agents to control A
 If you are starting cold, begin with [Agent Quickstart](agent-quickstart.md).
 For the exact `snapshot_ui` structure, use
 [Clawperator Snapshot Format](../reference/snapshot-format.md).
+For raw on-device recording files and the `record pull` / `record parse`
+workflow, use [Android Recording Format for Agents](android-recording.md).
 
 ## Concepts
 
@@ -47,6 +49,10 @@ For the exact `snapshot_ui` structure, use
 | `skills install` | Clone skills repo to `~/.clawperator/skills/` |
 | `skills update [--ref <git-ref>]` | Pull latest skills (optionally pin to a ref) |
 | `grant-device-permissions` | Re-grant Operator permissions only after an Operator APK crash causes Android to revoke them |
+| `record start [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]` | Start a recording session on the operator app and write NDJSON on device |
+| `record stop [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]` | Stop the active recording session and finalize the recording file |
+| `record pull [--session-id <id>] [--out <dir>] [--device-id <serial>]` | Pull the on-device NDJSON recording to host storage |
+| `record parse --input <file> [--out <file>]` | Parse a raw NDJSON recording into a step log JSON |
 | `serve` | Start HTTP/SSE server |
 | `doctor` | Run environment diagnostics |
 | `version` | Print the CLI version or check CLI / Clawperator Operator Android app compatibility |
