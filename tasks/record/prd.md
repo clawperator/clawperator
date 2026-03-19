@@ -1,7 +1,7 @@
 # PRD: Clawperator Record
 
 ## Status: In Progress
-## Phase: PoC (Phase 0 + 3-phase delivery)
+## Phase: PoC (Phase 0 + 3-phase delivery, Phase 2 Complete)
 
 ---
 
@@ -21,7 +21,7 @@ The Record feature closes this gap: a developer performs a UI flow once, Clawper
 | Phase 1 - Android recording runtime | Complete for the current PoC scope | Recording works end to end for click / scroll / text_change flows with synchronous snapshots on step-candidate accessibility events. |
 | `press_key` `key: "back"` capture | Deferred | True Back-key normalization is deferred until `tasks/android/system-gesture-detection/` is complete. |
 | System gesture detection and normalization | Deferred | Covered by `tasks/android/system-gesture-detection/`. This includes Back / Home / Recents inference work. |
-| Phase 2 - Retrieval and parse | Not started | Must reflect the narrowed PoC scope. |
+| Phase 2 - Retrieval and parse | Complete | Node CLI commands (`recording start/stop/pull/parse`), ADB pull, parser with v1 normalization rules, validation skill. |
 | Phase 3 - Agent-assisted reproduction and skill authoring | Not started | For the current PoC, this should target non-system-navigation flows. |
 
 **Scope clarification:** For the current PoC, recording is considered complete and usable for non-system-navigation capture. System navigation semantics such as Back / Home / Recents are intentionally deferred until the dedicated system-gesture-detection task is implemented. The current recording stream may still contain useful accessibility evidence for those actions, but the PoC must not depend on normalized gesture or hardware-navigation capture.
