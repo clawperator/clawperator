@@ -25,6 +25,8 @@ For the execution envelope structure, timeout policy, and result semantics, see 
 | [`snapshot_ui`](#snapshot_ui) | Capture UI hierarchy | - |
 | [`take_screenshot`](#take_screenshot) | Capture screen as PNG | `path` (optional) |
 | [`sleep`](#sleep) | Pause execution | `durationMs` |
+| [`start_recording`](#start_recording) | Start an on-device recording session | `sessionId` (optional) |
+| [`stop_recording`](#stop_recording) | Stop the active recording session | `sessionId` (optional) |
 | [`press_key`](#press_key) | System navigation key | `key` |
 
 ---
@@ -736,6 +738,88 @@ Pauses execution for the specified duration.
   "params": {
     "durationMs": 1000
   }
+}
+```
+
+---
+
+### `start_recording`
+
+Starts an on-device recording session and writes NDJSON to app storage.
+
+**Parameters:**
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `sessionId` | `string` | no | Optional session identifier. When omitted, the runtime generates one. |
+
+**Result data on success:**
+
+| Key | Value |
+|-----|-------|
+| `sessionId` | The resolved recording session identifier |
+| `filePath` | Local file path for the on-device recording |
+
+**Result data on failure:**
+
+| Error | Meaning |
+|-------|---------|
+| `RECORDING_ALREADY_IN_PROGRESS` | A recording session is already active |
+| `RECORDING_STORAGE_UNAVAILABLE` | The operator could not resolve or create the recordings directory |
+| `RECORDING_START_FAILED` | The runtime could not open or initialize the recording session |
+
+**Notes:**
+- PoC-phase action. Host-side pull and parse commands are not part of this page yet.
+- Session IDs must use only letters, numbers, hyphens, or underscores.
+
+**Example:**
+
+```json
+{
+  "id": "record-start",
+  "type": "start_recording",
+  "params": {
+    "sessionId": "demo-001"
+  }
+}
+```
+
+---
+
+### `stop_recording`
+
+Stops the active recording session and finalizes the NDJSON file.
+
+**Parameters:**
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `sessionId` | `string` | no | Optional session identifier for correlation only. |
+
+**Result data on success:**
+
+| Key | Value |
+|-----|-------|
+| `sessionId` | The finalized recording session identifier |
+| `filePath` | Local file path for the on-device recording |
+| `eventCount` | Number of captured events written to the file |
+
+**Result data on failure:**
+
+| Error | Meaning |
+|-------|---------|
+| `RECORDING_NOT_IN_PROGRESS` | No recording session is active |
+| `RECORDING_STOP_FAILED` | The runtime could not finalize or flush the recording file |
+
+**Notes:**
+- PoC-phase action. Host-side pull and parse commands are not part of this page yet.
+
+**Example:**
+
+```json
+{
+  "id": "record-stop",
+  "type": "stop_recording"
 }
 ```
 

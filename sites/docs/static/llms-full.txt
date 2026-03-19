@@ -1406,6 +1406,9 @@ This page intentionally focuses on the recording data itself. It does not
 document a public host-side retrieval API because that surface is still in
 progress.
 
+Recordings are started and stopped by dispatching `start_recording` and
+`stop_recording` action types through `clawperator execute`.
+
 ## Current status
 
 The current proof of concept can record usable interaction traces for
@@ -1933,6 +1936,8 @@ Combine fields to increase specificity when a single field is ambiguous:
 | `take_screenshot` | - | `path: string`, `retry: object` |
 | `sleep` | `durationMs: number` | - |
 | `scroll_and_click` | `matcher: NodeMatcher` | `container: NodeMatcher`, `direction: "down" \| "up" \| "left" \| "right"` (default: `"down"`), `maxSwipes: number` (default: `10`, range: 1-50), `distanceRatio: number` (default: `0.7`, range: 0-1), `settleDelayMs: number` (default: `250`, range: 0-10000), `findFirstScrollableChild: boolean` (default: `true`), `clickAfter: boolean` (default: `true`), `scrollRetry: object` (default preset: `maxAttempts=4`, `initialDelayMs=400`, `maxDelayMs=2000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`), `clickRetry: object` (default preset: `maxAttempts=5`, `initialDelayMs=500`, `maxDelayMs=3000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`) |
+| `start_recording` | - | `sessionId: string` (optional; PoC-phase action, no host-side retrieval API yet) |
+| `stop_recording` | - | `sessionId: string` (optional; PoC-phase action, no host-side retrieval API yet) |
 | `scroll_until` | - | `matcher: NodeMatcher` (optional, emits `TARGET_FOUND` when the target becomes visible), `container: NodeMatcher` (default: auto-detect), `clickType: "default" \| "long_click" \| "focus"` (used only when `clickAfter: true`), `clickAfter: boolean` (default: `false`, requires `matcher`), `direction: "down" \| "up" \| "left" \| "right"` (default: `"down"`), `distanceRatio: number` (default: `0.7`, range: 0-1), `settleDelayMs: number` (default: `250`, range: 0-10000), `maxScrolls: number` (default: `20`, range: 1-200), `maxDurationMs: number` (default: `10000`, range: 0-120000), `noPositionChangeThreshold: number` (default: `3`, range: 1-20), `findFirstScrollableChild: boolean` (default: `true`) |
 | `scroll` | - | `container: NodeMatcher` (default: auto-detect first scrollable), `direction: "down" \| "up" \| "left" \| "right"` (default: `"down"` - reveals content further down, finger swipes up), `distanceRatio: number` (default: `0.7`, range: 0-1), `settleDelayMs: number` (default: `250`, range: 0-10000), `findFirstScrollableChild: boolean` (default: `true`), `retry: object` (default: no retry - see scroll behavior note) |
 
@@ -4169,6 +4174,8 @@ For full params and result shapes, see [Action Types Reference](action-types.md)
 | `snapshot_ui` | - | Capture the canonical `hierarchy_xml` UI tree |
 | `take_screenshot` | - | Capture screen as PNG |
 | `sleep` | `durationMs` | Pause execution |
+| `start_recording` | - | Start a recording session in the operator app (`sessionId` optional) |
+| `stop_recording` | - | Stop the active recording session in the operator app (`sessionId` optional) |
 | `press_key` | `key` | Issue a system navigation key via accessibility |
 
 ### Aliases (normalized at input)
@@ -4535,6 +4542,8 @@ For the execution envelope structure, timeout policy, and result semantics, see 
 | [`snapshot_ui`](#snapshot_ui) | Capture UI hierarchy | - |
 | [`take_screenshot`](#take_screenshot) | Capture screen as PNG | `path` (optional) |
 | [`sleep`](#sleep) | Pause execution | `durationMs` |
+| [`start_recording`](#start_recording) | Start an on-device recording session | `sessionId` (optional) |
+| [`stop_recording`](#stop_recording) | Stop the active recording session | `sessionId` (optional) |
 | [`press_key`](#press_key) | System navigation key | `key` |
 
 ---
@@ -5246,6 +5255,88 @@ Pauses execution for the specified duration.
   "params": {
     "durationMs": 1000
   }
+}
+```
+
+---
+
+### `start_recording`
+
+Starts an on-device recording session and writes NDJSON to app storage.
+
+**Parameters:**
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `sessionId` | `string` | no | Optional session identifier. When omitted, the runtime generates one. |
+
+**Result data on success:**
+
+| Key | Value |
+|-----|-------|
+| `sessionId` | The resolved recording session identifier |
+| `filePath` | Local file path for the on-device recording |
+
+**Result data on failure:**
+
+| Error | Meaning |
+|-------|---------|
+| `RECORDING_ALREADY_IN_PROGRESS` | A recording session is already active |
+| `RECORDING_STORAGE_UNAVAILABLE` | The operator could not resolve or create the recordings directory |
+| `RECORDING_START_FAILED` | The runtime could not open or initialize the recording session |
+
+**Notes:**
+- PoC-phase action. Host-side pull and parse commands are not part of this page yet.
+- Session IDs must use only letters, numbers, hyphens, or underscores.
+
+**Example:**
+
+```json
+{
+  "id": "record-start",
+  "type": "start_recording",
+  "params": {
+    "sessionId": "demo-001"
+  }
+}
+```
+
+---
+
+### `stop_recording`
+
+Stops the active recording session and finalizes the NDJSON file.
+
+**Parameters:**
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `sessionId` | `string` | no | Optional session identifier for correlation only. |
+
+**Result data on success:**
+
+| Key | Value |
+|-----|-------|
+| `sessionId` | The finalized recording session identifier |
+| `filePath` | Local file path for the on-device recording |
+| `eventCount` | Number of captured events written to the file |
+
+**Result data on failure:**
+
+| Error | Meaning |
+|-------|---------|
+| `RECORDING_NOT_IN_PROGRESS` | No recording session is active |
+| `RECORDING_STOP_FAILED` | The runtime could not finalize or flush the recording file |
+
+**Notes:**
+- PoC-phase action. Host-side pull and parse commands are not part of this page yet.
+
+**Example:**
+
+```json
+{
+  "id": "record-stop",
+  "type": "stop_recording"
 }
 ```
 

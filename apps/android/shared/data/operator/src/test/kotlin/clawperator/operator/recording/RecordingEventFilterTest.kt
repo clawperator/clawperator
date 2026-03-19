@@ -189,6 +189,8 @@ class RecordingEventFilterTest {
             KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_BACK),
         )
 
+        // This unit test only verifies event routing. The real runtime capture path
+        // snapshots the window before enqueueing the press_key event.
         val recorded = assertIs<RecordingPressKeyEvent>(manager.enqueuedEvents.single())
         assertEquals("back", recorded.key)
         assertEquals(0L, recorded.seq)

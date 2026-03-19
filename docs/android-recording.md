@@ -15,6 +15,9 @@ This page intentionally focuses on the recording data itself. It does not
 document a public host-side retrieval API because that surface is still in
 progress.
 
+Recordings are started and stopped by dispatching `start_recording` and
+`stop_recording` action types through `clawperator execute`.
+
 ## Current status
 
 The current proof of concept can record usable interaction traces for

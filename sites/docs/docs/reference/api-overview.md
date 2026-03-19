@@ -89,6 +89,8 @@ For full params and result shapes, see [Action Types Reference](action-types.md)
 | `snapshot_ui` | - | Capture the canonical `hierarchy_xml` UI tree |
 | `take_screenshot` | - | Capture screen as PNG |
 | `sleep` | `durationMs` | Pause execution |
+| `start_recording` | - | Start a recording session in the operator app (`sessionId` optional) |
+| `stop_recording` | - | Stop the active recording session in the operator app (`sessionId` optional) |
 | `press_key` | `key` | Issue a system navigation key via accessibility |
 
 ### Aliases (normalized at input)

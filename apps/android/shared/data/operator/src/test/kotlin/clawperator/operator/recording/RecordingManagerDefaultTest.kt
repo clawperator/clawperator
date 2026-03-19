@@ -111,7 +111,7 @@ class RecordingManagerDefaultTest {
 
         val error = assertIs<RecordingCommandOutcome.Error>(result)
         assertEquals("RECORDING_START_FAILED", error.code)
-        assertTrue(error.message.contains("path separators"))
+        assertTrue(error.message.contains("letters, numbers, hyphens, or underscores"))
         assertFalse(java.io.File(directory).resolve("evil.ndjson").exists())
         assertTrue(java.io.File(directory).resolve("recordings").exists())
     }
@@ -120,6 +120,7 @@ class RecordingManagerDefaultTest {
     fun `is safe session id accepts plain identifiers`() {
         assertTrue(isSafeSessionId("demo-001"))
         assertTrue(isSafeSessionId("record-20260319-acde1234"))
+        assertTrue(isSafeSessionId("demo_001"))
     }
 
     @Test
@@ -129,6 +130,7 @@ class RecordingManagerDefaultTest {
         assertFalse(isSafeSessionId("../evil"))
         assertFalse(isSafeSessionId("nested/evil"))
         assertFalse(isSafeSessionId("nested\\evil"))
+        assertFalse(isSafeSessionId("session\nevil"))
     }
 
     @Test

@@ -70,7 +70,7 @@ class RecordingManagerDefault(
             if (!isSafeSessionId(resolvedSessionId)) {
                 return@synchronized RecordingCommandOutcome.Error(
                     code = "RECORDING_START_FAILED",
-                    message = "sessionId must not contain path separators",
+                    message = "sessionId must use only letters, numbers, hyphens, or underscores",
                 )
             }
             val outputFile = recordingsDirectory.resolve("$resolvedSessionId.ndjson")
@@ -259,10 +259,7 @@ class RecordingManagerDefault(
 }
 
 internal fun isSafeSessionId(sessionId: String): Boolean =
-    sessionId != "." &&
-        sessionId != ".." &&
-        '/' !in sessionId &&
-        '\\' !in sessionId
+    sessionId.matches(Regex("[A-Za-z0-9_-]+"))
 
 @Serializable
 data class RecordingHeader(
