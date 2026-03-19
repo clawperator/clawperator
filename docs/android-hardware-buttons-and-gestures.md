@@ -1,16 +1,16 @@
 # Android Hardware Buttons And Gestures
 
-This document captures runtime findings about how Android system navigation is exposed through accessibility during recording. It is a branch-local working reference for the Record proof of concept and will be updated as more physical-device tests are run.
+This document captures runtime findings about how Android system navigation is exposed through accessibility during recording. It is a working engineering reference for future implementation of system-navigation detection and normalization, and it should remain useful even if temporary task files are deleted.
 
 The main question is not just "did Back happen?", but "what accessibility evidence do we get when Back or Home happens under different navigation modes, and is that evidence strong enough to reconstruct replayable intent?"
 
 ## Current Scope
 
-These findings are based on Phase 1 recording work on:
+These findings are based on:
 
-- a physical Samsung Android device
 - `com.clawperator.operator.dev`
-- Play Store flows used as the manual test surface
+- Play Store flows used as the primary manual test surface
+- direct inspection of recorded NDJSON output after each manual interaction
 
 This document currently covers:
 
@@ -31,6 +31,31 @@ This document does not yet claim behavior is universal across:
 - third-party launchers
 - Recents / app-switcher replayability
 - long-press or predictive-back-specific variants
+
+## Device Matrix
+
+Behavior differs across OEMs, launchers, Android versions, and navigation modes. Future implementation work should treat device context as part of each finding rather than as incidental setup.
+
+### Physical Samsung Device
+
+- manufacturer: `samsung`
+- model: `SM-S901E`
+- Android version: `16`
+- SDK level: `36`
+- tested navigation modes:
+  - Samsung three-button navigation
+  - Samsung gesture navigation
+
+### Google Play Emulator
+
+- manufacturer: `Google`
+- model: `sdk_gphone64_arm64`
+- Android version: `15`
+- SDK level: `35`
+- image type: Google Play emulator image
+- launcher package: `com.google.android.apps.nexuslauncher`
+- tested navigation mode:
+  - gesture navigation
 
 ## High-Level Findings
 
@@ -60,6 +85,8 @@ The immediate engineering problem is therefore:
 
 - not "Back is missing"
 - but "Back is present in non-normalized accessibility shapes"
+
+This matters because proper detection of Back, Home, and Recents is likely its own dedicated implementation task. The important question is whether the evidence captured here is sufficient to support a first-pass normalization layer.
 
 ## Test Inventory
 
@@ -352,7 +379,7 @@ Interpretation:
 
 ## Working Inference Rules
 
-These rules are provisional and based on the current Samsung samples only.
+These rules are provisional and based on the device/version matrix documented above.
 
 ### Three-Button Navigation
 
@@ -401,6 +428,80 @@ Additional Recents signal:
 
 - launcher `scroll` events while `Recent apps` is active strongly suggest intentional overview interaction rather than a simple Home gesture
 
+## Suggested Normalization Rules
+
+These are candidate implementation rules, not settled product behavior.
+
+### Rule 1 - Samsung Three-Button Back
+
+If all of the following occur:
+
+- event type is `click`
+- package is `com.android.systemui`
+- title/text is `Back`
+- followed by app `window_change` to a prior screen
+
+Then infer:
+
+- semantic action: `back`
+- completion: `completed`
+
+### Rule 2 - Gesture Back Completed
+
+If all of the following occur:
+
+- transient `window_change` to `com.android.systemui`
+- immediately preceded by an app screen that could navigate back
+- immediately followed by app `window_change` to a prior screen
+
+Then infer:
+
+- semantic action: `back`
+- source: `gesture`
+- completion: `completed`
+
+### Rule 3 - Gesture Back Cancelled
+
+If all of the following occur:
+
+- transient `window_change` to `com.android.systemui`
+- preceded by an app screen that could navigate back
+- no follow-up app transition to the prior screen
+
+Then infer:
+
+- semantic action: `back`
+- source: `gesture`
+- completion: `cancelled`
+
+### Rule 4 - Home On Mainline-Style Gesture Navigation
+
+If all of the following occur:
+
+- launcher `window_change` to `Recent apps`
+- very shortly followed by launcher `window_change` to `Home screen`
+- no launcher `scroll`
+- no launcher `click`
+- no sustained repeated `Recent apps` sequence
+
+Then infer:
+
+- semantic action: `home`
+- completion: `completed`
+
+### Rule 5 - Intentional Recents
+
+If any of the following occur while launcher overview is active:
+
+- repeated `Recent apps` transitions
+- launcher `scroll`
+- launcher `click` followed by `window_change` into another app
+
+Then infer:
+
+- semantic action: `recents`
+- completion: `interactive` or `completed`
+
 ## What We Can Say With Confidence
 
 - `press_key/back` is not the only possible representation of Back in Android accessibility recordings.
@@ -410,6 +511,7 @@ Additional Recents signal:
 - On the emulator, Home appears distinguishable from Back because it stays in launcher-owned transitions and does not produce the `com.android.systemui` blip seen for gesture Back.
 - On the emulator, Home also appears distinguishable from intentional Recents because Home produced a short `Recent apps` -> `Home screen` sequence, while intentional Recents produced repeated `Recent apps` transitions.
 - On the emulator, Recents task switching is more distinct again because it adds launcher `scroll` and launcher `click` before transitioning into the chosen app.
+- The current samples are strong enough to support a first-pass heuristic implementation for Back, Home, and Recents normalization.
 
 ## What We Cannot Yet Claim
 
@@ -421,6 +523,7 @@ Additional Recents signal:
 - That a single Home heuristic is ready for production without more intentional Recents testing.
 - That Recents exit behavior is stable enough yet to model as anything stronger than a documented heuristic.
 - That launcher `scroll` in Recents is universal across launcher implementations rather than specific to the tested emulator surface.
+- That these heuristics are production-ready across OEMs.
 
 ## Implications For The Record Proof Of Concept
 
@@ -431,6 +534,7 @@ Additional Recents signal:
 - Home may also require explicit heuristics, including a documented shortcut that treats a very short-lived `Recent apps` state followed by `Home screen` as Home on surfaces that animate through overview.
 - Recents likely needs its own heuristic bucket rather than being treated as a special case of Home.
 - Recents task switching may be one of the easiest system-navigation cases to detect, because the launcher can expose explicit overview scrolling and task selection.
+- The right near-term goal is likely heuristic normalization with explicit documentation, not waiting for perfect raw `press_key` coverage.
 - Any POC claim should currently be phrased as "Back is observable but not normalized."
 
 ## Recommended Near-Term Next Tests
@@ -485,6 +589,30 @@ Cons:
 - Should Home normalization explicitly collapse a short-lived launcher `Recent apps` state into Home on devices that animate through overview?
 - What is the cleanest heuristic for distinguishing intentional Recents from a Home gesture that briefly traverses overview?
 - How stable are launcher `scroll` signals during Recents task switching across launchers and OEMs?
+
+## Implementation Readiness
+
+An implementation agent should be able to build a first-pass Back / Home / Recents normalization layer from this document alone.
+
+What this document already provides:
+
+- device and Android version context for each finding
+- positive and negative samples
+- exact event-sequence excerpts for each tested case
+- candidate heuristic rules
+- explicit caveats about where the rules may fail
+
+What an implementation agent would still need beyond this document:
+
+- access to the codebase where normalization should live
+- a product decision about whether normalization belongs at capture time, parse time, or replay time
+- more device coverage before calling the heuristics production-ready
+
+What the agent should not need:
+
+- access to `tmp/recordings/` just to understand the findings in this document
+
+The `tmp/recordings/` files were useful during investigation, but the key findings and representative event sequences are preserved here precisely so future work does not depend on ephemeral local artifacts.
 
 ## Current Bottom Line
 
