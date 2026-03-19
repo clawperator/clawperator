@@ -34,7 +34,12 @@ export function parseRecording(ndjson: string): RecordingStepLog {
   let header: RecordingHeader;
   try {
     const parsed = JSON.parse(headerLine) as RecordingHeader;
-    if (parsed.type !== "recording_header") {
+    if (
+      parsed.type !== "recording_header" ||
+      typeof parsed.sessionId !== "string" ||
+      typeof parsed.startedAt !== "number" ||
+      typeof parsed.operatorPackage !== "string"
+    ) {
       throw {
         code: ERROR_CODES.RECORDING_PARSE_FAILED,
         message: "Missing or invalid recording header",
@@ -58,6 +63,7 @@ export function parseRecording(ndjson: string): RecordingStepLog {
 
   // Step 4: Process remaining lines as RawRecordingEvent objects
   const events: RawRecordingEvent[] = [];
+  const warnings: string[] = [];
   for (let i = 1; i < lines.length; i++) {
     let parsed: unknown;
     try {
@@ -82,6 +88,12 @@ export function parseRecording(ndjson: string): RecordingStepLog {
     }
     // Validate event-type-specific required fields
     validateEventFields(event, i + 1);
+    if (
+      (event.type === "window_change" || event.type === "click") &&
+      event.snapshot == null
+    ) {
+      warnings.push(`seq ${event.seq}: snapshot missing on ${event.type} event (uiStateBefore null)`);
+    }
     events.push(event);
   }
 
@@ -103,7 +115,11 @@ export function parseRecording(ndjson: string): RecordingStepLog {
           (event.text !== null && typeof event.text !== "string") ||
           (event.contentDesc !== null && typeof event.contentDesc !== "string") ||
           typeof event.bounds !== "object" ||
-          event.bounds === null
+          event.bounds === null ||
+          typeof event.bounds.left !== "number" ||
+          typeof event.bounds.top !== "number" ||
+          typeof event.bounds.right !== "number" ||
+          typeof event.bounds.bottom !== "number"
         ) {
           throw {
             code: ERROR_CODES.RECORDING_PARSE_FAILED,
@@ -166,7 +182,6 @@ export function parseRecording(ndjson: string): RecordingStepLog {
 
   // Step 5: Apply normalization rules (v1)
   const steps: RecordingStep[] = [];
-  const warnings: string[] = [];
   let openAppInferred = false;
   let lastWasClickOrPressKey = false;
 

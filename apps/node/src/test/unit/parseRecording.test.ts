@@ -175,7 +175,7 @@ describe("parseRecording", () => {
         packageName: "com.android.settings",
         className: null,
         title: null,
-        snapshot: null,
+        snapshot: "<hierarchy><node /></hierarchy>",
       }),
       JSON.stringify({
         ts: 1710000000100,
@@ -209,7 +209,7 @@ describe("parseRecording", () => {
         packageName: "com.android.settings",
         className: null,
         title: null,
-        snapshot: null,
+        snapshot: "<hierarchy><node /></hierarchy>",
       }),
       JSON.stringify({
         ts: 1710000000100,
@@ -237,7 +237,7 @@ describe("parseRecording", () => {
         packageName: "com.android.settings",
         className: null,
         title: null,
-        snapshot: null,
+        snapshot: "<hierarchy><node /></hierarchy>",
       }),
     ].join("\n");
 
@@ -294,6 +294,43 @@ describe("parseRecording", () => {
 
     const result = parseRecording(ndjson);
     assert.strictEqual(result.steps[0].uiStateBefore, null);
+    assert.ok(result._warnings);
+    assert.strictEqual(result._warnings!.length, 1);
+    assert.match(result._warnings![0], /seq 0/);
+    assert.match(result._warnings![0], /snapshot missing/);
+  });
+
+  it("null snapshot on click produces step with uiStateBefore: null and warning", () => {
+    const ndjson = [
+      buildHeader(),
+      JSON.stringify({
+        ts: 1710000000000,
+        seq: 0,
+        type: "window_change",
+        packageName: "com.android.settings",
+        className: null,
+        title: null,
+        snapshot: "<hierarchy><node /></hierarchy>",
+      }),
+      JSON.stringify({
+        ts: 1710000000100,
+        seq: 1,
+        type: "click",
+        packageName: "com.android.settings",
+        resourceId: "id",
+        text: "Display",
+        contentDesc: null,
+        bounds: { left: 0, top: 0, right: 100, bottom: 100 },
+        snapshot: null,
+      }),
+    ].join("\n");
+
+    const result = parseRecording(ndjson);
+    assert.strictEqual(result.steps[1].uiStateBefore, null);
+    assert.ok(result._warnings);
+    assert.strictEqual(result._warnings!.length, 1);
+    assert.match(result._warnings![0], /seq 1/);
+    assert.match(result._warnings![0], /click/);
   });
 
   it("missing snapshot field on event produces step with uiStateBefore: null", () => {
@@ -312,6 +349,10 @@ describe("parseRecording", () => {
 
     const result = parseRecording(ndjson);
     assert.strictEqual(result.steps[0].uiStateBefore, null);
+    assert.ok(result._warnings);
+    assert.strictEqual(result._warnings!.length, 1);
+    assert.match(result._warnings![0], /seq 0/);
+    assert.match(result._warnings![0], /snapshot missing/);
   });
 
   it("rejects missing header (first line is not recording_header)", () => {
@@ -323,6 +364,21 @@ describe("parseRecording", () => {
       className: null,
       title: null,
       snapshot: null,
+    });
+
+    assert.throws(
+      () => parseRecording(ndjson),
+      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.RECORDING_PARSE_FAILED
+    );
+  });
+
+  it("rejects malformed header missing required fields", () => {
+    const ndjson = JSON.stringify({
+      type: "recording_header",
+      schemaVersion: 1,
+      startedAt: 1710000000000,
+      operatorPackage: "com.clawperator.operator.test",
+      // sessionId is missing
     });
 
     assert.throws(
@@ -402,7 +458,7 @@ describe("parseRecording", () => {
         packageName: "com.android.settings",
         className: null,
         title: null,
-        snapshot: null,
+        snapshot: "<hierarchy><node /></hierarchy>",
       }),
       JSON.stringify({
         ts: 1710000000100,
@@ -428,7 +484,7 @@ describe("parseRecording", () => {
         packageName: "com.android.settings",
         className: null,
         title: null,
-        snapshot: null,
+        snapshot: "<hierarchy><node /></hierarchy>",
       }),
       JSON.stringify({
         ts: 1710000000100,
@@ -613,6 +669,42 @@ describe("parseRecording", () => {
         text: "Display",
         contentDesc: null,
         // bounds is missing
+      }),
+    ].join("\n");
+
+    assert.throws(
+      () => parseRecording(ndjson),
+      (e: unknown) => {
+        const err = e as { code?: string; message?: string };
+        return err.code === ERROR_CODES.RECORDING_PARSE_FAILED &&
+               err.message?.includes("click") &&
+               err.message?.includes("missing required fields");
+      }
+    );
+  });
+
+  it("rejects click event with non-numeric bounds", () => {
+    const ndjson = [
+      buildHeader(),
+      JSON.stringify({
+        ts: 1710000000000,
+        seq: 0,
+        type: "window_change",
+        packageName: "com.android.settings",
+        className: null,
+        title: null,
+        snapshot: null,
+      }),
+      JSON.stringify({
+        ts: 1710000000100,
+        seq: 1,
+        type: "click",
+        packageName: "com.android.settings",
+        resourceId: "id",
+        text: "Display",
+        contentDesc: null,
+        bounds: { left: 0, top: 0, right: "100", bottom: 100 },
+        snapshot: null,
       }),
     ].join("\n");
 
