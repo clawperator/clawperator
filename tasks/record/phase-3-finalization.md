@@ -6,6 +6,28 @@ done until we complete the human-guided recording workflow, turn that workflow
 into at least two validated skills, and move every durable note out of
 `tasks/record/`.
 
+## Current status
+
+As of 2026-03-20, the Phase 3 skill-authorship loop is functionally complete.
+The remaining work is the task-folder cleanup and any final link removal that
+becomes necessary when `tasks/record/` is deleted.
+
+- [x] Restore the completion criteria to reality
+- [x] Prove the human-guided recording loop on a physical device
+- [x] Repeat the workflow for a second distinct skill
+- [x] Move durable knowledge out of `tasks/record/`
+- [x] Update source-of-truth docs and regenerate the public docs site
+- [ ] Clean up `tasks/record/` and remove any now-dead references
+
+Practical readout:
+
+- the recordings were human-performed, not adb-tapped
+- at least two distinct recording-derived skills were authored and validated
+- the durable lessons were migrated into long-lived docs
+- the docs site was regenerated and validated
+- the only remaining closeout step is deleting this task tree once nothing
+  durable still depends on it
+
 ## Why this exists
 
 The branch review showed a real constraint: Clawperator-driven taps do not
@@ -24,10 +46,12 @@ docs no longer imply that the task folder is still the source of truth.
 
 ## Working rules
 
-- Phase 3 aims to ship no new code. Everything it needs should already be on `main`. 
-  The only exception to this is if bugs are found during this phase.
-- Use the release APK (`com.clawperator.operator`) and the globally installed
-  `clawperator` binary. There is no branch-local build to test against.
+- Phase 3 aims to ship no new code. Everything it needs should already be on `main`.
+  The only exception is if bugs are found during this phase.
+- Use the branch-local Node CLI build and the `.dev` Operator APK when
+  reproducing the validated skill-authorship workflow. The earlier assumption
+  that Phase 3 would use the global binary and release APK was disproven by the
+  actual validation runs.
 - Use the connected physical Android device when one is available. The human
   recording steps must be performed with a real finger on the physical device
   - not via adb, not via emulator tap injection.
@@ -36,7 +60,6 @@ docs no longer imply that the task folder is still the source of truth.
   in `tasks/skills/env/plan.md` and ships as a follow-on PR. Do not block
   Phase 3 on it and do not use undocumented workarounds as a substitute for
   the criteria.
-- Keep any durable learning in `docs/` or `docs/design/`, not in `tasks/`.
 - Keep any durable learning in `docs/` or `docs/design/`, not in `tasks/`.
 - Do not delete `tasks/record/` until the durable docs migration is complete.
   Do not delete `tasks/skills/` - it is a separate active task.
@@ -125,7 +148,7 @@ copying it forward.
 
 ### 5. Clean up `tasks/record/`
 
-When the durable docs are in place:
+When the durable docs are in place and this checklist is no longer needed:
 
 - delete `tasks/record/`
 - remove any public-doc references that would become dead links
