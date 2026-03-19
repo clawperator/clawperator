@@ -864,9 +864,9 @@ apps/android/shared/data/operator/src/main/kotlin/clawperator/operator/
 | 1 | [DONE] Step-candidate events have snapshots; scroll/text-change events have `null` snapshot | `adb pull` + manual inspect |
 | 1 | [DONE] No AccessibilityService delivery warnings in logcat during recording | Logcat inspection |
 | 1 | [DEFERRED] `press_key` `key: "back"` normalization | `tasks/android/system-gesture-detection/` |
-| 2 | `record pull` retrieves file without error | CLI exit code 0 |
-| 2 | `record parse` produces step log with `uiStateBefore` per step | Developer visual inspection |
-| 2 | Step log matches performed actions in order | Developer visual inspection |
+| 2 | [DONE] `record pull` retrieves file without error | CLI exit code 0 |
+| 2 | [DONE] `record parse` produces step log with `uiStateBefore` per step | Developer visual inspection |
+| 2 | [DONE] Step log matches performed actions in order | Developer visual inspection |
 | 3A | Agent completes flow using recording as context | Developer visual inspection |
 | 3A | Each step issued as discrete `execute` call | Agent session log |
 | 3A | Flow succeeds at least once and reproduces a second time with minimal or no agent re-exploration | Repeat agent session |

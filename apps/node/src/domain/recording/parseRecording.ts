@@ -247,6 +247,11 @@ export function parseRecording(ndjson: string): RecordingStepLog {
         lastWasClickOrPressKey = true;
         break;
       }
+      default:
+        // validateEventFields() should keep this unreachable for known schema
+        // versions. If Android adds a new event type, update the parser in the
+        // same change so we do not silently accept a shape we do not normalize.
+        break;
     }
   }
 

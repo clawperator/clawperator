@@ -1402,9 +1402,9 @@ Use it for:
 - understanding current proof-of-concept limits before building replay or
   skill-authoring workflows on top
 
-This page intentionally focuses on the recording data itself. It does not
-document a public host-side retrieval API because that surface is still in
-progress.
+This page intentionally focuses on the recording data itself. For the CLI
+retrieval commands and step-log parser surface, see [Node API for
+Agents](node-api-for-agents.md).
 
 For the exact `hierarchy_xml` snapshot structure used inside `snapshot`
 fields, see [Clawperator Snapshot Format](../reference/snapshot-format.md).
