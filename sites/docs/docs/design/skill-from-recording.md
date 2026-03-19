@@ -8,6 +8,14 @@ final replay script. A skill is allowed to normalize the trace when that makes
 the flow more reliable, but those normalizations must be deliberate and
 documented.
 
+In practice, that means the author must be able to answer two questions for
+every step:
+
+1. Was this action replayed literally?
+2. If not, what stable skill-level action replaced it, and why?
+
+If the answer is unclear, the skill is not done yet.
+
 ## What to normalize
 
 ### Launcher taps become `open_app`
@@ -48,6 +56,22 @@ Do not use it when:
 - the recorded flow already begins from a clean app session
 - the skill is intentionally meant to resume from the current app state
 
+## What makes a recording-derived skill complete
+
+The most important lesson from constructing recording-derived skills is that
+"it reaches the right screen" is not enough. The replay is complete only when:
+
+- every meaningful recorded action is represented literally or intentionally
+  normalized
+- any omitted step has a documented reason
+- the skill reaches the same semantic terminal state as the recording
+- the final screen is detected from live state, not from a fixed timeout
+
+This is the gap that kept causing premature finishes while we built skills.
+The author would reach an intermediate screen, extract useful text, and declare
+success before the recorded intent had actually been replayed. Future skill
+work should treat that as a validation failure, not as a successful shortcut.
+
 ## Practical replay rule
 
 When the agent validates a recording, it should read the raw step log as a
@@ -81,6 +105,14 @@ These lessons came out of the first recording-derived skills we built.
 - During validation, prefer the branch-local Node CLI build and the dev
   receiver package so the skill exercises the code that is actually being
   authored.
+- Treat a raw recording as bootstrap evidence. The parser output is a guide
+  for authoring, not a promise that the exact event sequence should be replayed
+  verbatim.
+- If a literal replay drops a step that mattered in the recording, either add
+  the step back or explain the normalization in the skill docs before calling
+  the skill complete.
+- A replay skill should be judged by semantic coverage, not just by whether it
+  found a plausible end screen.
 
 ## Related docs
 

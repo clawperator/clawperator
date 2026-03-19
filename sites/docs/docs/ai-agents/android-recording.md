@@ -195,7 +195,9 @@ trace into stable runtime actions. For example, a launcher tap is often better
 represented as `open_app`, and a stateful app may need an intentional
 `close_app` before `open_app` so the replay starts from a fresh baseline. That
 normalization is part of skill authoring, not part of the raw recording
-contract. See [Skill Authoring from Recordings](../design/skill-from-recording.md).
+contract. A recording-derived skill is not complete until every meaningful
+recorded action is either replayed literally or deliberately normalized with a
+documented reason. See [Skill Authoring from Recordings](../design/skill-from-recording.md).
 
 ## Field reliability guidance
 

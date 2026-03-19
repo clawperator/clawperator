@@ -1586,7 +1586,9 @@ trace into stable runtime actions. For example, a launcher tap is often better
 represented as `open_app`, and a stateful app may need an intentional
 `close_app` before `open_app` so the replay starts from a fresh baseline. That
 normalization is part of skill authoring, not part of the raw recording
-contract. See [Skill Authoring from Recordings](../design/skill-from-recording.md).
+contract. A recording-derived skill is not complete until every meaningful
+recorded action is either replayed literally or deliberately normalized with a
+documented reason. See [Skill Authoring from Recordings](../design/skill-from-recording.md).
 
 ## Field reliability guidance
 
@@ -7831,6 +7833,38 @@ clawperator execute --validate-only --execution /path/to/compiled-execution.json
 
 This is the closest current workflow to a dry run for artifact-backed skills.
 
+### Recording-derived skills
+
+When a skill is authored from a human recording, do not replay the trace
+literally. Normalize it into a stable replay sequence:
+
+- map launcher entry taps to `open_app`
+- add `close_app` only when the app is stateful and a clean baseline is needed
+- keep the raw recording as evidence, but make the replay skill follow the
+  stable app-level intent
+- if a search screen stays open after `enter_text`, submit with a real IME
+  enter key instead of assuming the text action will advance the app
+- for long scrollable settings lists, settle briefly after the screen opens,
+  then scroll to the target element instead of waiting for that element to
+  already be visible
+- use live snapshots to detect terminal states instead of long fixed sleeps
+- stop immediately when the final screen is visible, even if the screen
+  arrived faster than expected
+- keep stdout for the final artifact and use stderr for small progress markers
+- during validation, prefer the branch-local Node CLI build and the dev
+  receiver package so the skill exercises the code that is actually being
+  authored
+
+Do not declare the skill complete until the replay covers every meaningful
+recorded action or documents why a step was normalized away. A click that
+opened a page in the recording, but is missing from the replay, is a bug - not
+just a stylistic difference. The same is true for any action that was
+replaced by `open_app`, `close_app`, IME submit, or a deliberate row click.
+
+If the recording lands on a terminal result screen, the skill should finish as
+soon as that screen is visible. Avoid fixed "sleep and hope" completion logic
+unless the app offers no better signal.
+
 ## 7. Use a layered test loop
 
 Treat skill verification as four distinct layers:
@@ -7904,7 +7938,9 @@ For a new skill, this is the practical order:
 6. run `clawperator execute --validate-only ...` on candidate payloads
 7. run `clawperator skills run <skill_id> --device-id <device_id>`
 8. harden selectors, timeout budgets, and output formatting
-9. run `clawperator skills validate --all` before wider use
+9. verify that every meaningful recorded action is covered or explicitly
+   normalized
+10. run `clawperator skills validate --all` before wider use
 
 ## Related pages
 
@@ -7960,6 +7996,26 @@ close-sleep-open sequence:
 
 Use judgment. Some skills should not force-close if the intent depends on
 preserving user state.
+
+Recording-derived skills may also need to normalize search entry behavior. If a
+recorded flow stays on a query entry screen after `enter_text`, submit the
+search with a real IME enter key rather than assuming the text action will
+advance the app. That keeps the skill aligned with what actually dismisses the
+UI on the target device.
+
+For long, scrollable settings-style lists, prefer a "settle, then scroll to
+`<element>`" pattern instead of waiting for the target row to already be
+visible. Let the screen stabilize briefly after the app opens, then scroll to
+the destination and click it. That avoids dead waits on rows that start below
+the fold.
+
+When turning a recording into a skill, do not treat the raw trace as a final
+replay script. A recording is evidence of intent, but the skill is only done
+when every meaningful recorded action is either represented literally or is
+explicitly normalized with a documented reason. If a click, submit, or
+terminal-state transition disappears during authoring, stop and explain why.
+That is the difference between a faithful replay skill and a brittle
+best-effort script.
 
 ---
 
@@ -9024,6 +9080,14 @@ final replay script. A skill is allowed to normalize the trace when that makes
 the flow more reliable, but those normalizations must be deliberate and
 documented.
 
+In practice, that means the author must be able to answer two questions for
+every step:
+
+1. Was this action replayed literally?
+2. If not, what stable skill-level action replaced it, and why?
+
+If the answer is unclear, the skill is not done yet.
+
 ## What to normalize
 
 ### Launcher taps become `open_app`
@@ -9064,6 +9128,22 @@ Do not use it when:
 - the recorded flow already begins from a clean app session
 - the skill is intentionally meant to resume from the current app state
 
+## What makes a recording-derived skill complete
+
+The most important lesson from constructing recording-derived skills is that
+"it reaches the right screen" is not enough. The replay is complete only when:
+
+- every meaningful recorded action is represented literally or intentionally
+  normalized
+- any omitted step has a documented reason
+- the skill reaches the same semantic terminal state as the recording
+- the final screen is detected from live state, not from a fixed timeout
+
+This is the gap that kept causing premature finishes while we built skills.
+The author would reach an intermediate screen, extract useful text, and declare
+success before the recorded intent had actually been replayed. Future skill
+work should treat that as a validation failure, not as a successful shortcut.
+
 ## Practical replay rule
 
 When the agent validates a recording, it should read the raw step log as a
@@ -9097,6 +9177,14 @@ These lessons came out of the first recording-derived skills we built.
 - During validation, prefer the branch-local Node CLI build and the dev
   receiver package so the skill exercises the code that is actually being
   authored.
+- Treat a raw recording as bootstrap evidence. The parser output is a guide
+  for authoring, not a promise that the exact event sequence should be replayed
+  verbatim.
+- If a literal replay drops a step that mattered in the recording, either add
+  the step back or explain the normalization in the skill docs before calling
+  the skill complete.
+- A replay skill should be judged by semantic coverage, not just by whether it
+  found a plausible end screen.
 
 ## Related docs
 

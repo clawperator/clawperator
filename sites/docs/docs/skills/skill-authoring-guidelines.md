@@ -43,6 +43,26 @@ close-sleep-open sequence:
 Use judgment. Some skills should not force-close if the intent depends on
 preserving user state.
 
+Recording-derived skills may also need to normalize search entry behavior. If a
+recorded flow stays on a query entry screen after `enter_text`, submit the
+search with a real IME enter key rather than assuming the text action will
+advance the app. That keeps the skill aligned with what actually dismisses the
+UI on the target device.
+
+For long, scrollable settings-style lists, prefer a "settle, then scroll to
+`<element>`" pattern instead of waiting for the target row to already be
+visible. Let the screen stabilize briefly after the app opens, then scroll to
+the destination and click it. That avoids dead waits on rows that start below
+the fold.
+
+When turning a recording into a skill, do not treat the raw trace as a final
+replay script. A recording is evidence of intent, but the skill is only done
+when every meaningful recorded action is either represented literally or is
+explicitly normalized with a documented reason. If a click, submit, or
+terminal-state transition disappears during authoring, stop and explain why.
+That is the difference between a faithful replay skill and a brittle
+best-effort script.
+
 ---
 
 ## 2. Skill folder layout
