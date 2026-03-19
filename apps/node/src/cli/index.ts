@@ -787,10 +787,12 @@ async function main(): Promise<void> {
         if (!inputFile) {
           result = JSON.stringify({ code: "USAGE", message: "record parse --input <file> [--out <file>]" });
         } else {
+          // Use getStringOpt for --out to require a value if the flag is present
+          const outputFileFlag = getStringOpt(rest, "--out");
           result = await (await import("./commands/record.js")).cmdRecordParse({
             ...out,
             inputFile,
-            outputFile: getOpt(rest, "--out"),
+            outputFile: outputFileFlag,
           });
         }
       } else {

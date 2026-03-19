@@ -476,4 +476,26 @@ describe("parseRecording", () => {
       (e: unknown) => (e as { code?: string }).code === ERROR_CODES.RECORDING_PARSE_FAILED
     );
   });
+
+  it("rejects malformed NDJSON lines", () => {
+    const ndjson = [
+      buildHeader(),
+      JSON.stringify({
+        ts: 1710000000000,
+        seq: 0,
+        type: "window_change",
+        packageName: "com.android.settings",
+        className: null,
+        title: null,
+        snapshot: null,
+      }),
+      // This line is malformed JSON (truncated)
+      '{"ts":1710000000100,"seq":1,"type":"click"',
+    ].join("\n");
+
+    assert.throws(
+      () => parseRecording(ndjson),
+      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.RECORDING_PARSE_FAILED
+    );
+  });
 });

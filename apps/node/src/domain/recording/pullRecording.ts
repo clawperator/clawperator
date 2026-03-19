@@ -14,6 +14,19 @@ export interface PullRecordingOptions {
   outputDir: string;
 }
 
+// Safe session ID pattern: alphanumeric, hyphens, and underscores only
+// Matches the Android writer's safe-character policy
+const SAFE_SESSION_ID_PATTERN = /^[a-zA-Z0-9_-]+$/;
+
+function validateSessionId(sessionId: string): void {
+  if (!SAFE_SESSION_ID_PATTERN.test(sessionId)) {
+    throw {
+      code: ERROR_CODES.RECORDING_SESSION_NOT_FOUND,
+      message: `Invalid session ID format: ${sessionId}`,
+    };
+  }
+}
+
 export async function pullRecording(
   config: RuntimeConfig,
   options: PullRecordingOptions
@@ -23,6 +36,7 @@ export async function pullRecording(
   // Step 1 & 2: Determine session ID
   if (options.sessionId) {
     sessionId = options.sessionId;
+    validateSessionId(sessionId);
   } else {
     // Read from latest pointer file
     const latestPointerPath = `/sdcard/Android/data/${config.receiverPackage}/files/recordings/latest`;
@@ -36,6 +50,7 @@ export async function pullRecording(
     }
 
     sessionId = result.stdout.trim();
+    validateSessionId(sessionId);
   }
 
   // Step 3: Construct remote path

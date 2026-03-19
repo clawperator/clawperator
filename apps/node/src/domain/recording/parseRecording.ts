@@ -63,7 +63,10 @@ export function parseRecording(ndjson: string): RecordingStepLog {
       const event = JSON.parse(lines[i]) as RawRecordingEvent;
       events.push(event);
     } catch {
-      // Skip malformed lines - they won't become steps
+      throw {
+        code: ERROR_CODES.RECORDING_PARSE_FAILED,
+        message: `Malformed NDJSON at line ${i + 1}`,
+      };
     }
   }
 
