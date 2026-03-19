@@ -190,6 +190,13 @@ Recommended usage pattern:
 5. Use `scroll` and `text_change` as behavioral context rather than assuming
    they are directly replayable in a one-to-one way.
 
+When agents turn a recording into a skill, they may also normalize the raw
+trace into stable runtime actions. For example, a launcher tap is often better
+represented as `open_app`, and a stateful app may need an intentional
+`close_app` before `open_app` so the replay starts from a fresh baseline. That
+normalization is part of skill authoring, not part of the raw recording
+contract. See [Skill Authoring from Recordings](../design/skill-from-recording.md).
+
 ## Field reliability guidance
 
 Some fields are much more stable than others.

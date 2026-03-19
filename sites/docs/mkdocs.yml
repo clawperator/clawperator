@@ -44,6 +44,7 @@ nav:
     - System Overview: architecture/architecture.md
     - Runtime Architecture and API Rationale: design/node-api-design.md
     - Operator Automation Playbook: design/operator-llm-playbook.md
+    - Skill Authoring from Recordings: design/skill-from-recording.md
 
   - Troubleshooting:
     - Version Compatibility: troubleshooting/compatibility.md

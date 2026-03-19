@@ -607,7 +607,7 @@ Opens the app's default launch activity by `applicationId`.
 
 ### `close_app`
 
-Force-stops an app. The Node layer runs `adb shell am force-stop` before dispatching to Android.
+Force-stops an app. The Node layer runs `adb shell am force-stop` before dispatching to Android. When an agent is converting a recording into a reusable skill, `close_app` is the deliberate reset primitive for flows that need a fresh baseline, but it should not be injected automatically for every recording.
 
 **Parameters:**
 

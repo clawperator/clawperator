@@ -120,7 +120,8 @@ Due to the dynamic nature of mobile apps (A/B tests, server-side flags, unexpect
 
 ## 5) New skill authoring checklist
 
-1. Start from a fresh app session (`close_app` then `open_app`).
+1. When the target flow needs a clean baseline, start from a fresh app session
+   (`close_app` then `open_app`).
 2. Capture `snapshot_ui` and an ADB screenshot.
 3. Identify robust selectors (`resource-id` first).
 4. Create `skills/<appId>.<intent>/SKILL.md`.
@@ -128,6 +129,13 @@ Due to the dynamic nature of mobile apps (A/B tests, server-side flags, unexpect
 6. Add optional `artifacts/*.recipe.json` template(s) if helpful.
 7. Validate on device end-to-end.
 8. Update this playbook if conventions changed.
+
+Notes:
+
+- `close_app` is a deliberate replay normalization step, not something that
+  should be injected automatically for every recording.
+- Use it when the app resumes into stale state and a fresh start is needed for
+  reproducibility.
 
 ---
 

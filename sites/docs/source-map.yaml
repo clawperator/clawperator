@@ -232,6 +232,11 @@ sections:
         mode: copy
         sources:
           - docs/design/operator-llm-playbook.md
+      - output: design/skill-from-recording.md
+        title: Skill Authoring from Recordings
+        mode: copy
+        sources:
+          - docs/design/skill-from-recording.md
       - output: design/skill-design.md
         title: Clawperator Skill Design
         mode: copy
