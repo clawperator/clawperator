@@ -284,6 +284,13 @@ Do not assume:
 Text changes can be useful even when they lack `resourceId`, but that means
 the event alone may not identify the correct field to target later.
 
+### Synthetic or adb-driven input will not look like human taps
+
+If the recording was produced while another agent was driving the device, or
+if the input came from `adb shell input tap`, do not expect `click` events to
+appear in the trace. Android emits `TYPE_VIEW_CLICKED` for real touch
+interactions, not for synthetic taps injected through adb.
+
 ### Scroll and text events do not carry snapshots
 
 That is intentional. High-rate event categories stay cheap by omitting tree
