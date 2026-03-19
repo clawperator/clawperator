@@ -1,6 +1,6 @@
 # PRD: Clawperator Record
 
-## Status: Draft
+## Status: In Progress
 ## Phase: PoC (Phase 0 + 3-phase delivery)
 
 ---
@@ -12,6 +12,19 @@ Clawperator can execute precise UI actions on Android devices, but every flow mu
 The Record feature closes this gap: a developer performs a UI flow once, Clawperator captures it (each interaction paired with the UI state at that moment), and an agent uses the step log to reproduce and validate the flow - then authors a skill from the result. The goal is an API worth keeping: designed with production viability in mind, cleanly integrated with existing contracts, and not requiring a rewrite when the PoC graduates. Specific details - particularly the parser's filtering rules - are expected to evolve as we learn what real recordings look like.
 
 **Terminology note:** In this PoC, "replay" does not mean a first-class Clawperator runtime behavior. It means agent-guided stepwise reproduction using a step log as context. The agent reads what the UI looked like at each recorded step, issues individual `clawperator execute` calls, observes device state between each, and decides whether to proceed. The skill authored from that validated flow is the durable, reusable artifact.
+
+## Current Implementation Status
+
+| Area | Status | Notes |
+|---|---|---|
+| Phase 0 - Runtime instrumentation spike | Complete | Candidate A was selected based on measured latency and correctness data. |
+| Phase 1 - Android recording runtime | Complete for the current PoC scope | Recording works end to end for click / scroll / text_change flows with synchronous snapshots on step-candidate accessibility events. |
+| `press_key` `key: "back"` capture | Deferred | True Back-key normalization is deferred until `tasks/android/system-gesture-detection/` is complete. |
+| System gesture detection and normalization | Deferred | Covered by `tasks/android/system-gesture-detection/`. This includes Back / Home / Recents inference work. |
+| Phase 2 - Retrieval and parse | Not started | Must reflect the narrowed PoC scope. |
+| Phase 3 - Agent-assisted reproduction and skill authoring | Not started | For the current PoC, this should target non-system-navigation flows. |
+
+**Scope clarification:** For the current PoC, recording is considered complete and usable for non-system-navigation capture. System navigation semantics such as Back / Home / Recents are intentionally deferred until the dedicated system-gesture-detection task is implemented. The current recording stream may still contain useful accessibility evidence for those actions, but the PoC must not depend on normalized gesture or hardware-navigation capture.
 
 ---
 
@@ -154,11 +167,11 @@ A short written note (inline in the Phase 1 PR description or in `tasks/record/`
 
 ### Success Criteria
 
-- All three flows instrumented and results logged on at least one physical device.
-- `getRootInActiveWindow()` latency documented per step-candidate event type.
-- No AccessibilityService delivery warnings observed during any flow.
-- Snapshot correctness for click events evaluated: for each captured click, verify whether the clicked element (`resourceId` or `text`) is present in the snapshot, and document the outcome (e.g. "present in N of M sampled clicks").
-- Snapshot capture strategy decided and written down.
+- [DONE] All three flows instrumented and results logged on at least one physical device.
+- [DONE] `getRootInActiveWindow()` latency documented per step-candidate event type.
+- [DONE] No AccessibilityService delivery warnings observed during any flow.
+- [DONE] Snapshot correctness for click events evaluated: for each captured click, verify whether the clicked element (`resourceId` or `text`) is present in the snapshot, and document the outcome (e.g. "present in N of M sampled clicks").
+- [DONE] Snapshot capture strategy decided and written down.
 
 ---
 
@@ -239,25 +252,27 @@ When recording is active, `onAccessibilityEvent()` routes events through `Record
 |---|---|---|---|
 | `TYPE_WINDOW_STATE_CHANGED` | `window_change` | Yes | App/screen transitions |
 | `TYPE_VIEW_CLICKED` | `click` | Yes | Taps on UI elements |
-| Key event `KEYCODE_BACK` | `press_key` `key: "back"` | Yes | Back navigation |
+| Key event `KEYCODE_BACK` | `press_key` `key: "back"` | Yes | Deferred for the current PoC scope pending `tasks/android/system-gesture-detection/` |
 | `TYPE_VIEW_SCROLLED` | `scroll` | **No** | Not a step in v1; no snapshot to avoid high-rate IPC |
 | `TYPE_VIEW_TEXT_CHANGED` | `text_change` | **No** | Out of scope for PoC; captured for schema completeness |
 
 Scroll and text-change events are written to the NDJSON without a snapshot field (or with `"snapshot": null`). The parser drops them at extraction time. The no-snapshot decision for these types is deliberate: both can fire at rates where `getRootInActiveWindow()` per event would be harmful, and neither will become a step in v1.
 
+**PoC scope update:** Although the schema and runtime leave room for `press_key` `key: "back"`, true Back-key capture is not part of the current proof of concept acceptance bar. Proper Back / Home / Recents normalization is deferred to `tasks/android/system-gesture-detection/`.
+
 ### Snapshot Capture Strategy
 
 For step-candidate events (click, press_key, window_change), `RecordingManager` reads the current accessibility tree via `getRootInActiveWindow()` and serializes it as UI hierarchy XML. This is the same traversal `snapshot_ui` uses - no new API.
 
-**Snapshot capture strategy (synchronous vs asynchronous) is determined by Phase 0 findings. Both paths are viable candidates - neither is assumed. Phase 1 implementation does not begin until Phase 0 has decided.**
+**Snapshot capture strategy was determined by Phase 0 findings. Candidate A was selected.**
 
-**Candidate A - synchronous capture:** Call `getRootInActiveWindow()` directly on the event delivery thread for step-candidate events only, accepting the latency cost. This is the simpler path: no background thread, no timing window, snapshot is guaranteed to be taken before the next event is processed. The tradeoff is blocking the handler for the duration of the IPC call (typically 50-300ms at human interaction speeds).
+**Candidate A - synchronous capture:** Call `getRootInActiveWindow()` directly on the event delivery thread for step-candidate events only, accepting the latency cost. This is the implemented Phase 1 path: no background capture thread, no timing window between event receipt and tree read, and simpler ordering/debugging semantics.
 
-**Candidate B - async capture:** The event delivery thread enqueues a lightweight capture request (event data only, no IPC). A background HandlerThread dequeues, calls `getRootInActiveWindow()`, and appends the completed record to the write buffer. This keeps the event delivery thread unblocked, at the cost of a timing window between the interaction and the snapshot - and introduces ordering complexity and harder debugging.
+**Candidate B - async capture:** Not selected for this PoC. It would enqueue a lightweight capture request on the event delivery thread and perform the tree read later on a background HandlerThread. Phase 0 did not justify this added complexity.
 
-Phase 0 measures the actual latency cost and snapshot correctness for each candidate and picks one. The Phase 0 findings document records the choice and the evidence behind it.
+Phase 0 measured the actual latency cost and snapshot correctness and selected Candidate A. The findings are recorded in `tasks/record/progress.md`.
 
-**Snapshot semantics (PoC):** `uiStateBefore` is a best-effort capture of the UI immediately after the accessibility event fires. Due to async capture timing, it may reflect the pre-interaction state (ideal), a partially transitioned state, or in fast transitions, the post-interaction state. Agents must treat `uiStateBefore` as approximate context, not exact ground truth. It identifies what was likely visible at interaction time; the live `observe snapshot` is the authoritative basis for action construction.
+**Snapshot semantics (PoC):** `uiStateBefore` is a best-effort capture of the UI immediately after the accessibility event fires. Because capture is synchronous in the current implementation, it is expected to be closer to the pre-transition state than an async design would be, but agents must still treat it as approximate context, not exact ground truth. Fast transitions can still yield partially transitioned or post-interaction trees. The live `observe snapshot` remains the authoritative basis for action construction.
 
 `snapshot` is `null` on a step-candidate event only if `getRootInActiveWindow()` returns null (window not yet settled, app in background). This is logged as a warning, not a failure. The agent treats null `uiStateBefore` as reduced context and falls back to event fields (resourceId, text, bounds).
 
@@ -308,18 +323,19 @@ All event records include `ts` (epoch ms) and `seq` (monotonic integer). `seq` i
 | `RECORDING_ALREADY_IN_PROGRESS` | `start_recording` while already recording |
 | `RECORDING_NOT_IN_PROGRESS` | `stop_recording` with no active session |
 | `RECORDING_SESSION_NOT_FOUND` | Pull/parse of non-existent session ID |
-| `RECORDING_EMPTY` | Session stopped with zero events captured |
 
 ### Success Criteria
 
-- Phase 0 findings document exists and snapshot strategy is decided before any Phase 1 code is written.
-- `clawperator execute` with `start_recording` action returns success.
-- Human performs a 3-5 step UI flow including at least one scroll.
-- `clawperator execute` with `stop_recording` action returns success.
-- Recording file exists on device at expected path.
-- Step-candidate events include a `snapshot` field (or explicit `null` if tree read failed); scroll and text-change events have `"snapshot": null`.
-- No AccessibilityService delivery warnings in logcat during a normal-paced recording.
-- `adb pull` retrieves the file successfully.
+- [DONE] Phase 0 findings document exists and snapshot strategy is decided before any Phase 1 code is written.
+- [DONE] `clawperator execute` with `start_recording` action returns success.
+- [DONE] Human performs a 3-5 step UI flow including at least one scroll.
+- [DONE] `clawperator execute` with `stop_recording` action returns success.
+- [DONE] Recording file exists on device at expected path.
+- [DONE] Step-candidate events include a `snapshot` field (or explicit `null` if tree read failed); scroll and text-change events have `"snapshot": null`.
+- [DONE] No AccessibilityService delivery warnings in logcat during a normal-paced recording.
+- [DONE] `adb pull` retrieves the file successfully.
+- [DONE] Event mask decision for `TYPE_VIEW_SCROLLED` is explicit and documented.
+- [DEFERRED] End-to-end `press_key` `key: "back"` capture. Back / Home / Recents normalization now belongs to `tasks/android/system-gesture-detection/`.
 
 ---
 
@@ -381,13 +397,14 @@ interface RecordingStepLog {
 }
 ```
 
-**Normalization rules (v1 - PoC scope):**
+**Normalization rules (v1 - current PoC scope):**
 
 | Rule | Input | Output |
 |---|---|---|
 | Open app at start | First `window_change` event | `open_app` step with `packageName`. This step is inferred from an event pattern, not captured directly - see note below. |
-| Back navigation | `press_key` with `key: "back"` | `press_key` step, `key: "back"` |
 | Drop consecutive window changes | `window_change` immediately followed by another `window_change` with no intervening user action | Keep only the final one |
+
+**Scope clarification:** Parser support for normalized system navigation semantics is deferred. In particular, `press_key` `key: "back"` must not be treated as a required Phase 2 input until `tasks/android/system-gesture-detection/` is completed and the normalization location decision is made explicitly.
 
 **Note on inferred steps:** Some step types are synthesized from event patterns rather than mapping 1:1 to a single accessibility event. `open_app` is the primary example: it is inferred from the first `window_change` in the session, not from a direct "app launch" event. It represents "ensure this app is in the foreground" - it does not guarantee a cold start and may represent a navigation into an already-running app. If the recording started while the app was already open, the first `window_change` may reflect a screen transition rather than an app launch entirely. The step log makes no attempt to hide this - the agent should treat `open_app` as a heuristic intent inference, not an exact event record, and must not assume it implies a fresh app state.
 
@@ -404,7 +421,6 @@ No matcher synthesis. No sleep injection. The agent constructs matchers from the
 ```
 [1] open_app    com.android.settings
 [2] click       resourceId=com.android.settings:id/dashboard_tile text="Display"
-[3] press_key   back
 ```
 
 The authoritative output is the JSON file. The stderr summary is for developer inspection and can be passed as context to an agent.
@@ -415,7 +431,7 @@ The authoritative output is the JSON file. The stderr summary is for developer i
 - `record parse` produces a valid step log JSON with `uiStateBefore` populated for each step.
 - Step log matches the human's performed actions in order.
 - Step log is human-readable and manually inspectable.
-- Parse only fails on structural errors: invalid schema version, missing header, empty recording (`RECORDING_EMPTY`), or malformed NDJSON. Missing snapshots on individual events produce a `null` `uiStateBefore` with a warning, not a parse failure.
+- Parse only fails on structural errors: invalid schema version, missing header, or malformed NDJSON. Missing snapshots on individual events produce a `null` `uiStateBefore` with a warning, not a parse failure.
 
 ---
 
@@ -462,21 +478,21 @@ No new Node code is needed. Each step in the loop uses `clawperator execute` (ex
 
 1. Open Settings app (`com.android.settings`)
 2. Tap "Display" list item
-3. Press back
 
 This scenario is chosen because:
 - It is universally present on all Android devices without any setup.
 - The UI elements have stable `resourceId` values that survive session boundaries.
 - It requires no network, no authentication, no dynamic content.
 - It contains no text input (intentional for PoC scope).
+- It avoids system-navigation semantics that are intentionally deferred in the current PoC.
 - It is short enough to execute reliably in under 10 seconds.
-- It exercises open-app, click, and back navigation - the three most important action types.
+- It exercises open-app and click - the two most important action types for the current PoC scope.
 
 The demo is conducted with a standard agent (Claude) receiving `demo-001.steps.json` from Phase 2. The agent is instructed to reproduce the flow on the connected device. For each step it reads the recorded `uiStateBefore` and action description, constructs the appropriate execute call, issues it, and verifies device state via `observe snapshot` before proceeding.
 
 ### Success Criteria
 
-- Agent successfully completes the Settings → Display → back flow using the recording as context.
+- Agent successfully completes the Settings → Display flow using the recording as context.
 - Each step is issued as a discrete `clawperator execute` call (not via `--execution-file`).
 - Agent observes device state between steps via `observe snapshot`.
 - Flow succeeds at least once and can be reproduced a second consecutive time with minimal or no agent intervention. One success could be luck; two confirms the step log provides reliable enough context for the agent to navigate the flow without re-exploring. Minor timing waits between steps are acceptable; re-discovering the navigation path is not.
@@ -570,12 +586,6 @@ type RawRecordingEvent =
       "text": "Display",
       "contentDesc": null,
       "bounds": { "left": 0, "top": 400, "right": 1080, "bottom": 560 },
-      "uiStateBefore": "<hierarchy .../>"
-    },
-    {
-      "seq": 2,
-      "type": "press_key",
-      "key": "back",
       "uiStateBefore": "<hierarchy .../>"
     }
   ],
@@ -710,7 +720,6 @@ These follow the same pattern as all existing action types - they are dispatched
 RECORDING_ALREADY_IN_PROGRESS
 RECORDING_NOT_IN_PROGRESS
 RECORDING_SESSION_NOT_FOUND
-RECORDING_EMPTY
 RECORDING_PULL_FAILED
 RECORDING_PARSE_FAILED
 ```
@@ -744,7 +753,7 @@ Documentation is part of the work for each PR, not a follow-up step. The table b
 | Phase | What ships | Docs updated | Notes |
 |---|---|---|---|
 | 0 | Findings note (event rates, latency measurements, strategy decision) | None | Internal spike output. Lives in `tasks/record/` or the Phase 1 PR description. Not public-facing. |
-| 1 | `start_recording` / `stop_recording` action types, Android recording runtime | None | The new action types are not user-accessible without the Phase 2 Node commands. Documenting them in isolation would describe a partial API. Defer to Phase 2. |
+| 1 | `start_recording` / `stop_recording` action types, Android recording runtime | None | Completed. The new action types are not user-accessible without the Phase 2 Node commands. Documenting them in isolation would describe a partial API. Defer to Phase 2. |
 | 2 | `record` CLI command group, ADB pull, parser, step log format, all error codes | `docs/node-api-for-agents.md` | This is the first user-accessible surface. Add a Recording section covering all four subcommands, the NDJSON schema, the step log format, and the new error codes. Note the API as early-access: contract is intentionally forward-looking but specific details may evolve. |
 | 3 | Agent-assisted reproduction validated | `docs/node-api-for-agents.md`, `docs/troubleshooting.md` | Remove the early-access note if Phase 3 validates cleanly. Update troubleshooting with known failure modes from Phase 3 testing: null snapshots on fast transitions, apps with no stable resourceIds, screen lock interrupting recording. |
 
@@ -778,7 +787,9 @@ The parser is pure deterministic logic and is the highest-value test target in t
 - Null snapshot handling: `null` snapshot on an event produces a step with `uiStateBefore: null` and a warning (not a failure)
 - Scroll drop: scroll events produce a warning, not a parse failure
 - Schema version: parser rejects a file whose header `schemaVersion` does not match expected
-- Empty recording: `RECORDING_EMPTY` error returned cleanly
+- Empty recording: parser accepts a structurally valid file even if it contains zero event records after the header
+
+System navigation normalization, including `press_key` `key: "back"` handling, is intentionally out of scope for the first Phase 2 parser pass. That work is deferred until `tasks/android/system-gesture-detection/` is completed.
 
 No Android runtime tests are required for Phase 2. The Android recording logic is manually verified against the Phase 1 success criteria.
 
@@ -831,14 +842,15 @@ apps/android/shared/data/operator/src/main/kotlin/clawperator/operator/
 
 | Phase | Criterion | Verification |
 |---|---|---|
-| 0 | Event rates and `getRootInActiveWindow()` latency measured for all three flows | Phase 0 findings note exists |
-| 0 | No AccessibilityService delivery warnings during any measured flow | Logcat inspection |
-| 0 | Snapshot capture strategy decided and written down | Phase 0 findings note exists |
-| 1 | Phase 0 findings note exists before any Phase 1 code is written | Code review gate |
-| 1 | Recording file exists on device after stop | `adb shell ls .../recordings/` |
-| 1 | File contains ordered events matching user actions including at least one scroll | `adb pull` + manual inspect |
-| 1 | Step-candidate events have snapshots; scroll/text-change events have `null` snapshot | `adb pull` + manual inspect |
-| 1 | No AccessibilityService delivery warnings in logcat during recording | Logcat inspection |
+| 0 | [DONE] Event rates and `getRootInActiveWindow()` latency measured for all three flows | Phase 0 findings note exists |
+| 0 | [DONE] No AccessibilityService delivery warnings during any measured flow | Logcat inspection |
+| 0 | [DONE] Snapshot capture strategy decided and written down | Phase 0 findings note exists |
+| 1 | [DONE] Phase 0 findings note exists before any Phase 1 code is written | Code review gate |
+| 1 | [DONE] Recording file exists on device after stop | `adb shell ls .../recordings/` |
+| 1 | [DONE] File contains ordered events matching user actions including at least one scroll | `adb pull` + manual inspect |
+| 1 | [DONE] Step-candidate events have snapshots; scroll/text-change events have `null` snapshot | `adb pull` + manual inspect |
+| 1 | [DONE] No AccessibilityService delivery warnings in logcat during recording | Logcat inspection |
+| 1 | [DEFERRED] `press_key` `key: "back"` normalization | `tasks/android/system-gesture-detection/` |
 | 2 | `record pull` retrieves file without error | CLI exit code 0 |
 | 2 | `record parse` produces step log with `uiStateBefore` per step | Developer visual inspection |
 | 2 | Step log matches performed actions in order | Developer visual inspection |
