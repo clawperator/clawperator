@@ -80,7 +80,85 @@ export function parseRecording(ndjson: string): RecordingStepLog {
         message: `Invalid event at line ${i + 1}: missing required fields (ts, seq, type)`,
       };
     }
+    // Validate event-type-specific required fields
+    validateEventFields(event, i + 1);
     events.push(event);
+  }
+
+  function validateEventFields(event: RawRecordingEvent, lineNum: number): void {
+    switch (event.type) {
+      case "window_change": {
+        if (typeof event.packageName !== "string") {
+          throw {
+            code: ERROR_CODES.RECORDING_PARSE_FAILED,
+            message: `Invalid window_change event at line ${lineNum}: missing packageName`,
+          };
+        }
+        break;
+      }
+      case "click": {
+        if (
+          typeof event.packageName !== "string" ||
+          (event.resourceId !== null && typeof event.resourceId !== "string") ||
+          (event.text !== null && typeof event.text !== "string") ||
+          (event.contentDesc !== null && typeof event.contentDesc !== "string") ||
+          typeof event.bounds !== "object" ||
+          event.bounds === null
+        ) {
+          throw {
+            code: ERROR_CODES.RECORDING_PARSE_FAILED,
+            message: `Invalid click event at line ${lineNum}: missing required fields`,
+          };
+        }
+        break;
+      }
+      case "scroll": {
+        if (
+          typeof event.packageName !== "string" ||
+          (event.resourceId !== null && typeof event.resourceId !== "string") ||
+          typeof event.scrollX !== "number" ||
+          typeof event.scrollY !== "number" ||
+          typeof event.maxScrollX !== "number" ||
+          typeof event.maxScrollY !== "number"
+        ) {
+          throw {
+            code: ERROR_CODES.RECORDING_PARSE_FAILED,
+            message: `Invalid scroll event at line ${lineNum}: missing required fields`,
+          };
+        }
+        break;
+      }
+      case "press_key": {
+        if (event.key !== "back") {
+          throw {
+            code: ERROR_CODES.RECORDING_PARSE_FAILED,
+            message: `Invalid press_key event at line ${lineNum}: missing or invalid key`,
+          };
+        }
+        break;
+      }
+      case "text_change": {
+        if (
+          typeof event.packageName !== "string" ||
+          (event.resourceId !== null && typeof event.resourceId !== "string") ||
+          typeof event.text !== "string"
+        ) {
+          throw {
+            code: ERROR_CODES.RECORDING_PARSE_FAILED,
+            message: `Invalid text_change event at line ${lineNum}: missing required fields`,
+          };
+        }
+        break;
+      }
+      default: {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const unknownType = (event as any).type;
+        throw {
+          code: ERROR_CODES.RECORDING_PARSE_FAILED,
+          message: `Unknown event type at line ${lineNum}: ${unknownType}`,
+        };
+      }
+    }
   }
 
   // Sort by seq to be safe
