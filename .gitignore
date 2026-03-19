@@ -92,3 +92,6 @@ __pycache__/
 
 # Local agent worktrees
 .claude/worktrees/
+
+# Local recording artifacts
+tmp/

@@ -610,9 +610,9 @@ What an implementation agent would still need beyond this document:
 
 What the agent should not need:
 
-- access to `tmp/recordings/` just to understand the findings in this document
+- access to `~/src/clawperator-dumps/recordings/` just to understand the findings in this document
 
-The `tmp/recordings/` files were useful during investigation, but the key findings and representative event sequences are preserved here precisely so future work does not depend on ephemeral local artifacts.
+The `~/src/clawperator-dumps/recordings/` files were useful during investigation, but the key findings and representative event sequences are preserved here precisely so future work does not depend on local capture artifacts.
 
 ## Current Bottom Line
 
