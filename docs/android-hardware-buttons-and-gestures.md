@@ -16,6 +16,7 @@ This document currently covers:
 
 - Samsung three-button navigation
 - Samsung gesture navigation
+- Google Play emulator gesture navigation
 - successful Back navigation
 - cancelled Back gesture navigation
 - Home / launcher transitions as observed incidentally during those runs
@@ -35,6 +36,7 @@ This document does not yet claim behavior is universal across:
 - The observed accessibility shape depends on the system navigation mode.
 - Samsung three-button Back appears as a `click` on `com.android.systemui`.
 - Samsung gesture Back appears as a transient `window_change` into `com.android.systemui`.
+- Google Play emulator gesture Back matches the Samsung gesture pattern in the current samples.
 - A successful gesture Back and a cancelled gesture Back are distinguishable in the current samples.
 - Home is also observable through accessibility, but not as `press_key`.
 
@@ -164,6 +166,77 @@ Interpretation:
 - Unlike the successful gesture sample, there was no follow-up `window_change` back to `com.android.vending` `Play Store`.
 - In the current samples, this is the clearest observable distinction between successful and cancelled gesture Back.
 
+### 4. Google Play Emulator Gesture Navigation - Successful Back
+
+Session:
+
+- `emu-mainline-nav-20260319-100206`
+
+Manual flow:
+
+1. Start on launcher.
+2. Open Play Store.
+3. Open account dialog.
+4. Perform successful gesture Back.
+
+Observed event mix:
+
+- `window_change=4`
+- `click=2`
+- `press_key=0`
+
+Key sequence excerpt:
+
+```text
+0 click          com.google.android.apps.nexuslauncher  "Play Store"
+1 window_change  com.android.vending                    "Play Store"
+2 click          com.android.vending                    null
+3 window_change  com.android.vending                    "Account and settings. Dialog"
+4 window_change  com.android.systemui                   "android.view.View"
+5 window_change  com.android.vending                    "Play Store"
+```
+
+Interpretation:
+
+- The emulator did not emit `press_key`.
+- The successful gesture Back matched the Samsung gesture-navigation pattern.
+- A transient `com.android.systemui` `window_change` was followed by a return `window_change` into the app's previous screen.
+
+### 5. Google Play Emulator Gesture Navigation - Cancelled Back Gesture
+
+Session:
+
+- `emu-mainline-nav-cancel-20260319-100404`
+
+Manual flow:
+
+1. Start on launcher.
+2. Open Play Store.
+3. Open account dialog.
+4. Start gesture Back and cancel before completion so the dialog remains open.
+
+Observed event mix:
+
+- `window_change=3`
+- `click=2`
+- `press_key=0`
+
+Key sequence excerpt:
+
+```text
+0 click          com.google.android.apps.nexuslauncher  "Play Store"
+1 window_change  com.android.vending                    "Play Store"
+2 click          com.android.vending                    null
+3 window_change  com.android.vending                    "Account and settings. Dialog"
+4 window_change  com.android.systemui                   "android.view.View"
+```
+
+Interpretation:
+
+- The cancelled gesture still produced the transient `com.android.systemui` `window_change`.
+- Like the Samsung cancelled-gesture sample, it did not produce the follow-up app transition back to Play Store.
+- This strengthens the provisional success-vs-cancel discriminator for gesture Back.
+
 ## Working Inference Rules
 
 These rules are provisional and based on the current Samsung samples only.
@@ -199,11 +272,11 @@ Potential cancelled Back gesture:
 - `press_key/back` is not the only possible representation of Back in Android accessibility recordings.
 - System navigation can be recorded even when the dedicated key path does not fire.
 - On Samsung, Back semantics differ between three-button and gesture navigation.
-- Successful and cancelled gesture Back appear distinguishable in the current samples.
+- Successful and cancelled gesture Back appear distinguishable in the current samples on both Samsung gesture navigation and the Google Play emulator.
 
 ## What We Cannot Yet Claim
 
-- That these Samsung-specific event shapes generalize to Pixel or AOSP devices.
+- That these gesture-navigation event shapes generalize to all Pixel or AOSP devices outside the tested Google Play emulator.
 - That every successful gesture Back will always produce the same `com.android.systemui` transition pattern.
 - That every cancelled gesture Back will always omit the follow-up app transition.
 - That replay should directly click observed System UI controls.
@@ -214,16 +287,17 @@ Potential cancelled Back gesture:
 - The proof of concept does not need to block on dedicated `press_key/back` support.
 - Non-Back flows are already valid and useful.
 - Back may also be POC-usable if replay or post-processing can infer semantic Back from recorded accessibility evidence.
+- Gesture Back normalization now has evidence from two surfaces: Samsung gesture navigation and a Google Play emulator.
 - Any POC claim should currently be phrased as "Back is observable but not normalized."
 
 ## Recommended Near-Term Next Tests
 
-1. Repeat cancelled gesture Back at least once more on the same Samsung device to check pattern stability.
-2. Repeat successful gesture Back on a different screen and app.
-3. Repeat three-button Back with a different app and target screen.
-4. Test Home under gesture navigation to determine whether it has a distinct and stable accessibility signature.
-5. Test Recents intentionally, not incidentally, to separate Recents-specific transitions from Home/Back transitions.
-6. Test on a Pixel or AOSP-style gesture-navigation device if available.
+1. Test Home under gesture navigation to determine whether it has a distinct and stable accessibility signature.
+2. Test Recents intentionally, not incidentally, to separate Recents-specific transitions from Home/Back transitions.
+3. Repeat cancelled gesture Back at least once more on the same Samsung device to check pattern stability.
+4. Repeat successful gesture Back on a different screen and app.
+5. Repeat three-button Back with a different app and target screen.
+6. Test on a physical Pixel or AOSP-style gesture-navigation device if available.
 
 ## Candidate Follow-Up Design Directions
 
@@ -274,5 +348,6 @@ Back is present, but in different accessibility forms depending on navigation mo
 
 - Samsung three-button Back: `com.android.systemui` `click`
 - Samsung gesture Back: transient `com.android.systemui` `window_change`
+- Google Play emulator gesture Back: transient `com.android.systemui` `window_change`
 
 The dedicated `press_key` path remains unresolved, but the system-navigation evidence recorded so far is strong enough to justify further testing and likely supports a proof-of-concept path based on inference and normalization.
