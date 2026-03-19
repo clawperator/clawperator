@@ -104,13 +104,16 @@ class RecordingManagerDefaultTest {
 
     @Test
     fun `start recording rejects session ids with path separators`() = runTest {
-        val manager = createManager("/tmp/clawperator-recording-manager-invalid-session")
+        val directory = "/tmp/clawperator-recording-manager-invalid-session"
+        val manager = createManager(directory)
 
         val result = manager.startRecording("../evil")
 
         val error = assertIs<RecordingCommandOutcome.Error>(result)
         assertEquals("RECORDING_START_FAILED", error.code)
         assertTrue(error.message.contains("path separators"))
+        assertFalse(java.io.File(directory).resolve("evil.ndjson").exists())
+        assertTrue(java.io.File(directory).resolve("recordings").exists())
     }
 
     @Test
