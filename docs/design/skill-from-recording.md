@@ -1,7 +1,9 @@
 # Skill Authoring from Recordings
 
-This note captures how agents should turn a raw recording into a reusable
-skill.
+This note captures how agents should turn a raw Android recording into a
+reusable skill. If you are starting from the capture itself, first read
+[Android Recording Format for Agents](../ai-agents/android-recording.md) so
+the recording fields and limits are clear before you normalize anything.
 
 The key principle is that a recording is evidence of user intent, not the
 final replay script. A skill is allowed to normalize the trace when that makes

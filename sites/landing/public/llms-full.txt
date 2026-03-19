@@ -1586,13 +1586,19 @@ trace into stable runtime actions. For example, a launcher tap is often better
 represented as `open_app`, and a stateful app may need an intentional
 `close_app` before `open_app` so the replay starts from a fresh baseline. That
 normalization is part of skill authoring, not part of the raw recording
-contract. The recordings used for skill authorship must be human-performed,
-not adb-tapped, because the replay skill is meant to encode what the human
+contract.
+
+If you are starting from a recording, use this page first to understand the
+capture format, then hand off to the skill-authoring docs:
+
+- [Skill Authoring from Recordings](../skills/skill-from-recording.md)
+- [Skill Authoring Guidelines](../skills/skill-authoring-guidelines.md)
+
+The recordings used for skill authorship must be human-performed, not
+adb-tapped, because the replay skill is meant to encode what the human
 actually did. A recording-derived skill is not complete until every
 meaningful recorded action is either replayed literally or deliberately
-normalized with a documented reason. See [Skill Authoring from
-Recordings](../skills/skill-from-recording.md) and [Skill Authoring
-Guidelines](../skills/skill-authoring-guidelines.md).
+normalized with a documented reason.
 
 ## Field reliability guidance
 
@@ -7699,8 +7705,10 @@ These skills reduce execution friction. The LLM/agent remains responsible for co
 
 # Skill Authoring from Recordings
 
-This note captures how agents should turn a raw recording into a reusable
-skill.
+This note captures how agents should turn a raw Android recording into a
+reusable skill. If you are starting from the capture itself, first read
+[Android Recording Format for Agents](../ai-agents/android-recording.md) so
+the recording fields and limits are clear before you normalize anything.
 
 The key principle is that a recording is evidence of user intent, not the
 final replay script. A skill is allowed to normalize the trace when that makes
@@ -8072,6 +8080,10 @@ literally. Normalize it into a stable replay sequence:
   arrived faster than expected
 - keep stdout for the final artifact and use stderr for small progress markers
 
+If you need the raw recording contract before you normalize anything, start
+with [Android Recording Format for Agents](../ai-agents/android-recording.md),
+then return here to turn the trace into a skill.
+
 Do not declare the skill complete until the replay covers every meaningful
 recorded action or documents why a step was normalized away. A click that
 opened a page in the recording, but is missing from the replay, is a bug - not
@@ -8235,6 +8247,11 @@ explicitly normalized with a documented reason. If a click, submit, or
 terminal-state transition disappears during authoring, stop and explain why.
 That is the difference between a faithful replay skill and a brittle
 best-effort script.
+
+If you need the raw capture contract first, start with [Android Recording
+Format for Agents](../ai-agents/android-recording.md). That page describes
+what the recording contains, while this page explains how to turn it into a
+reusable skill.
 
 ## Recording-derived prompt template
 

@@ -195,13 +195,19 @@ trace into stable runtime actions. For example, a launcher tap is often better
 represented as `open_app`, and a stateful app may need an intentional
 `close_app` before `open_app` so the replay starts from a fresh baseline. That
 normalization is part of skill authoring, not part of the raw recording
-contract. The recordings used for skill authorship must be human-performed,
-not adb-tapped, because the replay skill is meant to encode what the human
+contract.
+
+If you are starting from a recording, use this page first to understand the
+capture format, then hand off to the skill-authoring docs:
+
+- [Skill Authoring from Recordings](../skills/skill-from-recording.md)
+- [Skill Authoring Guidelines](../skills/skill-authoring-guidelines.md)
+
+The recordings used for skill authorship must be human-performed, not
+adb-tapped, because the replay skill is meant to encode what the human
 actually did. A recording-derived skill is not complete until every
 meaningful recorded action is either replayed literally or deliberately
-normalized with a documented reason. See [Skill Authoring from
-Recordings](../skills/skill-from-recording.md) and [Skill Authoring
-Guidelines](../skills/skill-authoring-guidelines.md).
+normalized with a documented reason.
 
 ## Field reliability guidance
 
