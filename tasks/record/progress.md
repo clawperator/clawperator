@@ -36,6 +36,14 @@ This file is for implementation findings, plan deviations, and cross-phase decis
 <!-- Entries below this line, newest first -->
 
 ## 2026-03-19
+### Phase 2
+
+- The new `test-recording-validate` smoke skill now runs end to end on the physical Samsung device `<device_serial>` using the branch-local Node CLI build and the local `.dev` Operator APK. The helper no longer depends on the external skills repo at runtime.
+- The Play Store search step is now embedded as a local helper under `.agents/skills/test-recording-validate/`, with the shared utility dependency inlined so module resolution is no longer tied to the external repo layout.
+- Added a best-effort pre-stop before recording start so repeat runs do not fail if a stale session is still active from an interrupted prior run.
+- Latest successful run (`20260319-135014`) produced `11` recorded events, parsed to `5` steps, with `1` `open_app` step and `4` `click` steps. The validation report passed with no structural parse errors.
+
+## 2026-03-19
 ### Phase 1
 
 - Additional physical-device text-input follow-up: session `manual-text-input-20260319-111309` on Samsung / YouTube produced `56` events total with event mix `click=10`, `window_change=11`, `scroll=10`, `text_change=25`. Real manual typing in the YouTube search field emitted reliable incremental `text_change` events from `com.google.android.youtube`, but with `resourceId=null` on each sampled `text_change`, so the evolving text value itself is currently the main useful payload.
