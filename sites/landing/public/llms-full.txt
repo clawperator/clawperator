@@ -1581,6 +1581,13 @@ Recommended usage pattern:
 5. Use `scroll` and `text_change` as behavioral context rather than assuming
    they are directly replayable in a one-to-one way.
 
+When agents turn a recording into a skill, they may also normalize the raw
+trace into stable runtime actions. For example, a launcher tap is often better
+represented as `open_app`, and a stateful app may need an intentional
+`close_app` before `open_app` so the replay starts from a fresh baseline. That
+normalization is part of skill authoring, not part of the raw recording
+contract. See [Skill Authoring from Recordings](../design/skill-from-recording.md).
+
 ## Field reliability guidance
 
 Some fields are much more stable than others.
@@ -2001,7 +2008,7 @@ What this action does not promise:
 Treat `open_uri` as an `ACTION_VIEW` URI launcher, not a general-purpose
 Android intent builder.
 
-**`close_app`:** The Node layer intercepts `close_app` actions and runs `adb shell am force-stop <applicationId>` before dispatching to Android. When that pre-flight close succeeds, the Node layer normalizes the resulting `close_app` step into a successful step result so the envelope reflects the real observed outcome. If the pre-flight `force-stop` fails, the execution now fails with a structured error instead of pretending the app was closed. In practice, treat `close_app` as a supported force-stop action through the Node interface.
+**`close_app`:** The Node layer intercepts `close_app` actions and runs `adb shell am force-stop <applicationId>` before dispatching to Android. When that pre-flight close succeeds, the Node layer normalizes the resulting `close_app` step into a successful step result so the envelope reflects the real observed outcome. If the pre-flight `force-stop` fails, the execution now fails with a structured error instead of pretending the app was closed. In practice, treat `close_app` as a supported force-stop action through the Node interface. When an agent is turning a recording into a reusable skill, `close_app` is the deliberate reset primitive for flows that need a fresh app baseline, but it should not be injected automatically for every recording.
 
 **`click`:** Finds the node matching `matcher` and performs the specified `clickType`. The default click type is `"default"` (standard accessibility click with gesture fallback). Use `"long_click"` for long-press targets and `"focus"` to focus without activating.
 
@@ -5197,7 +5204,7 @@ Opens the app's default launch activity by `applicationId`.
 
 ### `close_app`
 
-Force-stops an app. The Node layer runs `adb shell am force-stop` before dispatching to Android.
+Force-stops an app. The Node layer runs `adb shell am force-stop` before dispatching to Android. When an agent is converting a recording into a reusable skill, `close_app` is the deliberate reset primitive for flows that need a fresh baseline, but it should not be injected automatically for every recording.
 
 **Parameters:**
 
@@ -8979,7 +8986,8 @@ Due to the dynamic nature of mobile apps (A/B tests, server-side flags, unexpect
 
 ## 5) New skill authoring checklist
 
-1. Start from a fresh app session (`close_app` then `open_app`).
+1. When the target flow needs a clean baseline, start from a fresh app session
+   (`close_app` then `open_app`).
 2. Capture `snapshot_ui` and an ADB screenshot.
 3. Identify robust selectors (`resource-id` first).
 4. Create `skills/<appId>.<intent>/SKILL.md`.
@@ -8987,6 +8995,13 @@ Due to the dynamic nature of mobile apps (A/B tests, server-side flags, unexpect
 6. Add optional `artifacts/*.recipe.json` template(s) if helpful.
 7. Validate on device end-to-end.
 8. Update this playbook if conventions changed.
+
+Notes:
+
+- `close_app` is a deliberate replay normalization step, not something that
+  should be injected automatically for every recording.
+- Use it when the app resumes into stale state and a fresh start is needed for
+  reproducibility.
 
 ---
 

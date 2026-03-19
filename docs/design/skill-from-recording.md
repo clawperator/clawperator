@@ -62,6 +62,22 @@ Typical pattern:
 4. Re-check the device state with live snapshots while validating the flow.
 5. Author the skill from the validated, normalized sequence.
 
+## What Phase 3 taught us
+
+- Treat the recording as intent evidence, not as a literal replay script.
+- Launcher taps are often better represented as `open_app`.
+- `close_app` is a deliberate reset step for stateful apps, not an automatic
+  rewrite of every recording.
+- A good replay skill should finish on terminal screen detection, not on fixed
+  post-action sleeps.
+- If the result screen is slow or transitional, poll live snapshots until the
+  terminal state appears, then stop immediately.
+- Keep a small amount of stderr progress logging so manual runs are not
+  opaque, but keep stdout reserved for the actual result artifact.
+- During validation, prefer the branch-local Node CLI build and the dev
+  receiver package so the skill exercises the code that is actually being
+  authored.
+
 ## Related docs
 
 - [Android Recording Format for Agents](../ai-agents/android-recording.md)
