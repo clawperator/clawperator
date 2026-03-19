@@ -29,7 +29,11 @@ docs no longer imply that the task folder is still the source of truth.
 - Prefer `com.clawperator.operator.dev` and pass `--receiver-package`
   explicitly for local validation.
 - Do not fall back to the globally installed `clawperator` binary when testing
-  branch-local API changes.
+  branch-local API changes. If the `skills run` command calls the global binary
+  and times out because the package name does not match the dev APK, fix the
+  environment: set `CLAW_BIN` to `apps/node/dist/cli/index.js` and pass
+  `--receiver-package com.clawperator.operator.dev` on every command. That is a
+  setup issue, not a criteria softening situation.
 - Keep any durable learning in `docs/` or `docs/design/`, not in `tasks/`.
 - Do not delete `tasks/record/` until the durable docs migration is complete.
 
@@ -53,9 +57,12 @@ Minimum target flow:
 - stop recording
 - pull the NDJSON
 - parse the step log
-- reproduce the flow step by step with live observation
+- reproduce the flow step by step with live observation (discrete `execute`
+  calls, `observe snapshot` between each step)
+- reproduce the flow a **second consecutive time** from the same step log
+  without re-recording - this is the repeatability bar, not a nice-to-have
 - author a skill from that validated flow
-- run the skill successfully
+- run the skill via `clawperator skills run` and confirm exit code 0
 
 What to capture:
 - the start and stop outputs
@@ -87,11 +94,27 @@ long-term docs:
 - any remaining recorder / parser / skill-authoring caveats that future agents
   need after the task folder is deleted
 
-Likely permanent homes:
-- `docs/design/`
-- `docs/troubleshooting.md`
-- `docs/android-recording.md`
-- `docs/node-api-for-agents.md`
+Required permanent deliverables:
+
+- **`docs/design/skill-from-recording.md`** - a new design note covering what
+  Phase 3 proved: the recording pipeline works when recordings are
+  human-performed; the correct usage model is agent-orchestrated, human-executed
+  capture; and the open questions around a future `skills create --from-recording`
+  surface or equivalent agent-guided capture workflow. This is the conceptual
+  output of the PoC and belongs in `docs/design/` permanently.
+
+- **`docs/troubleshooting.md`** - the adb tap limitation entry added in acf34ba
+  is a keeper; verify nothing further is needed from the Phase 3 runs.
+
+- **`docs/android-recording.md`** - confirm the page correctly reflects that
+  recordings must be human-performed. The current page does not state this
+  explicitly.
+
+- **`docs/node-api-for-agents.md`** - two specific stale lines remain: the
+  `start_recording` and `stop_recording` entries in the action type table still
+  say "PoC-phase action, no host-side retrieval API yet." Phase 2 shipped the
+  retrieval API. Update those entries to remove the stale hedge. Also remove the
+  early-access note on the recording command section if Phase 3 validates cleanly.
 
 If a note is only useful as historical project memory, delete it instead of
 copying it forward.
@@ -111,11 +134,15 @@ Phase 3 is only done when all of the following are true:
 
 - a physical-device human-guided recording has been completed end to end
 - the recording has been pulled, parsed, and reproduced by an agent stepwise
-- at least two distinct skills have been authored from recordings and run
-  successfully
-- the Phase 3 findings have been migrated into permanent docs
+- at least two distinct skills have been authored from recordings and both run
+  successfully via `clawperator skills run` with exit code 0 (scaffolded-only
+  artifacts do not count)
+- the Phase 3 findings have been migrated into permanent docs including a new
+  `docs/design/skill-from-recording.md`
+- stale PoC-phase notes in `node-api-for-agents.md` have been corrected
 - `tasks/record/` is removed
-- docs generation and docs build validation are clean
+- docs-generate has been run and docs-validate passes clean
+- `./scripts/docs_build.sh` completes without error
 
 ## Notes for the implementing agent
 
