@@ -9254,18 +9254,43 @@ When an agent is turning a recording into a skill, a useful starting prompt is:
 > detection instead of fixed sleeps. If a recorded step disappears, stop and
 > justify the change before calling the skill complete.
 
+## Why one-shot skill generation is still hard
+
+The recording captures what the user did, but not what it meant. It does not
+indicate which steps are semantically required versus incidental, whether a
+given click was intended to open a new context or just focus a field, or which
+final screen state represents genuine completion. Without that metadata, the
+skill author must reconstruct those decisions from scratch every time.
+
+The agent is therefore forced to make correctness decisions - not style choices
+- by hand on every authoring pass. Should this launcher interaction become
+`open_app`? Should this scroll target be matched by text, resource ID, or
+bounds? Does the skill stop at the screen that contains the result, or at the
+exact result element? The current docs reduce the cost of those decisions but
+do not eliminate them. Until the recording contract carries normalization
+metadata, one-shot skill generation will require an author who understands what
+the recording was trying to accomplish, not just what it captured.
+
+This is the structural motivation for the parser metadata follow-up below.
+
 ## Open follow-ups
 
 These are the future improvements that the skill-authorship work surfaced and
-should be tracked as follow-on tasks rather than forgotten in `tasks/record/`:
+should be tracked as follow-on tasks rather than forgotten when the PoC task
+files are cleaned up:
 
 - a replay-completeness validator that compares the recording against the
-  authored skill
+  authored skill and reports missing or unnormalized actions
 - parser metadata that marks whether a step was literal, normalized, or
-  terminal-state related
-- a documented policy for when `close_app` is a reproducibility aid versus an
-  inappropriate mutation of the recording
+  terminal-state related - this is the direct fix for the structural gap above
+- a canonical normalization policy covering all five known normalizations:
+  launcher tap to `open_app`, stale app state to optional `close_app`, search
+  submit to real IME event, long lists to settle-then-scroll, and result screens
+  to terminal-state detection rather than fixed sleeps
+- a documented decision rule for when `close_app` is a reproducibility aid
+  versus an inappropriate mutation of the user's recorded state
 - a checklist that requires terminal-state detection for replay-derived skills
+  and explicitly prohibits fixed "sleep and hope" completion logic
 
 ## Related docs
 
