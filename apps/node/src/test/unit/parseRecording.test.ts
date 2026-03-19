@@ -498,4 +498,73 @@ describe("parseRecording", () => {
       (e: unknown) => (e as { code?: string }).code === ERROR_CODES.RECORDING_PARSE_FAILED
     );
   });
+
+  it("rejects event missing required fields (ts)", () => {
+    const ndjson = [
+      buildHeader(),
+      JSON.stringify({
+        // ts is missing
+        seq: 0,
+        type: "window_change",
+        packageName: "com.android.settings",
+        className: null,
+        title: null,
+      }),
+    ].join("\n");
+
+    assert.throws(
+      () => parseRecording(ndjson),
+      (e: unknown) => {
+        const err = e as { code?: string; message?: string };
+        return err.code === ERROR_CODES.RECORDING_PARSE_FAILED &&
+               err.message?.includes("missing required fields");
+      }
+    );
+  });
+
+  it("rejects event missing required fields (seq)", () => {
+    const ndjson = [
+      buildHeader(),
+      JSON.stringify({
+        ts: 1710000000000,
+        // seq is missing
+        type: "window_change",
+        packageName: "com.android.settings",
+        className: null,
+        title: null,
+      }),
+    ].join("\n");
+
+    assert.throws(
+      () => parseRecording(ndjson),
+      (e: unknown) => {
+        const err = e as { code?: string; message?: string };
+        return err.code === ERROR_CODES.RECORDING_PARSE_FAILED &&
+               err.message?.includes("missing required fields");
+      }
+    );
+  });
+
+  it("rejects event missing required fields (type)", () => {
+    const ndjson = [
+      buildHeader(),
+      JSON.stringify({
+        ts: 1710000000000,
+        seq: 0,
+        // type is missing
+        packageName: "com.android.settings",
+        className: null,
+        title: null,
+      }),
+    ].join("\n");
+
+    assert.throws(
+      () => parseRecording(ndjson),
+      (e: unknown) => {
+        const err = e as { code?: string; message?: string };
+        return err.code === ERROR_CODES.RECORDING_PARSE_FAILED &&
+               err.message?.includes("missing required fields");
+      }
+    );
+  });
 });

@@ -59,15 +59,28 @@ export function parseRecording(ndjson: string): RecordingStepLog {
   // Step 4: Process remaining lines as RawRecordingEvent objects
   const events: RawRecordingEvent[] = [];
   for (let i = 1; i < lines.length; i++) {
+    let parsed: unknown;
     try {
-      const event = JSON.parse(lines[i]) as RawRecordingEvent;
-      events.push(event);
+      parsed = JSON.parse(lines[i]);
     } catch {
       throw {
         code: ERROR_CODES.RECORDING_PARSE_FAILED,
         message: `Malformed NDJSON at line ${i + 1}`,
       };
     }
+    // Validate required event fields (ts, seq, type)
+    const event = parsed as RawRecordingEvent;
+    if (
+      typeof event.ts !== "number" ||
+      typeof event.seq !== "number" ||
+      typeof event.type !== "string"
+    ) {
+      throw {
+        code: ERROR_CODES.RECORDING_PARSE_FAILED,
+        message: `Invalid event at line ${i + 1}: missing required fields (ts, seq, type)`,
+      };
+    }
+    events.push(event);
   }
 
   // Sort by seq to be safe

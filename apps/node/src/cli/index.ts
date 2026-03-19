@@ -775,7 +775,9 @@ async function main(): Promise<void> {
           ...runOpts,
         });
       } else if (sub === "pull") {
-        const outputDir = getOpt(rest, "--out") ?? "./recordings/";
+        // Use getStringOpt for --out to require a value if the flag is present
+        const outputDirFlag = getStringOpt(rest, "--out");
+        const outputDir = outputDirFlag ?? "./recordings/";
         result = await (await import("./commands/record.js")).cmdRecordPull({
           ...out,
           sessionId: getOpt(rest, "--session-id"),
