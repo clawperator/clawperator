@@ -80,6 +80,11 @@ sections:
         mode: copy
         sources:
           - docs/agent-quickstart.md
+      - output: ai-agents/android-recording.md
+        title: Android Recording Format for Agents
+        mode: copy
+        sources:
+          - docs/android-recording.md
       - output: ai-agents/node-api-for-agents.md
         title: Clawperator Node API - Agent Guide
         mode: copy

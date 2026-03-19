@@ -19,6 +19,7 @@ Use this page as a technical map:
 ### Start here if you are integrating an agent
 
 - [Agent Quickstart](ai-agents/agent-quickstart.md) - Fastest path from first install to first successful execution
+- [Android Recording Format for Agents](ai-agents/android-recording.md) - What raw Android recordings contain and how agents should consume them
 - [Node API - Agent Guide](ai-agents/node-api-for-agents.md) - Canonical CLI and HTTP API contract for agent builders
 - [Execution Model](reference/execution-model.md) - Required payload fields, status vs step success, timeout, and error surfaces
 - [Timeout Budgeting](reference/timeout-budgeting.md) - Practical `timeoutMs` sizing for snapshots, scroll loops, and skill flows
@@ -51,6 +52,7 @@ Use this page as a technical map:
 ## For AI Agents
 
 - [Agent Quickstart](ai-agents/agent-quickstart.md) - Fastest path for a cold-start agent
+- [Android Recording Format for Agents](ai-agents/android-recording.md) - Recording structure, examples, and consumption guidance
 - [Node API - Agent Guide](ai-agents/node-api-for-agents.md) - Canonical CLI and HTTP API reference for agents
 - [Execution Model](reference/execution-model.md) - Envelope semantics, timeout policy, and validation behavior
 - [Timeout Budgeting](reference/timeout-budgeting.md) - Practical timeout sizing for common agent workflows

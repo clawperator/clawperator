@@ -27,6 +27,7 @@ Use this page as a technical map:
 ### Start here if you are integrating an agent
 
 - [Agent Quickstart](ai-agents/agent-quickstart.md) - Fastest path from first install to first successful execution
+- [Android Recording Format for Agents](ai-agents/android-recording.md) - What raw Android recordings contain and how agents should consume them
 - [Node API - Agent Guide](ai-agents/node-api-for-agents.md) - Canonical CLI and HTTP API contract for agent builders
 - [Execution Model](reference/execution-model.md) - Required payload fields, status vs step success, timeout, and error surfaces
 - [Timeout Budgeting](reference/timeout-budgeting.md) - Practical `timeoutMs` sizing for snapshots, scroll loops, and skill flows
@@ -59,6 +60,7 @@ Use this page as a technical map:
 ## For AI Agents
 
 - [Agent Quickstart](ai-agents/agent-quickstart.md) - Fastest path for a cold-start agent
+- [Android Recording Format for Agents](ai-agents/android-recording.md) - Recording structure, examples, and consumption guidance
 - [Node API - Agent Guide](ai-agents/node-api-for-agents.md) - Canonical CLI and HTTP API reference for agents
 - [Execution Model](reference/execution-model.md) - Envelope semantics, timeout policy, and validation behavior
 - [Timeout Budgeting](reference/timeout-budgeting.md) - Practical timeout sizing for common agent workflows
@@ -1188,7 +1190,7 @@ Skills are packaged app-specific automation recipes maintained in a sibling repo
 
 - **Deterministic execution:** one broadcast in, one `[Clawperator-Result]` envelope out
 - **Single-flight lock:** only one execution per device at a time
-- **No autonomous planning in the runtime:** Clawperator executes commands; reasoning stays in the agent
+- **No autonomous planning in the runtime:** Clawperator executes a command and reports what happened. It does not retry on failure, adapt to unexpected UI, or make decisions between steps in a multi-step execution. The agent decides what to do next at every step. This boundary is intentional: Android apps are dynamic, and any adaptive logic in the runtime would act on less context than the agent has.
 - **No direct adb required for agents:** all routine automation goes through the Node CLI/API
 
 ---
@@ -1387,6 +1389,308 @@ only after the UI path is already known.
 ---
 
 
+# Android Recording Format for Agents
+
+This page describes the current Android recording output that Clawperator can
+produce on device.
+
+Use it for:
+
+- understanding what a raw recording contains
+- deciding how an agent should consume a pulled recording
+- knowing which fields are reliable and which are best-effort
+- understanding current proof-of-concept limits before building replay or
+  skill-authoring workflows on top
+
+This page intentionally focuses on the recording data itself. It does not
+document a public host-side retrieval API because that surface is still in
+progress.
+
+## Current status
+
+The current proof of concept can record usable interaction traces for
+non-system-navigation flows.
+
+What is working today:
+
+- `window_change`
+- `click`
+- `scroll`
+- `text_change`
+- synchronous snapshot capture for step-candidate accessibility events
+
+What is intentionally deferred:
+
+- normalized Back / Home / Recents semantics
+- reliable `press_key` `key: "back"` capture as a required contract
+- any parser behavior that depends on system-gesture inference
+
+System navigation evidence may still appear in raw recordings, but agents
+should not currently assume those events are normalized or portable across
+devices.
+
+## Recording file shape
+
+Android recordings are newline-delimited JSON.
+
+- line 1 is always a `recording_header`
+- all following lines are individual event records
+- `seq` is the authoritative ordering field
+- `ts` is wall-clock event time in epoch milliseconds
+
+Example:
+
+```json
+{"type":"recording_header","schemaVersion":1,"sessionId":"demo-001","startedAt":1710000000000,"operatorPackage":"com.clawperator.operator.dev"}
+{"ts":1710000000000,"seq":0,"type":"window_change","packageName":"com.android.settings","className":"com.android.settings.Settings","title":"Settings","snapshot":"<hierarchy .../>"}
+{"ts":1710000000800,"seq":1,"type":"click","packageName":"com.android.settings","resourceId":"com.android.settings:id/dashboard_tile","text":"Display","contentDesc":null,"bounds":{"left":0,"top":400,"right":1080,"bottom":560},"snapshot":"<hierarchy .../>"}
+{"ts":1710000002100,"seq":2,"type":"scroll","packageName":"com.android.settings","resourceId":null,"scrollX":0,"scrollY":420,"maxScrollX":0,"maxScrollY":2800,"snapshot":null}
+{"ts":1710000002600,"seq":3,"type":"text_change","packageName":"com.google.android.youtube","resourceId":null,"text":"linkin park waiting for the end emily","snapshot":null}
+```
+
+## Header record
+
+The first line identifies the file and schema.
+
+Fields:
+
+- `type`: always `recording_header`
+- `schemaVersion`: file schema version
+- `sessionId`: session identifier chosen or generated when recording started
+- `startedAt`: epoch milliseconds for session start
+- `operatorPackage`: package that produced the recording
+
+Agents should use the header to:
+
+- reject unsupported schema versions
+- correlate the file to a session identifier
+- understand whether the file came from the debug or release operator variant
+
+## Event types
+
+The current recording runtime emits these event categories.
+
+### `window_change`
+
+Represents screen or window transitions.
+
+Common fields:
+
+- `packageName`
+- `className`
+- `title`
+- `snapshot`
+
+Use this event when an agent needs to understand:
+
+- which app or screen came to the foreground
+- what transition happened before a later click or text entry
+
+### `click`
+
+Represents a tap-like activation on a UI element.
+
+Common fields:
+
+- `packageName`
+- `resourceId`
+- `text`
+- `contentDesc`
+- `bounds`
+- `snapshot`
+
+This is usually the most useful action record for replay-style reasoning.
+
+### `scroll`
+
+Represents a view scroll event.
+
+Common fields:
+
+- `packageName`
+- `resourceId`
+- `scrollX`
+- `scrollY`
+- `maxScrollX`
+- `maxScrollY`
+- `snapshot: null`
+
+Scroll is captured because it is meaningful context, but it is intentionally
+cheap. It does not carry a tree snapshot.
+
+### `text_change`
+
+Represents text changing inside an editable control.
+
+Common fields:
+
+- `packageName`
+- `resourceId`
+- `text`
+- `snapshot: null`
+
+Important: the emitted `text` value is the whole visible text state after that
+change, not just the last character.
+
+## Snapshot semantics
+
+Snapshots are present on step-candidate accessibility events:
+
+- `window_change`
+- `click`
+
+Snapshots are intentionally `null` on high-rate events:
+
+- `scroll`
+- `text_change`
+
+The current implementation uses synchronous capture on the accessibility event
+thread for step-candidate events. That improves snapshot correctness relative
+to an async design, but it does not make snapshots perfect.
+
+Agents should treat `snapshot` as:
+
+- best-effort context about what was visible around the interaction
+- useful for understanding the target element and nearby UI
+- not guaranteed to be an exact pre-interaction ground truth frame
+
+The authoritative basis for a new action is still the live snapshot from the
+current device state.
+
+## How agents should use recordings
+
+The right mental model is:
+
+- recordings are context, not executable scripts
+- raw event fields are hints, not guaranteed selectors
+- live device state still decides what to do next
+
+Recommended usage pattern:
+
+1. Read the recording in `seq` order.
+2. Use `window_change` and `click` events to understand the intended path.
+3. Treat `snapshot` as supporting context for what the user likely saw.
+4. Derive the actual next selector from the current device snapshot, not from
+   recorded fields alone.
+5. Use `scroll` and `text_change` as behavioral context rather than assuming
+   they are directly replayable in a one-to-one way.
+
+## Field reliability guidance
+
+Some fields are much more stable than others.
+
+Usually helpful:
+
+- `seq`
+- `type`
+- `packageName`
+- `snapshot` when present
+- `text` on visible user-facing controls
+- `bounds` as spatial context
+
+Frequently missing or unstable:
+
+- `resourceId` on many third-party apps
+- `contentDesc` on many controls
+- `title` on some window transitions
+- `resourceId` on `text_change`
+
+Agents should prefer:
+
+1. live current snapshot
+2. package and nearby UI context
+3. visible text and content description
+4. resource IDs when they exist and appear stable
+5. recorded bounds only as supporting evidence
+
+## Real text-input example
+
+On a physical Samsung device, a manual YouTube search recording captured a
+useful text-input sequence:
+
+- manual character entry emitted repeated `text_change` events
+- autocomplete selection emitted a normal `click`
+- more manual typing after autocomplete emitted more `text_change` events
+
+Excerpt:
+
+```json
+{"seq":17,"type":"text_change","packageName":"com.google.android.youtube","resourceId":null,"text":"l","snapshot":null}
+{"seq":18,"type":"text_change","packageName":"com.google.android.youtube","resourceId":null,"text":"li","snapshot":null}
+{"seq":19,"type":"text_change","packageName":"com.google.android.youtube","resourceId":null,"text":"lin","snapshot":null}
+{"seq":28,"type":"text_change","packageName":"com.google.android.youtube","resourceId":null,"text":"linking park","snapshot":null}
+{"seq":37,"type":"click","packageName":"com.google.android.youtube","resourceId":"com.google.android.youtube:id/edit_suggestion","text":"Edit suggestion linkin park waiting for the end","contentDesc":"Edit suggestion linkin park waiting for the end","snapshot":"<hierarchy .../>"}
+{"seq":38,"type":"text_change","packageName":"com.google.android.youtube","resourceId":null,"text":"linkin park waiting for the end e","snapshot":null}
+{"seq":42,"type":"text_change","packageName":"com.google.android.youtube","resourceId":null,"text":"linkin park waiting for the end emily","snapshot":null}
+```
+
+What this means for agent design:
+
+- text entry is more tractable than system-navigation normalization in the
+  current proof of concept
+- autocomplete is visible as a click target, not a hidden IME-only effect
+- `text_change` may have `resourceId: null`, so surrounding UI context matters
+  more than the event alone
+
+## Current gotchas
+
+### System navigation is not normalized yet
+
+Back / Home / Recents behavior is device- and navigation-mode-dependent in
+current recordings.
+
+Do not assume:
+
+- a Back action will appear as `press_key`
+- a Home gesture has one universal raw shape
+- system UI events are portable across Samsung, emulator, and future devices
+
+### `text_change` may be underspecified
+
+Text changes can be useful even when they lack `resourceId`, but that means
+the event alone may not identify the correct field to target later.
+
+### Scroll and text events do not carry snapshots
+
+That is intentional. High-rate event categories stay cheap by omitting tree
+capture.
+
+### Recordings are lossy
+
+They preserve identifiable interaction moments, not full human intent or every
+intermediate visual state.
+
+Agents should expect:
+
+- missing timing nuance
+- missing IME-specific details
+- occasional nulls
+- OEM-specific variation
+
+## What recordings are good for right now
+
+The current recording format is already useful for:
+
+- understanding a user-demonstrated navigation path
+- turning a demonstrated flow into agent context
+- grounding replay attempts in actual observed UI state
+- bootstrapping skill authoring for stable non-system-navigation flows
+
+It is not yet the right contract to assume for:
+
+- normalized system gesture replay
+- device-portable Back / Home / Recents semantics
+- one-to-one deterministic playback with no live state verification
+
+## Related pages
+
+- [Clawperator Snapshot Format](../reference/snapshot-format.md)
+- [Navigation Patterns for Agents](navigation-patterns.md)
+- [Clawperator Node API - Agent Guide](node-api-for-agents.md)
+
+---
+
+
 # Clawperator Node API - Agent Guide
 
 Clawperator provides a deterministic execution layer for LLM agents to control Android devices. This guide covers the CLI and HTTP API contracts.
@@ -1397,7 +1701,7 @@ For the exact `snapshot_ui` structure, use
 
 ## Concepts
 
-- **Execution**: A payload of one or more actions dispatched to the device. Every execution produces exactly one `[Clawperator-Result]` envelope.
+- **Execution**: A payload of one or more actions dispatched to the device as a single atomic unit. Every execution produces exactly one `[Clawperator-Result]` envelope. Clawperator executes the action list sequentially and returns the result - it does not observe state between steps or adapt based on intermediate outcomes. The agent inspects the result and decides the next execution.
 - **Action**: A single step (`open_app`, `click`, `read_text`, etc.) within an execution.
 - **Snapshot**: A captured UI hierarchy dump (`hierarchy_xml`) for observing device state.
 - **Skill**: A packaged recipe from the skills repo, compiled into an execution payload.
@@ -2305,6 +2609,7 @@ For agent-side recovery strategy, use
 - **Single-flight:** One execution per device at a time. Concurrent requests return `EXECUTION_CONFLICT_IN_FLIGHT`.
 - **No hidden retries:** If an action fails, the error is returned immediately. Retry logic belongs in the agent.
 - **Deterministic results:** Exactly one terminal envelope per `commandId`. Timeouts return `RESULT_ENVELOPE_TIMEOUT` with diagnostics.
+- **Execution granularity:** Group multiple actions in one execution only when they are atomic - when the agent does not need to observe state or make a decision between them. For flows where intermediate state matters, use separate executions with `observe snapshot` between each. See [Execution Model](../reference/execution-model.md) for the full guidance.
 - **Timeout override:** `--timeout-ms <n>` overrides the execution timeout for `execute`, `observe snapshot`, and `observe screenshot` within policy limits.
 - **Screenshot output path:** `observe screenshot --path <file>` writes the PNG to the requested local path and still returns the final `data.path` in the result envelope. `<file>` must be a non-empty local filesystem path.
 - **Device targeting:** Specify `--device-id` when multiple devices are connected. Omit for single-device setups.
@@ -2476,7 +2781,13 @@ Skills can be invoked three ways:
 ## FAQ
 
 **Does Clawperator do autonomous planning?**
-No. It executes commands and reports structured results. Reasoning and planning stay in the agent.
+No. Clawperator executes a command and reports what happened. All reasoning and planning stay in the agent. Specifically:
+
+- Clawperator does not retry a failed action automatically - a failure is returned for the agent to handle.
+- Clawperator does not observe state between actions in a multi-step execution and adapt - it executes the list sequentially and returns one result.
+- Clawperator does not know whether a flow succeeded in any business sense - it knows whether each action completed without a runtime error.
+
+The practical implication: for unfamiliar apps, exploratory flows, or any sequence where the agent needs to verify state between steps, prefer single-action executions with `observe snapshot` calls between them. For mature skills and stable, pre-validated atomic sequences, multi-action executions are the right choice - they reduce round trips and are appropriate whenever the agent does not need to observe or adapt mid-flow. Skills are authored with the latter in mind.
 
 **How are concurrent executions handled?**
 Single-flight per device. A second overlapping execution returns `EXECUTION_CONFLICT_IN_FLIGHT`.
@@ -5177,13 +5488,66 @@ contract and the target environment.
 
 ## Recommended agent loop
 
-For unknown apps or UI drift:
+For any flow involving state-dependent decisions:
 
 1. Capture `snapshot_ui`.
-2. Decide one action or one short action sequence.
+2. Decide the next action (or a short, atomic sequence - see below).
 3. Execute it.
-4. Re-read the envelope and step results.
-5. Snapshot again before making the next major decision.
+4. Read the envelope and step results.
+5. Snapshot again before making the next decision.
+
+Clawperator does not observe state or make decisions between actions in a
+multi-step execution. It dispatches the action list sequentially and returns one
+result envelope. If the agent needs to inspect state, branch on what it sees, or
+handle unexpected UI between any two steps, those steps must be separate
+executions with the agent in the loop between them.
+
+## Execution granularity
+
+Multi-action executions are the preferred form for stable, pre-validated atomic flows and for mature skills - they reduce round trips and are appropriate whenever the agent does not need to observe state between steps. The guidance below is about when to split, not a recommendation to always go single-step.
+
+Group multiple actions in one execution only when they are **atomic** - meaning
+the agent does not need to inspect device state or make a decision between them.
+
+**Appropriate as a single execution:**
+
+- `close_app` + `open_app` + `sleep` - deterministic state reset; no decision
+  needed between steps
+- `click` + `wait_for_node` - click a button and wait for a specific element;
+  the target is specified in advance
+- `enter_text` + `click` - type in a field and submit; both succeed or fail as a
+  unit
+
+**Should be separate executions with agent observation between them:**
+
+- Any sequence where the agent needs to read the screen after one step to decide
+  the next
+- Navigation flows where the app may show an interstitial, dialog, or update
+  prompt that was not present when the flow was designed
+- Flows where the correct next step depends on current app state
+
+The rule of thumb: if you would naturally want to call `observe snapshot`
+between two steps, they belong in separate executions.
+
+## `sleep` vs `wait_for_node` vs separate snapshot
+
+Use the right primitive for each situation:
+
+| Situation | Correct tool |
+| :--- | :--- |
+| App needs a moment to settle after launch or a heavy transition | `sleep` with a conservative fixed value |
+| Waiting for a specific element to appear before proceeding | `wait_for_node` with appropriate retry config |
+| Checking whether the expected screen is showing | Separate `snapshot_ui` execution - agent inspects and decides |
+| Deciding what to do based on what the screen currently shows | Separate `snapshot_ui` execution - agent inspects and acts |
+
+`sleep` is for predictable, hardware-level timing. `wait_for_node` is for UI
+element readiness within a known, stable flow. A separate `snapshot_ui` followed
+by agent reasoning is for anything involving uncertainty, branching, or dynamic
+app behavior.
+
+Avoid using `sleep` as a substitute for observation. A long sleep that happens
+to let the UI settle is not the same as the agent verifying that the expected
+state was reached.
 
 For action-specific params, result shapes, and examples, use
 [Action Types Reference](action-types.md). For the full agent API contract,
@@ -8074,15 +8438,19 @@ Selection behavior:
 
 ## Agentic Best-Effort Mode
 
-Best-effort mode is a first-class execution path for unknown or drifting UIs.
+> **Status: alpha/unstable.** `execute best-effort` may break without a major version bump until promoted to stable. See Stability section.
 
-Behavior goals:
+Best-effort mode is an execution path for unknown or drifting UIs where the agent needs to make progress without a pre-authored action plan. It does not change the ownership model: Clawperator still executes individual actions and reports results; the agent still owns strategy.
 
-1. Observe current UI (`snapshot_ui`).
-2. Identify likely anchors (toolbar/tab/menu/button/search patterns).
-3. Attempt constrained navigation/action.
-4. Re-observe and verify progress.
-5. Retry within safety bounds.
+The steps below describe what an **agent** should do using Clawperator's primitives - not what Clawperator does autonomously:
+
+1. Agent calls `snapshot_ui` to observe current UI.
+2. Agent identifies likely anchors (toolbar/tab/menu/button/search patterns) from the snapshot.
+3. Agent calls a constrained navigation or click action.
+4. Agent calls `snapshot_ui` again to verify progress.
+5. Agent retries within its own safety bounds if progress stalled.
+
+Clawperator's role in each step is unchanged: execute the requested action, return the result. It does not identify anchors, decide whether progress was made, or choose the next action. Those decisions belong to the agent.
 
 Best-effort does not imply unsafe freeform behavior; all attempts remain within validated runtime action limits and capability policy.
 
@@ -8090,7 +8458,7 @@ Important ownership split:
 
 - Clawperator provides primitives and structured observations.
 - The agent owns exploration policy/strategy.
-- Clawperator should not silently invent fallback control flow.
+- Clawperator must not silently invent fallback control flow.
 
 Cardinality drift handling:
 
