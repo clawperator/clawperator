@@ -72,6 +72,14 @@ Commands:
                                             Pull latest skills (optionally pin to a ref)
   skills sync --ref <git-ref>
                                             Sync and pin skills index/cache to a git ref
+  record start  [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]
+                                            Start a recording session on device
+  record stop   [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]
+                                            Stop the active recording session and finalize the file
+  record pull   [--session-id <id>] [--out <dir>] [--device-id <serial>]
+                                            Pull the NDJSON recording from device to host (default output: ./recordings/)
+  record parse  --input <file> [--out <file>]
+                                            Parse a raw NDJSON recording into a step log JSON
   grant-device-permissions [--device-id <id>] [--receiver-package <package>]
                                             Re-grant accessibility and notification permissions (remediation only)
   serve [--port <number>] [--host <string>]
@@ -748,6 +756,48 @@ async function main(): Promise<void> {
         result = JSON.stringify({ code: "USAGE", message: "skills list|get|search|compile-artifact|new|validate|run|install|update|sync ..." });
       }
       break;
+    case "record": {
+      const sub = rest[0];
+      const runOpts = {
+        deviceId: global.deviceId ?? getOpt(rest, "--device-id"),
+        receiverPackage: global.receiverPackage ?? getOpt(rest, "--receiver-package"),
+      };
+      if (sub === "start") {
+        result = await (await import("./commands/record.js")).cmdRecordStart({
+          ...out,
+          sessionId: getOpt(rest, "--session-id"),
+          ...runOpts,
+        });
+      } else if (sub === "stop") {
+        result = await (await import("./commands/record.js")).cmdRecordStop({
+          ...out,
+          sessionId: getOpt(rest, "--session-id"),
+          ...runOpts,
+        });
+      } else if (sub === "pull") {
+        const outputDir = getOpt(rest, "--out") ?? "./recordings/";
+        result = await (await import("./commands/record.js")).cmdRecordPull({
+          ...out,
+          sessionId: getOpt(rest, "--session-id"),
+          outputDir,
+          ...runOpts,
+        });
+      } else if (sub === "parse") {
+        const inputFile = getStringOpt(rest, "--input");
+        if (!inputFile) {
+          result = JSON.stringify({ code: "USAGE", message: "record parse --input <file> [--out <file>]" });
+        } else {
+          result = await (await import("./commands/record.js")).cmdRecordParse({
+            ...out,
+            inputFile,
+            outputFile: getOpt(rest, "--out"),
+          });
+        }
+      } else {
+        result = JSON.stringify({ code: "USAGE", message: "record start|stop|pull|parse ..." });
+      }
+      break;
+    }
     case "serve":
       {
         const portStr = getOpt(rest, "--port");
