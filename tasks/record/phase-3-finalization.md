@@ -24,18 +24,21 @@ docs no longer imply that the task folder is still the source of truth.
 
 ## Working rules
 
-- Use the branch-local Node CLI build from `apps/node/dist/cli/index.js`.
-- Use the connected physical Android device when one is available.
-- Prefer `com.clawperator.operator.dev` and pass `--receiver-package`
-  explicitly for local validation.
-- Do not fall back to the globally installed `clawperator` binary when testing
-  branch-local API changes. If the `skills run` command calls the global binary
-  and times out because the package name does not match the dev APK, fix the
-  environment: set `CLAW_BIN` to `apps/node/dist/cli/index.js` and pass
-  `--receiver-package com.clawperator.operator.dev` on every command. That is a
-  setup issue, not a criteria softening situation.
+- Phase 3 ships no new code. Everything it needs is already on `main`.
+- Use the release APK (`com.clawperator.operator`) and the globally installed
+  `clawperator` binary. There is no branch-local build to test against.
+- Use the connected physical Android device when one is available. The human
+  recording steps must be performed with a real finger on the physical device
+  - not via adb, not via emulator tap injection.
+- The skills runtime does not yet support `CLAWPERATOR_BIN` or
+  `CLAWPERATOR_RECEIVER_PACKAGE` as first-class env vars. That work is tracked
+  in `tasks/skills/env/plan.md` and ships as a follow-on PR. Do not block
+  Phase 3 on it and do not use undocumented workarounds as a substitute for
+  the criteria.
+- Keep any durable learning in `docs/` or `docs/design/`, not in `tasks/`.
 - Keep any durable learning in `docs/` or `docs/design/`, not in `tasks/`.
 - Do not delete `tasks/record/` until the durable docs migration is complete.
+  Do not delete `tasks/skills/` - it is a separate active task.
 
 ## Required closeout sequence
 
