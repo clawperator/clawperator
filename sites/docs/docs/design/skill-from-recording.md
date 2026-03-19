@@ -145,9 +145,6 @@ These lessons came out of the first recording-derived skills we built.
   terminal state appears, then stop immediately.
 - Keep a small amount of stderr progress logging so manual runs are not
   opaque, but keep stdout reserved for the actual result artifact.
-- During validation, prefer the branch-local Node CLI build and the dev
-  receiver package so the skill exercises the code that is actually being
-  authored.
 - Treat a raw recording as bootstrap evidence. The parser output is a guide
   for authoring, not a promise that the exact event sequence should be replayed
   verbatim.
