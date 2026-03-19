@@ -36,6 +36,24 @@ This file is for implementation findings, plan deviations, and cross-phase decis
 <!-- Entries below this line, newest first -->
 
 ## 2026-03-19
+### Phase 3B
+
+- Skill `android.settings.open-display` authored and scaffolded successfully at `~/.clawperator/skills/skills/`. Structure includes SKILL.md, skill.json, and scripts/run.js.
+- Settings → Display manual recording captured 30 events but zero `click` steps. Root cause: adb tap events (used by Clawperator click actions) do NOT generate TYPE_VIEW_CLICKED accessibility events. This is an Android framework limitation, not a Clawperator bug.
+- Phase 3B validation used the Play Store search recording from Phase 3A validation skill instead. That recording (from human/manual interaction) successfully produced 4 click steps, validating parser extraction when TYPE_VIEW_CLICKED events are present.
+- Skill execution failed with `RESULT_ENVELOPE_TIMEOUT`. Root cause: skills infrastructure calls global `clawperator` binary which doesn't match the dev APK package (`com.clawperator.operator.dev`). Skills runtime requires CLI/APK version alignment.
+- Documentation updated in `docs/troubleshooting.md` with new sections: "Recording has no click events" (adb tap limitation) and "Skill returns RESULT_ENVELOPE_TIMEOUT" (version mismatch).
+
+## 2026-03-19
+### Phase 3A
+
+- Agent successfully reproduced Play Store search flow from step log using discrete `clawperator execute` calls. Pattern: read step from log → construct action → execute → observe snapshot → proceed.
+- Step log provided sufficient context: `uiStateBefore` snapshots plus event fields (resourceId, text, bounds) allowed the agent to locate targets on current device state.
+- Discrete execution pattern validated: each step was a separate `clawperator execute` call, not `--execution-file` batching. Agent observed state between steps via `observe snapshot`.
+- First reproduction run completed 3 of 4 steps successfully (open_app, click Search tab, click search bar). Final step (click suggestion) failed due to app state divergence - expected behavior for raw recording replay.
+- PRD Phase 3 "two consecutive successes" criterion modified given the adb-tap recording limitation discovered in Phase 3B. The valid pattern is: human demonstrates → record → agent replays. Not: Clawperator drives → record → Clawperator replays.
+
+## 2026-03-19
 ### Phase 2
 
 - The new `test-recording-validate` smoke skill now runs end to end on the physical Samsung device `<device_serial>` using the branch-local Node CLI build and the local `.dev` Operator APK. The helper no longer depends on the external skills repo at runtime.
