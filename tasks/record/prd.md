@@ -347,20 +347,33 @@ Retrieve the recording from the device and parse it into a step log: an ordered 
 
 ### Node CLI
 
-The public `record` command surface covers four subcommands:
+The public command family is `recording`; `record` remains accepted as a
+short alias for ergonomics and backward compatibility with earlier drafts. The
+Phase 2 retrieval surface covers four subcommands:
 
 ```
-clawperator record pull    [--session-id <id>] [--out <dir>]
-clawperator record parse   --input <file> [--out <file>]
-clawperator record start   [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]
-clawperator record stop    [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]
+clawperator recording pull  [--session-id <id>] [--out <dir>]
+clawperator recording parse --input <file> [--out <file>]
+clawperator recording start [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]
+clawperator recording stop  [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]
 ```
 
-`record pull` without `--session-id` pulls the most recent session (reads `latest` pointer file first, then fetches corresponding NDJSON). Output defaults to `./recordings/`.
+`recording pull` without `--session-id` pulls the most recent session (reads
+`latest` pointer file first, then fetches corresponding NDJSON). Output defaults
+to `./recordings/`.
 
-`record parse` reads the NDJSON file, normalizes and extracts steps, and writes a step log JSON. Output defaults to `<input_basename>.steps.json` in the same directory.
+`recording parse` reads the NDJSON file, normalizes and extracts steps, and
+writes a step log JSON. Output defaults to `<input_basename>.steps.json` in the
+same directory.
 
-`record pull` and `record parse` are usable standalone. An agent or developer may pull, inspect the raw NDJSON, then parse it to produce the step log. The pipeline does not have to be atomic.
+`recording pull` and `recording parse` are usable standalone. An agent or
+developer may pull, inspect the raw NDJSON, then parse it to produce the step
+log. The pipeline does not have to be atomic.
+
+**Follow-on command surface:** `recording list` is the likely next retrieval
+command if we need explicit discovery of available sessions. `recording delete`
+is intentionally deferred until there is a proven cleanup or storage-pressure
+need; it is not part of the current Phase 2 scope.
 
 ### ADB Pull
 
