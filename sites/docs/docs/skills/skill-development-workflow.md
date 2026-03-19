@@ -138,6 +138,39 @@ clawperator execute --validate-only --execution /path/to/compiled-execution.json
 
 This is the closest current workflow to a dry run for artifact-backed skills.
 
+### Recording-derived skills
+
+When a skill is authored from a human recording, do not replay the trace
+literally. Normalize it into a stable replay sequence:
+
+- map launcher entry taps to `open_app`
+- add `close_app` only when the app is stateful and a clean baseline is needed
+- keep the raw recording as evidence, but make the replay skill follow the
+  stable app-level intent
+- if a search screen stays open after `enter_text`, submit with a real IME
+  enter key instead of assuming the text action will advance the app
+- for long scrollable settings lists, settle briefly after the screen opens,
+  then scroll to the target element instead of waiting for that element to
+  already be visible
+- use live snapshots to detect terminal states instead of long fixed sleeps
+- stop immediately when the final screen is visible, even if the screen
+  arrived faster than expected
+- keep stdout for the final artifact and use stderr for small progress markers
+
+If you need the raw recording contract before you normalize anything, start
+with [Android Recording Format for Agents](../ai-agents/android-recording.md),
+then return here to turn the trace into a skill.
+
+Do not declare the skill complete until the replay covers every meaningful
+recorded action or documents why a step was normalized away. A click that
+opened a page in the recording, but is missing from the replay, is a bug - not
+just a stylistic difference. The same is true for any action that was
+replaced by `open_app`, `close_app`, IME submit, or a deliberate row click.
+
+If the recording lands on a terminal result screen, the skill should finish as
+soon as that screen is visible. Avoid fixed "sleep and hope" completion logic
+unless the app offers no better signal.
+
 ## 7. Use a layered test loop
 
 Treat skill verification as four distinct layers:
@@ -211,7 +244,9 @@ For a new skill, this is the practical order:
 6. run `clawperator execute --validate-only ...` on candidate payloads
 7. run `clawperator skills run <skill_id> --device-id <device_id>`
 8. harden selectors, timeout budgets, and output formatting
-9. run `clawperator skills validate --all` before wider use
+9. verify that every meaningful recorded action is covered or explicitly
+   normalized
+10. run `clawperator skills validate --all` before wider use
 
 ## Related pages
 

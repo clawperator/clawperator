@@ -40,6 +40,11 @@ What is intentionally deferred:
 - reliable `press_key` `key: "back"` capture as a required contract
 - any parser behavior that depends on system-gesture inference
 
+If a recording is meant to become a reusable skill, it must be human-
+performed. adb-driven input does not produce the same click events as real
+touch interactions, so synthetic traces are not a valid skill-authoring
+input.
+
 System navigation evidence may still appear in raw recordings, but agents
 should not currently assume those events are normalized or portable across
 devices.
@@ -190,6 +195,25 @@ Recommended usage pattern:
 5. Use `scroll` and `text_change` as behavioral context rather than assuming
    they are directly replayable in a one-to-one way.
 
+When agents turn a recording into a skill, they may also normalize the raw
+trace into stable runtime actions. For example, a launcher tap is often better
+represented as `open_app`, and a stateful app may need an intentional
+`close_app` before `open_app` so the replay starts from a fresh baseline. That
+normalization is part of skill authoring, not part of the raw recording
+contract.
+
+If you are starting from a recording, use this page first to understand the
+capture format, then hand off to the skill-authoring docs:
+
+- [Skill Authoring from Recordings](../skills/skill-from-recording.md)
+- [Skill Authoring Guidelines](../skills/skill-authoring-guidelines.md)
+
+The recordings used for skill authorship must be human-performed, not
+adb-tapped, because the replay skill is meant to encode what the human
+actually did. A recording-derived skill is not complete until every
+meaningful recorded action is either replayed literally or deliberately
+normalized with a documented reason.
+
 ## Field reliability guidance
 
 Some fields are much more stable than others.
@@ -264,6 +288,13 @@ Do not assume:
 
 Text changes can be useful even when they lack `resourceId`, but that means
 the event alone may not identify the correct field to target later.
+
+### Synthetic or adb-driven input will not look like human taps
+
+If the recording was produced while another agent was driving the device, or
+if the input came from `adb shell input tap`, do not expect `click` events to
+appear in the trace. Android emits `TYPE_VIEW_CLICKED` for real touch
+interactions, not for synthetic taps injected through adb.
 
 ### Scroll and text events do not carry snapshots
 

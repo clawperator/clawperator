@@ -9,7 +9,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL_DIR="$(dirname "$SCRIPT_DIR")"
-RUNS_DIR="$SKILL_DIR/runs"
+RUNS_DIR="${RECORDING_VALIDATION_RUNS_DIR:-$HOME/src/clawperator-dumps/runs}"
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 RUN_DIR="$RUNS_DIR/$TIMESTAMP"
 

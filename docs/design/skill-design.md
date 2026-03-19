@@ -12,6 +12,10 @@ Define a deterministic, open-source **skill package** format for Android automat
 
 Skills are the primary artifact for agents and humans.
 
+For the recording-to-skill workflow and the normalization rules that turn a
+raw capture into a reusable skill, see [Skill Authoring from
+Recordings](../skills/skill-from-recording.md).
+
 Each skill may include:
 - `SKILL.md` (canonical agent-facing interface)
 - `scripts/` (deterministic wrappers)

@@ -315,3 +315,105 @@ If the versions do not match, upgrade the CLI and install a compatible [Clawpera
 | Permissions (accessibility) | Run grant script or Settings → Accessibility | PermissionsNotGranted → run script     |
 
 When all three are satisfied, the app shows **Ready** and a **green** background. You can then use the Node API or agent workflows that depend on the operator.
+
+---
+
+## Recording capture issues
+
+### Recording has no click events
+
+**Symptom:** After pulling and parsing a recording, the step log contains `open_app` and `window_change` steps but no `click` steps, even though interactions clearly occurred.
+
+**Most common cause:** The recording captured Clawperator-driven interactions rather than manual human taps. Android's accessibility framework emits `TYPE_VIEW_CLICKED` events for human finger taps but does NOT emit them for `adb shell input tap` commands (which Clawperator uses internally for click actions).
+
+**This means:**
+- Human taps (manual screen touches) → `click` events captured ✓
+- Clawperator click actions → No `click` events captured ✗
+
+**How to capture usable recordings:**
+
+1. **Start recording** on the device:
+   ```bash
+   clawperator recording start --device-id <serial>
+   ```
+
+2. **Manually interact** with the device using your finger (not Clawperator commands)
+
+3. **Stop recording**:
+   ```bash
+   clawperator recording stop --device-id <serial>
+   ```
+
+4. **Pull and parse**:
+   ```bash
+   clawperator recording pull --device-id <serial> --session-id <id> --out ./recordings/
+   clawperator recording parse --input ./recordings/<file>.ndjson
+   ```
+
+**Expected behavior:** Manual interactions produce `click` steps in the parsed output; Clawperator-driven flows do not. This is a known Android limitation, not a bug.
+
+---
+
+## Skills execution issues
+
+### Skill returns RESULT_ENVELOPE_TIMEOUT
+
+**Symptom:** Running `clawperator skills run <skill_id>` fails with timeout error even though the device is connected and responsive.
+
+**Most common cause:** The global `clawperator` binary (from npm) does not match the installed APK package or version.
+
+**Check compatibility:**
+
+```bash
+# Check if using dev APK
+adb shell pm list packages | grep clawperator
+# Output: com.clawperator.operator.dev (dev) or com.clawperator.operator (release)
+
+# Check CLI/APK version compatibility
+clawperator version --check-compat --receiver-package com.clawperator.operator.dev
+```
+
+**How to fix:**
+
+1. **For development/testing with local build:**
+   ```bash
+   # Set CLAW_BIN to use local branch build
+   export CLAW_BIN=/path/to/clawperator/apps/node/dist/cli/index.js
+   
+   # Rebuild if needed
+   npm --prefix /path/to/clawperator/apps/node install
+   npm --prefix /path/to/clawperator/apps/node run build
+   ```
+
+2. **For production use:** Ensure the global npm package matches your APK:
+   ```bash
+   npm install -g clawperator
+   clawperator version --check-compat --receiver-package com.clawperator.operator
+   ```
+
+3. **For skills specifically:** Skills call the global `clawperator` binary internally. When testing skills with a dev APK, the skill will timeout unless you:
+   - Use the release APK (`com.clawperator.operator`)
+   - Or test skill logic via direct `clawperator execute` calls instead
+
+### Skill validation passes but execution fails
+
+**Symptom:** `clawperator skills validate <skill_id>` succeeds but `clawperator skills run <skill_id>` fails.
+
+**Check:**
+1. Device permissions: `clawperator doctor`
+2. APK/CLI compatibility: `clawperator version --check-compat`
+3. Device selection (if multiple devices): `--device-id <serial>`
+
+**Debug the skill directly:**
+
+Instead of `skills run`, test the skill's execution payload directly:
+
+```bash
+# 1. Get the skill's compiled execution
+clawperator skills compile-artifact <skill_id> --artifact main --output json
+
+# 2. Save to file and run manually
+clawperator execute --execution ./skill-execution.json --device-id <serial>
+```
+
+This bypasses the skills wrapper and helps identify whether the issue is the skill logic or the skills runtime.

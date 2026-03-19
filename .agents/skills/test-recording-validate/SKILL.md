@@ -55,7 +55,8 @@ The skill verifies:
 
 ## Output Artifacts
 
-All artifacts are written to `.agents/skills/test-recording-validate/runs/<timestamp>/`:
+All artifacts are written to `$HOME/src/clawperator-dumps/runs/<timestamp>/`
+(or the directory named by `RECORDING_VALIDATION_RUNS_DIR`):
 - `<session_id>.ndjson` - Raw recording from device
 - `<session_id>.steps.json` - Parsed step log
 - `parse_summary.txt` - Parse stderr summary (step inference log)
