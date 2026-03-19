@@ -67,6 +67,12 @@ class RecordingManagerDefault(
             }
 
             val resolvedSessionId = sessionId?.takeIf { it.isNotBlank() } ?: generateSessionId()
+            if (!isSafeSessionId(resolvedSessionId)) {
+                return@synchronized RecordingCommandOutcome.Error(
+                    code = "RECORDING_START_FAILED",
+                    message = "sessionId must not contain path separators",
+                )
+            }
             val outputFile = recordingsDirectory.resolve("$resolvedSessionId.ndjson")
 
             return@synchronized try {
@@ -165,21 +171,25 @@ class RecordingManagerDefault(
     }
 
     private fun drainQueue(session: ActiveRecordingSession) {
-        do {
-            var drainedCount = 0
-            while (true) {
-                val event = session.queue.peek() ?: break
-                session.writer.write(serializeEvent(event))
-                session.writer.newLine()
-                session.queue.poll()
-                session.writtenEventCount.incrementAndGet()
-                drainedCount++
-            }
-            if (drainedCount > 0) {
-                session.writer.flush()
-            }
+        try {
+            do {
+                var drainedCount = 0
+                while (true) {
+                    val event = session.queue.peek() ?: break
+                    session.writer.write(serializeEvent(event))
+                    session.writer.newLine()
+                    session.queue.poll()
+                    session.writtenEventCount.incrementAndGet()
+                    drainedCount++
+                }
+                if (drainedCount > 0) {
+                    session.writer.flush()
+                }
+                session.drainScheduled.set(false)
+            } while (session.queue.isNotEmpty() && session.drainScheduled.compareAndSet(false, true))
+        } finally {
             session.drainScheduled.set(false)
-        } while (session.queue.isNotEmpty() && session.drainScheduled.compareAndSet(false, true))
+        }
     }
 
     private fun finalizeSession(session: ActiveRecordingSession): RecordingCommandOutcome =
@@ -247,6 +257,12 @@ class RecordingManagerDefault(
         private const val FINALIZE_TIMEOUT_SECONDS = 10L
     }
 }
+
+internal fun isSafeSessionId(sessionId: String): Boolean =
+    sessionId != "." &&
+        sessionId != ".." &&
+        '/' !in sessionId &&
+        '\\' !in sessionId
 
 @Serializable
 data class RecordingHeader(
