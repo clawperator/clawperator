@@ -25,7 +25,11 @@ DEVICE_ID="${1:-}"
 if [[ -z "$DEVICE_ID" ]]; then
     echo "[INFO] No device serial provided, checking connected devices..."
     DEVICES=$(node "$CLAW" devices --output json 2>/dev/null | grep -o '"serial":"[^"]*"' | cut -d'"' -f4 || true)
-    DEVICE_COUNT=$(echo "$DEVICES" | grep -c "^" || true)
+    if [[ -z "$DEVICES" ]]; then
+        DEVICE_COUNT=0
+    else
+        DEVICE_COUNT=$(printf '%s\n' "$DEVICES" | grep -c ".*" || true)
+    fi
     
     if [[ "$DEVICE_COUNT" -eq 0 ]]; then
         echo "[ERROR] No Android devices connected"
