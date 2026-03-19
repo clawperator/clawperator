@@ -18,6 +18,7 @@ This document currently covers:
 - Samsung gesture navigation
 - Google Play emulator gesture navigation
 - Google Play emulator Home gesture navigation
+- Google Play emulator intentional Recents navigation
 - successful Back navigation
 - cancelled Back gesture navigation
 - Home / launcher transitions as observed incidentally during those runs
@@ -41,6 +42,7 @@ This document does not yet claim behavior is universal across:
 - A successful gesture Back and a cancelled gesture Back are distinguishable in the current samples.
 - Home is also observable through accessibility, but not as `press_key`.
 - On the Google Play emulator, Home appears as launcher-owned `window_change` events rather than a `com.android.systemui` transition.
+- Intentional Recents on the emulator appears noisier than Home and produces repeated launcher `Recent apps` transitions.
 
 ## Core Conclusion So Far
 
@@ -271,6 +273,42 @@ Interpretation:
 - The launcher briefly exposed `Recent apps` before settling on `Home screen 1 of 1`.
 - This suggests that at least on this emulator surface, a Home gesture may transiently pass through launcher overview state on the way to Home.
 
+### 7. Google Play Emulator - Intentional Recents
+
+Session:
+
+- `emu-mainline-recents-20260319-101242`
+
+Manual flow:
+
+1. Start in Play Store.
+2. Perform slow gesture to open Recents.
+3. Wait several seconds in Recents.
+4. Click empty space.
+
+Observed event mix:
+
+- `window_change=5`
+- `click=0`
+- `press_key=0`
+
+Key sequence excerpt:
+
+```text
+0 window_change  com.google.android.apps.nexuslauncher  "Recent apps"
+1 window_change  com.google.android.apps.nexuslauncher  "Recent apps"
+2 window_change  com.google.android.apps.nexuslauncher  "Recent apps"
+3 window_change  com.google.android.apps.nexuslauncher  "Home screen 1 of 1"
+4 window_change  com.google.android.apps.nexuslauncher  "Recent apps"
+```
+
+Interpretation:
+
+- Intentional Recents did not collapse to a single `Recent apps` -> `Home screen` pair.
+- It produced repeated `Recent apps` transitions, which makes it materially noisier than the simple Home sample.
+- This supports a practical heuristic: a brief single-hop through `Recent apps` into `Home screen` can be treated as Home, while repeated or sustained `Recent apps` transitions should be treated as intentional Recents interaction.
+- Clicking empty space after pausing in Recents did not yield a clean final "Home only" signature; the launcher still emitted another `Recent apps` transition. This reinforces the need to treat Recents normalization as heuristic-driven rather than exact.
+
 ## Working Inference Rules
 
 These rules are provisional and based on the current Samsung samples only.
@@ -316,6 +354,7 @@ Important caveat:
 
 - this is a heuristic, not a guaranteed platform contract
 - it should be documented as a best-effort normalization rule
+- repeated or sustained `Recent apps` transitions should bias interpretation toward intentional Recents, not Home
 
 ## What We Can Say With Confidence
 
@@ -324,6 +363,7 @@ Important caveat:
 - On Samsung, Back semantics differ between three-button and gesture navigation.
 - Successful and cancelled gesture Back appear distinguishable in the current samples on both Samsung gesture navigation and the Google Play emulator.
 - On the emulator, Home appears distinguishable from Back because it stays in launcher-owned transitions and does not produce the `com.android.systemui` blip seen for gesture Back.
+- On the emulator, Home also appears distinguishable from intentional Recents because Home produced a short `Recent apps` -> `Home screen` sequence, while intentional Recents produced repeated `Recent apps` transitions.
 
 ## What We Cannot Yet Claim
 
@@ -333,6 +373,7 @@ Important caveat:
 - That replay should directly click observed System UI controls.
 - That a single normalized Back heuristic is ready for production.
 - That a single Home heuristic is ready for production without more intentional Recents testing.
+- That Recents exit behavior is stable enough yet to model as anything stronger than a documented heuristic.
 
 ## Implications For The Record Proof Of Concept
 
@@ -341,12 +382,13 @@ Important caveat:
 - Back may also be POC-usable if replay or post-processing can infer semantic Back from recorded accessibility evidence.
 - Gesture Back normalization now has evidence from two surfaces: Samsung gesture navigation and a Google Play emulator.
 - Home may also require explicit heuristics, including a documented shortcut that treats a very short-lived `Recent apps` state followed by `Home screen` as Home on surfaces that animate through overview.
+- Recents likely needs its own heuristic bucket rather than being treated as a special case of Home.
 - Any POC claim should currently be phrased as "Back is observable but not normalized."
 
 ## Recommended Near-Term Next Tests
 
-1. Test Recents intentionally, not incidentally, to separate Recents-specific transitions from Home/Back transitions.
-2. Repeat Home on the emulator to see whether the `Recent apps` -> `Home screen` sequence is stable.
+1. Repeat Home on the emulator to see whether the `Recent apps` -> `Home screen` sequence is stable.
+2. Repeat intentional Recents on the emulator to see whether repeated `Recent apps` transitions are stable.
 3. Repeat cancelled gesture Back at least once more on the same Samsung device to check pattern stability.
 4. Repeat successful gesture Back on a different screen and app.
 5. Repeat three-button Back with a different app and target screen.
@@ -393,6 +435,7 @@ Cons:
 - Does gesture sensitivity or edge region configuration affect the signal?
 - Do Pixel devices expose gesture Back differently from Samsung?
 - Should Home normalization explicitly collapse a short-lived launcher `Recent apps` state into Home on devices that animate through overview?
+- What is the cleanest heuristic for distinguishing intentional Recents from a Home gesture that briefly traverses overview?
 
 ## Current Bottom Line
 
@@ -408,6 +451,12 @@ Home also appears to be observable without `press_key`, and on the emulator it c
 
 - launcher `window_change` to `Recent apps`
 - then launcher `window_change` to `Home screen`
+
+Intentional Recents on the emulator currently looks different:
+
+- repeated launcher `window_change` events titled `Recent apps`
+- potentially interleaved with a later `Home screen` transition
+- possibly followed by another `Recent apps` transition depending on how the launcher settles
 
 That likely means some system-navigation actions will require explicit normalization hacks. That is acceptable for the proof of concept as long as the heuristics are clearly documented, tested against positive and negative samples, and treated as best-effort rather than as a guaranteed Android contract.
 
