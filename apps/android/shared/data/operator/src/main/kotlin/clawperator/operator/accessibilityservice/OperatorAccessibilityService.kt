@@ -89,13 +89,21 @@ class OperatorAccessibilityService :
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        recordingEventFilter.onAccessibilityEvent(this, event)
+        try {
+            recordingEventFilter.onAccessibilityEvent(this, event)
+        } catch (t: Throwable) {
+            Log.e(t, "[Operator-AccessibilityService] RecordingEventFilter failed for accessibility event")
+        }
         recordingDiagnosticHook?.onAccessibilityEvent(this, event)
         Log.d("[Operator-AccessibilityService] onAccessibilityEvent($event)")
     }
 
     override fun onKeyEvent(event: KeyEvent): Boolean {
-        recordingEventFilter.onKeyEvent(this, event)
+        try {
+            recordingEventFilter.onKeyEvent(this, event)
+        } catch (t: Throwable) {
+            Log.e(t, "[Operator-AccessibilityService] RecordingEventFilter failed for key event")
+        }
         recordingDiagnosticHook?.onKeyEvent(this, event)
         return super.onKeyEvent(event)
     }
