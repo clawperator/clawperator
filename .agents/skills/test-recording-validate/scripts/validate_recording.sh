@@ -157,8 +157,8 @@ STEPS_FILE="$RUN_DIR/${SESSION_ID}.steps.json"
 # Find the actual steps.json file (may have different naming)
 if [[ -f "${NDJSON_FILE%.ndjson}.steps.json" ]]; then
     STEPS_FILE="${NDJSON_FILE%.ndjson}.steps.json"
-elif [[ -f "$RUN_DIR/$(echo "$PARSE_STDOUT" | jq -r '.outputFile // empty' 2>/dev/null)" ]]; then
-    STEPS_FILE="$RUN_DIR/$(echo "$PARSE_STDOUT" | jq -r '.outputFile')"
+elif OUTPUT_REL_PATH="$(echo "$PARSE_STDOUT" | jq -r '.outputFile // empty' 2>/dev/null)" && [[ -n "$OUTPUT_REL_PATH" && -f "$RUN_DIR/$OUTPUT_REL_PATH" ]]; then
+    STEPS_FILE="$RUN_DIR/$OUTPUT_REL_PATH"
 fi
 
 if [[ ! -f "$STEPS_FILE" ]]; then
