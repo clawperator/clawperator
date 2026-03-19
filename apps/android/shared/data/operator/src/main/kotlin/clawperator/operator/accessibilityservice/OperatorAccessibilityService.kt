@@ -62,7 +62,12 @@ class OperatorAccessibilityService :
 
         Log.d("[Operator-AccessibilityService] Enhanced accessibility configured with flags: ${serviceInfo?.flags}")
         accessibilityServiceManager.setCurrentAccessibilityService(this, set = true)
-        recordingDiagnosticHook?.onServiceConnected()
+        runRecordingDiagnosticHook(
+            hook = recordingDiagnosticHook,
+            hookLabel = "for service connected",
+        ) {
+            onServiceConnected()
+        }
 
         if (routineLoopJob == null) {
             routineLoopJob =
@@ -79,7 +84,12 @@ class OperatorAccessibilityService :
 
     override fun onDestroy() {
         Log.d("[Operator-AccessibilityService] onDestroy()")
-        recordingDiagnosticHook?.onServiceDestroyed()
+        runRecordingDiagnosticHook(
+            hook = recordingDiagnosticHook,
+            hookLabel = "for service destroyed",
+        ) {
+            onServiceDestroyed()
+        }
         accessibilityServiceManager.setCurrentAccessibilityService(this, set = false)
 
         routineManager.cancelCurrent()
@@ -94,7 +104,12 @@ class OperatorAccessibilityService :
         } catch (t: Throwable) {
             Log.e(t, "[Operator-AccessibilityService] RecordingEventFilter failed for accessibility event")
         }
-        recordingDiagnosticHook?.onAccessibilityEvent(this, event)
+        runRecordingDiagnosticHook(
+            hook = recordingDiagnosticHook,
+            hookLabel = "for accessibility event",
+        ) {
+            onAccessibilityEvent(this@OperatorAccessibilityService, event)
+        }
         Log.d("[Operator-AccessibilityService] onAccessibilityEvent($event)")
     }
 
@@ -104,12 +119,34 @@ class OperatorAccessibilityService :
         } catch (t: Throwable) {
             Log.e(t, "[Operator-AccessibilityService] RecordingEventFilter failed for key event")
         }
-        recordingDiagnosticHook?.onKeyEvent(this, event)
+        runRecordingDiagnosticHook(
+            hook = recordingDiagnosticHook,
+            hookLabel = "for key event",
+        ) {
+            onKeyEvent(this@OperatorAccessibilityService, event)
+        }
         return super.onKeyEvent(event)
     }
 
     override fun onInterrupt() {
-        recordingDiagnosticHook?.onInterrupt()
+        runRecordingDiagnosticHook(
+            hook = recordingDiagnosticHook,
+            hookLabel = "for interrupt",
+        ) {
+            onInterrupt()
+        }
         Log.d("[Operator-AccessibilityService] onInterrupt()")
+    }
+}
+
+internal inline fun runRecordingDiagnosticHook(
+    hook: RecordingDiagnosticHook?,
+    hookLabel: String,
+    block: RecordingDiagnosticHook.() -> Unit,
+) {
+    try {
+        hook?.block()
+    } catch (t: Throwable) {
+        Log.e(t, "[Operator-AccessibilityService] RecordingDiagnosticHook failed $hookLabel")
     }
 }
