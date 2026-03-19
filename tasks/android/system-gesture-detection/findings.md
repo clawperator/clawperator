@@ -1,8 +1,10 @@
-# Android Hardware Buttons And Gestures
+# Android System Gesture Detection Findings
 
-This document captures runtime findings about how Android system navigation is exposed through accessibility during recording. It is a working engineering reference for future implementation of system-navigation detection and normalization, and it should remain useful even if temporary task files are deleted.
+This document captures runtime findings about how Android system navigation is exposed through accessibility during recording. It is the findings log for the dedicated system-gesture-detection task, and it should be read together with [plan.md](~/src/clawperator/tasks/android/system-gesture-detection/plan.md) when implementation begins.
 
 The main question is not just "did Back happen?", but "what accessibility evidence do we get when Back or Home happens under different navigation modes, and is that evidence strong enough to reconstruct replayable intent?"
+
+This task is intentionally deferred until recording is complete enough that its output can serve as stable fixture input. The purpose of this document is to preserve the findings and their caveats so recording work can continue without losing the gesture-detection context.
 
 ## Current Scope
 
@@ -70,6 +72,20 @@ Behavior differs across OEMs, launchers, Android versions, and navigation modes.
 - On the Google Play emulator, Home appears as launcher-owned `window_change` events rather than a `com.android.systemui` transition.
 - Intentional Recents on the emulator appears noisier than Home and produces repeated launcher `Recent apps` transitions.
 - Intentional Recents with task switching on the emulator is even more distinct: repeated `Recent apps`, launcher `scroll`, launcher `click`, then `window_change` into the chosen app.
+
+## Limits Of Current Evidence
+
+- Every named scenario currently has a sample size of one run.
+- The successful-vs-cancelled gesture Back discriminator has evidence from two surfaces, but only one sample per surface.
+- The Home-vs-Recents discriminator is currently grounded only in emulator samples.
+- Samsung Home has not been tested yet.
+- Samsung three-button Home has not been tested yet.
+- Samsung three-button Recents has not been tested yet.
+- Pixel or AOSP physical-device behavior is still untested.
+- The current rules use temporal phrases like "immediately" and "quickly" without a measured time window yet.
+- The current findings preserve event sequences, but they do not yet extract timestamp deltas needed to ground timing thresholds.
+- String-based clues such as `"Back"` may be localized and should not be treated as universal.
+- Predictive Back may affect the observed event stream and is not isolated yet.
 
 ## Core Conclusion So Far
 
@@ -396,6 +412,7 @@ Completion evidence:
 Potential semantic Back-start signal:
 
 - `window_change` to `com.android.systemui`
+- currently observed with class name `android.view.View` in both successful and cancelled gesture samples
 
 Potential successful Back completion:
 
@@ -423,6 +440,7 @@ Important caveat:
 - this is a heuristic, not a guaranteed platform contract
 - it should be documented as a best-effort normalization rule
 - repeated or sustained `Recent apps` transitions should bias interpretation toward intentional Recents, not Home
+- no millisecond threshold has been derived yet for "quickly"
 
 Additional Recents signal:
 
@@ -446,11 +464,17 @@ Then infer:
 - semantic action: `back`
 - completion: `completed`
 
+Current limitations:
+
+- the observed `"Back"` label may be localized
+- the current evidence base is one Samsung sample
+
 ### Rule 2 - Gesture Back Completed
 
 If all of the following occur:
 
 - transient `window_change` to `com.android.systemui`
+- class name currently observed as `android.view.View`
 - immediately preceded by an app screen that could navigate back
 - immediately followed by app `window_change` to a prior screen
 
@@ -465,6 +489,7 @@ Then infer:
 If all of the following occur:
 
 - transient `window_change` to `com.android.systemui`
+- class name currently observed as `android.view.View`
 - preceded by an app screen that could navigate back
 - no follow-up app transition to the prior screen
 
@@ -489,6 +514,10 @@ Then infer:
 - semantic action: `home`
 - completion: `completed`
 
+Current limitation:
+
+- "very shortly" is not grounded to a measured time window yet
+
 ### Rule 5 - Intentional Recents
 
 If any of the following occur while launcher overview is active:
@@ -511,7 +540,7 @@ Then infer:
 - On the emulator, Home appears distinguishable from Back because it stays in launcher-owned transitions and does not produce the `com.android.systemui` blip seen for gesture Back.
 - On the emulator, Home also appears distinguishable from intentional Recents because Home produced a short `Recent apps` -> `Home screen` sequence, while intentional Recents produced repeated `Recent apps` transitions.
 - On the emulator, Recents task switching is more distinct again because it adds launcher `scroll` and launcher `click` before transitioning into the chosen app.
-- The current samples are strong enough to support a first-pass heuristic implementation for Back, Home, and Recents normalization.
+- The current samples are strong enough to start a fixture-driven test suite for Back, Home, and Recents normalization.
 
 ## What We Cannot Yet Claim
 
@@ -524,6 +553,9 @@ Then infer:
 - That Recents exit behavior is stable enough yet to model as anything stronger than a documented heuristic.
 - That launcher `scroll` in Recents is universal across launcher implementations rather than specific to the tested emulator surface.
 - That these heuristics are production-ready across OEMs.
+- That the current rules have enough repeated samples to lock thresholds.
+- That the current rules have a justified millisecond window for "immediate" or "quickly."
+- That Samsung Home or Samsung three-button Recents will resemble the emulator patterns.
 
 ## Implications For The Record Proof Of Concept
 
@@ -544,7 +576,11 @@ Then infer:
 3. Repeat cancelled gesture Back at least once more on the same Samsung device to check pattern stability.
 4. Repeat successful gesture Back on a different screen and app.
 5. Repeat three-button Back with a different app and target screen.
-6. Test on a physical Pixel or AOSP-style gesture-navigation device if available.
+6. Test Samsung gesture Home.
+7. Test Samsung three-button Home.
+8. Test Samsung three-button Recents.
+9. Test on a physical Pixel or AOSP-style gesture-navigation device if available.
+10. Extract timestamp deltas from successful and cancelled samples to ground any time-window-based rule.
 
 ## Candidate Follow-Up Design Directions
 
@@ -592,7 +628,7 @@ Cons:
 
 ## Implementation Readiness
 
-An implementation agent should be able to build a first-pass Back / Home / Recents normalization layer from this document alone.
+An implementation agent should be able to start a first-pass Back / Home / Recents normalization layer from this document and [plan.md](~/src/clawperator/tasks/android/system-gesture-detection/plan.md) alone.
 
 What this document already provides:
 
@@ -602,11 +638,12 @@ What this document already provides:
 - candidate heuristic rules
 - explicit caveats about where the rules may fail
 
-What an implementation agent would still need beyond this document:
+What an implementation agent would still need beyond these task documents:
 
 - access to the codebase where normalization should live
 - a product decision about whether normalization belongs at capture time, parse time, or replay time
 - more device coverage before calling the heuristics production-ready
+- explicit confirmation that parser responsibilities may expand if normalization lives at parse time
 
 What the agent should not need:
 
@@ -639,3 +676,5 @@ Intentional Recents on the emulator currently looks different:
 That likely means some system-navigation actions will require explicit normalization hacks. That is acceptable for the proof of concept as long as the heuristics are clearly documented, tested against positive and negative samples, and treated as best-effort rather than as a guaranteed Android contract.
 
 The dedicated `press_key` path remains unresolved, but the system-navigation evidence recorded so far is strong enough to justify further testing and likely supports a proof-of-concept path based on inference and normalization.
+
+That future normalization work should remain a separate task while recording capture and parsing are completed first.
