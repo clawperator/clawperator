@@ -62,12 +62,16 @@ Typical pattern:
 4. Re-check the device state with live snapshots while validating the flow.
 5. Author the skill from the validated, normalized sequence.
 
-## What Phase 3 taught us
+## Skill authoring lessons
+
+These lessons came out of the first recording-derived skills we built.
 
 - Treat the recording as intent evidence, not as a literal replay script.
 - Launcher taps are often better represented as `open_app`.
 - `close_app` is a deliberate reset step for stateful apps, not an automatic
   rewrite of every recording.
+- Search-entry screens often need a real IME submit key event instead of a
+  synthetic `enter_text` submit flag.
 - A good replay skill should finish on terminal screen detection, not on fixed
   post-action sleeps.
 - If the result screen is slow or transitional, poll live snapshots until the
