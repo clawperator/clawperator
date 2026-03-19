@@ -24,7 +24,8 @@ docs no longer imply that the task folder is still the source of truth.
 
 ## Working rules
 
-- Phase 3 ships no new code. Everything it needs is already on `main`.
+- Phase 3 aims to ship no new code. Everything it needs should already be on `main`. 
+  The only exception to this is if bugs are found during this phase.
 - Use the release APK (`com.clawperator.operator`) and the globally installed
   `clawperator` binary. There is no branch-local build to test against.
 - Use the connected physical Android device when one is available. The human
@@ -56,7 +57,7 @@ Run a full end-to-end recording with the human performing the Android steps.
 
 Minimum target flow:
 - start recording
-- agent instructs the human to open Settings and tap Display
+- agent instructs the human to open Settings and tap through to check if there is a software update.
 - stop recording
 - pull the NDJSON
 - parse the step log
@@ -80,7 +81,7 @@ Repeat the same human-guided workflow for a different app or flow so the phase
 cannot be dismissed as a one-off.
 
 Suggested second flow:
-- Play Store search or another stable, observable app path
+- Open the YouTube app, search for "first youtube video zoo", play the video, pause the video
 - the recording should again be human-performed, not adb-tapped
 - the resulting skill should be stored locally and run successfully
 
