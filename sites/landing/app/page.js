@@ -417,11 +417,11 @@ export default function Home() {
 
           <div className="hero-image-panel">
             <img
-              src="https://static.clawperator.com/img/hero/clawperator-hero.webp"
+              src="https://static.clawperator.com/img/hero/clawperator_hero-2x2.webp"
               alt="Diagram showing how OpenClaw and Clawperator let AI agents control real Android apps and return results to chat. This image was made with human claws."
               title="this image was made with human claws"
-              width="780"
-              height="286"
+              width="2600"
+              height="2600"
               className="hero-diagram"
             />
           </div>
