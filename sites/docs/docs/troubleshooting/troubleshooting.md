@@ -274,10 +274,10 @@ This will report any version mismatch between the CLI and the installed APK.
 
 **Temporary workaround (sibling repo checkout):**
 
-If you have a local checkout of the clawperator repo at the sibling path, skills will automatically prefer the local build over the global binary. You can also set `CLAW_BIN` explicitly:
+If you have a local checkout of the clawperator repo at the sibling path, skills will automatically prefer the local build over the global binary. You can also set `CLAWPERATOR_BIN` explicitly:
 
 ```bash
-export CLAW_BIN=/path/to/clawperator/apps/node/dist/cli/index.js
+export CLAWPERATOR_BIN=/path/to/clawperator/apps/node/dist/cli/index.js
 ```
 
 Rebuild the local binary first if needed:
@@ -286,6 +286,9 @@ Rebuild the local binary first if needed:
 npm --prefix /path/to/clawperator/apps/node install
 npm --prefix /path/to/clawperator/apps/node run build
 ```
+
+The skills runtime now uses `CLAWPERATOR_BIN` only. If you set a local branch
+build, keep `CLAWPERATOR_BIN` pointed at the branch-local CLI path.
 
 ---
 
@@ -315,3 +318,114 @@ If the versions do not match, upgrade the CLI and install a compatible [Clawpera
 | Permissions (accessibility) | Run grant script or Settings → Accessibility | PermissionsNotGranted → run script     |
 
 When all three are satisfied, the app shows **Ready** and a **green** background. You can then use the Node API or agent workflows that depend on the operator.
+
+---
+
+## Recording capture issues
+
+### Recording has no click events
+
+**Symptom:** After pulling and parsing a recording, the step log contains `open_app` and `window_change` steps but no `click` steps, even though interactions clearly occurred.
+
+**Most common cause:** The recording captured Clawperator-driven interactions rather than manual human taps. Android's accessibility framework emits `TYPE_VIEW_CLICKED` events for human finger taps but does NOT emit them for `adb shell input tap` commands (which Clawperator uses internally for click actions).
+
+**This means:**
+- Human taps (manual screen touches) → `click` events captured ✓
+- Clawperator click actions → No `click` events captured ✗
+
+**How to capture usable recordings:**
+
+1. **Start recording** on the device:
+   ```bash
+   clawperator recording start --device-id <serial>
+   ```
+
+2. **Manually interact** with the device using your finger (not Clawperator commands)
+
+3. **Stop recording**:
+   ```bash
+   clawperator recording stop --device-id <serial>
+   ```
+
+4. **Pull and parse**:
+   ```bash
+   clawperator recording pull --device-id <serial> --session-id <id> --out ./recordings/
+   clawperator recording parse --input ./recordings/<file>.ndjson
+   ```
+
+**Expected behavior:** Manual interactions produce `click` steps in the parsed output; Clawperator-driven flows do not. This is a known Android limitation, not a bug.
+
+---
+
+## Skills execution issues
+
+### Skill returns RESULT_ENVELOPE_TIMEOUT
+
+**Symptom:** Running `clawperator skills run <skill_id>` fails with timeout error even though the device is connected and responsive.
+
+**Most common cause:** The global `clawperator` binary (from npm) does not match the installed APK package or version.
+
+**Check compatibility:**
+
+```bash
+# Check if using dev APK
+adb shell pm list packages | grep clawperator
+# Output: com.clawperator.operator.dev (dev) or com.clawperator.operator (release)
+
+# Check CLI/APK version compatibility
+clawperator version --check-compat --receiver-package com.clawperator.operator.dev
+```
+
+**How to fix:**
+
+1. **For development/testing with local build and dev APK:**
+   ```bash
+   # Set CLAWPERATOR_BIN to use local branch build
+   export CLAWPERATOR_BIN=/path/to/clawperator/apps/node/dist/cli/index.js
+   
+   # Set CLAWPERATOR_RECEIVER_PACKAGE to target the dev APK
+   export CLAWPERATOR_RECEIVER_PACKAGE=com.clawperator.operator.dev
+   
+   # Rebuild if needed
+   npm --prefix /path/to/clawperator/apps/node install
+   npm --prefix /path/to/clawperator/apps/node run build
+   
+   # Now skills will use the local build and target the dev APK
+   clawperator skills run <skill_id>
+   ```
+
+   Or use the `--receiver-package` flag for a single run:
+   ```bash
+   clawperator skills run <skill_id> --receiver-package com.clawperator.operator.dev
+   ```
+
+2. **For production use:** Ensure the global npm package matches your APK:
+   ```bash
+   npm install -g clawperator
+   clawperator version --check-compat --receiver-package com.clawperator.operator
+   ```
+
+3. **For skills specifically:** Skills receive `CLAWPERATOR_BIN` and `CLAWPERATOR_RECEIVER_PACKAGE` environment variables automatically from the CLI. When testing skills with a dev APK, set these environment variables or use the `--receiver-package` flag.
+
+### Skill validation passes but execution fails
+
+**Symptom:** `clawperator skills validate <skill_id>` succeeds but `clawperator skills run <skill_id>` fails.
+
+**Check:**
+1. Device permissions: `clawperator doctor`
+2. APK/CLI compatibility: `clawperator version --check-compat`
+3. Device selection (if multiple devices): `--device-id <serial>`
+
+**Debug the skill directly:**
+
+Instead of `skills run`, test the skill's execution payload directly:
+
+```bash
+# 1. Get the skill's compiled execution
+clawperator skills compile-artifact <skill_id> --artifact main --output json
+
+# 2. Save to file and run manually
+clawperator execute --execution ./skill-execution.json --device-id <serial>
+```
+
+This bypasses the skills wrapper and helps identify whether the issue is the skill logic or the skills runtime.

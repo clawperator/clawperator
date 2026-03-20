@@ -287,7 +287,8 @@ npm --prefix /path/to/clawperator/apps/node install
 npm --prefix /path/to/clawperator/apps/node run build
 ```
 
-Note: The legacy `CLAW_BIN` variable is still supported but deprecated. Use `CLAWPERATOR_BIN` instead.
+The skills runtime now uses `CLAWPERATOR_BIN` only. If you set a local branch
+build, keep `CLAWPERATOR_BIN` pointed at the branch-local CLI path.
 
 ---
 
