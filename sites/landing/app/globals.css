@@ -522,7 +522,7 @@ body {
   font-weight: 800;
   letter-spacing: -0.02em;
   text-align: center;
-  color: var(--text);
+  color: var(--accent);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -549,7 +549,7 @@ body {
 
 .hero-image-caption {
   margin: 0.8rem 0 0;
-  font-size: 1.3rem;
+  font-size: 1.55rem;
   line-height: 1.35;
   font-weight: 700;
   text-align: center;
