@@ -110,5 +110,5 @@ Skills are packaged app-specific automation recipes maintained in a sibling repo
 
 - **Deterministic execution:** one broadcast in, one `[Clawperator-Result]` envelope out
 - **Single-flight lock:** only one execution per device at a time
-- **No autonomous planning in the runtime:** Clawperator executes a command and reports what happened. It does not retry on failure, adapt to unexpected UI, or make decisions between steps in a multi-step execution. The agent decides what to do next at every step. This boundary is intentional: Android apps are dynamic, and any adaptive logic in the runtime would act on less context than the agent has.
+- **No autonomous planning in the runtime:** Clawperator executes commands; reasoning stays in the agent
 - **No direct adb required for agents:** all routine automation goes through the Node CLI/API

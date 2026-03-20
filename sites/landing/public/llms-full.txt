@@ -1190,7 +1190,7 @@ Skills are packaged app-specific automation recipes maintained in a sibling repo
 
 - **Deterministic execution:** one broadcast in, one `[Clawperator-Result]` envelope out
 - **Single-flight lock:** only one execution per device at a time
-- **No autonomous planning in the runtime:** Clawperator executes a command and reports what happened. It does not retry on failure, adapt to unexpected UI, or make decisions between steps in a multi-step execution. The agent decides what to do next at every step. This boundary is intentional: Android apps are dynamic, and any adaptive logic in the runtime would act on less context than the agent has.
+- **No autonomous planning in the runtime:** Clawperator executes commands; reasoning stays in the agent
 - **No direct adb required for agents:** all routine automation goes through the Node CLI/API
 
 ---
@@ -3557,12 +3557,12 @@ clawperator inspect ui [--device-id <id>] [--receiver-package <package>] [--time
 
 ---
 
-### `recording start`
+### `record start`
 
-Start an on-device recording session through the Operator app. `record` is a supported alias.
+Start an on-device recording session through the Operator app.
 
 ```
-clawperator recording start [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]
+clawperator record start [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]
 ```
 
 Use `--session-id` to choose the recording name. If omitted, the Operator app
@@ -3573,12 +3573,12 @@ Global `--output` / `--format` options still apply.
 
 ---
 
-### `recording stop`
+### `record stop`
 
-Stop the active recording session and finalize the on-device NDJSON file. `record` is a supported alias.
+Stop the active recording session and finalize the on-device NDJSON file.
 
 ```
-clawperator recording stop [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]
+clawperator record stop [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]
 ```
 
 Use the same `--session-id` you started with if you want to target a specific
@@ -3589,12 +3589,12 @@ Global `--output` / `--format` options still apply.
 
 ---
 
-### `recording pull`
+### `record pull`
 
-Pull a recording from device storage to the host. `record` is a supported alias.
+Pull a recording from device storage to the host.
 
 ```
-clawperator recording pull [--session-id <id>] [--out <dir>] [--device-id <serial>]
+clawperator record pull [--session-id <id>] [--out <dir>] [--device-id <serial>]
 ```
 
 If `--session-id` is omitted, Clawperator reads the device-side `latest`
@@ -3605,12 +3605,12 @@ Global `--output` / `--format` options still apply.
 
 ---
 
-### `recording parse`
+### `record parse`
 
-Parse a raw NDJSON recording into a step log JSON file. `record` is a supported alias.
+Parse a raw NDJSON recording into a step log JSON file.
 
 ```
-clawperator recording parse --input <file> [--out <file>]
+clawperator record parse --input <file> [--out <file>]
 ```
 
 If `--out` is omitted, Clawperator writes `<input>.steps.json` when the input
@@ -5683,66 +5683,13 @@ contract and the target environment.
 
 ## Recommended agent loop
 
-For any flow involving state-dependent decisions:
+For unknown apps or UI drift:
 
 1. Capture `snapshot_ui`.
-2. Decide the next action (or a short, atomic sequence - see below).
+2. Decide one action or one short action sequence.
 3. Execute it.
-4. Read the envelope and step results.
-5. Snapshot again before making the next decision.
-
-Clawperator does not observe state or make decisions between actions in a
-multi-step execution. It dispatches the action list sequentially and returns one
-result envelope. If the agent needs to inspect state, branch on what it sees, or
-handle unexpected UI between any two steps, those steps must be separate
-executions with the agent in the loop between them.
-
-## Execution granularity
-
-Multi-action executions are the preferred form for stable, pre-validated atomic flows and for mature skills - they reduce round trips and are appropriate whenever the agent does not need to observe state between steps. The guidance below is about when to split, not a recommendation to always go single-step.
-
-Group multiple actions in one execution only when they are **atomic** - meaning
-the agent does not need to inspect device state or make a decision between them.
-
-**Appropriate as a single execution:**
-
-- `close_app` + `open_app` + `sleep` - deterministic state reset; no decision
-  needed between steps
-- `click` + `wait_for_node` - click a button and wait for a specific element;
-  the target is specified in advance
-- `enter_text` + `click` - type in a field and submit; both succeed or fail as a
-  unit
-
-**Should be separate executions with agent observation between them:**
-
-- Any sequence where the agent needs to read the screen after one step to decide
-  the next
-- Navigation flows where the app may show an interstitial, dialog, or update
-  prompt that was not present when the flow was designed
-- Flows where the correct next step depends on current app state
-
-The rule of thumb: if you would naturally want to call `observe snapshot`
-between two steps, they belong in separate executions.
-
-## `sleep` vs `wait_for_node` vs separate snapshot
-
-Use the right primitive for each situation:
-
-| Situation | Correct tool |
-| :--- | :--- |
-| App needs a moment to settle after launch or a heavy transition | `sleep` with a conservative fixed value |
-| Waiting for a specific element to appear before proceeding | `wait_for_node` with appropriate retry config |
-| Checking whether the expected screen is showing | Separate `snapshot_ui` execution - agent inspects and decides |
-| Deciding what to do based on what the screen currently shows | Separate `snapshot_ui` execution - agent inspects and acts |
-
-`sleep` is for predictable, hardware-level timing. `wait_for_node` is for UI
-element readiness within a known, stable flow. A separate `snapshot_ui` followed
-by agent reasoning is for anything involving uncertainty, branching, or dynamic
-app behavior.
-
-Avoid using `sleep` as a substitute for observation. A long sleep that happens
-to let the UI settle is not the same as the agent verifying that the expected
-state was reached.
+4. Re-read the envelope and step results.
+5. Snapshot again before making the next major decision.
 
 For action-specific params, result shapes, and examples, use
 [Action Types Reference](action-types.md). For the full agent API contract,
@@ -7732,6 +7679,9 @@ proof-of-concept artifacts under `~/.clawperator/skills/skills/...` rather
 than as canonical entries in the shared skills repo. This page explains the
 recording-side contract and the durable lessons from the experiment; the
 skills-repo docs cover the general authoring workflow and prompt templates.
+When regenerating the docs site locally, keep the sibling skills repo checked
+out at a matching commit so the linked authoring pages and this recording note
+stay in sync.
 
 In practice, that means the author must be able to answer two questions for
 every step:
@@ -8947,19 +8897,15 @@ Selection behavior:
 
 ## Agentic Best-Effort Mode
 
-> **Status: alpha/unstable.** `execute best-effort` may break without a major version bump until promoted to stable. See Stability section.
+Best-effort mode is a first-class execution path for unknown or drifting UIs.
 
-Best-effort mode is an execution path for unknown or drifting UIs where the agent needs to make progress without a pre-authored action plan. It does not change the ownership model: Clawperator still executes individual actions and reports results; the agent still owns strategy.
+Behavior goals:
 
-The steps below describe what an **agent** should do using Clawperator's primitives - not what Clawperator does autonomously:
-
-1. Agent calls `snapshot_ui` to observe current UI.
-2. Agent identifies likely anchors (toolbar/tab/menu/button/search patterns) from the snapshot.
-3. Agent calls a constrained navigation or click action.
-4. Agent calls `snapshot_ui` again to verify progress.
-5. Agent retries within its own safety bounds if progress stalled.
-
-Clawperator's role in each step is unchanged: execute the requested action, return the result. It does not identify anchors, decide whether progress was made, or choose the next action. Those decisions belong to the agent.
+1. Observe current UI (`snapshot_ui`).
+2. Identify likely anchors (toolbar/tab/menu/button/search patterns).
+3. Attempt constrained navigation/action.
+4. Re-observe and verify progress.
+5. Retry within safety bounds.
 
 Best-effort does not imply unsafe freeform behavior; all attempts remain within validated runtime action limits and capability policy.
 
@@ -8967,7 +8913,7 @@ Important ownership split:
 
 - Clawperator provides primitives and structured observations.
 - The agent owns exploration policy/strategy.
-- Clawperator must not silently invent fallback control flow.
+- Clawperator should not silently invent fallback control flow.
 
 Cardinality drift handling:
 

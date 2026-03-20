@@ -250,12 +250,12 @@ clawperator inspect ui [--device-id <id>] [--receiver-package <package>] [--time
 
 ---
 
-### `recording start`
+### `record start`
 
-Start an on-device recording session through the Operator app. `record` is a supported alias.
+Start an on-device recording session through the Operator app.
 
 ```
-clawperator recording start [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]
+clawperator record start [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]
 ```
 
 Use `--session-id` to choose the recording name. If omitted, the Operator app
@@ -266,12 +266,12 @@ Global `--output` / `--format` options still apply.
 
 ---
 
-### `recording stop`
+### `record stop`
 
-Stop the active recording session and finalize the on-device NDJSON file. `record` is a supported alias.
+Stop the active recording session and finalize the on-device NDJSON file.
 
 ```
-clawperator recording stop [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]
+clawperator record stop [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]
 ```
 
 Use the same `--session-id` you started with if you want to target a specific
@@ -282,12 +282,12 @@ Global `--output` / `--format` options still apply.
 
 ---
 
-### `recording pull`
+### `record pull`
 
-Pull a recording from device storage to the host. `record` is a supported alias.
+Pull a recording from device storage to the host.
 
 ```
-clawperator recording pull [--session-id <id>] [--out <dir>] [--device-id <serial>]
+clawperator record pull [--session-id <id>] [--out <dir>] [--device-id <serial>]
 ```
 
 If `--session-id` is omitted, Clawperator reads the device-side `latest`
@@ -298,12 +298,12 @@ Global `--output` / `--format` options still apply.
 
 ---
 
-### `recording parse`
+### `record parse`
 
-Parse a raw NDJSON recording into a step log JSON file. `record` is a supported alias.
+Parse a raw NDJSON recording into a step log JSON file.
 
 ```
-clawperator recording parse --input <file> [--out <file>]
+clawperator record parse --input <file> [--out <file>]
 ```
 
 If `--out` is omitted, Clawperator writes `<input>.steps.json` when the input

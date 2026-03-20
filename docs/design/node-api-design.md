@@ -232,19 +232,15 @@ Selection behavior:
 
 ## Agentic Best-Effort Mode
 
-> **Status: alpha/unstable.** `execute best-effort` may break without a major version bump until promoted to stable. See Stability section.
+Best-effort mode is a first-class execution path for unknown or drifting UIs.
 
-Best-effort mode is an execution path for unknown or drifting UIs where the agent needs to make progress without a pre-authored action plan. It does not change the ownership model: Clawperator still executes individual actions and reports results; the agent still owns strategy.
+Behavior goals:
 
-The steps below describe what an **agent** should do using Clawperator's primitives - not what Clawperator does autonomously:
-
-1. Agent calls `snapshot_ui` to observe current UI.
-2. Agent identifies likely anchors (toolbar/tab/menu/button/search patterns) from the snapshot.
-3. Agent calls a constrained navigation or click action.
-4. Agent calls `snapshot_ui` again to verify progress.
-5. Agent retries within its own safety bounds if progress stalled.
-
-Clawperator's role in each step is unchanged: execute the requested action, return the result. It does not identify anchors, decide whether progress was made, or choose the next action. Those decisions belong to the agent.
+1. Observe current UI (`snapshot_ui`).
+2. Identify likely anchors (toolbar/tab/menu/button/search patterns).
+3. Attempt constrained navigation/action.
+4. Re-observe and verify progress.
+5. Retry within safety bounds.
 
 Best-effort does not imply unsafe freeform behavior; all attempts remain within validated runtime action limits and capability policy.
 
@@ -252,7 +248,7 @@ Important ownership split:
 
 - Clawperator provides primitives and structured observations.
 - The agent owns exploration policy/strategy.
-- Clawperator must not silently invent fallback control flow.
+- Clawperator should not silently invent fallback control flow.
 
 Cardinality drift handling:
 
