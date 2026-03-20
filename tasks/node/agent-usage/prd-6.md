@@ -212,144 +212,68 @@ A silent no-op is worse than the current visible error. The stub must emit a std
 
 ### Fixtures
 
-**`renderCheck` test doubles:** The function takes a `DoctorCheckResult`. Construct
-minimal objects inline — no file needed.
-
-```typescript
-const checkWithDocsUrl: DoctorCheckResult = {
-  id: "readiness.apk.presence", status: "fail",
-  code: "RECEIVER_NOT_INSTALLED", message: "APK not installed",
-  fix: {
-    title: "Install Operator APK", platform: "any",
-    steps: [{ kind: "shell", value: "clawperator operator setup ..." }],
-    docsUrl: "https://docs.clawperator.com/getting-started/first-time-setup"
-  }
-};
-
-const checkWithoutDocsUrl: DoctorCheckResult = {
-  id: "readiness.apk.presence", status: "fail",
-  code: "RECEIVER_NOT_INSTALLED", message: "APK not installed",
-  fix: {
-    title: "Install Operator APK", platform: "any",
-    steps: [{ kind: "shell", value: "clawperator operator setup ..." }]
-    // no docsUrl field
-  }
-};
-```
+Inline `DoctorCheckResult` objects — construct in test body, no files needed:
+- One check with `fix.docsUrl` set to a full `https://` URL
+- One check without `fix.docsUrl` (the field is absent, not set to `undefined`)
 
 ### TDD Sequence
 
-The TypeScript type change drives everything. Do the type change first; the compiler
-will flag any call site that uses `fix` without `docsUrl` as a required field — confirming
-it's optional.
-
-**Step 1 — type change in `contracts/doctor.ts`:**
-Add `docsUrl?: string`. Run `npm run build`. Compilation must succeed without touching
-any other file (confirms the field is optional, not required).
-
-**Step 2 — before modifying `renderCheck`:**
-Write T1 (no `Docs:` line when absent). It passes against the unchanged `renderCheck`.
-This is the regression pin.
-
-**Step 3 — modify `renderCheck`:**
-Write T2 (includes `Docs:` line when present). It fails. Add the conditional. Both T1
-and T2 must pass.
-
-**Step 4 — populate `docsUrl` in `readinessChecks.ts`:**
-Write T3 (JSON output includes `fix.docsUrl`). It fails. Add the field. T3 must pass.
+1. Write T1 (no phantom `Docs:` line). Passes unchanged — this is the regression pin.
+2. Add `docsUrl?: string` to `contracts/doctor.ts`. Run `npm run build`. Must compile
+   with no new errors (confirms the field is optional, not required).
+3. Modify `renderCheck`. Write T2 (includes `Docs:` line). Fails; add conditional;
+   passes. T1 must still pass.
+4. Populate `docsUrl` in `readinessChecks.ts`. Write T3 (JSON output includes the field).
+   Fails; populate; passes.
 
 ### Unit Tests
 
 **T1 — `renderCheck` without `docsUrl` emits no `Docs:` line (regression anchor)**
-- Input: `checkWithoutDocsUrl` (no `docsUrl` field)
+- Input: check with `fix` containing `title` and `steps` but no `docsUrl`
 - Expected: output string does not contain the substring `"Docs:"`
-- Failure mode protected: `docsUrl` field added as a phantom line to every check output;
-  all existing check output gets a `"Docs: undefined"` line
-- When: write before modifying `renderCheck`; must pass before and after the change
+- Protects: field added as phantom line to all check output; every check gets
+  `"Docs: undefined"`; must pass before and after the change
 
 **T2 — `renderCheck` with `docsUrl` includes the `Docs:` line**
-- Input: `checkWithDocsUrl`
-- Expected: output string contains `"Docs: https://docs.clawperator.com/getting-started/first-time-setup"`
-- Failure mode protected: the field exists in the type and the check data but never
-  reaches the rendered output; doctor failure output silently omits the link
+- Input: check with `fix.docsUrl = "https://docs.clawperator.com/..."`
+- Expected: output contains `"Docs: https://docs.clawperator.com/..."`
+- Protects: field in type and data but never rendered; doctor failure output silently
+  omits the link
 
 **T3 — doctor JSON output for `RECEIVER_NOT_INSTALLED` includes `fix.docsUrl`**
-- Method: call the doctor check function that produces the `RECEIVER_NOT_INSTALLED`
-  result and inspect the returned object, or parse the CLI JSON output
-- Expected: `check.fix.docsUrl` is a non-empty string beginning with `"https://"`
-- Failure mode protected: `docsUrl` in the type and in `renderCheck` but never populated
-  in the check definition; JSON output correctly reflects what's in the data, so the
-  data itself must be populated
+- Method: call the readiness check function and inspect the returned object; or parse
+  `clawperator doctor --output json`
+- Expected: `check.fix.docsUrl` starts with `"https://"`
+- Protects: `docsUrl` in contract and renderer but never populated in the check
+  definition; JSON reflects what is in the data
 
-### CLI / Contract Regression
-
-**T4 — doctor JSON output remains parseable after adding `docsUrl`**
-- Command: `clawperator doctor --output json` (device in any state)
-- Expected: `JSON.parse(stdout)` succeeds; `report.checks` is an array
-- Failure mode protected: serialization broken by a new field (e.g., a circular
-  reference or an object where a string was expected)
-
-**T5 — TypeScript compilation passes without `docsUrl` in `fix`**
-- Build step: `npm run build` on a codebase that has checks without `docsUrl`
+**T4 — TypeScript compiles without errors when `docsUrl` is absent**
+- Method: `npm run build` on a codebase that has checks without `docsUrl`
 - Expected: zero type errors
-- Failure mode protected: field accidentally made required; every existing check that
-  does not set `docsUrl` becomes a compile error
+- Protects: field accidentally made required; every existing check without `docsUrl`
+  becomes a compile error
 
-### Docs Verification
+### Docs Review (Manual)
 
-PRD-6 is primarily docs work. The tests above cover the one runtime code change
-(`renderCheck` + type). The rest is manual review.
-
-**D1 — docs consistency check (manual)**
-- Open `docs/index.md`, `docs/agent-quickstart.md`, `docs/openclaw-first-run.md`,
-  `docs/first-time-setup.md` side by side
-- Verify: none describe APK absence as advisory after PR-1 lands; all name the install
-  command; no guide contradicts another on the doctor behavior
-- Verify: `docs/index.md` agent section leads with `llms.txt` and `agent-quickstart.md`
-
-**D2 — `llms.txt` alignment check (manual)**
-- Open both `sites/landing/public/llms.txt` and `sites/docs/static/llms.txt`
-- Verify each of the following shipped behaviors is described accurately:
-  - APK absence is a hard failure (not advisory)
-  - `skills validate --dry-run` exists and what it does
-  - Logs at `~/.clawperator/logs/`
-  - `enter_text clear: true` is a no-op
+- `docs/index.md`: agent section leads with `llms.txt` then `agent-quickstart.md`
+- `agent-quickstart.md`, `openclaw-first-run.md`, `first-time-setup.md`: all describe
+  APK absence as a blocking failure with the install command; none contradict each other
+- Both `llms.txt` files: accurately describe `skills validate --dry-run`, persistent
+  logs path, `enter_text clear: true` limitation
 
 ### `operator_event.sh` Verification
 
-**T6 — stub exits 0 and emits stderr notice**
-- Command: `./scripts/operator_event.sh` (with no arguments)
-- Expected: exit code 0; stderr contains the word "stub" or "not implemented"
-- Command: `./scripts/operator_event.sh foo bar baz` (with arbitrary arguments)
-- Expected: same — accepts any arguments, still exits 0
-- Failure mode protected: silent exit-0 stub with no stderr; OpenClaw log shows no
-  error but the intent is lost
-
-**T7 — OpenClaw gateway log clean**
-- After `operator_event.sh` is in place, trigger a gateway run
-- Expected: no `"no such file or directory: ./scripts/operator_event.sh"` in the gateway
-  error log
-- Failure mode protected: script file not executable, wrong path, or placed in wrong
-  directory
-
-### What to Skip
-
-- Do not write automated URL reachability tests in CI (curl to `docsUrl` in a test).
-  Network-dependent tests are flaky in offline or rate-limited CI environments. Manually
-  verify the URL returns HTTP 200 once before shipping; rely on the docs site's own
-  link-checker CI for ongoing reachability.
-- Do not test the docs site build output (`sites/docs/docs/`) directly — it is generated
-  output. Test the source files only.
-- Skip testing every check that does NOT have `docsUrl` — T1 covers the regression
-  anchor for the "absent field" case; additional cases add no information.
+- `./scripts/operator_event.sh` (no args): exits 0; stderr contains "stub" or "not
+  implemented"
+- With arbitrary args: same behavior
+- After placing the stub: trigger a gateway run; OpenClaw log shows no "no such file or
+  directory" error for this script
 
 ### Manual Verification
 
-**M1 — doctor failure output looks right in a terminal**
-- Run `clawperator doctor` with APK absent
-- Confirm: pretty output shows a `Docs:` line under the fix section for `RECEIVER_NOT_INSTALLED`
-- Confirm: the URL is the correct full URL (not relative, not `undefined`)
-- Confirm: other doctor checks that do NOT have `docsUrl` do not show a `Docs:` line
+- `clawperator doctor` with APK absent: `Docs:` line appears under the fix section for
+  `RECEIVER_NOT_INSTALLED`; URL is a valid `https://` URL; other checks without
+  `docsUrl` do not show a `Docs:` line
 
 ---
 
