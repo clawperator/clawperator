@@ -535,7 +535,7 @@ body {
 
 .hero-diagram {
   width: 100%;
-  max-width: 640px;
+  max-width: 576px;
   height: auto;
   display: block;
   margin: 0 auto;
@@ -543,7 +543,7 @@ body {
 
 @media (min-width: 841px) {
   .hero-diagram {
-    max-width: 576px;
+    max-width: 640px;
   }
 }
 
