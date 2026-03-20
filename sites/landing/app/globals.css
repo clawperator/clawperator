@@ -506,7 +506,7 @@ body {
   background-color: #efe3d2;
   border: 1px solid rgba(124, 92, 55, 0.22);
   border-radius: 20px;
-  padding: 1.3rem 1rem;
+  padding: 1.3rem 0.7rem;
   width: 100%;
   max-width: 680px;
   box-shadow: 0 16px 38px rgba(100, 72, 37, 0.1);
