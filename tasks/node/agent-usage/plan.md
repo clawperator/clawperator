@@ -38,8 +38,8 @@ The right fix is to compose and enforce existing primitives better, not invent n
 1. **APK absence is not a hard stop.** 30-120 second timeout with no diagnosis. [PRD-1]
 2. **Validation and timeout errors lack action-level context.** Agent must guess which action caused the failure. [PRD-2]
 3. **Skill payload errors only surface at runtime on a live device.** `skills validate` passes even with schema violations in the compiled artifact. [PRD-3]
-4. **Long-running work is a black box.** `runSkill.ts` buffers all output until exit. No log trail exists after timeout. [PRD-4]
-5. **Docs are not surfaced at install time or at failure time, and one guide contradicts shipped behavior.** [PRD-5]
+4. **Long-running work is a black box.** `runSkill.ts` buffers all output until exit. No log trail exists after timeout. [PRD-4, PRD-5]
+5. **Docs are not surfaced at install time or at failure time, and one guide contradicts shipped behavior.** [PRD-6]
 
 ---
 
@@ -61,11 +61,11 @@ Add `--dry-run` to `skills validate` that composes the existing `skills compile-
 
 Add optional `onOutput` callback to `runSkill`. CLI layer wires it to stdout in pretty mode; JSON mode gets no interleaving. `SkillRunResult.output` is unchanged.
 
-### PRD-6: Persistent Logging and Log Retrieval
+### PRD-5: Persistent Logging and Log Retrieval
 
 Add structured NDJSON log output to `~/.clawperator/logs/`. `--log-level` flag and `CLAWPERATOR_LOG_DIR` env var. `RESULT_ENVELOPE_TIMEOUT` error includes `logPath` for the current day's log file.
 
-### PRD-5: Docs and Entry Points
+### PRD-6: Docs and Entry Points
 
 Fix the `RECEIVER_NOT_INSTALLED` contradiction between `first-time-setup.md` and `node-api-doctor.md`. Add post-install docs reference to `install.sh`. Add docs links to doctor failure output. Create `scripts/operator_event.sh` stub. Consolidate first-run entry points into one canonical sequence.
 
@@ -74,7 +74,7 @@ Fix the `RECEIVER_NOT_INSTALLED` contradiction between `first-time-setup.md` and
 ## Recommended Sequencing
 
 ```
-PR-1  PRD-1 + PRD-5 (partial)
+PR-1  PRD-1 + PRD-6 (partial)
       - criticalChecks.ts: add readiness.apk.presence
       - readinessChecks.ts: RECEIVER_NOT_INSTALLED warn -> fail
       - runExecution.ts: APK pre-flight before broadcastAgentCommand
@@ -103,7 +103,7 @@ PR-4  PRD-4
       Risk: low. Purely additive to runSkill signature; backward-compatible.
       Depends on: nothing (independent).
 
-PR-6  PRD-6
+PR-5  PRD-5
       - NDJSON log infrastructure: ~/.clawperator/logs/clawperator-YYYY-MM-DD.log
       - --log-level global flag; CLAWPERATOR_LOG_DIR and CLAWPERATOR_LOG_LEVEL env vars
       - RESULT_ENVELOPE_TIMEOUT: add logPath (absolute) to details
@@ -111,16 +111,16 @@ PR-6  PRD-6
       Risk: medium. New filesystem surface; payload-privacy discipline required.
       Depends on: PR-1 (pre-flight events), PR-2 (extends timeout enrichment).
 
-PR-5  PRD-5 (remainder)
+PR-6  PRD-6 (remainder)
       - docs/index.md, agent-quickstart.md, openclaw-first-run.md consolidation
       - llms.txt alignment with shipped semantics
       - doctor failure output: docs links (contracts/doctor.ts, renderCheck, tests)
       - scripts/operator_event.sh stub (pending OpenClaw tool config review)
       Risk: low. Docs and thin contract change. Must not over-promise behavior.
-      Depends on: PR-1, PR-2, PR-3, PR-4, PR-6 settled (so docs reflect final behavior).
+      Depends on: PR-1, PR-2, PR-3, PR-4, PR-5 settled (so docs reflect final behavior).
 ```
 
-Rationale for splitting PRD-5 across PR-1 and PR-5: the `install.sh` banner and the doc contradiction fix have no code dependencies and should ship immediately with the readiness gate (they describe the same change). The remaining consolidation must wait for all runtime changes to settle or the docs will age immediately.
+Rationale for splitting PRD-6 across PR-1 and PR-6: the `install.sh` banner and the doc contradiction fix have no code dependencies and should ship immediately with the readiness gate (they describe the same change). The remaining consolidation must wait for all runtime changes to settle or the docs will age immediately.
 
 ---
 

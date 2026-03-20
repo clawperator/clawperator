@@ -5,7 +5,7 @@ Priority: 4
 Proposed PR: PR-4
 
 Split from the original PRD-4 per reviewer feedback. This PRD covers live progress
-forwarding for `skills run` only. Persistent logging is PRD-6.
+forwarding for `skills run` only. Persistent logging is PRD-5.
 
 ---
 
@@ -98,8 +98,8 @@ In scope:
 - Backward compatibility: call sites that omit `callbacks` are unchanged
 
 Out of scope:
-- Persistent log files (PRD-6)
-- `--log-level` flag (PRD-6)
+- Persistent log files (PRD-5)
+- `--log-level` flag (PRD-5)
 - Android-side per-action event streaming (requires APK changes)
 - Replacing the terminal envelope contract
 - Adding progress output to `execute` directly (that path has no script subprocess)
@@ -109,7 +109,7 @@ Out of scope:
 ## Dependencies
 
 - Independent of PRD-1, PRD-2, PRD-3.
-- PRD-6 (persistent logging) may add an additional `onOutput` consumer at the CLI layer - the callback pattern is forward-compatible with that.
+- PRD-5 (persistent logging) may add an additional `onOutput` consumer at the CLI layer - the callback pattern is forward-compatible with that.
 
 ---
 

@@ -152,7 +152,7 @@ Out of scope:
 - `RECEIVER_VARIANT_MISMATCH` severity (stays warn)
 - Streaming output (PRD-4)
 - Skill payload dry-run (PRD-3)
-- Full docs consolidation (PRD-5)
+- Full docs consolidation (PRD-6)
 
 ---
 

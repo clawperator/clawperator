@@ -34,7 +34,7 @@ This agent: "genuinely missing" - `validateExecution.ts:306-331` shows `Validati
 
 Other agent: deferred - "stronger near-term need is clearer recovery hints, not more files on disk."
 
-This agent: included as PRD-5 - with `runSkill.ts` evidence showing all output is buffered until process exit, and no log-to-disk path existing anywhere in the CLI.
+This agent: included as PRD-5 (persistent logging) - with `runSkill.ts` evidence showing all output is buffered until process exit, and no log-to-disk path existing anywhere in the CLI.
 
 Resolution: The other agent's PRD-3 (progress and recovery) proposes adding a "progress surface" for long-running work but does not say how without either (a) APK changes for Android-side events, or (b) a log file. Once APK-change-dependent streaming is ruled out of scope (both agents agree on this), a log file is the only way to provide a post-hoc evidence trail. The timeout case - where stdout produces nothing until the process exits - is genuinely unserved.
 
@@ -58,7 +58,7 @@ This agent: "genuinely missing" - the script is called from within the Clawperat
 
 The other agent noted the `operator.read` scope issue and the gateway port conflict as OpenClaw problems. Those are correct dismissals. The `operator_event.sh` failure is different: it is called at `./scripts/operator_event.sh` which means the working directory was the Clawperator repo. The other Clawperator scripts in `scripts/` are all present. This is a missing script, not an OpenClaw configuration error.
 
-**Resolution: it belongs in the plan. Included in merged PRD-5. Flagged as needing OpenClaw tool config review before the script can be written beyond a stub.**
+**Resolution: it belongs in the plan. Included in merged PRD-6 (docs and entry points). Flagged as needing OpenClaw tool config review before the script can be written beyond a stub.**
 
 ### 5. Docs PRD sequencing
 
@@ -68,7 +68,7 @@ This agent: post-install `install.sh` banner and doctor failure links are PR-3 (
 
 Both are correct for different parts of the docs work. The `install.sh` banner and `operator_event.sh` stub have no runtime dependencies and should ship early. The full docs consolidation and contradiction fix must wait for the readiness gate to land.
 
-**Resolution: split the docs work across two PRs. The banner and stub go into PR-1 (along with the readiness gate, since the doc contradiction fix must land at the same time). Full docs consolidation is PR-5.**
+**Resolution: split the docs work across two PRs. The banner and stub go into PR-1 (along with the readiness gate, since the doc contradiction fix must land at the same time). Full docs consolidation is PR-6.**
 
 ---
 
@@ -95,4 +95,4 @@ Both are correct for different parts of the docs work. The `install.sh` banner a
 
 ## Authoritative Output
 
-The merged plan and PRDs in this directory (`plan.md`, `prd-1.md` through `prd-5.md`) are the implementation-ready artifacts. The prior plans from each agent are superseded but preserved for reference.
+The merged plan and PRDs in this directory (`plan.md`, `prd-1.md` through `prd-6.md`) are the implementation-ready artifacts. The prior plans from each agent are superseded but preserved for reference.
