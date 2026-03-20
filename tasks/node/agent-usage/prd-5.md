@@ -1,184 +1,203 @@
-# PRD-5: Structured Persistent Logs
+# PRD-5: Docs, Entry Points, and Missing Integration Hooks
 
 Workstream: WS-5
 Priority: 5
 Proposed PR: PR-5
 
+Merged from both agents. Other agent's PRD-4 (docs consolidation) plus this analysis's
+PRD-3 items (doctor failure links, operator_event.sh). The install.sh banner and the
+doc contradiction fix ship in PR-1. This PR handles the remainder.
+
 ---
 
 ## Problem Statement
 
-When a Clawperator command fails or times out, there is no persistent log to inspect. The only evidence is what was printed to stdout/stderr before the process exited. For a timeout, that evidence is: the command that was run, and the timeout error. Nothing about what was dispatched to the device, what adb returned, whether the broadcast was received, or where in the execution sequence the failure occurred.
+The docs already contain the right material. The first-run story is spread across multiple pages, one of which contradicts the shipped behavior that PR-1 fixes. The docs are not pointed to from install output, and doctor failure output links to nothing. A missing integration hook (`scripts/operator_event.sh`) causes repeated visible errors in the OpenClaw gateway log.
 
-Agents and operators are left to guess or reproduce the failure in real time.
+The install.sh banner and RECEIVER_NOT_INSTALLED contradiction are fixed in PR-1 because they accompany the readiness gate change. This PRD covers everything that must wait for all runtime changes to settle.
 
 ---
 
 ## Evidence
 
-**From `tasks/node/agent-usage/issues.md`, Issue #2:**
-> When skills or commands fail, there is no persistent logging to help diagnose issues.
-> No log files written to disk. Only stdout/stderr from the CLI.
-> On timeout, zero information about what went wrong.
-> Agents must guess or ask the user.
+**From `tasks/node/agent-usage/issues.md`, Issue #10:**
+> I don't know where the docs are, and I haven't looked. I've been operating off CLI --help output.
+> After this session, I learned about https://docs.clawperator.com/llms.txt. These would have helped me understand the architecture, validation schema, error codes, and best practices. I didn't know they existed.
 
-**From `tasks/node/agent-usage/issues.md`, Issue #2 (suggested behavior):**
-> Clawperator writes structured logs to `~/.clawperator/logs/`
-> Agents can `tail -f` logs during skill execution
-> Logs include: broadcast sent, response received, errors, timing, device state
-> Log level configurable (debug, info, warn, error)
+**From `~/src/clawperator/tasks/node/agent-usage/findings-analysis.md` (other agent):**
+> `docs/index.md` already lists `llms.txt`, `Agent Quickstart`, `First-Time Setup`, and `OpenClaw First Run`, so the docs have the necessary entrypoints.
+> The docs are useful once found, but the first-run path is not a single obvious sequence.
+> `docs/agent-quickstart.md` and `docs/openclaw-first-run.md` exist, but they are separate starting points.
 
-**From `tasks/node/agent-usage/issues.md`, lessons learned:**
-> I didn't know where logs were - There were no logs to check.
+**From `~/.openclaw/logs/gateway.err.log` (2026-03-21):**
+```
+[tools] exec failed: zsh:1: no such file or directory: ./scripts/operator_event.sh
+[tools] exec failed: zsh:1: no such file or directory: ./scripts/operator_event.sh
+```
+Two failures at 04:14:29. All other scripts in `scripts/` are present. This script is missing.
 
-**From the GloBird incident:**
-A timeout occurred because the APK was not installed. With persistent logs, the absence of a "broadcast dispatched successfully" event - or a "pm list packages returned empty for com.clawperator.operator" event - would have narrowed the root cause from "something failed somewhere in the pipeline" to "pre-flight check failed: APK not found" within seconds.
+**From `docs/index.md`:**
+Entry points already exist: `llms.txt`, `Agent Quickstart`, `First-Time Setup`, `OpenClaw First Run`. The issue is ordering and prominence, not absence.
 
 ---
 
 ## Current Behavior
 
-All CLI output goes to stdout and stderr. When the process exits, the output is gone unless the caller captured it. No `~/.clawperator/logs/` directory is created by any command. No structured event log exists.
+1. `docs/index.md` lists multiple entry points with no clear priority order for agents.
+2. `docs/agent-quickstart.md` and `docs/openclaw-first-run.md` are peers, not a hierarchy.
+3. Doctor failure output (`pretty` and `json`) does not link to troubleshooting docs.
+4. `./scripts/operator_event.sh` does not exist. Two call attempts fail on each gateway run.
+5. `sites/landing/public/llms.txt` and `sites/docs/static/llms.txt` are accurate and comprehensive but not referenced from install output (that fix is in PR-1).
 
 ---
 
 ## Proposed Change
 
-### 1. Write JSON-structured logs to `~/.clawperator/logs/`
+### 1. Make one first-run path canonical in `docs/index.md`
 
-All CLI commands that interact with the device write structured JSON log entries to:
+Reorder the agent-facing section of `docs/index.md` so the sequence is:
+
+1. `llms.txt` (machine-readable entry point - read this first)
+2. `agent-quickstart.md` (fastest path from install to first command)
+3. `openclaw-first-run.md` (if starting from zero with OpenClaw)
+4. `first-time-setup.md` (device setup detail)
+5. `node-api-for-agents.md` (full API reference)
+
+Label the top of the agent section explicitly: "If you are an AI agent, start here."
+
+### 2. Align all first-run guides with the same command sequence
+
+The recommended first-run sequence across all guides must be consistent with the shipped behavior after PR-1 lands. Specifically:
+
+- `doctor` is the mandatory pre-step before any device command.
+- `doctor` hard-fails on missing APK (after PR-1).
+- `operator setup` is the install command when APK is absent.
+
+Check `agent-quickstart.md`, `openclaw-first-run.md`, and `first-time-setup.md` for any remaining references to APK absence as advisory. Update all three to match the PR-1 behavior.
+
+### 3. Add docs links to doctor failure output
+
+When `clawperator doctor` reports a critical failure in `pretty` mode, append:
 
 ```
-~/.clawperator/logs/clawperator-YYYY-MM-DD.log
+  Docs: https://docs.clawperator.com/troubleshooting
 ```
 
-One JSON object per line (NDJSON format). Entries include:
-- `ts`: ISO 8601 timestamp
-- `level`: `debug | info | warn | error`
-- `commandId`: correlation ID from the execution payload (when available)
-- `taskId`: correlation ID (when available)
-- `event`: short event identifier (e.g., `preflight.apk.check`, `broadcast.dispatched`, `envelope.received`, `timeout.fired`)
-- `deviceId`: the targeted device serial (when known)
-- `message`: human-readable description
-- `data`: optional structured data specific to the event
+In `json` mode, add a `docsUrl` field to the `fix` object of each critical failure:
 
-Example entries:
-
-```ndjson
-{"ts":"2026-03-21T04:14:28.001Z","level":"info","commandId":"skill-run-001","event":"preflight.apk.check","deviceId":"<device_id>","message":"Checking Operator APK presence","data":{"receiverPackage":"com.clawperator.operator"}}
-{"ts":"2026-03-21T04:14:28.102Z","level":"error","commandId":"skill-run-001","event":"preflight.apk.missing","deviceId":"<device_id>","message":"Operator APK not installed","data":{"receiverPackage":"com.clawperator.operator","exitCode":0,"stdout":""}}
+```json
+{
+  "fix": {
+    "title": "Install Operator APK",
+    "docsUrl": "https://docs.clawperator.com/getting-started/first-time-setup",
+    "steps": [...]
+  }
+}
 ```
 
-### 2. Log retention and rotation
+This is additive to the existing `fix` structure. Only add `docsUrl` for critical failures where a specific relevant page exists.
 
-- Keep 7 days of logs by default (one file per day).
-- Do not compress or rotate intra-day. Each day's file grows until midnight, then a new file starts.
-- No automatic deletion of older files beyond the 7-day window; leave cleanup to the operator.
-- Log directory configurable via `CLAWPERATOR_LOG_DIR` environment variable.
+### 4. `scripts/operator_event.sh`: investigation and stub
 
-### 3. `--log-level` flag
+Before writing this script, review the OpenClaw tool configuration to determine:
+- What arguments does it pass to this script?
+- What output format does it expect?
+- What should happen on success vs. failure?
 
-Add `--log-level <debug|info|warn|error>` as a global flag (alongside `--device-id`, `--output`, etc.).
+If the intended behavior is confirmed: write the script with that behavior, following the `clawperator_*` naming convention of other scripts in `scripts/`, or a new `scripts/hooks/` directory if this is the first hook.
 
-Default: `info`.
+If the intent cannot be confirmed before this PR: create a stub that:
+- Accepts any arguments
+- Exits 0
+- Emits one line to stderr: `operator_event.sh: stub - behavior not yet implemented`
 
-`debug` includes: adb command strings, full stdout/stderr from adb, timing for every adb call.
-`info` includes: pre-flight results, broadcast dispatch, result envelope received, timeout events.
-`warn` includes: recoverable issues (variant mismatch, dev options disabled).
-`error` includes: critical failures only.
+The stderr line keeps the stub visible and prevents the "no such file" error from silently masking future investigation.
 
-For agent usage, `info` is the correct default. `debug` is for human operators investigating adb-level issues.
+**Do not merge a silent no-op stub.** A stub that exits 0 and emits nothing will suppress the error but may silently drop behavior that OpenClaw expected. The stderr note keeps it detectable.
 
-### 4. Structured log events to capture (minimum viable set)
+### 5. `llms.txt` alignment
 
-| Event | Level | When |
-| :--- | :--- | :--- |
-| `preflight.apk.check` | info | Before execute dispatches broadcast |
-| `preflight.apk.missing` | error | APK not found in pre-flight |
-| `preflight.apk.pass` | info | APK confirmed present |
-| `broadcast.dispatched` | info | adb broadcast sent |
-| `broadcast.error` | error | adb broadcast returned non-zero |
-| `envelope.waiting` | debug | Polling for result envelope |
-| `envelope.received` | info | Result envelope returned |
-| `timeout.fired` | error | Timeout waiting for envelope |
-| `doctor.check` | info | Each doctor check with result |
-| `skills.run.start` | info | Skill run started |
-| `skills.run.complete` | info | Skill run finished with exit code |
+After all PRs land, verify that both `sites/landing/public/llms.txt` and `sites/docs/static/llms.txt` accurately describe the final shipped behavior. Specifically:
+- APK absence is a hard failure (not advisory)
+- `skills validate --dry-run` exists
+- Persistent logs are at `~/.clawperator/logs/`
+- `enter_text clear: true` is a known no-op
 
-### 5. Documentation
-
-- `docs/troubleshooting.md`: Add a "Reading the Clawperator log" section. Document the log path, the NDJSON format, and how to filter by `commandId`.
-- `docs/agent-quickstart.md`: Add a note pointing to logs when a command fails.
-- `docs/reference/node-api-doctor.md`: Note that doctor run events are logged.
+The `llms.txt` files should be the last thing updated, once all behavior is settled.
 
 ---
 
 ## Why This Matters for Agent Success
 
-Persistent logs close the gap between "something failed" and "here is which component failed and why." An agent that knows to check `~/.clawperator/logs/clawperator-2026-03-21.log` after a timeout has evidence immediately. Without logs, the agent must reproduce the failure in real time - which means running the command again, waiting for the timeout again, and still having no more information.
+An agent that reads `llms.txt` before running any commands has a correct mental model of the system, knows to run `doctor` first, and knows where logs are. Without this, the first session is a discovery loop. The docs exist; the routing to them is what needs to change.
 
-Logs also enable better `RESULT_ENVELOPE_TIMEOUT` enrichment (from WS-2): the timeout error message can reference the log file for the full event trace, even if the error envelope itself only surfaces the top-level action context.
+The `operator_event.sh` fix stops a visible recurring error in the OpenClaw gateway log that, if left unfixed, adds noise to every debugging session and may mask real failures.
 
 ---
 
 ## Scope Boundaries
 
 In scope:
-- NDJSON log to `~/.clawperator/logs/`
-- 7-day retention (daily files)
-- `--log-level` global flag
-- Minimum viable event set (table above)
-- Documentation updates (troubleshooting, quickstart, doctor reference)
-- `CLAWPERATOR_LOG_DIR` env var override
+- `docs/index.md` agent section reordering
+- `agent-quickstart.md`, `openclaw-first-run.md`, `first-time-setup.md` alignment with PR-1 behavior
+- Doctor failure output: `docsUrl` in `fix` object
+- `scripts/operator_event.sh` stub (after OpenClaw review)
+- `llms.txt` final alignment after all PRs land
 
 Out of scope:
-- Real-time streaming of log events to stdout (separate from log-to-disk)
-- Log compression or archival
-- Per-action Android-side event streaming (requires APK changes)
-- A `clawperator logs` command for reading/filtering logs (nice to have, defer)
+- Adding new documentation content (the content already exists)
+- Changing the docs site navigation structure beyond the index
+- `AGENTS.md` in the skills repo (separate repo, separate PR)
+- Shell profile or env var machinery beyond what setup already does
 
 ---
 
 ## Dependencies
 
-- WS-1 (PRD-1) should ship first. The most valuable log events are the pre-flight check events. Without WS-1, the pre-flight does not exist and the most important events cannot be logged.
-- Independent of WS-2, but the two complement each other: WS-2 enriches the error envelope, WS-5 provides the full trace behind it.
+- PR-1: the APK absence behavior change that the docs must describe
+- PR-2: the error format that `node-api-for-agents.md` must document
+- PR-3: `--dry-run` behavior for `skill-development-workflow.md`
+- PR-4: log path for `troubleshooting.md` and `agent-quickstart.md`
+
+This is the last PR in the sequence.
 
 ---
 
 ## Risks and Tradeoffs
 
-**Risk: disk space**
-A debug-level log for a long-running skill execution can grow quickly if adb output is verbose. Mitigation: `info` default keeps routine logs small; `debug` is an explicit opt-in.
+**Risk: docs stability**
+If this PR lands before the runtime changes are stable, the docs will describe behavior that does not yet exist. The sequencing dependency is critical. Do not write PR-5 docs content until all runtime PRs have merged.
 
-**Risk: log directory permissions**
-`~/.clawperator/logs/` must be created with appropriate permissions. The first write should create the directory if it does not exist. Handle creation errors gracefully (fail open: if log directory cannot be created, continue without logging but warn once to stderr).
+**Risk: `docsUrl` field in `fix` object**
+Hardcoded docs URLs in doctor output will become stale if the docs site is restructured. Use path-stable URLs. Document them as canonical in the docs site config so they are treated as stable references.
 
-**Risk: sensitive data in logs**
-adb command strings at `debug` level may include device serials and package names. These are not secrets but are device-specific identifiers. The log is user-local (`~/.clawperator/`) which is appropriate. Do not log execution payload content (which may contain user-entered data) at any level.
+**Risk: `operator_event.sh` stub masking intent**
+A silent no-op is worse than the current visible error. The stub must emit a stderr notice. This makes the stub detectable by anyone reviewing the logs.
 
-**Tradeoff: per-command vs. per-session log files**
-Per-day files (one per calendar day) are simple but make correlation harder when many commands run in a day. Correlation IDs (`commandId`, `taskId`) in each log entry are the primary mechanism for filtering. A `clawperator logs --command-id <id>` reader command would make this usable; deferred to a follow-on.
+**Tradeoff: llms.txt update timing**
+`llms.txt` should describe current shipped behavior, not aspirational behavior. Only update it in this PR (after all others have merged), not speculatively during earlier PRs.
 
 ---
 
 ## Validation Plan
 
-1. Unit test: log directory is created if absent on first write.
-2. Unit test: log entry includes `ts`, `level`, `event`, `commandId`, `deviceId`, `message` fields.
-3. Unit test: `--log-level error` suppresses `info` and `debug` entries.
-4. Integration test: after `clawperator execute` succeeds, `~/.clawperator/logs/clawperator-YYYY-MM-DD.log` exists and contains `broadcast.dispatched` and `envelope.received` entries with matching `commandId`.
-5. Integration test: after a timeout, the log contains `timeout.fired` with the last action context.
-6. Manual verification: `tail -f ~/.clawperator/logs/clawperator-$(date +%Y-%m-%d).log` while running a skill shows live events.
+1. Manual review: `docs/index.md` agent section leads with `llms.txt` and `agent-quickstart.md`.
+2. Manual review: all three first-run guides describe APK absence as a hard failure with the install command.
+3. Manual review: no guide describes APK absence as advisory after PR-1 lands.
+4. Integration test: `clawperator doctor --output pretty` with a critical failure includes a `Docs:` line.
+5. Integration test: `clawperator doctor --output json` with a critical failure includes `fix.docsUrl`.
+6. Verify: `./scripts/operator_event.sh` exists and exits 0.
+7. Verify: OpenClaw gateway log no longer shows "no such file or directory" for this script.
+8. Manual review: both `llms.txt` files describe `skills validate --dry-run`, persistent logs, and `enter_text clear: true` limitation accurately.
 
 ---
 
 ## Acceptance Criteria
 
-- All `execute` invocations write NDJSON entries to `~/.clawperator/logs/clawperator-YYYY-MM-DD.log`.
-- Each entry includes `ts`, `level`, `event`, `commandId` (when available), `deviceId` (when known), and `message`.
-- Log directory is created automatically if absent.
-- `--log-level debug|info|warn|error` controls verbosity; default is `info`.
-- `CLAWPERATOR_LOG_DIR` overrides the default log directory.
-- After a timeout, the log contains at minimum a `broadcast.dispatched` event and a `timeout.fired` event.
-- `docs/troubleshooting.md` documents the log path, format, and how to filter by `commandId`.
+- `docs/index.md` agent section labels `llms.txt` as the machine-readable starting point.
+- All first-run guides describe APK absence as a blocking failure with the install command.
+- `clawperator doctor --output pretty` includes a `Docs:` URL for critical failures.
+- `clawperator doctor --output json` includes `fix.docsUrl` for critical failures.
+- `./scripts/operator_event.sh` exists, exits 0, and emits a detectable stderr stub notice.
+- Both `llms.txt` files accurately describe all behavior shipped in PRs 1-4.
+- No guide contradicts shipped `doctor` behavior.

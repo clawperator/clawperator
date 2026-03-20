@@ -1,21 +1,24 @@
-# PRD-1: Fast-fail on Missing Operator APK
+# PRD-1: Shared Readiness Gate
 
 Workstream: WS-1
 Priority: 1 (highest)
 Proposed PR: PR-1
 
+Merged from both agents. This is the highest-confidence finding with the clearest code path.
+
 ---
 
 ## Problem Statement
 
-When the Clawperator Operator APK is not installed on the target device, nothing stops `execute` or `skills run` from dispatching an adb broadcast to a receiver that does not exist. The broadcast is sent, no result envelope is returned, and the command times out after 30-120 seconds with `RESULT_ENVELOPE_TIMEOUT`. This is the #1 agent confusion source. It produces the worst possible debugging experience: maximum wait time, minimum information.
+Agents reach a `RESULT_ENVELOPE_TIMEOUT` when the Operator APK is missing because nothing stops `execute` or `skills run` from dispatching an adb broadcast to a receiver that does not exist. Clawperator already knows how to detect this condition. The problem is that the detection is advisory-only in `doctor` and is not reused as a gate before live device dispatch.
 
 ---
 
 ## Evidence
 
-**From logs (GloBird incident, the triggering event for issues.md):**
-> GloBird skill timed out. Is it the app? The APK? The device? No logs to check. Had to manually verify APK was installed (it wasn't, but we had uninstalled it earlier and I forgot).
+**From `apps/node/src/domain/doctor/criticalChecks.ts`:**
+
+`readiness.apk.presence` is absent from `CRITICAL_DOCTOR_CHECK_PREFIXES`. Doctor does not halt on APK absence.
 
 **From `apps/node/src/domain/doctor/checks/readinessChecks.ts`:**
 
@@ -28,96 +31,128 @@ return {
 };
 ```
 
-**From `apps/node/src/domain/doctor/criticalChecks.ts`:**
+**From `apps/node/src/domain/executions/runExecution.ts`:**
 
-`readiness.apk.presence` is absent from `CRITICAL_DOCTOR_CHECK_PREFIXES`. Doctor does not halt on APK absence.
+The call sequence is:
+1. `validateExecution(input)` - validates payload shape
+2. `resolveDevice(config)` - resolves device serial
+3. `broadcastAgentCommand(...)` - sends to Android
 
-**From `docs/openclaw-first-run.md` Step 5:**
-> "If doctor does not pass, stop and fix the environment before moving on."
+No APK presence check between steps 2 and 3.
 
-The intent is correct. The enforcement is absent. Doctor "passes" (exits 0) even with the APK missing.
+**From `apps/node/src/domain/executions/runExecution.ts` (existing pattern):**
 
-**From `docs/reference/error-handling.md`:**
-> `RECEIVER_NOT_INSTALLED`: Fix environment first. Do not blindly retry the same execution.
+`injectServiceUnavailableHint` already injects a hint into the result envelope for `SERVICE_UNAVAILABLE`. The pre-flight pattern should follow the same approach: check early, return a structured error immediately.
 
-The guidance is correct. Nothing in the execution path enforces it.
+**From `sites/landing/public/install.sh`:**
+
+`install.sh` already calls `doctor --format json` and parses the JSON result to conditionally install the APK. Changing doctor severity must preserve this behavior.
+
+**From `docs/first-time-setup.md` (lines ~244-246):**
+
+Describes `RECEIVER_NOT_INSTALLED` as leading to an unhealthy exit. This matches the intended behavior but not the shipped behavior. The contradiction must be fixed in the same PR.
+
+**From `docs/reference/node-api-doctor.md`:**
+
+Documents APK absence as advisory today. Must be updated to reflect the new blocking behavior.
+
+**From `tasks/node/agent-usage/issues.md` (GloBird incident):**
+
+> GloBird skill timed out. Is it the app? The APK? The device? No logs to check.
+> Had to manually verify APK was installed - it wasn't.
 
 ---
 
 ## Current Behavior
 
-1. Operator APK is not installed on device.
-2. Agent runs `clawperator doctor`.
-3. Doctor emits `RECEIVER_NOT_INSTALLED` as a warning. Report status: pass (no critical failures). Exit 0.
-4. Agent proceeds, believing environment is healthy.
-5. Agent runs `clawperator execute` or `clawperator skills run`.
-6. Node dispatches broadcast via adb.
-7. No receiver is listening. No result envelope is returned.
-8. After 30-120 seconds: `RESULT_ENVELOPE_TIMEOUT`.
-9. Agent has no information about which link in the chain failed.
+1. `doctor` reports `RECEIVER_NOT_INSTALLED` as a warning. Exits 0 if all critical checks pass.
+2. `execute` validates the payload, resolves the device, broadcasts - no APK check.
+3. `skills run` delegates to the skill script with no device readiness guarantee.
+4. `install.sh` parses doctor JSON and can install the APK, but cannot force a hard stop if the agent proceeds before installation.
+5. 30-120 seconds elapse before `RESULT_ENVELOPE_TIMEOUT` is returned.
 
 ---
 
 ## Proposed Change
 
-### 1. Make APK absence a critical (halting) check in doctor
+### 1. `criticalChecks.ts`: add `readiness.apk.presence`
 
-In `apps/node/src/domain/doctor/criticalChecks.ts`, add `"readiness.apk.presence"` to `CRITICAL_DOCTOR_CHECK_PREFIXES`.
+Add `"readiness.apk.presence"` to `CRITICAL_DOCTOR_CHECK_PREFIXES`. This makes doctor halt when the APK is absent.
 
-In `apps/node/src/domain/doctor/checks/readinessChecks.ts`, change `status: "warn"` to `status: "fail"` for the `RECEIVER_NOT_INSTALLED` case.
+### 2. `readinessChecks.ts`: `RECEIVER_NOT_INSTALLED` becomes `fail`
 
-The `RECEIVER_VARIANT_MISMATCH` case (wrong variant installed) should remain a `warn` - the other variant can be addressed with `--receiver-package`, which is a usable workaround.
+Change `status: "warn"` to `status: "fail"` for the `RECEIVER_NOT_INSTALLED` case.
 
-### 2. Add APK presence pre-flight to `execute`
+Keep `RECEIVER_VARIANT_MISMATCH` as `warn` - the `--receiver-package` workaround makes it recoverable without reinstalling.
 
-At the start of the `execute` command handler, before dispatching any broadcast, run the equivalent of `checkApkPresence(config)`. If the check fails, return immediately with:
+### 3. `runExecution.ts`: APK presence pre-flight
+
+Before `broadcastAgentCommand`, run `checkApkPresence(config)`. On failure, return immediately:
 
 ```json
 {
   "ok": false,
   "error": {
     "code": "RECEIVER_NOT_INSTALLED",
-    "message": "Operator APK (com.clawperator.operator) is not installed on device <device_id>. Install it with: clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id <device_id>"
+    "message": "Operator APK (com.clawperator.operator) is not installed on <device_id>. Install it with: clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id <device_id>"
   }
 }
 ```
 
-Exit code: non-zero.
+Implementation notes:
+- Reuse `checkApkPresence` from `readinessChecks.ts` directly - do not duplicate the adb call.
+- Cache the result for the duration of a CLI session (keyed on device serial) to avoid the round-trip on every execute call in a tight loop. Invalidate the cache on device change or `operator setup`.
+- Follow the `injectServiceUnavailableHint` pattern already in `runExecution.ts` for the hint text.
+- `skills run` inherits this behavior because it calls `execute` internally via the skill script.
 
-This check should be:
-- Fast: a single `adb shell pm list packages` call (~100ms)
-- Cacheable: if a recent successful check result is available (written by `operator setup` or by a recent `doctor` run), skip the adb round-trip
-- Suppressible: `--skip-preflight` flag for agents that have already verified readiness externally (e.g., running their own doctor call within the same session)
+### 4. `--check-only` semantics preserved
 
-### 3. Documentation updates
+Doctor with `--check-only` must remain non-blocking and return the full JSON even when the APK is absent. The installer uses this path. The severity change must not break the installer's conditional logic.
 
-- `docs/troubleshooting.md`: Add a `RECEIVER_NOT_INSTALLED` section explaining the new fast-fail behavior and the install command.
-- `docs/reference/node-api-doctor.md`: Update the `readiness.apk.presence` check description to reflect `fail` severity.
-- `docs/reference/error-handling.md`: Update the `RECEIVER_NOT_INSTALLED` triage row to note it now fails fast rather than requiring manual doctor invocation.
+Verify: after this change, `clawperator doctor --check-only --output json` still returns a parseable result with `status: "fail"` in the APK check but does not exit non-zero.
+
+### 5. `install.sh`: post-install docs banner
+
+In the success banner at the end of `install.sh`, add:
+
+```
+  Docs:        https://docs.clawperator.com
+  Agent guide: https://docs.clawperator.com/llms.txt
+
+If you are an AI agent, read the agent guide before running any commands.
+```
+
+This belongs in PR-1 because it describes the same change (APK absence is now blocking, here is where to read about it).
+
+### 6. Documentation updates in PR-1
+
+- `docs/first-time-setup.md`: align the `RECEIVER_NOT_INSTALLED` wording with shipped behavior (now a hard failure).
+- `docs/reference/node-api-doctor.md`: update APK absence from advisory to blocking.
+- `docs/reference/error-handling.md`: clarify that `RECEIVER_NOT_INSTALLED` now fails fast at execute time.
+- `docs/troubleshooting.md`: add a `RECEIVER_NOT_INSTALLED` section with the install command.
 
 ---
 
 ## Why This Matters for Agent Success
 
-The 30-120 second timeout is the worst possible failure signal for an agent. The agent cannot distinguish "APK missing" from "app crashed" from "UI element not found" from "device asleep." Every other improvement in this plan - better error messages, docs links, persistent logs - is less valuable than simply not waiting 2 minutes before getting a diagnosis.
+The 30-120 second timeout is the worst possible failure signal. Every other improvement - better error messages, logs, docs links - is less valuable than not waiting 2 minutes before getting a diagnosis.
 
-This change is also the minimal-scope version of a "pre-flight checklist." It does not require running the full doctor suite before every execute. It runs exactly the one check that guards against the most common first-run failure mode.
+This is also the only change where the code path is entirely clear: two lines in `criticalChecks.ts`, one line in `readinessChecks.ts`, and a pre-flight guard in `runExecution.ts`.
 
 ---
 
 ## Scope Boundaries
 
 In scope:
-- `criticalChecks.ts`: add `readiness.apk.presence`
-- `readinessChecks.ts`: `warn` -> `fail` for `RECEIVER_NOT_INSTALLED`
-- `execute` command: APK presence pre-flight
-- Three doc updates (troubleshooting, node-api-doctor, error-handling)
+- `criticalChecks.ts`, `readinessChecks.ts`, `runExecution.ts`
+- `install.sh` docs banner
+- Four doc updates (first-time-setup, node-api-doctor, error-handling, troubleshooting)
 
 Out of scope:
-- Streaming output (WS-5/WS-6)
-- Logging to disk (WS-5)
-- `skills run` pre-flight (skills run calls execute internally; if execute pre-flights, skills inherits it)
-- `RECEIVER_VARIANT_MISMATCH` severity change (remains warn - usable workaround exists)
+- `RECEIVER_VARIANT_MISMATCH` severity (stays warn)
+- Streaming output (PRD-4)
+- Skill payload dry-run (PRD-3)
+- Full docs consolidation (PRD-5)
 
 ---
 
@@ -129,32 +164,32 @@ None. This is the first PR and depends on no other workstream.
 
 ## Risks and Tradeoffs
 
-**Risk: adb round-trip latency per execute call**
-Adding ~100ms to every `execute` call. Acceptable for the typical skill run (seconds to minutes). Mitigation: cache the result for the duration of a CLI session, or write a state token after `operator setup` that execute can read before making the adb call.
+**Risk: installer behavior**
+`install.sh` parses `doctor --format json` and uses the result to decide whether to install the APK. The installer must handle `status: "fail"` for APK absence correctly after this change. Verify that the installer's JSON parsing does not treat a `fail` severity as an unrecoverable error that prevents the install step from running.
 
-**Risk: agents that scripted around the warn behavior**
-Any agent that explicitly parses doctor output and ignores `RECEIVER_NOT_INSTALLED` warnings will now get a hard failure. This is the intended behavior. The change is semantically correct; the previous behavior was a bug.
-
-**Tradeoff: `--skip-preflight` scope**
-If we add `--skip-preflight`, agents can opt out. This is useful for automated pipelines that already verify readiness. But it also creates a footgun. Keep it undocumented or restrict it to `--output json` mode only.
+**Risk: adb round-trip in execute**
+The pre-flight adds ~100ms to every execute call. Cache the result by device serial for the session lifetime. Do not make the adb call if a fresh successful result is available from the current session.
 
 ---
 
 ## Validation Plan
 
-1. Unit test: `checkApkPresence` returns `fail` when pm list packages returns empty.
-2. Unit test: `isCriticalDoctorCheck` returns true for `readiness.apk.presence`.
-3. Integration test: `clawperator execute` with no APK installed returns `RECEIVER_NOT_INSTALLED` error within 2 seconds (not timeout after 30+).
-4. Integration test: `clawperator doctor` exits non-zero when APK is absent.
-5. Manual verification: install.sh path on clean device, uninstall APK, run doctor, observe hard failure.
+1. Unit test: `isCriticalDoctorCheck({ id: "readiness.apk.presence", ... })` returns `true`.
+2. Unit test: `checkApkPresence` returns `status: "fail"` (not `"warn"`) when the package is absent.
+3. Unit test: `runExecution` returns `RECEIVER_NOT_INSTALLED` error before broadcasting when APK absent.
+4. Integration test: `clawperator execute` with no APK returns `RECEIVER_NOT_INSTALLED` in under 2 seconds.
+5. Integration test: `clawperator doctor --output json` exits non-zero when APK is absent.
+6. Integration test: `clawperator doctor --check-only --output json` exits 0 and returns parseable JSON even when APK is absent.
+7. Integration test: `install.sh` still successfully installs the APK when doctor reports failure.
 
 ---
 
 ## Acceptance Criteria
 
 - `clawperator doctor` exits non-zero when the Operator APK is absent.
-- `clawperator execute` returns `RECEIVER_NOT_INSTALLED` in under 2 seconds when the APK is absent, not `RESULT_ENVELOPE_TIMEOUT` after 30+ seconds.
-- The `RECEIVER_NOT_INSTALLED` error response includes the install command.
-- `RECEIVER_VARIANT_MISMATCH` remains a warning (not a hard failure).
-- All existing doctor tests pass.
-- `docs/troubleshooting.md`, `docs/reference/node-api-doctor.md`, and `docs/reference/error-handling.md` reflect the new behavior.
+- `clawperator execute` returns `RECEIVER_NOT_INSTALLED` with install command in under 2 seconds when the APK is absent.
+- `clawperator doctor --check-only --output json` exits 0 and returns parseable JSON regardless of APK state.
+- `RECEIVER_VARIANT_MISMATCH` remains a `warn` (not a hard failure).
+- `install.sh` still installs the APK when the device is ready.
+- `install.sh` post-install banner includes `https://docs.clawperator.com/llms.txt`.
+- `docs/first-time-setup.md` and `docs/reference/node-api-doctor.md` agree on APK absence behavior.

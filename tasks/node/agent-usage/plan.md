@@ -1,181 +1,161 @@
-# Agent Usability Improvement Plan
+# Agent Usability Plan (Merged)
 
-Primary input: `tasks/node/agent-usage/findings-analysis.md`
-Date: 2026-03-21
+This plan supersedes the two prior per-agent plans. See `reconciliation.md` for the
+synthesis rationale.
+
+Primary inputs:
+- `tasks/node/agent-usage/findings-analysis.md` (this worktree)
+- `~/src/clawperator/tasks/node/agent-usage/findings-analysis.md` (other agent)
+- `apps/node/src/domain/executions/runExecution.ts`
+- `apps/node/src/domain/executions/validateExecution.ts`
+- `apps/node/src/domain/skills/runSkill.ts`
+- `apps/node/src/domain/skills/validateSkill.ts`
+- `apps/node/src/domain/doctor/criticalChecks.ts`
+- `apps/node/src/domain/doctor/checks/readinessChecks.ts`
+- `sites/landing/public/install.sh`
+- OpenClaw logs 2026-03-20 and 2026-03-21
 
 ---
 
 ## Executive Summary
 
-Clawperator is hard for agents on a first run for three compounding reasons:
+Clawperator is hard for agents on a first run for three compounding reasons, all confirmed in code:
 
-1. **Silent setup failures.** When the Operator APK is missing, nothing fails fast. `execute` broadcasts into the void for 30-120 seconds and returns a timeout with no useful context. Doctor detects the problem but reports it as a warning and does not halt - so an agent that ran doctor and saw no errors is still walking into a guaranteed timeout.
+1. **No fast-fail on missing APK.** `readiness.apk.presence` is a `warn`, absent from `CRITICAL_DOCTOR_CHECK_PREFIXES`. `runExecution.ts` validates the payload, resolves the device, and calls `broadcastAgentCommand` without an APK check. The result is a 30-120 second timeout with no useful signal.
 
-2. **Opaque error messages.** When a payload is malformed, the error names the schema violation but not the action that caused it. When a command times out, the error says nothing about which phase of the pipeline failed. Agents cannot self-correct without guessing.
+2. **Opaque error messages.** `validateExecution.ts` returns `ValidationFailure.details` with a Zod path string (`"actions.2.params"`) but not the action's semantic `id` or `type`. `RESULT_ENVELOPE_TIMEOUT` contains no information about which action was in flight. Both are fixable with additive changes.
 
-3. **Documentation that exists but is invisible.** Both `llms.txt` surfaces are comprehensive and accurate. `agent-quickstart.md` and `openclaw-first-run.md` are complete. But `install.sh` emits no doc reference after installation, doctor failures link to nothing, and the agent in the GloBird incident operated from `--help` output alone for the entire session.
+3. **Docs exist but are invisible and contradictory.** `llms.txt`, `agent-quickstart.md`, and `openclaw-first-run.md` are accurate and comprehensive. `install.sh` emits no reference to them. Doctor failure output links to nothing. One guide contradicts shipped behavior (APK absence as blocking vs. advisory).
 
-All three causes are fixable with focused, bounded changes. None require new commands or architectural changes. The most important fix (WS-1) is a two-line change to `criticalChecks.ts` plus a pre-flight guard in the execute path.
+Two secondary gaps, both confirmed in code: `runSkill.ts` fully buffers stdout/stderr until exit (no mid-flight visibility), and `validateSkill.ts` is integrity-only with no execution payload compilation.
+
+The right fix is to compose and enforce existing primitives better, not invent new commands. The one exception is `skills validate --dry-run`, which composes `skills compile-artifact` + `execute --validate-only` into a single command - justified because the three-step manual chain is not reliably followed.
 
 ---
 
 ## Top Problems, Ordered by Priority
 
-1. **APK absence is not a hard stop.** `readiness.apk.presence` is a `warn`, not in `CRITICAL_DOCTOR_CHECK_PREFIXES`, and `execute` has no pre-flight. Result: guaranteed timeout with no diagnosis. [WS-1]
-
-2. **Validation and timeout errors lack action-level context.** `EXECUTION_VALIDATION_FAILED` does not identify which action or parameter is invalid. `RESULT_ENVELOPE_TIMEOUT` does not report which action was in flight. [WS-2]
-
-3. **Docs are not surfaced at the moments agents need them.** Install completes silently. Doctor failures emit no links. The agent reads `--help` and guesses. [WS-3]
-
-4. **`skills validate` does not catch bad execution payloads.** Structural validation passes even when the compiled artifact has schema violations. Stale API usage like `format: "ascii"` survives until runtime. [WS-4]
-
-5. **No persistent log output.** On timeout or partial failure, there is no evidence trail. Agents and operators cannot triage without a live device in hand. [WS-5]
-
-6. **`./scripts/operator_event.sh` does not exist.** OpenClaw's tool executor calls this script from the Clawperator repo directory and gets a hard failure. Requires OpenClaw tool config review to determine intended behavior before the script can be written. [WS-3 or separate]
+1. **APK absence is not a hard stop.** 30-120 second timeout with no diagnosis. [PRD-1]
+2. **Validation and timeout errors lack action-level context.** Agent must guess which action caused the failure. [PRD-2]
+3. **Skill payload errors only surface at runtime on a live device.** `skills validate` passes even with schema violations in the compiled artifact. [PRD-3]
+4. **Long-running work is a black box.** `runSkill.ts` buffers all output until exit. No log trail exists after timeout. [PRD-4]
+5. **Docs are not surfaced at install time or at failure time, and one guide contradicts shipped behavior.** [PRD-5]
 
 ---
 
 ## Macro Workstreams
 
-### WS-1: Fast-fail on missing APK
+### PRD-1: Shared Readiness Gate
 
-**Goal:** Eliminate the 30-120s timeout-before-diagnosis loop.
+Make missing or mismatched Operator APK a blocking failure before live device dispatch. Reuse the existing `checkApkPresence` mechanism rather than inventing a new check. Preserve `--check-only` semantics so the installer's JSON-parsing behavior stays intact.
 
-Changes:
-- Add `readiness.apk.presence` to `CRITICAL_DOCTOR_CHECK_PREFIXES` in `criticalChecks.ts`
-- Change `status: "warn"` to `status: "fail"` for `RECEIVER_NOT_INSTALLED` in `readinessChecks.ts`
-- Add an APK presence pre-flight check at the start of the `execute` command handler, before broadcasting
-- Document the new fast-fail behavior in `docs/troubleshooting.md` and `docs/reference/node-api-doctor.md`
-- Update `docs/reference/error-handling.md` to clarify that `RECEIVER_NOT_INSTALLED` is now a hard stop
+### PRD-2: Error Message Context
 
-PRD: `prd-1.md`
+Add action `id` and `type` to `EXECUTION_VALIDATION_FAILED`. Add last-action context to `RESULT_ENVELOPE_TIMEOUT`. Both are additive changes to existing error envelopes.
 
-### WS-2: Richer error context
+### PRD-3: Skill Preflight With Payload Dry-run
 
-**Goal:** Give agents enough context in error responses to self-correct without user intervention.
+Add `--dry-run` to `skills validate` that composes the existing `skills compile-artifact` + `execute --validate-only` chain into one command. Catches schema violations before the device is touched.
 
-Changes:
-- Enrich `EXECUTION_VALIDATION_FAILED`: include offending action `id`, action `type`, and invalid parameter name in the error envelope
-- Enrich `RESULT_ENVELOPE_TIMEOUT`: include the last action `id` and `type` that was dispatched before the timeout
-- Update `docs/reference/error-handling.md` with the new envelope fields
-- Update `docs/node-api-for-agents.md` error section
+### PRD-4: Progress, Logs, and Recovery Guidance
 
-PRD: `prd-2.md`
+Add structured NDJSON log output to `~/.clawperator/logs/`. Stream `skills run` stdout/stderr to the caller in real time instead of buffering. Enrich timeout output with last-action context.
 
-### WS-3: Doctor-first agent entry points
+### PRD-5: Docs and Entry Points
 
-**Goal:** Ensure agents encounter documentation at the moment they need it, not after the debugging session ends.
-
-Changes:
-- Add a post-install banner to `install.sh` that emits the docs URL and `llms.txt` reference
-- Add a docs/troubleshooting link to doctor failure output (both `pretty` and `json` format)
-- Create `./scripts/operator_event.sh` (after OpenClaw tool config review confirms intended behavior)
-- Consider adding an `AGENTS.md` entry point to the skills repo root (deferred to skills repo discussion)
-
-PRD: `prd-3.md`
-
-### WS-4: Skills validate with payload dry-run
-
-**Goal:** Catch stale or invalid execution payloads at skill authoring time, not at runtime on a live device.
-
-Changes:
-- Extend `skills validate` to optionally compile the skill artifact and validate the resulting execution payload against the action schema
-- Add a `--dry-run` flag (or make it the default for validate) that runs compile + schema validation without touching a device
-- Report the offending action `id`, `type`, and parameter when validation fails
-- Update `docs/skills/skill-development-workflow.md` to include validate as a pre-commit step
-
-PRD: `prd-4.md`
-
-### WS-5: Structured persistent logs
-
-**Goal:** Give agents an evidence trail to triage failures without needing a live device.
-
-Changes:
-- Write JSON-structured logs to `~/.clawperator/logs/clawperator-YYYY-MM-DD.log`
-- Include `commandId`/`taskId` correlation IDs in each log entry
-- Log key events: broadcast dispatched, result envelope received, timeout fired, pre-flight checks run
-- Document the log path in `docs/troubleshooting.md`
-- Add `--log-level` flag (default `info`, options `debug|info|warn|error`)
-
-PRD: `prd-5.md`
+Fix the `RECEIVER_NOT_INSTALLED` contradiction between `first-time-setup.md` and `node-api-doctor.md`. Add post-install docs reference to `install.sh`. Add docs links to doctor failure output. Create `scripts/operator_event.sh` stub. Consolidate first-run entry points into one canonical sequence.
 
 ---
 
-## Recommended Sequencing Across PRs
+## Recommended Sequencing
 
 ```
-PR-1  WS-1: Fast-fail on missing APK
-      - criticalChecks.ts: add apk.presence
-      - readinessChecks.ts: warn -> fail
-      - execute: pre-flight guard
-      - docs: troubleshooting, error-handling, node-api-doctor updates
-      Risk: low. Pure enforcement change; no new behavior.
+PR-1  PRD-1 + PRD-5 (partial)
+      - criticalChecks.ts: add readiness.apk.presence
+      - readinessChecks.ts: RECEIVER_NOT_INSTALLED warn -> fail
+      - runExecution.ts: APK pre-flight before broadcastAgentCommand
+      - install.sh: post-install docs banner
+      - docs: fix first-time-setup.md / node-api-doctor.md contradiction
+      - scripts/operator_event.sh: stub (pending OpenClaw tool config review)
+      Risk: low. Pure enforcement + additive UX. --check-only preserved.
+      Depends on: nothing.
 
-PR-2  WS-2: Richer error context
-      - EXECUTION_VALIDATION_FAILED enrichment
-      - RESULT_ENVELOPE_TIMEOUT last-action context
-      - docs: error-handling, node-api-for-agents updates
-      Risk: low-medium. Envelope shape change; agents reading errors must handle new fields.
-      Depends on: none (independent of PR-1)
+PR-2  PRD-2
+      - validateExecution.ts: add actionId, actionType to ValidationFailure.details
+      - runExecution.ts: pass last-action context into RESULT_ENVELOPE_TIMEOUT
+      - docs: error-handling.md, node-api-for-agents.md
+      Risk: low-medium. Additive envelope change. Backward-compatible.
+      Depends on: nothing (independent of PR-1).
 
-PR-3  WS-3: Doctor-first entry points
-      - install.sh post-install banner
+PR-3  PRD-3
+      - skills validate: --dry-run flag composing compile-artifact + execute --validate-only
+      - docs: skill-development-workflow.md
+      Risk: medium. Requires compile-artifact to be usable without a device.
+      Depends on: PR-2 (uses enriched error format in dry-run output).
+
+PR-4  PRD-4
+      - runSkill.ts: stream stdout/stderr to caller instead of buffering
+      - log infrastructure: ~/.clawperator/logs/ NDJSON
+      - --log-level global flag
+      - docs: troubleshooting.md log section
+      Risk: medium. runSkill output contract change; log filesystem surface.
+      Depends on: PR-1 (pre-flight events are the most valuable log entries).
+
+PR-5  PRD-5 (remainder)
+      - docs/index.md, agent-quickstart.md, openclaw-first-run.md consolidation
+      - llms.txt alignment with shipped semantics
       - doctor failure output: docs links
-      - operator_event.sh (after OpenClaw review)
-      Risk: low. UX-only changes; no contract changes.
-      Depends on: none (independent)
-
-PR-4  WS-4: Skills validate payload dry-run
-      - skills validate --dry-run
-      - skill-development-workflow.md update
-      Risk: medium. Requires skill compile path to be invocable in isolation.
-      Depends on: PR-2 (uses same enriched validation error format)
-
-PR-5  WS-5: Structured persistent logs
-      - log-to-disk infrastructure
-      - correlation ID wiring
-      - --log-level flag
-      - troubleshooting.md update
-      Risk: medium. New file system surface; needs configurable path and rotation.
-      Depends on: none (independent, but more useful after PR-1 pre-flights are in place)
+      Risk: low. Docs-only. Must not over-promise behavior.
+      Depends on: PR-1, PR-2, PR-3, PR-4 settled (so docs reflect final behavior).
 ```
 
-**Recommended order:** PR-1, PR-3, PR-2, PR-5, PR-4
-
-Rationale: PR-1 eliminates the primary confusion source immediately. PR-3 requires no code changes to the runtime and can ship alongside PR-1. PR-2 improves the errors that still occur after PR-1. PR-5 provides the log trail that makes PR-2 errors even more actionable. PR-4 is most valuable once the runtime contract is stable.
+Rationale for splitting PRD-5 across PR-1 and PR-5: the `install.sh` banner and the doc contradiction fix have no code dependencies and should ship immediately with the readiness gate (they describe the same change). The remaining consolidation must wait for all runtime changes to settle or the docs will age immediately.
 
 ---
 
-## Key Risks and Open Questions
+## Key Risks
 
-**Risk: APK pre-flight latency in execute**
-Adding an adb `pm list packages` call to every `execute` invocation adds ~100ms. This is acceptable for CLI usage but could matter for agents running tight loops. Mitigation: check against a cached result written by the most recent `operator setup` or `doctor` run; invalidate on device change.
+**Risk: installer behavior after severity change**
+`install.sh` already parses `doctor --format json` output and conditionally installs the APK based on the result. Changing `RECEIVER_NOT_INSTALLED` from `warn` to `fail` in `readinessChecks.ts` must be accompanied by verifying that the installer's JSON parsing still handles the new severity correctly. Use `--check-only` where the installer needs non-destructive inspection semantics.
 
-**Open question: `operator_event.sh` intended behavior**
-The OpenClaw tool executor calls `./scripts/operator_event.sh` from the Clawperator repo directory. The script does not exist. Before writing it, the OpenClaw-side tool configuration must be reviewed to determine: what arguments does it pass? what output does it expect? what does it do on success vs. failure? Without this, any stub risks silently masking expected behavior.
+**Risk: `--check-only` vs. blocking mode confusion**
+There must be exactly one clear semantic: `clawperator doctor` blocks on missing APK; `clawperator doctor --check-only` reports without blocking. Document this distinction explicitly.
 
-**Open question: streaming architecture**
-Full per-action streaming from `skills run` requires the Android Operator APK to emit action-level events. This is not achievable in a pure Node/CLI change. A narrower version - streaming the CLI-side log to stdout as JSONL - is achievable without APK changes but does not surface Android-side action results. Product decision needed before PRD-5-streaming is written.
+**Risk: runSkill stdout streaming breaks expect-contains**
+`skills run` supports `--expect-contains` which checks the complete output. Streaming stdout to the caller while also capturing it for this check requires both. Ensure the streaming change does not break the `--expect-contains` contract.
 
-**Risk: envelope shape change in WS-2**
-Adding fields to `EXECUTION_VALIDATION_FAILED` and `RESULT_ENVELOPE_TIMEOUT` changes the error envelope contract. Agents that pattern-match on `error.message` alone are unaffected. Agents that parse `error.details` will see new fields. This is additive and backward-compatible.
+**Risk: operator_event.sh stub masking intent**
+If OpenClaw expects specific output from this script, a no-op stub will silently break the integration. The stub must emit a warning to stderr so the silence is visible. Requires OpenClaw tool config review before any real implementation.
 
-**Deferred: `enter_text clear: true`**
-Requires Android receiver changes plus a coordinated CLI/APK release. Document the gap explicitly in `docs/node-api-for-agents.md` as a known limitation until the fix ships.
+**Risk: dry-run compile for device-dependent skills**
+Some skill scripts may query device state when generating their payload. Dry-run will fail or produce incomplete results for these. Keep `--dry-run` as an explicit opt-in; document the limitation; do not make it the default until impact on existing skills is assessed.
 
-**Deferred: `clawperator status` command**
-The core need (is my environment ready, which device am I targeting) is met by `clawperator doctor --output json --check-only`. Implementing a separate `status` command duplicates the surface without clear incremental value. Close this issue as "doctor is the status surface; make it faster and link to it better."
+---
+
+## Open Questions
+
+1. Does the OpenClaw tool configuration that calls `./scripts/operator_event.sh` pass arguments? What output does it expect? This must be confirmed before writing anything beyond a stub.
+2. Should the APK pre-flight in `runExecution.ts` use a cached result (written by the most recent `operator setup` or `doctor` run) or always make a fresh adb call? The adb round-trip is ~100ms - acceptable, but a cache is better for tight loops.
+3. Should `RECEIVER_VARIANT_MISMATCH` also become a hard failure, or stay a `warn`? The current `--receiver-package` workaround makes it recoverable without reinstalling. Keep as `warn` for now.
+
+---
+
+## Explicitly Deferred
+
+- `clawperator status` command: `clawperator doctor --output json` already answers the core question. Insufficient evidence that a cached status surface is needed more than a faster doctor path.
+- Full per-action streaming from Android side: requires Operator APK changes. Not achievable in a Node/CLI-only change.
+- `AGENTS.md` or `CLAUDE.md` in the skills repo: useful maintenance improvement, not a first-run fix. Skills repo is a separate repo; coordinate separately.
+- `enter_text clear: true` no-op: requires Android receiver changes. Document the gap in `docs/node-api-for-agents.md` as a known limitation in PR-2.
+- Log compression and archival: out of scope for initial log infrastructure.
 
 ---
 
 ## What Success Looks Like
 
-A new OpenClaw agent, on a fresh Clawperator install, should:
-
-1. Run `install.sh`, see a post-install banner pointing to `llms.txt` and the docs site.
-2. Run `clawperator doctor` before anything else (prompted by install banner or agent-quickstart).
-3. If the APK is missing, get a hard failure with a specific install command - not a warning that allows the next command to time out.
-4. If a skill fails with `EXECUTION_VALIDATION_FAILED`, see the exact action and parameter that caused the error in the error envelope.
-5. If a skill times out, see the last action that was in flight in the timeout envelope.
-6. Find `~/.clawperator/logs/` with a structured log that traces what happened.
-7. Never wait 30-120 seconds for a timeout that could have been caught in under 1 second.
+1. A cold-start agent whose APK is missing gets a specific, instant error with an install command - not a 30-120 second timeout.
+2. A `EXECUTION_VALIDATION_FAILED` error names the action `id`, `type`, and the invalid parameter.
+3. `clawperator skills validate <id> --dry-run` catches schema violations before the device is touched.
+4. After any timeout, `~/.clawperator/logs/` contains a trace showing which phase of the pipeline failed.
+5. `skills run` produces visible output during execution, not just at completion.
+6. `install.sh` emits a docs reference. Doctor failures link to recovery guidance.
+7. The docs and shipped behavior agree about what `RECEIVER_NOT_INSTALLED` means.
