@@ -99,7 +99,7 @@ CLAWPERATOR_BIN=/path/to/clawperator/apps/node/dist/cli/index.js \
 
 Controls the installer's "install APK now?" prompt.
 
-Current behavior in `scripts/install.sh`:
+Current behavior in `sites/landing/public/install.sh`:
 
 - `Y`, `y`, `yes`, `YES` mean proceed with APK install
 - any other non-empty value means skip APK install
