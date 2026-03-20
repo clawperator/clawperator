@@ -12,14 +12,39 @@ const monoFont = IBM_Plex_Mono({
   weight: ["400", "500"]
 });
 
+const shareImage = "https://static.clawperator.com/img/share/clawperator_share_image.png";
+
 export const metadata = {
+  metadataBase: new URL("https://clawperator.com"),
   title: "Clawperator",
   description: "Deterministic Android Automation for AI Agents",
+  applicationName: "Clawperator",
   icons: {
     icon: [
       { url: "/favicon.png", sizes: "32x32", type: "image/png" },
       { url: "/favicon.png", sizes: "16x16", type: "image/png" }
     ]
+  },
+  openGraph: {
+    title: "Clawperator",
+    description: "Deterministic Android Automation for AI Agents",
+    siteName: "Clawperator",
+    type: "website",
+    images: [
+      {
+        url: shareImage,
+        type: "image/png",
+        width: 1200,
+        height: 630,
+        alt: "Clawperator share image"
+      }
+    ]
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Clawperator",
+    description: "Deterministic Android Automation for AI Agents",
+    images: [shareImage]
   }
 };
 
@@ -62,6 +87,9 @@ export default function RootLayout({ children }) {
     <html lang="en">
       <head>
         <link rel="alternate" type="text/markdown" href="https://clawperator.com/index.md" />
+        <link rel="image_src" href={shareImage} />
+        <meta property="og:image:secure_url" content={shareImage} />
+        <meta name="twitter:image:alt" content="Clawperator share image" />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: structuredDataJson }}
