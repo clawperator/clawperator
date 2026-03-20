@@ -15,6 +15,9 @@ proof-of-concept artifacts under `~/.clawperator/skills/skills/...` rather
 than as canonical entries in the shared skills repo. This page explains the
 recording-side contract and the durable lessons from the experiment; the
 skills-repo docs cover the general authoring workflow and prompt templates.
+When regenerating the docs site locally, keep the sibling skills repo checked
+out at a matching commit so the linked authoring pages and this recording note
+stay in sync.
 
 In practice, that means the author must be able to answer two questions for
 every step:
