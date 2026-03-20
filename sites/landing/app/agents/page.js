@@ -1,6 +1,27 @@
 export const metadata = {
   title: "Clawperator for Agents",
-  description: "Machine-oriented entrypoint for agents integrating with Clawperator."
+  description: "Machine-oriented entrypoint for agents integrating with Clawperator.",
+  openGraph: {
+    title: "Clawperator for Agents",
+    description: "Machine-oriented entrypoint for agents integrating with Clawperator.",
+    siteName: "Clawperator",
+    type: "website",
+    images: [
+      {
+        url: "https://static.clawperator.com/img/share/clawperator_share_image.png",
+        type: "image/png",
+        width: 1200,
+        height: 630,
+        alt: "Clawperator share image"
+      }
+    ]
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Clawperator for Agents",
+    description: "Machine-oriented entrypoint for agents integrating with Clawperator.",
+    images: ["https://static.clawperator.com/img/share/clawperator_share_image.png"]
+  }
 };
 
 const links = [
