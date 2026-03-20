@@ -77,43 +77,72 @@ Check `agent-quickstart.md`, `openclaw-first-run.md`, and `first-time-setup.md` 
 
 ### 3. Add docs links to doctor failure output
 
-When `clawperator doctor` reports a critical failure in `pretty` mode, append:
+Three files must change in lockstep:
 
+**a. `apps/node/src/contracts/doctor.ts`**: Add `docsUrl` to the `fix` type:
+
+```typescript
+fix?: {
+  title: string;
+  platform: "mac" | "linux" | "win" | "any";
+  steps: Array<{ kind: "shell" | "manual"; value: string }>;
+  docsUrl?: string;    // new optional field
+};
 ```
-  Docs: https://docs.clawperator.com/troubleshooting
-```
 
-In `json` mode, add a `docsUrl` field to the `fix` object of each critical failure:
+**b. `apps/node/src/cli/commands/doctor.ts`**: Update `renderCheck` to render `docsUrl` in pretty mode:
 
-```json
-{
-  "fix": {
-    "title": "Install Operator APK",
-    "docsUrl": "https://docs.clawperator.com/getting-started/first-time-setup",
-    "steps": [...]
+```typescript
+if (check.status !== "pass" && check.fix) {
+  lines.push(`    ${check.fix.title}:`);
+  for (const step of check.fix.steps) {
+    lines.push(`      - ${step.value}`);
+  }
+  if (check.fix.docsUrl) {
+    lines.push(`      Docs: ${check.fix.docsUrl}`);
   }
 }
 ```
 
-This is additive to the existing `fix` structure. Only add `docsUrl` for critical failures where a specific relevant page exists.
+JSON mode already serializes the full `DoctorReport` object, so `docsUrl` will appear automatically once it is in the type and populated in the check result. No separate JSON formatter change is needed.
+
+**c. `apps/node/src/domain/doctor/checks/readinessChecks.ts`**: Populate `docsUrl` in the `RECEIVER_NOT_INSTALLED` fix:
+
+```typescript
+fix: {
+  title: "Install Operator APK",
+  platform: "any",
+  docsUrl: "https://docs.clawperator.com/getting-started/first-time-setup",
+  steps: [...]
+}
+```
+
+Only add `docsUrl` to checks where a specific, stable docs page exists. The initial set: `RECEIVER_NOT_INSTALLED`, `RECEIVER_VARIANT_MISMATCH`, and `DEVICE_DEV_OPTIONS_DISABLED`. Do not add it to all checks as a bulk change.
+
+Required tests:
+- Unit test: `renderCheck` output for a check with `fix.docsUrl` includes the `Docs:` line.
+- Unit test: `renderCheck` output for a check without `fix.docsUrl` does not include a `Docs:` line.
+- Unit test: `JSON.parse(cmdDoctor({ format: "json", ... }))` output for `RECEIVER_NOT_INSTALLED` includes `fix.docsUrl`.
+- Type-level: TypeScript compilation verifies `docsUrl` is optional (not required) in the `fix` type.
 
 ### 4. `scripts/operator_event.sh`: investigation and stub
 
-Before writing this script, review the OpenClaw tool configuration to determine:
-- What arguments does it pass to this script?
-- What output format does it expect?
-- What should happen on success vs. failure?
+This is a **blocking prerequisite** for this item - review the OpenClaw tool configuration before writing any code:
+- What command invokes this script? What is the exact call path in the OpenClaw tool config?
+- What arguments are passed?
+- What output format or exit code does OpenClaw expect?
+- Is the missing script the root cause, or does the failure indicate a deeper contract issue between OpenClaw and Clawperator?
 
-If the intended behavior is confirmed: write the script with that behavior, following the `clawperator_*` naming convention of other scripts in `scripts/`, or a new `scripts/hooks/` directory if this is the first hook.
+If the intended behavior is confirmed and straightforward: implement it, following the `clawperator_*` naming convention and `set -euo pipefail` header used by other scripts in `scripts/`.
 
-If the intent cannot be confirmed before this PR: create a stub that:
+If the intended behavior is non-trivial or requires a human decision: create a stub with all of the following properties:
 - Accepts any arguments
 - Exits 0
-- Emits one line to stderr: `operator_event.sh: stub - behavior not yet implemented`
+- Emits one line to stderr: `operator_event.sh: stub - not yet implemented (see tasks/node/agent-usage/prd-5.md)`
 
-The stderr line keeps the stub visible and prevents the "no such file" error from silently masking future investigation.
+**Do not merge a silent no-op stub.** A silent exit-0 with no output masks the failure and could suppress real events that OpenClaw expected to receive. The stderr note keeps the stub visible in log inspection.
 
-**Do not merge a silent no-op stub.** A stub that exits 0 and emits nothing will suppress the error but may silently drop behavior that OpenClaw expected. The stderr note keeps it detectable.
+**Do not merge this item without the OpenClaw review.** If the review cannot be completed in this PR, drop the item and create a follow-up issue. An uninvestigated stub is preferable to leaving the "no such file" error, but a confirmed implementation is required before this is done.
 
 ### 5. `llms.txt` alignment
 
@@ -184,11 +213,13 @@ A silent no-op is worse than the current visible error. The stub must emit a std
 1. Manual review: `docs/index.md` agent section leads with `llms.txt` and `agent-quickstart.md`.
 2. Manual review: all three first-run guides describe APK absence as a hard failure with the install command.
 3. Manual review: no guide describes APK absence as advisory after PR-1 lands.
-4. Integration test: `clawperator doctor --output pretty` with a critical failure includes a `Docs:` line.
-5. Integration test: `clawperator doctor --output json` with a critical failure includes `fix.docsUrl`.
-6. Verify: `./scripts/operator_event.sh` exists and exits 0.
-7. Verify: OpenClaw gateway log no longer shows "no such file or directory" for this script.
-8. Manual review: both `llms.txt` files describe `skills validate --dry-run`, persistent logs, and `enter_text clear: true` limitation accurately.
+4. Unit test: `renderCheck` with `fix.docsUrl` present - output includes `Docs:` line.
+5. Unit test: `renderCheck` without `fix.docsUrl` - output does not include `Docs:` line.
+6. Unit test: doctor JSON output for `RECEIVER_NOT_INSTALLED` check includes `fix.docsUrl`.
+7. Type check: `fix.docsUrl` is optional (TypeScript compilation passes without providing it).
+8. Verify: `./scripts/operator_event.sh` exists, exits 0, and emits a detectable stderr stub notice (if full behavior is not yet confirmed).
+9. Verify: OpenClaw gateway log no longer shows "no such file or directory" for this script.
+10. Manual review: both `llms.txt` files describe `skills validate --dry-run`, persistent logs, and `enter_text clear: true` limitation accurately.
 
 ---
 
@@ -196,8 +227,12 @@ A silent no-op is worse than the current visible error. The stub must emit a std
 
 - `docs/index.md` agent section labels `llms.txt` as the machine-readable starting point.
 - All first-run guides describe APK absence as a blocking failure with the install command.
-- `clawperator doctor --output pretty` includes a `Docs:` URL for critical failures.
-- `clawperator doctor --output json` includes `fix.docsUrl` for critical failures.
-- `./scripts/operator_event.sh` exists, exits 0, and emits a detectable stderr stub notice.
+- `contracts/doctor.ts`: `fix.docsUrl` is an optional field in the `DoctorCheckResult.fix` type.
+- `cli/commands/doctor.ts`: `renderCheck` renders `Docs: <url>` in pretty output when `fix.docsUrl` is set.
+- `clawperator doctor --output json` for `RECEIVER_NOT_INSTALLED` includes `fix.docsUrl`.
+- `clawperator doctor --output pretty` for `RECEIVER_NOT_INSTALLED` includes a `Docs:` line.
+- Existing checks without `docsUrl` are unaffected (TypeScript `docsUrl?` optional).
+- `./scripts/operator_event.sh` exists, exits 0, and emits a detectable stderr notice (stub) OR has confirmed behavior from OpenClaw review.
+- OpenClaw review outcome is documented before merging the stub.
 - Both `llms.txt` files accurately describe all behavior shipped in PRs 1-4.
 - No guide contradicts shipped `doctor` behavior.

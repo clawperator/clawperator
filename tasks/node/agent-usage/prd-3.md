@@ -58,11 +58,19 @@ The validation chain exists. It is not composed.
 
 When `--dry-run` is specified:
 1. Run the existing integrity checks (unchanged - files, metadata).
-2. For each artifact defined in `skill.artifacts`, compile it using the same logic as `skills compile-artifact`.
-3. Validate the compiled payload against the action schema using the same path as `execute --validate-only`.
-4. Report any schema violations using the enriched error format from PRD-2: action `id`, `type`, `invalidKeys`, and `hint`.
+2. Inspect `skill.artifacts`:
+   - **Artifact-backed skills** (one or more entries in `skill.artifacts`): compile each artifact using the same logic as `skills compile-artifact`, then validate the compiled payload against the action schema using the same path as `execute --validate-only`. Report any schema violations using the enriched error format from PRD-2.
+   - **Script-only skills** (empty or absent `skill.artifacts`): run integrity checks only. Exit 0. Include a top-level `dryRun` field in the JSON output:
+     ```json
+     "dryRun": {
+       "payloadValidation": "skipped",
+       "reason": "skill has no pre-compiled artifacts; payload is generated at runtime by the skill script"
+     }
+     ```
+     In pretty mode, print: `  [INFO] Payload validation skipped: no pre-compiled artifacts`
+3. Do not attempt to execute or simulate the skill script for script-only skills. The dynamic payload path cannot be validated statically.
 
-If a skill has no artifacts (script-only skills), step 2-3 produce no output for the payload validation phase. Document this: `--dry-run` on a script-only skill validates integrity but cannot validate the payload since there is no pre-compiled artifact.
+`--dry-run` coverage is explicitly scoped: it is a payload schema check, not a UI behavior simulation. Script-only skills get integrity validation only. Document this distinction prominently so agents understand what passes `--dry-run` and what does not.
 
 ### 2. Keep `skills validate` (no flag) unchanged
 
@@ -158,8 +166,9 @@ Making `--dry-run` the default would break CI for skills that can't compile with
 
 ## Acceptance Criteria
 
-- `clawperator skills validate <id> --dry-run` compiles all skill artifacts and validates them against the action schema.
+- `clawperator skills validate <id> --dry-run` compiles all skill artifacts and validates them against the action schema for artifact-backed skills.
 - A skill with `format: "ascii"` in a `snapshot_ui` action fails `--dry-run` with `details.actionId`, `details.actionType`, `details.invalidKeys`.
+- `clawperator skills validate <id> --dry-run` on a script-only skill exits 0 and reports `dryRun.payloadValidation: "skipped"` with an explicit reason.
 - `clawperator skills validate <id>` (no flag) behaves identically to today.
 - A skill with valid files and valid payload passes `--dry-run`.
-- `docs/skills/skill-development-workflow.md` documents `--dry-run` as the pre-device validation step.
+- `docs/skills/skill-development-workflow.md` documents `--dry-run` as the pre-device validation step for artifact-backed skills, with an explicit note that script-only skills cannot be statically validated.

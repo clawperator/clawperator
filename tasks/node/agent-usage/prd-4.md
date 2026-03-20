@@ -58,17 +58,32 @@ Output is accumulated and only returned in the final result. No streaming to the
 
 ### 1. Stream `runSkill.ts` stdout/stderr to the caller in real time
 
-Change the `stdio` from `["ignore", "pipe", "pipe"]` to allow real-time forwarding of the child process output while still capturing it for the final result and `--expect-contains` check.
+Keep `runSkill.ts` as a pure domain helper - do not write to `process.stdout` or `process.stderr` from inside it. Instead, add an optional `onOutput` callback parameter:
 
-The child's stdout should be both:
-- forwarded to the CLI's stdout as it arrives (agents can observe it live)
-- accumulated for the `output` field in the final `SkillRunResult`
+```typescript
+export interface SkillRunCallbacks {
+  onOutput?: (chunk: string, stream: "stdout" | "stderr") => void;
+}
 
-Same for stderr.
+export async function runSkill(
+  skillId: string,
+  args: string[],
+  registryPath?: string,
+  timeoutMs?: number,
+  env?: SkillRunEnv,
+  callbacks?: SkillRunCallbacks,    // new optional parameter
+): Promise<SkillRunResult | SkillRunError>
+```
 
-This is a contained change within `runSkill.ts`. The final result shape (`SkillRunResult`) does not change. The `--expect-contains` check still operates on the full accumulated output.
+In the `data` handlers, call `callbacks?.onOutput(chunk, "stdout")` in addition to accumulating. The domain module stays clean; output routing is the caller's responsibility.
 
-Implementation note: use the existing `data` handlers but also call `process.stdout.write(chunk)` (or the equivalent output stream) in addition to accumulating.
+At the CLI layer (`apps/node/src/cli/commands/skills.ts` or wherever `runSkill` is called for `skills run`):
+- In `pretty` / TTY mode: wire `onOutput` to `process.stdout.write` / `process.stderr.write`
+- In `json` mode: do not wire `onOutput` at all - no live output interleaving with machine-readable output
+
+The final result shape (`SkillRunResult.output`) is unchanged - the full accumulated stdout is still returned for `--expect-contains` and JSON output consumers. Live forwarding does not replace it.
+
+This is also the correct pattern for the APK pre-flight callback in PRD-1 if `runSkill.ts` needs to surface a pre-flight error message before exit.
 
 ### 2. Structured NDJSON log to `~/.clawperator/logs/`
 
@@ -194,10 +209,12 @@ Do not log execution payload content at any level. Payload may contain user-ente
 
 ## Validation Plan
 
-1. Unit test: `runSkill` with a script that emits stdout line-by-line - verify output appears before script exits.
-2. Unit test: `SkillRunResult.output` contains the full accumulated stdout even after streaming.
-3. Unit test: `--expect-contains` still works correctly after streaming change.
-4. Unit test: `SKILL_EXECUTION_TIMEOUT` still returns partial `stdout` in the error.
+1. Unit test: `runSkill` with `onOutput` callback - verify the callback receives chunks before the promise resolves.
+2. Unit test: `SkillRunResult.output` contains the full accumulated stdout regardless of whether `onOutput` is provided.
+3. Unit test: `runSkill` without `onOutput` callback still accumulates correctly (backward-compatible call signature).
+4. Unit test: `--expect-contains` still works correctly (still operates on the full accumulated `output`).
+5. Unit test: `SKILL_EXECUTION_TIMEOUT` still returns partial `stdout` in the error.
+6. Integration test: `skills run --output json` produces no interleaved progress text - only the final JSON result on stdout.
 5. Integration test: after `clawperator execute` completes, `~/.clawperator/logs/clawperator-YYYY-MM-DD.log` exists and contains `broadcast.dispatched` and `envelope.received` with matching `commandId`.
 6. Integration test: after a timeout, the log contains `timeout.fired`.
 7. Integration test: `CLAWPERATOR_LOG_DIR=/tmp/custom-logs clawperator execute ...` writes to the custom path.
@@ -207,9 +224,11 @@ Do not log execution payload content at any level. Payload may contain user-ente
 
 ## Acceptance Criteria
 
-- `skills run` output is visible to the caller as it arrives, not only at completion.
-- `SkillRunResult.output` is unchanged (full accumulated output, not streaming reference).
-- `--expect-contains` works correctly with the streaming change.
+- `skills run` in pretty/TTY mode: output is visible to the caller as it arrives, not only at completion.
+- `skills run --output json`: no live output interleaving - stdout receives only the final JSON result envelope.
+- `runSkill.ts` does not write to `process.stdout` or `process.stderr` directly; live forwarding is performed by the CLI layer via the `onOutput` callback.
+- `SkillRunResult.output` is unchanged (full accumulated output regardless of streaming mode).
+- `--expect-contains` works correctly in both output modes.
 - All `execute` invocations write NDJSON to `~/.clawperator/logs/clawperator-YYYY-MM-DD.log`.
 - Each log entry includes `ts`, `level`, `event`, `commandId` (when available), `deviceId` (when known), `message`.
 - `--log-level debug|info|warn|error` controls verbosity.

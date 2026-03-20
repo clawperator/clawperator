@@ -101,9 +101,9 @@ Before `broadcastAgentCommand`, run `checkApkPresence(config)`. On failure, retu
 
 Implementation notes:
 - Reuse `checkApkPresence` from `readinessChecks.ts` directly - do not duplicate the adb call.
-- Cache the result for the duration of a CLI session (keyed on device serial) to avoid the round-trip on every execute call in a tight loop. Invalidate the cache on device change or `operator setup`.
+- The adb round-trip is ~100ms. No session-level cache is warranted: each `clawperator execute` is a separate process, so in-memory caching provides no benefit. Keep it a fresh check on every invocation.
 - Follow the `injectServiceUnavailableHint` pattern already in `runExecution.ts` for the hint text.
-- `skills run` inherits this behavior because it calls `execute` internally via the skill script.
+- `skills run` does NOT inherit this check automatically. `runSkill.ts` spawns an arbitrary script process - it has no call to `runExecution`. Skills that happen to call `clawperator execute` from within their script will hit the check. Skills that use `adb` directly or omit execution entirely will not. The `runSkill.ts` wrapper must therefore also call `checkApkPresence` before spawning the skill script, so the gate is enforced regardless of how the script is written.
 
 ### 4. `--check-only` semantics preserved
 
@@ -167,8 +167,11 @@ None. This is the first PR and depends on no other workstream.
 **Risk: installer behavior**
 `install.sh` parses `doctor --format json` and uses the result to decide whether to install the APK. The installer must handle `status: "fail"` for APK absence correctly after this change. Verify that the installer's JSON parsing does not treat a `fail` severity as an unrecoverable error that prevents the install step from running.
 
-**Risk: adb round-trip in execute**
-The pre-flight adds ~100ms to every execute call. Cache the result by device serial for the session lifetime. Do not make the adb call if a fresh successful result is available from the current session.
+**Risk: adb round-trip in execute and runSkill**
+The pre-flight adds ~100ms per invocation. Each CLI call is a new process, so no in-memory cache is possible. The raw adb cost is acceptable. If it proves measurable, a short-lived on-disk stamp (e.g. `~/.clawperator/cache/apk-<serial>.json` with a 5-second TTL) is the right follow-on optimization - do not add that complexity in this PR.
+
+**Risk: gate placement in runSkill.ts**
+The check added to `runSkill.ts` runs before the skill script is spawned. If a skill is designed to install the APK itself (unusual but possible), the pre-flight will incorrectly block it. Document that self-installing skills should call `clawperator operator setup` before being invoked via `skills run`.
 
 ---
 
@@ -177,6 +180,7 @@ The pre-flight adds ~100ms to every execute call. Cache the result by device ser
 1. Unit test: `isCriticalDoctorCheck({ id: "readiness.apk.presence", ... })` returns `true`.
 2. Unit test: `checkApkPresence` returns `status: "fail"` (not `"warn"`) when the package is absent.
 3. Unit test: `runExecution` returns `RECEIVER_NOT_INSTALLED` error before broadcasting when APK absent.
+3a. Unit test: `runSkill` returns `RECEIVER_NOT_INSTALLED` error before spawning the script when APK absent (gate at `runSkill.ts` layer, not just `runExecution.ts`).
 4. Integration test: `clawperator execute` with no APK returns `RECEIVER_NOT_INSTALLED` in under 2 seconds.
 5. Integration test: `clawperator doctor --output json` exits non-zero when APK is absent.
 6. Integration test: `clawperator doctor --check-only --output json` exits 0 and returns parseable JSON even when APK is absent.
