@@ -274,10 +274,10 @@ This will report any version mismatch between the CLI and the installed APK.
 
 **Temporary workaround (sibling repo checkout):**
 
-If you have a local checkout of the clawperator repo at the sibling path, skills will automatically prefer the local build over the global binary. You can also set `CLAW_BIN` explicitly:
+If you have a local checkout of the clawperator repo at the sibling path, skills will automatically prefer the local build over the global binary. You can also set `CLAWPERATOR_BIN` explicitly:
 
 ```bash
-export CLAW_BIN=/path/to/clawperator/apps/node/dist/cli/index.js
+export CLAWPERATOR_BIN=/path/to/clawperator/apps/node/dist/cli/index.js
 ```
 
 Rebuild the local binary first if needed:
@@ -286,6 +286,9 @@ Rebuild the local binary first if needed:
 npm --prefix /path/to/clawperator/apps/node install
 npm --prefix /path/to/clawperator/apps/node run build
 ```
+
+If you are using a local branch build, point `CLAWPERATOR_BIN` at the branch-local
+CLI path so skill scripts run against that build.
 
 ---
 
@@ -375,14 +378,25 @@ clawperator version --check-compat --receiver-package com.clawperator.operator.d
 
 **How to fix:**
 
-1. **For development/testing with local build:**
+1. **For development/testing with local build and dev APK:**
    ```bash
-   # Set CLAW_BIN to use local branch build
-   export CLAW_BIN=/path/to/clawperator/apps/node/dist/cli/index.js
+   # Set CLAWPERATOR_BIN to use local branch build
+   export CLAWPERATOR_BIN=/path/to/clawperator/apps/node/dist/cli/index.js
+   
+   # Set CLAWPERATOR_RECEIVER_PACKAGE to target the dev APK
+   export CLAWPERATOR_RECEIVER_PACKAGE=com.clawperator.operator.dev
    
    # Rebuild if needed
    npm --prefix /path/to/clawperator/apps/node install
    npm --prefix /path/to/clawperator/apps/node run build
+   
+   # Now skills will use the local build and target the dev APK
+   clawperator skills run <skill_id>
+   ```
+
+   Or use the `--receiver-package` flag for a single run:
+   ```bash
+   clawperator skills run <skill_id> --receiver-package com.clawperator.operator.dev
    ```
 
 2. **For production use:** Ensure the global npm package matches your APK:
@@ -391,9 +405,7 @@ clawperator version --check-compat --receiver-package com.clawperator.operator.d
    clawperator version --check-compat --receiver-package com.clawperator.operator
    ```
 
-3. **For skills specifically:** Skills call the global `clawperator` binary internally. When testing skills with a dev APK, the skill will timeout unless you:
-   - Use the release APK (`com.clawperator.operator`)
-   - Or test skill logic via direct `clawperator execute` calls instead
+3. **For skills specifically:** Skills receive `CLAWPERATOR_BIN` and `CLAWPERATOR_RECEIVER_PACKAGE` environment variables automatically from the CLI. When testing skills with a dev APK, set these environment variables or use the `--receiver-package` flag.
 
 ### Skill validation passes but execution fails
 

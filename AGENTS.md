@@ -209,6 +209,7 @@ When multiple devices are connected (physical + emulator), be explicit about whi
 - Do not hardcode personal names, device identifiers, or local machine paths.
 - Use placeholders in examples:
   - `<device_id>`, `<device_serial>`, `<person_name>`, `<local_user>`
+- Never shorten `Clawperator` to `Claw` in code, docs, comments, or commit messages. `Claw` is reserved for OpenClaw or OpenClaw-like agents and is not an acceptable shorthand for this project.
 - If local blocked-terms policy is enabled, keep it in the user-scoped config dir:
   - `~/.clawperator/blocked-terms.txt`
 - Before release or force-push events, run a blocked-term scan and verify clean history.

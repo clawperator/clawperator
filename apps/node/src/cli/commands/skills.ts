@@ -3,12 +3,18 @@ import { getSkill } from "../../domain/skills/getSkill.js";
 import { compileArtifact } from "../../domain/skills/compileArtifact.js";
 import { syncSkills } from "../../domain/skills/syncSkills.js";
 import { searchSkills } from "../../domain/skills/searchSkills.js";
-import { runSkill } from "../../domain/skills/runSkill.js";
+import { runSkill, type SkillRunEnv } from "../../domain/skills/runSkill.js";
 import { scaffoldSkill } from "../../domain/skills/scaffoldSkill.js";
 import { validateAllSkills, validateSkill } from "../../domain/skills/validateSkill.js";
 import { SKILL_OUTPUT_ASSERTION_FAILED } from "../../contracts/skills.js";
 import type { OutputOptions } from "../output.js";
 import { formatSuccess, formatError } from "../output.js";
+import {
+  CLAWPERATOR_BIN_ENV_VAR,
+  CLAWPERATOR_RECEIVER_PACKAGE_ENV_VAR,
+  resolveSkillBinCommand,
+  resolveReceiverPackage,
+} from "../../domain/skills/skillsConfig.js";
 
 export async function cmdSkillsList(options: { format: OutputOptions["format"] }): Promise<string> {
   const result = await listSkills();
@@ -98,9 +104,20 @@ export async function cmdSkillsRun(
   args: string[],
   timeoutMs: number | undefined,
   expectContains: string | undefined,
+  receiverPackage: string | undefined,
   options: { format: OutputOptions["format"] }
 ): Promise<string> {
-  const result = await runSkill(skillId, args, undefined, timeoutMs);
+  // Resolve the env vars for the skill script
+  // Priority: explicit flag > env var > default
+  const resolvedBin = resolveSkillBinCommand();
+  const resolvedReceiverPackage = receiverPackage ?? resolveReceiverPackage();
+
+  const env: SkillRunEnv = {
+    [CLAWPERATOR_BIN_ENV_VAR]: resolvedBin,
+    [CLAWPERATOR_RECEIVER_PACKAGE_ENV_VAR]: resolvedReceiverPackage,
+  };
+
+  const result = await runSkill(skillId, args, undefined, timeoutMs, env);
   if (result.ok) {
     if (expectContains && !result.output.includes(expectContains)) {
       return formatError({

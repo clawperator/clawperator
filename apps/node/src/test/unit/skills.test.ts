@@ -5,6 +5,15 @@ import { mkdtemp, mkdir, copyFile, readFile, rm, stat, writeFile } from "node:fs
 import { dirname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
+import {
+  CLAWPERATOR_BIN_ENV_VAR,
+  CLAWPERATOR_RECEIVER_PACKAGE_ENV_VAR,
+  DEFAULT_RECEIVER_PACKAGE,
+  formatSkillBinCommand,
+  resolveSkillBin,
+  resolveSkillBinCommand,
+  resolveReceiverPackage,
+} from "../../domain/skills/skillsConfig.js";
 
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "../../..");
 import { listSkills } from "../../domain/skills/listSkills.js";
@@ -1049,5 +1058,207 @@ describe("runSkill", () => {
     assert.strictEqual(parsed.code, SKILL_OUTPUT_ASSERTION_FAILED);
     assert.strictEqual(parsed.expectedSubstring, "missing-value");
     assert.ok(parsed.output?.includes("TEST_OUTPUT:hello"));
+  });
+});
+
+
+describe("resolveSkillBin", () => {
+  const ORIGINAL_CLAWPERATOR_BIN = process.env[CLAWPERATOR_BIN_ENV_VAR];
+
+  afterEach(() => {
+    if (ORIGINAL_CLAWPERATOR_BIN === undefined) {
+      delete process.env[CLAWPERATOR_BIN_ENV_VAR];
+    } else {
+      process.env[CLAWPERATOR_BIN_ENV_VAR] = ORIGINAL_CLAWPERATOR_BIN;
+    }
+  });
+
+  it("returns explicit CLAWPERATOR_BIN when set", () => {
+    process.env[CLAWPERATOR_BIN_ENV_VAR] = "/custom/path/to/clawperator";
+    const result = resolveSkillBin();
+    assert.strictEqual(result.cmd, "/custom/path/to/clawperator");
+    assert.deepStrictEqual(result.args, []);
+  });
+
+  it("prefers explicit CLAWPERATOR_BIN over sibling build", () => {
+    process.env[CLAWPERATOR_BIN_ENV_VAR] = "/explicit/clawperator";
+    const result = resolveSkillBin();
+    assert.strictEqual(result.cmd, "/explicit/clawperator");
+    assert.deepStrictEqual(result.args, []);
+  });
+
+  it("falls back to global clawperator when no env var and no sibling build", () => {
+    delete process.env[CLAWPERATOR_BIN_ENV_VAR];
+    const result = resolveSkillBin();
+    // When running in test environment, the sibling build may or may not exist
+    // The function should return either the sibling build or global binary
+    assert.ok(result.cmd === "clawperator" || result.args.length === 1);
+  });
+});
+
+describe("resolveSkillBinCommand", () => {
+  const ORIGINAL_CLAWPERATOR_BIN = process.env[CLAWPERATOR_BIN_ENV_VAR];
+
+  afterEach(() => {
+    if (ORIGINAL_CLAWPERATOR_BIN === undefined) {
+      delete process.env[CLAWPERATOR_BIN_ENV_VAR];
+    } else {
+      process.env[CLAWPERATOR_BIN_ENV_VAR] = ORIGINAL_CLAWPERATOR_BIN;
+    }
+  });
+
+  it("returns explicit CLAWPERATOR_BIN when set", () => {
+    process.env[CLAWPERATOR_BIN_ENV_VAR] = "/custom/path/to/clawperator";
+    const result = resolveSkillBinCommand();
+    assert.strictEqual(result, "/custom/path/to/clawperator");
+  });
+
+  it("returns full command with args for sibling build", () => {
+    delete process.env[CLAWPERATOR_BIN_ENV_VAR];
+    const result = resolveSkillBinCommand();
+    // When sibling build exists, should return "node "/path/to/cli/index.js""
+    // When it doesn't exist, should return "clawperator"
+    if (result !== "clawperator") {
+      assert.ok(result.includes(" "), "Expected command with args for sibling build");
+      assert.ok(result.startsWith(process.execPath), "Expected command to start with node executable");
+    }
+  });
+
+  it("quotes command parts that contain spaces", () => {
+    assert.strictEqual(
+      formatSkillBinCommand({
+        cmd: "C:\\Program Files\\nodejs\\node.exe",
+        args: ["C:\\clawperator apps\\node\\dist\\cli\\index.js"],
+      }),
+      '"C:\\Program Files\\nodejs\\node.exe" "C:\\clawperator apps\\node\\dist\\cli\\index.js"'
+    );
+  });
+});
+
+describe("resolveReceiverPackage", () => {
+  const ORIGINAL_RECEIVER_PACKAGE = process.env[CLAWPERATOR_RECEIVER_PACKAGE_ENV_VAR];
+
+  afterEach(() => {
+    if (ORIGINAL_RECEIVER_PACKAGE === undefined) {
+      delete process.env[CLAWPERATOR_RECEIVER_PACKAGE_ENV_VAR];
+    } else {
+      process.env[CLAWPERATOR_RECEIVER_PACKAGE_ENV_VAR] = ORIGINAL_RECEIVER_PACKAGE;
+    }
+  });
+
+  it("returns CLAWPERATOR_RECEIVER_PACKAGE env var when set", () => {
+    process.env[CLAWPERATOR_RECEIVER_PACKAGE_ENV_VAR] = "com.clawperator.operator.dev";
+    const result = resolveReceiverPackage();
+    assert.strictEqual(result, "com.clawperator.operator.dev");
+  });
+
+  it("returns default release package when env var is not set", () => {
+    delete process.env[CLAWPERATOR_RECEIVER_PACKAGE_ENV_VAR];
+    const result = resolveReceiverPackage();
+    assert.strictEqual(result, DEFAULT_RECEIVER_PACKAGE);
+  });
+
+  it("returns default when env var is empty string", () => {
+    process.env[CLAWPERATOR_RECEIVER_PACKAGE_ENV_VAR] = "";
+    const result = resolveReceiverPackage();
+    assert.strictEqual(result, DEFAULT_RECEIVER_PACKAGE);
+  });
+});
+
+describe("runSkill env vars", () => {
+  const ORIGINAL_BIN = process.env[CLAWPERATOR_BIN_ENV_VAR];
+  const ORIGINAL_RECEIVER_PACKAGE = process.env[CLAWPERATOR_RECEIVER_PACKAGE_ENV_VAR];
+
+  afterEach(() => {
+    if (ORIGINAL_BIN === undefined) {
+      delete process.env[CLAWPERATOR_BIN_ENV_VAR];
+    } else {
+      process.env[CLAWPERATOR_BIN_ENV_VAR] = ORIGINAL_BIN;
+    }
+    if (ORIGINAL_RECEIVER_PACKAGE === undefined) {
+      delete process.env[CLAWPERATOR_RECEIVER_PACKAGE_ENV_VAR];
+    } else {
+      process.env[CLAWPERATOR_RECEIVER_PACKAGE_ENV_VAR] = ORIGINAL_RECEIVER_PACKAGE;
+    }
+  });
+
+  it("injects CLAWPERATOR_BIN and CLAWPERATOR_RECEIVER_PACKAGE into skill env", async () => {
+    // Test that runSkill accepts and passes the env parameter correctly
+    const customEnv = {
+      [CLAWPERATOR_BIN_ENV_VAR]: "/custom/bin/clawperator",
+      [CLAWPERATOR_RECEIVER_PACKAGE_ENV_VAR]: "com.test.package",
+    };
+    const result = await runSkill("com.test.env-echo", [], undefined, undefined, customEnv);
+    assert.ok(result.ok, `Expected runSkill to succeed: ${"message" in result ? result.message : ""}`);
+    assert.ok(result.output.includes("CLAWPERATOR_BIN:/custom/bin/clawperator"), `Expected CLAWPERATOR_BIN in output, got: ${result.output}`);
+    assert.ok(result.output.includes("CLAWPERATOR_RECEIVER_PACKAGE:com.test.package"), `Expected CLAWPERATOR_RECEIVER_PACKAGE in output, got: ${result.output}`);
+  });
+
+  it("uses default values when env parameter is not provided", async () => {
+    // When no env is passed, the skill script won't receive the env vars
+    // because runSkill no longer sets defaults internally (CLI layer does)
+    const result = await runSkill("com.test.env-echo", []);
+    assert.ok(result.ok, `Expected runSkill to succeed: ${"message" in result ? result.message : ""}`);
+    // Without env parameter, these should be undefined (not injected by runSkill)
+    assert.ok(result.output.includes("CLAWPERATOR_BIN:undefined"), `Expected CLAWPERATOR_BIN to be undefined when not passed, got: ${result.output}`);
+    assert.ok(result.output.includes("CLAWPERATOR_RECEIVER_PACKAGE:undefined"), `Expected CLAWPERATOR_RECEIVER_PACKAGE to be undefined when not passed, got: ${result.output}`);
+  });
+});
+
+describe("CLI skills run env vars", () => {
+  const ORIGINAL_BIN = process.env[CLAWPERATOR_BIN_ENV_VAR];
+  const ORIGINAL_RECEIVER_PACKAGE = process.env[CLAWPERATOR_RECEIVER_PACKAGE_ENV_VAR];
+
+  afterEach(() => {
+    if (ORIGINAL_BIN === undefined) {
+      delete process.env[CLAWPERATOR_BIN_ENV_VAR];
+    } else {
+      process.env[CLAWPERATOR_BIN_ENV_VAR] = ORIGINAL_BIN;
+    }
+    if (ORIGINAL_RECEIVER_PACKAGE === undefined) {
+      delete process.env[CLAWPERATOR_RECEIVER_PACKAGE_ENV_VAR];
+    } else {
+      process.env[CLAWPERATOR_RECEIVER_PACKAGE_ENV_VAR] = ORIGINAL_RECEIVER_PACKAGE;
+    }
+  });
+
+  it("CLI skills run passes CLAWPERATOR_RECEIVER_PACKAGE via --receiver-package flag", async () => {
+    const { stdout, code } = await runCli([
+      "skills", "run", "com.test.env-echo", "--receiver-package", "com.clawperator.operator.dev", "--output", "json",
+    ]);
+    assert.strictEqual(code, 0, stdout);
+    const parsed = JSON.parse(stdout) as { output?: string };
+    assert.ok(parsed.output?.includes("CLAWPERATOR_RECEIVER_PACKAGE:com.clawperator.operator.dev"), `Expected dev package in output, got: ${parsed.output}`);
+  });
+
+  it("CLI skills run uses CLAWPERATOR_RECEIVER_PACKAGE env var when flag is not provided", async () => {
+    const { stdout, code } = await runCli(
+      ["skills", "run", "com.test.env-echo", "--output", "json"],
+      {
+        env: {
+          ...process.env,
+          CLAWPERATOR_RECEIVER_PACKAGE: "com.custom.operator.package",
+        },
+      }
+    );
+    assert.strictEqual(code, 0, stdout);
+    const parsed = JSON.parse(stdout) as { output?: string };
+    assert.ok(parsed.output?.includes("CLAWPERATOR_RECEIVER_PACKAGE:com.custom.operator.package"), `Expected custom package in output, got: ${parsed.output}`);
+  });
+
+  it("CLI skills run --receiver-package flag takes precedence over env var", async () => {
+    const { stdout, code } = await runCli(
+      ["skills", "run", "com.test.env-echo", "--receiver-package", "flag.package.value", "--output", "json"],
+      {
+        env: {
+          ...process.env,
+          CLAWPERATOR_RECEIVER_PACKAGE: "env.package.value",
+        },
+      }
+    );
+    assert.strictEqual(code, 0, stdout);
+    const parsed = JSON.parse(stdout) as { output?: string };
+    assert.ok(parsed.output?.includes("CLAWPERATOR_RECEIVER_PACKAGE:flag.package.value"), `Expected flag value in output, got: ${parsed.output}`);
+    assert.ok(!parsed.output?.includes("env.package.value"), `Should not contain env value, got: ${parsed.output}`);
   });
 });

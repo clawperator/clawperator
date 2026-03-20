@@ -11,7 +11,8 @@ not every internal shell temporary used by validation scripts.
 | Variable | Used by | Meaning |
 | :--- | :--- | :--- |
 | `CLAWPERATOR_SKILLS_REGISTRY` | CLI, installer | Path to the local skills registry JSON |
-| `CLAWPERATOR_RECEIVER_PACKAGE` | CLI, installer | Default Android Operator package to target when `--receiver-package` is omitted |
+| `CLAWPERATOR_RECEIVER_PACKAGE` | CLI, installer, skills | Default Android Operator package to target when `--receiver-package` is omitted. Also passed to skill scripts. |
+| `CLAWPERATOR_BIN` | skills | Path to CLI binary used by skill scripts (defaults to global `clawperator` or auto-detected sibling build) |
 | `CLAWPERATOR_INSTALL_APK` | installer | Pre-seeds the installer's APK install prompt |
 | `CLAWPERATOR_INSTALL_SKIP_SKILLS` | installer | Skips `skills install` during installer setup when set to `1` |
 | `CLAWPERATOR_APK_METADATA_URL` | installer | Overrides the metadata endpoint used to discover the latest downloadable Operator APK |
@@ -42,7 +43,8 @@ Use it when:
 ## `CLAWPERATOR_RECEIVER_PACKAGE`
 
 Sets the default receiver package for commands that dispatch to the Android
-Operator APK.
+Operator APK. Also injected into skill scripts via `CLAWPERATOR_RECEIVER_PACKAGE`
+so skills know which Operator package to target.
 
 Typical values:
 
@@ -58,6 +60,40 @@ export CLAWPERATOR_RECEIVER_PACKAGE="com.clawperator.operator.dev"
 CLI flags still win over the environment variable. Use an explicit
 `--receiver-package` when you want one command to differ from your shell
 default.
+
+For skill execution, this is also available as a CLI flag:
+
+```bash
+clawperator skills run <skill_id> --receiver-package com.clawperator.operator.dev
+```
+
+## `CLAWPERATOR_BIN`
+
+Sets the path to the Clawperator CLI binary that skill scripts should use.
+This is injected into skill scripts automatically by `clawperator skills run`.
+
+Resolution order (highest priority first):
+
+1. `CLAWPERATOR_BIN` environment variable (explicit override)
+2. Local sibling build at `apps/node/dist/cli/index.js` (if present)
+3. Global `clawperator` binary (fallback)
+
+The sibling build is preferred over the global binary so that developers with a
+local checkout automatically get the correct compiled output.
+
+Example for development with a local build:
+
+```bash
+export CLAWPERATOR_BIN=/path/to/clawperator/apps/node/dist/cli/index.js
+clawperator skills run <skill_id>
+```
+
+Or set it for a single command:
+
+```bash
+CLAWPERATOR_BIN=/path/to/clawperator/apps/node/dist/cli/index.js \
+  clawperator skills run <skill_id>
+```
 
 ## `CLAWPERATOR_INSTALL_APK`
 
@@ -143,6 +179,13 @@ export CLAWPERATOR_RECEIVER_PACKAGE="com.clawperator.operator"
 
 Then override `--device-id` per command when more than one Android target is
 connected.
+
+For development with a local branch build, also set:
+
+```bash
+export CLAWPERATOR_BIN="/path/to/clawperator/apps/node/dist/cli/index.js"
+export CLAWPERATOR_RECEIVER_PACKAGE="com.clawperator.operator.dev"
+```
 
 ## Related docs
 
