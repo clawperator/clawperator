@@ -1,38 +1,73 @@
 name: Pull Request Checks
 
 on:
+  push:
+    branches:
+      - "**"
   pull_request:
     branches:
       - main  # Adjust this if your default branch has a different name
       - master
 
 jobs:
-  unit-tests:
-    name: Run Unit Tests
+  android-unit-tests:
+    name: Run Android Unit Tests
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Set up JDK
         uses: actions/setup-java@v4
         with:
           java-version: '17'  # Adjust this version if needed
           distribution: 'temurin'
           cache: 'gradle'
-          
+
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
-        
+
       - name: Run unit tests
         run: ./gradlew unitTest
-        
+
       - name: Upload test results on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: test-results
+          name: android-test-results
           path: |
             **/build/reports/tests/
-            **/build/test-results/ 
+            **/build/test-results/
+
+  node-tests:
+    name: Run Node Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/node/package-lock.json
+
+      - name: Install Node dependencies
+        run: npm --prefix apps/node ci
+
+      - name: Build Node package
+        run: npm --prefix apps/node run build
+
+      - name: Run Node tests
+        run: npm --prefix apps/node run test
+
+      - name: Upload test results on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: node-test-results
+          path: |
+            apps/node/dist/test/
