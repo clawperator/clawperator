@@ -56,10 +56,21 @@ The validation chain exists. It is not composed.
 
 `clawperator skills validate <skill_id> --dry-run`
 
+**Before implementing**: locate the compile-artifact and validate-only domain functions.
+Search `apps/node/src/domain/skills/` for the module that handles artifact compilation
+(the CLI command `skills compile-artifact` maps to a domain function). Also note that
+`execute --validate-only` reuses `validateExecution` from `validateExecution.ts` -
+you can call it directly rather than going through the CLI command. The dry-run path
+should call `validateExecution(artifactJson)` after reading the artifact file. Do not
+duplicate the schema validation logic.
+
 When `--dry-run` is specified:
 1. Run the existing integrity checks (unchanged - files, metadata).
 2. Inspect `skill.artifacts`:
-   - **Artifact-backed skills** (one or more entries in `skill.artifacts`): compile each artifact using the same logic as `skills compile-artifact`, then validate the compiled payload against the action schema using the same path as `execute --validate-only`. Report any schema violations using the enriched error format from PRD-2.
+   - **Artifact-backed skills** (one or more entries in `skill.artifacts`): read each
+     artifact JSON file from the resolved path in `ValidateSkillResult.checks.artifactPaths`,
+     parse it, and call `validateExecution(parsed)`. If it throws, extract the
+     `ValidationFailure` details and report them. Use the enriched error format from PRD-2.
    - **Script-only skills** (empty or absent `skill.artifacts`): run integrity checks only. Exit 0. Include a top-level `dryRun` field in the JSON output:
      ```json
      "dryRun": {

@@ -101,6 +101,13 @@ Before `broadcastAgentCommand`, run `checkApkPresence(config)`. On failure, retu
 
 Implementation notes:
 - Reuse `checkApkPresence` from `readinessChecks.ts` directly - do not duplicate the adb call.
+  Import path: `import { checkApkPresence } from "../doctor/checks/readinessChecks.js"`.
+  Signature: `checkApkPresence(config: RuntimeConfig): Promise<DoctorCheckResult>`.
+- **Exact insertion point**: In the `performExecution` function in `runExecution.ts`, add
+  the check after `config.deviceId = deviceId` (after device resolution) and before the
+  `tryAcquire` call. This keeps the lock-acquisition path clean and returns early before
+  any state changes. If `checkApkPresence` returns `status !== "pass"`, return immediately
+  with `{ ok: false, error: { code: "RECEIVER_NOT_INSTALLED", message: "..." } }`.
 - The adb round-trip is ~100ms. No session-level cache is warranted: each `clawperator execute` is a separate process, so in-memory caching provides no benefit. Keep it a fresh check on every invocation.
 - Follow the `injectServiceUnavailableHint` pattern already in `runExecution.ts` for the hint text.
 - Gate placement: the check belongs in `runExecution.ts` only - this is the layer that actually requests device access (via `broadcastAgentCommand`). Do NOT add the gate to `runSkill.ts`. `runSkill.ts` launches arbitrary scripts; many skill scripts do not require device access and should not be blocked. Skills that call `clawperator execute` from within their script will hit the gate naturally at `runExecution.ts`. Skills that call `adb` directly already bypass the Node layer entirely and are a separate (pre-existing) concern.
@@ -177,14 +184,37 @@ Skill scripts that call `adb` directly rather than `clawperator execute` will no
 
 ## Testing Plan
 
-### Fixtures
+### Fixtures and Injection Patterns
 
-- `fake_adb.sh` needs three modes via `FAKE_ADB_PACKAGES`: `present` (package listed),
-  `absent` (empty output), `variant` (dev package returned instead of release)
-- `test/fixtures/execution-minimal-valid.json`:
-  `{ "commandId": "test-cmd-001", "taskId": "test-task-001", "actions": [{ "id": "t1", "type": "tap", "params": { "x": 100, "y": 200 } }] }`
-- Two unit-test doubles for `runExecution.ts`: `mockCheckApkPresence(result)` and a spy
-  on `broadcastAgentCommand` that records call count
+All unit tests for adb-dependent code use `FakeProcessRunner` from
+`test/unit/fakes/FakeProcessRunner.ts`. Do not use `fake_adb.sh` for unit tests.
+
+For `checkApkPresence` unit tests, queue the `pm list packages` result directly:
+```typescript
+const runner = new FakeProcessRunner();
+const config = getDefaultRuntimeConfig({ runner, deviceId: "test-device",
+  receiverPackage: "com.clawperator.operator" });
+// APK present: pm list packages returns "package:com.clawperator.operator"
+runner.queueResult({ code: 0, stdout: "package:com.clawperator.operator", stderr: "" });
+// APK absent: pm list packages returns empty output
+runner.queueResult({ code: 0, stdout: "", stderr: "" });
+// Variant: dev package installed instead of release
+runner.queueResult({ code: 0, stdout: "package:com.clawperator.operator.dev", stderr: "" });
+```
+
+For `runExecution` unit tests, inject a `runner` via `getDefaultRuntimeConfig` as shown
+in the existing `runCloseAppPreflight` tests. Use a runner whose `run` method returns
+instantly with the APK state you need, then spy on the broadcast call count.
+
+`fake_adb.sh` is used only for the CLI-level integration test (T7). Add a new
+`VARIANT_APK` scenario to `fake_adb.sh` for T8: when `FAKE_ADB_SCENARIO=VARIANT_APK`,
+the `pm list packages com.clawperator.operator` command returns
+`package:com.clawperator.operator.dev` instead.
+
+`test/fixtures/execution-minimal-valid.json`:
+`{ "commandId": "test-cmd-001", "taskId": "test-task-001", "source": "test",
+  "expectedFormat": "android-ui-automator", "timeoutMs": 5000,
+  "actions": [{ "id": "t1", "type": "tap", "params": { "x": 100, "y": 200 } }] }`
 
 ### TDD Sequence
 
@@ -216,14 +246,15 @@ Skill scripts that call `adb` directly rather than `clawperator execute` will no
 - Protects: severity escalated; dev-APK users get hard-blocked
 
 **T5 — `runExecution` blocks broadcast when APK absent**
-- Setup: `mockCheckApkPresence({ status: "fail" })`; broadcast spy
-- Expected: `{ ok: false, error: { code: "RECEIVER_NOT_INSTALLED" } }`; broadcast spy
-  called 0 times
+- Setup: `FakeProcessRunner` queued to return empty `pm list packages` output (APK absent);
+  also queue a failure response for any subsequent adb call to confirm broadcast never fires
+- Expected: `result.ok === false`, `result.error.code === "RECEIVER_NOT_INSTALLED"`;
+  `runner.calls` does not contain a broadcast call
 - Protects: guard added but broadcast fires anyway; error missing install guidance
 
 **T6 — `runExecution` passes through when APK present (happy-path anchor)**
-- Setup: `mockCheckApkPresence({ status: "pass" })`; broadcast spy returns success
-- Expected: `{ ok: true }`; broadcast spy called exactly once
+- Setup: `FakeProcessRunner` queued with APK present, then normal broadcast/envelope responses
+- Expected: `result.ok === true`; `runner.calls` contains the broadcast call
 - Protects: over-broad gate fires even when APK is installed; all commands blocked
 
 ### Integration Tests

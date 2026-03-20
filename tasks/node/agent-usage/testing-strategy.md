@@ -7,6 +7,21 @@ stay in place, and the cross-PRD tests that only matter after multiple workstrea
 
 ---
 
+## Test Framework
+
+The project uses Node's built-in test runner. All tests must follow this pattern:
+
+```typescript
+import { describe, it } from "node:test";
+import assert from "node:assert";
+```
+
+Do not use Jest, Vitest, or any external test framework. There is no `jest.fn()`, no
+`jest.mock()`. Use `FakeProcessRunner` for adb injection (see below). Run tests with
+`npm run build && npm run test` from `apps/node/`.
+
+---
+
 ## Philosophy
 
 We are not optimizing for coverage. We are optimizing for confidence on critical paths
@@ -28,10 +43,18 @@ The practical rules:
 
 ## Test Infrastructure
 
-**Fake adb (`scripts/fake_adb.sh`):**
-Unit tests for adb-dependent code inject `fake_adb.sh` via an env var instead of
-requiring a device. PRD-1 adds three modes via `FAKE_ADB_PACKAGES=present|absent|variant`.
-All unit tests must pass with `npm run test` on a machine with no device attached.
+**`FakeProcessRunner` (primary unit test injection mechanism):**
+All adb-dependent domain functions accept a `RuntimeConfig` object. Tests inject
+`FakeProcessRunner` via `getDefaultRuntimeConfig({ runner: fakeRunner })`. Use
+`fakeRunner.queueResult({ code, stdout, stderr })` to simulate each adb call.
+This is how `checkApkPresence`, `runCloseAppPreflight`, and most doctor checks
+are tested. See `apps/node/src/test/unit/fakes/FakeProcessRunner.ts`.
+
+**`fake_adb.sh` (integration tests only):**
+`scripts/fake_adb.sh` is used for CLI-level integration tests where you need a real
+`adb` binary path. It reads `FAKE_ADB_SCENARIO` (not `FAKE_ADB_PACKAGES`). Existing
+scenarios: `NO_DEVICE`, `NO_APK`, `VERSION_UNREADABLE`, `VERSION_MISMATCH`. PRD-1
+adds a `VARIANT_APK` scenario for the variant-mismatch case.
 
 **Integration tests:**
 Run under `CLAWPERATOR_RUN_INTEGRATION=1` with a connected device. Run on merge or

@@ -41,6 +41,28 @@ Neither file writes to disk at any point. All diagnostic information is either s
 
 ## Proposed Change
 
+### 0. New module: `apps/node/src/infra/logger.ts`
+
+Create the log writer as a standalone module at `apps/node/src/infra/logger.ts`. It
+should export:
+```typescript
+export interface LogEvent { ts: string; level: string; event: string;
+  commandId?: string; taskId?: string; deviceId?: string; message: string; }
+
+export interface Logger {
+  log(event: LogEvent): void;
+  logPath(): string | undefined;  // returns the current log file path, or undefined if logging disabled
+}
+
+export function createLogger(options?: { logDir?: string; logLevel?: string }): Logger
+```
+
+Wire it into `RunExecutionOptions` by adding optional `logger?: Logger`. The CLI layer
+creates a logger via `createLogger({ logDir: process.env.CLAWPERATOR_LOG_DIR,
+logLevel: options.logLevel ?? process.env.CLAWPERATOR_LOG_LEVEL })` and passes it in.
+Default to no logging when no logger is provided (fail-safe for call sites that do not
+pass one). This approach keeps the domain layer testable in isolation.
+
 ### 1. NDJSON log file at `~/.clawperator/logs/`
 
 All CLI commands that touch the device write structured log entries to:
@@ -49,7 +71,9 @@ All CLI commands that touch the device write structured log entries to:
 ~/.clawperator/logs/clawperator-YYYY-MM-DD.log
 ```
 
-Format: one JSON object per line (NDJSON). Minimum required fields per entry:
+Format: one JSON object per line (NDJSON), terminated by `\n` (not `\r\n`).
+Each line must be parseable independently with `JSON.parse`. Do not pretty-print.
+Minimum required fields per entry:
 
 | Field | Type | Description |
 | :--- | :--- | :--- |
@@ -96,7 +120,8 @@ Default: `info`.
 `info`: preflight results, dispatch, receipt, timeouts, skill lifecycle.
 `warn` and `error`: failures only.
 
-`CLAWPERATOR_LOG_LEVEL` env var as an alternative to the flag.
+`CLAWPERATOR_LOG_LEVEL` env var as an alternative to the flag. When both are set,
+the `--log-level` flag takes precedence over the env var. Document this explicitly.
 
 ### 4. `logPath` in `RESULT_ENVELOPE_TIMEOUT` error
 

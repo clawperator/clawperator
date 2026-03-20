@@ -52,8 +52,20 @@ Output is accumulated and only returned in the final result. No forwarding to th
 
 ### 1. Add optional `onOutput` callback to `runSkill`
 
-Keep `runSkill.ts` as a pure domain helper. Add an optional `callbacks` parameter:
+Keep `runSkill.ts` as a pure domain helper. Add an optional `callbacks` parameter.
 
+**Current signature** (confirmed from source):
+```typescript
+export async function runSkill(
+  skillId: string,
+  args: string[],
+  registryPath?: string,
+  timeoutMs?: number,
+  env?: SkillRunEnv
+): Promise<SkillRunResult | SkillRunError>
+```
+
+Add `callbacks` as the 6th parameter:
 ```typescript
 export interface SkillRunCallbacks {
   onOutput?: (chunk: string, stream: "stdout" | "stderr") => void;
@@ -80,7 +92,14 @@ In `apps/node/src/cli/commands/skills.ts` (or equivalent), when invoking `runSki
 
 ### 3. Final result shape unchanged
 
-`SkillRunResult.output` continues to carry the full accumulated stdout string. The callback does not replace it. `--expect-contains` continues to operate on the full accumulated output after the process exits.
+`SkillRunResult.output` continues to carry the full accumulated stdout string. The
+callback does not replace it. `--expect-contains` continues to operate on the full
+accumulated output after the process exits.
+
+**Note on `--expect-contains` location**: this check is implemented in the CLI layer
+(`cli/commands/skills.ts`), not in `runSkill.ts`. It reads `result.output` after
+`runSkill` returns. Confirm this before touching it — do not accidentally move it
+into the streaming path.
 
 ---
 

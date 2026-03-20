@@ -110,6 +110,35 @@ Known hint entries (initial set):
 
 Keep the existing `path` and `reason` fields unchanged. This is additive.
 
+**Implementation details:**
+
+`first.path` is an array (e.g., `["actions", 2, "params", "format"]`). To extract action
+context, check `first.path[0] === "actions"` first. If true, the action index is
+`first.path[1]` as a number. Then access the raw input:
+
+```typescript
+const rawActions = (input as { actions?: unknown[] })?.actions;
+const actionIndex = typeof first.path[1] === "number" ? first.path[1] : undefined;
+const rawAction = actionIndex !== undefined ? rawActions?.[actionIndex] : undefined;
+const actionId = (rawAction as { id?: unknown })?.id;
+const actionType = (rawAction as { type?: unknown })?.type;
+```
+
+Only populate `actionId`/`actionType` when they are strings. Omit them (not set to
+`undefined`) when extraction fails or the error is not action-level.
+
+For `invalidKeys`: Zod's unrecognized-keys error (`ZodIssueCode.unrecognized_keys`) has
+a `.keys: string[]` property on the issue object. Check:
+```typescript
+const invalidKeys = first.code === "unrecognized_keys"
+  ? (first as { keys?: string[] }).keys
+  : undefined;
+```
+
+For `hint`: maintain a small `Map<string, string>` keyed by `"actionType.paramName"`.
+Check `actionType && invalidKeys` to construct lookup keys. Keep the map in-module,
+near the `ValidationFailure` type.
+
 Example enriched response:
 ```json
 {
@@ -130,6 +159,34 @@ Example enriched response:
 ```
 
 ### 2. `runExecution.ts`: enrich `RESULT_ENVELOPE_TIMEOUT`
+
+**Exact location**: In `performExecution`, the timeout case is handled at the branch:
+```typescript
+if ("timeout" in result && result.timeout && "diagnostics" in result) {
+```
+The `execution` variable is in scope at this point. Enrich the returned error by
+spreading `result.diagnostics` and adding the new fields:
+```typescript
+return {
+  execution,
+  result: {
+    ok: false,
+    error: {
+      ...result.diagnostics,
+      ...(execution.commandId !== undefined && { commandId: execution.commandId }),
+      ...(execution.taskId !== undefined && { taskId: execution.taskId }),
+      lastActionId: execution.actions.at(-1)?.id,
+      lastActionType: execution.actions.at(-1)?.type,
+      lastActionCaveat: "payload-last only; Android execution position is unknown",
+      elapsedMs: /* capture Date.now() before the waitForResultEnvelope call and subtract */,
+      timeoutMs: execution.timeoutMs,
+    },
+    deviceId,
+  },
+};
+```
+Capture the start time with `const dispatchStart = Date.now()` just before the
+`waitForResultEnvelope` call so `elapsedMs` can be computed.
 
 When the timeout fires, include in the error response:
 - `details.commandId`: the `commandId` from the execution payload (when present)
@@ -264,17 +321,23 @@ The known-hint list will become stale if not updated during API changes. Keep it
 - Protects: hint fires for cases it doesn't apply to; missing for the one known case
 
 **T5 — timeout error carries all correlation fields**
-- Setup: mock `broadcastAgentCommand` to never resolve; `timeoutMs: 50`; payload has
-  `commandId` and `taskId`
-- Expected: `details.commandId`, `details.taskId`, `details.lastActionId`,
-  `details.lastActionType`, `details.lastActionCaveat` (non-empty string),
-  `details.elapsedMs >= 50`, `details.timeoutMs === 50`
+- Setup: pass a `timeoutMs: 50` payload to `runExecution` with `commandId` and `taskId`.
+  Use a `FakeProcessRunner` whose `run` method returns a broadcast success immediately
+  but the `waitForResultEnvelope` internal timeout logic fires (set `timeoutMs: 50` in
+  the execution payload - the `+ 5000` buffer in `runExecution.ts` adds time, so use
+  a `waitForResultEnvelope` mock or accept a slightly longer test time if needed).
+  Alternatively, test the timeout-enrichment logic at a lower level by unit-testing
+  the enrichment code extracted to a helper function, then testing the integration
+  end-to-end with a very short timeout and a mock that never returns an envelope.
+- Expected: `error.commandId`, `error.taskId`, `error.lastActionId`,
+  `error.lastActionType`, `error.lastActionCaveat` (non-empty string),
+  `error.elapsedMs >= 50`, `error.timeoutMs === 50`
 - Protects: agent has no correlation handle after timeout; caveat string absent
 
 **T6 — timeout handles absent `commandId`/`taskId` without throwing**
-- Setup: same timeout setup but payload has no `commandId` or `taskId`
-- Expected: no throw; `details.commandId` absent from the object (not the string
-  `"undefined"`)
+- Setup: same timeout setup but payload omits `commandId` and `taskId`
+- Expected: no throw; `error.commandId` is `undefined` — not the string `"undefined"`;
+  check with `assert.strictEqual("commandId" in error.details, false)` or equivalent
 - Protects: `String(undefined)` coercion baked into the error envelope
 
 ### Integration Tests
