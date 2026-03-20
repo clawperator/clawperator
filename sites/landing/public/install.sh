@@ -454,6 +454,10 @@ count_connected_devices() {
     adb devices | awk 'NR > 1 && $2 == "device" { count++ } END { print count + 0 }'
 }
 
+count_detected_android_devices() {
+    adb devices | awk 'NR > 1 && $2 != "" { count++ } END { print count + 0 }'
+}
+
 has_unready_android_devices() {
     adb devices | awk 'NR > 1 && ($2 == "unauthorized" || $2 == "offline") { found=1 } END { if (found) print "yes"; else print "no"; }'
 }
@@ -462,11 +466,58 @@ list_connected_devices() {
     adb devices | awk 'NR > 1 && $2 == "device" { print $1 }'
 }
 
-maybe_install_operator_apk() {
-    local DEVICE_COUNT
-    DEVICE_COUNT="$(count_connected_devices)"
+list_detected_android_devices() {
+    adb devices | awk 'NR > 1 && $2 != "" { print $1 "\t" $2 }'
+}
 
-    if [ "$DEVICE_COUNT" -eq 0 ]; then
+maybe_install_operator_apk() {
+    local READY_DEVICE_COUNT
+    local DETECTED_DEVICE_COUNT
+    READY_DEVICE_COUNT="$(count_connected_devices)"
+    DETECTED_DEVICE_COUNT="$(count_detected_android_devices)"
+
+    if [ "$DETECTED_DEVICE_COUNT" -eq 0 ]; then
+        echo -e "${YELLOW}⚠️  No connected Android device detected. Skipping APK install.${NC}"
+        return 0
+    fi
+
+    if [ "$DETECTED_DEVICE_COUNT" -gt 1 ]; then
+        echo -e "${YELLOW}⚠️  Multiple Android devices detected. Checking per-device readiness...${NC}"
+        if [ -z "${CLAWPERATOR_BIN_PATH:-}" ]; then
+            # CLI not available - fall back to original behaviour.
+            echo -e "${YELLOW}Connected devices:${NC}"
+            while IFS=$'\t' read -r device_id device_state; do
+                [ -n "$device_id" ] || continue
+                echo -e "${YELLOW} - ${device_id} (${device_state})${NC}"
+            done < <(list_detected_android_devices)
+            print_manual_operator_setup_commands
+            return 0
+        fi
+        local all_ready=true
+        while IFS=$'\t' read -r device_id device_state; do
+            [ -n "$device_id" ] || continue
+            if [ "$device_state" = "device" ]; then
+                if "$CLAWPERATOR_BIN_PATH" doctor --device-id "$device_id" --output json > /dev/null 2>&1; then
+                    echo -e "${GREEN}  ✅ ${device_id} - ready${NC}"
+                else
+                    echo -e "${YELLOW}  ⚠  ${device_id} - setup required: clawperator operator setup --apk ${APK_LOCAL_PATH} --device-id ${device_id}${NC}"
+                    all_ready=false
+                fi
+            else
+                echo -e "${YELLOW}  ⚠  ${device_id} - ADB state: ${device_state}. Unlock the device or restart ADB before setup.${NC}"
+                all_ready=false
+            fi
+        done < <(list_detected_android_devices)
+        if [ "$all_ready" = true ]; then
+            echo -e "${GREEN}All devices ready. No setup required.${NC}"
+            return 0
+        fi
+
+        echo -e "${YELLOW}Skipping APK install until every connected device is ready.${NC}"
+        return 0
+    fi
+
+    if [ "$READY_DEVICE_COUNT" -eq 0 ]; then
         if [ "$(has_unready_android_devices)" = "yes" ]; then
             echo -e "${YELLOW}⚠️  Android device detected but not ready for ADB.${NC}"
             echo -e "${YELLOW}   - If the device shows as 'unauthorized', unlock it and accept the USB debugging prompt.${NC}"
@@ -476,37 +527,6 @@ maybe_install_operator_apk() {
             echo -e "${YELLOW}⚠️  No connected Android device detected. Skipping APK install.${NC}"
         fi
         return 0
-    fi
-
-    if [ "$DEVICE_COUNT" -gt 1 ]; then
-        echo -e "${YELLOW}⚠️  Multiple Android devices detected. Checking per-device readiness...${NC}"
-        if [ -z "${CLAWPERATOR_BIN_PATH:-}" ]; then
-            # CLI not available - fall back to original behaviour.
-            echo -e "${YELLOW}Connected devices:${NC}"
-            while IFS= read -r device_id; do
-                [ -n "$device_id" ] || continue
-                echo -e "${YELLOW} - ${device_id}${NC}"
-            done < <(list_connected_devices)
-            print_manual_operator_setup_commands
-            return 0
-        fi
-        local all_ready=true
-        while IFS= read -r device_id; do
-            [ -n "$device_id" ] || continue
-            if "$CLAWPERATOR_BIN_PATH" doctor --device-id "$device_id" --output json > /dev/null 2>&1; then
-                echo -e "${GREEN}  ✅ ${device_id} - ready${NC}"
-            else
-                echo -e "${YELLOW}  ⚠  ${device_id} - setup required: clawperator operator setup --apk ${APK_LOCAL_PATH} --device-id ${device_id}${NC}"
-                all_ready=false
-            fi
-        done < <(list_connected_devices)
-        if [ "$all_ready" = true ]; then
-            echo -e "${GREEN}All devices ready. No setup required.${NC}"
-            return 0
-        fi
-
-        echo -e "${YELLOW}Skipping APK install until every connected device is ready.${NC}"
-        return 1
     fi
 
     local INSTALL_APK_RESPONSE="${CLAWPERATOR_INSTALL_APK:-}"

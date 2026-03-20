@@ -124,7 +124,8 @@ clawperator doctor \
 
 If `install.sh` ran while multiple devices were connected, host-side setup can
 still complete successfully. When any connected device is not ready, the
-installer returns non-zero and Android setup must be finished per device.
+installer keeps the host-side setup moving and Android setup must be finished
+per device.
 
 Use:
 
