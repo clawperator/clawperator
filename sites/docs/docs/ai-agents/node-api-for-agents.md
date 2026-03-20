@@ -45,7 +45,7 @@ workflow (also available as `record` alias), use [Android Recording Format for A
 | `skills validate <skill_id>` | Verify one local skill's metadata and required files before runtime testing |
 | `skills validate --all` | Validate the entire configured skills registry in one pass |
 | `skills compile-artifact <id> --artifact <name>` | Compile skill to execution payload |
-| `skills run <skill_id> [--device-id <id>] [--timeout-ms <n>] [--expect-contains <text>]` | Invoke a skill script (convenience wrapper) |
+| `skills run <skill_id> [--device-id <id>] [--receiver-package <pkg>] [--timeout-ms <n>] [--expect-contains <text>]` | Invoke a skill script (convenience wrapper) |
 | `skills install` | Clone skills repo to `~/.clawperator/skills/` |
 | `skills update [--ref <git-ref>]` | Pull latest skills (optionally pin to a ref) |
 | `grant-device-permissions` | Re-grant Operator permissions only after an Operator APK crash causes Android to revoke them |
@@ -1000,7 +1000,7 @@ installer are:
 
 ### `CLAWPERATOR_INSTALL_APK`
 
-`scripts/install.sh` reads `CLAWPERATOR_INSTALL_APK` before prompting whether to
+`sites/landing/public/install.sh` reads `CLAWPERATOR_INSTALL_APK` before prompting whether to
 install the Operator APK on the connected device.
 
 Useful values:
@@ -1148,6 +1148,35 @@ Current skills model:
 - `skills run --expect-contains <text>` turns the wrapper into a lightweight
   smoke check by failing if the script output does not contain the expected
   substring
+- `skills run --receiver-package <pkg>` sets the Operator package for this run
+  (default: `com.clawperator.operator`). Use `com.clawperator.operator.dev` for
+  local debug APKs.
+
+**Environment configuration for skills**
+
+When `clawperator skills run` spawns a skill script, it automatically injects
+two environment variables:
+
+| Variable | Description | Default |
+| :--- | :--- | :--- |
+| `CLAWPERATOR_BIN` | Path to the CLI binary the skill should use | Auto-resolved: sibling build if present, else global `clawperator` |
+| `CLAWPERATOR_RECEIVER_PACKAGE` | Operator package for the skill to target | `com.clawperator.operator` |
+
+These can be set explicitly to override the defaults:
+
+```bash
+# Use a local branch build
+export CLAWPERATOR_BIN=/path/to/clawperator/apps/node/dist/cli/index.js
+
+# Target the dev APK
+export CLAWPERATOR_RECEIVER_PACKAGE=com.clawperator.operator.dev
+
+# Now all skills will use these values
+clawperator skills run <skill_id>
+```
+
+CLI flags take precedence over environment variables. Use `--receiver-package`
+for one-off overrides without changing your shell environment.
 
 For the concrete `skill.json` contract and private-skill authoring model, see
 [Skill Authoring Guidelines](../skills/skill-authoring-guidelines.md),

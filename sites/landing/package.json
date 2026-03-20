@@ -4,8 +4,7 @@
   "version": "0.1.0",
   "scripts": {
     "dev": "next dev",
-    "sync-install-script": "cp ../../scripts/install.sh public/install.sh",
-    "build": "npm run sync-install-script && next build",
+    "build": "next build",
     "start": "next start"
   },
   "dependencies": {
