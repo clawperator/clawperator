@@ -30,11 +30,20 @@ export interface SkillRunError {
   stderr?: string;
 }
 
+export interface SkillRunEnv {
+  /** Path to CLI binary used by skill scripts */
+  CLAWPERATOR_BIN?: string;
+  /** Operator package passed as --receiver-package on every CLI call within a skill */
+  CLAWPERATOR_RECEIVER_PACKAGE?: string;
+  [key: string]: string | undefined;
+}
+
 export async function runSkill(
   skillId: string,
   args: string[],
   registryPath?: string,
-  timeoutMs?: number
+  timeoutMs?: number,
+  env?: SkillRunEnv
 ): Promise<SkillRunResult | SkillRunError> {
   let resolvedPath: string;
   try {
@@ -82,10 +91,17 @@ export async function runSkill(
   const cmdArgs = ext === ".js" ? [resolvedPath, ...args] : args;
   const timeout = timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
+  // Merge provided env with process.env, with provided env taking precedence
+  const childEnv: NodeJS.ProcessEnv = {
+    ...process.env,
+    ...env,
+  };
+
   const start = Date.now();
   return new Promise((resolve) => {
     const child = spawn(cmd, cmdArgs, {
       stdio: ["ignore", "pipe", "pipe"],
+      env: childEnv,
     });
 
     let stdout = "";

@@ -63,6 +63,18 @@
         "skills/com.test.echo/scripts/partial_timeout.js"
       ],
       "artifacts": []
+    },
+    {
+      "id": "com.test.env-echo",
+      "applicationId": "com.test",
+      "intent": "env-echo",
+      "summary": "Test skill that echoes env vars CLAWPERATOR_BIN and CLAWPERATOR_RECEIVER_PACKAGE.",
+      "path": "skills/com.test.env-echo",
+      "skillFile": "skills/com.test.env-echo/SKILL.md",
+      "scripts": [
+        "skills/com.test.env-echo/scripts/echo.js"
+      ],
+      "artifacts": []
     }
   ]
 }

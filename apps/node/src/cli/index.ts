@@ -64,7 +64,7 @@ Commands:
   skills validate <skill_id>
   skills validate --all
                                             Validate one local skill or the entire configured registry
-  skills run <skill_id> [--device-id <id>] [--timeout-ms <n>] [--expect-contains <text>] [-- <extra_args>]
+  skills run <skill_id> [--device-id <id>] [--receiver-package <pkg>] [--timeout-ms <n>] [--expect-contains <text>] [-- <extra_args>]
                                             Invoke a skill script (convenience wrapper)
   skills install
                                             Clone skills repository to ~/.clawperator/skills/
@@ -230,15 +230,18 @@ Notes:
   "skills run": `clawperator skills run
 
 Usage:
-  clawperator skills run <skill_id> [--device-id <id>] [--timeout-ms <n>] [--expect-contains <text>] [--output <json|pretty>] [-- <extra_args>]
+  clawperator skills run <skill_id> [--device-id <id>] [--receiver-package <pkg>] [--timeout-ms <n>] [--expect-contains <text>] [--output <json|pretty>] [-- <extra_args>]
 
 Notes:
   - Runs the selected skill script through the local skill wrapper.
   - Use --device-id explicitly when more than one Android device is connected.
+  - --receiver-package sets the Operator package for this skill run (default: com.clawperator.operator).
+    Use com.clawperator.operator.dev for local debug APKs.
   - --timeout-ms overrides the wrapper timeout for this run only.
   - --expect-contains turns the run into a lightweight output assertion.
   - If the assertion text is missing, the wrapper fails with SKILL_OUTPUT_ASSERTION_FAILED.
   - Arguments after -- are forwarded to the underlying skill script unchanged.
+  - Environment variables CLAWPERATOR_BIN and CLAWPERATOR_RECEIVER_PACKAGE are injected into the skill script.
   - This wrapper does not replace live validation of screenshots, artifacts, or app state.
 `,
   "doctor": `clawperator doctor
@@ -711,7 +714,7 @@ async function main(): Promise<void> {
       } else if (rest[0] === "run") {
         const skillId = rest[1];
         if (!skillId) {
-          result = JSON.stringify({ code: "USAGE", message: "skills run <skill_id> [--device-id <id>] [--timeout-ms <n>] [--expect-contains <text>] [-- <extra_args>]" });
+          result = JSON.stringify({ code: "USAGE", message: "skills run <skill_id> [--device-id <id>] [--receiver-package <pkg>] [--timeout-ms <n>] [--expect-contains <text>] [-- <extra_args>]" });
         } else {
           // Build args to pass to the skill script
           // Only parse options from args before "--" to avoid double-counting
@@ -722,6 +725,7 @@ async function main(): Promise<void> {
           const rawOptSegment = rawDashDash >= 0 ? rawSkillsRunArgs.slice(0, rawDashDash) : rawSkillsRunArgs;
           const scriptArgs: string[] = [];
           const deviceId = global.deviceId ?? getOpt(optSegment, "--device-id");
+          const receiverPackage = global.receiverPackage ?? getOpt(optSegment, "--receiver-package");
           const localTimeoutMs = getNumberOpt(rawOptSegment, "--timeout-ms");
           const effectiveTimeoutMs = localTimeoutMs ?? global.timeoutMs;
           const invalidTimeoutResult = getInvalidTimeoutResult(effectiveTimeoutMs, out);
@@ -740,6 +744,7 @@ async function main(): Promise<void> {
             scriptArgs,
             effectiveTimeoutMs,
             expectContains,
+            receiverPackage,
             out
           );
         }
