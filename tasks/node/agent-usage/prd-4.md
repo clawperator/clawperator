@@ -101,6 +101,46 @@ accumulated output after the process exits.
 `runSkill` returns. Confirm this before touching it — do not accidentally move it
 into the streaming path.
 
+### 4. Pre-run context banner in pretty mode
+
+Before calling `runSkill`, the CLI layer prints a brief orientation header in
+pretty/TTY mode only. This gives an agent the key operating context before any
+skill output arrives.
+
+Banner format (printed to stdout before skill output):
+
+```
+[Clawperator] v<version>  APK: <OK|MISSING>  Logs: <absolute-log-path>  Docs: https://docs.clawperator.com/llms.txt
+```
+
+Example:
+
+```
+[Clawperator] v0.3.3  APK: OK (com.clawperator.operator.dev)  Logs: /Users/<user>/.clawperator/logs/clawperator-2026-03-21.log  Docs: https://docs.clawperator.com/llms.txt
+Running skill: globird-get-usage
+```
+
+If the APK check returns a non-pass result:
+
+```
+[Clawperator] v0.3.3  APK: MISSING - run `clawperator operator setup --apk <path>`  Logs: /Users/<user>/.clawperator/logs/clawperator-2026-03-21.log  Docs: https://docs.clawperator.com/llms.txt
+```
+
+Implementation details:
+- **Version**: read from `package.json` or the version constant already in the CLI.
+- **APK check**: call `checkApkPresence(config)` from `readinessChecks.ts` (same
+  function PRD-1 adds to `runExecution.ts`). Use the same `RuntimeConfig` built from
+  CLI options. This check is **informational only** - the banner always lets skill
+  execution proceed regardless of APK state. The gate at execute-time in PRD-1 handles
+  blocking. The banner tells the agent what to expect before the skill starts.
+- **Log path**: compute `~/.clawperator/logs/clawperator-YYYY-MM-DD.log` using the
+  same date-path logic from PRD-5. If PRD-5 has not landed yet, compute the expected
+  path anyway (it is still useful to show where logs will appear once PR-5 ships). Use
+  `os.homedir()` for the absolute path, not `~`.
+- **Suppress entirely in JSON mode**: any output written to stdout before the final
+  JSON envelope breaks machine-readable callers. No banner, no newlines.
+- One line only. Do not add a spinner or multi-line block - keep it scannable.
+
 ---
 
 ## Why This Matters for Agent Success
@@ -113,7 +153,7 @@ Without this change, a 30-second skill run is 30 seconds of silence. With it, th
 
 In scope:
 - `runSkill.ts`: `SkillRunCallbacks` type, optional parameter, callback invocation in `data` handlers
-- `cli/commands/skills.ts`: callback wiring based on output mode
+- `cli/commands/skills.ts`: callback wiring based on output mode; pre-run banner
 - Backward compatibility: call sites that omit `callbacks` are unchanged
 
 Out of scope:
@@ -122,6 +162,8 @@ Out of scope:
 - Android-side per-action event streaming (requires APK changes)
 - Replacing the terminal envelope contract
 - Adding progress output to `execute` directly (that path has no script subprocess)
+- A `--pre-check` flag to make the APK check blocking at `skills run` level (deferred; the
+  execute-time gate from PRD-1 covers the critical path)
 
 ---
 
@@ -162,7 +204,9 @@ Three small shell scripts in `test/fixtures/scripts/`:
 2. Add `callbacks` parameter. Write T2, T3, T4. All must pass. T1 must still pass.
 3. Write T5 (`--expect-contains` still works). Wire CLI callback.
 4. Write T6 (JSON mode clean). This catches the output-mode guard in the CLI layer.
-5. Run integration test T7 with a real skill.
+5. Write T7 (banner present in pretty mode), T8 (banner absent in JSON mode). Both
+   fail. Wire banner. Both must pass. T6 must still pass.
+6. Run integration test T9 with a real skill.
 
 ### Unit Tests
 
@@ -202,24 +246,39 @@ chunk2
 - Expected: `JSON.parse(stdout)` succeeds; no skill output lines in stdout
 - Protects: `onOutput` wired to `process.stdout` regardless of output mode; JSON broken
 
+**T7 — banner appears in pretty mode before skill output (regression anchor)**
+- Method: capture stdout at the CLI layer for a `skills run` call in pretty mode
+- Expected: first line contains `"[Clawperator]"` with version, log path, and docs URL
+- Protects: banner not wired in CLI layer; agents get no orientation before skill runs
+
+**T8 — banner absent in JSON mode (regression anchor)**
+- Method: capture stdout for the same skill call with `--output json`
+- Expected: `JSON.parse(stdout)` succeeds with no parse error; no `[Clawperator]` line
+- Protects: banner written regardless of output mode; JSON output broken for machine callers
+
 ### Integration Tests
 
-**T7 — TTY mode shows output incrementally**
+**T9 — TTY mode shows banner then incremental output**
 - Command: `clawperator skills run <skill-with-stdout>` in a TTY
-- Expected: lines appear before the final result envelope; not all at once at the end
-- Protects: callback wired but never flushed; buffering bug survives the change
+- Expected: first line is the `[Clawperator]` banner; subsequent lines are skill output;
+  all arrive before the final result envelope
+- Protects: callback wired but never flushed; banner placed after skill output instead of before
 
 ### Manual Verification
 
-- Run a 5+ second skill in TTY mode; output arrives incrementally, not in a batch
-- Same skill with `--output json`; stdout is clean parseable JSON only
+- Run a 5+ second skill in TTY mode; banner appears first, then skill output arrives
+  incrementally, not in a batch
+- Same skill with `--output json`; stdout is clean parseable JSON only; no banner
 
 ---
 
 ## Acceptance Criteria
 
+- `skills run` in pretty/TTY mode: a one-line `[Clawperator]` banner is printed first,
+  containing version, APK status, today's log path (absolute), and the llms.txt URL.
 - `skills run` in pretty/TTY mode: skill stdout is visible to the caller as it arrives.
-- `skills run --output json`: no interleaving; stdout receives only the final JSON result.
+- `skills run --output json`: no banner, no interleaving; stdout receives only the final
+  JSON result.
 - `runSkill.ts` does not write to `process.stdout` or `process.stderr` directly.
 - `SkillRunResult.output` is unchanged (full accumulated string, not a stream reference).
 - `--expect-contains` passes and fails correctly in both output modes.
