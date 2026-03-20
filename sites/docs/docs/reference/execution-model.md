@@ -155,13 +155,66 @@ contract and the target environment.
 
 ## Recommended agent loop
 
-For unknown apps or UI drift:
+For any flow involving state-dependent decisions:
 
 1. Capture `snapshot_ui`.
-2. Decide one action or one short action sequence.
+2. Decide the next action (or a short, atomic sequence - see below).
 3. Execute it.
-4. Re-read the envelope and step results.
-5. Snapshot again before making the next major decision.
+4. Read the envelope and step results.
+5. Snapshot again before making the next decision.
+
+Clawperator does not observe state or make decisions between actions in a
+multi-step execution. It dispatches the action list sequentially and returns one
+result envelope. If the agent needs to inspect state, branch on what it sees, or
+handle unexpected UI between any two steps, those steps must be separate
+executions with the agent in the loop between them.
+
+## Execution granularity
+
+Multi-action executions are the preferred form for stable, pre-validated atomic flows and for mature skills - they reduce round trips and are appropriate whenever the agent does not need to observe state between steps. The guidance below is about when to split, not a recommendation to always go single-step.
+
+Group multiple actions in one execution only when they are **atomic** - meaning
+the agent does not need to inspect device state or make a decision between them.
+
+**Appropriate as a single execution:**
+
+- `close_app` + `open_app` + `sleep` - deterministic state reset; no decision
+  needed between steps
+- `click` + `wait_for_node` - click a button and wait for a specific element;
+  the target is specified in advance
+- `enter_text` + `click` - type in a field and submit; both succeed or fail as a
+  unit
+
+**Should be separate executions with agent observation between them:**
+
+- Any sequence where the agent needs to read the screen after one step to decide
+  the next
+- Navigation flows where the app may show an interstitial, dialog, or update
+  prompt that was not present when the flow was designed
+- Flows where the correct next step depends on current app state
+
+The rule of thumb: if you would naturally want to call `observe snapshot`
+between two steps, they belong in separate executions.
+
+## `sleep` vs `wait_for_node` vs separate snapshot
+
+Use the right primitive for each situation:
+
+| Situation | Correct tool |
+| :--- | :--- |
+| App needs a moment to settle after launch or a heavy transition | `sleep` with a conservative fixed value |
+| Waiting for a specific element to appear before proceeding | `wait_for_node` with appropriate retry config |
+| Checking whether the expected screen is showing | Separate `snapshot_ui` execution - agent inspects and decides |
+| Deciding what to do based on what the screen currently shows | Separate `snapshot_ui` execution - agent inspects and acts |
+
+`sleep` is for predictable, hardware-level timing. `wait_for_node` is for UI
+element readiness within a known, stable flow. A separate `snapshot_ui` followed
+by agent reasoning is for anything involving uncertainty, branching, or dynamic
+app behavior.
+
+Avoid using `sleep` as a substitute for observation. A long sleep that happens
+to let the UI settle is not the same as the agent verifying that the expected
+state was reached.
 
 For action-specific params, result shapes, and examples, use
 [Action Types Reference](action-types.md). For the full agent API contract,
