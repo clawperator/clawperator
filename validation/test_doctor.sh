@@ -5,7 +5,7 @@ set -euo pipefail
 # accurately detects integration/host issues like missing adb, no devices,
 # or no APK installed. It uses both PATH poisoning and a fake adb script.
 
-REQ_NODE="$(which node)"
+REQ_NODE="$(command -v node)"
 ORIGINAL_PATH="$PATH"
 
 REPO_ROOT="$(pwd)"
@@ -19,6 +19,8 @@ mkdir -p "$TMP_BIN"
 ln -s "$REQ_NODE" "$TMP_BIN/node"
 ln -s "$(which grep)" "$TMP_BIN/grep"
 ln -s "$(which cat)" "$TMP_BIN/cat"
+ln -s "$(which rm)" "$TMP_BIN/rm"
+ln -s "$(which cp)" "$TMP_BIN/cp"
 
 # Run doctor from source with poisoned path
 export PATH="$TMP_BIN"
