@@ -32,7 +32,7 @@ It intentionally does **not** update public release-facing docs or website conte
 - `docs/release-procedure.md`
 - `sites/docs/**`
 - `sites/landing/public/**`
-- `scripts/install.sh`
+- `sites/landing/public/install.sh`
 
 ## Mandatory Manual Audit
 

@@ -24,10 +24,9 @@ This skill updates public release-facing surfaces such as:
 - `docs/android-operator-apk.md`
 - `docs/compatibility.md`
 - `docs/release-procedure.md`
-- `scripts/install.sh`
+- `sites/landing/public/install.sh`
 - generated docs copies under `sites/docs/docs/`
 - generated `llms-full.txt` artifacts
-- `sites/landing/public/install.sh`
 
 It then rebuilds docs/site artifacts and creates a dedicated follow-up commit:
 
@@ -45,7 +44,6 @@ git commit -m "docs(release): update published version to <version>"
 ## Validation
 
 The script runs:
-- `npm --prefix sites/landing run sync-install-script`
 - `./scripts/docs_build.sh`
 
 If these steps fail, the published-version update is incomplete.
