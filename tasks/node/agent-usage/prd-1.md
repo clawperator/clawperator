@@ -175,15 +175,174 @@ Skill scripts that call `adb` directly rather than `clawperator execute` will no
 
 ---
 
-## Validation Plan
+## Testing Plan
 
-1. Unit test: `isCriticalDoctorCheck({ id: "readiness.apk.presence", ... })` returns `true`.
-2. Unit test: `checkApkPresence` returns `status: "fail"` (not `"warn"`) when the package is absent.
-3. Unit test: `runExecution` returns `RECEIVER_NOT_INSTALLED` error before broadcasting when APK absent.
-4. Integration test: `clawperator execute` with no APK returns `RECEIVER_NOT_INSTALLED` in under 2 seconds.
-5. Integration test: `clawperator doctor --output json` exits non-zero when APK is absent.
-6. Integration test: `clawperator doctor --check-only --output json` exits 0 and returns parseable JSON even when APK is absent.
-7. Integration test: `install.sh` still successfully installs the APK when doctor reports failure.
+### Fixtures and Mocks
+
+**`scripts/fake_adb.sh` extensions (env var `FAKE_ADB_PACKAGES`):**
+- `FAKE_ADB_PACKAGES=present` — `pm list packages com.clawperator.operator` returns
+  `package:com.clawperator.operator`
+- `FAKE_ADB_PACKAGES=absent` — same command returns empty output (no packages)
+- `FAKE_ADB_PACKAGES=variant` — same command returns `package:com.clawperator.operator.dev`
+
+**Unit test doubles (inject via module mock or dependency parameter):**
+- `mockCheckApkPresence(result: DoctorCheckResult)` — replaces the real adb call in
+  `runExecution.ts` unit tests
+- `spyBroadcastAgentCommand` — records call count and arguments; replaces the real
+  broadcast in `runExecution.ts` unit tests
+
+**Shared execution payload fixture (`test/fixtures/execution-minimal-valid.json`):**
+```json
+{
+  "commandId": "test-cmd-001",
+  "taskId": "test-task-001",
+  "actions": [{ "id": "t1", "type": "tap", "params": { "x": 100, "y": 200 } }]
+}
+```
+
+### TDD Sequence
+
+Write each test before making the code change it targets. Run the test first — it must
+fail before the change and pass after. Do not proceed to the next step until the previous
+step's tests pass and nothing already passing has broken.
+
+**Step 1 — before changing `criticalChecks.ts`:**
+Write T1. It fails (prefix absent). Add `"readiness.apk.presence"` to
+`CRITICAL_DOCTOR_CHECK_PREFIXES`. T1 must pass.
+
+**Step 2 — before changing `readinessChecks.ts`:**
+Write T2, T3, T4 together. T2 and T4 pass immediately (those behaviors are not changing
+yet). T3 fails (status is `"warn"`). Change `RECEIVER_NOT_INSTALLED` case to
+`status: "fail"`. Re-run all three: all must pass. T2 and T4 are the regression anchors -
+if either fails after the change, stop and investigate before committing.
+
+**Step 3 — before touching `runExecution.ts`:**
+Write T5 and T6 together. Both fail (no guard exists). Add `checkApkPresence` call before
+`broadcastAgentCommand`. Both must pass. Verify `spyBroadcastAgentCommand` call counts
+explicitly - do not rely on the return value alone.
+
+**Step 4 — integration tests after all unit tests pass:**
+Run T7–T10 under `CLAWPERATOR_RUN_INTEGRATION=1` with a device that has the APK
+uninstalled. Reinstall after T7 to avoid cascading failures in subsequent tests.
+
+### Unit Tests
+
+**T1 — `isCriticalDoctorCheck` recognizes the APK check id**
+- Call: `isCriticalDoctorCheck({ id: "readiness.apk.presence", status: "fail",
+  code: "RECEIVER_NOT_INSTALLED", message: "" })`
+- Expected: `true`
+- Failure mode protected: prefix absent from `CRITICAL_DOCTOR_CHECK_PREFIXES`; doctor
+  exits 0 when APK is absent; `--check-only` is the only exit-0 path
+
+**T2 — `checkApkPresence` passes when APK is installed (happy-path anchor)**
+- Setup: `FAKE_ADB_PACKAGES=present`; config uses default `com.clawperator.operator`
+- Expected: `{ id: "readiness.apk.presence", status: "pass" }`
+- Failure mode protected: over-broad check always returns "fail"; all commands blocked
+- Note: must pass before AND after the `readinessChecks.ts` change
+
+**T3 — `checkApkPresence` returns `"fail"` when APK is absent**
+- Setup: `FAKE_ADB_PACKAGES=absent`
+- Expected: `{ id: "readiness.apk.presence", status: "fail", code: "RECEIVER_NOT_INSTALLED" }` and `fix.steps` is a non-empty array containing an install command
+- Failure mode protected: status stays `"warn"`; gate never fires; 30-120s timeouts
+  continue
+- Note: must fail before the change, pass after
+
+**T4 — `checkApkPresence` warns (not fails) on variant mismatch (regression anchor)**
+- Setup: `FAKE_ADB_PACKAGES=variant` (dev APK installed, release expected)
+- Expected: `{ id: "readiness.apk.presence", status: "warn", code: "RECEIVER_VARIANT_MISMATCH" }`
+- Failure mode protected: severity accidentally promoted to "fail"; users with the dev APK
+  get hard-blocked
+- Note: must pass before AND after the change — this case is not being modified
+
+**T5 — `runExecution` blocks broadcast when APK absent**
+- Setup: `mockCheckApkPresence({ status: "fail", code: "RECEIVER_NOT_INSTALLED",
+  message: "...", fix: { steps: [...] } })`; `spyBroadcastAgentCommand` initialized
+- Input: `test/fixtures/execution-minimal-valid.json`
+- Expected: returns `{ ok: false, error: { code: "RECEIVER_NOT_INSTALLED",
+  message: <contains install command and device ID> } }`; `spyBroadcastAgentCommand` call
+  count is 0
+- Failure mode protected: guard added to wrong location; error returned but broadcast
+  still fires; error message missing actionable install step
+
+**T6 — `runExecution` passes through when APK present (happy-path anchor)**
+- Setup: `mockCheckApkPresence({ status: "pass" })`; `spyBroadcastAgentCommand` returns
+  `{ ok: true, data: { result: "pass" } }`
+- Input: `test/fixtures/execution-minimal-valid.json`
+- Expected: returns `{ ok: true }`; `spyBroadcastAgentCommand` call count is exactly 1
+- Failure mode protected: over-broad gate fires even when APK is installed; all commands
+  permanently blocked
+
+### Integration Tests
+
+Run with `CLAWPERATOR_RUN_INTEGRATION=1`. Requires a connected device.
+
+**T7 — Fast-fail when APK absent**
+- Precondition: `adb uninstall com.clawperator.operator` (record elapsed time to confirm
+  the old path takes 30+ seconds)
+- Command: `clawperator execute --execution test/fixtures/execution-minimal-valid.json`
+- Expected: process exits in under 2 seconds; output contains `RECEIVER_NOT_INSTALLED`;
+  error message contains the string `clawperator operator setup` or equivalent install
+  command
+- Failure mode protected: timeout path still fires (2 minute wait); no actionable guidance
+- After test: reinstall APK before running T8
+
+**T8 — `doctor` exits non-zero when APK absent**
+- Precondition: APK uninstalled
+- Command: `clawperator doctor --output json`; capture stdout and exit code
+- Expected: exit code is non-zero; `JSON.parse(stdout)` succeeds; APK check entry has
+  `"status": "fail"`; `fix.steps` array has at least one entry
+- Failure mode protected: exit code stays 0; `install.sh` cannot detect failure; installer
+  proceeds without installing APK
+
+**T9 — `doctor --check-only` exits 0 with honest data**
+- Precondition: APK uninstalled
+- Command: `clawperator doctor --check-only --output json`; capture stdout and exit code
+- Expected: exit code 0; `JSON.parse(stdout)` succeeds; APK check entry still has
+  `"status": "fail"` (data is honest; exit code is suppressed by `--check-only`)
+- Failure mode protected: `--check-only` semantics broken; installer bails instead of
+  reading the JSON and proceeding to install
+
+**T10 — `install.sh` handles `status: "fail"` from doctor**
+- Fixture: write a mock doctor JSON response to `/tmp/mock-doctor-output.json`:
+  ```json
+  { "checks": [{ "id": "readiness.apk.presence", "status": "fail",
+    "code": "RECEIVER_NOT_INSTALLED", "fix": { "steps": [] } }] }
+  ```
+- Run the installer's conditional parsing block against that file in a subshell
+- Expected: the install step is reached (not skipped); exit 0
+- Failure mode protected: installer bails on `"fail"` severity; APK install step never
+  runs after the severity change
+
+### CLI / Contract Regression
+
+**T11 — Doctor JSON output remains parseable after the change**
+- Command: `clawperator doctor --output json` (against any device state)
+- Expected: `JSON.parse(stdout)` succeeds; `report.checks` is an array; no extra commas,
+  unquoted keys, or formatting artifacts
+- Failure mode protected: serialization broken by the readinessChecks.ts edit
+
+**T12 — `install.sh` success banner contains the agent docs URL**
+- Method: `grep -F 'llms.txt' sites/landing/public/install.sh`
+- Expected: `https://docs.clawperator.com/llms.txt` present in the install.sh success
+  output block
+- Failure mode protected: banner added to wrong position; URL missing or wrong
+
+### Manual Verification
+
+**M1 — Fast-fail confirmed on device**
+- Uninstall: `adb uninstall com.clawperator.operator`
+- Run: `time clawperator execute --execution test/fixtures/execution-minimal-valid.json`
+- Confirm: total elapsed time under 2 seconds
+- Confirm: error message names the device ID and provides an install command the user
+  can copy-paste without looking up docs
+- Record elapsed time as a benchmark for comparison
+
+**M2 — No regression on device with APK installed**
+- Install: `adb install <path/to/operator.apk>`
+- Run: `clawperator execute --execution test/fixtures/execution-minimal-valid.json`
+- Confirm: command completes successfully (not `RECEIVER_NOT_INSTALLED`)
+- Run: `clawperator doctor`
+- Confirm: exits 0; APK check is `"pass"`
 
 ---
 

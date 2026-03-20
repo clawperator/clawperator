@@ -221,14 +221,146 @@ The known-hint list will become stale if not updated during API changes. Keep it
 
 ---
 
-## Validation Plan
+## Testing Plan
 
-1. Unit test: `validateExecution` with `{ type: "snapshot_ui", params: { format: "ascii" } }` - response includes `details.actionId`, `details.actionType`, `details.invalidKeys`.
-2. Unit test: `details.hint` is populated for `snapshot_ui.format`.
-3. Unit test: `details.hint` is absent for an unrecognized key that is not in the hint list.
-4. Unit test: existing `details.path` and `details.reason` are still present.
-5. Unit test: `RESULT_ENVELOPE_TIMEOUT` response includes `details.lastActionId`, `details.elapsedMs`, `details.timeoutMs`.
-6. Contract test: `error.code` and `error.message` are unchanged (additive only).
+### Fixtures
+
+**Invalid payload: action at index 0 (`test/fixtures/execution-invalid-action-0.json`):**
+```json
+{
+  "commandId": "cmd-001", "taskId": "task-001",
+  "actions": [{ "id": "snap", "type": "snapshot_ui", "params": { "format": "ascii" } }]
+}
+```
+
+**Invalid payload: action at index 2 (`test/fixtures/execution-invalid-action-2.json`):**
+```json
+{
+  "commandId": "cmd-001", "taskId": "task-001",
+  "actions": [
+    { "id": "open", "type": "open_app", "params": { "appId": "com.example" } },
+    { "id": "wait", "type": "wait_for_element", "params": { "query": "..." } },
+    { "id": "snap", "type": "snapshot_ui", "params": { "format": "ascii" } }
+  ]
+}
+```
+
+**Valid payload (`test/fixtures/execution-minimal-valid.json`):**
+Already defined in PRD-1. Reuse it here.
+
+**Payload without `commandId`/`taskId`:**
+```json
+{ "actions": [{ "id": "t1", "type": "tap", "params": { "x": 100, "y": 200 } }] }
+```
+
+### TDD Sequence
+
+**Before touching `validateExecution.ts`:**
+Write T1 (valid payload — no throw) and T2 (regression: existing `path` and `reason`
+present). Both must pass against the unchanged code. They are anchors: if either fails
+after the change, stop immediately.
+
+Write T3, T4, T5 next. All three fail (new fields absent). Make the changes to
+`validateExecution.ts`. All five must pass.
+
+**Before touching `runExecution.ts` timeout handling:**
+Write T6 and T7. Both fail. Add timeout context enrichment. Both must pass.
+
+### Unit Tests
+
+**T1 — valid payload passes without throwing (happy-path anchor)**
+- Input: `test/fixtures/execution-minimal-valid.json`
+- Expected: `validateExecution(input)` returns an `Execution` object; does not throw
+- Failure mode protected: false-positive validation rejections after the change; a
+  refactor that widens the error path accidentally blocks valid payloads
+- When: write before touching `validateExecution.ts`; must pass before and after
+
+**T2 — existing `details.path` and `details.reason` survive the change (regression anchor)**
+- Input: `test/fixtures/execution-invalid-action-2.json`
+- Expected: thrown error has `details.path === "actions.2.params.format"` and
+  `details.reason` is a non-empty string
+- Failure mode protected: additive change becomes destructive; existing agent code that
+  reads `details.path` breaks silently
+- When: write before touching `validateExecution.ts`; must pass before and after
+
+**T3 — action fields extracted at index 0**
+- Input: `test/fixtures/execution-invalid-action-0.json` (invalid action at index 0)
+- Expected: thrown error has `details.actionId === "snap"`,
+  `details.actionType === "snapshot_ui"`, `details.invalidKeys` contains `"format"`
+- Failure mode protected: Zod path extraction uses `path[1]` as the numeric index — when
+  the action is at index 0 this is `0`, which is falsy; a check like `path[1] || null`
+  would fail to extract the action id for index 0
+
+**T4 — action fields extracted at index 2**
+- Input: `test/fixtures/execution-invalid-action-2.json`
+- Expected: `details.actionId === "snap"`, `details.actionType === "snapshot_ui"`,
+  `details.invalidKeys` contains `"format"`
+- Failure mode protected: index extraction works for 0 but not for arbitrary positions
+
+**T5 — hint populated for known removed parameter**
+- Input: `test/fixtures/execution-invalid-action-0.json` (`snapshot_ui` with `format`)
+- Expected: `details.hint` contains the string `"format"` (the hint explains the removal)
+- Also: run with a payload where the invalid key is something NOT in the hint list (e.g.,
+  `"unknownParam"`); expected `details.hint` is `undefined`, not the string
+  `"undefined"`
+- Failure mode protected: hint firing for cases it doesn't apply to; hint missing for the
+  one known case
+
+**T6 — timeout error includes correlation handles when present**
+- Setup: mock `broadcastAgentCommand` to never resolve; use payload with `commandId` and
+  `taskId`; set `timeoutMs` to a small value (50ms for the test)
+- Expected: returned error has `details.commandId === "cmd-001"`,
+  `details.taskId === "task-001"`, `details.lastActionId === "t1"`,
+  `details.lastActionType === "tap"`, `details.elapsedMs >= 50`,
+  `details.timeoutMs === 50`, `details.lastActionCaveat` is a non-empty string
+- Failure mode protected: fields absent from the error; agent has no correlation handle
+  to match the timeout to its task tracking
+
+**T7 — timeout error handles absent `commandId`/`taskId` cleanly**
+- Setup: same as T6 but use the payload without `commandId`/`taskId`
+- Expected: returned error does not throw; `details.commandId` is `undefined` (absent
+  from the object), not the string `"undefined"`
+- Failure mode protected: string coercion bug (`String(undefined) === "undefined"`)
+  baked into the error envelope
+
+### Integration Tests
+
+Integration tests for PRD-2 are low-value relative to the unit tests — the contract
+changes are purely in Node JS code and are well-covered by unit tests. Run one
+smoke-level integration test after the unit tests pass:
+
+**T8 — enriched error appears in live CLI output**
+- Requires `CLAWPERATOR_RUN_INTEGRATION=1`
+- Command: `clawperator execute --execution test/fixtures/execution-invalid-action-0.json`
+  (no device needed — validation fails before any device contact)
+- Expected: stdout/stderr contains `"actionId"` and `"snapshot_ui"`; exit non-zero
+- Failure mode protected: unit test passes against internal function but CLI layer strips
+  or reformats the error before output
+
+### CLI / Contract Regression
+
+**T9 — additive contract: `error.code` and `error.message` unchanged**
+- Run `validateExecution` with `test/fixtures/execution-invalid-action-0.json`
+- Expected: `error.code === "EXECUTION_VALIDATION_FAILED"`;
+  `error.message` is a non-empty human-readable string (not changed to a machine code)
+- Failure mode protected: the new fields inadvertently replace rather than supplement
+
+### What to Skip
+
+- Do not write a test for every possible invalid action type — T3 and T4 cover the
+  extraction logic; additional cases are redundant.
+- Do not write timing bounds tests for `elapsedMs` (e.g., `elapsedMs < timeoutMs + 500`).
+  Timing tests are flaky under CI load. The existence of `elapsedMs` as a positive
+  integer is sufficient.
+- Defer URL-reachability checks on any docs URLs added here to the PRD-6 review.
+
+### Manual Verification
+
+**M1 — readable error on invalid payload**
+- Run: `clawperator execute --execution test/fixtures/execution-invalid-action-0.json`
+- Confirm: the error output names the action (`snap`) and the parameter (`format`)
+  explicitly; a developer seeing this output can fix the skill in under 30 seconds
+  without opening docs
 
 ---
 

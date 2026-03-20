@@ -1,318 +1,183 @@
 # Testing Strategy for Agent Usability PRDs
 
-This document is the testing supplement for `plan.md` and `prd-1.md` through `prd-6.md`.
-It covers gaps in the per-PRD validation plans, the test-driven implementation order for
-each workstream, regression anchors that must not be deleted, cross-PRD test dependencies,
-and the infrastructure assumptions tests depend on.
+This document is the cross-cutting testing guide for `plan.md` and `prd-1.md` through
+`prd-6.md`. Each PRD now contains its own concrete testing plan (fixtures, TDD sequence,
+unit/integration/manual tests, and failure modes). This document covers what the PRDs
+do not: the infrastructure each test plan depends on, the minimum bar for merging any PR,
+the regression anchors that must never be deleted, cross-PRD dependencies that span
+multiple workstreams, and the explicit list of tests that are too expensive or brittle
+to be worth running.
 
 ---
 
-## Honest Assessment of the Current Validation Plans
+## Test Infrastructure
 
-The current validation plans have three structural weaknesses:
+**Fake adb (`scripts/fake_adb.sh`):**
+Unit tests for adb-dependent code inject `fake_adb.sh` instead of requiring a device.
+The PRD-1 testing plan adds two env var modes (`FAKE_ADB_PACKAGES=present/absent/variant`)
+to the existing script. All unit tests must pass with `npm run test` on a machine with
+no device attached.
 
-**1. Post-hoc verification, not implementation drivers.**
-Every test is written in "verify at the end" style. None of the plans say what to write
-first. This produces tests that confirm what the code does rather than tests that prove
-it does what was intended. For contract-changing work (PRD-1, PRD-2) this is a
-meaningful risk: a gate that blocks everything and a gate that blocks only missing APKs
-can both pass the currently described tests.
+**Integration tests:**
+Any test labeled as an integration test in a PRD requires `CLAWPERATOR_RUN_INTEGRATION=1`
+and a connected device (physical or emulator). These run on merge or explicit opt-in, not
+on every commit.
 
-**2. Happy-path regression coverage is absent.**
-Every validation plan tests the new failure case. None explicitly test that the system
-still works normally after the change. A gate added to `runExecution.ts` that is too
-broad will not be caught by any test in the current PRD-1 plan.
+**Temp directories for file-system tests:**
+Tests that write to disk (PRD-5 log writer, PRD-3 compiled artifacts) must use unique
+temp directories created in `beforeEach` and cleaned in `afterEach`. Never use
+`~/.clawperator/` in unit tests.
 
-**3. Edge cases for optional and boundary conditions are underspecified.**
-Missing: absent optional fields (commandId/taskId), action at index 0 vs. last index,
-empty artifact arrays, onOutput throwing, concurrent log writes, NDJSON parseability,
-logPath pointing to the actual file written.
-
-These are fixed below per PRD. The existing test descriptions are kept; the additions
-are labeled `[MISSING - ADD]`.
+**Shared fixtures:**
+`test/fixtures/execution-minimal-valid.json` and `test/fixtures/execution-sentinel.json`
+are shared across PRDs. Create them once; reference them from all PRDs that need them.
 
 ---
 
-## Test Infrastructure Assumptions
+## Cross-Cutting Testing Strategy
 
-The existing `scripts/fake_adb.sh` provides a scriptable adb double. Unit tests for
-adb-dependent code should inject a fake adb path rather than requiring a connected
-device. The unit test suite (`npm run test`) must run without any device.
+### 1. Use tests to drive implementation (not confirm it)
 
-Integration tests (labeled "Integration test" in the validation plans) require a
-connected device or emulator and run under `CLAWPERATOR_RUN_INTEGRATION=1`.
+The canonical sequence for every code change in this project:
 
-The distinction matters for CI: unit tests run on every PR; integration tests run on
-merge or on explicit opt-in.
+1. Write the test first. Run it. Watch it fail.
+2. Write the minimum code to make it pass.
+3. Re-run all tests. If anything that was passing is now failing, stop and investigate
+   before committing.
+4. Commit the test and the code in the same commit.
 
----
+This is the only way to distinguish "the gate blocks what it should block" from "the gate
+blocks everything including what it should not." A green test written after the code
+cannot tell you which one you have.
 
-## PRD-1: Readiness Gate - Test Order and Missing Coverage
+Each PRD specifies the order in which to write its tests. Follow that order. The
+happy-path anchor always comes first.
 
-**Implementation order (write these first):**
+### 2. The minimum viable test for any change
 
-1. Unit: `isCriticalDoctorCheck("readiness.apk.presence")` → `true`. This drives the
-   two-line `criticalChecks.ts` change. Write it before changing the file.
-2. Unit: `checkApkPresence` with mock "package not listed" → `status: "fail"`. Write
-   before changing `readinessChecks.ts`.
-3. Unit: `checkApkPresence` with mock "package listed" → `status: "pass"`. Write at
-   the same time as (2). **This is the happy-path anchor.** Without it, a regression
-   that always returns fail goes undetected.
-4. Unit: `runExecution` with mock failed APK check → returns `RECEIVER_NOT_INSTALLED`
-   before `broadcastAgentCommand` is called. Write before adding the preflight guard.
-5. Unit: `runExecution` with mock passing APK check + mock successful broadcast →
-   returns `ok: true`. **This is the second happy-path anchor.** Without it, an
-   over-broad gate is invisible.
-6. Integration: execute fails fast with APK absent.
-7. Integration: execute succeeds with APK present.
+Every code change in these PRDs must have at least two tests before it can merge:
 
-**Missing tests `[ADD]`:**
+- **A failure test** — the new condition fires correctly.
+- **A happy-path anchor** — the existing working path still works after the change.
 
-- `checkApkPresence` with mock "package listed" → `status: "pass"`. (Happy path,
-  regression anchor. Currently missing from the validation plan.)
-- `RECEIVER_VARIANT_MISMATCH` case: mock shows wrong variant installed → result is
-  `status: "warn"`, not `"fail"`. (Explicit regression test that the severity change
-  was scoped correctly and did not accidentally promote the variant mismatch case.)
-- `runExecution` with APK present → `broadcastAgentCommand` IS called, not skipped.
-  (Regression anchor: the gate must not over-fire.)
-- `install.sh` JSON parsing: the installer reads `doctor --format json` output with
-  `status: "fail"` for the APK check and still proceeds to install, not bails. This
-  is a script-level regression test for the installer's conditional logic.
-- `doctor --output json` with APK absent → JSON is parseable and contains `status:
-  "fail"` in the APK check, plus `fix.steps` with the install command.
+These are not aspirational. They are the floor. A failure test without a happy-path
+anchor cannot distinguish a correct guard from an over-broad guard. This has already
+caused a review finding in PRD-1 (the original plan had no happy-path anchor for the
+APK pre-flight).
 
----
+### 3. What counts as "done testing" for a PR
 
-## PRD-2: Error Context - Test Order and Missing Coverage
+Before a PR is merged, all of the following must be true:
 
-**Implementation order:**
+1. `npm run test` passes with no skipped tests added in the PR.
+2. Every regression anchor listed in the table below for this PRD is present and passing.
+3. The happy-path anchor for every changed code path is present and passing.
+4. No existing test was deleted or made less strict to make the new tests pass.
+5. Integration tests pass under `CLAWPERATOR_RUN_INTEGRATION=1` on a connected device
+   for any change that touches device dispatch, logging, or skill execution.
 
-1. Unit: `validateExecution` with a payload containing a known-invalid param
-   (`format: "ascii"` on `snapshot_ui`) → `ValidationFailure.details` includes
-   `actionId` and `actionType`. Write before modifying `validateExecution.ts`.
-2. Unit: `validateExecution` with a fully valid payload → `Execution` returned, no
-   throw. **Happy-path anchor.** This must be in place before any schema change.
-3. Unit: `validateExecution` with invalid param at index 0, at middle index, at last
-   index → `actionId` is correct in all three cases. (The Zod path extraction uses
-   `path[1]` as the numeric index - verify it's correct for each position.)
-4. Unit: timeout enrichment with payload that has `commandId` and `taskId` → both
-   present in error details.
-5. Unit: timeout enrichment with payload that omits `commandId` → `details.commandId`
-   is absent, no throw.
+This is five conditions, not twenty. A PR that satisfies all five is done. Do not add
+test coverage beyond this unless a specific failure mode is identified that none of the
+existing tests would catch.
 
-**Missing tests `[ADD]`:**
+### 4. Tests that are not worth writing
 
-- `validateExecution` with a valid payload → no throw, returns `Execution`. (Happy
-  path. Without this, a change that adds false positives to validation goes
-  undetected.)
-- Action extraction at index 0 (not just middle index). The Zod path is `actions.0.
-  params.format` when the first action is invalid; verify `actionId` is extracted
-  from index 0 correctly.
-- `commandId`/`taskId` absent from payload → `details.commandId` and `details.taskId`
-  are `undefined`, not the string `"undefined"`, and the error does not throw.
-- `elapsedMs` is a positive integer and less than `timeoutMs + 500ms`. (Sanity bound -
-  catches a clock inversion bug.)
-- Existing error shape regression: `error.code`, `error.message`, `details.path`, and
-  `details.reason` are all present and unchanged for a known-invalid payload. The new
-  fields are additive; the old fields must not be removed or renamed.
+The following test categories have a poor return on investment for a project at this
+stage. Skip them unless there is a specific, identified failure mode they would catch
+that nothing else would catch.
 
----
+| Category | Why to skip |
+| :--- | :--- |
+| Timing bounds (e.g., `elapsedMs < timeoutMs + 500`) | Flaky under CI load; a positive integer check is sufficient |
+| URL reachability in CI (`curl docsUrl → HTTP 200`) | Network-dependent, offline CI breaks; do one manual check before shipping |
+| Concurrent append atomicity | Platform-dependent, hard to make reliable; document the assumption instead |
+| Every permutation of log level | Flag parsing is covered by one test; level filtering is configuration logic, not algorithmic |
+| `onOutput` callback throws and skill continues | High setup cost, low real-world risk; caller bug, not a library bug |
+| Exhaustive action type validation | PRD-2 covers the extraction logic with 2-3 cases; more cases add no information |
+| Generated docs content (`sites/docs/docs/`) | Generated output; test the source files and the generator, not the output |
 
-## PRD-3: Skill Preflight / Dry-run - Test Order and Missing Coverage
+### 5. Regression prevention for the highest-risk changes
 
-**Implementation order:**
+The three changes most likely to silently break something:
 
-1. Unit: `skills validate` (no flag) on a skill with an invalid artifact → `ok: true`.
-   This is the existing behavior. Write this test first to pin it, then add `--dry-run`
-   without breaking it.
-2. Unit: `skills validate --dry-run` on same skill → `ok: false`, `SKILL_VALIDATION_
-   FAILED`, with `details.actionId` from PRD-2.
-3. Unit: `skills validate --dry-run` on a skill with a valid artifact → `ok: true`.
-   (Happy-path anchor.)
-4. Unit: `skills validate --dry-run` on a script-only skill (no artifacts) → `ok: true`
-   with `dryRun.payloadValidation: "skipped"` and a non-empty `reason`.
-5. Unit: `skills validate --dry-run` on a skill with two artifacts, both invalid →
-   both failures are reported, not just the first.
+**PRD-1 gate in `runExecution.ts`:** An over-broad guard blocks all commands even when
+the APK is present. The happy-path anchor (T6 in PRD-1: APK present → broadcast IS
+called) is the only thing that catches this. It must be written before the guard is
+added, not after.
 
-**Missing tests `[ADD]`:**
+**PRD-2 `validateExecution.ts` enrichment:** The new fields must be additive. The
+regression anchor (T2 in PRD-2: existing `details.path` and `details.reason` still
+present) must survive every refactor of this function. If it breaks, existing agent
+error-handling code silently stops receiving the fields it depends on.
 
-- Happy path: valid artifact-backed skill passes `--dry-run`. (Currently missing from
-  the validation plan.)
-- Multiple artifact failures: a skill with two artifacts, each with a different schema
-  violation, produces two failure entries. (Without this, a "return on first failure"
-  bug goes undetected.)
-- Empty artifacts array (`"artifacts": []`) behaves identically to a script-only skill:
-  integrity passes, `dryRun.payloadValidation: "skipped"`.
-- Schema consistency: the schema used in `--dry-run` artifact validation is the same
-  module as `execute --validate-only`. Enforce this at the import level (one shared
-  schema import), and write a smoke test that compiles a skill and validates the
-  output with `execute --validate-only` to confirm they agree.
-- `--dry-run` output in `json` mode is valid parseable JSON. (The output format must
-  be consistent regardless of whether the check passes or fails.)
-
----
-
-## PRD-4: Progress Streaming - Test Order and Missing Coverage
-
-**Implementation order:**
-
-1. Unit: `runSkill` without `callbacks` → accumulates stdout, returns `SkillRunResult`.
-   Pin the existing behavior before touching the signature.
-2. Unit: `runSkill` with `callbacks.onOutput` → callback receives each stdout chunk
-   before the promise resolves.
-3. Unit: `runSkill` with `callbacks.onOutput` → `SkillRunResult.output` still contains
-   full accumulated string (not empty, not just the last chunk).
-4. Unit: `runSkill` with a script that writes to stderr → `onOutput` receives chunks
-   with `stream: "stderr"`.
-5. Integration: `skills run --output json` → stdout contains only the final JSON
-   envelope, no interleaved chunk text.
-
-**Missing tests `[ADD]`:**
-
-- `onOutput` receives `stream: "stderr"` chunks for stderr output. (Currently the
-  validation plan only mentions stdout.)
-- `onOutput` that throws → `runSkill` catches the error, logs it to stderr, and
-  continues accumulating. The skill process is not killed and `SkillRunResult` is
-  still returned. (Without this, a misbehaving caller crashes the domain helper.)
-- Skill that produces no output → `SkillRunResult.output` is `""`, not undefined. No
-  callback invocations, no error.
-- `--expect-contains` with streaming active → check passes when the full accumulated
-  output contains the string, even if no single chunk contained it. (Regression for
-  the check being accidentally moved to per-chunk.)
-
----
-
-## PRD-5: Persistent Logging - Test Order and Missing Coverage
-
-**Implementation order:**
-
-1. Unit: log writer creates the file and writes a single valid NDJSON entry. Parse it
-   with `JSON.parse` in the test to confirm parseability.
-2. Unit: log writer appends to an existing file rather than overwriting it.
-3. Unit: log writer when directory does not exist → creates the directory and writes.
-4. Unit: log writer when directory cannot be created (permissions) → emits one warning
-   to stderr, returns without throwing.
-5. Unit: `broadcast.dispatched` event is logged with `commandId` matching the
-   execution payload's `commandId`.
-6. Unit: `timeout.fired` event is logged, and `logPath` in the `RESULT_ENVELOPE_
-   TIMEOUT` error details is the absolute path to the file that was written.
-
-**Missing tests `[ADD]`:**
-
-- Log entries are valid NDJSON: each line is parseable with `JSON.parse`. (Currently
-  missing. A comma-separated JSON array, pretty-printed JSON, or truncated entry would
-  all fail an agent trying to read the log.)
-- `logPath` in the timeout error is the same absolute path as the file that was
-  written during that invocation. Test by writing to `CLAWPERATOR_LOG_DIR=/tmp/test`
-  and checking that `error.details.logPath` matches the file in `/tmp/test/`.
-- `CLAWPERATOR_LOG_LEVEL` env var is respected as an alternative to `--log-level`.
-  (Currently the plan only tests the flag.)
-- Payload body exclusion: write an execution with a `enter_text` action whose `text`
-  param contains a known sentinel string, then verify the sentinel does not appear in
-  any log line at any log level.
-- Concurrent invocations: run two `execute` calls in parallel against the same log
-  file. Read the log after both complete. Every line must be parseable and no line may
-  be split or interleaved. (Tests append atomicity - `fs.appendFile` with NDJSON lines
-  under 4KB is typically atomic on most OSes, but this should be confirmed under test.)
-- `preflight.apk.pass` and `preflight.apk.missing` events are logged (depends on PRD-1
-  gate being in place). This is a cross-PRD regression anchor: verify the pre-flight
-  from PRD-1 actually emits its log event.
-
----
-
-## PRD-6: Docs - Test Order and Missing Coverage
-
-**Implementation order:**
-
-1. Unit: `renderCheck` with a check that has `fix.docsUrl` → output includes `Docs:
-   <url>` line. Write before modifying `renderCheck`.
-2. Unit: `renderCheck` with a check that has no `fix.docsUrl` → output does not
-   include a `Docs:` line. (Regression: the field is optional and absent checks must
-   not gain a phantom `Docs:` line.)
-3. Unit: doctor `json` output for the `RECEIVER_NOT_INSTALLED` check includes
-   `fix.docsUrl`.
-4. TypeScript compilation: `fix` object without `docsUrl` compiles without error.
-
-**Missing tests `[ADD]`:**
-
-- `docsUrl` in `fix` does not appear in the output of checks that do not have it set.
-  Specifically: run doctor pretty output against a report that mixes checks with and
-  without `docsUrl`, and verify only the checks with `docsUrl` emit a `Docs:` line.
-- `clawperator doctor --output json | python3 -m json.tool` (or equivalent JSON
-  schema validation) passes. The `docsUrl` addition must not break JSON output
-  parseability.
-- Automated URL reachability: at minimum, verify that the `docsUrl` values used in the
-  code are valid URL strings (format check), and add a CI step or smoke test that
-  verifies the target pages return HTTP 200. This prevents dead docs links being baked
-  into error output.
+**PRD-4 streaming change:** `SkillRunResult.output` must still contain the full
+accumulated string even when `onOutput` is also provided. The anchor (T3 in PRD-4:
+output still full string with callback active) prevents `--expect-contains` from
+silently starting to operate on empty strings.
 
 ---
 
 ## Regression Anchors (Never Delete These)
 
-The following tests must not be removed once written. They protect the most critical
-behaviors from silent regression:
+The following tests protect the most critical behaviors from silent regression. Once
+written, do not delete or weaken them. If a later change makes one of these tests fail,
+that is a signal to investigate, not to update the test.
 
-| Anchor | PRD | What it prevents |
+| Anchor | PRD | Failure mode it prevents |
 | :--- | :--- | :--- |
-| `checkApkPresence` with package present → `status: "pass"` | 1 | Over-broad gate that blocks everything |
-| `runExecution` with APK present → broadcast IS called | 1 | Gate that never lets anything through |
+| `checkApkPresence` with APK present → `status: "pass"` | 1 | Over-broad gate blocks all commands |
+| `runExecution` with APK present → broadcast IS called | 1 | Gate never lets anything through |
 | `RECEIVER_VARIANT_MISMATCH` → `status: "warn"`, not `"fail"` | 1 | Accidental severity escalation |
-| `doctor --check-only` → exits 0 regardless of check results | 1 | Breaking the installer |
-| `validateExecution` with a currently valid payload → no throw | 2 | False positive validation rejections |
-| Existing `details.path` and `details.reason` present after PRD-2 change | 2 | Additive contract becoming destructive |
-| `skills validate` without `--dry-run` on invalid artifact → `ok: true` | 3 | Changing existing behavior |
-| `runSkill` without `callbacks` → still accumulates and returns correctly | 4 | Breaking existing callers |
-| `--expect-contains` after streaming change → operates on full output | 4 | Subtle breakage in expect-contains callers |
-| Log writer failure → command still completes | 5 | Logging breaking the CLI |
-| Log entries are parseable NDJSON | 5 | Agents failing to read logs |
-| `renderCheck` without `docsUrl` → no `Docs:` line emitted | 6 | Phantom docs lines in existing check output |
+| `doctor --check-only` → exits 0 regardless of APK state | 1 | Breaking the installer's JSON-parsing flow |
+| `validateExecution` with valid payload → no throw | 2 | False-positive validation rejections |
+| `details.path` and `details.reason` present after PRD-2 change | 2 | Additive change becoming destructive |
+| `skills validate` without `--dry-run` on invalid artifact → `ok: true` | 3 | Changing existing behavior of base command |
+| `runSkill` without `callbacks` → output accumulated and returned | 4 | Breaking existing callers of `runSkill` |
+| `--expect-contains` with split output → operates on full accumulated string | 4 | Check moved accidentally to per-chunk evaluation |
+| Log writer failure → command still completes | 5 | Logging crashing the CLI |
+| Log writer creates parseable NDJSON entries | 5 | Agents failing to read logs |
+| `renderCheck` without `docsUrl` → no `Docs:` line emitted | 6 | Phantom docs lines on existing checks |
 
 ---
 
 ## Cross-PRD Test Dependencies
 
-These are test cases that span two workstreams and must be maintained as each PRD lands:
+These are integration-level checks that must be run after multiple PRDs have landed.
+Each one verifies that two workstreams did not silently interfere with each other.
 
 **PRD-2 → PRD-3:**
-PRD-3's `--dry-run` output uses the enriched `EXECUTION_VALIDATION_FAILED` format from
-PRD-2. After both land, verify that a `--dry-run` failure response includes `actionId`,
-`actionType`, `invalidKeys`, and `hint` (not just `code` and `message`). This is a
-combined regression test.
+`--dry-run` failure output uses the PRD-2 enriched error format. After both land, run
+`skills validate --dry-run test-skill-invalid-artifact --output json` and verify the
+response contains `actionId`, `actionType`, `invalidKeys`, and `hint` (not just `code`
+and `message`).
 
 **PRD-2 → PRD-5:**
-PRD-5 adds `logPath` to `RESULT_ENVELOPE_TIMEOUT`. PRD-2 added `commandId`, `taskId`,
-`lastActionId`, and `lastActionCaveat` to the same error. After both land, verify all
-PRD-2 fields AND `logPath` coexist in the error details. Neither workstream should
-silently remove the other's fields.
+`RESULT_ENVELOPE_TIMEOUT` gains fields from both PRDs. After both land, trigger a
+timeout and verify `details` contains `commandId`, `taskId`, `lastActionId`,
+`lastActionCaveat`, `elapsedMs`, `timeoutMs`, and `logPath` simultaneously. Neither
+workstream should have dropped the other's fields.
 
 **PRD-1 → PRD-5:**
-PRD-5 logs `preflight.apk.pass` and `preflight.apk.missing` events that are produced
-by the gate added in PRD-1. After both land, verify these events appear in the log on
-a real execute invocation with APK absent, and on an invocation with APK present.
+`preflight.apk.pass` and `preflight.apk.missing` events are emitted by the gate added in
+PRD-1 and logged by the infrastructure added in PRD-5. After both land, run one execute
+with APK absent and one with APK present; verify each corresponding event appears in the
+log file.
 
 **PRD-5 → PRD-6:**
-PRD-6 docs reference `~/.clawperator/logs/` and the NDJSON format. After PRD-5 ships,
-run the docs validation (`./scripts/validate_docs_routes.py` or equivalent) to confirm
-the log path documented in troubleshooting.md matches the actual default path in the
-log infrastructure.
+`docs/troubleshooting.md` documents `~/.clawperator/logs/` as the log path. Verify the
+actual path written by the PRD-5 infrastructure matches the path documented in the PRD-6
+docs update. Mismatches here mean agents following the docs read the wrong file.
 
 ---
 
-## What "Done With Testing" Looks Like
+## Final Validation Before the Last PR
 
-For each PR, before merging:
+After all six PRDs have landed, run:
 
-1. `npm run test` passes with no skipped tests added in this PR.
-2. All new unit tests are in the same file as the code they test (colocated where the
-   project structure allows, or in the `__tests__` adjacent directory).
-3. Every regression anchor for this PRD is present and passing.
-4. The happy-path test for the changed code path is present and passing.
-5. Integration tests pass under `CLAWPERATOR_RUN_INTEGRATION=1` on a connected device.
-6. No existing test was deleted or made less strict to make the new tests pass.
+1. `npm run test` — all unit tests, no skipped.
+2. `CLAWPERATOR_RUN_INTEGRATION=1 ./scripts/clawperator_smoke_core.sh`
+3. `CLAWPERATOR_RUN_INTEGRATION=1 ./scripts/clawperator_smoke_skills.sh`
+4. All four cross-PRD tests listed above.
 
-For the overall sequence, after all PRDs land:
-
-7. Run the full cross-PRD regression anchors listed above.
-8. Run `./scripts/clawperator_smoke_core.sh` and `./scripts/clawperator_smoke_skills.sh`
-   end-to-end and confirm no regressions from the baseline before this work started.
+If all four pass with no regressions from the baseline before this work started, the
+project is done.

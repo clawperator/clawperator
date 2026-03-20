@@ -153,14 +153,124 @@ Making `--dry-run` the default would break CI for skills that can't compile with
 
 ---
 
-## Validation Plan
+## Testing Plan
 
-1. Unit test: `skills validate --dry-run` returns `SKILL_VALIDATION_FAILED` for a skill with `{ type: "snapshot_ui", params: { format: "ascii" } }` in its artifact.
-2. Unit test: response includes `details.actionId`, `details.actionType`, `details.invalidKeys`.
-3. Unit test: `details.hint` is populated for the `snapshot_ui.format` case.
-4. Unit test: `skills validate` (no flag) still returns `ok: true` for the same skill (existing behavior unchanged).
-5. Integration test: `skills validate --dry-run com.android.settings.capture-overview` passes (real bundled skill with valid artifact).
-6. Manual verification: dry-run failure message is sufficient to fix the payload without consulting docs.
+### Fixtures
+
+Create minimal test skills in `test/fixtures/skills/`:
+
+**`test-skill-invalid-artifact/`** — artifact-backed skill with a schema violation
+- `skill.json`: valid metadata, one artifact entry pointing to `artifact.json`
+- `artifact.json`: `{ "actions": [{ "id": "snap", "type": "snapshot_ui", "params": { "format": "ascii" } }] }`
+
+**`test-skill-valid-artifact/`** — artifact-backed skill with a valid payload
+- `skill.json`: valid metadata, one artifact
+- `artifact.json`: valid action (e.g., a `tap` with correct params)
+
+**`test-skill-script-only/`** — no artifacts field in skill.json
+- `skill.json`: valid metadata, no `artifacts` key
+
+**`test-skill-empty-artifacts/`** — artifacts array is present but empty
+- `skill.json`: valid metadata, `"artifacts": []`
+
+Two-artifact failure case: add a second invalid artifact to `test-skill-invalid-artifact`
+for the "all failures reported" test, or create a separate fixture if cleaner.
+
+### TDD Sequence
+
+**Step 1 — before adding `--dry-run` at all:**
+Write T1 (existing behavior unchanged). It passes. This is the pin. After every
+subsequent change, T1 must still pass.
+
+**Step 2 — scaffold `--dry-run` flag but before wiring compile + validate:**
+Write T2 (valid artifact passes). It should pass once the scaffold correctly routes
+artifact-backed skills. This confirms the scaffolding before the validation logic.
+
+**Step 3 — wire compile + validate logic:**
+Write T3, T4, T5, T6. Run them; most fail. Implement. All must pass. T1 must still pass.
+
+### Unit Tests
+
+**T1 — `skills validate` without `--dry-run` still passes invalid artifact (regression anchor)**
+- Input: `test-skill-invalid-artifact`, no `--dry-run` flag
+- Expected: `{ ok: true }` (integrity is fine; payload schema is not checked)
+- Failure mode protected: `--dry-run` accidentally changes the behavior of the base
+  `validate` command; existing CI that runs `skills validate` starts failing
+
+**T2 — `--dry-run` passes for valid artifact-backed skill (happy-path anchor)**
+- Input: `test-skill-valid-artifact`, `--dry-run` flag
+- Expected: `{ ok: true }`; no `dryRun.payloadValidation: "skipped"` (it was validated)
+- Failure mode protected: over-broad check blocks all skills including valid ones;
+  dry-run becomes useless as a pre-device gate
+
+**T3 — `--dry-run` fails for invalid artifact with actionable error**
+- Input: `test-skill-invalid-artifact`, `--dry-run` flag
+- Expected: `{ ok: false, code: "SKILL_VALIDATION_FAILED", details: { actionId: "snap", actionType: "snapshot_ui", invalidKeys: ["format"] } }`
+- Failure mode protected: dry-run silently passes the invalid artifact; the point of the
+  feature is missed
+
+**T4 — `--dry-run` on script-only skill exits cleanly with skip notice**
+- Input: `test-skill-script-only`, `--dry-run` flag
+- Expected: `{ ok: true, dryRun: { payloadValidation: "skipped", reason: <non-empty string> } }`
+- Failure mode protected: script-only skills crash or return `ok: false`; agents
+  using `--dry-run` on all skills start seeing false failures for script-only skills
+
+**T5 — `--dry-run` on empty artifacts array treated same as script-only**
+- Input: `test-skill-empty-artifacts`, `--dry-run` flag
+- Expected: same shape as T4 — `payloadValidation: "skipped"`
+- Failure mode protected: `artifacts: []` handled differently from absent `artifacts`;
+  empty array causes a crash or silent schema miss
+
+**T6 — `--dry-run` reports all failures when multiple artifacts are invalid**
+- Input: a skill with two artifacts, each with a different schema violation
+- Expected: response contains entries for both artifacts (not just the first)
+- Failure mode protected: early return on first failure; second invalid artifact goes
+  undetected and surfaces at runtime
+
+### CLI / Contract Regression
+
+**T7 — `--dry-run` output in JSON mode is parseable for both pass and fail**
+- Commands:
+  1. `clawperator skills validate test-skill-valid-artifact --dry-run --output json`
+  2. `clawperator skills validate test-skill-invalid-artifact --dry-run --output json`
+- Expected for both: `JSON.parse(stdout)` succeeds; no interleaved text
+- Failure mode protected: error path prints non-JSON to stdout and breaks agent
+  that parses the result
+
+**T8 — compile and validate use the same schema (static check)**
+- In the implementation, compile-artifact and execute's validation must import the
+  action schema from the same module. Add a comment in both call sites naming the
+  shared import. Write a test that imports both and asserts they reference the same
+  object (or at minimum the same module path).
+- Failure mode protected: schema drift between compile and validate produces a false
+  pass where `--dry-run` says valid but `execute` says invalid
+
+### Integration Tests
+
+One integration test is sufficient here. No device is needed — `--dry-run` is
+explicitly designed to work without a device.
+
+**T9 — real bundled skill passes `--dry-run`**
+- Precondition: registry contains a bundled skill with a pre-compiled artifact (e.g.,
+  `com.android.settings.capture-overview` if it ships with the repo)
+- Command: `clawperator skills validate <bundled-skill-id> --dry-run`
+- Expected: `ok: true`; no `payloadValidation: "skipped"` (it has an artifact)
+- Failure mode protected: real skill infrastructure not correctly wired to `--dry-run`
+
+### What to Skip
+
+- Do not test runtime UI behavior via `--dry-run` (out of scope by design).
+- Do not test device-dependent script-only skills in dry-run (they correctly return
+  "skipped"; testing against a real device adds no value here).
+- Skip testing every invalid parameter type — T3 is sufficient to confirm the validation
+  path works; the underlying validation logic is covered by PRD-2 tests.
+
+### Manual Verification
+
+**M1 — actionable failure message**
+- Run: `clawperator skills validate test-skill-invalid-artifact --dry-run`
+- Confirm: the output names the skill, the artifact file, the action id (`snap`), and the
+  invalid parameter (`format`); a developer can fix the artifact without opening docs
 
 ---
 
