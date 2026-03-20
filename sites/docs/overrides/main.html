@@ -11,8 +11,8 @@
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="{{ config.site_name }}" />
   <meta property="og:title" content="{{ page.title or config.site_name }}" />
-  <meta property="og:description" content="{{ page.description or config.site_description }}" />
-  <meta property="og:url" content="{{ page.canonical_url or page.abs_url }}" />
+  <meta property="og:description" content="{{ config.site_description }}" />
+  <meta property="og:url" content="{{ page.canonical_url }}" />
   <meta property="og:image" content="https://static.clawperator.com/img/share/clawperator_share_image.png" />
   <meta property="og:image:secure_url" content="https://static.clawperator.com/img/share/clawperator_share_image.png" />
   <meta property="og:image:type" content="image/png" />
@@ -21,7 +21,7 @@
   <meta property="og:image:alt" content="Clawperator share image" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="{{ page.title or config.site_name }}" />
-  <meta name="twitter:description" content="{{ page.description or config.site_description }}" />
+  <meta name="twitter:description" content="{{ config.site_description }}" />
   <meta name="twitter:image" content="https://static.clawperator.com/img/share/clawperator_share_image.png" />
   <meta name="twitter:image:alt" content="Clawperator share image" />
   <style>
