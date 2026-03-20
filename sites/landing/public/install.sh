@@ -502,8 +502,11 @@ maybe_install_operator_apk() {
         done < <(list_connected_devices)
         if [ "$all_ready" = true ]; then
             echo -e "${GREEN}All devices ready. No setup required.${NC}"
+            return 0
         fi
-        return 0
+
+        echo -e "${YELLOW}Skipping APK install until every connected device is ready.${NC}"
+        return 1
     fi
 
     local INSTALL_APK_RESPONSE="${CLAWPERATOR_INSTALL_APK:-}"

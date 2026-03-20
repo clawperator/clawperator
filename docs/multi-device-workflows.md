@@ -123,7 +123,8 @@ clawperator doctor \
 ## Recovery after installer or setup runs
 
 If `install.sh` ran while multiple devices were connected, host-side setup can
-still complete successfully, but Android setup must be finished per device.
+still complete successfully. The installer exits non-zero when any connected
+device still needs setup, and Android setup must be finished per device.
 
 Use:
 
