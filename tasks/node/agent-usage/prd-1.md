@@ -103,13 +103,13 @@ Implementation notes:
 - Reuse `checkApkPresence` from `readinessChecks.ts` directly - do not duplicate the adb call.
 - The adb round-trip is ~100ms. No session-level cache is warranted: each `clawperator execute` is a separate process, so in-memory caching provides no benefit. Keep it a fresh check on every invocation.
 - Follow the `injectServiceUnavailableHint` pattern already in `runExecution.ts` for the hint text.
-- `skills run` does NOT inherit this check automatically. `runSkill.ts` spawns an arbitrary script process - it has no call to `runExecution`. Skills that happen to call `clawperator execute` from within their script will hit the check. Skills that use `adb` directly or omit execution entirely will not. The `runSkill.ts` wrapper must therefore also call `checkApkPresence` before spawning the skill script, so the gate is enforced regardless of how the script is written.
+- Gate placement: the check belongs in `runExecution.ts` only - this is the layer that actually requests device access (via `broadcastAgentCommand`). Do NOT add the gate to `runSkill.ts`. `runSkill.ts` launches arbitrary scripts; many skill scripts do not require device access and should not be blocked. Skills that call `clawperator execute` from within their script will hit the gate naturally at `runExecution.ts`. Skills that call `adb` directly already bypass the Node layer entirely and are a separate (pre-existing) concern.
 
-### 4. `--check-only` semantics preserved
+### 4. `--check-only` semantics
 
-Doctor with `--check-only` must remain non-blocking and return the full JSON even when the APK is absent. The installer uses this path. The severity change must not break the installer's conditional logic.
+`--check-only` is an existing flag on `clawperator doctor` that suppresses the exit code, returning 0 regardless of check results. `install.sh` uses this path to inspect the report without triggering a failure exit.
 
-Verify: after this change, `clawperator doctor --check-only --output json` still returns a parseable result with `status: "fail"` in the APK check but does not exit non-zero.
+This PR does not add a new mode. The only change is: `doctor` without `--check-only` now exits 1 when the APK is absent (because the check is promoted from warn to fail). `--check-only` continues to exit 0 in all cases. This distinction must be documented precisely - do not add any prose that implies a new flag or new mode exists.
 
 ### 5. `install.sh`: post-install docs banner
 
@@ -167,11 +167,11 @@ None. This is the first PR and depends on no other workstream.
 **Risk: installer behavior**
 `install.sh` parses `doctor --format json` and uses the result to decide whether to install the APK. The installer must handle `status: "fail"` for APK absence correctly after this change. Verify that the installer's JSON parsing does not treat a `fail` severity as an unrecoverable error that prevents the install step from running.
 
-**Risk: adb round-trip in execute and runSkill**
-The pre-flight adds ~100ms per invocation. Each CLI call is a new process, so no in-memory cache is possible. The raw adb cost is acceptable. If it proves measurable, a short-lived on-disk stamp (e.g. `~/.clawperator/cache/apk-<serial>.json` with a 5-second TTL) is the right follow-on optimization - do not add that complexity in this PR.
+**Risk: adb round-trip in execute**
+The pre-flight adds ~100ms per `execute` invocation. Each CLI call is a new process, so no in-memory cache is possible. The raw adb cost is acceptable. If it proves measurable in practice, a short-lived on-disk stamp (e.g. `~/.clawperator/cache/apk-<serial>.json` with a 5-second TTL) is the right follow-on optimization - do not add that complexity in this PR.
 
-**Risk: gate placement in runSkill.ts**
-The check added to `runSkill.ts` runs before the skill script is spawned. If a skill is designed to install the APK itself (unusual but possible), the pre-flight will incorrectly block it. Document that self-installing skills should call `clawperator operator setup` before being invoked via `skills run`.
+**Risk: skills that use adb directly**
+Skill scripts that call `adb` directly rather than `clawperator execute` will not hit the gate. This is a pre-existing bypass of the Node layer and is out of scope for this PR. If a direct-adb skill is common, add a note to the skill authoring guide that `clawperator execute` is the required path for device dispatch.
 
 ---
 
@@ -180,7 +180,6 @@ The check added to `runSkill.ts` runs before the skill script is spawned. If a s
 1. Unit test: `isCriticalDoctorCheck({ id: "readiness.apk.presence", ... })` returns `true`.
 2. Unit test: `checkApkPresence` returns `status: "fail"` (not `"warn"`) when the package is absent.
 3. Unit test: `runExecution` returns `RECEIVER_NOT_INSTALLED` error before broadcasting when APK absent.
-3a. Unit test: `runSkill` returns `RECEIVER_NOT_INSTALLED` error before spawning the script when APK absent (gate at `runSkill.ts` layer, not just `runExecution.ts`).
 4. Integration test: `clawperator execute` with no APK returns `RECEIVER_NOT_INSTALLED` in under 2 seconds.
 5. Integration test: `clawperator doctor --output json` exits non-zero when APK is absent.
 6. Integration test: `clawperator doctor --check-only --output json` exits 0 and returns parseable JSON even when APK is absent.
@@ -191,9 +190,10 @@ The check added to `runSkill.ts` runs before the skill script is spawned. If a s
 ## Acceptance Criteria
 
 - `clawperator doctor` exits non-zero when the Operator APK is absent.
-- `clawperator execute` returns `RECEIVER_NOT_INSTALLED` with install command in under 2 seconds when the APK is absent.
-- `clawperator doctor --check-only --output json` exits 0 and returns parseable JSON regardless of APK state.
+- `clawperator execute` returns `RECEIVER_NOT_INSTALLED` with install command in under 2 seconds when the APK is absent. Gate is in `runExecution.ts` only.
+- `clawperator doctor --check-only` continues to exit 0 regardless of APK state. No new flag or mode is introduced; `--check-only` is the pre-existing escape hatch.
 - `RECEIVER_VARIANT_MISMATCH` remains a `warn` (not a hard failure).
-- `install.sh` still installs the APK when the device is ready.
+- `install.sh` still installs the APK when the device is ready (handles `status: "fail"` from doctor JSON).
 - `install.sh` post-install banner includes `https://docs.clawperator.com/llms.txt`.
 - `docs/first-time-setup.md` and `docs/reference/node-api-doctor.md` agree on APK absence behavior.
+- No `runSkill.ts` changes in this PR. Skill scripts that call `execute` get the gate naturally.

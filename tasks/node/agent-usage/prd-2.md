@@ -132,12 +132,16 @@ Example enriched response:
 ### 2. `runExecution.ts`: enrich `RESULT_ENVELOPE_TIMEOUT`
 
 When the timeout fires, include in the error response:
+- `details.commandId`: the `commandId` from the execution payload (when present)
+- `details.taskId`: the `taskId` from the execution payload (when present)
 - `details.lastActionId`: the `id` of the last action in the payload
-- `details.lastActionType`: the `type` of the last action
+- `details.lastActionType`: the `type` of the last action in the payload
 - `details.elapsedMs`: milliseconds elapsed since broadcast was dispatched
 - `details.timeoutMs`: the configured timeout
 
-Note: "last action" is the last action in the payload, not necessarily the action Android was executing when the timeout fired. Node does not receive per-action acknowledgments. Document this limitation.
+**Critical caveat on "last action":** `details.lastActionId` and `details.lastActionType` are the last action in the *payload*, not the action Android was executing when the timeout fired. Node does not receive per-action acknowledgments from Android. This limitation must be documented explicitly in both the code comment and the error-handling docs so agents do not assume Android reached the named action.
+
+Including `commandId` and `taskId` is the more reliable correlation handle - agents can use those to match the timeout against their own task tracking, regardless of which action Android was on.
 
 Example:
 ```json
@@ -145,10 +149,13 @@ Example:
   "ok": false,
   "error": {
     "code": "RESULT_ENVELOPE_TIMEOUT",
-    "message": "Timed out after 30000ms (last action in payload: 'open-energy-tab' / open_app)",
+    "message": "Timed out after 30000ms waiting for commandId 'cmd-001' (last action in payload: 'open-energy-tab' / open_app - not confirmed executing)",
     "details": {
+      "commandId": "cmd-001",
+      "taskId": "task-001",
       "lastActionId": "open-energy-tab",
       "lastActionType": "open_app",
+      "lastActionCaveat": "payload-last only; Android execution position is unknown",
       "elapsedMs": 30021,
       "timeoutMs": 30000
     }
@@ -209,8 +216,8 @@ The `error` object gains a `details` sub-object with new fields. This is additiv
 **Risk: hint list maintenance**
 The known-hint list will become stale if not updated during API changes. Keep it to under 10 entries. Add a new hint at the same time a parameter is removed from the schema.
 
-**Tradeoff: last-action context is best-effort**
-The "last action" in the timeout is the last action in the payload, not confirmed to be what Android was running. Document this clearly. It is still useful: an agent that timed out on a 7-action payload and sees `lastActionType: open_app` knows to check whether the app launched.
+**Tradeoff: last-action context is payload-last, not execution-last**
+`details.lastActionId` names the last action in the payload, not the action Android was executing when the timeout fired. Node does not receive per-action ACKs from Android. The `lastActionCaveat` field makes this explicit in the JSON. Agents should treat `commandId`/`taskId` as the primary correlation handle and `lastActionId` as a useful hint, not a confirmed execution position.
 
 ---
 
@@ -229,7 +236,7 @@ The "last action" in the timeout is the last action in the payload, not confirme
 
 - `EXECUTION_VALIDATION_FAILED` includes `details.actionId`, `details.actionType`, `details.invalidKeys` (array).
 - `details.hint` is populated for known removed parameters, absent otherwise.
-- `RESULT_ENVELOPE_TIMEOUT` includes `details.lastActionId`, `details.lastActionType`, `details.elapsedMs`, `details.timeoutMs`.
+- `RESULT_ENVELOPE_TIMEOUT` includes `details.commandId`, `details.taskId` (when present in the payload), `details.lastActionId`, `details.lastActionType`, `details.lastActionCaveat`, `details.elapsedMs`, `details.timeoutMs`.
 - Existing `details.path` and `details.reason` fields are unchanged.
 - `docs/node-api-for-agents.md` documents the `enter_text clear: true` limitation.
 - `docs/reference/error-handling.md` documents the new `details` fields.

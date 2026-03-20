@@ -57,9 +57,13 @@ Add action `id` and `type` to `EXECUTION_VALIDATION_FAILED`. Add last-action con
 
 Add `--dry-run` to `skills validate` that composes the existing `skills compile-artifact` + `execute --validate-only` chain into one command. Catches schema violations before the device is touched.
 
-### PRD-4: Progress, Logs, and Recovery Guidance
+### PRD-4: Progress Visibility During Skills Run
 
-Add structured NDJSON log output to `~/.clawperator/logs/`. Stream `skills run` stdout/stderr to the caller in real time instead of buffering. Enrich timeout output with last-action context.
+Add optional `onOutput` callback to `runSkill`. CLI layer wires it to stdout in pretty mode; JSON mode gets no interleaving. `SkillRunResult.output` is unchanged.
+
+### PRD-6: Persistent Logging and Log Retrieval
+
+Add structured NDJSON log output to `~/.clawperator/logs/`. `--log-level` flag and `CLAWPERATOR_LOG_DIR` env var. `RESULT_ENVELOPE_TIMEOUT` error includes `logPath` for the current day's log file.
 
 ### PRD-5: Docs and Entry Points
 
@@ -94,19 +98,26 @@ PR-3  PRD-3
       Depends on: PR-2 (uses enriched error format in dry-run output).
 
 PR-4  PRD-4
-      - runSkill.ts: stream stdout/stderr to caller instead of buffering
-      - log infrastructure: ~/.clawperator/logs/ NDJSON
-      - --log-level global flag
-      - docs: troubleshooting.md log section
-      Risk: medium. runSkill output contract change; log filesystem surface.
-      Depends on: PR-1 (pre-flight events are the most valuable log entries).
+      - runSkill.ts: add optional onOutput callback (no direct stdout writes)
+      - cli/commands/skills.ts: wire onOutput in pretty mode, not in json mode
+      Risk: low. Purely additive to runSkill signature; backward-compatible.
+      Depends on: nothing (independent).
+
+PR-6  PRD-6
+      - NDJSON log infrastructure: ~/.clawperator/logs/clawperator-YYYY-MM-DD.log
+      - --log-level global flag; CLAWPERATOR_LOG_DIR and CLAWPERATOR_LOG_LEVEL env vars
+      - RESULT_ENVELOPE_TIMEOUT: add logPath (absolute) to details
+      - docs: troubleshooting.md log section, agent-quickstart.md note
+      Risk: medium. New filesystem surface; payload-privacy discipline required.
+      Depends on: PR-1 (pre-flight events), PR-2 (extends timeout enrichment).
 
 PR-5  PRD-5 (remainder)
       - docs/index.md, agent-quickstart.md, openclaw-first-run.md consolidation
       - llms.txt alignment with shipped semantics
-      - doctor failure output: docs links
-      Risk: low. Docs-only. Must not over-promise behavior.
-      Depends on: PR-1, PR-2, PR-3, PR-4 settled (so docs reflect final behavior).
+      - doctor failure output: docs links (contracts/doctor.ts, renderCheck, tests)
+      - scripts/operator_event.sh stub (pending OpenClaw tool config review)
+      Risk: low. Docs and thin contract change. Must not over-promise behavior.
+      Depends on: PR-1, PR-2, PR-3, PR-4, PR-6 settled (so docs reflect final behavior).
 ```
 
 Rationale for splitting PRD-5 across PR-1 and PR-5: the `install.sh` banner and the doc contradiction fix have no code dependencies and should ship immediately with the readiness gate (they describe the same change). The remaining consolidation must wait for all runtime changes to settle or the docs will age immediately.
@@ -135,8 +146,11 @@ Some skill scripts may query device state when generating their payload. Dry-run
 ## Open Questions
 
 1. Does the OpenClaw tool configuration that calls `./scripts/operator_event.sh` pass arguments? What output does it expect? This must be confirmed before writing anything beyond a stub.
-2. Should the APK pre-flight in `runExecution.ts` use a cached result (written by the most recent `operator setup` or `doctor` run) or always make a fresh adb call? The adb round-trip is ~100ms - acceptable, but a cache is better for tight loops.
-3. Should `RECEIVER_VARIANT_MISMATCH` also become a hard failure, or stay a `warn`? The current `--receiver-package` workaround makes it recoverable without reinstalling. Keep as `warn` for now.
+2. Should `RECEIVER_VARIANT_MISMATCH` also become a hard failure, or stay a `warn`? The current `--receiver-package` workaround makes it recoverable without reinstalling. Keep as `warn` for now.
+
+Resolved:
+- Gate scoping: APK pre-flight lives in `runExecution.ts` only. `runSkill.ts` is not gated. Skills that call `execute` get the check naturally; skills that call `adb` directly are a pre-existing bypass.
+- Session cache: not viable (each CLI call is a new process). Fresh adb call per invocation; on-disk TTL stamp is a possible follow-on if needed.
 
 ---
 
