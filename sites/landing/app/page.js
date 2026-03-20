@@ -407,9 +407,9 @@ export default function Home() {
             Clawperator is a deterministic execution layer that lets agents run skills on real Android apps to read data and take action on behalf of users.
           </p>
           <p className="hero-brain-hand">
-            🧠 Your OpenClaw/agent is the brain.
+            Your OpenClaw/agent is the brain.
             <br />
-            ✋ Clawperator is the hand.
+            Clawperator is the hand.
           </p>
           <p className="hero-summary hero-summary-secondary">
             Connect a dedicated Android burner phone, run your own private skills, and get answers your agent can trust.
