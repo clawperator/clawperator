@@ -6,8 +6,7 @@ on:
       - "**"
   pull_request:
     branches:
-      - main  # Adjust this if your default branch has a different name
-      - master
+      - main
 
 jobs:
   android-unit-tests:
