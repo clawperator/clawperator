@@ -3,11 +3,10 @@ name: Pull Request Checks
 on:
   push:
     branches:
-      - "**"
+      - main
   pull_request:
     branches:
-      - main  # Adjust this if your default branch has a different name
-      - master
+      - main
 
 jobs:
   android-unit-tests:
@@ -71,3 +70,33 @@ jobs:
           name: node-test-results
           path: |
             apps/node/dist/test/
+
+  validation-tests:
+    name: Run Validation Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/node/package-lock.json
+
+      - name: Install Node dependencies
+        run: npm --prefix apps/node ci
+
+      - name: Build Node package
+        run: npm --prefix apps/node run build
+
+      - name: Make validation scripts executable
+        run: chmod +x validation/test_doctor.sh validation/test_install_multidevice.sh
+
+      - name: Run doctor validation
+        run: bash validation/test_doctor.sh
+
+      - name: Run multi-device install validation
+        run: bash validation/test_install_multidevice.sh
