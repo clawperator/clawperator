@@ -541,6 +541,12 @@ body {
   margin: 0 auto;
 }
 
+@media (min-width: 841px) {
+  .hero-diagram {
+    max-width: 576px;
+  }
+}
+
 .hero-image-caption {
   margin: 0.8rem 0 0;
   font-size: 1rem;
