@@ -90,7 +90,7 @@ If you must use **Wireless Debugging**, be aware that your mileage may vary (YMM
 `curl -fsSL https://clawperator.com/install.sh | bash` uses the stable metadata file at `https://downloads.clawperator.com/operator/latest.json`, downloads the immutable package for the [Clawperator Operator Android app](../getting-started/android-operator-apk.md) plus its `.sha256`, verifies the checksum, then handles device install like this:
 
 1. **One connected device** - the installer offers to run `clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id <device_id>`.
-2. **Multiple connected devices** - the installer completes host-side setup, checks each connected device, and prints one `clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id <device_id>` command per device that still needs setup. If any connected device is not ready, the installer exits non-zero so the partial setup is not mistaken for success.
+2. **Multiple connected devices** - the installer completes host-side setup, checks each connected device, and prints one `clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id <device_id>` command for each device that still needs setup. If any connected device is not ready, the installer returns non-zero so a partial setup does not look successful.
 3. **No connected devices** - the installer skips the install and leaves the verified package for the [Clawperator Operator Android app](../getting-started/android-operator-apk.md) at `~/.clawperator/downloads/operator.apk`.
 4. **`adb` missing** - the installer attempts to install `adb` automatically, or stops with a manual install link if it cannot.
 
