@@ -329,10 +329,23 @@ There's probably a `docs/` folder or README that explains all of this. I should 
 **Gap:**
 There's no "Agent Quickstart" that says "Stop. Before you run any commands, read this." If there is, I haven't seen it.
 
+**Update:** After this session, I learned about:
+- https://docs.clawperator.com/llms.txt — Concise reference for LLMs
+- https://docs.clawperator.com/llms-full.txt — Full documentation
+
+These would have helped me understand the architecture, validation schema, error codes, and best practices. I didn't know they existed.
+
+**What I would have learned:**
+- `format: "ascii"` was removed from `snapshot_ui` — would have caught the GloBird skill bug immediately
+- The distributed system nature (CLI → ADB → Operator → Target app)
+- Error code definitions and what they actually mean
+- That I should run `doctor` proactively, not just when things break
+
 **Suggested Fix:**
 - `AGENTS.md` or `docs/agent-quickstart.md` that agents are directed to first
 - Top of README: "If you're an AI agent, read this first"
 - Key points: run doctor first, check logs, troubleshooting flowchart
+- **Most important:** Link prominently to `https://docs.clawperator.com/llms.txt` — that's the doc format agents can actually use
 
 ---
 
