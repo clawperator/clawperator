@@ -7423,8 +7423,8 @@ npm --prefix /path/to/clawperator/apps/node install
 npm --prefix /path/to/clawperator/apps/node run build
 ```
 
-The skills runtime now uses `CLAWPERATOR_BIN` only. If you set a local branch
-build, keep `CLAWPERATOR_BIN` pointed at the branch-local CLI path.
+If you are using a local branch build, point `CLAWPERATOR_BIN` at the branch-local
+CLI path so skill scripts run against that build.
 
 ---
 
