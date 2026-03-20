@@ -549,11 +549,12 @@ body {
 
 .hero-image-caption {
   margin: 0.8rem 0 0;
-  font-size: 1.55rem;
+  font-size: 1.24rem;
   line-height: 1.35;
   font-weight: 600;
   text-align: center;
   color: var(--text-muted);
+  opacity: 0.8;
 }
 
 .quickstart-intro {

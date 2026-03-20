@@ -425,7 +425,7 @@ export default function Home() {
               height="2300"
               className="hero-diagram"
             />
-            <p className="hero-image-caption">Works with any Android app. No API required.</p>
+            <p className="hero-image-caption">Automate any Android app. No API required.</p>
           </div>
 
           <p className="hero-summary hero-summary-secondary">
