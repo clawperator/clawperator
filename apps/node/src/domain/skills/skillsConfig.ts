@@ -20,6 +20,16 @@ export interface ResolvedSkillBin {
   args: string[];
 }
 
+function quoteCommandPart(part: string): string {
+  if (part === "") {
+    return '""';
+  }
+  if (/\s/.test(part)) {
+    return `"${part}"`;
+  }
+  return part;
+}
+
 /**
  * Get the absolute path to the local sibling build.
  * This is resolved relative to this module's location, not process.cwd().
@@ -70,14 +80,12 @@ export function resolveSkillBin(): ResolvedSkillBin {
  * Resolve the full command string for CLAWPERATOR_BIN env var.
  * This combines cmd and args into a single executable string.
  */
+export function formatSkillBinCommand(resolved: ResolvedSkillBin): string {
+  return [resolved.cmd, ...resolved.args].map(quoteCommandPart).join(" ");
+}
+
 export function resolveSkillBinCommand(): string {
-  const resolved = resolveSkillBin();
-  if (resolved.args.length > 0) {
-    // For node-based execution, return the full command with args
-    // Quote the script path in case it contains spaces
-    return `${resolved.cmd} "${resolved.args[0]}"`;
-  }
-  return resolved.cmd;
+  return formatSkillBinCommand(resolveSkillBin());
 }
 
 /**

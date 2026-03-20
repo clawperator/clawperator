@@ -9,6 +9,7 @@ import {
   CLAWPERATOR_BIN_ENV_VAR,
   CLAWPERATOR_RECEIVER_PACKAGE_ENV_VAR,
   DEFAULT_RECEIVER_PACKAGE,
+  formatSkillBinCommand,
   resolveSkillBin,
   resolveSkillBinCommand,
   resolveReceiverPackage,
@@ -1121,6 +1122,16 @@ describe("resolveSkillBinCommand", () => {
       assert.ok(result.includes(" "), "Expected command with args for sibling build");
       assert.ok(result.startsWith(process.execPath), "Expected command to start with node executable");
     }
+  });
+
+  it("quotes command parts that contain spaces", () => {
+    assert.strictEqual(
+      formatSkillBinCommand({
+        cmd: "C:\\Program Files\\nodejs\\node.exe",
+        args: ["C:\\clawperator apps\\node\\dist\\cli\\index.js"],
+      }),
+      '"C:\\Program Files\\nodejs\\node.exe" "C:\\clawperator apps\\node\\dist\\cli\\index.js"'
+    );
   });
 });
 
