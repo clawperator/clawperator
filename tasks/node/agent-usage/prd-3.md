@@ -1,12 +1,14 @@
-# PRD-3: Skill Preflight With Payload Dry-run
+# PRD-3: Skill Preflight With Payload Dry-run and Pre-run Gate
 
 Workstream: WS-3
 Priority: 3
 Proposed PR: PR-3
 
 Merged from both agents. Other agent proposed documenting the compose chain; this analysis
-proposes making it a single command. The single-command approach was chosen because the
-three-step manual chain is not reliably followed in practice.
+proposes making it a single command and gating `skills run` on it by default. The
+single-command approach was chosen because the three-step manual chain is not reliably
+followed in practice - and since all Clawperator skills require an Android device, there
+is no class of device-free skill that would be broken by a pre-run check.
 
 ---
 
@@ -45,9 +47,11 @@ The `format` parameter was removed from `snapshot_ui`. Skills written before the
 1. `skills validate <id>` - checks file integrity and metadata. Returns `ok: true` even when the compiled artifact would fail schema validation.
 2. `skills compile-artifact <id> --artifact <name>` - compiles skill to execution payload JSON.
 3. `execute --validate-only --execution <file>` - validates payload against action schema without touching the device.
-4. `skills run` - no preflight. Spawns the skill script directly.
+4. `skills run` - no preflight. Spawns the skill script directly. Schema violations
+   discovered mid-execution on a live device waste a device interaction and produce
+   errors that do not identify the offending action.
 
-The validation chain exists. It is not composed.
+The validation chain exists. It is not composed, and it is not enforced.
 
 ---
 
@@ -86,11 +90,32 @@ When `--dry-run` is specified:
 
 ### 2. Keep `skills validate` (no flag) unchanged
 
-Without `--dry-run`, behavior is identical to today. This is an opt-in capability.
+Without `--dry-run`, behavior is identical to today.
 
-Do not make it the default until the impact on existing skills (particularly device-dependent script-only skills) is assessed.
+### 3. Gate `skills run` on dry-run validation by default
 
-### 3. Update the skill development workflow doc
+`clawperator skills run <skill_id>` runs the dry-run check before spawning the skill
+script. This happens at the CLI layer, before `runSkill` is called.
+
+**Implementation**: in the `skills run` CLI handler, call `validateSkill` with
+`{ dryRun: true }` on the skill id. Inspect the result:
+
+- `ok: false` - abort. Print the `SKILL_VALIDATION_FAILED` error. Exit non-zero.
+  Do not call `runSkill`.
+- `ok: true` and `dryRun.payloadValidation === "skipped"` (script-only skill) -
+  proceed. Print `[INFO] Payload validation skipped: no pre-compiled artifacts` in
+  pretty mode only. Do not print in JSON mode.
+- `ok: true` (artifact-backed, validation passed) - proceed silently.
+
+**`--skip-validate` flag**: add to `skills run`. When present, bypass the pre-run
+dry-run check entirely. Exit-code and JSON contract are unchanged when this flag is used.
+Document it as an escape hatch for CI or development scenarios, not as a routine option.
+
+**Pre-run banner interaction (PRD-4)**: the banner (version, APK status, log path, docs
+link) prints first. Then the dry-run check runs. If the check fails, the skill does not
+start. The banner still appeared, giving the agent context for the failure.
+
+### 4. Update the skill development workflow doc
 
 **IMPORTANT - do not edit the generated file.** Per `CLAUDE.md`, `sites/docs/docs/` is
 generated output that must never be edited directly. The generated page
@@ -113,18 +138,28 @@ it:
 Content to add (in the sibling repo source):
 
 ```
-Recommended pre-device workflow:
-1. clawperator skills validate <id> --dry-run   # integrity + payload schema
-2. clawperator skills validate <id>             # integrity only (if no artifacts)
-3. clawperator skills run <id> --device-id <device_id>
+Running a skill:
+  clawperator skills run <id> --device-id <device_id>
+
+skills run validates the skill payload automatically before touching the device.
+If validation fails, the skill does not start and the error identifies the
+offending action, type, and invalid parameters.
+
+To see validation results before running:
+  clawperator skills validate <id> --dry-run
+
+To bypass pre-run validation (CI or development use only):
+  clawperator skills run <id> --skip-validate --device-id <device_id>
 ```
 
 Explain what `--dry-run` does and does not cover (no runtime behavior, no UI validation).
+Note that script-only skills cannot be statically validated; the check is skipped for them
+and execution proceeds.
 
 If coordinating the sibling repo PR is out of scope for the implementing agent, note this
 as a follow-up item in the PR description.
 
-### 4. Surface dry-run failure using PRD-2 error format
+### 5. Surface dry-run failure using PRD-2 error format
 
 When `--dry-run` detects a schema violation, the output should match the enriched `EXECUTION_VALIDATION_FAILED` format:
 
@@ -155,11 +190,13 @@ A single `--dry-run` flag catches the GloBird class of error (stale API usage in
 
 In scope:
 - `skills validate --dry-run`: integrity + artifact compilation + schema validation
+- `skills run` pre-run gate: dry-run check runs automatically before skill execution
+- `skills run --skip-validate`: escape hatch to bypass the pre-run check
 - Uses enriched error format from PRD-2
-- `docs/skills/skill-development-workflow.md` update
+- `docs/skills/skill-development-workflow.md` update (sibling repo)
 
 Out of scope:
-- Changing default behavior of `skills validate`
+- Changing default behavior of `skills validate` (no flag)
 - Validating runtime UI behavior (scrolling, click targets) offline
 - Simulating device state for device-dependent skill scripts
 - Changes to the Android Operator APK
@@ -185,8 +222,14 @@ Some skill scripts may generate their payload by querying device state. For thes
 **Risk: compile-artifact and validate using different schemas**
 If `skills compile-artifact` and `execute --validate-only` diverge in the schema they use, dry-run can give a false pass. Both must reference the same schema module. Enforce at the code level.
 
-**Tradeoff: `--dry-run` as explicit opt-in**
-Making `--dry-run` the default would break CI for skills that can't compile without a device. Start as opt-in. Promote to default after assessing existing skill impact.
+**Tradeoff: pre-run gate vs. `--skip-validate`**
+All current Clawperator skills require an Android device. Making the dry-run check the
+default for `skills run` is the right call: it catches schema violations before the device
+is touched, at no meaningful cost (milliseconds, no device connection required). The
+`--skip-validate` flag exists as an explicit escape hatch, not as a routine option. If
+artifact compilation proves unreliable at scale (false negatives blocking valid runs),
+the failure mode is visible and the workaround (`--skip-validate`) is explicit rather than
+silent.
 
 ---
 
@@ -204,13 +247,15 @@ Four minimal skill fixtures in `test/fixtures/skills/`:
 
 ### TDD Sequence
 
-1. Write T1 (existing behavior pinned — no flag). Passes unchanged. This is the safety
-   net for every subsequent step; it must pass throughout.
+1. Write T1 (existing behavior pinned — no flag). Passes unchanged. Safety net throughout.
 2. Scaffold `--dry-run` flag. Write T2 (valid artifact passes). Passes once routing works.
 3. Write T3 (invalid fails), T4 (script-only skips). Wire compile + validate logic.
    T1 must still pass.
-4. Write T5 (JSON mode parseable). Quick to verify and catches CLI output regressions.
-5. Run integration test T6 with a real bundled skill.
+4. Write T5 (JSON mode parseable). Catches CLI output regressions.
+5. Write T7 (`skills run` aborts on invalid artifact). Fails until gate is wired.
+6. Write T8 (`skills run` proceeds on valid artifact, mock verifies runSkill called).
+7. Write T9 (`--skip-validate` bypasses gate, runSkill always called).
+8. Run integration test T6 with a real bundled skill.
 
 ### Unit Tests
 
@@ -254,18 +299,50 @@ No device required — `--dry-run` is designed to work without one.
 a real bundled skill is deferred until a bundled skill with artifacts is confirmed to
 exist in the installed registry.
 
+**T7 — `skills run` aborts when dry-run fails (gate enforcement)**
+- Input: `skills run test-skill-invalid-artifact --device-id <any>`
+- Mock `runSkill` to track whether it was called
+- Expected: process exits non-zero, `SKILL_VALIDATION_FAILED` in output, `runSkill`
+  was NOT called
+- Protects: gate is added but never wired; invalid skills still reach the device
+
+**T8 — `skills run` proceeds when dry-run passes (gate happy path)**
+- Input: `skills run test-skill-valid-artifact --device-id <any>`
+- Mock `runSkill` to return a success result
+- Expected: process exits 0, `runSkill` WAS called
+- Protects: over-broad validation blocks all skills from running
+
+**T9 — `--skip-validate` bypasses gate and calls `runSkill`**
+- Input: `skills run test-skill-invalid-artifact --skip-validate --device-id <any>`
+- Mock `runSkill` to return a success result
+- Expected: process exits 0, `runSkill` WAS called, no validation error in output
+- Protects: `--skip-validate` flag is ignored; escape hatch is broken
+
 ### Manual Verification
 
 - Run `--dry-run` on `test-skill-invalid-artifact`; output should name the skill, artifact,
   action id, and invalid parameter; fixable without consulting docs
+- Run `skills run` on a skill with an invalid artifact without `--skip-validate`; confirm
+  it aborts before the device is touched
 
 ---
 
 ## Acceptance Criteria
 
-- `clawperator skills validate <id> --dry-run` compiles all skill artifacts and validates them against the action schema for artifact-backed skills.
-- A skill with `format: "ascii"` in a `snapshot_ui` action fails `--dry-run` with `details.actionId`, `details.actionType`, `details.invalidKeys`.
-- `clawperator skills validate <id> --dry-run` on a script-only skill exits 0 and reports `dryRun.payloadValidation: "skipped"` with an explicit reason.
+- `clawperator skills validate <id> --dry-run` compiles all skill artifacts and validates
+  them against the action schema for artifact-backed skills.
+- A skill with `format: "ascii"` in a `snapshot_ui` action fails `--dry-run` with
+  `details.actionId`, `details.actionType`, `details.invalidKeys`.
+- `clawperator skills validate <id> --dry-run` on a script-only skill exits 0 and reports
+  `dryRun.payloadValidation: "skipped"` with an explicit reason.
 - `clawperator skills validate <id>` (no flag) behaves identically to today.
 - A skill with valid files and valid payload passes `--dry-run`.
-- `../clawperator-skills/docs/skill-development-workflow.md` (source in sibling repo) documents `--dry-run` as the pre-device validation step for artifact-backed skills, with an explicit note that script-only skills cannot be statically validated. The generated output at `sites/docs/docs/skills/skill-development-workflow.md` must NOT be edited directly.
+- `clawperator skills run <id>` automatically runs the dry-run check before spawning the
+  skill. If validation fails, the process exits non-zero and the skill does not start.
+- `clawperator skills run <id> --skip-validate` bypasses the pre-run check and proceeds
+  directly to execution.
+- `../clawperator-skills/docs/skill-development-workflow.md` (source in sibling repo)
+  documents that `skills run` validates automatically, explains `--skip-validate`, and
+  notes that `--dry-run` can be run standalone to inspect results before running. The
+  generated output at `sites/docs/docs/skills/skill-development-workflow.md` must NOT
+  be edited directly.

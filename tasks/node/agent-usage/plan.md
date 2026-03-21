@@ -186,6 +186,8 @@ Resolved:
 
 ---
 
+---
+
 ## Explicitly Deferred
 
 - `clawperator status` command: `clawperator doctor --output json` already answers the core question. Insufficient evidence that a cached status surface is needed more than a faster doctor path.
