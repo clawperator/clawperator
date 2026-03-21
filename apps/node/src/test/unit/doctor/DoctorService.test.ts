@@ -223,7 +223,7 @@ describe("DoctorService", () => {
     const apkPresence = report.checks.find(check => check.id === "readiness.apk.presence");
     assert.ok(apkPresence);
     assert.deepStrictEqual(apkPresence.fix?.steps.map(step => step.value), [
-      "Download the exact release APK from https://downloads.clawperator.com/operator/v0.4.0/operator-v0.4.0.apk and the checksum from https://downloads.clawperator.com/operator/v0.4.0/operator-v0.4.0.apk.sha256.",
+      "Download the exact release APK from https://downloads.clawperator.com/operator/v0.4.1/operator-v0.4.1.apk and the checksum from https://downloads.clawperator.com/operator/v0.4.1/operator-v0.4.1.apk.sha256.",
       "clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id test-device-1",
     ]);
   });
