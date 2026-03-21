@@ -508,7 +508,7 @@ describe("runExecution", () => {
 
     const result = await runExecution(execution, {
       deviceId: "test-device-1",
-      receiverPackage: "com.test.operator",
+      receiverPackage: "com.test.operator.dev",
       runner,
       warn: message => warnings.push(message),
     });
@@ -517,7 +517,7 @@ describe("runExecution", () => {
     if (!result.ok) {
       assert.strictEqual(result.error.code, ERROR_CODES.RECEIVER_NOT_INSTALLED);
       assert.strictEqual(result.deviceId, "test-device-1");
-      assert.match(result.error.message, /Operator APK \(com\.test\.operator\) is not installed on test-device-1/);
+      assert.match(result.error.message, /Operator APK \(com\.test\.operator\.dev\) is not installed on test-device-1/);
       assert.match(result.error.message, /clawperator operator setup --apk/);
       assert.match(result.error.message, /operator-debug\.apk/);
     }
@@ -526,8 +526,8 @@ describe("runExecution", () => {
       runner.calls.map(call => call.args.join(" ")),
       [
         "-s test-device-1 devices",
-        "-s test-device-1 shell pm list packages com.test.operator",
         "-s test-device-1 shell pm list packages com.test.operator.dev",
+        "-s test-device-1 shell pm list packages com.test.operator",
       ]
     );
   });
