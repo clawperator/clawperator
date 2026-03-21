@@ -9,6 +9,8 @@ import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeCo
 import { broadcastAgentCommand } from "../../adapters/android-bridge/broadcastAgentCommand.js";
 import { waitForResultEnvelope } from "../../adapters/android-bridge/logcatResultReader.js";
 import { runAdb } from "../../adapters/android-bridge/adbClient.js";
+import { checkApkPresence } from "../doctor/checks/readinessChecks.js";
+import { getReceiverPackageApkPath } from "../version/compatibility.js";
 import { tryAcquire, release, getConflictError } from "./executionStore.js";
 import type { ResultEnvelope, TerminalSource } from "../../contracts/result.js";
 import { extractSnapshotsFromLogs } from "./snapshotHelper.js";
@@ -21,6 +23,7 @@ export interface RunExecutionOptions {
   deviceId?: string;
   receiverPackage?: string;
   adbPath?: string;
+  runner?: RuntimeConfig["runner"];
   timeoutMs?: number;
   warn?: (message: string) => void;
 }
@@ -213,6 +216,7 @@ async function performExecution(
     deviceId: options.deviceId,
     receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_RECEIVER_PACKAGE,
     adbPath: options.adbPath ?? process.env.ADB_PATH,
+    runner: options.runner,
   });
 
   let execution: Execution;
@@ -263,6 +267,34 @@ async function performExecution(
     config.deviceId = deviceId;
   } catch (e) {
     return { execution, result: { ok: false, error: e as { code: string; message: string; [k: string]: unknown } } };
+  }
+
+  const apkCheck = await checkApkPresence(config);
+  if (apkCheck.status === "fail") {
+    const installCommand = `clawperator operator setup --apk ${getReceiverPackageApkPath(config.receiverPackage)} --device-id ${deviceId}${config.receiverPackage !== "com.clawperator.operator" ? ` --receiver-package ${config.receiverPackage}` : ""}`;
+    return {
+      execution,
+      result: {
+        ok: false,
+        error: {
+          code: ERROR_CODES.RECEIVER_NOT_INSTALLED,
+          message: `Operator APK (${config.receiverPackage}) is not installed on ${deviceId}. Install it with: ${installCommand}`,
+          details: {
+            checkId: apkCheck.id,
+            summary: apkCheck.summary,
+            detail: apkCheck.detail,
+            installCommand,
+          },
+        },
+        deviceId,
+      },
+    };
+  }
+
+  if (apkCheck.status === "warn") {
+    options.warn?.(
+      `[clawperator] WARN: ${apkCheck.id} ${apkCheck.summary}${apkCheck.detail ? ` - ${apkCheck.detail}` : ""}\n`
+    );
   }
 
   if (!tryAcquire(deviceId, execution.commandId)) {

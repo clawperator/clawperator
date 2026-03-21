@@ -7,8 +7,7 @@ import { FakeProcessRunner } from "./fakes/FakeProcessRunner.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
 
 function mockApkVersionForCurrentCli(): { versionName: string; versionCode: number } {
-  const [major, minor] = getCliVersion().split(".");
-  return { versionName: `${major}.${minor}.0-d`, versionCode: 100 };
+  return { versionName: `${getCliVersion()}-d`, versionCode: 100 };
 }
 
 afterEach(() => {
@@ -51,6 +50,8 @@ describe("cmdVersion", () => {
 
   it("returns a non-compatible payload when the APK is missing", async () => {
     const runner = new FakeProcessRunner();
+    const version = getCliVersion();
+    const receiverPackage = "com.clawperator.operator.dev";
 
     runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "", stderr: "" });
@@ -59,7 +60,7 @@ describe("cmdVersion", () => {
     const output = await cmdVersion({
       format: "json",
       checkCompat: true,
-      receiverPackage: "com.clawperator.operator.dev",
+      receiverPackage,
       runner,
     });
     const parsed = JSON.parse(output);
@@ -67,9 +68,11 @@ describe("cmdVersion", () => {
     assert.strictEqual(parsed.compatible, false);
     assert.strictEqual(parsed.error.code, ERROR_CODES.RECEIVER_NOT_INSTALLED);
     assert.deepStrictEqual(parsed.remediation, [
-      "Install the Operator APK from https://clawperator.com/operator.apk",
-      "If you need a specific build, use the install script: curl -fsSL https://clawperator.com/install.sh | bash",
-      "If a different variant is installed, rerun with --receiver-package <package>",
+      `Download the matching APK: https://downloads.clawperator.com/operator/v${version}/operator-v${version}.apk`,
+      `Download the checksum: https://downloads.clawperator.com/operator/v${version}/operator-v${version}.apk.sha256`,
+      `Verify the checksum: sha256sum -c operator-v${version}.apk.sha256`,
+      `Install the matching APK: clawperator operator setup --apk operator-v${version}.apk --device-id <device_id> --receiver-package ${receiverPackage}`,
+      "If you are targeting the local debug package, rebuild and reinstall the debug APK from the same source checkout instead of using the release download.",
     ]);
   });
 

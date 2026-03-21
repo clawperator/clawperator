@@ -3,8 +3,11 @@
 Workstream: WS-1
 Priority: 1 (highest)
 Proposed PR: PR-1
+Status: [DONE] Implemented and verified on emulator-5554 with the branch-local Node CLI build.
 
 Merged from both agents. This is the highest-confidence finding with the clearest code path.
+
+Implementation note: during delivery, the version gate was intentionally tightened from major/minor matching to exact normalized version matching, with only the trailing `-d` debug suffix ignored. That stricter behavior is now part of the accepted PRD-1 implementation and should be preserved in follow-up review.
 
 ---
 

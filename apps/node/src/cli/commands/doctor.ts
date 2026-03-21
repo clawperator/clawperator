@@ -15,14 +15,14 @@ export async function cmdDoctor(options: {
   checkOnly?: boolean;
   deviceId?: string;
   receiverPackage?: string;
-}): Promise<string> {
+}, deps: { doctorService?: Pick<DoctorService, "run"> } = {}): Promise<string> {
   const config = getDefaultRuntimeConfig({
     deviceId: options.deviceId,
     receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_RECEIVER_PACKAGE,
     adbPath: process.env.ADB_PATH,
   });
 
-  const service = new DoctorService();
+  const service = deps.doctorService ?? new DoctorService();
   const report = await service.run({ config, full: options.full, fix: options.fix });
 
   if (options.format === "json") {

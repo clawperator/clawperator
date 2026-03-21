@@ -55,8 +55,8 @@ Doctor runs checks in a fixed order. When a critical check fails, doctor returns
 
 ### 3. Runtime readiness
 
-- `readiness.apk.presence` - confirms the requested receiver package is installed, or warns if the other release/debug variant is installed instead
-- `readiness.version.compatibility` - verifies that the CLI and installed [Clawperator Operator Android app](../getting-started/android-operator-apk.md) share a compatible `major.minor`
+- `readiness.apk.presence` - confirms the requested receiver package is installed, warns if the other release/debug variant is installed instead, and fails when no matching package is present
+- `readiness.version.compatibility` - verifies that the CLI and installed [Clawperator Operator Android app](../getting-started/android-operator-apk.md) share the same normalized version
 - `readiness.settings.dev_options` - warns if Android Developer Options are disabled
 - `readiness.settings.usb_debugging` - warns if USB debugging is disabled
 - `readiness.handshake` - sends a `doctor_ping` command and waits for one canonical `[Clawperator-Result]` envelope
@@ -71,13 +71,14 @@ Critical checks currently include:
 - host Node/adb/java checks
 - device discovery and shell availability
 - Android build/install/launch checks in `--full`
-- [Clawperator Operator Android app](../getting-started/android-operator-apk.md) version compatibility
+- missing [Clawperator Operator Android app](../getting-started/android-operator-apk.md) package
+- [Clawperator Operator Android app](../getting-started/android-operator-apk.md) exact version compatibility
 - handshake
 - smoke test in `--full`
 
 Advisory warnings currently include:
 
-- [Clawperator Operator Android app](../getting-started/android-operator-apk.md) not installed or wrong release/debug variant installed
+- wrong release/debug variant of the [Clawperator Operator Android app](../getting-started/android-operator-apk.md) installed
 - Developer Options disabled
 - USB debugging disabled
 
@@ -88,7 +89,7 @@ Exit behavior:
 - normal mode exits `1` when any critical check fails
 - `--check-only` always exits `0`
 
-In other words, `doctor` is allowed to report warnings while still exiting successfully if the critical command path is usable.
+In other words, `doctor` is allowed to report warnings while still exiting successfully if the critical command path is usable. Missing Operator APKs are now a critical failure, so normal `doctor` exits non-zero until the requested package is installed.
 
 ## Output Model
 

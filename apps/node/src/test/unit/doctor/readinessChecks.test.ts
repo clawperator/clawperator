@@ -6,7 +6,25 @@ import { ERROR_CODES } from "../../../contracts/errors.js";
 import { FakeProcessRunner } from "../fakes/FakeProcessRunner.js";
 
 describe("checkApkPresence", () => {
-    it("returns a shell failure when package queries cannot run", async () => {
+    it("fails when the requested package is missing", async () => {
+        const runner = new FakeProcessRunner();
+        const config = getDefaultRuntimeConfig({
+            runner,
+            deviceId: "test-device",
+            receiverPackage: "com.test.operator",
+        });
+
+        runner.queueResult({ code: 0, stdout: "", stderr: "" });
+        runner.queueResult({ code: 0, stdout: "", stderr: "" });
+
+        const result = await checkApkPresence(config);
+
+        assert.strictEqual(result.status, "fail");
+        assert.strictEqual(result.code, ERROR_CODES.RECEIVER_NOT_INSTALLED);
+        assert.match(result.detail ?? "", /Package com\.test\.operator was not found/);
+    });
+
+    it("fails when package queries cannot run", async () => {
         const runner = new FakeProcessRunner();
         const config = getDefaultRuntimeConfig({
             runner,

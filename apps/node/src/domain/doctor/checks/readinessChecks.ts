@@ -4,7 +4,15 @@ import { type DoctorCheckResult } from "../../../contracts/doctor.js";
 import { ERROR_CODES } from "../../../contracts/errors.js";
 import { broadcastAgentCommand } from "../../../adapters/android-bridge/broadcastAgentCommand.js";
 import { waitForResultEnvelope } from "../../../adapters/android-bridge/logcatResultReader.js";
-import { getAlternateReceiverVariant, hasListedPackage, probeVersionCompatibility } from "../../version/compatibility.js";
+import {
+  getAlternateReceiverVariant,
+  getCliVersion,
+  getOperatorApkDownloadUrl,
+  getOperatorApkSha256Url,
+  getReceiverPackageApkPath,
+  hasListedPackage,
+  probeVersionCompatibility,
+} from "../../version/compatibility.js";
 
 export async function checkApkPresence(config: RuntimeConfig): Promise<DoctorCheckResult> {
   const packageList = await runAdb(config, ["shell", "pm", "list", "packages", config.receiverPackage]);
@@ -61,15 +69,28 @@ export async function checkApkPresence(config: RuntimeConfig): Promise<DoctorChe
 
     return {
       id: "readiness.apk.presence",
-      status: "warn",
+      status: "fail",
       code: ERROR_CODES.RECEIVER_NOT_INSTALLED,
       summary: "Operator APK not installed.",
       detail: `Package ${config.receiverPackage} was not found on the device.`,
+      evidence: {
+        cliVersion: getCliVersion(),
+        receiverPackage: config.receiverPackage,
+      },
       fix: {
         title: "Install Operator APK",
         platform: "any",
         steps: [
-          { kind: "manual", value: "Download and install the APK from https://github.com/clawperator/clawperator/releases/latest" }
+          config.receiverPackage.endsWith(".dev")
+            ? { kind: "manual", value: "If you do not already have a local debug APK copy, rebuild the debug app from the same checkout before rerunning setup." }
+            : {
+                kind: "manual",
+                value: `Download the exact release APK from ${getOperatorApkDownloadUrl(getCliVersion())} and the checksum from ${getOperatorApkSha256Url(getCliVersion())}.`,
+              },
+          {
+            kind: "shell",
+            value: `clawperator operator setup --apk ${getReceiverPackageApkPath(config.receiverPackage)} --device-id ${config.deviceId}${config.receiverPackage !== "com.clawperator.operator" ? ` --receiver-package ${config.receiverPackage}` : ""}`,
+          },
         ],
       },
     };

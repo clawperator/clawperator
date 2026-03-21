@@ -8,11 +8,13 @@ import {
   injectServiceUnavailableHint,
   markExtractionFailedSnapshotSteps,
   runCloseAppPreflight,
+  runExecution,
 } from "../../domain/executions/runExecution.js";
 import type { Execution } from "../../contracts/execution.js";
 import type { ResultEnvelope, StepResult } from "../../contracts/result.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
+import { FakeProcessRunner } from "./fakes/FakeProcessRunner.js";
 
 describe("attachSnapshotsToStepResults", () => {
   it("aligns fewer snapshots to the last snapshot_ui steps", () => {
@@ -482,5 +484,51 @@ describe("runCloseAppPreflight", () => {
         stderr: "shell failed",
       });
     }
+  });
+});
+
+describe("runExecution", () => {
+  it("fails fast when the Operator APK is missing and never broadcasts", async () => {
+    const runner = new FakeProcessRunner();
+    const warnings: string[] = [];
+    const execution: Execution = {
+      commandId: "cmd-preflight",
+      taskId: "task-preflight",
+      source: "test",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 5000,
+      actions: [
+        { id: "sleep-1", type: "sleep", params: { durationMs: 0 } },
+      ],
+    };
+
+    runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "", stderr: "" });
+
+    const result = await runExecution(execution, {
+      deviceId: "test-device-1",
+      receiverPackage: "com.test.operator.dev",
+      runner,
+      warn: message => warnings.push(message),
+    });
+
+    assert.strictEqual(result.ok, false);
+    if (!result.ok) {
+      assert.strictEqual(result.error.code, ERROR_CODES.RECEIVER_NOT_INSTALLED);
+      assert.strictEqual(result.deviceId, "test-device-1");
+      assert.match(result.error.message, /Operator APK \(com\.test\.operator\.dev\) is not installed on test-device-1/);
+      assert.match(result.error.message, /clawperator operator setup --apk/);
+      assert.match(result.error.message, /operator-debug\.apk/);
+    }
+    assert.strictEqual(warnings.length, 0);
+    assert.deepStrictEqual(
+      runner.calls.map(call => call.args.join(" ")),
+      [
+        "-s test-device-1 devices",
+        "-s test-device-1 shell pm list packages com.test.operator.dev",
+        "-s test-device-1 shell pm list packages com.test.operator",
+      ]
+    );
   });
 });
