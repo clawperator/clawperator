@@ -86,8 +86,8 @@ node "$REPO_ROOT/apps/node/dist/cli/index.js" doctor --json > "$TMP_DIR/out3.jso
 EXIT_CODE=$?
 set -e
 
-if [ "$EXIT_CODE" -ne 0 ]; then
-  echo "[Error] Doctor should exit 0 when only warning-level checks fail!"
+if [ "$EXIT_CODE" -eq 0 ]; then
+  echo "[Error] Doctor should have exited with a non-zero code when the APK is missing!"
   exit 1
 fi
 
@@ -99,10 +99,10 @@ else
   exit 1
 fi
 
-if grep -q '"criticalOk": true' "$TMP_DIR/out3.json"; then
-  echo "[Success] criticalOk reports that core setup is usable."
+if grep -q '"criticalOk": false' "$TMP_DIR/out3.json"; then
+  echo "[Success] criticalOk reports that core setup is not usable."
 else
-  echo "[Error] criticalOk should be true when only warning checks fail."
+  echo "[Error] criticalOk should be false when the APK is missing."
   cat "$TMP_DIR/out3.json"
   exit 1
 fi
