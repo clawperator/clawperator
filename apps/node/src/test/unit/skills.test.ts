@@ -337,6 +337,49 @@ describe("validateSkill", () => {
       await rm(tempRoot, { recursive: true, force: true });
     }
   });
+
+  it("rejects registry entries that omit the scripts array", async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-skill-validate-missing-scripts-"));
+    const skillsDir = join(tempRoot, "skills");
+    const skillDir = join(skillsDir, "com.test.missing-scripts");
+    const registryPath = join(skillsDir, "skills-registry.json");
+    const entry = {
+      id: "com.test.missing-scripts",
+      applicationId: "com.test",
+      intent: "missing-scripts",
+      summary: "Broken skill",
+      path: "skills/com.test.missing-scripts",
+      skillFile: "skills/com.test.missing-scripts/SKILL.md",
+      artifacts: [],
+    };
+
+    await mkdir(skillDir, { recursive: true });
+    await writeFile(registryPath, `${JSON.stringify({ skills: [entry] }, null, 2)}\n`, "utf8");
+    await writeFile(
+      join(skillDir, "skill.json"),
+      `${JSON.stringify({
+        id: "com.test.missing-scripts",
+        applicationId: "com.test",
+        intent: "missing-scripts",
+        summary: "Broken skill",
+        path: "skills/com.test.missing-scripts",
+        skillFile: "skills/com.test.missing-scripts/SKILL.md",
+        artifacts: [],
+      }, null, 2)}\n`,
+      "utf8"
+    );
+    await writeFile(join(skillDir, "SKILL.md"), "# Broken Skill\n", "utf8");
+
+    try {
+      const result = await validateSkill("com.test.missing-scripts", registryPath);
+      assert.ok(!result.ok);
+      assert.strictEqual(result.code, SKILL_VALIDATION_FAILED);
+      assert.deepStrictEqual(result.details?.missingFields, ["scripts"]);
+      assert.strictEqual(result.details?.mismatchFields, undefined);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("skills validate dry-run", () => {

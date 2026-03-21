@@ -40,6 +40,7 @@ export interface ValidateSkillError {
   message: string;
   details?: {
     skillJsonPath?: string;
+    missingFields?: string[];
     missingFiles?: string[];
     mismatchFields?: string[];
     artifact?: string;
@@ -105,8 +106,35 @@ async function validateLoadedSkill(
   const repoRoot = getRepoRoot(resolvedRegistryPath);
   const skillJsonPath = join(repoRoot, getSkillJsonRelativePath(skill));
   const skillFilePath = join(repoRoot, skill.skillFile);
-  const scriptPaths = (skill.scripts ?? []).map((file) => join(repoRoot, file));
-  const artifactPaths = (skill.artifacts ?? []).map((file) => join(repoRoot, file));
+
+  if (!Array.isArray(skill.scripts)) {
+    return {
+      ok: false,
+      code: SKILL_VALIDATION_FAILED,
+      message: `Skill ${skill.id} registry entry is missing required scripts`,
+      details: {
+        skillJsonPath,
+        missingFields: ["scripts"],
+        reason: "scripts must be an array",
+      },
+    };
+  }
+
+  if (skill.artifacts !== undefined && !Array.isArray(skill.artifacts)) {
+    return {
+      ok: false,
+      code: SKILL_VALIDATION_FAILED,
+      message: `Skill ${skill.id} registry entry has an invalid artifacts value`,
+      details: {
+        skillJsonPath,
+        reason: "artifacts must be an array when present",
+      },
+    };
+  }
+
+  const scriptPaths = skill.scripts.map((file) => join(repoRoot, file));
+  // Artifacts are optional for script-only skills, but when present they must be explicit arrays.
+  const artifactPaths = skill.artifacts === undefined ? [] : skill.artifacts.map((file) => join(repoRoot, file));
   const missingFiles: string[] = [];
 
   for (const file of [skillJsonPath, skillFilePath, ...scriptPaths, ...artifactPaths]) {
