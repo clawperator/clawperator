@@ -1,0 +1,16 @@
+{
+  "commandId": "cmd-invalid-action-0",
+  "taskId": "task-invalid-action-0",
+  "source": "test-fixture",
+  "expectedFormat": "android-ui-automator",
+  "timeoutMs": 5000,
+  "actions": [
+    {
+      "id": "snap",
+      "type": "snapshot_ui",
+      "params": {
+        "format": "ascii"
+      }
+    }
+  ]
+}

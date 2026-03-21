@@ -91,6 +91,10 @@ const actionSchema = z.object({
   params: actionParamsSchema.optional(),
 }).strict();
 
+const validationHintByActionParam = new Map<string, string>([
+  ["snapshot_ui.format", "'format' was removed from snapshot_ui. Remove this parameter."],
+]);
+
 const executionSchema = z.object({
   commandId: z.string().min(1).max(LIMITS.MAX_ID_LENGTH),
   taskId: z.string().min(1).max(LIMITS.MAX_ID_LENGTH),
@@ -306,7 +310,14 @@ const executionSchema = z.object({
 export interface ValidationFailure {
   code: typeof ERROR_CODES.EXECUTION_VALIDATION_FAILED;
   message: string;
-  details?: { path?: string; reason?: string };
+  details?: {
+    path?: string;
+    reason?: string;
+    actionId?: string;
+    actionType?: string;
+    invalidKeys?: string[];
+    hint?: string;
+  };
 }
 
 /**
@@ -317,13 +328,46 @@ export function validateExecution(input: unknown): Execution {
   const parsed = executionSchema.safeParse(input);
   if (!parsed.success) {
     const first = parsed.error.errors[0];
+    const details: NonNullable<ValidationFailure["details"]> = {
+      path: first?.path.join("."),
+      reason: parsed.error.message,
+    };
+
+    if (first && first.path[0] === "actions") {
+      const actionIndex = first.path[1] as number | undefined;
+      const rawActions = (input as { actions?: unknown[] } | undefined)?.actions;
+      const rawAction = actionIndex !== undefined ? rawActions?.[actionIndex] : undefined;
+      const actionId = (rawAction as { id?: unknown })?.id;
+      const actionType = (rawAction as { type?: unknown })?.type;
+
+      if (typeof actionId === "string") {
+        details.actionId = actionId;
+      }
+      if (typeof actionType === "string") {
+        details.actionType = actionType;
+      }
+
+      if (first.code === "unrecognized_keys") {
+        const invalidKeys = (first as { keys?: string[] }).keys;
+        if (invalidKeys !== undefined) {
+          details.invalidKeys = invalidKeys;
+          if (typeof actionType === "string") {
+            for (const invalidKey of invalidKeys) {
+              const hint = validationHintByActionParam.get(`${actionType}.${invalidKey}`);
+              if (hint !== undefined) {
+                details.hint = hint;
+                break;
+              }
+            }
+          }
+        }
+      }
+    }
+
     const err: ValidationFailure = {
       code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
       message: first?.message ?? "Invalid execution payload",
-      details: {
-        path: first?.path.join("."),
-        reason: parsed.error.message,
-      },
+      details,
     };
     throw err;
   }
