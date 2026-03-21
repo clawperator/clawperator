@@ -302,7 +302,7 @@ export async function probeVersionCompatibility(config: RuntimeConfig): Promise<
   }
 
   try {
-    const parsedApk = parseCompatibilityVersion(installed.versionName);
+    const parsedApk = parseCompatibilityVersion(normalizeCompatibilityVersion(installed.versionName));
     const compatible = parsedCli.normalized === parsedApk.normalized;
 
     if (!compatible) {
