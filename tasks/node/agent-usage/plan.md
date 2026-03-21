@@ -106,7 +106,6 @@ PR-1  PRD-1 + PRD-6 (partial)
       - runExecution.ts: APK pre-flight before broadcastAgentCommand
       - install.sh: post-install docs banner
       - docs: fix first-time-setup.md / node-api-doctor.md contradiction
-      - scripts/operator_event.sh: stub (pending OpenClaw tool config review)
       Risk: low. Pure enforcement + additive UX. --check-only preserved.
       Depends on: nothing.
 
