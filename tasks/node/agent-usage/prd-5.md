@@ -41,9 +41,18 @@ Neither file writes to disk at any point. All diagnostic information is either s
 
 ## Proposed Change
 
-### 0. New module: `apps/node/src/infra/logger.ts`
+### 0. New module: logger
 
-Create the log writer as a standalone module at `apps/node/src/infra/logger.ts`. It
+**Directory choice**: The `infra/` directory does not exist in this codebase. The existing
+top-level directories under `apps/node/src/` are `adapters/`, `cli/`, `contracts/`,
+`domain/`, and `test/`. A logger is an I/O adapter (it writes to the filesystem), so
+**prefer `apps/node/src/adapters/logger.ts`** over creating a new `infra/` directory.
+
+If there is a strong organizational reason to use `infra/` instead (e.g. a future logging
+or telemetry umbrella), note it in the PR and create the directory explicitly. Do not
+create it silently.
+
+Create the log writer as a standalone module. It
 should export:
 ```typescript
 export interface LogEvent { ts: string; level: string; event: string;
@@ -212,8 +221,10 @@ Use the resolved absolute path in `logPath` so agents can pass it directly to `f
   `afterEach` — never use `~/.clawperator/` in unit tests
 - Permission-failure simulation: create a regular file at the intended log directory path
   so `mkdir` fails (simpler than mocking `fs`)
-- Sentinel string for privacy test: `"CLAWPERATOR_TEST_SENTINEL_X9Z"` — used as action
-  param text; must not appear in any log line
+- Sentinel string for privacy test: `"CLAWPERATOR_TEST_SENTINEL_X9Z"` — used as the
+  `text` value in an `enter_text` action. The `enter_text` schema accepts any string for
+  `text`, so this sentinel is a valid payload and will pass `validateExecution`. It must
+  not appear in any log line at any log level.
 
 ### TDD Sequence
 

@@ -75,7 +75,10 @@ from all PRDs that need it.
 
 Before merging any PR:
 
-1. `npm run test` passes with no skipped tests added in this PR.
+1. **`npm run build && npm run test`** passes with no skipped tests added in this PR.
+   Run both commands from `apps/node/`. Tests run against compiled `dist/` output — never
+   run `npm run test` alone after code changes, or you will silently exercise stale
+   compiled output and waste time debugging phantom failures.
 2. Every regression anchor for this PRD (see table below) is present and passing.
 3. The happy-path anchor for every changed code path is present and passing.
 4. No existing test was deleted or made less strict to make new tests pass.

@@ -122,8 +122,16 @@ All navigation changes must be reflected in:
 - `sites/docs/source-map.yaml`: any page renames or moves require source map updates
 - Remove deleted pages from both files
 
-If pages are renamed or moved, add redirects in the MkDocs config where available, or
-add explicit notes in the old locations if redirects are not supported.
+**Redirect plugin**: before adding redirect entries, check `sites/docs/mkdocs.yml` for a
+`plugins:` section containing `redirects`. If the plugin is not configured, redirects via
+config are not available. In that case, either: (a) add the `mkdocs-redirects` plugin to
+`sites/docs/requirements.txt` and configure it, or (b) leave a markdown stub at the old
+URL with a manual "This page moved to: <new-url>" note. Document which approach was used.
+
+**Also update PRD-6 docsUrl values**: when renaming or moving the first-time-setup page
+and any other pages referenced by `docsUrl` in `readinessChecks.ts`, update those
+hardcoded URLs as part of this PR. Search `apps/node/src/domain/doctor/checks/` for
+`docsUrl` values and update them to match the new page paths.
 
 ### 5. Update `llms.txt` to reflect the new structure
 
@@ -182,7 +190,12 @@ Renaming or moving pages breaks external links and any llms.txt references. Use 
 where MkDocs supports them. Document the old paths in the commit message.
 
 **Risk: scope expansion**
-An audit often reveals more duplication than expected. Timebox the audit to one pass.
+An audit often reveals more duplication than expected. Timebox the audit to one pass
+through `mkdocs.yml` only — not the content of every page. The nav tree in `mkdocs.yml`
+lists every page and its location; that is sufficient to map the full structure and
+identify duplication without reading each page's prose. Open each page only when the
+nav tree entry is ambiguous about what it covers.
+
 Prioritize the first-run and reference sections; leave the deep architecture docs for
 a follow-on if needed.
 

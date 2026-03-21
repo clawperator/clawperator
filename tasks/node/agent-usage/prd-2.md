@@ -220,13 +220,17 @@ Example:
 }
 ```
 
-### 3. Document `enter_text clear: true` gap
+### 3. Verify `enter_text clear: true` documentation
 
-In `docs/node-api-for-agents.md`, add a note to the `enter_text` action entry:
+`docs/node-api-for-agents.md` already documents this at line 242 (table) and line 344
+(prose note):
+> "The Node contract still accepts `clear`, but the Android runtime does not implement it
+> yet, so it currently has no effect."
 
-> `clear: true` is accepted in the payload schema but the Android receiver does not currently implement field clearing. Text will be appended to the existing field contents. Do not rely on this parameter until a future Operator APK release implements it.
-
-This prevents new skills from being written with a false assumption. It is not a runtime fix but it is a contract accuracy fix.
+Before writing anything: read these two locations and confirm the existing note is clear
+and complete. If the current wording is adequate, skip this item. If the note is ambiguous
+or missing the "do not rely on this" guidance, strengthen it in place. Do not add a
+duplicate note elsewhere.
 
 ### 4. Documentation updates
 
@@ -320,19 +324,45 @@ The known-hint list will become stale if not updated during API changes. Keep it
   (not the string `"undefined"`)
 - Protects: hint fires for cases it doesn't apply to; missing for the one known case
 
-**T5 — timeout error carries all correlation fields**
-- Setup: pass a `timeoutMs: 50` payload to `runExecution` with `commandId` and `taskId`.
-  Use a `FakeProcessRunner` whose `run` method returns a broadcast success immediately
-  but the `waitForResultEnvelope` internal timeout logic fires (set `timeoutMs: 50` in
-  the execution payload - the `+ 5000` buffer in `runExecution.ts` adds time, so use
-  a `waitForResultEnvelope` mock or accept a slightly longer test time if needed).
-  Alternatively, test the timeout-enrichment logic at a lower level by unit-testing
-  the enrichment code extracted to a helper function, then testing the integration
-  end-to-end with a very short timeout and a mock that never returns an envelope.
-- Expected: `error.commandId`, `error.taskId`, `error.lastActionId`,
-  `error.lastActionType`, `error.lastActionCaveat` (non-empty string),
-  `error.elapsedMs >= 50`, `error.timeoutMs === 50`
+**T5 — timeout enrichment carries all correlation fields**
+
+Do not test this by letting the full timeout fire. The `+ 5000` buffer in `runExecution.ts`
+makes any real-timeout test take 5+ seconds, which is unacceptably slow for a unit test.
+
+**Implementation requirement**: extract the timeout-enrichment logic into a pure helper
+function before adding any enrichment code:
+
+```typescript
+function buildTimeoutError(
+  execution: Execution,
+  diagnostics: Record<string, unknown>,
+  elapsedMs: number
+): Record<string, unknown> {
+  return {
+    ...diagnostics,
+    ...(execution.commandId !== undefined && { commandId: execution.commandId }),
+    ...(execution.taskId !== undefined && { taskId: execution.taskId }),
+    lastActionId: execution.actions.at(-1)?.id,
+    lastActionType: execution.actions.at(-1)?.type,
+    lastActionCaveat: "payload-last only; Android execution position is unknown",
+    elapsedMs,
+    timeoutMs: execution.timeoutMs,
+  };
+}
+```
+
+Then write T5 directly against `buildTimeoutError`:
+
+- Setup: call `buildTimeoutError` with a fixture `Execution` containing `commandId`,
+  `taskId`, and an actions array; pass `elapsedMs: 30021`
+- Expected: returned object contains `commandId`, `taskId`, `lastActionId`,
+  `lastActionType`, `lastActionCaveat` (non-empty string), `elapsedMs: 30021`,
+  `timeoutMs` matching the fixture
 - Protects: agent has no correlation handle after timeout; caveat string absent
+
+Separately, add one end-to-end wiring test in the integration suite (not unit) that
+confirms `buildTimeoutError` is actually called when `waitForResultEnvelope` times out.
+That test is slow by nature and belongs in the `CLAWPERATOR_RUN_INTEGRATION=1` suite.
 
 **T6 — timeout handles absent `commandId`/`taskId` without throwing**
 - Setup: same timeout setup but payload omits `commandId` and `taskId`

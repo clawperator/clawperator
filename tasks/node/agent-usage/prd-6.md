@@ -185,7 +185,15 @@ Validate before run: `clawperator skills validate <id> --dry-run`
 ```
 
 Implementation:
-- Write this file from `install.sh` after the installation banner. Use `cat > "$HOME/.clawperator/AGENTS.md"` with the version substituted from the installed package version.
+- Write this file from `install.sh` after the installation banner. Use
+  `cat > "$HOME/.clawperator/AGENTS.md"` with the version substituted.
+- **Version source**: `install.sh` does not have a single `CLAWPERATOR_VERSION` variable.
+  After the `npm install -g clawperator` step completes, capture the installed version:
+  ```bash
+  CLAWPERATOR_VERSION=$(clawperator --version 2>/dev/null || echo "unknown")
+  ```
+  Use `$CLAWPERATOR_VERSION` in the AGENTS.md template substitution. Place this capture
+  immediately after the npm install step, before the banner is written.
 - Overwrite on each install (it is always regenerated, never hand-edited).
 - The file path (`~/.clawperator/AGENTS.md`) must be stable since agents will discover it by convention.
 
@@ -252,7 +260,12 @@ This is the last PR in the sequence.
 If this PR lands before the runtime changes are stable, the docs will describe behavior that does not yet exist. The sequencing dependency is critical. Do not write PR-6 docs content until all runtime PRs have merged.
 
 **Risk: `docsUrl` field in `fix` object**
-Hardcoded docs URLs in doctor output will become stale if the docs site is restructured. Use path-stable URLs. Document them as canonical in the docs site config so they are treated as stable references.
+Hardcoded docs URLs in doctor output will become stale if the docs site is restructured.
+PRD-7 restructures the docs and will rename pages. The implementing agent for PRD-7 must
+check and update all `docsUrl` values hardcoded in this PR as part of that work. The
+three initial `docsUrl` values are in `readinessChecks.ts` for `RECEIVER_NOT_INSTALLED`,
+`RECEIVER_VARIANT_MISMATCH`, and `DEVICE_DEV_OPTIONS_DISABLED`. Document these as
+explicit search targets in the PRD-7 implementation notes.
 
 **Risk: `operator_event.sh` stub masking intent**
 A silent no-op is worse than the current visible error. The stub must emit a stderr notice. This makes the stub detectable by anyone reviewing the logs.

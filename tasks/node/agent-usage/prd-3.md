@@ -89,9 +89,27 @@ Without `--dry-run`, behavior is identical to today. This is an opt-in capabilit
 
 Do not make it the default until the impact on existing skills (particularly device-dependent script-only skills) is assessed.
 
-### 3. Update `docs/skills/skill-development-workflow.md`
+### 3. Update the skill development workflow doc
 
-Add `skills validate --dry-run` as the recommended pre-device step:
+**IMPORTANT - do not edit the generated file.** Per `CLAUDE.md`, `sites/docs/docs/` is
+generated output that must never be edited directly. The generated page
+`sites/docs/docs/skills/skill-development-workflow.md` is produced from the source at:
+
+```
+../clawperator-skills/docs/skill-development-workflow.md
+```
+
+(Confirmed via `sites/docs/source-map.yaml` line 207-210.)
+
+This source lives in the sibling `clawperator-skills` repo, not in this repo. To update
+it:
+
+1. Edit `../clawperator-skills/docs/skill-development-workflow.md` in the sibling repo.
+2. Submit a PR to the `clawperator-skills` repo with the change.
+3. After that PR merges, run the `docs-generate` skill in this repo to regenerate
+   `sites/docs/docs/skills/skill-development-workflow.md`.
+
+Content to add (in the sibling repo source):
 
 ```
 Recommended pre-device workflow:
@@ -101,6 +119,9 @@ Recommended pre-device workflow:
 ```
 
 Explain what `--dry-run` does and does not cover (no runtime behavior, no UI validation).
+
+If coordinating the sibling repo PR is out of scope for the implementing agent, note this
+as a follow-up item in the PR description.
 
 ### 4. Surface dry-run failure using PRD-2 error format
 
@@ -146,7 +167,11 @@ Out of scope:
 
 ## Dependencies
 
-- PRD-2 should land first or concurrently. The enriched error format makes the dry-run failure output actionable. Can be developed in parallel but should merge after PRD-2.
+- PRD-2 should land first or concurrently. `--dry-run` is fully functional without PRD-2
+  (it exits with `SKILL_VALIDATION_FAILED` regardless). The dependency is about error
+  quality only: with PRD-2, the output includes `actionId`, `actionType`, `invalidKeys`,
+  and `hint`. Without PRD-2, the output has only `code` and `message`. Merge after PRD-2
+  to ship the complete user experience.
 - `skills compile-artifact` must be callable in isolation (no device connection required) for at least the common case of pre-compiled artifacts.
 
 ---
@@ -223,6 +248,11 @@ No device required — `--dry-run` is designed to work without one.
 - Expected: `ok: true`; no "skipped" (the skill has an artifact)
 - Protects: fixture tests pass but real skill infrastructure not correctly wired
 
+**Fallback if no installed skill has pre-compiled artifacts**: use
+`test-skill-valid-artifact` fixture as the stand-in and note in the PR that T6 against
+a real bundled skill is deferred until a bundled skill with artifacts is confirmed to
+exist in the installed registry.
+
 ### Manual Verification
 
 - Run `--dry-run` on `test-skill-invalid-artifact`; output should name the skill, artifact,
@@ -237,4 +267,4 @@ No device required — `--dry-run` is designed to work without one.
 - `clawperator skills validate <id> --dry-run` on a script-only skill exits 0 and reports `dryRun.payloadValidation: "skipped"` with an explicit reason.
 - `clawperator skills validate <id>` (no flag) behaves identically to today.
 - A skill with valid files and valid payload passes `--dry-run`.
-- `docs/skills/skill-development-workflow.md` documents `--dry-run` as the pre-device validation step for artifact-backed skills, with an explicit note that script-only skills cannot be statically validated.
+- `../clawperator-skills/docs/skill-development-workflow.md` (source in sibling repo) documents `--dry-run` as the pre-device validation step for artifact-backed skills, with an explicit note that script-only skills cannot be statically validated. The generated output at `sites/docs/docs/skills/skill-development-workflow.md` must NOT be edited directly.

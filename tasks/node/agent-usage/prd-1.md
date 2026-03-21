@@ -103,11 +103,46 @@ Implementation notes:
 - Reuse `checkApkPresence` from `readinessChecks.ts` directly - do not duplicate the adb call.
   Import path: `import { checkApkPresence } from "../doctor/checks/readinessChecks.js"`.
   Signature: `checkApkPresence(config: RuntimeConfig): Promise<DoctorCheckResult>`.
-- **Exact insertion point**: In the `performExecution` function in `runExecution.ts`, add
-  the check after `config.deviceId = deviceId` (after device resolution) and before the
-  `tryAcquire` call. This keeps the lock-acquisition path clean and returns early before
-  any state changes. If `checkApkPresence` returns `status !== "pass"`, return immediately
-  with `{ ok: false, error: { code: "RECEIVER_NOT_INSTALLED", message: "..." } }`.
+- **Exact insertion point**: In the `performExecution` function in `runExecution.ts`, the
+  device resolution block ends at `config.deviceId = deviceId` and is immediately followed
+  by the `tryAcquire` call. Insert the APK check between those two statements:
+
+  ```typescript
+  // existing
+  config.deviceId = deviceId;
+  } catch (e) {
+    return { execution, result: { ok: false, error: e as ..., deviceId } };
+  }
+
+  // INSERT HERE: APK pre-flight
+  const apkCheck = await checkApkPresence(config);
+  if (apkCheck.status !== "pass") {
+    return { execution, result: { ok: false, error: { code: "RECEIVER_NOT_INSTALLED",
+      message: `Operator APK (${config.receiverPackage}) is not installed on ${deviceId}. ` +
+        `Install it with: clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id ${deviceId}`,
+    }, deviceId } };
+  }
+
+  // existing
+  if (!tryAcquire(deviceId, execution.commandId)) {
+  ```
+
+  This placement is after device resolution (so `config.deviceId` is set and
+  `config.receiverPackage` is final) and before lock acquisition (so we return early
+  without holding the device lock on failure).
+
+- **`--receiver-package` propagation**: `config` is built at the top of `performExecution`
+  with `receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_RECEIVER_PACKAGE`.
+  This means if the caller passes `--receiver-package com.clawperator.operator.dev`, the
+  pre-flight will check for that package. No extra wiring is needed; verify this is still
+  the case when reading the function fresh before implementing.
+
+- **adb failure during pre-flight**: If `checkApkPresence` itself encounters an adb error
+  (e.g. `pm list packages` returns non-zero exit), the function should return `status: "warn"`
+  rather than `"fail"` for that sub-case. By the time we reach the pre-flight, `resolveDevice`
+  has already confirmed adb is responding, so a `pm` failure is likely transient. A `"warn"`
+  means the pre-flight does not block execution, but the issue is surfaced in logs. Add a unit
+  test for this case (T9 below).
 - The adb round-trip is ~100ms. No session-level cache is warranted: each `clawperator execute` is a separate process, so in-memory caching provides no benefit. Keep it a fresh check on every invocation.
 - Follow the `injectServiceUnavailableHint` pattern already in `runExecution.ts` for the hint text.
 - Gate placement: the check belongs in `runExecution.ts` only - this is the layer that actually requests device access (via `broadcastAgentCommand`). Do NOT add the gate to `runSkill.ts`. `runSkill.ts` launches arbitrary scripts; many skill scripts do not require device access and should not be blocked. Skills that call `clawperator execute` from within their script will hit the gate naturally at `runExecution.ts`. Skills that call `adb` directly already bypass the Node layer entirely and are a separate (pre-existing) concern.
@@ -120,7 +155,13 @@ This PR does not add a new mode. The only change is: `doctor` without `--check-o
 
 ### 5. `install.sh`: post-install docs banner
 
-In the success banner at the end of `install.sh`, add:
+The success banner at the end of `install.sh` already contains (line 750):
+```
+For more info, visit: https://docs.clawperator.com
+```
+
+Extend this with the `llms.txt` line immediately after — do not duplicate or replace the
+existing reference:
 
 ```
   Docs:        https://docs.clawperator.com
@@ -129,7 +170,8 @@ In the success banner at the end of `install.sh`, add:
 If you are an AI agent, read the agent guide before running any commands.
 ```
 
-This belongs in PR-1 because it describes the same change (APK absence is now blocking, here is where to read about it).
+This belongs in PR-1 because it describes the same change (APK absence is now blocking,
+here is where to read about it).
 
 ### 6. Documentation updates in PR-1
 
@@ -160,6 +202,9 @@ Out of scope:
 - Streaming output (PRD-4)
 - Skill payload dry-run (PRD-3)
 - Full docs consolidation (PRD-6)
+- `observe screenshot` and `observe snapshot`: these dispatch to the device via adb but
+  do not go through `runExecution.ts`. They will still timeout on a missing APK. This is a
+  known limitation; gate them in a follow-on if it becomes a reported pain point.
 
 ---
 
@@ -257,6 +302,11 @@ the `pm list packages com.clawperator.operator` command returns
 - Expected: `result.ok === true`; `runner.calls` contains the broadcast call
 - Protects: over-broad gate fires even when APK is installed; all commands blocked
 
+**T9 — adb failure during pre-flight does not block execution**
+- Setup: `FakeProcessRunner` queued to return `{ code: 1, stdout: "", stderr: "error: device offline" }` for the `pm list packages` call (simulating a transient adb failure)
+- Expected: `result.ok === true` (pre-flight treated as `warn`, execution continues); broadcast IS called
+- Protects: transient adb failure causes all commands to fail-closed; pre-flight becomes more disruptive than the problem it solves
+
 ### Integration Tests
 
 Run with `CLAWPERATOR_RUN_INTEGRATION=1`, device with APK uninstalled.
@@ -276,6 +326,10 @@ Run with `CLAWPERATOR_RUN_INTEGRATION=1`, device with APK uninstalled.
 
 - APK absent: confirm error arrives in under 2 seconds; install command is copy-pasteable
 - APK installed: confirm normal execution still works (no regression from the gate)
+- **Installer regression (required)**: run `install.sh` on a device that does not have the
+  APK installed. Verify the installer detects the missing APK, proceeds to install it, and
+  completes successfully. The severity change (warn -> fail) must not cause `install.sh` to
+  abort before reaching the install step.
 
 ---
 
@@ -285,7 +339,7 @@ Run with `CLAWPERATOR_RUN_INTEGRATION=1`, device with APK uninstalled.
 - `clawperator execute` returns `RECEIVER_NOT_INSTALLED` with install command in under 2 seconds when the APK is absent. Gate is in `runExecution.ts` only.
 - `clawperator doctor --check-only` continues to exit 0 regardless of APK state. No new flag or mode is introduced; `--check-only` is the pre-existing escape hatch.
 - `RECEIVER_VARIANT_MISMATCH` remains a `warn` (not a hard failure).
-- `install.sh` still installs the APK when the device is ready (handles `status: "fail"` from doctor JSON).
+- `install.sh` still installs the APK when the device is ready (handles `status: "fail"` from doctor JSON). Verified manually by running `install.sh` on a device without the APK present.
 - `install.sh` post-install banner includes `https://docs.clawperator.com/llms.txt`.
 - `docs/first-time-setup.md` and `docs/reference/node-api-doctor.md` agree on APK absence behavior.
 - No `runSkill.ts` changes in this PR. Skill scripts that call `execute` get the gate naturally.
