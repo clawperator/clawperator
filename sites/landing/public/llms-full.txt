@@ -1032,8 +1032,8 @@ This command installs the APK and grants all required permissions in one step. S
 Historical versions can be downloaded from `downloads.clawperator.com`. The URL structure follows the versioning pattern:
 - `https://downloads.clawperator.com/operator/v<version>/operator-v<version>.apk`
 
-Example for v0.3.2:
-- [https://downloads.clawperator.com/operator/v0.3.2/operator-v0.3.2.apk](https://downloads.clawperator.com/operator/v0.3.2/operator-v0.3.2.apk)
+Example for v0.4.0:
+- [https://downloads.clawperator.com/operator/v0.4.0/operator-v0.4.0.apk](https://downloads.clawperator.com/operator/v0.4.0/operator-v0.4.0.apk)
 
 If you need a specific release, download the exact APK and its checksum from that versioned directory before running `clawperator operator setup`.
 
@@ -7170,6 +7170,7 @@ Examples:
 - CLI `0.1.4` and app `0.1.9` - not compatible
 - CLI `0.1.4` and app `0.2.1` - not compatible
 - CLI `0.1.4` and app `0.3.2` - not compatible
+- CLI `0.1.4` and app `0.4.0` - not compatible
 
 Notes:
 
