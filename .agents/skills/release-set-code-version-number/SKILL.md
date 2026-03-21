@@ -17,7 +17,7 @@ cd "$(git rev-parse --show-toplevel)"
 Example:
 
 ```bash
-.agents/skills/release-set-code-version-number/scripts/set_code_version.py 0.2.4 0.2.5
+.agents/skills/release-set-code-version-number/scripts/set_code_version.py 0.4.0 0.4.1
 ```
 
 This skill updates code-facing surfaces only:
@@ -62,7 +62,7 @@ git commit -m "chore(build): set code version to <new_version>"
 Example:
 
 ```bash
-git commit -m "chore(build): set code version to 0.2.5"
+git commit -m "chore(build): set code version to 0.4.1"
 ```
 
 Do not fold unrelated changes into this commit. Start from a clean working tree.
