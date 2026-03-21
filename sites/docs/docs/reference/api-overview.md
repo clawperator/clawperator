@@ -136,7 +136,7 @@ All fields are optional but at least one must be non-empty. Values are ORed inte
 | `matcher` | NodeMatcher | `click`, `read_text`, `enter_text`, `wait_for_node` |
 | `text` | string | `enter_text` |
 | `submit` | boolean | `enter_text` - press enter after typing |
-| `clear` | boolean | `enter_text` - clear field before typing |
+| `clear` | boolean | `enter_text` - clear field before typing, but do not rely on Android to honor it yet |
 | `clickType` | string | `click` - `default`, `long_click`, or `focus` |
 | `matcher` | NodeMatcher | `scroll_and_click`, `scroll_until` (optional) |
 | `container` | NodeMatcher | `scroll_and_click`, `scroll`, `scroll_until` |
