@@ -138,6 +138,38 @@ clawperator execute --validate-only --execution /path/to/compiled-execution.json
 
 This is the closest current workflow to a dry run for artifact-backed skills.
 
+### Dry-run payload validation
+
+Before running a skill, validate the skill payload with the pre-run gate:
+
+```bash
+clawperator skills validate <skill_id> --dry-run
+clawperator skills run <skill_id> --device-id <device_id>
+```
+
+`skills validate --dry-run` keeps the normal integrity checks and adds payload
+schema validation for artifact-backed skills. It reads each compiled artifact,
+parses the JSON, and validates it against Clawperator's execution schema before
+any device interaction happens.
+
+What it does not cover:
+
+- runtime UI state
+- selector reachability on a live device
+- app-specific branching inside a skill script
+
+Script-only skills are a special case: their payload is generated at runtime by
+the skill script, so static payload validation is skipped and the command logs a
+reason instead of failing.
+
+If you need to bypass the pre-run gate for CI or development, use:
+
+```bash
+clawperator skills run <skill_id> --skip-validate --device-id <device_id>
+```
+
+Treat `--skip-validate` as an escape hatch, not a routine workflow.
+
 ### Recording-derived skills
 
 When a skill is authored from a human recording, do not replay the trace
@@ -242,11 +274,12 @@ For a new skill, this is the practical order:
 4. run `clawperator skills validate <skill_id>`
 5. if artifacts exist, run `clawperator skills compile-artifact ...`
 6. run `clawperator execute --validate-only ...` on candidate payloads
-7. run `clawperator skills run <skill_id> --device-id <device_id>`
-8. harden selectors, timeout budgets, and output formatting
-9. verify that every meaningful recorded action is covered or explicitly
+7. run `clawperator skills validate <skill_id> --dry-run`
+8. run `clawperator skills run <skill_id> --device-id <device_id>`
+9. harden selectors, timeout budgets, and output formatting
+10. verify that every meaningful recorded action is covered or explicitly
    normalized
-10. run `clawperator skills validate --all` before wider use
+11. run `clawperator skills validate --all --dry-run` before wider use
 
 ## Related pages
 

@@ -1140,9 +1140,16 @@ Current skills model:
 - `skills validate <skill_id>` checks that one registry entry, its
   `skill.json`, `SKILL.md`, script paths, and artifact paths line up before you
   spend time on a live device run
+- `skills validate <skill_id> --dry-run` keeps the integrity checks and also
+  validates each compiled artifact payload against Clawperator's execution
+  schema before any device interaction. Artifact-backed skills fail fast with
+  the offending artifact name, action id, action type, invalid keys, and hint
+  when available. Script-only skills skip payload validation because their
+  payload is generated at runtime by the skill script, and the command reports
+  that reason in the structured result
 - `skills validate --all` runs the same integrity checks across every entry in
   the configured registry and returns a failure summary if any skills are
-  broken
+  broken. Add `--dry-run` to extend that validation to artifact payloads
 - `skills run --timeout-ms <n>` overrides the wrapper timeout for one run when
   the default `120000` ms budget is not the right fit for the current flow
 - `skills run --expect-contains <text>` turns the wrapper into a lightweight
@@ -1151,6 +1158,13 @@ Current skills model:
 - `skills run --receiver-package <pkg>` sets the Operator package for this run
   (default: `com.clawperator.operator`). Use `com.clawperator.operator.dev` for
   local debug APKs.
+- `skills run` performs the dry-run validation gate by default before it starts
+  the skill script. That gate covers the compiled artifact payloads for
+  artifact-backed skills and skips payload validation for script-only skills
+  with a logged reason.
+- `skills run --skip-validate` bypasses that pre-run gate. Use it only as a CI
+  or development escape hatch when you intentionally want to skip the payload
+  check.
 
 **Environment configuration for skills**
 
