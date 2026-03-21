@@ -105,7 +105,12 @@ export async function cmdSkillsRun(
   timeoutMs: number | undefined,
   expectContains: string | undefined,
   receiverPackage: string | undefined,
-  options: { format: OutputOptions["format"] }
+  options: {
+    format: OutputOptions["format"];
+    skipValidate?: boolean;
+    runSkillImpl?: typeof runSkill;
+    validateSkillImpl?: typeof validateSkill;
+  }
 ): Promise<string> {
   // Resolve the env vars for the skill script
   // Priority: explicit flag > env var > default
@@ -117,7 +122,23 @@ export async function cmdSkillsRun(
     [CLAWPERATOR_RECEIVER_PACKAGE_ENV_VAR]: resolvedReceiverPackage,
   };
 
-  const result = await runSkill(skillId, args, undefined, timeoutMs, env);
+  const runSkillImpl = options.runSkillImpl ?? runSkill;
+  const validateSkillImpl = options.validateSkillImpl ?? validateSkill;
+  if (!options.skipValidate) {
+    const validation = await validateSkillImpl(skillId, undefined, { dryRun: true });
+    if (!validation.ok) {
+      return formatError({
+        code: validation.code,
+        message: validation.message,
+        details: validation.details,
+      }, options);
+    }
+    if (options.format === "pretty" && validation.dryRun?.payloadValidation === "skipped") {
+      process.stderr.write("  [INFO] Payload validation skipped: no pre-compiled artifacts\n");
+    }
+  }
+
+  const result = await runSkillImpl(skillId, args, undefined, timeoutMs, env);
   if (result.ok) {
     if (expectContains && !result.output.includes(expectContains)) {
       return formatError({
@@ -170,16 +191,21 @@ export async function cmdSkillsNew(
 
 export async function cmdSkillsValidate(
   skillId: string,
-  options: { format: OutputOptions["format"] }
+  options: { format: OutputOptions["format"]; dryRun?: boolean }
 ): Promise<string> {
-  const result = await validateSkill(skillId);
+  const result = await validateSkill(skillId, undefined, { dryRun: options.dryRun });
   if (result.ok) {
-    return formatSuccess({
+    const rendered = formatSuccess({
       valid: true,
       skill: result.skill,
       registryPath: result.registryPath,
+      ...(result.dryRun ? { dryRun: result.dryRun } : {}),
       checks: result.checks,
     }, options);
+    if (options.format === "pretty" && result.dryRun?.payloadValidation === "skipped") {
+      process.stderr.write("  [INFO] Payload validation skipped: no pre-compiled artifacts\n");
+    }
+    return rendered;
   }
   return formatError({
     code: result.code,
@@ -189,9 +215,9 @@ export async function cmdSkillsValidate(
 }
 
 export async function cmdSkillsValidateAll(
-  options: { format: OutputOptions["format"] }
+  options: { format: OutputOptions["format"]; dryRun?: boolean }
 ): Promise<string> {
-  const result = await validateAllSkills();
+  const result = await validateAllSkills(undefined, { dryRun: options.dryRun });
   if (result.ok) {
     return formatSuccess({
       valid: true,

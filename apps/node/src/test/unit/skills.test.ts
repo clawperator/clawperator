@@ -25,6 +25,7 @@ import { scaffoldSkill } from "../../domain/skills/scaffoldSkill.js";
 import { validateAllSkills, validateSkill } from "../../domain/skills/validateSkill.js";
 import { loadRegistry } from "../../adapters/skills-repo/localSkillsRegistry.js";
 import { validateExecution, validatePayloadSize } from "../../domain/executions/validateExecution.js";
+import { cmdSkillsRun } from "../../cli/commands/skills.js";
 import {
   SKILL_NOT_FOUND,
   ARTIFACT_NOT_FOUND,
@@ -39,6 +40,10 @@ import {
 } from "../../contracts/skills.js";
 
 const TEST_REGISTRY_PATH = join(packageRoot, "src", "test", "fixtures", "skills", "skills-registry.json");
+const TEST_SKILL_VALID_ARTIFACT = "test-skill-valid-artifact";
+const TEST_SKILL_INVALID_ARTIFACT = "test-skill-invalid-artifact";
+const TEST_SKILL_SCRIPT_ONLY = "test-skill-script-only";
+const TEST_SKILL_EMPTY_ARTIFACTS = "test-skill-empty-artifacts";
 const ORIGINAL_REGISTRY_PATH = process.env.CLAWPERATOR_SKILLS_REGISTRY;
 const ORIGINAL_STDERR_WRITE = process.stderr.write.bind(process.stderr);
 
@@ -250,6 +255,55 @@ describe("validateSkill", () => {
     }
   });
 
+  it("still passes invalid artifact payloads without dry-run", async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-skill-validate-artifact-"));
+    const skillsDir = join(tempRoot, "skills");
+    const skillDir = join(skillsDir, "com.test.artifact");
+    const registryPath = join(skillsDir, "skills-registry.json");
+    const entry = {
+      id: "com.test.artifact",
+      applicationId: "com.test",
+      intent: "artifact",
+      summary: "Artifact-backed skill",
+      path: "skills/com.test.artifact",
+      skillFile: "skills/com.test.artifact/SKILL.md",
+      scripts: ["skills/com.test.artifact/scripts/run.js"],
+      artifacts: ["skills/com.test.artifact/artifacts/bad.json"],
+    };
+
+    await mkdir(join(skillDir, "scripts"), { recursive: true });
+    await mkdir(join(skillDir, "artifacts"), { recursive: true });
+    await copyFile(
+      join(packageRoot, "src", "test", "fixtures", "skills", "com.test.echo", "scripts", "echo.js"),
+      join(skillDir, "scripts", "run.js")
+    );
+    await writeFile(join(skillDir, "SKILL.md"), "# Artifact Skill\n", "utf8");
+    await writeFile(
+      join(skillDir, "artifacts", "bad.json"),
+      `${JSON.stringify({
+        commandId: "cmd",
+        taskId: "task",
+        source: "skill",
+        expectedFormat: "android-ui-automator",
+        timeoutMs: 1000,
+        actions: [
+          { id: "snap", type: "snapshot_ui", params: { format: "ascii" } },
+        ],
+      }, null, 2)}\n`,
+      "utf8"
+    );
+    await writeFile(registryPath, `${JSON.stringify({ skills: [entry] }, null, 2)}\n`, "utf8");
+    await writeFile(join(skillDir, "skill.json"), `${JSON.stringify(entry, null, 2)}\n`, "utf8");
+
+    try {
+      const result = await validateSkill("com.test.artifact", registryPath);
+      if (!result.ok) assert.fail(result.message);
+      assert.ok(result.checks.artifactPaths.some((file) => file.endsWith("/bad.json")));
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
   it("returns SKILL_VALIDATION_FAILED when a referenced file is missing", async () => {
     const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-skill-validate-"));
     const skillsDir = join(tempRoot, "skills");
@@ -282,6 +336,159 @@ describe("validateSkill", () => {
     } finally {
       await rm(tempRoot, { recursive: true, force: true });
     }
+  });
+
+  it("rejects registry entries that omit the scripts array", async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-skill-validate-missing-scripts-"));
+    const skillsDir = join(tempRoot, "skills");
+    const skillDir = join(skillsDir, "com.test.missing-scripts");
+    const registryPath = join(skillsDir, "skills-registry.json");
+    const entry = {
+      id: "com.test.missing-scripts",
+      applicationId: "com.test",
+      intent: "missing-scripts",
+      summary: "Broken skill",
+      path: "skills/com.test.missing-scripts",
+      skillFile: "skills/com.test.missing-scripts/SKILL.md",
+      artifacts: [],
+    };
+
+    await mkdir(skillDir, { recursive: true });
+    await writeFile(registryPath, `${JSON.stringify({ skills: [entry] }, null, 2)}\n`, "utf8");
+    await writeFile(
+      join(skillDir, "skill.json"),
+      `${JSON.stringify({
+        id: "com.test.missing-scripts",
+        applicationId: "com.test",
+        intent: "missing-scripts",
+        summary: "Broken skill",
+        path: "skills/com.test.missing-scripts",
+        skillFile: "skills/com.test.missing-scripts/SKILL.md",
+        artifacts: [],
+      }, null, 2)}\n`,
+      "utf8"
+    );
+    await writeFile(join(skillDir, "SKILL.md"), "# Broken Skill\n", "utf8");
+
+    try {
+      const result = await validateSkill("com.test.missing-scripts", registryPath);
+      assert.ok(!result.ok);
+      assert.strictEqual(result.code, SKILL_VALIDATION_FAILED);
+      assert.deepStrictEqual(result.details?.missingFields, ["scripts"]);
+      assert.strictEqual(result.details?.mismatchFields, undefined);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("skills validate dry-run", () => {
+  it("passes a valid artifact-backed skill", async () => {
+    const { stdout, stderr, code } = await runCli([
+      "skills",
+      "validate",
+      TEST_SKILL_VALID_ARTIFACT,
+      "--dry-run",
+      "--output",
+      "json",
+    ]);
+    assert.strictEqual(code, 0, stdout);
+    assert.strictEqual(stderr, "");
+    const parsed = JSON.parse(stdout) as { valid?: boolean; dryRun?: unknown };
+    assert.strictEqual(parsed.valid, true);
+    assert.strictEqual(parsed.dryRun, undefined);
+  });
+
+  it("fails an invalid artifact-backed skill with PRD-2 details", async () => {
+    const { stdout, code } = await runCli([
+      "skills",
+      "validate",
+      TEST_SKILL_INVALID_ARTIFACT,
+      "--dry-run",
+      "--output",
+      "json",
+    ]);
+    assert.strictEqual(code, 1, stdout);
+    const parsed = JSON.parse(stdout) as {
+      code?: string;
+      message?: string;
+      details?: {
+        artifact?: string;
+        actionId?: string;
+        actionType?: string;
+        invalidKeys?: string[];
+        hint?: string;
+      };
+    };
+    assert.strictEqual(parsed.code, SKILL_VALIDATION_FAILED);
+    assert.match(parsed.message ?? "", /artifact payload schema violation/);
+    assert.strictEqual(parsed.details?.artifact, "artifact.json");
+    assert.strictEqual(parsed.details?.actionId, "snap");
+    assert.strictEqual(parsed.details?.actionType, "snapshot_ui");
+    assert.deepStrictEqual(parsed.details?.invalidKeys, ["format"]);
+    assert.match(parsed.details?.hint ?? "", /removed from snapshot_ui/);
+  });
+
+  it("skips payload validation for script-only skills and logs the reason in pretty mode", async () => {
+    for (const skillId of [TEST_SKILL_SCRIPT_ONLY, TEST_SKILL_EMPTY_ARTIFACTS]) {
+      const { stdout, stderr, code } = await runCli([
+        "skills",
+        "validate",
+        skillId,
+        "--dry-run",
+        "--output",
+        "pretty",
+      ]);
+      assert.strictEqual(code, 0, stdout);
+      assert.match(stderr, /Payload validation skipped: no pre-compiled artifacts/);
+      const parsed = JSON.parse(stdout) as {
+        valid?: boolean;
+        dryRun?: { payloadValidation?: string; reason?: string };
+      };
+      assert.strictEqual(parsed.valid, true);
+      assert.strictEqual(parsed.dryRun?.payloadValidation, "skipped");
+      assert.strictEqual(
+        parsed.dryRun?.reason,
+        "skill has no pre-compiled artifacts; payload is generated at runtime by the skill script"
+      );
+    }
+  });
+
+  it("emits JSON-parseable output for dry-run success and failure", async () => {
+    const success = await runCli([
+      "skills",
+      "validate",
+      TEST_SKILL_VALID_ARTIFACT,
+      "--dry-run",
+      "--output",
+      "json",
+    ]);
+    const failure = await runCli([
+      "skills",
+      "validate",
+      TEST_SKILL_INVALID_ARTIFACT,
+      "--dry-run",
+      "--output",
+      "json",
+    ]);
+
+    assert.doesNotThrow(() => JSON.parse(success.stdout));
+    assert.doesNotThrow(() => JSON.parse(failure.stdout));
+  });
+
+  it("passes dry-run for a real bundled artifact-backed skill without a device", async () => {
+    const { stdout, code } = await runCli([
+      "skills",
+      "validate",
+      "com.google.android.apps.chromecast.app.get-aircon-status",
+      "--dry-run",
+      "--output",
+      "json",
+    ]);
+    assert.strictEqual(code, 0, stdout);
+    const parsed = JSON.parse(stdout) as { valid?: boolean; skill?: { id?: string } };
+    assert.strictEqual(parsed.valid, true);
+    assert.strictEqual(parsed.skill?.id, "com.google.android.apps.chromecast.app.get-aircon-status");
   });
 });
 
@@ -1058,6 +1265,89 @@ describe("runSkill", () => {
     assert.strictEqual(parsed.code, SKILL_OUTPUT_ASSERTION_FAILED);
     assert.strictEqual(parsed.expectedSubstring, "missing-value");
     assert.ok(parsed.output?.includes("TEST_OUTPUT:hello"));
+  });
+});
+
+describe("cmdSkillsRun preflight gate", () => {
+  it("aborts invalid artifact skills before runSkill is called", async () => {
+    let runCalls = 0;
+    const fakeRunSkill = async () => {
+      runCalls += 1;
+      return {
+        ok: true,
+        skillId: TEST_SKILL_INVALID_ARTIFACT,
+        output: "should-not-run",
+        exitCode: 0,
+        durationMs: 1,
+      } as const;
+    };
+
+    const stdout = await cmdSkillsRun(
+      TEST_SKILL_INVALID_ARTIFACT,
+      [],
+      undefined,
+      undefined,
+      undefined,
+      { format: "json", runSkillImpl: fakeRunSkill as typeof runSkill }
+    );
+    const parsed = JSON.parse(stdout) as { code?: string; details?: { artifact?: string } };
+    assert.strictEqual(runCalls, 0);
+    assert.strictEqual(parsed.code, SKILL_VALIDATION_FAILED);
+    assert.strictEqual(parsed.details?.artifact, "artifact.json");
+  });
+
+  it("proceeds for valid artifact skills and calls runSkill", async () => {
+    let runCalls = 0;
+    const fakeRunSkill = async () => {
+      runCalls += 1;
+      return {
+        ok: true,
+        skillId: TEST_SKILL_VALID_ARTIFACT,
+        output: "RUN_OK",
+        exitCode: 0,
+        durationMs: 1,
+      } as const;
+    };
+
+    const stdout = await cmdSkillsRun(
+      TEST_SKILL_VALID_ARTIFACT,
+      [],
+      undefined,
+      undefined,
+      undefined,
+      { format: "json", runSkillImpl: fakeRunSkill as typeof runSkill }
+    );
+    const parsed = JSON.parse(stdout) as { skillId?: string; output?: string };
+    assert.strictEqual(runCalls, 1);
+    assert.strictEqual(parsed.skillId, TEST_SKILL_VALID_ARTIFACT);
+    assert.strictEqual(parsed.output, "RUN_OK");
+  });
+
+  it("bypasses validation when --skip-validate is set", async () => {
+    let runCalls = 0;
+    const fakeRunSkill = async () => {
+      runCalls += 1;
+      return {
+        ok: true,
+        skillId: TEST_SKILL_INVALID_ARTIFACT,
+        output: "RUN_OK",
+        exitCode: 0,
+        durationMs: 1,
+      } as const;
+    };
+
+    const stdout = await cmdSkillsRun(
+      TEST_SKILL_INVALID_ARTIFACT,
+      [],
+      undefined,
+      undefined,
+      undefined,
+      { format: "json", skipValidate: true, runSkillImpl: fakeRunSkill as typeof runSkill }
+    );
+    const parsed = JSON.parse(stdout) as { skillId?: string; output?: string };
+    assert.strictEqual(runCalls, 1);
+    assert.strictEqual(parsed.skillId, TEST_SKILL_INVALID_ARTIFACT);
+    assert.strictEqual(parsed.output, "RUN_OK");
   });
 });
 

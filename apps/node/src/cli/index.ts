@@ -61,10 +61,10 @@ Commands:
                                             Compile from a skill artifact (skill: positional or --skill-id; artifact: ac-status or ac-status.recipe.json)
   skills new <skill_id> [--summary <text>]
                                             Scaffold a new local skill folder and registry entry
-  skills validate <skill_id>
-  skills validate --all
+  skills validate <skill_id> [--dry-run]
+  skills validate --all [--dry-run]
                                             Validate one local skill or the entire configured registry
-  skills run <skill_id> [--device-id <id>] [--receiver-package <pkg>] [--timeout-ms <n>] [--expect-contains <text>] [-- <extra_args>]
+  skills run <skill_id> [--device-id <id>] [--receiver-package <pkg>] [--timeout-ms <n>] [--expect-contains <text>] [--skip-validate] [-- <extra_args>]
                                             Invoke a skill script (convenience wrapper)
   skills install
                                             Clone skills repository to ~/.clawperator/skills/
@@ -203,8 +203,8 @@ Notes:
   "skills validate": `clawperator skills validate
 
 Usage:
-  clawperator skills validate <skill_id> [--output <json|pretty>]
-  clawperator skills validate --all [--output <json|pretty>]
+  clawperator skills validate <skill_id> [--dry-run] [--output <json|pretty>]
+  clawperator skills validate --all [--dry-run] [--output <json|pretty>]
 
 Notes:
   - Use <skill_id> to validate one skill, or --all to validate every registry entry in one pass.
@@ -212,6 +212,8 @@ Notes:
   - Checks that skill.json, SKILL.md, script files, and artifact files exist on disk.
   - Confirms that the parsed skill.json metadata matches the registry entry.
   - This is an integrity check, not a live device test.
+  - --dry-run extends the check to compiled artifact payloads for artifact-backed skills by parsing each artifact JSON and validating it against the execution schema.
+  - Script-only skills skip payload validation during --dry-run because their payload is generated at runtime by the skill script.
 `,
   "skills compile-artifact": `clawperator skills compile-artifact
 
@@ -230,7 +232,7 @@ Notes:
   "skills run": `clawperator skills run
 
 Usage:
-  clawperator skills run <skill_id> [--device-id <id>] [--receiver-package <pkg>] [--timeout-ms <n>] [--expect-contains <text>] [--output <json|pretty>] [-- <extra_args>]
+  clawperator skills run <skill_id> [--device-id <id>] [--receiver-package <pkg>] [--timeout-ms <n>] [--expect-contains <text>] [--skip-validate] [--output <json|pretty>] [-- <extra_args>]
 
 Notes:
   - Runs the selected skill script through the local skill wrapper.
@@ -240,6 +242,8 @@ Notes:
   - --timeout-ms overrides the wrapper timeout for this run only.
   - --expect-contains turns the run into a lightweight output assertion.
   - If the assertion text is missing, the wrapper fails with SKILL_OUTPUT_ASSERTION_FAILED.
+  - By default, the wrapper performs a pre-run dry-run validation gate before starting the skill script.
+  - --skip-validate bypasses that gate for CI or development escape hatches only.
   - Arguments after -- are forwarded to the underlying skill script unchanged.
   - Environment variables CLAWPERATOR_BIN and CLAWPERATOR_RECEIVER_PACKAGE are injected into the skill script.
   - This wrapper does not replace live validation of screenshots, artifacts, or app state.
@@ -704,17 +708,18 @@ async function main(): Promise<void> {
           result = await (await import("./commands/skills.js")).cmdSkillsNew(rest[1], { ...out, summary });
         }
       } else if (rest[0] === "validate") {
+        const dryRun = hasFlag(rest, "--dry-run");
         if (hasFlag(rest, "--all")) {
-          result = await (await import("./commands/skills.js")).cmdSkillsValidateAll(out);
+          result = await (await import("./commands/skills.js")).cmdSkillsValidateAll({ ...out, dryRun });
         } else if (!rest[1]) {
-          result = JSON.stringify({ code: "USAGE", message: "skills validate <skill_id> | skills validate --all" });
+          result = JSON.stringify({ code: "USAGE", message: "skills validate <skill_id> [--dry-run] | skills validate --all [--dry-run]" });
         } else {
-          result = await (await import("./commands/skills.js")).cmdSkillsValidate(rest[1], out);
+          result = await (await import("./commands/skills.js")).cmdSkillsValidate(rest[1], { ...out, dryRun });
         }
       } else if (rest[0] === "run") {
         const skillId = rest[1];
         if (!skillId) {
-          result = JSON.stringify({ code: "USAGE", message: "skills run <skill_id> [--device-id <id>] [--receiver-package <pkg>] [--timeout-ms <n>] [--expect-contains <text>] [-- <extra_args>]" });
+          result = JSON.stringify({ code: "USAGE", message: "skills run <skill_id> [--device-id <id>] [--receiver-package <pkg>] [--timeout-ms <n>] [--expect-contains <text>] [--skip-validate] [-- <extra_args>]" });
         } else {
           // Build args to pass to the skill script
           // Only parse options from args before "--" to avoid double-counting
@@ -734,6 +739,7 @@ async function main(): Promise<void> {
             break;
           }
           const expectContains = getStringOpt(optSegment, "--expect-contains");
+          const skipValidate = hasFlag(optSegment, "--skip-validate");
           if (deviceId) scriptArgs.push(deviceId);
           // Pass anything after "--" as extra args
           if (dashDash >= 0) {
@@ -745,7 +751,7 @@ async function main(): Promise<void> {
             effectiveTimeoutMs,
             expectContains,
             receiverPackage,
-            out
+            { ...out, skipValidate }
           );
         }
       } else if (rest[0] === "install") {

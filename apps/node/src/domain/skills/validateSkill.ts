@@ -1,5 +1,5 @@
 import { access, readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import {
   loadRegistry,
   findSkillById,
@@ -11,11 +11,21 @@ import {
   SKILL_NOT_FOUND,
   SKILL_VALIDATION_FAILED,
 } from "../../contracts/skills.js";
+import { validateExecution, type ValidationFailure } from "../executions/validateExecution.js";
+
+const SKILL_DRY_RUN_SKIP_REASON =
+  "skill has no pre-compiled artifacts; payload is generated at runtime by the skill script";
+
+export interface ValidateSkillDryRunSkipped {
+  payloadValidation: "skipped";
+  reason: string;
+}
 
 export interface ValidateSkillResult {
   ok: true;
   skill: SkillEntry;
   registryPath: string;
+  dryRun?: ValidateSkillDryRunSkipped;
   checks: {
     skillJsonPath: string;
     skillFilePath: string;
@@ -30,8 +40,16 @@ export interface ValidateSkillError {
   message: string;
   details?: {
     skillJsonPath?: string;
+    missingFields?: string[];
     missingFiles?: string[];
     mismatchFields?: string[];
+    artifact?: string;
+    actionId?: string;
+    actionType?: string;
+    invalidKeys?: string[];
+    hint?: string;
+    path?: string;
+    reason?: string;
   };
 }
 
@@ -82,13 +100,41 @@ function findMismatchFields(skill: SkillEntry, parsed: Partial<SkillEntry>): str
 
 async function validateLoadedSkill(
   skill: SkillEntry,
-  resolvedRegistryPath: string
+  resolvedRegistryPath: string,
+  options?: { dryRun?: boolean }
 ): Promise<ValidateSkillResult | ValidateSkillError> {
   const repoRoot = getRepoRoot(resolvedRegistryPath);
   const skillJsonPath = join(repoRoot, getSkillJsonRelativePath(skill));
   const skillFilePath = join(repoRoot, skill.skillFile);
+
+  if (!Array.isArray(skill.scripts)) {
+    return {
+      ok: false,
+      code: SKILL_VALIDATION_FAILED,
+      message: `Skill ${skill.id} registry entry is missing required scripts`,
+      details: {
+        skillJsonPath,
+        missingFields: ["scripts"],
+        reason: "scripts must be an array",
+      },
+    };
+  }
+
+  if (skill.artifacts !== undefined && !Array.isArray(skill.artifacts)) {
+    return {
+      ok: false,
+      code: SKILL_VALIDATION_FAILED,
+      message: `Skill ${skill.id} registry entry has an invalid artifacts value`,
+      details: {
+        skillJsonPath,
+        reason: "artifacts must be an array when present",
+      },
+    };
+  }
+
   const scriptPaths = skill.scripts.map((file) => join(repoRoot, file));
-  const artifactPaths = skill.artifacts.map((file) => join(repoRoot, file));
+  // Artifacts are optional for script-only skills, but when present they must be explicit arrays.
+  const artifactPaths = skill.artifacts === undefined ? [] : skill.artifacts.map((file) => join(repoRoot, file));
   const missingFiles: string[] = [];
 
   for (const file of [skillJsonPath, skillFilePath, ...scriptPaths, ...artifactPaths]) {
@@ -126,6 +172,82 @@ async function validateLoadedSkill(
     };
   }
 
+  if (options?.dryRun) {
+    if (artifactPaths.length === 0) {
+      return {
+        ok: true,
+        skill,
+        registryPath: resolvedRegistryPath,
+        dryRun: {
+          payloadValidation: "skipped",
+          reason: SKILL_DRY_RUN_SKIP_REASON,
+        },
+        checks: {
+          skillJsonPath,
+          skillFilePath,
+          scriptPaths,
+          artifactPaths,
+        },
+      };
+    }
+
+    for (let index = 0; index < artifactPaths.length; index++) {
+      const artifactPath = artifactPaths[index];
+      const artifact = basename(skill.artifacts?.[index] ?? artifactPath);
+      let rawArtifact: string;
+      try {
+        rawArtifact = await readFile(artifactPath, "utf8");
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        return {
+          ok: false,
+          code: SKILL_VALIDATION_FAILED,
+          message: `Skill ${skill.id}: artifact payload schema violation`,
+          details: {
+            artifact,
+            reason: `Failed to read artifact: ${message}`,
+          },
+        };
+      }
+
+      let parsedArtifact: unknown;
+      try {
+        parsedArtifact = JSON.parse(rawArtifact);
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        return {
+          ok: false,
+          code: SKILL_VALIDATION_FAILED,
+          message: `Skill ${skill.id}: artifact payload schema violation`,
+          details: {
+            artifact,
+            reason: `Failed to parse artifact JSON: ${message}`,
+          },
+        };
+      }
+
+      try {
+        validateExecution(parsedArtifact);
+      } catch (e) {
+        const failure = e as ValidationFailure;
+        return {
+          ok: false,
+          code: SKILL_VALIDATION_FAILED,
+          message: `Skill ${skill.id}: artifact payload schema violation`,
+          details: {
+            artifact,
+            path: failure.details?.path,
+            reason: failure.details?.reason,
+            actionId: failure.details?.actionId,
+            actionType: failure.details?.actionType,
+            invalidKeys: failure.details?.invalidKeys,
+            hint: failure.details?.hint,
+          },
+        };
+      }
+    }
+  }
+
   return {
     ok: true,
     skill,
@@ -141,7 +263,8 @@ async function validateLoadedSkill(
 
 export async function validateSkill(
   skillId: string,
-  registryPath?: string
+  registryPath?: string,
+  options?: { dryRun?: boolean }
 ): Promise<ValidateSkillResult | ValidateSkillError> {
   try {
     const loaded = await loadRegistry(registryPath);
@@ -149,7 +272,7 @@ export async function validateSkill(
     if (!skill) {
       return { ok: false, code: SKILL_NOT_FOUND, message: `Skill not found: ${skillId}` };
     }
-    return await validateLoadedSkill(skill, loaded.resolvedPath);
+    return await validateLoadedSkill(skill, loaded.resolvedPath, options);
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     return { ok: false, code: REGISTRY_READ_FAILED, message };
@@ -157,7 +280,8 @@ export async function validateSkill(
 }
 
 export async function validateAllSkills(
-  registryPath?: string
+  registryPath?: string,
+  options?: { dryRun?: boolean }
 ): Promise<ValidateAllSkillsResult | ValidateAllSkillsError> {
   try {
     const loaded = await loadRegistry(registryPath);
@@ -165,7 +289,7 @@ export async function validateAllSkills(
     const failures: NonNullable<ValidateAllSkillsError["details"]>["failures"] = [];
 
     for (const skill of loaded.registry.skills) {
-      const result = await validateLoadedSkill(skill, loaded.resolvedPath);
+      const result = await validateLoadedSkill(skill, loaded.resolvedPath, options);
       if (result.ok) {
         validSkills.push({
           skill: result.skill,

@@ -2874,9 +2874,16 @@ Current skills model:
 - `skills validate <skill_id>` checks that one registry entry, its
   `skill.json`, `SKILL.md`, script paths, and artifact paths line up before you
   spend time on a live device run
+- `skills validate <skill_id> --dry-run` keeps the integrity checks and also
+  validates each compiled artifact payload against Clawperator's execution
+  schema before any device interaction. Artifact-backed skills fail fast with
+  the offending artifact name, action id, action type, invalid keys, and hint
+  when available. Script-only skills skip payload validation because their
+  payload is generated at runtime by the skill script, and the command reports
+  that reason in the structured result
 - `skills validate --all` runs the same integrity checks across every entry in
   the configured registry and returns a failure summary if any skills are
-  broken
+  broken. Add `--dry-run` to extend that validation to artifact payloads
 - `skills run --timeout-ms <n>` overrides the wrapper timeout for one run when
   the default `120000` ms budget is not the right fit for the current flow
 - `skills run --expect-contains <text>` turns the wrapper into a lightweight
@@ -2885,6 +2892,13 @@ Current skills model:
 - `skills run --receiver-package <pkg>` sets the Operator package for this run
   (default: `com.clawperator.operator`). Use `com.clawperator.operator.dev` for
   local debug APKs.
+- `skills run` performs the dry-run validation gate by default before it starts
+  the skill script. That gate covers the compiled artifact payloads for
+  artifact-backed skills and skips payload validation for script-only skills
+  with a logged reason.
+- `skills run --skip-validate` bypasses that pre-run gate. Use it only as a CI
+  or development escape hatch when you intentionally want to skip the payload
+  check.
 
 **Environment configuration for skills**
 
@@ -8317,6 +8331,38 @@ clawperator execute --validate-only --execution /path/to/compiled-execution.json
 
 This is the closest current workflow to a dry run for artifact-backed skills.
 
+### Dry-run payload validation
+
+Before running a skill, validate the skill payload with the pre-run gate:
+
+```bash
+clawperator skills validate <skill_id> --dry-run
+clawperator skills run <skill_id> --device-id <device_id>
+```
+
+`skills validate --dry-run` keeps the normal integrity checks and adds payload
+schema validation for artifact-backed skills. It reads each compiled artifact,
+parses the JSON, and validates it against Clawperator's execution schema before
+any device interaction happens.
+
+What it does not cover:
+
+- runtime UI state
+- selector reachability on a live device
+- app-specific branching inside a skill script
+
+Script-only skills are a special case: their payload is generated at runtime by
+the skill script, so static payload validation is skipped and the command logs a
+reason instead of failing.
+
+If you need to bypass the pre-run gate for CI or development, use:
+
+```bash
+clawperator skills run <skill_id> --skip-validate --device-id <device_id>
+```
+
+Treat `--skip-validate` as an escape hatch, not a routine workflow.
+
 ### Recording-derived skills
 
 When a skill is authored from a human recording, do not replay the trace
@@ -8421,11 +8467,12 @@ For a new skill, this is the practical order:
 4. run `clawperator skills validate <skill_id>`
 5. if artifacts exist, run `clawperator skills compile-artifact ...`
 6. run `clawperator execute --validate-only ...` on candidate payloads
-7. run `clawperator skills run <skill_id> --device-id <device_id>`
-8. harden selectors, timeout budgets, and output formatting
-9. verify that every meaningful recorded action is covered or explicitly
+7. run `clawperator skills validate <skill_id> --dry-run`
+8. run `clawperator skills run <skill_id> --device-id <device_id>`
+9. harden selectors, timeout budgets, and output formatting
+10. verify that every meaningful recorded action is covered or explicitly
    normalized
-10. run `clawperator skills validate --all` before wider use
+11. run `clawperator skills validate --all --dry-run` before wider use
 
 ## Related pages
 
