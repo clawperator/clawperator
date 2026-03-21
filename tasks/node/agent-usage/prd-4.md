@@ -34,7 +34,7 @@ child.stderr?.on("data", (chunk) => { stderr += chunk.toString(); });
 
 Output is accumulated and only returned in the final result. No forwarding to the caller during execution.
 
-**From `tasks/node/agent-usage/issues.md`, Issues #4, #6:**
+**GloBird incident (OpenClaw session logs):**
 > Running GloBird skill. 30 seconds pass. Is it working? Should I wait? Cancel? Check the device? I have no idea.
 > I treated it like a synchronous function call: send request, wait for response. But it's actually a sequence of actions over time, and I need visibility into that sequence.
 

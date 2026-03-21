@@ -5,7 +5,8 @@ Priority: 3
 Proposed PR: PR-3
 
 Merged from both agents. Other agent proposed documenting the compose chain; this analysis
-proposes making it a single command. See `reconciliation.md` for the resolution.
+proposes making it a single command. The single-command approach was chosen because the
+three-step manual chain is not reliably followed in practice.
 
 ---
 
@@ -30,7 +31,7 @@ No execution payload compilation. No schema validation against the action schema
 
 The CLI already points to `execute --validate-only` after `skills compile-artifact` in its help text. The building blocks are documented but not composed.
 
-**From `tasks/node/agent-usage/issues.md`, Issue #8:**
+**GloBird incident (OpenClaw session logs):**
 > The GloBird skill had an invalid `format: "ascii"` parameter. This was only caught at runtime, on the device, after the app was opened.
 > I assumed if the skill script runs without errors, the skill is valid.
 

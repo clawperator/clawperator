@@ -56,7 +56,7 @@ Describes `RECEIVER_NOT_INSTALLED` as leading to an unhealthy exit. This matches
 
 Documents APK absence as advisory today. Must be updated to reflect the new blocking behavior.
 
-**From `tasks/node/agent-usage/issues.md` (GloBird incident):**
+**GloBird incident (OpenClaw session logs):**
 
 > GloBird skill timed out. Is it the app? The APK? The device? No logs to check.
 > Had to manually verify APK was installed - it wasn't.

@@ -20,14 +20,12 @@ The install.sh banner and RECEIVER_NOT_INSTALLED contradiction are fixed in PR-1
 
 ## Evidence
 
-**From `tasks/node/agent-usage/issues.md`, Issue #10:**
+**OpenClaw session logs:**
 > I don't know where the docs are, and I haven't looked. I've been operating off CLI --help output.
 > After this session, I learned about https://docs.clawperator.com/llms.txt. These would have helped me understand the architecture, validation schema, error codes, and best practices. I didn't know they existed.
 
-**From `~/src/clawperator/tasks/node/agent-usage/findings-analysis.md` (other agent):**
-> `docs/index.md` already lists `llms.txt`, `Agent Quickstart`, `First-Time Setup`, and `OpenClaw First Run`, so the docs have the necessary entrypoints.
-> The docs are useful once found, but the first-run path is not a single obvious sequence.
-> `docs/agent-quickstart.md` and `docs/openclaw-first-run.md` exist, but they are separate starting points.
+**From `docs/index.md` (verified against source):**
+`docs/index.md` already lists `llms.txt`, `Agent Quickstart`, `First-Time Setup`, and `OpenClaw First Run`, so the docs have the necessary entry points. The docs are useful once found, but the first-run path is not a single obvious sequence. `docs/agent-quickstart.md` and `docs/openclaw-first-run.md` exist as peers, not a hierarchy.
 
 **From `~/.openclaw/logs/gateway.err.log` (2026-03-21):**
 ```

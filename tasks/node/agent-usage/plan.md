@@ -1,11 +1,6 @@
 # Agent Usability Plan (Merged)
 
-This plan supersedes the two prior per-agent plans. See `reconciliation.md` for the
-synthesis rationale.
-
 Primary inputs:
-- `tasks/node/agent-usage/findings-analysis.md` (this worktree)
-- `~/src/clawperator/tasks/node/agent-usage/findings-analysis.md` (other agent)
 - `apps/node/src/domain/executions/runExecution.ts`
 - `apps/node/src/domain/executions/validateExecution.ts`
 - `apps/node/src/domain/skills/runSkill.ts`

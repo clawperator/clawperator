@@ -26,12 +26,12 @@ is an information architecture problem.
 
 ## Evidence
 
-**From the other agent's findings-analysis.md:**
+**From `docs/index.md` (verified against source):**
 > `docs/index.md` already lists `llms.txt`, `Agent Quickstart`, `First-Time Setup`, and
-> `OpenClaw First Run`, so the docs have the necessary entrypoints. The docs are useful
+> `OpenClaw First Run`, so the docs have the necessary entry points. The docs are useful
 > once found, but the first-run path is not a single obvious sequence.
-> `docs/agent-quickstart.md` and `docs/openclaw-first-run.md` exist, but they are
-> separate starting points.
+> `docs/agent-quickstart.md` and `docs/openclaw-first-run.md` exist as peers with no
+> explicit priority ordering.
 
 **From the user's original brief:**
 > Structurally incoherent because it mixes multiple conflicting organizational models at

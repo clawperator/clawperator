@@ -4,8 +4,9 @@ Workstream: WS-2
 Priority: 2
 Proposed PR: PR-2
 
-From this analysis. The other agent classified this as "already solved" - see `reconciliation.md`
-for why that classification is wrong.
+From this analysis. The other agent classified this as "already solved" - code inspection of
+`validateExecution.ts:306-310` shows `details` only has a Zod path string, not semantic action
+context, confirming this is a genuine gap.
 
 ---
 
@@ -46,7 +47,7 @@ export function validateExecution(input: unknown): Execution {
 
 `path` is the Zod path joined with dots. For the GloBird failure (`format: "ascii"` in the third action), this would be `"actions.2.params"`. The agent still has to count through its payload to find the action - and the semantic `id` field (e.g. `"snap"`) is never surfaced.
 
-**From `tasks/node/agent-usage/issues.md`, Issue #5:**
+**GloBird incident (OpenClaw session logs):**
 > I spent time guessing whether the GloBird app was the problem, when it was actually the `format: "ascii"` parameter in a completely different action. The error didn't point me to the right place.
 
 **From `tasks/agent-ui-loop/docs-audit.md`:**

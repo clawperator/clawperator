@@ -22,7 +22,7 @@ After a `RESULT_ENVELOPE_TIMEOUT` or `SKILL_EXECUTION_TIMEOUT`, there is no evid
 
 Neither file writes to disk at any point. All diagnostic information is either surfaced in the return value or lost.
 
-**From `tasks/node/agent-usage/issues.md`, Issues #2, #6:**
+**OpenClaw session logs:**
 > No log files written to disk. On timeout, zero information about what went wrong.
 > I didn't know where logs were. There were no logs to check.
 
