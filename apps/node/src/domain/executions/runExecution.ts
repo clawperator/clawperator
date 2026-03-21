@@ -114,6 +114,38 @@ export function injectServiceUnavailableHint(envelope: ResultEnvelope, deviceId:
   envelope.hint = `Accessibility service not running. Run 'clawperator doctor --fix --device-id ${deviceId}' to diagnose and repair, or 'clawperator operator setup --apk <path-to-apk> --device-id ${deviceId}' to reinstall.`;
 }
 
+export interface TimeoutErrorDetails {
+  commandId?: string;
+  taskId?: string;
+  lastActionId?: string;
+  lastActionType?: string;
+  lastActionCaveat: string;
+  elapsedMs: number;
+  timeoutMs: number;
+}
+
+export function buildTimeoutError(
+  execution: Pick<Execution, "actions" | "timeoutMs"> & Partial<Pick<Execution, "commandId" | "taskId">>,
+  diagnostics: { code: typeof ERROR_CODES.RESULT_ENVELOPE_TIMEOUT; message: string },
+  elapsedMs: number
+): { code: typeof ERROR_CODES.RESULT_ENVELOPE_TIMEOUT; message: string; details: TimeoutErrorDetails } {
+  // Node only knows the last action in the payload, not the action Android was
+  // actually executing when the timeout elapsed.
+  const lastAction = execution.actions.at(-1);
+  return {
+    ...diagnostics,
+    details: {
+      ...(execution.commandId !== undefined ? { commandId: execution.commandId } : {}),
+      ...(execution.taskId !== undefined ? { taskId: execution.taskId } : {}),
+      ...(lastAction?.id !== undefined ? { lastActionId: lastAction.id } : {}),
+      ...(lastAction?.type !== undefined ? { lastActionType: lastAction.type } : {}),
+      lastActionCaveat: "payload-last only; Android execution position is unknown",
+      elapsedMs,
+      timeoutMs: execution.timeoutMs,
+    },
+  };
+}
+
 export function finalizeSuccessfulScreenshotCapture(
   screenStep: ResultEnvelope["stepResults"][number] | undefined,
   screenshotPath: string
@@ -312,6 +344,7 @@ async function performExecution(
     await runAdb(config, ["logcat", "-c"]);
 
     const payload = JSON.stringify(execution);
+    const dispatchStart = Date.now();
     const result = await waitForResultEnvelope(
       config,
       {
@@ -400,9 +433,10 @@ async function performExecution(
       return { execution, result: { ok: false, error: { ...result.diagnostics }, deviceId } };
     }
     if ("timeout" in result && result.timeout && "diagnostics" in result) {
+      const elapsedMs = Date.now() - dispatchStart;
       failureEnvelope.error = result.diagnostics.code;
       emitResult(deviceId, failureEnvelope);
-      return { execution, result: { ok: false, error: { ...result.diagnostics }, deviceId } };
+      return { execution, result: { ok: false, error: buildTimeoutError(execution, result.diagnostics, elapsedMs), deviceId } };
     }
     
     const errCode = ("code" in result && result.code) ? (result.code as string) : (("error" in result && typeof result.error === "string") ? result.error : "UNKNOWN_RUNTIME_ERROR");
