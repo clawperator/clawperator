@@ -173,14 +173,16 @@ return {
   result: {
     ok: false,
     error: {
-      ...result.diagnostics,
-      ...(execution.commandId !== undefined && { commandId: execution.commandId }),
-      ...(execution.taskId !== undefined && { taskId: execution.taskId }),
-      lastActionId: execution.actions.at(-1)?.id,
-      lastActionType: execution.actions.at(-1)?.type,
-      lastActionCaveat: "payload-last only; Android execution position is unknown",
-      elapsedMs: /* capture Date.now() before the waitForResultEnvelope call and subtract */,
-      timeoutMs: execution.timeoutMs,
+      ...result.diagnostics,   // spreads code and message from diagnostics
+      details: {
+        ...(execution.commandId !== undefined && { commandId: execution.commandId }),
+        ...(execution.taskId !== undefined && { taskId: execution.taskId }),
+        lastActionId: execution.actions.at(-1)?.id,
+        lastActionType: execution.actions.at(-1)?.type,
+        lastActionCaveat: "payload-last only; Android execution position is unknown",
+        elapsedMs: /* capture Date.now() before the waitForResultEnvelope call and subtract */,
+        timeoutMs: execution.timeoutMs,
+      },
     },
     deviceId,
   },
@@ -340,14 +342,16 @@ function buildTimeoutError(
   elapsedMs: number
 ): Record<string, unknown> {
   return {
-    ...diagnostics,
-    ...(execution.commandId !== undefined && { commandId: execution.commandId }),
-    ...(execution.taskId !== undefined && { taskId: execution.taskId }),
-    lastActionId: execution.actions.at(-1)?.id,
-    lastActionType: execution.actions.at(-1)?.type,
-    lastActionCaveat: "payload-last only; Android execution position is unknown",
-    elapsedMs,
-    timeoutMs: execution.timeoutMs,
+    ...diagnostics,   // spreads code and message
+    details: {
+      ...(execution.commandId !== undefined && { commandId: execution.commandId }),
+      ...(execution.taskId !== undefined && { taskId: execution.taskId }),
+      lastActionId: execution.actions.at(-1)?.id,
+      lastActionType: execution.actions.at(-1)?.type,
+      lastActionCaveat: "payload-last only; Android execution position is unknown",
+      elapsedMs,
+      timeoutMs: execution.timeoutMs,
+    },
   };
 }
 ```
@@ -356,9 +360,9 @@ Then write T5 directly against `buildTimeoutError`:
 
 - Setup: call `buildTimeoutError` with a fixture `Execution` containing `commandId`,
   `taskId`, and an actions array; pass `elapsedMs: 30021`
-- Expected: returned object contains `commandId`, `taskId`, `lastActionId`,
-  `lastActionType`, `lastActionCaveat` (non-empty string), `elapsedMs: 30021`,
-  `timeoutMs` matching the fixture
+- Expected: `result.details.commandId`, `result.details.taskId`, `result.details.lastActionId`,
+  `result.details.lastActionType`, `result.details.lastActionCaveat` (non-empty string),
+  `result.details.elapsedMs === 30021`, `result.details.timeoutMs` matching the fixture
 - Protects: agent has no correlation handle after timeout; caveat string absent
 
 Separately, add one end-to-end wiring test in the integration suite (not unit) that
@@ -367,8 +371,9 @@ That test is slow by nature and belongs in the `CLAWPERATOR_RUN_INTEGRATION=1` s
 
 **T6 — timeout handles absent `commandId`/`taskId` without throwing**
 - Setup: same timeout setup but payload omits `commandId` and `taskId`
-- Expected: no throw; `error.commandId` is `undefined` — not the string `"undefined"`;
-  check with `assert.strictEqual("commandId" in error.details, false)` or equivalent
+- Expected: no throw; `commandId` key is absent from `error.details` entirely —
+  not present as `undefined`, not as the string `"undefined"`;
+  check with `assert.strictEqual("commandId" in result.details, false)`
 - Protects: `String(undefined)` coercion baked into the error envelope
 
 ### Integration Tests
