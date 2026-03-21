@@ -9,6 +9,7 @@ REQ_NODE="$(command -v node)"
 ORIGINAL_PATH="$PATH"
 
 REPO_ROOT="$(pwd)"
+CLI_VERSION="$(node -p "require('$REPO_ROOT/apps/node/package.json').version")"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
@@ -165,7 +166,7 @@ else
   exit 1
 fi
 
-if grep -q 'https://downloads.clawperator.com/operator/v0.3.3/operator-v0.3.3.apk' "$TMP_DIR/out5.json"; then
+if grep -q "https://downloads.clawperator.com/operator/v${CLI_VERSION}/operator-v${CLI_VERSION}.apk" "$TMP_DIR/out5.json"; then
   echo "[Success] versioned APK remediation URL emitted."
 else
   echo "[Error] versioned APK remediation URL missing from output."
