@@ -119,6 +119,16 @@ export function normalizeCompatibilityVersion(versionName: string): string {
   return versionName.trim().replace(/-d$/, "");
 }
 
+export function getOperatorApkDownloadUrl(versionName: string): string {
+  const normalized = normalizeCompatibilityVersion(versionName);
+  return `https://downloads.clawperator.com/operator/v${normalized}/operator-v${normalized}.apk`;
+}
+
+export function getOperatorApkSha256Url(versionName: string): string {
+  const normalized = normalizeCompatibilityVersion(versionName);
+  return `https://downloads.clawperator.com/operator/v${normalized}/operator-v${normalized}.apk.sha256`;
+}
+
 export function parseCompatibilityVersion(versionName: string): ParsedCompatibilityVersion {
   const normalized = normalizeCompatibilityVersion(versionName);
   const match = COMPATIBILITY_VERSION_REGEX.exec(normalized);
@@ -151,9 +161,7 @@ export function parseInstalledApkVersion(dumpsysOutput: string): InstalledApkVer
 }
 
 export function isVersionCompatible(cliVersion: string, apkVersion: string): boolean {
-  const parsedCli = parseCompatibilityVersion(cliVersion);
-  const parsedApk = parseCompatibilityVersion(apkVersion);
-  return parsedCli.major === parsedApk.major && parsedCli.minor === parsedApk.minor;
+  return normalizeCompatibilityVersion(cliVersion) === normalizeCompatibilityVersion(apkVersion);
 }
 
 export async function probeVersionCompatibility(config: RuntimeConfig): Promise<VersionCompatibilityProbe> {
@@ -241,9 +249,13 @@ export async function probeVersionCompatibility(config: RuntimeConfig): Promise<
         hint: "Install the Operator APK or choose the correct receiver package.",
       },
       remediation: [
-        "Install the Operator APK from https://clawperator.com/operator.apk",
-        "If you need a specific build, use the install script: curl -fsSL https://clawperator.com/install.sh | bash",
-        `If a different variant is installed, rerun with --receiver-package <package>`,
+        `Download the matching APK: ${getOperatorApkDownloadUrl(parsedCli.normalized)}`,
+        `Download the checksum: ${getOperatorApkSha256Url(parsedCli.normalized)}`,
+        `Verify the checksum: sha256sum -c operator-v${parsedCli.normalized}.apk.sha256`,
+        `Install the matching APK: clawperator operator setup --apk operator-v${parsedCli.normalized}.apk --device-id <device_id>${receiverPackage.endsWith(".dev") ? " --receiver-package com.clawperator.operator.dev" : ""}`,
+        receiverPackage.endsWith(".dev")
+          ? "If you are targeting the local debug package, rebuild and reinstall the debug APK from the same source checkout instead of using the release download."
+          : "If you are using the release package, the versioned download above is the exact APK to install.",
       ],
     };
   }
@@ -293,10 +305,11 @@ export async function probeVersionCompatibility(config: RuntimeConfig): Promise<
 
   try {
     const parsedApk = parseCompatibilityVersion(installed.versionName);
-    const compatible =
-      parsedCli.major === parsedApk.major && parsedCli.minor === parsedApk.minor;
+    const compatible = parsedCli.normalized === parsedApk.normalized;
 
     if (!compatible) {
+      const apkUrl = getOperatorApkDownloadUrl(parsedCli.normalized);
+      const sha256Url = getOperatorApkSha256Url(parsedCli.normalized);
       return {
         cliVersion,
         apkVersion: installed.versionName,
@@ -306,11 +319,16 @@ export async function probeVersionCompatibility(config: RuntimeConfig): Promise<
         error: {
           code: ERROR_CODES.VERSION_INCOMPATIBLE,
           message: `CLI ${cliVersion} is not compatible with installed APK ${installed.versionName}.`,
-          hint: "Clawperator requires matching major.minor versions between the CLI and APK.",
+          hint: "Clawperator requires the exact same version between the CLI and APK, ignoring only the debug suffix.",
         },
         remediation: [
-          "Upgrade the CLI: npm install -g clawperator@latest",
-          `Install a compatible APK for ${receiverPackage} via adb install -r <apk_path>`,
+          `Download the matching APK: ${apkUrl}`,
+          `Download the checksum: ${sha256Url}`,
+          `Verify the checksum: sha256sum -c operator-v${parsedCli.normalized}.apk.sha256`,
+          `Install the matching APK: clawperator operator setup --apk operator-v${parsedCli.normalized}.apk --device-id <device_id>`,
+          receiverPackage.endsWith(".dev")
+            ? "If you are targeting the local debug package, rebuild and reinstall the debug APK from the same source checkout instead of using the release download."
+            : "If you are using the release package, the versioned download above is the exact APK to install.",
         ],
       };
     }

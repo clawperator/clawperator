@@ -559,6 +559,8 @@ Verify the installed CLI and [Clawperator Operator Android app](android-operator
 clawperator version --check-compat --receiver-package com.clawperator.operator
 ```
 
+If the versions do not match, install the exact APK for the CLI version from `https://downloads.clawperator.com/operator/v<version>/operator-v<version>.apk` and `https://downloads.clawperator.com/operator/v<version>/operator-v<version>.apk.sha256`.
+
 ### Multiple devices connected
 
 **Why the installer stops at device selection**
@@ -1032,6 +1034,8 @@ Historical versions can be downloaded from `downloads.clawperator.com`. The URL 
 
 Example for v0.3.2:
 - [https://downloads.clawperator.com/operator/v0.3.2/operator-v0.3.2.apk](https://downloads.clawperator.com/operator/v0.3.2/operator-v0.3.2.apk)
+
+If you need a specific release, download the exact APK and its checksum from that versioned directory before running `clawperator operator setup`.
 
 ## Required Permissions
 The app requires three permissions to operate:
@@ -1807,7 +1811,7 @@ clawperator skills sync --help
 clawperator doctor --help
 ```
 
-Use `clawperator version --check-compat` before automation batches when the agent needs to verify that the installed [Clawperator Operator Android app](../getting-started/android-operator-apk.md) matches the CLI's supported `major.minor` version:
+Use `clawperator version --check-compat` before automation batches when the agent needs to verify that the installed [Clawperator Operator Android app](../getting-started/android-operator-apk.md) matches the CLI's exact normalized version:
 
 ```bash
 clawperator version --check-compat --receiver-package com.clawperator.operator
@@ -2633,7 +2637,7 @@ Branch agent logic on codes from `envelope.errorCode` (top-level Android result 
 | `RESULT_ENVELOPE_TIMEOUT` | `error.code` | Command dispatched but no result received |
 | `RECEIVER_NOT_INSTALLED` | `error.code` | Requested [Clawperator Operator Android app](../getting-started/android-operator-apk.md) package is missing on the device; `execute` and `doctor` fail fast instead of timing out |
 | `DEVICE_UNAUTHORIZED` | `error.code` | Device not authorized for ADB |
-| `VERSION_INCOMPATIBLE` | `error.code` | CLI and installed [Clawperator Operator Android app](../getting-started/android-operator-apk.md) versions do not share the same `major.minor` |
+| `VERSION_INCOMPATIBLE` | `error.code` | CLI and installed [Clawperator Operator Android app](../getting-started/android-operator-apk.md) versions do not match exactly after ignoring the trailing debug suffix |
 | `APK_VERSION_UNREADABLE` | `error.code` | The device package dump did not expose a readable [Clawperator Operator Android app](../getting-started/android-operator-apk.md) version |
 | `EXECUTION_VALIDATION_FAILED` | `error.code` | Payload failed schema validation |
 | `SECURITY_BLOCK_DETECTED` | `data.error` | Android blocked the action (e.g., secure keyboard) |
@@ -6751,7 +6755,7 @@ Doctor runs checks in a fixed order. When a critical check fails, doctor returns
 ### 3. Runtime readiness
 
 - `readiness.apk.presence` - confirms the requested receiver package is installed, warns if the other release/debug variant is installed instead, and fails when no matching package is present
-- `readiness.version.compatibility` - verifies that the CLI and installed [Clawperator Operator Android app](../getting-started/android-operator-apk.md) share a compatible `major.minor`
+- `readiness.version.compatibility` - verifies that the CLI and installed [Clawperator Operator Android app](../getting-started/android-operator-apk.md) share the same normalized version
 - `readiness.settings.dev_options` - warns if Android Developer Options are disabled
 - `readiness.settings.usb_debugging` - warns if USB debugging is disabled
 - `readiness.handshake` - sends a `doctor_ping` command and waits for one canonical `[Clawperator-Result]` envelope
@@ -6767,7 +6771,7 @@ Critical checks currently include:
 - device discovery and shell availability
 - Android build/install/launch checks in `--full`
 - missing [Clawperator Operator Android app](../getting-started/android-operator-apk.md) package
-- [Clawperator Operator Android app](../getting-started/android-operator-apk.md) version compatibility
+- [Clawperator Operator Android app](../getting-started/android-operator-apk.md) exact version compatibility
 - handshake
 - smoke test in `--full`
 
@@ -7126,28 +7130,22 @@ Clawperator expects the Node CLI and the installed [Clawperator Operator Android
 
 ## Compatibility rule
 
-The CLI and the [Clawperator Operator Android app](../getting-started/android-operator-apk.md) are compatible when their `major.minor` versions match.
+The CLI and the [Clawperator Operator Android app](../getting-started/android-operator-apk.md) are compatible when their normalized versions match exactly. The trailing debug suffix `-d` is ignored, but patch, prerelease, and build-version differences are not.
 
 Examples:
 
 - CLI `0.1.4` and app `0.1.4` - compatible
-- CLI `0.1.4` and app `0.1.9` - compatible
 - CLI `0.1.4` and app `0.1.4-d` - compatible
-- CLI `0.1.4` and app `0.1.4-rc.1` - compatible
+- CLI `0.1.4-rc.1` and app `0.1.4-rc.1-d` - compatible
+- CLI `0.1.4` and app `0.1.9` - not compatible
+- CLI `0.1.4` and app `0.1.4-rc.1` - not compatible
 - CLI `0.1.4` and app `0.2.1` - not compatible
-- CLI `0.1.4` and app `0.2.2` - not compatible
-- CLI `0.1.4` and app `0.2.3` - not compatible
-- CLI `0.1.4` and app `0.2.4` - not compatible
-- CLI `0.1.4` and app `0.2.5` - not compatible
-- CLI `0.1.4` and app `0.3.0` - not compatible
-- CLI `0.1.4` and app `0.3.1` - not compatible
 - CLI `0.1.4` and app `0.3.2` - not compatible
 
 Notes:
 
-- Patch differences are allowed.
-- The local debug suffix `-d` is ignored for compatibility checks.
-- Prerelease suffixes such as `-alpha.1`, `-beta.2`, and `-rc.1` are parsed, but compatibility still depends only on matching `major.minor`.
+- If the versions do not match, download the exact release APK and checksum from `https://downloads.clawperator.com/operator/v<version>/operator-v<version>.apk` and `https://downloads.clawperator.com/operator/v<version>/operator-v<version>.apk.sha256`.
+- Prerelease suffixes such as `-alpha.1`, `-beta.2`, and `-rc.1` are parsed and must match exactly.
 
 ## Check versions
 
@@ -7527,10 +7525,12 @@ CLI path so skill scripts run against that build.
 
 ## Version Compatibility
 
-The Node CLI and the installed [Clawperator Operator Android app](../getting-started/android-operator-apk.md) must have matching `major.minor` versions.
+The Node CLI and the installed [Clawperator Operator Android app](../getting-started/android-operator-apk.md) must have the same normalized version. The trailing debug suffix `-d` is ignored, but patch and prerelease differences are not.
 
-- `0.1.4` and `0.1.9` are compatible
-- `0.1.4` and `0.2.x` are not compatible
+- `0.1.4` and `0.1.4` are compatible
+- `0.1.4` and `0.1.4-d` are compatible
+- `0.1.4` and `0.1.9` are not compatible
+- `0.1.4` and `0.1.4-rc.1` are not compatible
 
 Use:
 
@@ -7538,7 +7538,7 @@ Use:
 clawperator version --check-compat --receiver-package com.clawperator.operator
 ```
 
-If the versions do not match, upgrade the CLI and install a compatible [Clawperator Operator Android app](../getting-started/android-operator-apk.md). For the full rule, examples, and remediation steps, see [Version Compatibility](compatibility.md).
+If the versions do not match, install the exact matching release APK and checksum from the versioned download URLs. For the full rule, examples, and remediation steps, see [Version Compatibility](compatibility.md).
 
 ---
 

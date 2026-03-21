@@ -212,6 +212,8 @@ Verify the installed CLI and [Clawperator Operator Android app](android-operator
 clawperator version --check-compat --receiver-package com.clawperator.operator
 ```
 
+If the versions do not match, install the exact APK for the CLI version from `https://downloads.clawperator.com/operator/v<version>/operator-v<version>.apk` and `https://downloads.clawperator.com/operator/v<version>/operator-v<version>.apk.sha256`.
+
 ### Multiple devices connected
 
 **Why the installer stops at device selection**

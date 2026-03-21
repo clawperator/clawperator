@@ -314,10 +314,12 @@ CLI path so skill scripts run against that build.
 
 ## Version Compatibility
 
-The Node CLI and the installed [Clawperator Operator Android app](../getting-started/android-operator-apk.md) must have matching `major.minor` versions.
+The Node CLI and the installed [Clawperator Operator Android app](../getting-started/android-operator-apk.md) must have the same normalized version. The trailing debug suffix `-d` is ignored, but patch and prerelease differences are not.
 
-- `0.1.4` and `0.1.9` are compatible
-- `0.1.4` and `0.2.x` are not compatible
+- `0.1.4` and `0.1.4` are compatible
+- `0.1.4` and `0.1.4-d` are compatible
+- `0.1.4` and `0.1.9` are not compatible
+- `0.1.4` and `0.1.4-rc.1` are not compatible
 
 Use:
 
@@ -325,7 +327,7 @@ Use:
 clawperator version --check-compat --receiver-package com.clawperator.operator
 ```
 
-If the versions do not match, upgrade the CLI and install a compatible [Clawperator Operator Android app](../getting-started/android-operator-apk.md). For the full rule, examples, and remediation steps, see [Version Compatibility](compatibility.md).
+If the versions do not match, install the exact matching release APK and checksum from the versioned download URLs. For the full rule, examples, and remediation steps, see [Version Compatibility](compatibility.md).
 
 ---
 

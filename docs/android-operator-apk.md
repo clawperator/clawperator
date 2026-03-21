@@ -46,6 +46,8 @@ Historical versions can be downloaded from `downloads.clawperator.com`. The URL 
 Example for v0.3.2:
 - [https://downloads.clawperator.com/operator/v0.3.2/operator-v0.3.2.apk](https://downloads.clawperator.com/operator/v0.3.2/operator-v0.3.2.apk)
 
+If you need a specific release, download the exact APK and its checksum from that versioned directory before running `clawperator operator setup`.
+
 ## Required Permissions
 The app requires three permissions to operate:
 

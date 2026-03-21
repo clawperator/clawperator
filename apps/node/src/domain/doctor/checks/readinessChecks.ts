@@ -4,7 +4,15 @@ import { type DoctorCheckResult } from "../../../contracts/doctor.js";
 import { ERROR_CODES } from "../../../contracts/errors.js";
 import { broadcastAgentCommand } from "../../../adapters/android-bridge/broadcastAgentCommand.js";
 import { waitForResultEnvelope } from "../../../adapters/android-bridge/logcatResultReader.js";
-import { getAlternateReceiverVariant, getReceiverPackageApkPath, hasListedPackage, probeVersionCompatibility } from "../../version/compatibility.js";
+import {
+  getAlternateReceiverVariant,
+  getCliVersion,
+  getOperatorApkDownloadUrl,
+  getOperatorApkSha256Url,
+  getReceiverPackageApkPath,
+  hasListedPackage,
+  probeVersionCompatibility,
+} from "../../version/compatibility.js";
 
 export async function checkApkPresence(config: RuntimeConfig): Promise<DoctorCheckResult> {
   const packageList = await runAdb(config, ["shell", "pm", "list", "packages", config.receiverPackage]);
@@ -65,6 +73,10 @@ export async function checkApkPresence(config: RuntimeConfig): Promise<DoctorChe
       code: ERROR_CODES.RECEIVER_NOT_INSTALLED,
       summary: "Operator APK not installed.",
       detail: `Package ${config.receiverPackage} was not found on the device.`,
+      evidence: {
+        cliVersion: getCliVersion(),
+        receiverPackage: config.receiverPackage,
+      },
       fix: {
         title: "Install Operator APK",
         platform: "any",
@@ -73,7 +85,12 @@ export async function checkApkPresence(config: RuntimeConfig): Promise<DoctorChe
             kind: "shell",
             value: `clawperator operator setup --apk ${getReceiverPackageApkPath(config.receiverPackage)} --device-id ${config.deviceId}${config.receiverPackage !== "com.clawperator.operator" ? ` --receiver-package ${config.receiverPackage}` : ""}`,
           },
-          { kind: "manual", value: "Download the APK from https://github.com/clawperator/clawperator/releases/latest if you do not already have a local copy." }
+          config.receiverPackage.endsWith(".dev")
+            ? { kind: "manual", value: "If you do not already have a local debug APK copy, rebuild the debug app from the same checkout before rerunning setup." }
+            : {
+                kind: "manual",
+                value: `Download the exact release APK from ${getOperatorApkDownloadUrl(getCliVersion())} and the checksum from ${getOperatorApkSha256Url(getCliVersion())}.`,
+              },
         ],
       },
     };

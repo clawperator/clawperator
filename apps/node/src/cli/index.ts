@@ -265,10 +265,10 @@ Usage:
   clawperator version
   clawperator version --check-compat [--device-id <id>] [--receiver-package <package>] [--output <json|pretty>]
 
-Notes:
+  Notes:
   - Default receiver package: com.clawperator.operator
   - Use --receiver-package com.clawperator.operator.dev for local debug APKs.
-  - --check-compat compares CLI major.minor with the installed APK variant on the device.
+  - --check-compat compares the CLI version with the installed APK version on the device.
 `,
   "grant-device-permissions": `clawperator grant-device-permissions
 

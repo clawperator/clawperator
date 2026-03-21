@@ -44,21 +44,13 @@ describe("version compatibility", () => {
     });
   });
 
-  it("considers matching major.minor versions compatible", () => {
+  it("requires the same normalized version", () => {
     assert.strictEqual(isVersionCompatible("0.1.4", "0.1.4"), true);
-    assert.strictEqual(isVersionCompatible("0.1.4", "0.1.9"), true);
     assert.strictEqual(isVersionCompatible("0.1.4", "0.1.4-d"), true);
-    assert.strictEqual(isVersionCompatible("0.1.4-rc.1", "0.1.4-d"), true);
+    assert.strictEqual(isVersionCompatible("0.1.4-rc.1", "0.1.4-d"), false);
+    assert.strictEqual(isVersionCompatible("0.1.4", "0.1.9"), false);
     assert.strictEqual(isVersionCompatible("0.1.4", "0.2.1"), false);
-    assert.strictEqual(isVersionCompatible("0.1.4", "0.2.2"), false);
-    assert.strictEqual(isVersionCompatible("0.1.4", "0.2.3"), false);
-    assert.strictEqual(isVersionCompatible("0.1.4", "0.2.4"), false);
-    assert.strictEqual(isVersionCompatible("0.1.4", "0.2.5"), false);
-    assert.strictEqual(isVersionCompatible("0.1.4", "0.2.6"), false);
-    assert.strictEqual(isVersionCompatible("0.1.4", "0.3.0"), false);
-    assert.strictEqual(isVersionCompatible("0.1.4", "0.3.1"), false);
-    assert.strictEqual(isVersionCompatible("0.1.4", "0.3.2"), false);
-    assert.strictEqual(isVersionCompatible("0.1.4", "0.3.3"), false);
+    assert.strictEqual(isVersionCompatible("0.1.4", "0.1.4-rc.1"), false);
   });
 
   it("parses installed APK metadata from dumpsys output", () => {

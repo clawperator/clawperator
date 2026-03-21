@@ -56,7 +56,7 @@ Doctor runs checks in a fixed order. When a critical check fails, doctor returns
 ### 3. Runtime readiness
 
 - `readiness.apk.presence` - confirms the requested receiver package is installed, warns if the other release/debug variant is installed instead, and fails when no matching package is present
-- `readiness.version.compatibility` - verifies that the CLI and installed [Clawperator Operator Android app](../getting-started/android-operator-apk.md) share a compatible `major.minor`
+- `readiness.version.compatibility` - verifies that the CLI and installed [Clawperator Operator Android app](../getting-started/android-operator-apk.md) share the same normalized version
 - `readiness.settings.dev_options` - warns if Android Developer Options are disabled
 - `readiness.settings.usb_debugging` - warns if USB debugging is disabled
 - `readiness.handshake` - sends a `doctor_ping` command and waits for one canonical `[Clawperator-Result]` envelope
@@ -72,7 +72,7 @@ Critical checks currently include:
 - device discovery and shell availability
 - Android build/install/launch checks in `--full`
 - missing [Clawperator Operator Android app](../getting-started/android-operator-apk.md) package
-- [Clawperator Operator Android app](../getting-started/android-operator-apk.md) version compatibility
+- [Clawperator Operator Android app](../getting-started/android-operator-apk.md) exact version compatibility
 - handshake
 - smoke test in `--full`
 
