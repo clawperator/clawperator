@@ -239,7 +239,7 @@ Combine fields to increase specificity when a single field is ambiguous:
 | `open_uri` | `uri: string` | `retry: object` |
 | `close_app` | `applicationId: string` | - |
 | `click` | `matcher: NodeMatcher` | `clickType: "default" \| "long_click" \| "focus"` (default: `"default"`) |
-| `enter_text` | `matcher: NodeMatcher`, `text: string` | `submit: boolean` (default: `false`), `clear: boolean` (accepted by Node contract, currently ignored by Android runtime) |
+| `enter_text` | `matcher: NodeMatcher`, `text: string` | `submit: boolean` (default: `false`), `clear: boolean` (accepted by Node contract but currently ignored by Android runtime, so do not rely on it to clear existing text) |
 | `read_text` | `matcher: NodeMatcher` | `validator: "temperature" \| "version" \| "regex"`, `validatorPattern: string` (required when `validator` is `"regex"`), `retry: object` |
 | `wait_for_node` | `matcher: NodeMatcher` | `retry: object` - controls polling attempts and backoff delays (see `retry` object shape below). There is no per-action `timeoutMs`; the outer execution `timeoutMs` is the only wall-clock limit. |
 | `snapshot_ui` | - | `retry: object` |
@@ -900,12 +900,12 @@ Branch agent logic on codes from `envelope.errorCode` (top-level Android result 
 | `EMULATOR_STOP_FAILED` | `error.code` | Emulator stop request failed |
 | `EMULATOR_DELETE_FAILED` | `error.code` | Emulator deletion failed |
 | `NODE_NOT_FOUND` | `data.error` | Selector matched no UI element |
-| `RESULT_ENVELOPE_TIMEOUT` | `error.code` | Command dispatched but no result received |
+| `RESULT_ENVELOPE_TIMEOUT` | `error.code` | Command dispatched but no result received; `details` includes command/task correlation plus last payload action context and elapsed timing |
 | `RECEIVER_NOT_INSTALLED` | `error.code` | Requested [Clawperator Operator Android app](../getting-started/android-operator-apk.md) package is missing on the device; `execute` and `doctor` fail fast instead of timing out |
 | `DEVICE_UNAUTHORIZED` | `error.code` | Device not authorized for ADB |
 | `VERSION_INCOMPATIBLE` | `error.code` | CLI and installed [Clawperator Operator Android app](../getting-started/android-operator-apk.md) versions do not match exactly after ignoring the trailing debug suffix |
 | `APK_VERSION_UNREADABLE` | `error.code` | The device package dump did not expose a readable [Clawperator Operator Android app](../getting-started/android-operator-apk.md) version |
-| `EXECUTION_VALIDATION_FAILED` | `error.code` | Payload failed schema validation |
+| `EXECUTION_VALIDATION_FAILED` | `error.code` | Payload failed schema validation; `details` may include the offending action id/type, invalid keys, a hint, plus `path` and `reason` |
 | `SECURITY_BLOCK_DETECTED` | `data.error` | Android blocked the action (e.g., secure keyboard) |
 | `NODE_NOT_CLICKABLE` | `data.error` | Reserved error code. Intended for "element found but not interactable", but not currently emitted consistently by the Android and Node runtimes. |
 | `SNAPSHOT_EXTRACTION_FAILED` | `data.error` | `snapshot_ui` step completed but the Node layer did not attach any snapshot text to the step during post-processing. The most common cause is a Node binary packaging mismatch or other logcat extraction issue. Rebuild or reinstall the npm package and check version compatibility. |
@@ -923,7 +923,7 @@ For agent-side recovery strategy, use
 
 - **Single-flight:** One execution per device at a time. Concurrent requests return `EXECUTION_CONFLICT_IN_FLIGHT`.
 - **No hidden retries:** If an action fails, the error is returned immediately. Retry logic belongs in the agent.
-- **Deterministic results:** Exactly one terminal envelope per `commandId`. Timeouts return `RESULT_ENVELOPE_TIMEOUT` with diagnostics.
+- **Deterministic results:** Exactly one terminal envelope per `commandId`. Timeouts return `RESULT_ENVELOPE_TIMEOUT` with diagnostics and payload-side action context.
 - **Execution granularity:** Group multiple actions in one execution only when they are atomic - when the agent does not need to observe state or make a decision between them. For flows where intermediate state matters, use separate executions with `observe snapshot` between each. See [Execution Model](../reference/execution-model.md) for the full guidance.
 - **Timeout override:** `--timeout-ms <n>` overrides the execution timeout for `execute`, `observe snapshot`, and `observe screenshot` within policy limits.
 - **Screenshot output path:** `observe screenshot --path <file>` writes the PNG to the requested local path and still returns the final `data.path` in the result envelope. `<file>` must be a non-empty local filesystem path.

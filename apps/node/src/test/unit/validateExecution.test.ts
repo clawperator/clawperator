@@ -18,6 +18,21 @@ describe("validateExecution", () => {
     assert.strictEqual(ex.actions[0].type, "sleep");
   });
 
+  it("returns Execution for a valid payload without throwing", () => {
+    const ex = validateExecution({
+      commandId: "cmd-anchor-1",
+      taskId: "task-anchor-1",
+      source: "test",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 8000,
+      actions: [{ id: "snap-1", type: "snapshot_ui" }],
+    });
+
+    assert.strictEqual(ex.commandId, "cmd-anchor-1");
+    assert.strictEqual(ex.taskId, "task-anchor-1");
+    assert.strictEqual(ex.actions[0].id, "snap-1");
+  });
+
   it("normalizes action type alias (type_text -> enter_text)", () => {
     const ex = validateExecution({
       commandId: "c",
@@ -83,6 +98,29 @@ describe("validateExecution", () => {
           actions: [{ id: "x", type: "sleep", params: { durationMs: 0 } }],
         }),
       (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
+    );
+  });
+
+  it("keeps path and reason in ValidationFailure details", () => {
+    assert.throws(
+      () =>
+        validateExecution({
+          commandId: "cmd-anchor-2",
+          source: "test",
+          expectedFormat: "android-ui-automator",
+          timeoutMs: 5000,
+          actions: [{ id: "snap-1", type: "snapshot_ui" }],
+        }),
+      (e: unknown) => {
+        const err = e as {
+          code?: string;
+          details?: { path?: string; reason?: string };
+        };
+        assert.strictEqual(err.code, ERROR_CODES.EXECUTION_VALIDATION_FAILED);
+        assert.strictEqual(err.details?.path, "taskId");
+        assert.ok(typeof err.details?.reason === "string" && err.details.reason.length > 0);
+        return true;
+      }
     );
   });
 
@@ -232,6 +270,130 @@ describe("validateExecution", () => {
         }),
       (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
     );
+  });
+
+  it("extracts action context from index 0 validation failures", () => {
+    try {
+      validateExecution({
+        commandId: "cmd-anchor-3",
+        taskId: "task-anchor-3",
+        source: "test",
+        expectedFormat: "android-ui-automator",
+        timeoutMs: 5000,
+        actions: [
+          {
+            id: "snap",
+            type: "snapshot_ui",
+            params: { format: "ascii" },
+          },
+        ],
+      });
+      assert.fail("expected validation to fail");
+    } catch (e) {
+      const err = e as {
+        code?: string;
+        details?: {
+          actionId?: string;
+          actionType?: string;
+          invalidKeys?: string[];
+          hint?: string;
+          path?: string;
+          reason?: string;
+        };
+      };
+      assert.strictEqual(err.code, ERROR_CODES.EXECUTION_VALIDATION_FAILED);
+      assert.strictEqual(err.details?.actionId, "snap");
+      assert.strictEqual(err.details?.actionType, "snapshot_ui");
+      assert.deepStrictEqual(err.details?.invalidKeys, ["format"]);
+      assert.strictEqual(err.details?.path, "actions.0.params");
+    }
+  });
+
+  it("adds a known hint for removed parameters and omits unknown hints", () => {
+    try {
+      validateExecution({
+        commandId: "cmd-anchor-4",
+        taskId: "task-anchor-4",
+        source: "test",
+        expectedFormat: "android-ui-automator",
+        timeoutMs: 5000,
+        actions: [
+          {
+            id: "snap",
+            type: "snapshot_ui",
+            params: { format: "ascii" },
+          },
+        ],
+      });
+      assert.fail("expected validation to fail");
+    } catch (e) {
+      const err = e as {
+        details?: {
+          hint?: string;
+        };
+      };
+      assert.strictEqual(
+        err.details?.hint,
+        "'format' was removed from snapshot_ui. Remove this parameter."
+      );
+    }
+
+    try {
+      validateExecution({
+        commandId: "cmd-anchor-5",
+        taskId: "task-anchor-5",
+        source: "test",
+        expectedFormat: "android-ui-automator",
+        timeoutMs: 5000,
+        actions: [
+          {
+            id: "snap",
+            type: "snapshot_ui",
+            params: { other: "value" },
+          },
+        ],
+      });
+      assert.fail("expected validation to fail");
+    } catch (e) {
+      const err = e as {
+        details?: {
+          hint?: string;
+        };
+      };
+      assert.ok(!("hint" in (err.details ?? {})));
+    }
+  });
+
+  it("uses canonical action types for hint lookup while preserving the raw alias in details", () => {
+    try {
+      validateExecution({
+        commandId: "cmd-anchor-6",
+        taskId: "task-anchor-6",
+        source: "test",
+        expectedFormat: "android-ui-automator",
+        timeoutMs: 5000,
+        actions: [
+          {
+            id: "snap",
+            type: "snapshot",
+            params: { format: "ascii" },
+          },
+        ],
+      });
+      assert.fail("expected validation to fail");
+    } catch (e) {
+      const err = e as {
+        details?: {
+          actionType?: string;
+          hint?: string;
+        };
+      };
+      assert.strictEqual(err.details?.actionType, "snapshot");
+      assert.strictEqual(
+        err.details?.hint,
+        "'format' was removed from snapshot_ui. Remove this parameter."
+      );
+    }
   });
   it("accepts valid open_uri with uri", () => {
     const ex = validateExecution({

@@ -3,6 +3,7 @@ import assert from "node:assert";
 import {
   addSettleWarnings,
   attachSnapshotsToStepResults,
+  buildTimeoutError,
   finalizeSuccessfulCloseAppSteps,
   finalizeSuccessfulScreenshotCapture,
   injectServiceUnavailableHint,
@@ -530,5 +531,81 @@ describe("runExecution", () => {
         "-s test-device-1 shell pm list packages com.test.operator",
       ]
     );
+  });
+});
+
+describe("buildTimeoutError", () => {
+  it("includes correlation context and elapsed timing", () => {
+    const error = buildTimeoutError(
+      {
+        commandId: "cmd-timeout-1",
+        taskId: "task-timeout-1",
+        actions: [
+          { id: "click-1", type: "click" },
+          { id: "snap-1", type: "snapshot_ui" },
+        ],
+        timeoutMs: 30000,
+      },
+      {
+        code: ERROR_CODES.RESULT_ENVELOPE_TIMEOUT,
+        message: "Timed out waiting for result envelope",
+      },
+      321
+    );
+
+    assert.strictEqual(error.code, ERROR_CODES.RESULT_ENVELOPE_TIMEOUT);
+    assert.strictEqual(error.message, "Timed out waiting for result envelope");
+    assert.deepStrictEqual(error.details, {
+      commandId: "cmd-timeout-1",
+      taskId: "task-timeout-1",
+      lastActionId: "snap-1",
+      lastActionType: "snapshot_ui",
+      lastActionCaveat: "payload-last only; Android execution position is unknown",
+      elapsedMs: 321,
+      timeoutMs: 30000,
+    });
+  });
+
+  it("omits commandId and taskId keys when they are absent from the payload", () => {
+    const error = buildTimeoutError(
+      {
+        actions: [{ id: "snap-1", type: "snapshot_ui" }],
+        timeoutMs: 1000,
+      },
+      {
+        code: ERROR_CODES.RESULT_ENVELOPE_TIMEOUT,
+        message: "Timed out waiting for result envelope",
+      },
+      42
+    );
+
+    assert.strictEqual("commandId" in error.details, false);
+    assert.strictEqual("taskId" in error.details, false);
+    assert.strictEqual(error.details.lastActionId, "snap-1");
+  });
+
+  it("preserves timeout diagnostics fields on the returned error", () => {
+    const error = buildTimeoutError(
+      {
+        commandId: "cmd-timeout-2",
+        taskId: "task-timeout-2",
+        actions: [{ id: "snap-1", type: "snapshot_ui" }],
+        timeoutMs: 2000,
+      },
+      {
+        code: ERROR_CODES.RESULT_ENVELOPE_TIMEOUT,
+        message: "Timed out waiting for result envelope",
+        lastCorrelatedEvents: ["TaskScopeDefault: example"],
+        broadcastDispatchStatus: "sent",
+        deviceId: "emulator-5554",
+        receiverPackage: "com.clawperator.operator.dev",
+      },
+      55
+    );
+
+    assert.deepStrictEqual(error.lastCorrelatedEvents, ["TaskScopeDefault: example"]);
+    assert.strictEqual(error.broadcastDispatchStatus, "sent");
+    assert.strictEqual(error.deviceId, "emulator-5554");
+    assert.strictEqual(error.receiverPackage, "com.clawperator.operator.dev");
   });
 });

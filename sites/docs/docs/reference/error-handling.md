@@ -102,6 +102,14 @@ Recommended next action:
   action params
 - do not retry unchanged payloads
 
+Details that may be present:
+- `details.path`: the Zod path for the failing field, joined with dots
+- `details.reason`: the raw Zod validation summary
+- `details.actionId`: the offending action id when the failure maps to `actions[N]`
+- `details.actionType`: the offending action type when the failure maps to `actions[N]`
+- `details.invalidKeys`: unrecognized keys for `unrecognized_keys` failures
+- `details.hint`: a short migration hint when Clawperator knows a removed or renamed parameter
+
 ### `EXECUTION_CONFLICT_IN_FLIGHT`
 
 Meaning:
@@ -128,6 +136,15 @@ Recommended next action:
 - inspect whether the device is mid-transition or overloaded
 - retry with a larger `timeoutMs` only if the workflow genuinely needs it
 - if repeated, run `clawperator doctor --device-id <device_id> --output json`
+
+Details that may be present:
+- `details.commandId`: the execution command id used to correlate the timeout
+- `details.taskId`: the payload task id when the payload included one
+- `details.lastActionId`: the last action id in the payload, not the Android execution position
+- `details.lastActionType`: the last action type in the payload, not the Android execution position
+- `details.lastActionCaveat`: always `payload-last only; Android execution position is unknown`
+- `details.elapsedMs`: wall-clock milliseconds between dispatch and timeout detection
+- `details.timeoutMs`: the configured execution timeout budget
 
 ### `SNAPSHOT_EXTRACTION_FAILED`
 

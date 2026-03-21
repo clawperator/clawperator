@@ -1,6 +1,26 @@
 import { describe, it } from "node:test";
 import assert from "node:assert";
+import { spawn } from "node:child_process";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { cmdExecute } from "../../cli/commands/execute.js";
+
+const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "../../..");
+
+function runCli(args: string[]): Promise<{ stdout: string; stderr: string; code: number }> {
+  const cliPath = join(packageRoot, "dist", "cli", "index.js");
+  return new Promise((resolve) => {
+    const proc = spawn(process.execPath, [cliPath, ...args], {
+      cwd: packageRoot,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let stdout = "";
+    let stderr = "";
+    proc.stdout?.on("data", (d) => (stdout += d.toString()));
+    proc.stderr?.on("data", (d) => (stderr += d.toString()));
+    proc.on("close", (code) => resolve({ stdout, stderr, code: code ?? -1 }));
+  });
+}
 
 describe("cmdExecute --validate-only", () => {
   it("validates a payload without requiring a device", async () => {
@@ -131,5 +151,16 @@ describe("cmdExecute --dry-run", () => {
     const result = JSON.parse(output);
     assert.strictEqual(result.code, "EXECUTION_VALIDATION_FAILED");
     assert.ok(typeof result.details?.path === "string");
+  });
+});
+
+describe("clawperator execute CLI", () => {
+  it("surfaces action context for invalid fixture files before device contact", async () => {
+    const fixturePath = join(packageRoot, "src", "test", "fixtures", "execution-invalid-action-0.json");
+    const { stdout, code } = await runCli(["execute", "--execution", fixturePath]);
+
+    assert.notStrictEqual(code, 0);
+    assert.match(stdout, /actionId/);
+    assert.match(stdout, /snapshot_ui/);
   });
 });
