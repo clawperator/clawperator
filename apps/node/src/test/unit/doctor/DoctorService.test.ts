@@ -35,7 +35,7 @@ describe("DoctorService", () => {
     assert.strictEqual(apkPresence.code, ERROR_CODES.RECEIVER_NOT_INSTALLED);
 
     assert.ok(!report.checks.some(check => check.id === "readiness.handshake"));
-    assert.ok(report.nextActions?.includes("clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id test-device-1 --receiver-package com.clawperator.operator.dev"));
+    assert.ok(report.nextActions?.includes("clawperator operator setup --apk ~/.clawperator/downloads/operator-debug.apk --device-id test-device-1 --receiver-package com.clawperator.operator.dev"));
   });
 
   it("fails when the installed APK is version-incompatible and skips the handshake", async () => {

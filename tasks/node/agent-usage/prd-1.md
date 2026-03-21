@@ -3,6 +3,7 @@
 Workstream: WS-1
 Priority: 1 (highest)
 Proposed PR: PR-1
+Status: [DONE] Implemented and verified on emulator-5554 with the branch-local Node CLI build.
 
 Merged from both agents. This is the highest-confidence finding with the clearest code path.
 

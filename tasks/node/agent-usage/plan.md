@@ -103,6 +103,7 @@ PR-1  PRD-1 + PRD-6 (partial)
       - docs: fix first-time-setup.md / node-api-doctor.md contradiction
       Risk: low. Pure enforcement + additive UX. --check-only preserved.
       Depends on: nothing.
+      Status: [DONE] Implemented and verified on emulator-5554 using the branch-local Node CLI build.
 
 PR-2  PRD-2
       - validateExecution.ts: add actionId, actionType to ValidationFailure.details

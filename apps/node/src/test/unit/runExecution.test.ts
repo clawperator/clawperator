@@ -519,6 +519,7 @@ describe("runExecution", () => {
       assert.strictEqual(result.deviceId, "test-device-1");
       assert.match(result.error.message, /Operator APK \(com\.test\.operator\) is not installed on test-device-1/);
       assert.match(result.error.message, /clawperator operator setup --apk/);
+      assert.match(result.error.message, /operator-debug\.apk/);
     }
     assert.strictEqual(warnings.length, 0);
     assert.deepStrictEqual(

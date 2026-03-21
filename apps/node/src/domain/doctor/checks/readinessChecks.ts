@@ -4,7 +4,7 @@ import { type DoctorCheckResult } from "../../../contracts/doctor.js";
 import { ERROR_CODES } from "../../../contracts/errors.js";
 import { broadcastAgentCommand } from "../../../adapters/android-bridge/broadcastAgentCommand.js";
 import { waitForResultEnvelope } from "../../../adapters/android-bridge/logcatResultReader.js";
-import { getAlternateReceiverVariant, hasListedPackage, probeVersionCompatibility } from "../../version/compatibility.js";
+import { getAlternateReceiverVariant, getReceiverPackageApkPath, hasListedPackage, probeVersionCompatibility } from "../../version/compatibility.js";
 
 export async function checkApkPresence(config: RuntimeConfig): Promise<DoctorCheckResult> {
   const packageList = await runAdb(config, ["shell", "pm", "list", "packages", config.receiverPackage]);
@@ -71,7 +71,7 @@ export async function checkApkPresence(config: RuntimeConfig): Promise<DoctorChe
         steps: [
           {
             kind: "shell",
-            value: `clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id ${config.deviceId}${config.receiverPackage !== "com.clawperator.operator" ? ` --receiver-package ${config.receiverPackage}` : ""}`,
+            value: `clawperator operator setup --apk ${getReceiverPackageApkPath(config.receiverPackage)} --device-id ${config.deviceId}${config.receiverPackage !== "com.clawperator.operator" ? ` --receiver-package ${config.receiverPackage}` : ""}`,
           },
           { kind: "manual", value: "Download the APK from https://github.com/clawperator/clawperator/releases/latest if you do not already have a local copy." }
         ],

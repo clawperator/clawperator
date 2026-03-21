@@ -45,6 +45,12 @@ export function getAlternateReceiverVariant(receiverPackage: string): string {
     : `${receiverPackage}.dev`;
 }
 
+export function getReceiverPackageApkPath(receiverPackage: string): string {
+  return receiverPackage.endsWith(".dev")
+    ? "~/.clawperator/downloads/operator-debug.apk"
+    : "~/.clawperator/downloads/operator.apk";
+}
+
 export function readCliVersion(pkg: CliPackageMetadata): string {
   if (!pkg.version || pkg.version.trim().length === 0) {
     throw new Error("package.json version is missing");

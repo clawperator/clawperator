@@ -10,6 +10,7 @@ import { broadcastAgentCommand } from "../../adapters/android-bridge/broadcastAg
 import { waitForResultEnvelope } from "../../adapters/android-bridge/logcatResultReader.js";
 import { runAdb } from "../../adapters/android-bridge/adbClient.js";
 import { checkApkPresence } from "../doctor/checks/readinessChecks.js";
+import { getReceiverPackageApkPath } from "../version/compatibility.js";
 import { tryAcquire, release, getConflictError } from "./executionStore.js";
 import type { ResultEnvelope, TerminalSource } from "../../contracts/result.js";
 import { extractSnapshotsFromLogs } from "./snapshotHelper.js";
@@ -270,7 +271,7 @@ async function performExecution(
 
   const apkCheck = await checkApkPresence(config);
   if (apkCheck.status === "fail") {
-    const installCommand = `clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id ${deviceId}${config.receiverPackage !== "com.clawperator.operator" ? ` --receiver-package ${config.receiverPackage}` : ""}`;
+    const installCommand = `clawperator operator setup --apk ${getReceiverPackageApkPath(config.receiverPackage)} --device-id ${deviceId}${config.receiverPackage !== "com.clawperator.operator" ? ` --receiver-package ${config.receiverPackage}` : ""}`;
     return {
       execution,
       result: {
