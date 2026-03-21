@@ -11,7 +11,7 @@ export async function checkApkPresence(config: RuntimeConfig): Promise<DoctorChe
   if (packageList.code !== 0) {
     return {
       id: "readiness.apk.presence",
-      status: "fail",
+      status: "warn",
       code: ERROR_CODES.DEVICE_SHELL_UNAVAILABLE,
       summary: "Could not query installed packages on the device.",
       detail: packageList.stderr || undefined,
@@ -31,7 +31,7 @@ export async function checkApkPresence(config: RuntimeConfig): Promise<DoctorChe
     if (alternateList.code !== 0) {
       return {
         id: "readiness.apk.presence",
-        status: "fail",
+        status: "warn",
         code: ERROR_CODES.DEVICE_SHELL_UNAVAILABLE,
         summary: "Could not query installed packages on the device.",
         detail: alternateList.stderr || undefined,
@@ -61,7 +61,7 @@ export async function checkApkPresence(config: RuntimeConfig): Promise<DoctorChe
 
     return {
       id: "readiness.apk.presence",
-      status: "warn",
+      status: "fail",
       code: ERROR_CODES.RECEIVER_NOT_INSTALLED,
       summary: "Operator APK not installed.",
       detail: `Package ${config.receiverPackage} was not found on the device.`,
@@ -69,7 +69,11 @@ export async function checkApkPresence(config: RuntimeConfig): Promise<DoctorChe
         title: "Install Operator APK",
         platform: "any",
         steps: [
-          { kind: "manual", value: "Download and install the APK from https://github.com/clawperator/clawperator/releases/latest" }
+          {
+            kind: "shell",
+            value: `clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id ${config.deviceId}${config.receiverPackage !== "com.clawperator.operator" ? ` --receiver-package ${config.receiverPackage}` : ""}`,
+          },
+          { kind: "manual", value: "Download the APK from https://github.com/clawperator/clawperator/releases/latest if you do not already have a local copy." }
         ],
       },
     };

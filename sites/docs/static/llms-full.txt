@@ -506,7 +506,7 @@ A fully configured device will show all checks passing. Common warnings:
 | Warning | Fix |
 | :--- | :--- |
 | `DEVICE_UNAUTHORIZED` | Tap "Allow" on the device USB debugging dialog |
-| `RECEIVER_NOT_INSTALLED` | Complete Step 3 (run `clawperator operator setup`) |
+| `RECEIVER_NOT_INSTALLED` | Complete Step 3. Run `clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id <device_id>` and add `--receiver-package com.clawperator.operator.dev` for debug builds. |
 | `DEVICE_ACCESSIBILITY_NOT_RUNNING` | If the Operator APK crashed after setup, run `clawperator grant-device-permissions` to restore the revoked permissions |
 | `DEVICE_DEV_OPTIONS_DISABLED` | Enable Developer options (physical device only) |
 | `DEVICE_USB_DEBUGGING_DISABLED` | Enable USB debugging (physical device only) |
@@ -2631,7 +2631,7 @@ Branch agent logic on codes from `envelope.errorCode` (top-level Android result 
 | `EMULATOR_DELETE_FAILED` | `error.code` | Emulator deletion failed |
 | `NODE_NOT_FOUND` | `data.error` | Selector matched no UI element |
 | `RESULT_ENVELOPE_TIMEOUT` | `error.code` | Command dispatched but no result received |
-| `RECEIVER_NOT_INSTALLED` | `error.code` | [Clawperator Operator Android app](../getting-started/android-operator-apk.md) not found on device |
+| `RECEIVER_NOT_INSTALLED` | `error.code` | Requested [Clawperator Operator Android app](../getting-started/android-operator-apk.md) package is missing on the device; `execute` and `doctor` fail fast instead of timing out |
 | `DEVICE_UNAUTHORIZED` | `error.code` | Device not authorized for ADB |
 | `VERSION_INCOMPATIBLE` | `error.code` | CLI and installed [Clawperator Operator Android app](../getting-started/android-operator-apk.md) versions do not share the same `major.minor` |
 | `APK_VERSION_UNREADABLE` | `error.code` | The device package dump did not expose a readable [Clawperator Operator Android app](../getting-started/android-operator-apk.md) version |
@@ -6473,6 +6473,7 @@ Recommended next action:
 
 Meaning:
 - the targeted Clawperator Operator APK package is not installed on the device
+- `doctor` and `execute` fail fast with this code instead of waiting for a runtime timeout
 
 Usually recoverable:
 - yes
@@ -6749,7 +6750,7 @@ Doctor runs checks in a fixed order. When a critical check fails, doctor returns
 
 ### 3. Runtime readiness
 
-- `readiness.apk.presence` - confirms the requested receiver package is installed, or warns if the other release/debug variant is installed instead
+- `readiness.apk.presence` - confirms the requested receiver package is installed, warns if the other release/debug variant is installed instead, and fails when no matching package is present
 - `readiness.version.compatibility` - verifies that the CLI and installed [Clawperator Operator Android app](../getting-started/android-operator-apk.md) share a compatible `major.minor`
 - `readiness.settings.dev_options` - warns if Android Developer Options are disabled
 - `readiness.settings.usb_debugging` - warns if USB debugging is disabled
@@ -6765,13 +6766,14 @@ Critical checks currently include:
 - host Node/adb/java checks
 - device discovery and shell availability
 - Android build/install/launch checks in `--full`
+- missing [Clawperator Operator Android app](../getting-started/android-operator-apk.md) package
 - [Clawperator Operator Android app](../getting-started/android-operator-apk.md) version compatibility
 - handshake
 - smoke test in `--full`
 
 Advisory warnings currently include:
 
-- [Clawperator Operator Android app](../getting-started/android-operator-apk.md) not installed or wrong release/debug variant installed
+- wrong release/debug variant of the [Clawperator Operator Android app](../getting-started/android-operator-apk.md) installed
 - Developer Options disabled
 - USB debugging disabled
 
@@ -6782,7 +6784,7 @@ Exit behavior:
 - normal mode exits `1` when any critical check fails
 - `--check-only` always exits `0`
 
-In other words, `doctor` is allowed to report warnings while still exiting successfully if the critical command path is usable.
+In other words, `doctor` is allowed to report warnings while still exiting successfully if the critical command path is usable. Missing Operator APKs are now a critical failure, so normal `doctor` exits non-zero until the requested package is installed.
 
 ## Output Model
 
@@ -7274,6 +7276,26 @@ If any requirement is not met, the app shows an orange background and a dedicate
 3. After enabling, run `clawperator doctor` to confirm the handshake passes. If doctor still fails, wait 2-3 seconds for the service to initialize and retry.
 
 **Note:** Android revokes the accessibility permission if the Clawperator app crashes. If the doctor screen shows "Permissions not granted" after the app had been ready, the service may have been disabled by a crash - re-run `clawperator grant-device-permissions` or re-enable the Clawperator service in Settings → Accessibility.
+
+---
+
+## Missing Operator APK
+
+**What it means:** The requested Clawperator Operator package is not installed on the device. This is now a blocking readiness failure, so `clawperator doctor` and `clawperator execute` fail fast instead of waiting for a runtime timeout.
+
+**How to fix:**
+
+1. Install the Operator APK with the canonical setup command:
+   ```bash
+   clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id <device_id>
+   ```
+2. If you are using a local debug build, add:
+   ```bash
+   --receiver-package com.clawperator.operator.dev
+   ```
+3. Re-run `clawperator doctor --device-id <device_id>` to confirm the package is now installed.
+
+**In the app:** The doctor screen no longer reaches the runtime handshake until the package is installed, so this is usually the first thing to fix when a fresh device is not ready.
 
 ---
 
@@ -9007,7 +9029,7 @@ LLM agents must use these codes to decide their next step.
 - `ADB_NOT_FOUND`: ADB is missing from PATH.
 - `NO_DEVICES`: No Android devices are connected via USB/Network.
 - `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED`: More than one device exists; specify `--device-id`.
-- `RECEIVER_NOT_INSTALLED`: The target receiver package is not on the device.
+- `RECEIVER_NOT_INSTALLED`: The target receiver package is not on the device, so `doctor` and `execute` fail fast before dispatch.
 
 ### Execution & State
 - `EXECUTION_VALIDATION_FAILED`: The execution JSON is malformed or invalid.

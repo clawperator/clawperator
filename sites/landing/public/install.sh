@@ -748,6 +748,8 @@ main() {
     fi
     echo ""
     echo -e "For more info, visit: ${BLUE}https://docs.clawperator.com${NC}"
+    echo -e "Agent guide: ${BLUE}https://docs.clawperator.com/llms.txt${NC}"
+    echo -e "If you are an AI agent, read the agent guide before running any commands.${NC}"
     echo ""
 }
 

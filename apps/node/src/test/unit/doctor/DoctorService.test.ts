@@ -6,7 +6,7 @@ import { FakeProcessRunner } from "../fakes/FakeProcessRunner.js";
 import { ERROR_CODES } from "../../../contracts/errors.js";
 
 describe("DoctorService", () => {
-  it("treats missing APK as a warning and skips the handshake", async () => {
+  it("treats missing APK as a critical failure and skips the handshake", async () => {
     const runner = new FakeProcessRunner();
     const config = getDefaultRuntimeConfig({ runner, receiverPackage: "com.clawperator.operator.dev" });
 
@@ -25,17 +25,17 @@ describe("DoctorService", () => {
 
     const report = await new DoctorService().run({ config });
 
-    assert.strictEqual(report.criticalOk, true);
-    assert.strictEqual(report.ok, true);
+    assert.strictEqual(report.criticalOk, false);
+    assert.strictEqual(report.ok, false);
     assert.strictEqual(report.deviceId, "test-device-1");
 
     const apkPresence = report.checks.find(check => check.id === "readiness.apk.presence");
     assert.ok(apkPresence);
-    assert.strictEqual(apkPresence.status, "warn");
+    assert.strictEqual(apkPresence.status, "fail");
     assert.strictEqual(apkPresence.code, ERROR_CODES.RECEIVER_NOT_INSTALLED);
 
     assert.ok(!report.checks.some(check => check.id === "readiness.handshake"));
-    assert.ok(report.nextActions?.includes("Download and install the APK from https://github.com/clawperator/clawperator/releases/latest"));
+    assert.ok(report.nextActions?.includes("clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id test-device-1 --receiver-package com.clawperator.operator.dev"));
   });
 
   it("fails when the installed APK is version-incompatible and skips the handshake", async () => {

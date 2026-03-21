@@ -66,6 +66,26 @@ If any requirement is not met, the app shows an orange background and a dedicate
 
 ---
 
+## Missing Operator APK
+
+**What it means:** The requested Clawperator Operator package is not installed on the device. This is now a blocking readiness failure, so `clawperator doctor` and `clawperator execute` fail fast instead of waiting for a runtime timeout.
+
+**How to fix:**
+
+1. Install the Operator APK with the canonical setup command:
+   ```bash
+   clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id <device_id>
+   ```
+2. If you are using a local debug build, add:
+   ```bash
+   --receiver-package com.clawperator.operator.dev
+   ```
+3. Re-run `clawperator doctor --device-id <device_id>` to confirm the package is now installed.
+
+**In the app:** The doctor screen no longer reaches the runtime handshake until the package is installed, so this is usually the first thing to fix when a fresh device is not ready.
+
+---
+
 ## Wireless Debugging (YMMV)
 
 Clawperator is designed to work with a dedicated, **always-on, permanently powered** Android device. For maximum reliability, a physical USB connection is strongly recommended. 
