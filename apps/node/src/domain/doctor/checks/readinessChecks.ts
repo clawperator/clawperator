@@ -19,7 +19,7 @@ export async function checkApkPresence(config: RuntimeConfig): Promise<DoctorChe
   if (packageList.code !== 0) {
     return {
       id: "readiness.apk.presence",
-      status: "warn",
+      status: "fail",
       code: ERROR_CODES.DEVICE_SHELL_UNAVAILABLE,
       summary: "Could not query installed packages on the device.",
       detail: packageList.stderr || undefined,
@@ -39,7 +39,7 @@ export async function checkApkPresence(config: RuntimeConfig): Promise<DoctorChe
     if (alternateList.code !== 0) {
       return {
         id: "readiness.apk.presence",
-        status: "warn",
+        status: "fail",
         code: ERROR_CODES.DEVICE_SHELL_UNAVAILABLE,
         summary: "Could not query installed packages on the device.",
         detail: alternateList.stderr || undefined,

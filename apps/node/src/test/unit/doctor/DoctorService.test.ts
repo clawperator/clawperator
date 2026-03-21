@@ -173,6 +173,34 @@ describe("DoctorService", () => {
     assert.ok(!report.checks.some(check => check.id === "readiness.handshake"));
   });
 
+  it("treats package query failures as critical and skips the handshake", async () => {
+    const runner = new FakeProcessRunner();
+    const config = getDefaultRuntimeConfig({ runner, receiverPackage: "com.clawperator.operator.dev" });
+
+    runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "33\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "Physical size: 1080x2400\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "Physical density: 420\n", stderr: "" });
+    runner.queueResult({ code: 1, stdout: "", stderr: "cmd: Can't find service: package" });
+    runner.queueResult({ code: 0, stdout: "1\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "1\n", stderr: "" });
+
+    const report = await new DoctorService().run({ config });
+
+    assert.strictEqual(report.criticalOk, false);
+    assert.strictEqual(report.ok, false);
+
+    const apkPresence = report.checks.find(check => check.id === "readiness.apk.presence");
+    assert.ok(apkPresence);
+    assert.strictEqual(apkPresence.status, "fail");
+    assert.strictEqual(apkPresence.code, ERROR_CODES.DEVICE_SHELL_UNAVAILABLE);
+    assert.ok(!report.checks.some(check => check.id === "readiness.handshake"));
+  });
+
   it("lists the release download instructions before the install command", async () => {
     const runner = new FakeProcessRunner();
     const config = getDefaultRuntimeConfig({ runner, receiverPackage: "com.clawperator.operator" });

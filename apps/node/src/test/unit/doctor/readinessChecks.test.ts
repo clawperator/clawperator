@@ -24,7 +24,7 @@ describe("checkApkPresence", () => {
         assert.match(result.detail ?? "", /Package com\.test\.operator was not found/);
     });
 
-    it("warns when package queries cannot run", async () => {
+    it("fails when package queries cannot run", async () => {
         const runner = new FakeProcessRunner();
         const config = getDefaultRuntimeConfig({
             runner,
@@ -36,7 +36,7 @@ describe("checkApkPresence", () => {
 
         const result = await checkApkPresence(config);
 
-        assert.strictEqual(result.status, "warn");
+        assert.strictEqual(result.status, "fail");
         assert.strictEqual(result.code, ERROR_CODES.DEVICE_SHELL_UNAVAILABLE);
         assert.match(result.detail ?? "", /Can't find service: package/);
     });
