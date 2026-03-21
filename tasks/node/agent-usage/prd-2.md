@@ -3,6 +3,7 @@
 Workstream: WS-2
 Priority: 2
 Proposed PR: PR-2
+Status: [DONE]
 
 From this analysis. The other agent classified this as "already solved" - code inspection of
 `validateExecution.ts:306-310` shows `details` only has a Zod path string, not semantic action

@@ -118,13 +118,23 @@ PR-3  PRD-3
       Risk: medium. Requires compile-artifact to be usable without a device.
       Depends on: PR-2 (uses enriched error format in dry-run output).
 
+PR-3.5  PRD-3.5
+      - Audit all 4 artifact-backed skills in clawperator-skills with --dry-run
+      - Fix any failures (known: com.globird.energy.get-usage format param)
+      - Bump apps/node/package.json version (0.3.3 -> 0.4.0)
+      - Cut git tag v0.4.0; update install.sh version comment
+      Risk: low. Operational/maintenance step. No code changes to the CLI.
+      Depends on: PR-3 merged. Skills fixes PR in clawperator-skills must merge
+      before the version tag is cut.
+
 PR-4  PRD-4
       - runSkill.ts: add optional onOutput callback (no direct stdout writes)
       - cli/commands/skills.ts: wire onOutput in pretty mode, not in json mode;
         add pre-run banner BEFORE the dry-run gate added in PR-3
       Risk: low. Purely additive to runSkill signature; backward-compatible.
-      Depends on: PR-3 shipped first; banner must be inserted before the dry-run
-      gate in cli/commands/skills.ts (see PRD-4 ordering constraint).
+      Depends on: PR-3.5 complete (skills in passing state before more agent-facing
+      changes ship); banner must be inserted before the dry-run gate in
+      cli/commands/skills.ts (see PRD-4 ordering constraint).
 
 PR-5  PRD-5
       - NDJSON log infrastructure: ~/.clawperator/logs/clawperator-YYYY-MM-DD.log

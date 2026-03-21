@@ -3,6 +3,7 @@
 Workstream: WS-3
 Priority: 3
 Proposed PR: PR-3
+Status: [DONE]
 
 Completed on branch `codex/prd-3-skill-preflight-dry-run`. The implementation landed, was verified on a real Android device, and the remaining notes are preserved here for history.
 
