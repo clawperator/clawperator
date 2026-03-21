@@ -159,6 +159,10 @@ Use the resolved absolute path, not a `~` shorthand, so agents can read it direc
 
 ### 5. Documentation
 
+- `docs/node-api-for-agents.md`: document the `--log-level` global flag, the
+  `CLAWPERATOR_LOG_DIR` and `CLAWPERATOR_LOG_LEVEL` env vars, and the `logPath`
+  field added to `RESULT_ENVELOPE_TIMEOUT`. These are all new public-facing
+  contract additions.
 - `docs/troubleshooting.md`: add a "Reading the Clawperator log" section. Document the log path, NDJSON format, how to filter by `commandId`, and what each event means.
 - `docs/agent-quickstart.md`: add a note after the "read the result" section pointing agents to the log file when a command fails unexpectedly.
 
@@ -178,7 +182,7 @@ In scope:
 - `--log-level` global flag and `CLAWPERATOR_LOG_LEVEL` env var
 - `CLAWPERATOR_LOG_DIR` env var
 - `logPath` in `RESULT_ENVELOPE_TIMEOUT` (additive, depends on PRD-2)
-- Two doc updates: troubleshooting log section, quickstart note
+- Three source doc updates: node-api-for-agents (new flags, env vars, logPath field), troubleshooting log section, quickstart note
 
 Out of scope:
 - `clawperator logs` command for querying/filtering logs (defer - the NDJSON format is grep/jq-friendly enough)

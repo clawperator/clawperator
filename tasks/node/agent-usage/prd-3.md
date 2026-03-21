@@ -186,6 +186,18 @@ A single `--dry-run` flag catches the GloBird class of error (stale API usage in
 
 ---
 
+## Documentation updates in PR-3
+
+- `docs/node-api-for-agents.md`: document `skills validate --dry-run` and
+  `skills run --skip-validate` under the CLI reference section. Explain what
+  the pre-run gate covers and that script-only skills skip payload validation
+  with a logged reason.
+- `docs/skills/skill-development-workflow.md` (sibling repo): add `--dry-run`
+  as the recommended pre-device step before `skills run`. Show the full workflow:
+  `skills validate --dry-run` then `skills run`.
+
+---
+
 ## Scope Boundaries
 
 In scope:
@@ -193,7 +205,7 @@ In scope:
 - `skills run` pre-run gate: dry-run check runs automatically before skill execution
 - `skills run --skip-validate`: escape hatch to bypass the pre-run check
 - Uses enriched error format from PRD-2
-- `docs/skills/skill-development-workflow.md` update (sibling repo)
+- Two source doc updates (node-api-for-agents, skill-development-workflow in sibling repo)
 
 Out of scope:
 - Changing default behavior of `skills validate` (no flag)

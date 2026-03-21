@@ -149,12 +149,21 @@ Without this change, a 30-second skill run is 30 seconds of silence. With it, th
 
 ---
 
+## Documentation updates in PR-4
+
+- `docs/node-api-for-agents.md`: document the pre-run banner output format so agents
+  know what to expect before skill output begins. Note that the banner is suppressed in
+  JSON mode. Document that `skills run` now streams output in real time in pretty mode.
+
+---
+
 ## Scope Boundaries
 
 In scope:
 - `runSkill.ts`: `SkillRunCallbacks` type, optional parameter, callback invocation in `data` handlers
 - `cli/commands/skills.ts`: callback wiring based on output mode; pre-run banner
 - Backward compatibility: call sites that omit `callbacks` are unchanged
+- One source doc update (node-api-for-agents)
 
 Out of scope:
 - Persistent log files (PRD-5)

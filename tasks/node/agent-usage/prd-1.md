@@ -178,6 +178,9 @@ here is where to read about it).
 
 ### 6. Documentation updates in PR-1
 
+- `docs/node-api-for-agents.md`: update the `RECEIVER_NOT_INSTALLED` error code entry to
+  reflect that it is now a hard failure at execute time, not advisory. Add the install
+  command to the recovery guidance.
 - `docs/first-time-setup.md`: align the `RECEIVER_NOT_INSTALLED` wording with shipped behavior (now a hard failure).
 - `docs/reference/node-api-doctor.md`: update APK absence from advisory to blocking.
 - `docs/reference/error-handling.md`: clarify that `RECEIVER_NOT_INSTALLED` now fails fast at execute time.
@@ -198,7 +201,7 @@ This is also the only change where the code path is entirely clear: two lines in
 In scope:
 - `criticalChecks.ts`, `readinessChecks.ts`, `runExecution.ts`
 - `install.sh` docs banner
-- Four doc updates (first-time-setup, node-api-doctor, error-handling, troubleshooting)
+- Five source doc updates (node-api-for-agents, first-time-setup, node-api-doctor, error-handling, troubleshooting)
 
 Out of scope:
 - `RECEIVER_VARIANT_MISMATCH` severity (stays warn)
