@@ -173,7 +173,7 @@ There must be exactly one clear semantic: `clawperator doctor` blocks on missing
 If OpenClaw expects specific output from this script, a no-op stub will silently break the integration. The stub must emit a warning to stderr so the silence is visible. Requires OpenClaw tool config review before any real implementation.
 
 **Risk: dry-run compile for device-dependent skills**
-Some skill scripts may query device state when generating their payload. Dry-run will fail or produce incomplete results for these. Keep `--dry-run` as an explicit opt-in; document the limitation; do not make it the default until impact on existing skills is assessed.
+Some skill scripts may query device state when generating their payload. Dry-run will fail or produce incomplete results for these. PRD-3 addresses this by running a pre-ship skills audit against all skills in `clawperator-skills` before the gate ships, fixing any failures there first. Script-only skills that cannot be statically compiled skip payload validation and log a reason. The `--skip-validate` flag is the escape hatch for the rare case where the gate must be bypassed.
 
 ---
 
@@ -185,8 +185,6 @@ Some skill scripts may query device state when generating their payload. Dry-run
 Resolved:
 - Gate scoping: APK pre-flight lives in `runExecution.ts` only. `runSkill.ts` is not gated. Skills that call `execute` get the check naturally; skills that call `adb` directly are a pre-existing bypass.
 - Session cache: not viable (each CLI call is a new process). Fresh adb call per invocation; on-disk TTL stamp is a possible follow-on if needed.
-
----
 
 ---
 

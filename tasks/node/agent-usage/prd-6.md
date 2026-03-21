@@ -200,7 +200,7 @@ repository should add an `AGENTS.md` at the root of its skills directory
 (`~/.clawperator/skills/AGENTS.md` after install), covering skills-specific usage
 guidance, authoring conventions, and the `--dry-run` workflow. This file is outside
 the scope of this PR but must be tracked as a follow-up in the `clawperator-skills`
-repo. Create a GitHub issue for it when this PR merges.
+repo. The implementing agent owns this: create the GitHub issue when this PR merges.
 
 ### 6. `llms.txt` alignment
 

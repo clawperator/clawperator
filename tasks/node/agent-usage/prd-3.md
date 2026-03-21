@@ -156,8 +156,8 @@ Explain what `--dry-run` does and does not cover (no runtime behavior, no UI val
 Note that script-only skills cannot be statically validated; the check is skipped for them
 and execution proceeds.
 
-If coordinating the sibling repo PR is out of scope for the implementing agent, note this
-as a follow-up item in the PR description.
+The implementing agent owns this cross-repo work: edit the sibling repo source, open the
+`clawperator-skills` PR, and ensure it merges before this PR ships. Do not defer it.
 
 ### 5. Surface dry-run failure using PRD-2 error format
 
