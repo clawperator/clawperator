@@ -8,7 +8,7 @@ const require = createRequire(import.meta.url);
 
 export { hasListedPackage } from "../device/grantPermissions.js";
 
-const COMPATIBILITY_VERSION_REGEX = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z]+)(?:\.(\d+))?)?$/;
+const COMPATIBILITY_VERSION_REGEX = /^(\d+)\.(\d+)\.(\d+)$/;
 
 export interface ParsedCompatibilityVersion {
   raw: string;
@@ -16,8 +16,6 @@ export interface ParsedCompatibilityVersion {
   major: number;
   minor: number;
   patch: number;
-  prereleaseLabel?: string;
-  prereleaseNumber?: number;
 }
 
 export interface InstalledApkVersion {
@@ -142,8 +140,6 @@ export function parseCompatibilityVersion(versionName: string): ParsedCompatibil
     major: Number(match[1]),
     minor: Number(match[2]),
     patch: Number(match[3]),
-    prereleaseLabel: match[4] || undefined,
-    prereleaseNumber: match[5] ? Number(match[5]) : undefined,
   };
 }
 

@@ -12,7 +12,6 @@ import {
 describe("version compatibility", () => {
   it("normalizes the debug suffix before compatibility parsing", () => {
     assert.strictEqual(normalizeCompatibilityVersion("0.1.4-d"), "0.1.4");
-    assert.strictEqual(normalizeCompatibilityVersion("0.1.4-rc.1-d"), "0.1.4-rc.1");
   });
 
   it("removes only a trailing debug suffix when deriving the alternate package", () => {
@@ -32,25 +31,15 @@ describe("version compatibility", () => {
     assert.throws(() => readCliVersion({ version: "   " }), /package\.json version is missing/);
   });
 
-  it("parses release and prerelease versions", () => {
-    assert.deepStrictEqual(parseCompatibilityVersion("0.1.4-rc.1"), {
-      raw: "0.1.4-rc.1",
-      normalized: "0.1.4-rc.1",
-      major: 0,
-      minor: 1,
-      patch: 4,
-      prereleaseLabel: "rc",
-      prereleaseNumber: 1,
-    });
+  it("rejects non-simple versions", () => {
+    assert.throws(() => parseCompatibilityVersion("0.1.4.1"), /Unsupported Clawperator version format/);
   });
 
   it("requires the same normalized version", () => {
     assert.strictEqual(isVersionCompatible("0.1.4", "0.1.4"), true);
     assert.strictEqual(isVersionCompatible("0.1.4", "0.1.4-d"), true);
-    assert.strictEqual(isVersionCompatible("0.1.4-rc.1", "0.1.4-d"), false);
     assert.strictEqual(isVersionCompatible("0.1.4", "0.1.9"), false);
     assert.strictEqual(isVersionCompatible("0.1.4", "0.2.1"), false);
-    assert.strictEqual(isVersionCompatible("0.1.4", "0.1.4-rc.1"), false);
   });
 
   it("parses installed APK metadata from dumpsys output", () => {

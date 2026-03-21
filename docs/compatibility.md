@@ -4,22 +4,19 @@ Clawperator expects the Node CLI and the installed [Clawperator Operator Android
 
 ## Compatibility rule
 
-The CLI and the [Clawperator Operator Android app](../getting-started/android-operator-apk.md) are compatible when their normalized versions match exactly. The trailing debug suffix `-d` is ignored, but patch, prerelease, and build-version differences are not.
+The CLI and the [Clawperator Operator Android app](../getting-started/android-operator-apk.md) are compatible when their normalized versions match exactly. The trailing debug suffix `-d` is ignored, but patch and build-version differences are not.
 
 Examples:
 
 - CLI `0.1.4` and app `0.1.4` - compatible
 - CLI `0.1.4` and app `0.1.4-d` - compatible
-- CLI `0.1.4-rc.1` and app `0.1.4-rc.1-d` - compatible
 - CLI `0.1.4` and app `0.1.9` - not compatible
-- CLI `0.1.4` and app `0.1.4-rc.1` - not compatible
 - CLI `0.1.4` and app `0.2.1` - not compatible
 - CLI `0.1.4` and app `0.3.2` - not compatible
 
 Notes:
 
 - If the versions do not match, download the exact release APK and checksum from `https://downloads.clawperator.com/operator/v<version>/operator-v<version>.apk` and `https://downloads.clawperator.com/operator/v<version>/operator-v<version>.apk.sha256`.
-- Prerelease suffixes such as `-alpha.1`, `-beta.2`, and `-rc.1` are parsed and must match exactly.
 
 ## Check versions
 
