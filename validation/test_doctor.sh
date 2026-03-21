@@ -136,4 +136,49 @@ else
   exit 1
 fi
 
+echo "=== Scenario 5: VERSION_MISMATCH (Fake ADB) ==="
+export FAKE_ADB_SCENARIO="VERSION_MISMATCH"
+
+set +e
+node "$REPO_ROOT/apps/node/dist/cli/index.js" doctor --json > "$TMP_DIR/out5.json"
+EXIT_CODE=$?
+set -e
+
+if [ "$EXIT_CODE" -eq 0 ]; then
+  echo "[Error] Doctor should have exited with a non-zero code when the APK version mismatches!"
+  exit 1
+fi
+
+if grep -q "VERSION_INCOMPATIBLE" "$TMP_DIR/out5.json"; then
+  echo "[Success] VERSION_INCOMPATIBLE error code emitted."
+else
+  echo "[Error] VERSION_INCOMPATIBLE error code not found in output."
+  cat "$TMP_DIR/out5.json"
+  exit 1
+fi
+
+if grep -q '"criticalOk": false' "$TMP_DIR/out5.json"; then
+  echo "[Success] criticalOk reports that version mismatch is blocking."
+else
+  echo "[Error] criticalOk should be false when the APK version mismatches."
+  cat "$TMP_DIR/out5.json"
+  exit 1
+fi
+
+if grep -q 'https://downloads.clawperator.com/operator/v0.3.3/operator-v0.3.3.apk' "$TMP_DIR/out5.json"; then
+  echo "[Success] versioned APK remediation URL emitted."
+else
+  echo "[Error] versioned APK remediation URL missing from output."
+  cat "$TMP_DIR/out5.json"
+  exit 1
+fi
+
+if grep -q '"id": "readiness.handshake"' "$TMP_DIR/out5.json"; then
+  echo "[Error] Handshake should be skipped when the APK version mismatches."
+  cat "$TMP_DIR/out5.json"
+  exit 1
+else
+  echo "[Success] Handshake skipped when APK version mismatches."
+fi
+
 echo "=== All integration tests passed successfully! ==="
