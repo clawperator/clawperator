@@ -111,3 +111,8 @@ npm --prefix apps/node ci && npm --prefix apps/node run build && npm --prefix ap
 ## License
 
 Apache 2.0
+
+Built with human claws by [@chrismlacy](https://x.com/chrismlacy), with a scrappy crew of bots.  
+GitHub: [chrislacy](https://github.com/chrislacy) · X: [@chrismlacy](https://x.com/chrismlacy) · Email: [chris@actionlauncher.com](mailto:chris@actionlauncher.com)
+
+Copyright (c) 2026 Action Launcher Pty Ltd
