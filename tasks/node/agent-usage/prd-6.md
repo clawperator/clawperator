@@ -205,10 +205,11 @@ repo. Create a GitHub issue for it when this PR merges.
 ### 6. `llms.txt` alignment
 
 After all PRs land, verify that both `sites/landing/public/llms.txt` and `sites/docs/static/llms.txt` accurately describe the final shipped behavior. Specifically:
-- APK absence is a hard failure (not advisory)
-- `skills validate --dry-run` exists
-- Persistent logs are at `~/.clawperator/logs/`
-- `enter_text clear: true` is a known no-op
+- APK absence is a hard failure (not advisory) [PR-1]
+- `skills validate --dry-run` exists [PR-3]
+- Persistent NDJSON logs are at `~/.clawperator/logs/`; `--log-level` flag controls verbosity [PR-5]
+- `RESULT_ENVELOPE_TIMEOUT` error includes `logPath` pointing to the current day's log [PR-5]
+- `enter_text clear: true` is a known no-op [PR-2]
 
 The `llms.txt` files should be the last thing updated, once all behavior is settled.
 
@@ -363,5 +364,5 @@ Inline `DoctorCheckResult` objects — construct in test body, no files needed:
 - Existing checks without `docsUrl` are unaffected (TypeScript `docsUrl?` optional).
 - `./scripts/operator_event.sh` exists, exits 0, and emits a detectable stderr notice (stub) OR has confirmed behavior from OpenClaw review.
 - OpenClaw review outcome is documented before merging the stub.
-- Both `llms.txt` files accurately describe all behavior shipped in PRs 1-4.
+- Both `llms.txt` files accurately describe all behavior shipped in PRs 1-5.
 - No guide contradicts shipped `doctor` behavior.
