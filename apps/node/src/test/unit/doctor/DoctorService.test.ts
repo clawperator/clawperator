@@ -35,7 +35,10 @@ describe("DoctorService", () => {
     assert.strictEqual(apkPresence.code, ERROR_CODES.RECEIVER_NOT_INSTALLED);
 
     assert.ok(!report.checks.some(check => check.id === "readiness.handshake"));
-    assert.ok(report.nextActions?.includes("clawperator operator setup --apk ~/.clawperator/downloads/operator-debug.apk --device-id test-device-1 --receiver-package com.clawperator.operator.dev"));
+    assert.deepStrictEqual(report.nextActions, [
+      "If you do not already have a local debug APK copy, rebuild the debug app from the same checkout before rerunning setup.",
+      "clawperator operator setup --apk ~/.clawperator/downloads/operator-debug.apk --device-id test-device-1 --receiver-package com.clawperator.operator.dev",
+    ]);
   });
 
   it("fails when the installed APK is version-incompatible and skips the handshake", async () => {
@@ -168,5 +171,32 @@ describe("DoctorService", () => {
     assert.strictEqual(apkPresence.code, ERROR_CODES.RECEIVER_VARIANT_MISMATCH);
     assert.ok(!report.checks.some(check => check.id === "readiness.version.compatibility"));
     assert.ok(!report.checks.some(check => check.id === "readiness.handshake"));
+  });
+
+  it("lists the release download instructions before the install command", async () => {
+    const runner = new FakeProcessRunner();
+    const config = getDefaultRuntimeConfig({ runner, receiverPackage: "com.clawperator.operator" });
+
+    runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "33\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "Physical size: 1080x2400\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "Physical density: 420\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "1\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "1\n", stderr: "" });
+
+    const report = await new DoctorService().run({ config });
+
+    const apkPresence = report.checks.find(check => check.id === "readiness.apk.presence");
+    assert.ok(apkPresence);
+    assert.deepStrictEqual(apkPresence.fix?.steps.map(step => step.value), [
+      "Download the exact release APK from https://downloads.clawperator.com/operator/v0.3.3/operator-v0.3.3.apk and the checksum from https://downloads.clawperator.com/operator/v0.3.3/operator-v0.3.3.apk.sha256.",
+      "clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id test-device-1",
+    ]);
   });
 });
