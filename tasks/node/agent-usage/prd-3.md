@@ -210,7 +210,20 @@ Out of scope:
   quality only: with PRD-2, the output includes `actionId`, `actionType`, `invalidKeys`,
   and `hint`. Without PRD-2, the output has only `code` and `message`. Merge after PRD-2
   to ship the complete user experience.
-- `skills compile-artifact` must be callable in isolation (no device connection required) for at least the common case of pre-compiled artifacts.
+- `skills compile-artifact` must be callable in isolation (no device connection required)
+  for at least the common case of pre-compiled artifacts.
+- **Pre-ship skills audit (blocking)**: the `skills run` gate must not ship until all
+  skills in the `clawperator-skills` repo have been audited with `--dry-run` and any
+  failures are fixed. The gate turning on immediately breaks any agent running a skill
+  with a stale artifact. Procedure:
+  1. Build the PRD-3 branch locally.
+  2. Run `clawperator skills validate --all --dry-run` (or iterate over every skill id
+     in the registry) against the current `clawperator-skills` install.
+  3. Document every failure: skill id, artifact name, invalid action, invalid keys.
+  4. Fix each failing skill in a `clawperator-skills` PR. The GloBird `format: "ascii"`
+     case is the known example; others may exist.
+  5. The `clawperator-skills` fix PR must be merged (or ready to merge atomically) before
+     this PRD-3 PR ships. Do not merge the gate without the skill fixes landing first.
 
 ---
 
@@ -341,6 +354,8 @@ exist in the installed registry.
   skill. If validation fails, the process exits non-zero and the skill does not start.
 - `clawperator skills run <id> --skip-validate` bypasses the pre-run check and proceeds
   directly to execution.
+- All skills in the `clawperator-skills` registry pass `--dry-run` before this PR ships.
+  Any that do not are fixed in a coordinated `clawperator-skills` PR that merges first.
 - `../clawperator-skills/docs/skill-development-workflow.md` (source in sibling repo)
   documents that `skills run` validates automatically, explains `--skip-validate`, and
   notes that `--dry-run` can be run standalone to inspect results before running. The
