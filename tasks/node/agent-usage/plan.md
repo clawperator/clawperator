@@ -119,9 +119,11 @@ PR-3  PRD-3
 
 PR-4  PRD-4
       - runSkill.ts: add optional onOutput callback (no direct stdout writes)
-      - cli/commands/skills.ts: wire onOutput in pretty mode, not in json mode
+      - cli/commands/skills.ts: wire onOutput in pretty mode, not in json mode;
+        add pre-run banner BEFORE the dry-run gate added in PR-3
       Risk: low. Purely additive to runSkill signature; backward-compatible.
-      Depends on: nothing (independent).
+      Depends on: PR-3 shipped first; banner must be inserted before the dry-run
+      gate in cli/commands/skills.ts (see PRD-4 ordering constraint).
 
 PR-5  PRD-5
       - NDJSON log infrastructure: ~/.clawperator/logs/clawperator-YYYY-MM-DD.log

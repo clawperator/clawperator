@@ -178,7 +178,16 @@ Out of scope:
 
 ## Dependencies
 
-- Independent of PRD-1, PRD-2, PRD-3.
+- Independent of PRD-1 and PRD-2.
+- **Ordering constraint from PRD-3**: PRD-3 adds a dry-run validation gate to `skills run`
+  in `cli/commands/skills.ts`. When implementing the pre-run banner in the same function,
+  the banner must be inserted BEFORE that gate. The intended execution order is:
+  1. Banner prints (version, APK status, log path, docs link)
+  2. Dry-run validation runs
+  3. If validation fails, skill exits — but the agent already saw the banner context
+  If PR-3 has already shipped when this PR is implemented (which it will per the plan
+  sequencing), read `cli/commands/skills.ts` and confirm the banner call precedes the
+  dry-run check, not after it.
 - PRD-5 (persistent logging) may add an additional `onOutput` consumer at the CLI layer - the callback pattern is forward-compatible with that.
 
 ---
