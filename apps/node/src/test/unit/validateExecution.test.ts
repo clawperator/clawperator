@@ -363,6 +363,38 @@ describe("validateExecution", () => {
       assert.ok(!("hint" in (err.details ?? {})));
     }
   });
+
+  it("uses canonical action types for hint lookup while preserving the raw alias in details", () => {
+    try {
+      validateExecution({
+        commandId: "cmd-anchor-6",
+        taskId: "task-anchor-6",
+        source: "test",
+        expectedFormat: "android-ui-automator",
+        timeoutMs: 5000,
+        actions: [
+          {
+            id: "snap",
+            type: "snapshot",
+            params: { format: "ascii" },
+          },
+        ],
+      });
+      assert.fail("expected validation to fail");
+    } catch (e) {
+      const err = e as {
+        details?: {
+          actionType?: string;
+          hint?: string;
+        };
+      };
+      assert.strictEqual(err.details?.actionType, "snapshot");
+      assert.strictEqual(
+        err.details?.hint,
+        "'format' was removed from snapshot_ui. Remove this parameter."
+      );
+    }
+  });
   it("accepts valid open_uri with uri", () => {
     const ex = validateExecution({
       commandId: "c",

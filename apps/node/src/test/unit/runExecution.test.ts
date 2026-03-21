@@ -583,4 +583,29 @@ describe("buildTimeoutError", () => {
     assert.strictEqual("taskId" in error.details, false);
     assert.strictEqual(error.details.lastActionId, "snap-1");
   });
+
+  it("preserves timeout diagnostics fields on the returned error", () => {
+    const error = buildTimeoutError(
+      {
+        commandId: "cmd-timeout-2",
+        taskId: "task-timeout-2",
+        actions: [{ id: "snap-1", type: "snapshot_ui" }],
+        timeoutMs: 2000,
+      },
+      {
+        code: ERROR_CODES.RESULT_ENVELOPE_TIMEOUT,
+        message: "Timed out waiting for result envelope",
+        lastCorrelatedEvents: ["TaskScopeDefault: example"],
+        broadcastDispatchStatus: "sent",
+        deviceId: "emulator-5554",
+        receiverPackage: "com.clawperator.operator.dev",
+      },
+      55
+    );
+
+    assert.deepStrictEqual(error.lastCorrelatedEvents, ["TaskScopeDefault: example"]);
+    assert.strictEqual(error.broadcastDispatchStatus, "sent");
+    assert.strictEqual(error.deviceId, "emulator-5554");
+    assert.strictEqual(error.receiverPackage, "com.clawperator.operator.dev");
+  });
 });

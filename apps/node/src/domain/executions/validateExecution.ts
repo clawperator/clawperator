@@ -339,6 +339,7 @@ export function validateExecution(input: unknown): Execution {
       const rawAction = actionIndex !== undefined ? rawActions?.[actionIndex] : undefined;
       const actionId = (rawAction as { id?: unknown })?.id;
       const actionType = (rawAction as { type?: unknown })?.type;
+      const canonicalActionType = typeof actionType === "string" ? getCanonicalActionType(actionType) : undefined;
 
       if (typeof actionId === "string") {
         details.actionId = actionId;
@@ -351,9 +352,9 @@ export function validateExecution(input: unknown): Execution {
         const invalidKeys = (first as { keys?: string[] }).keys;
         if (invalidKeys !== undefined) {
           details.invalidKeys = invalidKeys;
-          if (typeof actionType === "string") {
+          if (canonicalActionType !== undefined) {
             for (const invalidKey of invalidKeys) {
-              const hint = validationHintByActionParam.get(`${actionType}.${invalidKey}`);
+              const hint = validationHintByActionParam.get(`${canonicalActionType}.${invalidKey}`);
               if (hint !== undefined) {
                 details.hint = hint;
                 break;

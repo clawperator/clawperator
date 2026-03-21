@@ -13,6 +13,7 @@ import { checkApkPresence } from "../doctor/checks/readinessChecks.js";
 import { getReceiverPackageApkPath } from "../version/compatibility.js";
 import { tryAcquire, release, getConflictError } from "./executionStore.js";
 import type { ResultEnvelope, TerminalSource } from "../../contracts/result.js";
+import type { TimeoutDiagnostics } from "../../contracts/errors.js";
 import { extractSnapshotsFromLogs } from "./snapshotHelper.js";
 import { emitResult, emitExecution } from "../observe/events.js";
 import { LIMITS } from "../../contracts/limits.js";
@@ -124,15 +125,20 @@ export interface TimeoutErrorDetails {
   timeoutMs: number;
 }
 
+export interface TimeoutErrorWithDetails extends TimeoutDiagnostics {
+  details: TimeoutErrorDetails;
+  [k: string]: unknown;
+}
+
 export function buildTimeoutError(
   execution: Pick<Execution, "actions" | "timeoutMs"> & Partial<Pick<Execution, "commandId" | "taskId">>,
-  diagnostics: { code: typeof ERROR_CODES.RESULT_ENVELOPE_TIMEOUT; message: string },
+  diagnostics: TimeoutDiagnostics,
   elapsedMs: number
-): { code: typeof ERROR_CODES.RESULT_ENVELOPE_TIMEOUT; message: string; details: TimeoutErrorDetails } {
+): TimeoutErrorWithDetails {
   // Node only knows the last action in the payload, not the action Android was
   // actually executing when the timeout elapsed.
   const lastAction = execution.actions.at(-1);
-  return {
+  const timeoutError: TimeoutErrorWithDetails = {
     ...diagnostics,
     details: {
       ...(execution.commandId !== undefined ? { commandId: execution.commandId } : {}),
@@ -144,6 +150,8 @@ export function buildTimeoutError(
       timeoutMs: execution.timeoutMs,
     },
   };
+
+  return timeoutError;
 }
 
 export function finalizeSuccessfulScreenshotCapture(
