@@ -2,6 +2,9 @@ import { describe, it } from "node:test";
 import assert from "node:assert";
 import {
   getAlternateReceiverVariant,
+  getOperatorApkDownloadUrl,
+  getOperatorApkSha256Url,
+  getReceiverPackageApkPath,
   isVersionCompatible,
   normalizeCompatibilityVersion,
   parseCompatibilityVersion,
@@ -12,6 +15,22 @@ import {
 describe("version compatibility", () => {
   it("normalizes the debug suffix before compatibility parsing", () => {
     assert.strictEqual(normalizeCompatibilityVersion("0.1.4-d"), "0.1.4");
+  });
+
+  it("maps receiver packages to their APK download paths", () => {
+    assert.strictEqual(getReceiverPackageApkPath("com.clawperator.operator.dev"), "~/.clawperator/downloads/operator-debug.apk");
+    assert.strictEqual(getReceiverPackageApkPath("com.clawperator.operator"), "~/.clawperator/downloads/operator.apk");
+  });
+
+  it("builds versioned APK download URLs", () => {
+    assert.strictEqual(
+      getOperatorApkDownloadUrl("0.1.4"),
+      "https://downloads.clawperator.com/operator/v0.1.4/operator-v0.1.4.apk"
+    );
+    assert.strictEqual(
+      getOperatorApkSha256Url("0.1.4"),
+      "https://downloads.clawperator.com/operator/v0.1.4/operator-v0.1.4.apk.sha256"
+    );
   });
 
   it("removes only a trailing debug suffix when deriving the alternate package", () => {
@@ -40,6 +59,12 @@ describe("version compatibility", () => {
     assert.strictEqual(isVersionCompatible("0.1.4", "0.1.4-d"), true);
     assert.strictEqual(isVersionCompatible("0.1.4", "0.1.9"), false);
     assert.strictEqual(isVersionCompatible("0.1.4", "0.2.1"), false);
+  });
+
+  it("rejects prerelease-style versions in compatibility checks", () => {
+    assert.throws(() => parseCompatibilityVersion("0.1.4-alpha"), /Unsupported Clawperator version format/);
+    assert.throws(() => parseCompatibilityVersion("0.1.4-rc.1"), /Unsupported Clawperator version format/);
+    assert.throws(() => isVersionCompatible("0.1.4-alpha", "0.1.4"), /Unsupported Clawperator version format/);
   });
 
   it("parses installed APK metadata from dumpsys output", () => {

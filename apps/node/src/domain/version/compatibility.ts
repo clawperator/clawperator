@@ -157,7 +157,9 @@ export function parseInstalledApkVersion(dumpsysOutput: string): InstalledApkVer
 }
 
 export function isVersionCompatible(cliVersion: string, apkVersion: string): boolean {
-  return normalizeCompatibilityVersion(cliVersion) === normalizeCompatibilityVersion(apkVersion);
+  const parsedCli = parseCompatibilityVersion(normalizeCompatibilityVersion(cliVersion));
+  const parsedApk = parseCompatibilityVersion(normalizeCompatibilityVersion(apkVersion));
+  return parsedCli.normalized === parsedApk.normalized;
 }
 
 export async function probeVersionCompatibility(config: RuntimeConfig): Promise<VersionCompatibilityProbe> {
