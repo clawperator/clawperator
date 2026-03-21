@@ -192,7 +192,13 @@ Out of scope:
 
 - PRD-1 must land first: `preflight.apk.pass` and `preflight.apk.missing` events are produced by the gate added in PRD-1. Without it there is nothing to log at the pre-flight phase.
 - PRD-2 must land first: `logPath` in the timeout error references and extends PRD-2's enrichment.
-- PRD-4 (streaming) may add an additional `onOutput` consumer that also writes to the log - the NDJSON writer should be composable as a second `onOutput` subscriber at the CLI layer.
+- PRD-4 (streaming) is independent of this PRD. Structured lifecycle events
+  (`skills.run.start`, `skills.run.complete`, `skills.run.timeout`) are emitted by the
+  domain layer on process spawn, exit, and timeout — regardless of whether an `onOutput`
+  callback is provided. The `onOutput` callback and the logger are independent mechanisms;
+  neither depends on the other being present. If raw subprocess output chunks should also
+  be written to the log in a future iteration, the NDJSON writer can be wired as a second
+  `onOutput` subscriber at the CLI layer — but that is not part of this PRD.
 - Independent of PRD-3 and PRD-6.
 
 ---
