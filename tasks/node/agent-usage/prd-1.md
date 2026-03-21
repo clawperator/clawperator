@@ -116,12 +116,15 @@ Implementation notes:
 
   // INSERT HERE: APK pre-flight
   const apkCheck = await checkApkPresence(config);
-  if (apkCheck.status !== "pass") {
+  if (apkCheck.status === "fail") {
     return { execution, result: { ok: false, error: { code: "RECEIVER_NOT_INSTALLED",
       message: `Operator APK (${config.receiverPackage}) is not installed on ${deviceId}. ` +
         `Install it with: clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id ${deviceId}`,
     }, deviceId } };
   }
+  // "warn" (transient adb error during pm list packages) does not block execution.
+  // resolveDevice already confirmed adb is responding; a pm failure here is likely
+  // transient. Log the warning and proceed.
 
   // existing
   if (!tryAcquire(deviceId, execution.commandId)) {
