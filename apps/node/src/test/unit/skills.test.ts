@@ -1461,6 +1461,7 @@ describe("runSkill", () => {
     const lines = stdout.split(/\r?\n/).filter((line) => line.length > 0);
     assert.ok(lines[0]?.startsWith(`[Clawperator] v${version}  APK: OK (com.clawperator.operator.dev)`), lines[0]);
     assert.ok(lines[0]?.includes(`Logs: ${logPath}`), lines[0]);
+    assert.ok(lines[0]?.includes(`Hint: tail -f ${logPath}`), lines[0]);
     assert.ok(lines[0]?.includes("Docs: https://docs.clawperator.com/llms.txt"), lines[0]);
   });
 
@@ -1489,6 +1490,7 @@ describe("runSkill", () => {
       assert.strictEqual(code, 0, stdout);
       const lines = stdout.split(/\r?\n/).filter((line) => line.length > 0);
       assert.ok(lines[0]?.includes(`Logs: ${expectedLogPath}`), lines[0]);
+      assert.ok(lines[0]?.includes(`Hint: tail -f ${expectedLogPath}`), lines[0]);
     } finally {
       await rm(tempLogDir, { recursive: true, force: true });
     }

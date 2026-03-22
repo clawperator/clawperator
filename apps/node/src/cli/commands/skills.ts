@@ -183,7 +183,7 @@ export async function cmdSkillsRun(
     const dd = String(logDate.getDate()).padStart(2, "0");
     const logPath = options.logger?.logPath() ?? join(homedir(), ".clawperator", "logs", `clawperator-${yyyy}-${mm}-${dd}.log`);
     process.stdout.write(
-      `[Clawperator] v${getCliVersion()}  APK: ${apkStatus}  Logs: ${logPath}  Docs: https://docs.clawperator.com/llms.txt\n`
+      `[Clawperator] v${getCliVersion()}  APK: ${apkStatus}  Logs: ${logPath}  Hint: tail -f ${logPath}  Docs: https://docs.clawperator.com/llms.txt\n`
     );
   }
 
