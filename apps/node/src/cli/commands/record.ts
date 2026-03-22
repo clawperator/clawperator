@@ -82,15 +82,11 @@ export async function cmdRecordPull(options: {
   logger?: Logger;
 }): Promise<string> {
   try {
-    const config = getDefaultRuntimeConfig();
-    config.logger = options.logger;
-    if (options.deviceId) {
-      config.deviceId = options.deviceId;
-    }
-    config.receiverPackage =
-      options.receiverPackage ??
-      process.env.CLAWPERATOR_RECEIVER_PACKAGE ??
-      config.receiverPackage;
+    const config = getDefaultRuntimeConfig({
+      logger: options.logger,
+      deviceId: options.deviceId,
+      receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_RECEIVER_PACKAGE,
+    });
 
     const { localPath, sessionId } = await pullRecording(config, {
       sessionId: options.sessionId,
