@@ -12,6 +12,7 @@ import { SKILL_OUTPUT_ASSERTION_FAILED } from "../../contracts/skills.js";
 import type { OutputOptions } from "../output.js";
 import { formatSuccess, formatError } from "../output.js";
 import { getCliVersion } from "../../domain/version/compatibility.js";
+import { getAlternateReceiverVariant } from "../../domain/version/compatibility.js";
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 import { checkApkPresence } from "../../domain/doctor/checks/readinessChecks.js";
 import {
@@ -140,6 +141,9 @@ export async function cmdSkillsRun(
       const apkPresence = await checkApkPresence(config);
       if (apkPresence.status === "pass") {
         apkStatus = `OK (${resolvedReceiverPackage})`;
+      } else if (apkPresence.status === "warn") {
+        const alternateVariant = getAlternateReceiverVariant(resolvedReceiverPackage);
+        apkStatus = `MISSING - ${apkPresence.summary}${apkPresence.detail ? ` ${apkPresence.detail}` : ""} Use --receiver-package ${alternateVariant} or reinstall the matching APK.`;
       }
     } catch {
       apkStatus = `MISSING - run \`clawperator operator setup --apk <path>\``;

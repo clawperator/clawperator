@@ -126,7 +126,11 @@ function getTodayLogPath(): string {
   return join(homedir(), ".clawperator", "logs", `clawperator-${yyyy}-${mm}-${dd}.log`);
 }
 
-async function createFakeAdb(options: { installed: boolean; receiverPackage: string }): Promise<string> {
+async function createFakeAdb(options: {
+  installed: boolean;
+  receiverPackage: string;
+  installedPackage?: string;
+}): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), "clawperator-fake-adb-"));
   const scriptPath = join(dir, "adb");
   const script = [
@@ -135,7 +139,7 @@ async function createFakeAdb(options: { installed: boolean; receiverPackage: str
     "  shift 2",
     "fi",
     "if [ \"$1\" = \"shell\" ] && [ \"$2\" = \"pm\" ] && [ \"$3\" = \"list\" ] && [ \"$4\" = \"packages\" ]; then",
-    `  if [ ${JSON.stringify(options.installed ? 0 : 1)} -eq 0 ] && [ \"$5\" = ${JSON.stringify(options.receiverPackage)} ]; then`,
+    `  if [ ${JSON.stringify(options.installed ? 0 : 1)} -eq 0 ] && [ \"$5\" = ${JSON.stringify(options.installedPackage ?? options.receiverPackage)} ]; then`,
     `    printf 'package:%s\\n' \"$5\"`,
     "  fi",
     "  exit 0",
@@ -1415,6 +1419,28 @@ describe("runSkill", () => {
     assert.ok(lines[0]?.startsWith(`[Clawperator] v${version}  APK: OK (com.clawperator.operator.dev)`), lines[0]);
     assert.ok(lines[0]?.includes(`Logs: ${logPath}`), lines[0]);
     assert.ok(lines[0]?.includes("Docs: https://docs.clawperator.com/llms.txt"), lines[0]);
+  });
+
+  it("CLI skills run preserves variant mismatch details in the pretty banner", async () => {
+    const fakeAdbDir = await createFakeAdb({
+      installed: true,
+      receiverPackage: "com.clawperator.operator",
+      installedPackage: "com.clawperator.operator.dev",
+    });
+    const { stdout, code } = await runCli([
+      "skills", "run", TEST_FIXTURE_CHUNKED_OUTPUT, "--receiver-package", "com.clawperator.operator", "--output", "pretty",
+    ], {
+      env: {
+        ...process.env,
+        PATH: `${fakeAdbDir}${process.env.PATH ? `:${process.env.PATH}` : ""}`,
+        CLAWPERATOR_SKILLS_REGISTRY: TEST_REGISTRY_PATH,
+      },
+    });
+    assert.strictEqual(code, 0, stdout);
+    const firstLine = stdout.split(/\r?\n/, 1)[0] ?? "";
+    assert.match(firstLine, /Wrong Operator variant installed/);
+    assert.match(firstLine, /Expected com\.clawperator\.operator but found com\.clawperator\.operator\.dev/);
+    assert.match(firstLine, /Use --receiver-package com\.clawperator\.operator\.dev/);
   });
 
   it("CLI skills run suppresses the banner in json mode", async () => {
