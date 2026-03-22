@@ -133,7 +133,7 @@ Current fields:
 | :--- | :--- | :--- |
 | `id` | Yes | Globally unique skill identifier. Usually `<applicationId>.<intent>`. |
 | `applicationId` | Yes | Android package primarily targeted by the skill. |
-| `intent` | Yes | Short action label such as `capture-overview` or `get-aircon-status`. |
+| `intent` | Yes | Short action label such as `capture-overview` or `get-climate`. |
 | `summary` | Yes | One-sentence description shown in discovery output. |
 | `path` | Yes | Skill folder path relative to the skills repo root. |
 | `skillFile` | Yes | Human-readable doc path, usually `skills/<skill_id>/SKILL.md`. |

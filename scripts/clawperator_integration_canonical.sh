@@ -15,14 +15,14 @@ npm --prefix apps/node run build
 
 export DEVICE_ID="${DEVICE_ID:-}"
 export CLAWPERATOR_RECEIVER_PACKAGE="${CLAWPERATOR_RECEIVER_PACKAGE:-com.clawperator.operator.dev}"
-SKILL_ID="${SKILL_ID:-com.google.android.apps.chromecast.app.get-aircon-status}"
-ARTIFACT_NAME="${ARTIFACT_NAME:-ac-status}"
-AC_TILE_NAME="${AC_TILE_NAME:-Master}"
+SKILL_ID="${SKILL_ID:-com.google.android.apps.chromecast.app.get-climate}"
+ARTIFACT_NAME="${ARTIFACT_NAME:-climate-status}"
+CLIMATE_TILE_NAME="${CLIMATE_TILE_NAME:-Master}"
 
 CLI=(node apps/node/dist/cli/index.js)
 
 echo "=== integration: compile artifact ==="
-"${CLI[@]}" skills compile-artifact "$SKILL_ID" --artifact "$ARTIFACT_NAME" --vars "{\"AC_TILE_NAME\":\"$AC_TILE_NAME\"}" --output json \
+"${CLI[@]}" skills compile-artifact "$SKILL_ID" --artifact "$ARTIFACT_NAME" --vars "{\"CLIMATE_TILE_NAME\":\"$CLIMATE_TILE_NAME\"}" --output json \
   | node -e 'const d=JSON.parse(require("fs").readFileSync(0,"utf8")); if (!d.execution) process.exit(1); require("fs").writeFileSync("/tmp/clawperator-integration-exec.json", JSON.stringify(d.execution));'
 
 echo "=== integration: execute on device ==="

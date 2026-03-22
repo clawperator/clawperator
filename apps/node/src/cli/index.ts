@@ -59,7 +59,7 @@ Commands:
                                             (bare keyword is shorthand for --keyword)
   skills compile-artifact <skill_id> --artifact <name> [--vars <json>]
   skills compile-artifact --skill-id <id> --artifact <name> [--vars <json>]
-                                            Compile from a skill artifact (skill: positional or --skill-id; artifact: ac-status or ac-status.recipe.json)
+                                            Compile from a skill artifact (skill: positional or --skill-id; artifact: climate-status or climate-status.recipe.json)
   skills new <skill_id> [--summary <text>]
                                             Scaffold a new local skill folder and registry entry
   skills validate <skill_id> [--dry-run]
@@ -716,7 +716,7 @@ async function main(): Promise<void> {
           result = JSON.stringify({
             code: "USAGE",
             message:
-              "skills compile-artifact requires <skill_id> (positional) or --skill-id <id>, and --artifact <name>. Example: skills compile-artifact com.example.skill --artifact ac-status [--vars '{}']",
+              "skills compile-artifact requires <skill_id> (positional) or --skill-id <id>, and --artifact <name>. Example: skills compile-artifact com.example.skill --artifact climate-status [--vars '{}']",
           });
         } else {
           result = await (await import("./commands/skills.js")).cmdSkillsCompileArtifact(skillId, artifact, vars, outWithLogger);
