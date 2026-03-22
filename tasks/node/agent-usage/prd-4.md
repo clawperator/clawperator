@@ -3,6 +3,7 @@
 Workstream: WS-4a
 Priority: 4
 Proposed PR: PR-4
+Status: [DONE]
 
 Split from the original PRD-4 per reviewer feedback. This PRD covers live progress
 forwarding for `skills run` only. Persistent logging is PRD-5.
