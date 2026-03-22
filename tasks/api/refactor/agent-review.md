@@ -877,4 +877,195 @@ My unfiltered verdict
 
 The underlying runtime model is strong. The CLI surface is not.
 Right now it feels like an implementation-shaped CLI, not an agent-shaped CLI.
-You should optimize for guessability first, taxonomy second. The command someone tries blind in minute 1 should usually work. The docs already establish the right mental model; the CLI should stop contradicting it.  ￼  ￼
+You should optimize for guessability first, taxonomy second. The command someone tries blind in minute 1 should usually work. The docs already establish the right mental model; the CLI should stop contradicting it.
+
+---
+
+# Second Agent Review: Plan Validation
+
+A second agent was given the API refactor plan (produced in response to the
+review above) and asked to validate it before implementation. The plan at that
+point had `press-key` as canonical with `press` as synonym, `scroll` marked as
+"needs investigation", no failure-mode acceptance criteria, and no explicit
+selector resolution rules.
+
+The review below drove several material changes to the final plan.
+
+---
+
+## Verdict
+
+The plan is structurally sound and ready for execution. Phase boundaries are
+clear, priorities are correct, and the direction aligns with agent-first CLI
+design. No architectural rewrites required.
+
+---
+
+## Required Changes (must fix before implementation)
+
+### 1. Command Naming: `press-key` -> `press` (canonical)
+
+**Problem:** Agents will not guess `press-key`. Current plan had `press-key` as
+canonical and `press` as synonym.
+
+**Change:**
+- canonical: `press`
+- synonym: `press-key`
+- keep shortcut: `back`
+
+Result: `clawperator press back`
+
+### 2. Unify `open` command surface
+
+**Problem:** Current plan exposes `open`, `open-uri`, and `open-url` as separate
+commands. This creates unnecessary branching.
+
+**Change:** Make `open` the canonical command:
+
+```
+clawperator open <target>
+```
+
+Interpretation:
+- `http(s)://` -> URL
+- `*://` -> URI
+- otherwise -> package name
+
+Optional: keep `open-uri` / `open-url` as internal aliases (not documented).
+
+### 3. Define deterministic selector resolution rules
+
+**Missing behavior:** Selector semantics were incomplete.
+
+**Add to Phase 2:**
+- multiple simple flags (`--text`, `--id`, etc.) combine with AND
+- `--selector` is mutually exclusive with simple flags
+- container flags scope element search
+- if multiple matches -> select first in traversal order
+
+Required for predictability and agent reasoning consistency.
+
+### 4. Define `read` output contract
+
+**Missing:** Ambiguity in return behavior.
+
+**Add rule:**
+- default: return first matching node text
+- future: `--all` may return list
+
+### 5. Lock `scroll` command spec in Phase 1
+
+**Problem:** Currently "needs investigation."
+
+**Required spec:**
+
+```
+clawperator scroll <down|up|left|right>
+```
+
+No deferral. This is a core primitive.
+
+### 6. Add failure-mode behavior requirements
+
+**Missing:** Only happy-path success was defined.
+
+**Add acceptance criteria:**
+
+**Case: missing selector**
+```
+clawperator click
+```
+Must: explain selector is required, list valid selector flags, show example.
+
+**Case: missing argument**
+```
+clawperator open
+```
+Must: explain required argument, show package + URL examples.
+
+**Case: incomplete press**
+```
+clawperator press
+```
+Must: list valid keys (back, home, recents).
+
+### 7. Clarify namespace rule
+
+**Problem:** "No namespaces" is too absolute and conflicts with existing
+commands like `skills` and `emulator`.
+
+**Replace with:** Flat commands are canonical for device interaction. Namespaces
+are only allowed for subsystems with lifecycle/state (e.g. `skills`, `emulator`,
+`recording`). Do not introduce `ui`, `app`, or `device` namespaces.
+
+---
+
+## Strong Recommendations (high value improvements)
+
+### 8. Establish primary command names vs synonyms
+
+**Problem:** Peer synonyms (`click` / `tap`) create doc ambiguity.
+
+**Rule:**
+- implementation: both work
+- documentation/help: use one canonical form only
+
+Example:
+- document: `click`
+- accept: `tap`
+
+### 9. Split Phase 1 mentally into two layers
+
+**Current risk:** Phase 1 bundles command promotion, positional args, flag
+normalization, and removals.
+
+**Suggested structure:**
+- Phase 1A: promote flat commands, remove `action`/`observe`, implement "did you mean"
+- Phase 1B: positional arguments, flag normalization
+
+Can be one PR, but must be logically separable.
+
+### 10. Decouple skills migration from CLI refactor
+
+**Add constraint:** Skills migration is a validation step, not a blocking
+dependency for CLI refactor. Avoids rollout coupling.
+
+---
+
+## Confirmed Correct Decisions (no changes needed)
+
+**Hard removal of `action` / `observe`:**
+- correct given zero users
+- use hard error with "did you mean"
+- do not support legacy aliases
+
+**Flat command surface:**
+- correct
+- aligns with agent guessability
+- avoids namespace pollution
+
+**Selector flags approach:**
+- correct
+- matches agent expectations
+- better than JSON input model
+
+**Phase ordering:**
+- Phase 1: command surface
+- Phase 2: selectors
+- Phase 3: ergonomics
+- Phase 4: docs
+
+Correct sequencing.
+
+---
+
+## Final Expected Outcome
+
+After applying changes:
+- CLI is fully guessable by agents
+- no legacy surface area remains
+- selector behavior is deterministic
+- commands are minimal and unambiguous
+- failure paths are recoverable via CLI feedback
+
+This plan is ready for execution after incorporating the required changes above.
