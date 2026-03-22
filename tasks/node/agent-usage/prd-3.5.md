@@ -3,8 +3,11 @@
 Workstream: WS-3.5 (maintenance/migration — between PRD-3 and PRD-4)
 Priority: 3.5 (blocking — must land before PRD-4)
 Proposed PR: PR-3.5 (in `clawperator-skills`; version bump and tag in this repo)
+Status: [DONE]
 
 ---
+
+Completed in `clawperator-skills` and verified on-device. The version/tag steps in this repository were already complete when this PRD was opened, so this doc now serves as the historical record for the audit and release work.
 
 ## Problem Statement
 

@@ -152,6 +152,10 @@ schema validation for artifact-backed skills. It reads each compiled artifact,
 parses the JSON, and validates it against Clawperator's execution schema before
 any device interaction happens.
 
+`clawperator skills run` also performs the same pre-run gate automatically
+before it starts device actions, so the explicit `--dry-run` check is the
+preflight step and `skills run` is the live execution step.
+
 What it does not cover:
 
 - runtime UI state
