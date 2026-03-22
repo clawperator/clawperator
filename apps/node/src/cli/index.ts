@@ -751,7 +751,7 @@ async function main(): Promise<void> {
             effectiveTimeoutMs,
             expectContains,
             receiverPackage,
-            { ...out, skipValidate }
+            { ...out, skipValidate, deviceId }
           );
         }
       } else if (rest[0] === "install") {

@@ -1,3 +1,6 @@
+import { EventEmitter } from "node:events";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { listSkills } from "../../domain/skills/listSkills.js";
 import { getSkill } from "../../domain/skills/getSkill.js";
 import { compileArtifact } from "../../domain/skills/compileArtifact.js";
@@ -9,12 +12,38 @@ import { validateAllSkills, validateSkill } from "../../domain/skills/validateSk
 import { SKILL_OUTPUT_ASSERTION_FAILED } from "../../contracts/skills.js";
 import type { OutputOptions } from "../output.js";
 import { formatSuccess, formatError } from "../output.js";
+import { getCliVersion } from "../../domain/version/compatibility.js";
+import { getAlternateReceiverVariant } from "../../domain/version/compatibility.js";
+import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
+import { checkApkPresence } from "../../domain/doctor/checks/readinessChecks.js";
 import {
   CLAWPERATOR_BIN_ENV_VAR,
   CLAWPERATOR_RECEIVER_PACKAGE_ENV_VAR,
   resolveSkillBinCommand,
   resolveReceiverPackage,
 } from "../../domain/skills/skillsConfig.js";
+
+function isIgnorablePipeError(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) {
+    return false;
+  }
+  const code = (error as { code?: unknown }).code;
+  return code === "EPIPE" || code === "ERR_STREAM_DESTROYED";
+}
+
+function suppressStreamPipeErrors(stream: EventEmitter): () => void {
+  const onError = (error: unknown) => {
+    if (!isIgnorablePipeError(error)) {
+      process.nextTick(() => {
+        throw error instanceof Error ? error : new Error(String(error));
+      });
+    }
+  };
+  stream.on("error", onError);
+  return () => {
+    stream.off("error", onError);
+  };
+}
 
 export async function cmdSkillsList(options: { format: OutputOptions["format"] }): Promise<string> {
   const result = await listSkills();
@@ -108,6 +137,7 @@ export async function cmdSkillsRun(
   options: {
     format: OutputOptions["format"];
     skipValidate?: boolean;
+    deviceId?: string;
     runSkillImpl?: typeof runSkill;
     validateSkillImpl?: typeof validateSkill;
   }
@@ -124,6 +154,36 @@ export async function cmdSkillsRun(
 
   const runSkillImpl = options.runSkillImpl ?? runSkill;
   const validateSkillImpl = options.validateSkillImpl ?? validateSkill;
+  if (options.format !== "json") {
+    const config = getDefaultRuntimeConfig({
+      deviceId: options.deviceId,
+      receiverPackage: resolvedReceiverPackage,
+    });
+    let apkStatus = `MISSING - run \`clawperator operator setup --apk <path>\``;
+    try {
+      const apkPresence = await checkApkPresence(config);
+      if (apkPresence.status === "pass") {
+        apkStatus = `OK (${resolvedReceiverPackage})`;
+      } else if (apkPresence.status === "warn") {
+        const alternateVariant = getAlternateReceiverVariant(resolvedReceiverPackage);
+        apkStatus = `WARN - ${apkPresence.summary}${apkPresence.detail ? ` ${apkPresence.detail}` : ""} Use --receiver-package ${alternateVariant} or reinstall the matching APK.`;
+      } else {
+        apkStatus = `FAIL - ${apkPresence.summary}${apkPresence.detail ? ` ${apkPresence.detail}` : ""}`;
+      }
+    } catch {
+      apkStatus = `MISSING - run \`clawperator operator setup --apk <path>\``;
+    }
+
+    const logDate = new Date();
+    const yyyy = String(logDate.getFullYear());
+    const mm = String(logDate.getMonth() + 1).padStart(2, "0");
+    const dd = String(logDate.getDate()).padStart(2, "0");
+    const logPath = join(homedir(), ".clawperator", "logs", `clawperator-${yyyy}-${mm}-${dd}.log`);
+    process.stdout.write(
+      `[Clawperator] v${getCliVersion()}  APK: ${apkStatus}  Logs: ${logPath}  Docs: https://docs.clawperator.com/llms.txt\n`
+    );
+  }
+
   if (!options.skipValidate) {
     const validation = await validateSkillImpl(skillId, undefined, { dryRun: true });
     if (!validation.ok) {
@@ -138,7 +198,32 @@ export async function cmdSkillsRun(
     }
   }
 
-  const result = await runSkillImpl(skillId, args, undefined, timeoutMs, env);
+  const result = options.format !== "json"
+    ? await (async () => {
+        const removeStdoutErrorListener = suppressStreamPipeErrors(process.stdout);
+        const removeStderrErrorListener = suppressStreamPipeErrors(process.stderr);
+        try {
+          return await runSkillImpl(skillId, args, undefined, timeoutMs, env, {
+            onOutput: (chunk, stream) => {
+              try {
+                if (stream === "stdout") {
+                  process.stdout.write(chunk);
+                } else {
+                  process.stderr.write(chunk);
+                }
+              } catch (error) {
+                if (!isIgnorablePipeError(error)) {
+                  throw error;
+                }
+              }
+            },
+          });
+        } finally {
+          removeStdoutErrorListener();
+          removeStderrErrorListener();
+        }
+      })()
+    : await runSkillImpl(skillId, args, undefined, timeoutMs, env);
   if (result.ok) {
     if (expectContains && !result.output.includes(expectContains)) {
       return formatError({

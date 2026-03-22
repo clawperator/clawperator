@@ -77,6 +77,42 @@
       "artifacts": []
     },
     {
+      "id": "test-fixture-chunked-output",
+      "applicationId": "test-fixture",
+      "intent": "chunked-output",
+      "summary": "Test fixture that emits stdout in multiple chunks.",
+      "path": "skills/test-fixture-chunked-output",
+      "skillFile": "skills/test-fixture-chunked-output/SKILL.md",
+      "scripts": [
+        "scripts/chunked-output.sh"
+      ],
+      "artifacts": []
+    },
+    {
+      "id": "test-fixture-mixed-streams",
+      "applicationId": "test-fixture",
+      "intent": "mixed-streams",
+      "summary": "Test fixture that emits both stdout and stderr.",
+      "path": "skills/test-fixture-mixed-streams",
+      "skillFile": "skills/test-fixture-mixed-streams/SKILL.md",
+      "scripts": [
+        "scripts/mixed-streams.sh"
+      ],
+      "artifacts": []
+    },
+    {
+      "id": "test-fixture-split-word",
+      "applicationId": "test-fixture",
+      "intent": "split-word",
+      "summary": "Test fixture that splits a word across multiple stdout chunks.",
+      "path": "skills/test-fixture-split-word",
+      "skillFile": "skills/test-fixture-split-word/SKILL.md",
+      "scripts": [
+        "scripts/split-word.sh"
+      ],
+      "artifacts": []
+    },
+    {
       "id": "test-skill-invalid-artifact",
       "applicationId": "test-skill",
       "intent": "invalid-artifact",
