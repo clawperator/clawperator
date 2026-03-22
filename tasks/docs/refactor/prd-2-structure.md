@@ -1,12 +1,11 @@
-# PRD-7: Docs Structural Reform
+# PRD-2: Docs Structural Reform
 
-Workstream: WS-7
-Priority: 7 (last - must follow all runtime PRDs)
-Proposed PR: PR-7
+Workstream: docs-refactor
+Priority: 2 (within docs refactor; blocked on PRD-1 completion)
 
-New PRD added to address a gap in the original plan. The runtime PRDs (1-5) fix the
-behavior; PR-6 aligns existing docs with that behavior. This PRD fixes the structure of
-the docs site itself, which has a separate and older problem.
+Originally PRD-7 in `tasks/node/agent-usage/`. Moved here after the API refactor
+plan split that work into its own task area. PRD-1 (entry points) aligns existing
+docs with shipped behavior. This PRD fixes the structure of the docs site itself.
 
 ---
 

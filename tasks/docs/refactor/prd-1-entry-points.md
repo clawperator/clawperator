@@ -1,12 +1,10 @@
-# PRD-6: Docs, Entry Points, and Missing Integration Hooks
+# PRD-1: Docs Entry Points, Agent Discoverability, and Integration Hooks
 
-Workstream: WS-6
-Priority: 6
-Proposed PR: PR-6
+Workstream: docs-refactor
+Priority: 1 (within docs refactor; blocked on API refactor completion)
 
-Merged from both agents. Other agent's PRD-4 (docs consolidation) plus this analysis's
-PRD-3 items (doctor failure links, operator_event.sh). The install.sh banner and the
-doc contradiction fix ship in PR-1. This PR handles the remainder.
+Originally PRD-6 in `tasks/node/agent-usage/`. Moved here after the API refactor
+plan split that work into its own task area.
 
 ---
 
@@ -136,7 +134,7 @@ If the intended behavior is confirmed and straightforward: implement it, followi
 If the intended behavior is non-trivial or requires a human decision: create a stub with all of the following properties:
 - Accepts any arguments
 - Exits 0
-- Emits one line to stderr: `operator_event.sh: stub - not yet implemented (see tasks/node/agent-usage/prd-6.md)`
+- Emits one line to stderr: `operator_event.sh: stub - not yet implemented (see tasks/docs/refactor/prd-1-entry-points.md)`
 
 **Do not merge a silent no-op stub.** A silent exit-0 with no output masks the failure and could suppress real events that OpenClaw expected to receive. The stderr note keeps the stub visible in log inspection.
 

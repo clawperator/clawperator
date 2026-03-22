@@ -10,7 +10,8 @@ Reviewed 2026-03-23 by a second independent agent. Required changes incorporated
 
 Primary inputs:
 - External agent UX review (full transcript in session context)
-- `tasks/node/agent-usage/prd-5.9.md` (original flatten proposal, now superseded by this plan)
+- Original PRD-5.9 flatten proposal (superseded by this plan; deleted with
+  `tasks/node/agent-usage/`)
 - `docs/node-api-for-agents.md` (current API contract)
 - `apps/node/src/cli/` (current CLI dispatch)
 
