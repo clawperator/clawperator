@@ -1964,4 +1964,20 @@ describe("runSkill logging", () => {
     assert.ok(lines.some(line => line.event === "skills.run.timeout"));
     assert.ok(!lines.some(line => line.event === "skills.run.complete"));
   });
+
+  it("logs a failure event when the skill exits non-zero", async () => {
+    const logger = createLogger({ logDir: join(tempRoot, "logs"), logLevel: "info" });
+
+    const result = await runSkill("com.test.fail", [], undefined, undefined, undefined, {
+      logger,
+    });
+
+    assert.ok(!result.ok);
+    assert.strictEqual(result.code, SKILL_EXECUTION_FAILED);
+    const contents = await readFile(logger.logPath()!, "utf8");
+    const lines = contents.trimEnd().split("\n").map(line => JSON.parse(line) as { event: string });
+    assert.ok(lines.some(line => line.event === "skills.run.start"));
+    assert.ok(lines.some(line => line.event === "skills.run.failed"));
+    assert.ok(!lines.some(line => line.event === "skills.run.complete"));
+  });
 });

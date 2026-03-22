@@ -557,7 +557,7 @@ async function main(): Promise<void> {
     }
     case "provision":
       if (rest[0] === "emulator") {
-        result = await (await import("./commands/emulator.js")).cmdProvisionEmulator(out);
+        result = await (await import("./commands/emulator.js")).cmdProvisionEmulator(outWithLogger);
       } else {
         result = JSON.stringify({ code: "USAGE", message: "provision emulator" });
       }

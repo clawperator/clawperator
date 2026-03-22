@@ -176,6 +176,12 @@ export async function runSkill(
 
       if (code !== 0) {
         const exitCode = code ?? 1;
+        callbacks?.logger?.log({
+          ts: new Date().toISOString(),
+          level: "error",
+          event: "skills.run.failed",
+          message: `Skill ${skillId} exited with code ${exitCode} after ${durationMs}ms`,
+        });
         finish({
           ok: false,
           code: SKILL_EXECUTION_FAILED,
