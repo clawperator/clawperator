@@ -45,6 +45,7 @@ const TEST_SKILL_VALID_ARTIFACT = "test-skill-valid-artifact";
 const TEST_SKILL_INVALID_ARTIFACT = "test-skill-invalid-artifact";
 const TEST_SKILL_SCRIPT_ONLY = "test-skill-script-only";
 const TEST_SKILL_EMPTY_ARTIFACTS = "test-skill-empty-artifacts";
+const TEST_SKILL_PROGRESS = "com.test.progress";
 const TEST_FIXTURE_CHUNKED_OUTPUT = "test-fixture-chunked-output";
 const TEST_FIXTURE_MIXED_STREAMS = "test-fixture-mixed-streams";
 const TEST_FIXTURE_SPLIT_WORD = "test-fixture-split-word";
@@ -1263,6 +1264,41 @@ describe("runSkill", () => {
     assert.strictEqual(result.code, SKILL_EXECUTION_FAILED);
     assert.ok(result.stdout?.includes('"stage":"before-failure"'));
     assert.ok(result.stderr?.includes("FAIL_OUTPUT:intentional"));
+  });
+
+  it("keeps progress lines before the result line in result.output", async () => {
+    const result = await runSkill(TEST_SKILL_PROGRESS, []);
+    assert.ok(result.ok, `Expected progress fixture to succeed: ${"message" in result ? result.message : ""}`);
+
+    const lines = result.output.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+    const resultIndex = lines.findIndex((line) => line.startsWith("✅"));
+    const progressLines = lines.filter((line) => line.startsWith("[skill:"));
+
+    assert.ok(progressLines.length > 0, "expected at least one progress line");
+    assert.ok(resultIndex >= 0, "expected a canonical result line");
+    assert.strictEqual(lines[lines.length - 1].startsWith("✅"), true, "✅ line must be last");
+    assert.ok(progressLines.every((line) => lines.indexOf(line) < resultIndex), "progress must precede result");
+    assert.ok(!lines.slice(resultIndex + 1).some((line) => line.startsWith("[skill:")), "no progress after result");
+  });
+
+  it("preserves progress lines in JSON mode result.output", async () => {
+    const { stdout, stderr, code } = await runCli([
+      "skills",
+      "run",
+      TEST_SKILL_PROGRESS,
+      "--output",
+      "json",
+    ]);
+
+    assert.strictEqual(code, 0, stderr);
+    const parsed = JSON.parse(stdout) as { output?: string };
+    assert.ok(typeof parsed.output === "string");
+
+    const outputLines = parsed.output!.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+    assert.ok(outputLines.some((line) => line.startsWith("[skill:")), "expected progress lines in result.output");
+    const resultLines = outputLines.filter((line) => line.startsWith("✅"));
+    assert.strictEqual(resultLines.length, 1, "expected exactly one canonical result line");
+    assert.ok(resultLines[0].includes("Progress fixture complete"));
   });
 
   it("returns partial stdout when a skill times out", async () => {
