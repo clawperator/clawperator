@@ -178,6 +178,88 @@ The following commands are not affected and should not be modified:
 
 ---
 
+## Implementation Discipline
+
+These rules apply to every phase. They are not optional.
+
+### Commit early, commit often
+
+Create a commit at every natural breakpoint - one coherent sub-task, one
+verified behavior change, one passing test suite. Do not batch an entire phase
+into a single commit. Use conventional commit format (`feat:`, `fix:`,
+`refactor:`, `chore:`). Prefer incremental commits over amending.
+
+A natural breakpoint is: "the flag aliases work and tests pass" or "the `click`
+command is promoted and smoke test passes" or "the selector shorthands are
+wired and unit tests are green." Each of these is a commit.
+
+### Build before test, always
+
+The CLI tests spawn `dist/cli/index.js` as a subprocess. If you run `npm run
+test` without `npm run build` first, the tests exercise stale compiled output.
+The loop is:
+
+```
+npm --prefix apps/node run build && npm --prefix apps/node run test
+```
+
+Do this every time. Do not skip the build step.
+
+### Test on a real device or emulator after every phase
+
+Unit tests prove the CLI parses arguments correctly. They do not prove the
+command works on an Android device. After completing each phase:
+
+1. Connect to a device or start an emulator: `clawperator devices`
+2. Run the promoted commands against the device:
+   ```
+   clawperator snapshot --json --device <id>
+   clawperator open com.android.settings --device <id>
+   clawperator click --text "Wi-Fi" --device <id>
+   clawperator press back --device <id>
+   ```
+3. Run the core smoke script: `./scripts/clawperator_smoke_core.sh`
+
+If a command works in unit tests but fails on a device, the command is broken.
+Fix it before moving on.
+
+Prefer the debug Operator APK (`--package com.clawperator.operator.dev`) for
+local testing. See CLAUDE.md "Device Selection" for full guidance.
+
+### Verify skills continuously, not at the end
+
+Three skills must remain working throughout the refactor:
+- `com.android.settings.capture-overview`
+- `com.google.android.apps.chromecast.app.set-climate`
+- `com.solaxcloud.starter.get-battery`
+
+After each phase, run at least the Android Settings skill on a connected device:
+
+```
+clawperator skills run com.android.settings.capture-overview --device <id> --json
+```
+
+If the skill breaks because it uses old command forms internally, update the
+skill immediately - do not defer it. A broken skill is a signal that the
+refactor missed something or that the migration path has a gap.
+
+The skills live in the sibling repo `../clawperator-skills`. Changes there
+should be committed and tested alongside the CLI changes. Do not leave skill
+fixes for "later."
+
+### Use the branch-local build, not the global install
+
+When testing CLI changes, always use the branch-local build:
+
+```
+node apps/node/dist/cli/index.js <command>
+```
+
+Or link it locally. Do not use the globally installed `clawperator` binary,
+which may lag behind the branch and silently hide new or renamed commands.
+
+---
+
 ## Phase 0: Infrastructure and Compatibility
 
 Establish the foundation that makes Phases 1-2 safe.
@@ -576,23 +658,36 @@ the alpha/unstable status and zero external consumers.
 
 ## Skills Migration Strategy
 
-Skills migration validates the refactor but does not block it. CLI changes land
-first; skills are updated to confirm the new surface works end-to-end.
+Skills are the primary integration test for this refactor. If skills break, the
+refactor has failed regardless of whether unit tests pass. Treat skill breakage
+as a blocking bug, not a follow-up task.
 
-**Phase 1 (validation):** Migrate three active skills that are regularly tested:
+**Three core skills must work at all times:**
 - `com.android.settings.capture-overview`
 - `com.google.android.apps.chromecast.app.set-climate`
 - `com.solaxcloud.starter.get-battery`
 
-These are migrated after Phase 1 CLI changes land. They validate the new command
-surface on real devices.
+These skills live in the sibling repo `../clawperator-skills`. If a CLI change
+breaks them, update the skill immediately in the same work session. Commit the
+skill fix alongside (or immediately after) the CLI change that caused it.
 
-**Phase 2 (optional):** Migrate any skill commands that use `--selector` JSON to
-use simple flags where possible. Most skills use `execute` payloads (not CLI
-selectors), so this may be minimal.
+**Per-phase expectations:**
 
-**Phase 3 (final):** Bulk migration of all remaining skills. Verify with
-`skills validate --dry-run` and `clawperator_smoke_skills.sh`.
+- **Phase 1:** After promoting commands and removing `action`/`observe`, check
+  whether any of the three skills invoke CLI commands directly (vs. using
+  `execute` payloads). If they use old command forms like `clawperator action
+  open-app` or `clawperator observe snapshot`, update them. Run each skill on a
+  connected device to confirm it still works end-to-end.
+
+- **Phase 2:** After adding selector flags, check whether any skill would
+  benefit from `--text` or `--id` instead of `--selector` JSON. Update if so.
+  Most skills use `execute` payloads rather than CLI selectors, so this may be
+  minimal. Run skills to confirm no regressions.
+
+- **Phase 3:** Bulk migration of any remaining skills. Verify with
+  `skills validate --dry-run` and `clawperator_smoke_skills.sh`. This is
+  cleanup, not first discovery - by this point, the three core skills should
+  already be working.
 
 ---
 
