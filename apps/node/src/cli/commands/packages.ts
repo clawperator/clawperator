@@ -3,15 +3,18 @@ import { resolveDevice } from "../../domain/devices/resolveDevice.js";
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 import type { OutputOptions } from "../output.js";
 import { formatSuccess, formatError } from "../output.js";
+import type { Logger } from "../../adapters/logger.js";
 
 export async function cmdPackagesList(options: {
   format: OutputOptions["format"];
   deviceId?: string;
   thirdParty?: boolean;
+  logger?: Logger;
 }): Promise<string> {
   const config = getDefaultRuntimeConfig({
     deviceId: options.deviceId,
     adbPath: process.env.ADB_PATH,
+    logger: options.logger,
   });
   try {
     const resolved = await resolveDevice(config);

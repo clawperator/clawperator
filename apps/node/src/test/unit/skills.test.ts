@@ -1428,6 +1428,36 @@ describe("runSkill", () => {
     assert.ok(lines[0]?.includes("Docs: https://docs.clawperator.com/llms.txt"), lines[0]);
   });
 
+  it("CLI skills run banner reflects CLAWPERATOR_LOG_DIR overrides", async () => {
+    const fakeAdbDir = await createFakeAdb({
+      installed: true,
+      receiverPackage: "com.clawperator.operator.dev",
+    });
+    const tempLogDir = await mkdtemp(join(tmpdir(), "clawperator-logs-"));
+    try {
+      const now = new Date();
+      const yyyy = String(now.getFullYear());
+      const mm = String(now.getMonth() + 1).padStart(2, "0");
+      const dd = String(now.getDate()).padStart(2, "0");
+      const expectedLogPath = join(tempLogDir, `clawperator-${yyyy}-${mm}-${dd}.log`);
+      const { stdout, code } = await runCli([
+        "skills", "run", TEST_FIXTURE_CHUNKED_OUTPUT, "--receiver-package", "com.clawperator.operator.dev", "--output", "pretty",
+      ], {
+        env: {
+          ...process.env,
+          PATH: `${fakeAdbDir}${process.env.PATH ? `:${process.env.PATH}` : ""}`,
+          CLAWPERATOR_SKILLS_REGISTRY: TEST_REGISTRY_PATH,
+          CLAWPERATOR_LOG_DIR: tempLogDir,
+        },
+      });
+      assert.strictEqual(code, 0, stdout);
+      const lines = stdout.split(/\r?\n/).filter((line) => line.length > 0);
+      assert.ok(lines[0]?.includes(`Logs: ${expectedLogPath}`), lines[0]);
+    } finally {
+      await rm(tempLogDir, { recursive: true, force: true });
+    }
+  });
+
   it("CLI skills run preserves variant mismatch details in the pretty banner", async () => {
     const fakeAdbDir = await createFakeAdb({
       installed: true,

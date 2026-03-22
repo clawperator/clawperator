@@ -1,5 +1,5 @@
-import { spawn } from "node:child_process";
 import type { RuntimeConfig } from "./runtimeConfig.js";
+import { runAdb } from "./adbClient.js";
 
 function singleQuoteForDeviceShell(value: string): string {
   // Device-side shell-safe single-quoted literal: 'foo'"'"'bar'
@@ -23,21 +23,13 @@ export async function broadcastAgentCommand(
   config: RuntimeConfig,
   payloadJson: string
 ): Promise<{ success: boolean; stdout: string; stderr: string }> {
-  const deviceArgs = config.deviceId ? ["-s", config.deviceId] : [];
   const shellCommand = buildBroadcastShellCommand(config, payloadJson);
-  const args = [...deviceArgs, "shell", shellCommand];
+  const redactedShellCommand = buildBroadcastShellCommand(config, "[REDACTED]");
+  const result = await runAdb(
+    config,
+    ["shell", shellCommand],
+    { redactedArgs: ["shell", redactedShellCommand] }
+  );
 
-  return new Promise((resolve) => {
-    const proc = spawn(config.adbPath, args, {
-      stdio: ["ignore", "pipe", "pipe"],
-      shell: false,
-    });
-    let stdout = "";
-    let stderr = "";
-    proc.stdout?.on("data", (d) => (stdout += d.toString()));
-    proc.stderr?.on("data", (d) => (stderr += d.toString()));
-    proc.on("close", (code) => {
-      resolve({ success: code === 0, stdout, stderr });
-    });
-  });
+  return { success: result.code === 0, stdout: result.stdout, stderr: result.stderr };
 }

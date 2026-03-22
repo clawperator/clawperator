@@ -95,6 +95,9 @@ export function createLogger(options?: { logDir?: string; logLevel?: string }): 
       }
     },
     logPath(): string | undefined {
+      if (state.disabled) {
+        return undefined;
+      }
       return formatLogPath(logDir);
     },
   };

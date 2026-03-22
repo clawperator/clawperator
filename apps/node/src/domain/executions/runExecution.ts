@@ -8,7 +8,7 @@ import { resolveDevice } from "../devices/resolveDevice.js";
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 import { broadcastAgentCommand } from "../../adapters/android-bridge/broadcastAgentCommand.js";
 import { waitForResultEnvelope } from "../../adapters/android-bridge/logcatResultReader.js";
-import { runAdb } from "../../adapters/android-bridge/adbClient.js";
+import { runAdb, formatCommandLine } from "../../adapters/android-bridge/adbClient.js";
 import { checkApkPresence } from "../doctor/checks/readinessChecks.js";
 import { getReceiverPackageApkPath } from "../version/compatibility.js";
 import { tryAcquire, release, getConflictError } from "./executionStore.js";
@@ -262,6 +262,7 @@ async function performExecution(
     receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_RECEIVER_PACKAGE,
     adbPath: options.adbPath ?? process.env.ADB_PATH,
     runner: options.runner,
+    logger: options.logger,
   });
 
   let execution: Execution;
@@ -418,7 +419,7 @@ async function performExecution(
       // Post-process to retrieve snapshot text from logcat
       const hasSnapshot = result.envelope.stepResults.some(s => s.actionType === "snapshot_ui");
       if (hasSnapshot) {
-        const dump = await runAdb(config, ["logcat", "-d", "-v", "tag"]);
+        const dump = await runAdb(config, ["logcat", "-d", "-v", "tag"], { logOutput: false });
         const snapshots = extractSnapshotsFromLogs(dump.stdout.split("\n"));
         attachSnapshotsToStepResults(result.envelope.stepResults, snapshots);
         markExtractionFailedSnapshotSteps(result.envelope.stepResults, options.warn);
@@ -434,6 +435,17 @@ async function performExecution(
           const screenStep = result.envelope.stepResults.find(s => s.actionType === "take_screenshot");
 
           const deviceArgs = config.deviceId ? ["-s", config.deviceId] : [];
+          const screencapCommand = formatCommandLine(config.adbPath, [...deviceArgs, "exec-out", "screencap", "-p"]);
+          options.logger?.log({
+            ts: new Date().toISOString(),
+            level: "debug",
+            event: "adb.command",
+            commandId: execution.commandId,
+            taskId: execution.taskId,
+            deviceId,
+            message: screencapCommand,
+          });
+          const screenshotStart = Date.now();
           const proc = spawn(config.adbPath, [...deviceArgs, "exec-out", "screencap", "-p"], {
             stdio: ["ignore", "pipe", "ignore"],
             shell: false,
@@ -446,6 +458,15 @@ async function performExecution(
 
           await new Promise((resolve, reject) => {
             proc.on("close", (code) => {
+              options.logger?.log({
+                ts: new Date().toISOString(),
+                level: "debug",
+                event: "adb.complete",
+                commandId: execution.commandId,
+                taskId: execution.taskId,
+                deviceId,
+                message: `${screencapCommand} code=${code ?? "null"} durationMs=${Date.now() - screenshotStart} stdout=[redacted] stderr=[redacted]`,
+              });
               if (code === 0) resolve(true);
               else reject(new Error(`screencap exited with code ${code}`));
             });

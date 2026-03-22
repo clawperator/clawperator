@@ -4,6 +4,7 @@ import { ERROR_CODES } from "../../contracts/errors.js";
 import type { OutputOptions } from "../output.js";
 import { formatSuccess, formatError } from "../output.js";
 import type { PermissionGrantResult } from "../../domain/device/setupOperator.js";
+import type { Logger } from "../../adapters/logger.js";
 
 export function didAllPermissionsAlreadyExist(permissions?: PermissionGrantResult): boolean {
   if (!permissions) {
@@ -22,6 +23,7 @@ export async function cmdOperatorSetup(options: {
   apkPath: string;
   deviceId?: string;
   receiverPackage?: string;
+  logger?: Logger;
 }): Promise<string> {
   const receiverPackage =
     options.receiverPackage ?? process.env.CLAWPERATOR_RECEIVER_PACKAGE;
@@ -29,6 +31,7 @@ export async function cmdOperatorSetup(options: {
     deviceId: options.deviceId,
     receiverPackage,
     adbPath: process.env.ADB_PATH,
+    logger: options.logger,
   });
 
   const result = await setupOperator(config, options.apkPath, receiverPackage);

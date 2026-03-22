@@ -166,5 +166,6 @@ describe("createLogger", () => {
 
     assert.strictEqual(stderrLines.length, 1);
     assert.match(stderrLines[0], /logging disabled after write failure/);
+    assert.strictEqual(logger.logPath(), undefined);
   });
 });

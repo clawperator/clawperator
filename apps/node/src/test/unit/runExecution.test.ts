@@ -674,6 +674,7 @@ describe("runExecution logging", () => {
     runner.queueResult({ code: 0, stdout: "List of devices attached\ndevice-123\tdevice\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "package:com.test.operator.dev\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "", stderr: "" });
 
     const result = await runExecution(
       {
@@ -728,6 +729,7 @@ describe("runExecution logging", () => {
 
     runner.queueResult({ code: 0, stdout: "List of devices attached\ndevice-123\tdevice\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "package:com.test.operator.dev\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "", stderr: "" });
     runner.queueResult({ code: 0, stdout: "", stderr: "" });
 
     const result = await runExecution(

@@ -7,12 +7,14 @@ import { parseRecordingFile } from "../../domain/recording/parseRecording.js";
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 import type { OutputOptions } from "../output.js";
 import { formatSuccess, formatError } from "../output.js";
+import type { Logger } from "../../adapters/logger.js";
 
 export async function cmdRecordStart(options: {
   format: OutputOptions["format"];
   sessionId?: string;
   deviceId?: string;
   receiverPackage?: string;
+  logger?: Logger;
 }): Promise<string> {
   try {
     const execution = buildStartRecordingExecution(options.sessionId);
@@ -20,6 +22,7 @@ export async function cmdRecordStart(options: {
       deviceId: options.deviceId,
       receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_RECEIVER_PACKAGE,
       warn: message => process.stderr.write(message),
+      logger: options.logger,
     });
     if (result.ok) {
       return formatSuccess(
@@ -43,6 +46,7 @@ export async function cmdRecordStop(options: {
   sessionId?: string;
   deviceId?: string;
   receiverPackage?: string;
+  logger?: Logger;
 }): Promise<string> {
   try {
     const execution = buildStopRecordingExecution(options.sessionId);
@@ -50,6 +54,7 @@ export async function cmdRecordStop(options: {
       deviceId: options.deviceId,
       receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_RECEIVER_PACKAGE,
       warn: message => process.stderr.write(message),
+      logger: options.logger,
     });
     if (result.ok) {
       return formatSuccess(
@@ -74,9 +79,11 @@ export async function cmdRecordPull(options: {
   outputDir: string;
   deviceId?: string;
   receiverPackage?: string;
+  logger?: Logger;
 }): Promise<string> {
   try {
     const config = getDefaultRuntimeConfig();
+    config.logger = options.logger;
     if (options.deviceId) {
       config.deviceId = options.deviceId;
     }

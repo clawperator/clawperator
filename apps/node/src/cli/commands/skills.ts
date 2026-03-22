@@ -160,6 +160,7 @@ export async function cmdSkillsRun(
     const config = getDefaultRuntimeConfig({
       deviceId: options.deviceId,
       receiverPackage: resolvedReceiverPackage,
+      logger: options.logger,
     });
     let apkStatus = `MISSING - run \`clawperator operator setup --apk <path>\``;
     try {
@@ -180,7 +181,7 @@ export async function cmdSkillsRun(
     const yyyy = String(logDate.getFullYear());
     const mm = String(logDate.getMonth() + 1).padStart(2, "0");
     const dd = String(logDate.getDate()).padStart(2, "0");
-    const logPath = join(homedir(), ".clawperator", "logs", `clawperator-${yyyy}-${mm}-${dd}.log`);
+    const logPath = options.logger?.logPath() ?? join(homedir(), ".clawperator", "logs", `clawperator-${yyyy}-${mm}-${dd}.log`);
     process.stdout.write(
       `[Clawperator] v${getCliVersion()}  APK: ${apkStatus}  Logs: ${logPath}  Docs: https://docs.clawperator.com/llms.txt\n`
     );
