@@ -16,6 +16,7 @@ import { getCliVersion } from "../../domain/version/compatibility.js";
 import { getAlternateReceiverVariant } from "../../domain/version/compatibility.js";
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 import { checkApkPresence } from "../../domain/doctor/checks/readinessChecks.js";
+import type { Logger } from "../../adapters/logger.js";
 import {
   CLAWPERATOR_BIN_ENV_VAR,
   CLAWPERATOR_RECEIVER_PACKAGE_ENV_VAR,
@@ -140,6 +141,7 @@ export async function cmdSkillsRun(
     deviceId?: string;
     runSkillImpl?: typeof runSkill;
     validateSkillImpl?: typeof validateSkill;
+    logger?: Logger;
   }
 ): Promise<string> {
   // Resolve the env vars for the skill script
@@ -217,13 +219,14 @@ export async function cmdSkillsRun(
                 }
               }
             },
+            logger: options.logger,
           });
         } finally {
           removeStdoutErrorListener();
           removeStderrErrorListener();
         }
       })()
-    : await runSkillImpl(skillId, args, undefined, timeoutMs, env);
+    : await runSkillImpl(skillId, args, undefined, timeoutMs, env, { logger: options.logger });
   if (result.ok) {
     if (expectContains && !result.output.includes(expectContains)) {
       return formatError({

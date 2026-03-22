@@ -4,6 +4,7 @@ import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 import { ERROR_CODES } from "../contracts/errors.js";
 import { formatError } from "./output.js";
+import { createLogger } from "../adapters/logger.js";
 
 const HELP = `Clawperator CLI
 
@@ -102,6 +103,7 @@ Global options:
   --receiver-package <package>              Target Operator package for broadcast dispatch
   --output <json|pretty>, --format <json|pretty>
                                             Output format (default: json)
+  --log-level <debug|info|warn|error>       Persistent log level (default: info)
   --timeout-ms <number>                     Override execution timeout within policy limits
   --verbose                                 Include debug diagnostics in output
   --help                                    Show help
@@ -334,6 +336,7 @@ function getGlobalOpts(argv: string[]): {
   deviceId?: string;
   receiverPackage?: string;
   timeoutMs?: number;
+  logLevel?: "debug" | "info" | "warn" | "error";
   output: "json" | "pretty";
   verbose: boolean;
   rest: string[];
@@ -342,6 +345,7 @@ function getGlobalOpts(argv: string[]): {
   let deviceId: string | undefined;
   let receiverPackage: string | undefined;
   let timeoutMs: number | undefined;
+  let logLevel: "debug" | "info" | "warn" | "error" | undefined;
   let output: "json" | "pretty" = "json";
   let verbose = false;
   for (let i = 0; i < argv.length; i++) {
@@ -356,13 +360,23 @@ function getGlobalOpts(argv: string[]): {
         throw new UsageError("--timeout-ms requires a value");
       }
       timeoutMs = Number(argv[++i]);
+    } else if (argv[i] === "--log-level") {
+      if (!argv[i + 1]) {
+        throw new UsageError("--log-level requires a value");
+      }
+      const value = argv[++i].toLowerCase();
+      if (value === "debug" || value === "info" || value === "warn" || value === "error") {
+        logLevel = value;
+      } else {
+        throw new UsageError("--log-level must be one of: debug, info, warn, error");
+      }
     } else if (argv[i] === "--verbose") {
       verbose = true;
     } else {
       rest.push(argv[i]);
     }
   }
-  return { deviceId, receiverPackage, timeoutMs, output, verbose, rest };
+  return { deviceId, receiverPackage, timeoutMs, logLevel, output, verbose, rest };
 }
 
 function getOpt(rest: string[], flag: string): string | undefined {
@@ -454,6 +468,10 @@ async function main(): Promise<void> {
   }
   const [cmd, ...rest] = global.rest;
   const out = { format: global.output as "json" | "pretty", verbose: global.verbose };
+  const logger = createLogger({
+    logDir: process.env.CLAWPERATOR_LOG_DIR,
+    logLevel: global.logLevel ?? process.env.CLAWPERATOR_LOG_LEVEL,
+  });
 
   let result: string;
   let usageParseError = false;
@@ -575,6 +593,7 @@ async function main(): Promise<void> {
             timeoutMs: global.timeoutMs,
             validateOnly: hasFlag(rest, "--validate-only"),
             dryRun: hasFlag(rest, "--dry-run"),
+            logger,
           });
         }
       }
@@ -751,7 +770,7 @@ async function main(): Promise<void> {
             effectiveTimeoutMs,
             expectContains,
             receiverPackage,
-            { ...out, skipValidate, deviceId }
+            { ...out, skipValidate, deviceId, logger }
           );
         }
       } else if (rest[0] === "install") {
@@ -842,6 +861,7 @@ async function main(): Promise<void> {
         checkOnly: hasFlag(rest, "--check-only"),
         deviceId: global.deviceId ?? getOpt(rest, "--device-id"),
         receiverPackage: global.receiverPackage ?? getOpt(rest, "--receiver-package"),
+        logger,
       });
       break;
     }

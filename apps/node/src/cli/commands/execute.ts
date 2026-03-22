@@ -5,6 +5,7 @@ import { LIMITS } from "../../contracts/limits.js";
 import type { OutputOptions } from "../output.js";
 import { formatSuccess, formatError } from "../output.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
+import type { Logger } from "../../adapters/logger.js";
 
 export async function cmdExecute(options: {
   format: OutputOptions["format"];
@@ -14,6 +15,7 @@ export async function cmdExecute(options: {
   timeoutMs?: number;
   validateOnly?: boolean;
   dryRun?: boolean;
+  logger?: Logger;
 }): Promise<string> {
   let payload: unknown;
   const raw = options.execution.trim();
@@ -105,6 +107,7 @@ export async function cmdExecute(options: {
       receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_RECEIVER_PACKAGE,
       timeoutMs: options.timeoutMs,
       warn: message => process.stderr.write(message),
+      logger: options.logger,
     });
     if (result.ok) {
       return formatSuccess(

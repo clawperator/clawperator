@@ -1,4 +1,4 @@
-import { describe, it, before, after, afterEach } from "node:test";
+import { describe, it, before, after, beforeEach, afterEach } from "node:test";
 import assert from "node:assert";
 import { spawn } from "node:child_process";
 import { chmod, mkdtemp, mkdir, copyFile, readFile, rm, stat, writeFile } from "node:fs/promises";
@@ -26,6 +26,7 @@ import { validateAllSkills, validateSkill } from "../../domain/skills/validateSk
 import { loadRegistry } from "../../adapters/skills-repo/localSkillsRegistry.js";
 import { validateExecution, validatePayloadSize } from "../../domain/executions/validateExecution.js";
 import { cmdSkillsRun } from "../../cli/commands/skills.js";
+import { createLogger } from "../../adapters/logger.js";
 import {
   SKILL_NOT_FOUND,
   ARTIFACT_NOT_FOUND,
@@ -1885,5 +1886,52 @@ describe("CLI skills run streaming", () => {
       ),
       stdoutChunks.join("")
     );
+  });
+});
+
+describe("runSkill logging", () => {
+  let tempRoot: string;
+
+  beforeEach(async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), "clawperator-skill-log-"));
+  });
+
+  afterEach(async () => {
+    await rm(tempRoot, { recursive: true, force: true });
+  });
+
+  it("logs start and complete without leaking sentinel args", async () => {
+    const sentinel = "CLAWPERATOR_TEST_SENTINEL_X9Z";
+    const logger = createLogger({ logDir: join(tempRoot, "logs"), logLevel: "debug" });
+
+    const result = await runSkill("com.test.echo", [sentinel], undefined, undefined, undefined, {
+      logger,
+    });
+
+    assert.ok(result.ok, `Expected runSkill to succeed: ${"message" in result ? result.message : ""}`);
+    const contents = await readFile(logger.logPath()!, "utf8");
+    const lines = contents.trimEnd().split("\n").map(line => JSON.parse(line) as { event: string; message?: string });
+    assert.ok(lines.some(line => line.event === "skills.run.start"));
+    assert.ok(lines.some(line => line.event === "skills.run.complete"));
+    for (const line of lines) {
+      assert.strictEqual(line.message?.includes(sentinel), false, `sentinel leaked into log line: ${JSON.stringify(line)}`);
+      assert.strictEqual(JSON.stringify(line).includes(sentinel), false, `sentinel leaked into log payload: ${JSON.stringify(line)}`);
+    }
+  });
+
+  it("logs start and timeout but not complete when the skill times out", async () => {
+    const logger = createLogger({ logDir: join(tempRoot, "logs"), logLevel: "info" });
+
+    const result = await runSkill("com.test.partial-timeout", [], undefined, 150, undefined, {
+      logger,
+    });
+
+    assert.ok(!result.ok);
+    assert.strictEqual(result.code, SKILL_EXECUTION_TIMEOUT);
+    const contents = await readFile(logger.logPath()!, "utf8");
+    const lines = contents.trimEnd().split("\n").map(line => JSON.parse(line) as { event: string });
+    assert.ok(lines.some(line => line.event === "skills.run.start"));
+    assert.ok(lines.some(line => line.event === "skills.run.timeout"));
+    assert.ok(!lines.some(line => line.event === "skills.run.complete"));
   });
 });
