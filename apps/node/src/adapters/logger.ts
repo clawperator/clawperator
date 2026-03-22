@@ -59,17 +59,13 @@ function warnOnce(state: { warned: boolean }, message: string): void {
 }
 
 export function createLogger(options?: { logDir?: string; logLevel?: string }): Logger {
-  const configuredDir = options?.logDir?.trim() || process.env.CLAWPERATOR_LOG_DIR?.trim();
-  const logDir = configuredDir ? resolve(expandHomePath(configuredDir)) : undefined;
+  const configuredDir =
+    options?.logDir?.trim() ||
+    process.env.CLAWPERATOR_LOG_DIR?.trim() ||
+    "~/.clawperator/logs";
+  const logDir = resolve(expandHomePath(configuredDir));
   const threshold = normalizeLogLevel(options?.logLevel ?? process.env.CLAWPERATOR_LOG_LEVEL);
   const state = { warned: false, disabled: false };
-
-  if (!logDir) {
-    return {
-      log: () => undefined,
-      logPath: () => undefined,
-    };
-  }
 
   const shouldLog = (level: string): boolean => {
     const normalized = normalizeLogLevel(level);

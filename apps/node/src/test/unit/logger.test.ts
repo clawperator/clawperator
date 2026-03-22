@@ -8,20 +8,44 @@ import { createLogger } from "../../adapters/logger.js";
 describe("createLogger", () => {
   let tempRoot: string;
   let stderrWrite: typeof process.stderr.write;
+  let originalHome: string | undefined;
+  let originalLogDir: string | undefined;
   const stderrLines: string[] = [];
+
+  function currentLogPath(root: string): string {
+    const now = new Date();
+    const yyyy = String(now.getFullYear());
+    const mm = String(now.getMonth() + 1).padStart(2, "0");
+    const dd = String(now.getDate()).padStart(2, "0");
+    return join(root, ".clawperator", "logs", `clawperator-${yyyy}-${mm}-${dd}.log`);
+  }
 
   beforeEach(async () => {
     tempRoot = await mkdtemp(join(tmpdir(), "clawperator-logger-"));
     stderrWrite = process.stderr.write.bind(process.stderr);
+    originalHome = process.env.HOME;
+    originalLogDir = process.env.CLAWPERATOR_LOG_DIR;
     stderrLines.length = 0;
     process.stderr.write = ((chunk: unknown) => {
       stderrLines.push(String(chunk));
       return true;
     }) as typeof process.stderr.write;
+    process.env.HOME = tempRoot;
+    delete process.env.CLAWPERATOR_LOG_DIR;
   });
 
   afterEach(async () => {
     process.stderr.write = stderrWrite;
+    if (originalHome === undefined) {
+      delete process.env.HOME;
+    } else {
+      process.env.HOME = originalHome;
+    }
+    if (originalLogDir === undefined) {
+      delete process.env.CLAWPERATOR_LOG_DIR;
+    } else {
+      process.env.CLAWPERATOR_LOG_DIR = originalLogDir;
+    }
     await rm(tempRoot, { recursive: true, force: true });
   });
 
@@ -102,6 +126,22 @@ describe("createLogger", () => {
 
     const contents = await readFile(logger.logPath()!, "utf8");
     assert.match(contents, /test\.mkdir/);
+  });
+
+  it("defaults to ~/.clawperator/logs when no log dir is configured", async () => {
+    const logger = createLogger({ logLevel: "info" });
+
+    assert.strictEqual(logger.logPath(), currentLogPath(tempRoot));
+
+    logger.log({
+      ts: "2026-03-22T00:00:00.000Z",
+      level: "info",
+      event: "test.default-path",
+      message: "default path",
+    });
+
+    const contents = await readFile(logger.logPath()!, "utf8");
+    assert.match(contents, /test\.default-path/);
   });
 
   it("warns once and fails open when log directory creation fails", async () => {
