@@ -38,12 +38,17 @@ export interface SkillRunEnv {
   [key: string]: string | undefined;
 }
 
+export interface SkillRunCallbacks {
+  onOutput?: (chunk: string, stream: "stdout" | "stderr") => void;
+}
+
 export async function runSkill(
   skillId: string,
   args: string[],
   registryPath?: string,
   timeoutMs?: number,
-  env?: SkillRunEnv
+  env?: SkillRunEnv,
+  callbacks?: SkillRunCallbacks
 ): Promise<SkillRunResult | SkillRunError> {
   let resolvedPath: string;
   try {
@@ -120,11 +125,15 @@ export async function runSkill(
     };
 
     child.stdout?.on("data", (chunk) => {
-      stdout += chunk.toString();
+      const text = chunk.toString();
+      callbacks?.onOutput?.(text, "stdout");
+      stdout += text;
     });
 
     child.stderr?.on("data", (chunk) => {
-      stderr += chunk.toString();
+      const text = chunk.toString();
+      callbacks?.onOutput?.(text, "stderr");
+      stderr += text;
     });
 
     child.on("error", (err) => {

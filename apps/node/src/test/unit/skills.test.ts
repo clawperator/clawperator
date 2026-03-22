@@ -1,10 +1,10 @@
 import { describe, it, before, after, afterEach } from "node:test";
 import assert from "node:assert";
 import { spawn } from "node:child_process";
-import { mkdtemp, mkdir, copyFile, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, mkdir, copyFile, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import {
   CLAWPERATOR_BIN_ENV_VAR,
   CLAWPERATOR_RECEIVER_PACKAGE_ENV_VAR,
@@ -44,6 +44,9 @@ const TEST_SKILL_VALID_ARTIFACT = "test-skill-valid-artifact";
 const TEST_SKILL_INVALID_ARTIFACT = "test-skill-invalid-artifact";
 const TEST_SKILL_SCRIPT_ONLY = "test-skill-script-only";
 const TEST_SKILL_EMPTY_ARTIFACTS = "test-skill-empty-artifacts";
+const TEST_FIXTURE_CHUNKED_OUTPUT = "test-fixture-chunked-output";
+const TEST_FIXTURE_MIXED_STREAMS = "test-fixture-mixed-streams";
+const TEST_FIXTURE_SPLIT_WORD = "test-fixture-split-word";
 const ORIGINAL_REGISTRY_PATH = process.env.CLAWPERATOR_SKILLS_REGISTRY;
 const ORIGINAL_STDERR_WRITE = process.stderr.write.bind(process.stderr);
 
@@ -107,6 +110,45 @@ function runNodeSnippet(
 
 function normalizeMacTmpPath(path: string): string {
   return normalize(path).replace(/^\/private(?=\/var\/)/, "");
+}
+
+async function getPackageVersion(): Promise<string> {
+  const pkg = await readFile(join(packageRoot, "package.json"), "utf8");
+  const parsed = JSON.parse(pkg) as { version?: string };
+  return parsed.version ?? "0.0.0";
+}
+
+function getTodayLogPath(): string {
+  const now = new Date();
+  const yyyy = String(now.getFullYear());
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const dd = String(now.getDate()).padStart(2, "0");
+  return join(homedir(), ".clawperator", "logs", `clawperator-${yyyy}-${mm}-${dd}.log`);
+}
+
+async function createFakeAdb(options: { installed: boolean; receiverPackage: string }): Promise<string> {
+  const dir = await mkdtemp(join(tmpdir(), "clawperator-fake-adb-"));
+  const scriptPath = join(dir, "adb");
+  const script = [
+    "#!/bin/sh",
+    "if [ \"$1\" = \"-s\" ]; then",
+    "  shift 2",
+    "fi",
+    "if [ \"$1\" = \"shell\" ] && [ \"$2\" = \"pm\" ] && [ \"$3\" = \"list\" ] && [ \"$4\" = \"packages\" ]; then",
+    `  if [ ${JSON.stringify(options.installed ? 0 : 1)} -eq 0 ] && [ \"$5\" = ${JSON.stringify(options.receiverPackage)} ]; then`,
+    `    printf 'package:%s\\n' \"$5\"`,
+    "  fi",
+    "  exit 0",
+    "fi",
+    "if [ \"$1\" = \"version\" ]; then",
+    "  printf 'Android Debug Bridge version 1.0.41\\n'",
+    "  exit 0",
+    "fi",
+    "exit 0",
+  ].join("\n");
+  await writeFile(scriptPath, script, "utf8");
+  await chmod(scriptPath, 0o755);
+  return dir;
 }
 
 describe("listSkills", () => {
@@ -1124,6 +1166,58 @@ describe("searchSkills", () => {
 });
 
 describe("runSkill", () => {
+  it("accumulates chunked stdout without callbacks", async () => {
+    const result = await runSkill(TEST_FIXTURE_CHUNKED_OUTPUT, []);
+    assert.ok(result.ok, `Expected runSkill to succeed: ${"message" in result ? result.message : ""}`);
+    assert.strictEqual(result.output, "chunk1\nchunk2\n");
+  });
+
+  it("streams each stdout chunk to onOutput before resolution", async () => {
+    const chunks: Array<{ chunk: string; stream: "stdout" | "stderr" }> = [];
+    let resolved = false;
+    const resultPromise = runSkill(TEST_FIXTURE_CHUNKED_OUTPUT, [], undefined, undefined, undefined, {
+      onOutput: (chunk, stream) => {
+        chunks.push({ chunk, stream });
+        assert.strictEqual(resolved, false, "callback should fire before the promise resolves");
+      },
+    });
+
+    const result = await resultPromise.then((value) => {
+      resolved = true;
+      return value;
+    });
+
+    assert.ok(result.ok, `Expected runSkill to succeed: ${"message" in result ? result.message : ""}`);
+    assert.deepStrictEqual(chunks, [
+      { chunk: "chunk1\n", stream: "stdout" },
+      { chunk: "chunk2\n", stream: "stdout" },
+    ]);
+  });
+
+  it("keeps result.output as the full accumulated stdout when onOutput is provided", async () => {
+    const result = await runSkill(TEST_FIXTURE_CHUNKED_OUTPUT, [], undefined, undefined, undefined, {
+      onOutput: () => undefined,
+    });
+
+    assert.ok(result.ok, `Expected runSkill to succeed: ${"message" in result ? result.message : ""}`);
+    assert.strictEqual(result.output, "chunk1\nchunk2\n");
+  });
+
+  it("tags stderr chunks as stderr", async () => {
+    const chunks: Array<{ chunk: string; stream: "stdout" | "stderr" }> = [];
+    const result = await runSkill(TEST_FIXTURE_MIXED_STREAMS, [], undefined, undefined, undefined, {
+      onOutput: (chunk, stream) => {
+        chunks.push({ chunk, stream });
+      },
+    });
+
+    assert.ok(result.ok, `Expected runSkill to succeed: ${"message" in result ? result.message : ""}`);
+    assert.deepStrictEqual(chunks, [
+      { chunk: "stdout-line\n", stream: "stdout" },
+      { chunk: "stderr-line\n", stream: "stderr" },
+    ]);
+  });
+
   it("returns SKILL_NOT_FOUND for unknown skill", async () => {
     const result = await runSkill("nonexistent.skill", []);
     assert.ok(!result.ok);
@@ -1265,6 +1359,81 @@ describe("runSkill", () => {
     assert.strictEqual(parsed.code, SKILL_OUTPUT_ASSERTION_FAILED);
     assert.strictEqual(parsed.expectedSubstring, "missing-value");
     assert.ok(parsed.output?.includes("TEST_OUTPUT:hello"));
+  });
+
+  it("CLI skills run expects substrings across chunk boundaries", async () => {
+    const { stdout, code } = await runCli([
+      "skills", "run", TEST_FIXTURE_SPLIT_WORD, "--expect-contains", "hello", "--output", "json",
+    ]);
+    assert.strictEqual(code, 0, stdout);
+    const parsed = JSON.parse(stdout) as { skillId?: string; expectedSubstring?: string; output?: string };
+    assert.strictEqual(parsed.skillId, TEST_FIXTURE_SPLIT_WORD);
+    assert.strictEqual(parsed.expectedSubstring, "hello");
+    assert.strictEqual(parsed.output, "hello\n");
+  });
+
+  it("CLI skills run keeps json output parseable without live skill output", async () => {
+    const fakeAdbDir = await createFakeAdb({
+      installed: true,
+      receiverPackage: "com.clawperator.operator.dev",
+    });
+    const { stdout, code } = await runCli([
+      "skills", "run", TEST_FIXTURE_CHUNKED_OUTPUT, "--receiver-package", "com.clawperator.operator.dev", "--output", "json",
+    ], {
+      env: {
+        ...process.env,
+        PATH: `${fakeAdbDir}${process.env.PATH ? `:${process.env.PATH}` : ""}`,
+        CLAWPERATOR_SKILLS_REGISTRY: TEST_REGISTRY_PATH,
+      },
+    });
+    assert.strictEqual(code, 0, stdout);
+    const parsed = JSON.parse(stdout) as { output?: string; skillId?: string };
+    assert.strictEqual(parsed.skillId, TEST_FIXTURE_CHUNKED_OUTPUT);
+    assert.ok(parsed.output?.includes("chunk1"));
+    assert.ok(parsed.output?.includes("chunk2"));
+    assert.ok(!stdout.includes("[Clawperator]"));
+  });
+
+  it("CLI skills run prints a banner first in pretty mode", async () => {
+    const fakeAdbDir = await createFakeAdb({
+      installed: true,
+      receiverPackage: "com.clawperator.operator.dev",
+    });
+    const { stdout, code } = await runCli([
+      "skills", "run", TEST_FIXTURE_CHUNKED_OUTPUT, "--receiver-package", "com.clawperator.operator.dev", "--output", "pretty",
+    ], {
+      env: {
+        ...process.env,
+        PATH: `${fakeAdbDir}${process.env.PATH ? `:${process.env.PATH}` : ""}`,
+        CLAWPERATOR_SKILLS_REGISTRY: TEST_REGISTRY_PATH,
+      },
+    });
+    assert.strictEqual(code, 0, stdout);
+    const version = await getPackageVersion();
+    const logPath = getTodayLogPath();
+    const lines = stdout.split(/\r?\n/).filter((line) => line.length > 0);
+    assert.ok(lines[0]?.startsWith(`[Clawperator] v${version}  APK: OK (com.clawperator.operator.dev)`), lines[0]);
+    assert.ok(lines[0]?.includes(`Logs: ${logPath}`), lines[0]);
+    assert.ok(lines[0]?.includes("Docs: https://docs.clawperator.com/llms.txt"), lines[0]);
+  });
+
+  it("CLI skills run suppresses the banner in json mode", async () => {
+    const fakeAdbDir = await createFakeAdb({
+      installed: true,
+      receiverPackage: "com.clawperator.operator.dev",
+    });
+    const { stdout, code } = await runCli([
+      "skills", "run", TEST_FIXTURE_CHUNKED_OUTPUT, "--receiver-package", "com.clawperator.operator.dev", "--output", "json",
+    ], {
+      env: {
+        ...process.env,
+        PATH: `${fakeAdbDir}${process.env.PATH ? `:${process.env.PATH}` : ""}`,
+        CLAWPERATOR_SKILLS_REGISTRY: TEST_REGISTRY_PATH,
+      },
+    });
+    assert.strictEqual(code, 0, stdout);
+    assert.doesNotThrow(() => JSON.parse(stdout));
+    assert.ok(!stdout.includes("[Clawperator]"));
   });
 });
 
@@ -1550,5 +1719,56 @@ describe("CLI skills run env vars", () => {
     const parsed = JSON.parse(stdout) as { output?: string };
     assert.ok(parsed.output?.includes("CLAWPERATOR_RECEIVER_PACKAGE:flag.package.value"), `Expected flag value in output, got: ${parsed.output}`);
     assert.ok(!parsed.output?.includes("env.package.value"), `Should not contain env value, got: ${parsed.output}`);
+  });
+});
+
+describe("CLI skills run streaming", () => {
+  it("prints the banner first and then streams incremental skill output in pretty mode", async () => {
+    const fakeAdbDir = await createFakeAdb({
+      installed: true,
+      receiverPackage: "com.clawperator.operator.dev",
+    });
+    const cliPath = join(packageRoot, "dist", "cli", "index.js");
+    const stdoutChunks: string[] = [];
+    const stderrChunks: string[] = [];
+
+    const proc = spawn(process.execPath, [
+      cliPath,
+      "skills",
+      "run",
+      TEST_FIXTURE_CHUNKED_OUTPUT,
+      "--receiver-package",
+      "com.clawperator.operator.dev",
+      "--output",
+      "pretty",
+    ], {
+      cwd: packageRoot,
+      env: {
+        ...process.env,
+        PATH: `${fakeAdbDir}${process.env.PATH ? `:${process.env.PATH}` : ""}`,
+        CLAWPERATOR_SKILLS_REGISTRY: TEST_REGISTRY_PATH,
+      },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    proc.stdout.on("data", (chunk) => {
+      stdoutChunks.push(chunk.toString());
+    });
+    proc.stderr.on("data", (chunk) => {
+      stderrChunks.push(chunk.toString());
+    });
+
+    const code = await new Promise<number>((resolve) => {
+      proc.on("close", (exitCode) => resolve(exitCode ?? -1));
+    });
+
+    assert.strictEqual(code, 0, `stderr: ${stderrChunks.join("")}`);
+    assert.ok(stdoutChunks[0]?.startsWith("[Clawperator]"), stdoutChunks[0]);
+    assert.ok(
+      stdoutChunks.some((chunk, index) =>
+        chunk.includes("chunk1") && stdoutChunks.slice(index + 1).some((later) => later.includes("chunk2"))
+      ),
+      stdoutChunks.join("")
+    );
   });
 });
