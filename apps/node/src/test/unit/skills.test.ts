@@ -130,6 +130,8 @@ async function createFakeAdb(options: {
   installed: boolean;
   receiverPackage: string;
   installedPackage?: string;
+  packageListCode?: number;
+  packageListStderr?: string;
 }): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), "clawperator-fake-adb-"));
   const scriptPath = join(dir, "adb");
@@ -139,6 +141,10 @@ async function createFakeAdb(options: {
     "  shift 2",
     "fi",
     "if [ \"$1\" = \"shell\" ] && [ \"$2\" = \"pm\" ] && [ \"$3\" = \"list\" ] && [ \"$4\" = \"packages\" ]; then",
+    `  if [ ${JSON.stringify(options.packageListCode ?? 0)} -ne 0 ]; then`,
+    `    printf '%s\\n' ${JSON.stringify(options.packageListStderr ?? "package query failed")} 1>&2`,
+    `    exit ${JSON.stringify(options.packageListCode ?? 1)}`,
+    "  fi",
     `  if [ ${JSON.stringify(options.installed ? 0 : 1)} -eq 0 ] && [ \"$5\" = ${JSON.stringify(options.installedPackage ?? options.receiverPackage)} ]; then`,
     `    printf 'package:%s\\n' \"$5\"`,
     "  fi",
@@ -1443,6 +1449,29 @@ describe("runSkill", () => {
     assert.match(firstLine, /Use --receiver-package com\.clawperator\.operator\.dev/);
   });
 
+  it("CLI skills run preserves adb failure details in the pretty banner", async () => {
+    const fakeAdbDir = await createFakeAdb({
+      installed: false,
+      receiverPackage: "com.clawperator.operator",
+      packageListCode: 1,
+      packageListStderr: "adb: device offline",
+    });
+    const { stdout, code } = await runCli([
+      "skills", "run", TEST_FIXTURE_CHUNKED_OUTPUT, "--receiver-package", "com.clawperator.operator", "--output", "pretty",
+    ], {
+      env: {
+        ...process.env,
+        PATH: `${fakeAdbDir}${process.env.PATH ? `:${process.env.PATH}` : ""}`,
+        CLAWPERATOR_SKILLS_REGISTRY: TEST_REGISTRY_PATH,
+      },
+    });
+    assert.strictEqual(code, 0, stdout);
+    const firstLine = stdout.split(/\r?\n/, 1)[0] ?? "";
+    assert.match(firstLine, /Could not query installed packages on the device/);
+    assert.match(firstLine, /adb: device offline/);
+    assert.ok(!firstLine.includes("MISSING - run `clawperator operator setup --apk <path>`"));
+  });
+
   it("CLI skills run suppresses the banner in json mode", async () => {
     const fakeAdbDir = await createFakeAdb({
       installed: true,
@@ -1516,6 +1545,66 @@ describe("cmdSkillsRun preflight gate", () => {
     assert.strictEqual(runCalls, 1);
     assert.strictEqual(parsed.skillId, TEST_SKILL_VALID_ARTIFACT);
     assert.strictEqual(parsed.output, "RUN_OK");
+  });
+
+  it("ignores pipe errors from live pretty-mode streaming", async () => {
+    const fakeAdbDir = await createFakeAdb({
+      installed: true,
+      receiverPackage: "com.clawperator.operator.dev",
+    });
+    const cmdModulePath = join(packageRoot, "dist", "cli", "commands", "skills.js");
+    const script = `
+      import { cmdSkillsRun } from ${JSON.stringify(cmdModulePath)};
+      const originalWrite = process.stdout.write.bind(process.stdout);
+      let writes = 0;
+      process.stdout.write = ((chunk) => {
+        writes += 1;
+        if (writes > 1) {
+          const error = new Error("broken pipe");
+          error.code = "EPIPE";
+          throw error;
+        }
+        return originalWrite(String(chunk));
+      });
+      const result = await cmdSkillsRun(
+        ${JSON.stringify(TEST_FIXTURE_CHUNKED_OUTPUT)},
+        [],
+        undefined,
+        undefined,
+        ${JSON.stringify("com.clawperator.operator.dev")},
+        {
+          format: "pretty",
+          skipValidate: true,
+          runSkillImpl: async (_skillId, _args, _registryPath, _timeoutMs, _env, callbacks) => {
+            callbacks?.onOutput?.("chunk1\\n", "stdout");
+            callbacks?.onOutput?.("chunk2\\n", "stdout");
+            return {
+              ok: true,
+              skillId: ${JSON.stringify(TEST_FIXTURE_CHUNKED_OUTPUT)},
+              output: "chunk1\\nchunk2\\n",
+              exitCode: 0,
+              durationMs: 1,
+            };
+          }
+        }
+      );
+      process.stderr.write(JSON.stringify({ result }));
+    `;
+
+    const child = await runNodeSnippet(script, {
+      env: {
+        ...process.env,
+        PATH: `${fakeAdbDir}${process.env.PATH ? `:${process.env.PATH}` : ""}`,
+        CLAWPERATOR_SKILLS_REGISTRY: TEST_REGISTRY_PATH,
+      },
+    });
+    assert.strictEqual(child.code, 0, child.stderr);
+    const jsonLine = child.stderr.trim().split(/\r?\n/).reverse().find((line) => line.startsWith("{") && line.includes("\"result\""));
+    assert.ok(jsonLine, child.stdout);
+    const parsed = JSON.parse(jsonLine) as { result?: string };
+    const rendered = JSON.parse(parsed.result ?? "{}") as { skillId?: string; output?: string };
+    assert.strictEqual(rendered.skillId, TEST_FIXTURE_CHUNKED_OUTPUT);
+    assert.strictEqual(rendered.output, "chunk1\nchunk2\n");
   });
 
   it("bypasses validation when --skip-validate is set", async () => {

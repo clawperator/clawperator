@@ -1,3 +1,4 @@
+import { EventEmitter } from "node:events";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { listSkills } from "../../domain/skills/listSkills.js";
@@ -21,6 +22,28 @@ import {
   resolveSkillBinCommand,
   resolveReceiverPackage,
 } from "../../domain/skills/skillsConfig.js";
+
+function isIgnorablePipeError(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) {
+    return false;
+  }
+  const code = (error as { code?: unknown }).code;
+  return code === "EPIPE" || code === "ERR_STREAM_DESTROYED";
+}
+
+function suppressStreamPipeErrors(stream: EventEmitter): () => void {
+  const onError = (error: unknown) => {
+    if (!isIgnorablePipeError(error)) {
+      process.nextTick(() => {
+        throw error instanceof Error ? error : new Error(String(error));
+      });
+    }
+  };
+  stream.on("error", onError);
+  return () => {
+    stream.off("error", onError);
+  };
+}
 
 export async function cmdSkillsList(options: { format: OutputOptions["format"] }): Promise<string> {
   const result = await listSkills();
@@ -143,7 +166,9 @@ export async function cmdSkillsRun(
         apkStatus = `OK (${resolvedReceiverPackage})`;
       } else if (apkPresence.status === "warn") {
         const alternateVariant = getAlternateReceiverVariant(resolvedReceiverPackage);
-        apkStatus = `MISSING - ${apkPresence.summary}${apkPresence.detail ? ` ${apkPresence.detail}` : ""} Use --receiver-package ${alternateVariant} or reinstall the matching APK.`;
+        apkStatus = `WARN - ${apkPresence.summary}${apkPresence.detail ? ` ${apkPresence.detail}` : ""} Use --receiver-package ${alternateVariant} or reinstall the matching APK.`;
+      } else {
+        apkStatus = `FAIL - ${apkPresence.summary}${apkPresence.detail ? ` ${apkPresence.detail}` : ""}`;
       }
     } catch {
       apkStatus = `MISSING - run \`clawperator operator setup --apk <path>\``;
@@ -174,15 +199,30 @@ export async function cmdSkillsRun(
   }
 
   const result = options.format !== "json"
-    ? await runSkillImpl(skillId, args, undefined, timeoutMs, env, {
-        onOutput: (chunk, stream) => {
-          if (stream === "stdout") {
-            process.stdout.write(chunk);
-          } else {
-            process.stderr.write(chunk);
-          }
-        },
-      })
+    ? await (async () => {
+        const removeStdoutErrorListener = suppressStreamPipeErrors(process.stdout);
+        const removeStderrErrorListener = suppressStreamPipeErrors(process.stderr);
+        try {
+          return await runSkillImpl(skillId, args, undefined, timeoutMs, env, {
+            onOutput: (chunk, stream) => {
+              try {
+                if (stream === "stdout") {
+                  process.stdout.write(chunk);
+                } else {
+                  process.stderr.write(chunk);
+                }
+              } catch (error) {
+                if (!isIgnorablePipeError(error)) {
+                  throw error;
+                }
+              }
+            },
+          });
+        } finally {
+          removeStdoutErrorListener();
+          removeStderrErrorListener();
+        }
+      })()
     : await runSkillImpl(skillId, args, undefined, timeoutMs, env);
   if (result.ok) {
     if (expectContains && !result.output.includes(expectContains)) {
