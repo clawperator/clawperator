@@ -83,7 +83,7 @@ export function findSkillById(registry: SkillsRegistry, skillId: string): SkillE
 }
 
 /**
- * Resolve artifact path to absolute. Registry artifact entries are like "skills/.../artifacts/ac-status.recipe.json".
+ * Resolve artifact path to absolute. Registry artifact entries are like "skills/.../artifacts/climate-status.recipe.json".
  */
 export function resolveArtifactPath(registryPath: string, artifactRelativePath: string): string {
   const repoRoot = getRepoRoot(registryPath);
@@ -91,7 +91,7 @@ export function resolveArtifactPath(registryPath: string, artifactRelativePath: 
 }
 
 /**
- * Get artifact path (relative to repo root) from skill by name (e.g. "ac-status" -> skills/.../artifacts/ac-status.recipe.json).
+ * Get artifact path (relative to repo root) from skill by name (e.g. "climate-status" -> skills/.../artifacts/climate-status.recipe.json).
  */
 export function getArtifactPathFromSkill(skill: SkillEntry, artifactName: string): string | undefined {
   const base = artifactName.replace(/\.recipe\.json$/i, "");

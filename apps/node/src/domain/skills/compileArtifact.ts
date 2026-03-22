@@ -122,7 +122,7 @@ export async function compileArtifact(
   }
 
   // Ensure deterministic COMMAND_ID/TASK_ID when not provided in vars.
-  // Normalize artifact name so "ac-status" and "ac-status.recipe.json" yield the same IDs.
+  // Normalize artifact name so "climate-status" and "climate-status.recipe.json" yield the same IDs.
   const normalizedArtifactName = artifactName.replace(/\.recipe\.json$/i, "");
   const sortedVars: Record<string, string> = {};
   for (const key of Object.keys(vars).sort()) {

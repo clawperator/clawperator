@@ -3,17 +3,17 @@
   "generatedAt": "2026-02-19T00:00:00Z",
   "skills": [
     {
-      "id": "com.google.android.apps.chromecast.app.get-aircon-status",
+      "id": "com.google.android.apps.chromecast.app.get-climate",
       "applicationId": "com.google.android.apps.chromecast.app",
-      "intent": "get-aircon-status",
-      "summary": "Read Google Home air conditioner status (power, mode, indoor temperature).",
-      "path": "skills/com.google.android.apps.chromecast.app.get-aircon-status",
-      "skillFile": "skills/com.google.android.apps.chromecast.app.get-aircon-status/SKILL.md",
+      "intent": "get-climate",
+      "summary": "Read Google Home climate unit status (power, mode, indoor temperature).",
+      "path": "skills/com.google.android.apps.chromecast.app.get-climate",
+      "skillFile": "skills/com.google.android.apps.chromecast.app.get-climate/SKILL.md",
       "scripts": [
-        "skills/com.google.android.apps.chromecast.app.get-aircon-status/scripts/get_aircon_status.sh"
+        "skills/com.google.android.apps.chromecast.app.get-climate/scripts/get_climate_status.sh"
       ],
       "artifacts": [
-        "skills/com.google.android.apps.chromecast.app.get-aircon-status/artifacts/ac-status.recipe.json"
+        "skills/com.google.android.apps.chromecast.app.get-climate/artifacts/climate-status.recipe.json"
       ]
     },
     {

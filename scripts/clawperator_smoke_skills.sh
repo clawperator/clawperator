@@ -14,9 +14,9 @@ npm --prefix apps/node run build
 # NOTE: Do not commit personal device serials to this repository.
 export DEVICE_ID="${DEVICE_ID:-}"
 export CLAWPERATOR_RECEIVER_PACKAGE="${CLAWPERATOR_RECEIVER_PACKAGE:-com.clawperator.operator.dev}"
-export SKILL_ID="${SKILL_ID:-com.google.android.apps.chromecast.app.get-aircon-status}"
-export ARTIFACT_NAME="${ARTIFACT_NAME:-ac-status}"
-export AC_TILE_NAME="${AC_TILE_NAME:-Master}"
+export SKILL_ID="${SKILL_ID:-com.google.android.apps.chromecast.app.get-climate}"
+export ARTIFACT_NAME="${ARTIFACT_NAME:-climate-status}"
+export CLIMATE_TILE_NAME="${CLIMATE_TILE_NAME:-Master}"
 
 SMOKE_SUMMARY="${CLAWPERATOR_SMOKE_SUMMARY:-}"
 OUTCOMES_FILE=""
@@ -57,10 +57,10 @@ echo "=== skills get $SKILL_ID ==="
 "${CLI[@]}" skills get "$SKILL_ID" --output pretty
 
 echo "=== skills compile-artifact (pretty) ==="
-"${CLI[@]}" skills compile-artifact "$SKILL_ID" --artifact "$ARTIFACT_NAME" --vars "{\"AC_TILE_NAME\":\"$AC_TILE_NAME\"}" --output pretty
+"${CLI[@]}" skills compile-artifact "$SKILL_ID" --artifact "$ARTIFACT_NAME" --vars "{\"CLIMATE_TILE_NAME\":\"$CLIMATE_TILE_NAME\"}" --output pretty
 
 echo "=== skills compile-artifact (json -> /tmp/clawperator-stage2-exec.json) ==="
-"${CLI[@]}" skills compile-artifact "$SKILL_ID" --artifact "$ARTIFACT_NAME" --vars "{\"AC_TILE_NAME\":\"$AC_TILE_NAME\"}" --output json \
+"${CLI[@]}" skills compile-artifact "$SKILL_ID" --artifact "$ARTIFACT_NAME" --vars "{\"CLIMATE_TILE_NAME\":\"$CLIMATE_TILE_NAME\"}" --output json \
   | node -e 'const d=JSON.parse(require("fs").readFileSync(0,"utf8")); require("fs").writeFileSync("/tmp/clawperator-stage2-exec.json", JSON.stringify(d.execution));'
 
 echo "=== execute compiled execution ==="

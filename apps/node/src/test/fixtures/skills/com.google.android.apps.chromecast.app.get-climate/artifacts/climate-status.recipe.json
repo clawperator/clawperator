@@ -25,7 +25,7 @@
       "id": "openController",
       "type": "scroll_and_click",
       "params": {
-        "matcher": { "textContains": "{{AC_TILE_NAME}}" },
+        "matcher": { "textContains": "{{CLIMATE_TILE_NAME}}" },
         "container": { "resourceId": "com.google.android.apps.chromecast.app:id/pager_home_tab" },
         "direction": "down",
         "maxSwipes": 8,

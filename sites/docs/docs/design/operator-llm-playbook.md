@@ -110,8 +110,8 @@ Due to the dynamic nature of mobile apps (A/B tests, server-side flags, unexpect
 
 ## 4) Current skill set
 
-- `com.google.android.apps.chromecast.app.get-aircon-status`
-- `com.google.android.apps.chromecast.app.set-aircon`
+- `com.google.android.apps.chromecast.app.get-climate`
+- `com.google.android.apps.chromecast.app.set-climate`
 - `com.globird.energy.get-usage`
 - `com.solaxcloud.starter.get-battery`
 - `com.theswitchbot.switchbot.get-bedroom-temperature`

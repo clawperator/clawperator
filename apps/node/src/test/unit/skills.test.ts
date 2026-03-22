@@ -170,10 +170,10 @@ describe("listSkills", () => {
       assert.fail(`Expected listSkills to succeed when registry present: ${result.message}`);
     }
     assert.ok(Array.isArray(result.skills));
-    const chromecast = result.skills.find((s) => s.id === "com.google.android.apps.chromecast.app.get-aircon-status");
+    const chromecast = result.skills.find((s) => s.id === "com.google.android.apps.chromecast.app.get-climate");
     assert.ok(chromecast);
     assert.strictEqual(chromecast.artifacts.length, 1);
-    assert.ok(chromecast.artifacts[0].endsWith("ac-status.recipe.json"));
+    assert.ok(chromecast.artifacts[0].endsWith("climate-status.recipe.json"));
   });
 });
 
@@ -259,9 +259,9 @@ describe("loadRegistry", () => {
 
 describe("getSkill", () => {
   it("returns skill for known id", async () => {
-    const result = await getSkill("com.google.android.apps.chromecast.app.get-aircon-status");
+    const result = await getSkill("com.google.android.apps.chromecast.app.get-climate");
     if (!result.ok) assert.fail(result.message);
-    assert.strictEqual(result.skill.id, "com.google.android.apps.chromecast.app.get-aircon-status");
+    assert.strictEqual(result.skill.id, "com.google.android.apps.chromecast.app.get-climate");
     assert.strictEqual(result.skill.applicationId, "com.google.android.apps.chromecast.app");
   });
 
@@ -534,7 +534,7 @@ describe("skills validate dry-run", () => {
     const { stdout, code } = await runCli([
       "skills",
       "validate",
-      "com.google.android.apps.chromecast.app.get-aircon-status",
+      "com.google.android.apps.chromecast.app.get-climate",
       "--dry-run",
       "--output",
       "json",
@@ -542,7 +542,7 @@ describe("skills validate dry-run", () => {
     assert.strictEqual(code, 0, stdout);
     const parsed = JSON.parse(stdout) as { valid?: boolean; skill?: { id?: string } };
     assert.strictEqual(parsed.valid, true);
-    assert.strictEqual(parsed.skill?.id, "com.google.android.apps.chromecast.app.get-aircon-status");
+    assert.strictEqual(parsed.skill?.id, "com.google.android.apps.chromecast.app.get-climate");
   });
 });
 
@@ -663,20 +663,20 @@ describe("validateAllSkills", () => {
 describe("compileArtifact", () => {
   it("returns COMPILE_VAR_MISSING when required placeholder missing", async () => {
     const result = await compileArtifact(
-      "com.google.android.apps.chromecast.app.get-aircon-status",
-      "ac-status",
+      "com.google.android.apps.chromecast.app.get-climate",
+      "climate-status",
       "{}"
     );
     assert.ok(!result.ok);
     assert.strictEqual(result.code, COMPILE_VAR_MISSING);
-    assert.ok(result.details && result.details.placeholder === "AC_TILE_NAME");
+    assert.ok(result.details && result.details.placeholder === "CLIMATE_TILE_NAME");
   });
 
   it("returns valid execution when vars include required placeholder", async () => {
     const result = await compileArtifact(
-      "com.google.android.apps.chromecast.app.get-aircon-status",
-      "ac-status",
-      '{"AC_TILE_NAME":"Master"}'
+      "com.google.android.apps.chromecast.app.get-climate",
+      "climate-status",
+      '{"CLIMATE_TILE_NAME":"Master"}'
     );
     if (!result.ok) assert.fail(result.message);
     assert.strictEqual(result.execution.mode, "artifact_compiled");
@@ -686,9 +686,9 @@ describe("compileArtifact", () => {
 
   it("escapes vars safely so quoted values keep compiled JSON valid", async () => {
     const result = await compileArtifact(
-      "com.google.android.apps.chromecast.app.get-aircon-status",
-      "ac-status",
-      "{\"AC_TILE_NAME\":\"Master \\\"Quoted\\\"\"}"
+      "com.google.android.apps.chromecast.app.get-climate",
+      "climate-status",
+      "{\"CLIMATE_TILE_NAME\":\"Master \\\"Quoted\\\"\"}"
     );
     if (!result.ok) assert.fail(result.message);
     const openController = result.execution.actions.find((a) => a.id === "openController");
@@ -698,7 +698,7 @@ describe("compileArtifact", () => {
 
   it("returns ARTIFACT_NOT_FOUND for wrong artifact name", async () => {
     const result = await compileArtifact(
-      "com.google.android.apps.chromecast.app.get-aircon-status",
+      "com.google.android.apps.chromecast.app.get-climate",
       "nonexistent-artifact",
       "{}"
     );
@@ -708,15 +708,15 @@ describe("compileArtifact", () => {
 
   it("compile failure returns nested details (not flattened top-level)", async () => {
     const result = await compileArtifact(
-      "com.google.android.apps.chromecast.app.get-aircon-status",
-      "ac-status",
+      "com.google.android.apps.chromecast.app.get-climate",
+      "climate-status",
       "{}"
     );
     assert.ok(!result.ok);
     assert.strictEqual(result.code, COMPILE_VAR_MISSING);
     assert.strictEqual(typeof result.message, "string");
     assert.ok(result.details && typeof result.details === "object");
-    assert.strictEqual(result.details.placeholder, "AC_TILE_NAME");
+    assert.strictEqual(result.details.placeholder, "CLIMATE_TILE_NAME");
     assert.ok("skillId" in result.details);
     assert.ok("artifactName" in result.details);
     const topLevelKeys = Object.keys(result as object).filter((k) => k !== "ok" && k !== "code" && k !== "message" && k !== "details");
@@ -725,29 +725,29 @@ describe("compileArtifact", () => {
 
   it("accepts artifact name with .recipe.json suffix (same as bare name)", async () => {
     const r1 = await compileArtifact(
-      "com.google.android.apps.chromecast.app.get-aircon-status",
-      "ac-status",
-      '{"AC_TILE_NAME":"Master"}'
+      "com.google.android.apps.chromecast.app.get-climate",
+      "climate-status",
+      '{"CLIMATE_TILE_NAME":"Master"}'
     );
     const r2 = await compileArtifact(
-      "com.google.android.apps.chromecast.app.get-aircon-status",
-      "ac-status.recipe.json",
-      '{"AC_TILE_NAME":"Master"}'
+      "com.google.android.apps.chromecast.app.get-climate",
+      "climate-status.recipe.json",
+      '{"CLIMATE_TILE_NAME":"Master"}'
     );
     if (!r1.ok || !r2.ok) assert.fail("Expected both to succeed");
     assert.strictEqual(JSON.stringify(r1.execution), JSON.stringify(r2.execution));
   });
 
   it("produces deterministic execution for identical inputs", async () => {
-    const varsJson = '{"AC_TILE_NAME":"Master"}';
+    const varsJson = '{"CLIMATE_TILE_NAME":"Master"}';
     const r1 = await compileArtifact(
-      "com.google.android.apps.chromecast.app.get-aircon-status",
-      "ac-status",
+      "com.google.android.apps.chromecast.app.get-climate",
+      "climate-status",
       varsJson
     );
     const r2 = await compileArtifact(
-      "com.google.android.apps.chromecast.app.get-aircon-status",
-      "ac-status",
+      "com.google.android.apps.chromecast.app.get-climate",
+      "climate-status",
       varsJson
     );
 
@@ -761,10 +761,10 @@ describe("compileArtifact", () => {
   });
 
   it("preserves user-provided COMMAND_ID and TASK_ID", async () => {
-    const varsJson = '{"AC_TILE_NAME":"Master","COMMAND_ID":"cmd-user-1","TASK_ID":"task-user-1"}';
+    const varsJson = '{"CLIMATE_TILE_NAME":"Master","COMMAND_ID":"cmd-user-1","TASK_ID":"task-user-1"}';
     const result = await compileArtifact(
-      "com.google.android.apps.chromecast.app.get-aircon-status",
-      "ac-status",
+      "com.google.android.apps.chromecast.app.get-climate",
+      "climate-status",
       varsJson
     );
     if (!result.ok) assert.fail(result.message);
@@ -774,16 +774,16 @@ describe("compileArtifact", () => {
   });
 
   it("is insensitive to vars key order", async () => {
-    const v1 = '{"AC_TILE_NAME":"Master","EXTRA":"1"}';
-    const v2 = '{"EXTRA":"1","AC_TILE_NAME":"Master"}';
+    const v1 = '{"CLIMATE_TILE_NAME":"Master","EXTRA":"1"}';
+    const v2 = '{"EXTRA":"1","CLIMATE_TILE_NAME":"Master"}';
     const r1 = await compileArtifact(
-      "com.google.android.apps.chromecast.app.get-aircon-status",
-      "ac-status",
+      "com.google.android.apps.chromecast.app.get-climate",
+      "climate-status",
       v1
     );
     const r2 = await compileArtifact(
-      "com.google.android.apps.chromecast.app.get-aircon-status",
-      "ac-status",
+      "com.google.android.apps.chromecast.app.get-climate",
+      "climate-status",
       v2
     );
     if (!r1.ok || !r2.ok) assert.fail("Expected both compileArtifact calls to succeed");
@@ -793,10 +793,10 @@ describe("compileArtifact", () => {
   });
 
   it("CLI compile-artifact accepts --skill-id (same result as positional skill_id)", async () => {
-    const skillId = "com.google.android.apps.chromecast.app.get-aircon-status";
-    const varsJson = '{"AC_TILE_NAME":"Master"}';
+    const skillId = "com.google.android.apps.chromecast.app.get-climate";
+    const varsJson = '{"CLIMATE_TILE_NAME":"Master"}';
     const { stdout, code } = await runCli([
-      "skills", "compile-artifact", "--skill-id", skillId, "--artifact", "ac-status", "--vars", varsJson, "--output", "json",
+      "skills", "compile-artifact", "--skill-id", skillId, "--artifact", "climate-status", "--vars", varsJson, "--output", "json",
     ]);
     assert.strictEqual(code, 0, stdout);
     const parsed = JSON.parse(stdout) as { execution?: { mode?: string; commandId?: string }; code?: string };
@@ -815,7 +815,7 @@ describe("compileArtifact", () => {
 
   it("CLI compile-artifact returns USAGE when --artifact missing", async () => {
     const { stdout } = await runCli([
-      "skills", "compile-artifact", "com.google.android.apps.chromecast.app.get-aircon-status", "--output", "json",
+      "skills", "compile-artifact", "com.google.android.apps.chromecast.app.get-climate", "--output", "json",
     ]);
     const parsed = JSON.parse(stdout) as { code?: string; message?: string };
     assert.strictEqual(parsed.code, "USAGE");
@@ -824,9 +824,9 @@ describe("compileArtifact", () => {
 
   it("compile-artifact output is valid execution input (e2e: compile → execute contract)", async () => {
     const result = await compileArtifact(
-      "com.google.android.apps.chromecast.app.get-aircon-status",
-      "ac-status",
-      '{"AC_TILE_NAME":"Master"}',
+      "com.google.android.apps.chromecast.app.get-climate",
+      "climate-status",
+      '{"CLIMATE_TILE_NAME":"Master"}',
       undefined
     );
     assert.ok(result.ok, result.ok ? "" : (result as { message?: string }).message);
@@ -1151,10 +1151,10 @@ describe("searchSkills", () => {
   });
 
   it("filters by intent", async () => {
-    const result = await searchSkills({ intent: "get-aircon-status" });
+    const result = await searchSkills({ intent: "get-climate" });
     assert.ok(result.ok);
     assert.strictEqual(result.skills.length, 1);
-    assert.strictEqual(result.skills[0].id, "com.google.android.apps.chromecast.app.get-aircon-status");
+    assert.strictEqual(result.skills[0].id, "com.google.android.apps.chromecast.app.get-climate");
   });
 
   it("filters by keyword in summary", async () => {
@@ -1171,7 +1171,7 @@ describe("searchSkills", () => {
   });
 
   it("combines app and intent filters", async () => {
-    const result = await searchSkills({ app: "com.android.settings", intent: "get-aircon-status" });
+    const result = await searchSkills({ app: "com.android.settings", intent: "get-climate" });
     assert.ok(result.ok);
     assert.strictEqual(result.skills.length, 0);
   });
