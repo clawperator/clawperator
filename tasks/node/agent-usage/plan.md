@@ -33,7 +33,7 @@ The right fix is to compose and enforce existing primitives better, not invent n
 1. **APK absence is not a hard stop.** 30-120 second timeout with no diagnosis. [PRD-1]
 2. **Validation and timeout errors lack action-level context.** Agent must guess which action caused the failure. [PRD-2]
 3. **Skill payload errors only surface at runtime on a live device.** `skills validate` passes even with schema violations in the compiled artifact. [PRD-3]
-4. **Long-running work is a black box.** `runSkill.ts` buffers all output until exit. No log trail exists after timeout. [PRD-4, PRD-5]
+4. **Long-running work is a black box.** `runSkill.ts` buffers all output until exit. No log trail exists after timeout. [PRD-5]
 5. **Docs are not surfaced at install time or at failure time, and one guide contradicts shipped behavior.** [PRD-6]
 
 ---
@@ -133,8 +133,9 @@ PR-4  PRD-4
         add pre-run banner BEFORE the dry-run gate added in PR-3
       Risk: low. Purely additive to runSkill signature; backward-compatible.
       Depends on: PR-3.5 complete (skills in passing state before more agent-facing
-      changes ship); banner must be inserted before the dry-run gate in
-      cli/commands/skills.ts (see PRD-4 ordering constraint).
+        changes ship); banner must be inserted before the dry-run gate in
+        cli/commands/skills.ts (see PRD-4 ordering constraint).
+      Status: [DONE] Implemented and verified in PR #101.
 
 PR-5  PRD-5
       - NDJSON log infrastructure: ~/.clawperator/logs/clawperator-YYYY-MM-DD.log
