@@ -66,38 +66,18 @@ arrives, satisfying the "brain needs data" requirement directly at the point of 
 
 Add structured NDJSON log output to `~/.clawperator/logs/`. `--log-level` flag and `CLAWPERATOR_LOG_DIR` env var. `RESULT_ENVELOPE_TIMEOUT` error includes `logPath` for the current day's log file.
 
-### PRD-5.9: Agent-Friendly Command Surface
+### PRD-5.9, PRD-6, PRD-7: Moved
 
-Promote high-frequency operations (`snapshot`, `screenshot`, `click`, `tap`, `open`,
-`fill`, `type`, `read`, `wait`, `press-key`, `back`) to top-level commands that
-delegate to the existing `observe` and `action` subcommands. Add `--text` and
-`--content-desc` as CLI shorthands for the common case of `--selector '{"text":"..."}'`.
-The nested forms remain unchanged. This removes the namespace-guessing tax that causes
-agents to fail on first contact.
+PRD-5.9 (flatten command surface) expanded into a full API refactoring plan after
+an external agent UX review (2026-03-23). The scope exceeded a single PRD.
 
-### PRD-6: Docs and Entry Points
-
-Fix the `RECEIVER_NOT_INSTALLED` contradiction between `first-time-setup.md` and
-`node-api-doctor.md`. Add post-install docs reference to `install.sh`. Add docs links
-to doctor failure output. Create `scripts/operator_event.sh` stub. Consolidate
-first-run entry points into one canonical sequence.
-
-Also generates `~/.clawperator/AGENTS.md` from `install.sh` - a stable, auto-discovered
-machine-readable orientation file covering the four-step workflow, log path, and docs
-URLs. Overwritten on every install. Files a tracking issue for the skills-directory
-AGENTS.md in the `clawperator-skills` repo.
-
-### PRD-7: Docs Structural Reform
-
-The content is correct after PRDs 1-6; the structure is not. `docs.clawperator.com`
-mixes user journeys, personas, content types, and internal architecture into a single
-incoherent hierarchy with competing entry points and duplicate pages. This PRD audits
-the current structure, collapses it into four intent-driven sections (Get Started / Use
-Clawperator / Reference / Troubleshoot), eliminates duplication, updates `mkdocs.yml`
-and `source-map.yaml`, and aligns `llms.txt` with the final page structure.
-
-Must land last - after all runtime PRDs have merged and deployed - so the structure
-reflects actual shipped behavior.
+- **API refactoring** (PRD-5.9 successor): moved to `tasks/api/refactor/plan.md`
+  with four implementation phases covering command surface, selector flags,
+  flag normalization, help text, and error messages.
+- **PRD-6** (docs entry points): moved to `tasks/docs/refactor/prd-6.md`.
+  Blocked on API refactor completion.
+- **PRD-7** (docs structural reform): moved to `tasks/docs/refactor/prd-7.md`.
+  Blocked on PRD-6 completion.
 
 ---
 
@@ -165,35 +145,15 @@ PR-5.5  PRD-5.5
       Depends on: PR-4 merged (streaming infrastructure must be in place).
       Repo: clawperator-skills only. Can run in parallel with PR-5.
 
-PR-5.9  PRD-5.9
-      - Top-level CLI aliases: snapshot, screenshot, click, tap, open, fill,
-        type, read, wait, press-key, back
-      - Selector shorthands: --text and --content-desc as alternatives to --selector JSON
-      - Positional app argument for open: `clawperator open com.foo.bar`
-      - Help text: "Quick Commands" group for top-level aliases
-      Risk: low. Purely additive CLI dispatch. No domain or contract changes.
-      Depends on: nothing (CLI layer only). Must land before PR-6 so docs
-      reference the flat command surface.
+--- Subsequent work moved to dedicated task plans ---
 
-PR-6  PRD-6 (remainder)
-      - docs/index.md, agent-quickstart.md, openclaw-first-run.md consolidation
-      - llms.txt alignment with shipped semantics
-      - doctor failure output: docs links (contracts/doctor.ts, renderCheck, tests)
-      - scripts/operator_event.sh stub (pending OpenClaw tool config review)
-      - install.sh: generate ~/.clawperator/AGENTS.md with version, log path, docs URLs,
-        four-step workflow; file tracking issue for clawperator-skills AGENTS.md
-      Risk: low. Docs and thin contract change. Must not over-promise behavior.
-      Depends on: PR-1, PR-2, PR-3, PR-4, PR-5 settled (so docs reflect final behavior).
+API Refactor (4 phases): see tasks/api/refactor/plan.md
+      Supersedes PRD-5.9. Flattens command surface, adds selector flags,
+      normalizes flags, rewrites help text and error messages.
+      Depends on: nothing. Must complete before docs work begins.
 
-PR-7  PRD-7
-      - Audit current docs structure: map all pages, identify duplication and wrong
-        org models
-      - Redesign nav: four sections (Get Started / Use / Reference / Troubleshoot)
-      - Consolidate duplicate pages; delete stale material
-      - Update mkdocs.yml, source-map.yaml, llms.txt
-      Risk: medium. Renaming pages breaks external links; use redirects where possible.
-      Depends on: ALL prior PRs merged and deployed. Do not open this PR until
-      runtime behavior is stable and PR-6 docs alignment is live.
+Docs Refactor (PRD-6, PRD-7): see tasks/docs/refactor/plan.md
+      Depends on: API refactor complete.
 ```
 
 Rationale for splitting PRD-6 across PR-1 and PR-6: the `install.sh` banner and the doc contradiction fix have no code dependencies and should ship immediately with the readiness gate (they describe the same change). The remaining consolidation must wait for all runtime changes to settle or the docs will age immediately.
