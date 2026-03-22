@@ -72,23 +72,21 @@ must not be used for progress. The `✅` result line must always be the last std
 #### Progress line format
 
 ```
-[skill:<short-id>] <present-tense description>...
+[skill:<registry-id>] <present-tense description>...
 ```
 
-Where `<short-id>` is the last segment of the skill's registry ID:
-- `com.globird.energy.get-usage` → `get-usage`
-- `com.solaxcloud.starter.get-battery` → `get-battery`
-- `com.google.android.apps.chromecast.app.get-aircon-status` → `get-aircon-status`
-
-The skill-id prefix allows attribution when multiple skills run in sequence or an agent
-is reviewing accumulated output.
+Where `<registry-id>` is the full skill registry ID — not a short suffix. Short suffixes
+are ambiguous as the skill set grows: `com.coles.search-products` and
+`com.woolworths.search-products` would both produce `[skill:com.coles.search-products]`, which is
+already a collision in the current registry. The full ID is unambiguous, grep-friendly,
+and stable.
 
 Examples:
 ```
-[skill:get-usage] Launching GloBird app...
-[skill:get-usage] Navigating to Energy tab...
-[skill:get-usage] Capturing energy usage snapshot...
-[skill:get-usage] Parsing results...
+[skill:com.globird.energy.get-usage] Launching GloBird app...
+[skill:com.globird.energy.get-usage] Navigating to Energy tab...
+[skill:com.globird.energy.get-usage] Capturing energy usage snapshot...
+[skill:com.globird.energy.get-usage] Parsing results...
 ✅ GloBird usage: cost_so_far=$4.21, grid_usage=12.3kWh, solar_feed_in=8.1kWh
 ```
 
@@ -103,29 +101,33 @@ Examples:
 **What counts as a meaningful phase:**
 - Before each `runClawperator` call (always)
 - Between phases in multi-phase skills (preflight → navigate → read)
-- Fallback or retry paths: `[skill:get-aircon-status] Direct read failed, navigating to tile...`
-- Explicit long waits: `[skill:get-battery] Waiting for app to load (12s)...`
+- Fallback or retry paths: `[skill:com.google.android.apps.chromecast.app.get-aircon-status] Direct read failed, navigating to tile...`
+- Explicit long waits: `[skill:com.solaxcloud.starter.get-battery] Waiting for app to load (12s)...`
 
 **What not to log:**
 - Individual actions within the payload (tap, sleep, click)
-- Intermediate data values (`[skill:get-usage] cost=$4.21` — that belongs in the `✅` line)
+- Intermediate data values (`[skill:com.globird.energy.get-usage] cost=$4.21` — that belongs in the `✅` line)
 - Debug information that requires source code to interpret
 
-#### JSON mode behaviour
+#### JSON mode behaviour and `result.output` contract
 
-In `--output json` mode, PRD-4 does not wire `onOutput` to stdout, so `[skill:*]` lines
-do not appear on the terminal during execution. However, they ARE present in
-`result.output` in the final JSON envelope, because `result.output` is the full
-accumulated stdout string from the skill subprocess.
+**Contract:** In `--output json` mode, `result.output` in the final JSON envelope
+contains the full accumulated stdout from the skill subprocess — including all
+`[skill:*]` progress lines. This is by design. `result.output` is a verbatim capture,
+not a filtered result. Consumers must not treat `result.output` as a structured payload.
 
-Agents parsing `--output json` results must treat `[skill:*]` lines in `result.output`
-as ignorable progress noise. The canonical result is always the `✅` line. An agent
-extracting the result value should filter for the `✅` prefix, not parse `result.output`
-as a whole.
+The canonical result is always the `✅`-prefixed line. Consumers must filter for it:
+```javascript
+const resultLine = result.output.split('\n').find(l => l.startsWith('✅'));
+```
 
-This is by design: `result.output` is a verbatim capture of the skill's stdout. Progress
-lines appearing there does not break the JSON contract — the JSON envelope itself is
-clean, and the `✅` line is always the semantic result.
+Stripping all `[skill:*]` lines from `result.output` must leave the `✅` line intact.
+If stripping progress lines would remove or corrupt the result, the skill is violating
+the channel contract.
+
+During execution in JSON mode, PRD-4 does not wire `onOutput` to stdout, so `[skill:*]`
+lines do not appear on the terminal live. They are only visible in `result.output` after
+the skill completes.
 
 ### 2. Update all skills in `clawperator-skills`
 
@@ -137,38 +139,38 @@ Minimum 3 progress lines covering the major phases.
 
 `com.globird.energy.get-usage`:
 ```
-[skill:get-usage] Launching GloBird app...
-[skill:get-usage] Navigating to Energy tab...
-[skill:get-usage] Capturing energy usage snapshot...
-[skill:get-usage] Parsing results...
+[skill:com.globird.energy.get-usage] Launching GloBird app...
+[skill:com.globird.energy.get-usage] Navigating to Energy tab...
+[skill:com.globird.energy.get-usage] Capturing energy usage snapshot...
+[skill:com.globird.energy.get-usage] Parsing results...
 ```
 
 `com.google.android.apps.chromecast.app.get-aircon-status`:
 This skill has a preflight snapshot and a fallback navigation path. Log each branch:
 ```
-[skill:get-aircon-status] Taking preflight snapshot...
-[skill:get-aircon-status] Direct tile read succeeded...
+[skill:com.google.android.apps.chromecast.app.get-aircon-status] Taking preflight snapshot...
+[skill:com.google.android.apps.chromecast.app.get-aircon-status] Direct tile read succeeded...
 ```
 or on the fallback path:
 ```
-[skill:get-aircon-status] Taking preflight snapshot...
-[skill:get-aircon-status] Direct read failed, navigating to aircon tile...
-[skill:get-aircon-status] Capturing aircon status...
-[skill:get-aircon-status] Parsing aircon data...
+[skill:com.google.android.apps.chromecast.app.get-aircon-status] Taking preflight snapshot...
+[skill:com.google.android.apps.chromecast.app.get-aircon-status] Direct read failed, navigating to aircon tile...
+[skill:com.google.android.apps.chromecast.app.get-aircon-status] Capturing aircon status...
+[skill:com.google.android.apps.chromecast.app.get-aircon-status] Parsing aircon data...
 ```
 
 `com.solaxcloud.starter.get-battery`:
 ```
-[skill:get-battery] Launching SolaX app...
-[skill:get-battery] Waiting for data to load (12s)...
-[skill:get-battery] Reading battery level...
+[skill:com.solaxcloud.starter.get-battery] Launching SolaX app...
+[skill:com.solaxcloud.starter.get-battery] Waiting for data to load (12s)...
+[skill:com.solaxcloud.starter.get-battery] Reading battery level...
 ```
 
 `com.theswitchbot.switchbot.get-bedroom-temperature`:
 ```
-[skill:get-bedroom-temperature] Launching SwitchBot app...
-[skill:get-bedroom-temperature] Navigating to bedroom device...
-[skill:get-bedroom-temperature] Reading temperature...
+[skill:com.theswitchbot.switchbot.get-bedroom-temperature] Launching SwitchBot app...
+[skill:com.theswitchbot.switchbot.get-bedroom-temperature] Navigating to bedroom device...
+[skill:com.theswitchbot.switchbot.get-bedroom-temperature] Reading temperature...
 ```
 
 **Script-only skills with complex multi-step execution:**
@@ -176,33 +178,33 @@ or on the fallback path:
 
 `com.life360.android.safetymapd.get-location`:
 ```
-[skill:get-location] Opening Life360...
-[skill:get-location] Searching for <person>...
-[skill:get-location] Capturing location snapshot...
-[skill:get-location] Parsing location data...
+[skill:com.life360.android.safetymapd.get-location] Opening Life360...
+[skill:com.life360.android.safetymapd.get-location] Searching for <person>...
+[skill:com.life360.android.safetymapd.get-location] Capturing location snapshot...
+[skill:com.life360.android.safetymapd.get-location] Parsing location data...
 ```
 
 `com.google.android.apps.chromecast.app.set-aircon`:
 ```
-[skill:set-aircon] Verifying target state (<on|off>)...
-[skill:set-aircon] Locating <ac_tile_name> tile...
-[skill:set-aircon] Applying state change...
+[skill:com.google.android.apps.chromecast.app.set-aircon] Verifying target state (<on|off>)...
+[skill:com.google.android.apps.chromecast.app.set-aircon] Locating <ac_tile_name> tile...
+[skill:com.google.android.apps.chromecast.app.set-aircon] Applying state change...
 ```
 
 `com.coles.search-products`:
 ```
-[skill:search-products] Opening Coles app...
-[skill:search-products] Searching for "<query>"...
-[skill:search-products] Capturing search results...
-[skill:search-products] Parsing product listings...
+[skill:com.coles.search-products] Opening Coles app...
+[skill:com.coles.search-products] Searching for "<query>"...
+[skill:com.coles.search-products] Capturing search results...
+[skill:com.coles.search-products] Parsing product listings...
 ```
 
 `com.woolworths.search-products`:
 ```
-[skill:search-products] Opening Woolworths app...
-[skill:search-products] Searching for "<query>"...
-[skill:search-products] Capturing search results...
-[skill:search-products] Parsing product listings...
+[skill:com.woolworths.search-products] Opening Woolworths app...
+[skill:com.woolworths.search-products] Searching for "<query>"...
+[skill:com.woolworths.search-products] Capturing search results...
+[skill:com.woolworths.search-products] Parsing product listings...
 ```
 
 **Script-only skills with simple, fast execution:**
@@ -223,7 +225,7 @@ One orientation line before the primary action.
 
 Add a "Progress logging" section documenting:
 - The three output channels and their purposes (table from section 1)
-- The `[skill:<short-id>]` format and how to derive the short-id
+- The `[skill:<registry-id>]` format and how to derive the short-id
 - The guardrail: progress lines must be ignorable; result is always the `✅` line
 - JSON mode behaviour: lines appear in `result.output` but are not the canonical result
 - What counts as a meaningful phase vs noise
@@ -274,7 +276,7 @@ silence.
 ## Scope Boundaries
 
 In scope:
-- `[skill:<short-id>]` progress line additions to skill scripts in `clawperator-skills`
+- `[skill:<registry-id>]` progress line additions to skill scripts in `clawperator-skills`
 - `skill-development-workflow.md` authoring guide update (in `clawperator-skills`)
 - All 11 skills in the current registry (proportional depth — artifact-backed first)
 
@@ -300,7 +302,32 @@ Out of scope:
 
 ## Testing Plan
 
-No unit tests needed — additive stdout output with no logic changes.
+### Regression tests (required — do not skip)
+
+Two tests protect the output contract for machine callers. Add these to the Node test
+suite in `apps/node/` alongside the PRD-4 skill runner tests.
+
+**R1 — progress lines appear before the result line in pretty mode**
+
+Use the `runSkill` fixture infrastructure from PRD-4. Pick one representative updated
+skill script (or a test fixture that mimics the pattern) and verify:
+- `result.output` contains at least one `[skill:*]` line
+- The `✅` line is the last non-empty line in `result.output`
+- No `[skill:*]` line appears after the `✅` line
+
+This protects against a future skill accidentally emitting progress after the result,
+which would corrupt consumers that read the last line.
+
+**R2 — result.output contract holds in JSON mode**
+
+Invoke the same skill with JSON output mode. Verify:
+- `JSON.parse(stdout)` succeeds (the terminal envelope is clean)
+- `result.output` in the parsed envelope contains `[skill:*]` lines
+- Filtering `result.output` lines by `startsWith('✅')` returns exactly one line
+- That line is the canonical result
+
+This test encodes the `result.output` contract explicitly so any future change that
+breaks it (e.g. filtering progress lines from `result.output`) fails visibly.
 
 ### Manual verification (required for each updated skill)
 
@@ -325,15 +352,19 @@ clawperator skills run <skill-id> --device-id <device_serial> --output json
 
 ## Acceptance Criteria
 
-- Every artifact-backed skill emits at least 3 `[skill:<short-id>]` progress lines
+- Every artifact-backed skill emits at least 3 `[skill:<registry-id>]` progress lines
   during a successful run, covering the major execution phases.
 - Every skill emits at least 1 progress line (even simple skills).
 - Progress lines arrive incrementally during execution — not batched at the end.
 - No progress line contains the canonical result value (that belongs in `✅` only).
 - `[skill:*]` lines are not visible on stdout during `--output json` execution.
-- `result.output` in the JSON envelope contains progress lines — this is expected and
-  correct. An agent filtering for `✅` still gets the right result.
+- `result.output` in the JSON envelope contains progress lines — this is the defined
+  contract. Filtering `result.output` for `startsWith('✅')` returns exactly one line,
+  which is the canonical result.
+- Regression test R1 passes: progress lines precede the `✅` line in `result.output`.
+- Regression test R2 passes: JSON mode envelope is parseable; `result.output` contract
+  holds; filtering for `✅` returns the correct result line.
 - The `✅` result format and `⚠️` error format are unchanged for all skills.
-- `skill-development-workflow.md` documents the channel table, the `[skill:<short-id>]`
-  format, the JSON mode behaviour, and the guardrail that progress lines must be ignorable.
+- `skill-development-workflow.md` documents the channel table, the `[skill:<registry-id>]`
+  format, the `result.output` contract, and the guardrail that progress lines must be ignorable.
 - All skills that previously passed `--dry-run` still pass after this PR.
