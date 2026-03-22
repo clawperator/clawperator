@@ -123,6 +123,12 @@ Common events mean:
 Set `--log-level debug` when you need more detail, or leave the default at
 `info` for the normal lifecycle events.
 
+`debug` logging can include adb command lines plus stdout and stderr for many
+calls, so it can grow quickly during long sessions and may expose more device
+metadata than the default lifecycle-only levels.
+Use `info` for normal runs and enable `debug` only while investigating a
+specific problem.
+
 ---
 
 ## Wireless Debugging (YMMV)

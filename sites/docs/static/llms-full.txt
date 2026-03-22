@@ -1816,6 +1816,9 @@ Configure logging with:
 
 When both `--log-level` and `CLAWPERATOR_LOG_LEVEL` are set, the flag takes precedence. If logging cannot initialize, Clawperator warns once to stderr and keeps running.
 
+Use `debug` sparingly: it can include adb command lines plus stdout and stderr for many calls, so logs can grow quickly during long sessions and may contain more device metadata than the default lifecycle events.
+Prefer `info` for normal automation and switch to `debug` only when you need the extra diagnostics.
+
 Each log line is one JSON object with these fields:
 
 - `ts`
@@ -7418,6 +7421,12 @@ Common events mean:
 
 Set `--log-level debug` when you need more detail, or leave the default at
 `info` for the normal lifecycle events.
+
+`debug` logging can include adb command lines plus stdout and stderr for many
+calls, so it can grow quickly during long sessions and may expose more device
+metadata than the default lifecycle-only levels.
+Use `info` for normal runs and enable `debug` only while investigating a
+specific problem.
 
 ---
 
