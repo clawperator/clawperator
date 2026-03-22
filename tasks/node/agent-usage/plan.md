@@ -66,6 +66,15 @@ arrives, satisfying the "brain needs data" requirement directly at the point of 
 
 Add structured NDJSON log output to `~/.clawperator/logs/`. `--log-level` flag and `CLAWPERATOR_LOG_DIR` env var. `RESULT_ENVELOPE_TIMEOUT` error includes `logPath` for the current day's log file.
 
+### PRD-5.9: Agent-Friendly Command Surface
+
+Promote high-frequency operations (`snapshot`, `screenshot`, `click`, `tap`, `open`,
+`fill`, `type`, `read`, `wait`, `press-key`, `back`) to top-level commands that
+delegate to the existing `observe` and `action` subcommands. Add `--text` and
+`--content-desc` as CLI shorthands for the common case of `--selector '{"text":"..."}'`.
+The nested forms remain unchanged. This removes the namespace-guessing tax that causes
+agents to fail on first contact.
+
 ### PRD-6: Docs and Entry Points
 
 Fix the `RECEIVER_NOT_INSTALLED` contradiction between `first-time-setup.md` and
@@ -155,6 +164,16 @@ PR-5.5  PRD-5.5
       Risk: low. Additive stdout only; no logic changes; no CLI changes.
       Depends on: PR-4 merged (streaming infrastructure must be in place).
       Repo: clawperator-skills only. Can run in parallel with PR-5.
+
+PR-5.9  PRD-5.9
+      - Top-level CLI aliases: snapshot, screenshot, click, tap, open, fill,
+        type, read, wait, press-key, back
+      - Selector shorthands: --text and --content-desc as alternatives to --selector JSON
+      - Positional app argument for open: `clawperator open com.foo.bar`
+      - Help text: "Quick Commands" group for top-level aliases
+      Risk: low. Purely additive CLI dispatch. No domain or contract changes.
+      Depends on: nothing (CLI layer only). Must land before PR-6 so docs
+      reference the flat command surface.
 
 PR-6  PRD-6 (remainder)
       - docs/index.md, agent-quickstart.md, openclaw-first-run.md consolidation
