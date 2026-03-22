@@ -1978,6 +1978,6 @@ describe("runSkill logging", () => {
     const lines = contents.trimEnd().split("\n").map(line => JSON.parse(line) as { event: string });
     assert.ok(lines.some(line => line.event === "skills.run.start"));
     assert.ok(lines.some(line => line.event === "skills.run.failed"));
-    assert.ok(!lines.some(line => line.event === "skills.run.complete"));
+    assert.ok(lines.some(line => line.event === "skills.run.complete"));
   });
 });
