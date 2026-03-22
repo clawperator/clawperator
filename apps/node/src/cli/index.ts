@@ -825,7 +825,7 @@ async function main(): Promise<void> {
         } else {
           // Use getStringOpt for --out to require a value if the flag is present
           const outputFileFlag = getStringOpt(rest, "--out");
-        result = await (await import("./commands/record.js")).cmdRecordParse({
+          result = await (await import("./commands/record.js")).cmdRecordParse({
             ...outWithLogger,
             inputFile,
             outputFile: outputFileFlag,

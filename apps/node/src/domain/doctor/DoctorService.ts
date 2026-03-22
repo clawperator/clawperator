@@ -35,10 +35,7 @@ export interface RunDoctorOptions {
 
 export class DoctorService {
   async run(options: RunDoctorOptions): Promise<DoctorReport> {
-    const config = options.config as RuntimeConfig & { logger?: Logger };
-    if (options.logger !== undefined) {
-      config.logger = options.logger;
-    }
+    const config = options.logger === undefined ? options.config : { ...options.config, logger: options.logger };
     const { full } = options;
     const checks: DoctorCheckResult[] = [];
 
@@ -132,7 +129,7 @@ export class DoctorService {
   }
 
   private async finalize(checks: DoctorCheckResult[], config: RuntimeConfig, autoFix?: boolean): Promise<DoctorReport> {
-    const logger = (config as RuntimeConfig & { logger?: Logger }).logger;
+    const logger = config.logger;
     for (const check of checks) {
       logger?.log({
         ts: new Date().toISOString(),

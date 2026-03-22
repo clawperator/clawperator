@@ -86,14 +86,14 @@ export async function startServer(options: ServeOptions): Promise<Server> {
   }
 
   function getEmulatorConfig() {
-      return getDefaultRuntimeConfig({
-        adbPath: process.env.ADB_PATH,
-        emulatorPath: process.env.EMULATOR_PATH,
-        sdkmanagerPath: process.env.SDKMANAGER_PATH,
-        avdmanagerPath: process.env.AVDMANAGER_PATH,
-        receiverPackage: process.env.CLAWPERATOR_RECEIVER_PACKAGE,
-        logger: options.logger,
-      });
+    return getDefaultRuntimeConfig({
+      adbPath: process.env.ADB_PATH,
+      emulatorPath: process.env.EMULATOR_PATH,
+      sdkmanagerPath: process.env.SDKMANAGER_PATH,
+      avdmanagerPath: process.env.AVDMANAGER_PATH,
+      receiverPackage: process.env.CLAWPERATOR_RECEIVER_PACKAGE,
+      logger: options.logger,
+    });
   }
 
   // REST: Execute command
