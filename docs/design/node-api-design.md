@@ -393,7 +393,7 @@ Because agents are the primary consumers, the CLI command surface must be
 optimized for first-contact guessability. Design principles, naming rules,
 synonym policy, and a pre-merge checklist for new commands and flags are in:
 
-- `docs/design/node-api-design-guiding-principals.md`
+- `docs/design/node-api-design-guiding-principles.md`
 
 The API refactoring plan that restructures the CLI surface is tracked in:
 

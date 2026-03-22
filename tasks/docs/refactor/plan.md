@@ -87,3 +87,8 @@ These are in sibling directories and can proceed independently:
   overview page (currently assembled from multiple sources by docs-generate).
 - `tasks/docs/validate/` - Add inner-page link validation to the docs build
   (relative markdown links not currently checked).
+
+Note: PRD-1's `scripts/operator_event.sh` stub (section 4) is unrelated to the
+API refactor and could proceed independently if desired. It is kept in PRD-1
+because it is a small deliverable that fits naturally with the other entry-point
+work, but it has no dependency on the CLI command surface.

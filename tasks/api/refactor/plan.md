@@ -7,6 +7,8 @@ verbose flag names are systematic first-contact failures. This plan implements t
 fixes across four phases.
 
 Reviewed 2026-03-23 by a second independent agent. Required changes incorporated.
+Reviewed 2026-03-23 by a third independent agent against actual source code.
+Required changes incorporated.
 
 Primary inputs:
 - External agent UX review (full transcript in session context)
@@ -100,6 +102,79 @@ These are deterministic and non-negotiable:
 - `--json` mode: returns structured result with the text value
 - Future consideration: `--all` flag to return all matches as a list (not in
   scope for this refactor)
+
+---
+
+## Implementation Context
+
+The CLI uses **hand-rolled argument parsing** - there is no external CLI
+framework (no Yargs, Commander, or similar). All infrastructure described below
+must be built from scratch in `apps/node/src/cli/index.ts`.
+
+Key functions the implementing agent must understand before starting:
+
+- `getGlobalOpts(argv)` (index.ts:335-380): manually iterates argv, extracts
+  `--device-id`, `--receiver-package`, `--output`/`--format`, `--timeout-ms`,
+  `--log-level`, `--verbose`. Everything else goes into `rest[]`.
+- `getOpt(rest, flag)` (index.ts:382-385): simple `rest.indexOf(flag)` lookup.
+- `hasFlag(rest, flag)` (index.ts:438-440): boolean `rest.includes(flag)`.
+- `resolveHelpTopic(rest)` (index.ts:313-333): maps command paths like
+  `["observe", "snapshot"]` to `HELP_TOPICS` keys. Must be updated when commands
+  are renamed or promoted.
+- `HELP` constant (index.ts:9-119): hardcoded template literal, ~110 lines.
+- `HELP_TOPICS` record (index.ts:121-330): hardcoded per-command help strings.
+- Command dispatch: giant `switch (cmd)` at index.ts:481-888.
+- Exit code logic (index.ts:903-908): parses JSON result to determine exit code.
+  Currently, USAGE errors from switch cases produce exit code 0 in most paths.
+
+Consequences for this refactor:
+
+- **Flag aliases** require modifying `getGlobalOpts` to check both old and new
+  names (e.g. `argv[i] === "--device-id" || argv[i] === "--device"`). There is
+  no alias table mechanism - each alias is a manual `||` check.
+- **`--json` as a global flag** requires a new branch in `getGlobalOpts` that
+  sets `output = "json"` when `--json` is encountered, alongside the existing
+  `--output`/`--format` parsing.
+- **Positional arguments** require manual extraction from the `rest[]` array.
+  The pattern is: check if `rest[0]` exists and does not start with `--`, then
+  treat it as the positional value. This must be written for each command that
+  accepts positional args.
+- **"Did you mean?" errors** go in the `default:` case of the switch statement
+  (currently index.ts:887) and in specific removed-command cases (e.g. a new
+  `case "action":` that produces the redirect error). Fuzzy matching must be
+  implemented manually or via a small utility (e.g. Levenshtein distance).
+- **Help text** is static strings, not generated. Every promoted command needs
+  a new `HELP_TOPICS` entry, and `resolveHelpTopic` must map its name to that
+  entry.
+- **Exit codes** for new error types ("did you mean?", missing selector, etc.)
+  must produce exit code 1. The current `default:` path exits 0 for unknown
+  commands. The implementing agent should ensure all error JSON includes a
+  `code` field so the exit-code logic at index.ts:903-908 catches it.
+
+### CLI command synonyms vs execution action type aliases
+
+`contracts/aliases.ts` defines action type aliases for the **execution payload**
+(e.g., `tap` -> `click`, `press` -> `click` at the payload level). These are
+payload normalization used by `normalizeActionType()` and `validateExecution()`.
+
+CLI command synonyms (e.g., the `tap` command routing to the `click` handler)
+are **dispatch-level routing** in index.ts. These are different layers.
+
+Do not modify `contracts/aliases.ts` as part of this refactor. CLI synonyms are
+implemented by adding additional `case` branches in the switch statement (e.g.
+`case "tap": case "click": { ... }`). The execution payload alias table is
+unchanged.
+
+### Commands unchanged by this refactor
+
+The following commands are not affected and should not be modified:
+
+- `devices`, `doctor`, `version`, `packages list`, `grant-device-permissions`
+- `operator setup` / `operator install`
+- `skills *`, `emulator *`, `recording` / `record`
+- `serve` (CLI dispatch - see HTTP API section below for route changes)
+- `execute` (the `--execution` flag name is deliberately not renamed; it is the
+  canonical interface for skill scripts and advanced agents)
 
 ---
 
@@ -199,6 +274,15 @@ separable for review:
    Detection: `https?://` -> URL, any `*://` -> URI, else package name.
    `--app` flag still works as explicit override for ambiguous cases.
 
+   Implementation note: the unified `open` must route to two different existing
+   builders: `buildOpenAppExecution()` (domain/actions/openApp.ts) for package
+   names, and `buildOpenUriExecution()` (domain/actions/openUri.ts) for URLs and
+   URIs. These produce different execution action types (`open_app` vs
+   `open_uri`). The detection is unambiguous: package names never contain `://`.
+
+   The existing `cmdActionOpenApp` and `cmdActionOpenUri` handlers in action.ts
+   can be reused or inlined - they are thin wrappers around their builders.
+
 4. **Positional arguments where obvious**
    - `clawperator open com.android.settings` (positional target)
    - `clawperator press back` (positional key name)
@@ -271,6 +355,24 @@ Did you mean:
   clawperator click --text "Wi-Fi"
 ```
 
+7. **Update smoke scripts to use new command surface**
+   - `clawperator_smoke_core.sh` uses old command forms (`action open-app`,
+     `observe snapshot`, `--output json`, etc.). These will break when
+     `action`/`observe` are removed. Update the script as part of this phase,
+     not Phase 3.
+   - `clawperator_smoke_skills.sh` - check and update if it uses old forms.
+   - `clawperator_integration_canonical.sh` - check and update if applicable.
+   - All scripts must pass after the update.
+
+8. **Update existing tests to use new command surface**
+   - Tests in `apps/node/src/test/unit/cliHelp.test.ts` match on old command
+     strings (e.g. `assert.match(stdout, /clawperator observe snapshot/)`).
+     Update all string matches to use new flat command names.
+   - Do not build a separate regression harness - the existing tests ARE the
+     harness. Update them.
+   - Tests spawn `dist/cli/index.js` as a subprocess, so `npm run build` must
+     run before `npm run test`.
+
 ### Risk
 
 Low-medium. Breaking change to CLI surface, but zero external users and only
@@ -286,7 +388,8 @@ unchanged. Phase 0 infrastructure catches regressions.
 - Positional arguments work and are mutually exclusive with their named flag
 - `open` correctly detects package vs URL vs URI targets
 - All failure-mode requirements above produce the specified output
-- `clawperator_smoke_core.sh` passes (update script if it uses old command forms)
+- All smoke scripts pass with new command forms
+- All existing unit tests pass with updated command name assertions
 
 ---
 
@@ -322,12 +425,12 @@ Replace JSON-heavy element targeting with simple, guessable flags.
    - Missing all selectors: clear error listing available flags with examples
    - Empty string values: rejected at validation boundary
 
-4. **Additional type ergonomics**
-   - `--submit` flag: press enter/submit after typing
-   - `--clear` flag: clear existing text first. If the Android receiver does not
-     yet support this, the flag is accepted but the help text documents the
-     limitation: "Note: --clear requires receiver support; currently a no-op on
-     some devices"
+4. **Preserve existing type flags**
+   - `--submit` and `--clear` already exist on `action type` (index.ts:667-668,
+     action.ts:151-153). These must be carried forward to the promoted `type`
+     command. This is not new work - just ensure they are not lost during
+     promotion and that the new help text documents them, including the `--clear`
+     limitation note.
 
 ### Risk
 
@@ -335,18 +438,36 @@ Low. CLI-layer parsing only. The domain layer receives a `NodeMatcher` object
 regardless of whether it was constructed from `--text`, `--selector`, or a
 positional flag. No changes to the Android receiver or execution payload schema.
 
+### NodeMatcher field mapping
+
+CLI selector flags map to `NodeMatcher` fields (contracts/selectors.ts:4-11).
+The field names do NOT match the flag names. Implementing agents must use this
+mapping:
+
+| CLI flag | NodeMatcher field |
+|---|---|
+| `--text <value>` | `textEquals` |
+| `--text-contains <value>` | `textContains` |
+| `--id <value>` | `resourceId` |
+| `--desc <value>` | `contentDescEquals` |
+| `--desc-contains <value>` | `contentDescContains` |
+| `--role <value>` | `role` |
+
+The same mapping applies to container flags with the `--container-` prefix,
+populating a separate `NodeMatcher` object for the `container` param.
+
 ### Testing
 
-- `--text "Login"` produces `{"text":"Login"}` matcher
+- `--text "Login"` produces `{"textEquals":"Login"}` matcher
 - `--id "com.foo:id/bar"` produces `{"resourceId":"com.foo:id/bar"}` matcher
-- `--desc "Submit"` produces `{"contentDescription":"Submit"}` matcher
-- `--text-contains "Log"` produces the correct partial-match matcher
-- `--role button` produces the correct role matcher
-- `--text "Login" --role button` combines to AND matcher
+- `--desc "Submit"` produces `{"contentDescEquals":"Submit"}` matcher
+- `--text-contains "Log"` produces `{"textContains":"Log"}` matcher
+- `--role button` produces `{"role":"button"}` matcher
+- `--text "Login" --role button` combines to `{"textEquals":"Login","role":"button"}`
 - `--text "Login" --selector '{...}'` errors clearly
 - All missing: error with example showing `--text` usage
 - `--text ""` errors (blank string rejected)
-- Container flags resolve independently and populate the correct matcher field
+- Container flags resolve independently and populate a separate matcher object
 
 ---
 
@@ -415,15 +536,31 @@ Finalize the developer and agent experience.
      command showing `--device` flag
    - Validation error: include task-oriented hint, not just schema path
 
-3. **Update smoke scripts and integration tests**
-   - `clawperator_smoke_core.sh` uses new command surface
-   - `clawperator_smoke_skills.sh` uses new command surface
-   - `clawperator_integration_canonical.sh` if applicable
-   - All scripts verified passing
+3. **Update HTTP API routes (`serve`)**
+
+   The HTTP API (serve.ts) must be updated to match the new CLI surface. The
+   HTTP API is alpha/unstable with zero external consumers - there is no
+   backward compatibility concern. An agent that learns `snapshot` from the CLI
+   will try `POST /snapshot`, not `POST /observe/snapshot`. Consistency between
+   CLI and HTTP surfaces prevents confusion.
+
+   Route changes:
+   - `POST /observe/snapshot` -> `POST /snapshot`
+   - `POST /observe/screenshot` -> `POST /screenshot`
+
+   The request/response body contracts are unchanged. Only the URL paths move.
+
+   `POST /execute`, `GET /devices`, skill routes, and emulator routes are
+   unchanged.
+
+   Note: smoke scripts and integration tests were already updated in Phase 1
+   (deliverable 7). Phase 3 should verify they still pass after help/error
+   changes but the migration work is done.
 
 ### Risk
 
-Low. UX polish with no behavioral changes.
+Low. UX polish with no behavioral changes. HTTP route renames are safe given
+the alpha/unstable status and zero external consumers.
 
 ### Testing
 
@@ -432,7 +569,8 @@ Low. UX polish with no behavioral changes.
 - Wrong flag produces suggestion
 - Missing selector produces example
 - Multi-device without `--device` lists devices
-- All smoke scripts pass
+- `POST /snapshot` and `POST /screenshot` work on the HTTP API
+- All smoke scripts still pass
 
 ---
 
@@ -518,3 +656,23 @@ not part of this refactoring:
   Separate feature.
 - **`read --all`**: Return all matches as a list. Useful but adds output format
   complexity. Track as a follow-up once the single-match contract is established.
+- **`scroll-until` and `scroll-and-click` CLI wrappers**: These are canonical
+  execution action types (contracts/aliases.ts:33-34) that currently require
+  `execute --execution <json>`. A CLI wrapper like
+  `clawperator scroll-until --text "About" --click` would be valuable but
+  involves designing a multi-flag interface for complex scroll parameters
+  (`maxScrolls`, `maxDurationMs`, `distanceRatio`, `noPositionChangeThreshold`).
+  Adding `scroll` as a simple directional command is the 80% case; scroll-until
+  is the 20% that can follow once the basic scroll surface is validated.
+- **`--long` and `--focus` click type flags**: The codebase supports
+  `clickType: "default" | "long_click" | "focus"` in ActionParams
+  (contracts/execution.ts). Adding `--long` and `--focus` flags to `click`
+  would expose these without JSON. Deferred because the default click covers
+  the vast majority of agent usage. Revisit after Phase 2 lands.
+- **`wait --timeout` semantic**: Currently `buildWaitExecution` uses a fixed
+  30s execution timeout. An agent using `wait --text "Loading" --timeout 5000`
+  might mean "wait up to 5 seconds for this element" rather than "set the
+  execution timeout to 5 seconds." The current refactor passes `--timeout`
+  through as the execution timeout. A dedicated wait-specific timeout would
+  require a separate flag or builder change. Defer until agent feedback
+  clarifies the expected behavior.

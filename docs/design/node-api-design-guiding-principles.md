@@ -130,6 +130,12 @@ When naming a new command or flag, ask: "What would an agent type if it had used
 Playwright yesterday and is using Clawperator today?" Use that name as the
 primary. Accept other reasonable guesses as synonyms.
 
+Note: this does not mean blindly copying Playwright names. Playwright uses
+`fill` for text entry, but `type` is a shorter, more universal verb that agents
+reach for first. Clawperator uses `type` as the primary name and accepts `fill`
+as a synonym. Apply the same judgment to each case: familiarity is a signal, not
+a mandate.
+
 ### 4. One Primary Name, Accept Synonyms
 
 Every command and flag has one canonical name used in docs, help text, and

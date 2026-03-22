@@ -127,7 +127,7 @@ config are not available. In that case, either: (a) add the `mkdocs-redirects` p
 `sites/docs/requirements.txt` and configure it, or (b) leave a markdown stub at the old
 URL with a manual "This page moved to: <new-url>" note. Document which approach was used.
 
-**Also update PRD-6 docsUrl values**: when renaming or moving the first-time-setup page
+**Also update PRD-1 docsUrl values**: when renaming or moving the first-time-setup page
 and any other pages referenced by `docsUrl` in `readinessChecks.ts`, update those
 hardcoded URLs as part of this PR. Search `apps/node/src/domain/doctor/checks/` for
 `docsUrl` values and update them to match the new page paths.
@@ -174,10 +174,10 @@ Out of scope:
 
 ## Dependencies
 
-- **ALL prior PRDs must land first.** This PRD documents the final shipped behavior. If
-  any runtime PRD is still in flight, the docs will describe behavior that does not yet
-  exist or that contradicts what is actually shipped.
-- PR-6 must land first: the first-run guide alignment (PR-6) is a prerequisite. This
+- **The API refactor and PRD-1 must land first.** This PRD documents the final shipped
+  behavior. If the API refactor or PRD-1 is still in flight, the docs will describe
+  behavior that does not yet exist or that contradicts what is actually shipped.
+- PRD-1 must land first: the entry-point alignment (PRD-1) is a prerequisite. This
   PRD then finalizes the structure around that aligned content.
 
 ---
@@ -199,7 +199,7 @@ Prioritize the first-run and reference sections; leave the deep architecture doc
 a follow-on if needed.
 
 **Risk: landing before runtime PRDs**
-If this PR lands before PR-1 through PR-6 merge, the restructured docs will describe
+If this PR lands before the API refactor and PRD-1 merge, the restructured docs will describe
 behavior that does not exist yet. Hard dependency: do not open this PR until all prior
 PRs are merged and deployed.
 
