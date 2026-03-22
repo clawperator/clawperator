@@ -3,6 +3,7 @@
 Workstream: WS-5.5 (skills-repo companion to WS-4/WS-5)
 Priority: 5.5 (after PRD-4, before or parallel with PRD-5)
 Proposed PR: PR-5.5 (in `clawperator-skills` repo only — no Node CLI changes)
+Status: [DONE]
 
 ---
 
