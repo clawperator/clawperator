@@ -45,7 +45,7 @@ workflow (also available as `record` alias), use [Android Recording Format for A
 | `skills validate <skill_id>` | Verify one local skill's metadata and required files before runtime testing |
 | `skills validate --all` | Validate the entire configured skills registry in one pass |
 | `skills compile-artifact <id> --artifact <name>` | Compile skill to execution payload |
-| `skills run <skill_id> [--device-id <id>] [--receiver-package <pkg>] [--timeout-ms <n>] [--expect-contains <text>]` | Invoke a skill script (convenience wrapper) |
+| `skills run <skill_id> [--device-id <id>] [--receiver-package <pkg>] [--timeout-ms <n>] [--expect-contains <text>]` | Invoke a skill script (convenience wrapper; pretty mode streams output live and prints a pre-run banner) |
 | `skills install` | Clone skills repo to `~/.clawperator/skills/` |
 | `skills update [--ref <git-ref>]` | Pull latest skills (optionally pin to a ref) |
 | `grant-device-permissions` | Re-grant Operator permissions only after an Operator APK crash causes Android to revoke them |
@@ -1158,6 +1158,17 @@ Current skills model:
 - `skills run --receiver-package <pkg>` sets the Operator package for this run
   (default: `com.clawperator.operator`). Use `com.clawperator.operator.dev` for
   local debug APKs.
+- In pretty mode, `skills run` prints a one-line banner before validation and
+  streams skill stdout and stderr in real time:
+
+  ```text
+  [Clawperator] v<version>  APK: <OK|MISSING>  Logs: <absolute-path>  Docs: https://docs.clawperator.com/llms.txt
+  ```
+
+  If the APK is present, the banner shows `OK (<receiver-package>)`. If the
+  APK check does not pass, it shows `MISSING - run \`clawperator operator setup --apk <path>\``.
+  The banner is suppressed entirely in JSON mode so the final output remains a
+  single parseable JSON envelope.
 - `skills run` performs the dry-run validation gate by default before it starts
   the skill script. That gate covers the compiled artifact payloads for
   artifact-backed skills and skips payload validation for script-only skills
