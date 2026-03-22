@@ -5,6 +5,7 @@ import { RESULT_ENVELOPE_PREFIX } from "../../contracts/result.js";
 import { parseTerminalEnvelope } from "./envelopeParser.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
 import type { TimeoutDiagnostics, BroadcastDiagnostics } from "../../contracts/errors.js";
+import { formatCommandLine } from "./adbClient.js";
 
 export interface LogcatResultOptions {
   commandId: string;
@@ -31,6 +32,7 @@ export async function waitForResultEnvelope(
   const { commandId, timeoutMs, lastCorrelatedLines = 20 } = options;
   const deviceArgs = config.deviceId ? ["-s", config.deviceId] : [];
   const args = [...deviceArgs, "logcat", "-v", "time", "-T", "1"];
+  const commandLine = formatCommandLine(config.adbPath, args);
 
   return new Promise((resolve) => {
     const correlatedLines: string[] = [];
@@ -39,6 +41,14 @@ export async function waitForResultEnvelope(
     let settled = false;
     let stderrBuffer = "";
     let timeoutId: NodeJS.Timeout;
+
+    config.logger?.log({
+      ts: new Date().toISOString(),
+      level: "debug",
+      event: "adb.command",
+      deviceId: config.deviceId,
+      message: commandLine,
+    });
 
     const proc = config.runner.spawn(config.adbPath, args);
 
@@ -67,6 +77,13 @@ export async function waitForResultEnvelope(
         deviceId: config.deviceId,
         receiverPackage: config.receiverPackage,
       };
+      config.logger?.log({
+        ts: new Date().toISOString(),
+        level: "debug",
+        event: "adb.complete",
+        deviceId: config.deviceId,
+        message: `${commandLine} timeoutMs=${timeoutMs} stdout=[redacted] stderr=[redacted]`,
+      });
       finalize({ ok: false, timeout: true, diagnostics });
     }, timeoutMs);
 
@@ -109,12 +126,26 @@ export async function waitForResultEnvelope(
 
     proc.on("error", (error: Error) => {
       if ((error as any).code === "ENOENT") {
+        config.logger?.log({
+          ts: new Date().toISOString(),
+          level: "debug",
+          event: "adb.complete",
+          deviceId: config.deviceId,
+          message: `${commandLine} code=127 stdout=[redacted] stderr=[redacted]`,
+        });
         finalize({
           ok: false,
           error: `ADB command not found at path: ${config.adbPath}`,
           code: ERROR_CODES.ADB_NOT_FOUND,
         } as any);
       } else {
+        config.logger?.log({
+          ts: new Date().toISOString(),
+          level: "debug",
+          event: "adb.complete",
+          deviceId: config.deviceId,
+          message: `${commandLine} error=${error.message} stdout=[redacted] stderr=[redacted]`,
+        });
         finalize({ ok: false, error: `logcat spawn failed: ${error.message}` });
       }
     });
@@ -123,6 +154,13 @@ export async function waitForResultEnvelope(
       if (settled) return;
       const base = `logcat exited before terminal envelope (code=${code ?? "null"}, signal=${signal ?? "null"})`;
       const stderr = stderrBuffer.trim();
+      config.logger?.log({
+        ts: new Date().toISOString(),
+        level: "debug",
+        event: "adb.complete",
+        deviceId: config.deviceId,
+        message: `${commandLine} code=${code ?? "null"} signal=${signal ?? "null"} stdout=[redacted] stderr=${JSON.stringify(stderr)}`,
+      });
       finalize({ ok: false, error: stderr ? `${base}: ${stderr}` : base });
     });
 

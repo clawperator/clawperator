@@ -1,8 +1,9 @@
-# PRD-5: Persistent Logging and Log Retrieval
+# PRD-5: Persistent Logging and Log Retrieval [DONE]
 
 Workstream: WS-5
 Priority: 5
 Proposed PR: PR-5
+Status: [DONE]
 
 Split from the original PRD-4 per reviewer feedback. This PRD covers persistent NDJSON
 logs, log-level controls, and the docs that teach agents to use them. Live progress

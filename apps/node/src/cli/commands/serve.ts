@@ -15,11 +15,13 @@ import { listRunningEmulators } from "../../domain/android-emulators/runningEmul
 import { createAvd, deleteAvd, enableEmulatorDeveloperSettings, startAvd, stopAvd, waitForBootCompletion, waitForEmulatorRegistration } from "../../domain/android-emulators/lifecycle.js";
 import { provisionEmulator } from "../../domain/android-emulators/provision.js";
 import { DEFAULT_EMULATOR_AVD_NAME, DEFAULT_EMULATOR_DEVICE_PROFILE, SUPPORTED_EMULATOR_API_LEVEL } from "../../domain/android-emulators/constants.js";
+import type { Logger } from "../../adapters/logger.js";
 
 interface ServeOptions {
   port: number;
   host: string;
   verbose: boolean;
+  logger?: Logger;
 }
 
 export async function cmdServe(options: ServeOptions): Promise<void> {
@@ -51,6 +53,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       const config = getDefaultRuntimeConfig({
         adbPath: process.env.ADB_PATH,
         receiverPackage: process.env.CLAWPERATOR_RECEIVER_PACKAGE,
+        logger: options.logger,
       });
       const devices = await listDevices(config);
       res.json({ ok: true, devices });
@@ -89,6 +92,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       sdkmanagerPath: process.env.SDKMANAGER_PATH,
       avdmanagerPath: process.env.AVDMANAGER_PATH,
       receiverPackage: process.env.CLAWPERATOR_RECEIVER_PACKAGE,
+      logger: options.logger,
     });
   }
 
@@ -120,6 +124,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       const result = await runExecution(execution, {
         deviceId,
         receiverPackage: receiverPackage || process.env.CLAWPERATOR_RECEIVER_PACKAGE,
+        logger: options.logger,
       });
 
       if (result.ok) {
@@ -165,6 +170,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       const result = await runExecution(executionInput, { 
         deviceId, 
         receiverPackage: receiverPackage || process.env.CLAWPERATOR_RECEIVER_PACKAGE,
+        logger: options.logger,
       });
       if (result.ok) {
         res.json(result);
@@ -214,6 +220,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       const result = await runExecution(executionInput, { 
         deviceId, 
         receiverPackage: receiverPackage || process.env.CLAWPERATOR_RECEIVER_PACKAGE,
+        logger: options.logger,
       });
       if (result.ok) {
         res.json(result);
@@ -427,7 +434,9 @@ export async function startServer(options: ServeOptions): Promise<Server> {
         req.params.skillId,
         scriptArgs,
         undefined,
-        typeof timeoutMs === "number" ? timeoutMs : undefined
+        typeof timeoutMs === "number" ? timeoutMs : undefined,
+        undefined,
+        { logger: options.logger }
       );
       if (result.ok) {
         if (typeof expectContains === "string" && !result.output.includes(expectContains)) {

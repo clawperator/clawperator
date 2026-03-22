@@ -57,9 +57,56 @@ workflow (also available as `record` alias), use [Android Recording Format for A
 | `doctor` | Run environment diagnostics |
 | `version` | Print the CLI version or check CLI / Clawperator Operator Android app compatibility |
 
-**Global options:** `--device-id <id>`, `--receiver-package <pkg>`, `--output <json|pretty>`, `--format <json|pretty>` (alias for `--output`), `--timeout-ms <n>`, `--verbose`
+**Global options:** `--device-id <id>`, `--receiver-package <pkg>`, `--output <json|pretty>`, `--format <json|pretty>` (alias for `--output`), `--timeout-ms <n>`, `--log-level <debug|info|warn|error>`, `--verbose`
 
 For agent callers, `--output json` is the canonical output mode. `pretty` is for human inspection.
+
+## Persistent Logging
+
+Clawperator can write persistent NDJSON logs for device-touching commands. By default, logs go to:
+
+```text
+~/.clawperator/logs/clawperator-YYYY-MM-DD.log
+```
+
+Configure logging with:
+
+- `CLAWPERATOR_LOG_DIR` to override the log directory
+- `CLAWPERATOR_LOG_LEVEL` to set the minimum level
+- `--log-level <debug|info|warn|error>` to override the env var for one command
+
+When both `--log-level` and `CLAWPERATOR_LOG_LEVEL` are set, the flag takes precedence. If logging cannot initialize, Clawperator warns once to stderr and keeps running.
+
+Use `debug` sparingly: it can include adb command lines plus stdout and stderr for many calls, so logs can grow quickly during long sessions and may contain more device metadata than the default lifecycle events.
+Prefer `info` for normal automation and switch to `debug` only when you need the extra diagnostics.
+
+Each log line is one JSON object with these fields:
+
+- `ts`
+- `level`
+- `event`
+- `commandId`
+- `taskId`
+- `deviceId`
+- `message`
+
+The timeout error `details.logPath` value is the resolved absolute path, so agents can pass it directly to `fs.readFile` or `cat`.
+
+Common events include:
+
+- `preflight.apk.pass`
+- `preflight.apk.missing`
+- `broadcast.dispatched`
+- `envelope.received`
+- `timeout.fired`
+- `doctor.check`
+- `skills.run.failed`
+- `skills.run.start`
+- `skills.run.complete`
+- `skills.run.timeout`
+
+`doctor.check` uses `info` for pass, `warn` for warnings, and `error` for failures so the log severity mirrors the check outcome.
+`skills.run.failed` is emitted for non-zero skill exits, while `skills.run.complete` remains the terminal marker for every skill run.
 
 Default receiver package:
 
@@ -900,7 +947,7 @@ Branch agent logic on codes from `envelope.errorCode` (top-level Android result 
 | `EMULATOR_STOP_FAILED` | `error.code` | Emulator stop request failed |
 | `EMULATOR_DELETE_FAILED` | `error.code` | Emulator deletion failed |
 | `NODE_NOT_FOUND` | `data.error` | Selector matched no UI element |
-| `RESULT_ENVELOPE_TIMEOUT` | `error.code` | Command dispatched but no result received; `details` includes command/task correlation plus last payload action context and elapsed timing |
+| `RESULT_ENVELOPE_TIMEOUT` | `error.code` | Command dispatched but no result received; `details` includes command/task correlation plus last payload action context, elapsed timing, and `logPath` when persistent logging is enabled |
 | `RECEIVER_NOT_INSTALLED` | `error.code` | Requested [Clawperator Operator Android app](../getting-started/android-operator-apk.md) package is missing on the device; `execute` and `doctor` fail fast instead of timing out |
 | `DEVICE_UNAUTHORIZED` | `error.code` | Device not authorized for ADB |
 | `VERSION_INCOMPATIBLE` | `error.code` | CLI and installed [Clawperator Operator Android app](../getting-started/android-operator-apk.md) versions do not match exactly after ignoring the trailing debug suffix |
@@ -923,7 +970,7 @@ For agent-side recovery strategy, use
 
 - **Single-flight:** One execution per device at a time. Concurrent requests return `EXECUTION_CONFLICT_IN_FLIGHT`.
 - **No hidden retries:** If an action fails, the error is returned immediately. Retry logic belongs in the agent.
-- **Deterministic results:** Exactly one terminal envelope per `commandId`. Timeouts return `RESULT_ENVELOPE_TIMEOUT` with diagnostics and payload-side action context.
+- **Deterministic results:** Exactly one terminal envelope per `commandId`. Timeouts return `RESULT_ENVELOPE_TIMEOUT` with diagnostics, payload-side action context, and `logPath` when persistent logging is enabled.
 - **Execution granularity:** Group multiple actions in one execution only when they are atomic - when the agent does not need to observe state or make a decision between them. For flows where intermediate state matters, use separate executions with `observe snapshot` between each. See [Execution Model](../reference/execution-model.md) for the full guidance.
 - **Timeout override:** `--timeout-ms <n>` overrides the execution timeout for `execute`, `observe snapshot`, and `observe screenshot` within policy limits.
 - **Screenshot output path:** `observe screenshot --path <file>` writes the PNG to the requested local path and still returns the final `data.path` in the result envelope. `<file>` must be a non-empty local filesystem path.

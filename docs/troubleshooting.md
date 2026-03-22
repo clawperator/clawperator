@@ -86,6 +86,52 @@ If any requirement is not met, the app shows an orange background and a dedicate
 
 ---
 
+## Reading the Clawperator log
+
+When a command times out or behaves unexpectedly, check the persistent log file
+for the matching `commandId`.
+
+**Default path:**
+
+```text
+~/.clawperator/logs/clawperator-YYYY-MM-DD.log
+```
+
+You can override the directory with `CLAWPERATOR_LOG_DIR`. The file is NDJSON:
+one JSON object per line, with no pretty-printing. Each line can be parsed with
+`jq` or `JSON.parse`.
+
+Useful filters:
+
+```bash
+grep '"'"'"commandId":"cmd-001"'"'"' ~/.clawperator/logs/clawperator-YYYY-MM-DD.log
+jq -c '"'"'select(.commandId == "cmd-001")'"'"' ~/.clawperator/logs/clawperator-YYYY-MM-DD.log
+```
+
+Common events mean:
+
+- `preflight.apk.pass` - the Operator APK was present before dispatch
+- `preflight.apk.missing` - the requested Operator APK was not installed
+- `broadcast.dispatched` - the Node layer sent the adb broadcast
+- `envelope.received` - the `[Clawperator-Result]` envelope came back
+- `timeout.fired` - the Node layer hit its timeout waiting for a result
+- `doctor.check` - one doctor check result was recorded; severity mirrors the check outcome (`info` for pass, `warn` for warning, `error` for failure)
+- `skills.run.start` - a skill script spawned
+- `skills.run.failed` - a skill script exited non-zero
+- `skills.run.complete` - a skill script exited cleanly
+- `skills.run.timeout` - a skill script hit its wrapper timeout
+
+Set `--log-level debug` when you need more detail, or leave the default at
+`info` for the normal lifecycle events.
+
+`debug` logging can include adb command lines plus stdout and stderr for many
+calls, so it can grow quickly during long sessions and may expose more device
+metadata than the default lifecycle-only levels.
+Use `info` for normal runs and enable `debug` only while investigating a
+specific problem.
+
+---
+
 ## Wireless Debugging (YMMV)
 
 Clawperator is designed to work with a dedicated, **always-on, permanently powered** Android device. For maximum reliability, a physical USB connection is strongly recommended. 

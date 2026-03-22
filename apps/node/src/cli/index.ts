@@ -4,6 +4,7 @@ import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 import { ERROR_CODES } from "../contracts/errors.js";
 import { formatError } from "./output.js";
+import { createLogger } from "../adapters/logger.js";
 
 const HELP = `Clawperator CLI
 
@@ -102,6 +103,7 @@ Global options:
   --receiver-package <package>              Target Operator package for broadcast dispatch
   --output <json|pretty>, --format <json|pretty>
                                             Output format (default: json)
+  --log-level <debug|info|warn|error>       Persistent log level (default: info)
   --timeout-ms <number>                     Override execution timeout within policy limits
   --verbose                                 Include debug diagnostics in output
   --help                                    Show help
@@ -334,6 +336,7 @@ function getGlobalOpts(argv: string[]): {
   deviceId?: string;
   receiverPackage?: string;
   timeoutMs?: number;
+  logLevel?: "debug" | "info" | "warn" | "error";
   output: "json" | "pretty";
   verbose: boolean;
   rest: string[];
@@ -342,6 +345,7 @@ function getGlobalOpts(argv: string[]): {
   let deviceId: string | undefined;
   let receiverPackage: string | undefined;
   let timeoutMs: number | undefined;
+  let logLevel: "debug" | "info" | "warn" | "error" | undefined;
   let output: "json" | "pretty" = "json";
   let verbose = false;
   for (let i = 0; i < argv.length; i++) {
@@ -356,13 +360,23 @@ function getGlobalOpts(argv: string[]): {
         throw new UsageError("--timeout-ms requires a value");
       }
       timeoutMs = Number(argv[++i]);
+    } else if (argv[i] === "--log-level") {
+      if (!argv[i + 1]) {
+        throw new UsageError("--log-level requires a value");
+      }
+      const value = argv[++i].toLowerCase();
+      if (value === "debug" || value === "info" || value === "warn" || value === "error") {
+        logLevel = value;
+      } else {
+        throw new UsageError("--log-level must be one of: debug, info, warn, error");
+      }
     } else if (argv[i] === "--verbose") {
       verbose = true;
     } else {
       rest.push(argv[i]);
     }
   }
-  return { deviceId, receiverPackage, timeoutMs, output, verbose, rest };
+  return { deviceId, receiverPackage, timeoutMs, logLevel, output, verbose, rest };
 }
 
 function getOpt(rest: string[], flag: string): string | undefined {
@@ -454,6 +468,11 @@ async function main(): Promise<void> {
   }
   const [cmd, ...rest] = global.rest;
   const out = { format: global.output as "json" | "pretty", verbose: global.verbose };
+  const logger = createLogger({
+    logDir: process.env.CLAWPERATOR_LOG_DIR,
+    logLevel: global.logLevel ?? process.env.CLAWPERATOR_LOG_LEVEL,
+  });
+  const outWithLogger = { ...out, logger };
 
   let result: string;
   let usageParseError = false;
@@ -468,7 +487,7 @@ async function main(): Promise<void> {
           result = JSON.stringify({ code: "USAGE", message: `operator ${sub ?? "setup"} requires --apk <path>. Use clawperator operator setup --help for details.` });
         } else {
           result = await (await import("./commands/operatorSetup.js")).cmdOperatorSetup({
-            ...out,
+            ...outWithLogger,
             apkPath,
             deviceId: global.deviceId ?? getOpt(rest, "--device-id"),
             receiverPackage: global.receiverPackage ?? getOpt(rest, "--receiver-package"),
@@ -500,37 +519,37 @@ async function main(): Promise<void> {
       });
       break;
     case "devices":
-      result = await (await import("./commands/devices.js")).cmdDevices(out);
+      result = await (await import("./commands/devices.js")).cmdDevices(outWithLogger);
       break;
     case "emulator": {
       const sub = rest[0];
       if (sub === "list") {
-        result = await (await import("./commands/emulator.js")).cmdEmulatorList(out);
+        result = await (await import("./commands/emulator.js")).cmdEmulatorList(outWithLogger);
       } else if (sub === "inspect") {
         result = rest[1]
-          ? await (await import("./commands/emulator.js")).cmdEmulatorInspect(rest[1], out)
+          ? await (await import("./commands/emulator.js")).cmdEmulatorInspect(rest[1], outWithLogger)
           : JSON.stringify({ code: "USAGE", message: "emulator inspect <name>" });
       } else if (sub === "create") {
         result = await (await import("./commands/emulator.js")).cmdEmulatorCreate({
-          ...out,
+          ...outWithLogger,
           name: getOpt(rest, "--name"),
         });
       } else if (sub === "start") {
         result = rest[1]
-          ? await (await import("./commands/emulator.js")).cmdEmulatorStart(rest[1], out)
+          ? await (await import("./commands/emulator.js")).cmdEmulatorStart(rest[1], outWithLogger)
           : JSON.stringify({ code: "USAGE", message: "emulator start <name>" });
       } else if (sub === "stop") {
         result = rest[1]
-          ? await (await import("./commands/emulator.js")).cmdEmulatorStop(rest[1], out)
+          ? await (await import("./commands/emulator.js")).cmdEmulatorStop(rest[1], outWithLogger)
           : JSON.stringify({ code: "USAGE", message: "emulator stop <name>" });
       } else if (sub === "delete") {
         result = rest[1]
-          ? await (await import("./commands/emulator.js")).cmdEmulatorDelete(rest[1], out)
+          ? await (await import("./commands/emulator.js")).cmdEmulatorDelete(rest[1], outWithLogger)
           : JSON.stringify({ code: "USAGE", message: "emulator delete <name>" });
       } else if (sub === "status") {
-        result = await (await import("./commands/emulator.js")).cmdEmulatorStatus(out);
+        result = await (await import("./commands/emulator.js")).cmdEmulatorStatus(outWithLogger);
       } else if (sub === "provision") {
-        result = await (await import("./commands/emulator.js")).cmdProvisionEmulator(out);
+        result = await (await import("./commands/emulator.js")).cmdProvisionEmulator(outWithLogger);
       } else {
         result = JSON.stringify({ code: "USAGE", message: "emulator list|inspect|create|start|stop|delete|status|provision" });
       }
@@ -538,7 +557,7 @@ async function main(): Promise<void> {
     }
     case "provision":
       if (rest[0] === "emulator") {
-        result = await (await import("./commands/emulator.js")).cmdProvisionEmulator(out);
+        result = await (await import("./commands/emulator.js")).cmdProvisionEmulator(outWithLogger);
       } else {
         result = JSON.stringify({ code: "USAGE", message: "provision emulator" });
       }
@@ -546,7 +565,7 @@ async function main(): Promise<void> {
     case "packages":
       if (rest[0] === "list") {
         result = await (await import("./commands/packages.js")).cmdPackagesList({
-          ...out,
+          ...outWithLogger,
           deviceId: global.deviceId ?? getOpt(rest, "--device-id"),
           thirdParty: hasFlag(rest, "--third-party"),
         });
@@ -568,13 +587,14 @@ async function main(): Promise<void> {
           result = JSON.stringify({ code: "USAGE", message: "execute requires --execution <json-or-file>" });
         } else {
           result = await (await import("./commands/execute.js")).cmdExecute({
-            ...out,
+            ...outWithLogger,
             execution,
             deviceId: global.deviceId ?? getOpt(rest, "--device-id"),
             receiverPackage: global.receiverPackage ?? getOpt(rest, "--receiver-package"),
             timeoutMs: global.timeoutMs,
             validateOnly: hasFlag(rest, "--validate-only"),
             dryRun: hasFlag(rest, "--dry-run"),
+            logger,
           });
         }
       }
@@ -582,14 +602,14 @@ async function main(): Promise<void> {
     case "observe":
       if (rest[0] === "snapshot") {
         result = await (await import("./commands/observe.js")).cmdObserveSnapshot({
-          ...out,
+          ...outWithLogger,
           deviceId: global.deviceId ?? getOpt(rest, "--device-id"),
           receiverPackage: global.receiverPackage ?? getOpt(rest, "--receiver-package"),
           timeoutMs: global.timeoutMs,
         });
       } else if (rest[0] === "screenshot") {
         result = await (await import("./commands/observe.js")).cmdObserveScreenshot({
-          ...out,
+          ...outWithLogger,
           deviceId: global.deviceId ?? getOpt(rest, "--device-id"),
           receiverPackage: global.receiverPackage ?? getOpt(rest, "--receiver-package"),
           timeoutMs: global.timeoutMs,
@@ -602,7 +622,7 @@ async function main(): Promise<void> {
     case "inspect":
       if (rest[0] === "ui") {
         result = await (await import("./commands/inspect.js")).cmdInspectUi({
-          ...out,
+          ...outWithLogger,
           deviceId: global.deviceId ?? getOpt(rest, "--device-id"),
           receiverPackage: global.receiverPackage ?? getOpt(rest, "--receiver-package"),
           timeoutMs: global.timeoutMs,
@@ -617,30 +637,31 @@ async function main(): Promise<void> {
       const runOpts = {
         deviceId: global.deviceId ?? getOpt(rest, "--device-id"),
         receiverPackage: global.receiverPackage ?? getOpt(rest, "--receiver-package"),
+        logger,
       };
       if (sub === "click") {
         result = selector
-          ? await (await import("./commands/action.js")).cmdActionClick({ ...out, selector, ...runOpts })
+          ? await (await import("./commands/action.js")).cmdActionClick({ ...outWithLogger, selector, ...runOpts })
           : JSON.stringify({ code: "USAGE", message: "action click --selector <json>" });
       } else if (sub === "open-app") {
         const app = getOpt(rest, "--app");
         result = app
-          ? await (await import("./commands/action.js")).cmdActionOpenApp({ ...out, applicationId: app, ...runOpts })
+          ? await (await import("./commands/action.js")).cmdActionOpenApp({ ...outWithLogger, applicationId: app, ...runOpts })
           : JSON.stringify({ code: "USAGE", message: "action open-app --app <packageId>" });
       } else if (sub === "read") {
         result = selector
-          ? await (await import("./commands/action.js")).cmdActionRead({ ...out, selector, ...runOpts })
+          ? await (await import("./commands/action.js")).cmdActionRead({ ...outWithLogger, selector, ...runOpts })
           : JSON.stringify({ code: "USAGE", message: "action read --selector <json>" });
       } else if (sub === "wait") {
         result = selector
-          ? await (await import("./commands/action.js")).cmdActionWait({ ...out, selector, ...runOpts })
+          ? await (await import("./commands/action.js")).cmdActionWait({ ...outWithLogger, selector, ...runOpts })
           : JSON.stringify({ code: "USAGE", message: "action wait --selector <json>" });
       } else if (sub === "type") {
         const text = getOpt(rest, "--text");
         result =
           selector && text !== undefined
             ? await (await import("./commands/action.js")).cmdActionType({
-              ...out,
+              ...outWithLogger,
               selector,
               text,
               submit: hasFlag(rest, "--submit"),
@@ -651,12 +672,12 @@ async function main(): Promise<void> {
       } else if (sub === "open-uri") {
         const uri = getOpt(rest, "--uri");
         result = uri
-          ? await (await import("./commands/action.js")).cmdActionOpenUri({ ...out, uri, ...runOpts })
+          ? await (await import("./commands/action.js")).cmdActionOpenUri({ ...outWithLogger, uri, ...runOpts })
           : JSON.stringify({ code: "USAGE", message: "action open-uri --uri <value>" });
       } else if (sub === "press-key") {
         const key = getOpt(rest, "--key");
         result = key
-          ? await (await import("./commands/action.js")).cmdActionPressKey({ ...out, key, ...runOpts })
+          ? await (await import("./commands/action.js")).cmdActionPressKey({ ...outWithLogger, key, ...runOpts })
           : JSON.stringify({ code: "USAGE", message: "action press-key --key <back|home|recents>" });
       } else {
         const validSubs = "open-app|open-uri|click|read|wait|type|press-key";
@@ -667,10 +688,10 @@ async function main(): Promise<void> {
     }
     case "skills":
       if (rest[0] === "list") {
-        result = await (await import("./commands/skills.js")).cmdSkillsList(out);
+        result = await (await import("./commands/skills.js")).cmdSkillsList(outWithLogger);
       } else if (rest[0] === "get") {
         result = rest[1]
-          ? await (await import("./commands/skills.js")).cmdSkillsGet(rest[1], out)
+          ? await (await import("./commands/skills.js")).cmdSkillsGet(rest[1], outWithLogger)
           : JSON.stringify({ code: "USAGE", message: "skills get <skill_id>" });
       } else if (rest[0] === "search") {
         const app = getOpt(rest, "--app");
@@ -685,7 +706,7 @@ async function main(): Promise<void> {
             example: "clawperator skills search --keyword solax",
           });
         } else {
-          result = await (await import("./commands/skills.js")).cmdSkillsSearch({ app, intent, keyword }, out);
+          result = await (await import("./commands/skills.js")).cmdSkillsSearch({ app, intent, keyword }, outWithLogger);
         }
       } else if (rest[0] === "compile-artifact") {
         const skillId = getOpt(rest, "--skill-id") ?? rest[1];
@@ -698,23 +719,23 @@ async function main(): Promise<void> {
               "skills compile-artifact requires <skill_id> (positional) or --skill-id <id>, and --artifact <name>. Example: skills compile-artifact com.example.skill --artifact ac-status [--vars '{}']",
           });
         } else {
-          result = await (await import("./commands/skills.js")).cmdSkillsCompileArtifact(skillId, artifact, vars, out);
+          result = await (await import("./commands/skills.js")).cmdSkillsCompileArtifact(skillId, artifact, vars, outWithLogger);
         }
       } else if (rest[0] === "new") {
         if (!rest[1]) {
           result = JSON.stringify({ code: "USAGE", message: "skills new <skill_id> [--summary <text>]" });
         } else {
           const summary = getOpt(rest, "--summary");
-          result = await (await import("./commands/skills.js")).cmdSkillsNew(rest[1], { ...out, summary });
+          result = await (await import("./commands/skills.js")).cmdSkillsNew(rest[1], { ...outWithLogger, summary });
         }
       } else if (rest[0] === "validate") {
         const dryRun = hasFlag(rest, "--dry-run");
         if (hasFlag(rest, "--all")) {
-          result = await (await import("./commands/skills.js")).cmdSkillsValidateAll({ ...out, dryRun });
+          result = await (await import("./commands/skills.js")).cmdSkillsValidateAll({ ...outWithLogger, dryRun });
         } else if (!rest[1]) {
           result = JSON.stringify({ code: "USAGE", message: "skills validate <skill_id> [--dry-run] | skills validate --all [--dry-run]" });
         } else {
-          result = await (await import("./commands/skills.js")).cmdSkillsValidate(rest[1], { ...out, dryRun });
+          result = await (await import("./commands/skills.js")).cmdSkillsValidate(rest[1], { ...outWithLogger, dryRun });
         }
       } else if (rest[0] === "run") {
         const skillId = rest[1];
@@ -751,18 +772,18 @@ async function main(): Promise<void> {
             effectiveTimeoutMs,
             expectContains,
             receiverPackage,
-            { ...out, skipValidate, deviceId }
+            { ...outWithLogger, skipValidate, deviceId, logger }
           );
         }
       } else if (rest[0] === "install") {
-        result = await (await import("./commands/skills.js")).cmdSkillsInstall(out);
+        result = await (await import("./commands/skills.js")).cmdSkillsInstall(outWithLogger);
       } else if (rest[0] === "update") {
         const ref = getOpt(rest, "--ref") ?? "main";
-        result = await (await import("./commands/skills.js")).cmdSkillsUpdate(ref, out);
+        result = await (await import("./commands/skills.js")).cmdSkillsUpdate(ref, outWithLogger);
       } else if (rest[0] === "sync") {
         const ref = getOpt(rest, "--ref");
         result = ref
-          ? await (await import("./commands/skills.js")).cmdSkillsSync(ref, out)
+          ? await (await import("./commands/skills.js")).cmdSkillsSync(ref, outWithLogger)
           : JSON.stringify({ code: "USAGE", message: "skills sync --ref <git-ref>" });
       } else {
         result = JSON.stringify({ code: "USAGE", message: "skills list|get|search|compile-artifact|new|validate|run|install|update|sync ..." });
@@ -777,13 +798,13 @@ async function main(): Promise<void> {
       };
       if (sub === "start") {
         result = await (await import("./commands/record.js")).cmdRecordStart({
-          ...out,
+          ...outWithLogger,
           sessionId: getOpt(rest, "--session-id"),
           ...runOpts,
         });
       } else if (sub === "stop") {
         result = await (await import("./commands/record.js")).cmdRecordStop({
-          ...out,
+          ...outWithLogger,
           sessionId: getOpt(rest, "--session-id"),
           ...runOpts,
         });
@@ -792,7 +813,7 @@ async function main(): Promise<void> {
         const outputDirFlag = getStringOpt(rest, "--out");
         const outputDir = outputDirFlag ?? "./recordings/";
         result = await (await import("./commands/record.js")).cmdRecordPull({
-          ...out,
+          ...outWithLogger,
           sessionId: getOpt(rest, "--session-id"),
           outputDir,
           ...runOpts,
@@ -805,7 +826,7 @@ async function main(): Promise<void> {
           // Use getStringOpt for --out to require a value if the flag is present
           const outputFileFlag = getStringOpt(rest, "--out");
           result = await (await import("./commands/record.js")).cmdRecordParse({
-            ...out,
+            ...outWithLogger,
             inputFile,
             outputFile: outputFileFlag,
           });
@@ -828,6 +849,7 @@ async function main(): Promise<void> {
           port,
           host,
           verbose: global.verbose,
+          logger,
         });
         // Long running, we don't return.
         return;
@@ -835,26 +857,27 @@ async function main(): Promise<void> {
     case "doctor": {
       const isJson = hasFlag(rest, "--json") || out.format === "json";
       result = await (await import("./commands/doctor.js")).cmdDoctor({
-        ...out,
+        ...outWithLogger,
         format: isJson ? "json" : "pretty",
         fix: hasFlag(rest, "--fix"),
         full: hasFlag(rest, "--full"),
         checkOnly: hasFlag(rest, "--check-only"),
         deviceId: global.deviceId ?? getOpt(rest, "--device-id"),
         receiverPackage: global.receiverPackage ?? getOpt(rest, "--receiver-package"),
+        logger,
       });
       break;
     }
     case "grant-device-permissions":
       result = await (await import("./commands/grantDevicePermissions.js")).cmdGrantDevicePermissions({
-        ...out,
+        ...outWithLogger,
         deviceId: global.deviceId ?? getOpt(rest, "--device-id"),
         receiverPackage: global.receiverPackage ?? getOpt(rest, "--receiver-package"),
       });
       break;
     case "version":
       result = await (await import("./commands/version.js")).cmdVersion({
-        ...out,
+        ...outWithLogger,
         checkCompat: hasFlag(rest, "--check-compat"),
         deviceId: global.deviceId ?? getOpt(rest, "--device-id"),
         receiverPackage: global.receiverPackage ?? getOpt(rest, "--receiver-package"),

@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { access } from "node:fs/promises";
 import { join, extname } from "node:path";
 import { loadRegistry, findSkillById, getRepoRoot } from "../../adapters/skills-repo/localSkillsRegistry.js";
+import type { Logger } from "../../adapters/logger.js";
 import {
   REGISTRY_READ_FAILED,
   SKILL_NOT_FOUND,
@@ -40,6 +41,7 @@ export interface SkillRunEnv {
 
 export interface SkillRunCallbacks {
   onOutput?: (chunk: string, stream: "stdout" | "stderr") => void;
+  logger?: Logger;
 }
 
 export async function runSkill(
@@ -104,6 +106,13 @@ export async function runSkill(
 
   const start = Date.now();
   return new Promise((resolve) => {
+    callbacks?.logger?.log({
+      ts: new Date().toISOString(),
+      level: "info",
+      event: "skills.run.start",
+      message: `Skill ${skillId} spawned`,
+    });
+
     const child = spawn(cmd, cmdArgs, {
       stdio: ["ignore", "pipe", "pipe"],
       env: childEnv,
@@ -167,6 +176,18 @@ export async function runSkill(
 
       if (code !== 0) {
         const exitCode = code ?? 1;
+        callbacks?.logger?.log({
+          ts: new Date().toISOString(),
+          level: "error",
+          event: "skills.run.failed",
+          message: `Skill ${skillId} exited with code ${exitCode} after ${durationMs}ms`,
+        });
+        callbacks?.logger?.log({
+          ts: new Date().toISOString(),
+          level: "info",
+          event: "skills.run.complete",
+          message: `Skill ${skillId} exited with code ${exitCode} after ${durationMs}ms`,
+        });
         finish({
           ok: false,
           code: SKILL_EXECUTION_FAILED,
@@ -179,6 +200,12 @@ export async function runSkill(
         return;
       }
 
+      callbacks?.logger?.log({
+        ts: new Date().toISOString(),
+        level: "info",
+        event: "skills.run.complete",
+        message: `Skill ${skillId} exited with code 0 after ${durationMs}ms`,
+      });
       finish({
         ok: true,
         skillId,
@@ -190,6 +217,12 @@ export async function runSkill(
 
     timeoutId = setTimeout(() => {
       timedOut = true;
+      callbacks?.logger?.log({
+        ts: new Date().toISOString(),
+        level: "error",
+        event: "skills.run.timeout",
+        message: `Skill ${skillId} timed out after ${timeout}ms`,
+      });
       child.kill("SIGTERM");
     }, timeout);
   });

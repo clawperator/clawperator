@@ -24,16 +24,19 @@ import {
   runAndroidLaunch
 } from "./checks/buildChecks.js";
 import { isCriticalDoctorCheck } from "./criticalChecks.js";
+import type { Logger } from "../../adapters/logger.js";
 
 export interface RunDoctorOptions {
   config: RuntimeConfig;
   full?: boolean;
   fix?: boolean;
+  logger?: Logger;
 }
 
 export class DoctorService {
   async run(options: RunDoctorOptions): Promise<DoctorReport> {
-    const { config, full } = options;
+    const config = options.logger === undefined ? options.config : { ...options.config, logger: options.logger };
+    const { full } = options;
     const checks: DoctorCheckResult[] = [];
 
     // 1. Host Checks
@@ -126,6 +129,17 @@ export class DoctorService {
   }
 
   private async finalize(checks: DoctorCheckResult[], config: RuntimeConfig, autoFix?: boolean): Promise<DoctorReport> {
+    const logger = config.logger;
+    for (const check of checks) {
+      logger?.log({
+        ts: new Date().toISOString(),
+        level: check.status === "fail" ? "error" : check.status === "warn" ? "warn" : "info",
+        event: "doctor.check",
+        deviceId: config.deviceId,
+        message: `${check.id} status=${check.status}${check.code ? ` code=${check.code}` : ""}${check.summary ? ` ${check.summary}` : ""}`,
+      });
+    }
+
     const criticalOk = checks
       .filter(check => isCriticalDoctorCheck(check))
       .every(check => check.status !== "fail");

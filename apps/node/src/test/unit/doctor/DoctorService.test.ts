@@ -1,9 +1,13 @@
-import { describe, it } from "node:test";
+import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { DoctorService } from "../../../domain/doctor/DoctorService.js";
 import { getDefaultRuntimeConfig } from "../../../adapters/android-bridge/runtimeConfig.js";
 import { FakeProcessRunner } from "../fakes/FakeProcessRunner.js";
 import { ERROR_CODES } from "../../../contracts/errors.js";
+import { createLogger } from "../../../adapters/logger.js";
 
 describe("DoctorService", () => {
   it("treats missing APK as a critical failure and skips the handshake", async () => {
@@ -226,5 +230,44 @@ describe("DoctorService", () => {
       "Download the exact release APK from https://downloads.clawperator.com/operator/v0.4.1/operator-v0.4.1.apk and the checksum from https://downloads.clawperator.com/operator/v0.4.1/operator-v0.4.1.apk.sha256.",
       "clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id test-device-1",
     ]);
+  });
+});
+
+describe("DoctorService logging", () => {
+  let tempRoot: string;
+
+  beforeEach(async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), "clawperator-doctor-log-"));
+  });
+
+  afterEach(async () => {
+    await rm(tempRoot, { recursive: true, force: true });
+  });
+
+  it("logs one doctor.check entry per check", async () => {
+    const runner = new FakeProcessRunner();
+    const logger = createLogger({ logDir: join(tempRoot, "logs"), logLevel: "info" });
+    const config = getDefaultRuntimeConfig({ runner, receiverPackage: "com.clawperator.operator.dev" });
+
+    runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "33\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "Physical size: 1080x2400\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "Physical density: 420\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "1\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "1\n", stderr: "" });
+
+    const report = await new DoctorService().run({ config, logger });
+
+    assert.strictEqual(report.ok, false);
+    const contents = await readFile(logger.logPath()!, "utf8");
+    const lines = contents.trimEnd().split("\n").map(line => JSON.parse(line) as { event: string; message?: string });
+    assert.ok(lines.some(line => line.event === "doctor.check"));
+    assert.ok(lines.some(line => line.message?.includes("readiness.apk.presence")));
   });
 });

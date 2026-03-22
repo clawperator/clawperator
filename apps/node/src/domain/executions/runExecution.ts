@@ -8,7 +8,7 @@ import { resolveDevice } from "../devices/resolveDevice.js";
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 import { broadcastAgentCommand } from "../../adapters/android-bridge/broadcastAgentCommand.js";
 import { waitForResultEnvelope } from "../../adapters/android-bridge/logcatResultReader.js";
-import { runAdb } from "../../adapters/android-bridge/adbClient.js";
+import { runAdb, formatCommandLine } from "../../adapters/android-bridge/adbClient.js";
 import { checkApkPresence } from "../doctor/checks/readinessChecks.js";
 import { getReceiverPackageApkPath } from "../version/compatibility.js";
 import { tryAcquire, release, getConflictError } from "./executionStore.js";
@@ -19,6 +19,7 @@ import { emitResult, emitExecution } from "../observe/events.js";
 import { LIMITS } from "../../contracts/limits.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
 import type { RuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
+import type { Logger } from "../../adapters/logger.js";
 
 export interface RunExecutionOptions {
   deviceId?: string;
@@ -27,6 +28,7 @@ export interface RunExecutionOptions {
   runner?: RuntimeConfig["runner"];
   timeoutMs?: number;
   warn?: (message: string) => void;
+  logger?: Logger;
 }
 
 export type RunExecutionResult =
@@ -123,6 +125,7 @@ export interface TimeoutErrorDetails {
   lastActionCaveat: string;
   elapsedMs: number;
   timeoutMs: number;
+  logPath?: string;
 }
 
 export interface TimeoutErrorWithDetails extends TimeoutDiagnostics {
@@ -133,7 +136,8 @@ export interface TimeoutErrorWithDetails extends TimeoutDiagnostics {
 export function buildTimeoutError(
   execution: Pick<Execution, "actions" | "timeoutMs"> & Partial<Pick<Execution, "commandId" | "taskId">>,
   diagnostics: TimeoutDiagnostics,
-  elapsedMs: number
+  elapsedMs: number,
+  logPath?: string
 ): TimeoutErrorWithDetails {
   // Node only knows the last action in the payload, not the action Android was
   // actually executing when the timeout elapsed.
@@ -148,6 +152,7 @@ export function buildTimeoutError(
       lastActionCaveat: "payload-last only; Android execution position is unknown",
       elapsedMs,
       timeoutMs: execution.timeoutMs,
+      ...(logPath !== undefined ? { logPath } : {}),
     },
   };
 
@@ -257,6 +262,7 @@ async function performExecution(
     receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_RECEIVER_PACKAGE,
     adbPath: options.adbPath ?? process.env.ADB_PATH,
     runner: options.runner,
+    logger: options.logger,
   });
 
   let execution: Execution;
@@ -311,6 +317,15 @@ async function performExecution(
 
   const apkCheck = await checkApkPresence(config);
   if (apkCheck.status === "fail") {
+    options.logger?.log({
+      ts: new Date().toISOString(),
+      level: "error",
+      event: "preflight.apk.missing",
+      commandId: execution.commandId,
+      taskId: execution.taskId,
+      deviceId,
+      message: `Operator APK (${config.receiverPackage}) is not installed on ${deviceId}`,
+    });
     const installCommand = `clawperator operator setup --apk ${getReceiverPackageApkPath(config.receiverPackage)} --device-id ${deviceId}${config.receiverPackage !== "com.clawperator.operator" ? ` --receiver-package ${config.receiverPackage}` : ""}`;
     return {
       execution,
@@ -335,6 +350,18 @@ async function performExecution(
     options.warn?.(
       `[clawperator] WARN: ${apkCheck.id} ${apkCheck.summary}${apkCheck.detail ? ` - ${apkCheck.detail}` : ""}\n`
     );
+  }
+
+  if (apkCheck.status === "pass") {
+    options.logger?.log({
+      ts: new Date().toISOString(),
+      level: "info",
+      event: "preflight.apk.pass",
+      commandId: execution.commandId,
+      taskId: execution.taskId,
+      deviceId,
+      message: `Operator APK (${config.receiverPackage}) is installed on ${deviceId}`,
+    });
   }
 
   if (!tryAcquire(deviceId, execution.commandId)) {
@@ -362,17 +389,37 @@ async function performExecution(
       },
       async () => {
         const broadcast = await broadcastAgentCommand(config, payload);
+        if (broadcast.success) {
+          options.logger?.log({
+            ts: new Date().toISOString(),
+            level: "info",
+            event: "broadcast.dispatched",
+            commandId: execution.commandId,
+            taskId: execution.taskId,
+            deviceId,
+            message: `Broadcast dispatched to ${deviceId} for ${config.receiverPackage}`,
+          });
+        }
         return { success: broadcast.success, stdout: broadcast.stdout, stderr: broadcast.stderr };
       }
     );
 
     if (result.ok) {
+      options.logger?.log({
+        ts: new Date().toISOString(),
+        level: "info",
+        event: "envelope.received",
+        commandId: execution.commandId,
+        taskId: execution.taskId,
+        deviceId,
+        message: `Result envelope received from ${deviceId}`,
+      });
       finalizeSuccessfulCloseAppSteps(result.envelope.stepResults, execution, closeAppPreflight.successfulCloseActionIds);
 
       // Post-process to retrieve snapshot text from logcat
       const hasSnapshot = result.envelope.stepResults.some(s => s.actionType === "snapshot_ui");
       if (hasSnapshot) {
-        const dump = await runAdb(config, ["logcat", "-d", "-v", "tag"]);
+        const dump = await runAdb(config, ["logcat", "-d", "-v", "tag"], { logOutput: false });
         const snapshots = extractSnapshotsFromLogs(dump.stdout.split("\n"));
         attachSnapshotsToStepResults(result.envelope.stepResults, snapshots);
         markExtractionFailedSnapshotSteps(result.envelope.stepResults, options.warn);
@@ -388,6 +435,17 @@ async function performExecution(
           const screenStep = result.envelope.stepResults.find(s => s.actionType === "take_screenshot");
 
           const deviceArgs = config.deviceId ? ["-s", config.deviceId] : [];
+          const screencapCommand = formatCommandLine(config.adbPath, [...deviceArgs, "exec-out", "screencap", "-p"]);
+          options.logger?.log({
+            ts: new Date().toISOString(),
+            level: "debug",
+            event: "adb.command",
+            commandId: execution.commandId,
+            taskId: execution.taskId,
+            deviceId,
+            message: screencapCommand,
+          });
+          const screenshotStart = Date.now();
           const proc = spawn(config.adbPath, [...deviceArgs, "exec-out", "screencap", "-p"], {
             stdio: ["ignore", "pipe", "ignore"],
             shell: false,
@@ -400,6 +458,15 @@ async function performExecution(
 
           await new Promise((resolve, reject) => {
             proc.on("close", (code) => {
+              options.logger?.log({
+                ts: new Date().toISOString(),
+                level: "debug",
+                event: "adb.complete",
+                commandId: execution.commandId,
+                taskId: execution.taskId,
+                deviceId,
+                message: `${screencapCommand} code=${code ?? "null"} durationMs=${Date.now() - screenshotStart} stdout=[redacted] stderr=[redacted]`,
+              });
               if (code === 0) resolve(true);
               else reject(new Error(`screencap exited with code ${code}`));
             });
@@ -442,9 +509,25 @@ async function performExecution(
     }
     if ("timeout" in result && result.timeout && "diagnostics" in result) {
       const elapsedMs = Date.now() - dispatchStart;
+      options.logger?.log({
+        ts: new Date().toISOString(),
+        level: "error",
+        event: "timeout.fired",
+        commandId: execution.commandId,
+        taskId: execution.taskId,
+        deviceId,
+        message: `Timeout waiting for result envelope after ${elapsedMs}ms`,
+      });
       failureEnvelope.error = result.diagnostics.code;
       emitResult(deviceId, failureEnvelope);
-      return { execution, result: { ok: false, error: buildTimeoutError(execution, result.diagnostics, elapsedMs), deviceId } };
+      return {
+        execution,
+        result: {
+          ok: false,
+          error: buildTimeoutError(execution, result.diagnostics, elapsedMs, options.logger?.logPath()),
+          deviceId,
+        },
+      };
     }
     
     const errCode = ("code" in result && result.code) ? (result.code as string) : (("error" in result && typeof result.error === "string") ? result.error : "UNKNOWN_RUNTIME_ERROR");

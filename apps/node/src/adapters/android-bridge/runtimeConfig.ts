@@ -2,6 +2,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { existsSync } from "node:fs";
 import { type ProcessRunner, NodeProcessRunner } from "./processRunner.js";
+import type { Logger } from "../logger.js";
 
 export const DEFAULT_ACTION_AGENT_COMMAND = "app.clawperator.operator.ACTION_AGENT_COMMAND";
 export const EXTRA_AGENT_PAYLOAD = "payload";
@@ -27,6 +28,8 @@ export interface RuntimeConfig {
   payloadExtraKey: string;
   /** Process runner for executing commands (optional, defaults to NodeProcessRunner) */
   runner: ProcessRunner;
+  /** Structured logger for lifecycle and debug diagnostics */
+  logger?: Logger;
 }
 
 function resolveDefaultSdkToolPath(

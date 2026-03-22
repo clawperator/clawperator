@@ -2,16 +2,19 @@ import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeCo
 import { grantDevicePermissions } from "../../domain/device/grantPermissions.js";
 import type { OutputOptions } from "../output.js";
 import { formatSuccess, formatError } from "../output.js";
+import type { Logger } from "../../adapters/logger.js";
 
 export async function cmdGrantDevicePermissions(options: {
   format: OutputOptions["format"];
   deviceId?: string;
   receiverPackage?: string;
+  logger?: Logger;
 }): Promise<string> {
   const config = getDefaultRuntimeConfig({
     deviceId: options.deviceId,
     receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_RECEIVER_PACKAGE,
     adbPath: process.env.ADB_PATH,
+    logger: options.logger,
   });
 
   const result = await grantDevicePermissions(config, options.receiverPackage);

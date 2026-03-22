@@ -7,6 +7,7 @@ import { DoctorService } from "../../domain/doctor/DoctorService.js";
 import { isCriticalDoctorCheck } from "../../domain/doctor/criticalChecks.js";
 import { type DoctorReport, type DoctorCheckResult } from "../../contracts/doctor.js";
 import type { OutputOptions } from "../output.js";
+import type { Logger } from "../../adapters/logger.js";
 
 export async function cmdDoctor(options: {
   format: OutputOptions["format"];
@@ -15,6 +16,7 @@ export async function cmdDoctor(options: {
   checkOnly?: boolean;
   deviceId?: string;
   receiverPackage?: string;
+  logger?: Logger;
 }, deps: { doctorService?: Pick<DoctorService, "run"> } = {}): Promise<string> {
   const config = getDefaultRuntimeConfig({
     deviceId: options.deviceId,
@@ -23,7 +25,7 @@ export async function cmdDoctor(options: {
   });
 
   const service = deps.doctorService ?? new DoctorService();
-  const report = await service.run({ config, full: options.full, fix: options.fix });
+  const report = await service.run({ config, full: options.full, fix: options.fix, logger: options.logger });
 
   if (options.format === "json") {
     process.exitCode = getDoctorExitCode(report, options.checkOnly);

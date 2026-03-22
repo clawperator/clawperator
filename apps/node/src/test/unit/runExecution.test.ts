@@ -1,5 +1,7 @@
-import { describe, it } from "node:test";
+import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert";
+import { EventEmitter } from "node:events";
+import { chmod, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import {
   addSettleWarnings,
   attachSnapshotsToStepResults,
@@ -15,6 +17,9 @@ import type { Execution } from "../../contracts/execution.js";
 import type { ResultEnvelope, StepResult } from "../../contracts/result.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
+import { createLogger } from "../../adapters/logger.js";
+import { isAbsolute, join } from "node:path";
+import { tmpdir } from "node:os";
 import { FakeProcessRunner } from "./fakes/FakeProcessRunner.js";
 
 describe("attachSnapshotsToStepResults", () => {
@@ -607,5 +612,193 @@ describe("buildTimeoutError", () => {
     assert.strictEqual(error.broadcastDispatchStatus, "sent");
     assert.strictEqual(error.deviceId, "emulator-5554");
     assert.strictEqual(error.receiverPackage, "com.clawperator.operator.dev");
+  });
+});
+
+describe("runExecution logging", () => {
+  let tempRoot: string;
+
+  beforeEach(async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), "clawperator-run-log-"));
+  });
+
+  afterEach(async () => {
+    await rm(tempRoot, { recursive: true, force: true });
+  });
+
+  async function writeFakeAdbScript(scriptName: string): Promise<string> {
+    const scriptPath = join(tempRoot, scriptName);
+    await writeFile(
+      scriptPath,
+      "#!/bin/sh\nexit 0\n",
+      "utf8"
+    );
+    await chmod(scriptPath, 0o755);
+    return scriptPath;
+  }
+
+  function createLogcatRunner(envelopeLine: string, delayMs = 350): FakeProcessRunner {
+    const runner = new FakeProcessRunner();
+    runner.spawn = (() => {
+      const proc = new EventEmitter() as EventEmitter & {
+        stdout?: EventEmitter;
+        stderr?: EventEmitter;
+        kill: () => void;
+      };
+      proc.stdout = new EventEmitter();
+      proc.stderr = new EventEmitter();
+      proc.kill = () => undefined;
+      setTimeout(() => {
+        proc.stdout?.emit("data", Buffer.from(`${envelopeLine}\n`));
+        proc.emit("close", 0, null);
+      }, delayMs);
+      return proc;
+    }) as FakeProcessRunner["spawn"];
+    return runner;
+  }
+
+  it("writes broadcast and envelope events with the execution commandId", async () => {
+    const logger = createLogger({ logDir: join(tempRoot, "logs"), logLevel: "info" });
+    const adbPath = await writeFakeAdbScript("adb");
+    const runner = createLogcatRunner(
+      `[Clawperator-Result] ${JSON.stringify({
+        commandId: "cmd-log-1",
+        taskId: "task-log-1",
+        status: "success",
+        stepResults: [{ id: "a1", actionType: "enter_text", success: true, data: {} }],
+        error: null,
+      })}`,
+      1200
+    );
+
+    runner.queueResult({ code: 0, stdout: "List of devices attached\ndevice-123\tdevice\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "package:com.test.operator.dev\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "", stderr: "" });
+
+    const result = await runExecution(
+      {
+        commandId: "cmd-log-1",
+        taskId: "task-log-1",
+        source: "test",
+        expectedFormat: "android-ui-automator",
+        timeoutMs: 1000,
+        actions: [
+          {
+            id: "a1",
+            type: "enter_text",
+            params: {
+              matcher: { textEquals: "input" },
+              text: "hello",
+            },
+          },
+        ],
+      },
+      {
+        deviceId: "device-123",
+        receiverPackage: "com.test.operator.dev",
+        adbPath,
+        runner,
+        logger,
+      }
+    );
+
+    assert.strictEqual(result.ok, true);
+    const contents = await readFile(logger.logPath()!, "utf8");
+    const lines = contents.trimEnd().split("\n").map(line => JSON.parse(line) as { event: string; commandId?: string });
+    const broadcastLine = lines.find(line => line.event === "broadcast.dispatched");
+    const envelopeLine = lines.find(line => line.event === "envelope.received");
+    assert.strictEqual(broadcastLine?.commandId, "cmd-log-1");
+    assert.strictEqual(envelopeLine?.commandId, "cmd-log-1");
+  });
+
+  it("keeps sentinel payload text out of every log line", async () => {
+    const logger = createLogger({ logDir: join(tempRoot, "logs"), logLevel: "debug" });
+    const adbPath = await writeFakeAdbScript("adb");
+    const sentinel = "CLAWPERATOR_TEST_SENTINEL_X9Z";
+    const runner = createLogcatRunner(
+      `[Clawperator-Result] ${JSON.stringify({
+        commandId: "cmd-log-2",
+        taskId: "task-log-2",
+        status: "success",
+        stepResults: [{ id: "a1", actionType: "enter_text", success: true, data: {} }],
+        error: null,
+      })}`,
+      1200
+    );
+
+    runner.queueResult({ code: 0, stdout: "List of devices attached\ndevice-123\tdevice\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "package:com.test.operator.dev\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "", stderr: "" });
+
+    const result = await runExecution(
+      {
+        commandId: "cmd-log-2",
+        taskId: "task-log-2",
+        source: "test",
+        expectedFormat: "android-ui-automator",
+        timeoutMs: 1000,
+        actions: [
+          {
+            id: "a1",
+            type: "enter_text",
+            params: {
+              matcher: { textEquals: "input" },
+              text: sentinel,
+            },
+          },
+        ],
+      },
+      {
+        deviceId: "device-123",
+        receiverPackage: "com.test.operator.dev",
+        adbPath,
+        runner,
+        logger,
+      }
+    );
+
+    assert.strictEqual(result.ok, true);
+    const contents = await readFile(logger.logPath()!, "utf8");
+    for (const line of contents.trimEnd().split("\n")) {
+      assert.strictEqual(line.includes(sentinel), false, `sentinel leaked into log line: ${line}`);
+    }
+  });
+
+  it("adds the logger path to timeout errors as an absolute file path", async () => {
+    const logger = createLogger({ logDir: join(tempRoot, "logs"), logLevel: "info" });
+    const logPath = logger.logPath();
+    assert.ok(logPath);
+
+    logger.log({
+      ts: "2026-03-22T00:00:00.000Z",
+      level: "info",
+      event: "preflight.apk.pass",
+      commandId: "cmd-timeout",
+      taskId: "task-timeout",
+      deviceId: "device-123",
+      message: "Operator APK is installed",
+    });
+
+    const error = buildTimeoutError(
+      {
+        commandId: "cmd-timeout",
+        taskId: "task-timeout",
+        actions: [{ id: "a1", type: "snapshot_ui" }],
+        timeoutMs: 1000,
+      },
+      {
+        code: ERROR_CODES.RESULT_ENVELOPE_TIMEOUT,
+        message: "Timed out waiting for result envelope",
+      },
+      123,
+      logPath
+    );
+
+    assert.ok(error.details.logPath);
+    assert.strictEqual(error.details.logPath, logPath);
+    assert.strictEqual(isAbsolute(error.details.logPath), true);
+    assert.strictEqual((await stat(error.details.logPath)).isFile(), true);
   });
 });

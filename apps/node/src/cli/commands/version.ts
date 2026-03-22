@@ -5,12 +5,14 @@ import { resolveDevice } from "../../domain/devices/resolveDevice.js";
 import { getCliVersion, probeVersionCompatibility } from "../../domain/version/compatibility.js";
 import type { OutputOptions } from "../output.js";
 import { formatError, formatSuccess } from "../output.js";
+import type { Logger } from "../../adapters/logger.js";
 
 export async function cmdVersion(options: OutputOptions & {
   checkCompat?: boolean;
   deviceId?: string;
   receiverPackage?: string;
   runner?: ProcessRunner;
+  logger?: Logger;
 }): Promise<string> {
   if (!options.checkCompat) {
     try {
@@ -30,6 +32,7 @@ export async function cmdVersion(options: OutputOptions & {
     receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_RECEIVER_PACKAGE,
     adbPath: process.env.ADB_PATH,
     runner: options.runner,
+    logger: options.logger,
   });
 
   try {

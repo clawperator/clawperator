@@ -159,6 +159,11 @@ Those mean different things:
 That distinction matters for actions like `close_app`, where the overall
 execution may complete even though the step reports a per-step failure.
 
+If a command fails unexpectedly, check the persistent log file at
+`~/.clawperator/logs/clawperator-YYYY-MM-DD.log` or use `RESULT_ENVELOPE_TIMEOUT.details.logPath`
+when the timeout error includes one. Filter by `commandId` to see the preflight,
+broadcast, and envelope events that led up to the failure.
+
 ## Step 4 - Use the default agent loop
 
 For unknown apps, use a single-action plus re-observe loop:

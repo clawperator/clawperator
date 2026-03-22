@@ -16,6 +16,7 @@ import { getCliVersion } from "../../domain/version/compatibility.js";
 import { getAlternateReceiverVariant } from "../../domain/version/compatibility.js";
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 import { checkApkPresence } from "../../domain/doctor/checks/readinessChecks.js";
+import type { Logger } from "../../adapters/logger.js";
 import {
   CLAWPERATOR_BIN_ENV_VAR,
   CLAWPERATOR_RECEIVER_PACKAGE_ENV_VAR,
@@ -140,6 +141,7 @@ export async function cmdSkillsRun(
     deviceId?: string;
     runSkillImpl?: typeof runSkill;
     validateSkillImpl?: typeof validateSkill;
+    logger?: Logger;
   }
 ): Promise<string> {
   // Resolve the env vars for the skill script
@@ -158,6 +160,7 @@ export async function cmdSkillsRun(
     const config = getDefaultRuntimeConfig({
       deviceId: options.deviceId,
       receiverPackage: resolvedReceiverPackage,
+      logger: options.logger,
     });
     let apkStatus = `MISSING - run \`clawperator operator setup --apk <path>\``;
     try {
@@ -178,7 +181,7 @@ export async function cmdSkillsRun(
     const yyyy = String(logDate.getFullYear());
     const mm = String(logDate.getMonth() + 1).padStart(2, "0");
     const dd = String(logDate.getDate()).padStart(2, "0");
-    const logPath = join(homedir(), ".clawperator", "logs", `clawperator-${yyyy}-${mm}-${dd}.log`);
+    const logPath = options.logger?.logPath() ?? join(homedir(), ".clawperator", "logs", `clawperator-${yyyy}-${mm}-${dd}.log`);
     process.stdout.write(
       `[Clawperator] v${getCliVersion()}  APK: ${apkStatus}  Logs: ${logPath}  Docs: https://docs.clawperator.com/llms.txt\n`
     );
@@ -217,13 +220,14 @@ export async function cmdSkillsRun(
                 }
               }
             },
+            logger: options.logger,
           });
         } finally {
           removeStdoutErrorListener();
           removeStderrErrorListener();
         }
       })()
-    : await runSkillImpl(skillId, args, undefined, timeoutMs, env);
+    : await runSkillImpl(skillId, args, undefined, timeoutMs, env, { logger: options.logger });
   if (result.ok) {
     if (expectContains && !result.output.includes(expectContains)) {
       return formatError({
