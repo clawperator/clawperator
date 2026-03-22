@@ -145,6 +145,17 @@ PR-5  PRD-5
       Risk: medium. New filesystem surface; payload-privacy discipline required.
       Depends on: PR-1 (pre-flight events), PR-2 (extends timeout enrichment).
 
+PR-5.5  PRD-5.5
+      - Add [skill] progress logging to all skills in clawperator-skills
+      - Convention: freeform console.log('[skill] ...') — no CLI changes needed
+      - Covers all 4 artifact-backed skills (minimum 3 progress lines each) and
+        complex script-only skills (life360, chromecast, coles, woolworths)
+      - skill-development-workflow.md: document the [skill] convention
+      - Deferred: structured JSON progress protocol (documented in PRD-5.5)
+      Risk: low. Additive stdout only; no logic changes; no CLI changes.
+      Depends on: PR-4 merged (streaming infrastructure must be in place).
+      Repo: clawperator-skills only. Can run in parallel with PR-5.
+
 PR-6  PRD-6 (remainder)
       - docs/index.md, agent-quickstart.md, openclaw-first-run.md consolidation
       - llms.txt alignment with shipped semantics
