@@ -100,9 +100,13 @@ Common events include:
 - `envelope.received`
 - `timeout.fired`
 - `doctor.check`
+- `skills.run.failed`
 - `skills.run.start`
 - `skills.run.complete`
 - `skills.run.timeout`
+
+`doctor.check` uses `info` for pass, `warn` for warnings, and `error` for failures so the log severity mirrors the check outcome.
+`skills.run.failed` is emitted for non-zero skill exits, while `skills.run.complete` remains the terminal marker for every skill run.
 
 Default receiver package:
 

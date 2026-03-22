@@ -115,8 +115,9 @@ Common events mean:
 - `broadcast.dispatched` - the Node layer sent the adb broadcast
 - `envelope.received` - the `[Clawperator-Result]` envelope came back
 - `timeout.fired` - the Node layer hit its timeout waiting for a result
-- `doctor.check` - one doctor check result was recorded
+- `doctor.check` - one doctor check result was recorded; severity mirrors the check outcome (`info` for pass, `warn` for warning, `error` for failure)
 - `skills.run.start` - a skill script spawned
+- `skills.run.failed` - a skill script exited non-zero
 - `skills.run.complete` - a skill script exited cleanly
 - `skills.run.timeout` - a skill script hit its wrapper timeout
 
