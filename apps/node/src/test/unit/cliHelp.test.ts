@@ -112,20 +112,20 @@ describe("CLI help", () => {
     assert.match(obj.message, /operator setup/);
   });
 
-  it("shows observe snapshot help instead of top-level help", async () => {
+  it("observe snapshot --help falls back to top-level help", async () => {
+    // observe snapshot is removed; --help with an unknown command falls back to top-level help.
     const { stdout, code } = await runCli(["observe", "snapshot", "--help"]);
     assert.strictEqual(code, 0);
-    assert.match(stdout, /clawperator observe snapshot/);
-    assert.match(stdout, /--timeout-ms <number>/);
-    assert.doesNotMatch(stdout, /skills compile-artifact/);
+    assert.match(stdout, /Clawperator CLI/);
+    assert.match(stdout, /Commands:/);
   });
 
-  it("shows observe screenshot help with path option", async () => {
+  it("observe screenshot --help falls back to top-level help", async () => {
+    // observe screenshot is removed; --help with an unknown command falls back to top-level help.
     const { stdout, code } = await runCli(["observe", "screenshot", "--help"]);
     assert.strictEqual(code, 0);
-    assert.match(stdout, /clawperator observe screenshot/);
-    assert.match(stdout, /--path <file>/);
-    assert.doesNotMatch(stdout, /skills compile-artifact/);
+    assert.match(stdout, /Clawperator CLI/);
+    assert.match(stdout, /Commands:/);
   });
 
   it("shows validate-only in top-level execute help", async () => {
@@ -171,16 +171,17 @@ describe("CLI help", () => {
     assert.doesNotMatch(stdout, /action open-app/);
   });
 
-  it("shows inspect ui help instead of top-level help", async () => {
+  it("inspect ui --help falls back to top-level help", async () => {
+    // inspect ui is removed; --help with an unknown command falls back to top-level help.
     const { stdout, code } = await runCli(["inspect", "ui", "--help"]);
     assert.strictEqual(code, 0);
-    assert.match(stdout, /clawperator observe snapshot/);
-    assert.match(stdout, /--timeout-ms <number>/);
-    assert.doesNotMatch(stdout, /skills compile-artifact/);
+    assert.match(stdout, /Clawperator CLI/);
+    assert.match(stdout, /Commands:/);
   });
 
-  it("forwards timeout parsing through inspect ui", async () => {
-    const { stdout, code } = await runCli(["inspect", "ui", "--timeout-ms", "nope"]);
+  it("forwards invalid timeout to EXECUTION_VALIDATION_FAILED", async () => {
+    // skills run validates the effective timeout before attempting device dispatch.
+    const { stdout, code } = await runCli(["skills", "run", "some-skill", "--timeout", "nope"]);
     assert.notStrictEqual(code, 0);
     assert.match(stdout, /EXECUTION_VALIDATION_FAILED/);
     assert.match(stdout, /timeoutMs must be a finite number/);
@@ -194,13 +195,14 @@ describe("CLI help", () => {
   });
 
   it("accepts --format as an alias for --output", async () => {
-    const jsonResult = await runCli(["inspect", "ui", "--timeout-ms", "nope", "--format", "json"]);
+    // --format is a global alias for --output; validated via timeout error through skills run.
+    const jsonResult = await runCli(["skills", "run", "some-skill", "--timeout", "nope", "--format", "json"]);
     assert.notStrictEqual(jsonResult.code, 0);
     const json = JSON.parse(jsonResult.stdout);
     assert.strictEqual(json.code, "EXECUTION_VALIDATION_FAILED");
     assert.strictEqual(json.message, "timeoutMs must be a finite number");
 
-    const prettyResult = await runCli(["inspect", "ui", "--timeout-ms", "nope", "--format", "pretty"]);
+    const prettyResult = await runCli(["skills", "run", "some-skill", "--timeout", "nope", "--format", "pretty"]);
     assert.notStrictEqual(prettyResult.code, 0);
     const pretty = JSON.parse(prettyResult.stdout);
     assert.strictEqual(pretty.code, "EXECUTION_VALIDATION_FAILED");
@@ -330,11 +332,13 @@ describe("operator setup CLI output", () => {
     assert.strictEqual(obj.code, "OPERATOR_APK_NOT_FOUND");
   });
 
-  it("observe screenshot returns USAGE when --path is missing a value", async () => {
+  it("observe screenshot returns UNKNOWN_COMMAND redirect to screenshot", async () => {
+    // observe screenshot is removed; any invocation (including with flags) gets the migration message.
     const { stdout, code } = await runCli(["observe", "screenshot", "--path"]);
     assert.strictEqual(code, 1, stdout);
-    const obj = JSON.parse(stdout) as { code?: string; message?: string };
-    assert.strictEqual(obj.code, "USAGE");
-    assert.strictEqual(obj.message, "--path requires a value");
+    const obj = JSON.parse(stdout) as { code?: string; message?: string; suggestion?: string };
+    assert.strictEqual(obj.code, "UNKNOWN_COMMAND");
+    assert.match(obj.message ?? "", /'observe screenshot' has been removed/);
+    assert.strictEqual(obj.suggestion, "screenshot");
   });
 });

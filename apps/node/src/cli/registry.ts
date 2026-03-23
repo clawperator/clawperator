@@ -124,31 +124,6 @@ Notes:
   - Use clawperator grant-device-permissions only after the Operator APK crashes and Android revokes permissions.
 `;
 
-const HELP_OBSERVE_SNAPSHOT = `clawperator observe snapshot
-
-Usage:
-  clawperator observe snapshot [--device <id>] [--operator-package <package>] [--timeout-ms <number>] [--output <json|pretty>] [--verbose]
-
-Notes:
-  - Captures a UI snapshot via the canonical execution path.
-  - Default receiver package: com.clawperator.operator
-  - Use --operator-package com.clawperator.operator.dev for local debug APKs. --operator-package is an accepted alias.
-  - --timeout-ms overrides the execution timeout within policy limits.
-`;
-
-const HELP_OBSERVE_SCREENSHOT = `clawperator observe screenshot
-
-Usage:
-  clawperator observe screenshot [--device <id>] [--operator-package <package>] [--path <file>] [--timeout-ms <number>] [--output <json|pretty>] [--verbose]
-
-Notes:
-  - Captures a PNG screenshot via the canonical execution path.
-  - Default receiver package: com.clawperator.operator
-  - Use --operator-package com.clawperator.operator.dev for local debug APKs. --operator-package is an accepted alias.
-  - --path writes the screenshot to the provided local filesystem path.
-  - If --path is omitted, Clawperator writes to a generated temp file and returns that path in the result envelope.
-  - --timeout-ms overrides the execution timeout within policy limits.
-`;
 
 const HELP_SKILLS_INSTALL = `clawperator skills install
 
@@ -532,148 +507,6 @@ COMMANDS["execute"] = {
   },
 };
 
-// observe
-COMMANDS["observe"] = {
-  name: "observe",
-  group: "Device Interaction",
-  summary: "Capture UI snapshot or screenshot from device",
-  help: HELP_OBSERVE_SNAPSHOT,
-  subtopics: {
-    snapshot: HELP_OBSERVE_SNAPSHOT,
-    screenshot: HELP_OBSERVE_SCREENSHOT,
-  },
-  topLevelBlock: `  observe snapshot [--device <id>] [--operator-package <package>]
-                                            Capture current UI snapshot output
-  observe screenshot [--device <id>] [--operator-package <package>] [--path <file>]
-                                            Capture current device screenshot (png)`,
-  handler: async (ctx) => {
-    const { rest, format, verbose, logger, deviceId, operatorPackage, timeoutMs } = ctx;
-    const out = { format, verbose, logger };
-    if (rest[0] === "snapshot") {
-      return (await import("./commands/observe.js")).cmdObserveSnapshot({
-        ...out,
-        deviceId: deviceId ?? getOpt(rest, "--device") ?? getOpt(rest, "--device-id"),
-        operatorPackage: operatorPackage ?? getOpt(rest, "--operator-package"),
-        timeoutMs,
-      });
-    } else if (rest[0] === "screenshot") {
-      return (await import("./commands/observe.js")).cmdObserveScreenshot({
-        ...out,
-        deviceId: deviceId ?? getOpt(rest, "--device") ?? getOpt(rest, "--device-id"),
-        operatorPackage: operatorPackage ?? getOpt(rest, "--operator-package"),
-        timeoutMs,
-        path: getStringOpt(rest, "--path"),
-      });
-    } else {
-      return JSON.stringify({ code: "USAGE", message: "observe snapshot|screenshot [options]" });
-    }
-  },
-};
-
-// inspect
-COMMANDS["inspect"] = {
-  name: "inspect",
-  group: "Device Interaction",
-  summary: "Alias of observe snapshot with formatted output",
-  help: HELP_OBSERVE_SNAPSHOT,
-  subtopics: {
-    ui: HELP_OBSERVE_SNAPSHOT,
-  },
-  topLevelBlock: `  inspect ui [--device <id>] [--operator-package <package>]
-                                            Alias of observe snapshot with formatted output`,
-  handler: async (ctx) => {
-    const { rest, format, verbose, logger, deviceId, operatorPackage, timeoutMs } = ctx;
-    const out = { format, verbose, logger };
-    if (rest[0] === "ui") {
-      return (await import("./commands/inspect.js")).cmdInspectUi({
-        ...out,
-        deviceId: deviceId ?? getOpt(rest, "--device") ?? getOpt(rest, "--device-id"),
-        operatorPackage: operatorPackage ?? getOpt(rest, "--operator-package"),
-        timeoutMs,
-      });
-    } else {
-      return JSON.stringify({ code: "USAGE", message: "inspect ui [options]" });
-    }
-  },
-};
-
-// action
-COMMANDS["action"] = {
-  name: "action",
-  group: "Device Interaction",
-  summary: "Build and run single device actions via execute path",
-  help: "clawperator action\n\nUsage:\n  clawperator action open-app|open-uri|click|read|wait|type|press-key [options]\n",
-  topLevelBlock: `  action open-app --app <packageId> [--device <id>] [--operator-package <package>]
-                                            Build and run single open_app action via execute path
-  action open-uri --uri <value> [--device <id>] [--operator-package <package>]
-                                            Build and run single open_uri action via execute path
-  action click --selector <json> [--device <id>] [--operator-package <package>]
-                                            Build and run single click action via execute path
-  action read --selector <json> [--device <id>] [--operator-package <package>]
-                                            Build and run single read_text action via execute path
-  action wait --selector <json> [--device <id>] [--operator-package <package>]
-                                            Build and run single wait_for_node action via execute path
-  action type --selector <json> --text <value> [--submit] [--clear] [--device <id>] [--operator-package <package>]
-                                            Build and run single enter_text action via execute path
-  action press-key --key <back|home|recents> [--device <id>] [--operator-package <package>]
-                                            Build and run single press_key action via execute path`,
-  handler: async (ctx) => {
-    const { rest, format, verbose, logger, deviceId, operatorPackage } = ctx;
-    const out = { format, verbose, logger };
-    const sub = rest[0];
-    const selector = getOpt(rest, "--selector");
-    const runOpts = {
-      deviceId: deviceId ?? getOpt(rest, "--device") ?? getOpt(rest, "--device-id"),
-      operatorPackage: operatorPackage ?? getOpt(rest, "--operator-package"),
-      logger,
-    };
-    if (sub === "click") {
-      return selector
-        ? (await import("./commands/action.js")).cmdActionClick({ ...out, selector, ...runOpts })
-        : JSON.stringify({ code: "USAGE", message: "action click --selector <json>" });
-    } else if (sub === "open-app") {
-      const app = getOpt(rest, "--app");
-      return app
-        ? (await import("./commands/action.js")).cmdActionOpenApp({ ...out, applicationId: app, ...runOpts })
-        : JSON.stringify({ code: "USAGE", message: "action open-app --app <packageId>" });
-    } else if (sub === "read") {
-      return selector
-        ? (await import("./commands/action.js")).cmdActionRead({ ...out, selector, ...runOpts })
-        : JSON.stringify({ code: "USAGE", message: "action read --selector <json>" });
-    } else if (sub === "wait") {
-      return selector
-        ? (await import("./commands/action.js")).cmdActionWait({ ...out, selector, ...runOpts })
-        : JSON.stringify({ code: "USAGE", message: "action wait --selector <json>" });
-    } else if (sub === "type") {
-      const text = getOpt(rest, "--text");
-      return selector && text !== undefined
-        ? (await import("./commands/action.js")).cmdActionType({
-          ...out,
-          selector,
-          text,
-          submit: hasFlag(rest, "--submit"),
-          clear: hasFlag(rest, "--clear"),
-          ...runOpts,
-        })
-        : JSON.stringify({ code: "USAGE", message: "action type --selector <json> --text <value>" });
-    } else if (sub === "open-uri") {
-      const uri = getOpt(rest, "--uri");
-      return uri
-        ? (await import("./commands/action.js")).cmdActionOpenUri({ ...out, uri, ...runOpts })
-        : JSON.stringify({ code: "USAGE", message: "action open-uri --uri <value>" });
-    } else if (sub === "press-key") {
-      const key = getOpt(rest, "--key");
-      return key
-        ? (await import("./commands/action.js")).cmdActionPressKey({ ...out, key, ...runOpts })
-        : JSON.stringify({ code: "USAGE", message: "action press-key --key <back|home|recents>" });
-    } else {
-      const validSubs = "open-app|open-uri|click|read|wait|type|press-key";
-      const unknownPart = sub ? `Unknown action subcommand '${sub}'. Valid: ` : "";
-      return JSON.stringify({ code: "USAGE", message: `${unknownPart}action ${validSubs} [options]` });
-    }
-  },
-};
-
 // skills
 COMMANDS["skills"] = {
   name: "skills",
@@ -1014,7 +847,35 @@ export function levenshtein(a: string, b: string): number {
   return dp[m][n];
 }
 
-export function didYouMean(cmd: string, commands: Record<string, CommandDef>): string {
+// Maps removed compound commands to their flat replacements.
+// When a caller types e.g. "action click", cmd="action" and rest[0]="click",
+// so we can give a precise "use 'click' instead" message.
+const REMOVED_COMPOUND_COMMANDS: Record<string, Record<string, string>> = {
+  action: { click: "click", "open-app": "open", "open-uri": "open", type: "type", read: "read", wait: "wait", "press-key": "press" },
+  observe: { snapshot: "snapshot", screenshot: "screenshot" },
+  inspect: { ui: "snapshot" },
+};
+
+export function didYouMean(cmd: string, rest: string[], commands: Record<string, CommandDef>): string {
+  // Check removed compound commands first - give precise migration guidance.
+  const compoundMap = REMOVED_COMPOUND_COMMANDS[cmd];
+  if (compoundMap) {
+    const sub = rest[0];
+    const replacement = sub ? compoundMap[sub] : undefined;
+    if (replacement) {
+      return JSON.stringify({
+        code: "UNKNOWN_COMMAND",
+        message: `'${cmd} ${sub}' has been removed. Use '${replacement}' instead. Run 'clawperator ${replacement} --help' for usage.`,
+        suggestion: replacement,
+      });
+    }
+    // Known removed namespace but unknown or missing subcommand
+    const validSubs = Object.keys(compoundMap).join(", ");
+    return JSON.stringify({
+      code: "UNKNOWN_COMMAND",
+      message: `'${cmd}' has been removed. Use one of: ${validSubs} - e.g. 'clawperator snapshot'. Run --help for available commands.`,
+    });
+  }
   const threshold = Math.max(2, Math.floor(cmd.length / 2));
   // Collect all candidates within threshold distance, then sort deterministically:
   //   1. closest distance first

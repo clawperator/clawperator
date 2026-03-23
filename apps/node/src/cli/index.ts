@@ -149,7 +149,7 @@ async function main(): Promise<void> {
           result = handlerResult;
         }
       } else {
-        result = didYouMean(cmd, COMMANDS);
+        result = didYouMean(cmd, rest, COMMANDS);
       }
     }
   } catch (error) {
@@ -169,7 +169,9 @@ async function main(): Promise<void> {
       process.exitCode = 1;
       return;
     }
-    // TODO(Phase 2): exit-code heuristic is fragile - see plan.md "Carried-forward debt"
+    // Heuristic: bare { code, message } objects without "envelope" are error results.
+    // All success shapes include "envelope" via formatSuccess; USAGE/NOT_IMPLEMENTED exit 0.
+    // Invariant must be maintained: new success paths must include "envelope" in their output.
     if (result.startsWith("{") && result.includes('"code"') && !result.includes('"envelope"')) {
       try {
         const obj = JSON.parse(result) as { code?: string };
