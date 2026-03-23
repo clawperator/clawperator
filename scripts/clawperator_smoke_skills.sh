@@ -65,12 +65,12 @@ echo "=== skills compile-artifact (json -> /tmp/clawperator-stage2-exec.json) ==
 
 echo "=== execute compiled execution ==="
 if [ -n "$SMOKE_SUMMARY" ]; then
-  EXEC_JSON="$("${CLI[@]}" execute --device-id "$DEVICE_ID" --operator-package "$CLAWPERATOR_OPERATOR_PACKAGE" --execution /tmp/clawperator-stage2-exec.json --output json 2>&1)" || true
+   EXEC_JSON="$("${CLI[@]}" execute --device "$DEVICE_ID" --operator-package "$CLAWPERATOR_OPERATOR_PACKAGE" --execution /tmp/clawperator-stage2-exec.json --json 2>&1)" || true
   echo "$EXEC_JSON" | node -e 'const d=require("fs").readFileSync(0,"utf8"); try { const j=JSON.parse(d); console.log(JSON.stringify({ step: "execute", result: j.terminalSource ? "ok" : (j.code === "RESULT_ENVELOPE_TIMEOUT" ? "timeout" : "error"), terminalSource: j.terminalSource || undefined, timeoutDiagnostics: j.code === "RESULT_ENVELOPE_TIMEOUT" ? j : undefined })); } catch(e) { console.log(JSON.stringify({ step: "execute", result: "error" })); }' >> "$OUTCOMES_FILE"
   echo "$EXEC_JSON" | node -e 'console.log(JSON.stringify(JSON.parse(require("fs").readFileSync(0,"utf8")),null,2))'
   EXEC_OUT="$EXEC_JSON"
 else
-  EXEC_OUT="$("${CLI[@]}" execute --device-id "$DEVICE_ID" --operator-package "$CLAWPERATOR_OPERATOR_PACKAGE" --execution /tmp/clawperator-stage2-exec.json --output pretty 2>&1)" || true
+   EXEC_OUT="$("${CLI[@]}" execute --device "$DEVICE_ID" --operator-package "$CLAWPERATOR_OPERATOR_PACKAGE" --execution /tmp/clawperator-stage2-exec.json --output pretty 2>&1)" || true
   echo "$EXEC_OUT"
 fi
 if echo "$EXEC_OUT" | grep -q '"terminalSource"'; then

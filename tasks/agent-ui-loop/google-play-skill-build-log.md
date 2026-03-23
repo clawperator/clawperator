@@ -26,7 +26,7 @@ of truth.
 
 Started by running the globally installed `clawperator` binary:
 ```
-clawperator execute --execution snap.json --device-id <device_serial>
+clawperator execute --execution snap.json --device <device_serial>
 ```
 
 Ran snapshot_ui. Got back:

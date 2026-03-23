@@ -89,7 +89,7 @@ clawperator provision emulator --output json
 
 This command reuses a running supported emulator, starts a stopped supported AVD, or creates a new Google Play emulator if none exist.
 
-Capture the returned serial and use it as `--device-id` in later commands.
+Capture the returned serial and use it as `--device <device_id>` in later commands (`--device-id` is accepted as an alias).
 
 ## Step 3 - Verify or install the Clawperator Operator Android app
 
@@ -98,10 +98,10 @@ The [Clawperator Operator Android app](android-operator-apk.md) must be installe
 The installer usually handles this automatically. If needed, install it with the canonical command:
 
 ```bash
-clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id <device_id>
+clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device <device_id>
 ```
 
-If only one device is connected, `--device-id` can be omitted:
+If only one device is connected, `--device` can be omitted:
 
 ```bash
 clawperator operator setup --apk ~/.clawperator/downloads/operator.apk
@@ -124,7 +124,7 @@ Do not split initial setup into separate `adb install` and `grant-device-permiss
 Before OpenClaw relies on the runtime, verify the environment:
 
 ```bash
-clawperator doctor --device-id <device_id> --output pretty
+clawperator doctor --device <device_id> --output pretty
 ```
 
 Expected checks include:
@@ -175,7 +175,7 @@ clawperator skills list
 Before attempting a user-facing app skill, run a known-safe verification skill:
 
 ```bash
-clawperator skills run com.android.settings.capture-overview --device-id <device_id>
+clawperator skills run com.android.settings.capture-overview --device <device_id>
 ```
 
 If this succeeds, the end-to-end OpenClaw + Clawperator + Android path is working.
@@ -212,7 +212,7 @@ If the user also wants Google Home or another app later, the same rule applies: 
 Run the public SolaX battery skill:
 
 ```bash
-clawperator skills run com.solaxcloud.starter.get-battery --device-id <device_id>
+clawperator skills run com.solaxcloud.starter.get-battery --device <device_id>
 ```
 
 The expected success shape is a line like:
@@ -231,14 +231,14 @@ For agents that need one deterministic sequence, the normal path is:
 curl -fsSL https://clawperator.com/install.sh | bash
 clawperator --version
 clawperator devices
-clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id <device_id>
-clawperator doctor --device-id <device_id> --output pretty
+clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device <device_id>
+clawperator doctor --device <device_id> --output pretty
 echo $CLAWPERATOR_SKILLS_REGISTRY
 clawperator skills list
-clawperator skills run com.android.settings.capture-overview --device-id <device_id>
+clawperator skills run com.android.settings.capture-overview --device <device_id>
 clawperator skills search --app com.solaxcloud.starter
 clawperator skills get com.solaxcloud.starter.get-battery
-clawperator skills run com.solaxcloud.starter.get-battery --device-id <device_id>
+clawperator skills run com.solaxcloud.starter.get-battery --device <device_id>
 ```
 
 If no physical device is present, insert this after install:
@@ -293,7 +293,7 @@ If the SolaX skill fails because the app is logged out, showing onboarding, or b
 
 ### Multiple devices connected
 
-Always pass `--device-id <device_id>` if more than one device is visible. This is especially important after emulator provisioning, because both a physical device and an emulator may be connected at the same time.
+Always pass `--device <device_id>` if more than one device is visible (`--device-id` is accepted as an alias). This is especially important after emulator provisioning, because both a physical device and an emulator may be connected at the same time.
 
 ## Summary
 

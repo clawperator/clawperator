@@ -99,7 +99,7 @@ LLM agents must use these codes to decide their next step.
 ### Setup & Connectivity
 - `ADB_NOT_FOUND`: ADB is missing from PATH.
 - `NO_DEVICES`: No Android devices are connected via USB/Network.
-- `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED`: More than one device exists; specify `--device-id`.
+- `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED`: More than one device exists; specify `--device` (alias: `--device-id`).
 - `OPERATOR_NOT_INSTALLED`: The target Operator package is not on the device, so `doctor` and `execute` fail fast before dispatch.
 
 ### Execution & State

@@ -199,9 +199,9 @@ commands are stable enough for future agents to reuse or rerun.
 
 | Skill ID | Provenance | Smoke command |
 | :--- | :--- | :--- |
-| `com.android.settings.check-software-update` | Settings -> Software update flow, validated to the "Your software is up to date" terminal screen. | `clawperator skills run com.android.settings.check-software-update --device-id <device_id>` |
-| `com.android.settings.set-theme` | Samsung Settings theme flow, parameterized for dark or light and validated on both themes. | `clawperator skills run com.android.settings.set-theme --device-id <device_id>` |
-| `com.solaxcloud.starter.get-device-discharging` | SolaX Cloud Device Discharging flow, validated to the detail screen text extraction path. | `clawperator skills run com.solaxcloud.starter.get-device-discharging --device-id <device_id>` |
+| `com.android.settings.check-software-update` | Settings -> Software update flow, validated to the "Your software is up to date" terminal screen. | `clawperator skills run com.android.settings.check-software-update --device <device_id>` |
+| `com.android.settings.set-theme` | Samsung Settings theme flow, parameterized for dark or light and validated on both themes. | `clawperator skills run com.android.settings.set-theme --device <device_id>` |
+| `com.solaxcloud.starter.get-device-discharging` | SolaX Cloud Device Discharging flow, validated to the detail screen text extraction path. | `clawperator skills run com.solaxcloud.starter.get-device-discharging --device <device_id>` |
 
 If you are reusing one of these skills, start from the skill ID and the
 validated smoke command above, then inspect the matching `SKILL.md` in the

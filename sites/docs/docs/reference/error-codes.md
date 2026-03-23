@@ -30,9 +30,9 @@ The `code` field is always one of the string constants listed below.
 |------|-------------|
 | `ADB_NOT_FOUND` | `adb` binary not found on the host |
 | `NO_DEVICES` | No Android devices are connected |
-| `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED` | Multiple devices connected but no `--device-id` specified |
+| `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED` | Multiple devices connected but no `--device` specified (alias: `--device-id`) |
 | `OPERATOR_NOT_INSTALLED` | The Clawperator Operator APK is not installed on the device |
-| `DEVICE_NOT_FOUND` | The specified `--device-id` is not among connected devices |
+| `DEVICE_NOT_FOUND` | The specified `--device` is not among connected devices (alias: `--device-id`) |
 
 ---
 

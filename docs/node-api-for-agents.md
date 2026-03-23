@@ -1030,7 +1030,7 @@ clawperator execute --execution '{"commandId":"test","taskId":"task","source":"c
 }
 ```
 
-The `--dry-run` flag does not require `--device-id` and performs no ADB activity.
+The `--dry-run` flag does not require `--device` and performs no ADB activity.
 
 ## Skills
 

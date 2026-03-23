@@ -9,8 +9,10 @@ export const ERROR_CODES = {
   // Setup & Connectivity
   ADB_NOT_FOUND: "ADB_NOT_FOUND",
   NO_DEVICES: "NO_DEVICES",
+  /** Recovery: pass `--device` (alias `--device-id`) when adb shows multiple targets. */
   MULTIPLE_DEVICES_DEVICE_ID_REQUIRED: "MULTIPLE_DEVICES_DEVICE_ID_REQUIRED",
   OPERATOR_NOT_INSTALLED: "OPERATOR_NOT_INSTALLED",
+  /** Recovery: the `--device` serial is not connected (alias `--device-id`). */
   DEVICE_NOT_FOUND: "DEVICE_NOT_FOUND", // Specific device ID provided but not connected
 
   // Execution & State

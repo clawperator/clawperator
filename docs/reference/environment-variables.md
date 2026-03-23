@@ -177,8 +177,8 @@ export CLAWPERATOR_SKILLS_REGISTRY="$HOME/.clawperator/skills/skills/skills-regi
 export CLAWPERATOR_OPERATOR_PACKAGE="com.clawperator.operator"
 ```
 
-Then override `--device-id` per command when more than one Android target is
-connected.
+Then pass `--device` per command when more than one Android target is connected
+(`--device-id` is accepted as an alias).
 
 For development with a local branch build, also set:
 

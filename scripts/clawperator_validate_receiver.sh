@@ -69,7 +69,7 @@ echo "=== validate receiver ingress (commandId=$VALIDATE_CMD_ID) ==="
 adb -s "$DEVICE_ID" logcat -c
 set +e
 "${CLI[@]}" execute \
-  --device-id "$DEVICE_ID" \
+   --device "$DEVICE_ID" \
   --operator-package "$CLAWPERATOR_OPERATOR_PACKAGE" \
   --execution "$VALIDATE_JSON" \
   --output pretty 2>&1

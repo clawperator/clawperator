@@ -26,7 +26,7 @@ echo "=== integration: compile artifact ==="
   | node -e 'const d=JSON.parse(require("fs").readFileSync(0,"utf8")); if (!d.execution) process.exit(1); require("fs").writeFileSync("/tmp/clawperator-integration-exec.json", JSON.stringify(d.execution));'
 
 echo "=== integration: execute on device ==="
-EXEC_OUT="$("${CLI[@]}" execute --device-id "$DEVICE_ID" --operator-package "$CLAWPERATOR_OPERATOR_PACKAGE" --execution /tmp/clawperator-integration-exec.json --output json 2>&1)" || true
+EXEC_OUT="$("${CLI[@]}" execute --device "$DEVICE_ID" --operator-package "$CLAWPERATOR_OPERATOR_PACKAGE" --execution /tmp/clawperator-integration-exec.json --json 2>&1)" || true
 
 echo "$EXEC_OUT" | node -e '
 const data = require("fs").readFileSync(0, "utf8");

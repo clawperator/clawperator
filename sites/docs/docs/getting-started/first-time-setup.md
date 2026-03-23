@@ -96,7 +96,7 @@ clawperator emulator list --output json
 clawperator emulator inspect clawperator-pixel --output json
 ```
 
-If both a physical device and an emulator are connected, you will need to pass `--device-id <serial>` to later commands.
+If both a physical device and an emulator are connected, you will need to pass `--device <serial>` to later commands (`--device-id` is accepted as an alias).
 
 If multiple devices are connected during install, the installer does not guess
 which device should receive the APK. It leaves the downloaded APK in
@@ -118,7 +118,7 @@ If you have multiple devices connected, specify the target device:
 ```bash
 clawperator operator setup \
   --apk ~/.clawperator/downloads/operator.apk \
-  --device-id <device_id>
+  --device <device_id>
 ```
 
 This is also the recovery command to use after a multi-device installer run
@@ -225,7 +225,7 @@ prints a per-device status line before returning control to you.
 
 ```
   ✅ <serial> - ready
-  ⚠  <serial> - setup required: clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id <serial>
+  ⚠  <serial> - setup required: clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device <serial>
 ```
 
 - `✅ ready` - the APK is installed and the accessibility service is running on
@@ -239,7 +239,7 @@ required.` and exits cleanly.
 **How to check a device's readiness yourself**
 
 ```bash
-clawperator doctor --device-id <serial>
+clawperator doctor --device <serial>
 ```
 
 A healthy device shows all checks passing and exits 0. An unhealthy device
@@ -251,7 +251,7 @@ exits 1 with details on which checks failed (for example,
 ```bash
 clawperator operator setup \
   --apk ~/.clawperator/downloads/operator.apk \
-  --device-id <serial>
+  --device <serial>
 ```
 
 This installs the APK, grants required permissions, and verifies the handshake

@@ -282,7 +282,7 @@ This must appear early in the doc, before any snapshot examples:
 
 **Path A - CLI shortcut:**
 ```bash
-clawperator observe snapshot --device-id <serial>
+clawperator snapshot --device <serial>
 ```
 
 **Path B - Execute payload:**

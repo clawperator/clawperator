@@ -60,7 +60,7 @@ resolve_device_id
 run_action() {
   local payload="$1"
   "${CLI[@]}" execute \
-    --device-id "$DEVICE_ID" \
+    --device "$DEVICE_ID" \
     --operator-package "$CLAWPERATOR_OPERATOR_PACKAGE" \
     --execution "$payload" \
     --output json 2>&1

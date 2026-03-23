@@ -138,7 +138,7 @@ else
 fi
 
 if [ -n "$DEVICE_SERIAL" ]; then
-    CLI_ARGS+=("--device-id" "$DEVICE_SERIAL")
+    CLI_ARGS+=("--device" "$DEVICE_SERIAL")
 fi
 
 if [ -n "$PACKAGE" ]; then

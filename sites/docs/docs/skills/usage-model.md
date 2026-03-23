@@ -63,7 +63,7 @@ which together are useful for multimodal LLM interpretation before moving to app
 You can run the packaged baseline skill via the Node API wrapper:
 
 ```bash
-clawperator skills run com.android.settings.capture-overview --device-id <device_id>
+clawperator skills run com.android.settings.capture-overview --device <device_id>
 ```
 
 Or invoke the script directly (no Node API required):
@@ -73,7 +73,7 @@ DEVICE_ID="$(adb devices | awk 'NR>1 && $2==\"device\" {print $1; exit}')"
 ./skills/com.android.settings.capture-overview/scripts/capture_settings_overview.sh "$DEVICE_ID" app.actiontask.operator.development
 ```
 
-Always pass `--device-id` to `skills run` when more than one device is connected. Without it the wrapper will fail if device auto-detection is ambiguous.
+Always pass `--device` to `skills run` when more than one device is connected (`--device-id` is accepted as an alias). Without it the wrapper will fail if device auto-detection is ambiguous.
 
 If a wrapped script exits non-zero or times out, `clawperator skills run`
 preserves partial `stdout` and `stderr` in the structured error output when
@@ -83,13 +83,13 @@ opaque failure.
 When a particular device or workflow needs a different wrapper budget, use:
 
 ```bash
-clawperator skills run <skill_id> --device-id <device_id> --timeout-ms 90000
+clawperator skills run <skill_id> --device <device_id> --timeout 90000
 ```
 
 When you want a lightweight smoke check for expected output markers, use:
 
 ```bash
-clawperator skills run <skill_id> --device-id <device_id> --expect-contains TEXT_BEGIN
+clawperator skills run <skill_id> --device <device_id> --expect-contains TEXT_BEGIN
 ```
 
 ## Private skills
