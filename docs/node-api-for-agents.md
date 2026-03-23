@@ -34,13 +34,29 @@ workflow (also available as `record` alias), use [Android Recording Format for A
 | `snapshot` | Capture UI hierarchy dump (`hierarchy_xml`) |
 | `screenshot [--path <file>]` | Capture device screen as PNG |
 | `open <package-id\|url\|uri>` | Open an app, URL, or URI (auto-detects target type) |
-| `click --selector <json>` | Tap the first matching UI element |
-| `type <text> --selector <json>` | Type text into the first matching element |
-| `read --selector <json>` | Read text from the first matching element |
-| `wait --selector <json>` | Wait until a matching element appears |
+| `click --text <text>` | Tap the first element with exact visible text |
+| `click --id <resource-id>` | Tap the first element with the given Android resource ID |
+| `click --role <role>` | Tap the first element with the given role |
+| `click --desc <text>` | Tap the first element with the given content description |
+| `click --text-contains <sub>` | Tap the first element whose text contains the substring |
+| `click --desc-contains <sub>` | Tap the first element whose content description contains the substring |
+| `click --selector <json>` | Tap the first matching element (raw JSON; mutually exclusive with simple flags) |
+| `type <text> --role <role>` | Type text into the first element with the given role |
+| `type <text> --id <resource-id>` | Type text into the first element with the given resource ID |
+| `type <text> --selector <json>` | Type text into the first matching element (raw JSON) |
+| `read --text <text>` | Read text from the first element with exact visible text |
+| `read --id <resource-id>` | Read text from the first element with the given resource ID |
+| `read --selector <json>` | Read text from the first matching element (raw JSON) |
+| `wait --text <text>` | Wait until an element with exact visible text appears |
+| `wait --id <resource-id>` | Wait until an element with the given resource ID appears |
+| `wait --selector <json>` | Wait until a matching element appears (raw JSON) |
 | `press <back\|home\|recents>` | Press a hardware key |
 | `back` | Press the Android back key (shorthand for `press back`) |
 | `scroll <down\|up\|left\|right>` | Scroll the screen in a direction |
+| `scroll <dir> --container-id <id>` | Scroll within a specific container by resource ID |
+| `scroll <dir> --container-role <role>` | Scroll within a specific container by role |
+| `scroll <dir> --container-text <text>` | Scroll within a specific container by exact text |
+| `scroll <dir> --container-selector <json>` | Scroll within a specific container (raw JSON) |
 | `skills list` | List available skills |
 | `skills get <skill_id>` | Show skill metadata |
 | `skills search [--app <pkg>] [--intent <i>] [--keyword <k>]` | Search skills by app, intent, or keyword (at least one filter required) |
@@ -63,6 +79,69 @@ workflow (also available as `record` alias), use [Android Recording Format for A
 **Global options:** `--device <id>` (canonical; `--device-id` accepted), `--operator-package <pkg>`, `--json` (canonical; `--output json` accepted), `--timeout <ms>` (canonical; `--timeout-ms` accepted), `--log-level <debug|info|warn|error>`, `--verbose`
 
 For agent callers, `--json` is the canonical output flag. `--output pretty` is for human inspection.
+
+### Selector Flags (click, type, read, wait)
+
+All element-targeting commands accept these flags instead of raw JSON:
+
+| Flag | NodeMatcher field | Description |
+| :--- | :--- | :--- |
+| `--text <value>` | `textEquals` | Exact visible text match |
+| `--text-contains <value>` | `textContains` | Partial text match |
+| `--id <value>` | `resourceId` | Android resource ID (e.g. `com.pkg:id/name`) |
+| `--desc <value>` | `contentDescEquals` | Exact content description |
+| `--desc-contains <value>` | `contentDescContains` | Partial content description |
+| `--role <value>` | `role` | Element role (`button`, `textfield`, `text`, `switch`, `checkbox`, `image`, `listitem`, `toolbar`, `tab`) |
+| `--selector <json>` | (all fields) | Raw JSON NodeMatcher object; mutually exclusive with the flags above |
+
+Multiple simple flags combine with AND semantics: `--text "Login" --role button` matches elements with both properties.
+
+For `type`, `--text` is reserved for the text to type. Use `--id`, `--role`, `--desc`, or `--selector` to identify the target element.
+
+### Container Flags (scroll)
+
+The `scroll` command accepts `--container-*` flags to restrict scrolling to a specific container:
+
+| Flag | Description |
+| :--- | :--- |
+| `--container-text <value>` | Container with exact visible text |
+| `--container-text-contains <value>` | Container with partial text match |
+| `--container-id <value>` | Container by Android resource ID |
+| `--container-desc <value>` | Container by exact content description |
+| `--container-desc-contains <value>` | Container by partial content description |
+| `--container-role <value>` | Container by element role |
+| `--container-selector <json>` | Container by raw JSON NodeMatcher; mutually exclusive with `--container-*` flags |
+
+### Quick Examples
+
+```bash
+# Click by text
+clawperator click --text "Wi-Fi" --device <device_id> --json
+
+# Click by resource ID
+clawperator click --id "com.android.settings:id/switch_widget" --device <device_id> --json
+
+# Click by role + text (AND match)
+clawperator click --role button --text-contains "Submit" --device <device_id> --json
+
+# Type into a text field by role
+clawperator type "hello world" --role textfield --device <device_id> --json
+
+# Type and submit
+clawperator type "search query" --id "com.example:id/search_box" --submit --device <device_id> --json
+
+# Read a value by resource ID
+clawperator read --id "com.solaxcloud.starter:id/tv_pb_title" --device <device_id> --json
+
+# Wait for element by text
+clawperator wait --text "Done" --timeout 15000 --device <device_id> --json
+
+# Scroll within a specific container
+clawperator scroll down --container-id "com.example:id/recycler_view" --device <device_id> --json
+
+# Use raw JSON selector (advanced/fallback)
+clawperator click --selector '{"textEquals":"Wi-Fi"}' --device <device_id> --json
+```
 
 ## Persistent Logging
 
