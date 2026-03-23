@@ -29,8 +29,8 @@ inputs are appropriate. It just provides the interaction primitives.
 Make sure the runtime is ready:
 
 ```bash
-clawperator doctor --output json
-clawperator devices --output json
+clawperator doctor --json
+clawperator devices --json
 ```
 
 If multiple devices are connected, always pass `--device <device_id>` so

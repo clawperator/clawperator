@@ -60,7 +60,7 @@ echo "=== skills compile-artifact (pretty) ==="
 "${CLI[@]}" skills compile-artifact "$SKILL_ID" --artifact "$ARTIFACT_NAME" --vars "{\"CLIMATE_TILE_NAME\":\"$CLIMATE_TILE_NAME\"}" --output pretty
 
 echo "=== skills compile-artifact (json -> /tmp/clawperator-stage2-exec.json) ==="
-"${CLI[@]}" skills compile-artifact "$SKILL_ID" --artifact "$ARTIFACT_NAME" --vars "{\"CLIMATE_TILE_NAME\":\"$CLIMATE_TILE_NAME\"}" --output json \
+"${CLI[@]}" skills compile-artifact "$SKILL_ID" --artifact "$ARTIFACT_NAME" --vars "{\"CLIMATE_TILE_NAME\":\"$CLIMATE_TILE_NAME\"}" --json \
   | node -e 'const d=JSON.parse(require("fs").readFileSync(0,"utf8")); require("fs").writeFileSync("/tmp/clawperator-stage2-exec.json", JSON.stringify(d.execution));'
 
 echo "=== exec compiled execution ==="

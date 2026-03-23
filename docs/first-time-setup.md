@@ -76,7 +76,7 @@ Requirements: `adb`, `emulator`, `sdkmanager`, `avdmanager` in `PATH`.
 Provision the emulator:
 
 ```bash
-clawperator provision emulator --output json
+clawperator provision emulator --json
 ```
 
 This command reuses a running supported emulator, starts a stopped supported AVD, or creates a new AVD with the default profile.
@@ -92,8 +92,8 @@ The default supported emulator profile is:
 You can inspect configured AVDs at any time:
 
 ```bash
-clawperator emulator list --output json
-clawperator emulator inspect clawperator-pixel --output json
+clawperator emulator list --json
+clawperator emulator inspect clawperator-pixel --json
 ```
 
 If both a physical device and an emulator are connected, you will need to pass `--device <serial>` to later commands (`--device-id` is accepted as an alias).

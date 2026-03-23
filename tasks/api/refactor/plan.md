@@ -808,7 +808,7 @@ Out of scope:
 
 ---
 
-## Phase 2: Command Surface Refactor
+## Phase 2: Command Surface Refactor [DONE]
 
 Fix the top-level CLI shape so agents can guess commands correctly on first
 attempt. With the COMMANDS registry from Phase 1 in place, this phase adds
