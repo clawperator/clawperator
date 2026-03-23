@@ -391,6 +391,8 @@ Establish the foundation that makes Phases 1-4 safe.
    - Mapping table:
      - `--device-id` -> `--device`
      - `--output json` -> `--json`
+     - `--format json` -> `--json` (existing alias in `getGlobalOpts`, tested
+       in `cliHelp.test.ts` - must be preserved)
      - `--timeout-ms` -> `--timeout`
      - `--receiver-package` -> `--operator-package` (rename)
      - `--package` -> `--operator-package` (alias for agents who guess it)
@@ -504,6 +506,8 @@ but leaves the codebase harder to maintain after the refactor than before it.
      logger: Logger;
      deviceId?: string;
      receiverPackage?: string;
+     timeoutMs?: number;       // global --timeout value; used by execute,
+                               // snapshot, screenshot, skills run
    };
 
    handler: (ctx: HandlerContext) => Promise<string>;
@@ -1033,6 +1037,7 @@ Finalize the developer and agent experience.
 
      Setup:
        operator setup        Install Operator APK
+       grant-device-permissions  Grant required permissions
        version               Show version info
 
      Global Options:
