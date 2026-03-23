@@ -79,7 +79,7 @@ Update this file with:
 Usage:
 
 \`\`\`bash
-node ${scriptPath} <device_id> [receiver_package]
+node ${scriptPath} <device_id> [operator_package]
 \`\`\`
 `;
 }

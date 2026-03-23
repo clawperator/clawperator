@@ -314,7 +314,7 @@ Run an execution payload.
 {
   "execution": { /* Execution object */ },
   "deviceId": "<device_serial>",
-  "receiverPackage": "com.clawperator.operator"
+  "operatorPackage": "com.clawperator.operator"
 }
 ```
 
@@ -341,13 +341,13 @@ Run an execution payload.
 
 ### `POST /observe/snapshot`
 
-Capture UI snapshot. Body: `{ "deviceId"?, "receiverPackage"? }`.
+Capture UI snapshot. Body: `{ "deviceId"?, "operatorPackage"? }`.
 
 Same response shape as `/execute`.
 
 ### `POST /observe/screenshot`
 
-Capture screenshot. Body: `{ "deviceId"?, "receiverPackage"? }`.
+Capture screenshot. Body: `{ "deviceId"?, "operatorPackage"? }`.
 
 Same response shape as `/execute`. The PNG path is in `envelope.stepResults[0].data.path`.
 

@@ -30,7 +30,7 @@ clawperator version
 Check the CLI against the installed [Clawperator Operator Android app](../getting-started/android-operator-apk.md):
 
 ```bash
-clawperator version --check-compat --receiver-package com.clawperator.operator
+clawperator version --check-compat --operator-package com.clawperator.operator
 ```
 
 The compatibility check reports:
@@ -75,5 +75,5 @@ If you are using a local debug build, make sure the receiver package matches the
 If the [Clawperator Operator Android app](../getting-started/android-operator-apk.md) version cannot be read, verify the device can return package metadata:
 
 ```bash
-adb shell dumpsys package <receiverPackage>
+adb shell dumpsys package <operatorPackage>
 ```

@@ -6,7 +6,7 @@ operator-package concept fits into execution dispatch.
 Use it when you need to understand:
 
 - what a `deviceId` really is
-- when `--device` is required
+- when `--device-id` is required
 - what `--operator-package` targets
 - how release and debug Operator APK variants differ
 
@@ -22,12 +22,12 @@ Examples:
 List visible devices with:
 
 ```bash
-clawperator devices --json
+clawperator devices --output json
 ```
 
 ## Device resolution rules
 
-When you run a command without `--device`, Clawperator resolves the target
+When you run a command without `--device-id`, Clawperator resolves the target
 using the currently connected ADB devices.
 
 Current behavior:
@@ -40,23 +40,18 @@ Current behavior:
 When multiple devices are connected, always pass:
 
 ```bash
---device <device_id>
+--device-id <device_id>
 ```
 
-## Commands that should use `--device`
+## Commands that should use `--device-id`
 
-In multi-device environments, keep `--device` explicit on:
+In multi-device environments, keep `--device-id` explicit on:
 
 - `execute`
-- `snapshot`
-- `screenshot`
-- `click`, `tap`
-- `open`
-- `type`, `fill`
-- `read`
-- `wait`
-- `press`, `back`
-- `scroll`
+- `observe snapshot`
+- `observe screenshot`
+- `inspect ui`
+- `action ...`
 - `doctor`
 - `version --check-compat`
 - `operator setup`
@@ -73,18 +68,18 @@ Use the printed recovery command, or run:
 ```bash
 clawperator operator setup \
   --apk ~/.clawperator/downloads/operator.apk \
-  --device <device_id>
+  --device-id <device_id>
 ```
 
 Then verify with:
 
 ```bash
-clawperator doctor --device <device_id> --json
+clawperator doctor --device-id <device_id> --output json
 ```
 
-## Operator package model
+## Receiver package model
 
-The operator package is the installed Android Operator APK that receives the
+The receiver package is the installed Android Operator APK that receives the
 broadcast command.
 
 Current defaults:
@@ -96,7 +91,7 @@ Most public docs assume the release package by default.
 
 ## When to pass `--operator-package`
 
-Pass `--operator-package` (or `--package` alias) when:
+Pass `--operator-package` when:
 
 - you are using a local debug APK
 - both release and debug variants are installed
@@ -106,17 +101,17 @@ Pass `--operator-package` (or `--package` alias) when:
 Example:
 
 ```bash
-clawperator snapshot \
-  --device <device_id> \
+clawperator observe snapshot \
+  --device-id <device_id> \
   --operator-package com.clawperator.operator.dev \
-  --json
+  --output json
 ```
 
 ## Device and package targeting are separate
 
 These two flags solve different problems:
 
-- `--device` picks the Android device
+- `--device-id` picks the Android device
 - `--operator-package` picks which Operator APK on that device receives the
   command
 
@@ -130,15 +125,15 @@ execution can overlap safely on the same device.
 A practical pattern for multiple devices is:
 
 - run one serialized work queue per device
-- keep `--device` explicit in every command
-- keep the operator package consistent per queue
+- keep `--device-id` explicit in every command
+- keep the receiver package consistent per queue
 
 ## Quick checks
 
 Use these commands when you are unsure what Clawperator is targeting:
 
 ```bash
-clawperator devices --json
-clawperator doctor --device <device_id> --json
-clawperator version --check-compat --device <device_id> --json
+clawperator devices --output json
+clawperator doctor --device-id <device_id> --output json
+clawperator version --check-compat --device-id <device_id> --output json
 ```

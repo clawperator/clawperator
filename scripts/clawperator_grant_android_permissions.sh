@@ -142,11 +142,11 @@ if [ -n "$DEVICE_SERIAL" ]; then
 fi
 
 if [ -n "$PACKAGE" ]; then
-    CLI_ARGS+=("--receiver-package" "$PACKAGE")
+    CLI_ARGS+=("--operator-package" "$PACKAGE")
 elif [ "$USE_DEBUG" = true ]; then
-    CLI_ARGS+=("--receiver-package" "$DEFAULT_DEBUG_PKG")
+    CLI_ARGS+=("--operator-package" "$DEFAULT_DEBUG_PKG")
 elif [ "$USE_RELEASE" = true ]; then
-    CLI_ARGS+=("--receiver-package" "$DEFAULT_RELEASE_PKG")
+    CLI_ARGS+=("--operator-package" "$DEFAULT_RELEASE_PKG")
 fi
 
 exec node "$NODE_CLI_DIST" "${CLI_ARGS[@]}"

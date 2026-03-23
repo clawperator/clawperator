@@ -71,7 +71,7 @@ describe("cmdVersion", () => {
       `Download the matching APK: https://downloads.clawperator.com/operator/v${version}/operator-v${version}.apk`,
       `Download the checksum: https://downloads.clawperator.com/operator/v${version}/operator-v${version}.apk.sha256`,
       `Verify the checksum: sha256sum -c operator-v${version}.apk.sha256`,
-      `Install the matching APK: clawperator operator setup --apk operator-v${version}.apk --device <device_id> --operator-package ${operatorPackage}`,
+      `Install the matching APK: clawperator operator setup --apk operator-v${version}.apk --device-id <device_id> --operator-package ${operatorPackage}`,
       "If you are targeting the local debug package, rebuild and reinstall the debug APK from the same source checkout instead of using the release download.",
     ]);
   });

@@ -4,7 +4,6 @@ import { spawn } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { COMMANDS, levenshtein, didYouMean } from "../../cli/registry.js";
-import { buildScrollExecution } from "../../domain/actions/scroll.js";
 
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "../../..");
 
@@ -82,7 +81,7 @@ describe("flag aliases - --device works like --device-id", () => {
   it("--device alias passes device id (validated via timeout error output)", async () => {
     // Use --timeout nope which produces EXECUTION_VALIDATION_FAILED. The device alias is consumed
     // by getGlobalOpts, so the command should still run and fail on the timeout.
-    const { stdout, code } = await runCli(["--device", "test-device-alias", "snapshot", "--timeout", "nope"]);
+    const { stdout, code } = await runCli(["--device", "test-device-alias", "observe", "snapshot", "--timeout", "nope"]);
     assert.notStrictEqual(code, 0);
     assert.match(stdout, /EXECUTION_VALIDATION_FAILED/);
     assert.match(stdout, /timeoutMs must be a finite number/);
@@ -111,7 +110,7 @@ describe("missing command after global flags", () => {
 
 describe("flag aliases - --timeout works like --timeout-ms", () => {
   it("--timeout nope produces EXECUTION_VALIDATION_FAILED", async () => {
-    const { stdout, code } = await runCli(["snapshot", "--timeout", "nope"]);
+    const { stdout, code } = await runCli(["observe", "snapshot", "--timeout", "nope"]);
     assert.notStrictEqual(code, 0);
     assert.match(stdout, /EXECUTION_VALIDATION_FAILED/);
     assert.match(stdout, /timeoutMs must be a finite number/);
@@ -125,25 +124,7 @@ describe("flag aliases - --timeout works like --timeout-ms", () => {
   });
 });
 
-describe("buildScrollExecution", () => {
-  it("uses default timeout of 30000ms when no timeoutMs provided", () => {
-    const exec = buildScrollExecution("down");
-    assert.strictEqual(exec.timeoutMs, 30000);
-  });
-
-  it("uses caller-supplied timeoutMs when provided", () => {
-    const exec = buildScrollExecution("up", 10000);
-    assert.strictEqual(exec.timeoutMs, 10000);
-  });
-
-  it("generates a unique commandId on each call", () => {
-    const a = buildScrollExecution("down");
-    const b = buildScrollExecution("down");
-    assert.notStrictEqual(a.commandId, b.commandId);
-  });
-});
-
-describe("flag aliases - --receiver-package works as alias for --operator-package", () => {
+describe("flag aliases - --operator-package works as alias for --operator-package", () => {
   it("--operator-package is accepted by getGlobalOpts (passed through to operator setup failure)", async () => {
     const { stdout } = await runCli([
       "--operator-package", "com.clawperator.operator.dev",
@@ -155,6 +136,47 @@ describe("flag aliases - --receiver-package works as alias for --operator-packag
     assert.strictEqual(obj.operatorPackage, "com.clawperator.operator.dev");
   });
 
+  it("--operator-package missing value produces USAGE error with exit code 1", async () => {
+    const { stdout, code } = await runCli(["--operator-package"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout);
+    assert.strictEqual(obj.code, "USAGE");
+    assert.match(obj.message, /--operator-package requires a value/);
+  });
+
+  it("--operator-package blank value produces USAGE error with exit code 1", async () => {
+    const { stdout, code } = await runCli(["--operator-package", ""]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout);
+    assert.strictEqual(obj.code, "USAGE");
+    assert.match(obj.message, /--operator-package requires a value/);
+  });
+
+  it("--receiver-package missing value produces USAGE error with exit code 1", async () => {
+    const { stdout, code } = await runCli(["--receiver-package"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout);
+    assert.strictEqual(obj.code, "USAGE");
+    assert.match(obj.message, /--receiver-package requires a value/);
+  });
+
+  it("--receiver-package blank value produces USAGE error with exit code 1", async () => {
+    const { stdout, code } = await runCli(["--receiver-package", ""]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout);
+    assert.strictEqual(obj.code, "USAGE");
+    assert.match(obj.message, /--receiver-package requires a value/);
+  });
+
+  it("--receiver-package is accepted and passed through to operator setup failure", async () => {
+    const { stdout } = await runCli([
+      "--receiver-package", "com.clawperator.operator.dev",
+      "operator", "setup",
+      "--apk", "/nonexistent/test.apk",
+    ]);
+    const obj = JSON.parse(stdout);
+    assert.strictEqual(obj.operatorPackage, "com.clawperator.operator.dev");
+  });
 });
 
 describe("unknown command produces UNKNOWN_COMMAND", () => {
@@ -204,8 +226,8 @@ describe("didYouMean tie-breaking", () => {
     // Primary name must win.
     const cmds = {
       foo: { ...fakeBase, name: "foo", synonyms: ["foa"] },
-    } as Parameters<typeof didYouMean>[2];
-    const result = JSON.parse(didYouMean("fob", [], cmds)) as { suggestion?: string };
+    } as Parameters<typeof didYouMean>[1];
+    const result = JSON.parse(didYouMean("fob", cmds)) as { suggestion?: string };
     assert.strictEqual(result.suggestion, "foo");
   });
 
@@ -214,8 +236,8 @@ describe("didYouMean tie-breaking", () => {
     const cmds = {
       bcd: { ...fakeBase, name: "bcd" },
       acd: { ...fakeBase, name: "acd" },
-    } as Parameters<typeof didYouMean>[2];
-    const result = JSON.parse(didYouMean("xcd", [], cmds)) as { suggestion?: string };
+    } as Parameters<typeof didYouMean>[1];
+    const result = JSON.parse(didYouMean("xcd", cmds)) as { suggestion?: string };
     assert.strictEqual(result.suggestion, "acd");
   });
 });

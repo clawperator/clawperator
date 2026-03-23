@@ -11,7 +11,7 @@ The app is distributed in two variants, each with its own application ID:
 * **`com.clawperator.operator`**: The stable, release version. This is the default package used by the CLI and intended for most users and remote AI agents.
 * **`com.clawperator.operator.dev`**: The local debug version. This is used by developers building the APK from source locally.
 
-*Note: The CLI communicates with `com.clawperator.operator` by default. If you are using a debug build, you must pass the `--receiver-package com.clawperator.operator.dev` flag to CLI commands.*
+*Note: The CLI communicates with `com.clawperator.operator` by default. If you are using a debug build, you must pass the `--operator-package com.clawperator.operator.dev` flag to CLI commands.*
 
 ## Installation
 

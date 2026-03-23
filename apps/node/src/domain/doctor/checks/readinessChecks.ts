@@ -5,11 +5,11 @@ import { ERROR_CODES } from "../../../contracts/errors.js";
 import { broadcastAgentCommand } from "../../../adapters/android-bridge/broadcastAgentCommand.js";
 import { waitForResultEnvelope } from "../../../adapters/android-bridge/logcatResultReader.js";
 import {
-  getAlternateReceiverVariant,
+  getAlternateOperatorVariant,
   getCliVersion,
   getOperatorApkDownloadUrl,
   getOperatorApkSha256Url,
-  getReceiverPackageApkPath,
+  getOperatorPackageApkPath,
   hasListedPackage,
   probeVersionCompatibility,
 } from "../../version/compatibility.js";
@@ -33,7 +33,7 @@ export async function checkApkPresence(config: RuntimeConfig): Promise<DoctorChe
 
   if (!isInstalled) {
     // Check if the other variant is installed
-    const otherVariant = getAlternateReceiverVariant(config.operatorPackage);
+    const otherVariant = getAlternateOperatorVariant(config.operatorPackage);
 
     const alternateList = await runAdb(config, ["shell", "pm", "list", "packages", otherVariant]);
     if (alternateList.code !== 0) {
@@ -89,7 +89,7 @@ export async function checkApkPresence(config: RuntimeConfig): Promise<DoctorChe
               },
           {
             kind: "shell",
-            value: `clawperator operator setup --apk ${getReceiverPackageApkPath(config.operatorPackage)} --device ${config.deviceId}${config.operatorPackage !== "com.clawperator.operator" ? ` --operator-package ${config.operatorPackage}` : ""}`,
+            value: `clawperator operator setup --apk ${getOperatorPackageApkPath(config.operatorPackage)} --device-id ${config.deviceId}${config.operatorPackage !== "com.clawperator.operator" ? ` --operator-package ${config.operatorPackage}` : ""}`,
           },
         ],
       },
@@ -208,7 +208,7 @@ export async function runHandshake(
         detail: "Node successfully dispatched a command and received a valid result envelope.",
       };
     } else {
-      const deviceFlag = config.deviceId ? ` --device ${config.deviceId}` : "";
+      const deviceFlag = config.deviceId ? ` --device-id ${config.deviceId}` : "";
       const pkgFlag = config.operatorPackage ? ` --operator-package ${config.operatorPackage}` : "";
       return {
         id: "readiness.handshake",
@@ -232,12 +232,12 @@ export async function runHandshake(
   }
 
   if ("timeout" in result && result.timeout) {
-    const deviceFlag = config.deviceId ? ` --device ${config.deviceId}` : "";
+    const deviceFlag = config.deviceId ? ` --device-id ${config.deviceId}` : "";
     const pkgFlag = config.operatorPackage ? ` --operator-package ${config.operatorPackage}` : "";
     const timeoutMessage = [
       `No [Clawperator-Result] envelope received within 7000ms.`,
       `Broadcast dispatch: ${result.diagnostics.broadcastDispatchStatus}.`,
-      `Operator package: ${config.operatorPackage}.`,
+        `Operator package: ${config.operatorPackage}.`,
       config.deviceId ? `Device: ${config.deviceId}.` : undefined,
       (result.diagnostics.lastCorrelatedEvents?.length ?? 0) > 0
         ? "Re-run with --verbose to inspect correlated Android log lines."
@@ -254,7 +254,7 @@ export async function runHandshake(
         platform: "any",
         steps: [
           { kind: "shell", value: `clawperator grant-device-permissions${deviceFlag}${pkgFlag}` },
-          { kind: "shell", value: `clawperator snapshot${deviceFlag}${pkgFlag} --timeout 5000 --verbose` },
+          { kind: "shell", value: `clawperator observe snapshot${deviceFlag}${pkgFlag} --timeout-ms 5000 --verbose` },
         ],
       },
       deviceGuidance: {

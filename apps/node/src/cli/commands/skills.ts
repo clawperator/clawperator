@@ -13,7 +13,7 @@ import { SKILL_OUTPUT_ASSERTION_FAILED } from "../../contracts/skills.js";
 import type { OutputOptions } from "../output.js";
 import { formatSuccess, formatError } from "../output.js";
 import { getCliVersion } from "../../domain/version/compatibility.js";
-import { getAlternateReceiverVariant } from "../../domain/version/compatibility.js";
+import { getAlternateOperatorVariant } from "../../domain/version/compatibility.js";
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 import { checkApkPresence } from "../../domain/doctor/checks/readinessChecks.js";
 import type { Logger } from "../../adapters/logger.js";
@@ -21,7 +21,7 @@ import {
   CLAWPERATOR_BIN_ENV_VAR,
   CLAWPERATOR_OPERATOR_PACKAGE_ENV_VAR,
   resolveSkillBinCommand,
-  resolveReceiverPackage,
+  resolveOperatorPackage,
 } from "../../domain/skills/skillsConfig.js";
 
 function isIgnorablePipeError(error: unknown): boolean {
@@ -71,6 +71,7 @@ export async function cmdSkillsCompileArtifact(
   varsJson: string,
   options: { format: OutputOptions["format"] }
 ): Promise<string> {
+  // CLI help examples for `--artifact` use `climate-status`.
   const result = await compileArtifact(skillId, artifact, varsJson ?? "{}");
   if (result.ok) {
     return formatSuccess({ execution: result.execution }, options);
@@ -147,11 +148,11 @@ export async function cmdSkillsRun(
   // Resolve the env vars for the skill script
   // Priority: explicit flag > env var > default
   const resolvedBin = resolveSkillBinCommand();
-  const resolvedReceiverPackage = operatorPackage ?? resolveReceiverPackage();
+  const resolvedOperatorPackage = operatorPackage ?? resolveOperatorPackage();
 
   const env: SkillRunEnv = {
     [CLAWPERATOR_BIN_ENV_VAR]: resolvedBin,
-    [CLAWPERATOR_OPERATOR_PACKAGE_ENV_VAR]: resolvedReceiverPackage,
+    [CLAWPERATOR_OPERATOR_PACKAGE_ENV_VAR]: resolvedOperatorPackage,
   };
 
   const runSkillImpl = options.runSkillImpl ?? runSkill;
@@ -159,16 +160,16 @@ export async function cmdSkillsRun(
   if (options.format !== "json") {
     const config = getDefaultRuntimeConfig({
       deviceId: options.deviceId,
-      operatorPackage: resolvedReceiverPackage,
+      operatorPackage: resolvedOperatorPackage,
       logger: options.logger,
     });
     let apkStatus = `MISSING - run \`clawperator operator setup --apk <path>\``;
     try {
       const apkPresence = await checkApkPresence(config);
       if (apkPresence.status === "pass") {
-        apkStatus = `OK (${resolvedReceiverPackage})`;
+        apkStatus = `OK (${resolvedOperatorPackage})`;
       } else if (apkPresence.status === "warn") {
-        const alternateVariant = getAlternateReceiverVariant(resolvedReceiverPackage);
+        const alternateVariant = getAlternateOperatorVariant(resolvedOperatorPackage);
         apkStatus = `WARN - ${apkPresence.summary}${apkPresence.detail ? ` ${apkPresence.detail}` : ""} Use --operator-package ${alternateVariant} or reinstall the matching APK.`;
       } else {
         apkStatus = `FAIL - ${apkPresence.summary}${apkPresence.detail ? ` ${apkPresence.detail}` : ""}`;

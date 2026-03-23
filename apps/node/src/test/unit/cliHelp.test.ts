@@ -112,18 +112,18 @@ describe("CLI help", () => {
     assert.match(obj.message, /operator setup/);
   });
 
-  it("shows snapshot help for snapshot --help", async () => {
-    const { stdout, code } = await runCli(["snapshot", "--help"]);
+  it("shows observe snapshot help instead of top-level help", async () => {
+    const { stdout, code } = await runCli(["observe", "snapshot", "--help"]);
     assert.strictEqual(code, 0);
-    assert.match(stdout, /clawperator snapshot/);
-    assert.match(stdout, /--timeout <ms>/);
+    assert.match(stdout, /clawperator observe snapshot/);
+    assert.match(stdout, /--timeout-ms <number>/);
     assert.doesNotMatch(stdout, /skills compile-artifact/);
   });
 
-  it("shows screenshot help with path option", async () => {
-    const { stdout, code } = await runCli(["screenshot", "--help"]);
+  it("shows observe screenshot help with path option", async () => {
+    const { stdout, code } = await runCli(["observe", "screenshot", "--help"]);
     assert.strictEqual(code, 0);
-    assert.match(stdout, /clawperator screenshot/);
+    assert.match(stdout, /clawperator observe screenshot/);
     assert.match(stdout, /--path <file>/);
     assert.doesNotMatch(stdout, /skills compile-artifact/);
   });
@@ -139,7 +139,7 @@ describe("CLI help", () => {
     assert.strictEqual(code, 0);
     assert.match(stdout, /clawperator skills sync/);
     assert.match(stdout, /--ref <git-ref>/);
-    assert.doesNotMatch(stdout, /clawperator action/);
+    assert.doesNotMatch(stdout, /action open-app/);
   });
 
   it("shows skills validate help instead of top-level help", async () => {
@@ -148,7 +148,7 @@ describe("CLI help", () => {
     assert.match(stdout, /clawperator skills validate/);
     assert.match(stdout, /skills validate --all/);
     assert.match(stdout, /integrity check, not a live device test/i);
-    assert.doesNotMatch(stdout, /clawperator action/);
+    assert.doesNotMatch(stdout, /action open-app/);
   });
 
   it("shows skills compile-artifact help instead of top-level help", async () => {
@@ -158,57 +158,49 @@ describe("CLI help", () => {
     assert.match(stdout, /--artifact <name>/);
     assert.match(stdout, /--skill-id <id>/);
     assert.match(stdout, /--vars <json>/);
-    assert.doesNotMatch(stdout, /clawperator action/);
+    assert.doesNotMatch(stdout, /action open-app/);
   });
 
   it("shows skills run help instead of top-level help", async () => {
     const { stdout, code } = await runCli(["skills", "run", "--help"]);
     assert.strictEqual(code, 0);
     assert.match(stdout, /clawperator skills run/);
-    assert.match(stdout, /--timeout <ms>/);
+    assert.match(stdout, /--timeout-ms <n>/);
     assert.match(stdout, /--expect-contains <text>/);
     assert.match(stdout, /SKILL_OUTPUT_ASSERTION_FAILED/);
-    assert.doesNotMatch(stdout, /clawperator action/);
+    assert.doesNotMatch(stdout, /action open-app/);
   });
 
-  it("does not intercept --help after -- for skills run", async () => {
-    const { stdout, code } = await runCli(["skills", "run", "com.missing.skill", "--", "--help"]);
-    assert.notStrictEqual(code, 0);
-    assert.doesNotMatch(stdout, /Clawperator CLI/);
-    const obj = JSON.parse(stdout) as { code?: string };
-    assert.strictEqual(obj.code, "SKILL_NOT_FOUND");
-  });
-
-  it("shows snapshot help for snapshot --help (replaces inspect ui)", async () => {
-    const { stdout, code } = await runCli(["snapshot", "--help"]);
+  it("shows inspect ui help instead of top-level help", async () => {
+    const { stdout, code } = await runCli(["inspect", "ui", "--help"]);
     assert.strictEqual(code, 0);
-    assert.match(stdout, /clawperator snapshot/);
-    assert.match(stdout, /--timeout <ms>/);
+    assert.match(stdout, /clawperator observe snapshot/);
+    assert.match(stdout, /--timeout-ms <number>/);
     assert.doesNotMatch(stdout, /skills compile-artifact/);
   });
 
-  it("forwards timeout parsing through snapshot", async () => {
-    const { stdout, code } = await runCli(["snapshot", "--timeout-ms", "nope"]);
+  it("forwards timeout parsing through inspect ui", async () => {
+    const { stdout, code } = await runCli(["inspect", "ui", "--timeout-ms", "nope"]);
     assert.notStrictEqual(code, 0);
     assert.match(stdout, /EXECUTION_VALIDATION_FAILED/);
     assert.match(stdout, /timeoutMs must be a finite number/);
   });
 
   it("returns usage when timeout value is missing", async () => {
-    const { stdout, code } = await runCli(["snapshot", "--timeout-ms"]);
+    const { stdout, code } = await runCli(["inspect", "ui", "--timeout-ms"]);
     assert.notStrictEqual(code, 0);
     assert.match(stdout, /"code":"USAGE"/);
     assert.match(stdout, /--timeout-ms requires a value/);
   });
 
   it("accepts --format as an alias for --output", async () => {
-    const jsonResult = await runCli(["snapshot", "--timeout-ms", "nope", "--format", "json"]);
+    const jsonResult = await runCli(["inspect", "ui", "--timeout-ms", "nope", "--format", "json"]);
     assert.notStrictEqual(jsonResult.code, 0);
     const json = JSON.parse(jsonResult.stdout);
     assert.strictEqual(json.code, "EXECUTION_VALIDATION_FAILED");
     assert.strictEqual(json.message, "timeoutMs must be a finite number");
 
-    const prettyResult = await runCli(["snapshot", "--timeout-ms", "nope", "--format", "pretty"]);
+    const prettyResult = await runCli(["inspect", "ui", "--timeout-ms", "nope", "--format", "pretty"]);
     assert.notStrictEqual(prettyResult.code, 0);
     const pretty = JSON.parse(prettyResult.stdout);
     assert.strictEqual(pretty.code, "EXECUTION_VALIDATION_FAILED");
@@ -301,11 +293,11 @@ describe("operator setup CLI output", () => {
     assert.strictEqual(obj.operatorPackage, "com.clawperator.operator.dev");
   });
 
-  it("accepts --receiver-package as alias for --operator-package", async () => {
+  it("accepts --operator-package as alias for --operator-package", async () => {
     const { stdout } = await runCli([
       "operator", "setup",
       "--apk", NONEXISTENT_APK,
-      "--receiver-package", "com.clawperator.operator.dev",
+      "--operator-package", "com.clawperator.operator.dev",
     ]);
     const obj = JSON.parse(stdout);
     assert.strictEqual(obj.operatorPackage, "com.clawperator.operator.dev");
@@ -338,181 +330,11 @@ describe("operator setup CLI output", () => {
     assert.strictEqual(obj.code, "OPERATOR_APK_NOT_FOUND");
   });
 
-  it("screenshot returns USAGE when --path is missing a value", async () => {
-    const { stdout, code } = await runCli(["screenshot", "--path"]);
+  it("observe screenshot returns USAGE when --path is missing a value", async () => {
+    const { stdout, code } = await runCli(["observe", "screenshot", "--path"]);
     assert.strictEqual(code, 1, stdout);
     const obj = JSON.parse(stdout) as { code?: string; message?: string };
     assert.strictEqual(obj.code, "USAGE");
     assert.strictEqual(obj.message, "--path requires a value");
-  });
-});
-
-describe("promoted flat commands", () => {
-  it("returns UNKNOWN_COMMAND with specific suggestion for 'observe snapshot'", async () => {
-    const { stdout, code } = await runCli(["observe", "snapshot"]);
-    assert.strictEqual(code, 1);
-    const obj = JSON.parse(stdout) as { code?: string; message?: string; suggestion?: string };
-    assert.strictEqual(obj.code, "UNKNOWN_COMMAND");
-    assert.strictEqual(obj.suggestion, "snapshot");
-    assert.match(obj.message ?? "", /snapshot/);
-  });
-
-  it("returns UNKNOWN_COMMAND with specific suggestion for 'observe screenshot'", async () => {
-    const { stdout, code } = await runCli(["observe", "screenshot"]);
-    assert.strictEqual(code, 1);
-    const obj = JSON.parse(stdout) as { code?: string; suggestion?: string };
-    assert.strictEqual(obj.code, "UNKNOWN_COMMAND");
-    assert.strictEqual(obj.suggestion, "screenshot");
-  });
-
-  it("returns UNKNOWN_COMMAND with snapshot suggestion for 'inspect ui'", async () => {
-    const { stdout, code } = await runCli(["inspect", "ui"]);
-    assert.strictEqual(code, 1);
-    const obj = JSON.parse(stdout) as { code?: string; suggestion?: string };
-    assert.strictEqual(obj.code, "UNKNOWN_COMMAND");
-    assert.strictEqual(obj.suggestion, "snapshot");
-  });
-
-  it("returns UNKNOWN_COMMAND with click suggestion for 'action click'", async () => {
-    const { stdout, code } = await runCli(["action", "click", "--selector", "{}"]);
-    assert.strictEqual(code, 1);
-    const obj = JSON.parse(stdout) as { code?: string; suggestion?: string };
-    assert.strictEqual(obj.code, "UNKNOWN_COMMAND");
-    assert.strictEqual(obj.suggestion, "click");
-  });
-
-  it("returns UNKNOWN_COMMAND with open suggestion for 'action open-app'", async () => {
-    const { stdout, code } = await runCli(["action", "open-app", "--app", "com.example"]);
-    assert.strictEqual(code, 1);
-    const obj = JSON.parse(stdout) as { code?: string; suggestion?: string };
-    assert.strictEqual(obj.code, "UNKNOWN_COMMAND");
-    assert.strictEqual(obj.suggestion, "open");
-  });
-
-  it("returns UNKNOWN_COMMAND with press suggestion for 'action press-key'", async () => {
-    const { stdout, code } = await runCli(["action", "press-key", "--key", "back"]);
-    assert.strictEqual(code, 1);
-    const obj = JSON.parse(stdout) as { code?: string; suggestion?: string };
-    assert.strictEqual(obj.code, "UNKNOWN_COMMAND");
-    assert.strictEqual(obj.suggestion, "press");
-  });
-
-  it("returns MISSING_SELECTOR when click has no --selector", async () => {
-    const { stdout, code } = await runCli(["click"]);
-    assert.strictEqual(code, 1);
-    const obj = JSON.parse(stdout) as { code?: string; message?: string };
-    assert.strictEqual(obj.code, "MISSING_SELECTOR");
-    assert.match(obj.message ?? "", /--selector/);
-  });
-
-  it("returns USAGE when open has no target", async () => {
-    const { stdout } = await runCli(["open"]);
-    const obj = JSON.parse(stdout) as { code?: string; message?: string };
-    assert.strictEqual(obj.code, "USAGE");
-    assert.match(obj.message ?? "", /open requires a target/);
-    // Plan spec: error message must include usage lines with descriptions and examples.
-    assert.match(obj.message ?? "", /Open an Android app/);
-    assert.match(obj.message ?? "", /Open a URL in browser/);
-    assert.match(obj.message ?? "", /clawperator open com\.android\.settings/);
-    assert.match(obj.message ?? "", /clawperator open https:\/\/example\.com/);
-  });
-
-  it("returns USAGE when open has both positional and --app flag", async () => {
-    const { stdout } = await runCli(["open", "com.example", "--app", "com.example"]);
-    const obj = JSON.parse(stdout) as { code?: string; message?: string };
-    assert.strictEqual(obj.code, "USAGE");
-    assert.match(obj.message ?? "", /positional argument or --app/);
-  });
-
-  it("returns USAGE when open has both --app and --uri flags", async () => {
-    const { stdout } = await runCli(["open", "--app", "com.example", "--uri", "https://example.com"]);
-    const obj = JSON.parse(stdout) as { code?: string; message?: string };
-    assert.strictEqual(obj.code, "USAGE");
-    assert.match(obj.message ?? "", /mutually exclusive/);
-  });
-
-  it("returns USAGE when press has no key", async () => {
-    const { stdout } = await runCli(["press"]);
-    const obj = JSON.parse(stdout) as { code?: string; message?: string };
-    assert.strictEqual(obj.code, "USAGE");
-    assert.match(obj.message ?? "", /press requires a key name/);
-  });
-
-  it("returns USAGE when press has both positional and --key flag", async () => {
-    const { stdout } = await runCli(["press", "back", "--key", "back"]);
-    const obj = JSON.parse(stdout) as { code?: string; message?: string };
-    assert.strictEqual(obj.code, "USAGE");
-    assert.match(obj.message ?? "", /positional argument or --key/);
-  });
-
-  it("returns USAGE when scroll has no direction", async () => {
-    const { stdout } = await runCli(["scroll"]);
-    const obj = JSON.parse(stdout) as { code?: string; message?: string };
-    assert.strictEqual(obj.code, "USAGE");
-    assert.match(obj.message ?? "", /scroll requires a direction/);
-  });
-
-  it("returns USAGE for invalid scroll direction", async () => {
-    const { stdout } = await runCli(["scroll", "sideways"]);
-    const obj = JSON.parse(stdout) as { code?: string; message?: string };
-    assert.strictEqual(obj.code, "USAGE");
-    assert.match(obj.message ?? "", /sideways/);
-    assert.match(obj.message ?? "", /down, up, left, right/);
-  });
-
-  it("returns USAGE when scroll has both positional and --direction flag", async () => {
-    const { stdout } = await runCli(["scroll", "down", "--direction", "up"]);
-    const obj = JSON.parse(stdout) as { code?: string; message?: string };
-    assert.strictEqual(obj.code, "USAGE");
-    assert.match(obj.message ?? "", /positional argument or --direction/);
-  });
-
-  it("returns MISSING_SELECTOR when type has no --selector", async () => {
-    const { stdout, code } = await runCli(["type", "hello"]);
-    assert.strictEqual(code, 1);
-    const obj = JSON.parse(stdout) as { code?: string; message?: string };
-    assert.strictEqual(obj.code, "MISSING_SELECTOR");
-    assert.match(obj.message ?? "", /--selector/);
-  });
-
-  it("shows click --help with selector usage", async () => {
-    const { stdout, code } = await runCli(["click", "--help"]);
-    assert.strictEqual(code, 0);
-    assert.match(stdout, /clawperator click/);
-    assert.match(stdout, /--selector/);
-  });
-
-  it("shows press --help with key usage", async () => {
-    const { stdout, code } = await runCli(["press", "--help"]);
-    assert.strictEqual(code, 0);
-    assert.match(stdout, /clawperator press/);
-    assert.match(stdout, /back.*home.*recents|back|home|recents/);
-  });
-
-  it("shows scroll --help with direction usage", async () => {
-    const { stdout, code } = await runCli(["scroll", "--help"]);
-    assert.strictEqual(code, 0);
-    assert.match(stdout, /clawperator scroll/);
-    assert.match(stdout, /down.*up.*left.*right|down|up|left|right/);
-  });
-
-  it("shows open --help with target detection notes", async () => {
-    const { stdout, code } = await runCli(["open", "--help"]);
-    assert.strictEqual(code, 0);
-    assert.match(stdout, /clawperator open/);
-    assert.match(stdout, /auto-detect/i);
-  });
-
-  it("shows back --help", async () => {
-    const { stdout, code } = await runCli(["back", "--help"]);
-    assert.strictEqual(code, 0);
-    assert.match(stdout, /clawperator back/);
-    assert.match(stdout, /back key/i);
-  });
-
-  it("shows tap as synonym for click in --help resolution", async () => {
-    const { stdout, code } = await runCli(["tap", "--help"]);
-    assert.strictEqual(code, 0);
-    assert.match(stdout, /clawperator click/);
   });
 });

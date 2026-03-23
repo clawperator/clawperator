@@ -20,7 +20,7 @@ export interface RuntimeConfig {
   avdmanagerPath: string;
   /** Target device serial (optional; resolved by domain if not set) */
   deviceId?: string;
-  /** Operator package for broadcast -p (required at dispatch time) */
+  /** Receiver package for broadcast -p (required at dispatch time) */
   operatorPackage: string;
   /** Action name for agent command broadcast */
   actionAgentCommand: string;

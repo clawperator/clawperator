@@ -61,7 +61,7 @@ run_action() {
   local payload="$1"
   "${CLI[@]}" execute \
     --device-id "$DEVICE_ID" \
-    --receiver-package "$CLAWPERATOR_OPERATOR_PACKAGE" \
+    --operator-package "$CLAWPERATOR_OPERATOR_PACKAGE" \
     --execution "$payload" \
     --output json 2>&1
 }

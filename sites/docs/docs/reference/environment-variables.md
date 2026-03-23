@@ -11,7 +11,7 @@ not every internal shell temporary used by validation scripts.
 | Variable | Used by | Meaning |
 | :--- | :--- | :--- |
 | `CLAWPERATOR_SKILLS_REGISTRY` | CLI, installer | Path to the local skills registry JSON |
-| `CLAWPERATOR_OPERATOR_PACKAGE` | CLI, installer, skills | Default Android Operator package to target when `--receiver-package` is omitted. Also passed to skill scripts. |
+| `CLAWPERATOR_OPERATOR_PACKAGE` | CLI, installer, skills | Default Android Operator package to target when `--operator-package` is omitted. Also passed to skill scripts. |
 | `CLAWPERATOR_BIN` | skills | Path to CLI binary used by skill scripts (defaults to global `clawperator` or auto-detected sibling build) |
 | `CLAWPERATOR_INSTALL_APK` | installer | Pre-seeds the installer's APK install prompt |
 | `CLAWPERATOR_INSTALL_SKIP_SKILLS` | installer | Skips `skills install` during installer setup when set to `1` |
@@ -58,13 +58,13 @@ export CLAWPERATOR_OPERATOR_PACKAGE="com.clawperator.operator.dev"
 ```
 
 CLI flags still win over the environment variable. Use an explicit
-`--receiver-package` when you want one command to differ from your shell
+`--operator-package` when you want one command to differ from your shell
 default.
 
 For skill execution, this is also available as a CLI flag:
 
 ```bash
-clawperator skills run <skill_id> --receiver-package com.clawperator.operator.dev
+clawperator skills run <skill_id> --operator-package com.clawperator.operator.dev
 ```
 
 ## `CLAWPERATOR_BIN`

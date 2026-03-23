@@ -112,7 +112,7 @@ For a local debug build of the [Clawperator Operator Android app](android-operat
 ```bash
 clawperator operator setup \
   --apk ~/.clawperator/downloads/operator-debug.apk \
-  --receiver-package com.clawperator.operator.dev
+  --operator-package com.clawperator.operator.dev
 ```
 
 This command is the normal path for agents and operators. It installs the APK and grants required permissions (accessibility, notification listener) in one step. `clawperator operator install` remains a compatibility alias.

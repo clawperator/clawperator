@@ -78,7 +78,7 @@ If any requirement is not met, the app shows an orange background and a dedicate
    ```
 2. If you are using a local debug build, add:
    ```bash
-   --receiver-package com.clawperator.operator.dev
+   --operator-package com.clawperator.operator.dev
    ```
 3. Re-run `clawperator doctor --device-id <device_id>` to confirm the package is now installed.
 
@@ -317,7 +317,7 @@ export CLAWPERATOR_SKILLS_REGISTRY="$HOME/.clawperator/skills/skills/skills-regi
 **How to confirm:**
 
 ```bash
-clawperator version --check-compat --receiver-package com.clawperator.operator
+clawperator version --check-compat --operator-package com.clawperator.operator
 ```
 
 This will report any version mismatch between the CLI and the installed APK.
@@ -333,7 +333,7 @@ This will report any version mismatch between the CLI and the installed APK.
 2. Verify the fix by running a snapshot:
 
    ```bash
-   clawperator snapshot --device <device_serial> --json
+   clawperator observe snapshot --device-id <device_serial> --output json
    ```
 
    A working snapshot returns `data.text` containing XML starting with `<hierarchy`.
@@ -369,7 +369,7 @@ The Node CLI and the installed [Clawperator Operator Android app](../getting-sta
 Use:
 
 ```bash
-clawperator version --check-compat --receiver-package com.clawperator.operator
+clawperator version --check-compat --operator-package com.clawperator.operator
 ```
 
 If the versions do not match, install the exact matching release APK and checksum from the versioned download URLs. For the full rule, examples, and remediation steps, see [Version Compatibility](compatibility.md).
@@ -440,7 +440,7 @@ adb shell pm list packages | grep clawperator
 # Output: com.clawperator.operator.dev (dev) or com.clawperator.operator (release)
 
 # Check CLI/APK version compatibility
-clawperator version --check-compat --receiver-package com.clawperator.operator.dev
+clawperator version --check-compat --operator-package com.clawperator.operator.dev
 ```
 
 **How to fix:**
@@ -461,18 +461,18 @@ clawperator version --check-compat --receiver-package com.clawperator.operator.d
    clawperator skills run <skill_id>
    ```
 
-   Or use the `--receiver-package` flag for a single run:
+   Or use the `--operator-package` flag for a single run:
    ```bash
-   clawperator skills run <skill_id> --receiver-package com.clawperator.operator.dev
+   clawperator skills run <skill_id> --operator-package com.clawperator.operator.dev
    ```
 
 2. **For production use:** Ensure the global npm package matches your APK:
    ```bash
    npm install -g clawperator
-   clawperator version --check-compat --receiver-package com.clawperator.operator
+   clawperator version --check-compat --operator-package com.clawperator.operator
    ```
 
-3. **For skills specifically:** Skills receive `CLAWPERATOR_BIN` and `CLAWPERATOR_OPERATOR_PACKAGE` environment variables automatically from the CLI. When testing skills with a dev APK, set these environment variables or use the `--receiver-package` flag.
+3. **For skills specifically:** Skills receive `CLAWPERATOR_BIN` and `CLAWPERATOR_OPERATOR_PACKAGE` environment variables automatically from the CLI. When testing skills with a dev APK, set these environment variables or use the `--operator-package` flag.
 
 ### Skill validation passes but execution fails
 

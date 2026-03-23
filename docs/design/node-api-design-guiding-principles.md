@@ -192,7 +192,7 @@ the shortest unambiguous name.
 - `--device` not `--device-id`
 - `--json` not `--output json`
 - `--timeout` not `--timeout-ms`
-- `--operator-package` not `--receiver-package` ("receiver" is an Android
+- `--operator-package` not `--operator-package` ("receiver" is an Android
   implementation detail; "operator" is Clawperator's own terminology)
 - `--text` not `--text-equals`
 - `--desc` not `--content-description`
@@ -277,7 +277,7 @@ Flag names, command names, and output schemas should reflect what the agent
 wants to do, not how Clawperator does it internally.
 
 Bad examples of implementation leaking into API:
-- `--receiver-package` (agent does not know what a "receiver" is; renamed to
+- `--operator-package` (agent does not know what a "receiver" is; renamed to
   `--operator-package` which uses Clawperator's own terminology)
 - `snapshot` (flat command - no nested namespace)
 - `open` (direct verb - the agent wants to open something)

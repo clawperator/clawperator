@@ -4,7 +4,7 @@ import { type RuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.
 import {
   grantDevicePermissions,
   hasListedPackage,
-  listInstalledReceiverPackages,
+  listInstalledOperatorPackages,
   type PermissionGrantResult,
 } from "./grantPermissions.js";
 
@@ -72,7 +72,7 @@ export async function setupOperator(
   const install: InstallPhaseResult = { ok: true };
 
   // Step 3: Resolve receiver package.
-  const installedPackages = operatorPackage ? [operatorPackage] : await listInstalledReceiverPackages(config);
+  const installedPackages = operatorPackage ? [operatorPackage] : await listInstalledOperatorPackages(config);
   const pkg = installedPackages.length === 1 ? installedPackages[0] : undefined;
   if (!pkg) {
     const error =

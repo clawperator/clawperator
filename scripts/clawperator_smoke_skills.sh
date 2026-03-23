@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Skills smoke for Clawperator Node API.
+# Stage 2 skills smoke for Clawperator Node API.
 # Evidence-oriented: exercises skills list/get/compile-artifact and execute path.
 # Usage: one physical device connected (or set DEVICE_ID); edit env vars if needed.
 # Optional: CLAWPERATOR_SMOKE_SUMMARY=/path/to/summary.json to write a machine-readable JSON summary.
@@ -10,7 +10,7 @@ cd "$(dirname "$0")/.."
 # Build Node CLI
 npm --prefix apps/node run build
 
-# Device selection: set DEVICE_ID or let the script auto-select from adb.
+# Device selection follows the same policy as Stage 1 smoke.
 # NOTE: Do not commit personal device serials to this repository.
 export DEVICE_ID="${DEVICE_ID:-}"
 export CLAWPERATOR_OPERATOR_PACKAGE="${CLAWPERATOR_OPERATOR_PACKAGE:-com.clawperator.operator.dev}"
@@ -59,26 +59,26 @@ echo "=== skills get $SKILL_ID ==="
 echo "=== skills compile-artifact (pretty) ==="
 "${CLI[@]}" skills compile-artifact "$SKILL_ID" --artifact "$ARTIFACT_NAME" --vars "{\"CLIMATE_TILE_NAME\":\"$CLIMATE_TILE_NAME\"}" --output pretty
 
-echo "=== skills compile-artifact (json -> /tmp/clawperator-smoke-exec.json) ==="
-"${CLI[@]}" skills compile-artifact "$SKILL_ID" --artifact "$ARTIFACT_NAME" --vars "{\"CLIMATE_TILE_NAME\":\"$CLIMATE_TILE_NAME\"}" --json \
-  | node -e 'const d=JSON.parse(require("fs").readFileSync(0,"utf8")); require("fs").writeFileSync("/tmp/clawperator-smoke-exec.json", JSON.stringify(d.execution));'
+echo "=== skills compile-artifact (json -> /tmp/clawperator-stage2-exec.json) ==="
+"${CLI[@]}" skills compile-artifact "$SKILL_ID" --artifact "$ARTIFACT_NAME" --vars "{\"CLIMATE_TILE_NAME\":\"$CLIMATE_TILE_NAME\"}" --output json \
+  | node -e 'const d=JSON.parse(require("fs").readFileSync(0,"utf8")); require("fs").writeFileSync("/tmp/clawperator-stage2-exec.json", JSON.stringify(d.execution));'
 
 echo "=== execute compiled execution ==="
 if [ -n "$SMOKE_SUMMARY" ]; then
-  EXEC_JSON="$("${CLI[@]}" execute --device "$DEVICE_ID" --operator-package "$CLAWPERATOR_OPERATOR_PACKAGE" --execution /tmp/clawperator-smoke-exec.json --json 2>&1)" || true
+  EXEC_JSON="$("${CLI[@]}" execute --device-id "$DEVICE_ID" --operator-package "$CLAWPERATOR_OPERATOR_PACKAGE" --execution /tmp/clawperator-stage2-exec.json --output json 2>&1)" || true
   echo "$EXEC_JSON" | node -e 'const d=require("fs").readFileSync(0,"utf8"); try { const j=JSON.parse(d); console.log(JSON.stringify({ step: "execute", result: j.terminalSource ? "ok" : (j.code === "RESULT_ENVELOPE_TIMEOUT" ? "timeout" : "error"), terminalSource: j.terminalSource || undefined, timeoutDiagnostics: j.code === "RESULT_ENVELOPE_TIMEOUT" ? j : undefined })); } catch(e) { console.log(JSON.stringify({ step: "execute", result: "error" })); }' >> "$OUTCOMES_FILE"
   echo "$EXEC_JSON" | node -e 'console.log(JSON.stringify(JSON.parse(require("fs").readFileSync(0,"utf8")),null,2))'
   EXEC_OUT="$EXEC_JSON"
 else
-  EXEC_OUT="$("${CLI[@]}" execute --device "$DEVICE_ID" --operator-package "$CLAWPERATOR_OPERATOR_PACKAGE" --execution /tmp/clawperator-smoke-exec.json --output pretty 2>&1)" || true
+  EXEC_OUT="$("${CLI[@]}" execute --device-id "$DEVICE_ID" --operator-package "$CLAWPERATOR_OPERATOR_PACKAGE" --execution /tmp/clawperator-stage2-exec.json --output pretty 2>&1)" || true
   echo "$EXEC_OUT"
 fi
 if echo "$EXEC_OUT" | grep -q '"terminalSource"'; then
-  echo "Skills smoke: execution succeeded with terminal envelope (record terminalSource above)."
+  echo "Stage 2: execution succeeded with terminal envelope (record terminalSource above)."
 elif echo "$EXEC_OUT" | grep -q 'RESULT_ENVELOPE_TIMEOUT'; then
-  echo "Skills smoke: execution timed out (diagnostics above; RESULT_ENVELOPE_TIMEOUT contract holds)."
+  echo "Stage 2: execution timed out (diagnostics above; RESULT_ENVELOPE_TIMEOUT contract holds)."
 else
-  echo "Skills smoke: execution failed with unexpected error; see output above." >&2
+  echo "Stage 2: execution failed with unexpected error; see output above." >&2
 fi
 
 if [ -n "$SMOKE_SUMMARY" ]; then
@@ -104,7 +104,7 @@ if [ -n "$SMOKE_SUMMARY" ]; then
       ...existing,
       timestamp: process.env.SUMMARY_TIMESTAMP,
       deviceId: process.env.SUMMARY_DEVICE_ID,
-      receiverPackage: process.env.SUMMARY_OPERATOR_PACKAGE,
+      operatorPackage: process.env.SUMMARY_OPERATOR_PACKAGE,
       commandOutcomes,
       strictMode: process.env.SUMMARY_STRICT_MODE === "true",
     };
@@ -112,4 +112,4 @@ if [ -n "$SMOKE_SUMMARY" ]; then
     console.log("Wrote smoke summary to", path);
   '
 fi
-echo "=== skills smoke done ==="
+echo "=== stage2 skills smoke done ==="

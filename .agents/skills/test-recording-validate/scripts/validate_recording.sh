@@ -72,10 +72,10 @@ update_report() {
 
 # Step 1: Start recording
 echo "[INFO] Clearing any stale recording session before starting..."
-node "$CLAW" recording stop --device-id "$DEVICE_ID" --receiver-package "$OPERATOR_PKG" --output json >/dev/null 2>&1 || true
+node "$CLAW" recording stop --device-id "$DEVICE_ID" --operator-package "$OPERATOR_PKG" --output json >/dev/null 2>&1 || true
 
 echo "[STEP 1] Starting recording session..."
-START_OUTPUT=$(node "$CLAW" recording start --device-id "$DEVICE_ID" --receiver-package "$OPERATOR_PKG" --output json 2>&1) || {
+START_OUTPUT=$(node "$CLAW" recording start --device-id "$DEVICE_ID" --operator-package "$OPERATOR_PKG" --output json 2>&1) || {
     echo "[ERROR] Recording start failed: $START_OUTPUT"
     update_report "steps.start" '{"success": false, "error": "command failed"}'
     exit 2
@@ -112,7 +112,7 @@ update_report "steps.skill" '{"success": true}'
 
 # Step 3: Stop recording
 echo "[STEP 3] Stopping recording session..."
-STOP_OUTPUT=$(node "$CLAW" recording stop --device-id "$DEVICE_ID" --receiver-package "$OPERATOR_PKG" --output json 2>&1) || {
+STOP_OUTPUT=$(node "$CLAW" recording stop --device-id "$DEVICE_ID" --operator-package "$OPERATOR_PKG" --output json 2>&1) || {
     echo "[ERROR] Recording stop failed: $STOP_OUTPUT"
     update_report "steps.stop" '{"success": false, "error": "command failed"}'
     exit 4
@@ -125,7 +125,7 @@ update_report "steps.stop" "{\"success\": true, \"eventCount\": $EVENT_COUNT}"
 
 # Step 4: Pull recording
 echo "[STEP 4] Pulling recording to host..."
-PULL_OUTPUT=$(node "$CLAW" recording pull --device-id "$DEVICE_ID" --receiver-package "$OPERATOR_PKG" --session-id "$SESSION_ID" --out "$RUN_DIR" --output json 2>&1) || {
+PULL_OUTPUT=$(node "$CLAW" recording pull --device-id "$DEVICE_ID" --operator-package "$OPERATOR_PKG" --session-id "$SESSION_ID" --out "$RUN_DIR" --output json 2>&1) || {
     echo "[ERROR] Recording pull failed: $PULL_OUTPUT"
     update_report "steps.pull" '{"success": false, "error": "command failed"}'
     exit 5

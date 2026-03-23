@@ -94,7 +94,7 @@ export function resolveSkillBinCommand(): string {
  * Returns the value from CLAWPERATOR_OPERATOR_PACKAGE env var, or the default
  * release package if not set.
  */
-export function resolveReceiverPackage(): string {
+export function resolveOperatorPackage(): string {
   const envPackage = process.env[CLAWPERATOR_OPERATOR_PACKAGE_ENV_VAR];
   if (envPackage !== undefined && envPackage !== "") {
     return envPackage;

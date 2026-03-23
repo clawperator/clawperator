@@ -11,7 +11,7 @@ This is the practical companion to
 When more than one Android target is visible in adb, always pass:
 
 ```bash
---device <device_id>
+--device-id <device_id>
 ```
 
 Do not rely on auto-resolution in multi-device environments. Clawperator will
@@ -42,10 +42,10 @@ clawperator devices --output json
 
 For each target device:
 
-1. identify the serial with `clawperator devices --json`
-2. run `clawperator doctor --device <device_id> --json`
-3. run `clawperator version --check-compat --device <device_id> --json`
-4. keep using that same `--device` on every later command
+1. identify the serial with `clawperator devices --output json`
+2. run `clawperator doctor --device-id <device_id> --output json`
+3. run `clawperator version --check-compat --device-id <device_id> --output json`
+4. keep using that same `--device-id` on every later command
 
 This is the safest default after:
 
@@ -62,25 +62,19 @@ In multi-device environments, keep `--device-id` explicit on:
 - `doctor`
 - `version --check-compat`
 - `execute`
-- `snapshot`
-- `screenshot`
-- `click`, `tap`
-- `open`
-- `type`, `fill`
-- `read`
-- `wait`
-- `press`, `back`
-- `scroll`
+- `observe snapshot`
+- `observe screenshot`
+- `inspect ui`
+- every `action ...` wrapper
 - `grant-device-permissions`
 - `skills run`
 
 Example:
 
 ```bash
-clawperator snapshot --device <device_id> --json
-clawperator screenshot --device <device_id> --json
-clawperator execute --device <device_id> --execution /path/to/execution.json --json
-clawperator skills run com.android.settings.capture-overview --device <device_id>
+clawperator observe snapshot --device-id <device_id> --output json
+clawperator execute --device-id <device_id> --execution /path/to/execution.json --output json
+clawperator skills run com.android.settings.capture-overview --device-id <device_id>
 ```
 
 ## Per-device work queues
@@ -93,7 +87,7 @@ Practical guidance:
 - keep one work queue per device
 - never overlap two executions on the same device
 - it is fine to run different queues against different devices
-- keep `--receiver-package` consistent within the same device queue
+- keep `--operator-package` consistent within the same device queue
 
 If you see `EXECUTION_CONFLICT_IN_FLIGHT`, do not immediately retry in
 parallel. Wait for the earlier execution to finish or explicitly serialize the
@@ -101,9 +95,9 @@ queue.
 
 ## Receiver package still matters
 
-`--device` and `--operator-package` solve different problems:
+`--device-id` and `--operator-package` solve different problems:
 
-- `--device` selects the Android runtime
+- `--device-id` selects the Android runtime
 - `--operator-package` selects which Operator APK on that runtime receives the
   command
 
@@ -121,9 +115,9 @@ In that case, keep both flags explicit:
 
 ```bash
 clawperator doctor \
-  --device emulator-5554 \
+  --device-id emulator-5554 \
   --operator-package com.clawperator.operator.dev \
-  --json
+  --output json
 ```
 
 ## Recovery after installer or setup runs
@@ -138,13 +132,13 @@ Use:
 ```bash
 clawperator operator setup \
   --apk ~/.clawperator/downloads/operator.apk \
-  --device <device_id>
+  --device-id <device_id>
 ```
 
 Then confirm readiness:
 
 ```bash
-clawperator doctor --device <device_id> --json
+clawperator doctor --device-id <device_id> --output json
 ```
 
 ## Emulator plus physical device
@@ -154,7 +148,7 @@ This is the most common ambiguous setup.
 Typical pattern:
 
 1. provision or start the emulator
-2. run `clawperator devices --json`
+2. run `clawperator devices --output json`
 3. choose the emulator serial for emulator work
 4. choose the physical-device serial for phone work
 5. keep those serials explicit in every later command
@@ -173,8 +167,8 @@ export CLAWPERATOR_EMULATOR_ID="emulator-5554"
 Then run:
 
 ```bash
-clawperator doctor --device "$CLAWPERATOR_PHONE_ID" --json
-clawperator doctor --device "$CLAWPERATOR_EMULATOR_ID" --json
+clawperator doctor --device-id "$CLAWPERATOR_PHONE_ID" --output json
+clawperator doctor --device-id "$CLAWPERATOR_EMULATOR_ID" --output json
 ```
 
 This keeps command history readable and avoids copy-paste mistakes.
@@ -193,20 +187,20 @@ Good pattern:
 Example:
 
 ```bash
-clawperator screenshot \
-  --device <device_id> \
+clawperator observe screenshot \
+  --device-id <device_id> \
   --path "/tmp/clawperator-<device_id>-settings.png" \
-  --json
+  --output json
 ```
 
 ## Failure triage
 
 If a command fails in a multi-device environment:
 
-1. run `clawperator devices --json`
+1. run `clawperator devices --output json`
 2. confirm the intended target is still present in `device` state
-3. rerun with explicit `--device <device_id>`
-4. rerun `clawperator doctor --device <device_id> --json` if the
+3. rerun with explicit `--device-id <device_id>`
+4. rerun `clawperator doctor --device-id <device_id> --output json` if the
    device state changed
 
 Most common multi-device errors:

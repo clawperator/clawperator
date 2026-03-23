@@ -23,8 +23,8 @@ Use this page as a technical map:
 - [Node API - Agent Guide](ai-agents/node-api-for-agents.md) - Canonical CLI and HTTP API contract for agent builders
 - [Execution Model](reference/execution-model.md) - Required payload fields, status vs step success, timeout, and error surfaces
 - [Timeout Budgeting](reference/timeout-budgeting.md) - Practical `timeoutMs` sizing for snapshots, scroll loops, and skill flows
-- [Device and Package Model](reference/device-and-package-model.md) - What `deviceId` and `receiverPackage` mean in practice
-- [Clawperator Snapshot Format](reference/snapshot-format.md) - Canonical `snapshot_ui` and `snapshot` output contract
+- [Device and Package Model](reference/device-and-package-model.md) - What `deviceId` and `operatorPackage` mean in practice
+- [Clawperator Snapshot Format](reference/snapshot-format.md) - Canonical `snapshot_ui` and `observe snapshot` output contract
 - [Navigation Patterns for Agents](ai-agents/navigation-patterns.md) - Practical patterns for scrolls, overlays, and OEM variation
 - [Multi-Device Workflows for Agents](ai-agents/multi-device-workflows.md) - Deterministic targeting, per-device queues, and install recovery
 - [Error Handling Guide](reference/error-handling.md) - Recoverable vs fatal patterns and what an agent should do next

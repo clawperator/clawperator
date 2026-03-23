@@ -129,7 +129,7 @@ For local debug builds, specify the receiver package:
 ```bash
 clawperator operator setup \
   --apk ~/.clawperator/downloads/operator-debug.apk \
-  --receiver-package com.clawperator.operator.dev
+  --operator-package com.clawperator.operator.dev
 ```
 
 This command runs three phases in order:
@@ -159,7 +159,7 @@ A fully configured device will show all checks passing. Common warnings:
 | Warning | Fix |
 | :--- | :--- |
 | `DEVICE_UNAUTHORIZED` | Tap "Allow" on the device USB debugging dialog |
-| `RECEIVER_NOT_INSTALLED` | Complete Step 3. Run `clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id <device_id>` and add `--receiver-package com.clawperator.operator.dev` for debug builds. |
+| `RECEIVER_NOT_INSTALLED` | Complete Step 3. Run `clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id <device_id>` and add `--operator-package com.clawperator.operator.dev` for debug builds. |
 | `DEVICE_ACCESSIBILITY_NOT_RUNNING` | If the Operator APK crashed after setup, run `clawperator grant-device-permissions` to restore the revoked permissions |
 | `DEVICE_DEV_OPTIONS_DISABLED` | Enable Developer options (physical device only) |
 | `DEVICE_USB_DEBUGGING_DISABLED` | Enable USB debugging (physical device only) |
@@ -171,18 +171,19 @@ A fully configured device will show all checks passing. Common warnings:
 Observe the current UI state:
 
 ```bash
-clawperator snapshot --device <device_id>
+clawperator observe snapshot --device-id <device_id>
 ```
 
 Open an app:
 
 ```bash
-clawperator open com.android.settings \
-  --device <device_id> \
+clawperator action open-app \
+  --app com.android.settings \
+  --device-id <device_id> \
   --operator-package com.clawperator.operator
 ```
 
-> Use `com.clawperator.operator` for the release [Clawperator Operator Android app](android-operator-apk.md), `com.clawperator.operator.dev` for the local debug build. Pass via `--operator-package` (or `--package` alias).
+> Use `com.clawperator.operator` for the release [Clawperator Operator Android app](android-operator-apk.md), `com.clawperator.operator.dev` for the local debug build.
 
 Before running real automations, make sure the Android apps the user wants Clawperator to operate are installed, signed in, and already configured on the device or emulator.
 
@@ -208,7 +209,7 @@ For environment checks: `clawperator doctor --output pretty`
 Verify the installed CLI and [Clawperator Operator Android app](android-operator-apk.md) pair explicitly:
 
 ```bash
-clawperator version --check-compat --receiver-package com.clawperator.operator
+clawperator version --check-compat --operator-package com.clawperator.operator
 ```
 
 If the versions do not match, install the exact APK for the CLI version from `https://downloads.clawperator.com/operator/v<version>/operator-v<version>.apk` and `https://downloads.clawperator.com/operator/v<version>/operator-v<version>.apk.sha256`.
