@@ -1402,6 +1402,45 @@ describe("runSkill", () => {
     assert.ok(parsed.message?.includes("--timeout"));
   });
 
+  it("does not steal --timeout after -- as a global flag", async () => {
+    // Regression: getGlobalOpts was scanning past -- and consuming --timeout
+    // before it could be forwarded to the script.
+    const { stdout, code } = await runCli([
+      "skills", "run", "com.test.echo", "--json", "--", "--timeout", "42",
+    ]);
+    assert.strictEqual(code, 0, stdout);
+    const parsed = JSON.parse(stdout) as { skillId?: string; output?: string; timeoutMs?: number };
+    // Script received "--timeout" as its first arg (forwarded verbatim).
+    assert.ok(parsed.output?.includes("TEST_OUTPUT:--timeout"), `expected forwarded arg in output, got: ${parsed.output}`);
+    // Global timeoutMs was not set to 42 by the stolen flag.
+    assert.notStrictEqual(parsed.timeoutMs, 42, "timeoutMs must not be stolen from script args");
+  });
+
+  it("does not steal --device after -- as a global flag", async () => {
+    // Regression: any recognized global flag name after -- was being consumed.
+    const { stdout, code } = await runCli([
+      "skills", "run", "com.test.echo", "--json", "--", "--device", "mydevice",
+    ]);
+    assert.strictEqual(code, 0, stdout);
+    const parsed = JSON.parse(stdout) as { skillId?: string; output?: string; deviceId?: string };
+    // Script received "--device" as its first arg.
+    assert.ok(parsed.output?.includes("TEST_OUTPUT:--device"), `expected forwarded arg in output, got: ${parsed.output}`);
+    // DeviceId was not stolen from script args.
+    assert.notStrictEqual(parsed.deviceId, "mydevice", "deviceId must not be stolen from script args");
+  });
+
+  it("flags before -- are still consumed as global opts, flags after -- are forwarded", async () => {
+    const { stdout, code } = await runCli([
+      "skills", "run", "com.test.echo", "--timeout", "30000", "--json", "--", "--timeout", "99",
+    ]);
+    assert.strictEqual(code, 0, stdout);
+    const parsed = JSON.parse(stdout) as { skillId?: string; output?: string; timeoutMs?: number };
+    // --timeout 30000 (before --) sets the effective timeout.
+    assert.strictEqual(parsed.timeoutMs, 30000, "global --timeout before -- must be respected");
+    // --timeout 99 (after --) is forwarded to the script as its first arg.
+    assert.ok(parsed.output?.includes("TEST_OUTPUT:--timeout"), `expected forwarded arg in output, got: ${parsed.output}`);
+  });
+
   it("CLI skills run can assert output content", async () => {
     const { stdout, code } = await runCli([
       "skills", "run", "com.test.echo", "--expect-contains", "TEST_OUTPUT:hello", "--output", "json", "--", "hello",

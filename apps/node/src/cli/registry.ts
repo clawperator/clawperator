@@ -733,7 +733,7 @@ COMMANDS["open"] = {
     if (!target) {
       return JSON.stringify({
         code: "USAGE",
-        message: "open requires a target.\n\nUsage:\n  clawperator open <package-id>\n  clawperator open <url>\n  clawperator open <uri>",
+        message: "open requires a target.\n\nUsage:\n  clawperator open <package-id>       Open an Android app\n  clawperator open <url>              Open a URL in browser\n  clawperator open <uri>              Open a deep link\n\nExamples:\n  clawperator open com.android.settings\n  clawperator open https://example.com",
       });
     }
     // If --app or --uri was given explicitly, route accordingly

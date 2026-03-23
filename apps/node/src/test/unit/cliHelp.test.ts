@@ -392,6 +392,11 @@ describe("Phase 2 promoted commands", () => {
     const obj = JSON.parse(stdout) as { code?: string; message?: string };
     assert.strictEqual(obj.code, "USAGE");
     assert.match(obj.message ?? "", /open requires a target/);
+    // Plan spec: error message must include usage lines with descriptions and examples.
+    assert.match(obj.message ?? "", /Open an Android app/);
+    assert.match(obj.message ?? "", /Open a URL in browser/);
+    assert.match(obj.message ?? "", /clawperator open com\.android\.settings/);
+    assert.match(obj.message ?? "", /clawperator open https:\/\/example\.com/);
   });
 
   it("returns USAGE when open has both positional and --app flag", async () => {
