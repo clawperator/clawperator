@@ -316,6 +316,8 @@ const HELP_CLICK = `clawperator click
 Usage:
   clawperator click --text <text> [--device <id>] [--operator-package <pkg>] [--json]
   clawperator click --id <resource-id> [--device <id>] [--operator-package <pkg>] [--json]
+  clawperator click --role <role> [--device <id>] [--operator-package <pkg>] [--json]
+  clawperator click --desc <text> [--device <id>] [--operator-package <pkg>] [--json]
   clawperator click --selector '<json>' [--device <id>] [--operator-package <pkg>] [--json]
 
 Selector flags (at least one required; combine for AND matching):
@@ -337,7 +339,7 @@ Examples:
   clawperator click --text "Wi-Fi"
   clawperator click --role button --text-contains "Submit"
   clawperator click --id "com.example:id/btn_ok"
-  clawperator click --selector '{"textEquals":"Wi-Fi"}'
+  Advanced (raw NodeMatcher JSON): clawperator click --selector '{"textEquals":"Wi-Fi","role":"text"}'
 `;
 
 const HELP_OPEN = `clawperator open
@@ -361,6 +363,7 @@ const HELP_TYPE = `clawperator type
 Usage:
   clawperator type <text> --role <role> [--device <id>] [--operator-package <pkg>] [--submit] [--clear] [--json]
   clawperator type <text> --id <resource-id> [--device <id>] [--operator-package <pkg>] [--submit] [--clear] [--json]
+  clawperator type <text> --desc <text> [--device <id>] [--operator-package <pkg>] [--submit] [--clear] [--json]
   clawperator type <text> --selector '<json>' [--device <id>] [--operator-package <pkg>] [--submit] [--clear] [--json]
 
 Text to type:
@@ -381,13 +384,14 @@ Options:
 Notes:
   - Types text into the first matching element.
   - --text is used for the text content to type, not the element selector.
-    Use --id, --role, --desc, or --selector to identify the target element.
+    Use --id, --role, --desc, --text-contains, --desc-contains, or --selector (advanced) to identify the target.
   - Synonym: fill (accepted, not in help)
 
 Examples:
   clawperator type "hello world" --role textfield
   clawperator type "search query" --id "com.example:id/search_box" --submit
   clawperator type --text "hello" --role textfield
+  Advanced (raw NodeMatcher JSON): clawperator type "hi" --selector '{"resourceId":"com.example:id/search_box"}'
 `;
 
 const HELP_READ = `clawperator read
@@ -395,6 +399,8 @@ const HELP_READ = `clawperator read
 Usage:
   clawperator read --text <text> [--device <id>] [--operator-package <pkg>] [--json]
   clawperator read --id <resource-id> [--device <id>] [--operator-package <pkg>] [--json]
+  clawperator read --role <role> [--device <id>] [--operator-package <pkg>] [--json]
+  clawperator read --desc <text> [--device <id>] [--operator-package <pkg>] [--json]
   clawperator read --selector '<json>' [--device <id>] [--operator-package <pkg>] [--json]
 
 Selector flags (at least one required; combine for AND matching):
@@ -413,7 +419,8 @@ Notes:
 Examples:
   clawperator read --id "com.example:id/battery_level"
   clawperator read --text "Battery"
-  clawperator read --selector '{"resourceId":"com.example:id/status"}'
+  clawperator read --role switch --desc "Wi-Fi"
+  Advanced (raw NodeMatcher JSON): clawperator read --selector '{"resourceId":"com.example:id/status"}'
 `;
 
 const HELP_WAIT = `clawperator wait
@@ -421,6 +428,8 @@ const HELP_WAIT = `clawperator wait
 Usage:
   clawperator wait --text <text> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
   clawperator wait --id <resource-id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
+  clawperator wait --role <role> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
+  clawperator wait --desc <text> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
   clawperator wait --selector '<json>' [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
 
 Selector flags (at least one required; combine for AND matching):
@@ -440,7 +449,8 @@ Notes:
 Examples:
   clawperator wait --text "Done"
   clawperator wait --id "com.example:id/progress" --timeout 10000
-  clawperator wait --selector '{"textEquals":"Done"}'
+  clawperator wait --role button --text-contains "OK"
+  Advanced (raw NodeMatcher JSON): clawperator wait --selector '{"textEquals":"Done"}'
 `;
 
 const HELP_PRESS = `clawperator press

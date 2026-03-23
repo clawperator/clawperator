@@ -35,28 +35,42 @@ workflow (also available as `record` alias), use [Android Recording Format for A
 | `screenshot [--path <file>]` | Capture device screen as PNG |
 | `open <package-id\|url\|uri>` | Open an app, URL, or URI (auto-detects target type) |
 | `click --text <text>` | Tap the first element with exact visible text |
+| `click --text-contains <sub>` | Tap the first element whose visible text contains the substring |
 | `click --id <resource-id>` | Tap the first element with the given Android resource ID |
-| `click --role <role>` | Tap the first element with the given role |
 | `click --desc <text>` | Tap the first element with the given content description |
-| `click --text-contains <sub>` | Tap the first element whose text contains the substring |
 | `click --desc-contains <sub>` | Tap the first element whose content description contains the substring |
-| `click --selector <json>` | Tap the first matching element (raw JSON; mutually exclusive with simple flags) |
-| `type <text> --role <role>` | Type text into the first element with the given role |
-| `type <text> --id <resource-id>` | Type text into the first element with the given resource ID |
-| `type <text> --selector <json>` | Type text into the first matching element (raw JSON) |
+| `click --role <role>` | Tap the first element with the given role |
+| `click --selector <json>` | Tap using raw `NodeMatcher` JSON (advanced only; mutually exclusive with simple flags) |
+| `type <text> --role <role>` | Type into the first element with the given role |
+| `type <text> --id <resource-id>` | Type into the first element with the given resource ID |
+| `type <text> --desc <text>` | Type into the first element with the given content description |
+| `type <text> --desc-contains <sub>` | Type into the first element whose content description contains the substring |
+| `type <text> --text-contains <sub>` | Type into the first element whose visible text contains the substring |
+| `type <text> --selector <json>` | Type using raw `NodeMatcher` JSON (advanced only; mutually exclusive with simple flags) |
 | `read --text <text>` | Read text from the first element with exact visible text |
-| `read --id <resource-id>` | Read text from the first element with the given resource ID |
-| `read --selector <json>` | Read text from the first matching element (raw JSON) |
+| `read --text-contains <sub>` | Read from the first element whose visible text contains the substring |
+| `read --id <resource-id>` | Read from the first element with the given resource ID |
+| `read --desc <text>` | Read from the first element with the given content description |
+| `read --desc-contains <sub>` | Read from the first element whose content description contains the substring |
+| `read --role <role>` | Read from the first element with the given role |
+| `read --selector <json>` | Read using raw `NodeMatcher` JSON (advanced only; mutually exclusive with simple flags) |
 | `wait --text <text>` | Wait until an element with exact visible text appears |
+| `wait --text-contains <sub>` | Wait until an element whose visible text contains the substring appears |
 | `wait --id <resource-id>` | Wait until an element with the given resource ID appears |
-| `wait --selector <json>` | Wait until a matching element appears (raw JSON) |
+| `wait --desc <text>` | Wait until an element with the given content description appears |
+| `wait --desc-contains <sub>` | Wait until an element whose content description contains the substring appears |
+| `wait --role <role>` | Wait until an element with the given role appears |
+| `wait --selector <json>` | Wait using raw `NodeMatcher` JSON (advanced only; mutually exclusive with simple flags) |
 | `press <back\|home\|recents>` | Press a hardware key |
 | `back` | Press the Android back key (shorthand for `press back`) |
 | `scroll <down\|up\|left\|right>` | Scroll the screen in a direction |
-| `scroll <dir> --container-id <id>` | Scroll within a specific container by resource ID |
-| `scroll <dir> --container-role <role>` | Scroll within a specific container by role |
-| `scroll <dir> --container-text <text>` | Scroll within a specific container by exact text |
-| `scroll <dir> --container-selector <json>` | Scroll within a specific container (raw JSON) |
+| `scroll <dir> --container-text <text>` | Scroll within a container matched by exact visible text |
+| `scroll <dir> --container-text-contains <sub>` | Scroll within a container matched by partial text |
+| `scroll <dir> --container-id <id>` | Scroll within a container matched by resource ID |
+| `scroll <dir> --container-desc <text>` | Scroll within a container matched by exact content description |
+| `scroll <dir> --container-desc-contains <sub>` | Scroll within a container matched by partial content description |
+| `scroll <dir> --container-role <role>` | Scroll within a container matched by role |
+| `scroll <dir> --container-selector <json>` | Scroll within a container using raw `NodeMatcher` JSON (advanced only) |
 | `skills list` | List available skills |
 | `skills get <skill_id>` | Show skill metadata |
 | `skills search [--app <pkg>] [--intent <i>] [--keyword <k>]` | Search skills by app, intent, or keyword (at least one filter required) |
@@ -96,7 +110,7 @@ All element-targeting commands accept these flags instead of raw JSON:
 
 Multiple simple flags combine with AND semantics: `--text "Login" --role button` matches elements with both properties.
 
-For `type`, `--text` is reserved for the text to type. Use `--id`, `--role`, `--desc`, or `--selector` to identify the target element.
+For `type`, `--text` is reserved for the text to type. Identify the target with `--id`, `--role`, `--desc`, `--text-contains`, `--desc-contains`, or `--selector` (advanced).
 
 ### Container Flags (scroll)
 
@@ -392,10 +406,10 @@ Combine fields to increase specificity when a single field is ambiguous:
 | :--- | :--- |
 | `snapshot` | `snapshot_ui` |
 | `screenshot` | `take_screenshot` |
-| `click --selector <json>` | `click` |
-| `type <text> --selector <json>` | `enter_text` |
-| `read --selector <json>` | `read_text` |
-| `wait --selector <json>` | `wait_for_node` |
+| `click` (any Phase 3 selector flag or `--selector <json>`) | `click` |
+| `type` (element selector flags or `--selector <json>`; typed text is positional or `--text`) | `enter_text` |
+| `read` (any Phase 3 selector flag or `--selector <json>`) | `read_text` |
+| `wait` (any Phase 3 selector flag or `--selector <json>`) | `wait_for_node` |
 | `open <package-id>` | `open_app` |
 | `open <url\|uri>` | `open_uri` |
 | `press <back\|home\|recents>` | `press_key` |
@@ -475,7 +489,7 @@ Android intent builder.
 }
 ```
 
-**`enter_text`:** The CLI command is `type <text> --selector <json>` and the execution payload action type is `enter_text`. The `submit` param triggers a keyboard Enter/submit after typing - use this for search fields and single-field forms where pressing Enter submits. The Node contract still accepts `clear`, but the Android runtime does not implement it yet, so it currently has no effect.
+**`enter_text`:** From the CLI, use `type <text>` with element selector flags (for example `--role textfield` or `--id <resource-id>`). Raw `--selector <json>` remains for complex `NodeMatcher` shapes. The execution payload action type is `enter_text`. The `submit` param triggers a keyboard Enter/submit after typing - use this for search fields and single-field forms where pressing Enter submits. The Node contract still accepts `clear`, but the Android runtime does not implement it yet, so it currently has no effect.
 
 **`enter_text` example request (`/execute`):**
 ```json

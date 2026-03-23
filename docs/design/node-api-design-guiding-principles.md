@@ -86,7 +86,7 @@ Good (current):
 ```
 clawperator open com.android.settings
 clawperator snapshot --json
-clawperator click --selector '{"textEquals":"Wi-Fi"}'
+clawperator click --text "Wi-Fi"
 ```
 
 ### 2. Flat Commands for Actions, Namespaces Only for Subsystems
