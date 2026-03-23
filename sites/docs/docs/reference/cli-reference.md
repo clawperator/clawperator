@@ -42,7 +42,7 @@ clawperator operator setup --apk <path> [--device <id>] [--operator-package <pac
 | `--device <id>` | Target Android device serial (required when multiple devices are connected) |
 | `--operator-package <package>` | Operator package identifier (required when both release and debug variants are installed) |
 
-This is the canonical setup command. `clawperator operator install` remains a compatibility alias. It runs three phases in sequence:
+This is the canonical setup command. It runs three phases in sequence:
 
 1. **Install**: Copies the APK onto the device via `adb install -r`.
 2. **Permissions**: Grants the accessibility service, notification posting, and notification listener permissions.
@@ -191,7 +191,7 @@ clawperator packages list [--device <id>] [--third-party]
 
 ### `exec`
 
-Execute a validated command payload. The CLI also accepts `execute` as a synonym.
+Execute a validated command payload.
 
 ```
 clawperator exec --execution <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>] [--timeout <ms>]
@@ -259,65 +259,66 @@ Target detection: `https?://` or any `*://` scheme routes as URI; otherwise trea
 
 ### `click`
 
-Tap a UI element matching a selector.
+Tap the first matching UI element.
 
 ```
-clawperator click --selector '<json>' [--device <id>] [--operator-package <pkg>] [--json]
+clawperator click [--text <label> | --id <resourceId> | --desc <contentDescription> | --selector '<json>'] [--device <id>] [--operator-package <pkg>] [--json]
 ```
 
 | Flag | Description |
 |------|-------------|
-| `--selector <json>` | `NodeMatcher` JSON (required) |
-
-Example selector: `'{"resourceId":"com.example.app:id/button_ok"}'`
-
-Synonym: `tap` (accepted, not in help).
+| `--text <label>` | Match visible text (`textEquals`) |
+| `--id <resourceId>` | Match Android resource id |
+| `--desc <text>` | Match content description |
+| `--selector <json>` | Advanced `NodeMatcher` JSON (mutually exclusive with `--text` / `--id` / `--desc`) |
 
 ---
 
 ### `type`
 
-Type text into a UI element matching a selector.
+Type into the first matching UI element.
 
 ```
-clawperator type <text> --selector '<json>' [--device <id>] [--operator-package <pkg>] [--submit] [--clear] [--json]
+clawperator type <typedText> [--text <fieldLabel> | --id <resourceId> | --desc <contentDescription> | --selector '<json>'] [--device <id>] [--operator-package <pkg>] [--submit] [--clear] [--json]
 ```
 
 | Flag | Description |
 |------|-------------|
-| `--selector <json>` | `NodeMatcher` JSON (required) |
+| `<typedText>` | Characters to enter (positional, before flags) |
+| `--text <fieldLabel>` | Match target field by visible text |
+| `--id <resourceId>` | Match by resource id |
+| `--desc <text>` | Match by content description |
+| `--selector <json>` | Advanced matcher (mutually exclusive with simple flags) |
 | `--submit` | Press Enter after typing |
 | `--clear` | Clear existing text before typing |
-
-Text may be supplied as a positional argument or via `--text <text>`. Synonym: `fill` (accepted, not in help).
 
 ---
 
 ### `read`
 
-Read text from a UI element matching a selector.
+Read text from the first matching UI element.
 
 ```
-clawperator read --selector '<json>' [--device <id>] [--operator-package <pkg>] [--json]
+clawperator read [--text <label> | --id <resourceId> | --desc <contentDescription> | --selector '<json>'] [--device <id>] [--operator-package <pkg>] [--json]
 ```
 
 | Flag | Description |
 |------|-------------|
-| `--selector <json>` | `NodeMatcher` JSON (required) |
+| `--text`, `--id`, `--desc`, `--selector` | Same semantics as `click` |
 
 ---
 
 ### `wait`
 
-Wait until a UI element matching a selector appears.
+Wait until the first matching UI element appears.
 
 ```
-clawperator wait --selector '<json>' [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
+clawperator wait [--text <label> | --id <resourceId> | --desc <contentDescription> | --selector '<json>'] [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
 ```
 
 | Flag | Description |
 |------|-------------|
-| `--selector <json>` | `NodeMatcher` JSON (required) |
+| `--text`, `--id`, `--desc`, `--selector` | Same semantics as `click` |
 
 ---
 
@@ -335,7 +336,7 @@ clawperator press <key> [--device <id>] [--operator-package <pkg>] [--json]
 | `home` | Return to home screen |
 | `recents` | Open recent apps |
 
-Key may be supplied as a positional argument or via `--key <key>`. Synonym: `press-key` (accepted, not in help).
+Key may be supplied as a positional argument or via `--key <key>`.
 
 ---
 
@@ -365,7 +366,7 @@ Valid directions: `down`, `up`, `left`, `right`. Direction may be supplied as a 
 
 ### `recording start`
 
-Start an on-device recording session through the Operator app. `record` is a supported alias.
+Start an on-device recording session through the Operator app.
 
 ```
 clawperator recording start [--session-id <id>] [--device <serial>] [--operator-package <pkg>]
@@ -379,7 +380,7 @@ the normal execution pipeline.
 
 ### `recording stop`
 
-Stop the active recording session and finalize the on-device NDJSON file. `record` is a supported alias.
+Stop the active recording session and finalize the on-device NDJSON file.
 
 ```
 clawperator recording stop [--session-id <id>] [--device <serial>] [--operator-package <pkg>]
@@ -392,7 +393,7 @@ recording.
 
 ### `recording pull`
 
-Pull a recording from device storage to the host. `record` is a supported alias.
+Pull a recording from device storage to the host.
 
 ```
 clawperator recording pull [--session-id <id>] [--out <dir>] [--device <serial>]
@@ -405,7 +406,7 @@ pointer first and pulls that recording. Output defaults to `./recordings/`.
 
 ### `recording parse`
 
-Parse a raw NDJSON recording into a step log JSON file. `record` is a supported alias.
+Parse a raw NDJSON recording into a step log JSON file.
 
 ```
 clawperator recording parse --input <file> [--out <file>]
@@ -601,8 +602,8 @@ clawperator serve [--port <number>] [--host <string>]
 HTTP endpoints exposed:
 - `GET /devices` - list connected devices
 - `POST /execute` - run an execution payload
-- `POST /observe/snapshot` - capture UI snapshot
-- `POST /observe/screenshot` - capture screenshot
+- `POST /snapshot` - capture UI snapshot
+- `POST /screenshot` - capture screenshot
 - `GET /skills` - list or search skills
 - `GET /skills/:skillId` - get skill metadata
 - `POST /skills/:skillId/run` - run a skill script
@@ -626,7 +627,7 @@ clawperator doctor --check-only
 
 | Flag | Description |
 |------|-------------|
-| `--json` | Output as JSON (alias for `--output json`) |
+| `--json` | Output as JSON |
 | `--fix` | Attempt non-destructive host fixes |
 | `--full` | Full Android build + install + handshake + smoke |
 | `--check-only` | Always exit 0 for CI or automation |

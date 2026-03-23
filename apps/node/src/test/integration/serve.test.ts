@@ -144,9 +144,9 @@ describe("serve API integration", () => {
     }
   });
 
-  test("POST /observe/snapshot returns success structure (dry-run)", async () => {
+  test("POST /snapshot returns success structure (dry-run)", async () => {
     // This will likely fail with NO_DEVICES in CI, but we test the structure/404/400 logic
-    const res = await fetch(`http://localhost:${port}/observe/snapshot`, {
+    const res = await fetch(`http://localhost:${port}/snapshot`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ deviceId: "non-existent" }),
@@ -158,8 +158,8 @@ describe("serve API integration", () => {
     assert.ok(body.error.code !== undefined);
   });
 
-  test("POST /observe/screenshot returns success structure (dry-run)", async () => {
-    const res = await fetch(`http://localhost:${port}/observe/screenshot`, {
+  test("POST /screenshot returns success structure (dry-run)", async () => {
+    const res = await fetch(`http://localhost:${port}/screenshot`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ deviceId: "non-existent" }),
@@ -170,8 +170,8 @@ describe("serve API integration", () => {
     assert.ok(body.error.code !== undefined);
   });
 
-  test("POST /observe/screenshot rejects non-string path", async () => {
-    const res = await fetch(`http://localhost:${port}/observe/screenshot`, {
+  test("POST /screenshot rejects non-string path", async () => {
+    const res = await fetch(`http://localhost:${port}/screenshot`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ path: 123 }),
@@ -183,8 +183,8 @@ describe("serve API integration", () => {
     assert.strictEqual(body.error.code, "INVALID_PATH");
   });
 
-  test("POST /observe/screenshot rejects empty path", async () => {
-    const res = await fetch(`http://localhost:${port}/observe/screenshot`, {
+  test("POST /screenshot rejects empty path", async () => {
+    const res = await fetch(`http://localhost:${port}/screenshot`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ path: "" }),

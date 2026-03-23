@@ -1,4 +1,5 @@
 import { ERROR_CODES } from "../contracts/errors.js";
+import { isNodeMatcherEmpty, type NodeMatcher } from "../contracts/selectors.js";
 import { formatError } from "./output.js";
 import type { Logger } from "../adapters/logger.js";
 
@@ -71,6 +72,42 @@ export function barePositionalTokens(
   return out;
 }
 
+/**
+ * Element matcher from CLI: either `--selector` JSON or simple `--text` / `--id` / `--desc` (combined with AND).
+ */
+export function resolveElementMatcherFromCli(
+  rest: string[],
+  command: string,
+): { ok: true; selectorJson: string } | { ok: false; code: "MISSING_SELECTOR" | "EXECUTION_VALIDATION_FAILED"; message: string } {
+  const selector = getOpt(rest, "--selector");
+  const textEq = getOpt(rest, "--text");
+  const id = getOpt(rest, "--id");
+  const desc = getOpt(rest, "--desc");
+  const hasSimple = textEq !== undefined || id !== undefined || desc !== undefined;
+  if (selector !== undefined && hasSimple) {
+    return {
+      ok: false,
+      code: "EXECUTION_VALIDATION_FAILED",
+      message: `${command}: use either --selector or simple matcher flags (--text, --id, --desc), not both.\n\nSee: clawperator ${command} --help`,
+    };
+  }
+  if (selector !== undefined) {
+    return { ok: true, selectorJson: selector };
+  }
+  const m: NodeMatcher = {};
+  if (textEq !== undefined) m.textEquals = textEq;
+  if (id !== undefined) m.resourceId = id;
+  if (desc !== undefined) m.contentDescEquals = desc;
+  if (isNodeMatcherEmpty(m)) {
+    return {
+      ok: false,
+      code: "MISSING_SELECTOR",
+      message: `${command} requires an element matcher. Pass --text, --id, --desc, or --selector.\n\nExample:\n  clawperator ${command} --text "Submit"\n\nSee: clawperator ${command} --help`,
+    };
+  }
+  return { ok: true, selectorJson: JSON.stringify(m) };
+}
+
 export function getInvalidTimeoutResult(timeoutMs: number | undefined, options: { format: "json" | "pretty" }): string | undefined {
   if (timeoutMs !== undefined && !Number.isFinite(timeoutMs)) {
     return formatError(
@@ -136,7 +173,6 @@ Notes:
   - If omitted, setup auto-detects the package only when exactly one known Operator variant is installed.
   - If both release and debug variants are installed, pass --operator-package explicitly.
   - Do not use raw adb install for normal setup. It leaves the device in a partial state without required permissions.
-  - operator install remains a compatibility alias for operator setup.
   - Use clawperator grant-device-permissions only after the Operator APK crashes and Android revokes permissions.
 `;
 
@@ -218,8 +254,8 @@ Notes:
   - Runs the selected skill script through the local skill wrapper.
   - Use --device explicitly when more than one Android device is connected.
   - --operator-package sets the Operator package for this skill run (default: com.clawperator.operator).
-    Use com.clawperator.operator.dev for local debug APKs. --receiver-package is a legacy alias (see global options).
-  - --timeout overrides the wrapper timeout for this run only (--timeout-ms is accepted as an alias).
+    Use com.clawperator.operator.dev for local debug APKs.
+  - --timeout overrides the wrapper timeout for this run only.
   - --expect-contains turns the run into a lightweight output assertion.
   - If the assertion text is missing, the wrapper fails with SKILL_OUTPUT_ASSERTION_FAILED.
   - By default, the wrapper performs a pre-run dry-run validation gate before starting the skill script.
@@ -238,8 +274,8 @@ Usage:
   clawperator doctor --check-only
 
 Notes:
-  - Default receiver package: com.clawperator.operator
-  - Use --operator-package com.clawperator.operator.dev for local debug APKs. --operator-package is an accepted alias.
+  - Default Operator package: com.clawperator.operator
+  - Use --operator-package com.clawperator.operator.dev for local debug APKs.
   - Exit code 0 means all critical checks passed, including the warning-only multi-device ambiguity case.
   - Exit code 1 means a genuine failure such as no device, APK not installed, or handshake failure.
   - If handshake times out, rerun with --verbose and compare the installed APK package with --operator-package.
@@ -252,8 +288,8 @@ Usage:
   clawperator version --check-compat [--device <id>] [--operator-package <package>] [--output <json|pretty>]
 
   Notes:
-  - Default receiver package: com.clawperator.operator
-  - Use --operator-package com.clawperator.operator.dev for local debug APKs. --operator-package is an accepted alias.
+  - Default Operator package: com.clawperator.operator
+  - Use --operator-package com.clawperator.operator.dev for local debug APKs.
   - --check-compat compares the CLI version with the installed APK version on the device.
 `;
 
@@ -263,8 +299,8 @@ Usage:
   clawperator grant-device-permissions [--device <id>] [--operator-package <package>] [--output <json|pretty>]
 
 Notes:
-  - Default receiver package: com.clawperator.operator
-  - Use --operator-package com.clawperator.operator.dev for local debug APKs. --operator-package is an accepted alias.
+  - Default Operator package: com.clawperator.operator
+  - Use --operator-package com.clawperator.operator.dev for local debug APKs.
   - Grants accessibility, notification posting, and notification listener permissions via adb.
   - This command is for crash recovery only. Use it when the Operator APK crashes and Android revokes permissions.
   - For normal setup, always use clawperator operator setup instead.
@@ -295,15 +331,16 @@ Notes:
 const HELP_CLICK = `clawperator click
 
 Usage:
-  clawperator click --selector '<json>' [--device <id>] [--operator-package <pkg>] [--json]
+  clawperator click (--text <label> | --id <resourceId> | --desc <contentDescription> | --selector '<json>') [--device <id>] [--operator-package <pkg>] [--json]
 
-Required:
-  --selector <json>    Element selector (JSON object, e.g. '{"textEquals":"Wi-Fi"}')
+Matchers (one required):
+  --text <label>       Match visible text (textEquals)
+  --id <resourceId>    Match Android resource id
+  --desc <text>        Match content description
+  --selector '<json>'   Advanced JSON matcher (mutually exclusive with --text/--id/--desc)
 
 Notes:
   - Performs a tap on the first matching element.
-  - Exits with MISSING_SELECTOR if --selector is omitted.
-  - Synonym: tap (accepted, not in help)
 `;
 
 const HELP_OPEN = `clawperator open
@@ -319,34 +356,32 @@ Options:
 Notes:
   - Target detection: if the value contains a URI scheme (*://), it uses open_uri; otherwise open_app.
   - --app does not force the app path: a URL or deep link passed with --app still opens as a URI.
-  - Synonyms: open-uri, open-url (accepted, not in help)
 `;
 
 const HELP_TYPE = `clawperator type
 
 Usage:
-  clawperator type <text> --selector '<json>' [--device <id>] [--operator-package <pkg>] [--submit] [--clear] [--json]
+  clawperator type <typedText> (--text <fieldLabel> | --id <resourceId> | --desc <contentDescription> | --selector '<json>') [--device <id>] [--operator-package <pkg>] [--submit] [--clear] [--json]
 
 Required:
-  --selector <json>    Element selector (JSON object, e.g. '{"textEquals":"Search"}')
+  <typedText>          Characters to enter (positional)
+  Element matcher:     --text matches visible text on the target field; or use --id, --desc, or --selector
 
 Options:
   --submit             Press Enter after typing
   --clear              Clear existing text before typing
 
 Notes:
-  - Types text into the first matching element.
-  - Text may be supplied as a positional argument or via --text <text>.
-  - Synonym: fill (accepted, not in help)
+  - Types into the first matching element.
 `;
 
 const HELP_READ = `clawperator read
 
 Usage:
-  clawperator read --selector '<json>' [--device <id>] [--operator-package <pkg>] [--json]
+  clawperator read (--text <label> | --id <resourceId> | --desc <contentDescription> | --selector '<json>') [--device <id>] [--operator-package <pkg>] [--json]
 
-Required:
-  --selector <json>    Element selector (JSON object, e.g. '{"textEquals":"Battery"}')
+Matchers (one required):
+  Same flags as clawperator click.
 
 Notes:
   - Returns the text content of the first matching element.
@@ -355,10 +390,10 @@ Notes:
 const HELP_WAIT = `clawperator wait
 
 Usage:
-  clawperator wait --selector '<json>' [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
+  clawperator wait (--text <label> | --id <resourceId> | --desc <contentDescription> | --selector '<json>') [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
 
-Required:
-  --selector <json>    Element selector (JSON object, e.g. '{"textEquals":"Done"}')
+Matchers (one required):
+  Same flags as clawperator click.
 
 Notes:
   - Waits until the first matching element appears.
@@ -377,7 +412,6 @@ Valid keys:
 
 Notes:
   - Key may be supplied as a positional argument or via --key <key>.
-  - Synonym: press-key (accepted, not in help)
 `;
 
 const HELP_BACK = `clawperator back
@@ -614,13 +648,13 @@ COMMANDS["packages"] = {
   },
 };
 
-// exec (synonym: execute)
+// exec
 COMMANDS["exec"] = {
   name: "exec",
   synonyms: ["execute"],
   group: "Execution",
   summary: "Execute a validated command payload",
-  help: "clawperator exec\n\nUsage:\n  clawperator exec --execution <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>]\n  clawperator exec best-effort --goal <text> [--device <id>] [--operator-package <package>]\n\n`execute` is accepted as a synonym for `exec`.\n",
+  help: "clawperator exec\n\nUsage:\n  clawperator exec --execution <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>]\n  clawperator exec best-effort --goal <text> [--device <id>] [--operator-package <package>]\n",
   topLevelBlock: `  exec --execution <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>]
                                             Execute a validated command payload or print a dry-run plan
   exec best-effort --goal <text> [--device <id>] [--operator-package <package>]
@@ -706,20 +740,23 @@ COMMANDS["click"] = {
   group: "Device Interaction",
   summary: "Tap the first matching UI element",
   help: HELP_CLICK,
-  topLevelBlock: `  click --selector '<json>' [--device <id>] [--json]
+  topLevelBlock: `  click [--text <label> | --id <id> | --desc <text> | --selector '<json>'] [--device <id>] [--json]
                                             Tap the first matching UI element`,
   handler: async (ctx) => {
     const { rest, format, logger, deviceId, operatorPackage } = ctx;
-    const selector = getOpt(rest, "--selector");
-    if (!selector) {
-      return JSON.stringify({
-        code: "MISSING_SELECTOR",
-        message: "click requires a selector.\n\nUsage:\n  clawperator click --selector '{\"textEquals\":\"...\"}'\n\nSee: clawperator click --help",
-      });
+    const resolved = resolveElementMatcherFromCli(rest, "click");
+    if (!resolved.ok) {
+      if (resolved.code === "EXECUTION_VALIDATION_FAILED") {
+        return formatError(
+          { code: ERROR_CODES.EXECUTION_VALIDATION_FAILED, message: resolved.message },
+          { format },
+        );
+      }
+      return JSON.stringify({ code: "MISSING_SELECTOR", message: resolved.message });
     }
     return (await import("./commands/action.js")).cmdActionClick({
       format,
-      selector,
+      selector: resolved.selectorJson,
       deviceId,
       operatorPackage,
       logger,
@@ -782,39 +819,32 @@ COMMANDS["type"] = {
   group: "Device Interaction",
   summary: "Type text into the first matching UI element",
   help: HELP_TYPE,
-  topLevelBlock: `  type <text> --selector '<json>' [--device <id>] [--json]
+  topLevelBlock: `  type <typedText> [--text <field> | --id <id> | --desc <text> | --selector '<json>'] [--device <id>] [--json]
                                             Type text into the first matching UI element`,
   handler: async (ctx) => {
     const { rest, format, logger, deviceId, operatorPackage } = ctx;
-    const selector = getOpt(rest, "--selector");
-    if (!selector) {
-      return JSON.stringify({
-        code: "MISSING_SELECTOR",
-        message: "type requires a selector.\n\nUsage:\n  clawperator type <text> --selector '{\"textEquals\":\"...\"}'\n\nSee: clawperator type --help",
-      });
+    const resolved = resolveElementMatcherFromCli(rest, "type");
+    if (!resolved.ok) {
+      if (resolved.code === "EXECUTION_VALIDATION_FAILED") {
+        return formatError(
+          { code: ERROR_CODES.EXECUTION_VALIDATION_FAILED, message: resolved.message },
+          { format },
+        );
+      }
+      return JSON.stringify({ code: "MISSING_SELECTOR", message: resolved.message });
     }
-    const textFlag = getOpt(rest, "--text");
-    const bare = barePositionalTokens(rest, ["--selector", "--text"], ["--submit", "--clear"]);
-    if (textFlag !== undefined && bare.length > 0) {
-      return formatError(
-        {
-          code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
-          message:
-            "type: pass text as a positional argument or via --text, not both.\n\nSee: clawperator type --help",
-        },
-        { format },
-      );
-    }
-    const text = textFlag ?? bare[0];
+    const bare = barePositionalTokens(rest, ["--selector", "--text", "--id", "--desc"], ["--submit", "--clear"]);
+    const text = bare[0];
     if (!text) {
       return JSON.stringify({
         code: "MISSING_ARGUMENT",
-        message: "type requires text to type. Pass text as a positional argument or via --text <text>.",
+        message:
+          "type requires characters to enter as a positional argument before flags.\n\nExample:\n  clawperator type \"hello\" --text \"Search\"\n\nSee: clawperator type --help",
       });
     }
     return (await import("./commands/action.js")).cmdActionType({
       format,
-      selector,
+      selector: resolved.selectorJson,
       text,
       submit: hasFlag(rest, "--submit"),
       clear: hasFlag(rest, "--clear"),
@@ -830,20 +860,23 @@ COMMANDS["read"] = {
   group: "Device Interaction",
   summary: "Read text from the first matching UI element",
   help: HELP_READ,
-  topLevelBlock: `  read --selector '<json>' [--device <id>] [--json]
+  topLevelBlock: `  read [--text <label> | --id <id> | --desc <text> | --selector '<json>'] [--device <id>] [--json]
                                             Read text from the first matching UI element`,
   handler: async (ctx) => {
     const { rest, format, logger, deviceId, operatorPackage } = ctx;
-    const selector = getOpt(rest, "--selector");
-    if (!selector) {
-      return JSON.stringify({
-        code: "MISSING_SELECTOR",
-        message: "read requires a selector.\n\nUsage:\n  clawperator read --selector '{\"textEquals\":\"...\"}'\n\nSee: clawperator read --help",
-      });
+    const resolved = resolveElementMatcherFromCli(rest, "read");
+    if (!resolved.ok) {
+      if (resolved.code === "EXECUTION_VALIDATION_FAILED") {
+        return formatError(
+          { code: ERROR_CODES.EXECUTION_VALIDATION_FAILED, message: resolved.message },
+          { format },
+        );
+      }
+      return JSON.stringify({ code: "MISSING_SELECTOR", message: resolved.message });
     }
     return (await import("./commands/action.js")).cmdActionRead({
       format,
-      selector,
+      selector: resolved.selectorJson,
       deviceId,
       operatorPackage,
       logger,
@@ -856,22 +889,25 @@ COMMANDS["wait"] = {
   group: "Device Interaction",
   summary: "Wait until a matching UI element appears",
   help: HELP_WAIT,
-  topLevelBlock: `  wait --selector '<json>' [--device <id>] [--json]
+  topLevelBlock: `  wait [--text <label> | --id <id> | --desc <text> | --selector '<json>'] [--device <id>] [--json]
                                             Wait until a matching UI element appears`,
   handler: async (ctx) => {
     const { rest, format, logger, deviceId, operatorPackage, timeoutMs } = ctx;
     const invalidTimeout = getInvalidTimeoutResult(timeoutMs, { format });
     if (invalidTimeout) return invalidTimeout;
-    const selector = getOpt(rest, "--selector");
-    if (!selector) {
-      return JSON.stringify({
-        code: "MISSING_SELECTOR",
-        message: "wait requires a selector.\n\nUsage:\n  clawperator wait --selector '{\"textEquals\":\"...\"}'\n\nSee: clawperator wait --help",
-      });
+    const resolved = resolveElementMatcherFromCli(rest, "wait");
+    if (!resolved.ok) {
+      if (resolved.code === "EXECUTION_VALIDATION_FAILED") {
+        return formatError(
+          { code: ERROR_CODES.EXECUTION_VALIDATION_FAILED, message: resolved.message },
+          { format },
+        );
+      }
+      return JSON.stringify({ code: "MISSING_SELECTOR", message: resolved.message });
     }
     return (await import("./commands/action.js")).cmdActionWait({
       format,
-      selector,
+      selector: resolved.selectorJson,
       deviceId,
       operatorPackage,
       logger,
@@ -1137,15 +1173,15 @@ COMMANDS["recording"] = {
   synonyms: ["record"],
   group: "Recording",
   summary: "Manage recording sessions on the Operator app",
-  help: "clawperator recording\n\nUsage:\n  clawperator recording start|stop|pull|parse ... ('record' is an alias)\n",
+  help: "clawperator recording\n\nUsage:\n  clawperator recording start|stop|pull|parse ...\n",
   topLevelBlock: `  recording start [--session-id <id>] [--device <serial>] [--operator-package <pkg>]
-                                            Start a recording session on the Operator app ('record' is an alias)
+                                            Start a recording session on the Operator app
   recording stop  [--session-id <id>] [--device <serial>] [--operator-package <pkg>]
-                                            Stop the active recording session and finalize the on-device file ('record' is an alias)
+                                            Stop the active recording session and finalize the on-device file
   recording pull  [--session-id <id>] [--out <dir>] [--device <serial>]
-                                            Pull the on-device NDJSON recording to host (default: ./recordings/, 'record' is an alias)
+                                            Pull the on-device NDJSON recording to host (default: ./recordings/)
   recording parse --input <file> [--out <file>]
-                                            Parse a raw NDJSON recording into a step log JSON ('record' is an alias)`,
+                                            Parse a raw NDJSON recording into a step log JSON`,
   handler: async (ctx) => {
     const { rest, format, verbose, logger, deviceId, operatorPackage } = ctx;
     const out = { format, verbose, logger };
@@ -1178,7 +1214,7 @@ COMMANDS["recording"] = {
     } else if (sub === "parse") {
       const inputFile = getStringOpt(rest, "--input");
       if (!inputFile) {
-        return JSON.stringify({ code: "USAGE", message: "recording parse --input <file> [--out <file>] ('record' is an alias)" });
+        return JSON.stringify({ code: "USAGE", message: "recording parse --input <file> [--out <file>]" });
       } else {
         const outputFileFlag = getStringOpt(rest, "--out");
         return (await import("./commands/record.js")).cmdRecordParse({
@@ -1188,7 +1224,7 @@ COMMANDS["recording"] = {
         });
       }
     } else {
-      return JSON.stringify({ code: "USAGE", message: "recording start|stop|pull|parse ... ('record' is an alias)" });
+      return JSON.stringify({ code: "USAGE", message: "recording start|stop|pull|parse ..." });
     }
   },
 };
@@ -1229,7 +1265,7 @@ COMMANDS["doctor"] = {
   summary: "Run environment and runtime checks",
   help: HELP_DOCTOR,
   topLevelBlock: `  doctor [--json]
-                                            Run environment and runtime checks (Stage 3). --json/--format json is alias for --output json.
+                                            Run environment and runtime checks (Stage 3)
   doctor --fix
                                             Attempt non-destructive host fixes (Stage 3)
   doctor --full
@@ -1321,35 +1357,7 @@ export function levenshtein(a: string, b: string): number {
   return dp[m][n];
 }
 
-// Maps removed compound commands to their flat replacements.
-// When a caller types e.g. "action click", cmd="action" and rest[0]="click",
-// so we can give a precise "use 'click' instead" message.
-const REMOVED_COMPOUND_COMMANDS: Record<string, Record<string, string>> = {
-  action: { click: "click", "open-app": "open", "open-uri": "open", type: "type", read: "read", wait: "wait", "press-key": "press" },
-  observe: { snapshot: "snapshot", screenshot: "screenshot" },
-  inspect: { ui: "snapshot" },
-};
-
-export function didYouMean(cmd: string, rest: string[], commands: Record<string, CommandDef>): string {
-  // Check removed compound commands first - give precise migration guidance.
-  const compoundMap = REMOVED_COMPOUND_COMMANDS[cmd];
-  if (compoundMap) {
-    const sub = rest[0];
-    const replacement = sub ? compoundMap[sub] : undefined;
-    if (replacement) {
-      return JSON.stringify({
-        code: "UNKNOWN_COMMAND",
-        message: `'${cmd} ${sub}' has been removed. Use '${replacement}' instead. Run 'clawperator ${replacement} --help' for usage.`,
-        suggestion: replacement,
-      });
-    }
-    // Known removed namespace but unknown or missing subcommand
-    const validSubs = Object.keys(compoundMap).join(", ");
-    return JSON.stringify({
-      code: "UNKNOWN_COMMAND",
-      message: `'${cmd}' has been removed. Use one of: ${validSubs} - e.g. 'clawperator snapshot'. Run --help for available commands.`,
-    });
-  }
+export function didYouMean(cmd: string, _rest: string[], commands: Record<string, CommandDef>): string {
   const threshold = Math.max(2, Math.floor(cmd.length / 2));
   // Collect all candidates within threshold distance, then sort deterministically:
   //   1. closest distance first
@@ -1405,25 +1413,20 @@ export function generateTopLevelHelp(commands: Record<string, CommandDef>): stri
   lines.push(
     "",
     "Global options:",
-    "  --device <id>, --device-id <id>         Target Android device serial (<!--flag-->--device<!--/flag--> is canonical)",
-    "  --operator-package <package>, --receiver-package <package>",
-    "                                            Target Operator package for broadcast dispatch (--receiver-package is a legacy alias)",
+    "  --device <id>                           Target Android device serial",
+    "  --operator-package <package>            Target Operator package for broadcast dispatch",
+    "  --json                                   JSON output (default)",
     "  --output <json|pretty>, --format <json|pretty>",
-    "                                            Output format (default: json)",
+    "                                            Output format",
     "  --log-level <debug|info|warn|error>       Persistent log level (default: info)",
-    "  --timeout-ms <n>, --timeout <n>           Override execution timeout within policy limits",
+    "  --timeout <ms>                           Override execution timeout within policy limits",
     "  --verbose                                 Include debug diagnostics in output",
     "  --help                                    Show help",
     "  --version                                 Show version",
     "",
     "Notes:",
-    "  - operator setup is the canonical setup command. operator install remains an alias.",
-    "  - recording is the canonical command family; 'record' is a supported short alias.",
-    "  - exec is the canonical command for execution payloads; 'execute' is a supported synonym.",
-    "  - Flat commands (snapshot, click, open, type, read, wait, press, back, scroll) are the canonical device interaction surface.",
-    "  - Removed nested CLI forms such as `observe snapshot` or `action click`; unknown-command errors suggest the flat replacement.",
-    "  - The default Operator package is com.clawperator.operator. Use --operator-package com.clawperator.operator.dev for local debug builds.",
-    "  - Terminal result semantics are driven by [Clawperator-Result].",
+    "  - Default Operator package is com.clawperator.operator. Use --operator-package com.clawperator.operator.dev for local debug builds.",
+    "  - Terminal results use the [Clawperator-Result] envelope.",
     ""
   );
 

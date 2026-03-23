@@ -19,7 +19,7 @@ workflow (also available as `record` alias), use [Android Recording Format for A
 
 | Command | Description |
 | :--- | :--- |
-| `operator setup --apk <path>` | Install the Operator APK and grant required device permissions (canonical setup command, with `operator install` kept as an alias) |
+| `operator setup --apk <path>` | Install the Operator APK and grant required device permissions |
 | `devices` | List connected Android serials and states |
 | `emulator list` | List configured Android Virtual Devices with compatibility metadata |
 | `emulator inspect <name>` | Show normalized metadata for one Android Virtual Device |
@@ -30,14 +30,14 @@ workflow (also available as `record` alias), use [Android Recording Format for A
 | `emulator status` | List running Android emulators and boot state |
 | `emulator provision` | Reuse or create a supported Android emulator and return its ADB serial |
 | `provision emulator` | Alias of `emulator provision` |
-| `exec --execution <json\|file>` | Run a full execution payload (see `--validate-only` and `--dry-run` below). `execute` is a supported synonym. |
+| `exec --execution <json\|file>` | Run a full execution payload (see `--validate-only` and `--dry-run` below) |
 | `snapshot` | Capture UI hierarchy dump (`hierarchy_xml`) |
 | `screenshot [--path <file>]` | Capture device screen as PNG |
 | `open <package-id\|url\|uri>` | Open an app, URL, or URI (auto-detects target type) |
-| `click --selector <json>` | Tap the first matching UI element |
-| `type <text> --selector <json>` | Type text into the first matching element |
-| `read --selector <json>` | Read text from the first matching element |
-| `wait --selector <json>` | Wait until a matching element appears |
+| `click (--text \| --id \| --desc \| --selector)` | Tap the first matching UI element (`--selector` is the advanced JSON escape hatch) |
+| `type <typedText> (--text \| --id \| --desc \| --selector)` | Type into the first matching element |
+| `read (--text \| --id \| --desc \| --selector)` | Read text from the first matching element |
+| `wait (--text \| --id \| --desc \| --selector)` | Wait until a matching element appears |
 | `press <back\|home\|recents>` | Press a hardware key |
 | `back` | Press the Android back key (shorthand for `press back`) |
 | `scroll <down\|up\|left\|right>` | Scroll the screen in a direction |
@@ -52,17 +52,17 @@ workflow (also available as `record` alias), use [Android Recording Format for A
 | `skills install` | Clone skills repo to `~/.clawperator/skills/` |
 | `skills update [--ref <git-ref>]` | Pull latest skills (optionally pin to a ref) |
 | `grant-device-permissions` | Re-grant Operator permissions only after an Operator APK crash causes Android to revoke them |
-| `recording start [--session-id <id>] [--device <serial>] [--operator-package <pkg>]` | Start a recording session on the operator app and write NDJSON on device (`record` is an alias) |
-| `recording stop [--session-id <id>] [--device <serial>] [--operator-package <pkg>]` | Stop the active recording session and finalize the recording file (`record` is an alias) |
-| `recording pull [--session-id <id>] [--out <dir>] [--device <serial>]` | Pull the on-device NDJSON recording to host storage (`record` is an alias) |
-| `recording parse --input <file> [--out <file>]` | Parse a raw NDJSON recording into a step log JSON (`record` is an alias) |
+| `recording start [--session-id <id>] [--device <serial>] [--operator-package <pkg>]` | Start a recording session on the operator app and write NDJSON on device |
+| `recording stop [--session-id <id>] [--device <serial>] [--operator-package <pkg>]` | Stop the active recording session and finalize the recording file |
+| `recording pull [--session-id <id>] [--out <dir>] [--device <serial>]` | Pull the on-device NDJSON recording to host storage |
+| `recording parse --input <file> [--out <file>]` | Parse a raw NDJSON recording into a step log JSON |
 | `serve` | Start HTTP/SSE server |
 | `doctor` | Run environment diagnostics |
 | `version` | Print the CLI version or check CLI / Clawperator Operator Android app compatibility |
 
-**Global options:** `--device <id>` (canonical; `--device-id` accepted), `--operator-package <pkg>`, `--json` (canonical; `--output json` accepted), `--timeout <ms>` (canonical; `--timeout-ms` accepted), `--log-level <debug|info|warn|error>`, `--verbose`
+**Global options:** `--device <id>`, `--operator-package <pkg>`, `--json`, `--output <json|pretty>`, `--timeout <ms>`, `--log-level <debug|info|warn|error>`, `--verbose`
 
-For agent callers, `--json` is the canonical output flag. `--output pretty` is for human inspection.
+Use `--json` for machine-readable output; `--output pretty` is for human inspection.
 
 ## Persistent Logging
 
@@ -155,8 +155,8 @@ Start with `clawperator serve [--port <n>] [--host <ip>]`. Default: `127.0.0.1:3
 | `DELETE /android/emulators/:name` | Delete an AVD by name |
 | `POST /android/provision/emulator` | Reuse or create a supported emulator and return a booted device |
 | `POST /execute` | Body: `{"execution": <payload>, "deviceId": "...", "operatorPackage": "..."}` |
-| `POST /observe/snapshot` | Capture UI tree |
-| `POST /observe/screenshot` | Capture screenshot |
+| `POST /snapshot` | Capture UI tree |
+| `POST /screenshot` | Capture screenshot |
 | `GET /skills` | List skills. Query params: `?app=<pkg>&intent=<i>&keyword=<k>` |
 | `GET /skills/:skillId` | Get skill metadata |
 | `POST /skills/:skillId/run` | Run skill. Body: `{"deviceId": "...", "args": [...], "timeoutMs": 90000, "expectContains": "TEXT_BEGIN"}` |

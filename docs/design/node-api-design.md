@@ -39,7 +39,7 @@ Core commands:
 - `clawperator doctor`: Validate prerequisites and environment.
 - `clawperator devices`: Discover connected device IDs.
 - `clawperator packages list`: Confirm presence of receiver and target apps on device.
-- `clawperator exec`: Run an execution JSON payload (`execute` is a supported synonym).
+- `clawperator exec`: Run an execution JSON payload.
 - `clawperator snapshot`: Get current UI hierarchy as `hierarchy_xml`.
 - `clawperator screenshot`: Capture device screen.
 - Flat device interaction commands (single-step wrappers): `clawperator open`, `clawperator click`, `clawperator type`, `clawperator read`, `clawperator wait`, `clawperator press`, `clawperator back`, `clawperator scroll`, and related flags documented in the CLI reference.
@@ -67,9 +67,9 @@ When running `clawperator serve [--port <number>] [--host <string>]`, a local HT
     - Body: `{"execution": {...}, "deviceId": "...", "operatorPackage": "..."}`
     - Returns: `RunExecutionResult` (200 OK or 4xx/5xx on failure).
     - Status **423 Locked**: Returned if another execution is in flight for the target device.
-- **`POST /observe/snapshot`**: Quick helper for UI capture.
+- **`POST /snapshot`**: Quick helper for UI capture.
     - Body: `{"deviceId": "...", "operatorPackage": "..."}`
-- **`POST /observe/screenshot`**: Quick helper for visual capture.
+- **`POST /screenshot`**: Quick helper for visual capture.
     - Body: `{"deviceId": "...", "operatorPackage": "..."}`
 
 ### Event Streaming (SSE)
@@ -194,7 +194,7 @@ This keeps behavior deterministic and avoids hidden control-flow in the runtime.
 Use one term everywhere: `execution`.
 
 - `compile` produces an `execution`.
-- `exec` runs an `execution` payload (`execute` is a synonym).
+- `exec` runs an `execution` payload.
 
 Execution schema aligns with Android `AgentCommand` constraints.
 

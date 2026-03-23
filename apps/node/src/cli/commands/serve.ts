@@ -154,8 +154,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
     }
   });
 
-  // HTTP snapshot (path kept as /observe/snapshot; CLI canonical is `clawperator snapshot`)
-  app.post("/observe/snapshot", async (req, res) => {
+  app.post("/snapshot", async (req, res) => {
     if (!req.body || typeof req.body !== "object") {
       res.status(400).json({ ok: false, error: { code: "INVALID_BODY", message: "Invalid or missing JSON body" } });
       return;
@@ -203,8 +202,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
     }
   });
 
-  // HTTP screenshot (path kept as /observe/screenshot; CLI canonical is `clawperator screenshot`)
-  app.post("/observe/screenshot", async (req, res) => {
+  app.post("/screenshot", async (req, res) => {
     if (!req.body || typeof req.body !== "object") {
       res.status(400).json({ ok: false, error: { code: "INVALID_BODY", message: "Invalid or missing JSON body" } });
       return;
@@ -595,8 +593,8 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       if (options.verbose) {
         console.log(`- GET  /devices`);
         console.log(`- POST /execute`);
-        console.log(`- POST /observe/snapshot (flat CLI: clawperator snapshot)`);
-        console.log(`- POST /observe/screenshot (flat CLI: clawperator screenshot)`);
+        console.log(`- POST /snapshot`);
+        console.log(`- POST /screenshot`);
         console.log(`- GET  /skills`);
         console.log(`- GET  /skills/:skillId`);
         console.log(`- POST /skills/:skillId/run`);
