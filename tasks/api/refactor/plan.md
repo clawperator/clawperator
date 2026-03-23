@@ -120,6 +120,8 @@ Synonyms are accepted by the parser but are not featured in documentation.
 | `click` | `tap` |
 | `type` | `fill` |
 | `press` | `press-key` |
+| `open` | `open-uri`, `open-url` |
+| `recording` | `record` |
 
 Implementation: both names call the same handler. Help text shows only the
 primary name. `--help` on the synonym shows the same output as the primary.
@@ -252,9 +254,11 @@ unchanged.
 
 ### Commands unchanged by this refactor
 
-The following commands are not affected and should not be modified:
+The following commands' behavior is unchanged by this refactor:
 
-- `devices`, `doctor`, `version`, `packages list`, `grant-device-permissions`
+- `devices`, `doctor`, `version`, `packages list`
+- `grant-device-permissions` (behavior unchanged; may appear in updated help
+  text grouping in Phase 4, but its command contract is not being refactored)
 - `operator setup` / `operator install`
 - `skills *`, `emulator *`, `recording` / `record`
 - `serve` remains the same CLI entrypoint. Only the HTTP route paths exposed
