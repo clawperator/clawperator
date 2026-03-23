@@ -1372,6 +1372,38 @@ describe("runSkill", () => {
     assert.strictEqual(parsed.timeoutMs, undefined);
   });
 
+  it("CLI skills run forwards --help after -- without triggering top-level help", async () => {
+    const { stdout, code } = await runCli([
+      "skills",
+      "run",
+      "com.test.echo",
+      "--output",
+      "json",
+      "--",
+      "--help",
+    ]);
+    assert.strictEqual(code, 0, stdout);
+    const parsed = JSON.parse(stdout) as { output?: string };
+    assert.ok(parsed.output?.includes("TEST_OUTPUT:--help"));
+    assert.doesNotMatch(stdout, /clawperator skills install/);
+  });
+
+  it("CLI skills run forwards --version after -- without triggering CLI version output", async () => {
+    const { stdout, code } = await runCli([
+      "skills",
+      "run",
+      "com.test.echo",
+      "--output",
+      "json",
+      "--",
+      "--version",
+    ]);
+    assert.strictEqual(code, 0, stdout);
+    const parsed = JSON.parse(stdout) as { output?: string };
+    assert.ok(parsed.output?.includes("TEST_OUTPUT:--version"));
+    assert.doesNotMatch(stdout, /^\d+\.\d+\.\d+$/m);
+  });
+
   it("CLI skills run still applies global flags that appear before the first --", async () => {
     const { stdout, code } = await runCli([
       "--timeout-ms",

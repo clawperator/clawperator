@@ -90,13 +90,20 @@ function getGlobalOpts(argv: string[]): {
   return { deviceId, operatorPackage, timeoutMs, logLevel, output, verbose, rest };
 }
 
+/** Tokens after the first `--` are forwarded verbatim (e.g. to skill scripts); exclude them from global meta-flag detection. */
+function argvPrefixBeforeForwardSeparator(argv: string[]): string[] {
+  const sep = argv.indexOf("--");
+  return sep === -1 ? argv : argv.slice(0, sep);
+}
+
 async function main(): Promise<void> {
   const argv = process.argv.slice(2);
   if (argv.length === 0 || argv[0] === "help") {
     console.log(generateTopLevelHelp(COMMANDS));
     process.exit(0);
   }
-  if (argv.includes("--version")) {
+  const argvForGlobalMeta = argvPrefixBeforeForwardSeparator(argv);
+  if (argvForGlobalMeta.includes("--version")) {
     const pkg = require("../../package.json") as { version?: string };
     console.log(pkg.version ?? "0.1.0");
     process.exit(0);
@@ -112,7 +119,7 @@ async function main(): Promise<void> {
     }
     throw error;
   }
-  if (argv.includes("--help")) {
+  if (argvForGlobalMeta.includes("--help")) {
     console.log(resolveHelpFromRegistry(global.rest, COMMANDS));
     process.exit(0);
   }

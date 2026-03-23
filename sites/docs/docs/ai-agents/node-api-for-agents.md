@@ -1234,6 +1234,9 @@ Current skills model:
 - `skills run --skip-validate` bypasses that pre-run gate. Use it only as a CI
   or development escape hatch when you intentionally want to skip the payload
   check.
+- Arguments after a bare `--` are forwarded to the skill script unchanged. Global
+  option scanning stops at `--`, and top-level `--help` / `--version` apply only
+  to tokens before that separator so scripts can receive those flags.
 
 **Environment configuration for skills**
 
