@@ -4,6 +4,7 @@ import { spawn } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { COMMANDS, levenshtein, didYouMean } from "../../cli/registry.js";
+import { buildScrollExecution } from "../../domain/actions/scroll.js";
 
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "../../..");
 
@@ -121,6 +122,24 @@ describe("flag aliases - --timeout works like --timeout-ms", () => {
     assert.notStrictEqual(code, 0);
     assert.match(stdout, /USAGE/);
     assert.match(stdout, /--timeout requires a value/);
+  });
+});
+
+describe("buildScrollExecution", () => {
+  it("uses default timeout of 30000ms when no timeoutMs provided", () => {
+    const exec = buildScrollExecution("down");
+    assert.strictEqual(exec.timeoutMs, 30000);
+  });
+
+  it("uses caller-supplied timeoutMs when provided", () => {
+    const exec = buildScrollExecution("up", 10000);
+    assert.strictEqual(exec.timeoutMs, 10000);
+  });
+
+  it("generates a unique commandId on each call", () => {
+    const a = buildScrollExecution("down");
+    const b = buildScrollExecution("down");
+    assert.notStrictEqual(a.commandId, b.commandId);
   });
 });
 

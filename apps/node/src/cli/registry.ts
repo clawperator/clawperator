@@ -436,9 +436,8 @@ COMMANDS["operator"] = {
         return (await import("./commands/operatorSetup.js")).cmdOperatorSetup({
           ...out,
           apkPath,
-          // TODO(Phase 2): ?? getOpt fallbacks are dead code - see plan.md "Carried-forward debt"
-          deviceId: deviceId ?? getOpt(rest, "--device-id"),
-          receiverPackage: receiverPackage ?? getOpt(rest, "--receiver-package"),
+          deviceId,
+          receiverPackage,
         });
       }
     } else {
@@ -591,7 +590,7 @@ COMMANDS["packages"] = {
     if (rest[0] === "list") {
       return (await import("./commands/packages.js")).cmdPackagesList({
         ...out,
-        deviceId: deviceId ?? getOpt(rest, "--device-id"),
+        deviceId,
         thirdParty: hasFlag(rest, "--third-party"),
       });
     } else {
@@ -628,8 +627,8 @@ COMMANDS["execute"] = {
         return (await import("./commands/execute.js")).cmdExecute({
           ...out,
           execution,
-          deviceId: deviceId ?? getOpt(rest, "--device-id"),
-          receiverPackage: receiverPackage ?? getOpt(rest, "--receiver-package"),
+          deviceId,
+          receiverPackage,
           timeoutMs,
           validateOnly: hasFlag(rest, "--validate-only"),
           dryRun: hasFlag(rest, "--dry-run"),
@@ -890,7 +889,7 @@ COMMANDS["scroll"] = {
   topLevelBlock: `  scroll <direction> [--device <id>] [--operator-package <pkg>]
                                             Build and run single scroll action (down|up|left|right)`,
   handler: async (ctx) => {
-    const { rest, format, verbose, logger, deviceId, receiverPackage } = ctx;
+    const { rest, format, verbose, logger, deviceId, receiverPackage, timeoutMs } = ctx;
     const out = { format, verbose, logger };
     const positional = rest[0] && !rest[0].startsWith("--") ? rest[0] : undefined;
     const dirFlag = getOpt(rest, "--direction");
@@ -915,7 +914,7 @@ COMMANDS["scroll"] = {
       const { buildScrollExecution } = await import("../domain/actions/scroll.js");
       const { runExecution } = await import("../domain/executions/runExecution.js");
       const { formatSuccess, formatError } = await import("./output.js");
-      const execution = buildScrollExecution(direction);
+      const execution = buildScrollExecution(direction, timeoutMs);
       const result = await runExecution(execution, {
         deviceId,
         receiverPackage: receiverPackage ?? process.env.CLAWPERATOR_RECEIVER_PACKAGE,
@@ -995,7 +994,7 @@ Usage:
   skills sync --ref <git-ref>
                                             Sync and pin skills index/cache to a git ref`,
   handler: async (ctx) => {
-    const { argv, rest, format, verbose, logger, deviceId, receiverPackage, timeoutMs } = ctx;
+    const { rest, format, verbose, logger, deviceId, receiverPackage, timeoutMs } = ctx;
     const out = { format, verbose, logger };
     if (rest[0] === "list") {
       return (await import("./commands/skills.js")).cmdSkillsList(out);
@@ -1053,22 +1052,15 @@ Usage:
       } else {
         const dashDash = rest.indexOf("--");
         const optSegment = dashDash >= 0 ? rest.slice(0, dashDash) : rest;
-        // TODO(Phase 2): getCommandArgs redundant - see plan.md "Carried-forward debt"
-        const rawSkillsRunArgs = getCommandArgs(argv, ["skills", "run"]) ?? [];
-        const rawDashDash = rawSkillsRunArgs.indexOf("--");
-        const rawOptSegment = rawDashDash >= 0 ? rawSkillsRunArgs.slice(0, rawDashDash) : rawSkillsRunArgs;
         const scriptArgs: string[] = [];
-        const resolvedDeviceId = deviceId ?? getOpt(optSegment, "--device-id");
-        const resolvedReceiverPackage = receiverPackage ?? getOpt(optSegment, "--receiver-package");
-        const localTimeoutMs = getNumberOpt(rawOptSegment, "--timeout-ms") ?? getNumberOpt(rawOptSegment, "--timeout");
-        const effectiveTimeoutMs = localTimeoutMs ?? timeoutMs;
+        const effectiveTimeoutMs = timeoutMs;
         const invalidTimeoutResult = getInvalidTimeoutResult(effectiveTimeoutMs, { format });
         if (invalidTimeoutResult) {
           return invalidTimeoutResult;
         }
         const expectContains = getStringOpt(optSegment, "--expect-contains");
         const skipValidate = hasFlag(optSegment, "--skip-validate");
-        if (resolvedDeviceId) scriptArgs.push(resolvedDeviceId);
+        if (deviceId) scriptArgs.push(deviceId);
         if (dashDash >= 0) {
           scriptArgs.push(...rest.slice(dashDash + 1));
         }
@@ -1077,8 +1069,8 @@ Usage:
           scriptArgs,
           effectiveTimeoutMs,
           expectContains,
-          resolvedReceiverPackage,
-          { ...out, skipValidate, deviceId: resolvedDeviceId, logger }
+          receiverPackage,
+          { ...out, skipValidate, deviceId, logger }
         );
       }
     } else if (rest[0] === "install") {
@@ -1117,8 +1109,8 @@ COMMANDS["recording"] = {
     const out = { format, verbose, logger };
     const sub = rest[0];
     const runOpts = {
-      deviceId: deviceId ?? getOpt(rest, "--device-id"),
-      receiverPackage: receiverPackage ?? getOpt(rest, "--receiver-package"),
+      deviceId,
+      receiverPackage,
     };
     if (sub === "start") {
       return (await import("./commands/record.js")).cmdRecordStart({
@@ -1212,8 +1204,8 @@ COMMANDS["doctor"] = {
       fix: hasFlag(rest, "--fix"),
       full: hasFlag(rest, "--full"),
       checkOnly: hasFlag(rest, "--check-only"),
-      deviceId: deviceId ?? getOpt(rest, "--device-id"),
-      receiverPackage: receiverPackage ?? getOpt(rest, "--receiver-package"),
+      deviceId,
+      receiverPackage,
       logger,
     });
   },
@@ -1228,12 +1220,12 @@ COMMANDS["grant-device-permissions"] = {
   topLevelBlock: `  grant-device-permissions [--device <id>] [--operator-package <pkg>]
                                             Re-grant accessibility and notification permissions (remediation only)`,
   handler: async (ctx) => {
-    const { rest, format, verbose, logger, deviceId, receiverPackage } = ctx;
+    const { format, verbose, logger, deviceId, receiverPackage } = ctx;
     const out = { format, verbose, logger };
     return (await import("./commands/grantDevicePermissions.js")).cmdGrantDevicePermissions({
       ...out,
-      deviceId: deviceId ?? getOpt(rest, "--device-id"),
-      receiverPackage: receiverPackage ?? getOpt(rest, "--receiver-package"),
+      deviceId,
+      receiverPackage,
     });
   },
 };
@@ -1254,8 +1246,8 @@ COMMANDS["version"] = {
     return (await import("./commands/version.js")).cmdVersion({
       ...out,
       checkCompat: hasFlag(rest, "--check-compat"),
-      deviceId: deviceId ?? getOpt(rest, "--device-id"),
-      receiverPackage: receiverPackage ?? getOpt(rest, "--receiver-package"),
+      deviceId,
+      receiverPackage,
     });
   },
 };
