@@ -116,6 +116,17 @@ These codes are produced by `clawperator operator setup` (or the `operator insta
 
 ---
 
+## CLI Validation
+
+These codes are returned by the flat CLI commands when required arguments are missing.
+
+| Code | Description |
+|------|-------------|
+| `MISSING_SELECTOR` | `click`, `type`, `read`, or `wait` was called without `--selector` |
+| `MISSING_ARGUMENT` | A required positional argument was omitted (`open`, `type`, `press`, or `scroll`) |
+
+---
+
 ## Internal / Other
 
 | Code | Description |

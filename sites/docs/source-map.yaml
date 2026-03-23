@@ -110,6 +110,7 @@ sections:
         sources:
           - apps/node/src/cli/index.ts
           - apps/node/src/cli/commands
+          - apps/node/src/cli/registry.ts
         notes: Prefer extracting commands and flags from source or live CLI help.
       - output: reference/error-codes.md
         title: Error Codes
@@ -117,7 +118,8 @@ sections:
         sources:
           - apps/node/src/contracts/errors.ts
           - apps/node/src/contracts/result.ts
-        notes: Keep error names and semantics aligned to code.
+          - apps/node/src/cli/registry.ts
+        notes: Keep error names and semantics aligned to code. CLI-level validation codes (MISSING_SELECTOR, MISSING_ARGUMENT) live in registry.ts.
       - output: reference/api-overview.md
         title: API Overview
         mode: curated

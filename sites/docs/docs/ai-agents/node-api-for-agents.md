@@ -31,13 +31,16 @@ workflow (also available as `record` alias), use [Android Recording Format for A
 | `emulator provision` | Reuse or create a supported Android emulator and return its ADB serial |
 | `provision emulator` | Alias of `emulator provision` |
 | `execute --execution <json\|file>` | Run a full execution payload (see `--validate-only` and `--dry-run` below) |
-| `observe snapshot` | Capture UI hierarchy dump (`hierarchy_xml`) |
-| `observe screenshot` | Capture device screen as PNG and return the local file path |
-| `action open-app --app <id>` | Open an application |
-| `action click --selector <json>` | Click a UI element |
-| `action read --selector <json>` | Read text from element |
-| `action type --selector <json> --text <value>` | Type text |
-| `action wait --selector <json>` | Wait for element |
+| `snapshot` | Capture UI hierarchy dump (`hierarchy_xml`) |
+| `screenshot [--path <file>]` | Capture device screen as PNG |
+| `open <package-id\|url\|uri>` | Open an app, URL, or URI (auto-detects target type) |
+| `click --selector <json>` | Tap the first matching UI element |
+| `type <text> --selector <json>` | Type text into the first matching element |
+| `read --selector <json>` | Read text from the first matching element |
+| `wait --selector <json>` | Wait until a matching element appears |
+| `press <back\|home\|recents>` | Press a hardware key |
+| `back` | Press the Android back key (shorthand for `press back`) |
+| `scroll <down\|up\|left\|right>` | Scroll the screen in a direction |
 | `skills list` | List available skills |
 | `skills get <skill_id>` | Show skill metadata |
 | `skills search [--app <pkg>] [--intent <i>] [--keyword <k>]` | Search skills by app, intent, or keyword (at least one filter required) |
@@ -45,21 +48,21 @@ workflow (also available as `record` alias), use [Android Recording Format for A
 | `skills validate <skill_id>` | Verify one local skill's metadata and required files before runtime testing |
 | `skills validate --all` | Validate the entire configured skills registry in one pass |
 | `skills compile-artifact <id> --artifact <name>` | Compile skill to execution payload |
-| `skills run <skill_id> [--device-id <id>] [--operator-package <pkg>] [--timeout-ms <n>] [--expect-contains <text>]` | Invoke a skill script (convenience wrapper; pretty mode streams output live and prints a pre-run banner) |
+| `skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>]` | Invoke a skill script (convenience wrapper; pretty mode streams output live and prints a pre-run banner) |
 | `skills install` | Clone skills repo to `~/.clawperator/skills/` |
 | `skills update [--ref <git-ref>]` | Pull latest skills (optionally pin to a ref) |
 | `grant-device-permissions` | Re-grant Operator permissions only after an Operator APK crash causes Android to revoke them |
-| `recording start [--session-id <id>] [--device-id <serial>] [--operator-package <pkg>]` | Start a recording session on the operator app and write NDJSON on device (`record` is an alias) |
-| `recording stop [--session-id <id>] [--device-id <serial>] [--operator-package <pkg>]` | Stop the active recording session and finalize the recording file (`record` is an alias) |
-| `recording pull [--session-id <id>] [--out <dir>] [--device-id <serial>]` | Pull the on-device NDJSON recording to host storage (`record` is an alias) |
+| `recording start [--session-id <id>] [--device <serial>] [--operator-package <pkg>]` | Start a recording session on the operator app and write NDJSON on device (`record` is an alias) |
+| `recording stop [--session-id <id>] [--device <serial>] [--operator-package <pkg>]` | Stop the active recording session and finalize the recording file (`record` is an alias) |
+| `recording pull [--session-id <id>] [--out <dir>] [--device <serial>]` | Pull the on-device NDJSON recording to host storage (`record` is an alias) |
 | `recording parse --input <file> [--out <file>]` | Parse a raw NDJSON recording into a step log JSON (`record` is an alias) |
 | `serve` | Start HTTP/SSE server |
 | `doctor` | Run environment diagnostics |
 | `version` | Print the CLI version or check CLI / Clawperator Operator Android app compatibility |
 
-**Global options:** `--device-id <id>`, `--operator-package <pkg>`, `--output <json|pretty>`, `--format <json|pretty>` (alias for `--output`), `--timeout-ms <n>`, `--log-level <debug|info|warn|error>`, `--verbose`
+**Global options:** `--device <id>` (canonical; `--device-id` accepted), `--operator-package <pkg>`, `--json` (canonical; `--output json` accepted), `--timeout <ms>` (canonical; `--timeout-ms` accepted), `--log-level <debug|info|warn|error>`, `--verbose`
 
-For agent callers, `--output json` is the canonical output mode. `pretty` is for human inspection.
+For agent callers, `--json` is the canonical output flag. `--output pretty` is for human inspection.
 
 ## Persistent Logging
 
@@ -116,8 +119,10 @@ Default receiver package:
 Use subcommand help when the docs and the current CLI differ:
 
 ```bash
-clawperator observe snapshot --help
-clawperator observe screenshot --help
+clawperator snapshot --help
+clawperator screenshot --help
+clawperator click --help
+clawperator open --help
 clawperator skills compile-artifact --help
 clawperator skills run --help
 clawperator skills sync --help
@@ -224,7 +229,7 @@ Typical provisioning result (CLI output):
 
 HTTP response from `POST /android/provision/emulator` wraps the same payload with `"ok": true`.
 
-If both a physical device and an emulator are connected, continue to pass `--device-id <serial>` to execution and observe commands so targeting stays explicit.
+If both a physical device and an emulator are connected, continue to pass `--device <serial>` to execution and device commands so targeting stays explicit.
 
 ## Execution Payload
 
@@ -306,14 +311,17 @@ Combine fields to increase specificity when a single field is ambiguous:
 
 | CLI command | Payload action type |
 | :--- | :--- |
-| `action type --selector <json> --text <value>` | `enter_text` |
-| `action click --selector <json>` | `click` |
-| `action read --selector <json>` | `read_text` |
-| `action wait --selector <json>` | `wait_for_node` |
-| `action open-app --app <id>` | `open_app` |
-| `action open-uri --uri <value>` | `open_uri` |
-| `action press-key --key <back\|home\|recents>` | `press_key` |
-| `observe snapshot` | `snapshot_ui` |
+| `snapshot` | `snapshot_ui` |
+| `screenshot` | `take_screenshot` |
+| `click --selector <json>` | `click` |
+| `type <text> --selector <json>` | `enter_text` |
+| `read --selector <json>` | `read_text` |
+| `wait --selector <json>` | `wait_for_node` |
+| `open <package-id>` | `open_app` |
+| `open <url\|uri>` | `open_uri` |
+| `press <back\|home\|recents>` | `press_key` |
+| `back` | `press_key` (key: `back`) |
+| `scroll <direction>` | `scroll` |
 
 ### Action behavior notes
 
@@ -388,7 +396,7 @@ Android intent builder.
 }
 ```
 
-**`enter_text`:** The CLI command is `action type` but the execution payload action type is `enter_text`. The `submit` param triggers a keyboard Enter/submit after typing - use this for search fields and single-field forms where pressing Enter submits. The Node contract still accepts `clear`, but the Android runtime does not implement it yet, so it currently has no effect.
+**`enter_text`:** The CLI command is `type <text> --selector <json>` and the execution payload action type is `enter_text`. The `submit` param triggers a keyboard Enter/submit after typing - use this for search fields and single-field forms where pressing Enter submits. The Node contract still accepts `clear`, but the Android runtime does not implement it yet, so it currently has no effect.
 
 **`enter_text` example request (`/execute`):**
 ```json
@@ -504,7 +512,7 @@ guarantee. `has_overlay: "true"` means Clawperator detected another meaningful
 accessibility window above the foreground app. It does not prove the screen is
 unusable, and `window_count > 1` alone is normal on some Android builds.
 
-`observe snapshot` (CLI subcommand) and `snapshot_ui` (execution action type) use the same internal pipeline and produce identical output. `observe snapshot` builds a single-action execution internally and calls `runExecution`. Use `observe snapshot` for ad-hoc inspection from the command line. Use `snapshot_ui` as a step within a multi-action execution payload.
+`snapshot` (CLI command) and `snapshot_ui` (execution action type) use the same internal pipeline and produce identical output. `snapshot` builds a single-action execution internally and calls `runExecution`. Use `snapshot` for ad-hoc inspection from the command line. Use `snapshot_ui` as a step within a multi-action execution payload.
 
 **Failure case - extraction error:** If snapshot post-processing finishes without attaching UI hierarchy text to the step (`data.text` remains absent), the step returns `success: false` with `data.error: "SNAPSHOT_EXTRACTION_FAILED"`. A common cause is that logcat does not contain a matching `[TaskScope] UI Hierarchy:` marker for the step, but partial extraction or other logcat mismatches can also trigger this error. This typically means the installed clawperator binary is out of date with the Android Operator APK. Run `clawperator version --check-compat` and `clawperator doctor` to diagnose. See Troubleshooting for resolution steps.
 
@@ -554,7 +562,7 @@ unusable, and `window_count > 1` alone is normal on some Android builds.
 }
 ```
 
-**`take_screenshot`:** `observe screenshot` uses the same execution contract under the hood. Android reports `UNSUPPORTED_RUNTIME_SCREENSHOT`, then the Node layer captures the screenshot via `adb exec-out screencap -p`, writes it to `data.path`, and normalizes the step result to `success: true` when capture succeeds. Pass `observe screenshot --path <file>` when you want a deterministic local filename instead of the default temp path.
+**`take_screenshot`:** `screenshot` uses the same execution contract under the hood. Android reports `UNSUPPORTED_RUNTIME_SCREENSHOT`, then the Node layer captures the screenshot via `adb exec-out screencap -p`, writes it to `data.path`, and normalizes the step result to `success: true` when capture succeeds. Pass `screenshot --path <file>` when you want a deterministic local filename instead of the default temp path.
 
 **`press_key`:** Issues a system-level key event via the Android Accessibility Service (`performGlobalAction`). Supported keys: `"back"`, `"home"`, `"recents"`. The alias `key_press` is normalized to `press_key`. No retry - this action is single-attempt by design. Requires the Clawperator Operator accessibility service to be running on the device. If the service is unavailable, the execution returns a top-level failed envelope with `status: "failed"` and no `stepResults`. Use `clawperator doctor` to diagnose accessibility service availability before running executions that include `press_key`. When testing local/debug builds, pass the matching `operatorPackage` (`com.clawperator.operator.dev`) instead of relying on the default release package. Returns `success: false` with `data.error: "GLOBAL_ACTION_FAILED"` if the OS reports the global action could not be performed (rare soft OS failure - accessibility service was running but Android declined the action).
 
@@ -904,7 +912,7 @@ For any failed step: `success: false` and `data.error` contains the error code s
 
 ## Snapshot Output Format
 
-`snapshot_ui` and `clawperator observe snapshot` produce the canonical
+`snapshot_ui` and `clawperator snapshot` produce the canonical
 `hierarchy_xml` format. `data.actual_format` reports `"hierarchy_xml"` on
 success.
 
@@ -971,10 +979,10 @@ For agent-side recovery strategy, use
 - **Single-flight:** One execution per device at a time. Concurrent requests return `EXECUTION_CONFLICT_IN_FLIGHT`.
 - **No hidden retries:** If an action fails, the error is returned immediately. Retry logic belongs in the agent.
 - **Deterministic results:** Exactly one terminal envelope per `commandId`. Timeouts return `RESULT_ENVELOPE_TIMEOUT` with diagnostics, payload-side action context, and `logPath` when persistent logging is enabled.
-- **Execution granularity:** Group multiple actions in one execution only when they are atomic - when the agent does not need to observe state or make a decision between them. For flows where intermediate state matters, use separate executions with `observe snapshot` between each. See [Execution Model](../reference/execution-model.md) for the full guidance.
-- **Timeout override:** `--timeout-ms <n>` overrides the execution timeout for `execute`, `observe snapshot`, and `observe screenshot` within policy limits.
-- **Screenshot output path:** `observe screenshot --path <file>` writes the PNG to the requested local path and still returns the final `data.path` in the result envelope. `<file>` must be a non-empty local filesystem path.
-- **Device targeting:** Specify `--device-id` when multiple devices are connected. Omit for single-device setups.
+- **Execution granularity:** Group multiple actions in one execution only when they are atomic - when the agent does not need to observe state or make a decision between them. For flows where intermediate state matters, use separate executions with `snapshot` between each. See [Execution Model](../reference/execution-model.md) for the full guidance.
+- **Timeout override:** `--timeout <ms>` overrides the execution timeout for `execute`, `snapshot`, and `screenshot` within policy limits.
+- **Screenshot output path:** `screenshot --path <file>` writes the PNG to the requested local path and still returns the final `data.path` in the result envelope. `<file>` must be a non-empty local filesystem path.
+- **Device targeting:** Specify `--device <id>` when multiple devices are connected. Omit for single-device setups.
 - **Emulator reuse over creation:** Provisioning never creates duplicate AVDs when a supported running or stopped emulator already exists.
 - **Deterministic emulator boots:** Emulator starts use `-no-snapshot-load` and wait for both `sys.boot_completed` and `dev.bootcomplete`.
 - **Validation before dispatch:** Every payload is schema-validated before any ADB command is issued.
@@ -1073,14 +1081,14 @@ export CLAWPERATOR_SKILLS_REGISTRY="$HOME/.clawperator/skills/skills/skills-regi
 
 ### Multiple devices
 
-If more than one device is connected, pass `--device-id <id>` on execute,
-observe, action, doctor, version, operator setup, and skills-run commands.
+If more than one device is connected, pass `--device <id>` on execute,
+snapshot, action, doctor, version, operator setup, and skills-run commands.
 
 When multiple devices are present:
 
 - the installer skips automatic APK install rather than guessing
 - it prints the manual recovery command
-- later automation should keep using explicit `--device-id`
+- later automation should keep using explicit `--device`
 
 ### Setup
 
@@ -1113,7 +1121,7 @@ Skills can be invoked three ways:
 
 2. **Convenience wrapper** via Node API:
    ```bash
-   clawperator skills run com.android.settings.capture-overview --device-id <device_id> --timeout-ms 90000
+   clawperator skills run com.android.settings.capture-overview --device <device_id> --timeout 90000
    ```
 
 3. **Artifact compile + execute** (for skills with `.recipe.json` artifacts):
@@ -1149,7 +1157,7 @@ No. Clawperator executes a command and reports what happened. All reasoning and 
 - Clawperator does not observe state between actions in a multi-step execution and adapt - it executes the list sequentially and returns one result.
 - Clawperator does not know whether a flow succeeded in any business sense - it knows whether each action completed without a runtime error.
 
-The practical implication: for unfamiliar apps, exploratory flows, or any sequence where the agent needs to verify state between steps, prefer single-action executions with `observe snapshot` calls between them. For mature skills and stable, pre-validated atomic sequences, multi-action executions are the right choice - they reduce round trips and are appropriate whenever the agent does not need to observe or adapt mid-flow. Skills are authored with the latter in mind.
+The practical implication: for unfamiliar apps, exploratory flows, or any sequence where the agent needs to verify state between steps, prefer single-action executions with `snapshot` calls between them. For mature skills and stable, pre-validated atomic sequences, multi-action executions are the right choice - they reduce round trips and are appropriate whenever the agent does not need to observe or adapt mid-flow. Skills are authored with the latter in mind.
 
 **How are concurrent executions handled?**
 Single-flight per device. A second overlapping execution returns `EXECUTION_CONFLICT_IN_FLIGHT`.
@@ -1197,7 +1205,7 @@ Current skills model:
 - `skills validate --all` runs the same integrity checks across every entry in
   the configured registry and returns a failure summary if any skills are
   broken. Add `--dry-run` to extend that validation to artifact payloads
-- `skills run --timeout-ms <n>` overrides the wrapper timeout for one run when
+- `skills run --timeout <ms>` overrides the wrapper timeout for one run when
   the default `120000` ms budget is not the right fit for the current flow
 - `skills run --expect-contains <text>` turns the wrapper into a lightweight
   smoke check by failing if the script output does not contain the expected

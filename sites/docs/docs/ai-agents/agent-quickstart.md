@@ -33,7 +33,7 @@ clawperator doctor --output json
 clawperator devices --output json
 ```
 
-If multiple devices are connected, always pass `--device-id <device_id>` so
+If multiple devices are connected, always pass `--device <device_id>` so
 targeting stays explicit.
 
 If the current CLI behavior and a narrative doc ever seem to disagree, prefer

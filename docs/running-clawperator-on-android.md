@@ -109,7 +109,7 @@ clawperator operator setup --apk ~/.clawperator/downloads/operator.apk
 If multiple devices are connected, target one explicitly:
 
 ```bash
-clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id <device_id>
+clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device <device_id>
 ```
 
 This command installs the APK, grants the accessibility service and notification listener permissions, and verifies the package is ready.
