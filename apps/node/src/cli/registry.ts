@@ -91,12 +91,6 @@ export interface CommandDef {
   subtopics?: Record<string, string>;
   topLevelBlock?: string;
   group: string;
-  /**
-   * Set to true for commands that run indefinitely and never return a result
-   * string (e.g. serve). The dispatcher will await the handler without logging
-   * its return value. All other commands must return a non-void string.
-   */
-  longRunning?: true;
   handler: (ctx: HandlerContext) => Promise<string | void>;
 }
 
@@ -905,7 +899,6 @@ COMMANDS["serve"] = {
   help: "clawperator serve\n\nUsage:\n  clawperator serve [--port <number>] [--host <string>]\n\nNotes:\n  - Default host: 127.0.0.1\n",
   topLevelBlock: `  serve [--port <number>] [--host <string>]
                                             Start local HTTP/SSE server for remote control (default host: 127.0.0.1)`,
-  longRunning: true,
   handler: async (ctx) => {
     const { rest, verbose, logger } = ctx;
     const portStr = getOpt(rest, "--port");
@@ -920,6 +913,9 @@ COMMANDS["serve"] = {
       verbose,
       logger,
     });
+    // Long-running: cmdServe never resolves in normal operation.
+    // Return undefined so the dispatcher's `result !== undefined` guard
+    // skips console.log, matching the old switch behavior.
     return undefined;
   },
 };

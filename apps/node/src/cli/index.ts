@@ -134,13 +134,10 @@ async function main(): Promise<void> {
           receiverPackage: global.receiverPackage,
           timeoutMs: global.timeoutMs,
         };
-        if (def.longRunning) {
-          // Long-running commands (e.g. serve) never resolve with a result string.
-          // Await and return immediately; exit code logic below is skipped.
-          await def.handler(ctx);
-          return;
+        const handlerResult = await def.handler(ctx);
+        if (handlerResult !== undefined) {
+          result = handlerResult;
         }
-        result = await def.handler(ctx) as string;
       } else {
         result = didYouMean(cmd, COMMANDS);
       }
