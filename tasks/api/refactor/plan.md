@@ -335,6 +335,28 @@ node apps/node/dist/cli/index.js <command>
 Or link it locally. Do not use the globally installed `clawperator` binary,
 which may lag behind the branch and silently hide new or renamed commands.
 
+### All CLI error paths must return structured JSON
+
+Every error the CLI produces must be a JSON object with a `code` field, output
+via `console.log()`. No raw `console.error()` + `process.exit(1)` paths are
+allowed for agent-facing commands.
+
+The exit code logic (index.ts:903-908) parses the JSON output to determine the
+exit code. If an error bypasses the JSON envelope, the exit code contract
+breaks and agent loops that depend on structured output will fail silently.
+
+The codebase already has mixed patterns (e.g. `serve.ts:33-34` does raw
+`console.error` + `process.exit(1)`). New error paths added by this refactor
+(missing selector, missing argument, "did you mean?", unknown flag) must all
+produce structured JSON:
+
+```json
+{"code": "MISSING_SELECTOR", "message": "click requires a selector.", ...}
+{"code": "UNKNOWN_COMMAND", "message": "Unknown command \"action\".", ...}
+```
+
+This is enforcement of the existing contract, not a design change.
+
 ---
 
 ## Phase 0: Infrastructure and Compatibility
