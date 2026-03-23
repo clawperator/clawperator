@@ -91,6 +91,12 @@ export interface CommandDef {
   subtopics?: Record<string, string>;
   topLevelBlock?: string;
   group: string;
+  /**
+   * Set to true for commands that run indefinitely and never return a result
+   * string (e.g. serve). The dispatcher will await the handler without logging
+   * its return value. All other commands must return a non-void string.
+   */
+  longRunning?: true;
   handler: (ctx: HandlerContext) => Promise<string | void>;
 }
 
@@ -791,6 +797,10 @@ Usage:
       } else {
         const dashDash = rest.indexOf("--");
         const optSegment = dashDash >= 0 ? rest.slice(0, dashDash) : rest;
+        // TODO(Phase 2): ctx.rest is already post-"skills run", so rawSkillsRunArgs
+        // is approximately rest.slice(1). The getCommandArgs full-argv traversal is
+        // redundant now that the registry pre-strips the command prefix. Simplify once
+        // the argv handling audit in Phase 2 lands.
         const rawSkillsRunArgs = getCommandArgs(argv, ["skills", "run"]) ?? [];
         const rawDashDash = rawSkillsRunArgs.indexOf("--");
         const rawOptSegment = rawDashDash >= 0 ? rawSkillsRunArgs.slice(0, rawDashDash) : rawSkillsRunArgs;
@@ -904,6 +914,7 @@ COMMANDS["serve"] = {
   help: "clawperator serve\n\nUsage:\n  clawperator serve [--port <number>] [--host <string>]\n\nNotes:\n  - Default host: 127.0.0.1\n",
   topLevelBlock: `  serve [--port <number>] [--host <string>]
                                             Start local HTTP/SSE server for remote control (default host: 127.0.0.1)`,
+  longRunning: true,
   handler: async (ctx) => {
     const { rest, verbose, logger } = ctx;
     const portStr = getOpt(rest, "--port");
@@ -1069,12 +1080,13 @@ export function generateTopLevelHelp(commands: Record<string, CommandDef>): stri
   lines.push(
     "",
     "Global options:",
-    "  --device-id <id>                          Target Android device serial",
-    "  --receiver-package <package>              Target Operator package for broadcast dispatch",
+    "  --device-id <id>, --device <id>           Target Android device serial",
+    "  --receiver-package <package>, --operator-package <package>",
+    "                                            Target Operator package for broadcast dispatch",
     "  --output <json|pretty>, --format <json|pretty>",
     "                                            Output format (default: json)",
     "  --log-level <debug|info|warn|error>       Persistent log level (default: info)",
-    "  --timeout-ms <number>                     Override execution timeout within policy limits",
+    "  --timeout-ms <n>, --timeout <n>           Override execution timeout within policy limits",
     "  --verbose                                 Include debug diagnostics in output",
     "  --help                                    Show help",
     "  --version                                 Show version",

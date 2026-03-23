@@ -36,7 +36,7 @@ function getGlobalOpts(argv: string[]): {
       deviceId = argv[++i];
     } else if (argv[i] === "--receiver-package" && argv[i + 1]) {
       receiverPackage = argv[++i];
-    } else if ((argv[i] === "--operator-package" || argv[i] === "--package") && argv[i + 1]) {
+    } else if (argv[i] === "--operator-package" && argv[i + 1]) {
       // --operator-package is the new canonical for --receiver-package
       receiverPackage = argv[++i];
     } else if ((argv[i] === "--output" || argv[i] === "--format") && argv[i + 1]) {
@@ -113,7 +113,7 @@ async function main(): Promise<void> {
     logLevel: global.logLevel ?? process.env.CLAWPERATOR_LOG_LEVEL,
   });
 
-  let result: string | void;
+  let result: string | undefined;
   let usageParseError = false;
 
   try {
@@ -134,7 +134,13 @@ async function main(): Promise<void> {
           receiverPackage: global.receiverPackage,
           timeoutMs: global.timeoutMs,
         };
-        result = await def.handler(ctx);
+        if (def.longRunning) {
+          // Long-running commands (e.g. serve) never resolve with a result string.
+          // Await and return immediately; exit code logic below is skipped.
+          await def.handler(ctx);
+          return;
+        }
+        result = await def.handler(ctx) as string;
       } else {
         result = didYouMean(cmd, COMMANDS);
       }
@@ -148,8 +154,8 @@ async function main(): Promise<void> {
     }
   }
 
-  if (result !== undefined && result !== null) {
-    console.log(result as string);
+  if (result !== undefined) {
+    console.log(result);
   }
   if (typeof result === "string") {
     if (usageParseError) {

@@ -136,15 +136,6 @@ describe("flag aliases - --operator-package works like --receiver-package", () =
     assert.strictEqual(obj.receiverPackage, "com.clawperator.operator.dev");
   });
 
-  it("--package alias is also accepted", async () => {
-    const { stdout } = await runCli([
-      "--package", "com.clawperator.operator.dev",
-      "operator", "setup",
-      "--apk", "/nonexistent/test.apk",
-    ]);
-    const obj = JSON.parse(stdout);
-    assert.strictEqual(obj.receiverPackage, "com.clawperator.operator.dev");
-  });
 });
 
 describe("unknown command produces UNKNOWN_COMMAND", () => {
