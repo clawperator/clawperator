@@ -59,7 +59,7 @@ BEFORE (current)              AFTER (canonical)         AFTER (still accepted)
 --device-id <id>              --device <id>             --device-id
 --output json                 --json                    --output json
 --timeout-ms <ms>             --timeout <ms>            --timeout-ms
---receiver-package <pkg>      --package <pkg>           --receiver-package
+--receiver-package <pkg>      --operator-package <pkg>  --receiver-package, --package
 --selector '{"text":"X"}'     --text "X"                --selector (advanced)
 --selector '{"resourceId":    --id "com.foo:id/bar"     --selector (advanced)
   "com.foo:id/bar"}'
@@ -130,6 +130,13 @@ primary name. `--help` on the synonym shows the same output as the primary.
 `--timeout-ms`. Old flag names continue to work (parsed silently) but are not
 shown in help text.
 
+**`--operator-package` replaces `--receiver-package`.** "Receiver" is an Android
+implementation detail (BroadcastReceiver) that means nothing to agents. "Operator"
+is Clawperator's own term - it is what `operator setup` installs, what docs
+reference, what agents will encounter. `--operator-package` is unambiguous and
+self-documenting. `--receiver-package` and `--package` are accepted as silent
+aliases. This flag is rarely needed (only for dev/release variant switching).
+
 ### `--selector` JSON becomes the escape hatch, not the default
 
 Simple selector flags (`--text`, `--id`, `--desc`, `--role`) are first-class.
@@ -176,7 +183,8 @@ must be built from scratch in `apps/node/src/cli/index.ts`.
 Key functions the implementing agent must understand before starting:
 
 - `getGlobalOpts(argv)` (index.ts:335-380): manually iterates argv, extracts
-  `--device-id`, `--receiver-package`, `--output`/`--format`, `--timeout-ms`,
+  `--device-id`, `--receiver-package` (renamed to `--operator-package`),
+  `--output`/`--format`, `--timeout-ms`,
   `--log-level`, `--verbose`. Everything else goes into `rest[]`.
 - `getOpt(rest, flag)` (index.ts:382-385): simple `rest.indexOf(flag)` lookup.
 - `hasFlag(rest, flag)` (index.ts:438-440): boolean `rest.includes(flag)`.
@@ -285,7 +293,7 @@ command works on an Android device. After completing each phase:
 If a command works in unit tests but fails on a device, the command is broken.
 Fix it before moving on.
 
-Prefer the debug Operator APK (`--package com.clawperator.operator.dev`) for
+Prefer the debug Operator APK (`--operator-package com.clawperator.operator.dev`) for
 local testing. See CLAUDE.md "Device Selection" for full guidance.
 
 ### Verify skills continuously, not at the end
@@ -346,7 +354,8 @@ Establish the foundation that makes Phases 1-2 safe.
      - `--device-id` -> `--device`
      - `--output json` -> `--json`
      - `--timeout-ms` -> `--timeout`
-     - `--receiver-package` -> `--package`
+     - `--receiver-package` -> `--operator-package` (rename)
+     - `--package` -> `--operator-package` (alias for agents who guess it)
    - Centralized so all commands inherit flag aliases automatically
 
 3. **Regression test harness**
@@ -439,7 +448,8 @@ separable for review:
    - `--device` (canonical), `--device-id` (accepted silently)
    - `--json` (canonical), `--output json` (accepted silently)
    - `--timeout` (canonical), `--timeout-ms` (accepted silently)
-   - `--package` (canonical), `--receiver-package` (accepted silently)
+   - `--operator-package` (canonical), `--receiver-package` and `--package`
+     (accepted silently). See Design Decisions for rationale.
 
 6. **Remove `action` and `observe` parent commands**
    - Removed from dispatch, removed from help text
@@ -656,7 +666,7 @@ Finalize the developer and agent experience.
 
      Global Options:
        --device <id>         Target device serial
-       --package <pkg>       Operator package
+       --operator-package <pkg>  Operator APK package
        --json                Machine-readable JSON output
        --timeout <ms>        Override command timeout
 
