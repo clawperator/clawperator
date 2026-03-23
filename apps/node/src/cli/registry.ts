@@ -331,9 +331,14 @@ Selector flags (at least one required; combine for AND matching):
   --role <role>           Element role (button, textfield, text, switch, checkbox, image, etc.)
   --selector <json>       Raw NodeMatcher JSON (advanced; mutually exclusive with simple flags)
 
+Options:
+  --long      Perform a long press (clickType: long_click)
+  --focus     Set input focus without clicking (clickType: focus)
+
 Notes:
   - Performs a tap on the first matching element.
   - Multiple simple flags combine with AND semantics.
+  - --long and --focus are mutually exclusive.
   - Exits with MISSING_SELECTOR if no selector flag is provided.
   - Synonym: tap (accepted, not in help)
 
@@ -341,6 +346,7 @@ Examples:
   clawperator click --text "Wi-Fi"
   clawperator click --role button --text-contains "Submit"
   clawperator click --id "com.example:id/btn_ok"
+  clawperator click --text "Settings" --long
   Advanced (raw NodeMatcher JSON): clawperator click --selector '{"textEquals":"Wi-Fi","role":"text"}'
 `;
 
@@ -891,9 +897,24 @@ COMMANDS["click"] = {
     if (!resolved.ok) {
       return formatError(resolved.error, { format });
     }
+
+    // Check for --long and --focus flags (mutually exclusive)
+    const hasLong = hasFlag(rest, "--long");
+    const hasFocus = hasFlag(rest, "--focus");
+    if (hasLong && hasFocus) {
+      return JSON.stringify({
+        code: "EXECUTION_VALIDATION_FAILED",
+        message: "--long and --focus are mutually exclusive.\n\nUse --long for a long press, or --focus to set input focus.",
+      });
+    }
+    let clickType: "default" | "long_click" | "focus" = "default";
+    if (hasLong) clickType = "long_click";
+    if (hasFocus) clickType = "focus";
+
     return (await import("./commands/action.js")).cmdActionClick({
       format,
       matcher: resolved.matcher,
+      clickType,
       deviceId,
       operatorPackage,
       logger,
