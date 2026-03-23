@@ -439,7 +439,9 @@ This is enforcement of the existing contract, not a design change.
 
 ---
 
-## Phase 0: Infrastructure and Compatibility
+## Phase 0: Infrastructure and Compatibility [DONE]
+
+Landed in PR `api-refactor/phase-0-1` (2026-03-23). Collapsed into Phase 1 per scope note.
 
 Establish the foundation that makes Phases 1-4 safe.
 
@@ -496,7 +498,13 @@ from Phase 0 survives into Phase 1 unchanged.
 
 ---
 
-## Phase 1: CLI Architecture (COMMANDS Registry)
+## Phase 1: CLI Architecture (COMMANDS Registry) [DONE]
+
+Landed in PR `api-refactor/phase-0-1` (2026-03-23). Collapsed with Phase 0 per scope note.
+- `apps/node/src/cli/registry.ts` created (1108 lines): `CommandDef`, `HandlerContext`, `COMMANDS` (17 entries), `didYouMean`, `generateTopLevelHelp`, `resolveHelpFromRegistry`, all CLI utilities.
+- `apps/node/src/cli/index.ts` reduced from ~915 to ~130 lines.
+- `apps/node/src/test/unit/cliRegistry.test.ts` added: registry consistency + flag alias tests.
+- 442 tests pass.
 
 Replace the hand-rolled dispatch sprawl in `index.ts` with a typed command
 registry that serves as the single source of truth for command metadata. This
