@@ -333,12 +333,12 @@ Required:
 
 Options:
   --submit             Press Enter after typing
-  --clear              Accepted for enter_text API parity (no effect on device yet)
+  --clear              Optional; no effect on device today (see Notes)
 
 Notes:
   - Types text into the first matching element.
   - Text may be supplied as a positional argument or via --text <text>.
-  - The Android Operator does not implement field clear yet; --clear is ignored on device (same as execution payloads).
+  - Operator behavior is unchanged: the Android runtime still does not implement clearing the field before typing, so --clear does nothing on device. This matches enter_text payloads: Node accepts clear, Android ignores it (same as before).
   - Synonym: fill (accepted, not in help)
 `;
 

@@ -287,7 +287,7 @@ clawperator type <text> --selector '<json>' [--device <id>] [--operator-package 
 |------|-------------|
 | `--selector <json>` | `NodeMatcher` JSON (required) |
 | `--submit` | Press Enter after typing |
-| `--clear` | Accepted for API parity; Android Operator does not implement clear yet (no effect on device) |
+| `--clear` | No effect on the device today: the Operator runtime still does not clear the field before typing. Node accepts the flag (same long-standing behavior as the `clear` field on `enter_text` in JSON). |
 
 Text may be supplied as a positional argument or via `--text <text>`. Synonym: `fill` (accepted, not in help).
 
