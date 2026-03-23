@@ -56,14 +56,13 @@ npm install -g clawperator
 ## Quick Start
 
 ```bash
-clawperator doctor                         # Verify setup
-clawperator devices                        # List connected devices
-clawperator observe snapshot \
-  --device-id <device_id>                  # Capture UI tree
-clawperator execute \
-  --execution payload.json \
-  --device-id <device_id>                  # Run an execution
+clawperator doctor                              # Verify setup
+clawperator devices --json                      # List connected devices
+clawperator snapshot --device <device_id> --json   # Capture UI tree
+clawperator execute --execution payload.json --device <device_id>   # Run an execution
 ```
+
+CLI device commands are flat (`snapshot`, `screenshot`, `click`, `open`, `type`, ...). When several devices are connected, pass `--device` (alias: `--device-id`). See [Node API for Agents](docs/node-api-for-agents.md) for flags, HTTP routes, and error codes.
 
 ## Requirements
 
