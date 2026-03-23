@@ -40,8 +40,8 @@ Core commands:
 - `clawperator devices`: Discover connected device IDs.
 - `clawperator packages list`: Confirm presence of receiver and target apps on device.
 - `clawperator execute`: Run an execution JSON payload.
-- `clawperator observe snapshot`: Get current UI hierarchy as `hierarchy_xml`.
-- `clawperator observe screenshot`: Capture device screen.
+- `clawperator snapshot`: Get current UI hierarchy as `hierarchy_xml`.
+- `clawperator screenshot`: Capture device screen.
 - `clawperator action [open-app|click|read|wait|type]`: Single-step interaction wrappers.
 - `clawperator serve`: Start HTTP/SSE server for remote agent access.
 - `clawperator doctor --fix`: Best-effort environment remediation.
@@ -472,5 +472,5 @@ Clawperator follows Semantic Versioning (SemVer) for the Node SDK/CLI and its AP
 - **Patch Bump (`x.x.1`):** Bug fixes, internal refactoring, or documentation updates.
 
 ### Stability Boundary
-- **Stable (v1):** `execute`, `observe snapshot`, `devices`, and the `[Clawperator-Result]` envelope structure.
+- **Stable (v1):** `execute`, `snapshot`, `devices`, and the `[Clawperator-Result]` envelope structure.
 - **Alpha/Unstable:** `execute best-effort`, `--serve` (HTTP), and any feature marked as `(Upcoming)` in these docs. These may break without a major version bump until they are promoted to stable.

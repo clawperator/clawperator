@@ -80,11 +80,18 @@ CLI tools, mobile automation, and common English verbs.
 Clawperator ("CLI tool for automating Android devices") and nothing else. What
 commands would it try? Those commands should work.
 
-Bad:
+Bad (legacy - no longer supported):
 ```
 clawperator action open-app --app com.android.settings
 clawperator observe snapshot --output json
 clawperator action click --selector '{"text":"Wi-Fi"}'
+```
+
+Good (current):
+```
+clawperator open com.android.settings
+clawperator snapshot --json
+clawperator click --selector '{"text":"Wi-Fi"}'
 ```
 
 Good:
@@ -272,8 +279,8 @@ wants to do, not how Clawperator does it internally.
 Bad examples of implementation leaking into API:
 - `--receiver-package` (agent does not know what a "receiver" is; renamed to
   `--operator-package` which uses Clawperator's own terminology)
-- `observe snapshot` (agent does not categorize actions as "observations")
-- `action open-app` (agent does not think "I want to perform an action")
+- `snapshot` (flat command - no nested namespace)
+- `open` (direct verb - the agent wants to open something)
 - `RESULT_ENVELOPE_TIMEOUT` (useful in logs, not in agent-facing errors)
 
 When adding a new command, ask: "Would an agent who has never read the Clawperator
