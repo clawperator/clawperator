@@ -174,3 +174,4 @@ If you see `RESULT_ENVELOPE_TIMEOUT` with `lastCorrelatedEvents: []`:
 The global `clawperator` binary may lag behind a checked-out branch. Set
 `CLAWPERATOR_BIN` or use the local build directly:
 `export CLAWPERATOR_BIN=/path/to/clawperator/apps/node/dist/cli/index.js`
+

@@ -165,7 +165,7 @@ describe("CLI help", () => {
     const { stdout, code } = await runCli(["skills", "run", "--help"]);
     assert.strictEqual(code, 0);
     assert.match(stdout, /clawperator skills run/);
-    assert.match(stdout, /--timeout-ms <n>/);
+    assert.match(stdout, /--timeout <ms>/);
     assert.match(stdout, /--expect-contains <text>/);
     assert.match(stdout, /SKILL_OUTPUT_ASSERTION_FAILED/);
     assert.doesNotMatch(stdout, /action open-app/);
@@ -467,5 +467,44 @@ describe("promoted flat commands - help and missing-arg errors", () => {
     const obj = JSON.parse(stdout) as { code?: string; message?: string };
     assert.strictEqual(obj.code, "MISSING_SELECTOR");
     assert.match(obj.message ?? "", /click requires a selector/);
+  });
+
+  it("type rejects positional text together with --text (exit 1)", async () => {
+    const { stdout, code } = await runCli([
+      "type",
+      "hello",
+      "--text",
+      "world",
+      "--selector",
+      "{}",
+    ]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "EXECUTION_VALIDATION_FAILED");
+    assert.match(obj.message ?? "", /not both/);
+  });
+
+  it("press rejects positional key together with --key (exit 1)", async () => {
+    const { stdout, code } = await runCli(["press", "back", "--key", "home"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "EXECUTION_VALIDATION_FAILED");
+    assert.match(obj.message ?? "", /not both/);
+  });
+
+  it("scroll rejects positional direction together with --direction (exit 1)", async () => {
+    const { stdout, code } = await runCli(["scroll", "down", "--direction", "up"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "EXECUTION_VALIDATION_FAILED");
+    assert.match(obj.message ?? "", /not both/);
+  });
+
+  it("open rejects positional target together with --app (exit 1)", async () => {
+    const { stdout, code } = await runCli(["open", "com.android.settings", "--app", "com.example.foo"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "EXECUTION_VALIDATION_FAILED");
+    assert.match(obj.message ?? "", /not both/);
   });
 });

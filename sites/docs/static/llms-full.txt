@@ -7426,6 +7426,24 @@ If any requirement is not met, the app shows an orange background and a dedicate
 
 ---
 
+## CLI and Operator APK version mismatch
+
+**What it means:** The Node CLI and the installed Operator APK are out of sync. The CLI may send execution shapes the older APK does not understand, so you see `RESULT_ENVELOPE_TIMEOUT` even though the host dispatched a broadcast successfully.
+
+**How to recognize it:** A timeout payload with `broadcastDispatchStatus: "sent"` and an empty `lastCorrelatedEvents` array often means the OS delivered the intent but the APK never produced a `[Clawperator-Result]` envelope (version skew or a stuck operator). When `lastCorrelatedEvents` has entries, the APK started handling the command and failed later (different diagnosis).
+
+**What to do first:**
+
+1. Run `clawperator doctor --device <device_id>` and read the CLI vs APK version line. If doctor reports a mismatch, rebuild and reinstall the Operator APK that matches your CLI branch.
+2. For a local debug cycle:
+   ```bash
+   ./gradlew :app:assembleDebug && ./gradlew :app:installDebug
+   clawperator grant-device-permissions --device <device_id>
+   ```
+   Re-run `grant-device-permissions` after each fresh install because Android may revoke the accessibility grant on reinstall.
+
+---
+
 ## Reading the Clawperator log
 
 When a command times out or behaves unexpectedly, check the persistent log file

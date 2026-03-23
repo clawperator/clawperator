@@ -3,7 +3,7 @@ import assert from "node:assert";
 import { spawn } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { COMMANDS, levenshtein, didYouMean } from "../../cli/registry.js";
+import { COMMANDS, levenshtein, didYouMean, barePositionalTokens } from "../../cli/registry.js";
 
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "../../..");
 
@@ -63,6 +63,19 @@ describe("COMMANDS registry consistency", () => {
         );
       }
     }
+  });
+});
+
+describe("barePositionalTokens", () => {
+  it("skips flag values and boolean flags", () => {
+    assert.deepStrictEqual(
+      barePositionalTokens(["hello", "--selector", "{}", "--text", "x"], ["--selector", "--text"], ["--submit"]),
+      ["hello"],
+    );
+    assert.deepStrictEqual(
+      barePositionalTokens(["--selector", "{}", "hello", "--submit"], ["--selector", "--text"], ["--submit"]),
+      ["hello"],
+    );
   });
 });
 

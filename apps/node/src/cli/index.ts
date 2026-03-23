@@ -169,17 +169,28 @@ async function main(): Promise<void> {
       process.exitCode = 1;
       return;
     }
-    // Heuristic: bare { code, message } objects without "envelope" are error results.
-    // All success shapes include "envelope" via formatSuccess; USAGE/NOT_IMPLEMENTED exit 0.
-    // Invariant must be maintained: new success paths must include "envelope" in their output.
-    if (result.startsWith("{") && result.includes('"code"') && !result.includes('"envelope"')) {
+    // Exit code: parse a single JSON object on stdout. Success payloads include "envelope"
+    // (formatSuccess). Informational CLI results use code USAGE or NOT_IMPLEMENTED and exit 0.
+    // Any other object with a non-empty string code is treated as failure (exit 1).
+    const trimmed = result.trim();
+    if (trimmed.startsWith("{")) {
       try {
-        const obj = JSON.parse(result) as { code?: string };
-        if (obj.code && obj.code !== "USAGE" && obj.code !== "NOT_IMPLEMENTED") {
+        const obj = JSON.parse(trimmed) as Record<string, unknown>;
+        if (obj === null || typeof obj !== "object" || Array.isArray(obj)) {
+          return;
+        }
+        if ("envelope" in obj) {
+          return;
+        }
+        const code = obj.code;
+        if (code === "USAGE" || code === "NOT_IMPLEMENTED") {
+          return;
+        }
+        if (typeof code === "string" && code.length > 0) {
           process.exitCode = 1;
         }
       } catch {
-        // Malformed JSON that passed the string heuristic - treat as non-error.
+        // Not a single JSON object; do not infer exit code from partial/substring matches.
       }
     }
   }

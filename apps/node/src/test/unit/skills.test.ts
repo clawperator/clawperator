@@ -1395,11 +1395,11 @@ describe("runSkill", () => {
     assert.strictEqual(parsed.message, "--expect-contains requires a value");
   });
 
-  it("CLI skills run returns usage when skill_id is missing even with --timeout-ms", async () => {
-    const { stdout } = await runCli(["skills", "run", "--timeout-ms", "5000", "--output", "json"]);
+  it("CLI skills run returns usage when skill_id is missing even with --timeout", async () => {
+    const { stdout } = await runCli(["skills", "run", "--timeout", "5000", "--output", "json"]);
     const parsed = JSON.parse(stdout) as { code?: string; message?: string };
     assert.strictEqual(parsed.code, "USAGE");
-    assert.ok(parsed.message?.includes("--timeout-ms"));
+    assert.ok(parsed.message?.includes("--timeout"));
   });
 
   it("CLI skills run can assert output content", async () => {

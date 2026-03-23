@@ -39,20 +39,36 @@ export function hasFlag(rest: string[], flag: string): boolean {
   return rest.includes(flag);
 }
 
-export function getCommandArgs(argv: string[], commandPath: string[]): string[] | undefined {
-  for (let i = 0; i <= argv.length - commandPath.length; i++) {
-    let matches = true;
-    for (let j = 0; j < commandPath.length; j++) {
-      if (argv[i + j] !== commandPath[j]) {
-        matches = false;
-        break;
+/**
+ * Positional tokens that are not flags and not values paired with `valueFlags`.
+ * Tokens in `booleanFlags` are skipped without consuming a following argument.
+ */
+export function barePositionalTokens(
+  rest: string[],
+  valueFlags: readonly string[],
+  booleanFlags: readonly string[],
+): string[] {
+  const valueSet = new Set(valueFlags);
+  const boolSet = new Set(booleanFlags);
+  const out: string[] = [];
+  for (let i = 0; i < rest.length; i++) {
+    const a = rest[i];
+    if (a === undefined) continue;
+    if (a.startsWith("-")) {
+      if (valueSet.has(a)) {
+        if (rest[i + 1] !== undefined && !rest[i + 1].startsWith("-")) {
+          i += 1;
+        }
+        continue;
       }
+      if (boolSet.has(a)) {
+        continue;
+      }
+      continue;
     }
-    if (matches) {
-      return argv.slice(i + commandPath.length);
-    }
+    out.push(a);
   }
-  return undefined;
+  return out;
 }
 
 export function getInvalidTimeoutResult(timeoutMs: number | undefined, options: { format: "json" | "pretty" }): string | undefined {
@@ -196,14 +212,14 @@ Notes:
 const HELP_SKILLS_RUN = `clawperator skills run
 
 Usage:
-  clawperator skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout-ms <n>] [--expect-contains <text>] [--skip-validate] [--output <json|pretty>] [-- <extra_args>]
+  clawperator skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--output <json|pretty>] [-- <extra_args>]
 
 Notes:
   - Runs the selected skill script through the local skill wrapper.
   - Use --device explicitly when more than one Android device is connected.
-  - --operator-package sets the Operator package (alias: --operator-package) for this skill run (default: com.clawperator.operator).
-    Use com.clawperator.operator.dev for local debug APKs.
-  - --timeout-ms overrides the wrapper timeout for this run only.
+  - --operator-package sets the Operator package for this skill run (default: com.clawperator.operator).
+    Use com.clawperator.operator.dev for local debug APKs. --receiver-package is a legacy alias (see global options).
+  - --timeout overrides the wrapper timeout for this run only (--timeout-ms is accepted as an alias).
   - --expect-contains turns the run into a lightweight output assertion.
   - If the assertion text is missing, the wrapper fails with SKILL_OUTPUT_ASSERTION_FAILED.
   - By default, the wrapper performs a pre-run dry-run validation gate before starting the skill script.
@@ -434,9 +450,8 @@ COMMANDS["operator"] = {
         return (await import("./commands/operatorSetup.js")).cmdOperatorSetup({
           ...out,
           apkPath,
-          // TODO(Phase 2): ?? getOpt fallbacks are dead code - see plan.md "Carried-forward debt"
-          deviceId: deviceId ?? getOpt(rest, "--device") ?? getOpt(rest, "--device-id"),
-          operatorPackage: operatorPackage ?? getOpt(rest, "--operator-package"),
+          deviceId,
+          operatorPackage,
         });
       }
     } else {
@@ -589,7 +604,7 @@ COMMANDS["packages"] = {
     if (rest[0] === "list") {
       return (await import("./commands/packages.js")).cmdPackagesList({
         ...out,
-        deviceId: deviceId ?? getOpt(rest, "--device") ?? getOpt(rest, "--device-id"),
+        deviceId,
         thirdParty: hasFlag(rest, "--third-party"),
       });
     } else {
@@ -615,7 +630,7 @@ COMMANDS["execute"] = {
       const goal = getOpt(rest, "--goal");
       return JSON.stringify({
         code: "NOT_IMPLEMENTED",
-        message: "execute best-effort is Stage 1 limited; use observe snapshot + agent reasoning for now",
+        message: "execute best-effort is Stage 1 limited; use snapshot + agent reasoning for now",
         goal,
       });
     } else {
@@ -626,8 +641,8 @@ COMMANDS["execute"] = {
         return (await import("./commands/execute.js")).cmdExecute({
           ...out,
           execution,
-          deviceId: deviceId ?? getOpt(rest, "--device") ?? getOpt(rest, "--device-id"),
-          operatorPackage: operatorPackage ?? getOpt(rest, "--operator-package"),
+          deviceId,
+          operatorPackage,
           timeoutMs,
           validateOnly: hasFlag(rest, "--validate-only"),
           dryRun: hasFlag(rest, "--dry-run"),
@@ -721,8 +736,18 @@ COMMANDS["open"] = {
   handler: async (ctx) => {
     const { rest, format, logger, deviceId, operatorPackage } = ctx;
     const appFlag = getOpt(rest, "--app");
-    const positional = rest.find((a) => !a.startsWith("-"));
-    const target = appFlag ?? positional;
+    const bare = barePositionalTokens(rest, ["--app"], []);
+    if (appFlag !== undefined && bare.length > 0) {
+      return formatError(
+        {
+          code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+          message:
+            "open: pass the target as a positional argument or via --app, not both.\n\nSee: clawperator open --help",
+        },
+        { format },
+      );
+    }
+    const target = appFlag ?? bare[0];
     if (!target || target.trim().length === 0) {
       return JSON.stringify({
         code: "MISSING_ARGUMENT",
@@ -770,8 +795,18 @@ COMMANDS["type"] = {
       });
     }
     const textFlag = getOpt(rest, "--text");
-    const positional = rest.find((a) => !a.startsWith("-"));
-    const text = textFlag ?? positional;
+    const bare = barePositionalTokens(rest, ["--selector", "--text"], ["--submit", "--clear"]);
+    if (textFlag !== undefined && bare.length > 0) {
+      return formatError(
+        {
+          code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+          message:
+            "type: pass text as a positional argument or via --text, not both.\n\nSee: clawperator type --help",
+        },
+        { format },
+      );
+    }
+    const text = textFlag ?? bare[0];
     if (!text) {
       return JSON.stringify({
         code: "MISSING_ARGUMENT",
@@ -856,8 +891,18 @@ COMMANDS["press"] = {
   handler: async (ctx) => {
     const { rest, format, logger, deviceId, operatorPackage } = ctx;
     const keyFlag = getOpt(rest, "--key");
-    const positional = rest.find((a) => !a.startsWith("-"));
-    const key = keyFlag ?? positional;
+    const bare = barePositionalTokens(rest, ["--key"], []);
+    if (keyFlag !== undefined && bare.length > 0) {
+      return formatError(
+        {
+          code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+          message:
+            "press: pass the key as a positional argument or via --key, not both.\n\nSee: clawperator press --help",
+        },
+        { format },
+      );
+    }
+    const key = keyFlag ?? bare[0];
     if (!key) {
       return JSON.stringify({
         code: "MISSING_ARGUMENT",
@@ -904,8 +949,18 @@ COMMANDS["scroll"] = {
     const invalidTimeout = getInvalidTimeoutResult(timeoutMs, { format });
     if (invalidTimeout) return invalidTimeout;
     const directionFlag = getOpt(rest, "--direction");
-    const positional = rest.find((a) => !a.startsWith("-"));
-    const direction = directionFlag ?? positional;
+    const bare = barePositionalTokens(rest, ["--direction"], []);
+    if (directionFlag !== undefined && bare.length > 0) {
+      return formatError(
+        {
+          code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+          message:
+            "scroll: pass direction as a positional argument or via --direction, not both.\n\nSee: clawperator scroll --help",
+        },
+        { format },
+      );
+    }
+    const direction = directionFlag ?? bare[0];
     const validDirections = ["down", "up", "left", "right"];
     if (!direction || !validDirections.includes(direction)) {
       return JSON.stringify({
@@ -940,7 +995,7 @@ Usage:
   clawperator skills new <skill_id> [--summary <text>]
   clawperator skills validate <skill_id> [--dry-run]
   clawperator skills validate --all [--dry-run]
-  clawperator skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout-ms <n>] [--expect-contains <text>] [--skip-validate] [-- <extra_args>]
+  clawperator skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [-- <extra_args>]
   clawperator skills install
   clawperator skills update [--ref <git-ref>]
   clawperator skills sync --ref <git-ref>
@@ -968,7 +1023,7 @@ Usage:
   skills validate <skill_id> [--dry-run]
   skills validate --all [--dry-run]
                                             Validate one local skill or the entire configured registry
-  skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout-ms <n>] [--expect-contains <text>] [--skip-validate] [-- <extra_args>]
+  skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [-- <extra_args>]
                                             Invoke a skill script (convenience wrapper)
   skills install
                                             Clone skills repository to ~/.clawperator/skills/
@@ -977,7 +1032,7 @@ Usage:
   skills sync --ref <git-ref>
                                             Sync and pin skills index/cache to a git ref`,
   handler: async (ctx) => {
-    const { argv, rest, format, verbose, logger, deviceId, operatorPackage, timeoutMs } = ctx;
+    const { rest, format, verbose, logger, deviceId, operatorPackage, timeoutMs } = ctx;
     const out = { format, verbose, logger };
     if (rest[0] === "list") {
       return (await import("./commands/skills.js")).cmdSkillsList(out);
@@ -1031,18 +1086,16 @@ Usage:
     } else if (rest[0] === "run") {
       const skillId = rest[1];
       if (!skillId) {
-        return JSON.stringify({ code: "USAGE", message: "skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout-ms <n>] [--expect-contains <text>] [--skip-validate] [-- <extra_args>]" });
+        return JSON.stringify({
+          code: "USAGE",
+          message:
+            "skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [-- <extra_args>]",
+        });
       } else {
         const dashDash = rest.indexOf("--");
         const optSegment = dashDash >= 0 ? rest.slice(0, dashDash) : rest;
-        // TODO(Phase 2): getCommandArgs redundant - see plan.md "Carried-forward debt"
-        const rawSkillsRunArgs = getCommandArgs(argv, ["skills", "run"]) ?? [];
-        const rawDashDash = rawSkillsRunArgs.indexOf("--");
-        const rawOptSegment = rawDashDash >= 0 ? rawSkillsRunArgs.slice(0, rawDashDash) : rawSkillsRunArgs;
         const scriptArgs: string[] = [];
-        const resolvedDeviceId = deviceId ?? getOpt(optSegment, "--device") ?? getOpt(optSegment, "--device-id");
-        const resolvedOperatorPackage = operatorPackage ?? getOpt(optSegment, "--operator-package");
-        const localTimeoutMs = getNumberOpt(rawOptSegment, "--timeout-ms") ?? getNumberOpt(rawOptSegment, "--timeout");
+        const localTimeoutMs = getNumberOpt(optSegment, "--timeout-ms") ?? getNumberOpt(optSegment, "--timeout");
         const effectiveTimeoutMs = localTimeoutMs ?? timeoutMs;
         const invalidTimeoutResult = getInvalidTimeoutResult(effectiveTimeoutMs, { format });
         if (invalidTimeoutResult) {
@@ -1050,7 +1103,7 @@ Usage:
         }
         const expectContains = getStringOpt(optSegment, "--expect-contains");
         const skipValidate = hasFlag(optSegment, "--skip-validate");
-        if (resolvedDeviceId) scriptArgs.push(resolvedDeviceId);
+        if (deviceId) scriptArgs.push(deviceId);
         if (dashDash >= 0) {
           scriptArgs.push(...rest.slice(dashDash + 1));
         }
@@ -1059,8 +1112,8 @@ Usage:
           scriptArgs,
           effectiveTimeoutMs,
           expectContains,
-          resolvedOperatorPackage,
-          { ...out, skipValidate, deviceId: resolvedDeviceId, logger }
+          operatorPackage,
+          { ...out, skipValidate, deviceId, logger }
         );
       }
     } else if (rest[0] === "install") {
@@ -1099,8 +1152,8 @@ COMMANDS["recording"] = {
     const out = { format, verbose, logger };
     const sub = rest[0];
     const runOpts = {
-      deviceId: deviceId ?? getOpt(rest, "--device") ?? getOpt(rest, "--device-id"),
-      operatorPackage: operatorPackage ?? getOpt(rest, "--operator-package"),
+      deviceId,
+      operatorPackage,
     };
     if (sub === "start") {
       return (await import("./commands/record.js")).cmdRecordStart({
@@ -1194,8 +1247,8 @@ COMMANDS["doctor"] = {
       fix: hasFlag(rest, "--fix"),
       full: hasFlag(rest, "--full"),
       checkOnly: hasFlag(rest, "--check-only"),
-      deviceId: deviceId ?? getOpt(rest, "--device") ?? getOpt(rest, "--device-id"),
-      operatorPackage: operatorPackage ?? getOpt(rest, "--operator-package"),
+      deviceId,
+      operatorPackage,
       logger,
     });
   },
@@ -1210,12 +1263,12 @@ COMMANDS["grant-device-permissions"] = {
   topLevelBlock: `  grant-device-permissions [--device <id>] [--operator-package <package>]
                                             Re-grant accessibility and notification permissions (remediation only)`,
   handler: async (ctx) => {
-    const { rest, format, verbose, logger, deviceId, operatorPackage } = ctx;
+    const { format, verbose, logger, deviceId, operatorPackage } = ctx;
     const out = { format, verbose, logger };
     return (await import("./commands/grantDevicePermissions.js")).cmdGrantDevicePermissions({
       ...out,
-      deviceId: deviceId ?? getOpt(rest, "--device") ?? getOpt(rest, "--device-id"),
-      operatorPackage: operatorPackage ?? getOpt(rest, "--operator-package"),
+      deviceId,
+      operatorPackage,
     });
   },
 };
@@ -1236,8 +1289,8 @@ COMMANDS["version"] = {
     return (await import("./commands/version.js")).cmdVersion({
       ...out,
       checkCompat: hasFlag(rest, "--check-compat"),
-      deviceId: deviceId ?? getOpt(rest, "--device") ?? getOpt(rest, "--device-id"),
-      operatorPackage: operatorPackage ?? getOpt(rest, "--operator-package"),
+      deviceId,
+      operatorPackage,
     });
   },
 };
@@ -1349,8 +1402,8 @@ export function generateTopLevelHelp(commands: Record<string, CommandDef>): stri
     "",
     "Global options:",
     "  --device <id>, --device-id <id>         Target Android device serial (<!--flag-->--device<!--/flag--> is canonical)",
-    "  --operator-package <package>, --operator-package <package>",
-    "                                            Target Operator package for broadcast dispatch",
+    "  --operator-package <package>, --receiver-package <package>",
+    "                                            Target Operator package for broadcast dispatch (--receiver-package is a legacy alias)",
     "  --output <json|pretty>, --format <json|pretty>",
     "                                            Output format (default: json)",
     "  --log-level <debug|info|warn|error>       Persistent log level (default: info)",
