@@ -329,7 +329,7 @@ describe("operator setup CLI output", () => {
   });
 });
 
-describe("Phase 2 promoted commands", () => {
+describe("promoted flat commands", () => {
   it("returns UNKNOWN_COMMAND with specific suggestion for 'observe snapshot'", async () => {
     const { stdout, code } = await runCli(["observe", "snapshot"]);
     assert.strictEqual(code, 1);

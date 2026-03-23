@@ -616,7 +616,7 @@ COMMANDS["execute"] = {
       const goal = getOpt(rest, "--goal");
       return JSON.stringify({
         code: "NOT_IMPLEMENTED",
-        message: "execute best-effort is Stage 1 limited; use snapshot + agent reasoning for now",
+        message: "execute best-effort is not yet implemented; use snapshot + agent reasoning for now",
         goal,
       });
     } else {

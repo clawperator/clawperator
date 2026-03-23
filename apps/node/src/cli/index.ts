@@ -165,7 +165,7 @@ async function main(): Promise<void> {
       return;
     }
     // Heuristic: bare { code, message } objects without "envelope" are error results.
-    // All Phase 2 success shapes include "envelope" via formatSuccess; USAGE/NOT_IMPLEMENTED exit 0.
+    // All success shapes include "envelope" via formatSuccess; USAGE/NOT_IMPLEMENTED exit 0.
     // Invariant must be maintained: new success paths must include "envelope" in their output.
     if (result.startsWith("{") && result.includes('"code"') && !result.includes('"envelope"')) {
       try {
