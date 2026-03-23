@@ -30,7 +30,12 @@ function getGlobalOpts(argv: string[]): {
   let output: "json" | "pretty" = "json";
   let verbose = false;
   for (let i = 0; i < argv.length; i++) {
-    if (argv[i] === "--device-id" && argv[i + 1]) {
+    if (argv[i] === "--") {
+      // Stop scanning for global flags. Push `--` and all remaining tokens to `rest` verbatim so
+      // callers like `skills run` can forward them to subprocess scripts.
+      rest.push(...argv.slice(i));
+      break;
+    } else if (argv[i] === "--device-id" && argv[i + 1]) {
       deviceId = argv[++i];
     } else if (argv[i] === "--device" && argv[i + 1]) {
       // --device is the new canonical for --device-id (old name still works)
