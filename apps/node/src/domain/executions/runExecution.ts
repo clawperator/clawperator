@@ -114,7 +114,7 @@ export function injectServiceUnavailableHint(envelope: ResultEnvelope, deviceId:
     return;
   }
 
-  envelope.hint = `Accessibility service not running. Run 'clawperator doctor --fix --device-id ${deviceId}' to diagnose and repair, or 'clawperator operator setup --apk <path-to-apk> --device-id ${deviceId}' to reinstall.`;
+  envelope.hint = `Accessibility service not running. Run 'clawperator doctor --fix --device ${deviceId}' to diagnose and repair, or 'clawperator operator setup --apk <path-to-apk> --device ${deviceId}' to reinstall.`;
 }
 
 export interface TimeoutErrorDetails {

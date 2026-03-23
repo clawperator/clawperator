@@ -275,7 +275,7 @@ describe("injectServiceUnavailableHint", () => {
 
     injectServiceUnavailableHint(envelope, "device-123");
 
-    assert.ok(envelope.hint?.includes("doctor --fix --device-id device-123"), `hint: ${envelope.hint}`);
+    assert.ok(envelope.hint?.includes("doctor --fix --device device-123"), `hint: ${envelope.hint}`);
     assert.ok(envelope.hint?.includes("operator setup"), `hint should mention operator setup: ${envelope.hint}`);
   });
 
