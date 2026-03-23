@@ -216,8 +216,7 @@ These are deterministic and non-negotiable:
 
 - Default: returns the text content of the first matching node
 - `--json` mode: returns structured result with the text value
-- Future consideration: `--all` flag to return all matches as a list (not in
-  scope for this refactor)
+- `--all` flag returns all matches as a JSON array (Phase 5, requires `--json`)
 
 ---
 
