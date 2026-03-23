@@ -4,7 +4,7 @@ Origin: Agent UX review session (2026-03-23). An independent agent was given the
 current API docs cold and asked to propose the ideal command surface. The feedback
 confirmed that the `action`/`observe` namespace nesting, JSON-only selectors, and
 verbose flag names are systematic first-contact failures. This plan implements the
-fixes across four phases.
+fixes across five phases.
 
 Reviewed 2026-03-23 by a second independent agent. Required changes incorporated.
 Reviewed 2026-03-23 by a third independent agent against actual source code.
@@ -249,7 +249,7 @@ The following commands are not affected and should not be modified:
 - `operator setup` / `operator install`
 - `skills *`, `emulator *`, `recording` / `record`
 - `serve` remains the same CLI entrypoint. Only the HTTP route paths exposed
-  by `serve.ts` change (in Phase 3)
+  by `serve.ts` change (in Phase 4)
 - `execute` (the `--execution` flag name is deliberately not renamed; it is the
   canonical interface for skill scripts and advanced agents)
 
@@ -361,7 +361,7 @@ This is enforcement of the existing contract, not a design change.
 
 ## Phase 0: Infrastructure and Compatibility
 
-Establish the foundation that makes Phases 1-2 safe.
+Establish the foundation that makes Phases 1-4 safe.
 
 ### Deliverables
 
@@ -407,16 +407,198 @@ planning clarity, not as a hard PR boundary.
 
 ---
 
-## Phase 1: Command Surface Refactor
+## Phase 1: CLI Architecture (COMMANDS Registry)
+
+Replace the hand-rolled dispatch sprawl in `index.ts` with a typed command
+registry that serves as the single source of truth for command metadata. This
+is code health investment that pays off immediately: every subsequent phase
+adds commands by adding registry entries, not by touching 3-4 unrelated
+locations.
+
+### Why this phase exists
+
+Today, `index.ts` has three surfaces that must stay in sync manually:
+
+1. **The switch statement** (index.ts:481-888, ~400 lines): dispatches commands
+   to handlers. Synonyms are duplicated `case` branches.
+2. **HELP / HELP_TOPICS** (index.ts:9-330): static strings that must match the
+   dispatch surface exactly. Adding a command means editing both.
+3. **"Did you mean?" / resolveHelpTopic**: hardcoded mappings that must know
+   every command name and synonym.
+
+After Phase 0 adds flag aliases and "did you mean?" infrastructure, and before
+Phase 2 adds ~10 new commands, this phase consolidates all three surfaces into
+a single registry. Without this, the implementing agent will expand the switch
+statement to ~500+ lines, expand HELP_TOPICS proportionally, and create a
+larger version of the same maintenance trap.
+
+This is the "40% on code health" investment described in the Yegge blog post.
+The alternative - adding commands to the existing sprawl - technically works
+but leaves the codebase harder to maintain after the refactor than before it.
+
+### Deliverables
+
+1. **Define a `CommandDef` type and `COMMANDS` registry**
+
+   ```typescript
+   interface CommandDef {
+     /** Primary name (used in docs, help, dispatch). */
+     name: string;
+     /** Synonyms accepted silently (not in help text). */
+     synonyms?: string[];
+     /** One-line description for top-level --help listing. */
+     summary: string;
+     /** Full help text shown by `<command> --help`. */
+     help: string;
+     /** Positional argument spec, if any. */
+     positional?: { name: string; required: boolean; description: string };
+     /** Whether this command requires element selectors. */
+     requiresSelector?: boolean;
+     /** Help group for --help display (e.g. "Device Interaction", "Device Management"). */
+     group: string;
+     /** The handler function. */
+     handler: (args: ParsedArgs, opts: GlobalOpts) => Promise<string>;
+   }
+
+   const COMMANDS: Record<string, CommandDef> = { ... };
+   ```
+
+   The registry is the canonical source for:
+   - Dispatch: loop over COMMANDS keys + synonyms instead of a switch
+   - Help generation: `--help` output is built from registry entries, not
+     a static string
+   - Synonym resolution: derived from `synonyms` fields
+   - "Did you mean?": fuzzy match against all registry keys + synonyms
+   - Missing selector errors: derived from `requiresSelector` flag
+
+   The exact interface shape is a suggestion. The implementing agent may
+   adjust field names or add fields as needed. The constraint is: **one
+   definition per command, everything else derived.**
+
+2. **Migrate existing commands onto the registry**
+
+   Every command that currently lives in the switch statement gets a registry
+   entry. This is a mechanical refactor - no behavior changes. The handlers
+   are the same functions, just referenced from registry entries instead of
+   case branches.
+
+   Commands to migrate:
+   - `operator` (with subcommand dispatch for `setup`/`install`)
+   - `setup`, `install` (guidance redirects)
+   - `devices`, `doctor`, `version`, `packages`
+   - `emulator` (with subcommand dispatch)
+   - `skills` (with subcommand dispatch)
+   - `execute`
+   - `recording` / `record`
+   - `serve`
+   - `observe` (existing, pre-promotion)
+   - `action` (existing, pre-promotion)
+   - `inspect` (existing, pre-promotion)
+   - `grant-device-permissions`
+
+   Namespaced commands (`operator`, `emulator`, `skills`) keep their
+   subcommand dispatch internally. The registry routes to the top-level
+   handler; subcommand routing stays inside the handler.
+
+3. **Replace the switch statement with registry-driven dispatch**
+
+   The ~400-line switch becomes approximately:
+
+   ```typescript
+   const def = COMMANDS[cmd] ??
+     Object.values(COMMANDS).find(c => c.synonyms?.includes(cmd));
+
+   if (def) {
+     result = await def.handler(parsedArgs, globalOpts);
+   } else {
+     result = didYouMean(cmd, COMMANDS);
+   }
+   ```
+
+   This is the core structural win. Adding a command post-refactor means
+   adding a registry entry and a handler function. No switch branch, no
+   HELP_TOPICS entry, no resolveHelpTopic mapping.
+
+4. **Replace static HELP/HELP_TOPICS with generated help text**
+
+   Top-level `--help` is generated from registry entries grouped by the
+   `group` field. Per-command `--help` is generated from the `help` field
+   and `positional`/`requiresSelector` metadata.
+
+   The generated output must match the target help structure from Phase 4
+   (see Phase 4, deliverable 1 for the target format). But the content at
+   this point still reflects the pre-promotion command surface (old command
+   names). Phase 2 will add the promoted commands to the registry.
+
+5. **Derive "did you mean?" from the registry**
+
+   Phase 0's "did you mean?" infrastructure should be updated to use the
+   registry's command names and synonyms as its known-commands list, rather
+   than a separate hardcoded list. The fuzzy matching logic itself (e.g.
+   Levenshtein distance) stays the same.
+
+6. **Tests: verify behavioral equivalence**
+
+   Every existing CLI test must pass with zero changes to its assertions.
+   This phase changes architecture, not behavior. If a test fails, the
+   migration has a bug.
+
+   Add a focused test that verifies `COMMANDS` entries are consistent:
+   - Every synonym is unique across all commands
+   - Every command has a non-empty `summary` and `help`
+   - Every command has a `group`
+   - `handler` is a function
+
+### File organization
+
+The registry and types should live in a new file (e.g.
+`apps/node/src/cli/commands.ts` or `apps/node/src/cli/registry.ts`).
+Individual command handlers that are currently inline in the switch statement
+should be extracted to `apps/node/src/cli/commands/` if they are not already
+there. Keep `index.ts` as the entry point that wires the registry to argv
+parsing and dispatch.
+
+Do not over-engineer the file split. If a handler is 5 lines, it can stay
+inline in the registry definition. Extract only when the handler is complex
+enough to warrant its own file (most already have one in `commands/`).
+
+### Risk
+
+Low. Pure refactor with no behavior changes. All existing tests serve as
+regression coverage. The risk is scope creep - resist the urge to also
+promote commands or add features in this phase. If a command works today,
+it should work identically after this phase.
+
+### Scope boundaries
+
+In scope:
+- COMMANDS registry type and data
+- Switch statement replacement
+- Help text generation from registry
+- "Did you mean?" derivation from registry
+- Extracting inline handlers to command files where they are complex
+
+Out of scope:
+- Promoting commands (Phase 2)
+- Adding new commands like `scroll`, `back` (Phase 2)
+- Selector flag parsing (Phase 3)
+- Help text content rewrite to match the target format (Phase 4)
+- HTTP API route changes (Phase 4)
+
+---
+
+## Phase 2: Command Surface Refactor
 
 Fix the top-level CLI shape so agents can guess commands correctly on first
-attempt.
+attempt. With the COMMANDS registry from Phase 1 in place, this phase adds
+new commands as registry entries with handler functions - no switch branches,
+no manual HELP_TOPICS entries, no hardcoded synonym mappings.
 
-Phase 1 has two logical layers. They can land in one PR but must be mentally
+Phase 2 has two logical layers. They can land in one PR but must be mentally
 separable for review:
 
-- **Layer A (command promotion):** promote flat commands, remove `action`/`observe`,
-  implement "did you mean?" errors
+- **Layer A (command promotion):** promote flat commands, remove `action`/`observe`
+  from registry, add promoted commands as new registry entries
 - **Layer B (argument ergonomics):** positional arguments, flag normalization
 
 ### Deliverables
@@ -443,8 +625,8 @@ separable for review:
    ```
    clawperator scroll <down|up|left|right> [--device <id>] [--json]
    ```
-   Phase 1 delivers direction-only scroll. Container-scoped scrolling
-   (`--container-text`, `--container-id`, etc.) is deferred to Phase 2
+   Phase 2 delivers direction-only scroll. Container-scoped scrolling
+   (`--container-text`, `--container-id`, etc.) is deferred to Phase 3
    alongside the other selector flag work, since container flags use the same
    parsing infrastructure.
 
@@ -552,7 +734,7 @@ Did you mean:
    - `clawperator_smoke_core.sh` uses old command forms (`action open-app`,
      `observe snapshot`, `--output json`, etc.). These will break when
      `action`/`observe` are removed. Update the script as part of this phase,
-     not Phase 3.
+     not Phase 4.
    - `clawperator_smoke_skills.sh` - check and update if it uses old forms.
    - `clawperator_integration_canonical.sh` - check and update if applicable.
    - All scripts must pass after the update.
@@ -586,7 +768,7 @@ unchanged. Phase 0 infrastructure catches regressions.
 
 ---
 
-## Phase 2: Selector Flags
+## Phase 3: Selector Flags
 
 Replace JSON-heavy element targeting with simple, guessable flags.
 
@@ -664,7 +846,7 @@ populating a separate `NodeMatcher` object for the `container` param.
 
 ---
 
-## Phase 3: Help, Errors, and Polish
+## Phase 4: Help, Errors, and Polish
 
 Finalize the developer and agent experience.
 
@@ -723,7 +905,7 @@ Finalize the developer and agent experience.
 
 2. **Error message improvements**
    - Wrong flag: suggest closest match (`--body` -> `--text`)
-   - Missing selector: show flag list with example (see Phase 1 failure-mode
+   - Missing selector: show flag list with example (see Phase 2 failure-mode
      requirements for exact format)
    - Missing device in multi-device setup: list connected devices with retry
      command showing `--device` flag
@@ -750,8 +932,8 @@ Finalize the developer and agent experience.
    `POST /execute`, `GET /devices`, skill routes, and emulator routes are
    unchanged.
 
-   Note: smoke scripts and integration tests were already updated in Phase 1
-   (deliverable 7). Phase 3 should verify they still pass after help/error
+   Note: smoke scripts and integration tests were already updated in Phase 2
+   (deliverable 7). Phase 4 should verify they still pass after help/error
    changes but the migration work is done.
 
 ### Risk
@@ -788,18 +970,22 @@ skill fix alongside (or immediately after) the CLI change that caused it.
 
 **Per-phase expectations:**
 
-- **Phase 1:** After promoting commands and removing `action`/`observe`, check
+- **Phase 1:** Pure refactor - no behavior changes, no skill impact expected.
+  Run the three core skills as a smoke test to confirm the registry migration
+  did not break dispatch.
+
+- **Phase 2:** After promoting commands and removing `action`/`observe`, check
   whether any of the three skills invoke CLI commands directly (vs. using
   `execute` payloads). If they use old command forms like `clawperator action
   open-app` or `clawperator observe snapshot`, update them. Run each skill on a
   connected device to confirm it still works end-to-end.
 
-- **Phase 2:** After adding selector flags, check whether any skill would
+- **Phase 3:** After adding selector flags, check whether any skill would
   benefit from `--text` or `--id` instead of `--selector` JSON. Update if so.
   Most skills use `execute` payloads rather than CLI selectors, so this may be
   minimal. Run skills to confirm no regressions.
 
-- **Phase 3:** Bulk migration of any remaining skills. Verify with
+- **Phase 4:** Bulk migration of any remaining skills. Verify with
   `skills validate --dry-run` and `clawperator_smoke_skills.sh`. This is
   cleanup, not first discovery - by this point, the three core skills should
   already be working.
@@ -809,20 +995,25 @@ skill fix alongside (or immediately after) the CLI change that caused it.
 ## Sequencing
 
 ```
-Phase 0 -> Phase 1 -> Phase 2 -> Phase 3
+Phase 0 -> Phase 1 -> Phase 2 -> Phase 3 -> Phase 4
 ```
 
 Phase 0 and Phase 1 can collapse into a single PR if the implementing agent
 finds the boundary artificial. The key constraint is: Phase 0's "did you mean?"
-infrastructure must exist before Phase 1 removes the old commands.
+infrastructure and Phase 1's registry must exist before Phase 2 adds new
+commands. Phase 2 adds commands as registry entries, not switch branches.
 
-Phase 2 is independent of Phase 1 in code (different files, different parsing
-paths) but should land after Phase 1 so the commands that accept selectors
+Phase 1 is the structural investment. It changes architecture, not behavior.
+All existing tests must pass unchanged. If Phase 1 is done well, Phase 2
+becomes mechanical: add registry entries, write handlers, update tests.
+
+Phase 3 is independent of Phase 2 in code (different files, different parsing
+paths) but should land after Phase 2 so the commands that accept selectors
 already exist in their flat form.
 
-Phase 3 is polish and must land last.
+Phase 4 is polish and must land last.
 
-Docs work (`tasks/docs/refactor/`) begins only after Phase 3 is complete.
+Docs work (`tasks/docs/refactor/`) begins only after Phase 4 is complete.
 
 ---
 
@@ -878,7 +1069,7 @@ not part of this refactoring:
   `clickType: "default" | "long_click" | "focus"` in ActionParams
   (contracts/execution.ts). Adding `--long` and `--focus` flags to `click`
   would expose these without JSON. Deferred because the default click covers
-  the vast majority of agent usage. Revisit after Phase 2 lands.
+  the vast majority of agent usage. Revisit after Phase 3 lands.
 - **`wait --timeout` semantic**: Currently `buildWaitExecution` uses a fixed
   30s execution timeout. An agent using `wait --text "Loading" --timeout 5000`
   might mean "wait up to 5 seconds for this element" rather than "set the
