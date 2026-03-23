@@ -251,7 +251,63 @@ still contains:
 - a partial parse result
 - enough context to distinguish a slow device from a selector failure
 
-## 9. Promote from exploration to reusable automation
+## 9. Progress logging
+
+Skill scripts should emit lightweight progress lines while they work so a human
+or agent can tell the skill is still making forward progress.
+
+Use three output channels:
+
+| Channel | Mechanism | Purpose |
+| --- | --- | --- |
+| Progress | `console.log("[skill:<registry-id>] ...")` | In-flight orientation while the skill is running |
+| Result | `console.log("✅ ...")` | Canonical success output, last stdout line |
+| Error | `console.error("⚠️ ...")` | Failures and blocking states |
+
+The progress prefix must use the full registry ID, not a short suffix. For
+example, `com.solaxcloud.starter.get-battery` becomes:
+
+```text
+[skill:com.solaxcloud.starter.get-battery] Launching SolaX app...
+```
+
+Guardrails:
+
+- progress lines must be ignorable
+- progress lines must not carry result data
+- the canonical result is always the `✅` line
+- in `--output json` mode, the full stdout stream is preserved in `result.output`
+  and may include `[skill:*]` lines
+- consumers should filter `result.output` for the `✅` line instead of treating
+  it as a structured payload
+
+What counts as a meaningful phase:
+
+- before each `runClawperator` call
+- between major phases in a multi-step skill
+- long waits that would otherwise look like a stall
+- fallback or retry paths
+
+What counts as noise:
+
+- per-action chatter
+- raw snapshot content
+- intermediate data values that belong in the result line
+
+Before and after:
+
+```text
+Launching SolaX app...
+Waiting for data to load...
+Reading battery level...
+✅ SolaX battery level: 36.0%
+```
+
+```text
+✅ SolaX battery level: 36.0%
+```
+
+## 10. Promote from exploration to reusable automation
 
 A workflow is ready to become a reusable skill when:
 
@@ -268,7 +324,7 @@ At that point, update `SKILL.md` so another agent can understand:
 - known failure modes
 - whether credentials, account state, or app setup are assumed
 
-## 10. Recommended development checklist
+## 11. Recommended development checklist
 
 For a new skill, this is the practical order:
 

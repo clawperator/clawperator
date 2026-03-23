@@ -40,8 +40,11 @@ If the current CLI behavior and a narrative doc ever seem to disagree, prefer
 subcommand help for the exact shipped flags and usage:
 
 ```bash
-clawperator observe snapshot --help
-clawperator observe screenshot --help
+clawperator snapshot --help
+clawperator screenshot --help
+clawperator click --help
+clawperator open --help
+clawperator type --help
 clawperator skills compile-artifact --help
 clawperator skills run --help
 clawperator doctor --help
@@ -52,7 +55,7 @@ clawperator doctor --help
 The quickest way to inspect the current UI is:
 
 ```bash
-clawperator observe snapshot --device-id <device_id> --output json
+clawperator snapshot --device <device_id> --json
 ```
 
 Successful snapshot output includes:
@@ -140,7 +143,7 @@ Example payload:
 Run it with:
 
 ```bash
-clawperator execute --device-id <device_id> --execution /path/to/execution.json --output json
+clawperator execute --device <device_id> --execution /path/to/execution.json --json
 ```
 
 ## Step 3 - Read the result envelope correctly

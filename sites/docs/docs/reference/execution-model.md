@@ -193,7 +193,7 @@ the agent does not need to inspect device state or make a decision between them.
   prompt that was not present when the flow was designed
 - Flows where the correct next step depends on current app state
 
-The rule of thumb: if you would naturally want to call `observe snapshot`
+The rule of thumb: if you would naturally want to call `snapshot`
 between two steps, they belong in separate executions.
 
 ## `sleep` vs `wait_for_node` vs separate snapshot

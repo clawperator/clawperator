@@ -171,19 +171,18 @@ A fully configured device will show all checks passing. Common warnings:
 Observe the current UI state:
 
 ```bash
-clawperator observe snapshot --device-id <device_id>
+clawperator snapshot --device <device_id>
 ```
 
 Open an app:
 
 ```bash
-clawperator action open-app \
-  --app com.android.settings \
-  --device-id <device_id> \
-  --receiver-package com.clawperator.operator
+clawperator open com.android.settings \
+  --device <device_id> \
+  --operator-package com.clawperator.operator
 ```
 
-> Use `com.clawperator.operator` for the release [Clawperator Operator Android app](android-operator-apk.md), `com.clawperator.operator.dev` for the local debug build.
+> Use `com.clawperator.operator` for the release [Clawperator Operator Android app](android-operator-apk.md), `com.clawperator.operator.dev` for the local debug build. Pass via `--operator-package` (or `--package` alias).
 
 Before running real automations, make sure the Android apps the user wants Clawperator to operate are installed, signed in, and already configured on the device or emulator.
 

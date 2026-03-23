@@ -333,7 +333,7 @@ This will report any version mismatch between the CLI and the installed APK.
 2. Verify the fix by running a snapshot:
 
    ```bash
-   clawperator observe snapshot --device-id <device_serial> --output json
+   clawperator snapshot --device <device_serial> --json
    ```
 
    A working snapshot returns `data.text` containing XML starting with `<hierarchy`.
