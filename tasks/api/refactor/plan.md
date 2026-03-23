@@ -1572,7 +1572,7 @@ skill fix alongside (or immediately after) the CLI change that caused it.
 ## Sequencing
 
 ```
-Phase 0 -> Phase 1 -> Phase 2 -> Phase 3 -> Phase 4 -> Phase 5
+Phase 0 -> Phase 1 -> Phase 2 -> Phase 3 -> Phase 5A -> Phase 4 -> Phase 5B -> Phase 5C (APK-gated)
 ```
 
 Phase 0 and Phase 1 can collapse into a single PR if the implementing agent
@@ -1588,7 +1588,23 @@ Phase 3 is independent of Phase 2 in code (different files, different parsing
 paths) but should land after Phase 2 so the commands that accept selectors
 already exist in their flat form.
 
-Phase 4 is polish and should land before Phase 5.
+The revised sequencing is:
+
+  Phase 0 -> Phase 1 -> Phase 2 -> Phase 3 -> Phase 5A -> Phase 4 -> Phase 5B -> Phase 5C (APK-gated)
+
+Phase 5A should land before Phase 4. The help-text rewrite in Phase 4 is
+most efficient when written over the final command surface. Landing 5A
+first (close, scroll-until, sleep, --long/--focus, wait --timeout,
+read --all) means Phase 4 only needs to be done once over the complete
+surface, rather than extended again after 5A adds new commands.
+
+Phase 4 (structured help, --json everywhere, --device global) is then a
+stable documentation and polish pass that lands on the full 5A surface
+before Phase 5B introduces higher-risk changes.
+
+Phase 5B (`exec` rename, `wait-for-nav`, `read-value`) lands after
+Phase 4. These are higher-risk contract changes and benefit from a clean,
+tested baseline established by Phase 4.
 
 Phase 5 depends on Phase 3 (selector flags) and Phase 1 (registry).
 Within Phase 5, complete all 5A deliverables before starting 5B. 5A
@@ -1601,9 +1617,9 @@ change as a precondition for the latter two.
 
 Phase 5C (`read --container-*`) is independent of 5A and 5B in terms of
 code but requires an APK change as a hard prerequisite. It can be worked
-in parallel with 5A/5B as long as the APK change lands on the target
-device before the CLI change is considered done. Do not merge the Node
-side of 5C without the APK side.
+in parallel with any phase as long as the APK change lands before the CLI
+change is considered done. Do not merge the Node side of 5C without the
+APK side.
 
 Docs work (`tasks/docs/refactor/`) begins only after Phase 5 is complete.
 
