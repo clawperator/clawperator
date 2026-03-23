@@ -6,6 +6,7 @@ import { buildTypeTextExecution } from "../../domain/actions/typeText.js";
 import { buildOpenAppExecution } from "../../domain/actions/openApp.js";
 import { buildOpenUriExecution } from "../../domain/actions/openUri.js";
 import { buildPressKeyExecution } from "../../domain/actions/pressKey.js";
+import { buildScrollExecution } from "../../domain/actions/scroll.js";
 import type { NodeMatcher } from "../../contracts/selectors.js";
 import type { OutputOptions } from "../output.js";
 import { formatSuccess, formatError } from "../output.js";
@@ -224,6 +225,38 @@ export async function cmdActionPressKey(options: {
 }): Promise<string> {
   try {
     const execution = buildPressKeyExecution(options.key);
+    const result = await runExecution(execution, {
+      deviceId: options.deviceId,
+      operatorPackage: options.operatorPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
+      warn: message => process.stderr.write(message),
+      logger: options.logger,
+    });
+    if (result.ok)
+      return formatSuccess(
+        {
+          envelope: result.envelope,
+          deviceId: result.deviceId,
+          terminalSource: result.terminalSource,
+          isCanonicalTerminal: result.terminalSource === "clawperator_result",
+        },
+        options
+      );
+    return formatError(result.error, options);
+  } catch (e) {
+    return formatError(e, options);
+  }
+}
+
+export async function cmdScroll(options: {
+  format: OutputOptions["format"];
+  direction: string;
+  deviceId?: string;
+  operatorPackage?: string;
+  timeoutMs?: number;
+  logger?: Logger;
+}): Promise<string> {
+  try {
+    const execution = buildScrollExecution(options.direction, options.timeoutMs);
     const result = await runExecution(execution, {
       deviceId: options.deviceId,
       operatorPackage: options.operatorPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,

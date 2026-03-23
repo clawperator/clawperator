@@ -254,6 +254,137 @@ Notes:
   - For normal setup, always use clawperator operator setup instead.
 `;
 
+const HELP_SNAPSHOT = `clawperator snapshot
+
+Usage:
+  clawperator snapshot [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
+
+Notes:
+  - Returns the current Android UI hierarchy as XML.
+  - Output includes envelope, stepResults[0].actionType = "snapshot_ui", stepResults[0].data.text (XML).
+  - --timeout overrides the default execution timeout (default: 30000 ms).
+`;
+
+const HELP_SCREENSHOT = `clawperator screenshot
+
+Usage:
+  clawperator screenshot [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--path <file>] [--json]
+
+Notes:
+  - Captures a screenshot from the connected device.
+  - --path saves the PNG to the specified file path; if omitted, the image is base64-encoded in the output.
+  - --timeout overrides the default execution timeout.
+`;
+
+const HELP_CLICK = `clawperator click
+
+Usage:
+  clawperator click --selector '<json>' [--device <id>] [--operator-package <pkg>] [--json]
+
+Required:
+  --selector <json>    Element selector (JSON object, e.g. '{"textEquals":"Wi-Fi"}')
+
+Notes:
+  - Performs a tap on the first matching element.
+  - Exits with MISSING_SELECTOR if --selector is omitted.
+  - Synonym: tap (accepted, not in help)
+`;
+
+const HELP_OPEN = `clawperator open
+
+Usage:
+  clawperator open <package-id>        Open an Android app
+  clawperator open <url>               Open a URL in the browser
+  clawperator open <uri>               Open a deep link
+
+Options:
+  --app <package>      Explicitly open as Android app package (override for ambiguous cases)
+
+Notes:
+  - Target detection: https?:// or any *:// scheme -> URI, otherwise -> package name.
+  - Synonyms: open-uri, open-url (accepted, not in help)
+`;
+
+const HELP_TYPE = `clawperator type
+
+Usage:
+  clawperator type <text> --selector '<json>' [--device <id>] [--operator-package <pkg>] [--submit] [--clear] [--json]
+
+Required:
+  --selector <json>    Element selector (JSON object, e.g. '{"textEquals":"Search"}')
+
+Options:
+  --submit             Press Enter after typing
+  --clear              Clear existing text before typing
+
+Notes:
+  - Types text into the first matching element.
+  - Text may be supplied as a positional argument or via --text <text>.
+  - Synonym: fill (accepted, not in help)
+`;
+
+const HELP_READ = `clawperator read
+
+Usage:
+  clawperator read --selector '<json>' [--device <id>] [--operator-package <pkg>] [--json]
+
+Required:
+  --selector <json>    Element selector (JSON object, e.g. '{"textEquals":"Battery"}')
+
+Notes:
+  - Returns the text content of the first matching element.
+`;
+
+const HELP_WAIT = `clawperator wait
+
+Usage:
+  clawperator wait --selector '<json>' [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
+
+Required:
+  --selector <json>    Element selector (JSON object, e.g. '{"textEquals":"Done"}')
+
+Notes:
+  - Waits until the first matching element appears.
+  - --timeout overrides the default wait timeout.
+`;
+
+const HELP_PRESS = `clawperator press
+
+Usage:
+  clawperator press <key> [--device <id>] [--operator-package <pkg>] [--json]
+
+Valid keys:
+  back       Navigate to previous screen
+  home       Return to home screen
+  recents    Open recent apps
+
+Notes:
+  - Key may be supplied as a positional argument or via --key <key>.
+  - Synonym: press-key (accepted, not in help)
+`;
+
+const HELP_BACK = `clawperator back
+
+Usage:
+  clawperator back [--device <id>] [--operator-package <pkg>] [--json]
+
+Notes:
+  - Presses the Android back key. Equivalent to 'clawperator press back'.
+`;
+
+const HELP_SCROLL = `clawperator scroll
+
+Usage:
+  clawperator scroll <direction> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
+
+Valid directions:
+  down, up, left, right
+
+Notes:
+  - Direction may be supplied as a positional argument or via --direction <direction>.
+  - --timeout overrides the default execution timeout (default: 30000 ms).
+`;
+
 const HELP_EMULATOR = `clawperator emulator
 
 Usage:
@@ -504,6 +635,292 @@ COMMANDS["execute"] = {
         });
       }
     }
+  },
+};
+
+// Device Interaction commands
+
+COMMANDS["snapshot"] = {
+  name: "snapshot",
+  group: "Device Interaction",
+  summary: "Get current Android UI hierarchy as XML",
+  help: HELP_SNAPSHOT,
+  topLevelBlock: `  snapshot [--device <id>] [--json]            Get current Android UI hierarchy as XML`,
+  handler: async (ctx) => {
+    const { format, logger, deviceId, operatorPackage, timeoutMs } = ctx;
+    const invalidTimeout = getInvalidTimeoutResult(timeoutMs, { format });
+    if (invalidTimeout) return invalidTimeout;
+    return (await import("./commands/observe.js")).cmdObserveSnapshot({
+      format,
+      deviceId,
+      operatorPackage,
+      timeoutMs,
+      logger,
+    });
+  },
+};
+
+COMMANDS["screenshot"] = {
+  name: "screenshot",
+  group: "Device Interaction",
+  summary: "Capture a screenshot from the device",
+  help: HELP_SCREENSHOT,
+  topLevelBlock: `  screenshot [--device <id>] [--path <file>] [--json]
+                                            Capture a screenshot from the device`,
+  handler: async (ctx) => {
+    const { rest, format, logger, deviceId, operatorPackage, timeoutMs } = ctx;
+    const invalidTimeout = getInvalidTimeoutResult(timeoutMs, { format });
+    if (invalidTimeout) return invalidTimeout;
+    const path = getStringOpt(rest, "--path");
+    return (await import("./commands/observe.js")).cmdObserveScreenshot({
+      format,
+      deviceId,
+      operatorPackage,
+      timeoutMs,
+      path,
+      logger,
+    });
+  },
+};
+
+COMMANDS["click"] = {
+  name: "click",
+  synonyms: ["tap"],
+  group: "Device Interaction",
+  summary: "Tap the first matching UI element",
+  help: HELP_CLICK,
+  topLevelBlock: `  click --selector '<json>' [--device <id>] [--json]
+                                            Tap the first matching UI element`,
+  handler: async (ctx) => {
+    const { rest, format, logger, deviceId, operatorPackage } = ctx;
+    const selector = getOpt(rest, "--selector");
+    if (!selector) {
+      return JSON.stringify({
+        code: "MISSING_SELECTOR",
+        message: "click requires a selector.\n\nUsage:\n  clawperator click --selector '{\"textEquals\":\"...\"}'\n\nSee: clawperator click --help",
+      });
+    }
+    return (await import("./commands/action.js")).cmdActionClick({
+      format,
+      selector,
+      deviceId,
+      operatorPackage,
+      logger,
+    });
+  },
+};
+
+COMMANDS["open"] = {
+  name: "open",
+  synonyms: ["open-uri", "open-url"],
+  group: "Device Interaction",
+  summary: "Open an app, URL, or URI on the device",
+  help: HELP_OPEN,
+  topLevelBlock: `  open <package-id|url|uri> [--device <id>] [--json]
+                                            Open an app, URL, or URI on the device`,
+  handler: async (ctx) => {
+    const { rest, format, logger, deviceId, operatorPackage } = ctx;
+    const appFlag = getOpt(rest, "--app");
+    const positional = rest.find((a) => !a.startsWith("-"));
+    const target = appFlag ?? positional;
+    if (!target || target.trim().length === 0) {
+      return JSON.stringify({
+        code: "MISSING_ARGUMENT",
+        message:
+          "open requires a target.\n\nUsage:\n  clawperator open <package-id>       Open an Android app\n  clawperator open <url>              Open a URL in browser\n  clawperator open <uri>              Open a deep link\n\nExamples:\n  clawperator open com.android.settings\n  clawperator open https://example.com",
+      });
+    }
+    if (appFlag || !/[a-z][a-z0-9+\-.]*:\/\//i.test(target)) {
+      // Explicit --app flag, or no URI scheme detected: treat as package name
+      return (await import("./commands/action.js")).cmdActionOpenApp({
+        format,
+        applicationId: target,
+        deviceId,
+        operatorPackage,
+        logger,
+      });
+    } else {
+      // Has a URI scheme (https://, myapp://, etc.): treat as URI
+      return (await import("./commands/action.js")).cmdActionOpenUri({
+        format,
+        uri: target,
+        deviceId,
+        operatorPackage,
+        logger,
+      });
+    }
+  },
+};
+
+COMMANDS["type"] = {
+  name: "type",
+  synonyms: ["fill"],
+  group: "Device Interaction",
+  summary: "Type text into the first matching UI element",
+  help: HELP_TYPE,
+  topLevelBlock: `  type <text> --selector '<json>' [--device <id>] [--json]
+                                            Type text into the first matching UI element`,
+  handler: async (ctx) => {
+    const { rest, format, logger, deviceId, operatorPackage } = ctx;
+    const selector = getOpt(rest, "--selector");
+    if (!selector) {
+      return JSON.stringify({
+        code: "MISSING_SELECTOR",
+        message: "type requires a selector.\n\nUsage:\n  clawperator type <text> --selector '{\"textEquals\":\"...\"}'\n\nSee: clawperator type --help",
+      });
+    }
+    const textFlag = getOpt(rest, "--text");
+    const positional = rest.find((a) => !a.startsWith("-"));
+    const text = textFlag ?? positional;
+    if (!text) {
+      return JSON.stringify({
+        code: "MISSING_ARGUMENT",
+        message: "type requires text to type. Pass text as a positional argument or via --text <text>.",
+      });
+    }
+    return (await import("./commands/action.js")).cmdActionType({
+      format,
+      selector,
+      text,
+      submit: hasFlag(rest, "--submit"),
+      clear: hasFlag(rest, "--clear"),
+      deviceId,
+      operatorPackage,
+      logger,
+    });
+  },
+};
+
+COMMANDS["read"] = {
+  name: "read",
+  group: "Device Interaction",
+  summary: "Read text from the first matching UI element",
+  help: HELP_READ,
+  topLevelBlock: `  read --selector '<json>' [--device <id>] [--json]
+                                            Read text from the first matching UI element`,
+  handler: async (ctx) => {
+    const { rest, format, logger, deviceId, operatorPackage } = ctx;
+    const selector = getOpt(rest, "--selector");
+    if (!selector) {
+      return JSON.stringify({
+        code: "MISSING_SELECTOR",
+        message: "read requires a selector.\n\nUsage:\n  clawperator read --selector '{\"textEquals\":\"...\"}'\n\nSee: clawperator read --help",
+      });
+    }
+    return (await import("./commands/action.js")).cmdActionRead({
+      format,
+      selector,
+      deviceId,
+      operatorPackage,
+      logger,
+    });
+  },
+};
+
+COMMANDS["wait"] = {
+  name: "wait",
+  group: "Device Interaction",
+  summary: "Wait until a matching UI element appears",
+  help: HELP_WAIT,
+  topLevelBlock: `  wait --selector '<json>' [--device <id>] [--json]
+                                            Wait until a matching UI element appears`,
+  handler: async (ctx) => {
+    const { rest, format, logger, deviceId, operatorPackage, timeoutMs } = ctx;
+    const invalidTimeout = getInvalidTimeoutResult(timeoutMs, { format });
+    if (invalidTimeout) return invalidTimeout;
+    const selector = getOpt(rest, "--selector");
+    if (!selector) {
+      return JSON.stringify({
+        code: "MISSING_SELECTOR",
+        message: "wait requires a selector.\n\nUsage:\n  clawperator wait --selector '{\"textEquals\":\"...\"}'\n\nSee: clawperator wait --help",
+      });
+    }
+    return (await import("./commands/action.js")).cmdActionWait({
+      format,
+      selector,
+      deviceId,
+      operatorPackage,
+      logger,
+    });
+  },
+};
+
+COMMANDS["press"] = {
+  name: "press",
+  synonyms: ["press-key"],
+  group: "Device Interaction",
+  summary: "Press a hardware key on the device",
+  help: HELP_PRESS,
+  topLevelBlock: `  press <back|home|recents> [--device <id>] [--json]
+                                            Press a hardware key on the device`,
+  handler: async (ctx) => {
+    const { rest, format, logger, deviceId, operatorPackage } = ctx;
+    const keyFlag = getOpt(rest, "--key");
+    const positional = rest.find((a) => !a.startsWith("-"));
+    const key = keyFlag ?? positional;
+    if (!key) {
+      return JSON.stringify({
+        code: "MISSING_ARGUMENT",
+        message: "press requires a key name.\n\nValid keys: back, home, recents\n\nExample:\n  clawperator press back",
+      });
+    }
+    return (await import("./commands/action.js")).cmdActionPressKey({
+      format,
+      key,
+      deviceId,
+      operatorPackage,
+      logger,
+    });
+  },
+};
+
+COMMANDS["back"] = {
+  name: "back",
+  group: "Device Interaction",
+  summary: "Press the Android back key",
+  help: HELP_BACK,
+  topLevelBlock: `  back [--device <id>] [--json]               Press the Android back key`,
+  handler: async (ctx) => {
+    const { format, logger, deviceId, operatorPackage } = ctx;
+    return (await import("./commands/action.js")).cmdActionPressKey({
+      format,
+      key: "back",
+      deviceId,
+      operatorPackage,
+      logger,
+    });
+  },
+};
+
+COMMANDS["scroll"] = {
+  name: "scroll",
+  group: "Device Interaction",
+  summary: "Scroll the screen in a direction",
+  help: HELP_SCROLL,
+  topLevelBlock: `  scroll <down|up|left|right> [--device <id>] [--json]
+                                            Scroll the screen in a direction`,
+  handler: async (ctx) => {
+    const { rest, format, logger, deviceId, operatorPackage, timeoutMs } = ctx;
+    const invalidTimeout = getInvalidTimeoutResult(timeoutMs, { format });
+    if (invalidTimeout) return invalidTimeout;
+    const directionFlag = getOpt(rest, "--direction");
+    const positional = rest.find((a) => !a.startsWith("-"));
+    const direction = directionFlag ?? positional;
+    const validDirections = ["down", "up", "left", "right"];
+    if (!direction || !validDirections.includes(direction)) {
+      return JSON.stringify({
+        code: "MISSING_ARGUMENT",
+        message: `scroll requires a direction.\n\nValid directions: ${validDirections.join(", ")}\n\nExamples:\n  clawperator scroll down\n  clawperator scroll up`,
+      });
+    }
+    return (await import("./commands/action.js")).cmdScroll({
+      format,
+      direction,
+      deviceId,
+      operatorPackage,
+      timeoutMs,
+      logger,
+    });
   },
 };
 
@@ -945,8 +1362,8 @@ export function generateTopLevelHelp(commands: Record<string, CommandDef>): stri
     "Notes:",
     "  - operator setup is the canonical setup command. operator install remains an alias.",
     "  - recording is the canonical command family; 'record' is a supported short alias.",
-    "  - inspect ui is a wrapper alias over observe snapshot.",
-    "  - action commands are thin wrappers that compile to execution and call execute.",
+    "  - Flat commands (snapshot, click, open, type, read, wait, press, back, scroll) are the canonical device interaction surface.",
+    "  - The old nested forms (observe snapshot, action click, etc.) are removed; they suggest the flat replacement.",
     "  - The default receiver package is com.clawperator.operator. Use --operator-package com.clawperator.operator.dev for local debug builds.",
     "  - Terminal result semantics are driven by [Clawperator-Result].",
     ""

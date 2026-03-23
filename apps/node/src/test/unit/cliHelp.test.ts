@@ -342,3 +342,130 @@ describe("operator setup CLI output", () => {
     assert.strictEqual(obj.suggestion, "screenshot");
   });
 });
+
+describe("promoted flat commands - help and missing-arg errors", () => {
+  it("snapshot --help shows snapshot help", async () => {
+    const { stdout, code } = await runCli(["snapshot", "--help"]);
+    assert.strictEqual(code, 0);
+    assert.match(stdout, /clawperator snapshot/);
+    assert.match(stdout, /--timeout <ms>/);
+  });
+
+  it("screenshot --help shows screenshot help", async () => {
+    const { stdout, code } = await runCli(["screenshot", "--help"]);
+    assert.strictEqual(code, 0);
+    assert.match(stdout, /clawperator screenshot/);
+    assert.match(stdout, /--path <file>/);
+  });
+
+  it("click --help shows click help", async () => {
+    const { stdout, code } = await runCli(["click", "--help"]);
+    assert.strictEqual(code, 0);
+    assert.match(stdout, /clawperator click/);
+    assert.match(stdout, /--selector/);
+  });
+
+  it("click with no selector returns MISSING_SELECTOR with exit code 1", async () => {
+    const { stdout, code } = await runCli(["click"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "MISSING_SELECTOR");
+    assert.match(obj.message ?? "", /click requires a selector/);
+  });
+
+  it("open --help shows open help", async () => {
+    const { stdout, code } = await runCli(["open", "--help"]);
+    assert.strictEqual(code, 0);
+    assert.match(stdout, /clawperator open/);
+    assert.match(stdout, /package-id/);
+  });
+
+  it("open with no target returns MISSING_ARGUMENT with exit code 1", async () => {
+    const { stdout, code } = await runCli(["open"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "MISSING_ARGUMENT");
+    assert.match(obj.message ?? "", /open requires a target/);
+    assert.match(obj.message ?? "", /com.android.settings/);
+    assert.match(obj.message ?? "", /https:\/\/example.com/);
+  });
+
+  it("press --help shows press help", async () => {
+    const { stdout, code } = await runCli(["press", "--help"]);
+    assert.strictEqual(code, 0);
+    assert.match(stdout, /clawperator press/);
+    assert.match(stdout, /back/);
+  });
+
+  it("press with no key returns MISSING_ARGUMENT with exit code 1", async () => {
+    const { stdout, code } = await runCli(["press"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "MISSING_ARGUMENT");
+    assert.match(obj.message ?? "", /press requires a key/);
+    assert.match(obj.message ?? "", /back/);
+  });
+
+  it("scroll --help shows scroll help", async () => {
+    const { stdout, code } = await runCli(["scroll", "--help"]);
+    assert.strictEqual(code, 0);
+    assert.match(stdout, /clawperator scroll/);
+    assert.match(stdout, /down/);
+  });
+
+  it("scroll with no direction returns MISSING_ARGUMENT with exit code 1", async () => {
+    const { stdout, code } = await runCli(["scroll"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "MISSING_ARGUMENT");
+    assert.match(obj.message ?? "", /scroll requires a direction/);
+  });
+
+  it("scroll with invalid direction returns MISSING_ARGUMENT with exit code 1", async () => {
+    const { stdout, code } = await runCli(["scroll", "sideways"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "MISSING_ARGUMENT");
+    assert.match(obj.message ?? "", /scroll requires a direction/);
+  });
+
+  it("type with no selector returns MISSING_SELECTOR with exit code 1", async () => {
+    const { stdout, code } = await runCli(["type", "hello"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "MISSING_SELECTOR");
+    assert.match(obj.message ?? "", /type requires a selector/);
+  });
+
+  it("read with no selector returns MISSING_SELECTOR with exit code 1", async () => {
+    const { stdout, code } = await runCli(["read"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "MISSING_SELECTOR");
+    assert.match(obj.message ?? "", /read requires a selector/);
+  });
+
+  it("wait with no selector returns MISSING_SELECTOR with exit code 1", async () => {
+    const { stdout, code } = await runCli(["wait"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "MISSING_SELECTOR");
+    assert.match(obj.message ?? "", /wait requires a selector/);
+  });
+
+  it("screenshot --path with missing value returns USAGE with exit code 1", async () => {
+    const { stdout, code } = await runCli(["screenshot", "--path"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "USAGE");
+    assert.strictEqual(obj.message, "--path requires a value");
+  });
+
+  it("tap synonym dispatches to click handler (missing selector returns MISSING_SELECTOR)", async () => {
+    const { stdout, code } = await runCli(["tap"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "MISSING_SELECTOR");
+    assert.match(obj.message ?? "", /click requires a selector/);
+  });
+});

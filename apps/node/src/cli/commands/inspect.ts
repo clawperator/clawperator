@@ -1,5 +1,7 @@
 /**
- * inspect ui is an alias of snapshot (single implementation).
+ * inspect.ts - legacy compatibility shim (no longer registered in COMMANDS).
+ * inspect ui was removed in the Phase 2 command surface refactor.
+ * Use 'snapshot' instead.
  */
 import { cmdObserveSnapshot } from "./observe.js";
 import type { OutputOptions } from "../output.js";
