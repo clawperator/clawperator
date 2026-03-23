@@ -351,13 +351,28 @@ function getGlobalOpts(argv: string[]): {
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--device-id" && argv[i + 1]) {
       deviceId = argv[++i];
+    } else if (argv[i] === "--device" && argv[i + 1]) {
+      // --device is the new canonical for --device-id (old name still works)
+      deviceId = argv[++i];
     } else if (argv[i] === "--receiver-package" && argv[i + 1]) {
+      receiverPackage = argv[++i];
+    } else if ((argv[i] === "--operator-package" || argv[i] === "--package") && argv[i + 1]) {
+      // --operator-package is the new canonical for --receiver-package
       receiverPackage = argv[++i];
     } else if ((argv[i] === "--output" || argv[i] === "--format") && argv[i + 1]) {
       output = argv[++i] === "pretty" ? "pretty" : "json";
+    } else if (argv[i] === "--json") {
+      // --json sets output to json (new canonical shorthand)
+      output = "json";
     } else if (argv[i] === "--timeout-ms") {
       if (!argv[i + 1]) {
         throw new UsageError("--timeout-ms requires a value");
+      }
+      timeoutMs = Number(argv[++i]);
+    } else if (argv[i] === "--timeout") {
+      // --timeout is the new canonical for --timeout-ms
+      if (!argv[i + 1]) {
+        throw new UsageError("--timeout requires a value");
       }
       timeoutMs = Number(argv[++i]);
     } else if (argv[i] === "--log-level") {
