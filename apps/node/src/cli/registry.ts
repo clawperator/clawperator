@@ -508,6 +508,50 @@ Examples:
   clawperator scroll down --container-role list
 `;
 
+const HELP_SCROLL_UNTIL = `clawperator scroll-until
+
+Usage:
+  clawperator scroll-until [<direction>] --text <text> [--click] [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
+  clawperator scroll-until [<direction>] --id <resource-id> [--click] [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
+
+Valid directions:
+  down, up, left, right (default: down)
+
+Selector flags (one is required):
+  --text <text>           Target element with exact visible text
+  --text-contains <text>  Target element with partial text match
+  --id <resource-id>      Target element by Android resource ID
+  --desc <text>           Target element by exact content description
+  --desc-contains <text>  Target element by partial content description
+  --role <role>           Target element by element role
+  --selector <json>       Target element by raw NodeMatcher JSON (mutually exclusive with simple flags)
+
+Container selector flags (all optional; restrict scroll to a specific scrollable container):
+  --container-text <text>           Container with exact visible text
+  --container-text-contains <text>  Container with partial text match
+  --container-id <resource-id>      Container by Android resource ID
+  --container-desc <text>           Container by exact content description
+  --container-desc-contains <text>  Container by partial content description
+  --container-role <role>           Container by element role
+  --container-selector <json>       Container by raw NodeMatcher JSON
+
+Options:
+  --click    Click the target element after scrolling to it (becomes scroll_and_click action)
+
+Notes:
+  - Synonym: scroll-and-click (implies --click)
+  - Without --click, the action type is scroll_until (scroll until element is visible).
+  - With --click, the action type is scroll_and_click (scroll until visible, then click).
+  - Tuning parameters (maxScrolls, maxDurationMs, etc.) are not exposed as CLI flags.
+    Use 'clawperator exec' with raw JSON for advanced tuning.
+
+Examples:
+  clawperator scroll-until --text "About phone"
+  clawperator scroll-until --text "Living room" --click
+  clawperator scroll-until up --text "Settings" --container-id "com.foo:id/list"
+  clawperator scroll-and-click --text "Submit"  (same as scroll-until --text "Submit" --click)
+`;
+
 const HELP_EMULATOR = `clawperator emulator
 
 Usage:
@@ -1099,6 +1143,78 @@ COMMANDS["scroll"] = {
       logger,
     });
   },
+};
+
+// scroll-until (and synonym scroll-and-click)
+const scrollUntilHandler = async (ctx: HandlerContext, clickAfterDefault: boolean): Promise<string | void> => {
+  const { rest, format, logger, deviceId, operatorPackage, timeoutMs } = ctx;
+  const invalidTimeout = getInvalidTimeoutResult(timeoutMs, { format });
+  if (invalidTimeout) return invalidTimeout;
+
+  // Check for selector flags
+  if (!hasElementSelectorFlag(rest)) {
+    return makeMissingSelectorError("scroll-until");
+  }
+
+  // Parse direction (positional or defaults to "down")
+  const scrollUntilValueFlags = [...ELEMENT_SELECTOR_VALUE_FLAGS, ...CONTAINER_SELECTOR_VALUE_FLAGS, "--click"];
+  const bare = barePositionalTokens(rest, scrollUntilValueFlags, []);
+  const direction = bare[0] ?? "down";
+  const validDirections = ["down", "up", "left", "right"];
+  if (!validDirections.includes(direction)) {
+    return JSON.stringify({
+      code: "MISSING_ARGUMENT",
+      message: `Invalid direction: ${direction}. Valid directions: ${validDirections.join(", ")}`,
+    });
+  }
+
+  // Resolve element matcher
+  const matcherResult = resolveElementMatcherFromCli(rest);
+  if (!matcherResult.ok) {
+    return formatError(matcherResult.error, { format });
+  }
+
+  // Resolve container matcher (optional)
+  const containerResult = resolveContainerMatcherFromCli(rest);
+  if (!containerResult.ok) {
+    return formatError(containerResult.error, { format });
+  }
+
+  // Check for --click flag
+  const clickAfter = clickAfterDefault || hasFlag(rest, "--click");
+
+  return (await import("./commands/action.js")).cmdScrollUntil({
+    format,
+    direction,
+    matcher: matcherResult.matcher,
+    container: containerResult.container,
+    clickAfter,
+    deviceId,
+    operatorPackage,
+    timeoutMs,
+    logger,
+  });
+};
+
+COMMANDS["scroll-until"] = {
+  name: "scroll-until",
+  group: "Device Interaction",
+  summary: "Scroll until a target element is visible",
+  help: HELP_SCROLL_UNTIL,
+  topLevelBlock: `  scroll-until [<direction>] --text <text> [--click] [--device <id>] [--json]
+                                            Scroll until a target element is visible (optionally click it)`,
+  handler: async (ctx) => scrollUntilHandler(ctx, false),
+};
+
+COMMANDS["scroll-and-click"] = {
+  name: "scroll-and-click",
+  synonyms: [],
+  group: "Device Interaction",
+  summary: "Scroll until target is visible, then click it (alias for scroll-until --click)",
+  help: HELP_SCROLL_UNTIL,
+  topLevelBlock: `  scroll-and-click [<direction>] --text <text> [--device <id>] [--json]
+                                            Scroll until target is visible, then click it`,
+  handler: async (ctx) => scrollUntilHandler(ctx, true),
 };
 
 // skills

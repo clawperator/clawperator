@@ -7,6 +7,7 @@ import { buildOpenAppExecution } from "../../domain/actions/openApp.js";
 import { buildOpenUriExecution } from "../../domain/actions/openUri.js";
 import { buildPressKeyExecution } from "../../domain/actions/pressKey.js";
 import { buildScrollExecution } from "../../domain/actions/scroll.js";
+import { buildScrollUntilExecution } from "../../domain/actions/scrollUntil.js";
 import type { NodeMatcher } from "../../contracts/selectors.js";
 import type { OutputOptions } from "../output.js";
 import { formatSuccess, formatError } from "../output.js";
@@ -248,6 +249,47 @@ export async function cmdScroll(options: {
 }): Promise<string> {
   try {
     const execution = buildScrollExecution(options.direction, options.timeoutMs, options.container);
+    const result = await runExecution(execution, {
+      deviceId: options.deviceId,
+      operatorPackage: options.operatorPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
+      warn: message => process.stderr.write(message),
+      logger: options.logger,
+    });
+    if (result.ok)
+      return formatSuccess(
+        {
+          envelope: result.envelope,
+          deviceId: result.deviceId,
+          terminalSource: result.terminalSource,
+          isCanonicalTerminal: result.terminalSource === "clawperator_result",
+        },
+        options
+      );
+    return formatError(result.error, options);
+  } catch (e) {
+    return formatError(e, options);
+  }
+}
+
+export async function cmdScrollUntil(options: {
+  format: OutputOptions["format"];
+  direction: string;
+  matcher: NodeMatcher;
+  container?: NodeMatcher;
+  clickAfter: boolean;
+  deviceId?: string;
+  operatorPackage?: string;
+  timeoutMs?: number;
+  logger?: Logger;
+}): Promise<string> {
+  try {
+    const execution = buildScrollUntilExecution(
+      options.direction,
+      options.matcher,
+      options.container,
+      options.clickAfter,
+      options.timeoutMs,
+    );
     const result = await runExecution(execution, {
       deviceId: options.deviceId,
       operatorPackage: options.operatorPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
