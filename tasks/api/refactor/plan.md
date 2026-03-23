@@ -15,7 +15,7 @@
 - [Skills Migration Strategy](#skills-migration-strategy)
 - [Sequencing](#sequencing)
 - [What Success Looks Like](#what-success-looks-like)
-- [Designed Surfaces (reference for Phase 5)](#designed-but-deferred-implementation-in-phase-5)
+- [Detailed Design Specs](#detailed-design-specs)
 - [Items Rejected](#items-rejected)
 
 ---
@@ -28,6 +28,7 @@ fixes across six phases.
 
 Reviewed 2026-03-23 by a second independent agent. Required changes incorporated.
 Reviewed 2026-03-23 by a third independent agent against actual source code.
+Reviewed 2026-03-23 (review 5, review 6). logs --follow scope contradiction resolved.
 Required changes incorporated.
 
 Primary inputs:
@@ -1176,7 +1177,7 @@ place, each of these is a registry entry + handler + tests.
    - Tuning params (`maxScrolls`, `maxDurationMs`, `distanceRatio`, etc.)
      are NOT CLI flags - use `exec` for those
    - Synonym: `scroll-and-click` (accepted, implies `--click`)
-   - See Designed but Deferred section for full spec and error examples
+   - See Detailed Design Specs section for full spec and error examples
 
 2. **`close` command**
 
@@ -1243,7 +1244,7 @@ place, each of these is a registry entry + handler + tests.
    - Validation: `durationMs >= 0`, capped at `MAX_EXECUTION_TIMEOUT_MS`
    - No selector flags - this is a raw timer
    - Builds execution with single `sleep` action, `params.durationMs` set
-   - See Designed but Deferred section for full spec
+   - See Detailed Design Specs section for full spec
 
 8. **`wait-for-nav` command**
 
@@ -1259,7 +1260,7 @@ place, each of these is a registry entry + handler + tests.
      Same wait-duration semantic as `wait --timeout`
    - At least one of `--app` or a selector flag required
    - Synonym: `wait-for-navigation`
-   - See Designed but Deferred section for full spec
+   - See Detailed Design Specs section for full spec
 
 9. **`read-value` command**
 
@@ -1271,7 +1272,7 @@ place, each of these is a registry entry + handler + tests.
    - `--label-id`, `--label-desc`: for other labelMatcher fields
    - `--all` + `--json`: returns all matches as array (same as `read --all`)
    - Synonym: `read-kv`
-   - See Designed but Deferred section for full spec
+   - See Detailed Design Specs section for full spec
 
 ### Risk
 
@@ -1425,15 +1426,16 @@ No flag name to look up. The help text confirms what the agent already guessed.
 
 ---
 
-## Designed but Deferred (implementation in Phase 5)
+## Detailed Design Specs
 
-These features have been designed to fit the new API surface. The CLI shapes
-below are settled decisions, not proposals. They are implemented in Phase 5.
-This section contains the full design rationale and detailed specs; Phase 5's
-deliverable list references this section.
+The CLI shapes below are settled decisions, not proposals. This section
+contains the full design rationale and detailed specs that Phase 5's
+deliverable list references.
 
-`logs --follow` is the exception - it requires streaming infrastructure
-beyond the scope of this refactor and is not scheduled in any phase.
+All items here are implemented in Phase 5 except `--follow` on logs, which
+is design-only. `logs --follow` requires streaming infrastructure beyond
+the scope of this refactor and is not scheduled in any phase. The design is
+recorded here so the surface is settled when that infrastructure is built.
 
 ### `scroll-until` (includes `scroll-and-click`)
 
@@ -1728,7 +1730,7 @@ Example:
 are specific to this command (not shared with the Phase 3 `--text`/`--id`
 selector flags, since they populate `labelMatcher` not `matcher`).
 
-### `--follow` on logs
+### `--follow` on logs (design only - not scheduled)
 
 ```bash
 clawperator logs --follow
@@ -1737,8 +1739,10 @@ clawperator logs -f
 
 - `-f` is the universal short form (tail -f, docker logs -f, kubectl logs -f)
 - Streams log output until interrupted (Ctrl+C)
-- Implementation requires streaming infrastructure; surface is designed now
-  so it fits cleanly when built
+- **Not implemented in any phase of this refactor.** Requires streaming
+  infrastructure that does not exist yet. The surface design is recorded
+  here so it is settled when that infrastructure is built. There is no
+  existing `logs` command - this is an entirely new command.
 
 ---
 
