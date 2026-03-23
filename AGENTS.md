@@ -199,7 +199,7 @@ When multiple devices are connected (physical + emulator), be explicit about whi
 ## Validation Commands
 - From the repo root, the Android Gradle app module tasks are typically invoked as `app:*` tasks such as `./gradlew app:assembleDebug`, `./gradlew app:testDebugUnitTest`, and `./gradlew app:installDebug`. Prefer the working task names already used in this file over guessing deeper module paths from the directory layout.
 - Permissions/bootstrap: `./scripts/clawperator_grant_android_permissions.sh`
-- Receiver ingress check: `./scripts/clawperator_validate_receiver.sh`
+- Operator ingress check: `./scripts/clawperator_validate_operator_ingress.sh`
 - Core smoke: `./scripts/clawperator_smoke_core.sh`
 - Skills smoke: `./scripts/clawperator_smoke_skills.sh`
 - Canonical integration check (opt-in): `CLAWPERATOR_RUN_INTEGRATION=1 ./scripts/clawperator_integration_canonical.sh`

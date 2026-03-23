@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Validate receiver ingress: send minimal snapshot_ui with unique commandId, then run logcat grep.
+# Validate Operator ingress (Android broadcast path into the Operator app): minimal snapshot_ui with
+# unique commandId, then logcat grep for correlatable Clawperator-Result / ACTION_AGENT_COMMAND lines.
 # Persists grep result for evidence doc and optional JSON summary.
 # Usage: one device connected (or set DEVICE_ID). Optional: CLAWPERATOR_SMOKE_SUMMARY or
 #        CLAWPERATOR_VALIDATE_SUMMARY=/path/to.json to write summary including logcatGrepOutput.
@@ -53,7 +54,7 @@ cat > "$VALIDATE_JSON" <<JSON
 {
   "commandId": "$VALIDATE_CMD_ID",
   "taskId": "validate-task-1",
-  "source": "validate-receiver",
+  "source": "validate-operator-ingress",
   "expectedFormat": "android-ui-automator",
   "timeoutMs": 20000,
   "actions": [
@@ -62,10 +63,10 @@ cat > "$VALIDATE_JSON" <<JSON
 }
 JSON
 
-GREP_OUTPUT_FILE="${CLAWPERATOR_OPERATOR_GREP_FILE:-/tmp/clawperator-receiver-grep.txt}"
+GREP_OUTPUT_FILE="${CLAWPERATOR_OPERATOR_GREP_FILE:-/tmp/clawperator-operator-ingress-grep.txt}"
 SUMMARY_OUT="${CLAWPERATOR_SMOKE_SUMMARY:-${CLAWPERATOR_VALIDATE_SUMMARY:-}}"
 
-echo "=== validate receiver ingress (commandId=$VALIDATE_CMD_ID) ==="
+echo "=== validate Operator ingress (commandId=$VALIDATE_CMD_ID) ==="
 adb -s "$DEVICE_ID" logcat -c
 set +e
 "${CLI[@]}" exec \
@@ -76,7 +77,7 @@ set +e
 EXEC_EXIT=$?
 set -e
 
-# Capture logcat lines that correlate to this command or receiver tags.
+# Capture logcat lines that correlate to this command or Operator / ACTION_AGENT_COMMAND tags.
 adb -s "$DEVICE_ID" logcat -d -t 800 \
   | awk -v cmd="$VALIDATE_CMD_ID" 'index($0, cmd) || $0 ~ /Clawperator-Result|ACTION_AGENT_COMMAND/' \
   > "$GREP_OUTPUT_FILE" || true
@@ -112,7 +113,7 @@ if [ -n "$SUMMARY_OUT" ]; then
     let existing = {};
     try { existing = JSON.parse(fs.readFileSync(path, 'utf8')); } catch (e) {}
     const grepContent = fs.readFileSync(grepFile, 'utf8');
-    existing.receiverValidation = {
+    existing.operatorIngressValidation = {
       timestamp: process.env.SMOKE_TIMESTAMP,
       deviceId: process.env.SMOKE_DEVICE_ID,
       operatorPackage: process.env.SMOKE_OPERATOR_PACKAGE,
@@ -121,8 +122,8 @@ if [ -n "$SUMMARY_OUT" ]; then
       logcatGrepOutput: grepContent
     };
     fs.writeFileSync(path, JSON.stringify(existing, null, 2));
-    console.log('Appended receiverValidation to', path);
+    console.log('Appended operatorIngressValidation to', path);
   "
 fi
 
-echo "=== validate receiver done ==="
+echo "=== validate Operator ingress done ==="
