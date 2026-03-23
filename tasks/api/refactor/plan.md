@@ -80,6 +80,9 @@ clawperator execute --execution '{"actions":          clawperator scroll-until -
 (no CLI command)                                      clawperator close com.android.settings
 clawperator execute --execution <json>                clawperator exec <json-or-file>
 clawperator read --selector '{"textEquals":"X"}'      clawperator read --text "X" --all --json
+(no CLI command)                                      clawperator sleep 2000
+(no CLI command)                                      clawperator wait-for-nav --app com.foo --timeout 5000
+(no CLI command)                                      clawperator read-value --label "Battery" --json
 ```
 
 ### Flags
@@ -107,6 +110,8 @@ click                    tap
 type                     fill
 press                    press-key
 open                     open-uri, open-url
+wait-for-nav             wait-for-navigation
+read-value               read-kv
 ```
 
 ### HTTP API Routes
@@ -294,7 +299,8 @@ The following commands' behavior is unchanged by this refactor:
 - `grant-device-permissions` (behavior unchanged; may appear in updated help
   text grouping in Phase 4, but its command contract is not being refactored)
 - `operator setup` / `operator install`
-- `skills *`, `emulator *`, `recording` / `record`
+- `skills *`, `emulator *`, `provision` (top-level alias for
+  `emulator provision`), `recording` / `record`
 - `serve` remains the same CLI entrypoint. Only the HTTP route paths exposed
   by `serve.ts` change (in Phase 4)
 - `execute` is renamed to `exec` with `execute` as a synonym (see Designed
@@ -1228,6 +1234,46 @@ place, each of these is a registry entry + handler + tests.
    - `--all` requires `--json` (error without it)
    - Without `--all`: unchanged single-match behavior
 
+7. **`sleep` command**
+
+   ```
+   clawperator sleep <ms> [--json]
+   ```
+
+   - Positional: duration in milliseconds (required)
+   - Validation: `durationMs >= 0`, capped at `MAX_EXECUTION_TIMEOUT_MS`
+   - No selector flags - this is a raw timer
+   - Builds execution with single `sleep` action, `params.durationMs` set
+   - See Designed but Deferred section for full spec
+
+8. **`wait-for-nav` command**
+
+   ```
+   clawperator wait-for-nav --app <package> --timeout <ms> [--json]
+   clawperator wait-for-nav --text <text> --timeout <ms> [--json]
+   ```
+
+   - `--app`: maps to `expectedPackage` (wait until app is in foreground)
+   - Selector flags: maps to `expectedNode` (wait until element appears
+     after navigation)
+   - `--timeout`: required, maps to action-level `timeoutMs` (max 30000ms).
+     Same wait-duration semantic as `wait --timeout`
+   - At least one of `--app` or a selector flag required
+   - Synonym: `wait-for-navigation`
+   - See Designed but Deferred section for full spec
+
+9. **`read-value` command**
+
+   ```
+   clawperator read-value --label <text> [--json]
+   ```
+
+   - `--label`: maps to `labelMatcher.textEquals` (required)
+   - `--label-id`, `--label-desc`: for other labelMatcher fields
+   - `--all` + `--json`: returns all matches as array (same as `read --all`)
+   - Synonym: `read-kv`
+   - See Designed but Deferred section for full spec
+
 ### Risk
 
 Low-medium. Each deliverable is independent and can land as a separate
@@ -1250,6 +1296,18 @@ around existing infrastructure. `--long`/`--focus`, `read --all`, and
 - `wait --text "X" --timeout 5000` waits up to 5 seconds
 - `read --text "X" --all --json` returns array of matches
 - `read --text "X" --all` without `--json` errors
+- `sleep 2000` pauses for 2 seconds
+- `sleep` without duration: error with usage example
+- `sleep -1` or `sleep 999999999`: validation error
+- `wait-for-nav --app com.foo --timeout 5000` waits for app transition
+- `wait-for-nav --text "Settings" --timeout 5000` waits for element after nav
+- `wait-for-nav` without `--app` or selector: error
+- `wait-for-nav --app com.foo` without `--timeout`: error
+- `wait-for-nav --timeout 50000`: error (max 30000ms)
+- `wait-for-navigation` works as synonym
+- `read-value --label "Battery" --json` reads associated value
+- `read-value` without `--label`: error with usage example
+- `read-kv` works as synonym
 - All smoke scripts and core skills still pass
 
 ---
@@ -1529,6 +1587,131 @@ clawperator read --text "Price" --all --json
 - Without `--all`, behavior is unchanged (first match, single value)
 - `--all` requires `--json` (error if used without it, since pretty output
   for a list is ambiguous)
+
+### `sleep` (execution pause)
+
+`sleep` is a canonical action type used in skill scaffolds and multi-action
+executions. Currently only available via `execute --execution <json>`. The
+CLI wrapper is trivial.
+
+**Designed surface:**
+
+```bash
+clawperator sleep 2000
+clawperator sleep 500 --json
+```
+
+- Positional: duration in milliseconds (required)
+- Validation: `durationMs >= 0`, capped at `MAX_EXECUTION_TIMEOUT_MS`
+- No selector flags, no `--timeout` override - `sleep` is a raw timer
+- Execution timeout set to `max(durationMs + 5000, globalTimeout)` to
+  ensure the envelope does not kill the sleep prematurely
+
+**Error when no duration provided:**
+```
+$ clawperator sleep
+Error: sleep requires a duration in milliseconds.
+
+Usage:
+  clawperator sleep <ms>
+
+Example:
+  clawperator sleep 2000
+```
+
+**Registry entry:** `sleep` gets its own entry with
+`positional: { name: "ms", required: true }`.
+
+**Implementation:** builds an execution with a single `sleep` action,
+`params.durationMs` set from the positional argument.
+
+### `wait-for-nav` (app/screen transition wait)
+
+`wait_for_navigation` is a canonical action type that waits for an app or
+screen transition. It is functionally distinct from `wait` (`wait_for_node`):
+`wait` looks for a specific UI element to appear, `wait-for-nav` waits for
+an app/screen transition to complete.
+
+**Designed surface:**
+
+```bash
+# Wait until a specific app is in the foreground
+clawperator wait-for-nav --app com.foo.bar --timeout 5000
+
+# Wait until a specific element appears after navigation
+clawperator wait-for-nav --text "Settings" --timeout 5000
+
+# Both: wait for app AND element
+clawperator wait-for-nav --app com.foo.bar --text "Home" --timeout 5000
+```
+
+- `--app <package>`: maps to `expectedPackage` in ActionParams
+- Selector flags (`--text`/`--id`/`--desc`/`--role` from Phase 3): maps to
+  `expectedNode` in ActionParams
+- `--timeout <ms>`: required, maps to action-level `timeoutMs` (max 30000ms).
+  Same wait-duration semantic as `wait --timeout` - this is how long to wait
+  for the transition, not the execution envelope timeout.
+- At least one of `--app` or a selector flag is required
+- Execution timeout set to `max(navTimeout + 5000, globalTimeout)`
+
+**Synonym:** `wait-for-navigation` (matches the canonical action type name).
+
+**Error when missing required args:**
+```
+$ clawperator wait-for-nav
+Error: wait-for-nav requires --app or a selector, and --timeout.
+
+Usage:
+  clawperator wait-for-nav --app <package> --timeout <ms>
+  clawperator wait-for-nav --text <text> --timeout <ms>
+
+Example:
+  clawperator wait-for-nav --app com.google.home --timeout 5000
+```
+
+**Registry entry:** `wait-for-nav` gets its own entry. No `requiresSelector`
+metadata since `--app` alone is sufficient (selectors are optional when
+`--app` is provided).
+
+### `read-value` (label-associated value read)
+
+`read_key_value_pair` is a canonical action type that reads the value
+associated with a labeled UI element (e.g., reading "85%" next to the
+"Battery" label). Currently only available via `execute --execution <json>`.
+
+**Designed surface:**
+
+```bash
+clawperator read-value --label "Battery" --json
+clawperator read-value --label-id "com.foo:id/battery_label" --json
+clawperator read-value --label "Wi-Fi" --all --json
+```
+
+- `--label <text>`: maps to `labelMatcher.textEquals` (required unless
+  another label flag is used)
+- `--label-id <id>`: maps to `labelMatcher.resourceId`
+- `--label-desc <text>`: maps to `labelMatcher.contentDescEquals`
+- At least one label flag is required
+- `--all` + `--json`: returns all matches as array (same semantics as
+  `read --all`)
+
+**Synonym:** `read-kv` (matches the `read_key_value_pair` shorthand).
+
+**Error when no label provided:**
+```
+$ clawperator read-value
+Error: read-value requires a label selector.
+
+Usage:
+  clawperator read-value --label <text> --json
+
+Example:
+  clawperator read-value --label "Battery" --json
+```
+
+**Registry entry:** `read-value` gets its own entry. The `--label*` flags
+are specific to this command (not shared with the Phase 3 `--text`/`--id`
+selector flags, since they populate `labelMatcher` not `matcher`).
 
 ### `--follow` on logs
 
