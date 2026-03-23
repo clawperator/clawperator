@@ -727,6 +727,9 @@ COMMANDS["open"] = {
     if (positional && uriFlag) {
       return JSON.stringify({ code: "USAGE", message: "Specify the target as a positional argument or --uri, not both." });
     }
+    if (appFlag && uriFlag) {
+      return JSON.stringify({ code: "USAGE", message: "--app and --uri are mutually exclusive. Provide one or the other." });
+    }
     const target = positional ?? appFlag ?? uriFlag;
     if (!target) {
       return JSON.stringify({

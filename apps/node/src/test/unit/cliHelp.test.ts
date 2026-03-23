@@ -401,6 +401,13 @@ describe("Phase 2 promoted commands", () => {
     assert.match(obj.message ?? "", /positional argument or --app/);
   });
 
+  it("returns USAGE when open has both --app and --uri flags", async () => {
+    const { stdout } = await runCli(["open", "--app", "com.example", "--uri", "https://example.com"]);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "USAGE");
+    assert.match(obj.message ?? "", /mutually exclusive/);
+  });
+
   it("returns USAGE when press has no key", async () => {
     const { stdout } = await runCli(["press"]);
     const obj = JSON.parse(stdout) as { code?: string; message?: string };
