@@ -385,7 +385,8 @@ Establish the foundation that makes Phases 1-4 safe.
      - `--timeout-ms` -> `--timeout`
      - `--receiver-package` -> `--operator-package` (rename)
      - `--package` -> `--operator-package` (alias for agents who guess it)
-   - Centralized so all commands inherit flag aliases automatically
+   - Centralized in `getGlobalOpts()` so all commands automatically inherit
+     the renamed global flags
 
 3. **Regression test coverage in the existing test suite**
    - Extend the existing subprocess-based tests in `apps/node/src/test/unit/`
@@ -457,7 +458,7 @@ but leaves the codebase harder to maintain after the refactor than before it.
      help: string;
      /** Positional argument spec, if any. */
      positional?: { name: string; required: boolean; description: string };
-     /** Whether this command requires element selectors. */
+     /** Metadata for error/help generation only; does not parse or validate selectors. */
      requiresSelector?: boolean;
      /** Help group for --help display (e.g. "Device Interaction", "Device Management"). */
      group: string;
@@ -619,6 +620,10 @@ but leaves the codebase harder to maintain after the refactor than before it.
    `group` field. Per-command `--help` uses the `help` field directly.
    `resolveHelpTopic()` is deleted - the registry replaces it.
 
+   In Phase 1, generated help output must preserve the existing wording
+   and test-visible structure closely enough that current help assertions
+   pass unchanged. Help content redesign is deferred to Phase 4.
+
    The generated top-level help output should roughly match the target
    structure from Phase 4 (see Phase 4, deliverable 1 for the format).
    But the content at this point still reflects the pre-promotion command
@@ -640,6 +645,8 @@ but leaves the codebase harder to maintain after the refactor than before it.
 
    Add a focused test that verifies `COMMANDS` entries are consistent:
    - Every synonym is unique across all commands
+   - No primary command name appears as another command's synonym
+   - No synonym collides with a primary command name or namespace name
    - Every command has a non-empty `summary` and `help`
    - Every command has a `group`
    - `handler` is a function
@@ -721,8 +728,10 @@ separable for review:
    | `inspect ui` | (removed, use `snapshot`) | - |
 
 2. **Add convenience commands**
-   - `back` = `press --key back` (most common key press)
-   - `scroll <direction>` = top-level scroll command
+   - `back` is its own registry entry whose handler delegates to the same
+     underlying key-press execution path as `press back`. It is a real
+     command, not a parser special case.
+   - `scroll <direction>` = top-level scroll command, also a registry entry.
 
    `scroll` spec (not deferred - this is a core primitive):
    ```
