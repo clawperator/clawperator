@@ -162,6 +162,14 @@ async function main(): Promise<void> {
       process.exitCode = 1;
       return;
     }
+    // Heuristic: treat bare-object JSON with a top-level "code" field (but not
+    // the result envelope shape, which carries "envelope") as an error signal.
+    // Fragile by design - carried over from the original switch dispatch.
+    // Invariants that keep this safe today:
+    //   - all error payloads are bare { code, message } objects
+    //   - all success payloads carry "envelope" somewhere in the string
+    //   - USAGE and NOT_IMPLEMENTED are informational and always exit 0
+    // If the envelope shape ever gains a top-level "code" field, revisit this.
     if (result.startsWith("{") && result.includes('"code"') && !result.includes('"envelope"')) {
       const obj = JSON.parse(result) as { code?: string };
       if (obj.code && obj.code !== "USAGE" && obj.code !== "NOT_IMPLEMENTED") {
