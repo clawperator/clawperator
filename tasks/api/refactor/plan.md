@@ -341,6 +341,27 @@ npm --prefix apps/node run build && npm --prefix apps/node run test
 
 Do this every time. Do not skip the build step.
 
+### Phase 1 starter checklist
+
+If you are beginning implementation from scratch, follow this order:
+
+1. Read the current `index.ts` dispatcher and identify the special cases that
+   do not behave like normal stdout-returning commands.
+2. Implement the registry as `Promise<string | void>`, not `Promise<string>`,
+   so `serve` can remain a long-running command without a fake wrapper.
+3. Keep the early intercepts (`help`, empty argv, `--version`) outside the
+   registry. They are not ordinary commands.
+4. Run `npm --prefix apps/node run build && npm --prefix apps/node run test`
+   after each meaningful registry chunk.
+5. Run `./scripts/clawperator_smoke_core.sh` after the promoted command set
+   changes, and verify on a connected device or emulator with `clawperator
+   devices` plus a small manual command sequence.
+6. Use the branch-local CLI build (`node apps/node/dist/cli/index.js ...`).
+   Do not use the global `clawperator` binary.
+7. If you touch docs later in the refactor, run the docs build and validation
+   steps only when the docs phase begins. Do not force docs validation into
+   Phase 1 unless the docs files changed.
+
 ### Test on a real device or emulator after every phase
 
 Unit tests prove the CLI parses arguments correctly. They do not prove the
