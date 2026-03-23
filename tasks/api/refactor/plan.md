@@ -1160,11 +1160,21 @@ the alpha/unstable status and zero external consumers.
 
 ## Phase 5: Extended Commands
 
-Implement the designed-but-deferred CLI surfaces that depend on Phase 3
-selector infrastructure and the Phase 1 registry. With the registry in
-place, each of these is a registry entry + handler + tests.
+Implement the extended CLI surfaces that depend on Phase 3 selector
+infrastructure and the Phase 1 registry. With the registry in place,
+each of these is a registry entry + handler + tests.
 
-### Deliverables
+Phase 5 is split into two sub-phases. **Phase 5A is required** - these
+are core agent-facing commands that complete the CLI surface. **Phase 5B
+is required but higher-risk** - these introduce new typed actions or
+rename an existing command, so they need more careful validation.
+Implement all of 5A before starting 5B.
+
+### Phase 5A: Core extended commands
+
+These are low-risk additions: new CLI wrappers around existing action
+types, or single-flag additions to existing handlers. Each can land as
+a separate commit.
 
 1. **`scroll-until` command**
 
@@ -1201,7 +1211,71 @@ place, each of these is a registry entry + handler + tests.
      `finalizeSuccessfulCloseAppSteps()`. Phase 5 only needs the CLI
      wrapper and execution builder.
 
-3. **`exec` rename**
+3. **`--long` and `--focus` flags on `click`**
+
+   ```
+   clawperator click --text "Settings" --long
+   clawperator click --text "Search" --focus
+   ```
+
+   - `--long` maps to `clickType: "long_click"`
+   - `--focus` maps to `clickType: "focus"`
+   - Mutually exclusive (error if both)
+   - **buildClickExecution signature change:** `buildClickExecution()` in
+     `domain/actions/click.ts` currently takes only a `NodeMatcher`
+     parameter. This deliverable requires adding an optional `clickType`
+     parameter to this builder.
+
+4. **`wait --timeout` semantic**
+
+   ```
+   clawperator wait --text "Loading" --timeout 5000
+   ```
+
+   - For `wait`, `--timeout` sets wait duration (not execution timeout)
+   - Execution timeout set to `max(waitTimeout + 5000, globalTimeout)`
+   - Default without `--timeout`: current 30s behavior
+
+5. **`read --all` flag**
+
+   ```
+   clawperator read --text "Price" --all --json
+   ```
+
+   - `--all` returns all matches as JSON array of strings (text content
+     of each matching node), e.g. `["$4.99", "$7.99"]`. Structured
+     match objects with node metadata are not in scope - agents that
+     need that should use `snapshot --json` and filter.
+   - `--all` requires `--json` (error without it)
+   - Without `--all`: unchanged single-match behavior
+
+6. **`sleep` command**
+
+   ```
+   clawperator sleep <ms> [--json]
+   ```
+
+   - Positional: duration in milliseconds (required)
+   - Validation: `durationMs >= 0`, capped at `MAX_EXECUTION_TIMEOUT_MS`
+   - No selector flags - this is a raw timer
+   - Builds execution with single `sleep` action, `params.durationMs` set
+   - See Detailed Design Specs section for full spec
+
+### Phase 5B: Higher-risk extended commands
+
+These are higher-risk because they either rename an existing command
+(`exec`) or introduce new typed actions that require contract changes
+(`wait-for-nav`, `read-value`). Implement these only after all Phase 5A
+deliverables have landed and tests pass.
+
+**Precondition: typed contract alignment.** Before implementing
+`wait-for-nav` and `read-value`, update `contracts/execution.ts` so
+`ActionParams` includes all fields already accepted by the runtime
+validation schema: `expectedPackage`, `expectedNode`, `timeoutMs`
+(action-level), and `labelMatcher`. Do not cast around the type system.
+This is a prerequisite, not optional cleanup.
+
+7. **`exec` rename**
 
    ```
    clawperator exec <json-or-file> [--validate-only] [--dry-run] [--json]
@@ -1216,52 +1290,6 @@ place, each of these is a registry entry + handler + tests.
      invalid JSON content -> missing payload.
    - `exec best-effort` subcommand unchanged
    - Behavior identical to current `execute`
-
-4. **`--long` and `--focus` flags on `click`**
-
-   ```
-   clawperator click --text "Settings" --long
-   clawperator click --text "Search" --focus
-   ```
-
-   - `--long` maps to `clickType: "long_click"`
-   - `--focus` maps to `clickType: "focus"`
-   - Mutually exclusive (error if both)
-
-5. **`wait --timeout` semantic**
-
-   ```
-   clawperator wait --text "Loading" --timeout 5000
-   ```
-
-   - For `wait`, `--timeout` sets wait duration (not execution timeout)
-   - Execution timeout set to `max(waitTimeout + 5000, globalTimeout)`
-   - Default without `--timeout`: current 30s behavior
-
-6. **`read --all` flag**
-
-   ```
-   clawperator read --text "Price" --all --json
-   ```
-
-   - `--all` returns all matches as JSON array of strings (text content
-     of each matching node), e.g. `["$4.99", "$7.99"]`. Structured
-     match objects with node metadata are not in scope - agents that
-     need that should use `snapshot --json` and filter.
-   - `--all` requires `--json` (error without it)
-   - Without `--all`: unchanged single-match behavior
-
-7. **`sleep` command**
-
-   ```
-   clawperator sleep <ms> [--json]
-   ```
-
-   - Positional: duration in milliseconds (required)
-   - Validation: `durationMs >= 0`, capped at `MAX_EXECUTION_TIMEOUT_MS`
-   - No selector flags - this is a raw timer
-   - Builds execution with single `sleep` action, `params.durationMs` set
-   - See Detailed Design Specs section for full spec
 
 8. **`wait-for-nav` command**
 
@@ -1293,29 +1321,17 @@ place, each of these is a registry entry + handler + tests.
 
 ### Risk
 
-Low-medium. Each deliverable is independent and can land as a separate
-commit. `scroll-until` is the largest (new builder, new handler, selector
-+ container flag parsing). `exec` rename and `close` are thin wrappers
-around existing infrastructure. `--long`/`--focus`, `read --all`, and
-`wait --timeout` are single-flag additions to existing handlers.
-
-### Precondition: typed contract alignment
-
-Before implementing `wait-for-nav` and `read-value`, update
-`contracts/execution.ts` so `ActionParams` includes all fields already
-accepted by the runtime validation schema: `expectedPackage`,
-`expectedNode`, `timeoutMs` (action-level), and `labelMatcher`. Do not
-cast around the type system. This is a prerequisite, not optional cleanup.
+Low-medium. Phase 5A deliverables are low-risk: CLI wrappers around
+existing action types or single-flag additions. Phase 5B deliverables
+are medium-risk: `exec` rename touches an existing command surface,
+`wait-for-nav` and `read-value` require the ActionParams contract
+change and new typed builders.
 
 ### Implementation notes for Phase 5 agents
 
-- **buildClickExecution signature:** `buildClickExecution()` in
-  `domain/actions/click.ts` currently takes only a `NodeMatcher`
-  parameter. Deliverable 4 (`--long`/`--focus`) requires adding an
-  optional `clickType` parameter to this builder.
 - **`logs` command does not exist yet:** The deferred `logs --follow`
   design requires building an entirely new `logs` command, not just
-  adding a flag to an existing one.
+  adding a flag to an existing one. It is not part of Phase 5.
 
 ### Testing
 
@@ -1415,10 +1431,14 @@ already exist in their flat form.
 
 Phase 4 is polish and should land before Phase 5.
 
-Phase 5 depends on Phase 3 (selector flags) and Phase 1 (registry). Its
+Phase 5 depends on Phase 3 (selector flags) and Phase 1 (registry).
+Within Phase 5, complete all 5A deliverables before starting 5B. 5A
 deliverables are independent of each other and can land as separate PRs.
-`scroll-until` is the largest; `close`, `exec` rename, `--long`/`--focus`,
-`wait --timeout`, and `read --all` are each small enough for a single commit.
+`scroll-until` is the largest; `close`, `--long`/`--focus`,
+`wait --timeout`, `read --all`, and `sleep` are each small enough for a
+single commit. 5B deliverables (`exec` rename, `wait-for-nav`,
+`read-value`) are also independent but require the ActionParams contract
+change as a precondition for the latter two.
 
 Docs work (`tasks/docs/refactor/`) begins only after Phase 5 is complete.
 
