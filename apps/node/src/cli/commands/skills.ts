@@ -134,7 +134,7 @@ export async function cmdSkillsRun(
   args: string[],
   timeoutMs: number | undefined,
   expectContains: string | undefined,
-  receiverPackage: string | undefined,
+  operatorPackage: string | undefined,
   options: {
     format: OutputOptions["format"];
     skipValidate?: boolean;
@@ -147,7 +147,7 @@ export async function cmdSkillsRun(
   // Resolve the env vars for the skill script
   // Priority: explicit flag > env var > default
   const resolvedBin = resolveSkillBinCommand();
-  const resolvedReceiverPackage = receiverPackage ?? resolveReceiverPackage();
+  const resolvedReceiverPackage = operatorPackage ?? resolveReceiverPackage();
 
   const env: SkillRunEnv = {
     [CLAWPERATOR_BIN_ENV_VAR]: resolvedBin,
@@ -159,7 +159,7 @@ export async function cmdSkillsRun(
   if (options.format !== "json") {
     const config = getDefaultRuntimeConfig({
       deviceId: options.deviceId,
-      receiverPackage: resolvedReceiverPackage,
+      operatorPackage: resolvedReceiverPackage,
       logger: options.logger,
     });
     let apkStatus = `MISSING - run \`clawperator operator setup --apk <path>\``;
@@ -169,7 +169,7 @@ export async function cmdSkillsRun(
         apkStatus = `OK (${resolvedReceiverPackage})`;
       } else if (apkPresence.status === "warn") {
         const alternateVariant = getAlternateReceiverVariant(resolvedReceiverPackage);
-        apkStatus = `WARN - ${apkPresence.summary}${apkPresence.detail ? ` ${apkPresence.detail}` : ""} Use --receiver-package ${alternateVariant} or reinstall the matching APK.`;
+        apkStatus = `WARN - ${apkPresence.summary}${apkPresence.detail ? ` ${apkPresence.detail}` : ""} Use --operator-package ${alternateVariant} or reinstall the matching APK.`;
       } else {
         apkStatus = `FAIL - ${apkPresence.summary}${apkPresence.detail ? ` ${apkPresence.detail}` : ""}`;
       }

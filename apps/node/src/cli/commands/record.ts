@@ -13,14 +13,14 @@ export async function cmdRecordStart(options: {
   format: OutputOptions["format"];
   sessionId?: string;
   deviceId?: string;
-  receiverPackage?: string;
+  operatorPackage?: string;
   logger?: Logger;
 }): Promise<string> {
   try {
     const execution = buildStartRecordingExecution(options.sessionId);
     const result = await runExecution(execution, {
       deviceId: options.deviceId,
-      receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
+      operatorPackage: options.operatorPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
       warn: message => process.stderr.write(message),
       logger: options.logger,
     });
@@ -45,14 +45,14 @@ export async function cmdRecordStop(options: {
   format: OutputOptions["format"];
   sessionId?: string;
   deviceId?: string;
-  receiverPackage?: string;
+  operatorPackage?: string;
   logger?: Logger;
 }): Promise<string> {
   try {
     const execution = buildStopRecordingExecution(options.sessionId);
     const result = await runExecution(execution, {
       deviceId: options.deviceId,
-      receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
+      operatorPackage: options.operatorPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
       warn: message => process.stderr.write(message),
       logger: options.logger,
     });
@@ -78,14 +78,14 @@ export async function cmdRecordPull(options: {
   sessionId?: string;
   outputDir: string;
   deviceId?: string;
-  receiverPackage?: string;
+  operatorPackage?: string;
   logger?: Logger;
 }): Promise<string> {
   try {
     const config = getDefaultRuntimeConfig({
       logger: options.logger,
       deviceId: options.deviceId,
-      receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
+      operatorPackage: options.operatorPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
     });
 
     const { localPath, sessionId } = await pullRecording(config, {

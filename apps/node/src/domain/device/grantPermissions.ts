@@ -27,7 +27,7 @@ export interface NotificationListenerGrantResult {
 }
 
 export interface PermissionGrantResult {
-  receiverPackage: string;
+  operatorPackage: string;
   accessibility: AccessibilityGrantResult;
   notification: NotificationGrantResult;
   notificationListener: NotificationListenerGrantResult;
@@ -58,9 +58,9 @@ export async function detectReceiverPackage(config: RuntimeConfig): Promise<stri
 
 export async function grantAccessibilityPermission(
   config: RuntimeConfig,
-  receiverPackage: string
+  operatorPackage: string
 ): Promise<AccessibilityGrantResult> {
-  const svc = `${receiverPackage}/${ACCESSIBILITY_SERVICE_CLASS}`;
+  const svc = `${operatorPackage}/${ACCESSIBILITY_SERVICE_CLASS}`;
 
   const currentResult = await runAdb(config, [
     "shell", "settings", "get", "secure", "enabled_accessibility_services",
@@ -97,10 +97,10 @@ export async function grantAccessibilityPermission(
 
 export async function grantNotificationPermission(
   config: RuntimeConfig,
-  receiverPackage: string
+  operatorPackage: string
 ): Promise<NotificationGrantResult> {
   const result = await runAdb(config, [
-    "shell", "pm", "grant", receiverPackage, "android.permission.POST_NOTIFICATIONS",
+    "shell", "pm", "grant", operatorPackage, "android.permission.POST_NOTIFICATIONS",
   ]);
   if (result.code !== 0) {
     const error = `${result.stderr} ${result.stdout}`.trim();
@@ -125,9 +125,9 @@ export async function grantNotificationPermission(
 
 export async function grantNotificationListenerPermission(
   config: RuntimeConfig,
-  receiverPackage: string
+  operatorPackage: string
 ): Promise<NotificationListenerGrantResult> {
-  const svc = `${receiverPackage}/${NOTIFICATION_LISTENER_SERVICE_CLASS}`;
+  const svc = `${operatorPackage}/${NOTIFICATION_LISTENER_SERVICE_CLASS}`;
 
   const currentResult = await runAdb(config, [
     "shell", "settings", "get", "secure", "enabled_notification_listeners",
@@ -157,12 +157,12 @@ export async function grantNotificationListenerPermission(
 
 export async function grantDevicePermissions(
   config: RuntimeConfig,
-  receiverPackage?: string
+  operatorPackage?: string
 ): Promise<PermissionGrantResult> {
-  const pkg = receiverPackage ?? config.receiverPackage ?? await detectReceiverPackage(config);
+  const pkg = operatorPackage ?? config.operatorPackage ?? await detectReceiverPackage(config);
   if (!pkg) {
     return {
-      receiverPackage: "<unknown>",
+      operatorPackage: "<unknown>",
       accessibility: {
         ok: false,
         alreadyEnabled: false,
@@ -177,5 +177,5 @@ export async function grantDevicePermissions(
   const notification = await grantNotificationPermission(config, pkg);
   const notificationListener = await grantNotificationListenerPermission(config, pkg);
 
-  return { receiverPackage: pkg, accessibility, notification, notificationListener };
+  return { operatorPackage: pkg, accessibility, notification, notificationListener };
 }

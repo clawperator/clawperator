@@ -23,7 +23,7 @@ import type { Logger } from "../../adapters/logger.js";
 
 export interface RunExecutionOptions {
   deviceId?: string;
-  receiverPackage?: string;
+  operatorPackage?: string;
   adbPath?: string;
   runner?: RuntimeConfig["runner"];
   timeoutMs?: number;
@@ -259,7 +259,7 @@ async function performExecution(
 ): Promise<PerformExecutionResult> {
   const config = getDefaultRuntimeConfig({
     deviceId: options.deviceId,
-    receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
+    operatorPackage: options.operatorPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
     adbPath: options.adbPath ?? process.env.ADB_PATH,
     runner: options.runner,
     logger: options.logger,
@@ -324,16 +324,16 @@ async function performExecution(
       commandId: execution.commandId,
       taskId: execution.taskId,
       deviceId,
-      message: `Operator APK (${config.receiverPackage}) is not installed on ${deviceId}`,
+      message: `Operator APK (${config.operatorPackage}) is not installed on ${deviceId}`,
     });
-    const installCommand = `clawperator operator setup --apk ${getReceiverPackageApkPath(config.receiverPackage)} --device-id ${deviceId}${config.receiverPackage !== "com.clawperator.operator" ? ` --receiver-package ${config.receiverPackage}` : ""}`;
+    const installCommand = `clawperator operator setup --apk ${getReceiverPackageApkPath(config.operatorPackage)} --device-id ${deviceId}${config.operatorPackage !== "com.clawperator.operator" ? ` --receiver-package ${config.operatorPackage}` : ""}`;
     return {
       execution,
       result: {
         ok: false,
         error: {
           code: ERROR_CODES.RECEIVER_NOT_INSTALLED,
-          message: `Operator APK (${config.receiverPackage}) is not installed on ${deviceId}. Install it with: ${installCommand}`,
+          message: `Operator APK (${config.operatorPackage}) is not installed on ${deviceId}. Install it with: ${installCommand}`,
           details: {
             checkId: apkCheck.id,
             summary: apkCheck.summary,
@@ -360,7 +360,7 @@ async function performExecution(
       commandId: execution.commandId,
       taskId: execution.taskId,
       deviceId,
-      message: `Operator APK (${config.receiverPackage}) is installed on ${deviceId}`,
+      message: `Operator APK (${config.operatorPackage}) is installed on ${deviceId}`,
     });
   }
 
@@ -397,7 +397,7 @@ async function performExecution(
             commandId: execution.commandId,
             taskId: execution.taskId,
             deviceId,
-            message: `Broadcast dispatched to ${deviceId} for ${config.receiverPackage}`,
+            message: `Broadcast dispatched to ${deviceId} for ${config.operatorPackage}`,
           });
         }
         return { success: broadcast.success, stdout: broadcast.stdout, stderr: broadcast.stderr };

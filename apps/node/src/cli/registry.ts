@@ -79,7 +79,7 @@ export type HandlerContext = {
   verbose: boolean;
   logger: Logger;
   deviceId?: string;
-  receiverPackage?: string;
+  operatorPackage?: string;
   timeoutMs?: number;
 };
 
@@ -425,7 +425,7 @@ COMMANDS["operator"] = {
   topLevelBlock: `  operator setup --apk <path> [--device <id>] [--operator-package <pkg>]
                                             Install the Operator APK, grant required permissions, and verify readiness`,
   handler: async (ctx) => {
-    const { rest, format, verbose, logger, deviceId, receiverPackage } = ctx;
+    const { rest, format, verbose, logger, deviceId, operatorPackage } = ctx;
     const out = { format, verbose, logger };
     const sub = rest[0];
     if (sub === "setup" || sub === "install") {
@@ -437,7 +437,7 @@ COMMANDS["operator"] = {
           ...out,
           apkPath,
           deviceId,
-          receiverPackage,
+          operatorPackage,
         });
       }
     } else {
@@ -610,7 +610,7 @@ COMMANDS["execute"] = {
   execute best-effort --goal <text> [--device <id>] [--operator-package <pkg>]
                                             Produce deterministic next-action suggestion from current UI`,
   handler: async (ctx) => {
-    const { rest, format, verbose, logger, deviceId, receiverPackage, timeoutMs } = ctx;
+    const { rest, format, verbose, logger, deviceId, operatorPackage, timeoutMs } = ctx;
     const out = { format, verbose, logger };
     if (rest[0] === "best-effort") {
       const goal = getOpt(rest, "--goal");
@@ -628,7 +628,7 @@ COMMANDS["execute"] = {
           ...out,
           execution,
           deviceId,
-          receiverPackage,
+          operatorPackage,
           timeoutMs,
           validateOnly: hasFlag(rest, "--validate-only"),
           dryRun: hasFlag(rest, "--dry-run"),
@@ -648,12 +648,12 @@ COMMANDS["snapshot"] = {
   topLevelBlock: `  snapshot [--device <id>] [--operator-package <pkg>]
                                             Capture current UI snapshot output`,
   handler: async (ctx) => {
-    const { format, logger, deviceId, receiverPackage, timeoutMs } = ctx;
+    const { format, logger, deviceId, operatorPackage, timeoutMs } = ctx;
     return (await import("./commands/observe.js")).cmdObserveSnapshot({
       format,
       logger,
       deviceId,
-      receiverPackage,
+      operatorPackage,
       timeoutMs,
     });
   },
@@ -668,12 +668,12 @@ COMMANDS["screenshot"] = {
   topLevelBlock: `  screenshot [--device <id>] [--operator-package <pkg>] [--path <file>]
                                             Capture current device screenshot (png)`,
   handler: async (ctx) => {
-    const { rest, format, logger, deviceId, receiverPackage, timeoutMs } = ctx;
+    const { rest, format, logger, deviceId, operatorPackage, timeoutMs } = ctx;
     return (await import("./commands/observe.js")).cmdObserveScreenshot({
       format,
       logger,
       deviceId,
-      receiverPackage,
+      operatorPackage,
       timeoutMs,
       path: getStringOpt(rest, "--path"),
     });
@@ -690,10 +690,10 @@ COMMANDS["click"] = {
   topLevelBlock: `  click --selector <json> [--device <id>] [--operator-package <pkg>]
                                             Build and run single click action via execute path`,
   handler: async (ctx) => {
-    const { rest, format, verbose, logger, deviceId, receiverPackage } = ctx;
+    const { rest, format, verbose, logger, deviceId, operatorPackage } = ctx;
     const out = { format, verbose, logger };
     const selector = getOpt(rest, "--selector");
-    const runOpts = { deviceId, receiverPackage, logger };
+    const runOpts = { deviceId, operatorPackage, logger };
     if (!selector) {
       return JSON.stringify({
         code: "MISSING_SELECTOR",
@@ -714,9 +714,9 @@ COMMANDS["open"] = {
   topLevelBlock: `  open <target> [--device <id>] [--operator-package <pkg>]
                                             Open a package ID, URL, or URI (auto-detected)`,
   handler: async (ctx) => {
-    const { rest, format, verbose, logger, deviceId, receiverPackage } = ctx;
+    const { rest, format, verbose, logger, deviceId, operatorPackage } = ctx;
     const out = { format, verbose, logger };
-    const runOpts = { deviceId, receiverPackage, logger };
+    const runOpts = { deviceId, operatorPackage, logger };
     const positional = rest[0] && !rest[0].startsWith("--") ? rest[0] : undefined;
     const appFlag = getOpt(rest, "--app");
     const uriFlag = getOpt(rest, "--uri");
@@ -761,9 +761,9 @@ COMMANDS["type"] = {
   topLevelBlock: `  type <text> --selector <json> [--submit] [--clear] [--device <id>] [--operator-package <pkg>]
                                             Build and run single enter_text action via execute path`,
   handler: async (ctx) => {
-    const { rest, format, verbose, logger, deviceId, receiverPackage } = ctx;
+    const { rest, format, verbose, logger, deviceId, operatorPackage } = ctx;
     const out = { format, verbose, logger };
-    const runOpts = { deviceId, receiverPackage, logger };
+    const runOpts = { deviceId, operatorPackage, logger };
     const selector = getOpt(rest, "--selector");
     const positional = rest[0] && !rest[0].startsWith("--") ? rest[0] : undefined;
     const textFlag = getOpt(rest, "--text");
@@ -798,9 +798,9 @@ COMMANDS["read"] = {
   topLevelBlock: `  read --selector <json> [--device <id>] [--operator-package <pkg>]
                                             Build and run single read_text action via execute path`,
   handler: async (ctx) => {
-    const { rest, format, verbose, logger, deviceId, receiverPackage } = ctx;
+    const { rest, format, verbose, logger, deviceId, operatorPackage } = ctx;
     const out = { format, verbose, logger };
-    const runOpts = { deviceId, receiverPackage, logger };
+    const runOpts = { deviceId, operatorPackage, logger };
     const selector = getOpt(rest, "--selector");
     if (!selector) {
       return JSON.stringify({
@@ -821,9 +821,9 @@ COMMANDS["wait"] = {
   topLevelBlock: `  wait --selector <json> [--device <id>] [--operator-package <pkg>]
                                             Build and run single wait_for_node action via execute path`,
   handler: async (ctx) => {
-    const { rest, format, verbose, logger, deviceId, receiverPackage } = ctx;
+    const { rest, format, verbose, logger, deviceId, operatorPackage } = ctx;
     const out = { format, verbose, logger };
-    const runOpts = { deviceId, receiverPackage, logger };
+    const runOpts = { deviceId, operatorPackage, logger };
     const selector = getOpt(rest, "--selector");
     if (!selector) {
       return JSON.stringify({
@@ -845,9 +845,9 @@ COMMANDS["press"] = {
   topLevelBlock: `  press <key> [--device <id>] [--operator-package <pkg>]
                                             Build and run single press_key action (back|home|recents)`,
   handler: async (ctx) => {
-    const { rest, format, verbose, logger, deviceId, receiverPackage } = ctx;
+    const { rest, format, verbose, logger, deviceId, operatorPackage } = ctx;
     const out = { format, verbose, logger };
-    const runOpts = { deviceId, receiverPackage, logger };
+    const runOpts = { deviceId, operatorPackage, logger };
     const positional = rest[0] && !rest[0].startsWith("--") ? rest[0] : undefined;
     const keyFlag = getOpt(rest, "--key");
     if (positional && keyFlag) {
@@ -873,9 +873,9 @@ COMMANDS["back"] = {
   topLevelBlock: `  back [--device <id>] [--operator-package <pkg>]
                                             Press the Android back key`,
   handler: async (ctx) => {
-    const { format, verbose, logger, deviceId, receiverPackage } = ctx;
+    const { format, verbose, logger, deviceId, operatorPackage } = ctx;
     const out = { format, verbose, logger };
-    const runOpts = { deviceId, receiverPackage, logger };
+    const runOpts = { deviceId, operatorPackage, logger };
     return (await import("./commands/action.js")).cmdActionPressKey({ ...out, key: "back", ...runOpts });
   },
 };
@@ -889,7 +889,7 @@ COMMANDS["scroll"] = {
   topLevelBlock: `  scroll <direction> [--device <id>] [--operator-package <pkg>]
                                             Build and run single scroll action (down|up|left|right)`,
   handler: async (ctx) => {
-    const { rest, format, verbose, logger, deviceId, receiverPackage, timeoutMs } = ctx;
+    const { rest, format, verbose, logger, deviceId, operatorPackage, timeoutMs } = ctx;
     const out = { format, verbose, logger };
     const positional = rest[0] && !rest[0].startsWith("--") ? rest[0] : undefined;
     const dirFlag = getOpt(rest, "--direction");
@@ -917,7 +917,7 @@ COMMANDS["scroll"] = {
       const execution = buildScrollExecution(direction, timeoutMs);
       const result = await runExecution(execution, {
         deviceId,
-        receiverPackage: receiverPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
+        operatorPackage: operatorPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
         warn: message => process.stderr.write(message),
         logger,
       });
@@ -994,7 +994,7 @@ Usage:
   skills sync --ref <git-ref>
                                             Sync and pin skills index/cache to a git ref`,
   handler: async (ctx) => {
-    const { rest, format, verbose, logger, deviceId, receiverPackage, timeoutMs } = ctx;
+    const { rest, format, verbose, logger, deviceId, operatorPackage, timeoutMs } = ctx;
     const out = { format, verbose, logger };
     if (rest[0] === "list") {
       return (await import("./commands/skills.js")).cmdSkillsList(out);
@@ -1069,7 +1069,7 @@ Usage:
           scriptArgs,
           effectiveTimeoutMs,
           expectContains,
-          receiverPackage,
+          operatorPackage,
           { ...out, skipValidate, deviceId, logger }
         );
       }
@@ -1105,12 +1105,12 @@ COMMANDS["recording"] = {
   recording parse --input <file> [--out <file>]
                                             Parse a raw NDJSON recording into a step log JSON ('record' is an alias)`,
   handler: async (ctx) => {
-    const { rest, format, verbose, logger, deviceId, receiverPackage } = ctx;
+    const { rest, format, verbose, logger, deviceId, operatorPackage } = ctx;
     const out = { format, verbose, logger };
     const sub = rest[0];
     const runOpts = {
       deviceId,
-      receiverPackage,
+      operatorPackage,
     };
     if (sub === "start") {
       return (await import("./commands/record.js")).cmdRecordStart({
@@ -1195,7 +1195,7 @@ COMMANDS["doctor"] = {
   doctor --check-only
                                             Keep doctor non-blocking by always exiting 0 (for CI/automation)`,
   handler: async (ctx) => {
-    const { rest, format, verbose, logger, deviceId, receiverPackage } = ctx;
+    const { rest, format, verbose, logger, deviceId, operatorPackage } = ctx;
     const out = { format, verbose, logger };
     const isJson = hasFlag(rest, "--json") || format === "json";
     return (await import("./commands/doctor.js")).cmdDoctor({
@@ -1205,7 +1205,7 @@ COMMANDS["doctor"] = {
       full: hasFlag(rest, "--full"),
       checkOnly: hasFlag(rest, "--check-only"),
       deviceId,
-      receiverPackage,
+      operatorPackage,
       logger,
     });
   },
@@ -1220,12 +1220,12 @@ COMMANDS["grant-device-permissions"] = {
   topLevelBlock: `  grant-device-permissions [--device <id>] [--operator-package <pkg>]
                                             Re-grant accessibility and notification permissions (remediation only)`,
   handler: async (ctx) => {
-    const { format, verbose, logger, deviceId, receiverPackage } = ctx;
+    const { format, verbose, logger, deviceId, operatorPackage } = ctx;
     const out = { format, verbose, logger };
     return (await import("./commands/grantDevicePermissions.js")).cmdGrantDevicePermissions({
       ...out,
       deviceId,
-      receiverPackage,
+      operatorPackage,
     });
   },
 };
@@ -1241,13 +1241,13 @@ COMMANDS["version"] = {
   version --check-compat [--device <id>] [--operator-package <pkg>]
                                             Compare the CLI version with the installed Operator APK version`,
   handler: async (ctx) => {
-    const { rest, format, verbose, logger, deviceId, receiverPackage } = ctx;
+    const { rest, format, verbose, logger, deviceId, operatorPackage } = ctx;
     const out = { format, verbose, logger };
     return (await import("./commands/version.js")).cmdVersion({
       ...out,
       checkCompat: hasFlag(rest, "--check-compat"),
       deviceId,
-      receiverPackage,
+      operatorPackage,
     });
   },
 };
@@ -1376,7 +1376,7 @@ export function generateTopLevelHelp(commands: Record<string, CommandDef>): stri
     "",
     "Global options:",
     "  --device-id <id>, --device <id>           Target Android device serial",
-    "  --receiver-package <package>, --operator-package <package>",
+    "  --operator-package <package>, --receiver-package <package>",
     "                                            Target Operator package for broadcast dispatch",
     "  --output <json|pretty>, --format <json|pretty>",
     "                                            Output format (default: json)",

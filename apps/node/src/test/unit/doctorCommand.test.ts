@@ -14,7 +14,7 @@ describe("cmdDoctor", () => {
         format: "json",
         checkOnly: true,
         deviceId: "test-device-1",
-        receiverPackage: "com.test.operator",
+        operatorPackage: "com.test.operator",
       },
       {
         doctorService: {
@@ -22,7 +22,7 @@ describe("cmdDoctor", () => {
             ok: false,
             criticalOk: false,
             deviceId: "test-device-1",
-            receiverPackage: "com.test.operator",
+            operatorPackage: "com.test.operator",
             checks: [
               {
                 id: "readiness.apk.presence",
@@ -48,7 +48,7 @@ describe("cmdDoctor", () => {
       {
         format: "json",
         deviceId: "test-device-1",
-        receiverPackage: "com.test.operator",
+        operatorPackage: "com.test.operator",
       },
       {
         doctorService: {
@@ -56,7 +56,7 @@ describe("cmdDoctor", () => {
             ok: false,
             criticalOk: false,
             deviceId: "test-device-1",
-            receiverPackage: "com.test.operator",
+            operatorPackage: "com.test.operator",
             checks: [
               {
                 id: "readiness.apk.presence",

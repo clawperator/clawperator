@@ -15,12 +15,12 @@ export async function cmdDoctor(options: {
   full?: boolean;
   checkOnly?: boolean;
   deviceId?: string;
-  receiverPackage?: string;
+  operatorPackage?: string;
   logger?: Logger;
 }, deps: { doctorService?: Pick<DoctorService, "run"> } = {}): Promise<string> {
   const config = getDefaultRuntimeConfig({
     deviceId: options.deviceId,
-    receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
+    operatorPackage: options.operatorPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
     adbPath: process.env.ADB_PATH,
   });
 
@@ -52,7 +52,7 @@ function renderPrettyDoctorReport(report: DoctorReport): string {
   lines.push("Clawperator Doctor Diagnostics");
   lines.push("");
   lines.push(`  Device:           ${report.deviceId ?? "(auto-detect)"}`);
-  lines.push(`  Receiver package: ${report.receiverPackage ?? "(default)"}`);
+  lines.push(`  Receiver package: ${report.operatorPackage ?? "(default)"}`);
   lines.push("");
 
   if (criticalChecks.length > 0) {

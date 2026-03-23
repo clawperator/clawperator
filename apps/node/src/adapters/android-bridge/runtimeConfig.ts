@@ -21,7 +21,7 @@ export interface RuntimeConfig {
   /** Target device serial (optional; resolved by domain if not set) */
   deviceId?: string;
   /** Receiver package for broadcast -p (required at dispatch time) */
-  receiverPackage: string;
+  operatorPackage: string;
   /** Action name for agent command broadcast */
   actionAgentCommand: string;
   /** Intent extra key for JSON payload */
@@ -71,7 +71,7 @@ export function getDefaultRuntimeConfig(overrides?: Partial<RuntimeConfig>): Run
     emulatorPath: defaultEmulatorPath,
     sdkmanagerPath: defaultSdkmanagerPath,
     avdmanagerPath: defaultAvdmanagerPath,
-    receiverPackage: "com.clawperator.operator",
+    operatorPackage: "com.clawperator.operator",
     actionAgentCommand: DEFAULT_ACTION_AGENT_COMMAND,
     payloadExtraKey: EXTRA_AGENT_PAYLOAD,
     runner: new NodeProcessRunner(),

@@ -130,7 +130,7 @@ function getTodayLogPath(): string {
 
 async function createFakeAdb(options: {
   installed: boolean;
-  receiverPackage: string;
+  operatorPackage: string;
   installedPackage?: string;
   packageListCode?: number;
   packageListStderr?: string;
@@ -147,7 +147,7 @@ async function createFakeAdb(options: {
     `    printf '%s\\n' ${JSON.stringify(options.packageListStderr ?? "package query failed")} 1>&2`,
     `    exit ${JSON.stringify(options.packageListCode ?? 1)}`,
     "  fi",
-    `  if [ ${JSON.stringify(options.installed ? 0 : 1)} -eq 0 ] && [ \"$5\" = ${JSON.stringify(options.installedPackage ?? options.receiverPackage)} ]; then`,
+    `  if [ ${JSON.stringify(options.installed ? 0 : 1)} -eq 0 ] && [ \"$5\" = ${JSON.stringify(options.installedPackage ?? options.operatorPackage)} ]; then`,
     `    printf 'package:%s\\n' \"$5\"`,
     "  fi",
     "  exit 0",
@@ -1476,10 +1476,10 @@ describe("runSkill", () => {
   it("CLI skills run keeps json output parseable without live skill output", async () => {
     const fakeAdbDir = await createFakeAdb({
       installed: true,
-      receiverPackage: "com.clawperator.operator.dev",
+      operatorPackage: "com.clawperator.operator.dev",
     });
     const { stdout, code } = await runCli([
-      "skills", "run", TEST_FIXTURE_CHUNKED_OUTPUT, "--receiver-package", "com.clawperator.operator.dev", "--output", "json",
+      "skills", "run", TEST_FIXTURE_CHUNKED_OUTPUT, "--operator-package", "com.clawperator.operator.dev", "--output", "json",
     ], {
       env: {
         ...process.env,
@@ -1498,10 +1498,10 @@ describe("runSkill", () => {
   it("CLI skills run prints a banner first in pretty mode", async () => {
     const fakeAdbDir = await createFakeAdb({
       installed: true,
-      receiverPackage: "com.clawperator.operator.dev",
+      operatorPackage: "com.clawperator.operator.dev",
     });
     const { stdout, code } = await runCli([
-      "skills", "run", TEST_FIXTURE_CHUNKED_OUTPUT, "--receiver-package", "com.clawperator.operator.dev", "--output", "pretty",
+      "skills", "run", TEST_FIXTURE_CHUNKED_OUTPUT, "--operator-package", "com.clawperator.operator.dev", "--output", "pretty",
     ], {
       env: {
         ...process.env,
@@ -1522,7 +1522,7 @@ describe("runSkill", () => {
   it("CLI skills run banner reflects CLAWPERATOR_LOG_DIR overrides", async () => {
     const fakeAdbDir = await createFakeAdb({
       installed: true,
-      receiverPackage: "com.clawperator.operator.dev",
+      operatorPackage: "com.clawperator.operator.dev",
     });
     const tempLogDir = await mkdtemp(join(tmpdir(), "clawperator-logs-"));
     try {
@@ -1532,7 +1532,7 @@ describe("runSkill", () => {
       const dd = String(now.getDate()).padStart(2, "0");
       const expectedLogPath = join(tempLogDir, `clawperator-${yyyy}-${mm}-${dd}.log`);
       const { stdout, code } = await runCli([
-        "skills", "run", TEST_FIXTURE_CHUNKED_OUTPUT, "--receiver-package", "com.clawperator.operator.dev", "--output", "pretty",
+        "skills", "run", TEST_FIXTURE_CHUNKED_OUTPUT, "--operator-package", "com.clawperator.operator.dev", "--output", "pretty",
       ], {
         env: {
           ...process.env,
@@ -1553,11 +1553,11 @@ describe("runSkill", () => {
   it("CLI skills run preserves variant mismatch details in the pretty banner", async () => {
     const fakeAdbDir = await createFakeAdb({
       installed: true,
-      receiverPackage: "com.clawperator.operator",
+      operatorPackage: "com.clawperator.operator",
       installedPackage: "com.clawperator.operator.dev",
     });
     const { stdout, code } = await runCli([
-      "skills", "run", TEST_FIXTURE_CHUNKED_OUTPUT, "--receiver-package", "com.clawperator.operator", "--output", "pretty",
+      "skills", "run", TEST_FIXTURE_CHUNKED_OUTPUT, "--operator-package", "com.clawperator.operator", "--output", "pretty",
     ], {
       env: {
         ...process.env,
@@ -1569,18 +1569,18 @@ describe("runSkill", () => {
     const firstLine = stdout.split(/\r?\n/, 1)[0] ?? "";
     assert.match(firstLine, /Wrong Operator variant installed/);
     assert.match(firstLine, /Expected com\.clawperator\.operator but found com\.clawperator\.operator\.dev/);
-    assert.match(firstLine, /Use --receiver-package com\.clawperator\.operator\.dev/);
+    assert.match(firstLine, /Use --operator-package com\.clawperator\.operator\.dev/);
   });
 
   it("CLI skills run preserves adb failure details in the pretty banner", async () => {
     const fakeAdbDir = await createFakeAdb({
       installed: false,
-      receiverPackage: "com.clawperator.operator",
+      operatorPackage: "com.clawperator.operator",
       packageListCode: 1,
       packageListStderr: "adb: device offline",
     });
     const { stdout, code } = await runCli([
-      "skills", "run", TEST_FIXTURE_CHUNKED_OUTPUT, "--receiver-package", "com.clawperator.operator", "--output", "pretty",
+      "skills", "run", TEST_FIXTURE_CHUNKED_OUTPUT, "--operator-package", "com.clawperator.operator", "--output", "pretty",
     ], {
       env: {
         ...process.env,
@@ -1598,10 +1598,10 @@ describe("runSkill", () => {
   it("CLI skills run suppresses the banner in json mode", async () => {
     const fakeAdbDir = await createFakeAdb({
       installed: true,
-      receiverPackage: "com.clawperator.operator.dev",
+      operatorPackage: "com.clawperator.operator.dev",
     });
     const { stdout, code } = await runCli([
-      "skills", "run", TEST_FIXTURE_CHUNKED_OUTPUT, "--receiver-package", "com.clawperator.operator.dev", "--output", "json",
+      "skills", "run", TEST_FIXTURE_CHUNKED_OUTPUT, "--operator-package", "com.clawperator.operator.dev", "--output", "json",
     ], {
       env: {
         ...process.env,
@@ -1673,7 +1673,7 @@ describe("cmdSkillsRun preflight gate", () => {
   it("ignores pipe errors from live pretty-mode streaming", async () => {
     const fakeAdbDir = await createFakeAdb({
       installed: true,
-      receiverPackage: "com.clawperator.operator.dev",
+      operatorPackage: "com.clawperator.operator.dev",
     });
     const cmdModulePath = join(packageRoot, "dist", "cli", "commands", "skills.js");
     const script = `
@@ -1919,9 +1919,9 @@ describe("CLI skills run env vars", () => {
     }
   });
 
-  it("CLI skills run passes CLAWPERATOR_OPERATOR_PACKAGE via --receiver-package flag", async () => {
+  it("CLI skills run passes CLAWPERATOR_OPERATOR_PACKAGE via --operator-package flag", async () => {
     const { stdout, code } = await runCli([
-      "skills", "run", "com.test.env-echo", "--receiver-package", "com.clawperator.operator.dev", "--output", "json",
+      "skills", "run", "com.test.env-echo", "--operator-package", "com.clawperator.operator.dev", "--output", "json",
     ]);
     assert.strictEqual(code, 0, stdout);
     const parsed = JSON.parse(stdout) as { output?: string };
@@ -1943,9 +1943,9 @@ describe("CLI skills run env vars", () => {
     assert.ok(parsed.output?.includes("CLAWPERATOR_OPERATOR_PACKAGE:com.custom.operator.package"), `Expected custom package in output, got: ${parsed.output}`);
   });
 
-  it("CLI skills run --receiver-package flag takes precedence over env var", async () => {
+  it("CLI skills run --operator-package flag takes precedence over env var", async () => {
     const { stdout, code } = await runCli(
-      ["skills", "run", "com.test.env-echo", "--receiver-package", "flag.package.value", "--output", "json"],
+      ["skills", "run", "com.test.env-echo", "--operator-package", "flag.package.value", "--output", "json"],
       {
         env: {
           ...process.env,
@@ -1964,7 +1964,7 @@ describe("CLI skills run streaming", () => {
   it("prints the banner first and then streams incremental skill output in pretty mode", async () => {
     const fakeAdbDir = await createFakeAdb({
       installed: true,
-      receiverPackage: "com.clawperator.operator.dev",
+      operatorPackage: "com.clawperator.operator.dev",
     });
     const cliPath = join(packageRoot, "dist", "cli", "index.js");
     const stdoutChunks: string[] = [];
@@ -1975,7 +1975,7 @@ describe("CLI skills run streaming", () => {
       "skills",
       "run",
       TEST_FIXTURE_CHUNKED_OUTPUT,
-      "--receiver-package",
+      "--operator-package",
       "com.clawperator.operator.dev",
       "--output",
       "pretty",

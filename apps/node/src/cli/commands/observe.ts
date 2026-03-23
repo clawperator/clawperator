@@ -7,14 +7,14 @@ import type { Logger } from "../../adapters/logger.js";
 export async function cmdObserveSnapshot(options: {
   format: OutputOptions["format"];
   deviceId?: string;
-  receiverPackage?: string;
+  operatorPackage?: string;
   timeoutMs?: number;
   logger?: Logger;
 }): Promise<string> {
   try {
     const result = await observeSnapshot({
       deviceId: options.deviceId,
-      receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
+      operatorPackage: options.operatorPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
       timeoutMs: options.timeoutMs,
       warn: message => process.stderr.write(message),
       logger: options.logger,
@@ -39,7 +39,7 @@ export async function cmdObserveSnapshot(options: {
 export async function cmdObserveScreenshot(options: {
   format: OutputOptions["format"];
   deviceId?: string;
-  receiverPackage?: string;
+  operatorPackage?: string;
   timeoutMs?: number;
   path?: string;
   logger?: Logger;
@@ -47,7 +47,7 @@ export async function cmdObserveScreenshot(options: {
   try {
     const result = await observeScreenshot({
       deviceId: options.deviceId,
-      receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
+      operatorPackage: options.operatorPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
       timeoutMs: options.timeoutMs,
       path: options.path,
       warn: message => process.stderr.write(message),

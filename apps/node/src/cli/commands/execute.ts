@@ -11,7 +11,7 @@ export async function cmdExecute(options: {
   format: OutputOptions["format"];
   execution: string; // JSON string or file path
   deviceId?: string;
-  receiverPackage?: string;
+  operatorPackage?: string;
   timeoutMs?: number;
   validateOnly?: boolean;
   dryRun?: boolean;
@@ -104,7 +104,7 @@ export async function cmdExecute(options: {
 
     const result = await runExecution(payload, {
       deviceId: options.deviceId,
-      receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
+      operatorPackage: options.operatorPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
       timeoutMs: options.timeoutMs,
       warn: message => process.stderr.write(message),
       logger: options.logger,

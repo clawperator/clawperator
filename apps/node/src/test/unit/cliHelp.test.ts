@@ -283,23 +283,33 @@ describe("operator setup CLI output", () => {
     assert.strictEqual(obj.install?.ok, false);
   });
 
-  it("passes --receiver-package through to output on failure", async () => {
+  it("passes --operator-package through to output on failure", async () => {
+    const { stdout } = await runCli([
+      "operator", "setup",
+      "--apk", NONEXISTENT_APK,
+      "--operator-package", "com.clawperator.operator.dev",
+    ]);
+    const obj = JSON.parse(stdout);
+    assert.strictEqual(obj.operatorPackage, "com.clawperator.operator.dev");
+  });
+
+  it("accepts --receiver-package as alias for --operator-package", async () => {
     const { stdout } = await runCli([
       "operator", "setup",
       "--apk", NONEXISTENT_APK,
       "--receiver-package", "com.clawperator.operator.dev",
     ]);
     const obj = JSON.parse(stdout);
-    assert.strictEqual(obj.receiverPackage, "com.clawperator.operator.dev");
+    assert.strictEqual(obj.operatorPackage, "com.clawperator.operator.dev");
   });
 
-  it("uses CLAWPERATOR_OPERATOR_PACKAGE on failure when --receiver-package is omitted", async () => {
+  it("uses CLAWPERATOR_OPERATOR_PACKAGE env var when --operator-package is omitted", async () => {
     const { stdout } = await runCli(
       ["operator", "setup", "--apk", NONEXISTENT_APK],
       { CLAWPERATOR_OPERATOR_PACKAGE: "com.clawperator.operator.dev" }
     );
     const obj = JSON.parse(stdout);
-    assert.strictEqual(obj.receiverPackage, "com.clawperator.operator.dev");
+    assert.strictEqual(obj.operatorPackage, "com.clawperator.operator.dev");
   });
 
   it("operator install alias still returns OPERATOR_APK_NOT_FOUND", async () => {

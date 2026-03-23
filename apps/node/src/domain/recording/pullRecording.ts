@@ -39,7 +39,7 @@ export async function pullRecording(
     validateSessionId(sessionId);
   } else {
     // Read from latest pointer file
-    const latestPointerPath = `/sdcard/Android/data/${config.receiverPackage}/files/recordings/latest`;
+    const latestPointerPath = `/sdcard/Android/data/${config.operatorPackage}/files/recordings/latest`;
     const result = await runAdb(config, ["shell", "cat", latestPointerPath]);
 
     if (result.code !== 0 || !result.stdout.trim()) {
@@ -54,7 +54,7 @@ export async function pullRecording(
   }
 
   // Step 3: Construct remote path
-  const remotePath = `/sdcard/Android/data/${config.receiverPackage}/files/recordings/${sessionId}.ndjson`;
+  const remotePath = `/sdcard/Android/data/${config.operatorPackage}/files/recordings/${sessionId}.ndjson`;
 
   // Step 4: Ensure output directory exists
   await fs.mkdir(options.outputDir, { recursive: true });

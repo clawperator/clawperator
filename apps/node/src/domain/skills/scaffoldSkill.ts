@@ -97,7 +97,7 @@ function buildScriptTemplate(skillId: string, applicationId: string): string {
 
 import { execFileSync } from "node:child_process";
 
-const [, , deviceId, receiverPackage = process.env.CLAWPERATOR_OPERATOR_PACKAGE || "com.clawperator.operator"] = process.argv;
+const [, , deviceId, operatorPackage = process.env.CLAWPERATOR_OPERATOR_PACKAGE || "com.clawperator.operator"] = process.argv;
 
 if (!deviceId) {
   console.error("Usage: node run.js <device_id> [receiver_package]");
@@ -127,7 +127,7 @@ try {
       "--device-id",
       deviceId,
       "--receiver-package",
-      receiverPackage,
+      operatorPackage,
       "--execution",
       JSON.stringify(execution),
       "--output",
