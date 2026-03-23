@@ -1896,8 +1896,8 @@ Start with `clawperator serve [--port <n>] [--host <ip>]`. Default: `127.0.0.1:3
 | `DELETE /android/emulators/:name` | Delete an AVD by name |
 | `POST /android/provision/emulator` | Reuse or create a supported emulator and return a booted device |
 | `POST /execute` | Body: `{"execution": <payload>, "deviceId": "...", "operatorPackage": "..."}` |
-| `POST /observe/snapshot` | Capture UI tree |
-| `POST /observe/screenshot` | Capture screenshot |
+| `POST /snapshot` | Capture UI tree |
+| `POST /screenshot` | Capture screenshot |
 | `GET /skills` | List skills. Query params: `?app=<pkg>&intent=<i>&keyword=<k>` |
 | `GET /skills/:skillId` | Get skill metadata |
 | `POST /skills/:skillId/run` | Run skill. Body: `{"deviceId": "...", "args": [...], "timeoutMs": 90000, "expectContains": "TEXT_BEGIN"}` |
@@ -4030,8 +4030,8 @@ clawperator serve [--port <number>] [--host <string>]
 HTTP endpoints exposed:
 - `GET /devices` - list connected devices
 - `POST /execute` - run an execution payload
-- `POST /observe/snapshot` - capture UI snapshot
-- `POST /observe/screenshot` - capture screenshot
+- `POST /snapshot` - capture UI snapshot
+- `POST /screenshot` - capture screenshot
 - `GET /skills` - list or search skills
 - `GET /skills/:skillId` - get skill metadata
 - `POST /skills/:skillId/run` - run a skill script
@@ -4676,13 +4676,13 @@ Run an execution payload.
 | 423 | Execution conflict (in-flight) |
 | 504 | Result envelope timeout |
 
-### `POST /observe/snapshot`
+### `POST /snapshot`
 
 Capture UI snapshot. Body: `{ "deviceId"?, "operatorPackage"? }`.
 
 Same response shape as `/execute`.
 
-### `POST /observe/screenshot`
+### `POST /screenshot`
 
 Capture screenshot. Body: `{ "deviceId"?, "operatorPackage"? }`.
 
@@ -9282,9 +9282,9 @@ When running `clawperator serve [--port <number>] [--host <string>]`, a local HT
     - Body: `{"execution": {...}, "deviceId": "...", "operatorPackage": "..."}`
     - Returns: `RunExecutionResult` (200 OK or 4xx/5xx on failure).
     - Status **423 Locked**: Returned if another execution is in flight for the target device.
-- **`POST /observe/snapshot`**: Quick helper for UI capture.
+- **`POST /snapshot`**: Quick helper for UI capture.
     - Body: `{"deviceId": "...", "operatorPackage": "..."}`
-- **`POST /observe/screenshot`**: Quick helper for visual capture.
+- **`POST /screenshot`**: Quick helper for visual capture.
     - Body: `{"deviceId": "...", "operatorPackage": "..."}`
 
 ### Event Streaming (SSE)

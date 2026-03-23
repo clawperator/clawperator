@@ -601,8 +601,8 @@ clawperator serve [--port <number>] [--host <string>]
 HTTP endpoints exposed:
 - `GET /devices` - list connected devices
 - `POST /execute` - run an execution payload
-- `POST /observe/snapshot` - capture UI snapshot
-- `POST /observe/screenshot` - capture screenshot
+- `POST /snapshot` - capture UI snapshot
+- `POST /screenshot` - capture screenshot
 - `GET /skills` - list or search skills
 - `GET /skills/:skillId` - get skill metadata
 - `POST /skills/:skillId/run` - run a skill script
