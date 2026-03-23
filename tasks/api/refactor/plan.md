@@ -38,13 +38,13 @@ BEFORE (current)                                       AFTER (target)
 ---------------------------------------------          -----------------------------------
 clawperator observe snapshot                           clawperator snapshot
 clawperator observe screenshot                         clawperator screenshot
-clawperator action click --selector '{"text":"X"}'     clawperator click --text "X"
-clawperator action open-app --app com.foo.bar          clawperator open com.foo.bar
-clawperator action open-uri --uri https://example.com  clawperator open https://example.com
-clawperator action type --selector '{"text":"X"}'      clawperator type "hello" --text "X"
+clawperator action click --selector '{"textEquals":"X"}'     clawperator click --text "X"
+clawperator action open-app --app com.foo.bar                clawperator open com.foo.bar
+clawperator action open-uri --uri https://example.com        clawperator open https://example.com
+clawperator action type --selector '{"textEquals":"X"}'      clawperator type "hello" --text "X"
   --text "hello"
-clawperator action read --selector '{"text":"X"}'      clawperator read --text "X"
-clawperator action wait --selector '{"text":"X"}'      clawperator wait --text "X"
+clawperator action read --selector '{"textEquals":"X"}'      clawperator read --text "X"
+clawperator action wait --selector '{"textEquals":"X"}'      clawperator wait --text "X"
 clawperator action press-key --key back                clawperator press back
 (no CLI command)                                       clawperator scroll down
 (no CLI command)                                       clawperator back
@@ -60,11 +60,11 @@ BEFORE (current)              AFTER (canonical)         AFTER (still accepted)
 --output json                 --json                    --output json
 --timeout-ms <ms>             --timeout <ms>            --timeout-ms
 --receiver-package <pkg>      --operator-package <pkg>  --receiver-package, --package
---selector '{"text":"X"}'     --text "X"                --selector (advanced)
---selector '{"resourceId":    --id "com.foo:id/bar"     --selector (advanced)
+--selector '{"textEquals":"X"}'          --text "X"             --selector (advanced)
+--selector '{"resourceId":              --id "com.foo:id/bar"  --selector (advanced)
   "com.foo:id/bar"}'
---selector '{"contentDesc     --desc "Submit"           --selector (advanced)
-  Equals":"Submit"}'
+--selector '{"contentDescEquals":       --desc "Submit"        --selector (advanced)
+  "Submit"}'
 ```
 
 ### Synonyms (accepted but not documented)
@@ -136,6 +136,12 @@ is Clawperator's own term - it is what `operator setup` installs, what docs
 reference, what agents will encounter. `--operator-package` is unambiguous and
 self-documenting. `--receiver-package` and `--package` are accepted as silent
 aliases. This flag is rarely needed (only for dev/release variant switching).
+
+**Scope of the rename:** The CLI/API surface changes to `--operator-package`.
+Internally, existing TypeScript field names (`receiverPackage` in `GlobalOpts`,
+command handlers, `serve.ts` request bodies) may remain `receiverPackage`
+temporarily to minimize churn. The internal rename is optional and should only be
+done if it does not expand scope.
 
 ### `--selector` JSON becomes the escape hatch, not the default
 
@@ -242,7 +248,8 @@ The following commands are not affected and should not be modified:
 - `devices`, `doctor`, `version`, `packages list`, `grant-device-permissions`
 - `operator setup` / `operator install`
 - `skills *`, `emulator *`, `recording` / `record`
-- `serve` (CLI dispatch - see HTTP API section below for route changes)
+- `serve` remains the same CLI entrypoint. Only the HTTP route paths exposed
+  by `serve.ts` change (in Phase 3)
 - `execute` (the `--execution` flag name is deliberately not renamed; it is the
   canonical interface for skill scripts and advanced agents)
 
@@ -358,10 +365,12 @@ Establish the foundation that makes Phases 1-2 safe.
      - `--package` -> `--operator-package` (alias for agents who guess it)
    - Centralized so all commands inherit flag aliases automatically
 
-3. **Regression test harness**
-   - Test that every old command + flag combination either works (if preserved)
-     or produces a clear "did you mean?" error (if removed)
-   - This harness runs throughout Phases 1-3 as a safety net
+3. **Regression test coverage in the existing test suite**
+   - Extend the existing subprocess-based tests in `apps/node/src/test/unit/`
+   - Add explicit coverage for removed commands (verify "did you mean?" errors),
+     renamed flags (verify old names still parse), and new flat commands
+   - Do not introduce a separate parallel test harness - the existing tests are
+     the harness
 
 ### Risk
 
@@ -411,12 +420,15 @@ separable for review:
    `scroll` spec (not deferred - this is a core primitive):
    ```
    clawperator scroll <down|up|left|right> [--device <id>] [--json]
-   clawperator scroll <direction> --container-text "..." [--json]
    ```
+   Phase 1 delivers direction-only scroll. Container-scoped scrolling
+   (`--container-text`, `--container-id`, etc.) is deferred to Phase 2
+   alongside the other selector flag work, since container flags use the same
+   parsing infrastructure.
+
    If no CLI command currently wraps the scroll action, one must be added in
    this phase. The scroll action exists in the execution payload; the CLI
-   wrapper translates positional direction + optional container flags into the
-   correct payload.
+   wrapper translates positional direction into the correct payload.
 
 3. **Unified `open` with smart target detection**
    ```
@@ -435,6 +447,11 @@ separable for review:
 
    The existing `cmdActionOpenApp` and `cmdActionOpenUri` handlers in action.ts
    can be reused or inlined - they are thin wrappers around their builders.
+
+   `open-uri` and `open-url` are accepted as top-level command spellings in
+   dispatch (additional `case` branches routing to the same `open` handler).
+   They are not shown in help text. This matches the synonym model used for
+   `tap`/`click`.
 
 4. **Positional arguments where obvious**
    - `clawperator open com.android.settings` (positional target)
@@ -702,7 +719,11 @@ Finalize the developer and agent experience.
    - `POST /observe/snapshot` -> `POST /snapshot`
    - `POST /observe/screenshot` -> `POST /screenshot`
 
-   The request/response body contracts are unchanged. Only the URL paths move.
+   Request and response body field names are unchanged in this refactor. Route
+   paths change; body schemas do not. Specifically, HTTP request bodies that
+   accept `receiverPackage` keep that field name even though the CLI flag is
+   renamed to `--operator-package`. Body field renames are a separate concern
+   that should not be bundled here.
 
    `POST /execute`, `GET /devices`, skill routes, and emulator routes are
    unchanged.
