@@ -71,6 +71,7 @@ export async function cmdSkillsCompileArtifact(
   varsJson: string,
   options: { format: OutputOptions["format"] }
 ): Promise<string> {
+  // CLI help examples for `--artifact` use `climate-status`.
   const result = await compileArtifact(skillId, artifact, varsJson ?? "{}");
   if (result.ok) {
     return formatSuccess({ execution: result.execution }, options);

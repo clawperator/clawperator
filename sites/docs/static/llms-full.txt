@@ -3855,7 +3855,7 @@ clawperator skills compile-artifact --skill-id <id> --artifact <name> [--vars <j
 |------------|-------------|
 | `<skill_id>` | Skill ID (positional) |
 | `--skill-id <id>` | Skill ID (named flag, alternative to positional) |
-| `--artifact <name>` | Artifact name, e.g. `ac-status` or `ac-status.recipe.json` (required) |
+| `--artifact <name>` | Artifact name, e.g. `climate-status` or `climate-status.recipe.json` (required) |
 | `--vars <json>` | Variable substitution JSON object (default: `{}`) |
 
 ---

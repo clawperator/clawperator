@@ -243,7 +243,7 @@ class OperatorCommandExecutorDefault(
     ): TaskResult<clawperator.task.runner.UiActionExecutionResult> {
         val command =
             AgentCommand(
-                commandId = "operator-ac-status-${taskId}-${suffix}",
+                commandId = "operator-climate-status-${taskId}-${suffix}",
                 taskId = taskId,
                 source = "operator-command",
                 timeoutMs = 90_000L,
