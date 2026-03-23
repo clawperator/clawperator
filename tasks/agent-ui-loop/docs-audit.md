@@ -188,8 +188,8 @@ the same `runExecution` path as `snapshot_ui`. Both use the same
 `extractSnapshotsFromLogs` pipeline. They are functionally equivalent.
 
 **API refactor note:** The nested `observe …` CLI parent is removed. Canonical ad-hoc
-inspection is `clawperator snapshot`. HTTP still exposes `POST /observe/snapshot` until
-route flattening; that path is not the removed nested CLI.
+inspection is `clawperator snapshot`. HTTP uses the flat route `POST /snapshot` (same
+behavior as the CLI shortcut; not the removed nested CLI).
 
 **Doc file:** `docs/node-api-for-agents.md`, section "Action behavior notes" under
 `snapshot_ui`, and/or the CLI reference table.

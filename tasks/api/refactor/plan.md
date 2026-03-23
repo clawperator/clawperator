@@ -1195,20 +1195,19 @@ Finalize the developer and agent experience.
      command showing `--device` flag
    - Validation error: include task-oriented hint, not just schema path
 
-3. **Update HTTP API routes (`serve`)**
+3. **HTTP API routes (`serve`)**
 
-   The HTTP API (serve.ts) must be updated to match the new CLI surface. The
-   HTTP API is alpha/unstable with zero external consumers - there is no
-   backward compatibility concern. An agent that learns `snapshot` from the CLI
-   will try `POST /snapshot`, not `POST /observe/snapshot`. Consistency between
-   CLI and HTTP surfaces prevents confusion.
+   The HTTP API (`serve.ts`) uses flat paths aligned with the CLI. The HTTP API
+   is alpha/unstable with zero external consumers. An agent that learns
+   `snapshot` from the CLI uses `POST /snapshot` on HTTP; same idea for
+   screenshot.
 
-   Route changes:
-   - `POST /observe/snapshot` -> `POST /snapshot`
-   - `POST /observe/screenshot` -> `POST /screenshot`
+   Routes (shipped):
+   - `POST /snapshot` (replaces removed `POST /observe/snapshot`)
+   - `POST /screenshot` (replaces removed `POST /observe/screenshot`)
 
    Request and response body field names are unchanged in this refactor. Route
-   paths change; body schemas do not. Specifically, HTTP request bodies that
+   paths were flattened; body schemas were not. Specifically, HTTP request bodies that
    accept `operatorPackage` keep that field name even though the CLI flag is
    renamed to `--operator-package`. Body field renames are a separate concern
    that should not be bundled here.
@@ -1222,8 +1221,8 @@ Finalize the developer and agent experience.
 
 ### Risk
 
-Low. UX polish with no behavioral changes. HTTP route renames are safe given
-the alpha/unstable status and zero external consumers.
+Low. UX polish with no behavioral changes. HTTP flat routes already shipped;
+the API remains alpha/unstable with zero external consumers.
 
 ### Testing
 

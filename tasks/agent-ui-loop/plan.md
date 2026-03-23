@@ -267,7 +267,7 @@ What each error means in an explore loop context, and what the agent should do:
 
 - **Hierarchy XML snapshot**: default path. Low context cost. Use for targeting and
   machine-readable UI inspection.
-- **Screenshot** (`clawperator screenshot` or `POST /observe/screenshot`): visual
+- **Screenshot** (`clawperator screenshot` or `POST /screenshot`): visual
   context. Higher token cost (image input). Use for disambiguation when the
   tree alone is insufficient to understand the current screen state. Cannot
   substitute the tree for element targeting.
