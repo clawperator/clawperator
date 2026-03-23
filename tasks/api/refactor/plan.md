@@ -71,7 +71,7 @@ clawperator action press-key --key back                clawperator press back
 (no CLI command)                                       clawperator back
 clawperator inspect ui                                 (removed, use snapshot)
 
-Post-Phase 4 (designed, implementation deferred):
+Phase 5 (extended commands):
 clawperator execute --execution '{"actions":          clawperator scroll-until --text "X"
   [{"type":"scroll_until","params":                   clawperator scroll-until --text "X" --click
   {"matcher":{"textEquals":"X"}}}]}'
@@ -160,11 +160,15 @@ Synonyms are accepted by the parser but are not featured in documentation.
 | `open` | `open-uri`, `open-url` |
 | `close` | `close-app` |
 | `exec` | `execute` |
-| `scroll-until` | `scroll-and-click` |
 | `recording` | `record` |
 
 Implementation: both names call the same handler. Help text shows only the
 primary name. `--help` on the synonym shows the same output as the primary.
+
+**Behavioral alias (not a pure synonym):** `scroll-and-click` is an accepted
+command alias for `scroll-until --click`. Unlike the synonyms above, it
+implies behavior (`--click` is set automatically). It is documented only in
+the `scroll-until` detailed spec, not in help text or the synonym table.
 
 ### Flag shorthands use short, familiar names
 
@@ -303,10 +307,10 @@ The following commands' behavior is unchanged by this refactor:
   `emulator provision`), `recording` / `record`
 - `serve` remains the same CLI entrypoint. Only the HTTP route paths exposed
   by `serve.ts` change (in Phase 4)
-- `execute` is renamed to `exec` with `execute` as a synonym (see Designed
-  but Deferred section). `--execution` is renamed to `--payload` with
-  `--execution` as a silent alias. Behavior is unchanged; only the names
-  change. This is deferred to post-Phase 4 implementation.
+- `execute` behavior is unchanged through Phases 0-4. In Phase 5, the
+  command is renamed to `exec` with `execute` retained as a synonym.
+  `--execution` is renamed to `--payload` with `--execution` as a silent
+  alias. Phase 4 help text intentionally still shows `execute`.
 
 ---
 
@@ -1190,6 +1194,12 @@ place, each of these is a registry entry + handler + tests.
    - Synonym: `close-app`
    - Implementation: builds execution with `close_app` action type,
      uses existing `adb force-stop` pre-flight path in `runExecution.ts`
+   - Runtime status (verified): `close_app` is already a first-class
+     execution action. It is in `validateExecution.ts` supportedTypes,
+     has applicationId validation, has pre-flight execution via
+     `runCloseAppPreflight()`, and has result normalization via
+     `finalizeSuccessfulCloseAppSteps()`. Phase 5 only needs the CLI
+     wrapper and execution builder.
 
 3. **`exec` rename**
 
@@ -1200,6 +1210,10 @@ place, each of these is a registry entry + handler + tests.
    - `exec` becomes primary, `execute` becomes synonym
    - `--payload` becomes primary flag, `--execution` becomes alias
    - Positional: execution payload (JSON string or file path)
+   - Parsing rule: if the positional value starts with `{` or `[`,
+     parse as inline JSON. Otherwise treat as a file path and load
+     the file contents. Error precedence: unreadable file path ->
+     invalid JSON content -> missing payload.
    - `exec best-effort` subcommand unchanged
    - Behavior identical to current `execute`
 
@@ -1230,7 +1244,10 @@ place, each of these is a registry entry + handler + tests.
    clawperator read --text "Price" --all --json
    ```
 
-   - `--all` returns all matches as JSON array
+   - `--all` returns all matches as JSON array of strings (text content
+     of each matching node), e.g. `["$4.99", "$7.99"]`. Structured
+     match objects with node metadata are not in scope - agents that
+     need that should use `snapshot --json` and filter.
    - `--all` requires `--json` (error without it)
    - Without `--all`: unchanged single-match behavior
 
@@ -1282,14 +1299,16 @@ commit. `scroll-until` is the largest (new builder, new handler, selector
 around existing infrastructure. `--long`/`--focus`, `read --all`, and
 `wait --timeout` are single-flag additions to existing handlers.
 
+### Precondition: typed contract alignment
+
+Before implementing `wait-for-nav` and `read-value`, update
+`contracts/execution.ts` so `ActionParams` includes all fields already
+accepted by the runtime validation schema: `expectedPackage`,
+`expectedNode`, `timeoutMs` (action-level), and `labelMatcher`. Do not
+cast around the type system. This is a prerequisite, not optional cleanup.
+
 ### Implementation notes for Phase 5 agents
 
-- **ActionParams type gap:** `expectedPackage`, `expectedNode`,
-  `timeoutMs` (action-level), and `labelMatcher` exist in the Zod
-  validation schema (`validateExecution.ts`) but are missing from the
-  TypeScript `ActionParams` interface (`contracts/execution.ts`). Add
-  them to `ActionParams` as part of `wait-for-nav` and `read-value`
-  work so builders stay fully typed. Do not cast around the type system.
 - **buildClickExecution signature:** `buildClickExecution()` in
   `domain/actions/click.ts` currently takes only a `NodeMatcher`
   parameter. Deliverable 4 (`--long`/`--focus`) requires adding an
@@ -1584,7 +1603,10 @@ clawperator exec --payload <json-or-file> [--validate-only] [--dry-run] [--json]
 
 - Primary name: `exec`. Synonym: `execute` (accepted silently).
 - Positional: the execution payload (JSON string or file path), replacing
-  the redundant `--execution` flag name.
+  the redundant `--execution` flag name. Parsing rule: if the value starts
+  with `{` or `[`, parse as inline JSON; otherwise treat as a file path
+  and load the file contents. Error precedence: unreadable file path ->
+  invalid JSON content -> missing payload.
 - `--payload` flag: alternative to positional (for when the JSON is complex
   or the agent prefers named args).
 - `--execution` is accepted as a silent alias for `--payload` to preserve
@@ -1599,8 +1621,9 @@ clawperator exec --payload <json-or-file> [--validate-only] [--dry-run] [--json]
 clawperator read --text "Price" --all --json
 ```
 
-- `--all` returns all matching elements as a JSON array instead of the
-  first match only
+- `--all` returns all matching elements as a JSON array of strings (text
+  content of each matching node), e.g. `["$4.99", "$7.99"]`. No node
+  metadata - agents needing that should use `snapshot --json` and filter.
 - Without `--all`, behavior is unchanged (first match, single value)
 - `--all` requires `--json` (error if used without it, since pretty output
   for a list is ambiguous)
