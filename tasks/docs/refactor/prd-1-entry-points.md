@@ -1,20 +1,18 @@
-# PRD-6: Docs, Entry Points, and Missing Integration Hooks
+# PRD-1: Docs Entry Points, Agent Discoverability, and Integration Hooks
 
-Workstream: WS-6
-Priority: 6
-Proposed PR: PR-6
+Workstream: docs-refactor
+Priority: 1 (within docs refactor; blocked on API refactor completion)
 
-Merged from both agents. Other agent's PRD-4 (docs consolidation) plus this analysis's
-PRD-3 items (doctor failure links, operator_event.sh). The install.sh banner and the
-doc contradiction fix ship in PR-1. This PR handles the remainder.
+Originally PRD-6 in `tasks/node/agent-usage/`. Moved here after the API refactor
+plan split that work into its own task area.
 
 ---
 
 ## Problem Statement
 
-The docs already contain the right material. The first-run story is spread across multiple pages, one of which contradicts the shipped behavior that PR-1 fixes. The docs are not pointed to from install output, and doctor failure output links to nothing. A missing integration hook (`scripts/operator_event.sh`) causes repeated visible errors in the OpenClaw gateway log.
+The docs already contain the right material. The first-run story is spread across multiple pages. The docs are not pointed to from install output, and doctor failure output links to nothing. A missing integration hook (`scripts/operator_event.sh`) causes repeated visible errors in the OpenClaw gateway log.
 
-The install.sh banner and RECEIVER_NOT_INSTALLED contradiction are fixed in PR-1 because they accompany the readiness gate change. This PRD covers everything that must wait for all runtime changes to settle.
+The install.sh banner and RECEIVER_NOT_INSTALLED behavior are already fixed in previously merged work (the old PRD-1 readiness gate). This PRD covers everything that must wait for all runtime changes - including the API refactor - to settle.
 
 ---
 
@@ -45,7 +43,7 @@ Entry points already exist: `llms.txt`, `Agent Quickstart`, `First-Time Setup`, 
 2. `docs/agent-quickstart.md` and `docs/openclaw-first-run.md` are peers, not a hierarchy.
 3. Doctor failure output (`pretty` and `json`) does not link to troubleshooting docs.
 4. `./scripts/operator_event.sh` does not exist. Two call attempts fail on each gateway run.
-5. `sites/landing/public/llms.txt` and `sites/docs/static/llms.txt` are accurate and comprehensive but not referenced from install output (that fix is in PR-1).
+5. `sites/landing/public/llms.txt` and `sites/docs/static/llms.txt` are accurate and comprehensive but not referenced from install output.
 
 ---
 
@@ -65,13 +63,17 @@ Label the top of the agent section explicitly: "If you are an AI agent, start he
 
 ### 2. Align all first-run guides with the same command sequence
 
-The recommended first-run sequence across all guides must be consistent with the shipped behavior after PR-1 lands. Specifically:
+The recommended first-run sequence across all guides must be consistent with the shipped behavior. Specifically:
 
 - `doctor` is the mandatory pre-step before any device command.
-- `doctor` hard-fails on missing APK (after PR-1).
+- `doctor` hard-fails on missing APK.
 - `operator setup` is the install command when APK is absent.
+- All command examples must use the new flat command surface from the API
+  refactor: `snapshot` not `observe snapshot`, `click --text` not
+  `action click --selector`, `--device` not `--device-id`, `--json` not
+  `--json`.
 
-Check `agent-quickstart.md`, `openclaw-first-run.md`, and `first-time-setup.md` for any remaining references to APK absence as advisory. Update all three to match the PR-1 behavior.
+Check `agent-quickstart.md`, `openclaw-first-run.md`, and `first-time-setup.md` for any remaining references to APK absence as advisory or old command forms. Update all three.
 
 ### 3. Add docs links to doctor failure output
 
@@ -136,7 +138,7 @@ If the intended behavior is confirmed and straightforward: implement it, followi
 If the intended behavior is non-trivial or requires a human decision: create a stub with all of the following properties:
 - Accepts any arguments
 - Exits 0
-- Emits one line to stderr: `operator_event.sh: stub - not yet implemented (see tasks/node/agent-usage/prd-6.md)`
+- Emits one line to stderr: `operator_event.sh: stub - not yet implemented (see tasks/docs/refactor/prd-1-entry-points.md)`
 
 **Do not merge a silent no-op stub.** A silent exit-0 with no output masks the failure and could suppress real events that OpenClaw expected to receive. The stderr note keeps the stub visible in log inspection.
 
@@ -166,8 +168,8 @@ the hand. Read docs before issuing commands.
 ## Workflow
 
 1. Run `clawperator doctor` before any device command.
-2. If APK missing: `clawperator operator setup --apk <path> --device-id <id>`
-3. Run skills: `clawperator skills run <skill-id> --device-id <id>`
+2. If APK missing: `clawperator operator setup --apk <path> --device <id>`
+3. Run skills: `clawperator skills run <skill-id> --device <id>`
 4. On timeout or failure: check logs at ~/.clawperator/logs/
 
 ## Logs
@@ -204,12 +206,16 @@ repo. The implementing agent owns this: create the GitHub issue when this PR mer
 
 ### 6. `llms.txt` alignment
 
-After all PRs land, verify that both `sites/landing/public/llms.txt` and `sites/docs/static/llms.txt` accurately describe the final shipped behavior. Specifically:
-- APK absence is a hard failure (not advisory) [PR-1]
-- `skills validate --dry-run` exists [PR-3]
-- Persistent NDJSON logs are at `~/.clawperator/logs/`; `--log-level` flag controls verbosity [PR-5]
-- `RESULT_ENVELOPE_TIMEOUT` error includes `logPath` pointing to the current day's log [PR-5]
-- `enter_text clear: true` is a known no-op [PR-2]
+After the API refactor lands, verify that both `sites/landing/public/llms.txt`
+and `sites/docs/static/llms.txt` accurately describe the final shipped
+behavior. Specifically:
+- APK absence is a hard failure (not advisory)
+- CLI uses flat commands (`snapshot`, `click --text`, etc.), not `action`/`observe`
+- Flag names use the new short forms (`--device`, `--json`, `--timeout`)
+- `skills validate --dry-run` exists
+- Persistent NDJSON logs are at `~/.clawperator/logs/`; `--log-level` flag controls verbosity
+- `RESULT_ENVELOPE_TIMEOUT` error includes `logPath` pointing to the current day's log
+- `enter_text clear: true` is a known no-op
 
 The `llms.txt` files should be the last thing updated, once all behavior is settled.
 
@@ -227,7 +233,7 @@ The `operator_event.sh` fix stops a visible recurring error in the OpenClaw gate
 
 In scope:
 - `docs/index.md` agent section reordering
-- `agent-quickstart.md`, `openclaw-first-run.md`, `first-time-setup.md` alignment with PR-1 behavior
+- `agent-quickstart.md`, `openclaw-first-run.md`, `first-time-setup.md` alignment with shipped behavior and new CLI surface
 - Doctor failure output: `docsUrl` in `fix` object
 - `scripts/operator_event.sh` stub (after OpenClaw review)
 - `~/.clawperator/AGENTS.md` generated by `install.sh`
@@ -235,7 +241,7 @@ In scope:
 
 Out of scope:
 - Adding new documentation content (the content already exists)
-- Docs structural reform (PRD-7 - must land after all runtime PRDs settle)
+- Docs structural reform (PRD-2 - must land after this PRD)
 - `AGENTS.md` in the `clawperator-skills` repo (separate repo - tracked as a follow-up
   issue to be filed when this PR merges)
 - Shell profile or env var machinery beyond what setup already does
@@ -244,27 +250,29 @@ Out of scope:
 
 ## Dependencies
 
-- PR-1: the APK absence behavior change that the docs must describe
-- PR-2: the error format that `node-api-for-agents.md` must document
-- PR-3: `--dry-run` behavior for `skill-development-workflow.md`
-- PR-4: log path for `troubleshooting.md` and `agent-quickstart.md`
+- **API refactor (all phases)**: the new CLI command surface must be stable
+  before this PRD writes docs against it. All command examples, flag names,
+  and help text references must use the post-refactor surface.
+- **Previously merged runtime PRDs** (readiness gate, error context, dry-run
+  validation, persistent logging): these are already shipped and their behavior
+  must be accurately described.
 
-This is the last PR in the sequence.
+This is the first deliverable after the API refactor completes.
 
 ---
 
 ## Risks and Tradeoffs
 
 **Risk: docs stability**
-If this PR lands before the runtime changes are stable, the docs will describe behavior that does not yet exist. The sequencing dependency is critical. Do not write PR-6 docs content until all runtime PRs have merged.
+If this PR lands before the API refactor is complete, the docs will describe behavior that does not yet exist. The sequencing dependency is critical. Do not write this PRD's content until all API refactor phases have merged.
 
 **Risk: `docsUrl` field in `fix` object**
 Hardcoded docs URLs in doctor output will become stale if the docs site is restructured.
-PRD-7 restructures the docs and will rename pages. The implementing agent for PRD-7 must
-check and update all `docsUrl` values hardcoded in this PR as part of that work. The
+PRD-2 restructures the docs and will rename pages. The implementing agent for PRD-2 must
+check and update all `docsUrl` values hardcoded in this PRD as part of that work. The
 three initial `docsUrl` values are in `readinessChecks.ts` for `RECEIVER_NOT_INSTALLED`,
 `RECEIVER_VARIANT_MISMATCH`, and `DEVICE_DEV_OPTIONS_DISABLED`. Document these as
-explicit search targets in the PRD-7 implementation notes.
+explicit search targets in the PRD-2 implementation notes.
 
 **Risk: `operator_event.sh` stub masking intent**
 A silent no-op is worse than the current visible error. The stub must emit a stderr notice. This makes the stub detectable by anyone reviewing the logs.
@@ -308,7 +316,7 @@ Inline `DoctorCheckResult` objects — construct in test body, no files needed:
 
 **T3 — doctor JSON output for `RECEIVER_NOT_INSTALLED` includes `fix.docsUrl`**
 - Method: call the readiness check function and inspect the returned object; or parse
-  `clawperator doctor --output json`
+  `clawperator doctor --json`
 - Expected: `check.fix.docsUrl` starts with `"https://"`
 - Protects: `docsUrl` in contract and renderer but never populated in the check
   definition; JSON reflects what is in the data
@@ -359,10 +367,13 @@ Inline `DoctorCheckResult` objects — construct in test body, no files needed:
 - All first-run guides describe APK absence as a blocking failure with the install command.
 - `contracts/doctor.ts`: `fix.docsUrl` is an optional field in the `DoctorCheckResult.fix` type.
 - `cli/commands/doctor.ts`: `renderCheck` renders `Docs: <url>` in pretty output when `fix.docsUrl` is set.
-- `clawperator doctor --output json` for `RECEIVER_NOT_INSTALLED` includes `fix.docsUrl`.
-- `clawperator doctor --output pretty` for `RECEIVER_NOT_INSTALLED` includes a `Docs:` line.
+- `clawperator doctor --json` for `RECEIVER_NOT_INSTALLED` includes `fix.docsUrl`.
+- `clawperator doctor` (pretty mode) for `RECEIVER_NOT_INSTALLED` includes a `Docs:` line.
 - Existing checks without `docsUrl` are unaffected (TypeScript `docsUrl?` optional).
 - `./scripts/operator_event.sh` exists, exits 0, and emits a detectable stderr notice (stub) OR has confirmed behavior from OpenClaw review.
 - OpenClaw review outcome is documented before merging the stub.
-- Both `llms.txt` files accurately describe all behavior shipped in PRs 1-5.
+- Both `llms.txt` files accurately describe all shipped behavior including the
+  new flat CLI command surface from the API refactor.
 - No guide contradicts shipped `doctor` behavior.
+- All command examples in docs use the new CLI surface (flat commands, short
+  flag names).

@@ -387,27 +387,22 @@ Migration policy:
 - Temporary Bash implementations (including the current Life360 flow) are acceptable only as stopgaps and must be queued for early migration once minimal Node skill SDK/runtime helpers are in place.
 
 
-## Agent-Friendly Command and Alias Layer
+## Agent-Friendly Command Surface
 
-Because agents are primary customers, Clawperator should accept intuitive aliases that normalize to canonical actions.
+Because agents are the primary consumers, the CLI command surface must be
+optimized for first-contact guessability.
 
-Examples:
-
-- `tap` -> `click`
-- `press` -> `click`
-- `long_press` -> `click` with long-click params
-- `wait_for` -> `wait_for_node`
-- `find` -> `wait_for_node`
-- `read` -> `read_text`
-- `snapshot` -> `snapshot_ui`
-- `sleep` -> `sleep`
-- `action`: Primary entry point for single-step interactions.
-
-Rules:
-
+Key principles:
 1. Canonical form is stored and logged.
-2. Aliases are input-only conveniences.
-3. Alias table is explicit/versioned (no fuzzy guessing in parser).
+2. Aliases are input-only conveniences accepted by the parser but not
+   featured in documentation.
+3. Alias table is explicit and versioned (no fuzzy guessing in parser).
+
+Design principles, naming rules, synonym policy, and a pre-merge checklist
+for new commands and flags are in `docs/design/node-api-design-guiding-principles.md`.
+
+Note: the "Shipped Commands" section above reflects the current CLI surface
+and will be updated as the command surface evolves.
 
 ## Node Module Structure
 

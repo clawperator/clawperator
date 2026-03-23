@@ -132,7 +132,11 @@ A unified logger would sit above all three, replacing the ad-hoc wiring of indiv
 - Implementation plan, API design, or module structure
 - Log forwarding to external systems (Datadog, CloudWatch, etc.)
 - Log rotation, compression, or retention policies (deferred in PRD-5)
-- A `clawperator logs` query command (deferred in PRD-5)
+- A `clawperator logs` command (deferred in PRD-5). The CLI surface for
+  streaming is settled: `clawperator logs --follow` / `logs -f` (streams
+  NDJSON log output until Ctrl+C, matching tail -f / docker logs -f
+  conventions). Query and filter flags depend on the unified logger's
+  event schema and are not yet designed.
 - Structured logging protocol for skill scripts (deferred in PRD-5.5)
 
 These are downstream of getting the unified logger architecture right and should be

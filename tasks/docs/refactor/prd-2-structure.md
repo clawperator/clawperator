@@ -1,12 +1,11 @@
-# PRD-7: Docs Structural Reform
+# PRD-2: Docs Structural Reform
 
-Workstream: WS-7
-Priority: 7 (last - must follow all runtime PRDs)
-Proposed PR: PR-7
+Workstream: docs-refactor
+Priority: 2 (within docs refactor; blocked on PRD-1 completion)
 
-New PRD added to address a gap in the original plan. The runtime PRDs (1-5) fix the
-behavior; PR-6 aligns existing docs with that behavior. This PRD fixes the structure of
-the docs site itself, which has a separate and older problem.
+Originally PRD-7 in `tasks/node/agent-usage/`. Moved here after the API refactor
+plan split that work into its own task area. PRD-1 (entry points) aligns existing
+docs with shipped behavior. This PRD fixes the structure of the docs site itself.
 
 ---
 
@@ -128,7 +127,7 @@ config are not available. In that case, either: (a) add the `mkdocs-redirects` p
 `sites/docs/requirements.txt` and configure it, or (b) leave a markdown stub at the old
 URL with a manual "This page moved to: <new-url>" note. Document which approach was used.
 
-**Also update PRD-6 docsUrl values**: when renaming or moving the first-time-setup page
+**Also update PRD-1 docsUrl values**: when renaming or moving the first-time-setup page
 and any other pages referenced by `docsUrl` in `readinessChecks.ts`, update those
 hardcoded URLs as part of this PR. Search `apps/node/src/domain/doctor/checks/` for
 `docsUrl` values and update them to match the new page paths.
@@ -175,10 +174,10 @@ Out of scope:
 
 ## Dependencies
 
-- **ALL prior PRDs must land first.** This PRD documents the final shipped behavior. If
-  any runtime PRD is still in flight, the docs will describe behavior that does not yet
-  exist or that contradicts what is actually shipped.
-- PR-6 must land first: the first-run guide alignment (PR-6) is a prerequisite. This
+- **The API refactor and PRD-1 must land first.** This PRD documents the final shipped
+  behavior. If the API refactor or PRD-1 is still in flight, the docs will describe
+  behavior that does not yet exist or that contradicts what is actually shipped.
+- PRD-1 must land first: the entry-point alignment (PRD-1) is a prerequisite. This
   PRD then finalizes the structure around that aligned content.
 
 ---
@@ -200,7 +199,7 @@ Prioritize the first-run and reference sections; leave the deep architecture doc
 a follow-on if needed.
 
 **Risk: landing before runtime PRDs**
-If this PR lands before PR-1 through PR-6 merge, the restructured docs will describe
+If this PR lands before the API refactor and PRD-1 merge, the restructured docs will describe
 behavior that does not exist yet. Hard dependency: do not open this PR until all prior
 PRs are merged and deployed.
 
