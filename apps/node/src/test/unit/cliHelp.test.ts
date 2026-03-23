@@ -55,11 +55,11 @@ describe("CLI help", () => {
     assert.match(stdout, /--apk <path>/);
   });
 
-  it("shows operator setup help for operator install --help", async () => {
+  it("shows operator setup help for operator install --help alias", async () => {
     const { stdout, code } = await runCli(["operator", "install", "--help"]);
     assert.strictEqual(code, 0);
     assert.match(stdout, /clawperator operator setup/);
-    assert.match(stdout, /--apk <path>/);
+    assert.match(stdout, /operator install remains a compatibility alias/);
   });
 
   it("falls back to top-level help for operator unknown --help", async () => {
@@ -226,7 +226,7 @@ describe("CLI help", () => {
     assert.match(stdout, /recording stop/);
     assert.match(stdout, /recording pull/);
     assert.match(stdout, /recording parse/);
-    assert.doesNotMatch(stdout, /record' is an alias/);
+    assert.match(stdout, /'record' is an alias/);
   });
 
   it("returns USAGE for bare recording command", async () => {
@@ -235,14 +235,16 @@ describe("CLI help", () => {
     const obj = JSON.parse(stdout);
     assert.strictEqual(obj.code, "USAGE");
     assert.match(obj.message, /recording start\|stop\|pull\|parse/);
+    assert.match(obj.message, /'record' is an alias/);
   });
 
-  it("returns USAGE for bare record synonym", async () => {
+  it("returns USAGE for bare record alias", async () => {
     const { stdout, code } = await runCli(["record"]);
     assert.strictEqual(code, 0);
     const obj = JSON.parse(stdout);
     assert.strictEqual(obj.code, "USAGE");
     assert.match(obj.message, /recording start\|stop\|pull\|parse/);
+    assert.match(obj.message, /'record' is an alias/);
   });
 
   it("returns USAGE for recording parse without --input", async () => {
@@ -340,12 +342,14 @@ describe("operator setup CLI output", () => {
     assert.strictEqual(obj.code, "OPERATOR_APK_NOT_FOUND");
   });
 
-  it("unknown command `observe` returns UNKNOWN_COMMAND", async () => {
+  it("nested `observe screenshot` returns UNKNOWN_COMMAND redirect to `screenshot`", async () => {
+    // Nested observe is removed; any invocation (including with flags) gets the migration message.
     const { stdout, code } = await runCli(["observe", "screenshot", "--path"]);
     assert.strictEqual(code, 1, stdout);
-    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    const obj = JSON.parse(stdout) as { code?: string; message?: string; suggestion?: string };
     assert.strictEqual(obj.code, "UNKNOWN_COMMAND");
-    assert.match(obj.message ?? "", /observe|Unknown command/i);
+    assert.match(obj.message ?? "", /'observe screenshot' has been removed/);
+    assert.strictEqual(obj.suggestion, "screenshot");
   });
 });
 
@@ -368,16 +372,15 @@ describe("promoted flat commands - help and missing-arg errors", () => {
     const { stdout, code } = await runCli(["click", "--help"]);
     assert.strictEqual(code, 0);
     assert.match(stdout, /clawperator click/);
-    assert.match(stdout, /--text/);
     assert.match(stdout, /--selector/);
   });
 
-  it("click with no matcher returns MISSING_SELECTOR with exit code 1", async () => {
+  it("click with no selector returns MISSING_SELECTOR with exit code 1", async () => {
     const { stdout, code } = await runCli(["click"]);
     assert.strictEqual(code, 1, stdout);
     const obj = JSON.parse(stdout) as { code?: string; message?: string };
     assert.strictEqual(obj.code, "MISSING_SELECTOR");
-    assert.match(obj.message ?? "", /element matcher/);
+    assert.match(obj.message ?? "", /click requires a selector/);
   });
 
   it("open --help shows open help", async () => {
@@ -436,28 +439,28 @@ describe("promoted flat commands - help and missing-arg errors", () => {
     assert.match(obj.message ?? "", /scroll requires a direction/);
   });
 
-  it("type with no element matcher returns MISSING_SELECTOR with exit code 1", async () => {
+  it("type with no selector returns MISSING_SELECTOR with exit code 1", async () => {
     const { stdout, code } = await runCli(["type", "hello"]);
     assert.strictEqual(code, 1, stdout);
     const obj = JSON.parse(stdout) as { code?: string; message?: string };
     assert.strictEqual(obj.code, "MISSING_SELECTOR");
-    assert.match(obj.message ?? "", /element matcher/);
+    assert.match(obj.message ?? "", /type requires a selector/);
   });
 
-  it("read with no matcher returns MISSING_SELECTOR with exit code 1", async () => {
+  it("read with no selector returns MISSING_SELECTOR with exit code 1", async () => {
     const { stdout, code } = await runCli(["read"]);
     assert.strictEqual(code, 1, stdout);
     const obj = JSON.parse(stdout) as { code?: string; message?: string };
     assert.strictEqual(obj.code, "MISSING_SELECTOR");
-    assert.match(obj.message ?? "", /element matcher/);
+    assert.match(obj.message ?? "", /read requires a selector/);
   });
 
-  it("wait with no matcher returns MISSING_SELECTOR with exit code 1", async () => {
+  it("wait with no selector returns MISSING_SELECTOR with exit code 1", async () => {
     const { stdout, code } = await runCli(["wait"]);
     assert.strictEqual(code, 1, stdout);
     const obj = JSON.parse(stdout) as { code?: string; message?: string };
     assert.strictEqual(obj.code, "MISSING_SELECTOR");
-    assert.match(obj.message ?? "", /element matcher/);
+    assert.match(obj.message ?? "", /wait requires a selector/);
   });
 
   it("screenshot --path with missing value returns USAGE with exit code 1", async () => {
@@ -468,15 +471,15 @@ describe("promoted flat commands - help and missing-arg errors", () => {
     assert.strictEqual(obj.message, "--path requires a value");
   });
 
-  it("tap synonym dispatches to click handler (missing matcher returns MISSING_SELECTOR)", async () => {
+  it("tap synonym dispatches to click handler (missing selector returns MISSING_SELECTOR)", async () => {
     const { stdout, code } = await runCli(["tap"]);
     assert.strictEqual(code, 1, stdout);
     const obj = JSON.parse(stdout) as { code?: string; message?: string };
     assert.strictEqual(obj.code, "MISSING_SELECTOR");
-    assert.match(obj.message ?? "", /element matcher/);
+    assert.match(obj.message ?? "", /click requires a selector/);
   });
 
-  it("type rejects --selector together with --text matcher (exit 1)", async () => {
+  it("type rejects positional text together with --text (exit 1)", async () => {
     const { stdout, code } = await runCli([
       "type",
       "hello",

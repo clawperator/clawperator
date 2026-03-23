@@ -38,12 +38,14 @@ function getGlobalOpts(argv: string[]): {
     } else if (argv[i] === "--device-id" && argv[i + 1]) {
       deviceId = argv[++i];
     } else if (argv[i] === "--device" && argv[i + 1]) {
+      // --device is the new canonical for --device-id (old name still works)
       deviceId = argv[++i];
     } else if (argv[i] === "--receiver-package") {
       const value = argv[i + 1];
       if (value === undefined || value.trim().length === 0 || value.startsWith("-")) {
         throw new UsageError("--receiver-package requires a value");
       }
+      // --receiver-package is an alias for --operator-package (old name still works)
       operatorPackage = value;
       i++;
     } else if (argv[i] === "--operator-package") {

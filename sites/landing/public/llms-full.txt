@@ -1760,7 +1760,7 @@ workflow (also available as `record` alias), use [Android Recording Format for A
 
 | Command | Description |
 | :--- | :--- |
-| `operator setup --apk <path>` | Install the Operator APK and grant required device permissions |
+| `operator setup --apk <path>` | Install the Operator APK and grant required device permissions (canonical setup command, with `operator install` kept as an alias) |
 | `devices` | List connected Android serials and states |
 | `emulator list` | List configured Android Virtual Devices with compatibility metadata |
 | `emulator inspect <name>` | Show normalized metadata for one Android Virtual Device |
@@ -1771,14 +1771,14 @@ workflow (also available as `record` alias), use [Android Recording Format for A
 | `emulator status` | List running Android emulators and boot state |
 | `emulator provision` | Reuse or create a supported Android emulator and return its ADB serial |
 | `provision emulator` | Alias of `emulator provision` |
-| `exec --execution <json\|file>` | Run a full execution payload (see `--validate-only` and `--dry-run` below) |
+| `exec --execution <json\|file>` | Run a full execution payload (see `--validate-only` and `--dry-run` below). `execute` is a supported synonym. |
 | `snapshot` | Capture UI hierarchy dump (`hierarchy_xml`) |
 | `screenshot [--path <file>]` | Capture device screen as PNG |
 | `open <package-id\|url\|uri>` | Open an app, URL, or URI (auto-detects target type) |
-| `click (--text \| --id \| --desc \| --selector)` | Tap the first matching UI element (`--selector` is the advanced JSON escape hatch) |
-| `type <typedText> (--text \| --id \| --desc \| --selector)` | Type into the first matching element |
-| `read (--text \| --id \| --desc \| --selector)` | Read text from the first matching element |
-| `wait (--text \| --id \| --desc \| --selector)` | Wait until a matching element appears |
+| `click --selector <json>` | Tap the first matching UI element |
+| `type <text> --selector <json>` | Type text into the first matching element |
+| `read --selector <json>` | Read text from the first matching element |
+| `wait --selector <json>` | Wait until a matching element appears |
 | `press <back\|home\|recents>` | Press a hardware key |
 | `back` | Press the Android back key (shorthand for `press back`) |
 | `scroll <down\|up\|left\|right>` | Scroll the screen in a direction |
@@ -1793,17 +1793,17 @@ workflow (also available as `record` alias), use [Android Recording Format for A
 | `skills install` | Clone skills repo to `~/.clawperator/skills/` |
 | `skills update [--ref <git-ref>]` | Pull latest skills (optionally pin to a ref) |
 | `grant-device-permissions` | Re-grant Operator permissions only after an Operator APK crash causes Android to revoke them |
-| `recording start [--session-id <id>] [--device <serial>] [--operator-package <pkg>]` | Start a recording session on the operator app and write NDJSON on device |
-| `recording stop [--session-id <id>] [--device <serial>] [--operator-package <pkg>]` | Stop the active recording session and finalize the recording file |
-| `recording pull [--session-id <id>] [--out <dir>] [--device <serial>]` | Pull the on-device NDJSON recording to host storage |
-| `recording parse --input <file> [--out <file>]` | Parse a raw NDJSON recording into a step log JSON |
+| `recording start [--session-id <id>] [--device <serial>] [--operator-package <pkg>]` | Start a recording session on the operator app and write NDJSON on device (`record` is an alias) |
+| `recording stop [--session-id <id>] [--device <serial>] [--operator-package <pkg>]` | Stop the active recording session and finalize the recording file (`record` is an alias) |
+| `recording pull [--session-id <id>] [--out <dir>] [--device <serial>]` | Pull the on-device NDJSON recording to host storage (`record` is an alias) |
+| `recording parse --input <file> [--out <file>]` | Parse a raw NDJSON recording into a step log JSON (`record` is an alias) |
 | `serve` | Start HTTP/SSE server |
 | `doctor` | Run environment diagnostics |
 | `version` | Print the CLI version or check CLI / Clawperator Operator Android app compatibility |
 
-**Global options:** `--device <id>`, `--operator-package <pkg>`, `--json`, `--output <json|pretty>`, `--timeout <ms>`, `--log-level <debug|info|warn|error>`, `--verbose`
+**Global options:** `--device <id>` (canonical; `--device-id` accepted), `--operator-package <pkg>`, `--json` (canonical; `--output json` accepted), `--timeout <ms>` (canonical; `--timeout-ms` accepted), `--log-level <debug|info|warn|error>`, `--verbose`
 
-Use `--json` for machine-readable output; `--output pretty` is for human inspection.
+For agent callers, `--json` is the canonical output flag. `--output pretty` is for human inspection.
 
 ## Persistent Logging
 
@@ -1896,8 +1896,8 @@ Start with `clawperator serve [--port <n>] [--host <ip>]`. Default: `127.0.0.1:3
 | `DELETE /android/emulators/:name` | Delete an AVD by name |
 | `POST /android/provision/emulator` | Reuse or create a supported emulator and return a booted device |
 | `POST /execute` | Body: `{"execution": <payload>, "deviceId": "...", "operatorPackage": "..."}` |
-| `POST /snapshot` | Capture UI tree |
-| `POST /screenshot` | Capture screenshot |
+| `POST /observe/snapshot` | Capture UI tree |
+| `POST /observe/screenshot` | Capture screenshot |
 | `GET /skills` | List skills. Query params: `?app=<pkg>&intent=<i>&keyword=<k>` |
 | `GET /skills/:skillId` | Get skill metadata |
 | `POST /skills/:skillId/run` | Run skill. Body: `{"deviceId": "...", "args": [...], "timeoutMs": 90000, "expectContains": "TEXT_BEGIN"}` |
@@ -3269,10 +3269,10 @@ In multi-device environments, keep `--device` explicit on:
 - `operator setup`
 - `doctor`
 - `version --check-compat`
-- `exec`
+- `exec` (`execute` is a synonym)
 - `snapshot`
 - `screenshot`
-- flat device interaction commands (`click`, `type`, `open`, `read`, `wait`, `press`, `back`, `scroll`)
+- flat device interaction commands (`click`, `type`, `open`, and related synonyms)
 - `grant-device-permissions`
 - `skills run`
 
@@ -3471,7 +3471,7 @@ clawperator operator setup --apk <path> [--device <id>] [--operator-package <pac
 | `--device <id>` | Target Android device serial (required when multiple devices are connected) |
 | `--operator-package <package>` | Operator package identifier (required when both release and debug variants are installed) |
 
-This is the canonical setup command. It runs three phases in sequence:
+This is the canonical setup command. `clawperator operator install` remains a compatibility alias. It runs three phases in sequence:
 
 1. **Install**: Copies the APK onto the device via `adb install -r`.
 2. **Permissions**: Grants the accessibility service, notification posting, and notification listener permissions.
@@ -3620,7 +3620,7 @@ clawperator packages list [--device <id>] [--third-party]
 
 ### `exec`
 
-Execute a validated command payload.
+Execute a validated command payload. The CLI also accepts `execute` as a synonym.
 
 ```
 clawperator exec --execution <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>] [--timeout <ms>]
@@ -3688,66 +3688,65 @@ Target detection: `https?://` or any `*://` scheme routes as URI; otherwise trea
 
 ### `click`
 
-Tap the first matching UI element.
+Tap a UI element matching a selector.
 
 ```
-clawperator click [--text <label> | --id <resourceId> | --desc <contentDescription> | --selector '<json>'] [--device <id>] [--operator-package <pkg>] [--json]
+clawperator click --selector '<json>' [--device <id>] [--operator-package <pkg>] [--json]
 ```
 
 | Flag | Description |
 |------|-------------|
-| `--text <label>` | Match visible text (`textEquals`) |
-| `--id <resourceId>` | Match Android resource id |
-| `--desc <text>` | Match content description |
-| `--selector <json>` | Advanced `NodeMatcher` JSON (mutually exclusive with `--text` / `--id` / `--desc`) |
+| `--selector <json>` | `NodeMatcher` JSON (required) |
+
+Example selector: `'{"resourceId":"com.example.app:id/button_ok"}'`
+
+Synonym: `tap` (accepted, not in help).
 
 ---
 
 ### `type`
 
-Type into the first matching UI element.
+Type text into a UI element matching a selector.
 
 ```
-clawperator type <typedText> [--text <fieldLabel> | --id <resourceId> | --desc <contentDescription> | --selector '<json>'] [--device <id>] [--operator-package <pkg>] [--submit] [--clear] [--json]
+clawperator type <text> --selector '<json>' [--device <id>] [--operator-package <pkg>] [--submit] [--clear] [--json]
 ```
 
 | Flag | Description |
 |------|-------------|
-| `<typedText>` | Characters to enter (positional, before flags) |
-| `--text <fieldLabel>` | Match target field by visible text |
-| `--id <resourceId>` | Match by resource id |
-| `--desc <text>` | Match by content description |
-| `--selector <json>` | Advanced matcher (mutually exclusive with simple flags) |
+| `--selector <json>` | `NodeMatcher` JSON (required) |
 | `--submit` | Press Enter after typing |
 | `--clear` | Clear existing text before typing |
+
+Text may be supplied as a positional argument or via `--text <text>`. Synonym: `fill` (accepted, not in help).
 
 ---
 
 ### `read`
 
-Read text from the first matching UI element.
+Read text from a UI element matching a selector.
 
 ```
-clawperator read [--text <label> | --id <resourceId> | --desc <contentDescription> | --selector '<json>'] [--device <id>] [--operator-package <pkg>] [--json]
+clawperator read --selector '<json>' [--device <id>] [--operator-package <pkg>] [--json]
 ```
 
 | Flag | Description |
 |------|-------------|
-| `--text`, `--id`, `--desc`, `--selector` | Same semantics as `click` |
+| `--selector <json>` | `NodeMatcher` JSON (required) |
 
 ---
 
 ### `wait`
 
-Wait until the first matching UI element appears.
+Wait until a UI element matching a selector appears.
 
 ```
-clawperator wait [--text <label> | --id <resourceId> | --desc <contentDescription> | --selector '<json>'] [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
+clawperator wait --selector '<json>' [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
 ```
 
 | Flag | Description |
 |------|-------------|
-| `--text`, `--id`, `--desc`, `--selector` | Same semantics as `click` |
+| `--selector <json>` | `NodeMatcher` JSON (required) |
 
 ---
 
@@ -3765,7 +3764,7 @@ clawperator press <key> [--device <id>] [--operator-package <pkg>] [--json]
 | `home` | Return to home screen |
 | `recents` | Open recent apps |
 
-Key may be supplied as a positional argument or via `--key <key>`.
+Key may be supplied as a positional argument or via `--key <key>`. Synonym: `press-key` (accepted, not in help).
 
 ---
 
@@ -3795,7 +3794,7 @@ Valid directions: `down`, `up`, `left`, `right`. Direction may be supplied as a 
 
 ### `recording start`
 
-Start an on-device recording session through the Operator app.
+Start an on-device recording session through the Operator app. `record` is a supported alias.
 
 ```
 clawperator recording start [--session-id <id>] [--device <serial>] [--operator-package <pkg>]
@@ -3809,7 +3808,7 @@ the normal execution pipeline.
 
 ### `recording stop`
 
-Stop the active recording session and finalize the on-device NDJSON file.
+Stop the active recording session and finalize the on-device NDJSON file. `record` is a supported alias.
 
 ```
 clawperator recording stop [--session-id <id>] [--device <serial>] [--operator-package <pkg>]
@@ -3822,7 +3821,7 @@ recording.
 
 ### `recording pull`
 
-Pull a recording from device storage to the host.
+Pull a recording from device storage to the host. `record` is a supported alias.
 
 ```
 clawperator recording pull [--session-id <id>] [--out <dir>] [--device <serial>]
@@ -3835,7 +3834,7 @@ pointer first and pulls that recording. Output defaults to `./recordings/`.
 
 ### `recording parse`
 
-Parse a raw NDJSON recording into a step log JSON file.
+Parse a raw NDJSON recording into a step log JSON file. `record` is a supported alias.
 
 ```
 clawperator recording parse --input <file> [--out <file>]
@@ -4031,8 +4030,8 @@ clawperator serve [--port <number>] [--host <string>]
 HTTP endpoints exposed:
 - `GET /devices` - list connected devices
 - `POST /execute` - run an execution payload
-- `POST /snapshot` - capture UI snapshot
-- `POST /screenshot` - capture screenshot
+- `POST /observe/snapshot` - capture UI snapshot
+- `POST /observe/screenshot` - capture screenshot
 - `GET /skills` - list or search skills
 - `GET /skills/:skillId` - get skill metadata
 - `POST /skills/:skillId/run` - run a skill script
@@ -4056,7 +4055,7 @@ clawperator doctor --check-only
 
 | Flag | Description |
 |------|-------------|
-| `--json` | Output as JSON |
+| `--json` | Output as JSON (alias for `--output json`) |
 | `--fix` | Attempt non-destructive host fixes |
 | `--full` | Full Android build + install + handshake + smoke |
 | `--check-only` | Always exit 0 for CI or automation |
@@ -4677,13 +4676,13 @@ Run an execution payload.
 | 423 | Execution conflict (in-flight) |
 | 504 | Result envelope timeout |
 
-### `POST /snapshot`
+### `POST /observe/snapshot`
 
 Capture UI snapshot. Body: `{ "deviceId"?, "operatorPackage"? }`.
 
 Same response shape as `/execute`.
 
-### `POST /screenshot`
+### `POST /observe/screenshot`
 
 Capture screenshot. Body: `{ "deviceId"?, "operatorPackage"? }`.
 
@@ -6132,10 +6131,10 @@ When multiple devices are connected, always pass an explicit device flag:
 
 In multi-device environments, keep `--device` explicit on:
 
-- `exec`
+- `exec` (`execute` is a synonym)
 - `snapshot`
 - `screenshot`
-- flat device interaction commands (`click`, `type`, `read`, `wait`, `open`, `press`, `back`, `scroll`)
+- flat device interaction commands (`click`, `type`, `read`, `wait`, `open`, `press`, `back`, `scroll`, and related synonyms)
 - `doctor`
 - `version --check-compat`
 - `operator setup`
@@ -9255,7 +9254,7 @@ Core commands:
 - `clawperator doctor`: Validate prerequisites and environment.
 - `clawperator devices`: Discover connected device IDs.
 - `clawperator packages list`: Confirm presence of receiver and target apps on device.
-- `clawperator exec`: Run an execution JSON payload.
+- `clawperator exec`: Run an execution JSON payload (`execute` is a supported synonym).
 - `clawperator snapshot`: Get current UI hierarchy as `hierarchy_xml`.
 - `clawperator screenshot`: Capture device screen.
 - Flat device interaction commands (single-step wrappers): `clawperator open`, `clawperator click`, `clawperator type`, `clawperator read`, `clawperator wait`, `clawperator press`, `clawperator back`, `clawperator scroll`, and related flags documented in the CLI reference.
@@ -9283,9 +9282,9 @@ When running `clawperator serve [--port <number>] [--host <string>]`, a local HT
     - Body: `{"execution": {...}, "deviceId": "...", "operatorPackage": "..."}`
     - Returns: `RunExecutionResult` (200 OK or 4xx/5xx on failure).
     - Status **423 Locked**: Returned if another execution is in flight for the target device.
-- **`POST /snapshot`**: Quick helper for UI capture.
+- **`POST /observe/snapshot`**: Quick helper for UI capture.
     - Body: `{"deviceId": "...", "operatorPackage": "..."}`
-- **`POST /screenshot`**: Quick helper for visual capture.
+- **`POST /observe/screenshot`**: Quick helper for visual capture.
     - Body: `{"deviceId": "...", "operatorPackage": "..."}`
 
 ### Event Streaming (SSE)
@@ -9410,7 +9409,7 @@ This keeps behavior deterministic and avoids hidden control-flow in the runtime.
 Use one term everywhere: `execution`.
 
 - `compile` produces an `execution`.
-- `exec` runs an `execution` payload.
+- `exec` runs an `execution` payload (`execute` is a synonym).
 
 Execution schema aligns with Android `AgentCommand` constraints.
 
@@ -9755,8 +9754,8 @@ For app automation commands, default to:
 | :--- | :--- | :--- |
 | `open_app` | `applicationId: string` | Launches app by package ID |
 | `close_app` | `applicationId: string` | Node runs `adb shell am force-stop` pre-flight, normalizes the step result only when that close succeeds, and otherwise returns a structured execution failure |
-| `enter_text` | `matcher: NodeMatcher`, `text: string`, `submit?: boolean`, `clear?: boolean` | CLI: `type`. `submit: true` presses Enter after typing. `clear` is accepted by Node but currently ignored by Android |
-| `click` | `matcher: NodeMatcher`, `clickType?: "default"\|"long_click"\|"focus"` | CLI: `click` |
+| `enter_text` | `matcher: NodeMatcher`, `text: string`, `submit?: boolean`, `clear?: boolean` | CLI: `type` (synonym: `fill`). `submit: true` presses Enter after typing. `clear` is accepted by Node but currently ignored by Android |
+| `click` | `matcher: NodeMatcher`, `clickType?: "default"\|"long_click"\|"focus"` | CLI: `click` (synonym: `tap`) |
 | `read_text` | `matcher: NodeMatcher`, `validator?: "temperature"`, `retry?: object` | CLI: `read`. Result in `data.text`. Other validator values are rejected by the runtime |
 | `wait_for_node` | `matcher: NodeMatcher`, `retry?: object` | CLI: `wait`. Waits with internal retry |
 | `snapshot_ui` | `retry?: object` | CLI: `snapshot`. Snapshot content in `data.text` as `hierarchy_xml`, plus best-effort `foreground_package` / `has_overlay` metadata |
@@ -9766,7 +9765,7 @@ For app automation commands, default to:
 | `scroll_until` | `target?: NodeMatcher`, `container?: NodeMatcher`, `clickType?: "default"\|"long_click"\|"focus"`, `clickAfter?: boolean`, `direction?`, `distanceRatio?`, `settleDelayMs?`, `maxScrolls?`, `maxDurationMs?`, `noPositionChangeThreshold?`, `findFirstScrollableChild?` | Bounded scroll loop that returns `termination_reason`. With `target`, the runtime emits `TARGET_FOUND` when the matcher becomes visible in the on-screen filtered tree. Set `clickAfter: true` to click immediately once visible. Some Android screens keep off-screen descendants in raw snapshots, so clipped edge cases can still end as `EDGE_REACHED`. Without `target`, use it for feed pagination with explicit caps |
 | `sleep` | `durationMs: number` | Pause between steps. Must fit within the execution `timeoutMs` budget |
 
-**`enter_text` vs CLI `type`:** The CLI command is `type` but the action type field in execution payloads is `enter_text`. These map to the same runtime action. When building execution payloads directly, always use `enter_text`.
+**`enter_text` vs CLI `type`:** The CLI command is `type` (synonym: `fill`) but the action type field in execution payloads is `enter_text`. These map to the same runtime action. When building execution payloads directly, always use `enter_text`.
 
 **NodeMatcher fields:** `resourceId`, `contentDescEquals`, `textEquals`, `textContains`, `contentDescContains`, `role`. All fields are AND-combined. Prefer `resourceId` when available. Full reference in `docs/node-api-for-agents.md`.
 

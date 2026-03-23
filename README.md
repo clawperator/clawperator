@@ -59,7 +59,7 @@ npm install -g clawperator
 clawperator doctor                              # Verify setup
 clawperator devices --json                      # List connected devices
 clawperator snapshot --device <device_id> --json   # Capture UI tree
-clawperator exec --execution payload.json --device <device_id>   # Run an execution
+clawperator exec --execution payload.json --device <device_id>   # Run an execution (`execute` is a synonym)
 ```
 
 CLI device commands are flat (`snapshot`, `screenshot`, `click`, `open`, `type`, ...). When several devices are connected, pass `--device` (alias: `--device-id`). See [Node API for Agents](docs/node-api-for-agents.md) for flags, HTTP routes, and error codes.

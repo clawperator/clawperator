@@ -339,13 +339,13 @@ Run an execution payload.
 | 423 | Execution conflict (in-flight) |
 | 504 | Result envelope timeout |
 
-### `POST /snapshot`
+### `POST /observe/snapshot`
 
 Capture UI snapshot. Body: `{ "deviceId"?, "operatorPackage"? }`.
 
 Same response shape as `/execute`.
 
-### `POST /screenshot`
+### `POST /observe/screenshot`
 
 Capture screenshot. Body: `{ "deviceId"?, "operatorPackage"? }`.
 

@@ -62,10 +62,10 @@ In multi-device environments, keep `--device` explicit on:
 - `operator setup`
 - `doctor`
 - `version --check-compat`
-- `exec`
+- `exec` (`execute` is a synonym)
 - `snapshot`
 - `screenshot`
-- flat device interaction commands (`click`, `type`, `open`, `read`, `wait`, `press`, `back`, `scroll`)
+- flat device interaction commands (`click`, `type`, `open`, and related synonyms)
 - `grant-device-permissions`
 - `skills run`
 
