@@ -402,12 +402,13 @@ Low. Infrastructure only. No behavior changes visible to current callers.
 
 Phase 0 is deliberately thin. Its purpose is to make Phase 1 safe, not to be a
 standalone deliverable. If the implementing agent finds Phase 0 and Phase 1
-naturally collapse into one PR, that is acceptable - and likely preferable,
-since Phase 1 replaces the "did you mean?" hardcoded mappings with
-registry-derived lookup. Building the hardcoded version in Phase 0 only to
-replace it in Phase 1 is wasted work if both land together. The separation
-exists for planning clarity, not as a hard PR boundary. The flag alias
-infrastructure from Phase 0 survives into Phase 1 unchanged.
+naturally collapse into one PR, that is acceptable - and likely preferable.
+**If Phase 0 and Phase 1 land together, do not implement a temporary hardcoded
+command suggestion map first. Build "did you mean?" directly against the
+Phase 1 registry.** Building the hardcoded version in Phase 0 only to replace
+it in Phase 1 is wasted work if both land together. The separation exists for
+planning clarity, not as a hard PR boundary. The flag alias infrastructure
+from Phase 0 survives into Phase 1 unchanged.
 
 ---
 
@@ -529,6 +530,13 @@ but leaves the codebase harder to maintain after the refactor than before it.
    subcommand dispatch internally. The registry routes to the top-level
    handler; subcommand routing stays inside the handler.
 
+   For namespaced commands (`skills`, `emulator`, `operator`, `recording`),
+   the registry entry owns only top-level command metadata. Subcommand
+   dispatch and subcommand-specific help remain internal to the existing
+   handler modules in this phase. Do not generalize the registry to a
+   nested subcommand registry - that is unnecessary complexity for
+   commands that already have working internal dispatch.
+
    **Concrete example - migrating `devices`:**
 
    Before (switch case in index.ts:521-523):
@@ -649,6 +657,14 @@ Do not over-engineer the file split. If a handler is 5 lines, it can stay
 inline in the registry definition. Extract only when the handler is complex
 enough to warrant its own file (most already have one in `commands/`).
 
+### Behavioral preservation rule
+
+Phase 1 is an architectural refactor only. For commands that exist before
+Phase 1, stdout/stderr shape, JSON envelope shape, and exit-code behavior
+must remain unchanged unless a failing test proves the old behavior was
+already inconsistent. Do not "clean up" help wording, error messages, or
+output formatting opportunistically. Those changes belong in Phase 4.
+
 ### Risk
 
 Low. Pure refactor with no behavior changes. All existing tests serve as
@@ -768,6 +784,23 @@ separable for review:
 These are not nice-to-haves. Each must be tested.
 
 **Missing selector:**
+
+In Phase 2, selector-required errors mention the currently supported input
+(`--selector`). In Phase 3, the error expands to include the full selector
+flag list (`--text`, `--id`, `--desc`, `--role`).
+
+Phase 2 version:
+```
+$ clawperator click
+Error: click requires a selector.
+
+Usage:
+  clawperator click --selector '{"textEquals":"Login"}'
+
+See: clawperator click --help
+```
+
+Phase 3 version (after selector flags land):
 ```
 $ clawperator click
 Error: click requires a selector.
@@ -992,8 +1025,8 @@ Finalize the developer and agent experience.
 
 2. **Error message improvements**
    - Wrong flag: suggest closest match (`--body` -> `--text`)
-   - Missing selector: show flag list with example (see Phase 2 failure-mode
-     requirements for exact format)
+   - Missing selector: show full flag list with example (the Phase 3 version
+     of the error from Phase 2's failure-mode requirements)
    - Missing device in multi-device setup: list connected devices with retry
      command showing `--device` flag
    - Validation error: include task-oriented hint, not just schema path
