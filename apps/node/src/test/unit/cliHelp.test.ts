@@ -219,6 +219,12 @@ describe("CLI help", () => {
     assert.strictEqual(pretty.message, "timeoutMs must be a finite number");
   });
 
+  it("lists --json in top-level global options", async () => {
+    const { stdout, code } = await runCli(["--help"]);
+    assert.strictEqual(code, 0);
+    assert.match(stdout, /--json/);
+  });
+
   it("shows recording as canonical command in top-level help", async () => {
     const { stdout, code } = await runCli(["--help"]);
     assert.strictEqual(code, 0);

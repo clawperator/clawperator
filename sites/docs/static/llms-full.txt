@@ -1852,7 +1852,7 @@ Common events include:
 `doctor.check` uses `info` for pass, `warn` for warnings, and `error` for failures so the log severity mirrors the check outcome.
 `skills.run.failed` is emitted for non-zero skill exits, while `skills.run.complete` remains the terminal marker for every skill run.
 
-Default receiver package:
+Default Operator package:
 
 - release app package: `com.clawperator.operator`
 - local debug app package: pass `--operator-package com.clawperator.operator.dev`
@@ -1876,7 +1876,7 @@ Use `clawperator version --check-compat` before automation batches when the agen
 clawperator version --check-compat --operator-package com.clawperator.operator
 ```
 
-The response includes the CLI version, detected [Clawperator Operator Android app](../getting-started/android-operator-apk.md) version, app `versionCode`, receiver package, compatibility verdict, and remediation guidance on mismatch.
+The response includes the CLI version, detected [Clawperator Operator Android app](../getting-started/android-operator-apk.md) version, app `versionCode`, operator package, compatibility verdict, and remediation guidance on mismatch.
 
 ## HTTP API (`clawperator serve`)
 
@@ -2792,7 +2792,7 @@ installer are:
 | :--- | :--- | :--- |
 | `CLAWPERATOR_SKILLS_REGISTRY` | CLI and installer | Overrides the path to the local skills registry JSON |
 | `CLAWPERATOR_INSTALL_APK` | installer | Pre-seeds the installer's "install APK now?" decision for non-interactive runs |
-| `CLAWPERATOR_OPERATOR_PACKAGE` | installer | Overrides the default receiver package used during installer setup |
+| `CLAWPERATOR_OPERATOR_PACKAGE` | installer | Overrides the default Operator package used during installer setup |
 
 ### `CLAWPERATOR_INSTALL_APK`
 

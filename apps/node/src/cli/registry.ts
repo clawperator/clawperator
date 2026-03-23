@@ -1408,6 +1408,7 @@ export function generateTopLevelHelp(commands: Record<string, CommandDef>): stri
     "  --device <id>, --device-id <id>         Target Android device serial (<!--flag-->--device<!--/flag--> is canonical)",
     "  --operator-package <package>, --receiver-package <package>",
     "                                            Target Operator package for broadcast dispatch (--receiver-package is a legacy alias)",
+    "  --json                                    JSON output shorthand (same as --output json)",
     "  --output <json|pretty>, --format <json|pretty>",
     "                                            Output format (default: json)",
     "  --log-level <debug|info|warn|error>       Persistent log level (default: info)",

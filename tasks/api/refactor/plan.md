@@ -17,6 +17,7 @@
 - [What Success Looks Like](#what-success-looks-like)
 - [Detailed Design Specs](#detailed-design-specs)
 - [Items Rejected](#items-rejected)
+- [Branch progress and deviations (additive)](#branch-progress-and-deviations-additive)
 
 ---
 
@@ -1195,19 +1196,20 @@ Finalize the developer and agent experience.
      command showing `--device` flag
    - Validation error: include task-oriented hint, not just schema path
 
-3. **HTTP API routes (`serve`)**
+3. **Update HTTP API routes (`serve`)**
 
-   The HTTP API (`serve.ts`) uses flat paths aligned with the CLI. The HTTP API
-   is alpha/unstable with zero external consumers. An agent that learns
-   `snapshot` from the CLI uses `POST /snapshot` on HTTP; same idea for
-   screenshot.
+   The HTTP API (serve.ts) must be updated to match the new CLI surface. The
+   HTTP API is alpha/unstable with zero external consumers - there is no
+   backward compatibility concern. An agent that learns `snapshot` from the CLI
+   will try `POST /snapshot`, not `POST /observe/snapshot`. Consistency between
+   CLI and HTTP surfaces prevents confusion.
 
-   Routes (shipped):
-   - `POST /snapshot` (replaces removed `POST /observe/snapshot`)
-   - `POST /screenshot` (replaces removed `POST /observe/screenshot`)
+   Route changes:
+   - `POST /observe/snapshot` -> `POST /snapshot`
+   - `POST /observe/screenshot` -> `POST /screenshot`
 
    Request and response body field names are unchanged in this refactor. Route
-   paths were flattened; body schemas were not. Specifically, HTTP request bodies that
+   paths change; body schemas do not. Specifically, HTTP request bodies that
    accept `operatorPackage` keep that field name even though the CLI flag is
    renamed to `--operator-package`. Body field renames are a separate concern
    that should not be bundled here.
@@ -1221,8 +1223,8 @@ Finalize the developer and agent experience.
 
 ### Risk
 
-Low. UX polish with no behavioral changes. HTTP flat routes already shipped;
-the API remains alpha/unstable with zero external consumers.
+Low. UX polish with no behavioral changes. HTTP route renames are safe given
+the alpha/unstable status and zero external consumers.
 
 ### Testing
 
@@ -1899,3 +1901,59 @@ final.
   Contradicts the namespace rule.
 - **Selector string DSL** (e.g. `text=Login`): `--text` flag covers 80%+
   of cases. A parser adds complexity for marginal gain.
+
+---
+
+## Branch progress and deviations (additive)
+
+This section was added for the **`api-refactor/phase-2`** branch. It does not
+edit or replace the plan above, which stays the original design record.
+
+### Phase status (high level)
+
+| Phase | Status (as of this branch) | Notes |
+| :--- | :--- | :--- |
+| Phase 0 | Done | Infrastructure and compatibility work merged per plan |
+| Phase 1 | Done | `COMMANDS` registry and registry-driven dispatch in `apps/node/src/cli/` |
+| Phase 2 | Done | Flat verbs, global flags, `action` / `observe` removed from registry with did-you-mean, docs and smoke updates |
+| Phase 3 | Not done | Selector shorthand flags (`--text`, `--id`, `--desc`) still future work |
+| Phase 4 | Partial | Exit-code and help polish in flight; full deliverable set not complete |
+| Phase 5 | Not done | Extended commands as specified in plan |
+
+### Deviations from the written plan (intentional or scheduling)
+
+1. **HTTP route flattening (`serve.ts`)**  
+   The plan text in Phase 1 (out of scope), Phase 4 (deliverable 3), and
+   **Commands unchanged** for `serve` describe changing HTTP paths in **Phase 4**.
+   **As implemented:** `POST /snapshot` and `POST /screenshot` shipped with **Phase 2**
+   so HTTP matches the flat CLI. Request/response body shapes were unchanged; only
+   paths moved off the removed `/observe/...` URLs.
+
+2. **Implementation Context (earlier in this doc)**  
+   That section describes a **pre-registry** layout (`HELP_TOPICS`, `switch` in
+   `main()`). **As-built:** command definitions and help live in
+   `apps/node/src/cli/registry.ts` (`COMMANDS`, optional `synonyms`, `didYouMean`);
+   `apps/node/src/cli/index.ts` dispatches via the registry. Keep the Implementation
+   Context as the historical starting picture; use the repo for the current shape.
+
+3. **CLI synonyms**  
+   The plan text in places refers to extra `switch` `case` branches for synonyms.
+   **As-built:** synonyms are `synonyms` arrays on `CommandDef` entries in the
+   registry.
+
+4. **Phase 4 testing checklist**  
+   When verifying this branch, do not assume Phase 3 selector shorthands appear on
+   `clawperator click --help` yet. Until Phase 3 lands, missing-selector guidance
+   remains JSON `--selector` oriented, per Phase 2 failure-mode text in the plan.
+
+5. **`execute` vs `exec`**  
+   The plan schedules renaming `execute` to `exec` in Phase 5. **As implemented
+   early:** `exec` is canonical with `execute` as a supported synonym; help and
+   compatibility text document both. Phase 5 may still align other naming (`--payload`
+   vs `--execution`) per the plan.
+
+### Small follow-ups (non-deviation)
+
+- Top-level `clawperator --help` lists **`--json`** as a global JSON output shorthand
+  alongside `--output` / `--format` (matches `getGlobalOpts` behavior).
+
