@@ -755,10 +755,9 @@ separable for review:
    The existing `cmdActionOpenApp` and `cmdActionOpenUri` handlers in action.ts
    can be reused or inlined - they are thin wrappers around their builders.
 
-   `open-uri` and `open-url` are accepted as top-level command spellings in
-   dispatch (additional `case` branches routing to the same `open` handler).
-   They are not shown in help text. This matches the synonym model used for
-   `tap`/`click`.
+   `open-uri` and `open-url` are accepted as top-level command spellings via
+   the `synonyms` field on the `open` registry entry (same mechanism as
+   `tap`/`click`). They are not shown in help text.
 
 4. **Positional arguments where obvious**
    - `clawperator open com.android.settings` (positional target)
@@ -767,6 +766,8 @@ separable for review:
    - `clawperator scroll down` (positional direction)
    - Named flags (`--app`, `--key`, `--text`, `--direction`) still work
    - Positional and named flag for the same value: error with clear message
+   - When promoting `type`, carry forward the existing `--submit` and `--clear`
+     flags (currently on `action type`). Do not defer these to Phase 3.
 
 5. **Normalize global flags**
    - `--device` (canonical), `--device-id` (accepted silently)
@@ -911,7 +912,13 @@ Replace JSON-heavy element targeting with simple, guessable flags.
      - `--container-text`, `--container-id`, `--container-desc`,
        `--container-role`, `--container-selector`
 
-3. **Selector resolution (deterministic, tested)**
+3. **Update Phase 2's "missing selector" error to show the full flag list**
+   - Phase 2 introduced a missing-selector error that references `--selector`
+     only. Now that `--text`, `--id`, `--desc`, `--role` exist, update the
+     error text to show the full flag list (see Phase 2 failure-mode
+     requirements, "Phase 3 version").
+
+4. **Selector resolution (deterministic, tested)**
    - Multiple simple flags combine with AND semantics:
      `--text "Login" --role button` matches elements with both properties
    - `--selector` is mutually exclusive with simple flags: error if combined
@@ -920,12 +927,12 @@ Replace JSON-heavy element targeting with simple, guessable flags.
    - Missing all selectors: clear error listing available flags with examples
    - Empty string values: rejected at validation boundary
 
-4. **Preserve existing type flags**
+5. **Verify existing type flags survived Phase 2 promotion**
    - `--submit` and `--clear` already exist on `action type` (index.ts:667-668,
-     action.ts:151-153). These must be carried forward to the promoted `type`
-     command. This is not new work - just ensure they are not lost during
-     promotion and that the new help text documents them, including the `--clear`
-     limitation note.
+     action.ts:151-153). These should have been carried forward when `type` was
+     promoted in Phase 2. Verify they work on the promoted command and that the
+     help text documents them, including the `--clear` limitation note. If Phase
+     2 missed them, add them now.
 
 ### Risk
 
@@ -973,6 +980,10 @@ Finalize the developer and agent experience.
 ### Deliverables
 
 1. **Rewrite help text**
+   - Help generation is already registry-driven after Phase 1. This
+     deliverable is about updating `summary` and `help` fields in registry
+     entries and refining the `generateTopLevelHelp` grouping/formatting -
+     not rebuilding help infrastructure.
    - Top-level `--help` shows flat commands grouped by function
    - Target structure:
      ```
