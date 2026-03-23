@@ -29,6 +29,68 @@ Related work (deferred until API stabilizes):
 
 ---
 
+## Before and After
+
+### Commands
+
+```
+BEFORE (current)                                       AFTER (target)
+---------------------------------------------          -----------------------------------
+clawperator observe snapshot                           clawperator snapshot
+clawperator observe screenshot                         clawperator screenshot
+clawperator action click --selector '{"text":"X"}'     clawperator click --text "X"
+clawperator action open-app --app com.foo.bar          clawperator open com.foo.bar
+clawperator action open-uri --uri https://example.com  clawperator open https://example.com
+clawperator action type --selector '{"text":"X"}'      clawperator type "hello" --text "X"
+  --text "hello"
+clawperator action read --selector '{"text":"X"}'      clawperator read --text "X"
+clawperator action wait --selector '{"text":"X"}'      clawperator wait --text "X"
+clawperator action press-key --key back                clawperator press back
+(no CLI command)                                       clawperator scroll down
+(no CLI command)                                       clawperator back
+clawperator inspect ui                                 (removed, use snapshot)
+```
+
+### Flags
+
+```
+BEFORE (current)              AFTER (canonical)         AFTER (still accepted)
+----------------------------  ------------------------  ----------------------
+--device-id <id>              --device <id>             --device-id
+--output json                 --json                    --output json
+--timeout-ms <ms>             --timeout <ms>            --timeout-ms
+--receiver-package <pkg>      --package <pkg>           --receiver-package
+--selector '{"text":"X"}'     --text "X"                --selector (advanced)
+--selector '{"resourceId":    --id "com.foo:id/bar"     --selector (advanced)
+  "com.foo:id/bar"}'
+--selector '{"contentDesc     --desc "Submit"           --selector (advanced)
+  Equals":"Submit"}'
+```
+
+### Synonyms (accepted but not documented)
+
+```
+PRIMARY (in docs/help)   SYNONYM (accepted silently)
+-----------------------  --------------------------
+click                    tap
+type                     fill
+press                    press-key
+open                     open-uri, open-url
+```
+
+### HTTP API Routes
+
+```
+BEFORE                       AFTER
+---------------------------  ---------------------------
+POST /observe/snapshot       POST /snapshot
+POST /observe/screenshot     POST /screenshot
+POST /execute                POST /execute  (unchanged)
+GET  /devices                GET  /devices  (unchanged)
+```
+
+---
+
 ## Design Decisions
 
 These are settled. Implementing agents should not re-litigate them.
