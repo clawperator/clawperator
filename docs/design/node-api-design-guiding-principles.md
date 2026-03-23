@@ -80,25 +80,13 @@ CLI tools, mobile automation, and common English verbs.
 Clawperator ("CLI tool for automating Android devices") and nothing else. What
 commands would it try? Those commands should work.
 
-Bad (legacy - no longer supported):
-```
-clawperator action open-app --app com.android.settings
-clawperator observe snapshot --output json
-clawperator action click --selector '{"text":"Wi-Fi"}'
-```
+Anti-pattern (removed - do not use): nested command families such as `action *` and `observe snapshot` are not supported. They are not documented here as runnable examples because agents and crawlers sometimes copy code blocks verbatim.
 
 Good (current):
 ```
 clawperator open com.android.settings
 clawperator snapshot --json
-clawperator click --selector '{"text":"Wi-Fi"}'
-```
-
-Good:
-```
-clawperator open com.android.settings
-clawperator snapshot --json
-clawperator click --text "Wi-Fi"
+clawperator click --selector '{"textEquals":"Wi-Fi"}'
 ```
 
 ### 2. Flat Commands for Actions, Namespaces Only for Subsystems
