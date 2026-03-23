@@ -14,7 +14,8 @@
 - [Skills Migration Strategy](#skills-migration-strategy)
 - [Sequencing](#sequencing)
 - [What Success Looks Like](#what-success-looks-like)
-- [Items Considered and Deferred](#items-considered-and-deferred)
+- [Designed but Deferred](#designed-but-deferred-implementation-follows-phase-4)
+- [Items Rejected](#items-rejected)
 
 ---
 
@@ -67,6 +68,14 @@ clawperator action press-key --key back                clawperator press back
 (no CLI command)                                       clawperator scroll down
 (no CLI command)                                       clawperator back
 clawperator inspect ui                                 (removed, use snapshot)
+
+Post-Phase 4 (designed, implementation deferred):
+clawperator execute --execution '{"actions":          clawperator scroll-until --text "X"
+  [{"type":"scroll_until","params":                   clawperator scroll-until --text "X" --click
+  {"matcher":{"textEquals":"X"}}}]}'
+(no CLI flag)                                         clawperator click --text "X" --long
+(no CLI flag)                                         clawperator click --text "X" --focus
+(fixed 30s timeout)                                   clawperator wait --text "X" --timeout 5000
 ```
 
 ### Flags
@@ -1213,44 +1222,138 @@ No flag name to look up. The help text confirms what the agent already guessed.
 
 ---
 
-## Items Considered and Deferred
+## Designed but Deferred (implementation follows Phase 4)
 
-These were raised in the external review and are worth revisiting later, but are
-not part of this refactoring:
+These features have been designed to fit the new API surface. The CLI shapes
+below are settled decisions, not proposals. Implementation is deferred only
+because they depend on Phase 3 selector infrastructure and should not expand
+the scope of Phases 0-4. They can be implemented as a Phase 5 or as
+independent follow-on PRs after Phase 4 ships.
 
-- **`app close <package>`**: No current `close-app` action exists in the Android
-  receiver. Adding it requires receiver changes beyond CLI dispatch. Track as a
-  separate feature.
-- **`exec run/validate/plan` replacing `execute`**: The current `execute` command
-  has a settled contract. Renaming it adds migration cost with minimal
-  discoverability gain since agents rarely type `execute` directly. Revisit if
-  feedback shows confusion.
-- **`device` namespace grouping `devices`/`doctor`/`version`**: Adds a namespace
-  to three commands that work fine as flat top-level names. Contradicts the
-  namespace rule.
-- **Selector string DSL** (e.g. `text=Login`): `--text` flag covers 80%+ of
-  cases. A parser adds complexity for marginal gain.
+### `scroll-until` (includes `scroll-and-click`)
+
+`scroll_until` and `scroll_and_click` are canonical execution action types
+that currently require `execute --execution <json>`. The CLI wrapper unifies
+both under one command with `--click` as the differentiator.
+
+**Designed surface:**
+
+```
+clawperator scroll-until [<direction>] --text <text> [--click] [--json]
+clawperator scroll-until [<direction>] --id <id> [--click] [--json]
+clawperator scroll-until [<direction>] --desc <text> [--click] [--json]
+```
+
+- Positional: direction (`down`, `up`, `left`, `right`). Default: `down`.
+- Selector flags: same `--text`/`--id`/`--desc`/`--role` from Phase 3.
+  These populate the `matcher` field in `ActionParams`.
+- Container flags: same `--container-text`/`--container-id`/etc. from Phase 3.
+  These populate the `container` field in `ActionParams`.
+- `--click`: click the target after scrolling to it. When present, action
+  type is `scroll_and_click` (maps to `clickAfter: true`). When absent,
+  action type is `scroll_until`.
+
+**Tuning parameters are NOT exposed as CLI flags.** `maxScrolls`,
+`maxDurationMs`, `distanceRatio`, `noPositionChangeThreshold`,
+`settleDelayMs`, `findFirstScrollableChild` are tuning knobs that 99% of
+agents never touch. Agents needing these use `execute --execution <json>`.
+This is the `--selector` escape hatch principle applied to scroll params.
+
+**Examples:**
+
+```bash
+# Scroll down until "About phone" is visible
+clawperator scroll-until --text "About phone"
+
+# Scroll down until "Living room" is visible, then click it
+clawperator scroll-until --text "Living room" --click
+
+# Scroll up in a specific container
+clawperator scroll-until up --text "Settings" --container-id "com.foo:id/list"
+```
+
+**Synonyms:** `scroll-and-click` is accepted as a command synonym for
+`scroll-until --click` (same handler, `--click` implied). This matches
+the pattern agents trained on the execution payload would guess.
+
+**Error when no selector provided:**
+```
+$ clawperator scroll-until
+Error: scroll-until requires a target selector.
+
+Usage:
+  clawperator scroll-until --text <text> [--click]
+
+Example:
+  clawperator scroll-until --text "About phone" --click
+```
+
+**Registry entry:** `scroll-until` gets its own registry entry with
+`requiresSelector: true`. `scroll-and-click` is a synonym.
+
+### `--long` and `--focus` click type flags
+
+```bash
+clawperator click --text "Settings" --long
+clawperator click --text "Search field" --focus
+```
+
+- `--long` maps to `clickType: "long_click"` in ActionParams
+- `--focus` maps to `clickType: "focus"` in ActionParams
+- Mutually exclusive: error if both are present
+- Default (neither flag): `clickType: "default"` (omitted from payload)
+- These flags apply to all selector forms (`--text`, `--id`, `--desc`,
+  `--role`, `--selector`)
+
+**Error when both present:**
+```
+$ clawperator click --text "X" --long --focus
+Error: --long and --focus are mutually exclusive.
+
+Use --long for a long press, or --focus to set input focus.
+```
+
+### `wait --timeout` semantic
+
+```bash
+clawperator wait --text "Loading complete" --timeout 5000
+```
+
+For `wait` specifically, `--timeout` sets the **wait duration** (how long
+to wait for the element to appear), not the execution envelope timeout.
+This is the one command where `--timeout` has command-specific meaning,
+because no agent using `wait --timeout 5000` means "set the execution
+envelope to 5 seconds but wait for the element for 30 seconds."
+
+**Implementation:** the builder sets the execution `timeoutMs` to
+`max(waitTimeout + 5000, globalTimeout)` to ensure the execution envelope
+does not kill the wait prematurely. The 5-second buffer accounts for
+command overhead.
+
+**Default:** when `--timeout` is not provided, `wait` uses the current
+fixed 30s behavior (execution timeout = 30000ms).
+
+---
+
+## Items Rejected
+
+These were raised in the external review and rejected. The decisions are
+final for this refactoring.
+
+- **`app close <package>`**: No current `close-app` action exists in the
+  Android receiver. Adding it requires receiver changes beyond CLI dispatch.
+  Track as a separate feature.
+- **`exec run/validate/plan` replacing `execute`**: The current `execute`
+  command has a settled contract. Renaming it adds migration cost with
+  minimal discoverability gain since agents rarely type `execute` directly.
+  Revisit if feedback shows confusion.
+- **`device` namespace grouping `devices`/`doctor`/`version`**: Adds a
+  namespace to three commands that work fine as flat top-level names.
+  Contradicts the namespace rule.
+- **Selector string DSL** (e.g. `text=Login`): `--text` flag covers 80%+
+  of cases. A parser adds complexity for marginal gain.
 - **`--follow` flag on logs**: Useful but requires streaming infrastructure.
   Separate feature.
-- **`read --all`**: Return all matches as a list. Useful but adds output format
-  complexity. Track as a follow-up once the single-match contract is established.
-- **`scroll-until` and `scroll-and-click` CLI wrappers**: These are canonical
-  execution action types (contracts/aliases.ts:33-34) that currently require
-  `execute --execution <json>`. A CLI wrapper like
-  `clawperator scroll-until --text "About" --click` would be valuable but
-  involves designing a multi-flag interface for complex scroll parameters
-  (`maxScrolls`, `maxDurationMs`, `distanceRatio`, `noPositionChangeThreshold`).
-  Adding `scroll` as a simple directional command is the 80% case; scroll-until
-  is the 20% that can follow once the basic scroll surface is validated.
-- **`--long` and `--focus` click type flags**: The codebase supports
-  `clickType: "default" | "long_click" | "focus"` in ActionParams
-  (contracts/execution.ts). Adding `--long` and `--focus` flags to `click`
-  would expose these without JSON. Deferred because the default click covers
-  the vast majority of agent usage. Revisit after Phase 3 lands.
-- **`wait --timeout` semantic**: Currently `buildWaitExecution` uses a fixed
-  30s execution timeout. An agent using `wait --text "Loading" --timeout 5000`
-  might mean "wait up to 5 seconds for this element" rather than "set the
-  execution timeout to 5 seconds." The current refactor passes `--timeout`
-  through as the execution timeout. A dedicated wait-specific timeout would
-  require a separate flag or builder change. Defer until agent feedback
-  clarifies the expected behavior.
+- **`read --all`**: Return all matches as a list. Useful but adds output
+  format complexity. Track as a follow-up once the single-match contract
+  is established.
