@@ -77,8 +77,8 @@ export async function setupOperator(
   if (!pkg) {
     const error =
       installedPackages.length > 1
-        ? "Multiple Operator package variants are installed after setup. Use --receiver-package to specify the package explicitly."
-        : "Could not detect installed Operator package after install. Use --receiver-package to specify the package explicitly.";
+        ? "Multiple Operator package variants are installed after setup. Use --operator-package to specify the package explicitly."
+        : "Could not detect installed Operator package after install. Use --operator-package to specify the package explicitly.";
     return {
       operatorPackage: "<unknown>",
       install,

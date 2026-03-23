@@ -101,7 +101,12 @@ async function main(): Promise<void> {
     }
     throw error;
   }
-  if (argv.includes("--help")) {
+  // Respect "--" as the end of Clawperator argument parsing. Tokens after it
+  // are forwarded to subcommands (for example skills script arguments), so they
+  // must not trigger top-level help handling.
+  const dashDashIndex = argv.indexOf("--");
+  const parserScope = dashDashIndex >= 0 ? argv.slice(0, dashDashIndex) : argv;
+  if (parserScope.includes("--help")) {
     console.log(resolveHelpFromRegistry(global.rest, COMMANDS));
     process.exit(0);
   }

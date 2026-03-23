@@ -171,6 +171,14 @@ describe("CLI help", () => {
     assert.doesNotMatch(stdout, /clawperator action/);
   });
 
+  it("does not intercept --help after -- for skills run", async () => {
+    const { stdout, code } = await runCli(["skills", "run", "com.missing.skill", "--", "--help"]);
+    assert.notStrictEqual(code, 0);
+    assert.doesNotMatch(stdout, /Clawperator CLI/);
+    const obj = JSON.parse(stdout) as { code?: string };
+    assert.strictEqual(obj.code, "SKILL_NOT_FOUND");
+  });
+
   it("shows snapshot help for snapshot --help (replaces inspect ui)", async () => {
     const { stdout, code } = await runCli(["snapshot", "--help"]);
     assert.strictEqual(code, 0);

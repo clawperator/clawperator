@@ -1,5 +1,5 @@
 /**
- * inspect ui is an alias of observe snapshot (single implementation).
+ * inspect ui is an alias of snapshot (single implementation).
  */
 import { cmdObserveSnapshot } from "./observe.js";
 import type { OutputOptions } from "../output.js";

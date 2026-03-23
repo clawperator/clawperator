@@ -114,7 +114,7 @@ export function injectServiceUnavailableHint(envelope: ResultEnvelope, deviceId:
     return;
   }
 
-  envelope.hint = `Accessibility service not running. Run 'clawperator doctor --fix --device-id ${deviceId}' to diagnose and repair, or 'clawperator operator setup --apk <path-to-apk> --device-id ${deviceId}' to reinstall.`;
+  envelope.hint = `Accessibility service not running. Run 'clawperator doctor --fix --device ${deviceId}' to diagnose and repair, or 'clawperator operator setup --apk <path-to-apk> --device ${deviceId}' to reinstall.`;
 }
 
 export interface TimeoutErrorDetails {
@@ -326,7 +326,7 @@ async function performExecution(
       deviceId,
       message: `Operator APK (${config.operatorPackage}) is not installed on ${deviceId}`,
     });
-    const installCommand = `clawperator operator setup --apk ${getReceiverPackageApkPath(config.operatorPackage)} --device-id ${deviceId}${config.operatorPackage !== "com.clawperator.operator" ? ` --receiver-package ${config.operatorPackage}` : ""}`;
+    const installCommand = `clawperator operator setup --apk ${getReceiverPackageApkPath(config.operatorPackage)} --device ${deviceId}${config.operatorPackage !== "com.clawperator.operator" ? ` --operator-package ${config.operatorPackage}` : ""}`;
     return {
       execution,
       result: {

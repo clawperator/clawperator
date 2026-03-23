@@ -31,7 +31,7 @@ describe("cmdDoctor", () => {
                 summary: "Operator APK not installed.",
               },
             ],
-            nextActions: ["clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id test-device-1"],
+            nextActions: ["clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device test-device-1"],
           }),
         },
       }

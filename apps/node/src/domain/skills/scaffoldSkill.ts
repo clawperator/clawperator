@@ -100,7 +100,7 @@ import { execFileSync } from "node:child_process";
 const [, , deviceId, operatorPackage = process.env.CLAWPERATOR_OPERATOR_PACKAGE || "com.clawperator.operator"] = process.argv;
 
 if (!deviceId) {
-  console.error("Usage: node run.js <device_id> [receiver_package]");
+  console.error("Usage: node run.js <device_id> [operator_package]");
   process.exit(1);
 }
 
@@ -124,14 +124,13 @@ try {
     "clawperator",
     [
       "execute",
-      "--device-id",
+      "--device",
       deviceId,
-      "--receiver-package",
+      "--operator-package",
       operatorPackage,
       "--execution",
       JSON.stringify(execution),
-      "--output",
-      "json",
+      "--json",
     ],
     {
       encoding: "utf8",

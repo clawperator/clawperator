@@ -1375,8 +1375,8 @@ export function generateTopLevelHelp(commands: Record<string, CommandDef>): stri
   lines.push(
     "",
     "Global options:",
-    "  --device-id <id>, --device <id>           Target Android device serial",
-    "  --operator-package <package>, --receiver-package <package>",
+    "  --device <id>                             Target Android device serial",
+    "  --operator-package <package>",
     "                                            Target Operator package for broadcast dispatch",
     "  --output <json|pretty>, --format <json|pretty>",
     "                                            Output format (default: json)",
