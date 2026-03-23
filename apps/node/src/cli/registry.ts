@@ -1,6 +1,14 @@
 import { ERROR_CODES } from "../contracts/errors.js";
 import { formatError } from "./output.js";
 import type { Logger } from "../adapters/logger.js";
+import {
+  resolveElementMatcherFromCli,
+  resolveContainerMatcherFromCli,
+  hasElementSelectorFlag,
+  makeMissingSelectorError,
+  ELEMENT_SELECTOR_VALUE_FLAGS,
+  CONTAINER_SELECTOR_VALUE_FLAGS,
+} from "./selectorFlags.js";
 
 // ---------------------------------------------------------------------------
 // Exported utilities (moved from index.ts so registry handlers can use them)
@@ -69,6 +77,18 @@ export function barePositionalTokens(
     out.push(a);
   }
   return out;
+}
+
+/**
+ * Return a copy of rest with the given flag and its following value removed.
+ * If the flag is not present, returns the original array.
+ */
+export function stripFlagWithValue(rest: string[], flag: string): string[] {
+  const i = rest.indexOf(flag);
+  if (i < 0) return rest;
+  const next = rest[i + 1];
+  if (next === undefined || next.startsWith("-")) return rest;
+  return [...rest.slice(0, i), ...rest.slice(i + 2)];
 }
 
 export function getInvalidTimeoutResult(timeoutMs: number | undefined, options: { format: "json" | "pretty" }): string | undefined {
@@ -296,15 +316,32 @@ Notes:
 const HELP_CLICK = `clawperator click
 
 Usage:
+  clawperator click --text <text> [--device <id>] [--operator-package <pkg>] [--json]
+  clawperator click --id <resource-id> [--device <id>] [--operator-package <pkg>] [--json]
+  clawperator click --role <role> [--device <id>] [--operator-package <pkg>] [--json]
+  clawperator click --desc <text> [--device <id>] [--operator-package <pkg>] [--json]
   clawperator click --selector '<json>' [--device <id>] [--operator-package <pkg>] [--json]
 
-Required:
-  --selector <json>    Element selector (JSON object, e.g. '{"textEquals":"Wi-Fi"}')
+Selector flags (at least one required; combine for AND matching):
+  --text <text>           Exact visible text
+  --text-contains <text>  Partial text match
+  --id <resource-id>      Android resource ID
+  --desc <text>           Exact content description
+  --desc-contains <text>  Partial content description
+  --role <role>           Element role (button, textfield, text, switch, checkbox, image, etc.)
+  --selector <json>       Raw NodeMatcher JSON (advanced; mutually exclusive with simple flags)
 
 Notes:
   - Performs a tap on the first matching element.
-  - Exits with MISSING_SELECTOR if --selector is omitted.
+  - Multiple simple flags combine with AND semantics.
+  - Exits with MISSING_SELECTOR if no selector flag is provided.
   - Synonym: tap (accepted, not in help)
+
+Examples:
+  clawperator click --text "Wi-Fi"
+  clawperator click --role button --text-contains "Submit"
+  clawperator click --id "com.example:id/btn_ok"
+  Advanced (raw NodeMatcher JSON): clawperator click --selector '{"textEquals":"Wi-Fi","role":"text"}'
 `;
 
 const HELP_OPEN = `clawperator open
@@ -326,10 +363,21 @@ Notes:
 const HELP_TYPE = `clawperator type
 
 Usage:
+  clawperator type <text> --role <role> [--device <id>] [--operator-package <pkg>] [--submit] [--clear] [--json]
+  clawperator type <text> --id <resource-id> [--device <id>] [--operator-package <pkg>] [--submit] [--clear] [--json]
+  clawperator type <text> --desc <text> [--device <id>] [--operator-package <pkg>] [--submit] [--clear] [--json]
   clawperator type <text> --selector '<json>' [--device <id>] [--operator-package <pkg>] [--submit] [--clear] [--json]
 
-Required:
-  --selector <json>    Element selector (JSON object, e.g. '{"textEquals":"Search"}')
+Text to type:
+  Positional argument or --text <text> (mutually exclusive; --text is reserved for text to type)
+
+Selector flags (at least one required; combine for AND matching):
+  --id <resource-id>      Android resource ID
+  --desc <text>           Exact content description
+  --desc-contains <text>  Partial content description
+  --role <role>           Element role (button, textfield, text, switch, checkbox, image, etc.)
+  --text-contains <text>  Partial text match
+  --selector <json>       Raw NodeMatcher JSON (advanced; mutually exclusive with simple flags)
 
 Options:
   --submit             Press Enter after typing
@@ -337,33 +385,74 @@ Options:
 
 Notes:
   - Types text into the first matching element.
-  - Text may be supplied as a positional argument or via --text <text>.
+  - --text is used for the text content to type, not the element selector.
+    Use --id, --role, --desc, --text-contains, --desc-contains, or --selector (advanced) to identify the target.
   - Synonym: fill (accepted, not in help)
+
+Examples:
+  clawperator type "hello world" --role textfield
+  clawperator type "search query" --id "com.example:id/search_box" --submit
+  clawperator type --text "hello" --role textfield
+  Advanced (raw NodeMatcher JSON): clawperator type "hi" --selector '{"resourceId":"com.example:id/search_box"}'
 `;
 
 const HELP_READ = `clawperator read
 
 Usage:
+  clawperator read --text <text> [--device <id>] [--operator-package <pkg>] [--json]
+  clawperator read --id <resource-id> [--device <id>] [--operator-package <pkg>] [--json]
+  clawperator read --role <role> [--device <id>] [--operator-package <pkg>] [--json]
+  clawperator read --desc <text> [--device <id>] [--operator-package <pkg>] [--json]
   clawperator read --selector '<json>' [--device <id>] [--operator-package <pkg>] [--json]
 
-Required:
-  --selector <json>    Element selector (JSON object, e.g. '{"textEquals":"Battery"}')
+Selector flags (at least one required; combine for AND matching):
+  --text <text>           Exact visible text
+  --text-contains <text>  Partial text match
+  --id <resource-id>      Android resource ID
+  --desc <text>           Exact content description
+  --desc-contains <text>  Partial content description
+  --role <role>           Element role
+  --selector <json>       Raw NodeMatcher JSON (advanced; mutually exclusive with simple flags)
 
 Notes:
   - Returns the text content of the first matching element.
+  - Multiple simple flags combine with AND semantics.
+
+Examples:
+  clawperator read --id "com.example:id/battery_level"
+  clawperator read --text "Battery"
+  clawperator read --role switch --desc "Wi-Fi"
+  Advanced (raw NodeMatcher JSON): clawperator read --selector '{"resourceId":"com.example:id/status"}'
 `;
 
 const HELP_WAIT = `clawperator wait
 
 Usage:
+  clawperator wait --text <text> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
+  clawperator wait --id <resource-id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
+  clawperator wait --role <role> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
+  clawperator wait --desc <text> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
   clawperator wait --selector '<json>' [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
 
-Required:
-  --selector <json>    Element selector (JSON object, e.g. '{"textEquals":"Done"}')
+Selector flags (at least one required; combine for AND matching):
+  --text <text>           Exact visible text
+  --text-contains <text>  Partial text match
+  --id <resource-id>      Android resource ID
+  --desc <text>           Exact content description
+  --desc-contains <text>  Partial content description
+  --role <role>           Element role
+  --selector <json>       Raw NodeMatcher JSON (advanced; mutually exclusive with simple flags)
 
 Notes:
   - Waits until the first matching element appears.
   - --timeout overrides the default wait timeout.
+  - Multiple simple flags combine with AND semantics.
+
+Examples:
+  clawperator wait --text "Done"
+  clawperator wait --id "com.example:id/progress" --timeout 10000
+  clawperator wait --role button --text-contains "OK"
+  Advanced (raw NodeMatcher JSON): clawperator wait --selector '{"textEquals":"Done"}'
 `;
 
 const HELP_PRESS = `clawperator press
@@ -393,14 +482,30 @@ Notes:
 const HELP_SCROLL = `clawperator scroll
 
 Usage:
-  clawperator scroll <direction> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
+  clawperator scroll <direction> [--container-text <text>] [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
+  clawperator scroll <direction> [--container-id <resource-id>] [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
 
 Valid directions:
   down, up, left, right
 
+Container selector flags (all optional; restrict scroll to a specific scrollable container):
+  --container-text <text>           Container with exact visible text
+  --container-text-contains <text>  Container with partial text match
+  --container-id <resource-id>      Container by Android resource ID
+  --container-desc <text>           Container by exact content description
+  --container-desc-contains <text>  Container by partial content description
+  --container-role <role>           Container by element role
+  --container-selector <json>       Container by raw NodeMatcher JSON (mutually exclusive with --container-* flags)
+
 Notes:
   - Direction may be supplied as a positional argument or via --direction <direction>.
   - --timeout overrides the default execution timeout (default: 30000 ms).
+  - Without container flags, scrolls the default scrollable container on screen.
+
+Examples:
+  clawperator scroll down
+  clawperator scroll up --container-id "com.example:id/list_view"
+  clawperator scroll down --container-role list
 `;
 
 const HELP_EMULATOR = `clawperator emulator
@@ -707,20 +812,20 @@ COMMANDS["click"] = {
   group: "Device Interaction",
   summary: "Tap the first matching UI element",
   help: HELP_CLICK,
-  topLevelBlock: `  click --selector '<json>' [--device <id>] [--json]
+  topLevelBlock: `  click --text <text> | --id <id> | --role <role> [--device <id>] [--json]
                                             Tap the first matching UI element`,
   handler: async (ctx) => {
     const { rest, format, logger, deviceId, operatorPackage } = ctx;
-    const selector = getOpt(rest, "--selector");
-    if (!selector) {
-      return JSON.stringify({
-        code: "MISSING_SELECTOR",
-        message: "click requires a selector.\n\nUsage:\n  clawperator click --selector '{\"textEquals\":\"...\"}'\n\nSee: clawperator click --help",
-      });
+    if (!hasElementSelectorFlag(rest)) {
+      return makeMissingSelectorError("click");
+    }
+    const resolved = resolveElementMatcherFromCli(rest);
+    if (!resolved.ok) {
+      return formatError(resolved.error, { format });
     }
     return (await import("./commands/action.js")).cmdActionClick({
       format,
-      selector,
+      matcher: resolved.matcher,
       deviceId,
       operatorPackage,
       logger,
@@ -783,20 +888,16 @@ COMMANDS["type"] = {
   group: "Device Interaction",
   summary: "Type text into the first matching UI element",
   help: HELP_TYPE,
-  topLevelBlock: `  type <text> --selector '<json>' [--device <id>] [--json]
+  topLevelBlock: `  type <text> --role <role> | --id <id> [--device <id>] [--json]
                                             Type text into the first matching UI element`,
   handler: async (ctx) => {
     const { rest, format, logger, deviceId, operatorPackage } = ctx;
-    const selector = getOpt(rest, "--selector");
-    if (!selector) {
-      return JSON.stringify({
-        code: "MISSING_SELECTOR",
-        message: "type requires a selector.\n\nUsage:\n  clawperator type <text> --selector '{\"textEquals\":\"...\"}'\n\nSee: clawperator type --help",
-      });
-    }
-    const textFlag = getOpt(rest, "--text");
-    const bare = barePositionalTokens(rest, ["--selector", "--text"], ["--submit", "--clear"]);
-    if (textFlag !== undefined && bare.length > 0) {
+    // --text for type is the text-to-type, not an element selector.
+    // Extract it first, then resolve the element selector from the remaining flags.
+    const typeTextFlag = getOpt(rest, "--text");
+    const allSelectorValueFlags = [...ELEMENT_SELECTOR_VALUE_FLAGS];
+    const bare = barePositionalTokens(rest, allSelectorValueFlags, ["--submit", "--clear"]);
+    if (typeTextFlag !== undefined && bare.length > 0) {
       return formatError(
         {
           code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
@@ -806,17 +907,32 @@ COMMANDS["type"] = {
         { format },
       );
     }
-    const text = textFlag ?? bare[0];
-    if (!text) {
+    const typeText = typeTextFlag ?? bare[0];
+    if (!typeText) {
       return JSON.stringify({
         code: "MISSING_ARGUMENT",
         message: "type requires text to type. Pass text as a positional argument or via --text <text>.",
       });
     }
+    // Build rest-for-selector: strip --text <value> so it is not treated as textEquals
+    const restForSelector = stripFlagWithValue(rest, "--text");
+    // For type, the selector flags exclude --text (used for text-to-type above).
+    // Check for any selector flag except --text in restForSelector.
+    const TYPE_SELECTOR_FLAGS = ELEMENT_SELECTOR_VALUE_FLAGS.filter((f) => f !== "--text");
+    if (!TYPE_SELECTOR_FLAGS.some((f) => restForSelector.includes(f))) {
+      return JSON.stringify({
+        code: "MISSING_SELECTOR",
+        message: `type requires a selector.\nUse one of:\n  --id <resource-id>      Android resource ID\n  --desc <text>           Content description\n  --desc-contains <text>  Partial content description\n  --role <role>           Element role\n  --text-contains <text>  Partial text match\n  --selector <json>       Raw JSON (advanced)\nExample:\n  clawperator type "hello" --role textfield`,
+      });
+    }
+    const resolved = resolveElementMatcherFromCli(restForSelector);
+    if (!resolved.ok) {
+      return formatError(resolved.error, { format });
+    }
     return (await import("./commands/action.js")).cmdActionType({
       format,
-      selector,
-      text,
+      matcher: resolved.matcher,
+      text: typeText,
       submit: hasFlag(rest, "--submit"),
       clear: hasFlag(rest, "--clear"),
       deviceId,
@@ -831,20 +947,20 @@ COMMANDS["read"] = {
   group: "Device Interaction",
   summary: "Read text from the first matching UI element",
   help: HELP_READ,
-  topLevelBlock: `  read --selector '<json>' [--device <id>] [--json]
+  topLevelBlock: `  read --text <text> | --id <id> | --role <role> [--device <id>] [--json]
                                             Read text from the first matching UI element`,
   handler: async (ctx) => {
     const { rest, format, logger, deviceId, operatorPackage } = ctx;
-    const selector = getOpt(rest, "--selector");
-    if (!selector) {
-      return JSON.stringify({
-        code: "MISSING_SELECTOR",
-        message: "read requires a selector.\n\nUsage:\n  clawperator read --selector '{\"textEquals\":\"...\"}'\n\nSee: clawperator read --help",
-      });
+    if (!hasElementSelectorFlag(rest)) {
+      return makeMissingSelectorError("read");
+    }
+    const resolved = resolveElementMatcherFromCli(rest);
+    if (!resolved.ok) {
+      return formatError(resolved.error, { format });
     }
     return (await import("./commands/action.js")).cmdActionRead({
       format,
-      selector,
+      matcher: resolved.matcher,
       deviceId,
       operatorPackage,
       logger,
@@ -857,22 +973,22 @@ COMMANDS["wait"] = {
   group: "Device Interaction",
   summary: "Wait until a matching UI element appears",
   help: HELP_WAIT,
-  topLevelBlock: `  wait --selector '<json>' [--device <id>] [--json]
+  topLevelBlock: `  wait --text <text> | --id <id> | --role <role> [--device <id>] [--timeout <ms>] [--json]
                                             Wait until a matching UI element appears`,
   handler: async (ctx) => {
     const { rest, format, logger, deviceId, operatorPackage, timeoutMs } = ctx;
     const invalidTimeout = getInvalidTimeoutResult(timeoutMs, { format });
     if (invalidTimeout) return invalidTimeout;
-    const selector = getOpt(rest, "--selector");
-    if (!selector) {
-      return JSON.stringify({
-        code: "MISSING_SELECTOR",
-        message: "wait requires a selector.\n\nUsage:\n  clawperator wait --selector '{\"textEquals\":\"...\"}'\n\nSee: clawperator wait --help",
-      });
+    if (!hasElementSelectorFlag(rest)) {
+      return makeMissingSelectorError("wait");
+    }
+    const resolved = resolveElementMatcherFromCli(rest);
+    if (!resolved.ok) {
+      return formatError(resolved.error, { format });
     }
     return (await import("./commands/action.js")).cmdActionWait({
       format,
-      selector,
+      matcher: resolved.matcher,
       deviceId,
       operatorPackage,
       logger,
@@ -942,14 +1058,15 @@ COMMANDS["scroll"] = {
   group: "Device Interaction",
   summary: "Scroll the screen in a direction",
   help: HELP_SCROLL,
-  topLevelBlock: `  scroll <down|up|left|right> [--device <id>] [--json]
+  topLevelBlock: `  scroll <down|up|left|right> [--container-id <id>] [--device <id>] [--json]
                                             Scroll the screen in a direction`,
   handler: async (ctx) => {
     const { rest, format, logger, deviceId, operatorPackage, timeoutMs } = ctx;
     const invalidTimeout = getInvalidTimeoutResult(timeoutMs, { format });
     if (invalidTimeout) return invalidTimeout;
+    const scrollValueFlags = ["--direction", ...CONTAINER_SELECTOR_VALUE_FLAGS];
     const directionFlag = getOpt(rest, "--direction");
-    const bare = barePositionalTokens(rest, ["--direction"], []);
+    const bare = barePositionalTokens(rest, scrollValueFlags, []);
     if (directionFlag !== undefined && bare.length > 0) {
       return formatError(
         {
@@ -968,9 +1085,14 @@ COMMANDS["scroll"] = {
         message: `scroll requires a direction.\n\nValid directions: ${validDirections.join(", ")}\n\nExamples:\n  clawperator scroll down\n  clawperator scroll up`,
       });
     }
+    const containerResolved = resolveContainerMatcherFromCli(rest);
+    if (!containerResolved.ok) {
+      return formatError(containerResolved.error, { format });
+    }
     return (await import("./commands/action.js")).cmdScroll({
       format,
       direction,
+      container: containerResolved.container,
       deviceId,
       operatorPackage,
       timeoutMs,

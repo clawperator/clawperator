@@ -33,6 +33,10 @@ That ordering matters because the same execution can:
 | Runtime refusal | `GESTURE_FAILED`, `GLOBAL_ACTION_FAILED`, `SECURITY_BLOCK_DETECTED` | Inspect current state, then choose a different action or recovery path. |
 | Skills wrapper | `SKILL_EXECUTION_FAILED`, `SKILL_EXECUTION_TIMEOUT`, `REGISTRY_READ_FAILED` | Inspect partial `stdout` and `stderr`, then decide whether the problem is script logic, timeout budget, or local registry setup. |
 
+## CLI argument validation
+
+**`MISSING_SELECTOR`:** Returned when `click`, `type`, `read`, or `wait` runs without any element selector. Add at least one of `--text`, `--text-contains`, `--id`, `--desc`, `--desc-contains`, `--role`, or (for complex matchers only) `--selector <json>`. On `type`, `--text` is the string to type; target the field with `--role`, `--id`, `--desc`, `--text-contains`, `--desc-contains`, or `--selector`. The JSON error message lists the supported flags.
+
 ## Recommended agent responses
 
 ### `NO_DEVICES`

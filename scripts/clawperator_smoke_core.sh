@@ -133,7 +133,7 @@ echo "=== read (optional) ==="
 if ! "${CLI[@]}" read \
   --device "$DEVICE_ID" \
   --operator-package "$CLAWPERATOR_OPERATOR_PACKAGE" \
-  --selector '{"resourceId":"android:id/title"}'; then
+  --id "android:id/title"; then
   echo "WARN: optional read failed on this device/locale; continuing."
 fi
 
@@ -141,7 +141,7 @@ echo "=== type (optional) ==="
 if ! "${CLI[@]}" type \
   --device "$DEVICE_ID" \
   --operator-package "$CLAWPERATOR_OPERATOR_PACKAGE" \
-  --selector '{"role":"textfield"}' \
+  --role "textfield" \
   --text "test"; then
   echo "WARN: optional type failed (expected on some screens); continuing."
 fi

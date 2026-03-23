@@ -9,7 +9,7 @@
 - [Phase 0: Infrastructure and Compatibility](#phase-0-infrastructure-and-compatibility)
 - [Phase 1: CLI Architecture (COMMANDS Registry)](#phase-1-cli-architecture-commands-registry)
 - [Phase 2: Command Surface Refactor](#phase-2-command-surface-refactor)
-- [Phase 3: Selector Flags](#phase-3-selector-flags)
+- [Phase 3: Selector Flags (done)](#phase-3-selector-flags)
 - [Phase 4: Help, Errors, and Polish](#phase-4-help-errors-and-polish)
 - [Phase 5: Extended Commands](#phase-5-extended-commands)
 - [Skills Migration Strategy](#skills-migration-strategy)
@@ -1037,6 +1037,9 @@ unchanged. Phase 0 infrastructure catches regressions.
 
 ## Phase 3: Selector Flags
 
+**[DONE]** Shipped on branch `api-refactor/phase-3`. The working checklist
+`tasks/api/refactor/phase-3-impl-plan.md` was removed when the phase closed for PR.
+
 Replace JSON-heavy element targeting with simple, guessable flags.
 
 ### Deliverables
@@ -1054,9 +1057,15 @@ Replace JSON-heavy element targeting with simple, guessable flags.
      - `--selector <json>` - raw NodeMatcher JSON (advanced fallback)
 
 2. **Container selector flags**
-   - Same set with `--container-` prefix for scroll-within and read-within:
-     - `--container-text`, `--container-id`, `--container-desc`,
-       `--container-role`, `--container-selector`
+   - Same set with `--container-` prefix for scroll-within:
+     - `--container-text`, `--container-text-contains`, `--container-id`,
+       `--container-desc`, `--container-desc-contains`, `--container-role`,
+       `--container-selector`
+   - `scroll` only: `UiAction.Scroll` already accepts `container: NodeMatcher?`
+     in the Android runtime.
+   - "read-within" (container-scoped `read`) is NOT in Phase 3. `UiAction.ReadText`
+     has no `container` field in the Android runtime. That requires an APK change
+     and is scheduled as Phase 5C.
 
 3. **Update Phase 2's "missing selector" error to show the full flag list**
    - Phase 2 introduced a missing-selector error that references `--selector`
@@ -1071,7 +1080,10 @@ Replace JSON-heavy element targeting with simple, guessable flags.
    - Container flags resolve independently from element flags
    - First match in accessibility traversal order is selected
    - Missing all selectors: clear error listing available flags with examples
+     (including `--text-contains`, `--desc-contains`, and `--selector` where applicable)
    - Empty string values: rejected at validation boundary
+   - The same value flag token must not appear twice (for example two `--text`);
+     rejected with `EXECUTION_VALIDATION_FAILED`
 
 5. **Verify existing type flags survived Phase 2 promotion**
    - `--submit` and `--clear` already exist on `action type` (index.ts:667-668,
@@ -1195,6 +1207,14 @@ Finalize the developer and agent experience.
    - Missing device in multi-device setup: list connected devices with retry
      command showing `--device` flag
    - Validation error: include task-oriented hint, not just schema path
+   - **Pretty vs JSON errors:** Several handlers return a pre-stringified JSON
+     object on stdout (for example `makeMissingSelectorError` for
+     `MISSING_SELECTOR`, and inline `JSON.stringify` for `MISSING_ARGUMENT` and
+     similar). That output is logged as-is and does not go through
+     `format` / `formatError`, so users in default (non-`--json`) / pretty mode
+     still see a JSON line for those failures. Phase 4 error polish may unify
+     this so structured errors respect output format the same way validation and
+     execution errors already do, if desired.
 
 3. **Update HTTP API routes (`serve`)**
 
@@ -1399,19 +1419,86 @@ This is a prerequisite, not optional cleanup.
    - Synonym: `read-kv`
    - See Detailed Design Specs section for full spec
 
+### Phase 5C: Read-within (APK + CLI)
+
+Container-scoped `read`: find and return text from a node matching
+`matcher` that exists within the subtree of a node matching `container`.
+
+**Prerequisite:** `UiAction.ReadText` in the Android runtime does not
+have a `container` field today. Phase 5C requires an APK change before
+the CLI layer can expose it. Do not implement the CLI side without first
+shipping and installing the APK change, or the container field will be
+silently ignored by the device and the command will appear to work while
+producing wrong results.
+
+**APK change (Kotlin):**
+
+- Add `container: NodeMatcher? = null` to `UiAction.ReadText` in
+  `apps/android/shared/data/task/src/main/kotlin/clawperator/task/runner/UiAction.kt`
+- Update `UiActionEngine` to scope the node search within the container
+  subtree when `container` is non-null. The same container-scoping logic
+  used by `UiAction.Scroll` is a reference implementation.
+- Build and install: `./gradlew :app:assembleDebug :app:installDebug`
+- Add Kotlin unit tests in `NodeMatcherTest.kt` or a new
+  `UiActionReadTextContainerTest.kt` covering the scoped-search path.
+
+**Node/CLI change:**
+
+- Add `--container-*` flags to the `read` command handler in `registry.ts`,
+  reusing `resolveContainerMatcherFromCli` from `selectorFlags.ts` (already
+  exists from Phase 3).
+- Update `buildReadExecution` in `domain/actions/read.ts` to accept an
+  optional `container: NodeMatcher` and include it in `ActionParams`.
+  `ActionParams.container` is already typed in `contracts/execution.ts`.
+- Update `cmdActionRead` in `commands/action.ts` to accept and forward
+  the container.
+- Update `HELP_READ` in `registry.ts` and `docs/node-api-for-agents.md`
+  to document the new flags.
+
+**CLI surface:**
+
+```
+clawperator read --id <resource-id> --container-id <container-id>
+clawperator read --text <text> --container-role list
+clawperator read --id <resource-id> --container-selector '<json>'
+```
+
+**Testing:**
+
+- `read --id X --container-id Y` sends `{ matcher: {resourceId:X}, container: {resourceId:Y} }` in the execution payload
+- `read --id X --container-selector '{...}'` works; mutual exclusion with `--container-*` simple flags enforced
+- `read --container-id X` without an element selector returns `MISSING_SELECTOR`
+- On device: verify that a `read` with a container scopes the search to the container subtree and does not match a node with the same resource ID outside that container
+- All existing `read` tests still pass (container is optional)
+
+**Risk:** Medium. APK change required - needs Gradle build, device
+install, and on-device verification before the CLI change is useful.
+The Node-side is low-risk (reuses existing infrastructure).
+
+**Sequencing:** Implement APK change first (separate commit), validate
+on device, then land the Node/CLI change. Do not merge the CLI change
+until the APK change is shipped to the device being tested against.
+
+---
+
 ### Risk
 
 Low-medium. Phase 5A deliverables are low-risk: CLI wrappers around
 existing action types or single-flag additions. Phase 5B deliverables
 are medium-risk: `exec` rename touches an existing command surface,
 `wait-for-nav` and `read-value` require the ActionParams contract
-change and new typed builders.
+change and new typed builders. Phase 5C is medium-risk: requires an
+APK change before the CLI change is meaningful.
 
 ### Implementation notes for Phase 5 agents
 
 - **`logs` command does not exist yet:** The deferred `logs --follow`
   design requires building an entirely new `logs` command, not just
   adding a flag to an existing one. It is not part of Phase 5.
+- **Phase 5C APK-first rule:** Do not land the `read --container-*` CLI
+  change without the APK change installed on the target device. A CLI
+  that sends `container` to an APK that ignores it passes all unit tests
+  and silently produces wrong behavior on device.
 
 ### Testing
 
@@ -1493,7 +1580,7 @@ skill fix alongside (or immediately after) the CLI change that caused it.
 ## Sequencing
 
 ```
-Phase 0 -> Phase 1 -> Phase 2 -> Phase 3 -> Phase 4 -> Phase 5
+Phase 0 -> Phase 1 -> Phase 2 -> Phase 3 -> Phase 5A -> Phase 4 -> Phase 5B -> Phase 5C (APK-gated)
 ```
 
 Phase 0 and Phase 1 can collapse into a single PR if the implementing agent
@@ -1509,7 +1596,23 @@ Phase 3 is independent of Phase 2 in code (different files, different parsing
 paths) but should land after Phase 2 so the commands that accept selectors
 already exist in their flat form.
 
-Phase 4 is polish and should land before Phase 5.
+The revised sequencing is:
+
+  Phase 0 -> Phase 1 -> Phase 2 -> Phase 3 -> Phase 5A -> Phase 4 -> Phase 5B -> Phase 5C (APK-gated)
+
+Phase 5A should land before Phase 4. The help-text rewrite in Phase 4 is
+most efficient when written over the final command surface. Landing 5A
+first (close, scroll-until, sleep, --long/--focus, wait --timeout,
+read --all) means Phase 4 only needs to be done once over the complete
+surface, rather than extended again after 5A adds new commands.
+
+Phase 4 (structured help, --json everywhere, --device global) is then a
+stable documentation and polish pass that lands on the full 5A surface
+before Phase 5B introduces higher-risk changes.
+
+Phase 5B (`exec` rename, `wait-for-nav`, `read-value`) lands after
+Phase 4. These are higher-risk contract changes and benefit from a clean,
+tested baseline established by Phase 4.
 
 Phase 5 depends on Phase 3 (selector flags) and Phase 1 (registry).
 Within Phase 5, complete all 5A deliverables before starting 5B. 5A
@@ -1519,6 +1622,12 @@ deliverables are independent of each other and can land as separate PRs.
 single commit. 5B deliverables (`exec` rename, `wait-for-nav`,
 `read-value`) are also independent but require the ActionParams contract
 change as a precondition for the latter two.
+
+Phase 5C (`read --container-*`) is independent of 5A and 5B in terms of
+code but requires an APK change as a hard prerequisite. It can be worked
+in parallel with any phase as long as the APK change lands before the CLI
+change is considered done. Do not merge the Node side of 5C without the
+APK side.
 
 Docs work (`tasks/docs/refactor/`) begins only after Phase 5 is complete.
 
@@ -1916,9 +2025,11 @@ edit or replace the plan above, which stays the original design record.
 | Phase 0 | Done | Infrastructure and compatibility work merged per plan |
 | Phase 1 | Done | `COMMANDS` registry and registry-driven dispatch in `apps/node/src/cli/` |
 | Phase 2 | Done | Flat verbs, global flags, `action` / `observe` removed from registry with did-you-mean, docs and smoke updates |
-| Phase 3 | Not done | Selector shorthand flags (`--text`, `--id`, `--desc`) still future work |
+| Phase 3 | Done | Selector shorthand flags on click/type/read/wait; `--container-*` (incl. `-contains` variants) on scroll; MISSING_SELECTOR lists full flag surface incl. `--desc-contains`; duplicate value flags rejected; docs updated |
 | Phase 4 | Partial | Exit-code and help polish in flight; full deliverable set not complete |
-| Phase 5 | Not done | Extended commands as specified in plan |
+| Phase 5A | Not done | Extended commands: scroll-until, close, --long/--focus on click, wait --timeout, read --all, sleep |
+| Phase 5B | Not done | Higher-risk: exec rename, wait-for-nav, read-value; requires ActionParams contract alignment first |
+| Phase 5C | Not done | read-within: container-scoped read; requires APK change to UiAction.ReadText before CLI change |
 
 ### Deviations from the written plan (intentional or scheduling)
 
@@ -1941,10 +2052,12 @@ edit or replace the plan above, which stays the original design record.
    **As-built:** synonyms are `synonyms` arrays on `CommandDef` entries in the
    registry.
 
-4. **Phase 4 testing checklist**  
-   When verifying this branch, do not assume Phase 3 selector shorthands appear on
-   `clawperator click --help` yet. Until Phase 3 lands, missing-selector guidance
-   remains JSON `--selector` oriented, per Phase 2 failure-mode text in the plan.
+4. **Phase 3 closure**
+   Phase 3 is complete and the temporary `phase-3-impl-plan.md` checklist is removed.
+   `clawperator click --help` shows the full selector flag list. Missing-selector
+   guidance lists the full flag surface (including `--desc-contains` on click/read/wait
+   and on `type` where `--text` is reserved for typed content). Duplicate selector
+   container/value flags are rejected.
 
 5. **`execute` vs `exec`**  
    The plan schedules renaming `execute` to `exec` in Phase 5. **As implemented

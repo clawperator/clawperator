@@ -259,17 +259,27 @@ Target detection: `https?://` or any `*://` scheme routes as URI; otherwise trea
 
 ### `click`
 
-Tap a UI element matching a selector.
+Tap the first UI element that matches the selector flags (AND semantics when multiple simple flags are set).
 
 ```
+clawperator click --text <text> [--device <id>] [--operator-package <pkg>] [--json]
+clawperator click --id <resource-id> [--device <id>] [--operator-package <pkg>] [--json]
+clawperator click --role <role> [--device <id>] [--operator-package <pkg>] [--json]
+clawperator click --desc <text> [--device <id>] [--operator-package <pkg>] [--json]
 clawperator click --selector '<json>' [--device <id>] [--operator-package <pkg>] [--json]
 ```
 
 | Flag | Description |
 |------|-------------|
-| `--selector <json>` | `NodeMatcher` JSON (required) |
+| `--text <text>` | Exact visible text (`textEquals`) |
+| `--text-contains <text>` | Partial visible text (`textContains`) |
+| `--id <resource-id>` | Android resource ID (`resourceId`) |
+| `--desc <text>` | Exact content description (`contentDescEquals`) |
+| `--desc-contains <text>` | Partial content description (`contentDescContains`) |
+| `--role <role>` | Element role (`role`) |
+| `--selector <json>` | Raw `NodeMatcher` JSON (advanced; mutually exclusive with the simple flags above) |
 
-Example selector: `'{"resourceId":"com.example.app:id/button_ok"}'`
+At least one of the selector mechanisms above is required. Prefer `--text`, `--id`, `--role`, or `--desc` over `--selector` when a single field is enough.
 
 Synonym: `tap` (accepted, not in help).
 
@@ -277,47 +287,82 @@ Synonym: `tap` (accepted, not in help).
 
 ### `type`
 
-Type text into a UI element matching a selector.
+Type text into the first matching element. Typed text is the positional argument or `--text <text>` (that `--text` is not an element selector).
 
 ```
+clawperator type <text> --role <role> [--device <id>] [--operator-package <pkg>] [--submit] [--clear] [--json]
+clawperator type <text> --id <resource-id> [--device <id>] [--operator-package <pkg>] [--submit] [--clear] [--json]
+clawperator type <text> --desc <text> [--device <id>] [--operator-package <pkg>] [--submit] [--clear] [--json]
 clawperator type <text> --selector '<json>' [--device <id>] [--operator-package <pkg>] [--submit] [--clear] [--json]
 ```
 
 | Flag | Description |
 |------|-------------|
-| `--selector <json>` | `NodeMatcher` JSON (required) |
+| `--id <resource-id>` | Target element by resource ID |
+| `--desc <text>` | Target by exact content description |
+| `--desc-contains <text>` | Target by partial content description |
+| `--text-contains <text>` | Target by partial visible text |
+| `--role <role>` | Target by element role |
+| `--selector <json>` | Raw `NodeMatcher` JSON (advanced; mutually exclusive with simple target flags) |
 | `--submit` | Press Enter after typing |
 | `--clear` | No effect today (field is not cleared before typing on device). |
 
-Text may be supplied as a positional argument or via `--text <text>`. Synonym: `fill` (accepted, not in help).
+At least one element-targeting flag (`--id`, `--role`, `--desc`, `--text-contains`, `--desc-contains`, or `--selector`) is required.
+
+Synonym: `fill` (accepted, not in help).
 
 ---
 
 ### `read`
 
-Read text from a UI element matching a selector.
+Read text from the first matching element.
 
 ```
+clawperator read --text <text> [--device <id>] [--operator-package <pkg>] [--json]
+clawperator read --id <resource-id> [--device <id>] [--operator-package <pkg>] [--json]
+clawperator read --role <role> [--device <id>] [--operator-package <pkg>] [--json]
+clawperator read --desc <text> [--device <id>] [--operator-package <pkg>] [--json]
 clawperator read --selector '<json>' [--device <id>] [--operator-package <pkg>] [--json]
 ```
 
 | Flag | Description |
 |------|-------------|
-| `--selector <json>` | `NodeMatcher` JSON (required) |
+| `--text <text>` | Exact visible text |
+| `--text-contains <text>` | Partial visible text |
+| `--id <resource-id>` | Android resource ID |
+| `--desc <text>` | Exact content description |
+| `--desc-contains <text>` | Partial content description |
+| `--role <role>` | Element role |
+| `--selector <json>` | Raw `NodeMatcher` JSON (advanced; mutually exclusive with simple flags) |
+
+At least one selector mechanism is required.
 
 ---
 
 ### `wait`
 
-Wait until a UI element matching a selector appears.
+Wait until the first matching element appears.
 
 ```
+clawperator wait --text <text> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
+clawperator wait --id <resource-id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
+clawperator wait --role <role> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
+clawperator wait --desc <text> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
 clawperator wait --selector '<json>' [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
 ```
 
 | Flag | Description |
 |------|-------------|
-| `--selector <json>` | `NodeMatcher` JSON (required) |
+| `--text <text>` | Exact visible text |
+| `--text-contains <text>` | Partial visible text |
+| `--id <resource-id>` | Android resource ID |
+| `--desc <text>` | Exact content description |
+| `--desc-contains <text>` | Partial content description |
+| `--role <role>` | Element role |
+| `--selector <json>` | Raw `NodeMatcher` JSON (advanced; mutually exclusive with simple flags) |
+| `--timeout <ms>` | Override wait timeout |
+
+At least one selector mechanism is required.
 
 ---
 
@@ -353,13 +398,24 @@ Equivalent to `clawperator press back`.
 
 ### `scroll`
 
-Scroll the screen in a direction.
+Scroll the screen in a direction. Optional `--container-*` flags restrict scrolling to a specific scrollable container.
 
 ```
 clawperator scroll <direction> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
+clawperator scroll <direction> --container-id <resource-id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
 ```
 
 Valid directions: `down`, `up`, `left`, `right`. Direction may be supplied as a positional argument or via `--direction <direction>`.
+
+| Flag | Description |
+|------|-------------|
+| `--container-text <text>` | Container matched by exact visible text |
+| `--container-text-contains <text>` | Container matched by partial visible text |
+| `--container-id <resource-id>` | Container matched by resource ID |
+| `--container-desc <text>` | Container matched by exact content description |
+| `--container-desc-contains <text>` | Container matched by partial content description |
+| `--container-role <role>` | Container matched by role |
+| `--container-selector <json>` | Raw `NodeMatcher` for container (advanced; mutually exclusive with other `--container-*` flags) |
 
 ---
 

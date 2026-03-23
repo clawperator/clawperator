@@ -122,7 +122,7 @@ These codes are returned by the flat CLI commands when required arguments are mi
 
 | Code | Description |
 |------|-------------|
-| `MISSING_SELECTOR` | `click`, `type`, `read`, or `wait` was called without `--selector` |
+| `MISSING_SELECTOR` | `click`, `type`, `read`, or `wait` was called without any element selector (no `--text`, `--id`, `--role`, `--desc`, partial-match flags, or `--selector`) |
 | `MISSING_ARGUMENT` | A required positional argument was omitted (`open`, `type`, `press`, or `scroll`) |
 
 ---
