@@ -5,13 +5,13 @@
  * Searches for a named app in the Google Play Store and navigates to its details page.
  *
  * Usage:
- *   node search_play_store.js <device_id> <query> [receiver_package] [package_id]
+ *   node search_play_store.js <device_id> <query> [operator_package] [package_id]
  *
  * Arguments:
- *   device_id       - ADB device serial
- *   query           - App name to search for (e.g. "VLC")
- *   receiver_package - Clawperator receiver package (default: com.clawperator.operator)
- *   package_id      - Optional Android package ID for direct entry path (e.g. org.videolan.vlc)
+ *   device_id         - ADB device serial
+ *   query             - App name to search for (e.g. "VLC")
+ *   operator_package  - Clawperator Operator package (default: com.clawperator.operator.dev)
+ *   package_id        - Optional Android package ID for direct entry path (e.g. org.videolan.vlc)
  *
  * Selector notes (discovered via live exploration):
  *   - Play Store has NO resource-ids on interactive elements.
@@ -41,7 +41,7 @@ function runClawperatorLocal(execution, deviceId, operatorPkg) {
   const tmpFile = path.join(tmpdir(), execution.commandId + '.json');
   writeFileSync(tmpFile, JSON.stringify(execution));
 
-  const args = [LOCAL_CLAW, 'execute', '--execution', tmpFile, '--device-id', deviceId, '--operator-package', operatorPkg];
+  const args = [LOCAL_CLAW, 'exec', '--execution', tmpFile, '--device', deviceId, '--operator-package', operatorPkg];
 
   try {
     const output = execFileSync('node', args, { encoding: 'utf-8' });
@@ -65,7 +65,7 @@ function findAttribute(line, attrName) {
 }
 
 if (!deviceId || !query) {
-  console.error('Usage: node search_play_store.js <device_id> <query> [receiver_package] [package_id]');
+  console.error('Usage: node search_play_store.js <device_id> <query> [operator_package] [package_id]');
   process.exit(1);
 }
 

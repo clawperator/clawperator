@@ -90,7 +90,7 @@ Reference
   - CLI reference (every command and flag)
 
 Troubleshoot and Diagnose
-  - Common failures (RECEIVER_NOT_INSTALLED, timeout, etc. - one page per failure class)
+  - Common failures (OPERATOR_NOT_INSTALLED, timeout, etc. - one page per failure class)
   - Reading the log (how to use the NDJSON log)
   - Version compatibility
 ```
@@ -226,7 +226,7 @@ Walk through two user journeys and confirm each has a single unambiguous path:
    dead ends, no "see also" that leads to a peer page covering the same thing.
 
 2. **Experienced agent, error debugging**: navigate to the error code reference for
-   `RECEIVER_NOT_INSTALLED`; navigate to the troubleshooting page for timeout errors.
+   `OPERATOR_NOT_INSTALLED`; navigate to the troubleshooting page for timeout errors.
    Each should be a direct path with no disambiguation required.
 
 ---

@@ -7,7 +7,7 @@ Clawperator exposes a Node-based interface for agent-driven device automation. T
 ## Interaction Model
 
 1. Agent constructs an `Execution` payload.
-2. Agent calls `execute` (CLI) or `POST /execute` (HTTP).
+2. Agent calls `exec` (CLI; `execute` is a synonym) or `POST /execute` (HTTP).
 3. Clawperator validates the payload, resolves the device, dispatches via ADB broadcast, and waits for a `[Clawperator-Result]` envelope from logcat.
 4. The result envelope is returned to the agent.
 
@@ -339,13 +339,13 @@ Run an execution payload.
 | 423 | Execution conflict (in-flight) |
 | 504 | Result envelope timeout |
 
-### `POST /observe/snapshot`
+### `POST /snapshot`
 
 Capture UI snapshot. Body: `{ "deviceId"?, "operatorPackage"? }`.
 
 Same response shape as `/execute`.
 
-### `POST /observe/screenshot`
+### `POST /screenshot`
 
 Capture screenshot. Body: `{ "deviceId"?, "operatorPackage"? }`.
 
@@ -415,12 +415,12 @@ Server-Sent Events stream. Emits two event types:
 | Variable | Description |
 |----------|-------------|
 | `ADB_PATH` | Override path to `adb` binary |
-| `CLAWPERATOR_OPERATOR_PACKAGE` | Default receiver package (fallback if not passed as option) |
+| `CLAWPERATOR_OPERATOR_PACKAGE` | Default Android Operator package when `--operator-package` is omitted (CLI, installer, skills; see [Environment variables](environment-variables.md)) |
 | `CLAWPERATOR_SKILLS_REGISTRY` | Path to `skills-registry.json`. If unset, defaults to `./skills/skills-registry.json` relative to the working directory. After `skills install`, set to `~/.clawperator/skills/skills/skills-registry.json`. |
 
 ---
 
-## Receiver Packages
+## Operator packages
 
 | Variant | Package ID |
 |---------|-----------|

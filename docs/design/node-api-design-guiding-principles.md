@@ -80,18 +80,13 @@ CLI tools, mobile automation, and common English verbs.
 Clawperator ("CLI tool for automating Android devices") and nothing else. What
 commands would it try? Those commands should work.
 
-Bad:
-```
-clawperator action open-app --app com.android.settings
-clawperator observe snapshot --output json
-clawperator action click --selector '{"text":"Wi-Fi"}'
-```
+Anti-pattern (removed - do not use): nested command families such as `action *` and `observe snapshot` are not supported. They are not documented here as runnable examples because agents and crawlers sometimes copy code blocks verbatim.
 
-Good:
+Good (current):
 ```
 clawperator open com.android.settings
 clawperator snapshot --json
-clawperator click --text "Wi-Fi"
+clawperator click --selector '{"textEquals":"Wi-Fi"}'
 ```
 
 ### 2. Flat Commands for Actions, Namespaces Only for Subsystems
@@ -272,8 +267,8 @@ wants to do, not how Clawperator does it internally.
 Bad examples of implementation leaking into API:
 - `--operator-package` (agent does not know what a "receiver" is; renamed to
   `--operator-package` which uses Clawperator's own terminology)
-- `observe snapshot` (agent does not categorize actions as "observations")
-- `action open-app` (agent does not think "I want to perform an action")
+- `snapshot` (flat command - no nested namespace)
+- `open` (direct verb - the agent wants to open something)
 - `RESULT_ENVELOPE_TIMEOUT` (useful in logs, not in agent-facing errors)
 
 When adding a new command, ask: "Would an agent who has never read the Clawperator

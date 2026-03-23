@@ -497,10 +497,10 @@ maybe_install_operator_apk() {
         while IFS=$'\t' read -r device_id device_state; do
             [ -n "$device_id" ] || continue
             if [ "$device_state" = "device" ]; then
-                if "$CLAWPERATOR_BIN_PATH" doctor --device-id "$device_id" --output json > /dev/null 2>&1; then
+                if "$CLAWPERATOR_BIN_PATH" doctor --device "$device_id" --json > /dev/null 2>&1; then
                     echo -e "${GREEN}  ✅ ${device_id} - ready${NC}"
                 else
-                    echo -e "${YELLOW}  ⚠  ${device_id} - setup required: clawperator operator setup --apk ${APK_LOCAL_PATH} --device-id ${device_id}${NC}"
+                    echo -e "${YELLOW}  ⚠  ${device_id} - setup required: clawperator operator setup --apk ${APK_LOCAL_PATH} --device ${device_id}${NC}"
                     all_ready=false
                 fi
             else
@@ -548,7 +548,7 @@ maybe_install_operator_apk() {
             echo -e "${BLUE}Installing operator APK on connected device...${NC}"
             if [ -n "$CLAWPERATOR_BIN_PATH" ]; then
                 # Use the canonical install command: installs APK and grants permissions in one step.
-                if "$CLAWPERATOR_BIN_PATH" operator setup --apk "$APK_LOCAL_PATH" --device-id "$DEVICE_ID" --operator-package "$DEFAULT_OPERATOR_PACKAGE" > /dev/null 2>&1; then
+                if "$CLAWPERATOR_BIN_PATH" operator setup --apk "$APK_LOCAL_PATH" --device "$DEVICE_ID" --operator-package "$DEFAULT_OPERATOR_PACKAGE" > /dev/null 2>&1; then
                     echo -e "${GREEN}✅ Operator APK installed and permissions granted.${NC}"
                 else
                     echo -e "${RED}❌ operator setup failed. Run: clawperator operator setup --apk ${APK_LOCAL_PATH}${NC}"
@@ -624,7 +624,7 @@ print_manual_operator_setup_commands() {
     echo -e "${YELLOW}Complete Android setup on one target device with one of:${NC}"
     while IFS= read -r device_id; do
         [ -n "$device_id" ] || continue
-        echo -e "${YELLOW}  clawperator operator setup --apk ${APK_LOCAL_PATH} --device-id ${device_id}${NC}"
+        echo -e "${YELLOW}  clawperator operator setup --apk ${APK_LOCAL_PATH} --device ${device_id}${NC}"
     done < <(list_connected_devices)
 }
 
@@ -661,7 +661,7 @@ run_doctor_and_fix() {
             DEVICE_ID="$(list_connected_devices)"
             # Handshake failed after install - re-grant permissions as remediation (not initial setup).
             echo -e "${BLUE}Handshake failed. Re-granting device permissions for $DEVICE_ID as recovery...${NC}"
-            "$CLAWPERATOR_BIN_PATH" grant-device-permissions --device-id "$DEVICE_ID" --operator-package "$DEFAULT_OPERATOR_PACKAGE" > /dev/null 2>&1 || true
+            "$CLAWPERATOR_BIN_PATH" grant-device-permissions --device "$DEVICE_ID" --operator-package "$DEFAULT_OPERATOR_PACKAGE" > /dev/null 2>&1 || true
         fi
     fi
 }
@@ -702,7 +702,7 @@ main() {
             print_manual_operator_setup_commands
             echo ""
             echo -e "${YELLOW}After setup, verify one device explicitly with:${NC}"
-            echo -e "${YELLOW}  clawperator doctor --device-id <device_id> --output pretty${NC}"
+            echo -e "${YELLOW}  clawperator doctor --device <device_id> --output pretty${NC}"
             echo ""
             echo -e "${GREEN}════════════════════════════════════════════════════════════════${NC}"
             echo -e "${GREEN}  Installation Complete (Device Selection Required)${NC}"

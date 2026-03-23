@@ -6,7 +6,7 @@ snapshot surfaces.
 Use this page as the source of truth for:
 
 - `snapshot_ui` result payloads
-- `clawperator observe snapshot`
+- `clawperator snapshot`
 - the `hierarchy_xml` UI tree format
 - how snapshot fields relate to `NodeMatcher`
 
@@ -16,7 +16,7 @@ the NDJSON event schema and step-log parsing contract.
 
 ## Contract summary
 
-`snapshot_ui` and `clawperator observe snapshot` use the same internal
+`snapshot_ui` and `clawperator snapshot` use the same internal
 pipeline and return the same canonical snapshot format: `hierarchy_xml`.
 
 On success:

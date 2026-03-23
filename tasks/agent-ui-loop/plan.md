@@ -83,7 +83,7 @@ task is:
 
 Confirmed from the current branch source and live device validation:
 
-- `clawperator observe snapshot` and `snapshot_ui` both return the same canonical
+- `clawperator snapshot` (flat CLI) and `snapshot_ui` (inside `execute`) both return the same canonical
   snapshot format: `hierarchy_xml`
 - successful snapshot steps report `data.actual_format = "hierarchy_xml"`
 - the Android runtime writes the hierarchy dump to logcat and the Node layer injects
@@ -106,7 +106,7 @@ The basic loop:
 
 1. `open_app` - launch the target app
 2. `sleep` 1000ms or `wait_for_node` on a stable element - let the app settle
-3. `observe snapshot` or `snapshot_ui` - read current UI state
+3. `clawperator snapshot` or a `snapshot_ui` step in `execute` - read current UI state
 4. Agent inspects tree, identifies the target element, reads its matcher fields
 5. Construct an action payload (click, enter_text, scroll_and_click) targeting
    that element by its most stable matcher
@@ -156,7 +156,7 @@ This must be a first-class section with concrete examples - not a footnote.
 
 This section of the doc must cover:
 
-- The two access paths (`observe snapshot` and `snapshot_ui`) and the fact that both
+- The two access paths (flat CLI `snapshot` and execute action `snapshot_ui`) and the fact that both
   return the same `hierarchy_xml` output
 - How to read the XML hierarchy to identify elements and extract matcher field values
 - How `data.text` and `data.actual_format` are delivered in the result envelope
@@ -267,7 +267,7 @@ What each error means in an explore loop context, and what the agent should do:
 
 - **Hierarchy XML snapshot**: default path. Low context cost. Use for targeting and
   machine-readable UI inspection.
-- **Screenshot** (`observe screenshot` or `POST /observe/screenshot`): visual
+- **Screenshot** (`clawperator screenshot` or `POST /screenshot`): visual
   context. Higher token cost (image input). Use for disambiguation when the
   tree alone is insufficient to understand the current screen state. Cannot
   substitute the tree for element targeting.
@@ -282,7 +282,7 @@ This must appear early in the doc, before any snapshot examples:
 
 **Path A - CLI shortcut:**
 ```bash
-clawperator observe snapshot --device-id <serial>
+clawperator snapshot --device <serial>
 ```
 
 **Path B - Execute payload:**
@@ -349,7 +349,7 @@ Section outline:
 
 This task depends on the current branch contract remaining stable:
 
-- `snapshot_ui` and `observe snapshot` continue to expose canonical `hierarchy_xml`
+- `snapshot_ui` and flat CLI `snapshot` continue to expose canonical `hierarchy_xml`
 - the Node API guide remains the source of truth for per-action params and result data
 - any future contract changes must update this plan before implementation work starts
 

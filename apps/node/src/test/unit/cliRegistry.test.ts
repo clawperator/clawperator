@@ -3,7 +3,13 @@ import assert from "node:assert";
 import { spawn } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { COMMANDS, levenshtein, didYouMean } from "../../cli/registry.js";
+import {
+  COMMANDS,
+  levenshtein,
+  didYouMean,
+  barePositionalTokens,
+  isOpenCliUriTarget,
+} from "../../cli/registry.js";
 
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "../../..");
 
@@ -66,6 +72,32 @@ describe("COMMANDS registry consistency", () => {
   });
 });
 
+describe("isOpenCliUriTarget", () => {
+  it("returns true for http(s) and custom schemes", () => {
+    assert.strictEqual(isOpenCliUriTarget("https://example.com"), true);
+    assert.strictEqual(isOpenCliUriTarget("http://example.com"), true);
+    assert.strictEqual(isOpenCliUriTarget("myapp://path"), true);
+  });
+
+  it("returns false for Android package ids and bare hosts", () => {
+    assert.strictEqual(isOpenCliUriTarget("com.android.settings"), false);
+    assert.strictEqual(isOpenCliUriTarget("example.com"), false);
+  });
+});
+
+describe("barePositionalTokens", () => {
+  it("skips flag values and boolean flags", () => {
+    assert.deepStrictEqual(
+      barePositionalTokens(["hello", "--selector", "{}", "--text", "x"], ["--selector", "--text"], ["--submit"]),
+      ["hello"],
+    );
+    assert.deepStrictEqual(
+      barePositionalTokens(["--selector", "{}", "hello", "--submit"], ["--selector", "--text"], ["--submit"]),
+      ["hello"],
+    );
+  });
+});
+
 describe("levenshtein", () => {
   it("returns 0 for identical strings", () => {
     assert.strictEqual(levenshtein("observe", "observe"), 0);
@@ -81,7 +113,7 @@ describe("flag aliases - --device works like --device-id", () => {
   it("--device alias passes device id (validated via timeout error output)", async () => {
     // Use --timeout nope which produces EXECUTION_VALIDATION_FAILED. The device alias is consumed
     // by getGlobalOpts, so the command should still run and fail on the timeout.
-    const { stdout, code } = await runCli(["--device", "test-device-alias", "observe", "snapshot", "--timeout", "nope"]);
+    const { stdout, code } = await runCli(["--device", "test-device-alias", "skills", "run", "some-skill", "--timeout", "nope"]);
     assert.notStrictEqual(code, 0);
     assert.match(stdout, /EXECUTION_VALIDATION_FAILED/);
     assert.match(stdout, /timeoutMs must be a finite number/);
@@ -110,7 +142,7 @@ describe("missing command after global flags", () => {
 
 describe("flag aliases - --timeout works like --timeout-ms", () => {
   it("--timeout nope produces EXECUTION_VALIDATION_FAILED", async () => {
-    const { stdout, code } = await runCli(["observe", "snapshot", "--timeout", "nope"]);
+    const { stdout, code } = await runCli(["skills", "run", "some-skill", "--timeout", "nope"]);
     assert.notStrictEqual(code, 0);
     assert.match(stdout, /EXECUTION_VALIDATION_FAILED/);
     assert.match(stdout, /timeoutMs must be a finite number/);
@@ -226,8 +258,8 @@ describe("didYouMean tie-breaking", () => {
     // Primary name must win.
     const cmds = {
       foo: { ...fakeBase, name: "foo", synonyms: ["foa"] },
-    } as Parameters<typeof didYouMean>[1];
-    const result = JSON.parse(didYouMean("fob", cmds)) as { suggestion?: string };
+    } as Parameters<typeof didYouMean>[2];
+    const result = JSON.parse(didYouMean("fob", [], cmds)) as { suggestion?: string };
     assert.strictEqual(result.suggestion, "foo");
   });
 
@@ -236,8 +268,8 @@ describe("didYouMean tie-breaking", () => {
     const cmds = {
       bcd: { ...fakeBase, name: "bcd" },
       acd: { ...fakeBase, name: "acd" },
-    } as Parameters<typeof didYouMean>[1];
-    const result = JSON.parse(didYouMean("xcd", cmds)) as { suggestion?: string };
+    } as Parameters<typeof didYouMean>[2];
+    const result = JSON.parse(didYouMean("xcd", [], cmds)) as { suggestion?: string };
     assert.strictEqual(result.suggestion, "acd");
   });
 });

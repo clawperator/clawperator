@@ -39,10 +39,10 @@ Core commands:
 - `clawperator doctor`: Validate prerequisites and environment.
 - `clawperator devices`: Discover connected device IDs.
 - `clawperator packages list`: Confirm presence of receiver and target apps on device.
-- `clawperator execute`: Run an execution JSON payload.
-- `clawperator observe snapshot`: Get current UI hierarchy as `hierarchy_xml`.
-- `clawperator observe screenshot`: Capture device screen.
-- `clawperator action [open-app|click|read|wait|type]`: Single-step interaction wrappers.
+- `clawperator exec`: Run an execution JSON payload (`execute` is a supported synonym).
+- `clawperator snapshot`: Get current UI hierarchy as `hierarchy_xml`.
+- `clawperator screenshot`: Capture device screen.
+- Flat device interaction commands (single-step wrappers): `clawperator open`, `clawperator click`, `clawperator type`, `clawperator read`, `clawperator wait`, `clawperator press`, `clawperator back`, `clawperator scroll`, and related flags documented in the CLI reference.
 - `clawperator serve`: Start HTTP/SSE server for remote agent access.
 - `clawperator doctor --fix`: Best-effort environment remediation.
 - `clawperator skills install/update/search/run`: Skills lifecycle.
@@ -67,9 +67,9 @@ When running `clawperator serve [--port <number>] [--host <string>]`, a local HT
     - Body: `{"execution": {...}, "deviceId": "...", "operatorPackage": "..."}`
     - Returns: `RunExecutionResult` (200 OK or 4xx/5xx on failure).
     - Status **423 Locked**: Returned if another execution is in flight for the target device.
-- **`POST /observe/snapshot`**: Quick helper for UI capture.
+- **`POST /snapshot`**: Quick helper for UI capture.
     - Body: `{"deviceId": "...", "operatorPackage": "..."}`
-- **`POST /observe/screenshot`**: Quick helper for visual capture.
+- **`POST /screenshot`**: Quick helper for visual capture.
     - Body: `{"deviceId": "...", "operatorPackage": "..."}`
 
 ### Event Streaming (SSE)
@@ -99,8 +99,8 @@ LLM agents must use these codes to decide their next step.
 ### Setup & Connectivity
 - `ADB_NOT_FOUND`: ADB is missing from PATH.
 - `NO_DEVICES`: No Android devices are connected via USB/Network.
-- `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED`: More than one device exists; specify `--device-id`.
-- `RECEIVER_NOT_INSTALLED`: The target receiver package is not on the device, so `doctor` and `execute` fail fast before dispatch.
+- `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED`: More than one device exists; specify `--device` (alias: `--device-id`).
+- `OPERATOR_NOT_INSTALLED`: The target Operator package is not on the device, so `doctor` and `exec` fail fast before dispatch.
 
 ### Execution & State
 - `EXECUTION_VALIDATION_FAILED`: The execution JSON is malformed or invalid.
@@ -194,7 +194,7 @@ This keeps behavior deterministic and avoids hidden control-flow in the runtime.
 Use one term everywhere: `execution`.
 
 - `compile` produces an `execution`.
-- `execute` runs an `execution`.
+- `exec` runs an `execution` payload (`execute` is a synonym).
 
 Execution schema aligns with Android `AgentCommand` constraints.
 
@@ -222,7 +222,7 @@ Example execution:
 
 ## Device Selection Policy (v1)
 
-`deviceId?: string` is supported on execute/observe.
+`deviceId?: string` is supported on `exec` and on flat observe-style commands (`snapshot`, `screenshot`).
 
 Selection behavior:
 
@@ -232,7 +232,7 @@ Selection behavior:
 
 ## Agentic Best-Effort Mode
 
-> **Status: alpha/unstable.** `execute best-effort` may break without a major version bump until promoted to stable. See Stability section.
+> **Status: alpha/unstable.** `exec best-effort` may break without a major version bump until promoted to stable. See Stability section.
 
 Best-effort mode is an execution path for unknown or drifting UIs where the agent needs to make progress without a pre-authored action plan. It does not change the ownership model: Clawperator still executes individual actions and reports results; the agent still owns strategy.
 
@@ -387,27 +387,22 @@ Migration policy:
 - Temporary Bash implementations (including the current Life360 flow) are acceptable only as stopgaps and must be queued for early migration once minimal Node skill SDK/runtime helpers are in place.
 
 
-## Agent-Friendly Command and Alias Layer
+## Agent-Friendly Command Surface
 
-Because agents are primary customers, Clawperator should accept intuitive aliases that normalize to canonical actions.
+Because agents are the primary consumers, the CLI command surface must be
+optimized for first-contact guessability.
 
-Examples:
-
-- `tap` -> `click`
-- `press` -> `click`
-- `long_press` -> `click` with long-click params
-- `wait_for` -> `wait_for_node`
-- `find` -> `wait_for_node`
-- `read` -> `read_text`
-- `snapshot` -> `snapshot_ui`
-- `sleep` -> `sleep`
-- `action`: Primary entry point for single-step interactions.
-
-Rules:
-
+Key principles:
 1. Canonical form is stored and logged.
-2. Aliases are input-only conveniences.
-3. Alias table is explicit/versioned (no fuzzy guessing in parser).
+2. Aliases are input-only conveniences accepted by the parser but not
+   featured in documentation.
+3. Alias table is explicit and versioned (no fuzzy guessing in parser).
+
+Design principles, naming rules, synonym policy, and a pre-merge checklist
+for new commands and flags are in `docs/design/node-api-design-guiding-principles.md`.
+
+Note: the "Shipped Commands" section above reflects the current CLI surface
+and will be updated as the command surface evolves.
 
 ## Node Module Structure
 
@@ -477,5 +472,5 @@ Clawperator follows Semantic Versioning (SemVer) for the Node SDK/CLI and its AP
 - **Patch Bump (`x.x.1`):** Bug fixes, internal refactoring, or documentation updates.
 
 ### Stability Boundary
-- **Stable (v1):** `execute`, `observe snapshot`, `devices`, and the `[Clawperator-Result]` envelope structure.
-- **Alpha/Unstable:** `execute best-effort`, `--serve` (HTTP), and any feature marked as `(Upcoming)` in these docs. These may break without a major version bump until they are promoted to stable.
+- **Stable (v1):** `exec`, `snapshot`, `devices`, and the `[Clawperator-Result]` envelope structure.
+- **Alpha/Unstable:** `exec best-effort`, `--serve` (HTTP), and any feature marked as `(Upcoming)` in these docs. These may break without a major version bump until they are promoted to stable.

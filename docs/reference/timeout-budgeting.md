@@ -32,7 +32,7 @@ These are practical starting points, not guarantees.
 
 | Workflow shape | Suggested `timeoutMs` |
 |---|---:|
-| Single `snapshot_ui` or `observe snapshot` | `10000`-`15000` |
+| Single `snapshot_ui` or `snapshot` | `10000`-`15000` |
 | `open_app` + brief settle + snapshot | `15000`-`25000` |
 | One click or text-entry step plus verification snapshot | `15000`-`30000` |
 | Short deterministic sequence in one screen | `20000`-`30000` |

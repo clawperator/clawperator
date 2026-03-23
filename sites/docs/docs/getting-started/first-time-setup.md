@@ -76,7 +76,7 @@ Requirements: `adb`, `emulator`, `sdkmanager`, `avdmanager` in `PATH`.
 Provision the emulator:
 
 ```bash
-clawperator provision emulator --output json
+clawperator provision emulator --json
 ```
 
 This command reuses a running supported emulator, starts a stopped supported AVD, or creates a new AVD with the default profile.
@@ -92,11 +92,11 @@ The default supported emulator profile is:
 You can inspect configured AVDs at any time:
 
 ```bash
-clawperator emulator list --output json
-clawperator emulator inspect clawperator-pixel --output json
+clawperator emulator list --json
+clawperator emulator inspect clawperator-pixel --json
 ```
 
-If both a physical device and an emulator are connected, you will need to pass `--device-id <serial>` to later commands.
+If both a physical device and an emulator are connected, you will need to pass `--device <serial>` to later commands (`--device-id` is accepted as an alias).
 
 If multiple devices are connected during install, the installer does not guess
 which device should receive the APK. It leaves the downloaded APK in
@@ -118,7 +118,7 @@ If you have multiple devices connected, specify the target device:
 ```bash
 clawperator operator setup \
   --apk ~/.clawperator/downloads/operator.apk \
-  --device-id <device_id>
+  --device <device_id>
 ```
 
 This is also the recovery command to use after a multi-device installer run
@@ -159,7 +159,7 @@ A fully configured device will show all checks passing. Common warnings:
 | Warning | Fix |
 | :--- | :--- |
 | `DEVICE_UNAUTHORIZED` | Tap "Allow" on the device USB debugging dialog |
-| `RECEIVER_NOT_INSTALLED` | Complete Step 3. Run `clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id <device_id>` and add `--operator-package com.clawperator.operator.dev` for debug builds. |
+| `OPERATOR_NOT_INSTALLED` | Complete Step 3. Run `clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device <device_id>` and add `--operator-package com.clawperator.operator.dev` for debug builds. |
 | `DEVICE_ACCESSIBILITY_NOT_RUNNING` | If the Operator APK crashed after setup, run `clawperator grant-device-permissions` to restore the revoked permissions |
 | `DEVICE_DEV_OPTIONS_DISABLED` | Enable Developer options (physical device only) |
 | `DEVICE_USB_DEBUGGING_DISABLED` | Enable USB debugging (physical device only) |
@@ -171,15 +171,14 @@ A fully configured device will show all checks passing. Common warnings:
 Observe the current UI state:
 
 ```bash
-clawperator observe snapshot --device-id <device_id>
+clawperator snapshot --device <device_id> --json
 ```
 
 Open an app:
 
 ```bash
-clawperator action open-app \
-  --app com.android.settings \
-  --device-id <device_id> \
+clawperator open com.android.settings \
+  --device <device_id> \
   --operator-package com.clawperator.operator
 ```
 
@@ -226,7 +225,7 @@ prints a per-device status line before returning control to you.
 
 ```
   ✅ <serial> - ready
-  ⚠  <serial> - setup required: clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id <serial>
+  ⚠  <serial> - setup required: clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device <serial>
 ```
 
 - `✅ ready` - the APK is installed and the accessibility service is running on
@@ -240,19 +239,19 @@ required.` and exits cleanly.
 **How to check a device's readiness yourself**
 
 ```bash
-clawperator doctor --device-id <serial>
+clawperator doctor --device <serial>
 ```
 
 A healthy device shows all checks passing and exits 0. An unhealthy device
 exits 1 with details on which checks failed (for example,
-`RECEIVER_NOT_INSTALLED` or `DEVICE_ACCESSIBILITY_NOT_RUNNING`).
+`OPERATOR_NOT_INSTALLED` or `DEVICE_ACCESSIBILITY_NOT_RUNNING`).
 
 **How to complete setup for a device that needs it**
 
 ```bash
 clawperator operator setup \
   --apk ~/.clawperator/downloads/operator.apk \
-  --device-id <serial>
+  --device <serial>
 ```
 
 This installs the APK, grants required permissions, and verifies the handshake

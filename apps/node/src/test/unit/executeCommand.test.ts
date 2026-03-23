@@ -154,13 +154,20 @@ describe("cmdExecute --dry-run", () => {
   });
 });
 
-describe("clawperator execute CLI", () => {
+describe("clawperator exec CLI", () => {
   it("surfaces action context for invalid fixture files before device contact", async () => {
     const fixturePath = join(packageRoot, "src", "test", "fixtures", "execution-invalid-action-0.json");
-    const { stdout, code } = await runCli(["execute", "--execution", fixturePath]);
+    const { stdout, code } = await runCli(["exec", "--execution", fixturePath]);
 
     assert.notStrictEqual(code, 0);
     assert.match(stdout, /actionId/);
     assert.match(stdout, /snapshot_ui/);
+  });
+
+  it("accepts execute as a synonym for exec", async () => {
+    const fixturePath = join(packageRoot, "src", "test", "fixtures", "execution-invalid-action-0.json");
+    const { stdout, code } = await runCli(["execute", "--execution", fixturePath]);
+    assert.notStrictEqual(code, 0);
+    assert.match(stdout, /actionId/);
   });
 });

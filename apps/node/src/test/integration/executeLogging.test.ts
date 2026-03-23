@@ -8,7 +8,7 @@ import { tmpdir } from "node:os";
 
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "../../..");
 
-describe("CLI execute logging integration", () => {
+describe("CLI exec logging integration", () => {
   let tempRoot: string;
   let adbPath: string;
   let executionPath: string;
@@ -92,7 +92,7 @@ describe("CLI execute logging integration", () => {
     const cliPath = join(packageRoot, "dist", "cli", "index.js");
     const proc = spawn(process.execPath, [
       cliPath,
-      "execute",
+      "exec",
       "--execution",
       executionPath,
       "--device-id",

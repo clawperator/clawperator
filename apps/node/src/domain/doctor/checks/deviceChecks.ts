@@ -57,7 +57,7 @@ export async function checkDeviceDiscovery(config: RuntimeConfig): Promise<Docto
       status: "warn",
       code: ERROR_CODES.MULTIPLE_DEVICES_DEVICE_ID_REQUIRED,
       summary: "Multiple devices connected.",
-      detail: "Specify --device-id to target a single device.",
+      detail: "Specify --device to target a single device.",
       evidence: { devices: devices.map(d => d.serial) },
     };
   }

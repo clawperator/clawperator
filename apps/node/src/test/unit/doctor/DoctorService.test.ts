@@ -36,12 +36,12 @@ describe("DoctorService", () => {
     const apkPresence = report.checks.find(check => check.id === "readiness.apk.presence");
     assert.ok(apkPresence);
     assert.strictEqual(apkPresence.status, "fail");
-    assert.strictEqual(apkPresence.code, ERROR_CODES.RECEIVER_NOT_INSTALLED);
+    assert.strictEqual(apkPresence.code, ERROR_CODES.OPERATOR_NOT_INSTALLED);
 
     assert.ok(!report.checks.some(check => check.id === "readiness.handshake"));
     assert.deepStrictEqual(report.nextActions, [
       "If you do not already have a local debug APK copy, rebuild the debug app from the same checkout before rerunning setup.",
-      "clawperator operator setup --apk ~/.clawperator/downloads/operator-debug.apk --device-id test-device-1 --operator-package com.clawperator.operator.dev",
+      "clawperator operator setup --apk ~/.clawperator/downloads/operator-debug.apk --device test-device-1 --operator-package com.clawperator.operator.dev",
     ]);
   });
 
@@ -108,7 +108,7 @@ describe("DoctorService", () => {
     assert.ok(!report.checks.some(check => check.id === "readiness.handshake"));
   });
 
-  it("exits cleanly with warn when multiple devices are connected and no --device-id is given", async () => {
+  it("exits cleanly with warn when multiple devices are connected and no --device is given", async () => {
     // Regression: when checkDeviceDiscovery returns "warn" (not "fail") for
     // MULTIPLE_DEVICES_DEVICE_ID_REQUIRED, shouldHaltOnFailure returns false and
     // execution continues. resolveDevice then throws due to ambiguity. The catch
@@ -172,7 +172,7 @@ describe("DoctorService", () => {
     const apkPresence = report.checks.find(check => check.id === "readiness.apk.presence");
     assert.ok(apkPresence);
     assert.strictEqual(apkPresence.status, "warn");
-    assert.strictEqual(apkPresence.code, ERROR_CODES.RECEIVER_VARIANT_MISMATCH);
+    assert.strictEqual(apkPresence.code, ERROR_CODES.OPERATOR_VARIANT_MISMATCH);
     assert.ok(!report.checks.some(check => check.id === "readiness.version.compatibility"));
     assert.ok(!report.checks.some(check => check.id === "readiness.handshake"));
   });
@@ -228,7 +228,7 @@ describe("DoctorService", () => {
     assert.ok(apkPresence);
     assert.deepStrictEqual(apkPresence.fix?.steps.map(step => step.value), [
       "Download the exact release APK from https://downloads.clawperator.com/operator/v0.4.1/operator-v0.4.1.apk and the checksum from https://downloads.clawperator.com/operator/v0.4.1/operator-v0.4.1.apk.sha256.",
-      "clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id test-device-1",
+      "clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device test-device-1",
     ]);
   });
 });

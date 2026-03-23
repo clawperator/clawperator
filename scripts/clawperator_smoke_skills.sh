@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Stage 2 skills smoke for Clawperator Node API.
-# Evidence-oriented: exercises skills list/get/compile-artifact and execute path.
+# Evidence-oriented: exercises skills list/get/compile-artifact and exec path.
 # Usage: one physical device connected (or set DEVICE_ID); edit env vars if needed.
 # Optional: CLAWPERATOR_SMOKE_SUMMARY=/path/to/summary.json to write a machine-readable JSON summary.
 set -euo pipefail
@@ -60,17 +60,17 @@ echo "=== skills compile-artifact (pretty) ==="
 "${CLI[@]}" skills compile-artifact "$SKILL_ID" --artifact "$ARTIFACT_NAME" --vars "{\"CLIMATE_TILE_NAME\":\"$CLIMATE_TILE_NAME\"}" --output pretty
 
 echo "=== skills compile-artifact (json -> /tmp/clawperator-stage2-exec.json) ==="
-"${CLI[@]}" skills compile-artifact "$SKILL_ID" --artifact "$ARTIFACT_NAME" --vars "{\"CLIMATE_TILE_NAME\":\"$CLIMATE_TILE_NAME\"}" --output json \
+"${CLI[@]}" skills compile-artifact "$SKILL_ID" --artifact "$ARTIFACT_NAME" --vars "{\"CLIMATE_TILE_NAME\":\"$CLIMATE_TILE_NAME\"}" --json \
   | node -e 'const d=JSON.parse(require("fs").readFileSync(0,"utf8")); require("fs").writeFileSync("/tmp/clawperator-stage2-exec.json", JSON.stringify(d.execution));'
 
-echo "=== execute compiled execution ==="
+echo "=== exec compiled execution ==="
 if [ -n "$SMOKE_SUMMARY" ]; then
-  EXEC_JSON="$("${CLI[@]}" execute --device-id "$DEVICE_ID" --operator-package "$CLAWPERATOR_OPERATOR_PACKAGE" --execution /tmp/clawperator-stage2-exec.json --output json 2>&1)" || true
-  echo "$EXEC_JSON" | node -e 'const d=require("fs").readFileSync(0,"utf8"); try { const j=JSON.parse(d); console.log(JSON.stringify({ step: "execute", result: j.terminalSource ? "ok" : (j.code === "RESULT_ENVELOPE_TIMEOUT" ? "timeout" : "error"), terminalSource: j.terminalSource || undefined, timeoutDiagnostics: j.code === "RESULT_ENVELOPE_TIMEOUT" ? j : undefined })); } catch(e) { console.log(JSON.stringify({ step: "execute", result: "error" })); }' >> "$OUTCOMES_FILE"
+   EXEC_JSON="$("${CLI[@]}" exec --device "$DEVICE_ID" --operator-package "$CLAWPERATOR_OPERATOR_PACKAGE" --execution /tmp/clawperator-stage2-exec.json --json 2>&1)" || true
+  echo "$EXEC_JSON" | node -e 'const d=require("fs").readFileSync(0,"utf8"); try { const j=JSON.parse(d); console.log(JSON.stringify({ step: "exec", result: j.terminalSource ? "ok" : (j.code === "RESULT_ENVELOPE_TIMEOUT" ? "timeout" : "error"), terminalSource: j.terminalSource || undefined, timeoutDiagnostics: j.code === "RESULT_ENVELOPE_TIMEOUT" ? j : undefined })); } catch(e) { console.log(JSON.stringify({ step: "exec", result: "error" })); }' >> "$OUTCOMES_FILE"
   echo "$EXEC_JSON" | node -e 'console.log(JSON.stringify(JSON.parse(require("fs").readFileSync(0,"utf8")),null,2))'
   EXEC_OUT="$EXEC_JSON"
 else
-  EXEC_OUT="$("${CLI[@]}" execute --device-id "$DEVICE_ID" --operator-package "$CLAWPERATOR_OPERATOR_PACKAGE" --execution /tmp/clawperator-stage2-exec.json --output pretty 2>&1)" || true
+   EXEC_OUT="$("${CLI[@]}" exec --device "$DEVICE_ID" --operator-package "$CLAWPERATOR_OPERATOR_PACKAGE" --execution /tmp/clawperator-stage2-exec.json --output pretty 2>&1)" || true
   echo "$EXEC_OUT"
 fi
 if echo "$EXEC_OUT" | grep -q '"terminalSource"'; then

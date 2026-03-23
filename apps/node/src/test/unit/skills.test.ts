@@ -1341,9 +1341,8 @@ describe("runSkill", () => {
 
   it("CLI skills run accepts --timeout as a local timeout flag", async () => {
     // Verifies that --timeout is recognised in the command-local segment.
-    // Note: getGlobalOpts scans all argv linearly so the second --timeout (3210)
-    // overwrites the first (9000) at the global level too. Both paths resolve to
-    // 3210; this test confirms the flag is not silently dropped.
+    // Note: getGlobalOpts scans argv for globals only before the first bare `--`; the local
+    // `--timeout` (3210) wins over the global (9000) for execution budget.
     const { stdout, code } = await runCli([
       "--timeout", "9000",
       "skills", "run", "com.test.echo", "--timeout", "3210", "--output", "json", "--", "hello",
@@ -1352,6 +1351,76 @@ describe("runSkill", () => {
     const parsed = JSON.parse(stdout) as { skillId?: string; timeoutMs?: number };
     assert.strictEqual(parsed.skillId, "com.test.echo");
     assert.strictEqual(parsed.timeoutMs, 3210);
+  });
+
+  it("CLI skills run forwards flag-like tokens after -- without getGlobalOpts consuming them", async () => {
+    const { stdout, code } = await runCli([
+      "skills",
+      "run",
+      "com.test.echo",
+      "--output",
+      "json",
+      "--",
+      "--timeout",
+      "not-a-global-timeout",
+      "--device",
+      "not-a-global-device",
+    ]);
+    assert.strictEqual(code, 0, stdout);
+    const parsed = JSON.parse(stdout) as { output?: string; timeoutMs?: number | undefined };
+    assert.ok(parsed.output?.includes("TEST_OUTPUT:--timeout"));
+    assert.strictEqual(parsed.timeoutMs, undefined);
+  });
+
+  it("CLI skills run forwards --help after -- without triggering top-level help", async () => {
+    const { stdout, code } = await runCli([
+      "skills",
+      "run",
+      "com.test.echo",
+      "--output",
+      "json",
+      "--",
+      "--help",
+    ]);
+    assert.strictEqual(code, 0, stdout);
+    const parsed = JSON.parse(stdout) as { output?: string };
+    assert.ok(parsed.output?.includes("TEST_OUTPUT:--help"));
+    assert.doesNotMatch(stdout, /clawperator skills install/);
+  });
+
+  it("CLI skills run forwards --version after -- without triggering CLI version output", async () => {
+    const { stdout, code } = await runCli([
+      "skills",
+      "run",
+      "com.test.echo",
+      "--output",
+      "json",
+      "--",
+      "--version",
+    ]);
+    assert.strictEqual(code, 0, stdout);
+    const parsed = JSON.parse(stdout) as { output?: string };
+    assert.ok(parsed.output?.includes("TEST_OUTPUT:--version"));
+    assert.doesNotMatch(stdout, /^\d+\.\d+\.\d+$/m);
+  });
+
+  it("CLI skills run still applies global flags that appear before the first --", async () => {
+    const { stdout, code } = await runCli([
+      "--timeout-ms",
+      "4500",
+      "skills",
+      "run",
+      "com.test.echo",
+      "--output",
+      "json",
+      "--",
+      "--timeout",
+      "script-arg",
+    ]);
+    assert.strictEqual(code, 0, stdout);
+    const parsed = JSON.parse(stdout) as { output?: string; timeoutMs?: number };
+    assert.strictEqual(parsed.timeoutMs, 4500);
+    assert.ok(parsed.output?.includes("TEST_OUTPUT:--timeout"));
   });
 
   it("CLI skills run rejects a non-numeric local --timeout-ms", async () => {
@@ -1395,11 +1464,11 @@ describe("runSkill", () => {
     assert.strictEqual(parsed.message, "--expect-contains requires a value");
   });
 
-  it("CLI skills run returns usage when skill_id is missing even with --timeout-ms", async () => {
-    const { stdout } = await runCli(["skills", "run", "--timeout-ms", "5000", "--output", "json"]);
+  it("CLI skills run returns usage when skill_id is missing even with --timeout", async () => {
+    const { stdout } = await runCli(["skills", "run", "--timeout", "5000", "--output", "json"]);
     const parsed = JSON.parse(stdout) as { code?: string; message?: string };
     assert.strictEqual(parsed.code, "USAGE");
-    assert.ok(parsed.message?.includes("--timeout-ms"));
+    assert.ok(parsed.message?.includes("--timeout"));
   });
 
   it("CLI skills run can assert output content", async () => {

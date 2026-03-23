@@ -55,12 +55,12 @@ resolve_device_id() {
 resolve_device_id
 
 # ---------------------------------------------------------------------------
-# Helper: run a single-action execute payload and return JSON result
+# Helper: run a single-action execution payload and return JSON result
 # ---------------------------------------------------------------------------
 run_action() {
   local payload="$1"
-  "${CLI[@]}" execute \
-    --device-id "$DEVICE_ID" \
+  "${CLI[@]}" exec \
+    --device "$DEVICE_ID" \
     --operator-package "$CLAWPERATOR_OPERATOR_PACKAGE" \
     --execution "$payload" \
     --output json 2>&1

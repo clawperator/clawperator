@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Validate receiver ingress against a running Android emulator.
-# Defaults to the release receiver package and auto-selects a single emulator target.
+# Validate Operator ingress against a running Android emulator.
+# Defaults to the release Operator package and auto-selects a single emulator target.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -31,4 +31,4 @@ resolve_emulator_device_id() {
 resolve_emulator_device_id
 export CLAWPERATOR_OPERATOR_PACKAGE="${CLAWPERATOR_OPERATOR_PACKAGE:-com.clawperator.operator}"
 
-./scripts/clawperator_validate_receiver.sh
+./scripts/clawperator_validate_operator_ingress.sh

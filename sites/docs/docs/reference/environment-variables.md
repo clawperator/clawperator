@@ -42,7 +42,7 @@ Use it when:
 
 ## `CLAWPERATOR_OPERATOR_PACKAGE`
 
-Sets the default receiver package for commands that dispatch to the Android
+Sets the default Operator package for commands that dispatch to the Android
 Operator APK. Also injected into skill scripts via `CLAWPERATOR_OPERATOR_PACKAGE`
 so skills know which Operator package to target.
 
@@ -139,7 +139,7 @@ Clawperator can use environment variables to find Android host tools.
 ### `ADB_PATH`
 
 Overrides the `adb` binary path used by CLI commands such as `devices`,
-`doctor`, `execute`, and `operator setup`.
+`doctor`, `exec`, and `operator setup`.
 
 Example:
 
@@ -177,8 +177,8 @@ export CLAWPERATOR_SKILLS_REGISTRY="$HOME/.clawperator/skills/skills/skills-regi
 export CLAWPERATOR_OPERATOR_PACKAGE="com.clawperator.operator"
 ```
 
-Then override `--device-id` per command when more than one Android target is
-connected.
+Then pass `--device` per command when more than one Android target is connected
+(`--device-id` is accepted as an alias).
 
 For development with a local branch build, also set:
 

@@ -26,7 +26,7 @@ That ordering matters because the same execution can:
 
 | Failure class | Typical examples | Agent response |
 | :--- | :--- | :--- |
-| Targeting / environment | `NO_DEVICES`, `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED`, `DEVICE_UNAUTHORIZED`, `RECEIVER_NOT_INSTALLED` | Fix environment first. Do not blindly retry the same execution. |
+| Targeting / environment | `NO_DEVICES`, `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED`, `DEVICE_UNAUTHORIZED`, `OPERATOR_NOT_INSTALLED` | Fix environment first. Do not blindly retry the same execution. |
 | Payload / contract | `EXECUTION_VALIDATION_FAILED` | Fix the payload shape. Retrying unchanged is wasted work. |
 | Concurrency / timing | `EXECUTION_CONFLICT_IN_FLIGHT`, `RESULT_ENVELOPE_TIMEOUT`, `SNAPSHOT_EXTRACTION_FAILED` | Retry only after a short wait or after reducing contention. |
 | UI state / selector | `NODE_NOT_FOUND`, `CONTAINER_NOT_FOUND`, `CONTAINER_NOT_SCROLLABLE` | Re-observe the UI, then adjust selectors or navigation. |
@@ -44,7 +44,7 @@ Usually recoverable:
 - yes, but only after the environment changes
 
 Recommended next action:
-- check `clawperator devices --output json`
+- check `clawperator devices --json`
 - reconnect USB or start the emulator
 - do not retry the same execution until a device appears
 
@@ -52,15 +52,15 @@ Recommended next action:
 
 Meaning:
 - More than one reachable Android target is connected and the command did not
-  specify `--device-id`.
+  specify `--device` (alias: `--device-id`).
 
 Usually recoverable:
 - yes
 
 Recommended next action:
-- run `clawperator devices --output json`
+- run `clawperator devices --json`
 - choose one serial
-- rerun the same command with `--device-id <device_id>`
+- rerun the same command with `--device <device_id>`
 
 ### `DEVICE_UNAUTHORIZED`
 
@@ -73,19 +73,19 @@ Usually recoverable:
 Recommended next action:
 - unlock the device
 - accept the USB debugging prompt
-- rerun `clawperator doctor --device-id <device_id> --output json`
+- rerun `clawperator doctor --device <device_id> --json`
 
-### `RECEIVER_NOT_INSTALLED`
+### `OPERATOR_NOT_INSTALLED`
 
 Meaning:
 - the targeted Clawperator Operator APK package is not installed on the device
-- `doctor` and `execute` fail fast with this code instead of waiting for a runtime timeout
+- `doctor` and `exec` fail fast with this code instead of waiting for a runtime timeout
 
 Usually recoverable:
 - yes
 
 Recommended next action:
-- run `clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id <device_id>`
+- run `clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device <device_id>`
 - if using a local debug APK, also pass `--operator-package com.clawperator.operator.dev`
 
 ### `EXECUTION_VALIDATION_FAILED`
@@ -135,7 +135,7 @@ Usually recoverable:
 Recommended next action:
 - inspect whether the device is mid-transition or overloaded
 - retry with a larger `timeoutMs` only if the workflow genuinely needs it
-- if repeated, run `clawperator doctor --device-id <device_id> --output json`
+- if repeated, run `clawperator doctor --device <device_id> --json`
 
 Details that may be present:
 - `details.commandId`: the execution command id used to correlate the timeout
@@ -252,7 +252,7 @@ Usually recoverable:
 Recommended next action:
 - verify `CLAWPERATOR_SKILLS_REGISTRY`
 - confirm the registry file exists and contains valid JSON
-- rerun `clawperator skills list --output json` before retrying the workflow
+- rerun `clawperator skills list --json` before retrying the workflow
 
 ### `SKILL_EXECUTION_FAILED`
 
@@ -297,7 +297,7 @@ Usually wrong to retry unchanged:
 
 - `EXECUTION_VALIDATION_FAILED`
 - `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED`
-- `RECEIVER_NOT_INSTALLED`
+- `OPERATOR_NOT_INSTALLED`
 - `NODE_NOT_FOUND` when the agent has not re-observed the UI
 - `REGISTRY_READ_FAILED`
 - `SKILL_EXECUTION_FAILED` when the script already returned a real error signal

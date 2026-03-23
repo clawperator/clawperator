@@ -53,7 +53,7 @@ If any requirement is not met, the app shows an orange background and a dedicate
    ```bash
    clawperator grant-device-permissions
    ```
-   This uses `adb` to enable the Clawperator accessibility service on the connected device without requiring screen interaction. Add `--device-id <id>` if multiple devices are connected.
+   This uses `adb` to enable the Clawperator accessibility service on the connected device without requiring screen interaction. Add `--device <id>` if multiple devices are connected.
 
 2. On the **device** (manual alternative):
    - Open **Settings** → **Accessibility** (or **Settings** → **Apps** → **Special app access** → **Accessibility**).
@@ -68,21 +68,39 @@ If any requirement is not met, the app shows an orange background and a dedicate
 
 ## Missing Operator APK
 
-**What it means:** The requested Clawperator Operator package is not installed on the device. This is now a blocking readiness failure, so `clawperator doctor` and `clawperator execute` fail fast instead of waiting for a runtime timeout.
+**What it means:** The requested Clawperator Operator package is not installed on the device. This is now a blocking readiness failure, so `clawperator doctor` and `clawperator exec` fail fast instead of waiting for a runtime timeout.
 
 **How to fix:**
 
 1. Install the Operator APK with the canonical setup command:
    ```bash
-   clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id <device_id>
+   clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device <device_id>
    ```
 2. If you are using a local debug build, add:
    ```bash
    --operator-package com.clawperator.operator.dev
    ```
-3. Re-run `clawperator doctor --device-id <device_id>` to confirm the package is now installed.
+3. Re-run `clawperator doctor --device <device_id>` to confirm the package is now installed.
 
 **In the app:** The doctor screen no longer reaches the runtime handshake until the package is installed, so this is usually the first thing to fix when a fresh device is not ready.
+
+---
+
+## CLI and Operator APK version mismatch
+
+**What it means:** The Node CLI and the installed Operator APK are out of sync. The CLI may send execution shapes the older APK does not understand, so you see `RESULT_ENVELOPE_TIMEOUT` even though the host dispatched a broadcast successfully.
+
+**How to recognize it:** A timeout payload with `broadcastDispatchStatus: "sent"` and an empty `lastCorrelatedEvents` array often means the OS delivered the intent but the APK never produced a `[Clawperator-Result]` envelope (version skew or a stuck operator). When `lastCorrelatedEvents` has entries, the APK started handling the command and failed later (different diagnosis).
+
+**What to do first:**
+
+1. Run `clawperator doctor --device <device_id>` and read the CLI vs APK version line. If doctor reports a mismatch, rebuild and reinstall the Operator APK that matches your CLI branch.
+2. For a local debug cycle:
+   ```bash
+   ./gradlew :app:assembleDebug && ./gradlew :app:installDebug
+   clawperator grant-device-permissions --device <device_id>
+   ```
+   Re-run `grant-device-permissions` after each fresh install because Android may revoke the accessibility grant on reinstall.
 
 ---
 
@@ -155,8 +173,8 @@ If you must use **Wireless Debugging**, be aware that your mileage may vary (YMM
 
 `curl -fsSL https://clawperator.com/install.sh | bash` uses the stable metadata file at `https://downloads.clawperator.com/operator/latest.json`, downloads the immutable package for the [Clawperator Operator Android app](../getting-started/android-operator-apk.md) plus its `.sha256`, verifies the checksum, then handles device install like this:
 
-1. **One connected device** - the installer offers to run `clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id <device_id>`.
-2. **Multiple connected devices** - the installer completes host-side setup, checks each connected device, and prints one `clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id <device_id>` command for each device that still needs setup. Devices that are unauthorized or offline are reported separately so you can make them ADB-ready first.
+1. **One connected device** - the installer offers to run `clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device <device_id>`.
+2. **Multiple connected devices** - the installer completes host-side setup, checks each connected device, and prints one `clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device <device_id>` command for each device that still needs setup. Devices that are unauthorized or offline are reported separately so you can make them ADB-ready first.
 3. **No connected devices** - the installer skips the install and leaves the verified package for the [Clawperator Operator Android app](../getting-started/android-operator-apk.md) at `~/.clawperator/downloads/operator.apk`.
 4. **`adb` missing** - the installer attempts to install `adb` automatically, or stops with a manual install link if it cannot.
 
@@ -289,7 +307,7 @@ If the emulator is consistently slow, consider using a physical device instead.
 
 ### Multiple devices connected
 
-Once an emulator is provisioned, you may have both a physical device and an emulator connected at the same time. In that state, continue to pass `--device-id <serial>` to `execute`, `observe`, `action`, and `skills run` commands.
+Once an emulator is provisioned, you may have both a physical device and an emulator connected at the same time. In that state, continue to pass `--device <serial>` to `exec`, `snapshot`, and `skills run` commands.
 
 If you omit it, the CLI returns `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED`.
 
@@ -333,7 +351,7 @@ This will report any version mismatch between the CLI and the installed APK.
 2. Verify the fix by running a snapshot:
 
    ```bash
-   clawperator observe snapshot --device-id <device_serial> --output json
+   clawperator snapshot --device <device_serial> --json
    ```
 
    A working snapshot returns `data.text` containing XML starting with `<hierarchy`.
@@ -404,19 +422,19 @@ When all three are satisfied, the app shows **Ready** and a **green** background
 
 1. **Start recording** on the device:
    ```bash
-   clawperator recording start --device-id <serial>
+   clawperator recording start --device <serial>
    ```
 
 2. **Manually interact** with the device using your finger (not Clawperator commands)
 
 3. **Stop recording**:
    ```bash
-   clawperator recording stop --device-id <serial>
+   clawperator recording stop --device <serial>
    ```
 
 4. **Pull and parse**:
    ```bash
-   clawperator recording pull --device-id <serial> --session-id <id> --out ./recordings/
+   clawperator recording pull --device <serial> --session-id <id> --out ./recordings/
    clawperator recording parse --input ./recordings/<file>.ndjson
    ```
 
@@ -481,7 +499,7 @@ clawperator version --check-compat --operator-package com.clawperator.operator.d
 **Check:**
 1. Device permissions: `clawperator doctor`
 2. APK/CLI compatibility: `clawperator version --check-compat`
-3. Device selection (if multiple devices): `--device-id <serial>`
+3. Device selection (if multiple devices): `--device <serial>`
 
 **Debug the skill directly:**
 
@@ -492,7 +510,7 @@ Instead of `skills run`, test the skill's execution payload directly:
 clawperator skills compile-artifact <skill_id> --artifact main --output json
 
 # 2. Save to file and run manually
-clawperator execute --execution ./skill-execution.json --device-id <serial>
+clawperator exec --execution ./skill-execution.json --device <serial>
 ```
 
 This bypasses the skills wrapper and helps identify whether the issue is the skill logic or the skills runtime.

@@ -56,13 +56,13 @@ export function readCliVersion(pkg: CliPackageMetadata): string {
   return pkg.version;
 }
 
-interface InstalledReceiverVariantResult {
+interface InstalledOperatorVariantResult {
   installed: boolean;
   alternateVariant?: string;
   error?: ClawperatorError;
 }
 
-function buildReceiverProbeError(
+function buildOperatorProbeError(
   operatorPackage: string,
   stderr: string,
   exitCode: number | null
@@ -78,15 +78,15 @@ function buildReceiverProbeError(
   };
 }
 
-async function getInstalledReceiverVariant(
+async function getInstalledOperatorVariant(
   config: RuntimeConfig,
   operatorPackage: string
-): Promise<InstalledReceiverVariantResult> {
+): Promise<InstalledOperatorVariantResult> {
   const packageList = await runAdb(config, ["shell", "pm", "list", "packages", operatorPackage]);
   if (packageList.code !== 0) {
     return {
       installed: false,
-      error: buildReceiverProbeError(operatorPackage, packageList.stderr, packageList.code),
+      error: buildOperatorProbeError(operatorPackage, packageList.stderr, packageList.code),
     };
   }
   if (hasListedPackage(packageList.stdout, operatorPackage)) {
@@ -98,7 +98,7 @@ async function getInstalledReceiverVariant(
   if (alternateList.code !== 0) {
     return {
       installed: false,
-      error: buildReceiverProbeError(alternateVariant, alternateList.stderr, alternateList.code),
+      error: buildOperatorProbeError(alternateVariant, alternateList.stderr, alternateList.code),
     };
   }
   if (hasListedPackage(alternateList.stdout, alternateVariant)) {
@@ -205,13 +205,13 @@ export async function probeVersionCompatibility(config: RuntimeConfig): Promise<
     };
   }
 
-  const receiverVariant = await getInstalledReceiverVariant(config, operatorPackage);
-  if (receiverVariant.error) {
+  const operatorVariant = await getInstalledOperatorVariant(config, operatorPackage);
+  if (operatorVariant.error) {
     return {
       cliVersion,
       operatorPackage,
       compatible: false,
-      error: receiverVariant.error,
+      error: operatorVariant.error,
       remediation: [
         "Verify adb shell access with: adb shell pm list packages",
         "Reconnect the device or restart adb if shell commands are failing",
@@ -219,19 +219,19 @@ export async function probeVersionCompatibility(config: RuntimeConfig): Promise<
     };
   }
 
-  if (!receiverVariant.installed) {
-    if (receiverVariant.alternateVariant) {
+  if (!operatorVariant.installed) {
+    if (operatorVariant.alternateVariant) {
       return {
         cliVersion,
         operatorPackage,
         compatible: false,
         error: {
-          code: ERROR_CODES.RECEIVER_VARIANT_MISMATCH,
-          message: `Expected ${operatorPackage} but found installed variant ${receiverVariant.alternateVariant}.`,
-          hint: "Use the installed receiver package or reinstall the correct APK variant.",
+          code: ERROR_CODES.OPERATOR_VARIANT_MISMATCH,
+          message: `Expected ${operatorPackage} but found installed variant ${operatorVariant.alternateVariant}.`,
+          hint: "Use the installed Operator package or reinstall the correct APK variant.",
         },
         remediation: [
-          `Use --operator-package ${receiverVariant.alternateVariant}`,
+          `Use --operator-package ${operatorVariant.alternateVariant}`,
           `Reinstall the correct APK variant for ${operatorPackage}`,
         ],
       };
@@ -242,15 +242,15 @@ export async function probeVersionCompatibility(config: RuntimeConfig): Promise<
       operatorPackage,
       compatible: false,
       error: {
-        code: ERROR_CODES.RECEIVER_NOT_INSTALLED,
+        code: ERROR_CODES.OPERATOR_NOT_INSTALLED,
         message: `Package ${operatorPackage} is not installed on the device.`,
-        hint: "Install the Operator APK or choose the correct receiver package.",
+        hint: "Install the Operator APK or choose the correct Operator package.",
       },
       remediation: [
         `Download the matching APK: ${getOperatorApkDownloadUrl(parsedCli.normalized)}`,
         `Download the checksum: ${getOperatorApkSha256Url(parsedCli.normalized)}`,
         `Verify the checksum: sha256sum -c operator-v${parsedCli.normalized}.apk.sha256`,
-        `Install the matching APK: clawperator operator setup --apk operator-v${parsedCli.normalized}.apk --device-id <device_id>${operatorPackage.endsWith(".dev") ? " --operator-package com.clawperator.operator.dev" : ""}`,
+        `Install the matching APK: clawperator operator setup --apk operator-v${parsedCli.normalized}.apk --device <device_id>${operatorPackage.endsWith(".dev") ? " --operator-package com.clawperator.operator.dev" : ""}`,
         operatorPackage.endsWith(".dev")
           ? "If you are targeting the local debug package, rebuild and reinstall the debug APK from the same source checkout instead of using the release download."
           : "If you are using the release package, the versioned download above is the exact APK to install.",
@@ -323,7 +323,7 @@ export async function probeVersionCompatibility(config: RuntimeConfig): Promise<
           `Download the matching APK: ${apkUrl}`,
           `Download the checksum: ${sha256Url}`,
           `Verify the checksum: sha256sum -c operator-v${parsedCli.normalized}.apk.sha256`,
-          `Install the matching APK: clawperator operator setup --apk operator-v${parsedCli.normalized}.apk --device-id <device_id>`,
+          `Install the matching APK: clawperator operator setup --apk operator-v${parsedCli.normalized}.apk --device <device_id>`,
           operatorPackage.endsWith(".dev")
             ? "If you are targeting the local debug package, rebuild and reinstall the debug APK from the same source checkout instead of using the release download."
             : "If you are using the release package, the versioned download above is the exact APK to install.",

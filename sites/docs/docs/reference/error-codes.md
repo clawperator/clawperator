@@ -30,9 +30,9 @@ The `code` field is always one of the string constants listed below.
 |------|-------------|
 | `ADB_NOT_FOUND` | `adb` binary not found on the host |
 | `NO_DEVICES` | No Android devices are connected |
-| `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED` | Multiple devices connected but no `--device-id` specified |
-| `RECEIVER_NOT_INSTALLED` | The Clawperator Operator APK is not installed on the device |
-| `DEVICE_NOT_FOUND` | The specified `--device-id` is not among connected devices |
+| `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED` | Multiple devices connected but no `--device` specified (alias: `--device-id`) |
+| `OPERATOR_NOT_INSTALLED` | The Clawperator Operator APK is not installed on the device |
+| `DEVICE_NOT_FOUND` | The specified `--device` is not among connected devices (alias: `--device-id`) |
 
 ---
 
@@ -74,7 +74,7 @@ These codes are produced by `clawperator doctor` and related checks.
 | `DEVICE_UNAUTHORIZED` | Device is connected but has not authorized this host for ADB |
 | `DEVICE_OFFLINE` | Device is listed by ADB but is offline |
 | `DEVICE_SHELL_UNAVAILABLE` | ADB shell is not available on the device |
-| `RECEIVER_VARIANT_MISMATCH` | The installed APK variant (debug/release) does not match the expected variant |
+| `OPERATOR_VARIANT_MISMATCH` | The installed APK variant (debug/release) does not match the expected variant |
 | `DEVICE_DEV_OPTIONS_DISABLED` | Developer options are not enabled on the device |
 | `DEVICE_USB_DEBUGGING_DISABLED` | USB debugging is not enabled on the device |
 | `DEVICE_ACCESSIBILITY_NOT_RUNNING` | The Clawperator accessibility service is not running |
@@ -116,11 +116,22 @@ These codes are produced by `clawperator operator setup` (or the `operator insta
 
 ---
 
+## CLI Validation
+
+These codes are returned by the flat CLI commands when required arguments are missing.
+
+| Code | Description |
+|------|-------------|
+| `MISSING_SELECTOR` | `click`, `type`, `read`, or `wait` was called without `--selector` |
+| `MISSING_ARGUMENT` | A required positional argument was omitted (`open`, `type`, `press`, or `scroll`) |
+
+---
+
 ## Internal / Other
 
 | Code | Description |
 |------|-------------|
-| `BROADCAST_FAILED` | ADB broadcast to the receiver package failed |
+| `BROADCAST_FAILED` | ADB broadcast to the Operator package failed |
 | `PAYLOAD_TOO_LARGE` | Execution payload exceeds the 64,000 byte limit |
 | `DOCTOR_FAILED` | Doctor check runner encountered an unexpected error |
 
@@ -168,11 +179,11 @@ Returned when `RESULT_ENVELOPE_TIMEOUT` occurs.
 
 ### BroadcastDiagnostics
 
-Returned when `BROADCAST_FAILED` or `RECEIVER_NOT_INSTALLED` occurs.
+Returned when `BROADCAST_FAILED` or `OPERATOR_NOT_INSTALLED` occurs.
 
 ```ts
 {
-  code: "BROADCAST_FAILED" | "RECEIVER_NOT_INSTALLED";
+  code: "BROADCAST_FAILED" | "OPERATOR_NOT_INSTALLED";
   message: string;
   lastCorrelatedEvents?: string[];
   broadcastDispatchStatus?: string;

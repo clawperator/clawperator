@@ -151,8 +151,8 @@ export class DoctorService {
       nextActions.push("Docs: https://docs.clawperator.com/getting-started/first-time-setup/");
       nextActions.push(
         config.deviceId
-          ? `Try: clawperator observe snapshot --device-id ${config.deviceId}`
-          : "Try: clawperator observe snapshot --device-id <device_id>"
+          ? `Try: clawperator snapshot --device ${config.deviceId}`
+          : "Try: clawperator snapshot --device <device_id>"
       );
     }
 

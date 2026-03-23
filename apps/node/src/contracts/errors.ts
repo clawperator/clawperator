@@ -9,8 +9,10 @@ export const ERROR_CODES = {
   // Setup & Connectivity
   ADB_NOT_FOUND: "ADB_NOT_FOUND",
   NO_DEVICES: "NO_DEVICES",
+  /** Recovery: pass `--device` (alias `--device-id`) when adb shows multiple targets. */
   MULTIPLE_DEVICES_DEVICE_ID_REQUIRED: "MULTIPLE_DEVICES_DEVICE_ID_REQUIRED",
-  RECEIVER_NOT_INSTALLED: "RECEIVER_NOT_INSTALLED",
+  OPERATOR_NOT_INSTALLED: "OPERATOR_NOT_INSTALLED",
+  /** Recovery: the `--device` serial is not connected (alias `--device-id`). */
   DEVICE_NOT_FOUND: "DEVICE_NOT_FOUND", // Specific device ID provided but not connected
 
   // Execution & State
@@ -36,7 +38,8 @@ export const ERROR_CODES = {
   DEVICE_UNAUTHORIZED: "DEVICE_UNAUTHORIZED",
   DEVICE_OFFLINE: "DEVICE_OFFLINE",
   DEVICE_SHELL_UNAVAILABLE: "DEVICE_SHELL_UNAVAILABLE",
-  RECEIVER_VARIANT_MISMATCH: "RECEIVER_VARIANT_MISMATCH",
+  /** Installed release/debug Operator APK variant does not match `--operator-package`. */
+  OPERATOR_VARIANT_MISMATCH: "OPERATOR_VARIANT_MISMATCH",
   DEVICE_DEV_OPTIONS_DISABLED: "DEVICE_DEV_OPTIONS_DISABLED",
   DEVICE_USB_DEBUGGING_DISABLED: "DEVICE_USB_DEBUGGING_DISABLED",
   DEVICE_ACCESSIBILITY_NOT_RUNNING: "DEVICE_ACCESSIBILITY_NOT_RUNNING",
@@ -78,6 +81,7 @@ export const ERROR_CODES = {
   RECORDING_SCHEMA_VERSION_UNSUPPORTED: "RECORDING_SCHEMA_VERSION_UNSUPPORTED",
 
   // Internal / Other
+  /** ADB broadcast dispatch to the Operator package failed. */
   BROADCAST_FAILED: "BROADCAST_FAILED",
   PAYLOAD_TOO_LARGE: "PAYLOAD_TOO_LARGE",
   DOCTOR_FAILED: "DOCTOR_FAILED",
@@ -103,7 +107,7 @@ export interface TimeoutDiagnostics {
 }
 
 export interface BroadcastDiagnostics {
-  code: typeof ERROR_CODES.BROADCAST_FAILED | typeof ERROR_CODES.RECEIVER_NOT_INSTALLED;
+  code: typeof ERROR_CODES.BROADCAST_FAILED | typeof ERROR_CODES.OPERATOR_NOT_INSTALLED;
   message: string;
   lastCorrelatedEvents?: string[];
   broadcastDispatchStatus?: string;

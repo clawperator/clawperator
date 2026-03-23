@@ -53,7 +53,7 @@ export async function checkApkPresence(config: RuntimeConfig): Promise<DoctorChe
       return {
         id: "readiness.apk.presence",
         status: "warn",
-        code: ERROR_CODES.RECEIVER_VARIANT_MISMATCH,
+        code: ERROR_CODES.OPERATOR_VARIANT_MISMATCH,
         summary: `Wrong Operator variant installed.`,
         detail: `Expected ${config.operatorPackage} but found ${otherVariant}.`,
         fix: {
@@ -70,7 +70,7 @@ export async function checkApkPresence(config: RuntimeConfig): Promise<DoctorChe
     return {
       id: "readiness.apk.presence",
       status: "fail",
-      code: ERROR_CODES.RECEIVER_NOT_INSTALLED,
+      code: ERROR_CODES.OPERATOR_NOT_INSTALLED,
       summary: "Operator APK not installed.",
       detail: `Package ${config.operatorPackage} was not found on the device.`,
       evidence: {
@@ -89,7 +89,7 @@ export async function checkApkPresence(config: RuntimeConfig): Promise<DoctorChe
               },
           {
             kind: "shell",
-            value: `clawperator operator setup --apk ${getOperatorPackageApkPath(config.operatorPackage)} --device-id ${config.deviceId}${config.operatorPackage !== "com.clawperator.operator" ? ` --operator-package ${config.operatorPackage}` : ""}`,
+            value: `clawperator operator setup --apk ${getOperatorPackageApkPath(config.operatorPackage)} --device ${config.deviceId}${config.operatorPackage !== "com.clawperator.operator" ? ` --operator-package ${config.operatorPackage}` : ""}`,
           },
         ],
       },
@@ -208,7 +208,7 @@ export async function runHandshake(
         detail: "Node successfully dispatched a command and received a valid result envelope.",
       };
     } else {
-      const deviceFlag = config.deviceId ? ` --device-id ${config.deviceId}` : "";
+      const deviceFlag = config.deviceId ? ` --device ${config.deviceId}` : "";
       const pkgFlag = config.operatorPackage ? ` --operator-package ${config.operatorPackage}` : "";
       return {
         id: "readiness.handshake",
@@ -232,7 +232,7 @@ export async function runHandshake(
   }
 
   if ("timeout" in result && result.timeout) {
-    const deviceFlag = config.deviceId ? ` --device-id ${config.deviceId}` : "";
+    const deviceFlag = config.deviceId ? ` --device ${config.deviceId}` : "";
     const pkgFlag = config.operatorPackage ? ` --operator-package ${config.operatorPackage}` : "";
     const timeoutMessage = [
       `No [Clawperator-Result] envelope received within 7000ms.`,
@@ -254,7 +254,7 @@ export async function runHandshake(
         platform: "any",
         steps: [
           { kind: "shell", value: `clawperator grant-device-permissions${deviceFlag}${pkgFlag}` },
-          { kind: "shell", value: `clawperator observe snapshot${deviceFlag}${pkgFlag} --timeout-ms 5000 --verbose` },
+          { kind: "shell", value: `clawperator snapshot${deviceFlag}${pkgFlag} --timeout 5000 --verbose` },
         ],
       },
       deviceGuidance: {

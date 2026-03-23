@@ -112,26 +112,36 @@ describe("CLI help", () => {
     assert.match(obj.message, /operator setup/);
   });
 
-  it("shows observe snapshot help instead of top-level help", async () => {
+  it("legacy nested `observe snapshot --help` falls back to top-level help", async () => {
+    // Nested observe is removed; --help with an unknown command falls back to top-level help.
     const { stdout, code } = await runCli(["observe", "snapshot", "--help"]);
     assert.strictEqual(code, 0);
-    assert.match(stdout, /clawperator observe snapshot/);
-    assert.match(stdout, /--timeout-ms <number>/);
-    assert.doesNotMatch(stdout, /skills compile-artifact/);
+    assert.match(stdout, /Clawperator CLI/);
+    assert.match(stdout, /Commands:/);
   });
 
-  it("shows observe screenshot help with path option", async () => {
+  it("legacy nested `observe screenshot --help` falls back to top-level help", async () => {
+    // Nested observe is removed; --help with an unknown command falls back to top-level help.
     const { stdout, code } = await runCli(["observe", "screenshot", "--help"]);
     assert.strictEqual(code, 0);
-    assert.match(stdout, /clawperator observe screenshot/);
-    assert.match(stdout, /--path <file>/);
-    assert.doesNotMatch(stdout, /skills compile-artifact/);
+    assert.match(stdout, /Clawperator CLI/);
+    assert.match(stdout, /Commands:/);
   });
 
-  it("shows validate-only in top-level execute help", async () => {
+  it("shows validate-only in top-level exec help", async () => {
     const { stdout, code } = await runCli(["--help"]);
     assert.strictEqual(code, 0);
-    assert.match(stdout, /execute --execution <json-or-file> \[--validate-only\]/);
+    assert.match(stdout, /exec --execution <json-or-file> \[--validate-only\]/);
+  });
+
+  it("exec best-effort points at flat `snapshot`, not nested `observe snapshot` (exit 0)", async () => {
+    const { stdout, code } = await runCli(["exec", "best-effort", "--goal", "test-goal"]);
+    assert.strictEqual(code, 0, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string; goal?: string };
+    assert.strictEqual(obj.code, "NOT_IMPLEMENTED");
+    assert.strictEqual(obj.goal, "test-goal");
+    assert.match(obj.message ?? "", /snapshot/);
+    assert.doesNotMatch(obj.message ?? "", /observe snapshot/);
   });
 
   it("shows skills sync help instead of top-level help", async () => {
@@ -165,22 +175,23 @@ describe("CLI help", () => {
     const { stdout, code } = await runCli(["skills", "run", "--help"]);
     assert.strictEqual(code, 0);
     assert.match(stdout, /clawperator skills run/);
-    assert.match(stdout, /--timeout-ms <n>/);
+    assert.match(stdout, /--timeout <ms>/);
     assert.match(stdout, /--expect-contains <text>/);
     assert.match(stdout, /SKILL_OUTPUT_ASSERTION_FAILED/);
     assert.doesNotMatch(stdout, /action open-app/);
   });
 
-  it("shows inspect ui help instead of top-level help", async () => {
+  it("inspect ui --help falls back to top-level help", async () => {
+    // inspect ui is removed; --help with an unknown command falls back to top-level help.
     const { stdout, code } = await runCli(["inspect", "ui", "--help"]);
     assert.strictEqual(code, 0);
-    assert.match(stdout, /clawperator observe snapshot/);
-    assert.match(stdout, /--timeout-ms <number>/);
-    assert.doesNotMatch(stdout, /skills compile-artifact/);
+    assert.match(stdout, /Clawperator CLI/);
+    assert.match(stdout, /Commands:/);
   });
 
-  it("forwards timeout parsing through inspect ui", async () => {
-    const { stdout, code } = await runCli(["inspect", "ui", "--timeout-ms", "nope"]);
+  it("forwards invalid timeout to EXECUTION_VALIDATION_FAILED", async () => {
+    // skills run validates the effective timeout before attempting device dispatch.
+    const { stdout, code } = await runCli(["skills", "run", "some-skill", "--timeout", "nope"]);
     assert.notStrictEqual(code, 0);
     assert.match(stdout, /EXECUTION_VALIDATION_FAILED/);
     assert.match(stdout, /timeoutMs must be a finite number/);
@@ -194,17 +205,33 @@ describe("CLI help", () => {
   });
 
   it("accepts --format as an alias for --output", async () => {
-    const jsonResult = await runCli(["inspect", "ui", "--timeout-ms", "nope", "--format", "json"]);
+    // --format is a global alias for --output; validated via timeout error through skills run.
+    const jsonResult = await runCli(["skills", "run", "some-skill", "--timeout", "nope", "--format", "json"]);
     assert.notStrictEqual(jsonResult.code, 0);
     const json = JSON.parse(jsonResult.stdout);
     assert.strictEqual(json.code, "EXECUTION_VALIDATION_FAILED");
     assert.strictEqual(json.message, "timeoutMs must be a finite number");
 
-    const prettyResult = await runCli(["inspect", "ui", "--timeout-ms", "nope", "--format", "pretty"]);
+    const prettyResult = await runCli(["skills", "run", "some-skill", "--timeout", "nope", "--format", "pretty"]);
     assert.notStrictEqual(prettyResult.code, 0);
     const pretty = JSON.parse(prettyResult.stdout);
     assert.strictEqual(pretty.code, "EXECUTION_VALIDATION_FAILED");
     assert.strictEqual(pretty.message, "timeoutMs must be a finite number");
+  });
+
+  it("lists --json under Global options in top-level help", async () => {
+    const { stdout, code } = await runCli(["--help"]);
+    assert.strictEqual(code, 0);
+    const globalIdx = stdout.indexOf("Global options:\n");
+    assert.notStrictEqual(globalIdx, -1, "expected Global options section");
+    const notesIdx = stdout.indexOf("\n\nNotes:", globalIdx);
+    const globalBlock =
+      notesIdx === -1 ? stdout.slice(globalIdx) : stdout.slice(globalIdx, notesIdx);
+    assert.match(
+      globalBlock,
+      /\n  --json\s+/,
+      "expected --json as an indented global option line",
+    );
   });
 
   it("shows recording as canonical command in top-level help", async () => {
@@ -330,11 +357,189 @@ describe("operator setup CLI output", () => {
     assert.strictEqual(obj.code, "OPERATOR_APK_NOT_FOUND");
   });
 
-  it("observe screenshot returns USAGE when --path is missing a value", async () => {
+  it("nested `observe screenshot` returns UNKNOWN_COMMAND redirect to `screenshot`", async () => {
+    // Nested observe is removed; any invocation (including with flags) gets the migration message.
     const { stdout, code } = await runCli(["observe", "screenshot", "--path"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string; suggestion?: string };
+    assert.strictEqual(obj.code, "UNKNOWN_COMMAND");
+    assert.match(obj.message ?? "", /'observe screenshot' has been removed/);
+    assert.strictEqual(obj.suggestion, "screenshot");
+  });
+
+  it("nested `action click` returns UNKNOWN_COMMAND redirect to `click`", async () => {
+    const { stdout, code } = await runCli(["action", "click", "--selector"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string; suggestion?: string };
+    assert.strictEqual(obj.code, "UNKNOWN_COMMAND");
+    assert.match(obj.message ?? "", /'action click' has been removed/);
+    assert.match(obj.message ?? "", /Use 'click' instead/);
+    assert.strictEqual(obj.suggestion, "click");
+  });
+});
+
+describe("promoted flat commands - help and missing-arg errors", () => {
+  it("snapshot --help shows snapshot help", async () => {
+    const { stdout, code } = await runCli(["snapshot", "--help"]);
+    assert.strictEqual(code, 0);
+    assert.match(stdout, /clawperator snapshot/);
+    assert.match(stdout, /--timeout <ms>/);
+  });
+
+  it("screenshot --help shows screenshot help", async () => {
+    const { stdout, code } = await runCli(["screenshot", "--help"]);
+    assert.strictEqual(code, 0);
+    assert.match(stdout, /clawperator screenshot/);
+    assert.match(stdout, /--path <file>/);
+  });
+
+  it("click --help shows click help", async () => {
+    const { stdout, code } = await runCli(["click", "--help"]);
+    assert.strictEqual(code, 0);
+    assert.match(stdout, /clawperator click/);
+    assert.match(stdout, /--selector/);
+  });
+
+  it("click with no selector returns MISSING_SELECTOR with exit code 1", async () => {
+    const { stdout, code } = await runCli(["click"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "MISSING_SELECTOR");
+    assert.match(obj.message ?? "", /click requires a selector/);
+  });
+
+  it("open --help shows open help", async () => {
+    const { stdout, code } = await runCli(["open", "--help"]);
+    assert.strictEqual(code, 0);
+    assert.match(stdout, /clawperator open/);
+    assert.match(stdout, /package-id/);
+  });
+
+  it("open with no target returns MISSING_ARGUMENT with exit code 1", async () => {
+    const { stdout, code } = await runCli(["open"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "MISSING_ARGUMENT");
+    assert.match(obj.message ?? "", /open requires a target/);
+    assert.match(obj.message ?? "", /com.android.settings/);
+    assert.match(obj.message ?? "", /https:\/\/example.com/);
+  });
+
+  it("press --help shows press help", async () => {
+    const { stdout, code } = await runCli(["press", "--help"]);
+    assert.strictEqual(code, 0);
+    assert.match(stdout, /clawperator press/);
+    assert.match(stdout, /back/);
+  });
+
+  it("press with no key returns MISSING_ARGUMENT with exit code 1", async () => {
+    const { stdout, code } = await runCli(["press"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "MISSING_ARGUMENT");
+    assert.match(obj.message ?? "", /press requires a key/);
+    assert.match(obj.message ?? "", /back/);
+  });
+
+  it("scroll --help shows scroll help", async () => {
+    const { stdout, code } = await runCli(["scroll", "--help"]);
+    assert.strictEqual(code, 0);
+    assert.match(stdout, /clawperator scroll/);
+    assert.match(stdout, /down/);
+  });
+
+  it("scroll with no direction returns MISSING_ARGUMENT with exit code 1", async () => {
+    const { stdout, code } = await runCli(["scroll"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "MISSING_ARGUMENT");
+    assert.match(obj.message ?? "", /scroll requires a direction/);
+  });
+
+  it("scroll with invalid direction returns MISSING_ARGUMENT with exit code 1", async () => {
+    const { stdout, code } = await runCli(["scroll", "sideways"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "MISSING_ARGUMENT");
+    assert.match(obj.message ?? "", /scroll requires a direction/);
+  });
+
+  it("type with no selector returns MISSING_SELECTOR with exit code 1", async () => {
+    const { stdout, code } = await runCli(["type", "hello"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "MISSING_SELECTOR");
+    assert.match(obj.message ?? "", /type requires a selector/);
+  });
+
+  it("read with no selector returns MISSING_SELECTOR with exit code 1", async () => {
+    const { stdout, code } = await runCli(["read"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "MISSING_SELECTOR");
+    assert.match(obj.message ?? "", /read requires a selector/);
+  });
+
+  it("wait with no selector returns MISSING_SELECTOR with exit code 1", async () => {
+    const { stdout, code } = await runCli(["wait"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "MISSING_SELECTOR");
+    assert.match(obj.message ?? "", /wait requires a selector/);
+  });
+
+  it("screenshot --path with missing value returns USAGE with exit code 1", async () => {
+    const { stdout, code } = await runCli(["screenshot", "--path"]);
     assert.strictEqual(code, 1, stdout);
     const obj = JSON.parse(stdout) as { code?: string; message?: string };
     assert.strictEqual(obj.code, "USAGE");
     assert.strictEqual(obj.message, "--path requires a value");
+  });
+
+  it("tap synonym dispatches to click handler (missing selector returns MISSING_SELECTOR)", async () => {
+    const { stdout, code } = await runCli(["tap"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "MISSING_SELECTOR");
+    assert.match(obj.message ?? "", /click requires a selector/);
+  });
+
+  it("type rejects positional text together with --text (exit 1)", async () => {
+    const { stdout, code } = await runCli([
+      "type",
+      "hello",
+      "--text",
+      "world",
+      "--selector",
+      "{}",
+    ]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "EXECUTION_VALIDATION_FAILED");
+    assert.match(obj.message ?? "", /not both/);
+  });
+
+  it("press rejects positional key together with --key (exit 1)", async () => {
+    const { stdout, code } = await runCli(["press", "back", "--key", "home"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "EXECUTION_VALIDATION_FAILED");
+    assert.match(obj.message ?? "", /not both/);
+  });
+
+  it("scroll rejects positional direction together with --direction (exit 1)", async () => {
+    const { stdout, code } = await runCli(["scroll", "down", "--direction", "up"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "EXECUTION_VALIDATION_FAILED");
+    assert.match(obj.message ?? "", /not both/);
+  });
+
+  it("open rejects positional target together with --app (exit 1)", async () => {
+    const { stdout, code } = await runCli(["open", "com.android.settings", "--app", "com.example.foo"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "EXECUTION_VALIDATION_FAILED");
+    assert.match(obj.message ?? "", /not both/);
   });
 });

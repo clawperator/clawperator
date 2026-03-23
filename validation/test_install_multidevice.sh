@@ -51,11 +51,11 @@ EOF
             chmod +x "$mock_dir/adb"
             cat > "$mock_dir/clawperator" <<'EOF'
 #!/usr/bin/env bash
-if [ "$1" = doctor ] && [ "$2" = --device-id ] && [ "$3" = serial-ready ]; then
+if [ "$1" = doctor ] && [ "$2" = --device ] && [ "$3" = serial-ready ]; then
     exit 0
 fi
 
-if [ "$1" = doctor ] && [ "$2" = --device-id ] && [ "$3" = serial-bad ]; then
+if [ "$1" = doctor ] && [ "$2" = --device ] && [ "$3" = serial-bad ]; then
     exit 1
 fi
 
@@ -74,7 +74,7 @@ EOF
             chmod +x "$mock_dir/adb"
             cat > "$mock_dir/clawperator" <<'EOF'
 #!/usr/bin/env bash
-if [ "$1" = doctor ] && [ "$2" = --device-id ]; then
+if [ "$1" = doctor ] && [ "$2" = --device ]; then
     exit 0
 fi
 

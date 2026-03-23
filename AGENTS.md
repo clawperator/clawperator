@@ -180,10 +180,10 @@ When multiple devices are connected (physical + emulator), be explicit about whi
    about the release build. This reduces false negatives caused by a stale release APK
    or a mismatched global CLI install.
 
-4. **Always use `--device-id` when multiple devices are connected:**
+4. **Always use `--device` when multiple devices are connected** (accepted alias: `--device-id`):
    ```bash
-   clawperator observe snapshot --device-id <device_serial>
-   clawperator skills run <skill_id> --device-id <device_serial>
+   clawperator snapshot --device <device_serial>
+   clawperator skills run <skill_id> --device <device_serial>
    ```
 
 5. **Do not assume device availability:** The presence of `emulator-5554` does not mean a physical device is unavailable. Check `clawperator devices` output and explicitly select the appropriate device for the test scenario.
@@ -199,7 +199,7 @@ When multiple devices are connected (physical + emulator), be explicit about whi
 ## Validation Commands
 - From the repo root, the Android Gradle app module tasks are typically invoked as `app:*` tasks such as `./gradlew app:assembleDebug`, `./gradlew app:testDebugUnitTest`, and `./gradlew app:installDebug`. Prefer the working task names already used in this file over guessing deeper module paths from the directory layout.
 - Permissions/bootstrap: `./scripts/clawperator_grant_android_permissions.sh`
-- Receiver ingress check: `./scripts/clawperator_validate_receiver.sh`
+- Operator ingress check: `./scripts/clawperator_validate_operator_ingress.sh`
 - Core smoke: `./scripts/clawperator_smoke_core.sh`
 - Skills smoke: `./scripts/clawperator_smoke_skills.sh`
 - Canonical integration check (opt-in): `CLAWPERATOR_RUN_INTEGRATION=1 ./scripts/clawperator_integration_canonical.sh`

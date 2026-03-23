@@ -11,6 +11,7 @@ import {
   resolveHelpFromRegistry,
   type HandlerContext,
 } from "./registry.js";
+import { shouldCliStdoutForceExitCode1 } from "./stdoutExitCode.js";
 
 function getGlobalOpts(argv: string[]): {
   deviceId?: string;
@@ -29,7 +30,12 @@ function getGlobalOpts(argv: string[]): {
   let output: "json" | "pretty" = "json";
   let verbose = false;
   for (let i = 0; i < argv.length; i++) {
-    if (argv[i] === "--device-id" && argv[i + 1]) {
+    if (argv[i] === "--") {
+      // Stop scanning for global flags. Push `--` and all remaining tokens to `rest` verbatim so
+      // callers like `skills run` can forward them to subprocess scripts.
+      rest.push(...argv.slice(i));
+      break;
+    } else if (argv[i] === "--device-id" && argv[i + 1]) {
       deviceId = argv[++i];
     } else if (argv[i] === "--device" && argv[i + 1]) {
       // --device is the new canonical for --device-id (old name still works)
@@ -84,13 +90,20 @@ function getGlobalOpts(argv: string[]): {
   return { deviceId, operatorPackage, timeoutMs, logLevel, output, verbose, rest };
 }
 
+/** Tokens after the first `--` are forwarded verbatim (e.g. to skill scripts); exclude them from global meta-flag detection. */
+function argvPrefixBeforeForwardSeparator(argv: string[]): string[] {
+  const sep = argv.indexOf("--");
+  return sep === -1 ? argv : argv.slice(0, sep);
+}
+
 async function main(): Promise<void> {
   const argv = process.argv.slice(2);
   if (argv.length === 0 || argv[0] === "help") {
     console.log(generateTopLevelHelp(COMMANDS));
     process.exit(0);
   }
-  if (argv.includes("--version")) {
+  const argvForGlobalMeta = argvPrefixBeforeForwardSeparator(argv);
+  if (argvForGlobalMeta.includes("--version")) {
     const pkg = require("../../package.json") as { version?: string };
     console.log(pkg.version ?? "0.1.0");
     process.exit(0);
@@ -106,7 +119,7 @@ async function main(): Promise<void> {
     }
     throw error;
   }
-  if (argv.includes("--help")) {
+  if (argvForGlobalMeta.includes("--help")) {
     console.log(resolveHelpFromRegistry(global.rest, COMMANDS));
     process.exit(0);
   }
@@ -149,7 +162,7 @@ async function main(): Promise<void> {
           result = handlerResult;
         }
       } else {
-        result = didYouMean(cmd, COMMANDS);
+        result = didYouMean(cmd, rest, COMMANDS);
       }
     }
   } catch (error) {
@@ -164,22 +177,8 @@ async function main(): Promise<void> {
   if (result !== undefined) {
     console.log(result);
   }
-  if (typeof result === "string") {
-    if (usageParseError) {
-      process.exitCode = 1;
-      return;
-    }
-    // TODO(Phase 2): exit-code heuristic is fragile - see plan.md "Carried-forward debt"
-    if (result.startsWith("{") && result.includes('"code"') && !result.includes('"envelope"')) {
-      try {
-        const obj = JSON.parse(result) as { code?: string };
-        if (obj.code && obj.code !== "USAGE" && obj.code !== "NOT_IMPLEMENTED") {
-          process.exitCode = 1;
-        }
-      } catch {
-        // Malformed JSON that passed the string heuristic - treat as non-error.
-      }
-    }
+  if (typeof result === "string" && shouldCliStdoutForceExitCode1(result, usageParseError)) {
+    process.exitCode = 1;
   }
 }
 

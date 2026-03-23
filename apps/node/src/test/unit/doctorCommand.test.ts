@@ -27,11 +27,11 @@ describe("cmdDoctor", () => {
               {
                 id: "readiness.apk.presence",
                 status: "fail",
-                code: ERROR_CODES.RECEIVER_NOT_INSTALLED,
+                code: ERROR_CODES.OPERATOR_NOT_INSTALLED,
                 summary: "Operator APK not installed.",
               },
             ],
-            nextActions: ["clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id test-device-1"],
+            nextActions: ["clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device test-device-1"],
           }),
         },
       }
@@ -39,7 +39,7 @@ describe("cmdDoctor", () => {
 
     const parsed = JSON.parse(output);
     assert.strictEqual(parsed.criticalOk, false);
-    assert.strictEqual(parsed.checks[0].code, ERROR_CODES.RECEIVER_NOT_INSTALLED);
+    assert.strictEqual(parsed.checks[0].code, ERROR_CODES.OPERATOR_NOT_INSTALLED);
     assert.strictEqual(process.exitCode, 0);
   });
 
@@ -61,7 +61,7 @@ describe("cmdDoctor", () => {
               {
                 id: "readiness.apk.presence",
                 status: "fail",
-                code: ERROR_CODES.RECEIVER_NOT_INSTALLED,
+                code: ERROR_CODES.OPERATOR_NOT_INSTALLED,
                 summary: "Operator APK not installed.",
               },
             ],

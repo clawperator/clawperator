@@ -36,7 +36,7 @@ export async function resolveDevice(config: RuntimeConfig): Promise<ResolveDevic
   if (connected.length > 1) {
     throw {
       code: ERROR_CODES.MULTIPLE_DEVICES_DEVICE_ID_REQUIRED,
-      message: "Multiple devices connected; set --device-id",
+      message: "Multiple devices connected; set --device",
       details: { devices: connected.map((d) => d.serial) },
     };
   }

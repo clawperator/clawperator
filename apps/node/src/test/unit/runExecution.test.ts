@@ -275,7 +275,7 @@ describe("injectServiceUnavailableHint", () => {
 
     injectServiceUnavailableHint(envelope, "device-123");
 
-    assert.ok(envelope.hint?.includes("doctor --fix --device-id device-123"), `hint: ${envelope.hint}`);
+    assert.ok(envelope.hint?.includes("doctor --fix --device device-123"), `hint: ${envelope.hint}`);
     assert.ok(envelope.hint?.includes("operator setup"), `hint should mention operator setup: ${envelope.hint}`);
   });
 
@@ -521,7 +521,7 @@ describe("runExecution", () => {
 
     assert.strictEqual(result.ok, false);
     if (!result.ok) {
-      assert.strictEqual(result.error.code, ERROR_CODES.RECEIVER_NOT_INSTALLED);
+      assert.strictEqual(result.error.code, ERROR_CODES.OPERATOR_NOT_INSTALLED);
       assert.strictEqual(result.deviceId, "test-device-1");
       assert.match(result.error.message, /Operator APK \(com\.test\.operator\.dev\) is not installed on test-device-1/);
       assert.match(result.error.message, /clawperator operator setup --apk/);

@@ -337,7 +337,7 @@ Never hardcode:
 2. device serials
 3. user PII
 
-Use placeholders such as `<device_id>`, `<person_name>`, or `AC_TILE_NAME`.
+Use placeholders such as `<device_id>`, `<person_name>`, or `CLIMATE_TILE_NAME`.
 
 Validation command:
 

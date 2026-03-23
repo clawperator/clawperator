@@ -172,7 +172,7 @@ export async function waitForResultEnvelope(
         if (!result.success) {
           const combined = (result.stderr ?? result.stdout ?? "unknown").trim();
           const isMissingPackage = combined.includes("Target package not found") || combined.includes("does not exist");
-          const code = isMissingPackage ? ERROR_CODES.RECEIVER_NOT_INSTALLED : ERROR_CODES.BROADCAST_FAILED;
+          const code = isMissingPackage ? ERROR_CODES.OPERATOR_NOT_INSTALLED : ERROR_CODES.BROADCAST_FAILED;
 
           broadcastStatus = `failed: ${combined}`;
           const diagnostics: BroadcastDiagnostics = {

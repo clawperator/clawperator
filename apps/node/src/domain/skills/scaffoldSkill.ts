@@ -123,15 +123,14 @@ try {
   const stdout = execFileSync(
     "clawperator",
     [
-      "execute",
-      "--device-id",
+      "exec",
+      "--device",
       deviceId,
       "--operator-package",
       operatorPackage,
       "--execution",
       JSON.stringify(execution),
-      "--output",
-      "json",
+      "--json",
     ],
     {
       encoding: "utf8",

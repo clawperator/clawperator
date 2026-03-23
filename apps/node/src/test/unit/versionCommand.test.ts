@@ -66,12 +66,12 @@ describe("cmdVersion", () => {
     const parsed = JSON.parse(output);
 
     assert.strictEqual(parsed.compatible, false);
-    assert.strictEqual(parsed.error.code, ERROR_CODES.RECEIVER_NOT_INSTALLED);
+    assert.strictEqual(parsed.error.code, ERROR_CODES.OPERATOR_NOT_INSTALLED);
     assert.deepStrictEqual(parsed.remediation, [
       `Download the matching APK: https://downloads.clawperator.com/operator/v${version}/operator-v${version}.apk`,
       `Download the checksum: https://downloads.clawperator.com/operator/v${version}/operator-v${version}.apk.sha256`,
       `Verify the checksum: sha256sum -c operator-v${version}.apk.sha256`,
-      `Install the matching APK: clawperator operator setup --apk operator-v${version}.apk --device-id <device_id> --operator-package ${operatorPackage}`,
+      `Install the matching APK: clawperator operator setup --apk operator-v${version}.apk --device <device_id> --operator-package ${operatorPackage}`,
       "If you are targeting the local debug package, rebuild and reinstall the debug APK from the same source checkout instead of using the release download.",
     ]);
   });
@@ -92,7 +92,7 @@ describe("cmdVersion", () => {
     const parsed = JSON.parse(output);
 
     assert.strictEqual(parsed.compatible, false);
-    assert.strictEqual(parsed.error.code, ERROR_CODES.RECEIVER_VARIANT_MISMATCH);
+    assert.strictEqual(parsed.error.code, ERROR_CODES.OPERATOR_VARIANT_MISMATCH);
     assert.match(parsed.error.message, /Expected com\.clawperator\.operator\.dev/);
   });
 
@@ -112,7 +112,7 @@ describe("cmdVersion", () => {
     const parsed = JSON.parse(output);
 
     assert.strictEqual(parsed.compatible, false);
-    assert.strictEqual(parsed.error.code, ERROR_CODES.RECEIVER_VARIANT_MISMATCH);
+    assert.strictEqual(parsed.error.code, ERROR_CODES.OPERATOR_VARIANT_MISMATCH);
     assert.match(parsed.error.message, /Expected com\.clawperator\.operator but found installed variant com\.clawperator\.operator\.dev/);
   });
 
@@ -149,7 +149,7 @@ describe("probeVersionCompatibility", () => {
     const result = await probeVersionCompatibility(config);
 
     assert.strictEqual(result.compatible, false);
-    assert.strictEqual(result.error?.code, ERROR_CODES.RECEIVER_VARIANT_MISMATCH);
+    assert.strictEqual(result.error?.code, ERROR_CODES.OPERATOR_VARIANT_MISMATCH);
     assert.ok(result.remediation?.includes("Use --operator-package com.clawperator.operator"));
   });
 
@@ -188,7 +188,7 @@ describe("probeVersionCompatibility", () => {
     const result = await probeVersionCompatibility(config);
 
     assert.strictEqual(result.compatible, false);
-    assert.strictEqual(result.error?.code, ERROR_CODES.RECEIVER_VARIANT_MISMATCH);
+    assert.strictEqual(result.error?.code, ERROR_CODES.OPERATOR_VARIANT_MISMATCH);
     assert.ok(result.remediation?.includes("Use --operator-package com.clawperator.operator.dev"));
   });
 
