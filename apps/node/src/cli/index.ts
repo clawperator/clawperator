@@ -34,11 +34,21 @@ function getGlobalOpts(argv: string[]): {
     } else if (argv[i] === "--device" && argv[i + 1]) {
       // --device is the new canonical for --device-id (old name still works)
       deviceId = argv[++i];
-    } else if (argv[i] === "--receiver-package" && argv[i + 1]) {
+    } else if (argv[i] === "--receiver-package") {
+      const value = argv[i + 1];
+      if (value === undefined || value.trim().length === 0 || value.startsWith("-")) {
+        throw new UsageError("--receiver-package requires a value");
+      }
       // --receiver-package is an alias for --operator-package (old name still works)
-      operatorPackage = argv[++i];
-    } else if (argv[i] === "--operator-package" && argv[i + 1]) {
-      operatorPackage = argv[++i];
+      operatorPackage = value;
+      i++;
+    } else if (argv[i] === "--operator-package") {
+      const value = argv[i + 1];
+      if (value === undefined || value.trim().length === 0 || value.startsWith("-")) {
+        throw new UsageError("--operator-package requires a value");
+      }
+      operatorPackage = value;
+      i++;
     } else if ((argv[i] === "--output" || argv[i] === "--format") && argv[i + 1]) {
       output = argv[++i] === "pretty" ? "pretty" : "json";
     } else if (argv[i] === "--json") {

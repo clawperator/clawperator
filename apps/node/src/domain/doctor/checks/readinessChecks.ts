@@ -237,7 +237,7 @@ export async function runHandshake(
     const timeoutMessage = [
       `No [Clawperator-Result] envelope received within 7000ms.`,
       `Broadcast dispatch: ${result.diagnostics.broadcastDispatchStatus}.`,
-      `Receiver package: ${config.operatorPackage}.`,
+        `Operator package: ${config.operatorPackage}.`,
       config.deviceId ? `Device: ${config.deviceId}.` : undefined,
       (result.diagnostics.lastCorrelatedEvents?.length ?? 0) > 0
         ? "Re-run with --verbose to inspect correlated Android log lines."

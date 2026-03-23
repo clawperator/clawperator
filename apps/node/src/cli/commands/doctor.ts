@@ -52,7 +52,7 @@ function renderPrettyDoctorReport(report: DoctorReport): string {
   lines.push("Clawperator Doctor Diagnostics");
   lines.push("");
   lines.push(`  Device:           ${report.deviceId ?? "(auto-detect)"}`);
-  lines.push(`  Receiver package: ${report.operatorPackage ?? "(default)"}`);
+  lines.push(`  Operator package: ${report.operatorPackage ?? "(default)"}`);
   lines.push("");
 
   if (criticalChecks.length > 0) {

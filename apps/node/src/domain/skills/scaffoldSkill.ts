@@ -79,7 +79,7 @@ Update this file with:
 Usage:
 
 \`\`\`bash
-node ${scriptPath} <device_id> [receiver_package]
+node ${scriptPath} <device_id> [operator_package]
 \`\`\`
 `;
 }
@@ -100,7 +100,7 @@ import { execFileSync } from "node:child_process";
 const [, , deviceId, operatorPackage = process.env.CLAWPERATOR_OPERATOR_PACKAGE || "com.clawperator.operator"] = process.argv;
 
 if (!deviceId) {
-  console.error("Usage: node run.js <device_id> [receiver_package]");
+  console.error("Usage: node run.js <device_id> [operator_package]");
   process.exit(1);
 }
 

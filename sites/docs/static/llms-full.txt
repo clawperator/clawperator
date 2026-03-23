@@ -31,7 +31,7 @@ Use this page as a technical map:
 - [Node API - Agent Guide](ai-agents/node-api-for-agents.md) - Canonical CLI and HTTP API contract for agent builders
 - [Execution Model](reference/execution-model.md) - Required payload fields, status vs step success, timeout, and error surfaces
 - [Timeout Budgeting](reference/timeout-budgeting.md) - Practical `timeoutMs` sizing for snapshots, scroll loops, and skill flows
-- [Device and Package Model](reference/device-and-package-model.md) - What `deviceId` and `receiverPackage` mean in practice
+- [Device and Package Model](reference/device-and-package-model.md) - What `deviceId` and `operatorPackage` mean in practice
 - [Clawperator Snapshot Format](reference/snapshot-format.md) - Canonical `snapshot_ui` and `observe snapshot` output contract
 - [Navigation Patterns for Agents](ai-agents/navigation-patterns.md) - Practical patterns for scrolls, overlays, and OEM variation
 - [Multi-Device Workflows for Agents](ai-agents/multi-device-workflows.md) - Deterministic targeting, per-device queues, and install recovery
@@ -476,7 +476,7 @@ For local debug builds, specify the receiver package:
 ```bash
 clawperator operator setup \
   --apk ~/.clawperator/downloads/operator-debug.apk \
-  --receiver-package com.clawperator.operator.dev
+  --operator-package com.clawperator.operator.dev
 ```
 
 This command runs three phases in order:
@@ -506,7 +506,7 @@ A fully configured device will show all checks passing. Common warnings:
 | Warning | Fix |
 | :--- | :--- |
 | `DEVICE_UNAUTHORIZED` | Tap "Allow" on the device USB debugging dialog |
-| `RECEIVER_NOT_INSTALLED` | Complete Step 3. Run `clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id <device_id>` and add `--receiver-package com.clawperator.operator.dev` for debug builds. |
+| `RECEIVER_NOT_INSTALLED` | Complete Step 3. Run `clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id <device_id>` and add `--operator-package com.clawperator.operator.dev` for debug builds. |
 | `DEVICE_ACCESSIBILITY_NOT_RUNNING` | If the Operator APK crashed after setup, run `clawperator grant-device-permissions` to restore the revoked permissions |
 | `DEVICE_DEV_OPTIONS_DISABLED` | Enable Developer options (physical device only) |
 | `DEVICE_USB_DEBUGGING_DISABLED` | Enable USB debugging (physical device only) |
@@ -527,7 +527,7 @@ Open an app:
 clawperator action open-app \
   --app com.android.settings \
   --device-id <device_id> \
-  --receiver-package com.clawperator.operator
+  --operator-package com.clawperator.operator
 ```
 
 > Use `com.clawperator.operator` for the release [Clawperator Operator Android app](android-operator-apk.md), `com.clawperator.operator.dev` for the local debug build.
@@ -556,7 +556,7 @@ For environment checks: `clawperator doctor --output pretty`
 Verify the installed CLI and [Clawperator Operator Android app](android-operator-apk.md) pair explicitly:
 
 ```bash
-clawperator version --check-compat --receiver-package com.clawperator.operator
+clawperator version --check-compat --operator-package com.clawperator.operator
 ```
 
 If the versions do not match, install the exact APK for the CLI version from `https://downloads.clawperator.com/operator/v<version>/operator-v<version>.apk` and `https://downloads.clawperator.com/operator/v<version>/operator-v<version>.apk.sha256`.
@@ -728,7 +728,7 @@ For a local debug build of the [Clawperator Operator Android app](android-operat
 ```bash
 clawperator operator setup \
   --apk ~/.clawperator/downloads/operator-debug.apk \
-  --receiver-package com.clawperator.operator.dev
+  --operator-package com.clawperator.operator.dev
 ```
 
 This command is the normal path for agents and operators. It installs the APK and grants required permissions (accessibility, notification listener) in one step. `clawperator operator install` remains a compatibility alias.
@@ -1000,7 +1000,7 @@ The app is distributed in two variants, each with its own application ID:
 * **`com.clawperator.operator`**: The stable, release version. This is the default package used by the CLI and intended for most users and remote AI agents.
 * **`com.clawperator.operator.dev`**: The local debug version. This is used by developers building the APK from source locally.
 
-*Note: The CLI communicates with `com.clawperator.operator` by default. If you are using a debug build, you must pass the `--receiver-package com.clawperator.operator.dev` flag to CLI commands.*
+*Note: The CLI communicates with `com.clawperator.operator` by default. If you are using a debug build, you must pass the `--operator-package com.clawperator.operator.dev` flag to CLI commands.*
 
 ## Installation
 
@@ -1784,19 +1784,19 @@ workflow (also available as `record` alias), use [Android Recording Format for A
 | `skills validate <skill_id>` | Verify one local skill's metadata and required files before runtime testing |
 | `skills validate --all` | Validate the entire configured skills registry in one pass |
 | `skills compile-artifact <id> --artifact <name>` | Compile skill to execution payload |
-| `skills run <skill_id> [--device-id <id>] [--receiver-package <pkg>] [--timeout-ms <n>] [--expect-contains <text>]` | Invoke a skill script (convenience wrapper; pretty mode streams output live and prints a pre-run banner) |
+| `skills run <skill_id> [--device-id <id>] [--operator-package <pkg>] [--timeout-ms <n>] [--expect-contains <text>]` | Invoke a skill script (convenience wrapper; pretty mode streams output live and prints a pre-run banner) |
 | `skills install` | Clone skills repo to `~/.clawperator/skills/` |
 | `skills update [--ref <git-ref>]` | Pull latest skills (optionally pin to a ref) |
 | `grant-device-permissions` | Re-grant Operator permissions only after an Operator APK crash causes Android to revoke them |
-| `recording start [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]` | Start a recording session on the operator app and write NDJSON on device (`record` is an alias) |
-| `recording stop [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]` | Stop the active recording session and finalize the recording file (`record` is an alias) |
+| `recording start [--session-id <id>] [--device-id <serial>] [--operator-package <pkg>]` | Start a recording session on the operator app and write NDJSON on device (`record` is an alias) |
+| `recording stop [--session-id <id>] [--device-id <serial>] [--operator-package <pkg>]` | Stop the active recording session and finalize the recording file (`record` is an alias) |
 | `recording pull [--session-id <id>] [--out <dir>] [--device-id <serial>]` | Pull the on-device NDJSON recording to host storage (`record` is an alias) |
 | `recording parse --input <file> [--out <file>]` | Parse a raw NDJSON recording into a step log JSON (`record` is an alias) |
 | `serve` | Start HTTP/SSE server |
 | `doctor` | Run environment diagnostics |
 | `version` | Print the CLI version or check CLI / Clawperator Operator Android app compatibility |
 
-**Global options:** `--device-id <id>`, `--receiver-package <pkg>`, `--output <json|pretty>`, `--format <json|pretty>` (alias for `--output`), `--timeout-ms <n>`, `--log-level <debug|info|warn|error>`, `--verbose`
+**Global options:** `--device-id <id>`, `--operator-package <pkg>`, `--output <json|pretty>`, `--format <json|pretty>` (alias for `--output`), `--timeout-ms <n>`, `--log-level <debug|info|warn|error>`, `--verbose`
 
 For agent callers, `--output json` is the canonical output mode. `pretty` is for human inspection.
 
@@ -1850,7 +1850,7 @@ Common events include:
 Default receiver package:
 
 - release app package: `com.clawperator.operator`
-- local debug app package: pass `--receiver-package com.clawperator.operator.dev`
+- local debug app package: pass `--operator-package com.clawperator.operator.dev`
 
 Use subcommand help when the docs and the current CLI differ:
 
@@ -1866,7 +1866,7 @@ clawperator doctor --help
 Use `clawperator version --check-compat` before automation batches when the agent needs to verify that the installed [Clawperator Operator Android app](../getting-started/android-operator-apk.md) matches the CLI's exact normalized version:
 
 ```bash
-clawperator version --check-compat --receiver-package com.clawperator.operator
+clawperator version --check-compat --operator-package com.clawperator.operator
 ```
 
 The response includes the CLI version, detected [Clawperator Operator Android app](../getting-started/android-operator-apk.md) version, app `versionCode`, receiver package, compatibility verdict, and remediation guidance on mismatch.
@@ -1888,7 +1888,7 @@ Start with `clawperator serve [--port <n>] [--host <ip>]`. Default: `127.0.0.1:3
 | `POST /android/emulators/:name/stop` | Stop a running emulator by AVD name |
 | `DELETE /android/emulators/:name` | Delete an AVD by name |
 | `POST /android/provision/emulator` | Reuse or create a supported emulator and return a booted device |
-| `POST /execute` | Body: `{"execution": <payload>, "deviceId": "...", "receiverPackage": "..."}` |
+| `POST /execute` | Body: `{"execution": <payload>, "deviceId": "...", "operatorPackage": "..."}` |
 | `POST /observe/snapshot` | Capture UI tree |
 | `POST /observe/screenshot` | Capture screenshot |
 | `GET /skills` | List skills. Query params: `?app=<pkg>&intent=<i>&keyword=<k>` |
@@ -2295,7 +2295,7 @@ unusable, and `window_count > 1` alone is normal on some Android builds.
 
 **`take_screenshot`:** `observe screenshot` uses the same execution contract under the hood. Android reports `UNSUPPORTED_RUNTIME_SCREENSHOT`, then the Node layer captures the screenshot via `adb exec-out screencap -p`, writes it to `data.path`, and normalizes the step result to `success: true` when capture succeeds. Pass `observe screenshot --path <file>` when you want a deterministic local filename instead of the default temp path.
 
-**`press_key`:** Issues a system-level key event via the Android Accessibility Service (`performGlobalAction`). Supported keys: `"back"`, `"home"`, `"recents"`. The alias `key_press` is normalized to `press_key`. No retry - this action is single-attempt by design. Requires the Clawperator Operator accessibility service to be running on the device. If the service is unavailable, the execution returns a top-level failed envelope with `status: "failed"` and no `stepResults`. Use `clawperator doctor` to diagnose accessibility service availability before running executions that include `press_key`. When testing local/debug builds, pass the matching `receiverPackage` (`com.clawperator.operator.dev`) instead of relying on the default release package. Returns `success: false` with `data.error: "GLOBAL_ACTION_FAILED"` if the OS reports the global action could not be performed (rare soft OS failure - accessibility service was running but Android declined the action).
+**`press_key`:** Issues a system-level key event via the Android Accessibility Service (`performGlobalAction`). Supported keys: `"back"`, `"home"`, `"recents"`. The alias `key_press` is normalized to `press_key`. No retry - this action is single-attempt by design. Requires the Clawperator Operator accessibility service to be running on the device. If the service is unavailable, the execution returns a top-level failed envelope with `status: "failed"` and no `stepResults`. Use `clawperator doctor` to diagnose accessibility service availability before running executions that include `press_key`. When testing local/debug builds, pass the matching `operatorPackage` (`com.clawperator.operator.dev`) instead of relying on the default release package. Returns `success: false` with `data.error: "GLOBAL_ACTION_FAILED"` if the OS reports the global action could not be performed (rare soft OS failure - accessibility service was running but Android declined the action).
 
 **`press_key` key scope:** This action covers only Android accessibility global actions. Non-global keys - `enter`, `search`, `volume_up`, `volume_down`, `escape`, and raw keycodes - are not supported by `press_key`. They use a different Android mechanism (`input keyevent`) that is not routed through the Operator accessibility service. Use `adb shell input keyevent <keycode>` outside the execution payload for those keys until a dedicated raw-key primitive is added.
 
@@ -2303,7 +2303,7 @@ unusable, and `window_count > 1` alone is normal on some Android builds.
 ```json
 {
   "deviceId": "<device_id>",
-  "receiverPackage": "com.clawperator.operator.dev",
+  "operatorPackage": "com.clawperator.operator.dev",
   "execution": {
     "commandId": "cmd-press-home",
     "taskId": "task-press-home",
@@ -2782,7 +2782,7 @@ installer are:
 | :--- | :--- | :--- |
 | `CLAWPERATOR_SKILLS_REGISTRY` | CLI and installer | Overrides the path to the local skills registry JSON |
 | `CLAWPERATOR_INSTALL_APK` | installer | Pre-seeds the installer's "install APK now?" decision for non-interactive runs |
-| `CLAWPERATOR_RECEIVER_PACKAGE` | installer | Overrides the default receiver package used during installer setup |
+| `CLAWPERATOR_OPERATOR_PACKAGE` | installer | Overrides the default receiver package used during installer setup |
 
 ### `CLAWPERATOR_INSTALL_APK`
 
@@ -2941,7 +2941,7 @@ Current skills model:
 - `skills run --expect-contains <text>` turns the wrapper into a lightweight
   smoke check by failing if the script output does not contain the expected
   substring
-- `skills run --receiver-package <pkg>` sets the Operator package for this run
+- `skills run --operator-package <pkg>` sets the Operator package for this run
   (default: `com.clawperator.operator`). Use `com.clawperator.operator.dev` for
   local debug APKs.
 - In pretty mode, `skills run` prints a one-line banner before validation and
@@ -2951,7 +2951,7 @@ Current skills model:
   [Clawperator] v<version>  APK: <OK|MISSING>  Logs: <absolute-path>  Docs: https://docs.clawperator.com/llms.txt
   ```
 
-  If the APK is present, the banner shows `OK (<receiver-package>)`. If the
+  If the APK is present, the banner shows `OK (<operator-package>)`. If the
   APK check does not pass, it shows `MISSING - run \`clawperator operator setup --apk <path>\``.
   The banner is suppressed entirely in JSON mode so the final output remains a
   single parseable JSON envelope.
@@ -2971,7 +2971,7 @@ two environment variables:
 | Variable | Description | Default |
 | :--- | :--- | :--- |
 | `CLAWPERATOR_BIN` | Path to the CLI binary the skill should use | Auto-resolved: sibling build if present, else global `clawperator` |
-| `CLAWPERATOR_RECEIVER_PACKAGE` | Operator package for the skill to target | `com.clawperator.operator` |
+| `CLAWPERATOR_OPERATOR_PACKAGE` | Operator package for the skill to target | `com.clawperator.operator` |
 
 These can be set explicitly to override the defaults:
 
@@ -2980,13 +2980,13 @@ These can be set explicitly to override the defaults:
 export CLAWPERATOR_BIN=/path/to/clawperator/apps/node/dist/cli/index.js
 
 # Target the dev APK
-export CLAWPERATOR_RECEIVER_PACKAGE=com.clawperator.operator.dev
+export CLAWPERATOR_OPERATOR_PACKAGE=com.clawperator.operator.dev
 
 # Now all skills will use these values
 clawperator skills run <skill_id>
 ```
 
-CLI flags take precedence over environment variables. Use `--receiver-package`
+CLI flags take precedence over environment variables. Use `--operator-package`
 for one-off overrides without changing your shell environment.
 
 For the concrete `skill.json` contract and private-skill authoring model, see
@@ -3284,7 +3284,7 @@ Practical guidance:
 - keep one work queue per device
 - never overlap two executions on the same device
 - it is fine to run different queues against different devices
-- keep `--receiver-package` consistent within the same device queue
+- keep `--operator-package` consistent within the same device queue
 
 If you see `EXECUTION_CONFLICT_IN_FLIGHT`, do not immediately retry in
 parallel. Wait for the earlier execution to finish or explicitly serialize the
@@ -3292,10 +3292,10 @@ queue.
 
 ## Receiver package still matters
 
-`--device-id` and `--receiver-package` solve different problems:
+`--device-id` and `--operator-package` solve different problems:
 
 - `--device-id` selects the Android runtime
-- `--receiver-package` selects which Operator APK on that runtime receives the
+- `--operator-package` selects which Operator APK on that runtime receives the
   command
 
 Examples:
@@ -3313,7 +3313,7 @@ In that case, keep both flags explicit:
 ```bash
 clawperator doctor \
   --device-id emulator-5554 \
-  --receiver-package com.clawperator.operator.dev \
+  --operator-package com.clawperator.operator.dev \
   --output json
 ```
 
@@ -3432,14 +3432,14 @@ These flags are parsed globally. Command support varies by path.
 | Flag | Description |
 |------|-------------|
 | `--device-id <id>` | Target Android device serial |
-| `--receiver-package <package>` | Target Operator package for broadcast dispatch |
+| `--operator-package <package>` | Target Operator package for broadcast dispatch |
 | `--output <json\|pretty>` | Output format (default: `json`) |
 | `--timeout-ms <number>` | Override execution timeout for `execute`, `observe snapshot`, `observe screenshot`, and `inspect ui` within policy limits |
 | `--verbose` | Include debug diagnostics in output |
 | `--help` | Show help |
 | `--version` | Show version |
 
-Default receiver package: `com.clawperator.operator`. Use `--receiver-package com.clawperator.operator.dev` for local debug APKs.
+Default receiver package: `com.clawperator.operator`. Use `--operator-package com.clawperator.operator.dev` for local debug APKs.
 
 ---
 
@@ -3450,14 +3450,14 @@ Default receiver package: `com.clawperator.operator`. Use `--receiver-package co
 Install the Clawperator Operator APK and grant required device permissions in one step.
 
 ```
-clawperator operator setup --apk <path> [--device-id <id>] [--receiver-package <package>] [--output <json|pretty>]
+clawperator operator setup --apk <path> [--device-id <id>] [--operator-package <package>] [--output <json|pretty>]
 ```
 
 | Flag | Description |
 |------|-------------|
 | `--apk <path>` | Local path to the Operator APK file (required) |
 | `--device-id <id>` | Target Android device serial (required when multiple devices are connected) |
-| `--receiver-package <package>` | Operator package identifier (required when both release and debug variants are installed) |
+| `--operator-package <package>` | Operator package identifier (required when both release and debug variants are installed) |
 
 This is the canonical setup command. `clawperator operator install` remains a compatibility alias. It runs three phases in sequence:
 
@@ -3465,7 +3465,7 @@ This is the canonical setup command. `clawperator operator install` remains a co
 2. **Permissions**: Grants the accessibility service, notification posting, and notification listener permissions.
 3. **Verification**: Confirms the package is visible via `pm list packages`.
 
-If `--receiver-package` is omitted, setup auto-detects the package only when exactly one known Operator variant is installed. If both release and debug variants are installed, pass `--receiver-package` explicitly.
+If `--operator-package` is omitted, setup auto-detects the package only when exactly one known Operator variant is installed. If both release and debug variants are installed, pass `--operator-package` explicitly.
 
 If any phase fails, the command exits with a structured JSON error identifying which phase failed. Error codes:
 
@@ -3478,7 +3478,7 @@ If any phase fails, the command exits with a structured JSON error identifying w
 
 Do not use raw `adb install` for normal setup. It installs the APK without granting permissions, leaving the device in an unusable state.
 
-For debug builds, pass `--receiver-package com.clawperator.operator.dev`.
+For debug builds, pass `--operator-package com.clawperator.operator.dev`.
 
 ---
 
@@ -3611,7 +3611,7 @@ clawperator packages list [--device-id <id>] [--third-party]
 Execute a validated command payload.
 
 ```
-clawperator execute --execution <json-or-file> [--validate-only] [--dry-run] [--device-id <id>] [--receiver-package <package>] [--timeout-ms <number>]
+clawperator execute --execution <json-or-file> [--validate-only] [--dry-run] [--device-id <id>] [--operator-package <package>] [--timeout-ms <number>]
 ```
 
 | Flag | Description |
@@ -3620,7 +3620,7 @@ clawperator execute --execution <json-or-file> [--validate-only] [--dry-run] [--
 | `--validate-only` | Validate and normalize the payload without dispatching to any device |
 | `--dry-run` | Print the execution plan without dispatching to any device |
 | `--device-id <id>` | Target device serial |
-| `--receiver-package <package>` | Target Operator package |
+| `--operator-package <package>` | Target Operator package |
 | `--timeout-ms <number>` | Override execution timeout within policy limits |
 
 The `--execution` value must conform to the `Execution` contract (see [api-overview.md](./api-overview.md)).
@@ -3638,7 +3638,7 @@ adb or resolving a device.
 Capture the current UI snapshot from the device.
 
 ```
-clawperator observe snapshot [--device-id <id>] [--receiver-package <package>] [--timeout-ms <number>] [--output <json\|pretty>] [--verbose]
+clawperator observe snapshot [--device-id <id>] [--operator-package <package>] [--timeout-ms <number>] [--output <json\|pretty>] [--verbose]
 ```
 
 Returns ASCII-formatted UI tree via the `snapshot_ui` action.
@@ -3650,7 +3650,7 @@ Returns ASCII-formatted UI tree via the `snapshot_ui` action.
 Capture the current device screen as a PNG file.
 
 ```
-clawperator observe screenshot [--device-id <id>] [--receiver-package <package>] [--timeout-ms <number>] [--output <json\|pretty>] [--verbose]
+clawperator observe screenshot [--device-id <id>] [--operator-package <package>] [--timeout-ms <number>] [--output <json\|pretty>] [--verbose]
 ```
 
 The PNG is saved to a temp path and the path is returned in the result envelope.
@@ -3662,7 +3662,7 @@ The PNG is saved to a temp path and the path is returned in the result envelope.
 Alias for `observe snapshot` with formatted output.
 
 ```
-clawperator inspect ui [--device-id <id>] [--receiver-package <package>] [--timeout-ms <number>] [--output <json\|pretty>] [--verbose]
+clawperator inspect ui [--device-id <id>] [--operator-package <package>] [--timeout-ms <number>] [--output <json\|pretty>] [--verbose]
 ```
 
 `inspect ui` is a wrapper alias over `observe snapshot`.
@@ -3674,7 +3674,7 @@ clawperator inspect ui [--device-id <id>] [--receiver-package <package>] [--time
 Start an on-device recording session through the Operator app. `record` is a supported alias.
 
 ```
-clawperator recording start [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]
+clawperator recording start [--session-id <id>] [--device-id <serial>] [--operator-package <pkg>]
 ```
 
 Use `--session-id` to choose the recording name. If omitted, the Operator app
@@ -3690,7 +3690,7 @@ Global `--output` / `--format` options still apply.
 Stop the active recording session and finalize the on-device NDJSON file. `record` is a supported alias.
 
 ```
-clawperator recording stop [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]
+clawperator recording stop [--session-id <id>] [--device-id <serial>] [--operator-package <pkg>]
 ```
 
 Use the same `--session-id` you started with if you want to target a specific
@@ -3711,7 +3711,7 @@ clawperator recording pull [--session-id <id>] [--out <dir>] [--device-id <seria
 
 If `--session-id` is omitted, Clawperator reads the device-side `latest`
 pointer first and pulls that recording. Output defaults to `./recordings/`.
-`--receiver-package` is also honored as a global option.
+`--operator-package` is also honored as a global option.
 
 Global `--output` / `--format` options still apply.
 
@@ -3738,7 +3738,7 @@ Global `--output` / `--format` options still apply.
 Open a URI on the device using the system default handler.
 
 ```
-clawperator action open-uri --uri <uri> [--device-id <id>] [--receiver-package <package>]
+clawperator action open-uri --uri <uri> [--device-id <id>] [--operator-package <package>]
 ```
 
 | Flag | Description |
@@ -3752,7 +3752,7 @@ clawperator action open-uri --uri <uri> [--device-id <id>] [--receiver-package <
 Open an app by package ID.
 
 ```
-clawperator action open-app --app <packageId> [--device-id <id>] [--receiver-package <package>]
+clawperator action open-app --app <packageId> [--device-id <id>] [--operator-package <package>]
 ```
 
 | Flag | Description |
@@ -3766,7 +3766,7 @@ clawperator action open-app --app <packageId> [--device-id <id>] [--receiver-pac
 Click a UI node matching a selector.
 
 ```
-clawperator action click --selector <json> [--device-id <id>] [--receiver-package <package>]
+clawperator action click --selector <json> [--device-id <id>] [--operator-package <package>]
 ```
 
 | Flag | Description |
@@ -3782,7 +3782,7 @@ Example selector: `'{"resourceId":"com.example.app:id/button_ok"}'`
 Read text from a UI node.
 
 ```
-clawperator action read --selector <json> [--device-id <id>] [--receiver-package <package>]
+clawperator action read --selector <json> [--device-id <id>] [--operator-package <package>]
 ```
 
 | Flag | Description |
@@ -3796,7 +3796,7 @@ clawperator action read --selector <json> [--device-id <id>] [--receiver-package
 Wait for a UI node to appear.
 
 ```
-clawperator action wait --selector <json> [--device-id <id>] [--receiver-package <package>]
+clawperator action wait --selector <json> [--device-id <id>] [--operator-package <package>]
 ```
 
 | Flag | Description |
@@ -3810,7 +3810,7 @@ clawperator action wait --selector <json> [--device-id <id>] [--receiver-package
 Type text into a UI node.
 
 ```
-clawperator action type --selector <json> --text <value> [--submit] [--clear] [--device-id <id>] [--receiver-package <package>]
+clawperator action type --selector <json> --text <value> [--submit] [--clear] [--device-id <id>] [--operator-package <package>]
 ```
 
 | Flag | Description |
@@ -3855,7 +3855,7 @@ clawperator skills compile-artifact --skill-id <id> --artifact <name> [--vars <j
 |------------|-------------|
 | `<skill_id>` | Skill ID (positional) |
 | `--skill-id <id>` | Skill ID (named flag, alternative to positional) |
-| `--artifact <name>` | Artifact name, e.g. `climate-status` or `climate-status.recipe.json` (required) |
+| `--artifact <name>` | Artifact name, e.g. `ac-status` or `ac-status.recipe.json` (required) |
 | `--vars <json>` | Variable substitution JSON object (default: `{}`) |
 
 ---
@@ -3978,12 +3978,12 @@ Use `clawperator skills sync --help` when you need the current clone and registr
 Re-grant accessibility and notification permissions only after an Operator APK crash causes Android to revoke them.
 
 ```
-clawperator grant-device-permissions [--device-id <id>] [--receiver-package <package>] [--output <json\|pretty>]
+clawperator grant-device-permissions [--device-id <id>] [--operator-package <package>] [--output <json\|pretty>]
 ```
 
 This command is for **crash recovery only**. Use it after a previously working Operator APK crashes and Android revokes the accessibility or notification permissions. For initial setup, always use `clawperator operator setup` instead.
 
-Use the release package by default. Pass `--receiver-package com.clawperator.operator.dev` for local debug builds.
+Use the release package by default. Pass `--operator-package com.clawperator.operator.dev` for local debug builds.
 
 ---
 
@@ -4019,7 +4019,7 @@ See [api-overview.md](./api-overview.md) for HTTP API details.
 Run environment and runtime checks.
 
 ```
-clawperator doctor [--output <json\|pretty>] [--device-id <id>] [--receiver-package <package>] [--verbose]
+clawperator doctor [--output <json\|pretty>] [--device-id <id>] [--operator-package <package>] [--verbose]
 clawperator doctor --json
 clawperator doctor --fix
 clawperator doctor --full
@@ -4033,7 +4033,7 @@ clawperator doctor --check-only
 | `--full` | Full Android build + install + handshake + smoke |
 | `--check-only` | Always exit 0 for CI or automation |
 | `--device-id <id>` | Target device serial |
-| `--receiver-package <package>` | Target Operator package |
+| `--operator-package <package>` | Target Operator package |
 
 `doctor` checks APK presence before attempting version compatibility and handshake validation. Use `clawperator doctor --help` if you need the current timeout and package-target guidance.
 
@@ -4050,18 +4050,18 @@ Show the CLI version, or compare it with the installed Operator APK.
 
 ```
 clawperator version
-clawperator version --check-compat [--device-id <id>] [--receiver-package <package>]
+clawperator version --check-compat [--device-id <id>] [--operator-package <package>]
 ```
 
 | Flag | Description |
 |------|-------------|
 | `--check-compat` | Compare the CLI version with the installed APK version |
 | `--device-id <id>` | Target device serial |
-| `--receiver-package <package>` | Target Operator package |
+| `--operator-package <package>` | Target Operator package |
 
 `clawperator version --check-compat` reports the CLI version, installed APK version, APK `versionCode`, receiver package, compatibility verdict, and remediation guidance when versions do not match.
 
-Use `clawperator version --help` for the current compatibility-check notes and default receiver-package guidance.
+Use `clawperator version --help` for the current compatibility-check notes and default operator-package guidance.
 
 ---
 
@@ -4239,7 +4239,7 @@ Returned when `RESULT_ENVELOPE_TIMEOUT` occurs.
   lastCorrelatedEvents?: string[];    // last logcat lines correlated to this command
   broadcastDispatchStatus?: string;   // result of the ADB broadcast call
   deviceId?: string;
-  receiverPackage?: string;
+  operatorPackage?: string;
 }
 ```
 
@@ -4254,7 +4254,7 @@ Returned when `BROADCAST_FAILED` or `RECEIVER_NOT_INSTALLED` occurs.
   lastCorrelatedEvents?: string[];
   broadcastDispatchStatus?: string;
   deviceId?: string;
-  receiverPackage?: string;
+  operatorPackage?: string;
 }
 ```
 
@@ -4268,7 +4268,7 @@ Returned when `BROADCAST_FAILED` or `RECEIVER_NOT_INSTALLED` occurs.
 {
   ok: boolean;
   deviceId?: string;
-  receiverPackage?: string;
+  operatorPackage?: string;
   checks: DoctorCheckResult[];
   nextActions?: string[];
 }
@@ -4615,7 +4615,7 @@ Run an execution payload.
 {
   "execution": { /* Execution object */ },
   "deviceId": "<device_serial>",
-  "receiverPackage": "com.clawperator.operator"
+  "operatorPackage": "com.clawperator.operator"
 }
 ```
 
@@ -4642,13 +4642,13 @@ Run an execution payload.
 
 ### `POST /observe/snapshot`
 
-Capture UI snapshot. Body: `{ "deviceId"?, "receiverPackage"? }`.
+Capture UI snapshot. Body: `{ "deviceId"?, "operatorPackage"? }`.
 
 Same response shape as `/execute`.
 
 ### `POST /observe/screenshot`
 
-Capture screenshot. Body: `{ "deviceId"?, "receiverPackage"? }`.
+Capture screenshot. Body: `{ "deviceId"?, "operatorPackage"? }`.
 
 Same response shape as `/execute`. The PNG path is in `envelope.stepResults[0].data.path`.
 
@@ -4716,7 +4716,7 @@ Server-Sent Events stream. Emits two event types:
 | Variable | Description |
 |----------|-------------|
 | `ADB_PATH` | Override path to `adb` binary |
-| `CLAWPERATOR_RECEIVER_PACKAGE` | Default receiver package (fallback if not passed as option) |
+| `CLAWPERATOR_OPERATOR_PACKAGE` | Default receiver package (fallback if not passed as option) |
 | `CLAWPERATOR_SKILLS_REGISTRY` | Path to `skills-registry.json`. If unset, defaults to `./skills/skills-registry.json` relative to the working directory. After `skills install`, set to `~/.clawperator/skills/skills/skills-registry.json`. |
 
 ---
@@ -6046,13 +6046,13 @@ See also:
 # Device and Package Model
 
 This page explains how Clawperator targets Android devices and how the
-receiver-package concept fits into execution dispatch.
+operator-package concept fits into execution dispatch.
 
 Use it when you need to understand:
 
 - what a `deviceId` really is
 - when `--device-id` is required
-- what `--receiver-package` targets
+- what `--operator-package` targets
 - how release and debug Operator APK variants differ
 
 ## `deviceId` means ADB serial
@@ -6134,9 +6134,9 @@ Current defaults:
 
 Most public docs assume the release package by default.
 
-## When to pass `--receiver-package`
+## When to pass `--operator-package`
 
-Pass `--receiver-package` when:
+Pass `--operator-package` when:
 
 - you are using a local debug APK
 - both release and debug variants are installed
@@ -6148,7 +6148,7 @@ Example:
 ```bash
 clawperator observe snapshot \
   --device-id <device_id> \
-  --receiver-package com.clawperator.operator.dev \
+  --operator-package com.clawperator.operator.dev \
   --output json
 ```
 
@@ -6157,7 +6157,7 @@ clawperator observe snapshot \
 These two flags solve different problems:
 
 - `--device-id` picks the Android device
-- `--receiver-package` picks which Operator APK on that device receives the
+- `--operator-package` picks which Operator APK on that device receives the
   command
 
 You sometimes need both, especially during local development.
@@ -6561,7 +6561,7 @@ Usually recoverable:
 
 Recommended next action:
 - run `clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id <device_id>`
-- if using a local debug APK, also pass `--receiver-package com.clawperator.operator.dev`
+- if using a local debug APK, also pass `--operator-package com.clawperator.operator.dev`
 
 ### `EXECUTION_VALIDATION_FAILED`
 
@@ -6800,7 +6800,7 @@ This page describes the current shipped behavior. It replaces the older v0.1 des
 ## Command Surface
 
 ```bash
-clawperator doctor [--output <json|pretty>] [--device-id <id>] [--receiver-package <package>]
+clawperator doctor [--output <json|pretty>] [--device-id <id>] [--operator-package <package>]
 clawperator doctor --json
 clawperator doctor --fix
 clawperator doctor --full
@@ -6813,7 +6813,7 @@ Supported flags:
 - `--format pretty|json` - alias for `--output`
 - `--json` - shorthand for `--output json`
 - `--device-id <id>` - target one device when multiple are connected
-- `--receiver-package <package>` - override the target Operator package
+- `--operator-package <package>` - override the target Operator package
 - `--fix` - run shell-based remediation steps from non-passing checks (both `fail` and `warn`)
 - `--full` - include Android build, install, launch, and smoke test checks
 - `--check-only` - always exit `0`, even when critical checks fail; does not change halt behavior (doctor still returns early on critical failures)
@@ -6823,7 +6823,7 @@ Default receiver package:
 - release app package: `com.clawperator.operator`
 - local debug app package: `com.clawperator.operator.dev`
 
-If you use a local debug build of the [Clawperator Operator Android app](../getting-started/android-operator-apk.md), pass `--receiver-package com.clawperator.operator.dev` consistently to `doctor`, `operator setup`, `grant-device-permissions`, `version --check-compat`, and `observe snapshot`.
+If you use a local debug build of the [Clawperator Operator Android app](../getting-started/android-operator-apk.md), pass `--operator-package com.clawperator.operator.dev` consistently to `doctor`, `operator setup`, `grant-device-permissions`, `version --check-compat`, and `observe snapshot`.
 
 ## What Doctor Checks
 
@@ -6905,7 +6905,7 @@ Pretty output groups results into:
   "ok": true,
   "criticalOk": true,
   "deviceId": "<device_id>",
-  "receiverPackage": "com.clawperator.operator",
+  "operatorPackage": "com.clawperator.operator",
   "checks": [
     {
       "id": "readiness.handshake",
@@ -6990,7 +6990,7 @@ Target a specific device and debug build of the [Clawperator Operator Android ap
 ```bash
 clawperator doctor \
   --device-id <device_id> \
-  --receiver-package com.clawperator.operator.dev \
+  --operator-package com.clawperator.operator.dev \
   --output pretty
 ```
 
@@ -7030,7 +7030,7 @@ not every internal shell temporary used by validation scripts.
 | Variable | Used by | Meaning |
 | :--- | :--- | :--- |
 | `CLAWPERATOR_SKILLS_REGISTRY` | CLI, installer | Path to the local skills registry JSON |
-| `CLAWPERATOR_RECEIVER_PACKAGE` | CLI, installer, skills | Default Android Operator package to target when `--receiver-package` is omitted. Also passed to skill scripts. |
+| `CLAWPERATOR_OPERATOR_PACKAGE` | CLI, installer, skills | Default Android Operator package to target when `--operator-package` is omitted. Also passed to skill scripts. |
 | `CLAWPERATOR_BIN` | skills | Path to CLI binary used by skill scripts (defaults to global `clawperator` or auto-detected sibling build) |
 | `CLAWPERATOR_INSTALL_APK` | installer | Pre-seeds the installer's APK install prompt |
 | `CLAWPERATOR_INSTALL_SKIP_SKILLS` | installer | Skips `skills install` during installer setup when set to `1` |
@@ -7059,10 +7059,10 @@ Use it when:
 - you want `skills list`, `skills get`, `skills run`, and `skills new` to use
   a specific local repo
 
-## `CLAWPERATOR_RECEIVER_PACKAGE`
+## `CLAWPERATOR_OPERATOR_PACKAGE`
 
 Sets the default receiver package for commands that dispatch to the Android
-Operator APK. Also injected into skill scripts via `CLAWPERATOR_RECEIVER_PACKAGE`
+Operator APK. Also injected into skill scripts via `CLAWPERATOR_OPERATOR_PACKAGE`
 so skills know which Operator package to target.
 
 Typical values:
@@ -7073,17 +7073,17 @@ Typical values:
 Example:
 
 ```bash
-export CLAWPERATOR_RECEIVER_PACKAGE="com.clawperator.operator.dev"
+export CLAWPERATOR_OPERATOR_PACKAGE="com.clawperator.operator.dev"
 ```
 
 CLI flags still win over the environment variable. Use an explicit
-`--receiver-package` when you want one command to differ from your shell
+`--operator-package` when you want one command to differ from your shell
 default.
 
 For skill execution, this is also available as a CLI flag:
 
 ```bash
-clawperator skills run <skill_id> --receiver-package com.clawperator.operator.dev
+clawperator skills run <skill_id> --operator-package com.clawperator.operator.dev
 ```
 
 ## `CLAWPERATOR_BIN`
@@ -7193,7 +7193,7 @@ For a typical local setup, these are the most useful persistent exports:
 
 ```bash
 export CLAWPERATOR_SKILLS_REGISTRY="$HOME/.clawperator/skills/skills/skills-registry.json"
-export CLAWPERATOR_RECEIVER_PACKAGE="com.clawperator.operator"
+export CLAWPERATOR_OPERATOR_PACKAGE="com.clawperator.operator"
 ```
 
 Then override `--device-id` per command when more than one Android target is
@@ -7203,7 +7203,7 @@ For development with a local branch build, also set:
 
 ```bash
 export CLAWPERATOR_BIN="/path/to/clawperator/apps/node/dist/cli/index.js"
-export CLAWPERATOR_RECEIVER_PACKAGE="com.clawperator.operator.dev"
+export CLAWPERATOR_OPERATOR_PACKAGE="com.clawperator.operator.dev"
 ```
 
 ## Related docs
@@ -7250,7 +7250,7 @@ clawperator version
 Check the CLI against the installed [Clawperator Operator Android app](../getting-started/android-operator-apk.md):
 
 ```bash
-clawperator version --check-compat --receiver-package com.clawperator.operator
+clawperator version --check-compat --operator-package com.clawperator.operator
 ```
 
 The compatibility check reports:
@@ -7295,7 +7295,7 @@ If you are using a local debug build, make sure the receiver package matches the
 If the [Clawperator Operator Android app](../getting-started/android-operator-apk.md) version cannot be read, verify the device can return package metadata:
 
 ```bash
-adb shell dumpsys package <receiverPackage>
+adb shell dumpsys package <operatorPackage>
 ```
 
 ---
@@ -7381,7 +7381,7 @@ If any requirement is not met, the app shows an orange background and a dedicate
    ```
 2. If you are using a local debug build, add:
    ```bash
-   --receiver-package com.clawperator.operator.dev
+   --operator-package com.clawperator.operator.dev
    ```
 3. Re-run `clawperator doctor --device-id <device_id>` to confirm the package is now installed.
 
@@ -7620,7 +7620,7 @@ export CLAWPERATOR_SKILLS_REGISTRY="$HOME/.clawperator/skills/skills/skills-regi
 **How to confirm:**
 
 ```bash
-clawperator version --check-compat --receiver-package com.clawperator.operator
+clawperator version --check-compat --operator-package com.clawperator.operator
 ```
 
 This will report any version mismatch between the CLI and the installed APK.
@@ -7672,7 +7672,7 @@ The Node CLI and the installed [Clawperator Operator Android app](../getting-sta
 Use:
 
 ```bash
-clawperator version --check-compat --receiver-package com.clawperator.operator
+clawperator version --check-compat --operator-package com.clawperator.operator
 ```
 
 If the versions do not match, install the exact matching release APK and checksum from the versioned download URLs. For the full rule, examples, and remediation steps, see [Version Compatibility](compatibility.md).
@@ -7743,7 +7743,7 @@ adb shell pm list packages | grep clawperator
 # Output: com.clawperator.operator.dev (dev) or com.clawperator.operator (release)
 
 # Check CLI/APK version compatibility
-clawperator version --check-compat --receiver-package com.clawperator.operator.dev
+clawperator version --check-compat --operator-package com.clawperator.operator.dev
 ```
 
 **How to fix:**
@@ -7753,8 +7753,8 @@ clawperator version --check-compat --receiver-package com.clawperator.operator.d
    # Set CLAWPERATOR_BIN to use local branch build
    export CLAWPERATOR_BIN=/path/to/clawperator/apps/node/dist/cli/index.js
    
-   # Set CLAWPERATOR_RECEIVER_PACKAGE to target the dev APK
-   export CLAWPERATOR_RECEIVER_PACKAGE=com.clawperator.operator.dev
+   # Set CLAWPERATOR_OPERATOR_PACKAGE to target the dev APK
+   export CLAWPERATOR_OPERATOR_PACKAGE=com.clawperator.operator.dev
    
    # Rebuild if needed
    npm --prefix /path/to/clawperator/apps/node install
@@ -7764,18 +7764,18 @@ clawperator version --check-compat --receiver-package com.clawperator.operator.d
    clawperator skills run <skill_id>
    ```
 
-   Or use the `--receiver-package` flag for a single run:
+   Or use the `--operator-package` flag for a single run:
    ```bash
-   clawperator skills run <skill_id> --receiver-package com.clawperator.operator.dev
+   clawperator skills run <skill_id> --operator-package com.clawperator.operator.dev
    ```
 
 2. **For production use:** Ensure the global npm package matches your APK:
    ```bash
    npm install -g clawperator
-   clawperator version --check-compat --receiver-package com.clawperator.operator
+   clawperator version --check-compat --operator-package com.clawperator.operator
    ```
 
-3. **For skills specifically:** Skills receive `CLAWPERATOR_BIN` and `CLAWPERATOR_RECEIVER_PACKAGE` environment variables automatically from the CLI. When testing skills with a dev APK, set these environment variables or use the `--receiver-package` flag.
+3. **For skills specifically:** Skills receive `CLAWPERATOR_BIN` and `CLAWPERATOR_OPERATOR_PACKAGE` environment variables automatically from the CLI. When testing skills with a dev APK, set these environment variables or use the `--operator-package` flag.
 
 ### Skill validation passes but execution fails
 
@@ -9155,7 +9155,7 @@ Contracts:
 
 - **Canonical Envelope:** `[Clawperator-Result] {JSON}` is the ONLY way success/failure is reported.
 - **`expectedFormat` Required:** Every observation/execution must include `expectedFormat: "android-ui-automator"`.
-- **Single-Flight Lock:** Only one execution per `deviceId` / `receiverPackage` at a time. Overlaps return `EXECUTION_CONFLICT_IN_FLIGHT`.
+- **Single-Flight Lock:** Only one execution per `deviceId` / `operatorPackage` at a time. Overlaps return `EXECUTION_CONFLICT_IN_FLIGHT`.
 
 ## HTTP API Server (`serve`)
 
@@ -9167,13 +9167,13 @@ When running `clawperator serve [--port <number>] [--host <string>]`, a local HT
 
 - **`GET /devices`**: List all connected Android devices and their states.
 - **`POST /execute`**: Execute a full JSON execution payload.
-    - Body: `{"execution": {...}, "deviceId": "...", "receiverPackage": "..."}`
+    - Body: `{"execution": {...}, "deviceId": "...", "operatorPackage": "..."}`
     - Returns: `RunExecutionResult` (200 OK or 4xx/5xx on failure).
     - Status **423 Locked**: Returned if another execution is in flight for the target device.
 - **`POST /observe/snapshot`**: Quick helper for UI capture.
-    - Body: `{"deviceId": "...", "receiverPackage": "..."}`
+    - Body: `{"deviceId": "...", "operatorPackage": "..."}`
 - **`POST /observe/screenshot`**: Quick helper for visual capture.
-    - Body: `{"deviceId": "...", "receiverPackage": "..."}`
+    - Body: `{"deviceId": "...", "operatorPackage": "..."}`
 
 ### Event Streaming (SSE)
 

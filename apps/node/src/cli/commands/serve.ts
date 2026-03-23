@@ -96,6 +96,19 @@ export async function startServer(options: ServeOptions): Promise<Server> {
     });
   }
 
+  function resolveOperatorPackageForRequest(provided: string | undefined): string {
+    // - When the caller provides operatorPackage, use it verbatim (already validated non-empty).
+    // - When omitted, fall back to env var if non-empty, otherwise default to the release package.
+    if (provided !== undefined) {
+      return provided;
+    }
+    const env = process.env.CLAWPERATOR_OPERATOR_PACKAGE;
+    if (env !== undefined && env.trim().length > 0) {
+      return env;
+    }
+    return "com.clawperator.operator";
+  }
+
   // REST: Execute command
   app.post("/execute", async (req, res) => {
     if (!req.body || typeof req.body !== "object") {
@@ -119,11 +132,15 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       res.status(400).json({ ok: false, error: { code: "INVALID_OPERATOR_PACKAGE", message: "'operatorPackage' must be a string" } });
       return;
     }
+    if (typeof operatorPackage === "string" && operatorPackage.trim().length === 0) {
+      res.status(400).json({ ok: false, error: { code: "INVALID_OPERATOR_PACKAGE", message: "'operatorPackage' must be a non-empty string" } });
+      return;
+    }
 
     try {
       const result = await runExecution(execution, {
         deviceId,
-        operatorPackage: operatorPackage || process.env.CLAWPERATOR_OPERATOR_PACKAGE,
+        operatorPackage: resolveOperatorPackageForRequest(operatorPackage),
         logger: options.logger,
       });
 
@@ -155,6 +172,10 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       res.status(400).json({ ok: false, error: { code: "INVALID_OPERATOR_PACKAGE", message: "'operatorPackage' must be a string" } });
       return;
     }
+    if (typeof operatorPackage === "string" && operatorPackage.trim().length === 0) {
+      res.status(400).json({ ok: false, error: { code: "INVALID_OPERATOR_PACKAGE", message: "'operatorPackage' must be a non-empty string" } });
+      return;
+    }
 
     const ts = Date.now();
     const executionInput = {
@@ -169,7 +190,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
     try {
       const result = await runExecution(executionInput, { 
         deviceId, 
-        operatorPackage: operatorPackage || process.env.CLAWPERATOR_OPERATOR_PACKAGE,
+        operatorPackage: resolveOperatorPackageForRequest(operatorPackage),
         logger: options.logger,
       });
       if (result.ok) {
@@ -200,6 +221,10 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       res.status(400).json({ ok: false, error: { code: "INVALID_OPERATOR_PACKAGE", message: "'operatorPackage' must be a string" } });
       return;
     }
+    if (typeof operatorPackage === "string" && operatorPackage.trim().length === 0) {
+      res.status(400).json({ ok: false, error: { code: "INVALID_OPERATOR_PACKAGE", message: "'operatorPackage' must be a non-empty string" } });
+      return;
+    }
 
     if (path !== undefined && (typeof path !== "string" || path.trim() === "")) {
       res.status(400).json({ ok: false, error: { code: "INVALID_PATH", message: "'path' must be a non-empty string" } });
@@ -219,7 +244,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
     try {
       const result = await runExecution(executionInput, { 
         deviceId, 
-        operatorPackage: operatorPackage || process.env.CLAWPERATOR_OPERATOR_PACKAGE,
+        operatorPackage: resolveOperatorPackageForRequest(operatorPackage),
         logger: options.logger,
       });
       if (result.ok) {

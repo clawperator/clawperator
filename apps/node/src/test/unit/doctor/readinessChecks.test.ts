@@ -104,7 +104,7 @@ describe("runHandshake", () => {
         assert.strictEqual(result.status, "fail");
         assert.strictEqual(result.code, ERROR_CODES.RESULT_ENVELOPE_TIMEOUT);
         assert.match(result.detail ?? "", /Broadcast dispatch: sent/);
-        assert.match(result.detail ?? "", /Receiver package: com\.test\.operator/);
+        assert.match(result.detail ?? "", /Operator package: com\.test\.operator/);
         assert.ok(result.fix?.steps.some(step => step.kind === "shell" && step.value.includes("observe snapshot")));
     });
 
