@@ -242,7 +242,7 @@ export async function probeVersionCompatibility(config: RuntimeConfig): Promise<
       operatorPackage,
       compatible: false,
       error: {
-        code: ERROR_CODES.RECEIVER_NOT_INSTALLED,
+        code: ERROR_CODES.OPERATOR_NOT_INSTALLED,
         message: `Package ${operatorPackage} is not installed on the device.`,
         hint: "Install the Operator APK or choose the correct receiver package.",
       },

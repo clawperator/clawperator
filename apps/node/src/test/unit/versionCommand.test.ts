@@ -66,7 +66,7 @@ describe("cmdVersion", () => {
     const parsed = JSON.parse(output);
 
     assert.strictEqual(parsed.compatible, false);
-    assert.strictEqual(parsed.error.code, ERROR_CODES.RECEIVER_NOT_INSTALLED);
+    assert.strictEqual(parsed.error.code, ERROR_CODES.OPERATOR_NOT_INSTALLED);
     assert.deepStrictEqual(parsed.remediation, [
       `Download the matching APK: https://downloads.clawperator.com/operator/v${version}/operator-v${version}.apk`,
       `Download the checksum: https://downloads.clawperator.com/operator/v${version}/operator-v${version}.apk.sha256`,

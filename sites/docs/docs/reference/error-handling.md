@@ -26,7 +26,7 @@ That ordering matters because the same execution can:
 
 | Failure class | Typical examples | Agent response |
 | :--- | :--- | :--- |
-| Targeting / environment | `NO_DEVICES`, `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED`, `DEVICE_UNAUTHORIZED`, `RECEIVER_NOT_INSTALLED` | Fix environment first. Do not blindly retry the same execution. |
+| Targeting / environment | `NO_DEVICES`, `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED`, `DEVICE_UNAUTHORIZED`, `OPERATOR_NOT_INSTALLED` | Fix environment first. Do not blindly retry the same execution. |
 | Payload / contract | `EXECUTION_VALIDATION_FAILED` | Fix the payload shape. Retrying unchanged is wasted work. |
 | Concurrency / timing | `EXECUTION_CONFLICT_IN_FLIGHT`, `RESULT_ENVELOPE_TIMEOUT`, `SNAPSHOT_EXTRACTION_FAILED` | Retry only after a short wait or after reducing contention. |
 | UI state / selector | `NODE_NOT_FOUND`, `CONTAINER_NOT_FOUND`, `CONTAINER_NOT_SCROLLABLE` | Re-observe the UI, then adjust selectors or navigation. |
@@ -75,7 +75,7 @@ Recommended next action:
 - accept the USB debugging prompt
 - rerun `clawperator doctor --device-id <device_id> --output json`
 
-### `RECEIVER_NOT_INSTALLED`
+### `OPERATOR_NOT_INSTALLED`
 
 Meaning:
 - the targeted Clawperator Operator APK package is not installed on the device
@@ -297,7 +297,7 @@ Usually wrong to retry unchanged:
 
 - `EXECUTION_VALIDATION_FAILED`
 - `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED`
-- `RECEIVER_NOT_INSTALLED`
+- `OPERATOR_NOT_INSTALLED`
 - `NODE_NOT_FOUND` when the agent has not re-observed the UI
 - `REGISTRY_READ_FAILED`
 - `SKILL_EXECUTION_FAILED` when the script already returned a real error signal

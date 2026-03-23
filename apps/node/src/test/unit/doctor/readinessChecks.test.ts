@@ -20,7 +20,7 @@ describe("checkApkPresence", () => {
         const result = await checkApkPresence(config);
 
         assert.strictEqual(result.status, "fail");
-        assert.strictEqual(result.code, ERROR_CODES.RECEIVER_NOT_INSTALLED);
+        assert.strictEqual(result.code, ERROR_CODES.OPERATOR_NOT_INSTALLED);
         assert.match(result.detail ?? "", /Package com\.test\.operator was not found/);
     });
 
@@ -116,7 +116,7 @@ describe("runHandshake", () => {
             ok: false as const,
             broadcastFailed: true as const,
             diagnostics: {
-                code: ERROR_CODES.RECEIVER_NOT_INSTALLED,
+                code: ERROR_CODES.OPERATOR_NOT_INSTALLED,
                 message: "Dispatch failed",
                 lastCorrelatedEvents: [],
                 broadcastDispatchStatus: "failed",
@@ -125,6 +125,6 @@ describe("runHandshake", () => {
 
         const result = await runHandshake(config, mockWait);
         assert.strictEqual(result.status, "fail");
-        assert.strictEqual(result.code, ERROR_CODES.RECEIVER_NOT_INSTALLED);
+        assert.strictEqual(result.code, ERROR_CODES.OPERATOR_NOT_INSTALLED);
     });
 });

@@ -70,7 +70,7 @@ export async function checkApkPresence(config: RuntimeConfig): Promise<DoctorChe
     return {
       id: "readiness.apk.presence",
       status: "fail",
-      code: ERROR_CODES.RECEIVER_NOT_INSTALLED,
+      code: ERROR_CODES.OPERATOR_NOT_INSTALLED,
       summary: "Operator APK not installed.",
       detail: `Package ${config.operatorPackage} was not found on the device.`,
       evidence: {

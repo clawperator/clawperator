@@ -332,7 +332,7 @@ async function performExecution(
       result: {
         ok: false,
         error: {
-          code: ERROR_CODES.RECEIVER_NOT_INSTALLED,
+          code: ERROR_CODES.OPERATOR_NOT_INSTALLED,
           message: `Operator APK (${config.operatorPackage}) is not installed on ${deviceId}. Install it with: ${installCommand}`,
           details: {
             checkId: apkCheck.id,

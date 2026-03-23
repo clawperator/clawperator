@@ -36,7 +36,7 @@ describe("DoctorService", () => {
     const apkPresence = report.checks.find(check => check.id === "readiness.apk.presence");
     assert.ok(apkPresence);
     assert.strictEqual(apkPresence.status, "fail");
-    assert.strictEqual(apkPresence.code, ERROR_CODES.RECEIVER_NOT_INSTALLED);
+    assert.strictEqual(apkPresence.code, ERROR_CODES.OPERATOR_NOT_INSTALLED);
 
     assert.ok(!report.checks.some(check => check.id === "readiness.handshake"));
     assert.deepStrictEqual(report.nextActions, [

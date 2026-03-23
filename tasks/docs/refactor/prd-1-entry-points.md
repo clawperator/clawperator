@@ -12,7 +12,7 @@ plan split that work into its own task area.
 
 The docs already contain the right material. The first-run story is spread across multiple pages. The docs are not pointed to from install output, and doctor failure output links to nothing. A missing integration hook (`scripts/operator_event.sh`) causes repeated visible errors in the OpenClaw gateway log.
 
-The install.sh banner and RECEIVER_NOT_INSTALLED behavior are already fixed in previously merged work (the old PRD-1 readiness gate). This PRD covers everything that must wait for all runtime changes - including the API refactor - to settle.
+The install.sh banner and OPERATOR_NOT_INSTALLED behavior are already fixed in previously merged work (the old PRD-1 readiness gate). This PRD covers everything that must wait for all runtime changes - including the API refactor - to settle.
 
 ---
 
@@ -106,7 +106,7 @@ if (check.status !== "pass" && check.fix) {
 
 JSON mode already serializes the full `DoctorReport` object, so `docsUrl` will appear automatically once it is in the type and populated in the check result. No separate JSON formatter change is needed.
 
-**c. `apps/node/src/domain/doctor/checks/readinessChecks.ts`**: Populate `docsUrl` in the `RECEIVER_NOT_INSTALLED` fix:
+**c. `apps/node/src/domain/doctor/checks/readinessChecks.ts`**: Populate `docsUrl` in the `OPERATOR_NOT_INSTALLED` fix:
 
 ```typescript
 fix: {
@@ -117,12 +117,12 @@ fix: {
 }
 ```
 
-Only add `docsUrl` to checks where a specific, stable docs page exists. The initial set: `RECEIVER_NOT_INSTALLED`, `RECEIVER_VARIANT_MISMATCH`, and `DEVICE_DEV_OPTIONS_DISABLED`. Do not add it to all checks as a bulk change.
+Only add `docsUrl` to checks where a specific, stable docs page exists. The initial set: `OPERATOR_NOT_INSTALLED`, `RECEIVER_VARIANT_MISMATCH`, and `DEVICE_DEV_OPTIONS_DISABLED`. Do not add it to all checks as a bulk change.
 
 Required tests:
 - Unit test: `renderCheck` output for a check with `fix.docsUrl` includes the `Docs:` line.
 - Unit test: `renderCheck` output for a check without `fix.docsUrl` does not include a `Docs:` line.
-- Unit test: `JSON.parse(cmdDoctor({ format: "json", ... }))` output for `RECEIVER_NOT_INSTALLED` includes `fix.docsUrl`.
+- Unit test: `JSON.parse(cmdDoctor({ format: "json", ... }))` output for `OPERATOR_NOT_INSTALLED` includes `fix.docsUrl`.
 - Type-level: TypeScript compilation verifies `docsUrl` is optional (not required) in the `fix` type.
 
 ### 4. `scripts/operator_event.sh`: investigation and stub
@@ -270,7 +270,7 @@ If this PR lands before the API refactor is complete, the docs will describe beh
 Hardcoded docs URLs in doctor output will become stale if the docs site is restructured.
 PRD-2 restructures the docs and will rename pages. The implementing agent for PRD-2 must
 check and update all `docsUrl` values hardcoded in this PRD as part of that work. The
-three initial `docsUrl` values are in `readinessChecks.ts` for `RECEIVER_NOT_INSTALLED`,
+three initial `docsUrl` values are in `readinessChecks.ts` for `OPERATOR_NOT_INSTALLED`,
 `RECEIVER_VARIANT_MISMATCH`, and `DEVICE_DEV_OPTIONS_DISABLED`. Document these as
 explicit search targets in the PRD-2 implementation notes.
 
@@ -314,7 +314,7 @@ Inline `DoctorCheckResult` objects — construct in test body, no files needed:
 - Protects: field in type and data but never rendered; doctor failure output silently
   omits the link
 
-**T3 — doctor JSON output for `RECEIVER_NOT_INSTALLED` includes `fix.docsUrl`**
+**T3 — doctor JSON output for `OPERATOR_NOT_INSTALLED` includes `fix.docsUrl`**
 - Method: call the readiness check function and inspect the returned object; or parse
   `clawperator doctor --json`
 - Expected: `check.fix.docsUrl` starts with `"https://"`
@@ -353,7 +353,7 @@ Inline `DoctorCheckResult` objects — construct in test body, no files needed:
 ### Manual Verification
 
 - `clawperator doctor` with APK absent: `Docs:` line appears under the fix section for
-  `RECEIVER_NOT_INSTALLED`; URL is a valid `https://` URL; other checks without
+  `OPERATOR_NOT_INSTALLED`; URL is a valid `https://` URL; other checks without
   `docsUrl` do not show a `Docs:` line
 
 ---
@@ -367,8 +367,8 @@ Inline `DoctorCheckResult` objects — construct in test body, no files needed:
 - All first-run guides describe APK absence as a blocking failure with the install command.
 - `contracts/doctor.ts`: `fix.docsUrl` is an optional field in the `DoctorCheckResult.fix` type.
 - `cli/commands/doctor.ts`: `renderCheck` renders `Docs: <url>` in pretty output when `fix.docsUrl` is set.
-- `clawperator doctor --json` for `RECEIVER_NOT_INSTALLED` includes `fix.docsUrl`.
-- `clawperator doctor` (pretty mode) for `RECEIVER_NOT_INSTALLED` includes a `Docs:` line.
+- `clawperator doctor --json` for `OPERATOR_NOT_INSTALLED` includes `fix.docsUrl`.
+- `clawperator doctor` (pretty mode) for `OPERATOR_NOT_INSTALLED` includes a `Docs:` line.
 - Existing checks without `docsUrl` are unaffected (TypeScript `docsUrl?` optional).
 - `./scripts/operator_event.sh` exists, exits 0, and emits a detectable stderr notice (stub) OR has confirmed behavior from OpenClaw review.
 - OpenClaw review outcome is documented before merging the stub.

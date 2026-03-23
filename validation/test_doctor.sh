@@ -92,10 +92,10 @@ if [ "$EXIT_CODE" -eq 0 ]; then
   exit 1
 fi
 
-if grep -q "RECEIVER_NOT_INSTALLED" "$TMP_DIR/out3.json"; then
-  echo "[Success] RECEIVER_NOT_INSTALLED error code emitted."
+if grep -q "OPERATOR_NOT_INSTALLED" "$TMP_DIR/out3.json"; then
+  echo "[Success] OPERATOR_NOT_INSTALLED error code emitted."
 else
-  echo "[Error] RECEIVER_NOT_INSTALLED error code not found in output."
+  echo "[Error] OPERATOR_NOT_INSTALLED error code not found in output."
   cat "$TMP_DIR/out3.json"
   exit 1
 fi

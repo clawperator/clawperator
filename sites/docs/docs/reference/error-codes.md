@@ -31,7 +31,7 @@ The `code` field is always one of the string constants listed below.
 | `ADB_NOT_FOUND` | `adb` binary not found on the host |
 | `NO_DEVICES` | No Android devices are connected |
 | `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED` | Multiple devices connected but no `--device-id` specified |
-| `RECEIVER_NOT_INSTALLED` | The Clawperator Operator APK is not installed on the device |
+| `OPERATOR_NOT_INSTALLED` | The Clawperator Operator APK is not installed on the device |
 | `DEVICE_NOT_FOUND` | The specified `--device-id` is not among connected devices |
 
 ---
@@ -179,11 +179,11 @@ Returned when `RESULT_ENVELOPE_TIMEOUT` occurs.
 
 ### BroadcastDiagnostics
 
-Returned when `BROADCAST_FAILED` or `RECEIVER_NOT_INSTALLED` occurs.
+Returned when `BROADCAST_FAILED` or `OPERATOR_NOT_INSTALLED` occurs.
 
 ```ts
 {
-  code: "BROADCAST_FAILED" | "RECEIVER_NOT_INSTALLED";
+  code: "BROADCAST_FAILED" | "OPERATOR_NOT_INSTALLED";
   message: string;
   lastCorrelatedEvents?: string[];
   broadcastDispatchStatus?: string;

@@ -10,7 +10,7 @@ export const ERROR_CODES = {
   ADB_NOT_FOUND: "ADB_NOT_FOUND",
   NO_DEVICES: "NO_DEVICES",
   MULTIPLE_DEVICES_DEVICE_ID_REQUIRED: "MULTIPLE_DEVICES_DEVICE_ID_REQUIRED",
-  RECEIVER_NOT_INSTALLED: "RECEIVER_NOT_INSTALLED",
+  OPERATOR_NOT_INSTALLED: "OPERATOR_NOT_INSTALLED",
   DEVICE_NOT_FOUND: "DEVICE_NOT_FOUND", // Specific device ID provided but not connected
 
   // Execution & State
@@ -103,7 +103,7 @@ export interface TimeoutDiagnostics {
 }
 
 export interface BroadcastDiagnostics {
-  code: typeof ERROR_CODES.BROADCAST_FAILED | typeof ERROR_CODES.RECEIVER_NOT_INSTALLED;
+  code: typeof ERROR_CODES.BROADCAST_FAILED | typeof ERROR_CODES.OPERATOR_NOT_INSTALLED;
   message: string;
   lastCorrelatedEvents?: string[];
   broadcastDispatchStatus?: string;

@@ -159,7 +159,7 @@ A fully configured device will show all checks passing. Common warnings:
 | Warning | Fix |
 | :--- | :--- |
 | `DEVICE_UNAUTHORIZED` | Tap "Allow" on the device USB debugging dialog |
-| `RECEIVER_NOT_INSTALLED` | Complete Step 3. Run `clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device <device_id>` and add `--operator-package com.clawperator.operator.dev` for debug builds. |
+| `OPERATOR_NOT_INSTALLED` | Complete Step 3. Run `clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device <device_id>` and add `--operator-package com.clawperator.operator.dev` for debug builds. |
 | `DEVICE_ACCESSIBILITY_NOT_RUNNING` | If the Operator APK crashed after setup, run `clawperator grant-device-permissions` to restore the revoked permissions |
 | `DEVICE_DEV_OPTIONS_DISABLED` | Enable Developer options (physical device only) |
 | `DEVICE_USB_DEBUGGING_DISABLED` | Enable USB debugging (physical device only) |
@@ -244,7 +244,7 @@ clawperator doctor --device-id <serial>
 
 A healthy device shows all checks passing and exits 0. An unhealthy device
 exits 1 with details on which checks failed (for example,
-`RECEIVER_NOT_INSTALLED` or `DEVICE_ACCESSIBILITY_NOT_RUNNING`).
+`OPERATOR_NOT_INSTALLED` or `DEVICE_ACCESSIBILITY_NOT_RUNNING`).
 
 **How to complete setup for a device that needs it**
 

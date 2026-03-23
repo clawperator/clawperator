@@ -100,7 +100,7 @@ LLM agents must use these codes to decide their next step.
 - `ADB_NOT_FOUND`: ADB is missing from PATH.
 - `NO_DEVICES`: No Android devices are connected via USB/Network.
 - `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED`: More than one device exists; specify `--device-id`.
-- `RECEIVER_NOT_INSTALLED`: The target receiver package is not on the device, so `doctor` and `execute` fail fast before dispatch.
+- `OPERATOR_NOT_INSTALLED`: The target Operator package is not on the device, so `doctor` and `execute` fail fast before dispatch.
 
 ### Execution & State
 - `EXECUTION_VALIDATION_FAILED`: The execution JSON is malformed or invalid.
