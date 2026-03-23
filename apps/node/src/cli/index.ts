@@ -164,9 +164,13 @@ async function main(): Promise<void> {
     }
     // TODO(Phase 2): exit-code heuristic is fragile - see plan.md "Carried-forward debt"
     if (result.startsWith("{") && result.includes('"code"') && !result.includes('"envelope"')) {
-      const obj = JSON.parse(result) as { code?: string };
-      if (obj.code && obj.code !== "USAGE" && obj.code !== "NOT_IMPLEMENTED") {
-        process.exitCode = 1;
+      try {
+        const obj = JSON.parse(result) as { code?: string };
+        if (obj.code && obj.code !== "USAGE" && obj.code !== "NOT_IMPLEMENTED") {
+          process.exitCode = 1;
+        }
+      } catch {
+        // Malformed JSON that passed the string heuristic - treat as non-error.
       }
     }
   }

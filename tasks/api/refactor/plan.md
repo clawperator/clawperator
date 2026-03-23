@@ -94,7 +94,7 @@ BEFORE (current)              AFTER (canonical)         AFTER (still accepted)
 --device-id <id>              --device <id>             --device-id
 --output json                 --json                    --output json
 --timeout-ms <ms>             --timeout <ms>            --timeout-ms
---receiver-package <pkg>      --operator-package <pkg>  --receiver-package, --package
+--receiver-package <pkg>      --operator-package <pkg>  --receiver-package
 --selector '{"textEquals":"X"}'          --text "X"             --selector (advanced)
 --selector '{"resourceId":              --id "com.foo:id/bar"  --selector (advanced)
   "com.foo:id/bar"}'
@@ -180,8 +180,10 @@ shown in help text.
 implementation detail (BroadcastReceiver) that means nothing to agents. "Operator"
 is Clawperator's own term - it is what `operator setup` installs, what docs
 reference, what agents will encounter. `--operator-package` is unambiguous and
-self-documenting. `--receiver-package` and `--package` are accepted as silent
-aliases. This flag is rarely needed (only for dev/release variant switching).
+self-documenting. `--receiver-package` is accepted as a silent alias.
+`--package` was considered but dropped: it is too generic and risks colliding
+with future flags or confusing agents who assume it means something else.
+This flag is rarely needed (only for dev/release variant switching).
 
 **Scope of the rename:** The CLI/API surface changes to `--operator-package`.
 Internally, existing TypeScript field names (`receiverPackage` in `GlobalOpts`,
@@ -468,7 +470,7 @@ Establish the foundation that makes Phases 1-4 safe.
        in `cliHelp.test.ts` - must be preserved)
      - `--timeout-ms` -> `--timeout`
      - `--receiver-package` -> `--operator-package` (rename)
-     - `--package` -> `--operator-package` (alias for agents who guess it)
+     - `--package` -> not aliased (too generic; dropped after review)
    - Centralized in `getGlobalOpts()` so all commands automatically inherit
      the renamed global flags
 
@@ -890,8 +892,8 @@ separable for review:
    - `--device` (canonical), `--device-id` (accepted silently)
    - `--json` (canonical), `--output json` (accepted silently)
    - `--timeout` (canonical), `--timeout-ms` (accepted silently)
-   - `--operator-package` (canonical), `--receiver-package` and `--package`
-     (accepted silently). See Design Decisions for rationale.
+   - `--operator-package` (canonical), `--receiver-package` (accepted silently).
+     `--package` was considered and deliberately dropped - see Design Decisions.
 
 6. **Remove `action` and `observe` parent commands**
    - Removed from dispatch, removed from help text
@@ -1127,6 +1129,12 @@ Finalize the developer and agent experience.
      deliverable is about updating `summary` and `help` fields in registry
      entries and refining the `generateTopLevelHelp` grouping/formatting -
      not rebuilding help infrastructure.
+   - **Global options flag order:** The Phase 0/1 global options block lists
+     both old and new flag names (e.g. `--device-id <id>, --device <id>`).
+     Phase 4 should flip this so the canonical new name leads and the legacy
+     name appears in a parenthetical or is dropped from the banner entirely.
+     This is a cosmetic change deferred here because it requires touching the
+     same text as the broader help rewrite.
    - Top-level `--help` shows flat commands grouped by function
    - Target structure:
      ```
