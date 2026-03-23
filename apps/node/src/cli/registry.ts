@@ -132,7 +132,7 @@ Usage:
 Notes:
   - Captures a UI snapshot via the canonical execution path.
   - Default receiver package: com.clawperator.operator
-  - Use --operator-package com.clawperator.operator.dev for local debug APKs. --receiver-package is an accepted alias.
+  - Use --operator-package com.clawperator.operator.dev for local debug APKs. --operator-package is an accepted alias.
   - --timeout-ms overrides the execution timeout within policy limits.
 `;
 
@@ -144,7 +144,7 @@ Usage:
 Notes:
   - Captures a PNG screenshot via the canonical execution path.
   - Default receiver package: com.clawperator.operator
-  - Use --operator-package com.clawperator.operator.dev for local debug APKs. --receiver-package is an accepted alias.
+  - Use --operator-package com.clawperator.operator.dev for local debug APKs. --operator-package is an accepted alias.
   - --path writes the screenshot to the provided local filesystem path.
   - If --path is omitted, Clawperator writes to a generated temp file and returns that path in the result envelope.
   - --timeout-ms overrides the execution timeout within policy limits.
@@ -226,7 +226,7 @@ Usage:
 Notes:
   - Runs the selected skill script through the local skill wrapper.
   - Use --device-id explicitly when more than one Android device is connected.
-  - --operator-package sets the Operator package (alias: --receiver-package) for this skill run (default: com.clawperator.operator).
+  - --operator-package sets the Operator package (alias: --operator-package) for this skill run (default: com.clawperator.operator).
     Use com.clawperator.operator.dev for local debug APKs.
   - --timeout-ms overrides the wrapper timeout for this run only.
   - --expect-contains turns the run into a lightweight output assertion.
@@ -248,7 +248,7 @@ Usage:
 
 Notes:
   - Default receiver package: com.clawperator.operator
-  - Use --operator-package com.clawperator.operator.dev for local debug APKs. --receiver-package is an accepted alias.
+  - Use --operator-package com.clawperator.operator.dev for local debug APKs. --operator-package is an accepted alias.
   - Exit code 0 means all critical checks passed, including the warning-only multi-device ambiguity case.
   - Exit code 1 means a genuine failure such as no device, APK not installed, or handshake failure.
   - If handshake times out, rerun with --verbose and compare the installed APK package with --operator-package.
@@ -262,7 +262,7 @@ Usage:
 
   Notes:
   - Default receiver package: com.clawperator.operator
-  - Use --operator-package com.clawperator.operator.dev for local debug APKs. --receiver-package is an accepted alias.
+  - Use --operator-package com.clawperator.operator.dev for local debug APKs. --operator-package is an accepted alias.
   - --check-compat compares the CLI version with the installed APK version on the device.
 `;
 
@@ -273,7 +273,7 @@ Usage:
 
 Notes:
   - Default receiver package: com.clawperator.operator
-  - Use --operator-package com.clawperator.operator.dev for local debug APKs. --receiver-package is an accepted alias.
+  - Use --operator-package com.clawperator.operator.dev for local debug APKs. --operator-package is an accepted alias.
   - Grants accessibility, notification posting, and notification listener permissions via adb.
   - This command is for crash recovery only. Use it when the Operator APK crashes and Android revokes permissions.
   - For normal setup, always use clawperator operator setup instead.
@@ -330,7 +330,7 @@ COMMANDS["operator"] = {
           apkPath,
           // TODO(Phase 2): ?? getOpt fallbacks are dead code - see plan.md "Carried-forward debt"
           deviceId: deviceId ?? getOpt(rest, "--device-id"),
-          operatorPackage: operatorPackage ?? getOpt(rest, "--receiver-package"),
+          operatorPackage: operatorPackage ?? getOpt(rest, "--operator-package"),
         });
       }
     } else {
@@ -521,7 +521,7 @@ COMMANDS["execute"] = {
           ...out,
           execution,
           deviceId: deviceId ?? getOpt(rest, "--device-id"),
-          operatorPackage: operatorPackage ?? getOpt(rest, "--receiver-package"),
+          operatorPackage: operatorPackage ?? getOpt(rest, "--operator-package"),
           timeoutMs,
           validateOnly: hasFlag(rest, "--validate-only"),
           dryRun: hasFlag(rest, "--dry-run"),
@@ -553,14 +553,14 @@ COMMANDS["observe"] = {
       return (await import("./commands/observe.js")).cmdObserveSnapshot({
         ...out,
         deviceId: deviceId ?? getOpt(rest, "--device-id"),
-        operatorPackage: operatorPackage ?? getOpt(rest, "--receiver-package"),
+        operatorPackage: operatorPackage ?? getOpt(rest, "--operator-package"),
         timeoutMs,
       });
     } else if (rest[0] === "screenshot") {
       return (await import("./commands/observe.js")).cmdObserveScreenshot({
         ...out,
         deviceId: deviceId ?? getOpt(rest, "--device-id"),
-        operatorPackage: operatorPackage ?? getOpt(rest, "--receiver-package"),
+        operatorPackage: operatorPackage ?? getOpt(rest, "--operator-package"),
         timeoutMs,
         path: getStringOpt(rest, "--path"),
       });
@@ -588,7 +588,7 @@ COMMANDS["inspect"] = {
       return (await import("./commands/inspect.js")).cmdInspectUi({
         ...out,
         deviceId: deviceId ?? getOpt(rest, "--device-id"),
-        operatorPackage: operatorPackage ?? getOpt(rest, "--receiver-package"),
+        operatorPackage: operatorPackage ?? getOpt(rest, "--operator-package"),
         timeoutMs,
       });
     } else {
@@ -624,7 +624,7 @@ COMMANDS["action"] = {
     const selector = getOpt(rest, "--selector");
     const runOpts = {
       deviceId: deviceId ?? getOpt(rest, "--device-id"),
-      operatorPackage: operatorPackage ?? getOpt(rest, "--receiver-package"),
+      operatorPackage: operatorPackage ?? getOpt(rest, "--operator-package"),
       logger,
     };
     if (sub === "click") {
@@ -791,7 +791,7 @@ Usage:
         const rawOptSegment = rawDashDash >= 0 ? rawSkillsRunArgs.slice(0, rawDashDash) : rawSkillsRunArgs;
         const scriptArgs: string[] = [];
         const resolvedDeviceId = deviceId ?? getOpt(optSegment, "--device-id");
-        const resolvedOperatorPackage = operatorPackage ?? getOpt(optSegment, "--receiver-package");
+        const resolvedOperatorPackage = operatorPackage ?? getOpt(optSegment, "--operator-package");
         const localTimeoutMs = getNumberOpt(rawOptSegment, "--timeout-ms") ?? getNumberOpt(rawOptSegment, "--timeout");
         const effectiveTimeoutMs = localTimeoutMs ?? timeoutMs;
         const invalidTimeoutResult = getInvalidTimeoutResult(effectiveTimeoutMs, { format });
@@ -850,7 +850,7 @@ COMMANDS["recording"] = {
     const sub = rest[0];
     const runOpts = {
       deviceId: deviceId ?? getOpt(rest, "--device-id"),
-      operatorPackage: operatorPackage ?? getOpt(rest, "--receiver-package"),
+      operatorPackage: operatorPackage ?? getOpt(rest, "--operator-package"),
     };
     if (sub === "start") {
       return (await import("./commands/record.js")).cmdRecordStart({
@@ -945,7 +945,7 @@ COMMANDS["doctor"] = {
       full: hasFlag(rest, "--full"),
       checkOnly: hasFlag(rest, "--check-only"),
       deviceId: deviceId ?? getOpt(rest, "--device-id"),
-      operatorPackage: operatorPackage ?? getOpt(rest, "--receiver-package"),
+      operatorPackage: operatorPackage ?? getOpt(rest, "--operator-package"),
       logger,
     });
   },
@@ -965,7 +965,7 @@ COMMANDS["grant-device-permissions"] = {
     return (await import("./commands/grantDevicePermissions.js")).cmdGrantDevicePermissions({
       ...out,
       deviceId: deviceId ?? getOpt(rest, "--device-id"),
-      operatorPackage: operatorPackage ?? getOpt(rest, "--receiver-package"),
+      operatorPackage: operatorPackage ?? getOpt(rest, "--operator-package"),
     });
   },
 };
@@ -987,7 +987,7 @@ COMMANDS["version"] = {
       ...out,
       checkCompat: hasFlag(rest, "--check-compat"),
       deviceId: deviceId ?? getOpt(rest, "--device-id"),
-      operatorPackage: operatorPackage ?? getOpt(rest, "--receiver-package"),
+      operatorPackage: operatorPackage ?? getOpt(rest, "--operator-package"),
     });
   },
 };
@@ -1071,7 +1071,7 @@ export function generateTopLevelHelp(commands: Record<string, CommandDef>): stri
     "",
     "Global options:",
     "  --device-id <id>, --device <id>           Target Android device serial",
-    "  --operator-package <package>, --receiver-package <package>",
+    "  --operator-package <package>, --operator-package <package>",
     "                                            Target Operator package for broadcast dispatch",
     "  --output <json|pretty>, --format <json|pretty>",
     "                                            Output format (default: json)",
@@ -1086,7 +1086,7 @@ export function generateTopLevelHelp(commands: Record<string, CommandDef>): stri
     "  - recording is the canonical command family; 'record' is a supported short alias.",
     "  - inspect ui is a wrapper alias over observe snapshot.",
     "  - action commands are thin wrappers that compile to execution and call execute.",
-    "  - The default receiver package is com.clawperator.operator. Use --receiver-package com.clawperator.operator.dev for local debug builds.",
+    "  - The default receiver package is com.clawperator.operator. Use --operator-package com.clawperator.operator.dev for local debug builds.",
     "  - Terminal result semantics are driven by [Clawperator-Result].",
     ""
   );

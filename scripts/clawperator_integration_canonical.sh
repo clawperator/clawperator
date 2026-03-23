@@ -14,7 +14,7 @@ cd "$(dirname "$0")/.."
 npm --prefix apps/node run build
 
 export DEVICE_ID="${DEVICE_ID:-}"
-export CLAWPERATOR_RECEIVER_PACKAGE="${CLAWPERATOR_RECEIVER_PACKAGE:-com.clawperator.operator.dev}"
+export CLAWPERATOR_OPERATOR_PACKAGE="${CLAWPERATOR_OPERATOR_PACKAGE:-com.clawperator.operator.dev}"
 SKILL_ID="${SKILL_ID:-com.google.android.apps.chromecast.app.get-climate}"
 ARTIFACT_NAME="${ARTIFACT_NAME:-climate-status}"
 CLIMATE_TILE_NAME="${CLIMATE_TILE_NAME:-Master}"
@@ -26,7 +26,7 @@ echo "=== integration: compile artifact ==="
   | node -e 'const d=JSON.parse(require("fs").readFileSync(0,"utf8")); if (!d.execution) process.exit(1); require("fs").writeFileSync("/tmp/clawperator-integration-exec.json", JSON.stringify(d.execution));'
 
 echo "=== integration: execute on device ==="
-EXEC_OUT="$("${CLI[@]}" execute --device-id "$DEVICE_ID" --receiver-package "$CLAWPERATOR_RECEIVER_PACKAGE" --execution /tmp/clawperator-integration-exec.json --output json 2>&1)" || true
+EXEC_OUT="$("${CLI[@]}" execute --device-id "$DEVICE_ID" --operator-package "$CLAWPERATOR_OPERATOR_PACKAGE" --execution /tmp/clawperator-integration-exec.json --output json 2>&1)" || true
 
 echo "$EXEC_OUT" | node -e '
 const data = require("fs").readFileSync(0, "utf8");

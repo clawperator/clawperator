@@ -45,19 +45,19 @@ workflow (also available as `record` alias), use [Android Recording Format for A
 | `skills validate <skill_id>` | Verify one local skill's metadata and required files before runtime testing |
 | `skills validate --all` | Validate the entire configured skills registry in one pass |
 | `skills compile-artifact <id> --artifact <name>` | Compile skill to execution payload |
-| `skills run <skill_id> [--device-id <id>] [--receiver-package <pkg>] [--timeout-ms <n>] [--expect-contains <text>]` | Invoke a skill script (convenience wrapper; pretty mode streams output live and prints a pre-run banner) |
+| `skills run <skill_id> [--device-id <id>] [--operator-package <pkg>] [--timeout-ms <n>] [--expect-contains <text>]` | Invoke a skill script (convenience wrapper; pretty mode streams output live and prints a pre-run banner) |
 | `skills install` | Clone skills repo to `~/.clawperator/skills/` |
 | `skills update [--ref <git-ref>]` | Pull latest skills (optionally pin to a ref) |
 | `grant-device-permissions` | Re-grant Operator permissions only after an Operator APK crash causes Android to revoke them |
-| `recording start [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]` | Start a recording session on the operator app and write NDJSON on device (`record` is an alias) |
-| `recording stop [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]` | Stop the active recording session and finalize the recording file (`record` is an alias) |
+| `recording start [--session-id <id>] [--device-id <serial>] [--operator-package <pkg>]` | Start a recording session on the operator app and write NDJSON on device (`record` is an alias) |
+| `recording stop [--session-id <id>] [--device-id <serial>] [--operator-package <pkg>]` | Stop the active recording session and finalize the recording file (`record` is an alias) |
 | `recording pull [--session-id <id>] [--out <dir>] [--device-id <serial>]` | Pull the on-device NDJSON recording to host storage (`record` is an alias) |
 | `recording parse --input <file> [--out <file>]` | Parse a raw NDJSON recording into a step log JSON (`record` is an alias) |
 | `serve` | Start HTTP/SSE server |
 | `doctor` | Run environment diagnostics |
 | `version` | Print the CLI version or check CLI / Clawperator Operator Android app compatibility |
 
-**Global options:** `--device-id <id>`, `--receiver-package <pkg>`, `--output <json|pretty>`, `--format <json|pretty>` (alias for `--output`), `--timeout-ms <n>`, `--log-level <debug|info|warn|error>`, `--verbose`
+**Global options:** `--device-id <id>`, `--operator-package <pkg>`, `--output <json|pretty>`, `--format <json|pretty>` (alias for `--output`), `--timeout-ms <n>`, `--log-level <debug|info|warn|error>`, `--verbose`
 
 For agent callers, `--output json` is the canonical output mode. `pretty` is for human inspection.
 
@@ -111,7 +111,7 @@ Common events include:
 Default receiver package:
 
 - release app package: `com.clawperator.operator`
-- local debug app package: pass `--receiver-package com.clawperator.operator.dev`
+- local debug app package: pass `--operator-package com.clawperator.operator.dev`
 
 Use subcommand help when the docs and the current CLI differ:
 
@@ -127,7 +127,7 @@ clawperator doctor --help
 Use `clawperator version --check-compat` before automation batches when the agent needs to verify that the installed [Clawperator Operator Android app](../getting-started/android-operator-apk.md) matches the CLI's exact normalized version:
 
 ```bash
-clawperator version --check-compat --receiver-package com.clawperator.operator
+clawperator version --check-compat --operator-package com.clawperator.operator
 ```
 
 The response includes the CLI version, detected [Clawperator Operator Android app](../getting-started/android-operator-apk.md) version, app `versionCode`, receiver package, compatibility verdict, and remediation guidance on mismatch.
@@ -149,7 +149,7 @@ Start with `clawperator serve [--port <n>] [--host <ip>]`. Default: `127.0.0.1:3
 | `POST /android/emulators/:name/stop` | Stop a running emulator by AVD name |
 | `DELETE /android/emulators/:name` | Delete an AVD by name |
 | `POST /android/provision/emulator` | Reuse or create a supported emulator and return a booted device |
-| `POST /execute` | Body: `{"execution": <payload>, "deviceId": "...", "receiverPackage": "..."}` |
+| `POST /execute` | Body: `{"execution": <payload>, "deviceId": "...", "operatorPackage": "..."}` |
 | `POST /observe/snapshot` | Capture UI tree |
 | `POST /observe/screenshot` | Capture screenshot |
 | `GET /skills` | List skills. Query params: `?app=<pkg>&intent=<i>&keyword=<k>` |
@@ -556,7 +556,7 @@ unusable, and `window_count > 1` alone is normal on some Android builds.
 
 **`take_screenshot`:** `observe screenshot` uses the same execution contract under the hood. Android reports `UNSUPPORTED_RUNTIME_SCREENSHOT`, then the Node layer captures the screenshot via `adb exec-out screencap -p`, writes it to `data.path`, and normalizes the step result to `success: true` when capture succeeds. Pass `observe screenshot --path <file>` when you want a deterministic local filename instead of the default temp path.
 
-**`press_key`:** Issues a system-level key event via the Android Accessibility Service (`performGlobalAction`). Supported keys: `"back"`, `"home"`, `"recents"`. The alias `key_press` is normalized to `press_key`. No retry - this action is single-attempt by design. Requires the Clawperator Operator accessibility service to be running on the device. If the service is unavailable, the execution returns a top-level failed envelope with `status: "failed"` and no `stepResults`. Use `clawperator doctor` to diagnose accessibility service availability before running executions that include `press_key`. When testing local/debug builds, pass the matching `receiverPackage` (`com.clawperator.operator.dev`) instead of relying on the default release package. Returns `success: false` with `data.error: "GLOBAL_ACTION_FAILED"` if the OS reports the global action could not be performed (rare soft OS failure - accessibility service was running but Android declined the action).
+**`press_key`:** Issues a system-level key event via the Android Accessibility Service (`performGlobalAction`). Supported keys: `"back"`, `"home"`, `"recents"`. The alias `key_press` is normalized to `press_key`. No retry - this action is single-attempt by design. Requires the Clawperator Operator accessibility service to be running on the device. If the service is unavailable, the execution returns a top-level failed envelope with `status: "failed"` and no `stepResults`. Use `clawperator doctor` to diagnose accessibility service availability before running executions that include `press_key`. When testing local/debug builds, pass the matching `operatorPackage` (`com.clawperator.operator.dev`) instead of relying on the default release package. Returns `success: false` with `data.error: "GLOBAL_ACTION_FAILED"` if the OS reports the global action could not be performed (rare soft OS failure - accessibility service was running but Android declined the action).
 
 **`press_key` key scope:** This action covers only Android accessibility global actions. Non-global keys - `enter`, `search`, `volume_up`, `volume_down`, `escape`, and raw keycodes - are not supported by `press_key`. They use a different Android mechanism (`input keyevent`) that is not routed through the Operator accessibility service. Use `adb shell input keyevent <keycode>` outside the execution payload for those keys until a dedicated raw-key primitive is added.
 
@@ -564,7 +564,7 @@ unusable, and `window_count > 1` alone is normal on some Android builds.
 ```json
 {
   "deviceId": "<device_id>",
-  "receiverPackage": "com.clawperator.operator.dev",
+  "operatorPackage": "com.clawperator.operator.dev",
   "execution": {
     "commandId": "cmd-press-home",
     "taskId": "task-press-home",
@@ -1043,7 +1043,7 @@ installer are:
 | :--- | :--- | :--- |
 | `CLAWPERATOR_SKILLS_REGISTRY` | CLI and installer | Overrides the path to the local skills registry JSON |
 | `CLAWPERATOR_INSTALL_APK` | installer | Pre-seeds the installer's "install APK now?" decision for non-interactive runs |
-| `CLAWPERATOR_RECEIVER_PACKAGE` | installer | Overrides the default receiver package used during installer setup |
+| `CLAWPERATOR_OPERATOR_PACKAGE` | installer | Overrides the default receiver package used during installer setup |
 
 ### `CLAWPERATOR_INSTALL_APK`
 
@@ -1202,7 +1202,7 @@ Current skills model:
 - `skills run --expect-contains <text>` turns the wrapper into a lightweight
   smoke check by failing if the script output does not contain the expected
   substring
-- `skills run --receiver-package <pkg>` sets the Operator package for this run
+- `skills run --operator-package <pkg>` sets the Operator package for this run
   (default: `com.clawperator.operator`). Use `com.clawperator.operator.dev` for
   local debug APKs.
 - In pretty mode, `skills run` prints a one-line banner before validation and
@@ -1212,7 +1212,7 @@ Current skills model:
   [Clawperator] v<version>  APK: <OK|MISSING>  Logs: <absolute-path>  Docs: https://docs.clawperator.com/llms.txt
   ```
 
-  If the APK is present, the banner shows `OK (<receiver-package>)`. If the
+  If the APK is present, the banner shows `OK (<operator-package>)`. If the
   APK check does not pass, it shows `MISSING - run \`clawperator operator setup --apk <path>\``.
   The banner is suppressed entirely in JSON mode so the final output remains a
   single parseable JSON envelope.
@@ -1232,7 +1232,7 @@ two environment variables:
 | Variable | Description | Default |
 | :--- | :--- | :--- |
 | `CLAWPERATOR_BIN` | Path to the CLI binary the skill should use | Auto-resolved: sibling build if present, else global `clawperator` |
-| `CLAWPERATOR_RECEIVER_PACKAGE` | Operator package for the skill to target | `com.clawperator.operator` |
+| `CLAWPERATOR_OPERATOR_PACKAGE` | Operator package for the skill to target | `com.clawperator.operator` |
 
 These can be set explicitly to override the defaults:
 
@@ -1241,13 +1241,13 @@ These can be set explicitly to override the defaults:
 export CLAWPERATOR_BIN=/path/to/clawperator/apps/node/dist/cli/index.js
 
 # Target the dev APK
-export CLAWPERATOR_RECEIVER_PACKAGE=com.clawperator.operator.dev
+export CLAWPERATOR_OPERATOR_PACKAGE=com.clawperator.operator.dev
 
 # Now all skills will use these values
 clawperator skills run <skill_id>
 ```
 
-CLI flags take precedence over environment variables. Use `--receiver-package`
+CLI flags take precedence over environment variables. Use `--operator-package`
 for one-off overrides without changing your shell environment.
 
 For the concrete `skill.json` contract and private-skill authoring model, see

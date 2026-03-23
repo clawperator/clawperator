@@ -9,7 +9,7 @@ import {
   getCliVersion,
   getOperatorApkDownloadUrl,
   getOperatorApkSha256Url,
-  getReceiverPackageApkPath,
+  getOperatorPackageApkPath,
   hasListedPackage,
   probeVersionCompatibility,
 } from "../../version/compatibility.js";
@@ -89,7 +89,7 @@ export async function checkApkPresence(config: RuntimeConfig): Promise<DoctorChe
               },
           {
             kind: "shell",
-            value: `clawperator operator setup --apk ${getReceiverPackageApkPath(config.operatorPackage)} --device-id ${config.deviceId}${config.operatorPackage !== "com.clawperator.operator" ? ` --operator-package ${config.operatorPackage}` : ""}`,
+            value: `clawperator operator setup --apk ${getOperatorPackageApkPath(config.operatorPackage)} --device-id ${config.deviceId}${config.operatorPackage !== "com.clawperator.operator" ? ` --operator-package ${config.operatorPackage}` : ""}`,
           },
         ],
       },

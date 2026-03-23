@@ -116,7 +116,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
     }
 
     if (operatorPackage !== undefined && typeof operatorPackage !== "string") {
-      res.status(400).json({ ok: false, error: { code: "INVALID_RECEIVER_PACKAGE", message: "'operatorPackage' must be a string" } });
+      res.status(400).json({ ok: false, error: { code: "INVALID_OPERATOR_PACKAGE", message: "'operatorPackage' must be a string" } });
       return;
     }
 
@@ -152,7 +152,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
     }
 
     if (operatorPackage !== undefined && typeof operatorPackage !== "string") {
-      res.status(400).json({ ok: false, error: { code: "INVALID_RECEIVER_PACKAGE", message: "'operatorPackage' must be a string" } });
+      res.status(400).json({ ok: false, error: { code: "INVALID_OPERATOR_PACKAGE", message: "'operatorPackage' must be a string" } });
       return;
     }
 
@@ -197,7 +197,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
     }
 
     if (operatorPackage !== undefined && typeof operatorPackage !== "string") {
-      res.status(400).json({ ok: false, error: { code: "INVALID_RECEIVER_PACKAGE", message: "'operatorPackage' must be a string" } });
+      res.status(400).json({ ok: false, error: { code: "INVALID_OPERATOR_PACKAGE", message: "'operatorPackage' must be a string" } });
       return;
     }
 

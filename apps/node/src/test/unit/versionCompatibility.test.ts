@@ -4,7 +4,7 @@ import {
   getAlternateOperatorVariant,
   getOperatorApkDownloadUrl,
   getOperatorApkSha256Url,
-  getReceiverPackageApkPath,
+  getOperatorPackageApkPath,
   isVersionCompatible,
   normalizeCompatibilityVersion,
   parseCompatibilityVersion,
@@ -18,8 +18,8 @@ describe("version compatibility", () => {
   });
 
   it("maps receiver packages to their APK download paths", () => {
-    assert.strictEqual(getReceiverPackageApkPath("com.clawperator.operator.dev"), "~/.clawperator/downloads/operator-debug.apk");
-    assert.strictEqual(getReceiverPackageApkPath("com.clawperator.operator"), "~/.clawperator/downloads/operator.apk");
+    assert.strictEqual(getOperatorPackageApkPath("com.clawperator.operator.dev"), "~/.clawperator/downloads/operator-debug.apk");
+    assert.strictEqual(getOperatorPackageApkPath("com.clawperator.operator"), "~/.clawperator/downloads/operator.apk");
   });
 
   it("builds versioned APK download URLs", () => {

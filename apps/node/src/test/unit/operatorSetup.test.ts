@@ -59,9 +59,9 @@ describe("setupOperator - domain", () => {
 
     // adb install succeeds
     runner.queueResult({ code: 0, stdout: "Success", stderr: "" });
-    // listInstalledReceiverPackages: release pkg found
+    // listInstalledOperatorPackages: release pkg found
     runner.queueResult({ code: 0, stdout: "package:com.clawperator.operator", stderr: "" });
-    // listInstalledReceiverPackages: debug pkg not found
+    // listInstalledOperatorPackages: debug pkg not found
     runner.queueResult({ code: 0, stdout: "", stderr: "" });
     // grantAccessibilityPermission: settings get fails
     runner.queueResult({ code: 1, stdout: "", stderr: "settings: command failed" });
@@ -145,9 +145,9 @@ describe("setupOperator - domain", () => {
 
     // adb install succeeds
     runner.queueResult({ code: 0, stdout: "Success", stderr: "" });
-    // listInstalledReceiverPackages: release pkg found
+    // listInstalledOperatorPackages: release pkg found
     runner.queueResult({ code: 0, stdout: "package:com.clawperator.operator", stderr: "" });
-    // listInstalledReceiverPackages: debug pkg not found
+    // listInstalledOperatorPackages: debug pkg not found
     runner.queueResult({ code: 0, stdout: "", stderr: "" });
     // grantAccessibilityPermission: read current (no existing)
     runner.queueResult({ code: 0, stdout: "null", stderr: "" });
@@ -217,9 +217,9 @@ describe("setupOperator - domain", () => {
 
     // adb install succeeds
     runner.queueResult({ code: 0, stdout: "Success", stderr: "" });
-    // listInstalledReceiverPackages: release pkg found
+    // listInstalledOperatorPackages: release pkg found
     runner.queueResult({ code: 0, stdout: "package:com.clawperator.operator", stderr: "" });
-    // listInstalledReceiverPackages: debug pkg not found
+    // listInstalledOperatorPackages: debug pkg not found
     runner.queueResult({ code: 0, stdout: "", stderr: "" });
     // grantAccessibilityPermission: already enabled
     runner.queueResult({ code: 0, stdout: "com.clawperator.operator/clawperator.operator.accessibilityservice.OperatorAccessibilityService", stderr: "" });

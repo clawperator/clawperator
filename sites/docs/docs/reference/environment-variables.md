@@ -11,7 +11,7 @@ not every internal shell temporary used by validation scripts.
 | Variable | Used by | Meaning |
 | :--- | :--- | :--- |
 | `CLAWPERATOR_SKILLS_REGISTRY` | CLI, installer | Path to the local skills registry JSON |
-| `CLAWPERATOR_RECEIVER_PACKAGE` | CLI, installer, skills | Default Android Operator package to target when `--receiver-package` is omitted. Also passed to skill scripts. |
+| `CLAWPERATOR_OPERATOR_PACKAGE` | CLI, installer, skills | Default Android Operator package to target when `--operator-package` is omitted. Also passed to skill scripts. |
 | `CLAWPERATOR_BIN` | skills | Path to CLI binary used by skill scripts (defaults to global `clawperator` or auto-detected sibling build) |
 | `CLAWPERATOR_INSTALL_APK` | installer | Pre-seeds the installer's APK install prompt |
 | `CLAWPERATOR_INSTALL_SKIP_SKILLS` | installer | Skips `skills install` during installer setup when set to `1` |
@@ -40,10 +40,10 @@ Use it when:
 - you want `skills list`, `skills get`, `skills run`, and `skills new` to use
   a specific local repo
 
-## `CLAWPERATOR_RECEIVER_PACKAGE`
+## `CLAWPERATOR_OPERATOR_PACKAGE`
 
 Sets the default receiver package for commands that dispatch to the Android
-Operator APK. Also injected into skill scripts via `CLAWPERATOR_RECEIVER_PACKAGE`
+Operator APK. Also injected into skill scripts via `CLAWPERATOR_OPERATOR_PACKAGE`
 so skills know which Operator package to target.
 
 Typical values:
@@ -54,17 +54,17 @@ Typical values:
 Example:
 
 ```bash
-export CLAWPERATOR_RECEIVER_PACKAGE="com.clawperator.operator.dev"
+export CLAWPERATOR_OPERATOR_PACKAGE="com.clawperator.operator.dev"
 ```
 
 CLI flags still win over the environment variable. Use an explicit
-`--receiver-package` when you want one command to differ from your shell
+`--operator-package` when you want one command to differ from your shell
 default.
 
 For skill execution, this is also available as a CLI flag:
 
 ```bash
-clawperator skills run <skill_id> --receiver-package com.clawperator.operator.dev
+clawperator skills run <skill_id> --operator-package com.clawperator.operator.dev
 ```
 
 ## `CLAWPERATOR_BIN`
@@ -174,7 +174,7 @@ For a typical local setup, these are the most useful persistent exports:
 
 ```bash
 export CLAWPERATOR_SKILLS_REGISTRY="$HOME/.clawperator/skills/skills/skills-registry.json"
-export CLAWPERATOR_RECEIVER_PACKAGE="com.clawperator.operator"
+export CLAWPERATOR_OPERATOR_PACKAGE="com.clawperator.operator"
 ```
 
 Then override `--device-id` per command when more than one Android target is
@@ -184,7 +184,7 @@ For development with a local branch build, also set:
 
 ```bash
 export CLAWPERATOR_BIN="/path/to/clawperator/apps/node/dist/cli/index.js"
-export CLAWPERATOR_RECEIVER_PACKAGE="com.clawperator.operator.dev"
+export CLAWPERATOR_OPERATOR_PACKAGE="com.clawperator.operator.dev"
 ```
 
 ## Related docs

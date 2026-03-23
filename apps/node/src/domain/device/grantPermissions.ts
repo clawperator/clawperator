@@ -40,7 +40,7 @@ export function hasListedPackage(packageListOutput: string, packageName: string)
     .some(line => line === `package:${packageName}`);
 }
 
-export async function listInstalledReceiverPackages(config: RuntimeConfig): Promise<string[]> {
+export async function listInstalledOperatorPackages(config: RuntimeConfig): Promise<string[]> {
   const installedPackages: string[] = [];
   for (const pkg of [DEFAULT_RELEASE_PACKAGE, DEFAULT_DEBUG_PACKAGE]) {
     const result = await runAdb(config, ["shell", "pm", "list", "packages", pkg]);
@@ -51,8 +51,8 @@ export async function listInstalledReceiverPackages(config: RuntimeConfig): Prom
   return installedPackages;
 }
 
-export async function detectReceiverPackage(config: RuntimeConfig): Promise<string | undefined> {
-  const installedPackages = await listInstalledReceiverPackages(config);
+export async function detectOperatorPackage(config: RuntimeConfig): Promise<string | undefined> {
+  const installedPackages = await listInstalledOperatorPackages(config);
   return installedPackages[0];
 }
 
@@ -159,7 +159,7 @@ export async function grantDevicePermissions(
   config: RuntimeConfig,
   operatorPackage?: string
 ): Promise<PermissionGrantResult> {
-  const pkg = operatorPackage ?? config.operatorPackage ?? await detectReceiverPackage(config);
+  const pkg = operatorPackage ?? config.operatorPackage ?? await detectOperatorPackage(config);
   if (!pkg) {
     return {
       operatorPackage: "<unknown>",

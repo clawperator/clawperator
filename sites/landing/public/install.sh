@@ -17,7 +17,7 @@ APK_METADATA_URL="${CLAWPERATOR_APK_METADATA_URL:-https://downloads.clawperator.
 APK_DOWNLOAD_DIR="${HOME}/.clawperator/downloads"
 APK_LOCAL_PATH="${APK_DOWNLOAD_DIR}/operator.apk"
 APK_SHA_PATH="${APK_DOWNLOAD_DIR}/operator.apk.sha256"
-DEFAULT_RECEIVER_PACKAGE="${CLAWPERATOR_RECEIVER_PACKAGE:-com.clawperator.operator}"
+DEFAULT_OPERATOR_PACKAGE="${CLAWPERATOR_OPERATOR_PACKAGE:-com.clawperator.operator}"
 INSTALL_COMMAND="curl -fsSL https://clawperator.com/install.sh | bash"
 SKILLS_SETUP_STATUS="not-run"
 SKILLS_REGISTRY_PATH=""
@@ -548,7 +548,7 @@ maybe_install_operator_apk() {
             echo -e "${BLUE}Installing operator APK on connected device...${NC}"
             if [ -n "$CLAWPERATOR_BIN_PATH" ]; then
                 # Use the canonical install command: installs APK and grants permissions in one step.
-                if "$CLAWPERATOR_BIN_PATH" operator setup --apk "$APK_LOCAL_PATH" --device-id "$DEVICE_ID" --receiver-package "$DEFAULT_RECEIVER_PACKAGE" > /dev/null 2>&1; then
+                if "$CLAWPERATOR_BIN_PATH" operator setup --apk "$APK_LOCAL_PATH" --device-id "$DEVICE_ID" --operator-package "$DEFAULT_OPERATOR_PACKAGE" > /dev/null 2>&1; then
                     echo -e "${GREEN}✅ Operator APK installed and permissions granted.${NC}"
                 else
                     echo -e "${RED}❌ operator setup failed. Run: clawperator operator setup --apk ${APK_LOCAL_PATH}${NC}"
@@ -661,7 +661,7 @@ run_doctor_and_fix() {
             DEVICE_ID="$(list_connected_devices)"
             # Handshake failed after install - re-grant permissions as remediation (not initial setup).
             echo -e "${BLUE}Handshake failed. Re-granting device permissions for $DEVICE_ID as recovery...${NC}"
-            "$CLAWPERATOR_BIN_PATH" grant-device-permissions --device-id "$DEVICE_ID" --receiver-package "$DEFAULT_RECEIVER_PACKAGE" > /dev/null 2>&1 || true
+            "$CLAWPERATOR_BIN_PATH" grant-device-permissions --device-id "$DEVICE_ID" --operator-package "$DEFAULT_OPERATOR_PACKAGE" > /dev/null 2>&1 || true
         fi
     fi
 }

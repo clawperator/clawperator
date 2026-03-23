@@ -8,7 +8,7 @@ import { homedir, tmpdir } from "node:os";
 import {
   CLAWPERATOR_BIN_ENV_VAR,
   CLAWPERATOR_OPERATOR_PACKAGE_ENV_VAR,
-  DEFAULT_RECEIVER_PACKAGE,
+  DEFAULT_OPERATOR_PACKAGE,
   formatSkillBinCommand,
   resolveSkillBin,
   resolveSkillBinCommand,
@@ -1440,7 +1440,7 @@ describe("runSkill", () => {
       operatorPackage: "com.clawperator.operator.dev",
     });
     const { stdout, code } = await runCli([
-      "skills", "run", TEST_FIXTURE_CHUNKED_OUTPUT, "--receiver-package", "com.clawperator.operator.dev", "--output", "json",
+      "skills", "run", TEST_FIXTURE_CHUNKED_OUTPUT, "--operator-package", "com.clawperator.operator.dev", "--output", "json",
     ], {
       env: {
         ...process.env,
@@ -1462,7 +1462,7 @@ describe("runSkill", () => {
       operatorPackage: "com.clawperator.operator.dev",
     });
     const { stdout, code } = await runCli([
-      "skills", "run", TEST_FIXTURE_CHUNKED_OUTPUT, "--receiver-package", "com.clawperator.operator.dev", "--output", "pretty",
+      "skills", "run", TEST_FIXTURE_CHUNKED_OUTPUT, "--operator-package", "com.clawperator.operator.dev", "--output", "pretty",
     ], {
       env: {
         ...process.env,
@@ -1493,7 +1493,7 @@ describe("runSkill", () => {
       const dd = String(now.getDate()).padStart(2, "0");
       const expectedLogPath = join(tempLogDir, `clawperator-${yyyy}-${mm}-${dd}.log`);
       const { stdout, code } = await runCli([
-        "skills", "run", TEST_FIXTURE_CHUNKED_OUTPUT, "--receiver-package", "com.clawperator.operator.dev", "--output", "pretty",
+        "skills", "run", TEST_FIXTURE_CHUNKED_OUTPUT, "--operator-package", "com.clawperator.operator.dev", "--output", "pretty",
       ], {
         env: {
           ...process.env,
@@ -1518,7 +1518,7 @@ describe("runSkill", () => {
       installedPackage: "com.clawperator.operator.dev",
     });
     const { stdout, code } = await runCli([
-      "skills", "run", TEST_FIXTURE_CHUNKED_OUTPUT, "--receiver-package", "com.clawperator.operator", "--output", "pretty",
+      "skills", "run", TEST_FIXTURE_CHUNKED_OUTPUT, "--operator-package", "com.clawperator.operator", "--output", "pretty",
     ], {
       env: {
         ...process.env,
@@ -1541,7 +1541,7 @@ describe("runSkill", () => {
       packageListStderr: "adb: device offline",
     });
     const { stdout, code } = await runCli([
-      "skills", "run", TEST_FIXTURE_CHUNKED_OUTPUT, "--receiver-package", "com.clawperator.operator", "--output", "pretty",
+      "skills", "run", TEST_FIXTURE_CHUNKED_OUTPUT, "--operator-package", "com.clawperator.operator", "--output", "pretty",
     ], {
       env: {
         ...process.env,
@@ -1562,7 +1562,7 @@ describe("runSkill", () => {
       operatorPackage: "com.clawperator.operator.dev",
     });
     const { stdout, code } = await runCli([
-      "skills", "run", TEST_FIXTURE_CHUNKED_OUTPUT, "--receiver-package", "com.clawperator.operator.dev", "--output", "json",
+      "skills", "run", TEST_FIXTURE_CHUNKED_OUTPUT, "--operator-package", "com.clawperator.operator.dev", "--output", "json",
     ], {
       env: {
         ...process.env,
@@ -1794,13 +1794,13 @@ describe("resolveSkillBinCommand", () => {
 });
 
 describe("resolveOperatorPackage", () => {
-  const ORIGINAL_RECEIVER_PACKAGE = process.env[CLAWPERATOR_OPERATOR_PACKAGE_ENV_VAR];
+  const ORIGINAL_OPERATOR_PACKAGE = process.env[CLAWPERATOR_OPERATOR_PACKAGE_ENV_VAR];
 
   afterEach(() => {
-    if (ORIGINAL_RECEIVER_PACKAGE === undefined) {
+    if (ORIGINAL_OPERATOR_PACKAGE === undefined) {
       delete process.env[CLAWPERATOR_OPERATOR_PACKAGE_ENV_VAR];
     } else {
-      process.env[CLAWPERATOR_OPERATOR_PACKAGE_ENV_VAR] = ORIGINAL_RECEIVER_PACKAGE;
+      process.env[CLAWPERATOR_OPERATOR_PACKAGE_ENV_VAR] = ORIGINAL_OPERATOR_PACKAGE;
     }
   });
 
@@ -1813,19 +1813,19 @@ describe("resolveOperatorPackage", () => {
   it("returns default release package when env var is not set", () => {
     delete process.env[CLAWPERATOR_OPERATOR_PACKAGE_ENV_VAR];
     const result = resolveOperatorPackage();
-    assert.strictEqual(result, DEFAULT_RECEIVER_PACKAGE);
+    assert.strictEqual(result, DEFAULT_OPERATOR_PACKAGE);
   });
 
   it("returns default when env var is empty string", () => {
     process.env[CLAWPERATOR_OPERATOR_PACKAGE_ENV_VAR] = "";
     const result = resolveOperatorPackage();
-    assert.strictEqual(result, DEFAULT_RECEIVER_PACKAGE);
+    assert.strictEqual(result, DEFAULT_OPERATOR_PACKAGE);
   });
 });
 
 describe("runSkill env vars", () => {
   const ORIGINAL_BIN = process.env[CLAWPERATOR_BIN_ENV_VAR];
-  const ORIGINAL_RECEIVER_PACKAGE = process.env[CLAWPERATOR_OPERATOR_PACKAGE_ENV_VAR];
+  const ORIGINAL_OPERATOR_PACKAGE = process.env[CLAWPERATOR_OPERATOR_PACKAGE_ENV_VAR];
 
   afterEach(() => {
     if (ORIGINAL_BIN === undefined) {
@@ -1833,10 +1833,10 @@ describe("runSkill env vars", () => {
     } else {
       process.env[CLAWPERATOR_BIN_ENV_VAR] = ORIGINAL_BIN;
     }
-    if (ORIGINAL_RECEIVER_PACKAGE === undefined) {
+    if (ORIGINAL_OPERATOR_PACKAGE === undefined) {
       delete process.env[CLAWPERATOR_OPERATOR_PACKAGE_ENV_VAR];
     } else {
-      process.env[CLAWPERATOR_OPERATOR_PACKAGE_ENV_VAR] = ORIGINAL_RECEIVER_PACKAGE;
+      process.env[CLAWPERATOR_OPERATOR_PACKAGE_ENV_VAR] = ORIGINAL_OPERATOR_PACKAGE;
     }
   });
 
@@ -1865,7 +1865,7 @@ describe("runSkill env vars", () => {
 
 describe("CLI skills run env vars", () => {
   const ORIGINAL_BIN = process.env[CLAWPERATOR_BIN_ENV_VAR];
-  const ORIGINAL_RECEIVER_PACKAGE = process.env[CLAWPERATOR_OPERATOR_PACKAGE_ENV_VAR];
+  const ORIGINAL_OPERATOR_PACKAGE = process.env[CLAWPERATOR_OPERATOR_PACKAGE_ENV_VAR];
 
   afterEach(() => {
     if (ORIGINAL_BIN === undefined) {
@@ -1873,16 +1873,16 @@ describe("CLI skills run env vars", () => {
     } else {
       process.env[CLAWPERATOR_BIN_ENV_VAR] = ORIGINAL_BIN;
     }
-    if (ORIGINAL_RECEIVER_PACKAGE === undefined) {
+    if (ORIGINAL_OPERATOR_PACKAGE === undefined) {
       delete process.env[CLAWPERATOR_OPERATOR_PACKAGE_ENV_VAR];
     } else {
-      process.env[CLAWPERATOR_OPERATOR_PACKAGE_ENV_VAR] = ORIGINAL_RECEIVER_PACKAGE;
+      process.env[CLAWPERATOR_OPERATOR_PACKAGE_ENV_VAR] = ORIGINAL_OPERATOR_PACKAGE;
     }
   });
 
   it("CLI skills run passes CLAWPERATOR_OPERATOR_PACKAGE via --operator-package flag", async () => {
     const { stdout, code } = await runCli([
-      "skills", "run", "com.test.env-echo", "--receiver-package", "com.clawperator.operator.dev", "--output", "json",
+      "skills", "run", "com.test.env-echo", "--operator-package", "com.clawperator.operator.dev", "--output", "json",
     ]);
     assert.strictEqual(code, 0, stdout);
     const parsed = JSON.parse(stdout) as { output?: string };
@@ -1906,7 +1906,7 @@ describe("CLI skills run env vars", () => {
 
   it("CLI skills run --operator-package flag takes precedence over env var", async () => {
     const { stdout, code } = await runCli(
-      ["skills", "run", "com.test.env-echo", "--receiver-package", "flag.package.value", "--output", "json"],
+      ["skills", "run", "com.test.env-echo", "--operator-package", "flag.package.value", "--output", "json"],
       {
         env: {
           ...process.env,
@@ -1936,7 +1936,7 @@ describe("CLI skills run streaming", () => {
       "skills",
       "run",
       TEST_FIXTURE_CHUNKED_OUTPUT,
-      "--receiver-package",
+      "--operator-package",
       "com.clawperator.operator.dev",
       "--output",
       "pretty",

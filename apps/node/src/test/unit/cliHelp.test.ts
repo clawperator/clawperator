@@ -293,11 +293,11 @@ describe("operator setup CLI output", () => {
     assert.strictEqual(obj.operatorPackage, "com.clawperator.operator.dev");
   });
 
-  it("accepts --receiver-package as alias for --operator-package", async () => {
+  it("accepts --operator-package as alias for --operator-package", async () => {
     const { stdout } = await runCli([
       "operator", "setup",
       "--apk", NONEXISTENT_APK,
-      "--receiver-package", "com.clawperator.operator.dev",
+      "--operator-package", "com.clawperator.operator.dev",
     ]);
     const obj = JSON.parse(stdout);
     assert.strictEqual(obj.operatorPackage, "com.clawperator.operator.dev");

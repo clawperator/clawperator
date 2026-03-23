@@ -9,7 +9,7 @@ export const DEFAULT_SKILLS_REGISTRY_SUBPATH = join("skills", "skills-registry.j
 
 export const CLAWPERATOR_BIN_ENV_VAR = "CLAWPERATOR_BIN";
 export const CLAWPERATOR_OPERATOR_PACKAGE_ENV_VAR = "CLAWPERATOR_OPERATOR_PACKAGE";
-export const DEFAULT_RECEIVER_PACKAGE = "com.clawperator.operator";
+export const DEFAULT_OPERATOR_PACKAGE = "com.clawperator.operator";
 
 export function getDefaultSkillsRegistryPath(): string {
   return join(DEFAULT_SKILLS_DIR, DEFAULT_SKILLS_REGISTRY_SUBPATH);
@@ -99,5 +99,5 @@ export function resolveOperatorPackage(): string {
   if (envPackage !== undefined && envPackage !== "") {
     return envPackage;
   }
-  return DEFAULT_RECEIVER_PACKAGE;
+  return DEFAULT_OPERATOR_PACKAGE;
 }

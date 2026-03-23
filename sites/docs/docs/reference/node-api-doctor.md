@@ -7,7 +7,7 @@ This page describes the current shipped behavior. It replaces the older v0.1 des
 ## Command Surface
 
 ```bash
-clawperator doctor [--output <json|pretty>] [--device-id <id>] [--receiver-package <package>]
+clawperator doctor [--output <json|pretty>] [--device-id <id>] [--operator-package <package>]
 clawperator doctor --json
 clawperator doctor --fix
 clawperator doctor --full
@@ -20,7 +20,7 @@ Supported flags:
 - `--format pretty|json` - alias for `--output`
 - `--json` - shorthand for `--output json`
 - `--device-id <id>` - target one device when multiple are connected
-- `--receiver-package <package>` - override the target Operator package
+- `--operator-package <package>` - override the target Operator package
 - `--fix` - run shell-based remediation steps from non-passing checks (both `fail` and `warn`)
 - `--full` - include Android build, install, launch, and smoke test checks
 - `--check-only` - always exit `0`, even when critical checks fail; does not change halt behavior (doctor still returns early on critical failures)
@@ -30,7 +30,7 @@ Default receiver package:
 - release app package: `com.clawperator.operator`
 - local debug app package: `com.clawperator.operator.dev`
 
-If you use a local debug build of the [Clawperator Operator Android app](../getting-started/android-operator-apk.md), pass `--receiver-package com.clawperator.operator.dev` consistently to `doctor`, `operator setup`, `grant-device-permissions`, `version --check-compat`, and `observe snapshot`.
+If you use a local debug build of the [Clawperator Operator Android app](../getting-started/android-operator-apk.md), pass `--operator-package com.clawperator.operator.dev` consistently to `doctor`, `operator setup`, `grant-device-permissions`, `version --check-compat`, and `observe snapshot`.
 
 ## What Doctor Checks
 
@@ -112,7 +112,7 @@ Pretty output groups results into:
   "ok": true,
   "criticalOk": true,
   "deviceId": "<device_id>",
-  "receiverPackage": "com.clawperator.operator",
+  "operatorPackage": "com.clawperator.operator",
   "checks": [
     {
       "id": "readiness.handshake",
@@ -197,7 +197,7 @@ Target a specific device and debug build of the [Clawperator Operator Android ap
 ```bash
 clawperator doctor \
   --device-id <device_id> \
-  --receiver-package com.clawperator.operator.dev \
+  --operator-package com.clawperator.operator.dev \
   --output pretty
 ```
 

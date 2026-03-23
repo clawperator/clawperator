@@ -10,7 +10,7 @@ import { broadcastAgentCommand } from "../../adapters/android-bridge/broadcastAg
 import { waitForResultEnvelope } from "../../adapters/android-bridge/logcatResultReader.js";
 import { runAdb, formatCommandLine } from "../../adapters/android-bridge/adbClient.js";
 import { checkApkPresence } from "../doctor/checks/readinessChecks.js";
-import { getReceiverPackageApkPath } from "../version/compatibility.js";
+import { getOperatorPackageApkPath } from "../version/compatibility.js";
 import { tryAcquire, release, getConflictError } from "./executionStore.js";
 import type { ResultEnvelope, TerminalSource } from "../../contracts/result.js";
 import type { TimeoutDiagnostics } from "../../contracts/errors.js";
@@ -326,7 +326,7 @@ async function performExecution(
       deviceId,
       message: `Operator APK (${config.operatorPackage}) is not installed on ${deviceId}`,
     });
-    const installCommand = `clawperator operator setup --apk ${getReceiverPackageApkPath(config.operatorPackage)} --device-id ${deviceId}${config.operatorPackage !== "com.clawperator.operator" ? ` --operator-package ${config.operatorPackage}` : ""}`;
+    const installCommand = `clawperator operator setup --apk ${getOperatorPackageApkPath(config.operatorPackage)} --device-id ${deviceId}${config.operatorPackage !== "com.clawperator.operator" ? ` --operator-package ${config.operatorPackage}` : ""}`;
     return {
       execution,
       result: {

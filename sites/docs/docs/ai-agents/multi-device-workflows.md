@@ -87,7 +87,7 @@ Practical guidance:
 - keep one work queue per device
 - never overlap two executions on the same device
 - it is fine to run different queues against different devices
-- keep `--receiver-package` consistent within the same device queue
+- keep `--operator-package` consistent within the same device queue
 
 If you see `EXECUTION_CONFLICT_IN_FLIGHT`, do not immediately retry in
 parallel. Wait for the earlier execution to finish or explicitly serialize the
@@ -95,10 +95,10 @@ queue.
 
 ## Receiver package still matters
 
-`--device-id` and `--receiver-package` solve different problems:
+`--device-id` and `--operator-package` solve different problems:
 
 - `--device-id` selects the Android runtime
-- `--receiver-package` selects which Operator APK on that runtime receives the
+- `--operator-package` selects which Operator APK on that runtime receives the
   command
 
 Examples:
@@ -116,7 +116,7 @@ In that case, keep both flags explicit:
 ```bash
 clawperator doctor \
   --device-id emulator-5554 \
-  --receiver-package com.clawperator.operator.dev \
+  --operator-package com.clawperator.operator.dev \
   --output json
 ```
 

@@ -13,7 +13,7 @@ cd "$(dirname "$0")/.."
 # - If unset and multiple devices are connected, fail and require explicit DEVICE_ID.
 # NOTE: Do not commit personal device serials to this repository.
 export DEVICE_ID="${DEVICE_ID:-}"
-export CLAWPERATOR_RECEIVER_PACKAGE="${CLAWPERATOR_RECEIVER_PACKAGE:-com.clawperator.operator.dev}"
+export CLAWPERATOR_OPERATOR_PACKAGE="${CLAWPERATOR_OPERATOR_PACKAGE:-com.clawperator.operator.dev}"
 
 # Unique commandId for this run (so logcat grep is correlatable)
 VALIDATE_CMD_ID="validate-$(date +%s)"
@@ -62,7 +62,7 @@ cat > "$VALIDATE_JSON" <<JSON
 }
 JSON
 
-GREP_OUTPUT_FILE="${CLAWPERATOR_RECEIVER_GREP_FILE:-/tmp/clawperator-receiver-grep.txt}"
+GREP_OUTPUT_FILE="${CLAWPERATOR_OPERATOR_GREP_FILE:-/tmp/clawperator-receiver-grep.txt}"
 SUMMARY_OUT="${CLAWPERATOR_SMOKE_SUMMARY:-${CLAWPERATOR_VALIDATE_SUMMARY:-}}"
 
 echo "=== validate receiver ingress (commandId=$VALIDATE_CMD_ID) ==="
@@ -70,7 +70,7 @@ adb -s "$DEVICE_ID" logcat -c
 set +e
 "${CLI[@]}" execute \
   --device-id "$DEVICE_ID" \
-  --receiver-package "$CLAWPERATOR_RECEIVER_PACKAGE" \
+  --operator-package "$CLAWPERATOR_OPERATOR_PACKAGE" \
   --execution "$VALIDATE_JSON" \
   --output pretty 2>&1
 EXEC_EXIT=$?
@@ -102,7 +102,7 @@ if [ -n "$SUMMARY_OUT" ]; then
   export GREP_FILE="$GREP_OUTPUT_FILE"
   export SMOKE_TIMESTAMP="$TIMESTAMP"
   export SMOKE_DEVICE_ID="$DEVICE_ID"
-  export SMOKE_RECEIVER_PACKAGE="$CLAWPERATOR_RECEIVER_PACKAGE"
+  export SMOKE_OPERATOR_PACKAGE="$CLAWPERATOR_OPERATOR_PACKAGE"
   export SMOKE_VALIDATE_CMD_ID="$VALIDATE_CMD_ID"
   node -e "
     const fs = require('fs');
@@ -115,7 +115,7 @@ if [ -n "$SUMMARY_OUT" ]; then
     existing.receiverValidation = {
       timestamp: process.env.SMOKE_TIMESTAMP,
       deviceId: process.env.SMOKE_DEVICE_ID,
-      receiverPackage: process.env.SMOKE_RECEIVER_PACKAGE,
+      operatorPackage: process.env.SMOKE_OPERATOR_PACKAGE,
       commandId: process.env.SMOKE_VALIDATE_CMD_ID,
       logcatGrepPath: grepFile,
       logcatGrepOutput: grepContent

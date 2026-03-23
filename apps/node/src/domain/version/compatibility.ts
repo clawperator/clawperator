@@ -43,7 +43,7 @@ export function getAlternateOperatorVariant(operatorPackage: string): string {
     : `${operatorPackage}.dev`;
 }
 
-export function getReceiverPackageApkPath(operatorPackage: string): string {
+export function getOperatorPackageApkPath(operatorPackage: string): string {
   return operatorPackage.endsWith(".dev")
     ? "~/.clawperator/downloads/operator-debug.apk"
     : "~/.clawperator/downloads/operator.apk";

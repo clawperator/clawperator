@@ -124,7 +124,7 @@ describe("flag aliases - --timeout works like --timeout-ms", () => {
   });
 });
 
-describe("flag aliases - --receiver-package works as alias for --operator-package", () => {
+describe("flag aliases - --operator-package works as alias for --operator-package", () => {
   it("--operator-package is accepted by getGlobalOpts (passed through to operator setup failure)", async () => {
     const { stdout } = await runCli([
       "--operator-package", "com.clawperator.operator.dev",
