@@ -219,10 +219,19 @@ describe("CLI help", () => {
     assert.strictEqual(pretty.message, "timeoutMs must be a finite number");
   });
 
-  it("lists --json in top-level global options", async () => {
+  it("lists --json under Global options in top-level help", async () => {
     const { stdout, code } = await runCli(["--help"]);
     assert.strictEqual(code, 0);
-    assert.match(stdout, /--json/);
+    const globalIdx = stdout.indexOf("Global options:\n");
+    assert.notStrictEqual(globalIdx, -1, "expected Global options section");
+    const notesIdx = stdout.indexOf("\n\nNotes:", globalIdx);
+    const globalBlock =
+      notesIdx === -1 ? stdout.slice(globalIdx) : stdout.slice(globalIdx, notesIdx);
+    assert.match(
+      globalBlock,
+      /\n  --json\s+/,
+      "expected --json as an indented global option line",
+    );
   });
 
   it("shows recording as canonical command in top-level help", async () => {

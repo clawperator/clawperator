@@ -1876,7 +1876,7 @@ Use `clawperator version --check-compat` before automation batches when the agen
 clawperator version --check-compat --operator-package com.clawperator.operator
 ```
 
-The response includes the CLI version, detected [Clawperator Operator Android app](../getting-started/android-operator-apk.md) version, app `versionCode`, operator package, compatibility verdict, and remediation guidance on mismatch.
+The response includes the CLI version, detected [Clawperator Operator Android app](../getting-started/android-operator-apk.md) version, app `versionCode`, Operator package, compatibility verdict, and remediation guidance on mismatch.
 
 ## HTTP API (`clawperator serve`)
 
