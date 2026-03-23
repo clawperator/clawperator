@@ -9,7 +9,7 @@
 - [Phase 0: Infrastructure and Compatibility](#phase-0-infrastructure-and-compatibility)
 - [Phase 1: CLI Architecture (COMMANDS Registry)](#phase-1-cli-architecture-commands-registry)
 - [Phase 2: Command Surface Refactor](#phase-2-command-surface-refactor)
-- [Phase 3: Selector Flags](#phase-3-selector-flags)
+- [Phase 3: Selector Flags (done)](#phase-3-selector-flags)
 - [Phase 4: Help, Errors, and Polish](#phase-4-help-errors-and-polish)
 - [Phase 5: Extended Commands](#phase-5-extended-commands)
 - [Skills Migration Strategy](#skills-migration-strategy)
@@ -1037,6 +1037,9 @@ unchanged. Phase 0 infrastructure catches regressions.
 
 ## Phase 3: Selector Flags
 
+**[DONE]** Shipped on branch `api-refactor/phase-3`. The working checklist
+`tasks/api/refactor/phase-3-impl-plan.md` was removed when the phase closed for PR.
+
 Replace JSON-heavy element targeting with simple, guessable flags.
 
 ### Deliverables
@@ -1055,8 +1058,9 @@ Replace JSON-heavy element targeting with simple, guessable flags.
 
 2. **Container selector flags**
    - Same set with `--container-` prefix for scroll-within:
-     - `--container-text`, `--container-id`, `--container-desc`,
-       `--container-role`, `--container-selector`
+     - `--container-text`, `--container-text-contains`, `--container-id`,
+       `--container-desc`, `--container-desc-contains`, `--container-role`,
+       `--container-selector`
    - `scroll` only: `UiAction.Scroll` already accepts `container: NodeMatcher?`
      in the Android runtime.
    - "read-within" (container-scoped `read`) is NOT in Phase 3. `UiAction.ReadText`
@@ -1076,7 +1080,10 @@ Replace JSON-heavy element targeting with simple, guessable flags.
    - Container flags resolve independently from element flags
    - First match in accessibility traversal order is selected
    - Missing all selectors: clear error listing available flags with examples
+     (including `--text-contains`, `--desc-contains`, and `--selector` where applicable)
    - Empty string values: rejected at validation boundary
+   - The same value flag token must not appear twice (for example two `--text`);
+     rejected with `EXECUTION_VALIDATION_FAILED`
 
 5. **Verify existing type flags survived Phase 2 promotion**
    - `--submit` and `--clear` already exist on `action type` (index.ts:667-668,
@@ -1994,7 +2001,7 @@ edit or replace the plan above, which stays the original design record.
 | Phase 0 | Done | Infrastructure and compatibility work merged per plan |
 | Phase 1 | Done | `COMMANDS` registry and registry-driven dispatch in `apps/node/src/cli/` |
 | Phase 2 | Done | Flat verbs, global flags, `action` / `observe` removed from registry with did-you-mean, docs and smoke updates |
-| Phase 3 | Done | Selector shorthand flags (`--text`, `--id`, `--desc`, `--role`, `--text-contains`, `--desc-contains`) on click/type/read/wait; `--container-*` on scroll; Phase 3 MISSING_SELECTOR help text; docs updated |
+| Phase 3 | Done | Selector shorthand flags on click/type/read/wait; `--container-*` (incl. `-contains` variants) on scroll; MISSING_SELECTOR lists full flag surface incl. `--desc-contains`; duplicate value flags rejected; docs updated |
 | Phase 4 | Partial | Exit-code and help polish in flight; full deliverable set not complete |
 | Phase 5A | Not done | Extended commands: scroll-until, close, --long/--focus on click, wait --timeout, read --all, sleep |
 | Phase 5B | Not done | Higher-risk: exec rename, wait-for-nav, read-value; requires ActionParams contract alignment first |
@@ -2021,10 +2028,12 @@ edit or replace the plan above, which stays the original design record.
    **As-built:** synonyms are `synonyms` arrays on `CommandDef` entries in the
    registry.
 
-4. **Phase 4 testing checklist**
-   Phase 3 is now complete. `clawperator click --help` shows the full selector flag
-   list (--text, --id, --role, --desc, etc.). Missing-selector guidance uses the
-   Phase 3 format with the full flag list and examples.
+4. **Phase 3 closure**
+   Phase 3 is complete and the temporary `phase-3-impl-plan.md` checklist is removed.
+   `clawperator click --help` shows the full selector flag list. Missing-selector
+   guidance lists the full flag surface (including `--desc-contains` on click/read/wait
+   and on `type` where `--text` is reserved for typed content). Duplicate selector
+   container/value flags are rejected.
 
 5. **`execute` vs `exec`**  
    The plan schedules renaming `execute` to `exec` in Phase 5. **As implemented
