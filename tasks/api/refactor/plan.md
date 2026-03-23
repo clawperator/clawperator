@@ -94,7 +94,7 @@ BEFORE (current)              AFTER (canonical)         AFTER (still accepted)
 --device-id <id>              --device <id>             --device-id
 --output json                 --json                    --output json
 --timeout-ms <ms>             --timeout <ms>            --timeout-ms
---receiver-package <pkg>      --operator-package <pkg>  --receiver-package, --package
+--receiver-package <pkg>      --operator-package <pkg>  --receiver-package
 --selector '{"textEquals":"X"}'          --text "X"             --selector (advanced)
 --selector '{"resourceId":              --id "com.foo:id/bar"  --selector (advanced)
   "com.foo:id/bar"}'
@@ -180,8 +180,10 @@ shown in help text.
 implementation detail (BroadcastReceiver) that means nothing to agents. "Operator"
 is Clawperator's own term - it is what `operator setup` installs, what docs
 reference, what agents will encounter. `--operator-package` is unambiguous and
-self-documenting. `--receiver-package` and `--package` are accepted as silent
-aliases. This flag is rarely needed (only for dev/release variant switching).
+self-documenting. `--receiver-package` is accepted as a silent alias.
+`--package` was considered but dropped: it is too generic and risks colliding
+with future flags or confusing agents who assume it means something else.
+This flag is rarely needed (only for dev/release variant switching).
 
 **Scope of the rename:** The CLI/API surface changes to `--operator-package`.
 Internally, existing TypeScript field names (`receiverPackage` in `GlobalOpts`,
@@ -439,7 +441,9 @@ This is enforcement of the existing contract, not a design change.
 
 ---
 
-## Phase 0: Infrastructure and Compatibility
+## Phase 0: Infrastructure and Compatibility [DONE]
+
+Landed in PR `api-refactor/phase-0-1` (2026-03-23). Collapsed into Phase 1 per scope note.
 
 Establish the foundation that makes Phases 1-4 safe.
 
@@ -447,14 +451,14 @@ Establish the foundation that makes Phases 1-4 safe.
 
 1. **"Did you mean?" error system**
    - When an unknown command is entered, suggest the closest known command
-   - Specific mappings for removed commands:
-     - `action click` -> `click`
-     - `action open-app` -> `open`
-     - `action type` -> `type`
-     - `observe snapshot` -> `snapshot`
-     - `observe screenshot` -> `screenshot`
-     - `inspect ui` -> `snapshot`
-   - Generic fuzzy matching for typos: `screensht` -> `screenshot`
+   - Fuzzy matching (Levenshtein) runs against all primary names and synonyms
+     in the COMMANDS registry. Tie-breaking: closest distance first, then
+     primary name over synonym, then alphabetical.
+   - Specific redirect hints for removed nested forms (`action click` -> `click`,
+     `observe snapshot` -> `snapshot`, etc.) and typos (`screensht` ->
+     `screenshot`) become accurate only after Phase 2 adds the flat commands
+     to the registry. In Phase 0/1 those flat names do not exist yet, so fuzzy
+     match cannot suggest them.
 
 2. **Flag alias infrastructure**
    - Parser accepts both old and new flag names
@@ -466,7 +470,7 @@ Establish the foundation that makes Phases 1-4 safe.
        in `cliHelp.test.ts` - must be preserved)
      - `--timeout-ms` -> `--timeout`
      - `--receiver-package` -> `--operator-package` (rename)
-     - `--package` -> `--operator-package` (alias for agents who guess it)
+     - `--package` -> not aliased (too generic; dropped after review)
    - Centralized in `getGlobalOpts()` so all commands automatically inherit
      the renamed global flags
 
@@ -496,7 +500,14 @@ from Phase 0 survives into Phase 1 unchanged.
 
 ---
 
-## Phase 1: CLI Architecture (COMMANDS Registry)
+## Phase 1: CLI Architecture (COMMANDS Registry) [DONE]
+
+Landed in PR `api-refactor/phase-0-1` (2026-03-23). Collapsed with Phase 0 per scope note.
+- `apps/node/src/cli/registry.ts` created (1108 lines): `CommandDef`, `HandlerContext`, `COMMANDS` (17 entries), `didYouMean`, `generateTopLevelHelp`, `resolveHelpFromRegistry`, all CLI utilities.
+- `apps/node/src/cli/index.ts` reduced from ~915 to ~130 lines.
+- `apps/node/src/test/unit/cliRegistry.test.ts` added: registry consistency + flag alias tests.
+- 442 tests pass.
+- **Intentional behavior change:** unknown commands now return `code: "UNKNOWN_COMMAND"` and exit 1. The old switch `default:` returned `code: "USAGE"` and exited 0. The new behavior is correct and desirable (unknown command is a caller error), and is covered by the `cliRegistry.test.ts` UNKNOWN_COMMAND assertions.
 
 Replace the hand-rolled dispatch sprawl in `index.ts` with a typed command
 registry that serves as the single source of truth for command metadata. This
@@ -881,8 +892,8 @@ separable for review:
    - `--device` (canonical), `--device-id` (accepted silently)
    - `--json` (canonical), `--output json` (accepted silently)
    - `--timeout` (canonical), `--timeout-ms` (accepted silently)
-   - `--operator-package` (canonical), `--receiver-package` and `--package`
-     (accepted silently). See Design Decisions for rationale.
+   - `--operator-package` (canonical), `--receiver-package` (accepted silently).
+     `--package` was considered and deliberately dropped - see Design Decisions.
 
 6. **Remove `action` and `observe` parent commands**
    - Removed from dispatch, removed from help text
@@ -976,6 +987,32 @@ Did you mean:
      harness. Update them.
    - Tests spawn `dist/cli/index.js` as a subprocess, so `npm run build` must
      run before `npm run test`.
+
+### Carried-forward debt from Phase 0/1
+
+These items were deferred during Phase 0/1 and must be addressed in Phase 2.
+Search for `TODO(Phase 2)` in `apps/node/src/` to locate them in code.
+
+1. **Dead-code `?? getOpt(rest, ...)` fallbacks in registry.ts** - Every handler
+   passes `deviceId: deviceId ?? getOpt(rest, "--device-id")` as a safety net.
+   Because `getGlobalOpts` scans all of argv linearly (including post-command
+   tokens), the `getOpt` branch is unreachable under normal invocation. Once the
+   Phase 2 argv handling audit confirms no bypass paths exist, remove the
+   fallbacks. If a bypass path is found, document it instead.
+
+2. **`getCommandArgs` redundancy in `skills run`** - The handler calls
+   `getCommandArgs(argv, ["skills", "run"])` to get the raw pre-`--` segment.
+   With the registry, `ctx.rest` is already post-`"skills run"`, making the
+   full-argv traversal redundant. Simplify to derive `rawOptSegment` from
+   `ctx.rest` directly once the argv audit confirms correctness.
+
+3. **Exit-code heuristic in `index.ts`** - The
+   `startsWith("{") && includes('"code"') && !includes('"envelope"')` check for
+   setting exit code 1 is brittle. It holds today because all error payloads are
+   bare `{ code, message }` and all success payloads carry `"envelope"`. If any
+   new Phase 2 command returns a success shape without `"envelope"`, this will
+   incorrectly set exit code 1. Audit all new handler return shapes against this
+   heuristic before landing Phase 2.
 
 ### Risk
 
@@ -1092,6 +1129,12 @@ Finalize the developer and agent experience.
      deliverable is about updating `summary` and `help` fields in registry
      entries and refining the `generateTopLevelHelp` grouping/formatting -
      not rebuilding help infrastructure.
+   - **Global options flag order:** The Phase 0/1 global options block lists
+     both old and new flag names (e.g. `--device-id <id>, --device <id>`).
+     Phase 4 should flip this so the canonical new name leads and the legacy
+     name appears in a parenthetical or is dropped from the banner entirely.
+     This is a cosmetic change deferred here because it requires touching the
+     same text as the broader help rewrite.
    - Top-level `--help` shows flat commands grouped by function
    - Target structure:
      ```
