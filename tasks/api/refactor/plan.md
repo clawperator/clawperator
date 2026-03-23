@@ -1054,9 +1054,14 @@ Replace JSON-heavy element targeting with simple, guessable flags.
      - `--selector <json>` - raw NodeMatcher JSON (advanced fallback)
 
 2. **Container selector flags**
-   - Same set with `--container-` prefix for scroll-within and read-within:
+   - Same set with `--container-` prefix for scroll-within:
      - `--container-text`, `--container-id`, `--container-desc`,
        `--container-role`, `--container-selector`
+   - `scroll` only: `UiAction.Scroll` already accepts `container: NodeMatcher?`
+     in the Android runtime.
+   - "read-within" (container-scoped `read`) is NOT in Phase 3. `UiAction.ReadText`
+     has no `container` field in the Android runtime. That requires an APK change
+     and is scheduled as Phase 5C.
 
 3. **Update Phase 2's "missing selector" error to show the full flag list**
    - Phase 2 introduced a missing-selector error that references `--selector`
@@ -1399,19 +1404,86 @@ This is a prerequisite, not optional cleanup.
    - Synonym: `read-kv`
    - See Detailed Design Specs section for full spec
 
+### Phase 5C: Read-within (APK + CLI)
+
+Container-scoped `read`: find and return text from a node matching
+`matcher` that exists within the subtree of a node matching `container`.
+
+**Prerequisite:** `UiAction.ReadText` in the Android runtime does not
+have a `container` field today. Phase 5C requires an APK change before
+the CLI layer can expose it. Do not implement the CLI side without first
+shipping and installing the APK change, or the container field will be
+silently ignored by the device and the command will appear to work while
+producing wrong results.
+
+**APK change (Kotlin):**
+
+- Add `container: NodeMatcher? = null` to `UiAction.ReadText` in
+  `apps/android/shared/data/task/src/main/kotlin/clawperator/task/runner/UiAction.kt`
+- Update `UiActionEngine` to scope the node search within the container
+  subtree when `container` is non-null. The same container-scoping logic
+  used by `UiAction.Scroll` is a reference implementation.
+- Build and install: `./gradlew :app:assembleDebug :app:installDebug`
+- Add Kotlin unit tests in `NodeMatcherTest.kt` or a new
+  `UiActionReadTextContainerTest.kt` covering the scoped-search path.
+
+**Node/CLI change:**
+
+- Add `--container-*` flags to the `read` command handler in `registry.ts`,
+  reusing `resolveContainerMatcherFromCli` from `selectorFlags.ts` (already
+  exists from Phase 3).
+- Update `buildReadExecution` in `domain/actions/read.ts` to accept an
+  optional `container: NodeMatcher` and include it in `ActionParams`.
+  `ActionParams.container` is already typed in `contracts/execution.ts`.
+- Update `cmdActionRead` in `commands/action.ts` to accept and forward
+  the container.
+- Update `HELP_READ` in `registry.ts` and `docs/node-api-for-agents.md`
+  to document the new flags.
+
+**CLI surface:**
+
+```
+clawperator read --id <resource-id> --container-id <container-id>
+clawperator read --text <text> --container-role list
+clawperator read --id <resource-id> --container-selector '<json>'
+```
+
+**Testing:**
+
+- `read --id X --container-id Y` sends `{ matcher: {resourceId:X}, container: {resourceId:Y} }` in the execution payload
+- `read --id X --container-selector '{...}'` works; mutual exclusion with `--container-*` simple flags enforced
+- `read --container-id X` without an element selector returns `MISSING_SELECTOR`
+- On device: verify that a `read` with a container scopes the search to the container subtree and does not match a node with the same resource ID outside that container
+- All existing `read` tests still pass (container is optional)
+
+**Risk:** Medium. APK change required - needs Gradle build, device
+install, and on-device verification before the CLI change is useful.
+The Node-side is low-risk (reuses existing infrastructure).
+
+**Sequencing:** Implement APK change first (separate commit), validate
+on device, then land the Node/CLI change. Do not merge the CLI change
+until the APK change is shipped to the device being tested against.
+
+---
+
 ### Risk
 
 Low-medium. Phase 5A deliverables are low-risk: CLI wrappers around
 existing action types or single-flag additions. Phase 5B deliverables
 are medium-risk: `exec` rename touches an existing command surface,
 `wait-for-nav` and `read-value` require the ActionParams contract
-change and new typed builders.
+change and new typed builders. Phase 5C is medium-risk: requires an
+APK change before the CLI change is meaningful.
 
 ### Implementation notes for Phase 5 agents
 
 - **`logs` command does not exist yet:** The deferred `logs --follow`
   design requires building an entirely new `logs` command, not just
   adding a flag to an existing one. It is not part of Phase 5.
+- **Phase 5C APK-first rule:** Do not land the `read --container-*` CLI
+  change without the APK change installed on the target device. A CLI
+  that sends `container` to an APK that ignores it passes all unit tests
+  and silently produces wrong behavior on device.
 
 ### Testing
 
@@ -1519,6 +1591,12 @@ deliverables are independent of each other and can land as separate PRs.
 single commit. 5B deliverables (`exec` rename, `wait-for-nav`,
 `read-value`) are also independent but require the ActionParams contract
 change as a precondition for the latter two.
+
+Phase 5C (`read --container-*`) is independent of 5A and 5B in terms of
+code but requires an APK change as a hard prerequisite. It can be worked
+in parallel with 5A/5B as long as the APK change lands on the target
+device before the CLI change is considered done. Do not merge the Node
+side of 5C without the APK side.
 
 Docs work (`tasks/docs/refactor/`) begins only after Phase 5 is complete.
 
@@ -1918,7 +1996,9 @@ edit or replace the plan above, which stays the original design record.
 | Phase 2 | Done | Flat verbs, global flags, `action` / `observe` removed from registry with did-you-mean, docs and smoke updates |
 | Phase 3 | Done | Selector shorthand flags (`--text`, `--id`, `--desc`, `--role`, `--text-contains`, `--desc-contains`) on click/type/read/wait; `--container-*` on scroll; Phase 3 MISSING_SELECTOR help text; docs updated |
 | Phase 4 | Partial | Exit-code and help polish in flight; full deliverable set not complete |
-| Phase 5 | Not done | Extended commands as specified in plan |
+| Phase 5A | Not done | Extended commands: scroll-until, close, --long/--focus on click, wait --timeout, read --all, sleep |
+| Phase 5B | Not done | Higher-risk: exec rename, wait-for-nav, read-value; requires ActionParams contract alignment first |
+| Phase 5C | Not done | read-within: container-scoped read; requires APK change to UiAction.ReadText before CLI change |
 
 ### Deviations from the written plan (intentional or scheduling)
 
