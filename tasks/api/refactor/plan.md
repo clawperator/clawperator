@@ -452,7 +452,8 @@ Establish the foundation that makes Phases 1-4 safe.
 3. **Regression test coverage in the existing test suite**
    - Extend the existing subprocess-based tests in `apps/node/src/test/unit/`
    - Add explicit coverage for removed commands (verify "did you mean?" errors),
-     renamed flags (verify old names still parse), and new flat commands
+     renamed flags (verify old names still parse), and any flat commands
+     introduced in the same PR
    - Do not introduce a separate parallel test harness - the existing tests are
      the harness
 
@@ -1284,10 +1285,10 @@ This is a prerequisite, not optional cleanup.
    - `exec` becomes primary, `execute` becomes synonym
    - `--payload` becomes primary flag, `--execution` becomes alias
    - Positional: execution payload (JSON string or file path)
-   - Parsing rule: if the positional value starts with `{` or `[`,
-     parse as inline JSON. Otherwise treat as a file path and load
-     the file contents. Error precedence: unreadable file path ->
-     invalid JSON content -> missing payload.
+   - Parsing rule: trim leading whitespace, then if the value starts
+     with `{` or `[`, parse as inline JSON. Otherwise treat as a file
+     path and load the file contents. Error precedence: unreadable
+     file path -> invalid JSON content -> missing payload.
    - `exec best-effort` subcommand unchanged
    - Behavior identical to current `execute`
 
@@ -1518,9 +1519,9 @@ clawperator scroll-until --text "Living room" --click
 clawperator scroll-until up --text "Settings" --container-id "com.foo:id/list"
 ```
 
-**Synonyms:** `scroll-and-click` is accepted as a command synonym for
-`scroll-until --click` (same handler, `--click` implied). This matches
-the pattern agents trained on the execution payload would guess.
+**Accepted command alias:** `scroll-and-click` is an accepted command
+alias for `scroll-until --click` (same handler, `--click` implied). This
+matches the pattern agents trained on the execution payload would guess.
 
 **Error when no selector provided:**
 ```
@@ -1535,7 +1536,7 @@ Example:
 ```
 
 **Registry entry:** `scroll-until` gets its own registry entry with
-`requiresSelector: true`. `scroll-and-click` is a synonym.
+`requiresSelector: true`. `scroll-and-click` is an accepted command alias.
 
 ### `--long` and `--focus` click type flags
 
@@ -1623,10 +1624,11 @@ clawperator exec --payload <json-or-file> [--validate-only] [--dry-run] [--json]
 
 - Primary name: `exec`. Synonym: `execute` (accepted silently).
 - Positional: the execution payload (JSON string or file path), replacing
-  the redundant `--execution` flag name. Parsing rule: if the value starts
-  with `{` or `[`, parse as inline JSON; otherwise treat as a file path
-  and load the file contents. Error precedence: unreadable file path ->
-  invalid JSON content -> missing payload.
+  the redundant `--execution` flag name. Parsing rule: trim leading
+  whitespace, then if the value starts with `{` or `[`, parse as inline
+  JSON; otherwise treat as a file path and load the file contents. Error
+  precedence: unreadable file path -> invalid JSON content -> missing
+  payload.
 - `--payload` flag: alternative to positional (for when the JSON is complex
   or the agent prefers named args).
 - `--execution` is accepted as a silent alias for `--payload` to preserve
