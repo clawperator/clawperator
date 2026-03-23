@@ -30,18 +30,18 @@ const { tmpdir } = require('os');
 const deviceId = process.argv[2] || process.env.DEVICE_ID;
 const rawQuery = process.argv[3] || process.env.QUERY || '';
 const query = rawQuery.trim();
-const receiverPkg = process.argv[4] || process.env.RECEIVER_PKG || 'com.clawperator.operator.dev';
+const operatorPkg = process.argv[4] || process.env.OPERATOR_PKG || 'com.clawperator.operator.dev';
 const packageId = process.argv[5] || process.env.PACKAGE_ID || '';
 
 // Use local CLI build from the repo root (supports 'recording' canonical command)
 const REPO_ROOT = path.resolve(__dirname, '..', '..', '..', '..', '..');
 const LOCAL_CLAW = path.join(REPO_ROOT, 'apps', 'node', 'dist', 'cli', 'index.js');
 
-function runClawperatorLocal(execution, deviceId, receiverPkg) {
+function runClawperatorLocal(execution, deviceId, operatorPkg) {
   const tmpFile = path.join(tmpdir(), execution.commandId + '.json');
   writeFileSync(tmpFile, JSON.stringify(execution));
 
-  const args = [LOCAL_CLAW, 'execute', '--execution', tmpFile, '--device-id', deviceId, '--receiver-package', receiverPkg];
+  const args = [LOCAL_CLAW, 'execute', '--execution', tmpFile, '--device-id', deviceId, '--operator-package', operatorPkg];
 
   try {
     const output = execFileSync('node', args, { encoding: 'utf-8' });
@@ -196,7 +196,7 @@ if (packageId) {
 
 if (usedDirectPath) {
   const execution = buildDirectEntryExecution();
-  const { ok, result: r, error } = runClawperatorLocal(execution, deviceId, receiverPkg);
+  const { ok, result: r, error } = runClawperatorLocal(execution, deviceId, operatorPkg);
   if (!ok) {
     console.error(`Direct entry execution failed: ${error}`);
     console.error('Falling back to in-app search path.');
@@ -208,7 +208,7 @@ if (usedDirectPath) {
 
 if (!usedDirectPath) {
   const execution = buildSearchExecution(query);
-  const { ok, result: r, error } = runClawperatorLocal(execution, deviceId, receiverPkg);
+  const { ok, result: r, error } = runClawperatorLocal(execution, deviceId, operatorPkg);
   if (!ok) {
     console.error(`Search execution failed: ${error}`);
     process.exit(2);
