@@ -30,11 +30,11 @@ Design consequence:
   build from `apps/node/` and its generated artifacts, not the globally installed
   `clawperator` binary. The global install may lag behind the checked-out branch and
   silently hide new or renamed commands.
-- Keep receiver package and action identifiers consistent with current defaults:
+- Keep operator package and action identifiers consistent with current defaults:
   - `com.clawperator.operator` (Release)
   - `com.clawperator.operator.dev` (Local/Debug)
 - For local development, prefer the `.dev` Operator APK and pass
-  `--receiver-package com.clawperator.operator.dev` unless you are explicitly
+ `--operator-package com.clawperator.operator.dev` unless you are explicitly
   validating the release variant. This keeps local CLI changes aligned with the
   debug app that is usually installed on a developer device.
 - **Clawperator is an actuator:** It does not own strategy, planning, or autonomous reasoning. These live in the Agent.
@@ -176,7 +176,7 @@ When multiple devices are connected (physical + emulator), be explicit about whi
 
 3. **Prefer the debug Operator APK for local CLI/API work:** When validating branch-local
    recording, docs, or command-surface changes, use the `.dev` variant and
-   `--receiver-package com.clawperator.operator.dev` unless the change is specifically
+   `--operator-package com.clawperator.operator.dev` unless the change is specifically
    about the release build. This reduces false negatives caused by a stale release APK
    or a mismatched global CLI install.
 

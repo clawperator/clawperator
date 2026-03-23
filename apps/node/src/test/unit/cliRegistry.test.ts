@@ -124,7 +124,7 @@ describe("flag aliases - --timeout works like --timeout-ms", () => {
   });
 });
 
-describe("flag aliases - --operator-package works like --receiver-package", () => {
+describe("flag aliases - --operator-package works as alias for --operator-package", () => {
   it("--operator-package is accepted by getGlobalOpts (passed through to operator setup failure)", async () => {
     const { stdout } = await runCli([
       "--operator-package", "com.clawperator.operator.dev",
@@ -132,10 +132,51 @@ describe("flag aliases - --operator-package works like --receiver-package", () =
       "--apk", "/nonexistent/test.apk",
     ]);
     const obj = JSON.parse(stdout);
-    // Should fail with OPERATOR_APK_NOT_FOUND and echo back the receiverPackage
-    assert.strictEqual(obj.receiverPackage, "com.clawperator.operator.dev");
+    // Should fail with OPERATOR_APK_NOT_FOUND and echo back the operatorPackage
+    assert.strictEqual(obj.operatorPackage, "com.clawperator.operator.dev");
   });
 
+  it("--operator-package missing value produces USAGE error with exit code 1", async () => {
+    const { stdout, code } = await runCli(["--operator-package"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout);
+    assert.strictEqual(obj.code, "USAGE");
+    assert.match(obj.message, /--operator-package requires a value/);
+  });
+
+  it("--operator-package blank value produces USAGE error with exit code 1", async () => {
+    const { stdout, code } = await runCli(["--operator-package", ""]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout);
+    assert.strictEqual(obj.code, "USAGE");
+    assert.match(obj.message, /--operator-package requires a value/);
+  });
+
+  it("--receiver-package missing value produces USAGE error with exit code 1", async () => {
+    const { stdout, code } = await runCli(["--receiver-package"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout);
+    assert.strictEqual(obj.code, "USAGE");
+    assert.match(obj.message, /--receiver-package requires a value/);
+  });
+
+  it("--receiver-package blank value produces USAGE error with exit code 1", async () => {
+    const { stdout, code } = await runCli(["--receiver-package", ""]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout);
+    assert.strictEqual(obj.code, "USAGE");
+    assert.match(obj.message, /--receiver-package requires a value/);
+  });
+
+  it("--receiver-package is accepted and passed through to operator setup failure", async () => {
+    const { stdout } = await runCli([
+      "--receiver-package", "com.clawperator.operator.dev",
+      "operator", "setup",
+      "--apk", "/nonexistent/test.apk",
+    ]);
+    const obj = JSON.parse(stdout);
+    assert.strictEqual(obj.operatorPackage, "com.clawperator.operator.dev");
+  });
 });
 
 describe("unknown command produces UNKNOWN_COMMAND", () => {

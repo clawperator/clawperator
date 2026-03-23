@@ -7,17 +7,17 @@ import type { Logger } from "../../adapters/logger.js";
 export async function cmdGrantDevicePermissions(options: {
   format: OutputOptions["format"];
   deviceId?: string;
-  receiverPackage?: string;
+  operatorPackage?: string;
   logger?: Logger;
 }): Promise<string> {
   const config = getDefaultRuntimeConfig({
     deviceId: options.deviceId,
-    receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_RECEIVER_PACKAGE,
+    operatorPackage: options.operatorPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
     adbPath: process.env.ADB_PATH,
     logger: options.logger,
   });
 
-  const result = await grantDevicePermissions(config, options.receiverPackage);
+  const result = await grantDevicePermissions(config, options.operatorPackage);
 
   const failedGrant =
     !result.accessibility.ok ? result.accessibility
@@ -30,7 +30,7 @@ export async function cmdGrantDevicePermissions(options: {
       {
         code: "GRANT_DEVICE_PERMISSIONS_FAILED",
         message: failedGrant.error ?? "Failed to grant required device permissions.",
-        receiverPackage: result.receiverPackage,
+        operatorPackage: result.operatorPackage,
         accessibility: result.accessibility,
         notification: result.notification,
         notificationListener: result.notificationListener,
@@ -41,7 +41,7 @@ export async function cmdGrantDevicePermissions(options: {
 
   return formatSuccess(
     {
-      receiverPackage: result.receiverPackage,
+      operatorPackage: result.operatorPackage,
       accessibility: result.accessibility,
       notification: result.notification,
       notificationListener: result.notificationListener,

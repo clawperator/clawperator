@@ -34,8 +34,8 @@ export interface SkillRunError {
 export interface SkillRunEnv {
   /** Path to CLI binary used by skill scripts */
   CLAWPERATOR_BIN?: string;
-  /** Operator package passed as --receiver-package on every CLI call within a skill */
-  CLAWPERATOR_RECEIVER_PACKAGE?: string;
+  /** Operator package passed as --operator-package on every CLI call within a skill */
+  CLAWPERATOR_OPERATOR_PACKAGE?: string;
   [key: string]: string | undefined;
 }
 

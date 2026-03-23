@@ -184,7 +184,7 @@ export class DoctorService {
       ok,
       criticalOk,
       deviceId: config.deviceId,
-      receiverPackage: config.receiverPackage,
+      operatorPackage: config.operatorPackage,
       checks,
       nextActions: nextActions.length > 0 ? [...new Set(nextActions)] : undefined,
     };

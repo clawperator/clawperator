@@ -10,7 +10,7 @@ const CONFIG: RuntimeConfig = {
   sdkmanagerPath: "sdkmanager",
   avdmanagerPath: "avdmanager",
   deviceId: "test-device-serial",
-  receiverPackage: "com.clawperator.operator.dev",
+  operatorPackage: "com.clawperator.operator.dev",
   actionAgentCommand: "app.clawperator.operator.ACTION_AGENT_COMMAND",
   payloadExtraKey: "payload",
   runner: { run: async () => ({ code: 0, stdout: "", stderr: "" }), runShell: async () => ({ code: 0, stdout: "", stderr: "" }), spawn: () => ({}) }

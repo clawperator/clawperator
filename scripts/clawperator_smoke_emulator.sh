@@ -29,6 +29,6 @@ resolve_emulator_device_id() {
 }
 
 resolve_emulator_device_id
-export CLAWPERATOR_RECEIVER_PACKAGE="${CLAWPERATOR_RECEIVER_PACKAGE:-com.clawperator.operator}"
+export CLAWPERATOR_OPERATOR_PACKAGE="${CLAWPERATOR_OPERATOR_PACKAGE:-com.clawperator.operator}"
 
 ./scripts/clawperator_smoke_core.sh

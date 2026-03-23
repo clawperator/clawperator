@@ -94,7 +94,7 @@ BEFORE (current)              AFTER (canonical)         AFTER (still accepted)
 --device-id <id>              --device <id>             --device-id
 --output json                 --json                    --output json
 --timeout-ms <ms>             --timeout <ms>            --timeout-ms
---receiver-package <pkg>      --operator-package <pkg>  --receiver-package
+--operator-package <pkg>      --operator-package <pkg>  --operator-package
 --selector '{"textEquals":"X"}'          --text "X"             --selector (advanced)
 --selector '{"resourceId":              --id "com.foo:id/bar"  --selector (advanced)
   "com.foo:id/bar"}'
@@ -176,18 +176,18 @@ the `scroll-until` detailed spec, not in help text or the synonym table.
 `--timeout-ms`. Old flag names continue to work (parsed silently) but are not
 shown in help text.
 
-**`--operator-package` replaces `--receiver-package`.** "Receiver" is an Android
+**`--operator-package` replaces `--operator-package`.** "Receiver" is an Android
 implementation detail (BroadcastReceiver) that means nothing to agents. "Operator"
 is Clawperator's own term - it is what `operator setup` installs, what docs
 reference, what agents will encounter. `--operator-package` is unambiguous and
-self-documenting. `--receiver-package` is accepted as a silent alias.
+self-documenting. `--operator-package` is accepted as a silent alias.
 `--package` was considered but dropped: it is too generic and risks colliding
 with future flags or confusing agents who assume it means something else.
 This flag is rarely needed (only for dev/release variant switching).
 
 **Scope of the rename:** The CLI/API surface changes to `--operator-package`.
-Internally, existing TypeScript field names (`receiverPackage` in `GlobalOpts`,
-command handlers, `serve.ts` request bodies) may remain `receiverPackage`
+Internally, existing TypeScript field names (`operatorPackage` in `GlobalOpts`,
+command handlers, `serve.ts` request bodies) may remain `operatorPackage`
 temporarily to minimize churn. The internal rename is optional and should only be
 done if it does not expand scope.
 
@@ -238,7 +238,7 @@ numbers are approximate - search by function name, not line number, as other
 merges may shift offsets):
 
 - `getGlobalOpts(argv)`: manually iterates argv, extracts `--device-id`,
-  `--receiver-package` (renamed to `--operator-package`),
+  `--operator-package` (renamed to `--operator-package`),
   `--output`/`--format`, `--timeout-ms`, `--log-level`, `--verbose`.
   Everything else goes into `rest[]`.
 - `getOpt(rest, flag)`: simple `rest.indexOf(flag)` lookup.
@@ -469,7 +469,7 @@ Establish the foundation that makes Phases 1-4 safe.
      - `--format json` -> `--json` (existing alias in `getGlobalOpts`, tested
        in `cliHelp.test.ts` - must be preserved)
      - `--timeout-ms` -> `--timeout`
-     - `--receiver-package` -> `--operator-package` (rename)
+     - `--operator-package` -> `--operator-package` (rename)
      - `--package` -> not aliased (too generic; dropped after review)
    - Centralized in `getGlobalOpts()` so all commands automatically inherit
      the renamed global flags
@@ -583,7 +583,7 @@ but leaves the codebase harder to maintain after the refactor than before it.
    **Handler signature:** The current switch cases close over `rest` (the
    remaining argv after global opts), `outWithLogger` (format + logger),
    and `global` (parsed global flags including `deviceId`,
-   `receiverPackage`). The handler signature must thread these through.
+   `operatorPackage`). The handler signature must thread these through.
    The simplest correct approach:
 
    ```typescript
@@ -593,7 +593,7 @@ but leaves the codebase harder to maintain after the refactor than before it.
      verbose: boolean;
      logger: Logger;
      deviceId?: string;
-     receiverPackage?: string;
+     operatorPackage?: string;
      timeoutMs?: number;       // global --timeout value; used by execute,
                                // snapshot, screenshot, skills run
    };
@@ -892,7 +892,7 @@ separable for review:
    - `--device` (canonical), `--device-id` (accepted silently)
    - `--json` (canonical), `--output json` (accepted silently)
    - `--timeout` (canonical), `--timeout-ms` (accepted silently)
-   - `--operator-package` (canonical), `--receiver-package` (accepted silently).
+   - `--operator-package` (canonical), `--operator-package` (accepted silently).
      `--package` was considered and deliberately dropped - see Design Decisions.
 
 6. **Remove `action` and `observe` parent commands**
@@ -1209,7 +1209,7 @@ Finalize the developer and agent experience.
 
    Request and response body field names are unchanged in this refactor. Route
    paths change; body schemas do not. Specifically, HTTP request bodies that
-   accept `receiverPackage` keep that field name even though the CLI flag is
+   accept `operatorPackage` keep that field name even though the CLI flag is
    renamed to `--operator-package`. Body field renames are a separate concern
    that should not be bundled here.
 

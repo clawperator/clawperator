@@ -21,14 +21,14 @@ export async function cmdActionOpenApp(options: {
   format: OutputOptions["format"];
   applicationId: string;
   deviceId?: string;
-  receiverPackage?: string;
+  operatorPackage?: string;
   logger?: Logger;
 }): Promise<string> {
   try {
     const execution = buildOpenAppExecution(options.applicationId);
     const result = await runExecution(execution, {
       deviceId: options.deviceId,
-      receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_RECEIVER_PACKAGE,
+      operatorPackage: options.operatorPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
       warn: message => process.stderr.write(message),
       logger: options.logger,
     });
@@ -52,7 +52,7 @@ export async function cmdActionClick(options: {
   format: OutputOptions["format"];
   selector: string;
   deviceId?: string;
-  receiverPackage?: string;
+  operatorPackage?: string;
   logger?: Logger;
 }): Promise<string> {
   try {
@@ -60,7 +60,7 @@ export async function cmdActionClick(options: {
     const execution = buildClickExecution(selector);
     const result = await runExecution(execution, {
       deviceId: options.deviceId,
-      receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_RECEIVER_PACKAGE,
+      operatorPackage: options.operatorPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
       warn: message => process.stderr.write(message),
       logger: options.logger,
     });
@@ -84,7 +84,7 @@ export async function cmdActionRead(options: {
   format: OutputOptions["format"];
   selector: string;
   deviceId?: string;
-  receiverPackage?: string;
+  operatorPackage?: string;
   logger?: Logger;
 }): Promise<string> {
   try {
@@ -92,7 +92,7 @@ export async function cmdActionRead(options: {
     const execution = buildReadExecution(selector);
     const result = await runExecution(execution, {
       deviceId: options.deviceId,
-      receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_RECEIVER_PACKAGE,
+      operatorPackage: options.operatorPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
       warn: message => process.stderr.write(message),
       logger: options.logger,
     });
@@ -116,7 +116,7 @@ export async function cmdActionWait(options: {
   format: OutputOptions["format"];
   selector: string;
   deviceId?: string;
-  receiverPackage?: string;
+  operatorPackage?: string;
   logger?: Logger;
 }): Promise<string> {
   try {
@@ -124,7 +124,7 @@ export async function cmdActionWait(options: {
     const execution = buildWaitExecution(selector);
     const result = await runExecution(execution, {
       deviceId: options.deviceId,
-      receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_RECEIVER_PACKAGE,
+      operatorPackage: options.operatorPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
       warn: message => process.stderr.write(message),
       logger: options.logger,
     });
@@ -151,7 +151,7 @@ export async function cmdActionType(options: {
   submit?: boolean;
   clear?: boolean;
   deviceId?: string;
-  receiverPackage?: string;
+  operatorPackage?: string;
   logger?: Logger;
 }): Promise<string> {
   try {
@@ -164,7 +164,7 @@ export async function cmdActionType(options: {
     });
     const result = await runExecution(execution, {
       deviceId: options.deviceId,
-      receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_RECEIVER_PACKAGE,
+      operatorPackage: options.operatorPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
       warn: message => process.stderr.write(message),
       logger: options.logger,
     });
@@ -188,14 +188,14 @@ export async function cmdActionOpenUri(options: {
   format: OutputOptions["format"];
   uri: string;
   deviceId?: string;
-  receiverPackage?: string;
+  operatorPackage?: string;
   logger?: Logger;
 }): Promise<string> {
   try {
     const execution = buildOpenUriExecution(options.uri);
     const result = await runExecution(execution, {
       deviceId: options.deviceId,
-      receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_RECEIVER_PACKAGE,
+      operatorPackage: options.operatorPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
       warn: message => process.stderr.write(message),
       logger: options.logger,
     });
@@ -219,14 +219,14 @@ export async function cmdActionPressKey(options: {
   format: OutputOptions["format"];
   key: string;
   deviceId?: string;
-  receiverPackage?: string;
+  operatorPackage?: string;
   logger?: Logger;
 }): Promise<string> {
   try {
     const execution = buildPressKeyExecution(options.key);
     const result = await runExecution(execution, {
       deviceId: options.deviceId,
-      receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_RECEIVER_PACKAGE,
+      operatorPackage: options.operatorPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
       warn: message => process.stderr.write(message),
       logger: options.logger,
     });

@@ -27,7 +27,7 @@ export interface VersionCompatibilityProbe {
   cliVersion: string;
   apkVersion?: string;
   apkVersionCode?: number;
-  receiverPackage: string;
+  operatorPackage: string;
   compatible: boolean;
   error?: ClawperatorError;
   remediation?: string[];
@@ -37,14 +37,14 @@ interface CliPackageMetadata {
   version?: string;
 }
 
-export function getAlternateReceiverVariant(receiverPackage: string): string {
-  return receiverPackage.endsWith(".dev")
-    ? receiverPackage.slice(0, -4)
-    : `${receiverPackage}.dev`;
+export function getAlternateOperatorVariant(operatorPackage: string): string {
+  return operatorPackage.endsWith(".dev")
+    ? operatorPackage.slice(0, -4)
+    : `${operatorPackage}.dev`;
 }
 
-export function getReceiverPackageApkPath(receiverPackage: string): string {
-  return receiverPackage.endsWith(".dev")
+export function getOperatorPackageApkPath(operatorPackage: string): string {
+  return operatorPackage.endsWith(".dev")
     ? "~/.clawperator/downloads/operator-debug.apk"
     : "~/.clawperator/downloads/operator.apk";
 }
@@ -63,13 +63,13 @@ interface InstalledReceiverVariantResult {
 }
 
 function buildReceiverProbeError(
-  receiverPackage: string,
+  operatorPackage: string,
   stderr: string,
   exitCode: number | null
 ): ClawperatorError {
   return {
     code: ERROR_CODES.DEVICE_SHELL_UNAVAILABLE,
-    message: `Could not query installed packages for ${receiverPackage}.`,
+    message: `Could not query installed packages for ${operatorPackage}.`,
     hint: "Verify adb shell access on the device and retry the compatibility check.",
     details: {
       stderr: stderr || undefined,
@@ -80,20 +80,20 @@ function buildReceiverProbeError(
 
 async function getInstalledReceiverVariant(
   config: RuntimeConfig,
-  receiverPackage: string
+  operatorPackage: string
 ): Promise<InstalledReceiverVariantResult> {
-  const packageList = await runAdb(config, ["shell", "pm", "list", "packages", receiverPackage]);
+  const packageList = await runAdb(config, ["shell", "pm", "list", "packages", operatorPackage]);
   if (packageList.code !== 0) {
     return {
       installed: false,
-      error: buildReceiverProbeError(receiverPackage, packageList.stderr, packageList.code),
+      error: buildReceiverProbeError(operatorPackage, packageList.stderr, packageList.code),
     };
   }
-  if (hasListedPackage(packageList.stdout, receiverPackage)) {
+  if (hasListedPackage(packageList.stdout, operatorPackage)) {
     return { installed: true };
   }
 
-  const alternateVariant = getAlternateReceiverVariant(receiverPackage);
+  const alternateVariant = getAlternateOperatorVariant(operatorPackage);
   const alternateList = await runAdb(config, ["shell", "pm", "list", "packages", alternateVariant]);
   if (alternateList.code !== 0) {
     return {
@@ -169,7 +169,7 @@ export async function probeVersionCompatibility(config: RuntimeConfig): Promise<
   } catch (error) {
     return {
       cliVersion: "unknown",
-      receiverPackage: config.receiverPackage,
+      operatorPackage: config.operatorPackage,
       compatible: false,
       error: {
         code: ERROR_CODES.CLI_VERSION_INVALID,
@@ -183,7 +183,7 @@ export async function probeVersionCompatibility(config: RuntimeConfig): Promise<
     };
   }
 
-  const receiverPackage = config.receiverPackage;
+  const operatorPackage = config.operatorPackage;
 
   let parsedCli: ParsedCompatibilityVersion;
   try {
@@ -191,7 +191,7 @@ export async function probeVersionCompatibility(config: RuntimeConfig): Promise<
   } catch (error) {
     return {
       cliVersion,
-      receiverPackage,
+      operatorPackage,
       compatible: false,
       error: {
         code: ERROR_CODES.CLI_VERSION_INVALID,
@@ -205,11 +205,11 @@ export async function probeVersionCompatibility(config: RuntimeConfig): Promise<
     };
   }
 
-  const receiverVariant = await getInstalledReceiverVariant(config, receiverPackage);
+  const receiverVariant = await getInstalledReceiverVariant(config, operatorPackage);
   if (receiverVariant.error) {
     return {
       cliVersion,
-      receiverPackage,
+      operatorPackage,
       compatible: false,
       error: receiverVariant.error,
       remediation: [
@@ -223,50 +223,50 @@ export async function probeVersionCompatibility(config: RuntimeConfig): Promise<
     if (receiverVariant.alternateVariant) {
       return {
         cliVersion,
-        receiverPackage,
+        operatorPackage,
         compatible: false,
         error: {
           code: ERROR_CODES.RECEIVER_VARIANT_MISMATCH,
-          message: `Expected ${receiverPackage} but found installed variant ${receiverVariant.alternateVariant}.`,
+          message: `Expected ${operatorPackage} but found installed variant ${receiverVariant.alternateVariant}.`,
           hint: "Use the installed receiver package or reinstall the correct APK variant.",
         },
         remediation: [
-          `Use --receiver-package ${receiverVariant.alternateVariant}`,
-          `Reinstall the correct APK variant for ${receiverPackage}`,
+          `Use --operator-package ${receiverVariant.alternateVariant}`,
+          `Reinstall the correct APK variant for ${operatorPackage}`,
         ],
       };
     }
 
     return {
       cliVersion,
-      receiverPackage,
+      operatorPackage,
       compatible: false,
       error: {
         code: ERROR_CODES.RECEIVER_NOT_INSTALLED,
-        message: `Package ${receiverPackage} is not installed on the device.`,
+        message: `Package ${operatorPackage} is not installed on the device.`,
         hint: "Install the Operator APK or choose the correct receiver package.",
       },
       remediation: [
         `Download the matching APK: ${getOperatorApkDownloadUrl(parsedCli.normalized)}`,
         `Download the checksum: ${getOperatorApkSha256Url(parsedCli.normalized)}`,
         `Verify the checksum: sha256sum -c operator-v${parsedCli.normalized}.apk.sha256`,
-        `Install the matching APK: clawperator operator setup --apk operator-v${parsedCli.normalized}.apk --device-id <device_id>${receiverPackage.endsWith(".dev") ? " --receiver-package com.clawperator.operator.dev" : ""}`,
-        receiverPackage.endsWith(".dev")
+        `Install the matching APK: clawperator operator setup --apk operator-v${parsedCli.normalized}.apk --device-id <device_id>${operatorPackage.endsWith(".dev") ? " --operator-package com.clawperator.operator.dev" : ""}`,
+        operatorPackage.endsWith(".dev")
           ? "If you are targeting the local debug package, rebuild and reinstall the debug APK from the same source checkout instead of using the release download."
           : "If you are using the release package, the versioned download above is the exact APK to install.",
       ],
     };
   }
 
-  const dump = await runAdb(config, ["shell", "dumpsys", "package", receiverPackage]);
+  const dump = await runAdb(config, ["shell", "dumpsys", "package", operatorPackage]);
   if (dump.code !== 0 || !dump.stdout.trim()) {
     return {
       cliVersion,
-      receiverPackage,
+      operatorPackage,
       compatible: false,
       error: {
         code: ERROR_CODES.APK_VERSION_UNREADABLE,
-        message: `Could not read the installed APK version for ${receiverPackage}.`,
+        message: `Could not read the installed APK version for ${operatorPackage}.`,
         hint: "Reinstall the APK or verify adb shell access.",
         details: {
           stderr: dump.stderr || undefined,
@@ -274,8 +274,8 @@ export async function probeVersionCompatibility(config: RuntimeConfig): Promise<
         },
       },
       remediation: [
-        `Reinstall the APK for ${receiverPackage}`,
-        "Verify adb shell access with: adb shell dumpsys package <receiverPackage>",
+        `Reinstall the APK for ${operatorPackage}`,
+        "Verify adb shell access with: adb shell dumpsys package <operatorPackage>",
       ],
     };
   }
@@ -286,17 +286,17 @@ export async function probeVersionCompatibility(config: RuntimeConfig): Promise<
   } catch (error) {
     return {
       cliVersion,
-      receiverPackage,
+      operatorPackage,
       compatible: false,
       error: {
         code: ERROR_CODES.APK_VERSION_UNREADABLE,
-        message: `Could not find version metadata for ${receiverPackage} in dumpsys output.`,
+        message: `Could not find version metadata for ${operatorPackage} in dumpsys output.`,
         hint: "Reinstall the APK or inspect the package dump output.",
         details: { cause: String(error) },
       },
       remediation: [
-        `Inspect the package dump with: adb shell dumpsys package ${receiverPackage}`,
-        `Reinstall the APK for ${receiverPackage}`,
+        `Inspect the package dump with: adb shell dumpsys package ${operatorPackage}`,
+        `Reinstall the APK for ${operatorPackage}`,
       ],
     };
   }
@@ -312,7 +312,7 @@ export async function probeVersionCompatibility(config: RuntimeConfig): Promise<
         cliVersion,
         apkVersion: installed.versionName,
         apkVersionCode: installed.versionCode,
-        receiverPackage,
+        operatorPackage,
         compatible: false,
         error: {
           code: ERROR_CODES.VERSION_INCOMPATIBLE,
@@ -324,7 +324,7 @@ export async function probeVersionCompatibility(config: RuntimeConfig): Promise<
           `Download the checksum: ${sha256Url}`,
           `Verify the checksum: sha256sum -c operator-v${parsedCli.normalized}.apk.sha256`,
           `Install the matching APK: clawperator operator setup --apk operator-v${parsedCli.normalized}.apk --device-id <device_id>`,
-          receiverPackage.endsWith(".dev")
+          operatorPackage.endsWith(".dev")
             ? "If you are targeting the local debug package, rebuild and reinstall the debug APK from the same source checkout instead of using the release download."
             : "If you are using the release package, the versioned download above is the exact APK to install.",
         ],
@@ -335,7 +335,7 @@ export async function probeVersionCompatibility(config: RuntimeConfig): Promise<
       cliVersion,
       apkVersion: installed.versionName,
       apkVersionCode: installed.versionCode,
-      receiverPackage,
+      operatorPackage,
       compatible: true,
     };
   } catch (error) {
@@ -343,7 +343,7 @@ export async function probeVersionCompatibility(config: RuntimeConfig): Promise<
       cliVersion,
       apkVersion: installed.versionName,
       apkVersionCode: installed.versionCode,
-      receiverPackage,
+      operatorPackage,
       compatible: false,
       error: {
         code: ERROR_CODES.APK_VERSION_INVALID,
@@ -352,7 +352,7 @@ export async function probeVersionCompatibility(config: RuntimeConfig): Promise<
         details: { cause: String(error) },
       },
       remediation: [
-        `Reinstall the APK for ${receiverPackage} from a current release`,
+        `Reinstall the APK for ${operatorPackage} from a current release`,
       ],
     };
   }

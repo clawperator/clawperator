@@ -12,7 +12,7 @@ import { createLogger } from "../../../adapters/logger.js";
 describe("DoctorService", () => {
   it("treats missing APK as a critical failure and skips the handshake", async () => {
     const runner = new FakeProcessRunner();
-    const config = getDefaultRuntimeConfig({ runner, receiverPackage: "com.clawperator.operator.dev" });
+    const config = getDefaultRuntimeConfig({ runner, operatorPackage: "com.clawperator.operator.dev" });
 
     runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
     runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
@@ -41,13 +41,13 @@ describe("DoctorService", () => {
     assert.ok(!report.checks.some(check => check.id === "readiness.handshake"));
     assert.deepStrictEqual(report.nextActions, [
       "If you do not already have a local debug APK copy, rebuild the debug app from the same checkout before rerunning setup.",
-      "clawperator operator setup --apk ~/.clawperator/downloads/operator-debug.apk --device-id test-device-1 --receiver-package com.clawperator.operator.dev",
+      "clawperator operator setup --apk ~/.clawperator/downloads/operator-debug.apk --device-id test-device-1 --operator-package com.clawperator.operator.dev",
     ]);
   });
 
   it("fails when the installed APK is version-incompatible and skips the handshake", async () => {
     const runner = new FakeProcessRunner();
-    const config = getDefaultRuntimeConfig({ runner, receiverPackage: "com.clawperator.operator.dev" });
+    const config = getDefaultRuntimeConfig({ runner, operatorPackage: "com.clawperator.operator.dev" });
 
     runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
     runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
@@ -81,7 +81,7 @@ describe("DoctorService", () => {
 
   it("fails clearly when the installed APK version cannot be read", async () => {
     const runner = new FakeProcessRunner();
-    const config = getDefaultRuntimeConfig({ runner, receiverPackage: "com.clawperator.operator.dev" });
+    const config = getDefaultRuntimeConfig({ runner, operatorPackage: "com.clawperator.operator.dev" });
 
     runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
     runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
@@ -151,7 +151,7 @@ describe("DoctorService", () => {
 
   it("warns when the release package is requested but only debug is installed", async () => {
     const runner = new FakeProcessRunner();
-    const config = getDefaultRuntimeConfig({ runner, receiverPackage: "com.clawperator.operator" });
+    const config = getDefaultRuntimeConfig({ runner, operatorPackage: "com.clawperator.operator" });
 
     runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
     runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
@@ -179,7 +179,7 @@ describe("DoctorService", () => {
 
   it("treats package query failures as critical and skips the handshake", async () => {
     const runner = new FakeProcessRunner();
-    const config = getDefaultRuntimeConfig({ runner, receiverPackage: "com.clawperator.operator.dev" });
+    const config = getDefaultRuntimeConfig({ runner, operatorPackage: "com.clawperator.operator.dev" });
 
     runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
     runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
@@ -207,7 +207,7 @@ describe("DoctorService", () => {
 
   it("lists the release download instructions before the install command", async () => {
     const runner = new FakeProcessRunner();
-    const config = getDefaultRuntimeConfig({ runner, receiverPackage: "com.clawperator.operator" });
+    const config = getDefaultRuntimeConfig({ runner, operatorPackage: "com.clawperator.operator" });
 
     runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
     runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
@@ -247,7 +247,7 @@ describe("DoctorService logging", () => {
   it("logs one doctor.check entry per check", async () => {
     const runner = new FakeProcessRunner();
     const logger = createLogger({ logDir: join(tempRoot, "logs"), logLevel: "info" });
-    const config = getDefaultRuntimeConfig({ runner, receiverPackage: "com.clawperator.operator.dev" });
+    const config = getDefaultRuntimeConfig({ runner, operatorPackage: "com.clawperator.operator.dev" });
 
     runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
     runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });

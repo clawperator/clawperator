@@ -8,11 +8,11 @@ function singleQuoteForDeviceShell(value: string): string {
 
 export function buildBroadcastShellCommand(config: RuntimeConfig, payloadJson: string): string {
   const action = singleQuoteForDeviceShell(config.actionAgentCommand);
-  const receiverPackage = singleQuoteForDeviceShell(config.receiverPackage);
+  const operatorPackage = singleQuoteForDeviceShell(config.operatorPackage);
   const payloadKey = singleQuoteForDeviceShell(config.payloadExtraKey);
   const payload = singleQuoteForDeviceShell(payloadJson.replace(/\n/g, ""));
 
-  return `am broadcast -a ${action} -p ${receiverPackage} --es ${payloadKey} ${payload} --receiver-foreground`;
+  return `am broadcast -a ${action} -p ${operatorPackage} --es ${payloadKey} ${payload} --receiver-foreground`;
 }
 
 /**

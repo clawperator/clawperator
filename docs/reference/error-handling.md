@@ -86,7 +86,7 @@ Usually recoverable:
 
 Recommended next action:
 - run `clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id <device_id>`
-- if using a local debug APK, also pass `--receiver-package com.clawperator.operator.dev`
+- if using a local debug APK, also pass `--operator-package com.clawperator.operator.dev`
 
 ### `EXECUTION_VALIDATION_FAILED`
 

@@ -162,7 +162,7 @@ Returned when `RESULT_ENVELOPE_TIMEOUT` occurs.
   lastCorrelatedEvents?: string[];    // last logcat lines correlated to this command
   broadcastDispatchStatus?: string;   // result of the ADB broadcast call
   deviceId?: string;
-  receiverPackage?: string;
+  operatorPackage?: string;
 }
 ```
 
@@ -177,7 +177,7 @@ Returned when `BROADCAST_FAILED` or `RECEIVER_NOT_INSTALLED` occurs.
   lastCorrelatedEvents?: string[];
   broadcastDispatchStatus?: string;
   deviceId?: string;
-  receiverPackage?: string;
+  operatorPackage?: string;
 }
 ```
 
@@ -191,7 +191,7 @@ Returned when `BROADCAST_FAILED` or `RECEIVER_NOT_INSTALLED` occurs.
 {
   ok: boolean;
   deviceId?: string;
-  receiverPackage?: string;
+  operatorPackage?: string;
   checks: DoctorCheckResult[];
   nextActions?: string[];
 }

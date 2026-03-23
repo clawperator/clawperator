@@ -79,7 +79,7 @@ Update this file with:
 Usage:
 
 \`\`\`bash
-node ${scriptPath} <device_id> [receiver_package]
+node ${scriptPath} <device_id> [operator_package]
 \`\`\`
 `;
 }
@@ -97,10 +97,10 @@ function buildScriptTemplate(skillId: string, applicationId: string): string {
 
 import { execFileSync } from "node:child_process";
 
-const [, , deviceId, receiverPackage = process.env.CLAWPERATOR_RECEIVER_PACKAGE || "com.clawperator.operator"] = process.argv;
+const [, , deviceId, operatorPackage = process.env.CLAWPERATOR_OPERATOR_PACKAGE || "com.clawperator.operator"] = process.argv;
 
 if (!deviceId) {
-  console.error("Usage: node run.js <device_id> [receiver_package]");
+  console.error("Usage: node run.js <device_id> [operator_package]");
   process.exit(1);
 }
 
@@ -126,8 +126,8 @@ try {
       "execute",
       "--device-id",
       deviceId,
-      "--receiver-package",
-      receiverPackage,
+      "--operator-package",
+      operatorPackage,
       "--execution",
       JSON.stringify(execution),
       "--output",

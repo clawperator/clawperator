@@ -1,10 +1,10 @@
 import { describe, it } from "node:test";
 import assert from "node:assert";
 import {
-  getAlternateReceiverVariant,
+  getAlternateOperatorVariant,
   getOperatorApkDownloadUrl,
   getOperatorApkSha256Url,
-  getReceiverPackageApkPath,
+  getOperatorPackageApkPath,
   isVersionCompatible,
   normalizeCompatibilityVersion,
   parseCompatibilityVersion,
@@ -18,8 +18,8 @@ describe("version compatibility", () => {
   });
 
   it("maps receiver packages to their APK download paths", () => {
-    assert.strictEqual(getReceiverPackageApkPath("com.clawperator.operator.dev"), "~/.clawperator/downloads/operator-debug.apk");
-    assert.strictEqual(getReceiverPackageApkPath("com.clawperator.operator"), "~/.clawperator/downloads/operator.apk");
+    assert.strictEqual(getOperatorPackageApkPath("com.clawperator.operator.dev"), "~/.clawperator/downloads/operator-debug.apk");
+    assert.strictEqual(getOperatorPackageApkPath("com.clawperator.operator"), "~/.clawperator/downloads/operator.apk");
   });
 
   it("builds versioned APK download URLs", () => {
@@ -34,13 +34,13 @@ describe("version compatibility", () => {
   });
 
   it("removes only a trailing debug suffix when deriving the alternate package", () => {
-    assert.strictEqual(getAlternateReceiverVariant("com.clawperator.operator.dev"), "com.clawperator.operator");
+    assert.strictEqual(getAlternateOperatorVariant("com.clawperator.operator.dev"), "com.clawperator.operator");
     assert.strictEqual(
-      getAlternateReceiverVariant("com.example.devtools.operator.dev"),
+      getAlternateOperatorVariant("com.example.devtools.operator.dev"),
       "com.example.devtools.operator"
     );
     assert.strictEqual(
-      getAlternateReceiverVariant("com.example.devtools.operator"),
+      getAlternateOperatorVariant("com.example.devtools.operator"),
       "com.example.devtools.operator.dev"
     );
   });

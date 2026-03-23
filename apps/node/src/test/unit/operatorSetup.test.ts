@@ -59,9 +59,9 @@ describe("setupOperator - domain", () => {
 
     // adb install succeeds
     runner.queueResult({ code: 0, stdout: "Success", stderr: "" });
-    // listInstalledReceiverPackages: release pkg found
+    // listInstalledOperatorPackages: release pkg found
     runner.queueResult({ code: 0, stdout: "package:com.clawperator.operator", stderr: "" });
-    // listInstalledReceiverPackages: debug pkg not found
+    // listInstalledOperatorPackages: debug pkg not found
     runner.queueResult({ code: 0, stdout: "", stderr: "" });
     // grantAccessibilityPermission: settings get fails
     runner.queueResult({ code: 1, stdout: "", stderr: "settings: command failed" });
@@ -135,7 +135,7 @@ describe("setupOperator - domain", () => {
 
     const result = await setupOperator(config, TEST_APK_PATH);
 
-    assert.strictEqual(result.receiverPackage, "com.clawperator.operator.dev");
+    assert.strictEqual(result.operatorPackage, "com.clawperator.operator.dev");
     assert.strictEqual(result.verification?.ok, true);
   });
 
@@ -145,9 +145,9 @@ describe("setupOperator - domain", () => {
 
     // adb install succeeds
     runner.queueResult({ code: 0, stdout: "Success", stderr: "" });
-    // listInstalledReceiverPackages: release pkg found
+    // listInstalledOperatorPackages: release pkg found
     runner.queueResult({ code: 0, stdout: "package:com.clawperator.operator", stderr: "" });
-    // listInstalledReceiverPackages: debug pkg not found
+    // listInstalledOperatorPackages: debug pkg not found
     runner.queueResult({ code: 0, stdout: "", stderr: "" });
     // grantAccessibilityPermission: read current (no existing)
     runner.queueResult({ code: 0, stdout: "null", stderr: "" });
@@ -167,7 +167,7 @@ describe("setupOperator - domain", () => {
     const result = await setupOperator(config, TEST_APK_PATH);
 
     assert.strictEqual(result.install.ok, true);
-    assert.strictEqual(result.receiverPackage, "com.clawperator.operator");
+    assert.strictEqual(result.operatorPackage, "com.clawperator.operator");
     assert.ok(result.permissions);
     assert.strictEqual(result.permissions?.accessibility.ok, true);
     assert.strictEqual(result.permissions?.notification.ok, true);
@@ -177,7 +177,7 @@ describe("setupOperator - domain", () => {
     assert.strictEqual(result.verification?.packageInstalled, true);
   });
 
-  it("respects explicit --receiver-package and skips auto-detect", async () => {
+  it("respects explicit --operator-package and skips auto-detect", async () => {
     const runner = new FakeProcessRunner();
     const config = makeConfig(runner);
 
@@ -194,12 +194,12 @@ describe("setupOperator - domain", () => {
 
     const result = await setupOperator(config, TEST_APK_PATH, "com.clawperator.operator.dev");
 
-    assert.strictEqual(result.receiverPackage, "com.clawperator.operator.dev");
+    assert.strictEqual(result.operatorPackage, "com.clawperator.operator.dev");
     assert.strictEqual(result.install.ok, true);
     assert.strictEqual(result.permissions?.accessibility.alreadyEnabled, true);
     assert.strictEqual(result.verification?.ok, true);
 
-    // Explicit receiver-package should avoid the release/debug auto-detect probes.
+    // Explicit operator-package should avoid the release/debug auto-detect probes.
     const detectCalls = runner.calls.filter(c =>
       c.args.length >= 6 &&
       c.args[2] === "shell" &&
@@ -208,7 +208,7 @@ describe("setupOperator - domain", () => {
       c.args[5] === "packages" &&
       c.args[6] === "com.clawperator.operator"
     );
-    assert.strictEqual(detectCalls.length, 0, "Should not probe the release package when receiver-package is explicit");
+    assert.strictEqual(detectCalls.length, 0, "Should not probe the release package when operator-package is explicit");
   });
 
   it("fails verification gracefully when pm list does not find package", async () => {
@@ -217,9 +217,9 @@ describe("setupOperator - domain", () => {
 
     // adb install succeeds
     runner.queueResult({ code: 0, stdout: "Success", stderr: "" });
-    // listInstalledReceiverPackages: release pkg found
+    // listInstalledOperatorPackages: release pkg found
     runner.queueResult({ code: 0, stdout: "package:com.clawperator.operator", stderr: "" });
-    // listInstalledReceiverPackages: debug pkg not found
+    // listInstalledOperatorPackages: debug pkg not found
     runner.queueResult({ code: 0, stdout: "", stderr: "" });
     // grantAccessibilityPermission: already enabled
     runner.queueResult({ code: 0, stdout: "com.clawperator.operator/clawperator.operator.accessibilityservice.OperatorAccessibilityService", stderr: "" });

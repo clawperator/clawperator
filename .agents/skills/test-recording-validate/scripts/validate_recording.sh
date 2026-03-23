@@ -18,7 +18,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
 CLAW="$REPO_ROOT/apps/node/dist/cli/index.js"
 
 # Receiver package - use env var or default to dev package for testing
-RECEIVER_PKG="${CLAWPERATOR_RECEIVER_PACKAGE:-com.clawperator.operator.dev}"
+OPERATOR_PKG="${CLAWPERATOR_OPERATOR_PACKAGE:-com.clawperator.operator.dev}"
 
 # Device selection
 DEVICE_ID="${1:-}"
@@ -72,10 +72,10 @@ update_report() {
 
 # Step 1: Start recording
 echo "[INFO] Clearing any stale recording session before starting..."
-node "$CLAW" recording stop --device-id "$DEVICE_ID" --receiver-package "$RECEIVER_PKG" --output json >/dev/null 2>&1 || true
+node "$CLAW" recording stop --device-id "$DEVICE_ID" --operator-package "$OPERATOR_PKG" --output json >/dev/null 2>&1 || true
 
 echo "[STEP 1] Starting recording session..."
-START_OUTPUT=$(node "$CLAW" recording start --device-id "$DEVICE_ID" --receiver-package "$RECEIVER_PKG" --output json 2>&1) || {
+START_OUTPUT=$(node "$CLAW" recording start --device-id "$DEVICE_ID" --operator-package "$OPERATOR_PKG" --output json 2>&1) || {
     echo "[ERROR] Recording start failed: $START_OUTPUT"
     update_report "steps.start" '{"success": false, "error": "command failed"}'
     exit 2
@@ -102,7 +102,7 @@ update_report "steps.start" "{\"success\": true, \"sessionId\": \"$SESSION_ID\"}
 echo "[STEP 2] Running Play Store search skill for 'Action Launcher'..."
 # Use local copy of Play Store search skill that uses local CLI build
 SKILL_SCRIPT="$SCRIPT_DIR/../play-store-search-skill/scripts/search_play_store.js"
-SKILL_OUTPUT=$(node "$SKILL_SCRIPT" "$DEVICE_ID" "Action Launcher" "$RECEIVER_PKG" 2>&1) || {
+SKILL_OUTPUT=$(node "$SKILL_SCRIPT" "$DEVICE_ID" "Action Launcher" "$OPERATOR_PKG" 2>&1) || {
     echo "[WARN] Play Store skill may have encountered issues: $SKILL_OUTPUT"
     # Continue anyway - partial results are still valid for recording
 }
@@ -112,7 +112,7 @@ update_report "steps.skill" '{"success": true}'
 
 # Step 3: Stop recording
 echo "[STEP 3] Stopping recording session..."
-STOP_OUTPUT=$(node "$CLAW" recording stop --device-id "$DEVICE_ID" --receiver-package "$RECEIVER_PKG" --output json 2>&1) || {
+STOP_OUTPUT=$(node "$CLAW" recording stop --device-id "$DEVICE_ID" --operator-package "$OPERATOR_PKG" --output json 2>&1) || {
     echo "[ERROR] Recording stop failed: $STOP_OUTPUT"
     update_report "steps.stop" '{"success": false, "error": "command failed"}'
     exit 4
@@ -125,7 +125,7 @@ update_report "steps.stop" "{\"success\": true, \"eventCount\": $EVENT_COUNT}"
 
 # Step 4: Pull recording
 echo "[STEP 4] Pulling recording to host..."
-PULL_OUTPUT=$(node "$CLAW" recording pull --device-id "$DEVICE_ID" --receiver-package "$RECEIVER_PKG" --session-id "$SESSION_ID" --out "$RUN_DIR" --output json 2>&1) || {
+PULL_OUTPUT=$(node "$CLAW" recording pull --device-id "$DEVICE_ID" --operator-package "$OPERATOR_PKG" --session-id "$SESSION_ID" --out "$RUN_DIR" --output json 2>&1) || {
     echo "[ERROR] Recording pull failed: $PULL_OUTPUT"
     update_report "steps.pull" '{"success": false, "error": "command failed"}'
     exit 5

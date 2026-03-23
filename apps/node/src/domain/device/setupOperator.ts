@@ -4,7 +4,7 @@ import { type RuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.
 import {
   grantDevicePermissions,
   hasListedPackage,
-  listInstalledReceiverPackages,
+  listInstalledOperatorPackages,
   type PermissionGrantResult,
 } from "./grantPermissions.js";
 
@@ -21,7 +21,7 @@ export interface VerifyPhaseResult {
 }
 
 export interface OperatorInstallResult {
-  receiverPackage: string;
+  operatorPackage: string;
   install: InstallPhaseResult;
   permissions?: PermissionGrantResult;
   verification?: VerifyPhaseResult;
@@ -42,12 +42,12 @@ export type { PermissionGrantResult } from "./grantPermissions.js";
 export async function setupOperator(
   config: RuntimeConfig,
   apkPath: string,
-  receiverPackage?: string
+  operatorPackage?: string
 ): Promise<OperatorInstallResult> {
   // Step 1: Check that the APK file exists before invoking adb.
   if (!existsSync(apkPath)) {
     return {
-      receiverPackage: receiverPackage ?? "<unknown>",
+      operatorPackage: operatorPackage ?? "<unknown>",
       install: {
         ok: false,
         error: `APK file not found: ${apkPath}`,
@@ -60,7 +60,7 @@ export async function setupOperator(
   if (adbInstall.code !== 0) {
     const error = [adbInstall.stderr, adbInstall.stdout].filter(Boolean).join(" ").trim();
     return {
-      receiverPackage: receiverPackage ?? "<unknown>",
+      operatorPackage: operatorPackage ?? "<unknown>",
       install: {
         ok: false,
         error: error || "adb install returned a non-zero exit code",
@@ -72,15 +72,15 @@ export async function setupOperator(
   const install: InstallPhaseResult = { ok: true };
 
   // Step 3: Resolve receiver package.
-  const installedPackages = receiverPackage ? [receiverPackage] : await listInstalledReceiverPackages(config);
+  const installedPackages = operatorPackage ? [operatorPackage] : await listInstalledOperatorPackages(config);
   const pkg = installedPackages.length === 1 ? installedPackages[0] : undefined;
   if (!pkg) {
     const error =
       installedPackages.length > 1
-        ? "Multiple Operator package variants are installed after setup. Use --receiver-package to specify the package explicitly."
-        : "Could not detect installed Operator package after install. Use --receiver-package to specify the package explicitly.";
+        ? "Multiple Operator package variants are installed after setup. Use --operator-package to specify the package explicitly."
+        : "Could not detect installed Operator package after install. Use --operator-package to specify the package explicitly.";
     return {
-      receiverPackage: "<unknown>",
+      operatorPackage: "<unknown>",
       install,
       verification: {
         ok: false,
@@ -102,7 +102,7 @@ export async function setupOperator(
           : undefined;
 
   if (permFailed) {
-    return { receiverPackage: pkg, install, permissions };
+    return { operatorPackage: pkg, install, permissions };
   }
 
   // Step 5: Lightweight post-install verification.
@@ -116,5 +116,5 @@ export async function setupOperator(
     error: packageInstalled ? undefined : `Package ${pkg} was not found after install.`,
   };
 
-  return { receiverPackage: pkg, install, permissions, verification };
+  return { operatorPackage: pkg, install, permissions, verification };
 }

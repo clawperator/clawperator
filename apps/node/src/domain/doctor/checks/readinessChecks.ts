@@ -5,17 +5,17 @@ import { ERROR_CODES } from "../../../contracts/errors.js";
 import { broadcastAgentCommand } from "../../../adapters/android-bridge/broadcastAgentCommand.js";
 import { waitForResultEnvelope } from "../../../adapters/android-bridge/logcatResultReader.js";
 import {
-  getAlternateReceiverVariant,
+  getAlternateOperatorVariant,
   getCliVersion,
   getOperatorApkDownloadUrl,
   getOperatorApkSha256Url,
-  getReceiverPackageApkPath,
+  getOperatorPackageApkPath,
   hasListedPackage,
   probeVersionCompatibility,
 } from "../../version/compatibility.js";
 
 export async function checkApkPresence(config: RuntimeConfig): Promise<DoctorCheckResult> {
-  const packageList = await runAdb(config, ["shell", "pm", "list", "packages", config.receiverPackage]);
+  const packageList = await runAdb(config, ["shell", "pm", "list", "packages", config.operatorPackage]);
   if (packageList.code !== 0) {
     return {
       id: "readiness.apk.presence",
@@ -24,16 +24,16 @@ export async function checkApkPresence(config: RuntimeConfig): Promise<DoctorChe
       summary: "Could not query installed packages on the device.",
       detail: packageList.stderr || undefined,
       evidence: {
-        receiverPackage: config.receiverPackage,
+        operatorPackage: config.operatorPackage,
         exitCode: packageList.code ?? undefined,
       },
     };
   }
-  const isInstalled = hasListedPackage(packageList.stdout, config.receiverPackage);
+  const isInstalled = hasListedPackage(packageList.stdout, config.operatorPackage);
 
   if (!isInstalled) {
     // Check if the other variant is installed
-    const otherVariant = getAlternateReceiverVariant(config.receiverPackage);
+    const otherVariant = getAlternateOperatorVariant(config.operatorPackage);
 
     const alternateList = await runAdb(config, ["shell", "pm", "list", "packages", otherVariant]);
     if (alternateList.code !== 0) {
@@ -44,7 +44,7 @@ export async function checkApkPresence(config: RuntimeConfig): Promise<DoctorChe
         summary: "Could not query installed packages on the device.",
         detail: alternateList.stderr || undefined,
         evidence: {
-          receiverPackage: otherVariant,
+          operatorPackage: otherVariant,
           exitCode: alternateList.code ?? undefined,
         },
       };
@@ -55,12 +55,12 @@ export async function checkApkPresence(config: RuntimeConfig): Promise<DoctorChe
         status: "warn",
         code: ERROR_CODES.RECEIVER_VARIANT_MISMATCH,
         summary: `Wrong Operator variant installed.`,
-        detail: `Expected ${config.receiverPackage} but found ${otherVariant}.`,
+        detail: `Expected ${config.operatorPackage} but found ${otherVariant}.`,
         fix: {
           title: "Switch variant",
           platform: "any",
           steps: [
-            { kind: "manual", value: `Use --receiver-package ${otherVariant} or reinstall the correct APK` },
+            { kind: "manual", value: `Use --operator-package ${otherVariant} or reinstall the correct APK` },
             { kind: "manual", value: `Public installs typically use com.clawperator.operator; local debug builds use com.clawperator.operator.dev` },
           ],
         },
@@ -72,16 +72,16 @@ export async function checkApkPresence(config: RuntimeConfig): Promise<DoctorChe
       status: "fail",
       code: ERROR_CODES.RECEIVER_NOT_INSTALLED,
       summary: "Operator APK not installed.",
-      detail: `Package ${config.receiverPackage} was not found on the device.`,
+      detail: `Package ${config.operatorPackage} was not found on the device.`,
       evidence: {
         cliVersion: getCliVersion(),
-        receiverPackage: config.receiverPackage,
+        operatorPackage: config.operatorPackage,
       },
       fix: {
         title: "Install Operator APK",
         platform: "any",
         steps: [
-          config.receiverPackage.endsWith(".dev")
+          config.operatorPackage.endsWith(".dev")
             ? { kind: "manual", value: "If you do not already have a local debug APK copy, rebuild the debug app from the same checkout before rerunning setup." }
             : {
                 kind: "manual",
@@ -89,7 +89,7 @@ export async function checkApkPresence(config: RuntimeConfig): Promise<DoctorChe
               },
           {
             kind: "shell",
-            value: `clawperator operator setup --apk ${getReceiverPackageApkPath(config.receiverPackage)} --device-id ${config.deviceId}${config.receiverPackage !== "com.clawperator.operator" ? ` --receiver-package ${config.receiverPackage}` : ""}`,
+            value: `clawperator operator setup --apk ${getOperatorPackageApkPath(config.operatorPackage)} --device-id ${config.deviceId}${config.operatorPackage !== "com.clawperator.operator" ? ` --operator-package ${config.operatorPackage}` : ""}`,
           },
         ],
       },
@@ -99,7 +99,7 @@ export async function checkApkPresence(config: RuntimeConfig): Promise<DoctorChe
   return {
     id: "readiness.apk.presence",
     status: "pass",
-    summary: `Operator APK (${config.receiverPackage}) is installed.`,
+    summary: `Operator APK (${config.operatorPackage}) is installed.`,
   };
 }
 
@@ -147,7 +147,7 @@ export async function checkVersionCompatibility(config: RuntimeConfig): Promise<
         cliVersion: result.cliVersion,
         apkVersion: result.apkVersion,
         apkVersionCode: result.apkVersionCode,
-        receiverPackage: result.receiverPackage,
+        operatorPackage: result.operatorPackage,
       },
     };
   }
@@ -171,7 +171,7 @@ export async function checkVersionCompatibility(config: RuntimeConfig): Promise<
       cliVersion: result.cliVersion,
       apkVersion: result.apkVersion,
       apkVersionCode: result.apkVersionCode,
-      receiverPackage: result.receiverPackage,
+      operatorPackage: result.operatorPackage,
     },
   };
 }
@@ -209,7 +209,7 @@ export async function runHandshake(
       };
     } else {
       const deviceFlag = config.deviceId ? ` --device-id ${config.deviceId}` : "";
-      const pkgFlag = config.receiverPackage ? ` --receiver-package ${config.receiverPackage}` : "";
+      const pkgFlag = config.operatorPackage ? ` --operator-package ${config.operatorPackage}` : "";
       return {
         id: "readiness.handshake",
         status: "fail",
@@ -233,11 +233,11 @@ export async function runHandshake(
 
   if ("timeout" in result && result.timeout) {
     const deviceFlag = config.deviceId ? ` --device-id ${config.deviceId}` : "";
-    const pkgFlag = config.receiverPackage ? ` --receiver-package ${config.receiverPackage}` : "";
+    const pkgFlag = config.operatorPackage ? ` --operator-package ${config.operatorPackage}` : "";
     const timeoutMessage = [
       `No [Clawperator-Result] envelope received within 7000ms.`,
       `Broadcast dispatch: ${result.diagnostics.broadcastDispatchStatus}.`,
-      `Receiver package: ${config.receiverPackage}.`,
+        `Operator package: ${config.operatorPackage}.`,
       config.deviceId ? `Device: ${config.deviceId}.` : undefined,
       (result.diagnostics.lastCorrelatedEvents?.length ?? 0) > 0
         ? "Re-run with --verbose to inspect correlated Android log lines."

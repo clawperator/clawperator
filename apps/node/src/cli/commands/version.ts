@@ -10,7 +10,7 @@ import type { Logger } from "../../adapters/logger.js";
 export async function cmdVersion(options: OutputOptions & {
   checkCompat?: boolean;
   deviceId?: string;
-  receiverPackage?: string;
+  operatorPackage?: string;
   runner?: ProcessRunner;
   logger?: Logger;
 }): Promise<string> {
@@ -29,7 +29,7 @@ export async function cmdVersion(options: OutputOptions & {
 
   const config = getDefaultRuntimeConfig({
     deviceId: options.deviceId,
-    receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_RECEIVER_PACKAGE,
+    operatorPackage: options.operatorPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
     adbPath: process.env.ADB_PATH,
     runner: options.runner,
     logger: options.logger,
@@ -45,7 +45,7 @@ export async function cmdVersion(options: OutputOptions & {
       cliVersion: result.cliVersion,
       apkVersion: result.apkVersion,
       apkVersionCode: result.apkVersionCode,
-      receiverPackage: result.receiverPackage,
+      operatorPackage: result.operatorPackage,
       compatible: result.compatible,
       error: result.error,
       remediation: result.remediation,

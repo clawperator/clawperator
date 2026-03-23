@@ -514,7 +514,7 @@ describe("runExecution", () => {
 
     const result = await runExecution(execution, {
       deviceId: "test-device-1",
-      receiverPackage: "com.test.operator.dev",
+      operatorPackage: "com.test.operator.dev",
       runner,
       warn: message => warnings.push(message),
     });
@@ -603,7 +603,7 @@ describe("buildTimeoutError", () => {
         lastCorrelatedEvents: ["TaskScopeDefault: example"],
         broadcastDispatchStatus: "sent",
         deviceId: "emulator-5554",
-        receiverPackage: "com.clawperator.operator.dev",
+        operatorPackage: "com.clawperator.operator.dev",
       },
       55
     );
@@ -611,7 +611,7 @@ describe("buildTimeoutError", () => {
     assert.deepStrictEqual(error.lastCorrelatedEvents, ["TaskScopeDefault: example"]);
     assert.strictEqual(error.broadcastDispatchStatus, "sent");
     assert.strictEqual(error.deviceId, "emulator-5554");
-    assert.strictEqual(error.receiverPackage, "com.clawperator.operator.dev");
+    assert.strictEqual(error.operatorPackage, "com.clawperator.operator.dev");
   });
 });
 
@@ -696,7 +696,7 @@ describe("runExecution logging", () => {
       },
       {
         deviceId: "device-123",
-        receiverPackage: "com.test.operator.dev",
+        operatorPackage: "com.test.operator.dev",
         adbPath,
         runner,
         logger,
@@ -752,7 +752,7 @@ describe("runExecution logging", () => {
       },
       {
         deviceId: "device-123",
-        receiverPackage: "com.test.operator.dev",
+        operatorPackage: "com.test.operator.dev",
         adbPath,
         runner,
         logger,

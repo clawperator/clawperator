@@ -11,7 +11,7 @@ describe("checkApkPresence", () => {
         const config = getDefaultRuntimeConfig({
             runner,
             deviceId: "test-device",
-            receiverPackage: "com.test.operator",
+            operatorPackage: "com.test.operator",
         });
 
         runner.queueResult({ code: 0, stdout: "", stderr: "" });
@@ -29,7 +29,7 @@ describe("checkApkPresence", () => {
         const config = getDefaultRuntimeConfig({
             runner,
             deviceId: "test-device",
-            receiverPackage: "com.test.operator",
+            operatorPackage: "com.test.operator",
         });
 
         runner.queueResult({ code: 1, stdout: "", stderr: "cmd: Can't find service: package", error: new Error("shell failed") });
@@ -48,7 +48,7 @@ describe("runHandshake", () => {
             config: getDefaultRuntimeConfig({
                 runner,
                 deviceId: "test-device",
-                receiverPackage: "com.test.operator",
+                operatorPackage: "com.test.operator",
             }),
             runner,
         };
@@ -104,7 +104,7 @@ describe("runHandshake", () => {
         assert.strictEqual(result.status, "fail");
         assert.strictEqual(result.code, ERROR_CODES.RESULT_ENVELOPE_TIMEOUT);
         assert.match(result.detail ?? "", /Broadcast dispatch: sent/);
-        assert.match(result.detail ?? "", /Receiver package: com\.test\.operator/);
+        assert.match(result.detail ?? "", /Operator package: com\.test\.operator/);
         assert.ok(result.fix?.steps.some(step => step.kind === "shell" && step.value.includes("observe snapshot")));
     });
 

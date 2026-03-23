@@ -75,7 +75,7 @@ export async function waitForResultEnvelope(
         lastCorrelatedEvents: correlatedLines.slice(-lastCorrelatedLines),
         broadcastDispatchStatus: broadcastStatus,
         deviceId: config.deviceId,
-        receiverPackage: config.receiverPackage,
+        operatorPackage: config.operatorPackage,
       };
       config.logger?.log({
         ts: new Date().toISOString(),
@@ -181,7 +181,7 @@ export async function waitForResultEnvelope(
             lastCorrelatedEvents: correlatedLines.slice(-lastCorrelatedLines),
             broadcastDispatchStatus: broadcastStatus,
             deviceId: config.deviceId,
-            receiverPackage: config.receiverPackage,
+            operatorPackage: config.operatorPackage,
           };
           flush();
           finalize({ ok: false, broadcastFailed: true, diagnostics });
@@ -197,7 +197,7 @@ export async function waitForResultEnvelope(
           lastCorrelatedEvents: correlatedLines.slice(-lastCorrelatedLines),
           broadcastDispatchStatus: broadcastStatus,
           deviceId: config.deviceId,
-          receiverPackage: config.receiverPackage,
+          operatorPackage: config.operatorPackage,
         };
         flush();
         finalize({ ok: false, broadcastFailed: true, diagnostics });

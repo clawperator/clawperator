@@ -1,13 +1,13 @@
 # Device and Package Model
 
 This page explains how Clawperator targets Android devices and how the
-receiver-package concept fits into execution dispatch.
+operator-package concept fits into execution dispatch.
 
 Use it when you need to understand:
 
 - what a `deviceId` really is
 - when `--device-id` is required
-- what `--receiver-package` targets
+- what `--operator-package` targets
 - how release and debug Operator APK variants differ
 
 ## `deviceId` means ADB serial
@@ -89,9 +89,9 @@ Current defaults:
 
 Most public docs assume the release package by default.
 
-## When to pass `--receiver-package`
+## When to pass `--operator-package`
 
-Pass `--receiver-package` when:
+Pass `--operator-package` when:
 
 - you are using a local debug APK
 - both release and debug variants are installed
@@ -103,7 +103,7 @@ Example:
 ```bash
 clawperator observe snapshot \
   --device-id <device_id> \
-  --receiver-package com.clawperator.operator.dev \
+  --operator-package com.clawperator.operator.dev \
   --output json
 ```
 
@@ -112,7 +112,7 @@ clawperator observe snapshot \
 These two flags solve different problems:
 
 - `--device-id` picks the Android device
-- `--receiver-package` picks which Operator APK on that device receives the
+- `--operator-package` picks which Operator APK on that device receives the
   command
 
 You sometimes need both, especially during local development.

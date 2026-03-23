@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Stage 1 real-device smoke for Clawperator Node API.
-# Usage: one physical device connected (or set DEVICE_ID); edit DEVICE_ID and CLAWPERATOR_RECEIVER_PACKAGE if needed.
+# Usage: one physical device connected (or set DEVICE_ID); edit DEVICE_ID and CLAWPERATOR_OPERATOR_PACKAGE if needed.
 # Optional: CLAWPERATOR_SMOKE_SUMMARY=/path/to/summary.json to write a machine-readable JSON summary.
 set -euo pipefail
 
@@ -17,7 +17,7 @@ npm --prefix apps/node run build
 export DEVICE_ID="${DEVICE_ID:-}"
 
 # 2) Set receiver package (edit if needed)
-export CLAWPERATOR_RECEIVER_PACKAGE="${CLAWPERATOR_RECEIVER_PACKAGE:-com.clawperator.operator.dev}"
+export CLAWPERATOR_OPERATOR_PACKAGE="${CLAWPERATOR_OPERATOR_PACKAGE:-com.clawperator.operator.dev}"
 # 3) Baseline app package should be broadly available on Android devices.
 export BASELINE_APP_PACKAGE="${BASELINE_APP_PACKAGE:-com.android.settings}"
 
@@ -60,8 +60,8 @@ echo "=== packages list (third-party) ==="
 PACKAGES_JSON="$("${CLI[@]}" packages list --device-id "$DEVICE_ID" --third-party --output json)"
 echo "$PACKAGES_JSON" | node -e 'const d=JSON.parse(require("fs").readFileSync(0,"utf8")); console.log(JSON.stringify(d, null, 2));'
 
-if ! echo "$PACKAGES_JSON" | grep -q "\"$CLAWPERATOR_RECEIVER_PACKAGE\""; then
-  echo "ERROR: receiver package not found in packages list: $CLAWPERATOR_RECEIVER_PACKAGE" >&2
+if ! echo "$PACKAGES_JSON" | grep -q "\"$CLAWPERATOR_OPERATOR_PACKAGE\""; then
+  echo "ERROR: receiver package not found in packages list: $CLAWPERATOR_OPERATOR_PACKAGE" >&2
   exit 1
 fi
 # Baseline may be system app (e.g. com.android.settings); check full list if not in third-party
@@ -94,11 +94,11 @@ JSON
 
 echo "=== execute (minimal) ==="
 if [ -n "$SMOKE_SUMMARY" ]; then
-  EXEC_JSON="$("${CLI[@]}" execute --device-id "$DEVICE_ID" --receiver-package "$CLAWPERATOR_RECEIVER_PACKAGE" --execution "$SMOKE_JSON" --output json 2>&1)" || true
+  EXEC_JSON="$("${CLI[@]}" execute --device-id "$DEVICE_ID" --operator-package "$CLAWPERATOR_OPERATOR_PACKAGE" --execution "$SMOKE_JSON" --output json 2>&1)" || true
   echo "$EXEC_JSON" | node -e 'const d=require("fs").readFileSync(0,"utf8"); try { const j=JSON.parse(d); console.log(JSON.stringify({ step: "execute", result: j.terminalSource ? "ok" : (j.code === "RESULT_ENVELOPE_TIMEOUT" ? "timeout" : "error"), terminalSource: j.terminalSource || undefined, timeoutDiagnostics: j.code === "RESULT_ENVELOPE_TIMEOUT" ? j : undefined })); } catch(e) { console.log(JSON.stringify({ step: "execute", result: "error" })); }' >> "$OUTCOMES_FILE"
   echo "$EXEC_JSON" | node -e 'console.log(JSON.stringify(JSON.parse(require("fs").readFileSync(0,"utf8")),null,2))'
 else
-  EXEC_OUT="$("${CLI[@]}" execute --device-id "$DEVICE_ID" --receiver-package "$CLAWPERATOR_RECEIVER_PACKAGE" --execution "$SMOKE_JSON" --output pretty)" || true
+  EXEC_OUT="$("${CLI[@]}" execute --device-id "$DEVICE_ID" --operator-package "$CLAWPERATOR_OPERATOR_PACKAGE" --execution "$SMOKE_JSON" --output pretty)" || true
   echo "$EXEC_OUT"
 fi
 # Stage 1: timeout with correct diagnostics is acceptable; continue to observe/inspect
@@ -117,12 +117,12 @@ fi
 # 6) Observe/inspect parity checks
 echo "=== observe snapshot ==="
 if [ -n "$SMOKE_SUMMARY" ]; then
-  OBS_JSON="$("${CLI[@]}" observe snapshot --device-id "$DEVICE_ID" --receiver-package "$CLAWPERATOR_RECEIVER_PACKAGE" --output json 2>&1)" || true
+  OBS_JSON="$("${CLI[@]}" observe snapshot --device-id "$DEVICE_ID" --operator-package "$CLAWPERATOR_OPERATOR_PACKAGE" --output json 2>&1)" || true
   echo "$OBS_JSON" | node -e 'const d=require("fs").readFileSync(0,"utf8"); try { const j=JSON.parse(d); console.log(JSON.stringify({ step: "observe", result: j.terminalSource ? "ok" : (j.code === "RESULT_ENVELOPE_TIMEOUT" ? "timeout" : "error"), terminalSource: j.terminalSource || undefined, timeoutDiagnostics: j.code === "RESULT_ENVELOPE_TIMEOUT" ? j : undefined })); } catch(e) { console.log(JSON.stringify({ step: "observe", result: "error" })); }' >> "$OUTCOMES_FILE"
   echo "$OBS_JSON" | node -e 'console.log(JSON.stringify(JSON.parse(require("fs").readFileSync(0,"utf8")),null,2))'
   OBS_OUT="$OBS_JSON"
 else
-  OBS_OUT="$("${CLI[@]}" observe snapshot --device-id "$DEVICE_ID" --receiver-package "$CLAWPERATOR_RECEIVER_PACKAGE" --output pretty)" || true
+  OBS_OUT="$("${CLI[@]}" observe snapshot --device-id "$DEVICE_ID" --operator-package "$CLAWPERATOR_OPERATOR_PACKAGE" --output pretty)" || true
   echo "$OBS_OUT"
 fi
 if echo "$OBS_OUT" | grep -q '"terminalSource"'; then echo "Observe: record terminalSource above."; fi
@@ -130,12 +130,12 @@ if echo "$OBS_OUT" | grep -q 'RESULT_ENVELOPE_TIMEOUT'; then echo "Observe: time
 
 echo "=== inspect ui ==="
 if [ -n "$SMOKE_SUMMARY" ]; then
-  INS_JSON="$("${CLI[@]}" inspect ui --device-id "$DEVICE_ID" --receiver-package "$CLAWPERATOR_RECEIVER_PACKAGE" --output json 2>&1)" || true
+  INS_JSON="$("${CLI[@]}" inspect ui --device-id "$DEVICE_ID" --operator-package "$CLAWPERATOR_OPERATOR_PACKAGE" --output json 2>&1)" || true
   echo "$INS_JSON" | node -e 'const d=require("fs").readFileSync(0,"utf8"); try { const j=JSON.parse(d); console.log(JSON.stringify({ step: "inspect", result: j.terminalSource ? "ok" : (j.code === "RESULT_ENVELOPE_TIMEOUT" ? "timeout" : "error"), terminalSource: j.terminalSource || undefined, timeoutDiagnostics: j.code === "RESULT_ENVELOPE_TIMEOUT" ? j : undefined })); } catch(e) { console.log(JSON.stringify({ step: "inspect", result: "error" })); }' >> "$OUTCOMES_FILE"
   echo "$INS_JSON" | node -e 'console.log(JSON.stringify(JSON.parse(require("fs").readFileSync(0,"utf8")),null,2))'
   INS_OUT="$INS_JSON"
 else
-  INS_OUT="$("${CLI[@]}" inspect ui --device-id "$DEVICE_ID" --receiver-package "$CLAWPERATOR_RECEIVER_PACKAGE" --output pretty)" || true
+  INS_OUT="$("${CLI[@]}" inspect ui --device-id "$DEVICE_ID" --operator-package "$CLAWPERATOR_OPERATOR_PACKAGE" --output pretty)" || true
   echo "$INS_OUT"
 fi
 if echo "$INS_OUT" | grep -q '"terminalSource"'; then echo "Inspect: record terminalSource above."; fi
@@ -145,7 +145,7 @@ if echo "$INS_OUT" | grep -q 'RESULT_ENVELOPE_TIMEOUT'; then echo "Inspect: time
 echo "=== action read (optional) ==="
 if ! "${CLI[@]}" action read \
   --device-id "$DEVICE_ID" \
-  --receiver-package "$CLAWPERATOR_RECEIVER_PACKAGE" \
+  --operator-package "$CLAWPERATOR_OPERATOR_PACKAGE" \
   --selector '{"resourceId":"android:id/title"}' \
   --output pretty; then
   echo "WARN: optional action read failed on this device/locale; continuing."
@@ -154,7 +154,7 @@ fi
 echo "=== action type (optional) ==="
 if ! "${CLI[@]}" action type \
   --device-id "$DEVICE_ID" \
-  --receiver-package "$CLAWPERATOR_RECEIVER_PACKAGE" \
+  --operator-package "$CLAWPERATOR_OPERATOR_PACKAGE" \
   --selector '{"role":"textfield"}' \
   --text "test" \
   --output pretty; then
@@ -166,7 +166,7 @@ if [ -n "$SMOKE_SUMMARY" ]; then
   OUTCOMES_PATH="$OUTCOMES_FILE" \
   SUMMARY_TIMESTAMP="$SMOKE_TIMESTAMP" \
   SUMMARY_DEVICE_ID="$DEVICE_ID" \
-  SUMMARY_RECEIVER_PACKAGE="$CLAWPERATOR_RECEIVER_PACKAGE" \
+  SUMMARY_OPERATOR_PACKAGE="$CLAWPERATOR_OPERATOR_PACKAGE" \
   SUMMARY_STRICT_MODE="true" \
   node -e '
     const fs = require("fs");
@@ -184,7 +184,7 @@ if [ -n "$SMOKE_SUMMARY" ]; then
       ...existing,
       timestamp: process.env.SUMMARY_TIMESTAMP,
       deviceId: process.env.SUMMARY_DEVICE_ID,
-      receiverPackage: process.env.SUMMARY_RECEIVER_PACKAGE,
+      operatorPackage: process.env.SUMMARY_OPERATOR_PACKAGE,
       commandOutcomes,
       strictMode: process.env.SUMMARY_STRICT_MODE === "true",
     };

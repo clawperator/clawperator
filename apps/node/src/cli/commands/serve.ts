@@ -52,7 +52,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
     try {
       const config = getDefaultRuntimeConfig({
         adbPath: process.env.ADB_PATH,
-        receiverPackage: process.env.CLAWPERATOR_RECEIVER_PACKAGE,
+        operatorPackage: process.env.CLAWPERATOR_OPERATOR_PACKAGE,
         logger: options.logger,
       });
       const devices = await listDevices(config);
@@ -91,9 +91,22 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       emulatorPath: process.env.EMULATOR_PATH,
       sdkmanagerPath: process.env.SDKMANAGER_PATH,
       avdmanagerPath: process.env.AVDMANAGER_PATH,
-      receiverPackage: process.env.CLAWPERATOR_RECEIVER_PACKAGE,
+      operatorPackage: process.env.CLAWPERATOR_OPERATOR_PACKAGE,
       logger: options.logger,
     });
+  }
+
+  function resolveOperatorPackageForRequest(provided: string | undefined): string {
+    // - When the caller provides operatorPackage, use it verbatim (already validated non-empty).
+    // - When omitted, fall back to env var if non-empty, otherwise default to the release package.
+    if (provided !== undefined) {
+      return provided;
+    }
+    const env = process.env.CLAWPERATOR_OPERATOR_PACKAGE;
+    if (env !== undefined && env.trim().length > 0) {
+      return env;
+    }
+    return "com.clawperator.operator";
   }
 
   // REST: Execute command
@@ -103,7 +116,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       return;
     }
 
-    const { execution, deviceId, receiverPackage } = req.body;
+    const { execution, deviceId, operatorPackage } = req.body;
     
     if (!execution) {
       res.status(400).json({ ok: false, error: { code: "MISSING_EXECUTION", message: "Missing 'execution' in body" } });
@@ -115,15 +128,19 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       return;
     }
 
-    if (receiverPackage !== undefined && typeof receiverPackage !== "string") {
-      res.status(400).json({ ok: false, error: { code: "INVALID_RECEIVER_PACKAGE", message: "'receiverPackage' must be a string" } });
+    if (operatorPackage !== undefined && typeof operatorPackage !== "string") {
+      res.status(400).json({ ok: false, error: { code: "INVALID_OPERATOR_PACKAGE", message: "'operatorPackage' must be a string" } });
+      return;
+    }
+    if (typeof operatorPackage === "string" && operatorPackage.trim().length === 0) {
+      res.status(400).json({ ok: false, error: { code: "INVALID_OPERATOR_PACKAGE", message: "'operatorPackage' must be a non-empty string" } });
       return;
     }
 
     try {
       const result = await runExecution(execution, {
         deviceId,
-        receiverPackage: receiverPackage || process.env.CLAWPERATOR_RECEIVER_PACKAGE,
+        operatorPackage: resolveOperatorPackageForRequest(operatorPackage),
         logger: options.logger,
       });
 
@@ -144,15 +161,19 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       return;
     }
 
-    const { deviceId, receiverPackage } = req.body;
+    const { deviceId, operatorPackage } = req.body;
     
     if (deviceId !== undefined && typeof deviceId !== "string") {
       res.status(400).json({ ok: false, error: { code: "INVALID_DEVICE_ID", message: "'deviceId' must be a string" } });
       return;
     }
 
-    if (receiverPackage !== undefined && typeof receiverPackage !== "string") {
-      res.status(400).json({ ok: false, error: { code: "INVALID_RECEIVER_PACKAGE", message: "'receiverPackage' must be a string" } });
+    if (operatorPackage !== undefined && typeof operatorPackage !== "string") {
+      res.status(400).json({ ok: false, error: { code: "INVALID_OPERATOR_PACKAGE", message: "'operatorPackage' must be a string" } });
+      return;
+    }
+    if (typeof operatorPackage === "string" && operatorPackage.trim().length === 0) {
+      res.status(400).json({ ok: false, error: { code: "INVALID_OPERATOR_PACKAGE", message: "'operatorPackage' must be a non-empty string" } });
       return;
     }
 
@@ -169,7 +190,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
     try {
       const result = await runExecution(executionInput, { 
         deviceId, 
-        receiverPackage: receiverPackage || process.env.CLAWPERATOR_RECEIVER_PACKAGE,
+        operatorPackage: resolveOperatorPackageForRequest(operatorPackage),
         logger: options.logger,
       });
       if (result.ok) {
@@ -189,15 +210,19 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       return;
     }
 
-    const { deviceId, receiverPackage, path } = req.body;
+    const { deviceId, operatorPackage, path } = req.body;
 
     if (deviceId !== undefined && typeof deviceId !== "string") {
       res.status(400).json({ ok: false, error: { code: "INVALID_DEVICE_ID", message: "'deviceId' must be a string" } });
       return;
     }
 
-    if (receiverPackage !== undefined && typeof receiverPackage !== "string") {
-      res.status(400).json({ ok: false, error: { code: "INVALID_RECEIVER_PACKAGE", message: "'receiverPackage' must be a string" } });
+    if (operatorPackage !== undefined && typeof operatorPackage !== "string") {
+      res.status(400).json({ ok: false, error: { code: "INVALID_OPERATOR_PACKAGE", message: "'operatorPackage' must be a string" } });
+      return;
+    }
+    if (typeof operatorPackage === "string" && operatorPackage.trim().length === 0) {
+      res.status(400).json({ ok: false, error: { code: "INVALID_OPERATOR_PACKAGE", message: "'operatorPackage' must be a non-empty string" } });
       return;
     }
 
@@ -219,7 +244,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
     try {
       const result = await runExecution(executionInput, { 
         deviceId, 
-        receiverPackage: receiverPackage || process.env.CLAWPERATOR_RECEIVER_PACKAGE,
+        operatorPackage: resolveOperatorPackageForRequest(operatorPackage),
         logger: options.logger,
       });
       if (result.ok) {

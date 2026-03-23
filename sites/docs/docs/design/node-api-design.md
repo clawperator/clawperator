@@ -52,7 +52,7 @@ Contracts:
 
 - **Canonical Envelope:** `[Clawperator-Result] {JSON}` is the ONLY way success/failure is reported.
 - **`expectedFormat` Required:** Every observation/execution must include `expectedFormat: "android-ui-automator"`.
-- **Single-Flight Lock:** Only one execution per `deviceId` / `receiverPackage` at a time. Overlaps return `EXECUTION_CONFLICT_IN_FLIGHT`.
+- **Single-Flight Lock:** Only one execution per `deviceId` / `operatorPackage` at a time. Overlaps return `EXECUTION_CONFLICT_IN_FLIGHT`.
 
 ## HTTP API Server (`serve`)
 
@@ -64,13 +64,13 @@ When running `clawperator serve [--port <number>] [--host <string>]`, a local HT
 
 - **`GET /devices`**: List all connected Android devices and their states.
 - **`POST /execute`**: Execute a full JSON execution payload.
-    - Body: `{"execution": {...}, "deviceId": "...", "receiverPackage": "..."}`
+    - Body: `{"execution": {...}, "deviceId": "...", "operatorPackage": "..."}`
     - Returns: `RunExecutionResult` (200 OK or 4xx/5xx on failure).
     - Status **423 Locked**: Returned if another execution is in flight for the target device.
 - **`POST /observe/snapshot`**: Quick helper for UI capture.
-    - Body: `{"deviceId": "...", "receiverPackage": "..."}`
+    - Body: `{"deviceId": "...", "operatorPackage": "..."}`
 - **`POST /observe/screenshot`**: Quick helper for visual capture.
-    - Body: `{"deviceId": "...", "receiverPackage": "..."}`
+    - Body: `{"deviceId": "...", "operatorPackage": "..."}`
 
 ### Event Streaming (SSE)
 
