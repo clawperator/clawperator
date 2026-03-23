@@ -505,6 +505,7 @@ Landed in PR `api-refactor/phase-0-1` (2026-03-23). Collapsed with Phase 0 per s
 - `apps/node/src/cli/index.ts` reduced from ~915 to ~130 lines.
 - `apps/node/src/test/unit/cliRegistry.test.ts` added: registry consistency + flag alias tests.
 - 442 tests pass.
+- **Intentional behavior change:** unknown commands now return `code: "UNKNOWN_COMMAND"` and exit 1. The old switch `default:` returned `code: "USAGE"` and exited 0. The new behavior is correct and desirable (unknown command is a caller error), and is covered by the `cliRegistry.test.ts` UNKNOWN_COMMAND assertions.
 
 Replace the hand-rolled dispatch sprawl in `index.ts` with a typed command
 registry that serves as the single source of truth for command metadata. This

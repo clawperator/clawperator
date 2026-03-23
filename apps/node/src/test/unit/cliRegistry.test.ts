@@ -157,12 +157,30 @@ describe("unknown command produces UNKNOWN_COMMAND", () => {
   });
 
   it("typo close to a real command includes did-you-mean suggestion", async () => {
-    // "recrod" is close to "record"
+    // levenshtein("recrod", "record") = 1; threshold = max(2, floor(6/2)) = 3.
+    // The suggestion always fires for this input - assert it explicitly.
     const { stdout, code } = await runCli(["recrod"]);
     assert.notStrictEqual(code, 0);
-    const obj = JSON.parse(stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string; suggestion?: string };
     assert.strictEqual(obj.code, "UNKNOWN_COMMAND");
-    // May or may not include suggestion depending on threshold - just check it fails cleanly
-    assert.match(obj.message, /Unknown command: recrod/);
+    assert.match(obj.message ?? "", /Unknown command: recrod/);
+    assert.strictEqual(obj.suggestion, "record");
+  });
+});
+
+describe("record synonym dispatches to recording handler", () => {
+  it("record with no subcommand returns USAGE (not UNKNOWN_COMMAND)", async () => {
+    // Proves the synonym resolves to the recording handler rather than being
+    // treated as an unknown command.
+    const { stdout } = await runCli(["record"]);
+    const obj = JSON.parse(stdout) as { code?: string };
+    assert.strictEqual(obj.code, "USAGE");
+    assert.notStrictEqual(obj.code, "UNKNOWN_COMMAND");
+  });
+
+  it("record --help resolves to recording help text", async () => {
+    const { stdout, code } = await runCli(["record", "--help"]);
+    assert.strictEqual(code, 0);
+    assert.match(stdout, /recording start/);
   });
 });

@@ -328,6 +328,13 @@ COMMANDS["operator"] = {
         return (await import("./commands/operatorSetup.js")).cmdOperatorSetup({
           ...out,
           apkPath,
+          // Note: getGlobalOpts scans all of argv linearly (including post-command
+          // tokens), so deviceId/receiverPackage are always populated from the context
+          // when the caller used --device-id/--receiver-package anywhere in argv.
+          // The ?? getOpt(rest, ...) fallbacks below are therefore dead code under
+          // normal invocation. They are kept as a safety net for any future call
+          // path that bypasses getGlobalOpts, and will be cleaned up in Phase 2
+          // once the full argv handling is audited.
           deviceId: deviceId ?? getOpt(rest, "--device-id"),
           receiverPackage: receiverPackage ?? getOpt(rest, "--receiver-package"),
         });
@@ -901,7 +908,7 @@ COMMANDS["serve"] = {
     const { rest, verbose, logger } = ctx;
     const portStr = getOpt(rest, "--port");
     const port = portStr ? parseInt(portStr, 10) : 3000;
-    const host = getOpt(rest, "--host") || "127.0.0.1";
+    const host = getOpt(rest, "--host") ?? "127.0.0.1";
     if (isNaN(port) || port <= 0 || port > 65535) {
       return JSON.stringify({ code: "USAGE", message: "Invalid port number. Must be 1-65535." });
     }
