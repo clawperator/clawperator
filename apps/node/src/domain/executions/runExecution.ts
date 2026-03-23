@@ -326,7 +326,7 @@ async function performExecution(
       deviceId,
       message: `Operator APK (${config.operatorPackage}) is not installed on ${deviceId}`,
     });
-    const installCommand = `clawperator operator setup --apk ${getOperatorPackageApkPath(config.operatorPackage)} --device-id ${deviceId}${config.operatorPackage !== "com.clawperator.operator" ? ` --operator-package ${config.operatorPackage}` : ""}`;
+    const installCommand = `clawperator operator setup --apk ${getOperatorPackageApkPath(config.operatorPackage)} --device ${deviceId}${config.operatorPackage !== "com.clawperator.operator" ? ` --operator-package ${config.operatorPackage}` : ""}`;
     return {
       execution,
       result: {

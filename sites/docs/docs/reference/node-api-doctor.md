@@ -7,7 +7,7 @@ This page describes the current shipped behavior. It replaces the older v0.1 des
 ## Command Surface
 
 ```bash
-clawperator doctor [--output <json|pretty>] [--device-id <id>] [--operator-package <package>]
+clawperator doctor [--output <json|pretty>] [--device <id>] [--operator-package <package>]
 clawperator doctor --json
 clawperator doctor --fix
 clawperator doctor --full
@@ -19,18 +19,18 @@ Supported flags:
 - `--output pretty|json` - select human-readable or machine-readable output
 - `--format pretty|json` - alias for `--output`
 - `--json` - shorthand for `--output json`
-- `--device-id <id>` - target one device when multiple are connected
+- `--device <id>` - target one device when multiple are connected (accepted alias: `--device-id`)
 - `--operator-package <package>` - override the target Operator package
 - `--fix` - run shell-based remediation steps from non-passing checks (both `fail` and `warn`)
 - `--full` - include Android build, install, launch, and smoke test checks
 - `--check-only` - always exit `0`, even when critical checks fail; does not change halt behavior (doctor still returns early on critical failures)
 
-Default receiver package:
+Default Operator package:
 
 - release app package: `com.clawperator.operator`
 - local debug app package: `com.clawperator.operator.dev`
 
-If you use a local debug build of the [Clawperator Operator Android app](../getting-started/android-operator-apk.md), pass `--operator-package com.clawperator.operator.dev` consistently to `doctor`, `operator setup`, `grant-device-permissions`, `version --check-compat`, and `observe snapshot`.
+If you use a local debug build of the [Clawperator Operator Android app](../getting-started/android-operator-apk.md), pass `--operator-package com.clawperator.operator.dev` consistently to `doctor`, `operator setup`, `grant-device-permissions`, `version --check-compat`, and `snapshot`.
 
 ## What Doctor Checks
 
@@ -48,14 +48,14 @@ Doctor runs checks in a fixed order. When a critical check fails, doctor returns
 
 ### 2. Device discovery
 
-- `device.discovery` - exactly one reachable target device must be available, or `--device-id` must disambiguate multiple devices
+- `device.discovery` - exactly one reachable target device must be available, or `--device` must disambiguate multiple devices
 - `build.android.install` - runs `./gradlew :app:installDebug` (`--full` only)
 - `build.android.launch` - launches `clawperator.activity.MainActivity` (`--full` only)
 - `device.capability` - the target device shell must be reachable; the report also captures SDK level, `wm size`, and `wm density` as evidence
 
 ### 3. Runtime readiness
 
-- `readiness.apk.presence` - confirms the requested receiver package is installed, warns if the other release/debug variant is installed instead, and fails when no matching package is present
+- `readiness.apk.presence` - confirms the requested Operator package is installed, warns if the other release/debug variant is installed instead, and fails when no matching package is present
 - `readiness.version.compatibility` - verifies that the CLI and installed [Clawperator Operator Android app](../getting-started/android-operator-apk.md) share the same normalized version
 - `readiness.settings.dev_options` - warns if Android Developer Options are disabled
 - `readiness.settings.usb_debugging` - warns if USB debugging is disabled
@@ -121,7 +121,7 @@ Pretty output groups results into:
     }
   ],
   "nextActions": [
-    "Try: clawperator observe snapshot --device-id <device_id>"
+    "Try: clawperator snapshot --device <device_id>"
   ]
 }
 ```
@@ -167,9 +167,9 @@ The handshake is the core end-to-end proof that the Node CLI can talk to the Ope
 On handshake timeout, the report includes:
 
 - broadcast dispatch status
-- receiver package
+- Operator package
 - device id when available
-- follow-up commands such as `clawperator grant-device-permissions` after a crash-revocation event and `clawperator observe snapshot --timeout-ms 5000`
+- follow-up commands such as `clawperator grant-device-permissions` after a crash-revocation event and `clawperator snapshot --timeout 5000`
 
 ## Common Usage
 
@@ -196,7 +196,7 @@ Target a specific device and debug build of the [Clawperator Operator Android ap
 
 ```bash
 clawperator doctor \
-  --device-id <device_id> \
+  --device <device_id> \
   --operator-package com.clawperator.operator.dev \
   --output pretty
 ```
@@ -217,6 +217,6 @@ clawperator doctor --full
 
 - `clawperator version --check-compat` - version compatibility check without the full doctor report
 - `clawperator grant-device-permissions` - restore Accessibility and related app ops after an Operator APK crash causes Android to revoke them
-- `clawperator observe snapshot` - direct runtime check once doctor reports the environment is ready
+- `clawperator snapshot` - direct runtime check once doctor reports the environment is ready
 
 For initial installation and device setup, see [First-Time Setup](../getting-started/first-time-setup.md) and [OpenClaw First Run](../getting-started/openclaw-first-run.md).

@@ -159,7 +159,7 @@ A fully configured device will show all checks passing. Common warnings:
 | Warning | Fix |
 | :--- | :--- |
 | `DEVICE_UNAUTHORIZED` | Tap "Allow" on the device USB debugging dialog |
-| `RECEIVER_NOT_INSTALLED` | Complete Step 3. Run `clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device-id <device_id>` and add `--operator-package com.clawperator.operator.dev` for debug builds. |
+| `RECEIVER_NOT_INSTALLED` | Complete Step 3. Run `clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device <device_id>` and add `--operator-package com.clawperator.operator.dev` for debug builds. |
 | `DEVICE_ACCESSIBILITY_NOT_RUNNING` | If the Operator APK crashed after setup, run `clawperator grant-device-permissions` to restore the revoked permissions |
 | `DEVICE_DEV_OPTIONS_DISABLED` | Enable Developer options (physical device only) |
 | `DEVICE_USB_DEBUGGING_DISABLED` | Enable USB debugging (physical device only) |
@@ -171,15 +171,14 @@ A fully configured device will show all checks passing. Common warnings:
 Observe the current UI state:
 
 ```bash
-clawperator observe snapshot --device-id <device_id>
+clawperator snapshot --device <device_id> --json
 ```
 
 Open an app:
 
 ```bash
-clawperator action open-app \
-  --app com.android.settings \
-  --device-id <device_id> \
+clawperator open com.android.settings \
+  --device <device_id> \
   --operator-package com.clawperator.operator
 ```
 

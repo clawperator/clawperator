@@ -23,7 +23,7 @@ APK version installed: 0.3.3-d (stale debug build)
   "lastCorrelatedEvents": [],
   "broadcastDispatchStatus": "sent",
   "deviceId": "<redacted>",
-  "receiverPackage": "com.clawperator.operator.dev"
+  "operatorPackage": "com.clawperator.operator.dev"
 }
 ```
 

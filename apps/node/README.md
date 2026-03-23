@@ -26,7 +26,7 @@ curl -fsSL https://clawperator.com/install.sh | bash
 ```bash
 clawperator doctor
 clawperator devices
-clawperator observe snapshot --device-id <device_id>
+clawperator snapshot --device <device_id>
 ```
 
 ## Documentation

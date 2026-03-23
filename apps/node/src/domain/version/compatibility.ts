@@ -250,7 +250,7 @@ export async function probeVersionCompatibility(config: RuntimeConfig): Promise<
         `Download the matching APK: ${getOperatorApkDownloadUrl(parsedCli.normalized)}`,
         `Download the checksum: ${getOperatorApkSha256Url(parsedCli.normalized)}`,
         `Verify the checksum: sha256sum -c operator-v${parsedCli.normalized}.apk.sha256`,
-        `Install the matching APK: clawperator operator setup --apk operator-v${parsedCli.normalized}.apk --device-id <device_id>${operatorPackage.endsWith(".dev") ? " --operator-package com.clawperator.operator.dev" : ""}`,
+        `Install the matching APK: clawperator operator setup --apk operator-v${parsedCli.normalized}.apk --device <device_id>${operatorPackage.endsWith(".dev") ? " --operator-package com.clawperator.operator.dev" : ""}`,
         operatorPackage.endsWith(".dev")
           ? "If you are targeting the local debug package, rebuild and reinstall the debug APK from the same source checkout instead of using the release download."
           : "If you are using the release package, the versioned download above is the exact APK to install.",
@@ -323,7 +323,7 @@ export async function probeVersionCompatibility(config: RuntimeConfig): Promise<
           `Download the matching APK: ${apkUrl}`,
           `Download the checksum: ${sha256Url}`,
           `Verify the checksum: sha256sum -c operator-v${parsedCli.normalized}.apk.sha256`,
-          `Install the matching APK: clawperator operator setup --apk operator-v${parsedCli.normalized}.apk --device-id <device_id>`,
+          `Install the matching APK: clawperator operator setup --apk operator-v${parsedCli.normalized}.apk --device <device_id>`,
           operatorPackage.endsWith(".dev")
             ? "If you are targeting the local debug package, rebuild and reinstall the debug APK from the same source checkout instead of using the release download."
             : "If you are using the release package, the versioned download above is the exact APK to install.",

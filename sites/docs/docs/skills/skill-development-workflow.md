@@ -24,9 +24,9 @@ For unknown apps, use the default observe-act-observe loop:
 Useful commands:
 
 ```bash
-clawperator observe snapshot --device-id <device_id> --output json
-clawperator observe screenshot --device-id <device_id> --path /tmp/example.png --output json
-clawperator execute --device-id <device_id> --execution /path/to/execution.json --output json
+clawperator snapshot --device <device_id> --json
+clawperator screenshot --device <device_id> --path /tmp/example.png --json
+clawperator execute --device <device_id> --execution /path/to/execution.json --json
 ```
 
 During exploration, record:
@@ -119,7 +119,7 @@ What this does not prove:
 For artifact-backed skills, compile the artifact before any live run:
 
 ```bash
-clawperator skills compile-artifact <skill_id> --artifact <name> --vars '{"KEY":"value"}' --output json
+clawperator skills compile-artifact <skill_id> --artifact <name> --vars '{"KEY":"value"}' --json
 ```
 
 This catches:
@@ -133,7 +133,7 @@ If you want to check the compiled payload again through the execution validator
 without sending it to a device, use:
 
 ```bash
-clawperator execute --validate-only --execution /path/to/compiled-execution.json --output json
+clawperator execute --validate-only --execution /path/to/compiled-execution.json --json
 ```
 
 This is the closest current workflow to a dry run for artifact-backed skills.
@@ -144,7 +144,7 @@ Before running a skill, validate the skill payload with the pre-run gate:
 
 ```bash
 clawperator skills validate <skill_id> --dry-run
-clawperator skills run <skill_id> --device-id <device_id>
+clawperator skills run <skill_id> --device <device_id>
 ```
 
 `skills validate --dry-run` keeps the normal integrity checks and adds payload
@@ -169,7 +169,7 @@ reason instead of failing.
 If you need to bypass the pre-run gate for CI or development, use:
 
 ```bash
-clawperator skills run <skill_id> --skip-validate --device-id <device_id>
+clawperator skills run <skill_id> --skip-validate --device <device_id>
 ```
 
 Treat `--skip-validate` as an escape hatch, not a routine workflow.
@@ -218,7 +218,7 @@ Treat skill verification as four distinct layers:
 3. **Execution payload validity**
    `clawperator execute --validate-only ...`
 4. **Live device behavior**
-   `clawperator skills run <skill_id> --device-id <device_id> [--timeout-ms <n>]`
+   `clawperator skills run <skill_id> --device <device_id> [--timeout <ms>]`
 
 This keeps failures local:
 
@@ -328,14 +328,14 @@ At that point, update `SKILL.md` so another agent can understand:
 
 For a new skill, this is the practical order:
 
-1. explore with `observe snapshot`, `observe screenshot`, and small executions
+1. explore with `snapshot`, `screenshot`, and small executions
 2. scaffold with `clawperator skills new <skill_id>`
 3. encode the skill script or artifact
 4. run `clawperator skills validate <skill_id>`
 5. if artifacts exist, run `clawperator skills compile-artifact ...`
 6. run `clawperator execute --validate-only ...` on candidate payloads
 7. run `clawperator skills validate <skill_id> --dry-run`
-8. run `clawperator skills run <skill_id> --device-id <device_id>`
+8. run `clawperator skills run <skill_id> --device <device_id>`
 9. harden selectors, timeout budgets, and output formatting
 10. verify that every meaningful recorded action is covered or explicitly
    normalized
