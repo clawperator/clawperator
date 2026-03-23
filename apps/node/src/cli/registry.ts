@@ -1096,11 +1096,11 @@ COMMANDS["recording"] = {
   group: "Recording",
   summary: "Manage recording sessions on the Operator app",
   help: "clawperator recording\n\nUsage:\n  clawperator recording start|stop|pull|parse ... ('record' is an alias)\n",
-  topLevelBlock: `  recording start [--session-id <id>] [--device-id <serial>] [--operator-package <pkg>]
+  topLevelBlock: `  recording start [--session-id <id>] [--device <serial>] [--operator-package <pkg>]
                                             Start a recording session on the Operator app ('record' is an alias)
-  recording stop  [--session-id <id>] [--device-id <serial>] [--operator-package <pkg>]
+  recording stop  [--session-id <id>] [--device <serial>] [--operator-package <pkg>]
                                             Stop the active recording session and finalize the on-device file ('record' is an alias)
-  recording pull  [--session-id <id>] [--out <dir>] [--device-id <serial>]
+  recording pull  [--session-id <id>] [--out <dir>] [--device <serial>]
                                             Pull the on-device NDJSON recording to host (default: ./recordings/, 'record' is an alias)
   recording parse --input <file> [--out <file>]
                                             Parse a raw NDJSON recording into a step log JSON ('record' is an alias)`,
