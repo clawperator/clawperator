@@ -134,6 +134,16 @@ describe("CLI help", () => {
     assert.match(stdout, /execute --execution <json-or-file> \[--validate-only\]/);
   });
 
+  it("execute best-effort points at snapshot not observe snapshot (exit 0)", async () => {
+    const { stdout, code } = await runCli(["execute", "best-effort", "--goal", "test-goal"]);
+    assert.strictEqual(code, 0, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string; goal?: string };
+    assert.strictEqual(obj.code, "NOT_IMPLEMENTED");
+    assert.strictEqual(obj.goal, "test-goal");
+    assert.match(obj.message ?? "", /snapshot/);
+    assert.doesNotMatch(obj.message ?? "", /observe snapshot/);
+  });
+
   it("shows skills sync help instead of top-level help", async () => {
     const { stdout, code } = await runCli(["skills", "sync", "--help"]);
     assert.strictEqual(code, 0);
