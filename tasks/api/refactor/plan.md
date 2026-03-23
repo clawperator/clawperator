@@ -11,10 +11,11 @@
 - [Phase 2: Command Surface Refactor](#phase-2-command-surface-refactor)
 - [Phase 3: Selector Flags](#phase-3-selector-flags)
 - [Phase 4: Help, Errors, and Polish](#phase-4-help-errors-and-polish)
+- [Phase 5: Extended Commands](#phase-5-extended-commands)
 - [Skills Migration Strategy](#skills-migration-strategy)
 - [Sequencing](#sequencing)
 - [What Success Looks Like](#what-success-looks-like)
-- [Designed but Deferred](#designed-but-deferred-implementation-follows-phase-4)
+- [Designed Surfaces (reference for Phase 5)](#designed-but-deferred-implementation-in-phase-5)
 - [Items Rejected](#items-rejected)
 
 ---
@@ -23,7 +24,7 @@ Origin: Agent UX review session (2026-03-23). An independent agent was given the
 current API docs cold and asked to propose the ideal command surface. The feedback
 confirmed that the `action`/`observe` namespace nesting, JSON-only selectors, and
 verbose flag names are systematic first-contact failures. This plan implements the
-fixes across five phases.
+fixes across six phases.
 
 Reviewed 2026-03-23 by a second independent agent. Required changes incorporated.
 Reviewed 2026-03-23 by a third independent agent against actual source code.
@@ -1147,6 +1148,112 @@ the alpha/unstable status and zero external consumers.
 
 ---
 
+## Phase 5: Extended Commands
+
+Implement the designed-but-deferred CLI surfaces that depend on Phase 3
+selector infrastructure and the Phase 1 registry. With the registry in
+place, each of these is a registry entry + handler + tests.
+
+### Deliverables
+
+1. **`scroll-until` command**
+
+   ```
+   clawperator scroll-until [<direction>] --text <text> [--click] [--json]
+   ```
+
+   - Positional: direction (default: `down`)
+   - Selector flags: `--text`/`--id`/`--desc`/`--role` (from Phase 3)
+   - Container flags: `--container-text`/`--container-id`/etc. (from Phase 3)
+   - `--click`: click target after scrolling to it (action type becomes
+     `scroll_and_click`, maps to `clickAfter: true`)
+   - Without `--click`: action type is `scroll_until`
+   - Tuning params (`maxScrolls`, `maxDurationMs`, `distanceRatio`, etc.)
+     are NOT CLI flags - use `exec` for those
+   - Synonym: `scroll-and-click` (accepted, implies `--click`)
+   - See Designed but Deferred section for full spec and error examples
+
+2. **`close` command**
+
+   ```
+   clawperator close <package> [--json]
+   ```
+
+   - Positional: package name (required)
+   - `--app` flag: alternative to positional
+   - Synonym: `close-app`
+   - Implementation: builds execution with `close_app` action type,
+     uses existing `adb force-stop` pre-flight path in `runExecution.ts`
+
+3. **`exec` rename**
+
+   ```
+   clawperator exec <json-or-file> [--validate-only] [--dry-run] [--json]
+   ```
+
+   - `exec` becomes primary, `execute` becomes synonym
+   - `--payload` becomes primary flag, `--execution` becomes alias
+   - Positional: execution payload (JSON string or file path)
+   - `exec best-effort` subcommand unchanged
+   - Behavior identical to current `execute`
+
+4. **`--long` and `--focus` flags on `click`**
+
+   ```
+   clawperator click --text "Settings" --long
+   clawperator click --text "Search" --focus
+   ```
+
+   - `--long` maps to `clickType: "long_click"`
+   - `--focus` maps to `clickType: "focus"`
+   - Mutually exclusive (error if both)
+
+5. **`wait --timeout` semantic**
+
+   ```
+   clawperator wait --text "Loading" --timeout 5000
+   ```
+
+   - For `wait`, `--timeout` sets wait duration (not execution timeout)
+   - Execution timeout set to `max(waitTimeout + 5000, globalTimeout)`
+   - Default without `--timeout`: current 30s behavior
+
+6. **`read --all` flag**
+
+   ```
+   clawperator read --text "Price" --all --json
+   ```
+
+   - `--all` returns all matches as JSON array
+   - `--all` requires `--json` (error without it)
+   - Without `--all`: unchanged single-match behavior
+
+### Risk
+
+Low-medium. Each deliverable is independent and can land as a separate
+commit. `scroll-until` is the largest (new builder, new handler, selector
++ container flag parsing). `exec` rename and `close` are thin wrappers
+around existing infrastructure. `--long`/`--focus`, `read --all`, and
+`wait --timeout` are single-flag additions to existing handlers.
+
+### Testing
+
+- `scroll-until --text "About phone"` scrolls until element is visible
+- `scroll-until --text "X" --click` scrolls and clicks
+- `scroll-until` without selector: error with example
+- `close com.android.settings` force-stops the app
+- `exec <file>` works as `execute --execution <file>` does today
+- `execute` still works as synonym for `exec`
+- `--execution` still works as alias for `--payload`
+- `click --text "X" --long` produces long press
+- `click --text "X" --long --focus` errors
+- `wait --text "X" --timeout 5000` waits up to 5 seconds
+- `read --text "X" --all --json` returns array of matches
+- `read --text "X" --all` without `--json` errors
+- All smoke scripts and core skills still pass
+
+---
+
 ## Skills Migration Strategy
 
 Skills are the primary integration test for this refactor. If skills break, the
@@ -1184,12 +1291,20 @@ skill fix alongside (or immediately after) the CLI change that caused it.
   cleanup, not first discovery - by this point, the three core skills should
   already be working.
 
+- **Phase 5:** The `exec` rename means skills using `clawperator execute`
+  will still work (synonym). Skills using `scroll_and_click` in execution
+  payloads are unaffected (payload action types are unchanged). Skills
+  that would benefit from `scroll-until` CLI wrapper or `close` command
+  can be updated to use them. The climate skill already uses `close_app`
+  and `scroll_and_click` in its recipe JSON - it can optionally be
+  rewritten to use CLI commands instead.
+
 ---
 
 ## Sequencing
 
 ```
-Phase 0 -> Phase 1 -> Phase 2 -> Phase 3 -> Phase 4
+Phase 0 -> Phase 1 -> Phase 2 -> Phase 3 -> Phase 4 -> Phase 5
 ```
 
 Phase 0 and Phase 1 can collapse into a single PR if the implementing agent
@@ -1205,9 +1320,14 @@ Phase 3 is independent of Phase 2 in code (different files, different parsing
 paths) but should land after Phase 2 so the commands that accept selectors
 already exist in their flat form.
 
-Phase 4 is polish and must land last.
+Phase 4 is polish and should land before Phase 5.
 
-Docs work (`tasks/docs/refactor/`) begins only after Phase 4 is complete.
+Phase 5 depends on Phase 3 (selector flags) and Phase 1 (registry). Its
+deliverables are independent of each other and can land as separate PRs.
+`scroll-until` is the largest; `close`, `exec` rename, `--long`/`--focus`,
+`wait --timeout`, and `read --all` are each small enough for a single commit.
+
+Docs work (`tasks/docs/refactor/`) begins only after Phase 5 is complete.
 
 ---
 
@@ -1222,6 +1342,8 @@ clawperator click --text "Wi-Fi" --json
 clawperator type "password123" --role textfield --json
 clawperator press back --json
 clawperator scroll down --json
+clawperator scroll-until --text "About phone" --click --json
+clawperator close com.android.settings --json
 clawperator screenshot --json
 ```
 
@@ -1230,13 +1352,15 @@ No flag name to look up. The help text confirms what the agent already guessed.
 
 ---
 
-## Designed but Deferred (implementation follows Phase 4)
+## Designed but Deferred (implementation in Phase 5)
 
 These features have been designed to fit the new API surface. The CLI shapes
-below are settled decisions, not proposals. Implementation is deferred only
-because they depend on Phase 3 selector infrastructure and should not expand
-the scope of Phases 0-4. They can be implemented as a Phase 5 or as
-independent follow-on PRs after Phase 4 ships.
+below are settled decisions, not proposals. They are implemented in Phase 5.
+This section contains the full design rationale and detailed specs; Phase 5's
+deliverable list references this section.
+
+`logs --follow` is the exception - it requires streaming infrastructure
+beyond the scope of this refactor and is not scheduled in any phase.
 
 ### `scroll-until` (includes `scroll-and-click`)
 
