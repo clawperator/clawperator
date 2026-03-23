@@ -64,6 +64,9 @@ export function hasElementSelectorFlag(rest: string[]): boolean {
  * Read a flag value from rest, returning the raw next token (including "").
  * Returns undefined if the flag is absent.
  * Throws a plain Error if the flag is present but no following token exists.
+ *
+ * If the same flag token appears more than once in `rest`, callers should reject
+ * first via `duplicateValueFlagError` so behavior is explicit.
  */
 function readFlagRaw(rest: string[], flag: string): string | undefined {
   const i = rest.indexOf(flag);
@@ -72,6 +75,26 @@ function readFlagRaw(rest: string[], flag: string): string | undefined {
     throw new Error(`${flag} requires a value`);
   }
   return rest[i + 1];
+}
+
+/** Rejects when any flag in `flags` appears more than once as a token in `rest`. */
+function duplicateValueFlagError(
+  rest: string[],
+  flags: readonly string[],
+): ClawperatorError | undefined {
+  for (const flag of flags) {
+    let count = 0;
+    for (const t of rest) {
+      if (t === flag) count += 1;
+    }
+    if (count > 1) {
+      return {
+        code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+        message: `${flag} must not appear more than once`,
+      };
+    }
+  }
+  return undefined;
 }
 
 function blankError(flag: string): ClawperatorError {
@@ -95,6 +118,9 @@ function blankError(flag: string): ClawperatorError {
  * Returns { ok: false, error } on mutual exclusion or blank string violations.
  */
 export function resolveElementMatcherFromCli(rest: string[]): MatcherResult {
+  const dupEl = duplicateValueFlagError(rest, ELEMENT_SELECTOR_VALUE_FLAGS);
+  if (dupEl) return { ok: false, error: dupEl };
+
   let selectorJson: string | undefined;
   let text: string | undefined;
   let textContains: string | undefined;
@@ -204,6 +230,9 @@ export function resolveElementMatcherFromCli(rest: string[]): MatcherResult {
  * Returns { ok: false, error } on mutual exclusion or blank string violations.
  */
 export function resolveContainerMatcherFromCli(rest: string[]): ContainerResult {
+  const dupCt = duplicateValueFlagError(rest, CONTAINER_SELECTOR_VALUE_FLAGS);
+  if (dupCt) return { ok: false, error: dupCt };
+
   let selectorJson: string | undefined;
   let text: string | undefined;
   let textContains: string | undefined;
@@ -315,6 +344,7 @@ const SELECTOR_FLAG_LIST = `Use one of:
   --text-contains <text>  Partial text match
   --id <resource-id>      Android resource ID
   --desc <text>           Content description
+  --desc-contains <text>  Partial content description
   --role <role>           Element role
   --selector <json>       Raw JSON (advanced)`;
 

@@ -198,6 +198,25 @@ describe("resolveElementMatcherFromCli - errors", () => {
     assert.ok(!result.ok);
     assert.strictEqual(result.error.code, "EXECUTION_VALIDATION_FAILED");
   });
+
+  it("duplicate --text returns EXECUTION_VALIDATION_FAILED", () => {
+    const result = resolveElementMatcherFromCli(["--text", "a", "--text", "b"]);
+    assert.ok(!result.ok);
+    assert.strictEqual(result.error.code, "EXECUTION_VALIDATION_FAILED");
+    assert.match(result.error.message, /--text must not appear more than once/);
+  });
+
+  it("duplicate --selector returns EXECUTION_VALIDATION_FAILED", () => {
+    const result = resolveElementMatcherFromCli([
+      "--selector",
+      "{}",
+      "--selector",
+      "{}",
+    ]);
+    assert.ok(!result.ok);
+    assert.strictEqual(result.error.code, "EXECUTION_VALIDATION_FAILED");
+    assert.match(result.error.message, /--selector must not appear more than once/);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -294,6 +313,18 @@ describe("resolveContainerMatcherFromCli", () => {
     // container only contains the --container-id field
     assert.deepStrictEqual(result.container, { resourceId: "com.foo:id/list" });
   });
+
+  it("duplicate --container-id returns EXECUTION_VALIDATION_FAILED", () => {
+    const result = resolveContainerMatcherFromCli([
+      "--container-id",
+      "a",
+      "--container-id",
+      "b",
+    ]);
+    assert.ok(!result.ok);
+    assert.strictEqual(result.error.code, "EXECUTION_VALIDATION_FAILED");
+    assert.match(result.error.message, /--container-id must not appear more than once/);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -308,6 +339,7 @@ describe("makeMissingSelectorError", () => {
     assert.match(obj.message, /click requires a selector/);
     assert.match(obj.message, /--text/);
     assert.match(obj.message, /--id/);
+    assert.match(obj.message, /--desc-contains/);
     assert.match(obj.message, /--role/);
   });
 
@@ -355,6 +387,7 @@ describe("CLI: missing selector returns Phase 3 help text", () => {
     const obj = JSON.parse(stdout);
     assert.strictEqual(obj.code, "MISSING_SELECTOR");
     assert.match(obj.message, /--role/);
+    assert.match(obj.message, /--desc-contains/);
   });
 });
 
@@ -374,6 +407,23 @@ describe("CLI: --selector combined with simple flag returns EXECUTION_VALIDATION
     const obj = JSON.parse(stdout);
     assert.strictEqual(obj.code, "EXECUTION_VALIDATION_FAILED");
     assert.match(obj.message, /not both/);
+  });
+});
+
+describe("CLI: duplicate selector flags return EXECUTION_VALIDATION_FAILED", () => {
+  it("click with duplicate --text returns EXECUTION_VALIDATION_FAILED", async () => {
+    const { stdout, code } = await runCli([
+      "click",
+      "--text",
+      "a",
+      "--text",
+      "b",
+      "--json",
+    ]);
+    assert.strictEqual(code, 1);
+    const obj = JSON.parse(stdout);
+    assert.strictEqual(obj.code, "EXECUTION_VALIDATION_FAILED");
+    assert.match(obj.message, /--text must not appear more than once/);
   });
 });
 

@@ -910,7 +910,7 @@ COMMANDS["type"] = {
     if (!TYPE_SELECTOR_FLAGS.some((f) => restForSelector.includes(f))) {
       return JSON.stringify({
         code: "MISSING_SELECTOR",
-        message: `type requires a selector.\nUse one of:\n  --id <resource-id>      Android resource ID\n  --desc <text>           Content description\n  --role <role>           Element role\n  --text-contains <text>  Partial text match\n  --selector <json>       Raw JSON (advanced)\nExample:\n  clawperator type "hello" --role textfield`,
+        message: `type requires a selector.\nUse one of:\n  --id <resource-id>      Android resource ID\n  --desc <text>           Content description\n  --desc-contains <text>  Partial content description\n  --role <role>           Element role\n  --text-contains <text>  Partial text match\n  --selector <json>       Raw JSON (advanced)\nExample:\n  clawperator type "hello" --role textfield`,
       });
     }
     const resolved = resolveElementMatcherFromCli(restForSelector);
