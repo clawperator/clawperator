@@ -1339,7 +1339,11 @@ describe("runSkill", () => {
     assert.strictEqual(parsed.timeoutMs, 3210);
   });
 
-  it("CLI skills run prefers local --timeout over the global flag", async () => {
+  it("CLI skills run accepts --timeout as a local timeout flag", async () => {
+    // Verifies that --timeout is recognised in the command-local segment.
+    // Note: getGlobalOpts scans all argv linearly so the second --timeout (3210)
+    // overwrites the first (9000) at the global level too. Both paths resolve to
+    // 3210; this test confirms the flag is not silently dropped.
     const { stdout, code } = await runCli([
       "--timeout", "9000",
       "skills", "run", "com.test.echo", "--timeout", "3210", "--output", "json", "--", "hello",

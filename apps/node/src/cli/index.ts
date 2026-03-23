@@ -102,6 +102,8 @@ async function main(): Promise<void> {
   }
   const [cmd, ...rest] = global.rest;
   if (cmd === undefined) {
+    // All argv tokens were consumed as global flags; no command was given. Exit 0
+    // (informational, not a caller error) so agent loops don't treat this as a failure.
     console.log(JSON.stringify({ code: "USAGE", message: "Use --help for available commands." }));
     process.exit(0);
   }
@@ -116,6 +118,8 @@ async function main(): Promise<void> {
 
   try {
     if (!cmd) {
+      // cmd is "" (explicit empty-string argument). The undefined case is handled
+      // by the early guard above; this branch exists only for that edge case.
       result = JSON.stringify({ code: "USAGE", message: "Use --help for available commands." });
     } else {
       const def = COMMANDS[cmd] ?? Object.values(COMMANDS).find((c) => c.synonyms?.includes(cmd));
