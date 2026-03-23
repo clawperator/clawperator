@@ -479,6 +479,30 @@ Notes:
   - Presses the Android back key. Equivalent to 'clawperator press back'.
 `;
 
+const HELP_CLOSE = `clawperator close
+
+Usage:
+  clawperator close <package> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
+  clawperator close --app <package> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
+
+Required:
+  <package>             Android application package ID (e.g., com.android.settings)
+  --app <package>       Alternative to positional argument
+
+Synonym:
+  close-app             Same as close
+
+Notes:
+  - Force-stops the specified application via adb.
+  - The close_app action runs as a pre-flight in the Node layer before broadcast dispatch.
+  - Requires the target app to be installed (does not need to be running).
+
+Examples:
+  clawperator close com.android.settings
+  clawperator close com.google.android.apps.chromecast.app --json
+  clawperator close-app com.android.settings
+`;
+
 const HELP_SCROLL = `clawperator scroll
 
 Usage:
@@ -1095,6 +1119,51 @@ COMMANDS["back"] = {
       logger,
     });
   },
+};
+
+const closeHandler = async (ctx: HandlerContext): Promise<string | void> => {
+  const { rest, format, logger, deviceId, operatorPackage, timeoutMs } = ctx;
+  const invalidTimeout = getInvalidTimeoutResult(timeoutMs, { format });
+  if (invalidTimeout) return invalidTimeout;
+
+  const appFlag = getOpt(rest, "--app");
+  const bare = barePositionalTokens(rest, ["--app"], []);
+  if (appFlag !== undefined && bare.length > 0) {
+    return formatError(
+      {
+        code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+        message:
+          "close: pass the package as a positional argument or via --app, not both.\n\nSee: clawperator close --help",
+      },
+      { format },
+    );
+  }
+  const applicationId = appFlag ?? bare[0];
+  if (!applicationId || applicationId.trim().length === 0) {
+    return JSON.stringify({
+      code: "MISSING_ARGUMENT",
+      message:
+        "close requires a package name.\n\nUsage:\n  clawperator close <package>\n  clawperator close --app <package>\n\nExamples:\n  clawperator close com.android.settings\n  clawperator close com.google.android.apps.chromecast.app --json",
+    });
+  }
+  return (await import("./commands/action.js")).cmdCloseApp({
+    format,
+    applicationId,
+    deviceId,
+    operatorPackage,
+    timeoutMs,
+    logger,
+  });
+};
+
+COMMANDS["close"] = {
+  name: "close",
+  synonyms: ["close-app"],
+  group: "Device Interaction",
+  summary: "Force-stop an Android application",
+  help: HELP_CLOSE,
+  topLevelBlock: `  close <package> [--device <id>] [--json]    Force-stop an Android application`,
+  handler: async (ctx) => closeHandler(ctx),
 };
 
 COMMANDS["scroll"] = {
