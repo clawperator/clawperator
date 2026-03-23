@@ -86,6 +86,8 @@ export function barePositionalTokens(
 export function stripFlagWithValue(rest: string[], flag: string): string[] {
   const i = rest.indexOf(flag);
   if (i < 0) return rest;
+  const next = rest[i + 1];
+  if (next === undefined || next.startsWith("-")) return rest;
   return [...rest.slice(0, i), ...rest.slice(i + 2)];
 }
 

@@ -71,10 +71,11 @@ export function hasElementSelectorFlag(rest: string[]): boolean {
 function readFlagRaw(rest: string[], flag: string): string | undefined {
   const i = rest.indexOf(flag);
   if (i < 0) return undefined;
-  if (i + 1 >= rest.length) {
+  const next = rest[i + 1];
+  if (next === undefined || next.startsWith("-")) {
     throw new Error(`${flag} requires a value`);
   }
-  return rest[i + 1];
+  return next;
 }
 
 /** Rejects when any flag in `flags` appears more than once as a token in `rest`. */

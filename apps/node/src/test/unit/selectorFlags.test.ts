@@ -162,6 +162,13 @@ describe("resolveElementMatcherFromCli - errors", () => {
     assert.match(result.error.message, /blank/);
   });
 
+  it("--text followed by another flag returns EXECUTION_VALIDATION_FAILED", () => {
+    const result = resolveElementMatcherFromCli(["--text", "--json"]);
+    assert.ok(!result.ok);
+    assert.strictEqual(result.error.code, "EXECUTION_VALIDATION_FAILED");
+    assert.match(result.error.message, /requires a value/);
+  });
+
   it("--id with blank value returns EXECUTION_VALIDATION_FAILED", () => {
     const result = resolveElementMatcherFromCli(["--id", ""]);
     assert.ok(!result.ok);
@@ -388,6 +395,14 @@ describe("CLI: missing selector returns Phase 3 help text", () => {
     assert.strictEqual(obj.code, "MISSING_SELECTOR");
     assert.match(obj.message, /--role/);
     assert.match(obj.message, /--desc-contains/);
+  });
+
+  it("type rejects a selector flag token where --text value should be", async () => {
+    const { stdout, code } = await runCli(["type", "--text", "--role", "textfield", "--json"]);
+    assert.strictEqual(code, 1);
+    const obj = JSON.parse(stdout);
+    assert.strictEqual(obj.code, "EXECUTION_VALIDATION_FAILED");
+    assert.match(obj.message ?? "", /--text requires a value/);
   });
 });
 
