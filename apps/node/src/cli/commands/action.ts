@@ -12,12 +12,6 @@ import type { OutputOptions } from "../output.js";
 import { formatSuccess, formatError } from "../output.js";
 import type { Logger } from "../../adapters/logger.js";
 
-function parseSelector(selectorJson: string): NodeMatcher {
-  const s = JSON.parse(selectorJson) as NodeMatcher;
-  if (typeof s !== "object" || s === null) throw new Error("Selector must be a JSON object");
-  return s;
-}
-
 export async function cmdActionOpenApp(options: {
   format: OutputOptions["format"];
   applicationId: string;
@@ -51,14 +45,13 @@ export async function cmdActionOpenApp(options: {
 
 export async function cmdActionClick(options: {
   format: OutputOptions["format"];
-  selector: string;
+  matcher: NodeMatcher;
   deviceId?: string;
   operatorPackage?: string;
   logger?: Logger;
 }): Promise<string> {
   try {
-    const selector = parseSelector(options.selector);
-    const execution = buildClickExecution(selector);
+    const execution = buildClickExecution(options.matcher);
     const result = await runExecution(execution, {
       deviceId: options.deviceId,
       operatorPackage: options.operatorPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
@@ -83,14 +76,13 @@ export async function cmdActionClick(options: {
 
 export async function cmdActionRead(options: {
   format: OutputOptions["format"];
-  selector: string;
+  matcher: NodeMatcher;
   deviceId?: string;
   operatorPackage?: string;
   logger?: Logger;
 }): Promise<string> {
   try {
-    const selector = parseSelector(options.selector);
-    const execution = buildReadExecution(selector);
+    const execution = buildReadExecution(options.matcher);
     const result = await runExecution(execution, {
       deviceId: options.deviceId,
       operatorPackage: options.operatorPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
@@ -115,14 +107,13 @@ export async function cmdActionRead(options: {
 
 export async function cmdActionWait(options: {
   format: OutputOptions["format"];
-  selector: string;
+  matcher: NodeMatcher;
   deviceId?: string;
   operatorPackage?: string;
   logger?: Logger;
 }): Promise<string> {
   try {
-    const selector = parseSelector(options.selector);
-    const execution = buildWaitExecution(selector);
+    const execution = buildWaitExecution(options.matcher);
     const result = await runExecution(execution, {
       deviceId: options.deviceId,
       operatorPackage: options.operatorPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
@@ -147,7 +138,7 @@ export async function cmdActionWait(options: {
 
 export async function cmdActionType(options: {
   format: OutputOptions["format"];
-  selector: string;
+  matcher: NodeMatcher;
   text: string;
   submit?: boolean;
   clear?: boolean;
@@ -156,9 +147,8 @@ export async function cmdActionType(options: {
   logger?: Logger;
 }): Promise<string> {
   try {
-    const selector = parseSelector(options.selector);
     const execution = buildTypeTextExecution({
-      selector,
+      selector: options.matcher,
       text: options.text,
       submit: options.submit ?? false,
       clear: options.clear ?? false,
@@ -250,13 +240,14 @@ export async function cmdActionPressKey(options: {
 export async function cmdScroll(options: {
   format: OutputOptions["format"];
   direction: string;
+  container?: NodeMatcher;
   deviceId?: string;
   operatorPackage?: string;
   timeoutMs?: number;
   logger?: Logger;
 }): Promise<string> {
   try {
-    const execution = buildScrollExecution(options.direction, options.timeoutMs);
+    const execution = buildScrollExecution(options.direction, options.timeoutMs, options.container);
     const result = await runExecution(execution, {
       deviceId: options.deviceId,
       operatorPackage: options.operatorPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
