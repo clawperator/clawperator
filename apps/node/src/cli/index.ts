@@ -139,7 +139,7 @@ async function main(): Promise<void> {
           result = handlerResult;
         }
       } else {
-        result = didYouMean(cmd, COMMANDS);
+        result = didYouMean(cmd, rest, COMMANDS);
       }
     }
   } catch (error) {

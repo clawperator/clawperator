@@ -81,7 +81,7 @@ describe("flag aliases - --device works like --device-id", () => {
   it("--device alias passes device id (validated via timeout error output)", async () => {
     // Use --timeout nope which produces EXECUTION_VALIDATION_FAILED. The device alias is consumed
     // by getGlobalOpts, so the command should still run and fail on the timeout.
-    const { stdout, code } = await runCli(["--device", "test-device-alias", "observe", "snapshot", "--timeout", "nope"]);
+    const { stdout, code } = await runCli(["--device", "test-device-alias", "snapshot", "--timeout", "nope"]);
     assert.notStrictEqual(code, 0);
     assert.match(stdout, /EXECUTION_VALIDATION_FAILED/);
     assert.match(stdout, /timeoutMs must be a finite number/);
@@ -110,7 +110,7 @@ describe("missing command after global flags", () => {
 
 describe("flag aliases - --timeout works like --timeout-ms", () => {
   it("--timeout nope produces EXECUTION_VALIDATION_FAILED", async () => {
-    const { stdout, code } = await runCli(["observe", "snapshot", "--timeout", "nope"]);
+    const { stdout, code } = await runCli(["snapshot", "--timeout", "nope"]);
     assert.notStrictEqual(code, 0);
     assert.match(stdout, /EXECUTION_VALIDATION_FAILED/);
     assert.match(stdout, /timeoutMs must be a finite number/);
@@ -185,8 +185,8 @@ describe("didYouMean tie-breaking", () => {
     // Primary name must win.
     const cmds = {
       foo: { ...fakeBase, name: "foo", synonyms: ["foa"] },
-    } as Parameters<typeof didYouMean>[1];
-    const result = JSON.parse(didYouMean("fob", cmds)) as { suggestion?: string };
+    } as Parameters<typeof didYouMean>[2];
+    const result = JSON.parse(didYouMean("fob", [], cmds)) as { suggestion?: string };
     assert.strictEqual(result.suggestion, "foo");
   });
 
@@ -195,8 +195,8 @@ describe("didYouMean tie-breaking", () => {
     const cmds = {
       bcd: { ...fakeBase, name: "bcd" },
       acd: { ...fakeBase, name: "acd" },
-    } as Parameters<typeof didYouMean>[1];
-    const result = JSON.parse(didYouMean("xcd", cmds)) as { suggestion?: string };
+    } as Parameters<typeof didYouMean>[2];
+    const result = JSON.parse(didYouMean("xcd", [], cmds)) as { suggestion?: string };
     assert.strictEqual(result.suggestion, "acd");
   });
 });

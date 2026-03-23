@@ -124,10 +124,10 @@ Notes:
   - Use clawperator grant-device-permissions only after the Operator APK crashes and Android revokes permissions.
 `;
 
-const HELP_OBSERVE_SNAPSHOT = `clawperator observe snapshot
+const HELP_SNAPSHOT = `clawperator snapshot
 
 Usage:
-  clawperator observe snapshot [--device-id <id>] [--receiver-package <package>] [--timeout-ms <number>] [--output <json|pretty>] [--verbose]
+  clawperator snapshot [--device-id <id>] [--receiver-package <package>] [--timeout-ms <number>] [--output <json|pretty>] [--verbose]
 
 Notes:
   - Captures a UI snapshot via the canonical execution path.
@@ -136,10 +136,10 @@ Notes:
   - --timeout-ms overrides the execution timeout within policy limits.
 `;
 
-const HELP_OBSERVE_SCREENSHOT = `clawperator observe screenshot
+const HELP_SCREENSHOT = `clawperator screenshot
 
 Usage:
-  clawperator observe screenshot [--device-id <id>] [--receiver-package <package>] [--path <file>] [--timeout-ms <number>] [--output <json|pretty>] [--verbose]
+  clawperator screenshot [--device-id <id>] [--receiver-package <package>] [--path <file>] [--timeout-ms <number>] [--output <json|pretty>] [--verbose]
 
 Notes:
   - Captures a PNG screenshot via the canonical execution path.
@@ -148,6 +148,114 @@ Notes:
   - --path writes the screenshot to the provided local filesystem path.
   - If --path is omitted, Clawperator writes to a generated temp file and returns that path in the result envelope.
   - --timeout-ms overrides the execution timeout within policy limits.
+`;
+
+const HELP_CLICK = `clawperator click
+
+Usage:
+  clawperator click --selector <json> [--device-id <id>] [--receiver-package <package>] [--output <json|pretty>]
+
+Required:
+  --selector <json>         JSON selector object, e.g. '{"textEquals":"Login"}'
+
+Notes:
+  - Builds and runs a single click action via the execute path.
+  - Default receiver package: com.clawperator.operator
+  - Use --receiver-package com.clawperator.operator.dev for local debug APKs.
+`;
+
+const HELP_OPEN = `clawperator open
+
+Usage:
+  clawperator open <target> [--device-id <id>] [--receiver-package <package>] [--output <json|pretty>]
+  clawperator open --app <package-id> [--device-id <id>] [--receiver-package <package>]
+  clawperator open --uri <uri> [--device-id <id>] [--receiver-package <package>]
+
+Notes:
+  - Target is auto-detected: https?:// -> open_uri, <scheme>:// -> open_uri, otherwise -> open_app.
+  - --app forces package name interpretation.
+  - --uri forces URI/URL interpretation.
+  - Default receiver package: com.clawperator.operator
+  - Use --receiver-package com.clawperator.operator.dev for local debug APKs.
+`;
+
+const HELP_TYPE = `clawperator type
+
+Usage:
+  clawperator type <text> --selector <json> [--submit] [--clear] [--device-id <id>] [--receiver-package <package>] [--output <json|pretty>]
+  clawperator type --text <value> --selector <json> [--submit] [--clear] [--device-id <id>] [--receiver-package <package>]
+
+Notes:
+  - Builds and runs a single enter_text action via the execute path.
+  - --submit sends Enter/Return after typing.
+  - --clear clears the field before typing.
+  - Default receiver package: com.clawperator.operator
+  - Use --receiver-package com.clawperator.operator.dev for local debug APKs.
+`;
+
+const HELP_READ = `clawperator read
+
+Usage:
+  clawperator read --selector <json> [--device-id <id>] [--receiver-package <package>] [--output <json|pretty>]
+
+Required:
+  --selector <json>         JSON selector object, e.g. '{"resourceId":"android:id/title"}'
+
+Notes:
+  - Builds and runs a single read_text action via the execute path.
+  - Default receiver package: com.clawperator.operator
+  - Use --receiver-package com.clawperator.operator.dev for local debug APKs.
+`;
+
+const HELP_WAIT = `clawperator wait
+
+Usage:
+  clawperator wait --selector <json> [--device-id <id>] [--receiver-package <package>] [--output <json|pretty>]
+
+Required:
+  --selector <json>         JSON selector object, e.g. '{"textContains":"Loading"}'
+
+Notes:
+  - Builds and runs a single wait_for_node action via the execute path.
+  - Default receiver package: com.clawperator.operator
+  - Use --receiver-package com.clawperator.operator.dev for local debug APKs.
+`;
+
+const HELP_PRESS = `clawperator press
+
+Usage:
+  clawperator press <key> [--device-id <id>] [--receiver-package <package>] [--output <json|pretty>]
+  clawperator press --key <key> [--device-id <id>] [--receiver-package <package>]
+
+Notes:
+  - Builds and runs a single press_key action via the execute path.
+  - Valid keys: back, home, recents
+  - Default receiver package: com.clawperator.operator
+  - Use --receiver-package com.clawperator.operator.dev for local debug APKs.
+`;
+
+const HELP_BACK = `clawperator back
+
+Usage:
+  clawperator back [--device-id <id>] [--receiver-package <package>] [--output <json|pretty>]
+
+Notes:
+  - Presses the Android back key. Equivalent to: clawperator press back
+  - Default receiver package: com.clawperator.operator
+  - Use --receiver-package com.clawperator.operator.dev for local debug APKs.
+`;
+
+const HELP_SCROLL = `clawperator scroll
+
+Usage:
+  clawperator scroll <direction> [--device-id <id>] [--receiver-package <package>] [--output <json|pretty>]
+  clawperator scroll --direction <direction> [--device-id <id>] [--receiver-package <package>]
+
+Notes:
+  - Builds and runs a single scroll action via the execute path.
+  - Valid directions: down, up, left, right
+  - Default receiver package: com.clawperator.operator
+  - Use --receiver-package com.clawperator.operator.dev for local debug APKs.
 `;
 
 const HELP_SKILLS_INSTALL = `clawperator skills install
@@ -532,147 +640,304 @@ COMMANDS["execute"] = {
   },
 };
 
-// observe
-COMMANDS["observe"] = {
-  name: "observe",
+// snapshot
+COMMANDS["snapshot"] = {
+  name: "snapshot",
   group: "Device Interaction",
-  summary: "Capture UI snapshot or screenshot from device",
-  help: HELP_OBSERVE_SNAPSHOT,
-  subtopics: {
-    snapshot: HELP_OBSERVE_SNAPSHOT,
-    screenshot: HELP_OBSERVE_SCREENSHOT,
+  summary: "Capture UI snapshot from device",
+  help: HELP_SNAPSHOT,
+  topLevelBlock: `  snapshot [--device-id <id>] [--receiver-package <package>]
+                                            Capture current UI snapshot output`,
+  handler: async (ctx) => {
+    const { format, logger, deviceId, receiverPackage, timeoutMs } = ctx;
+    return (await import("./commands/observe.js")).cmdObserveSnapshot({
+      format,
+      logger,
+      deviceId,
+      receiverPackage,
+      timeoutMs,
+    });
   },
-  topLevelBlock: `  observe snapshot [--device-id <id>] [--receiver-package <package>]
-                                            Capture current UI snapshot output
-  observe screenshot [--device-id <id>] [--receiver-package <package>] [--path <file>]
+};
+
+// screenshot
+COMMANDS["screenshot"] = {
+  name: "screenshot",
+  group: "Device Interaction",
+  summary: "Capture PNG screenshot from device",
+  help: HELP_SCREENSHOT,
+  topLevelBlock: `  screenshot [--device-id <id>] [--receiver-package <package>] [--path <file>]
                                             Capture current device screenshot (png)`,
   handler: async (ctx) => {
-    const { rest, format, verbose, logger, deviceId, receiverPackage, timeoutMs } = ctx;
-    const out = { format, verbose, logger };
-    if (rest[0] === "snapshot") {
-      return (await import("./commands/observe.js")).cmdObserveSnapshot({
-        ...out,
-        deviceId: deviceId ?? getOpt(rest, "--device-id"),
-        receiverPackage: receiverPackage ?? getOpt(rest, "--receiver-package"),
-        timeoutMs,
-      });
-    } else if (rest[0] === "screenshot") {
-      return (await import("./commands/observe.js")).cmdObserveScreenshot({
-        ...out,
-        deviceId: deviceId ?? getOpt(rest, "--device-id"),
-        receiverPackage: receiverPackage ?? getOpt(rest, "--receiver-package"),
-        timeoutMs,
-        path: getStringOpt(rest, "--path"),
-      });
-    } else {
-      return JSON.stringify({ code: "USAGE", message: "observe snapshot|screenshot [options]" });
-    }
+    const { rest, format, logger, deviceId, receiverPackage, timeoutMs } = ctx;
+    return (await import("./commands/observe.js")).cmdObserveScreenshot({
+      format,
+      logger,
+      deviceId,
+      receiverPackage,
+      timeoutMs,
+      path: getStringOpt(rest, "--path"),
+    });
   },
 };
 
-// inspect
-COMMANDS["inspect"] = {
-  name: "inspect",
+// click (synonym: tap)
+COMMANDS["click"] = {
+  name: "click",
+  synonyms: ["tap"],
   group: "Device Interaction",
-  summary: "Alias of observe snapshot with formatted output",
-  help: HELP_OBSERVE_SNAPSHOT,
-  subtopics: {
-    ui: HELP_OBSERVE_SNAPSHOT,
-  },
-  topLevelBlock: `  inspect ui [--device-id <id>] [--receiver-package <package>]
-                                            Alias of observe snapshot with formatted output`,
-  handler: async (ctx) => {
-    const { rest, format, verbose, logger, deviceId, receiverPackage, timeoutMs } = ctx;
-    const out = { format, verbose, logger };
-    if (rest[0] === "ui") {
-      return (await import("./commands/inspect.js")).cmdInspectUi({
-        ...out,
-        deviceId: deviceId ?? getOpt(rest, "--device-id"),
-        receiverPackage: receiverPackage ?? getOpt(rest, "--receiver-package"),
-        timeoutMs,
-      });
-    } else {
-      return JSON.stringify({ code: "USAGE", message: "inspect ui [options]" });
-    }
-  },
-};
-
-// action
-COMMANDS["action"] = {
-  name: "action",
-  group: "Device Interaction",
-  summary: "Build and run single device actions via execute path",
-  help: "clawperator action\n\nUsage:\n  clawperator action open-app|open-uri|click|read|wait|type|press-key [options]\n",
-  topLevelBlock: `  action open-app --app <packageId> [--device-id <id>] [--receiver-package <package>]
-                                            Build and run single open_app action via execute path
-  action open-uri --uri <value> [--device-id <id>] [--receiver-package <package>]
-                                            Build and run single open_uri action via execute path
-  action click --selector <json> [--device-id <id>] [--receiver-package <package>]
-                                            Build and run single click action via execute path
-  action read --selector <json> [--device-id <id>] [--receiver-package <package>]
-                                            Build and run single read_text action via execute path
-  action wait --selector <json> [--device-id <id>] [--receiver-package <package>]
-                                            Build and run single wait_for_node action via execute path
-  action type --selector <json> --text <value> [--submit] [--clear] [--device-id <id>] [--receiver-package <package>]
-                                            Build and run single enter_text action via execute path
-  action press-key --key <back|home|recents> [--device-id <id>] [--receiver-package <package>]
-                                            Build and run single press_key action via execute path`,
+  summary: "Run a single click action via execute path",
+  help: HELP_CLICK,
+  topLevelBlock: `  click --selector <json> [--device-id <id>] [--receiver-package <package>]
+                                            Build and run single click action via execute path`,
   handler: async (ctx) => {
     const { rest, format, verbose, logger, deviceId, receiverPackage } = ctx;
     const out = { format, verbose, logger };
-    const sub = rest[0];
     const selector = getOpt(rest, "--selector");
-    const runOpts = {
-      deviceId: deviceId ?? getOpt(rest, "--device-id"),
-      receiverPackage: receiverPackage ?? getOpt(rest, "--receiver-package"),
-      logger,
-    };
-    if (sub === "click") {
-      return selector
-        ? (await import("./commands/action.js")).cmdActionClick({ ...out, selector, ...runOpts })
-        : JSON.stringify({ code: "USAGE", message: "action click --selector <json>" });
-    } else if (sub === "open-app") {
-      const app = getOpt(rest, "--app");
-      return app
-        ? (await import("./commands/action.js")).cmdActionOpenApp({ ...out, applicationId: app, ...runOpts })
-        : JSON.stringify({ code: "USAGE", message: "action open-app --app <packageId>" });
-    } else if (sub === "read") {
-      return selector
-        ? (await import("./commands/action.js")).cmdActionRead({ ...out, selector, ...runOpts })
-        : JSON.stringify({ code: "USAGE", message: "action read --selector <json>" });
-    } else if (sub === "wait") {
-      return selector
-        ? (await import("./commands/action.js")).cmdActionWait({ ...out, selector, ...runOpts })
-        : JSON.stringify({ code: "USAGE", message: "action wait --selector <json>" });
-    } else if (sub === "type") {
-      const text = getOpt(rest, "--text");
-      return selector && text !== undefined
-        ? (await import("./commands/action.js")).cmdActionType({
-          ...out,
-          selector,
-          text,
-          submit: hasFlag(rest, "--submit"),
-          clear: hasFlag(rest, "--clear"),
-          ...runOpts,
-        })
-        : JSON.stringify({ code: "USAGE", message: "action type --selector <json> --text <value>" });
-    } else if (sub === "open-uri") {
-      const uri = getOpt(rest, "--uri");
-      return uri
-        ? (await import("./commands/action.js")).cmdActionOpenUri({ ...out, uri, ...runOpts })
-        : JSON.stringify({ code: "USAGE", message: "action open-uri --uri <value>" });
-    } else if (sub === "press-key") {
-      const key = getOpt(rest, "--key");
-      return key
-        ? (await import("./commands/action.js")).cmdActionPressKey({ ...out, key, ...runOpts })
-        : JSON.stringify({ code: "USAGE", message: "action press-key --key <back|home|recents>" });
-    } else {
-      const validSubs = "open-app|open-uri|click|read|wait|type|press-key";
-      const unknownPart = sub ? `Unknown action subcommand '${sub}'. Valid: ` : "";
-      return JSON.stringify({ code: "USAGE", message: `${unknownPart}action ${validSubs} [options]` });
+    const runOpts = { deviceId, receiverPackage, logger };
+    if (!selector) {
+      return JSON.stringify({
+        code: "MISSING_SELECTOR",
+        message: "click requires a selector.\n\nUsage:\n  clawperator click --selector '{\"textEquals\":\"Login\"}'\n\nSee: clawperator click --help",
+      });
+    }
+    return (await import("./commands/action.js")).cmdActionClick({ ...out, selector, ...runOpts });
+  },
+};
+
+// open (synonyms: open-uri, open-url)
+COMMANDS["open"] = {
+  name: "open",
+  synonyms: ["open-uri", "open-url"],
+  group: "Device Interaction",
+  summary: "Open a package, URL, or URI (auto-detected)",
+  help: HELP_OPEN,
+  topLevelBlock: `  open <target> [--device-id <id>] [--receiver-package <package>]
+                                            Open a package ID, URL, or URI (auto-detected)`,
+  handler: async (ctx) => {
+    const { rest, format, verbose, logger, deviceId, receiverPackage } = ctx;
+    const out = { format, verbose, logger };
+    const runOpts = { deviceId, receiverPackage, logger };
+    const positional = rest[0] && !rest[0].startsWith("--") ? rest[0] : undefined;
+    const appFlag = getOpt(rest, "--app");
+    const uriFlag = getOpt(rest, "--uri");
+    if (positional && appFlag) {
+      return JSON.stringify({ code: "USAGE", message: "Specify the target as a positional argument or --app, not both." });
+    }
+    if (positional && uriFlag) {
+      return JSON.stringify({ code: "USAGE", message: "Specify the target as a positional argument or --uri, not both." });
+    }
+    const target = positional ?? appFlag ?? uriFlag;
+    if (!target) {
+      return JSON.stringify({
+        code: "USAGE",
+        message: "open requires a target.\n\nUsage:\n  clawperator open <package-id>\n  clawperator open <url>\n  clawperator open <uri>",
+      });
+    }
+    // If --app or --uri was given explicitly, route accordingly
+    if (appFlag) {
+      return (await import("./commands/action.js")).cmdActionOpenApp({ ...out, applicationId: appFlag, ...runOpts });
+    }
+    if (uriFlag) {
+      return (await import("./commands/action.js")).cmdActionOpenUri({ ...out, uri: uriFlag, ...runOpts });
+    }
+    // Auto-detect from positional target
+    if (/^https?:\/\//.test(target) || target.includes("://")) {
+      return (await import("./commands/action.js")).cmdActionOpenUri({ ...out, uri: target, ...runOpts });
+    }
+    return (await import("./commands/action.js")).cmdActionOpenApp({ ...out, applicationId: target, ...runOpts });
+  },
+};
+
+// type (synonym: fill)
+COMMANDS["type"] = {
+  name: "type",
+  synonyms: ["fill"],
+  group: "Device Interaction",
+  summary: "Run a single enter_text action via execute path",
+  help: HELP_TYPE,
+  topLevelBlock: `  type <text> --selector <json> [--submit] [--clear] [--device-id <id>] [--receiver-package <package>]
+                                            Build and run single enter_text action via execute path`,
+  handler: async (ctx) => {
+    const { rest, format, verbose, logger, deviceId, receiverPackage } = ctx;
+    const out = { format, verbose, logger };
+    const runOpts = { deviceId, receiverPackage, logger };
+    const selector = getOpt(rest, "--selector");
+    const positional = rest[0] && !rest[0].startsWith("--") ? rest[0] : undefined;
+    const textFlag = getOpt(rest, "--text");
+    if (positional && textFlag !== undefined) {
+      return JSON.stringify({ code: "USAGE", message: "Specify the text as a positional argument or --text, not both." });
+    }
+    const text = positional ?? textFlag;
+    if (!selector) {
+      return JSON.stringify({
+        code: "MISSING_SELECTOR",
+        message: "type requires a selector.\n\nUsage:\n  clawperator type --selector <json> --text <value>\n\nSee: clawperator type --help",
+      });
+    }
+    if (text === undefined) {
+      return JSON.stringify({ code: "USAGE", message: "type requires --text <value> or a positional text argument.\n\nUsage:\n  clawperator type --selector <json> --text <value>" });
+    }
+    return (await import("./commands/action.js")).cmdActionType({
+      ...out, selector, text,
+      submit: hasFlag(rest, "--submit"),
+      clear: hasFlag(rest, "--clear"),
+      ...runOpts,
+    });
+  },
+};
+
+// read
+COMMANDS["read"] = {
+  name: "read",
+  group: "Device Interaction",
+  summary: "Run a single read_text action via execute path",
+  help: HELP_READ,
+  topLevelBlock: `  read --selector <json> [--device-id <id>] [--receiver-package <package>]
+                                            Build and run single read_text action via execute path`,
+  handler: async (ctx) => {
+    const { rest, format, verbose, logger, deviceId, receiverPackage } = ctx;
+    const out = { format, verbose, logger };
+    const runOpts = { deviceId, receiverPackage, logger };
+    const selector = getOpt(rest, "--selector");
+    if (!selector) {
+      return JSON.stringify({
+        code: "MISSING_SELECTOR",
+        message: "read requires a selector.\n\nUsage:\n  clawperator read --selector <json>\n\nSee: clawperator read --help",
+      });
+    }
+    return (await import("./commands/action.js")).cmdActionRead({ ...out, selector, ...runOpts });
+  },
+};
+
+// wait
+COMMANDS["wait"] = {
+  name: "wait",
+  group: "Device Interaction",
+  summary: "Run a single wait_for_node action via execute path",
+  help: HELP_WAIT,
+  topLevelBlock: `  wait --selector <json> [--device-id <id>] [--receiver-package <package>]
+                                            Build and run single wait_for_node action via execute path`,
+  handler: async (ctx) => {
+    const { rest, format, verbose, logger, deviceId, receiverPackage } = ctx;
+    const out = { format, verbose, logger };
+    const runOpts = { deviceId, receiverPackage, logger };
+    const selector = getOpt(rest, "--selector");
+    if (!selector) {
+      return JSON.stringify({
+        code: "MISSING_SELECTOR",
+        message: "wait requires a selector.\n\nUsage:\n  clawperator wait --selector <json>\n\nSee: clawperator wait --help",
+      });
+    }
+    return (await import("./commands/action.js")).cmdActionWait({ ...out, selector, ...runOpts });
+  },
+};
+
+// press (synonym: press-key)
+COMMANDS["press"] = {
+  name: "press",
+  synonyms: ["press-key"],
+  group: "Device Interaction",
+  summary: "Run a single press_key action via execute path",
+  help: HELP_PRESS,
+  topLevelBlock: `  press <key> [--device-id <id>] [--receiver-package <package>]
+                                            Build and run single press_key action (back|home|recents)`,
+  handler: async (ctx) => {
+    const { rest, format, verbose, logger, deviceId, receiverPackage } = ctx;
+    const out = { format, verbose, logger };
+    const runOpts = { deviceId, receiverPackage, logger };
+    const positional = rest[0] && !rest[0].startsWith("--") ? rest[0] : undefined;
+    const keyFlag = getOpt(rest, "--key");
+    if (positional && keyFlag) {
+      return JSON.stringify({ code: "USAGE", message: "Specify the key as a positional argument or --key, not both." });
+    }
+    const key = positional ?? keyFlag;
+    if (!key) {
+      return JSON.stringify({
+        code: "USAGE",
+        message: "press requires a key name.\n\nValid keys: back, home, recents\n\nExample:\n  clawperator press back",
+      });
+    }
+    return (await import("./commands/action.js")).cmdActionPressKey({ ...out, key, ...runOpts });
+  },
+};
+
+// back
+COMMANDS["back"] = {
+  name: "back",
+  group: "Device Interaction",
+  summary: "Press the Android back key",
+  help: HELP_BACK,
+  topLevelBlock: `  back [--device-id <id>] [--receiver-package <package>]
+                                            Press the Android back key`,
+  handler: async (ctx) => {
+    const { format, verbose, logger, deviceId, receiverPackage } = ctx;
+    const out = { format, verbose, logger };
+    const runOpts = { deviceId, receiverPackage, logger };
+    return (await import("./commands/action.js")).cmdActionPressKey({ ...out, key: "back", ...runOpts });
+  },
+};
+
+// scroll
+COMMANDS["scroll"] = {
+  name: "scroll",
+  group: "Device Interaction",
+  summary: "Run a single scroll action via execute path",
+  help: HELP_SCROLL,
+  topLevelBlock: `  scroll <direction> [--device-id <id>] [--receiver-package <package>]
+                                            Build and run single scroll action (down|up|left|right)`,
+  handler: async (ctx) => {
+    const { rest, format, verbose, logger, deviceId, receiverPackage } = ctx;
+    const out = { format, verbose, logger };
+    const positional = rest[0] && !rest[0].startsWith("--") ? rest[0] : undefined;
+    const dirFlag = getOpt(rest, "--direction");
+    if (positional && dirFlag) {
+      return JSON.stringify({ code: "USAGE", message: "Specify the direction as a positional argument or --direction, not both." });
+    }
+    const direction = positional ?? dirFlag;
+    if (!direction) {
+      return JSON.stringify({
+        code: "USAGE",
+        message: "scroll requires a direction.\n\nValid directions: down, up, left, right\n\nExample:\n  clawperator scroll down",
+      });
+    }
+    const validDirections = ["down", "up", "left", "right"];
+    if (!validDirections.includes(direction)) {
+      return JSON.stringify({
+        code: "USAGE",
+        message: `Invalid scroll direction "${direction}". Valid: down, up, left, right`,
+      });
+    }
+    try {
+      const { buildScrollExecution } = await import("../domain/actions/scroll.js");
+      const { runExecution } = await import("../domain/executions/runExecution.js");
+      const { formatSuccess, formatError } = await import("./output.js");
+      const execution = buildScrollExecution(direction);
+      const result = await runExecution(execution, {
+        deviceId,
+        receiverPackage: receiverPackage ?? process.env.CLAWPERATOR_RECEIVER_PACKAGE,
+        warn: message => process.stderr.write(message),
+        logger,
+      });
+      if (result.ok) {
+        return formatSuccess(
+          {
+            envelope: result.envelope,
+            deviceId: result.deviceId,
+            terminalSource: result.terminalSource,
+            isCanonicalTerminal: result.terminalSource === "clawperator_result",
+          },
+          out
+        );
+      }
+      return formatError(result.error, out);
+    } catch (e) {
+      const { formatError } = await import("./output.js");
+      return formatError(e, out);
     }
   },
 };
+
 
 // skills
 COMMANDS["skills"] = {
@@ -1014,7 +1279,52 @@ export function levenshtein(a: string, b: string): number {
   return dp[m][n];
 }
 
-export function didYouMean(cmd: string, commands: Record<string, CommandDef>): string {
+// Mapping table for removed compound commands -> new flat command names.
+// Used by didYouMean to produce specific suggestions when users type old command forms.
+const REMOVED_COMPOUND_COMMANDS: Record<string, Record<string, string>> = {
+  action: {
+    click: "click",
+    "open-app": "open",
+    "open-uri": "open",
+    type: "type",
+    read: "read",
+    wait: "wait",
+    "press-key": "press",
+  },
+  observe: {
+    snapshot: "snapshot",
+    screenshot: "screenshot",
+  },
+  inspect: {
+    ui: "snapshot",
+  },
+};
+
+export function didYouMean(cmd: string, rest: string[], commands: Record<string, CommandDef>): string {
+  // Check for removed compound commands first (e.g. "action click", "observe snapshot")
+  const compoundMap = REMOVED_COMPOUND_COMMANDS[cmd];
+  if (compoundMap) {
+    const sub = rest[0];
+    const suggestion = sub ? compoundMap[sub] : undefined;
+    if (suggestion) {
+      return JSON.stringify({
+        code: "UNKNOWN_COMMAND",
+        message: `Unknown command '${cmd} ${sub}'. Use '${suggestion}' instead. See: clawperator ${suggestion} --help`,
+        suggestion,
+      });
+    }
+    // Known removed parent command but no matching subcommand - give general guidance
+    const generalSuggestion =
+      cmd === "observe" ? "snapshot" :
+      cmd === "inspect" ? "snapshot" :
+      "click";
+    return JSON.stringify({
+      code: "UNKNOWN_COMMAND",
+      message: `Unknown command: ${cmd}. The '${cmd}' namespace has been removed. Use '${generalSuggestion}' or --help for available commands.`,
+      suggestion: generalSuggestion,
+    });
+  }
+
   const threshold = Math.max(2, Math.floor(cmd.length / 2));
   // Collect all candidates within threshold distance, then sort deterministically:
   //   1. closest distance first
@@ -1084,8 +1394,7 @@ export function generateTopLevelHelp(commands: Record<string, CommandDef>): stri
     "Notes:",
     "  - operator setup is the canonical setup command. operator install remains an alias.",
     "  - recording is the canonical command family; 'record' is a supported short alias.",
-    "  - inspect ui is a wrapper alias over observe snapshot.",
-    "  - action commands are thin wrappers that compile to execution and call execute.",
+    "  - snapshot, screenshot, click, open, type, read, wait, press, back, scroll are flat top-level commands.",
     "  - The default receiver package is com.clawperator.operator. Use --receiver-package com.clawperator.operator.dev for local debug builds.",
     "  - Terminal result semantics are driven by [Clawperator-Result].",
     ""
