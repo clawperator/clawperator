@@ -1070,7 +1070,7 @@ installer are:
 | :--- | :--- | :--- |
 | `CLAWPERATOR_SKILLS_REGISTRY` | CLI and installer | Overrides the path to the local skills registry JSON |
 | `CLAWPERATOR_INSTALL_APK` | installer | Pre-seeds the installer's "install APK now?" decision for non-interactive runs |
-| `CLAWPERATOR_RECEIVER_PACKAGE` | installer | Overrides the default receiver package used during installer setup |
+| `CLAWPERATOR_OPERATOR_PACKAGE` | installer | Overrides the default receiver package used during installer setup |
 
 ### `CLAWPERATOR_INSTALL_APK`
 
@@ -1260,7 +1260,7 @@ two environment variables:
 | Variable | Description | Default |
 | :--- | :--- | :--- |
 | `CLAWPERATOR_BIN` | Path to the CLI binary the skill should use | Auto-resolved: sibling build if present, else global `clawperator` |
-| `CLAWPERATOR_RECEIVER_PACKAGE` | Operator package for the skill to target | `com.clawperator.operator` |
+| `CLAWPERATOR_OPERATOR_PACKAGE` | Operator package for the skill to target | `com.clawperator.operator` |
 
 These can be set explicitly to override the defaults:
 
@@ -1269,7 +1269,7 @@ These can be set explicitly to override the defaults:
 export CLAWPERATOR_BIN=/path/to/clawperator/apps/node/dist/cli/index.js
 
 # Target the dev APK
-export CLAWPERATOR_RECEIVER_PACKAGE=com.clawperator.operator.dev
+export CLAWPERATOR_OPERATOR_PACKAGE=com.clawperator.operator.dev
 
 # Now all skills will use these values
 clawperator skills run <skill_id>

@@ -259,7 +259,7 @@ async function performExecution(
 ): Promise<PerformExecutionResult> {
   const config = getDefaultRuntimeConfig({
     deviceId: options.deviceId,
-    receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_RECEIVER_PACKAGE,
+    receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
     adbPath: options.adbPath ?? process.env.ADB_PATH,
     runner: options.runner,
     logger: options.logger,

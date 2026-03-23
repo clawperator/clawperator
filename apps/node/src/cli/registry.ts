@@ -342,7 +342,7 @@ Notes:
   - By default, the wrapper performs a pre-run dry-run validation gate before starting the skill script.
   - --skip-validate bypasses that gate for CI or development escape hatches only.
   - Arguments after -- are forwarded to the underlying skill script unchanged.
-  - Environment variables CLAWPERATOR_BIN and CLAWPERATOR_RECEIVER_PACKAGE are injected into the skill script.
+  - Environment variables CLAWPERATOR_BIN and CLAWPERATOR_OPERATOR_PACKAGE are injected into the skill script.
   - This wrapper does not replace live validation of screenshots, artifacts, or app state.
 `;
 
@@ -917,7 +917,7 @@ COMMANDS["scroll"] = {
       const execution = buildScrollExecution(direction, timeoutMs);
       const result = await runExecution(execution, {
         deviceId,
-        receiverPackage: receiverPackage ?? process.env.CLAWPERATOR_RECEIVER_PACKAGE,
+        receiverPackage: receiverPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
         warn: message => process.stderr.write(message),
         logger,
       });

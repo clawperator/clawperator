@@ -30,7 +30,7 @@ const { tmpdir } = require('os');
 const deviceId = process.argv[2] || process.env.DEVICE_ID;
 const rawQuery = process.argv[3] || process.env.QUERY || '';
 const query = rawQuery.trim();
-const receiverPkg = process.argv[4] || process.env.RECEIVER_PKG || 'com.clawperator.operator.dev';
+const receiverPkg = process.argv[4] || process.env.OPERATOR_PKG || 'com.clawperator.operator.dev';
 const packageId = process.argv[5] || process.env.PACKAGE_ID || '';
 
 // Use local CLI build from the repo root (supports 'recording' canonical command)

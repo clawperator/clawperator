@@ -14,7 +14,7 @@ export async function cmdObserveSnapshot(options: {
   try {
     const result = await observeSnapshot({
       deviceId: options.deviceId,
-      receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_RECEIVER_PACKAGE,
+      receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
       timeoutMs: options.timeoutMs,
       warn: message => process.stderr.write(message),
       logger: options.logger,
@@ -47,7 +47,7 @@ export async function cmdObserveScreenshot(options: {
   try {
     const result = await observeScreenshot({
       deviceId: options.deviceId,
-      receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_RECEIVER_PACKAGE,
+      receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
       timeoutMs: options.timeoutMs,
       path: options.path,
       warn: message => process.stderr.write(message),

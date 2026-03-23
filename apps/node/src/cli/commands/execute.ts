@@ -104,7 +104,7 @@ export async function cmdExecute(options: {
 
     const result = await runExecution(payload, {
       deviceId: options.deviceId,
-      receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_RECEIVER_PACKAGE,
+      receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
       timeoutMs: options.timeoutMs,
       warn: message => process.stderr.write(message),
       logger: options.logger,

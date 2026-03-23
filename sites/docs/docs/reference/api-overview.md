@@ -415,7 +415,7 @@ Server-Sent Events stream. Emits two event types:
 | Variable | Description |
 |----------|-------------|
 | `ADB_PATH` | Override path to `adb` binary |
-| `CLAWPERATOR_RECEIVER_PACKAGE` | Default receiver package (fallback if not passed as option) |
+| `CLAWPERATOR_OPERATOR_PACKAGE` | Default receiver package (fallback if not passed as option) |
 | `CLAWPERATOR_SKILLS_REGISTRY` | Path to `skills-registry.json`. If unset, defaults to `./skills/skills-registry.json` relative to the working directory. After `skills install`, set to `~/.clawperator/skills/skills/skills-registry.json`. |
 
 ---

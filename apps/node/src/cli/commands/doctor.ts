@@ -20,7 +20,7 @@ export async function cmdDoctor(options: {
 }, deps: { doctorService?: Pick<DoctorService, "run"> } = {}): Promise<string> {
   const config = getDefaultRuntimeConfig({
     deviceId: options.deviceId,
-    receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_RECEIVER_PACKAGE,
+    receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
     adbPath: process.env.ADB_PATH,
   });
 

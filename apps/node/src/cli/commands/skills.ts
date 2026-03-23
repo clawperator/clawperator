@@ -19,7 +19,7 @@ import { checkApkPresence } from "../../domain/doctor/checks/readinessChecks.js"
 import type { Logger } from "../../adapters/logger.js";
 import {
   CLAWPERATOR_BIN_ENV_VAR,
-  CLAWPERATOR_RECEIVER_PACKAGE_ENV_VAR,
+  CLAWPERATOR_OPERATOR_PACKAGE_ENV_VAR,
   resolveSkillBinCommand,
   resolveReceiverPackage,
 } from "../../domain/skills/skillsConfig.js";
@@ -151,7 +151,7 @@ export async function cmdSkillsRun(
 
   const env: SkillRunEnv = {
     [CLAWPERATOR_BIN_ENV_VAR]: resolvedBin,
-    [CLAWPERATOR_RECEIVER_PACKAGE_ENV_VAR]: resolvedReceiverPackage,
+    [CLAWPERATOR_OPERATOR_PACKAGE_ENV_VAR]: resolvedReceiverPackage,
   };
 
   const runSkillImpl = options.runSkillImpl ?? runSkill;

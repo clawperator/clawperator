@@ -293,10 +293,10 @@ describe("operator setup CLI output", () => {
     assert.strictEqual(obj.receiverPackage, "com.clawperator.operator.dev");
   });
 
-  it("uses CLAWPERATOR_RECEIVER_PACKAGE on failure when --receiver-package is omitted", async () => {
+  it("uses CLAWPERATOR_OPERATOR_PACKAGE on failure when --receiver-package is omitted", async () => {
     const { stdout } = await runCli(
       ["operator", "setup", "--apk", NONEXISTENT_APK],
-      { CLAWPERATOR_RECEIVER_PACKAGE: "com.clawperator.operator.dev" }
+      { CLAWPERATOR_OPERATOR_PACKAGE: "com.clawperator.operator.dev" }
     );
     const obj = JSON.parse(stdout);
     assert.strictEqual(obj.receiverPackage, "com.clawperator.operator.dev");

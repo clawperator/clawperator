@@ -13,7 +13,7 @@ npm --prefix apps/node run build
 # Device selection: set DEVICE_ID or let the script auto-select from adb.
 # NOTE: Do not commit personal device serials to this repository.
 export DEVICE_ID="${DEVICE_ID:-}"
-export CLAWPERATOR_RECEIVER_PACKAGE="${CLAWPERATOR_RECEIVER_PACKAGE:-com.clawperator.operator.dev}"
+export CLAWPERATOR_OPERATOR_PACKAGE="${CLAWPERATOR_OPERATOR_PACKAGE:-com.clawperator.operator.dev}"
 export SKILL_ID="${SKILL_ID:-com.google.android.apps.chromecast.app.get-climate}"
 export ARTIFACT_NAME="${ARTIFACT_NAME:-climate-status}"
 export CLIMATE_TILE_NAME="${CLIMATE_TILE_NAME:-Master}"
@@ -65,12 +65,12 @@ echo "=== skills compile-artifact (json -> /tmp/clawperator-smoke-exec.json) ===
 
 echo "=== execute compiled execution ==="
 if [ -n "$SMOKE_SUMMARY" ]; then
-  EXEC_JSON="$("${CLI[@]}" execute --device "$DEVICE_ID" --operator-package "$CLAWPERATOR_RECEIVER_PACKAGE" --execution /tmp/clawperator-smoke-exec.json --json 2>&1)" || true
+  EXEC_JSON="$("${CLI[@]}" execute --device "$DEVICE_ID" --operator-package "$CLAWPERATOR_OPERATOR_PACKAGE" --execution /tmp/clawperator-smoke-exec.json --json 2>&1)" || true
   echo "$EXEC_JSON" | node -e 'const d=require("fs").readFileSync(0,"utf8"); try { const j=JSON.parse(d); console.log(JSON.stringify({ step: "execute", result: j.terminalSource ? "ok" : (j.code === "RESULT_ENVELOPE_TIMEOUT" ? "timeout" : "error"), terminalSource: j.terminalSource || undefined, timeoutDiagnostics: j.code === "RESULT_ENVELOPE_TIMEOUT" ? j : undefined })); } catch(e) { console.log(JSON.stringify({ step: "execute", result: "error" })); }' >> "$OUTCOMES_FILE"
   echo "$EXEC_JSON" | node -e 'console.log(JSON.stringify(JSON.parse(require("fs").readFileSync(0,"utf8")),null,2))'
   EXEC_OUT="$EXEC_JSON"
 else
-  EXEC_OUT="$("${CLI[@]}" execute --device "$DEVICE_ID" --operator-package "$CLAWPERATOR_RECEIVER_PACKAGE" --execution /tmp/clawperator-smoke-exec.json --output pretty 2>&1)" || true
+  EXEC_OUT="$("${CLI[@]}" execute --device "$DEVICE_ID" --operator-package "$CLAWPERATOR_OPERATOR_PACKAGE" --execution /tmp/clawperator-smoke-exec.json --output pretty 2>&1)" || true
   echo "$EXEC_OUT"
 fi
 if echo "$EXEC_OUT" | grep -q '"terminalSource"'; then
@@ -86,7 +86,7 @@ if [ -n "$SMOKE_SUMMARY" ]; then
   OUTCOMES_PATH="$OUTCOMES_FILE" \
   SUMMARY_TIMESTAMP="$SMOKE_TIMESTAMP" \
   SUMMARY_DEVICE_ID="$DEVICE_ID" \
-  SUMMARY_RECEIVER_PACKAGE="$CLAWPERATOR_RECEIVER_PACKAGE" \
+  SUMMARY_OPERATOR_PACKAGE="$CLAWPERATOR_OPERATOR_PACKAGE" \
   SUMMARY_STRICT_MODE="true" \
   node -e '
     const fs = require("fs");
@@ -104,7 +104,7 @@ if [ -n "$SMOKE_SUMMARY" ]; then
       ...existing,
       timestamp: process.env.SUMMARY_TIMESTAMP,
       deviceId: process.env.SUMMARY_DEVICE_ID,
-      receiverPackage: process.env.SUMMARY_RECEIVER_PACKAGE,
+      receiverPackage: process.env.SUMMARY_OPERATOR_PACKAGE,
       commandOutcomes,
       strictMode: process.env.SUMMARY_STRICT_MODE === "true",
     };

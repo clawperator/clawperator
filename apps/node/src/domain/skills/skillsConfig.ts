@@ -8,8 +8,8 @@ export const DEFAULT_SKILLS_DIR = join(homedir(), ".clawperator", "skills");
 export const DEFAULT_SKILLS_REGISTRY_SUBPATH = join("skills", "skills-registry.json");
 
 export const CLAWPERATOR_BIN_ENV_VAR = "CLAWPERATOR_BIN";
-export const CLAWPERATOR_RECEIVER_PACKAGE_ENV_VAR = "CLAWPERATOR_RECEIVER_PACKAGE";
-export const DEFAULT_RECEIVER_PACKAGE = "com.clawperator.operator";
+export const CLAWPERATOR_OPERATOR_PACKAGE_ENV_VAR = "CLAWPERATOR_OPERATOR_PACKAGE";
+export const DEFAULT_OPERATOR_PACKAGE = "com.clawperator.operator";
 
 export function getDefaultSkillsRegistryPath(): string {
   return join(DEFAULT_SKILLS_DIR, DEFAULT_SKILLS_REGISTRY_SUBPATH);
@@ -91,13 +91,13 @@ export function resolveSkillBinCommand(): string {
 /**
  * Resolve the receiver package for skill execution.
  *
- * Returns the value from CLAWPERATOR_RECEIVER_PACKAGE env var, or the default
+ * Returns the value from CLAWPERATOR_OPERATOR_PACKAGE env var, or the default
  * release package if not set.
  */
 export function resolveReceiverPackage(): string {
-  const envPackage = process.env[CLAWPERATOR_RECEIVER_PACKAGE_ENV_VAR];
+  const envPackage = process.env[CLAWPERATOR_OPERATOR_PACKAGE_ENV_VAR];
   if (envPackage !== undefined && envPackage !== "") {
     return envPackage;
   }
-  return DEFAULT_RECEIVER_PACKAGE;
+  return DEFAULT_OPERATOR_PACKAGE;
 }

@@ -450,8 +450,8 @@ clawperator version --check-compat --receiver-package com.clawperator.operator.d
    # Set CLAWPERATOR_BIN to use local branch build
    export CLAWPERATOR_BIN=/path/to/clawperator/apps/node/dist/cli/index.js
    
-   # Set CLAWPERATOR_RECEIVER_PACKAGE to target the dev APK
-   export CLAWPERATOR_RECEIVER_PACKAGE=com.clawperator.operator.dev
+   # Set CLAWPERATOR_OPERATOR_PACKAGE to target the dev APK
+   export CLAWPERATOR_OPERATOR_PACKAGE=com.clawperator.operator.dev
    
    # Rebuild if needed
    npm --prefix /path/to/clawperator/apps/node install
@@ -472,7 +472,7 @@ clawperator version --check-compat --receiver-package com.clawperator.operator.d
    clawperator version --check-compat --receiver-package com.clawperator.operator
    ```
 
-3. **For skills specifically:** Skills receive `CLAWPERATOR_BIN` and `CLAWPERATOR_RECEIVER_PACKAGE` environment variables automatically from the CLI. When testing skills with a dev APK, set these environment variables or use the `--receiver-package` flag.
+3. **For skills specifically:** Skills receive `CLAWPERATOR_BIN` and `CLAWPERATOR_OPERATOR_PACKAGE` environment variables automatically from the CLI. When testing skills with a dev APK, set these environment variables or use the `--receiver-package` flag.
 
 ### Skill validation passes but execution fails
 

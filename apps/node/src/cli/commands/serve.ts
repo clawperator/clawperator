@@ -52,7 +52,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
     try {
       const config = getDefaultRuntimeConfig({
         adbPath: process.env.ADB_PATH,
-        receiverPackage: process.env.CLAWPERATOR_RECEIVER_PACKAGE,
+        receiverPackage: process.env.CLAWPERATOR_OPERATOR_PACKAGE,
         logger: options.logger,
       });
       const devices = await listDevices(config);
@@ -91,7 +91,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       emulatorPath: process.env.EMULATOR_PATH,
       sdkmanagerPath: process.env.SDKMANAGER_PATH,
       avdmanagerPath: process.env.AVDMANAGER_PATH,
-      receiverPackage: process.env.CLAWPERATOR_RECEIVER_PACKAGE,
+      receiverPackage: process.env.CLAWPERATOR_OPERATOR_PACKAGE,
       logger: options.logger,
     });
   }
@@ -123,7 +123,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
     try {
       const result = await runExecution(execution, {
         deviceId,
-        receiverPackage: receiverPackage || process.env.CLAWPERATOR_RECEIVER_PACKAGE,
+        receiverPackage: receiverPackage || process.env.CLAWPERATOR_OPERATOR_PACKAGE,
         logger: options.logger,
       });
 
@@ -169,7 +169,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
     try {
       const result = await runExecution(executionInput, { 
         deviceId, 
-        receiverPackage: receiverPackage || process.env.CLAWPERATOR_RECEIVER_PACKAGE,
+        receiverPackage: receiverPackage || process.env.CLAWPERATOR_OPERATOR_PACKAGE,
         logger: options.logger,
       });
       if (result.ok) {
@@ -219,7 +219,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
     try {
       const result = await runExecution(executionInput, { 
         deviceId, 
-        receiverPackage: receiverPackage || process.env.CLAWPERATOR_RECEIVER_PACKAGE,
+        receiverPackage: receiverPackage || process.env.CLAWPERATOR_OPERATOR_PACKAGE,
         logger: options.logger,
       });
       if (result.ok) {

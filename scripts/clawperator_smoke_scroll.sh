@@ -14,7 +14,7 @@
 #
 # Optional env vars:
 #   DEVICE_ID                    - device serial (auto-selected when only one device is connected)
-#   CLAWPERATOR_RECEIVER_PACKAGE - defaults to com.clawperator.operator.dev
+#   CLAWPERATOR_OPERATOR_PACKAGE - defaults to com.clawperator.operator.dev
 #   SCROLL_MAX_STEPS             - max scroll steps in each direction before failing (default: 30)
 set -euo pipefail
 
@@ -23,7 +23,7 @@ cd "$(dirname "$0")/.."
 npm --prefix apps/node run build --silent
 
 export DEVICE_ID="${DEVICE_ID:-}"
-export CLAWPERATOR_RECEIVER_PACKAGE="${CLAWPERATOR_RECEIVER_PACKAGE:-com.clawperator.operator.dev}"
+export CLAWPERATOR_OPERATOR_PACKAGE="${CLAWPERATOR_OPERATOR_PACKAGE:-com.clawperator.operator.dev}"
 SCROLL_MAX_STEPS="${SCROLL_MAX_STEPS:-30}"
 SETTINGS_PACKAGE="com.android.settings"
 
@@ -61,7 +61,7 @@ run_action() {
   local payload="$1"
   "${CLI[@]}" execute \
     --device-id "$DEVICE_ID" \
-    --receiver-package "$CLAWPERATOR_RECEIVER_PACKAGE" \
+    --receiver-package "$CLAWPERATOR_OPERATOR_PACKAGE" \
     --execution "$payload" \
     --output json 2>&1
 }
@@ -122,7 +122,7 @@ leading_signature() {
 PAYLOAD_FILE=$(mktemp /tmp/clawperator-scroll-smoke-XXXXXX.json)
 trap 'rm -f "$PAYLOAD_FILE"' EXIT
 
-echo "=== scroll smoke: DEVICE_ID=$DEVICE_ID receiver=$CLAWPERATOR_RECEIVER_PACKAGE ==="
+echo "=== scroll smoke: DEVICE_ID=$DEVICE_ID receiver=$CLAWPERATOR_OPERATOR_PACKAGE ==="
 
 # ---------------------------------------------------------------------------
 # 1) Open Settings and take initial snapshot

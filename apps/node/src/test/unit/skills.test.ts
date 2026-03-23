@@ -7,8 +7,8 @@ import { fileURLToPath } from "node:url";
 import { homedir, tmpdir } from "node:os";
 import {
   CLAWPERATOR_BIN_ENV_VAR,
-  CLAWPERATOR_RECEIVER_PACKAGE_ENV_VAR,
-  DEFAULT_RECEIVER_PACKAGE,
+  CLAWPERATOR_OPERATOR_PACKAGE_ENV_VAR,
+  DEFAULT_OPERATOR_PACKAGE,
   formatSkillBinCommand,
   resolveSkillBin,
   resolveSkillBinCommand,
@@ -1833,38 +1833,38 @@ describe("resolveSkillBinCommand", () => {
 });
 
 describe("resolveReceiverPackage", () => {
-  const ORIGINAL_RECEIVER_PACKAGE = process.env[CLAWPERATOR_RECEIVER_PACKAGE_ENV_VAR];
+  const ORIGINAL_RECEIVER_PACKAGE = process.env[CLAWPERATOR_OPERATOR_PACKAGE_ENV_VAR];
 
   afterEach(() => {
     if (ORIGINAL_RECEIVER_PACKAGE === undefined) {
-      delete process.env[CLAWPERATOR_RECEIVER_PACKAGE_ENV_VAR];
+      delete process.env[CLAWPERATOR_OPERATOR_PACKAGE_ENV_VAR];
     } else {
-      process.env[CLAWPERATOR_RECEIVER_PACKAGE_ENV_VAR] = ORIGINAL_RECEIVER_PACKAGE;
+      process.env[CLAWPERATOR_OPERATOR_PACKAGE_ENV_VAR] = ORIGINAL_RECEIVER_PACKAGE;
     }
   });
 
-  it("returns CLAWPERATOR_RECEIVER_PACKAGE env var when set", () => {
-    process.env[CLAWPERATOR_RECEIVER_PACKAGE_ENV_VAR] = "com.clawperator.operator.dev";
+  it("returns CLAWPERATOR_OPERATOR_PACKAGE env var when set", () => {
+    process.env[CLAWPERATOR_OPERATOR_PACKAGE_ENV_VAR] = "com.clawperator.operator.dev";
     const result = resolveReceiverPackage();
     assert.strictEqual(result, "com.clawperator.operator.dev");
   });
 
   it("returns default release package when env var is not set", () => {
-    delete process.env[CLAWPERATOR_RECEIVER_PACKAGE_ENV_VAR];
+    delete process.env[CLAWPERATOR_OPERATOR_PACKAGE_ENV_VAR];
     const result = resolveReceiverPackage();
-    assert.strictEqual(result, DEFAULT_RECEIVER_PACKAGE);
+    assert.strictEqual(result, DEFAULT_OPERATOR_PACKAGE);
   });
 
   it("returns default when env var is empty string", () => {
-    process.env[CLAWPERATOR_RECEIVER_PACKAGE_ENV_VAR] = "";
+    process.env[CLAWPERATOR_OPERATOR_PACKAGE_ENV_VAR] = "";
     const result = resolveReceiverPackage();
-    assert.strictEqual(result, DEFAULT_RECEIVER_PACKAGE);
+    assert.strictEqual(result, DEFAULT_OPERATOR_PACKAGE);
   });
 });
 
 describe("runSkill env vars", () => {
   const ORIGINAL_BIN = process.env[CLAWPERATOR_BIN_ENV_VAR];
-  const ORIGINAL_RECEIVER_PACKAGE = process.env[CLAWPERATOR_RECEIVER_PACKAGE_ENV_VAR];
+  const ORIGINAL_RECEIVER_PACKAGE = process.env[CLAWPERATOR_OPERATOR_PACKAGE_ENV_VAR];
 
   afterEach(() => {
     if (ORIGINAL_BIN === undefined) {
@@ -1873,22 +1873,22 @@ describe("runSkill env vars", () => {
       process.env[CLAWPERATOR_BIN_ENV_VAR] = ORIGINAL_BIN;
     }
     if (ORIGINAL_RECEIVER_PACKAGE === undefined) {
-      delete process.env[CLAWPERATOR_RECEIVER_PACKAGE_ENV_VAR];
+      delete process.env[CLAWPERATOR_OPERATOR_PACKAGE_ENV_VAR];
     } else {
-      process.env[CLAWPERATOR_RECEIVER_PACKAGE_ENV_VAR] = ORIGINAL_RECEIVER_PACKAGE;
+      process.env[CLAWPERATOR_OPERATOR_PACKAGE_ENV_VAR] = ORIGINAL_RECEIVER_PACKAGE;
     }
   });
 
-  it("injects CLAWPERATOR_BIN and CLAWPERATOR_RECEIVER_PACKAGE into skill env", async () => {
+  it("injects CLAWPERATOR_BIN and CLAWPERATOR_OPERATOR_PACKAGE into skill env", async () => {
     // Test that runSkill accepts and passes the env parameter correctly
     const customEnv = {
       [CLAWPERATOR_BIN_ENV_VAR]: "/custom/bin/clawperator",
-      [CLAWPERATOR_RECEIVER_PACKAGE_ENV_VAR]: "com.test.package",
+      [CLAWPERATOR_OPERATOR_PACKAGE_ENV_VAR]: "com.test.package",
     };
     const result = await runSkill("com.test.env-echo", [], undefined, undefined, customEnv);
     assert.ok(result.ok, `Expected runSkill to succeed: ${"message" in result ? result.message : ""}`);
     assert.ok(result.output.includes("CLAWPERATOR_BIN:/custom/bin/clawperator"), `Expected CLAWPERATOR_BIN in output, got: ${result.output}`);
-    assert.ok(result.output.includes("CLAWPERATOR_RECEIVER_PACKAGE:com.test.package"), `Expected CLAWPERATOR_RECEIVER_PACKAGE in output, got: ${result.output}`);
+    assert.ok(result.output.includes("CLAWPERATOR_OPERATOR_PACKAGE:com.test.package"), `Expected CLAWPERATOR_OPERATOR_PACKAGE in output, got: ${result.output}`);
   });
 
   it("uses default values when env parameter is not provided", async () => {
@@ -1898,13 +1898,13 @@ describe("runSkill env vars", () => {
     assert.ok(result.ok, `Expected runSkill to succeed: ${"message" in result ? result.message : ""}`);
     // Without env parameter, these should be undefined (not injected by runSkill)
     assert.ok(result.output.includes("CLAWPERATOR_BIN:undefined"), `Expected CLAWPERATOR_BIN to be undefined when not passed, got: ${result.output}`);
-    assert.ok(result.output.includes("CLAWPERATOR_RECEIVER_PACKAGE:undefined"), `Expected CLAWPERATOR_RECEIVER_PACKAGE to be undefined when not passed, got: ${result.output}`);
+    assert.ok(result.output.includes("CLAWPERATOR_OPERATOR_PACKAGE:undefined"), `Expected CLAWPERATOR_OPERATOR_PACKAGE to be undefined when not passed, got: ${result.output}`);
   });
 });
 
 describe("CLI skills run env vars", () => {
   const ORIGINAL_BIN = process.env[CLAWPERATOR_BIN_ENV_VAR];
-  const ORIGINAL_RECEIVER_PACKAGE = process.env[CLAWPERATOR_RECEIVER_PACKAGE_ENV_VAR];
+  const ORIGINAL_RECEIVER_PACKAGE = process.env[CLAWPERATOR_OPERATOR_PACKAGE_ENV_VAR];
 
   afterEach(() => {
     if (ORIGINAL_BIN === undefined) {
@@ -1913,34 +1913,34 @@ describe("CLI skills run env vars", () => {
       process.env[CLAWPERATOR_BIN_ENV_VAR] = ORIGINAL_BIN;
     }
     if (ORIGINAL_RECEIVER_PACKAGE === undefined) {
-      delete process.env[CLAWPERATOR_RECEIVER_PACKAGE_ENV_VAR];
+      delete process.env[CLAWPERATOR_OPERATOR_PACKAGE_ENV_VAR];
     } else {
-      process.env[CLAWPERATOR_RECEIVER_PACKAGE_ENV_VAR] = ORIGINAL_RECEIVER_PACKAGE;
+      process.env[CLAWPERATOR_OPERATOR_PACKAGE_ENV_VAR] = ORIGINAL_RECEIVER_PACKAGE;
     }
   });
 
-  it("CLI skills run passes CLAWPERATOR_RECEIVER_PACKAGE via --receiver-package flag", async () => {
+  it("CLI skills run passes CLAWPERATOR_OPERATOR_PACKAGE via --receiver-package flag", async () => {
     const { stdout, code } = await runCli([
       "skills", "run", "com.test.env-echo", "--receiver-package", "com.clawperator.operator.dev", "--output", "json",
     ]);
     assert.strictEqual(code, 0, stdout);
     const parsed = JSON.parse(stdout) as { output?: string };
-    assert.ok(parsed.output?.includes("CLAWPERATOR_RECEIVER_PACKAGE:com.clawperator.operator.dev"), `Expected dev package in output, got: ${parsed.output}`);
+    assert.ok(parsed.output?.includes("CLAWPERATOR_OPERATOR_PACKAGE:com.clawperator.operator.dev"), `Expected dev package in output, got: ${parsed.output}`);
   });
 
-  it("CLI skills run uses CLAWPERATOR_RECEIVER_PACKAGE env var when flag is not provided", async () => {
+  it("CLI skills run uses CLAWPERATOR_OPERATOR_PACKAGE env var when flag is not provided", async () => {
     const { stdout, code } = await runCli(
       ["skills", "run", "com.test.env-echo", "--output", "json"],
       {
         env: {
           ...process.env,
-          CLAWPERATOR_RECEIVER_PACKAGE: "com.custom.operator.package",
+          CLAWPERATOR_OPERATOR_PACKAGE: "com.custom.operator.package",
         },
       }
     );
     assert.strictEqual(code, 0, stdout);
     const parsed = JSON.parse(stdout) as { output?: string };
-    assert.ok(parsed.output?.includes("CLAWPERATOR_RECEIVER_PACKAGE:com.custom.operator.package"), `Expected custom package in output, got: ${parsed.output}`);
+    assert.ok(parsed.output?.includes("CLAWPERATOR_OPERATOR_PACKAGE:com.custom.operator.package"), `Expected custom package in output, got: ${parsed.output}`);
   });
 
   it("CLI skills run --receiver-package flag takes precedence over env var", async () => {
@@ -1949,13 +1949,13 @@ describe("CLI skills run env vars", () => {
       {
         env: {
           ...process.env,
-          CLAWPERATOR_RECEIVER_PACKAGE: "env.package.value",
+          CLAWPERATOR_OPERATOR_PACKAGE: "env.package.value",
         },
       }
     );
     assert.strictEqual(code, 0, stdout);
     const parsed = JSON.parse(stdout) as { output?: string };
-    assert.ok(parsed.output?.includes("CLAWPERATOR_RECEIVER_PACKAGE:flag.package.value"), `Expected flag value in output, got: ${parsed.output}`);
+    assert.ok(parsed.output?.includes("CLAWPERATOR_OPERATOR_PACKAGE:flag.package.value"), `Expected flag value in output, got: ${parsed.output}`);
     assert.ok(!parsed.output?.includes("env.package.value"), `Should not contain env value, got: ${parsed.output}`);
   });
 });

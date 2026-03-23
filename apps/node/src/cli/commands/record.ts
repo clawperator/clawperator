@@ -20,7 +20,7 @@ export async function cmdRecordStart(options: {
     const execution = buildStartRecordingExecution(options.sessionId);
     const result = await runExecution(execution, {
       deviceId: options.deviceId,
-      receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_RECEIVER_PACKAGE,
+      receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
       warn: message => process.stderr.write(message),
       logger: options.logger,
     });
@@ -52,7 +52,7 @@ export async function cmdRecordStop(options: {
     const execution = buildStopRecordingExecution(options.sessionId);
     const result = await runExecution(execution, {
       deviceId: options.deviceId,
-      receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_RECEIVER_PACKAGE,
+      receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
       warn: message => process.stderr.write(message),
       logger: options.logger,
     });
@@ -85,7 +85,7 @@ export async function cmdRecordPull(options: {
     const config = getDefaultRuntimeConfig({
       logger: options.logger,
       deviceId: options.deviceId,
-      receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_RECEIVER_PACKAGE,
+      receiverPackage: options.receiverPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
     });
 
     const { localPath, sessionId } = await pullRecording(config, {

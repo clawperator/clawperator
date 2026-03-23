@@ -26,7 +26,7 @@ export async function cmdOperatorSetup(options: {
   logger?: Logger;
 }): Promise<string> {
   const receiverPackage =
-    options.receiverPackage ?? process.env.CLAWPERATOR_RECEIVER_PACKAGE;
+    options.receiverPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE;
   const config = getDefaultRuntimeConfig({
     deviceId: options.deviceId,
     receiverPackage,
