@@ -1281,6 +1281,22 @@ commit. `scroll-until` is the largest (new builder, new handler, selector
 around existing infrastructure. `--long`/`--focus`, `read --all`, and
 `wait --timeout` are single-flag additions to existing handlers.
 
+### Implementation notes for Phase 5 agents
+
+- **ActionParams type gap:** `expectedPackage`, `expectedNode`,
+  `timeoutMs` (action-level), and `labelMatcher` exist in the Zod
+  validation schema (`validateExecution.ts`) but are missing from the
+  TypeScript `ActionParams` interface (`contracts/execution.ts`). Add
+  them to `ActionParams` as part of `wait-for-nav` and `read-value`
+  work so builders stay fully typed. Do not cast around the type system.
+- **buildClickExecution signature:** `buildClickExecution()` in
+  `domain/actions/click.ts` currently takes only a `NodeMatcher`
+  parameter. Deliverable 4 (`--long`/`--focus`) requires adding an
+  optional `clickType` parameter to this builder.
+- **`logs` command does not exist yet:** The deferred `logs --follow`
+  design requires building an entirely new `logs` command, not just
+  adding a flag to an existing one.
+
 ### Testing
 
 - `scroll-until --text "About phone"` scrolls until element is visible
