@@ -123,7 +123,4 @@ without documentation. The snippet demonstrates: app launch, UI observation,
 text-based element targeting, scroll-until-found, conditional interaction -
 the full agent loop in 10 lines.
 
-Note: `scrollUntil` is currently in the API refactor's deferred items list.
-If it has not shipped by the time this update happens, replace that line with
-a `scroll("down")` + `click({ text: "Living room" })` pair. The snippet is
-still strong without it.
+Note: `scrollUntil` ships in the API refactor Phase 5A.

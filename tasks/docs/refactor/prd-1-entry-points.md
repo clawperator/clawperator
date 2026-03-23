@@ -71,7 +71,7 @@ The recommended first-run sequence across all guides must be consistent with the
 - All command examples must use the new flat command surface from the API
   refactor: `snapshot` not `observe snapshot`, `click --text` not
   `action click --selector`, `--device` not `--device-id`, `--json` not
-  `--output json`.
+  `--json`.
 
 Check `agent-quickstart.md`, `openclaw-first-run.md`, and `first-time-setup.md` for any remaining references to APK absence as advisory or old command forms. Update all three.
 
@@ -316,7 +316,7 @@ Inline `DoctorCheckResult` objects — construct in test body, no files needed:
 
 **T3 — doctor JSON output for `RECEIVER_NOT_INSTALLED` includes `fix.docsUrl`**
 - Method: call the readiness check function and inspect the returned object; or parse
-  `clawperator doctor --output json`
+  `clawperator doctor --json`
 - Expected: `check.fix.docsUrl` starts with `"https://"`
 - Protects: `docsUrl` in contract and renderer but never populated in the check
   definition; JSON reflects what is in the data
@@ -367,8 +367,8 @@ Inline `DoctorCheckResult` objects — construct in test body, no files needed:
 - All first-run guides describe APK absence as a blocking failure with the install command.
 - `contracts/doctor.ts`: `fix.docsUrl` is an optional field in the `DoctorCheckResult.fix` type.
 - `cli/commands/doctor.ts`: `renderCheck` renders `Docs: <url>` in pretty output when `fix.docsUrl` is set.
-- `clawperator doctor --output json` for `RECEIVER_NOT_INSTALLED` includes `fix.docsUrl`.
-- `clawperator doctor --output pretty` for `RECEIVER_NOT_INSTALLED` includes a `Docs:` line.
+- `clawperator doctor --json` for `RECEIVER_NOT_INSTALLED` includes `fix.docsUrl`.
+- `clawperator doctor` (pretty mode) for `RECEIVER_NOT_INSTALLED` includes a `Docs:` line.
 - Existing checks without `docsUrl` are unaffected (TypeScript `docsUrl?` optional).
 - `./scripts/operator_event.sh` exists, exits 0, and emits a detectable stderr notice (stub) OR has confirmed behavior from OpenClaw review.
 - OpenClaw review outcome is documented before merging the stub.

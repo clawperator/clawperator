@@ -525,7 +525,7 @@ but leaves the codebase harder to maintain after the refactor than before it.
      /** Help group for --help display (e.g. "Device Interaction", "Device Management"). */
      group: string;
      /** The handler function. See HandlerContext below. */
-     handler: (ctx: HandlerContext) => Promise<string>;
+     handler: (ctx: HandlerContext) => Promise<string | void>;
    }
 
    const COMMANDS: Record<string, CommandDef> = { ... };
@@ -561,7 +561,7 @@ but leaves the codebase harder to maintain after the refactor than before it.
                                // snapshot, screenshot, skills run
    };
 
-   handler: (ctx: HandlerContext) => Promise<string>;
+   handler: (ctx: HandlerContext) => Promise<string | void>;
    ```
 
    `rest` stays as the raw string array. Each handler extracts what it
@@ -569,6 +569,15 @@ but leaves the codebase harder to maintain after the refactor than before it.
    today. Do not invent a parsed-args abstraction in this phase - that
    adds scope without reducing risk. Phase 2 can refine the handler
    contract when adding positional arg parsing.
+
+   **Long-running command escape hatch:** The return type is
+   `Promise<string | void>`. Most handlers return a string that the
+   dispatcher prints to stdout. `serve` is the exception: `cmdServe`
+   returns `Promise<void>` (parks the process via a never-resolving
+   promise after starting the HTTP server). The dispatcher must check
+   the return value - if `void`, skip the `console.log(result)` path.
+   This matches the current special-case in `index.ts` where the
+   `serve` branch returns early.
 
 2. **Migrate existing commands onto the registry**
 
