@@ -1478,6 +1478,12 @@ change as a precondition for the latter two.
 
 Docs work (`tasks/docs/refactor/`) begins only after Phase 5 is complete.
 
+`docs/design/node-api-design.md` contains a "Shipped Commands" section
+and an "Agent-Friendly Command Surface" section that describe the current
+CLI surface. These must be updated to reflect the new command surface once
+the API refactor phases have landed. This is part of the docs refactor
+work, not a task for the API refactor implementing agents.
+
 ---
 
 ## What Success Looks Like

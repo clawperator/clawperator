@@ -390,17 +390,19 @@ Migration policy:
 ## Agent-Friendly Command Surface
 
 Because agents are the primary consumers, the CLI command surface must be
-optimized for first-contact guessability. Design principles, naming rules,
-synonym policy, and a pre-merge checklist for new commands and flags are in:
+optimized for first-contact guessability.
 
-- `docs/design/node-api-design-guiding-principles.md`
+Key principles:
+1. Canonical form is stored and logged.
+2. Aliases are input-only conveniences accepted by the parser but not
+   featured in documentation.
+3. Alias table is explicit and versioned (no fuzzy guessing in parser).
 
-The API refactoring plan that restructures the CLI surface is tracked in:
+Design principles, naming rules, synonym policy, and a pre-merge checklist
+for new commands and flags are in `docs/design/node-api-design-guiding-principles.md`.
 
-- `tasks/api/refactor/plan.md`
-
-Note: the "Shipped Commands" section above reflects the current CLI surface.
-It will be updated when the API refactor lands.
+Note: the "Shipped Commands" section above reflects the current CLI surface
+and will be updated as the command surface evolves.
 
 ## Node Module Structure
 
