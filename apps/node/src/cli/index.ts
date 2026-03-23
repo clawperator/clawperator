@@ -34,8 +34,8 @@ function getGlobalOpts(argv: string[]): {
     } else if (argv[i] === "--device" && argv[i + 1]) {
       // --device is the new canonical for --device-id (old name still works)
       deviceId = argv[++i];
-    } else if (argv[i] === "--operator-package" && argv[i + 1]) {
-      // --operator-package is an alias for --operator-package (old name still works)
+    } else if (argv[i] === "--receiver-package" && argv[i + 1]) {
+      // --receiver-package is an alias for --operator-package (old name still works)
       operatorPackage = argv[++i];
     } else if (argv[i] === "--operator-package" && argv[i + 1]) {
       operatorPackage = argv[++i];
