@@ -314,10 +314,11 @@ Usage:
   clawperator open <uri>               Open a deep link
 
 Options:
-  --app <package>      Explicitly open as Android app package (override for ambiguous cases)
+  --app <target>       Same as a single positional target (package, URL, or URI)
 
 Notes:
-  - Target detection: https?:// or any *:// scheme -> URI, otherwise -> package name.
+  - Target detection: if the value contains a URI scheme (*://), it uses open_uri; otherwise open_app.
+  - --app does not force the app path: a URL or deep link passed with --app still opens as a URI.
   - Synonyms: open-uri, open-url (accepted, not in help)
 `;
 
@@ -755,17 +756,7 @@ COMMANDS["open"] = {
           "open requires a target.\n\nUsage:\n  clawperator open <package-id>       Open an Android app\n  clawperator open <url>              Open a URL in browser\n  clawperator open <uri>              Open a deep link\n\nExamples:\n  clawperator open com.android.settings\n  clawperator open https://example.com",
       });
     }
-    if (appFlag || !/[a-z][a-z0-9+\-.]*:\/\//i.test(target)) {
-      // Explicit --app flag, or no URI scheme detected: treat as package name
-      return (await import("./commands/action.js")).cmdActionOpenApp({
-        format,
-        applicationId: target,
-        deviceId,
-        operatorPackage,
-        logger,
-      });
-    } else {
-      // Has a URI scheme (https://, myapp://, etc.): treat as URI
+    if (isOpenCliUriTarget(target)) {
       return (await import("./commands/action.js")).cmdActionOpenUri({
         format,
         uri: target,
@@ -774,6 +765,13 @@ COMMANDS["open"] = {
         logger,
       });
     }
+    return (await import("./commands/action.js")).cmdActionOpenApp({
+      format,
+      applicationId: target,
+      deviceId,
+      operatorPackage,
+      logger,
+    });
   },
 };
 
@@ -1298,6 +1296,11 @@ COMMANDS["version"] = {
 // ---------------------------------------------------------------------------
 // Helper functions
 // ---------------------------------------------------------------------------
+
+/** True when the open command should use open_uri (target string contains a URI scheme). */
+export function isOpenCliUriTarget(target: string): boolean {
+  return /[a-z][a-z0-9+\-.]*:\/\//i.test(target);
+}
 
 export function levenshtein(a: string, b: string): number {
   const m = a.length;

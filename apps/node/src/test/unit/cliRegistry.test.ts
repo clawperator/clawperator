@@ -3,7 +3,13 @@ import assert from "node:assert";
 import { spawn } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { COMMANDS, levenshtein, didYouMean, barePositionalTokens } from "../../cli/registry.js";
+import {
+  COMMANDS,
+  levenshtein,
+  didYouMean,
+  barePositionalTokens,
+  isOpenCliUriTarget,
+} from "../../cli/registry.js";
 
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "../../..");
 
@@ -63,6 +69,19 @@ describe("COMMANDS registry consistency", () => {
         );
       }
     }
+  });
+});
+
+describe("isOpenCliUriTarget", () => {
+  it("returns true for http(s) and custom schemes", () => {
+    assert.strictEqual(isOpenCliUriTarget("https://example.com"), true);
+    assert.strictEqual(isOpenCliUriTarget("http://example.com"), true);
+    assert.strictEqual(isOpenCliUriTarget("myapp://path"), true);
+  });
+
+  it("returns false for Android package ids and bare hosts", () => {
+    assert.strictEqual(isOpenCliUriTarget("com.android.settings"), false);
+    assert.strictEqual(isOpenCliUriTarget("example.com"), false);
   });
 });
 

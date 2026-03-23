@@ -16,7 +16,7 @@ npm --prefix apps/node run build
 # NOTE: Do not commit personal device serials to this repository.
 export DEVICE_ID="${DEVICE_ID:-}"
 
-# 2) Set receiver package (edit if needed)
+# 2) Set operator package (edit if needed)
 export CLAWPERATOR_OPERATOR_PACKAGE="${CLAWPERATOR_OPERATOR_PACKAGE:-com.clawperator.operator.dev}"
 # 3) Baseline app package should be broadly available on Android devices.
 export BASELINE_APP_PACKAGE="${BASELINE_APP_PACKAGE:-com.android.settings}"
@@ -61,7 +61,7 @@ PACKAGES_JSON="$("${CLI[@]}" packages list --device "$DEVICE_ID" --third-party -
 echo "$PACKAGES_JSON" | node -e 'const d=JSON.parse(require("fs").readFileSync(0,"utf8")); console.log(JSON.stringify(d, null, 2));'
 
 if ! echo "$PACKAGES_JSON" | grep -q "\"$CLAWPERATOR_OPERATOR_PACKAGE\""; then
-  echo "ERROR: receiver package not found in packages list: $CLAWPERATOR_OPERATOR_PACKAGE" >&2
+  echo "ERROR: operator package not found in packages list: $CLAWPERATOR_OPERATOR_PACKAGE" >&2
   exit 1
 fi
 # Baseline may be system app (e.g. com.android.settings); check full list if not in third-party
@@ -72,7 +72,7 @@ if ! echo "$PACKAGES_JSON" | grep -q "\"$BASELINE_APP_PACKAGE\""; then
     exit 1
   fi
 fi
-echo "Package precheck passed: receiver + baseline app present."
+echo "Package precheck passed: operator package + baseline app present."
 
 # 5) Minimal direct execute (close/open/sleep/snapshot)
 SMOKE_JSON="/tmp/clawperator-smoke-exec.json"
