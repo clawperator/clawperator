@@ -102,7 +102,7 @@ async function main(): Promise<void> {
   }
   const [cmd, ...rest] = global.rest;
   if (cmd === undefined) {
-    console.log(generateTopLevelHelp(COMMANDS));
+    console.log(JSON.stringify({ code: "USAGE", message: "Use --help for available commands." }));
     process.exit(0);
   }
   const out = { format: global.output as "json" | "pretty", verbose: global.verbose };
@@ -115,21 +115,25 @@ async function main(): Promise<void> {
   let usageParseError = false;
 
   try {
-    const def = COMMANDS[cmd] ?? Object.values(COMMANDS).find((c) => c.synonyms?.includes(cmd));
-    if (def) {
-      const ctx: HandlerContext = {
-        argv,
-        rest,
-        format: out.format,
-        verbose: out.verbose,
-        logger,
-        deviceId: global.deviceId,
-        receiverPackage: global.receiverPackage,
-        timeoutMs: global.timeoutMs,
-      };
-      result = await def.handler(ctx);
+    if (!cmd) {
+      result = JSON.stringify({ code: "USAGE", message: "Use --help for available commands." });
     } else {
-      result = didYouMean(cmd, COMMANDS);
+      const def = COMMANDS[cmd] ?? Object.values(COMMANDS).find((c) => c.synonyms?.includes(cmd));
+      if (def) {
+        const ctx: HandlerContext = {
+          argv,
+          rest,
+          format: out.format,
+          verbose: out.verbose,
+          logger,
+          deviceId: global.deviceId,
+          receiverPackage: global.receiverPackage,
+          timeoutMs: global.timeoutMs,
+        };
+        result = await def.handler(ctx);
+      } else {
+        result = didYouMean(cmd, COMMANDS);
+      }
     }
   } catch (error) {
     if (error instanceof UsageError) {

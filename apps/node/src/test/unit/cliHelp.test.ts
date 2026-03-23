@@ -134,6 +134,15 @@ describe("CLI help", () => {
     assert.match(stdout, /execute --execution <json-or-file> \[--validate-only\]/);
   });
 
+  it("does not print top-level help when only --json is supplied", async () => {
+    const { stdout, code } = await runCli(["--json"]);
+    assert.strictEqual(code, 0);
+    const obj = JSON.parse(stdout);
+    assert.strictEqual(obj.code, "USAGE");
+    assert.match(obj.message, /--help/);
+    assert.doesNotMatch(stdout, /Clawperator CLI/);
+  });
+
   it("shows skills sync help instead of top-level help", async () => {
     const { stdout, code } = await runCli(["skills", "sync", "--help"]);
     assert.strictEqual(code, 0);

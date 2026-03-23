@@ -98,6 +98,16 @@ describe("flag aliases - --json sets output to json", () => {
   });
 });
 
+describe("missing command after global flags", () => {
+  it("returns USAGE instead of crashing when only global flags are supplied", async () => {
+    const { stdout, code } = await runCli(["--json"]);
+    assert.strictEqual(code, 0);
+    const obj = JSON.parse(stdout);
+    assert.strictEqual(obj.code, "USAGE");
+    assert.match(obj.message, /--help/);
+  });
+});
+
 describe("flag aliases - --timeout works like --timeout-ms", () => {
   it("--timeout nope produces EXECUTION_VALIDATION_FAILED", async () => {
     const { stdout, code } = await runCli(["observe", "snapshot", "--timeout", "nope"]);
