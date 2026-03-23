@@ -1207,6 +1207,14 @@ Finalize the developer and agent experience.
    - Missing device in multi-device setup: list connected devices with retry
      command showing `--device` flag
    - Validation error: include task-oriented hint, not just schema path
+   - **Pretty vs JSON errors:** Several handlers return a pre-stringified JSON
+     object on stdout (for example `makeMissingSelectorError` for
+     `MISSING_SELECTOR`, and inline `JSON.stringify` for `MISSING_ARGUMENT` and
+     similar). That output is logged as-is and does not go through
+     `format` / `formatError`, so users in default (non-`--json`) / pretty mode
+     still see a JSON line for those failures. Phase 4 error polish may unify
+     this so structured errors respect output format the same way validation and
+     execution errors already do, if desired.
 
 3. **Update HTTP API routes (`serve`)**
 
