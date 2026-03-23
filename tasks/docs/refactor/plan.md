@@ -92,3 +92,38 @@ Note: PRD-1's `scripts/operator_event.sh` stub (section 4) is unrelated to the
 API refactor and could proceed independently if desired. It is kept in PRD-1
 because it is a small deliverable that fits naturally with the other entry-point
 work, but it has no dependency on the CLI command surface.
+
+---
+
+## Landing Page Update (blocked on API refactor)
+
+After the API refactor ships, update the agent loop pseudocode on the landing
+page (`sites/landing/app/page.js`, the `.loop-example` section). The current
+pseudocode uses invented syntax (`open_app()`, `snapshot_ui()`,
+`scroll_and_click()`) that does not reflect the actual API and undersells the
+product.
+
+Target replacement:
+
+```javascript
+const clawperator = require("clawperator");
+await clawperator.open("com.google.home");
+let ui = await clawperator.snapshot();
+await clawperator.click({ text: "Climate" });
+ui = await clawperator.snapshot();
+await clawperator.scrollUntil({ text: "Living room", click: true });
+ui = await clawperator.snapshot();
+if (ui.nodes.find(n => n.text === "Off")) {
+  await clawperator.click({ text: "Turn on" });
+}
+```
+
+This is real Node API code, not pseudocode. Every line is self-explanatory
+without documentation. The snippet demonstrates: app launch, UI observation,
+text-based element targeting, scroll-until-found, conditional interaction -
+the full agent loop in 10 lines.
+
+Note: `scrollUntil` is currently in the API refactor's deferred items list.
+If it has not shipped by the time this update happens, replace that line with
+a `scroll("down")` + `click({ text: "Living room" })` pair. The snippet is
+still strong without it.

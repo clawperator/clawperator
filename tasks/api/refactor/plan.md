@@ -1,5 +1,23 @@
 # API Refactor Plan
 
+## Contents
+
+- [Before and After](#before-and-after)
+- [Design Decisions](#design-decisions)
+- [Implementation Context](#implementation-context)
+- [Implementation Discipline](#implementation-discipline)
+- [Phase 0: Infrastructure and Compatibility](#phase-0-infrastructure-and-compatibility)
+- [Phase 1: CLI Architecture (COMMANDS Registry)](#phase-1-cli-architecture-commands-registry)
+- [Phase 2: Command Surface Refactor](#phase-2-command-surface-refactor)
+- [Phase 3: Selector Flags](#phase-3-selector-flags)
+- [Phase 4: Help, Errors, and Polish](#phase-4-help-errors-and-polish)
+- [Skills Migration Strategy](#skills-migration-strategy)
+- [Sequencing](#sequencing)
+- [What Success Looks Like](#what-success-looks-like)
+- [Items Considered and Deferred](#items-considered-and-deferred)
+
+---
+
 Origin: Agent UX review session (2026-03-23). An independent agent was given the
 current API docs cold and asked to propose the ideal command surface. The feedback
 confirmed that the `action`/`observe` namespace nesting, JSON-only selectors, and
