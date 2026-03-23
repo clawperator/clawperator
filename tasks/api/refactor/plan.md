@@ -186,22 +186,31 @@ The CLI uses **hand-rolled argument parsing** - there is no external CLI
 framework (no Yargs, Commander, or similar). All infrastructure described below
 must be built from scratch in `apps/node/src/cli/index.ts`.
 
-Key functions the implementing agent must understand before starting:
+Key functions the implementing agent must understand before starting (line
+numbers are approximate - search by function name, not line number, as other
+merges may shift offsets):
 
-- `getGlobalOpts(argv)` (index.ts:335-380): manually iterates argv, extracts
-  `--device-id`, `--receiver-package` (renamed to `--operator-package`),
-  `--output`/`--format`, `--timeout-ms`,
-  `--log-level`, `--verbose`. Everything else goes into `rest[]`.
-- `getOpt(rest, flag)` (index.ts:382-385): simple `rest.indexOf(flag)` lookup.
-- `hasFlag(rest, flag)` (index.ts:438-440): boolean `rest.includes(flag)`.
-- `resolveHelpTopic(rest)` (index.ts:313-333): maps command paths like
-  `["observe", "snapshot"]` to `HELP_TOPICS` keys. Must be updated when commands
-  are renamed or promoted.
-- `HELP` constant (index.ts:9-119): hardcoded template literal, ~110 lines.
-- `HELP_TOPICS` record (index.ts:121-330): hardcoded per-command help strings.
-- Command dispatch: giant `switch (cmd)` at index.ts:481-888.
-- Exit code logic (index.ts:903-908): parses JSON result to determine exit code.
-  Currently, USAGE errors from switch cases produce exit code 0 in most paths.
+- `getGlobalOpts(argv)`: manually iterates argv, extracts `--device-id`,
+  `--receiver-package` (renamed to `--operator-package`),
+  `--output`/`--format`, `--timeout-ms`, `--log-level`, `--verbose`.
+  Everything else goes into `rest[]`.
+- `getOpt(rest, flag)`: simple `rest.indexOf(flag)` lookup.
+- `hasFlag(rest, flag)`: boolean `rest.includes(flag)`.
+- `resolveHelpTopic(rest)`: maps command paths like `["observe", "snapshot"]`
+  to `HELP_TOPICS` keys. Must be updated when commands are renamed or promoted.
+- `HELP` constant: hardcoded template literal near top of file.
+- `HELP_TOPICS` record: hardcoded per-command help strings, follows `HELP`.
+- Command dispatch: giant `switch (cmd)` in `main()`.
+- Exit code logic: at the end of `main()`, parses JSON result to determine
+  exit code. Currently, USAGE errors from switch cases produce exit code 0
+  in most paths.
+- **Early intercepts in `main()`**: before global opts parsing and the switch,
+  `main()` handles three special cases: empty argv (prints HELP, exits 0),
+  `argv[0] === "help"` (prints HELP, exits 0), and `--version` (prints
+  version, exits 0). These are not part of the switch and should remain as
+  early intercepts in Phase 1 - do not move them into the registry. They
+  execute before `getGlobalOpts()` runs and are intentionally outside the
+  normal dispatch path.
 
 Consequences for this refactor:
 
@@ -1017,6 +1026,7 @@ Finalize the developer and agent experience.
      Execution:
        execute               Run a full execution payload
        skills                Skill operations
+       serve                 Start HTTP API server
 
      Recording:
        recording, record     Session recording
