@@ -101,6 +101,10 @@ async function main(): Promise<void> {
     process.exit(0);
   }
   const [cmd, ...rest] = global.rest;
+  if (cmd === undefined) {
+    console.log(generateTopLevelHelp(COMMANDS));
+    process.exit(0);
+  }
   const out = { format: global.output as "json" | "pretty", verbose: global.verbose };
   const logger = createLogger({
     logDir: process.env.CLAWPERATOR_LOG_DIR,

@@ -790,7 +790,7 @@ Usage:
         const scriptArgs: string[] = [];
         const resolvedDeviceId = deviceId ?? getOpt(optSegment, "--device-id");
         const resolvedReceiverPackage = receiverPackage ?? getOpt(optSegment, "--receiver-package");
-        const localTimeoutMs = getNumberOpt(rawOptSegment, "--timeout-ms");
+        const localTimeoutMs = getNumberOpt(rawOptSegment, "--timeout-ms") ?? getNumberOpt(rawOptSegment, "--timeout");
         const effectiveTimeoutMs = localTimeoutMs ?? timeoutMs;
         const invalidTimeoutResult = getInvalidTimeoutResult(effectiveTimeoutMs, { format });
         if (invalidTimeoutResult) {
