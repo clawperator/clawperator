@@ -402,8 +402,12 @@ Low. Infrastructure only. No behavior changes visible to current callers.
 
 Phase 0 is deliberately thin. Its purpose is to make Phase 1 safe, not to be a
 standalone deliverable. If the implementing agent finds Phase 0 and Phase 1
-naturally collapse into one PR, that is acceptable. The separation exists for
-planning clarity, not as a hard PR boundary.
+naturally collapse into one PR, that is acceptable - and likely preferable,
+since Phase 1 replaces the "did you mean?" hardcoded mappings with
+registry-derived lookup. Building the hardcoded version in Phase 0 only to
+replace it in Phase 1 is wasted work if both land together. The separation
+exists for planning clarity, not as a hard PR boundary. The flag alias
+infrastructure from Phase 0 survives into Phase 1 unchanged.
 
 ---
 
@@ -456,8 +460,8 @@ but leaves the codebase harder to maintain after the refactor than before it.
      requiresSelector?: boolean;
      /** Help group for --help display (e.g. "Device Interaction", "Device Management"). */
      group: string;
-     /** The handler function. */
-     handler: (args: ParsedArgs, opts: GlobalOpts) => Promise<string>;
+     /** The handler function. See HandlerContext below. */
+     handler: (ctx: HandlerContext) => Promise<string>;
    }
 
    const COMMANDS: Record<string, CommandDef> = { ... };
@@ -474,6 +478,31 @@ but leaves the codebase harder to maintain after the refactor than before it.
    The exact interface shape is a suggestion. The implementing agent may
    adjust field names or add fields as needed. The constraint is: **one
    definition per command, everything else derived.**
+
+   **Handler signature:** The current switch cases close over `rest` (the
+   remaining argv after global opts), `outWithLogger` (format + logger),
+   and `global` (parsed global flags including `deviceId`,
+   `receiverPackage`). The handler signature must thread these through.
+   The simplest correct approach:
+
+   ```typescript
+   type HandlerContext = {
+     rest: string[];           // remaining argv after command name
+     format: "json" | "pretty";
+     verbose: boolean;
+     logger: Logger;
+     deviceId?: string;
+     receiverPackage?: string;
+   };
+
+   handler: (ctx: HandlerContext) => Promise<string>;
+   ```
+
+   `rest` stays as the raw string array. Each handler extracts what it
+   needs via `getOpt(rest, ...)` and `hasFlag(rest, ...)`, exactly as
+   today. Do not invent a parsed-args abstraction in this phase - that
+   adds scope without reducing risk. Phase 2 can refine the handler
+   contract when adding positional arg parsing.
 
 2. **Migrate existing commands onto the registry**
 
@@ -500,6 +529,35 @@ but leaves the codebase harder to maintain after the refactor than before it.
    subcommand dispatch internally. The registry routes to the top-level
    handler; subcommand routing stays inside the handler.
 
+   **Concrete example - migrating `devices`:**
+
+   Before (switch case in index.ts:521-523):
+   ```typescript
+   case "devices":
+     result = await (await import("./commands/devices.js")).cmdDevices(outWithLogger);
+     break;
+   ```
+
+   After (registry entry):
+   ```typescript
+   devices: {
+     name: "devices",
+     summary: "List connected devices",
+     help: "List all connected Android devices.\n\nUsage:\n  clawperator devices [--json]",
+     group: "Device Management",
+     handler: async (ctx) => {
+       return (await import("./commands/devices.js")).cmdDevices({
+         format: ctx.format,
+         verbose: ctx.verbose,
+         logger: ctx.logger,
+       });
+     },
+   },
+   ```
+
+   The handler is a thin wrapper that maps `HandlerContext` to the
+   existing command function's expected arguments. No logic changes.
+
 3. **Replace the switch statement with registry-driven dispatch**
 
    The ~400-line switch becomes approximately:
@@ -509,7 +567,7 @@ but leaves the codebase harder to maintain after the refactor than before it.
      Object.values(COMMANDS).find(c => c.synonyms?.includes(cmd));
 
    if (def) {
-     result = await def.handler(parsedArgs, globalOpts);
+     result = await def.handler(ctx);
    } else {
      result = didYouMean(cmd, COMMANDS);
    }
@@ -519,16 +577,45 @@ but leaves the codebase harder to maintain after the refactor than before it.
    adding a registry entry and a handler function. No switch branch, no
    HELP_TOPICS entry, no resolveHelpTopic mapping.
 
+   **`--help` routing:** Currently, `--help` is intercepted at
+   index.ts:464-468 before the switch, using `resolveHelpTopic()` to map
+   command paths to HELP_TOPICS keys. With the registry, this becomes:
+
+   ```typescript
+   if (argv.includes("--help")) {
+     const def = COMMANDS[cmd] ??
+       Object.values(COMMANDS).find(c => c.synonyms?.includes(cmd));
+     console.log(def ? def.help : generateTopLevelHelp(COMMANDS));
+     process.exit(0);
+   }
+   ```
+
+   For namespaced commands (`operator setup --help`, `skills list --help`),
+   the handler itself checks for `--help` in `rest` and returns its
+   subcommand help text. The registry's `help` field covers the top-level
+   help (e.g., `clawperator operator --help` lists subcommands), not
+   individual subcommand help. This matches the current behavior where
+   `resolveHelpTopic` maps `["operator", "setup"]` to a specific topic.
+
+   **Exit code contract:** The `usageParseError` flag and the exit code
+   logic at index.ts:899-908 live outside the switch and are unchanged by
+   this refactor. The try/catch around dispatch catches `UsageError`, sets
+   `usageParseError = true`, and produces JSON. The post-dispatch exit
+   code logic parses the JSON result to set `process.exitCode`. Both of
+   these wrap the registry dispatch the same way they wrapped the switch.
+   Do not refactor the exit code logic in this phase.
+
 4. **Replace static HELP/HELP_TOPICS with generated help text**
 
    Top-level `--help` is generated from registry entries grouped by the
-   `group` field. Per-command `--help` is generated from the `help` field
-   and `positional`/`requiresSelector` metadata.
+   `group` field. Per-command `--help` uses the `help` field directly.
+   `resolveHelpTopic()` is deleted - the registry replaces it.
 
-   The generated output must match the target help structure from Phase 4
-   (see Phase 4, deliverable 1 for the target format). But the content at
-   this point still reflects the pre-promotion command surface (old command
-   names). Phase 2 will add the promoted commands to the registry.
+   The generated top-level help output should roughly match the target
+   structure from Phase 4 (see Phase 4, deliverable 1 for the format).
+   But the content at this point still reflects the pre-promotion command
+   surface (old command names). Phase 2 will add the promoted commands to
+   the registry.
 
 5. **Derive "did you mean?" from the registry**
 
