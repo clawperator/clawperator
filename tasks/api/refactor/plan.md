@@ -1916,7 +1916,7 @@ edit or replace the plan above, which stays the original design record.
 | Phase 0 | Done | Infrastructure and compatibility work merged per plan |
 | Phase 1 | Done | `COMMANDS` registry and registry-driven dispatch in `apps/node/src/cli/` |
 | Phase 2 | Done | Flat verbs, global flags, `action` / `observe` removed from registry with did-you-mean, docs and smoke updates |
-| Phase 3 | Not done | Selector shorthand flags (`--text`, `--id`, `--desc`) still future work |
+| Phase 3 | Done | Selector shorthand flags (`--text`, `--id`, `--desc`, `--role`, `--text-contains`, `--desc-contains`) on click/type/read/wait; `--container-*` on scroll; Phase 3 MISSING_SELECTOR help text; docs updated |
 | Phase 4 | Partial | Exit-code and help polish in flight; full deliverable set not complete |
 | Phase 5 | Not done | Extended commands as specified in plan |
 
@@ -1941,10 +1941,10 @@ edit or replace the plan above, which stays the original design record.
    **As-built:** synonyms are `synonyms` arrays on `CommandDef` entries in the
    registry.
 
-4. **Phase 4 testing checklist**  
-   When verifying this branch, do not assume Phase 3 selector shorthands appear on
-   `clawperator click --help` yet. Until Phase 3 lands, missing-selector guidance
-   remains JSON `--selector` oriented, per Phase 2 failure-mode text in the plan.
+4. **Phase 4 testing checklist**
+   Phase 3 is now complete. `clawperator click --help` shows the full selector flag
+   list (--text, --id, --role, --desc, etc.). Missing-selector guidance uses the
+   Phase 3 format with the full flag list and examples.
 
 5. **`execute` vs `exec`**  
    The plan schedules renaming `execute` to `exec` in Phase 5. **As implemented

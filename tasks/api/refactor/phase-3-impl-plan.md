@@ -296,6 +296,44 @@ Do NOT push unless explicitly asked.
 Update tasks/api/refactor/phase-3-impl-plan.md as you make progress. Refer back to tasks/api/refactor/phase-3-impl-plan.md as necessary.
 
 
+=== PHASE 3 STATUS: COMPLETE ===
+
+All deliverables implemented and verified (2026-03-24):
+
+1. Selector flags: --text, --text-contains, --id, --desc, --desc-contains, --role
+   added to click/tap, type/fill, read, wait. --selector remains as advanced option.
+   Mutual exclusion enforced. Blank strings rejected.
+
+2. Container flags: --container-text, --container-text-contains, --container-id,
+   --container-desc, --container-desc-contains, --container-role, --container-selector
+   added to scroll. Mutual exclusion enforced.
+
+3. Missing-selector errors updated to Phase 3 format with full flag list on all
+   element-targeting commands.
+
+4. Help text updated for click, type, read, wait, scroll. Docs updated and regenerated.
+
+5. --submit and --clear verified working on type command.
+
+Commits on api-refactor/phase-3:
+- feat(cli): Phase 3 selector flag parsing (resolveElementMatcherFromCli) [66e183f]
+- test(cli): unit tests for selector flag resolution [d3af273]
+- feat(cli): wire selector flags to click, type, read, wait; container flags to scroll [f30360b]
+- docs: update selector flag reference and regenerate docs site [1dd9d0b]
+
+Skill verification:
+- capture-overview on emulator-5554: PASS
+- search-app on <physical-device-serial>: PASS (Path: direct, App: VLC for Android)
+- get-battery on <physical-device-serial>: PASS (SolaX battery level: 11.0%)
+
+Skills were NOT migrated to flat calls per migration decision guide:
+- capture-overview: uses execute payload, passes cleanly, no migration needed now
+- search-app: complex branching, left on execute payload per recommendation
+- get-battery: uses execute payload with resource IDs, passes cleanly
+
+Test count: 539 (494 existing + 45 new Phase 3 tests), 0 failures.
+
+
 === VALIDATION SEQUENCE ===
 
 For each change, validate before committing:
