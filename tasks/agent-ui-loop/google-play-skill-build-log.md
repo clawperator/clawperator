@@ -427,11 +427,12 @@ First execution attempt omitted `id` in action objects. Got:
 ```
 Every action needs an `id` string field.
 
-### Issue 3: `observe snapshot` CLI vs execute
+### Issue 3: Snapshot via CLI vs `execute` + `snapshot_ui`
 
-The `clawperator observe snapshot` subcommand routes through a different code path and
-returned empty results initially (possibly due to the global CLI bug). Switched to
-using `execute` with `snapshot_ui` action, which worked with the local build.
+During this workstream, ad-hoc snapshot via the old nested `observe snapshot` spelling
+was unreliable with the then-current CLI. The stable path was `execute` with a
+`snapshot_ui` action. The shipped surface is now flat: use `clawperator snapshot` for
+the same pipeline as `snapshot_ui`, or keep using `execute` for multi-step payloads.
 
 ### Issue 4: No `StepResult.error` field at top level
 

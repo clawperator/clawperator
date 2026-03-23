@@ -112,16 +112,16 @@ describe("CLI help", () => {
     assert.match(obj.message, /operator setup/);
   });
 
-  it("observe snapshot --help falls back to top-level help", async () => {
-    // observe snapshot is removed; --help with an unknown command falls back to top-level help.
+  it("legacy nested `observe snapshot --help` falls back to top-level help", async () => {
+    // Nested observe is removed; --help with an unknown command falls back to top-level help.
     const { stdout, code } = await runCli(["observe", "snapshot", "--help"]);
     assert.strictEqual(code, 0);
     assert.match(stdout, /Clawperator CLI/);
     assert.match(stdout, /Commands:/);
   });
 
-  it("observe screenshot --help falls back to top-level help", async () => {
-    // observe screenshot is removed; --help with an unknown command falls back to top-level help.
+  it("legacy nested `observe screenshot --help` falls back to top-level help", async () => {
+    // Nested observe is removed; --help with an unknown command falls back to top-level help.
     const { stdout, code } = await runCli(["observe", "screenshot", "--help"]);
     assert.strictEqual(code, 0);
     assert.match(stdout, /Clawperator CLI/);
@@ -134,7 +134,7 @@ describe("CLI help", () => {
     assert.match(stdout, /execute --execution <json-or-file> \[--validate-only\]/);
   });
 
-  it("execute best-effort points at snapshot not observe snapshot (exit 0)", async () => {
+  it("execute best-effort points at flat `snapshot`, not nested `observe snapshot` (exit 0)", async () => {
     const { stdout, code } = await runCli(["execute", "best-effort", "--goal", "test-goal"]);
     assert.strictEqual(code, 0, stdout);
     const obj = JSON.parse(stdout) as { code?: string; message?: string; goal?: string };
@@ -342,8 +342,8 @@ describe("operator setup CLI output", () => {
     assert.strictEqual(obj.code, "OPERATOR_APK_NOT_FOUND");
   });
 
-  it("observe screenshot returns UNKNOWN_COMMAND redirect to screenshot", async () => {
-    // observe screenshot is removed; any invocation (including with flags) gets the migration message.
+  it("nested `observe screenshot` returns UNKNOWN_COMMAND redirect to `screenshot`", async () => {
+    // Nested observe is removed; any invocation (including with flags) gets the migration message.
     const { stdout, code } = await runCli(["observe", "screenshot", "--path"]);
     assert.strictEqual(code, 1, stdout);
     const obj = JSON.parse(stdout) as { code?: string; message?: string; suggestion?: string };

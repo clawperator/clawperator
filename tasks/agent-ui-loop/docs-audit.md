@@ -177,24 +177,27 @@ automation must handle.
 
 ---
 
-### ISSUE-07: `observe snapshot` vs `execute` + `snapshot_ui` behavior not explained
+### ISSUE-07: Flat `snapshot` CLI vs `execute` + `snapshot_ui` behavior not explained
 
-**Problem:** The CLI reference lists both `observe snapshot` (a subcommand) and
-`snapshot_ui` (an action type within `execute`). The docs do not explain the relationship
-between them, how they differ internally, or when to use one vs. the other.
+**Problem (historical wording):** Docs once listed nested `observe snapshot` alongside
+`snapshot_ui` without explaining the relationship.
 
-**What actually happens:** `observe snapshot` builds a single-action execution internally
-(`apps/node/src/domain/observe/snapshot.ts`) and calls the same `runExecution` code path.
-Both go through the same `extractSnapshotsFromLogs` pipeline. They are functionally
-equivalent. The subcommand is a convenience wrapper.
+**What actually happens:** Flat `clawperator snapshot` builds the same single-action
+execution the old nested form used (`apps/node/src/domain/observe/snapshot.ts`) and calls
+the same `runExecution` path as `snapshot_ui`. Both use the same
+`extractSnapshotsFromLogs` pipeline. They are functionally equivalent.
+
+**API refactor note:** The nested `observe …` CLI parent is removed. Canonical ad-hoc
+inspection is `clawperator snapshot`. HTTP still exposes `POST /observe/snapshot` until
+route flattening; that path is not the removed nested CLI.
 
 **Doc file:** `docs/node-api-for-agents.md`, section "Action behavior notes" under
 `snapshot_ui`, and/or the CLI reference table.
 
 **Required fix:** Add a note in the `snapshot_ui` action behavior:
 ```
-`observe snapshot` (CLI subcommand) and `snapshot_ui` (execution action type) use the
-same internal pipeline and produce identical output. Use `observe snapshot` for ad-hoc
+`clawperator snapshot` (flat CLI) and `snapshot_ui` (execution action type) use the
+same internal pipeline and produce identical output. Use `clawperator snapshot` for ad-hoc
 inspection. Use `snapshot_ui` as a step within a multi-action execution payload.
 ```
 
@@ -335,7 +338,7 @@ For routine UI automation, use Clawperator so result/error semantics stay consis
 | ISSUE-04: no troubleshooting entry for empty snapshot | P2 - missing | `docs/troubleshooting.md` | New section | **Resolved - PR #53** |
 | ISSUE-05: HTML entity encoding not documented | P2 - missing | `docs/node-api-for-agents.md` | Snapshot Output / hierarchy_xml | **Resolved** |
 | ISSUE-06: no `open_uri` gap documented | P2 - missing | `docs/node-api-for-agents.md` | Action notes + FAQ | **Resolved** |
-| ISSUE-07: `observe snapshot` vs `snapshot_ui` not explained | P2 - missing | `docs/node-api-for-agents.md` | Action behavior notes | **Resolved** |
+| ISSUE-07: flat `snapshot` vs `snapshot_ui` not explained | P2 - missing | `docs/node-api-for-agents.md` | Action behavior notes | **Resolved** |
 | ISSUE-08: `timeoutMs` cap buried in sleep note | P3 - incomplete | `docs/node-api-for-agents.md` | Execution Payload | **Resolved** |
 | ISSUE-09: `wait_for_node` `timeoutMs` param not listed | P3 - incomplete | `docs/node-api-for-agents.md` | Action Reference table | **Resolved** - note: no `timeoutMs` param exists; `retry` is the correct knob; added `retry` object schema |
 | ISSUE-10: `UNSUPPORTED_RUNTIME_CLOSE` missing from error table | P3 - incomplete | `docs/node-api-for-agents.md` | Error Codes | **Resolved** |
