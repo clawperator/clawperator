@@ -212,13 +212,14 @@ Notes:
 const HELP_SKILLS_RUN = `clawperator skills run
 
 Usage:
-  clawperator skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--output <json|pretty>] [-- <extra_args>]
+  clawperator skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--json] [--output <json|pretty>] [-- <extra_args>]
 
 Notes:
   - Runs the selected skill script through the local skill wrapper.
   - Use --device explicitly when more than one Android device is connected.
   - --operator-package sets the Operator package for this skill run (default: com.clawperator.operator).
     Use com.clawperator.operator.dev for local debug APKs. --receiver-package is a legacy alias (see global options).
+  - --json is canonical for JSON output here too (--output json and --format json are accepted; see global options).
   - --timeout overrides the wrapper timeout for this run only (--timeout-ms is accepted as an alias).
   - --expect-contains turns the run into a lightweight output assertion.
   - If the assertion text is missing, the wrapper fails with SKILL_OUTPUT_ASSERTION_FAILED.
@@ -332,11 +333,12 @@ Required:
 
 Options:
   --submit             Press Enter after typing
-  --clear              Clear existing text before typing
+  --clear              Accepted for enter_text API parity (no effect on device yet)
 
 Notes:
   - Types text into the first matching element.
   - Text may be supplied as a positional argument or via --text <text>.
+  - The Android Operator does not implement field clear yet; --clear is ignored on device (same as execution payloads).
   - Synonym: fill (accepted, not in help)
 `;
 
@@ -994,7 +996,7 @@ Usage:
   clawperator skills new <skill_id> [--summary <text>]
   clawperator skills validate <skill_id> [--dry-run]
   clawperator skills validate --all [--dry-run]
-  clawperator skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [-- <extra_args>]
+  clawperator skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--json] [--output <json|pretty>] [-- <extra_args>]
   clawperator skills install
   clawperator skills update [--ref <git-ref>]
   clawperator skills sync --ref <git-ref>
@@ -1022,7 +1024,7 @@ Usage:
   skills validate <skill_id> [--dry-run]
   skills validate --all [--dry-run]
                                             Validate one local skill or the entire configured registry
-  skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [-- <extra_args>]
+  skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--json] [--output <json|pretty>] [-- <extra_args>]
                                             Invoke a skill script (convenience wrapper)
   skills install
                                             Clone skills repository to ~/.clawperator/skills/
@@ -1088,7 +1090,7 @@ Usage:
         return JSON.stringify({
           code: "USAGE",
           message:
-            "skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [-- <extra_args>]",
+            "skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--json] [--output <json|pretty>] [-- <extra_args>]",
         });
       } else {
         const dashDash = rest.indexOf("--");

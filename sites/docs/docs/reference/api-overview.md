@@ -209,6 +209,8 @@ For `press_key`, `data.key` contains the normalized lowercase key name. If Andro
 
 Start with `clawperator serve [--port 3000] [--host 127.0.0.1]`.
 
+Only documented paths are served. Removed nested snapshot or screenshot routes under `/observe/` are not supported (404); use `POST /snapshot` and `POST /screenshot`.
+
 ### `GET /android/emulators`
 
 Return configured Android Virtual Devices with normalized compatibility metadata.

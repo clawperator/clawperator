@@ -162,6 +162,8 @@ Start with `clawperator serve [--port <n>] [--host <ip>]`. Default: `127.0.0.1:3
 | `POST /skills/:skillId/run` | Run skill. Body: `{"deviceId": "...", "args": [...], "timeoutMs": 90000, "expectContains": "TEXT_BEGIN"}` |
 | `GET /events` | SSE stream: `clawperator:result`, `clawperator:execution`, `heartbeat` |
 
+Only the paths in this table are served. Removed nested snapshot or screenshot routes under `/observe/` are not supported (404); use `POST /snapshot` and `POST /screenshot`.
+
 See `apps/node/examples/basic-api-usage.js` for a complete SSE + REST example.
 
 For `POST /skills/:skillId/run`, error responses may include partial `stdout`

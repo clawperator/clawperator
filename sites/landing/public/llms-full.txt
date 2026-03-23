@@ -1903,6 +1903,8 @@ Start with `clawperator serve [--port <n>] [--host <ip>]`. Default: `127.0.0.1:3
 | `POST /skills/:skillId/run` | Run skill. Body: `{"deviceId": "...", "args": [...], "timeoutMs": 90000, "expectContains": "TEXT_BEGIN"}` |
 | `GET /events` | SSE stream: `clawperator:result`, `clawperator:execution`, `heartbeat` |
 
+Only the paths in this table are served. Removed nested snapshot or screenshot routes under `/observe/` are not supported (404); use `POST /snapshot` and `POST /screenshot`.
+
 See `apps/node/examples/basic-api-usage.js` for a complete SSE + REST example.
 
 For `POST /skills/:skillId/run`, error responses may include partial `stdout`
@@ -3716,7 +3718,7 @@ clawperator type <text> --selector '<json>' [--device <id>] [--operator-package 
 |------|-------------|
 | `--selector <json>` | `NodeMatcher` JSON (required) |
 | `--submit` | Press Enter after typing |
-| `--clear` | Clear existing text before typing |
+| `--clear` | Accepted for API parity; Android Operator does not implement clear yet (no effect on device) |
 
 Text may be supplied as a positional argument or via `--text <text>`. Synonym: `fill` (accepted, not in help).
 
@@ -3943,7 +3945,7 @@ The bare `<keyword>` positional form is shorthand for `--keyword`. At least one 
 Invoke a skill's primary script as a convenience wrapper.
 
 ```
-clawperator skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout-ms <n>] [--expect-contains <text>] [--skip-validate] [-- <extra_args>]
+clawperator skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--json] [--output <json|pretty>] [-- <extra_args>]
 ```
 
 | Flag / Arg | Description |
@@ -3951,7 +3953,9 @@ clawperator skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--
 | `<skill_id>` | Skill ID (required) |
 | `--device <id>` | Device serial passed as first script arg |
 | `--operator-package <pkg>` | Operator package for this run (default: `com.clawperator.operator`) |
-| `--timeout-ms <n>` | Override the wrapper timeout for this run only |
+| `--json` | Canonical JSON output shorthand (same as global options; `--output json` accepted) |
+| `--output` | Output format: `json` or `pretty` (`--format` accepted as alias) |
+| `--timeout <ms>` | Override the wrapper timeout for this run only (`--timeout-ms` accepted as alias) |
 | `--expect-contains <text>` | Lightweight output assertion; fails with `SKILL_OUTPUT_ASSERTION_FAILED` if text is missing |
 | `--skip-validate` | Bypass the pre-run dry-run validation gate (for CI or development escape hatches only) |
 | `-- <extra_args>` | Additional arguments forwarded to the underlying skill script unchanged |
@@ -4545,6 +4549,8 @@ For `press_key`, `data.key` contains the normalized lowercase key name. If Andro
 ## HTTP API (serve mode)
 
 Start with `clawperator serve [--port 3000] [--host 127.0.0.1]`.
+
+Only documented paths are served. Removed nested snapshot or screenshot routes under `/observe/` are not supported (404); use `POST /snapshot` and `POST /screenshot`.
 
 ### `GET /android/emulators`
 

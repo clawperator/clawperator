@@ -287,7 +287,7 @@ clawperator type <text> --selector '<json>' [--device <id>] [--operator-package 
 |------|-------------|
 | `--selector <json>` | `NodeMatcher` JSON (required) |
 | `--submit` | Press Enter after typing |
-| `--clear` | Clear existing text before typing |
+| `--clear` | Accepted for API parity; Android Operator does not implement clear yet (no effect on device) |
 
 Text may be supplied as a positional argument or via `--text <text>`. Synonym: `fill` (accepted, not in help).
 
@@ -514,7 +514,7 @@ The bare `<keyword>` positional form is shorthand for `--keyword`. At least one 
 Invoke a skill's primary script as a convenience wrapper.
 
 ```
-clawperator skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout-ms <n>] [--expect-contains <text>] [--skip-validate] [-- <extra_args>]
+clawperator skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--json] [--output <json|pretty>] [-- <extra_args>]
 ```
 
 | Flag / Arg | Description |
@@ -522,7 +522,9 @@ clawperator skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--
 | `<skill_id>` | Skill ID (required) |
 | `--device <id>` | Device serial passed as first script arg |
 | `--operator-package <pkg>` | Operator package for this run (default: `com.clawperator.operator`) |
-| `--timeout-ms <n>` | Override the wrapper timeout for this run only |
+| `--json` | Canonical JSON output shorthand (same as global options; `--output json` accepted) |
+| `--output` | Output format: `json` or `pretty` (`--format` accepted as alias) |
+| `--timeout <ms>` | Override the wrapper timeout for this run only (`--timeout-ms` accepted as alias) |
 | `--expect-contains <text>` | Lightweight output assertion; fails with `SKILL_OUTPUT_ASSERTION_FAILED` if text is missing |
 | `--skip-validate` | Bypass the pre-run dry-run validation gate (for CI or development escape hatches only) |
 | `-- <extra_args>` | Additional arguments forwarded to the underlying skill script unchanged |
