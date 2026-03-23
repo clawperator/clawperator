@@ -3,7 +3,7 @@ import assert from "node:assert";
 import { spawn } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { COMMANDS, levenshtein } from "../../cli/registry.js";
+import { COMMANDS, levenshtein, didYouMean } from "../../cli/registry.js";
 
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "../../..");
 
@@ -173,5 +173,30 @@ describe("record synonym dispatches to recording handler", () => {
     const { stdout, code } = await runCli(["record", "--help"]);
     assert.strictEqual(code, 0);
     assert.match(stdout, /recording start/);
+  });
+});
+
+describe("didYouMean tie-breaking", () => {
+  // Minimal fake command map used across both cases.
+  const fakeBase = { summary: "s", help: "h", group: "g", handler: async () => "" } as const;
+
+  it("prefers primary name over synonym at equal Levenshtein distance", () => {
+    // "fob" is distance 1 from primary "foo" and distance 1 from synonym "foa".
+    // Primary name must win.
+    const cmds = {
+      foo: { ...fakeBase, name: "foo", synonyms: ["foa"] },
+    } as Parameters<typeof didYouMean>[1];
+    const result = JSON.parse(didYouMean("fob", cmds)) as { suggestion?: string };
+    assert.strictEqual(result.suggestion, "foo");
+  });
+
+  it("picks alphabetically first primary name when distance is equal", () => {
+    // "xcd" is distance 1 from both "acd" and "bcd". "acd" should win.
+    const cmds = {
+      bcd: { ...fakeBase, name: "bcd" },
+      acd: { ...fakeBase, name: "acd" },
+    } as Parameters<typeof didYouMean>[1];
+    const result = JSON.parse(didYouMean("xcd", cmds)) as { suggestion?: string };
+    assert.strictEqual(result.suggestion, "acd");
   });
 });

@@ -451,14 +451,14 @@ Establish the foundation that makes Phases 1-4 safe.
 
 1. **"Did you mean?" error system**
    - When an unknown command is entered, suggest the closest known command
-   - Specific mappings for removed commands:
-     - `action click` -> `click`
-     - `action open-app` -> `open`
-     - `action type` -> `type`
-     - `observe snapshot` -> `snapshot`
-     - `observe screenshot` -> `screenshot`
-     - `inspect ui` -> `snapshot`
-   - Generic fuzzy matching for typos: `screensht` -> `screenshot`
+   - Fuzzy matching (Levenshtein) runs against all primary names and synonyms
+     in the COMMANDS registry. Tie-breaking: closest distance first, then
+     primary name over synonym, then alphabetical.
+   - Specific redirect hints for removed nested forms (`action click` -> `click`,
+     `observe snapshot` -> `snapshot`, etc.) and typos (`screensht` ->
+     `screenshot`) become accurate only after Phase 2 adds the flat commands
+     to the registry. In Phase 0/1 those flat names do not exist yet, so fuzzy
+     match cannot suggest them.
 
 2. **Flag alias infrastructure**
    - Parser accepts both old and new flag names

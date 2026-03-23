@@ -1019,23 +1019,26 @@ export function levenshtein(a: string, b: string): number {
 }
 
 export function didYouMean(cmd: string, commands: Record<string, CommandDef>): string {
-  const allNames: string[] = [];
-  for (const def of Object.values(commands)) {
-    allNames.push(def.name);
-    if (def.synonyms) {
-      allNames.push(...def.synonyms);
-    }
-  }
   const threshold = Math.max(2, Math.floor(cmd.length / 2));
-  let bestMatch: string | undefined;
-  let bestDist = Infinity;
-  for (const name of allNames) {
-    const dist = levenshtein(cmd, name);
-    if (dist < bestDist && dist <= threshold) {
-      bestDist = dist;
-      bestMatch = name;
+  // Collect all candidates within threshold distance, then sort deterministically:
+  //   1. closest distance first
+  //   2. primary name beats synonym at equal distance (more canonical suggestion)
+  //   3. alphabetical within same tier (removes dependence on Object.values order)
+  const candidates: { name: string; isPrimary: boolean; dist: number }[] = [];
+  for (const def of Object.values(commands)) {
+    const d = levenshtein(cmd, def.name);
+    if (d <= threshold) candidates.push({ name: def.name, isPrimary: true, dist: d });
+    for (const syn of def.synonyms ?? []) {
+      const ds = levenshtein(cmd, syn);
+      if (ds <= threshold) candidates.push({ name: syn, isPrimary: false, dist: ds });
     }
   }
+  candidates.sort((a, b) =>
+    a.dist !== b.dist ? a.dist - b.dist :
+    a.isPrimary !== b.isPrimary ? (b.isPrimary ? 1 : -1) :
+    a.name.localeCompare(b.name)
+  );
+  const bestMatch = candidates[0]?.name;
   if (bestMatch) {
     return JSON.stringify({
       code: "UNKNOWN_COMMAND",
