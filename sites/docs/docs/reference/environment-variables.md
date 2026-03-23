@@ -139,7 +139,7 @@ Clawperator can use environment variables to find Android host tools.
 ### `ADB_PATH`
 
 Overrides the `adb` binary path used by CLI commands such as `devices`,
-`doctor`, `execute`, and `operator setup`.
+`doctor`, `exec`, and `operator setup`.
 
 Example:
 

@@ -206,7 +206,7 @@ Notes:
   - --artifact accepts either the bare artifact name or the full .recipe.json filename.
   - --vars must be a JSON object string used for template substitution.
   - Compile failure usually means a missing artifact, missing required vars, or an invalid execution shape.
-  - Use clawperator execute --validate-only for an extra contract-only check before a live device run.
+  - Use clawperator exec --validate-only for an extra contract-only check before a live device run.
 `;
 
 const HELP_SKILLS_RUN = `clawperator skills run
@@ -614,15 +614,16 @@ COMMANDS["packages"] = {
   },
 };
 
-// execute
-COMMANDS["execute"] = {
-  name: "execute",
+// exec (synonym: execute)
+COMMANDS["exec"] = {
+  name: "exec",
+  synonyms: ["execute"],
   group: "Execution",
   summary: "Execute a validated command payload",
-  help: "clawperator execute\n\nUsage:\n  clawperator execute --execution <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>]\n  clawperator execute best-effort --goal <text> [--device <id>] [--operator-package <package>]\n",
-  topLevelBlock: `  execute --execution <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>]
+  help: "clawperator exec\n\nUsage:\n  clawperator exec --execution <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>]\n  clawperator exec best-effort --goal <text> [--device <id>] [--operator-package <package>]\n\n`execute` is accepted as a synonym for `exec`.\n",
+  topLevelBlock: `  exec --execution <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>]
                                             Execute a validated command payload or print a dry-run plan
-  execute best-effort --goal <text> [--device <id>] [--operator-package <package>]
+  exec best-effort --goal <text> [--device <id>] [--operator-package <package>]
                                             Produce deterministic next-action suggestion from current UI`,
   handler: async (ctx) => {
     const { rest, format, verbose, logger, deviceId, operatorPackage, timeoutMs } = ctx;
@@ -631,13 +632,13 @@ COMMANDS["execute"] = {
       const goal = getOpt(rest, "--goal");
       return JSON.stringify({
         code: "NOT_IMPLEMENTED",
-        message: "execute best-effort is Stage 1 limited; use snapshot + agent reasoning for now",
+        message: "exec best-effort is Stage 1 limited; use snapshot + agent reasoning for now",
         goal,
       });
     } else {
       const execution = getOpt(rest, "--execution");
       if (!execution) {
-        return JSON.stringify({ code: "USAGE", message: "execute requires --execution <json-or-file>" });
+        return JSON.stringify({ code: "USAGE", message: "exec requires --execution <json-or-file>" });
       } else {
         return (await import("./commands/execute.js")).cmdExecute({
           ...out,
@@ -1418,6 +1419,7 @@ export function generateTopLevelHelp(commands: Record<string, CommandDef>): stri
     "Notes:",
     "  - operator setup is the canonical setup command. operator install remains an alias.",
     "  - recording is the canonical command family; 'record' is a supported short alias.",
+    "  - exec is the canonical command for execution payloads; 'execute' is a supported synonym.",
     "  - Flat commands (snapshot, click, open, type, read, wait, press, back, scroll) are the canonical device interaction surface.",
     "  - Removed nested CLI forms such as `observe snapshot` or `action click`; unknown-command errors suggest the flat replacement.",
     "  - The default Operator package is com.clawperator.operator. Use --operator-package com.clawperator.operator.dev for local debug builds.",

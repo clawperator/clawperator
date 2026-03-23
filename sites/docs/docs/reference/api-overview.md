@@ -7,7 +7,7 @@ Clawperator exposes a Node-based interface for agent-driven device automation. T
 ## Interaction Model
 
 1. Agent constructs an `Execution` payload.
-2. Agent calls `execute` (CLI) or `POST /execute` (HTTP).
+2. Agent calls `exec` (CLI; `execute` is a synonym) or `POST /execute` (HTTP).
 3. Clawperator validates the payload, resolves the device, dispatches via ADB broadcast, and waits for a `[Clawperator-Result]` envelope from logcat.
 4. The result envelope is returned to the agent.
 

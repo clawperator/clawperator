@@ -123,7 +123,7 @@ try {
   const stdout = execFileSync(
     "clawperator",
     [
-      "execute",
+      "exec",
       "--device",
       deviceId,
       "--operator-package",

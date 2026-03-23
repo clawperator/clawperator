@@ -74,7 +74,7 @@ if ! echo "$PACKAGES_JSON" | grep -q "\"$BASELINE_APP_PACKAGE\""; then
 fi
 echo "Package precheck passed: operator package + baseline app present."
 
-# 5) Minimal direct execute (close/open/sleep/snapshot)
+# 5) Minimal direct exec (close/open/sleep/snapshot)
 SMOKE_JSON="/tmp/clawperator-smoke-exec.json"
 cat > "$SMOKE_JSON" <<JSON
 {
@@ -92,13 +92,13 @@ cat > "$SMOKE_JSON" <<JSON
 }
 JSON
 
-echo "=== execute (minimal) ==="
+echo "=== exec (minimal) ==="
 if [ -n "$SMOKE_SUMMARY" ]; then
-  EXEC_JSON="$("${CLI[@]}" execute --device "$DEVICE_ID" --operator-package "$CLAWPERATOR_OPERATOR_PACKAGE" --execution "$SMOKE_JSON" --json 2>&1)" || true
-  echo "$EXEC_JSON" | node -e 'const d=require("fs").readFileSync(0,"utf8"); try { const j=JSON.parse(d); console.log(JSON.stringify({ step: "execute", result: j.terminalSource ? "ok" : (j.code === "RESULT_ENVELOPE_TIMEOUT" ? "timeout" : "error"), terminalSource: j.terminalSource || undefined, timeoutDiagnostics: j.code === "RESULT_ENVELOPE_TIMEOUT" ? j : undefined })); } catch(e) { console.log(JSON.stringify({ step: "execute", result: "error" })); }' >> "$OUTCOMES_FILE"
+  EXEC_JSON="$("${CLI[@]}" exec --device "$DEVICE_ID" --operator-package "$CLAWPERATOR_OPERATOR_PACKAGE" --execution "$SMOKE_JSON" --json 2>&1)" || true
+  echo "$EXEC_JSON" | node -e 'const d=require("fs").readFileSync(0,"utf8"); try { const j=JSON.parse(d); console.log(JSON.stringify({ step: "exec", result: j.terminalSource ? "ok" : (j.code === "RESULT_ENVELOPE_TIMEOUT" ? "timeout" : "error"), terminalSource: j.terminalSource || undefined, timeoutDiagnostics: j.code === "RESULT_ENVELOPE_TIMEOUT" ? j : undefined })); } catch(e) { console.log(JSON.stringify({ step: "exec", result: "error" })); }' >> "$OUTCOMES_FILE"
   echo "$EXEC_JSON" | node -e 'console.log(JSON.stringify(JSON.parse(require("fs").readFileSync(0,"utf8")),null,2))'
 else
-  EXEC_OUT="$("${CLI[@]}" execute --device "$DEVICE_ID" --operator-package "$CLAWPERATOR_OPERATOR_PACKAGE" --execution "$SMOKE_JSON")" || true
+  EXEC_OUT="$("${CLI[@]}" exec --device "$DEVICE_ID" --operator-package "$CLAWPERATOR_OPERATOR_PACKAGE" --execution "$SMOKE_JSON")" || true
   echo "$EXEC_OUT"
 fi
 # Stage 1: timeout with correct diagnostics is acceptable; continue to snapshot

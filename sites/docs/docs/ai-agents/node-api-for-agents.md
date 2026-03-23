@@ -30,7 +30,7 @@ workflow (also available as `record` alias), use [Android Recording Format for A
 | `emulator status` | List running Android emulators and boot state |
 | `emulator provision` | Reuse or create a supported Android emulator and return its ADB serial |
 | `provision emulator` | Alias of `emulator provision` |
-| `execute --execution <json\|file>` | Run a full execution payload (see `--validate-only` and `--dry-run` below) |
+| `exec --execution <json\|file>` | Run a full execution payload (see `--validate-only` and `--dry-run` below). `execute` is a supported synonym. |
 | `snapshot` | Capture UI hierarchy dump (`hierarchy_xml`) |
 | `screenshot [--path <file>]` | Capture device screen as PNG |
 | `open <package-id\|url\|uri>` | Open an app, URL, or URI (auto-detects target type) |
@@ -956,7 +956,7 @@ Branch agent logic on codes from `envelope.errorCode` (top-level Android result 
 | `EMULATOR_DELETE_FAILED` | `error.code` | Emulator deletion failed |
 | `NODE_NOT_FOUND` | `data.error` | Selector matched no UI element |
 | `RESULT_ENVELOPE_TIMEOUT` | `error.code` | Command dispatched but no result received; `details` includes command/task correlation plus last payload action context, elapsed timing, and `logPath` when persistent logging is enabled |
-| `OPERATOR_NOT_INSTALLED` | `error.code` | Requested [Clawperator Operator Android app](../getting-started/android-operator-apk.md) package is missing on the device; `execute` and `doctor` fail fast instead of timing out |
+| `OPERATOR_NOT_INSTALLED` | `error.code` | Requested [Clawperator Operator Android app](../getting-started/android-operator-apk.md) package is missing on the device; `exec` and `doctor` fail fast instead of timing out |
 | `DEVICE_UNAUTHORIZED` | `error.code` | Device not authorized for ADB |
 | `VERSION_INCOMPATIBLE` | `error.code` | CLI and installed [Clawperator Operator Android app](../getting-started/android-operator-apk.md) versions do not match exactly after ignoring the trailing debug suffix |
 | `APK_VERSION_UNREADABLE` | `error.code` | The device package dump did not expose a readable [Clawperator Operator Android app](../getting-started/android-operator-apk.md) version |
@@ -980,7 +980,7 @@ For agent-side recovery strategy, use
 - **No hidden retries:** If an action fails, the error is returned immediately. Retry logic belongs in the agent.
 - **Deterministic results:** Exactly one terminal envelope per `commandId`. Timeouts return `RESULT_ENVELOPE_TIMEOUT` with diagnostics, payload-side action context, and `logPath` when persistent logging is enabled.
 - **Execution granularity:** Group multiple actions in one execution only when they are atomic - when the agent does not need to observe state or make a decision between them. For flows where intermediate state matters, use separate executions with `snapshot` between each. See [Execution Model](../reference/execution-model.md) for the full guidance.
-- **Timeout override:** `--timeout <ms>` overrides the execution timeout for `execute`, `snapshot`, and `screenshot` within policy limits.
+- **Timeout override:** `--timeout <ms>` overrides the execution timeout for `exec`, `snapshot`, and `screenshot` within policy limits.
 - **Screenshot output path:** `screenshot --path <file>` writes the PNG to the requested local path and still returns the final `data.path` in the result envelope. `<file>` must be a non-empty local filesystem path.
 - **Device targeting:** Specify `--device <id>` when multiple devices are connected. Omit for single-device setups.
 - **Emulator reuse over creation:** Provisioning never creates duplicate AVDs when a supported running or stopped emulator already exists.
@@ -991,9 +991,9 @@ For agent-side recovery strategy, use
 
 - Payload validation happens automatically at execution time. Invalid payloads
   fail fast with `EXECUTION_VALIDATION_FAILED` before any device action runs.
-- `clawperator execute --execution <json-or-file> --validate-only` validates
+- `clawperator exec --execution <json-or-file> --validate-only` validates
   and normalizes a payload without dispatching it to any device.
-- `clawperator execute --execution <json-or-file> --dry-run` validates the
+- `clawperator exec --execution <json-or-file> --dry-run` validates the
   payload and prints a plan summary without requiring a device connection.
   This is useful for local payload development and CI checks.
 - If you want the lowest-risk contract check on a live device, use a minimal
@@ -1002,7 +1002,7 @@ For agent-side recovery strategy, use
 ### `--dry-run` output format
 
 ```bash
-clawperator execute --execution '{"commandId":"test","taskId":"task","source":"cli","expectedFormat":"android-ui-automator","timeoutMs":10000,"actions":[{"id":"s1","type":"sleep","params":{"durationMs":500}}]}' --dry-run
+clawperator exec --execution '{"commandId":"test","taskId":"task","source":"cli","expectedFormat":"android-ui-automator","timeoutMs":10000,"actions":[{"id":"s1","type":"sleep","params":{"durationMs":500}}]}' --dry-run
 ```
 
 **Success response:**
@@ -1081,7 +1081,7 @@ export CLAWPERATOR_SKILLS_REGISTRY="$HOME/.clawperator/skills/skills/skills-regi
 
 ### Multiple devices
 
-If more than one device is connected, pass `--device <id>` on execute,
+If more than one device is connected, pass `--device <id>` on exec,
 snapshot, action, doctor, version, operator setup, and skills-run commands.
 
 When multiple devices are present:
@@ -1124,10 +1124,10 @@ Skills can be invoked three ways:
    clawperator skills run com.android.settings.capture-overview --device <device_id> --timeout 90000
    ```
 
-3. **Artifact compile + execute** (for skills with `.recipe.json` artifacts):
+3. **Artifact compile + exec** (for skills with `.recipe.json` artifacts):
    ```bash
    clawperator skills compile-artifact <skill_id> --artifact <name> --vars '{"KEY":"value"}'
-   clawperator execute --execution <compiled_output>
+   clawperator exec --execution <compiled_output>
    ```
 
 ### Skills Run Response

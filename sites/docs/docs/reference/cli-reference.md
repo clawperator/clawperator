@@ -189,12 +189,12 @@ clawperator packages list [--device <id>] [--third-party]
 
 ---
 
-### `execute`
+### `exec`
 
-Execute a validated command payload.
+Execute a validated command payload. The CLI also accepts `execute` as a synonym.
 
 ```
-clawperator execute --execution <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>] [--timeout <ms>]
+clawperator exec --execution <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>] [--timeout <ms>]
 ```
 
 | Flag | Description |

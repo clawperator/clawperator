@@ -62,7 +62,7 @@ In multi-device environments, keep `--device` explicit on:
 - `operator setup`
 - `doctor`
 - `version --check-compat`
-- `execute`
+- `exec` (`execute` is a synonym)
 - `snapshot`
 - `screenshot`
 - flat device interaction commands (`click`, `type`, `open`, and related synonyms)
@@ -73,7 +73,7 @@ Example:
 
 ```bash
 clawperator snapshot --device <device_id> --json
-clawperator execute --device <device_id> --execution /path/to/execution.json --json
+clawperator exec --device <device_id> --execution /path/to/execution.json --json
 clawperator skills run com.android.settings.capture-overview --device <device_id>
 ```
 

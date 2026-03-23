@@ -68,7 +68,7 @@ SUMMARY_OUT="${CLAWPERATOR_SMOKE_SUMMARY:-${CLAWPERATOR_VALIDATE_SUMMARY:-}}"
 echo "=== validate receiver ingress (commandId=$VALIDATE_CMD_ID) ==="
 adb -s "$DEVICE_ID" logcat -c
 set +e
-"${CLI[@]}" execute \
+"${CLI[@]}" exec \
    --device "$DEVICE_ID" \
   --operator-package "$CLAWPERATOR_OPERATOR_PACKAGE" \
   --execution "$VALIDATE_JSON" \
@@ -88,7 +88,7 @@ if [ ! -s "$GREP_OUTPUT_FILE" ]; then
 fi
 
 if [ "$EXEC_EXIT" -ne 0 ]; then
-  echo "ERROR: execute command failed (exit=$EXEC_EXIT)." >&2
+  echo "ERROR: exec command failed (exit=$EXEC_EXIT)." >&2
   exit 1
 fi
 

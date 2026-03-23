@@ -79,7 +79,7 @@ Recommended next action:
 
 Meaning:
 - the targeted Clawperator Operator APK package is not installed on the device
-- `doctor` and `execute` fail fast with this code instead of waiting for a runtime timeout
+- `doctor` and `exec` fail fast with this code instead of waiting for a runtime timeout
 
 Usually recoverable:
 - yes

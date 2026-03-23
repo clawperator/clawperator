@@ -50,7 +50,7 @@ When multiple devices are connected, always pass an explicit device flag:
 
 In multi-device environments, keep `--device` explicit on:
 
-- `execute`
+- `exec` (`execute` is a synonym)
 - `snapshot`
 - `screenshot`
 - flat device interaction commands (`click`, `type`, `read`, `wait`, `open`, `press`, `back`, `scroll`, and related synonyms)

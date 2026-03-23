@@ -68,7 +68,7 @@ If any requirement is not met, the app shows an orange background and a dedicate
 
 ## Missing Operator APK
 
-**What it means:** The requested Clawperator Operator package is not installed on the device. This is now a blocking readiness failure, so `clawperator doctor` and `clawperator execute` fail fast instead of waiting for a runtime timeout.
+**What it means:** The requested Clawperator Operator package is not installed on the device. This is now a blocking readiness failure, so `clawperator doctor` and `clawperator exec` fail fast instead of waiting for a runtime timeout.
 
 **How to fix:**
 
@@ -307,7 +307,7 @@ If the emulator is consistently slow, consider using a physical device instead.
 
 ### Multiple devices connected
 
-Once an emulator is provisioned, you may have both a physical device and an emulator connected at the same time. In that state, continue to pass `--device <serial>` to `execute`, `snapshot`, and `skills run` commands.
+Once an emulator is provisioned, you may have both a physical device and an emulator connected at the same time. In that state, continue to pass `--device <serial>` to `exec`, `snapshot`, and `skills run` commands.
 
 If you omit it, the CLI returns `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED`.
 
@@ -510,7 +510,7 @@ Instead of `skills run`, test the skill's execution payload directly:
 clawperator skills compile-artifact <skill_id> --artifact main --output json
 
 # 2. Save to file and run manually
-clawperator execute --execution ./skill-execution.json --device <serial>
+clawperator exec --execution ./skill-execution.json --device <serial>
 ```
 
 This bypasses the skills wrapper and helps identify whether the issue is the skill logic or the skills runtime.

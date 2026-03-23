@@ -128,14 +128,14 @@ describe("CLI help", () => {
     assert.match(stdout, /Commands:/);
   });
 
-  it("shows validate-only in top-level execute help", async () => {
+  it("shows validate-only in top-level exec help", async () => {
     const { stdout, code } = await runCli(["--help"]);
     assert.strictEqual(code, 0);
-    assert.match(stdout, /execute --execution <json-or-file> \[--validate-only\]/);
+    assert.match(stdout, /exec --execution <json-or-file> \[--validate-only\]/);
   });
 
-  it("execute best-effort points at flat `snapshot`, not nested `observe snapshot` (exit 0)", async () => {
-    const { stdout, code } = await runCli(["execute", "best-effort", "--goal", "test-goal"]);
+  it("exec best-effort points at flat `snapshot`, not nested `observe snapshot` (exit 0)", async () => {
+    const { stdout, code } = await runCli(["exec", "best-effort", "--goal", "test-goal"]);
     assert.strictEqual(code, 0, stdout);
     const obj = JSON.parse(stdout) as { code?: string; message?: string; goal?: string };
     assert.strictEqual(obj.code, "NOT_IMPLEMENTED");

@@ -41,7 +41,7 @@ function runClawperatorLocal(execution, deviceId, operatorPkg) {
   const tmpFile = path.join(tmpdir(), execution.commandId + '.json');
   writeFileSync(tmpFile, JSON.stringify(execution));
 
-  const args = [LOCAL_CLAW, 'execute', '--execution', tmpFile, '--device', deviceId, '--operator-package', operatorPkg];
+  const args = [LOCAL_CLAW, 'exec', '--execution', tmpFile, '--device', deviceId, '--operator-package', operatorPkg];
 
   try {
     const output = execFileSync('node', args, { encoding: 'utf-8' });

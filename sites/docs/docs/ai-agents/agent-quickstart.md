@@ -143,7 +143,7 @@ Example payload:
 Run it with:
 
 ```bash
-clawperator execute --device <device_id> --execution /path/to/execution.json --json
+clawperator exec --device <device_id> --execution /path/to/execution.json --json
 ```
 
 ## Step 3 - Read the result envelope correctly

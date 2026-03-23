@@ -26,7 +26,7 @@ Useful commands:
 ```bash
 clawperator snapshot --device <device_id> --json
 clawperator screenshot --device <device_id> --path /tmp/example.png --json
-clawperator execute --device <device_id> --execution /path/to/execution.json --json
+clawperator exec --device <device_id> --execution /path/to/execution.json --json
 ```
 
 During exploration, record:
@@ -133,7 +133,7 @@ If you want to check the compiled payload again through the execution validator
 without sending it to a device, use:
 
 ```bash
-clawperator execute --validate-only --execution /path/to/compiled-execution.json --json
+clawperator exec --validate-only --execution /path/to/compiled-execution.json --json
 ```
 
 This is the closest current workflow to a dry run for artifact-backed skills.
@@ -216,7 +216,7 @@ Treat skill verification as four distinct layers:
 2. **Artifact compile validity**
    `clawperator skills compile-artifact ...`
 3. **Execution payload validity**
-   `clawperator execute --validate-only ...`
+   `clawperator exec --validate-only ...`
 4. **Live device behavior**
    `clawperator skills run <skill_id> --device <device_id> [--timeout <ms>]`
 
@@ -333,7 +333,7 @@ For a new skill, this is the practical order:
 3. encode the skill script or artifact
 4. run `clawperator skills validate <skill_id>`
 5. if artifacts exist, run `clawperator skills compile-artifact ...`
-6. run `clawperator execute --validate-only ...` on candidate payloads
+6. run `clawperator exec --validate-only ...` on candidate payloads
 7. run `clawperator skills validate <skill_id> --dry-run`
 8. run `clawperator skills run <skill_id> --device <device_id>`
 9. harden selectors, timeout budgets, and output formatting
