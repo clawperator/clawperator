@@ -8,7 +8,7 @@ import type { Logger } from "../../adapters/logger.js";
 export async function cmdInspectUi(options: {
   format: OutputOptions["format"];
   deviceId?: string;
-  receiverPackage?: string;
+  operatorPackage?: string;
   timeoutMs?: number;
   logger?: Logger;
 }): Promise<string> {

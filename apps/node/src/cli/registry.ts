@@ -79,7 +79,7 @@ export type HandlerContext = {
   verbose: boolean;
   logger: Logger;
   deviceId?: string;
-  receiverPackage?: string;
+  operatorPackage?: string;
   timeoutMs?: number;
 };
 
@@ -101,14 +101,14 @@ export interface CommandDef {
 const HELP_OPERATOR_SETUP = `clawperator operator setup
 
 Usage:
-  clawperator operator setup --apk <path> [--device-id <id>] [--receiver-package <package>] [--output <json|pretty>]
+  clawperator operator setup --apk <path> [--device-id <id>] [--operator-package <package>] [--output <json|pretty>]
 
 Required:
   --apk <path>              Local filesystem path to the Operator APK file
 
 Optional:
   --device-id <id>          Target Android device serial (required when multiple devices are connected)
-  --receiver-package <pkg>  Operator package identifier (required when both release and debug variants are installed)
+  --operator-package <pkg>  Operator package identifier (required when both release and debug variants are installed)
 
 Notes:
   - This is the canonical setup command for the Clawperator Operator APK.
@@ -118,7 +118,7 @@ Notes:
   - Verification phase: confirms the package is visible to the package manager.
   - Fails with a structured error if any phase fails. The error code identifies which phase failed.
   - If omitted, setup auto-detects the package only when exactly one known Operator variant is installed.
-  - If both release and debug variants are installed, pass --receiver-package explicitly.
+  - If both release and debug variants are installed, pass --operator-package explicitly.
   - Do not use raw adb install for normal setup. It leaves the device in a partial state without required permissions.
   - operator install remains a compatibility alias for operator setup.
   - Use clawperator grant-device-permissions only after the Operator APK crashes and Android revokes permissions.
@@ -127,24 +127,24 @@ Notes:
 const HELP_OBSERVE_SNAPSHOT = `clawperator observe snapshot
 
 Usage:
-  clawperator observe snapshot [--device-id <id>] [--receiver-package <package>] [--timeout-ms <number>] [--output <json|pretty>] [--verbose]
+  clawperator observe snapshot [--device-id <id>] [--operator-package <package>] [--timeout-ms <number>] [--output <json|pretty>] [--verbose]
 
 Notes:
   - Captures a UI snapshot via the canonical execution path.
   - Default receiver package: com.clawperator.operator
-  - Use --receiver-package com.clawperator.operator.dev for local debug APKs.
+  - Use --operator-package com.clawperator.operator.dev for local debug APKs. --receiver-package is an accepted alias.
   - --timeout-ms overrides the execution timeout within policy limits.
 `;
 
 const HELP_OBSERVE_SCREENSHOT = `clawperator observe screenshot
 
 Usage:
-  clawperator observe screenshot [--device-id <id>] [--receiver-package <package>] [--path <file>] [--timeout-ms <number>] [--output <json|pretty>] [--verbose]
+  clawperator observe screenshot [--device-id <id>] [--operator-package <package>] [--path <file>] [--timeout-ms <number>] [--output <json|pretty>] [--verbose]
 
 Notes:
   - Captures a PNG screenshot via the canonical execution path.
   - Default receiver package: com.clawperator.operator
-  - Use --receiver-package com.clawperator.operator.dev for local debug APKs.
+  - Use --operator-package com.clawperator.operator.dev for local debug APKs. --receiver-package is an accepted alias.
   - --path writes the screenshot to the provided local filesystem path.
   - If --path is omitted, Clawperator writes to a generated temp file and returns that path in the result envelope.
   - --timeout-ms overrides the execution timeout within policy limits.
@@ -221,12 +221,12 @@ Notes:
 const HELP_SKILLS_RUN = `clawperator skills run
 
 Usage:
-  clawperator skills run <skill_id> [--device-id <id>] [--receiver-package <pkg>] [--timeout-ms <n>] [--expect-contains <text>] [--skip-validate] [--output <json|pretty>] [-- <extra_args>]
+  clawperator skills run <skill_id> [--device-id <id>] [--operator-package <pkg>] [--timeout-ms <n>] [--expect-contains <text>] [--skip-validate] [--output <json|pretty>] [-- <extra_args>]
 
 Notes:
   - Runs the selected skill script through the local skill wrapper.
   - Use --device-id explicitly when more than one Android device is connected.
-  - --receiver-package sets the Operator package for this skill run (default: com.clawperator.operator).
+  - --operator-package sets the Operator package (alias: --receiver-package) for this skill run (default: com.clawperator.operator).
     Use com.clawperator.operator.dev for local debug APKs.
   - --timeout-ms overrides the wrapper timeout for this run only.
   - --expect-contains turns the run into a lightweight output assertion.
@@ -234,46 +234,46 @@ Notes:
   - By default, the wrapper performs a pre-run dry-run validation gate before starting the skill script.
   - --skip-validate bypasses that gate for CI or development escape hatches only.
   - Arguments after -- are forwarded to the underlying skill script unchanged.
-  - Environment variables CLAWPERATOR_BIN and CLAWPERATOR_RECEIVER_PACKAGE are injected into the skill script.
+  - Environment variables CLAWPERATOR_BIN and CLAWPERATOR_OPERATOR_PACKAGE are injected into the skill script.
   - This wrapper does not replace live validation of screenshots, artifacts, or app state.
 `;
 
 const HELP_DOCTOR = `clawperator doctor
 
 Usage:
-  clawperator doctor [--output <json|pretty>] [--device-id <id>] [--receiver-package <package>] [--verbose]
+  clawperator doctor [--output <json|pretty>] [--device-id <id>] [--operator-package <package>] [--verbose]
   clawperator doctor --fix
   clawperator doctor --full
   clawperator doctor --check-only
 
 Notes:
   - Default receiver package: com.clawperator.operator
-  - Use --receiver-package com.clawperator.operator.dev for local debug APKs.
+  - Use --operator-package com.clawperator.operator.dev for local debug APKs. --receiver-package is an accepted alias.
   - Exit code 0 means all critical checks passed, including the warning-only multi-device ambiguity case.
   - Exit code 1 means a genuine failure such as no device, APK not installed, or handshake failure.
-  - If handshake times out, rerun with --verbose and compare the installed APK package with --receiver-package.
+  - If handshake times out, rerun with --verbose and compare the installed APK package with --operator-package.
 `;
 
 const HELP_VERSION = `clawperator version
 
 Usage:
   clawperator version
-  clawperator version --check-compat [--device-id <id>] [--receiver-package <package>] [--output <json|pretty>]
+  clawperator version --check-compat [--device-id <id>] [--operator-package <package>] [--output <json|pretty>]
 
   Notes:
   - Default receiver package: com.clawperator.operator
-  - Use --receiver-package com.clawperator.operator.dev for local debug APKs.
+  - Use --operator-package com.clawperator.operator.dev for local debug APKs. --receiver-package is an accepted alias.
   - --check-compat compares the CLI version with the installed APK version on the device.
 `;
 
 const HELP_GRANT_DEVICE_PERMISSIONS = `clawperator grant-device-permissions
 
 Usage:
-  clawperator grant-device-permissions [--device-id <id>] [--receiver-package <package>] [--output <json|pretty>]
+  clawperator grant-device-permissions [--device-id <id>] [--operator-package <package>] [--output <json|pretty>]
 
 Notes:
   - Default receiver package: com.clawperator.operator
-  - Use --receiver-package com.clawperator.operator.dev for local debug APKs.
+  - Use --operator-package com.clawperator.operator.dev for local debug APKs. --receiver-package is an accepted alias.
   - Grants accessibility, notification posting, and notification listener permissions via adb.
   - This command is for crash recovery only. Use it when the Operator APK crashes and Android revokes permissions.
   - For normal setup, always use clawperator operator setup instead.
@@ -314,10 +314,10 @@ COMMANDS["operator"] = {
     setup: HELP_OPERATOR_SETUP,
     install: HELP_OPERATOR_SETUP,
   },
-  topLevelBlock: `  operator setup --apk <path> [--device-id <id>] [--receiver-package <package>]
+  topLevelBlock: `  operator setup --apk <path> [--device-id <id>] [--operator-package <package>]
                                             Install the Operator APK, grant required permissions, and verify readiness`,
   handler: async (ctx) => {
-    const { rest, format, verbose, logger, deviceId, receiverPackage } = ctx;
+    const { rest, format, verbose, logger, deviceId, operatorPackage } = ctx;
     const out = { format, verbose, logger };
     const sub = rest[0];
     if (sub === "setup" || sub === "install") {
@@ -330,7 +330,7 @@ COMMANDS["operator"] = {
           apkPath,
           // TODO(Phase 2): ?? getOpt fallbacks are dead code - see plan.md "Carried-forward debt"
           deviceId: deviceId ?? getOpt(rest, "--device-id"),
-          receiverPackage: receiverPackage ?? getOpt(rest, "--receiver-package"),
+          operatorPackage: operatorPackage ?? getOpt(rest, "--receiver-package"),
         });
       }
     } else {
@@ -354,7 +354,7 @@ COMMANDS["setup"] = {
     return JSON.stringify({
       code: "USAGE",
       message: "clawperator setup is not a valid top-level command. Use: clawperator operator setup --apk <path>",
-      canonical: "clawperator operator setup --apk <path> [--device-id <id>] [--receiver-package <package>]",
+      canonical: "clawperator operator setup --apk <path> [--device-id <id>] [--operator-package <package>]",
     });
   },
 };
@@ -369,7 +369,7 @@ COMMANDS["install"] = {
     return JSON.stringify({
       code: "USAGE",
       message: "clawperator install is not a valid command. Use: clawperator operator setup --apk <path>",
-      canonical: "clawperator operator setup --apk <path> [--device-id <id>] [--receiver-package <package>]",
+      canonical: "clawperator operator setup --apk <path> [--device-id <id>] [--operator-package <package>]",
     });
   },
 };
@@ -497,13 +497,13 @@ COMMANDS["execute"] = {
   name: "execute",
   group: "Execution",
   summary: "Execute a validated command payload",
-  help: "clawperator execute\n\nUsage:\n  clawperator execute --execution <json-or-file> [--validate-only] [--dry-run] [--device-id <id>] [--receiver-package <package>]\n  clawperator execute best-effort --goal <text> [--device-id <id>] [--receiver-package <package>]\n",
-  topLevelBlock: `  execute --execution <json-or-file> [--validate-only] [--dry-run] [--device-id <id>] [--receiver-package <package>]
+  help: "clawperator execute\n\nUsage:\n  clawperator execute --execution <json-or-file> [--validate-only] [--dry-run] [--device-id <id>] [--operator-package <package>]\n  clawperator execute best-effort --goal <text> [--device-id <id>] [--operator-package <package>]\n",
+  topLevelBlock: `  execute --execution <json-or-file> [--validate-only] [--dry-run] [--device-id <id>] [--operator-package <package>]
                                             Execute a validated command payload or print a dry-run plan
-  execute best-effort --goal <text> [--device-id <id>] [--receiver-package <package>]
+  execute best-effort --goal <text> [--device-id <id>] [--operator-package <package>]
                                             Produce deterministic next-action suggestion from current UI`,
   handler: async (ctx) => {
-    const { rest, format, verbose, logger, deviceId, receiverPackage, timeoutMs } = ctx;
+    const { rest, format, verbose, logger, deviceId, operatorPackage, timeoutMs } = ctx;
     const out = { format, verbose, logger };
     if (rest[0] === "best-effort") {
       const goal = getOpt(rest, "--goal");
@@ -521,7 +521,7 @@ COMMANDS["execute"] = {
           ...out,
           execution,
           deviceId: deviceId ?? getOpt(rest, "--device-id"),
-          receiverPackage: receiverPackage ?? getOpt(rest, "--receiver-package"),
+          operatorPackage: operatorPackage ?? getOpt(rest, "--receiver-package"),
           timeoutMs,
           validateOnly: hasFlag(rest, "--validate-only"),
           dryRun: hasFlag(rest, "--dry-run"),
@@ -542,25 +542,25 @@ COMMANDS["observe"] = {
     snapshot: HELP_OBSERVE_SNAPSHOT,
     screenshot: HELP_OBSERVE_SCREENSHOT,
   },
-  topLevelBlock: `  observe snapshot [--device-id <id>] [--receiver-package <package>]
+  topLevelBlock: `  observe snapshot [--device-id <id>] [--operator-package <package>]
                                             Capture current UI snapshot output
-  observe screenshot [--device-id <id>] [--receiver-package <package>] [--path <file>]
+  observe screenshot [--device-id <id>] [--operator-package <package>] [--path <file>]
                                             Capture current device screenshot (png)`,
   handler: async (ctx) => {
-    const { rest, format, verbose, logger, deviceId, receiverPackage, timeoutMs } = ctx;
+    const { rest, format, verbose, logger, deviceId, operatorPackage, timeoutMs } = ctx;
     const out = { format, verbose, logger };
     if (rest[0] === "snapshot") {
       return (await import("./commands/observe.js")).cmdObserveSnapshot({
         ...out,
         deviceId: deviceId ?? getOpt(rest, "--device-id"),
-        receiverPackage: receiverPackage ?? getOpt(rest, "--receiver-package"),
+        operatorPackage: operatorPackage ?? getOpt(rest, "--receiver-package"),
         timeoutMs,
       });
     } else if (rest[0] === "screenshot") {
       return (await import("./commands/observe.js")).cmdObserveScreenshot({
         ...out,
         deviceId: deviceId ?? getOpt(rest, "--device-id"),
-        receiverPackage: receiverPackage ?? getOpt(rest, "--receiver-package"),
+        operatorPackage: operatorPackage ?? getOpt(rest, "--receiver-package"),
         timeoutMs,
         path: getStringOpt(rest, "--path"),
       });
@@ -579,16 +579,16 @@ COMMANDS["inspect"] = {
   subtopics: {
     ui: HELP_OBSERVE_SNAPSHOT,
   },
-  topLevelBlock: `  inspect ui [--device-id <id>] [--receiver-package <package>]
+  topLevelBlock: `  inspect ui [--device-id <id>] [--operator-package <package>]
                                             Alias of observe snapshot with formatted output`,
   handler: async (ctx) => {
-    const { rest, format, verbose, logger, deviceId, receiverPackage, timeoutMs } = ctx;
+    const { rest, format, verbose, logger, deviceId, operatorPackage, timeoutMs } = ctx;
     const out = { format, verbose, logger };
     if (rest[0] === "ui") {
       return (await import("./commands/inspect.js")).cmdInspectUi({
         ...out,
         deviceId: deviceId ?? getOpt(rest, "--device-id"),
-        receiverPackage: receiverPackage ?? getOpt(rest, "--receiver-package"),
+        operatorPackage: operatorPackage ?? getOpt(rest, "--receiver-package"),
         timeoutMs,
       });
     } else {
@@ -603,28 +603,28 @@ COMMANDS["action"] = {
   group: "Device Interaction",
   summary: "Build and run single device actions via execute path",
   help: "clawperator action\n\nUsage:\n  clawperator action open-app|open-uri|click|read|wait|type|press-key [options]\n",
-  topLevelBlock: `  action open-app --app <packageId> [--device-id <id>] [--receiver-package <package>]
+  topLevelBlock: `  action open-app --app <packageId> [--device-id <id>] [--operator-package <package>]
                                             Build and run single open_app action via execute path
-  action open-uri --uri <value> [--device-id <id>] [--receiver-package <package>]
+  action open-uri --uri <value> [--device-id <id>] [--operator-package <package>]
                                             Build and run single open_uri action via execute path
-  action click --selector <json> [--device-id <id>] [--receiver-package <package>]
+  action click --selector <json> [--device-id <id>] [--operator-package <package>]
                                             Build and run single click action via execute path
-  action read --selector <json> [--device-id <id>] [--receiver-package <package>]
+  action read --selector <json> [--device-id <id>] [--operator-package <package>]
                                             Build and run single read_text action via execute path
-  action wait --selector <json> [--device-id <id>] [--receiver-package <package>]
+  action wait --selector <json> [--device-id <id>] [--operator-package <package>]
                                             Build and run single wait_for_node action via execute path
-  action type --selector <json> --text <value> [--submit] [--clear] [--device-id <id>] [--receiver-package <package>]
+  action type --selector <json> --text <value> [--submit] [--clear] [--device-id <id>] [--operator-package <package>]
                                             Build and run single enter_text action via execute path
-  action press-key --key <back|home|recents> [--device-id <id>] [--receiver-package <package>]
+  action press-key --key <back|home|recents> [--device-id <id>] [--operator-package <package>]
                                             Build and run single press_key action via execute path`,
   handler: async (ctx) => {
-    const { rest, format, verbose, logger, deviceId, receiverPackage } = ctx;
+    const { rest, format, verbose, logger, deviceId, operatorPackage } = ctx;
     const out = { format, verbose, logger };
     const sub = rest[0];
     const selector = getOpt(rest, "--selector");
     const runOpts = {
       deviceId: deviceId ?? getOpt(rest, "--device-id"),
-      receiverPackage: receiverPackage ?? getOpt(rest, "--receiver-package"),
+      operatorPackage: operatorPackage ?? getOpt(rest, "--receiver-package"),
       logger,
     };
     if (sub === "click") {
@@ -690,7 +690,7 @@ Usage:
   clawperator skills new <skill_id> [--summary <text>]
   clawperator skills validate <skill_id> [--dry-run]
   clawperator skills validate --all [--dry-run]
-  clawperator skills run <skill_id> [--device-id <id>] [--receiver-package <pkg>] [--timeout-ms <n>] [--expect-contains <text>] [--skip-validate] [-- <extra_args>]
+  clawperator skills run <skill_id> [--device-id <id>] [--operator-package <pkg>] [--timeout-ms <n>] [--expect-contains <text>] [--skip-validate] [-- <extra_args>]
   clawperator skills install
   clawperator skills update [--ref <git-ref>]
   clawperator skills sync --ref <git-ref>
@@ -718,7 +718,7 @@ Usage:
   skills validate <skill_id> [--dry-run]
   skills validate --all [--dry-run]
                                             Validate one local skill or the entire configured registry
-  skills run <skill_id> [--device-id <id>] [--receiver-package <pkg>] [--timeout-ms <n>] [--expect-contains <text>] [--skip-validate] [-- <extra_args>]
+  skills run <skill_id> [--device-id <id>] [--operator-package <pkg>] [--timeout-ms <n>] [--expect-contains <text>] [--skip-validate] [-- <extra_args>]
                                             Invoke a skill script (convenience wrapper)
   skills install
                                             Clone skills repository to ~/.clawperator/skills/
@@ -727,7 +727,7 @@ Usage:
   skills sync --ref <git-ref>
                                             Sync and pin skills index/cache to a git ref`,
   handler: async (ctx) => {
-    const { argv, rest, format, verbose, logger, deviceId, receiverPackage, timeoutMs } = ctx;
+    const { argv, rest, format, verbose, logger, deviceId, operatorPackage, timeoutMs } = ctx;
     const out = { format, verbose, logger };
     if (rest[0] === "list") {
       return (await import("./commands/skills.js")).cmdSkillsList(out);
@@ -781,7 +781,7 @@ Usage:
     } else if (rest[0] === "run") {
       const skillId = rest[1];
       if (!skillId) {
-        return JSON.stringify({ code: "USAGE", message: "skills run <skill_id> [--device-id <id>] [--receiver-package <pkg>] [--timeout-ms <n>] [--expect-contains <text>] [--skip-validate] [-- <extra_args>]" });
+        return JSON.stringify({ code: "USAGE", message: "skills run <skill_id> [--device-id <id>] [--operator-package <pkg>] [--timeout-ms <n>] [--expect-contains <text>] [--skip-validate] [-- <extra_args>]" });
       } else {
         const dashDash = rest.indexOf("--");
         const optSegment = dashDash >= 0 ? rest.slice(0, dashDash) : rest;
@@ -791,7 +791,7 @@ Usage:
         const rawOptSegment = rawDashDash >= 0 ? rawSkillsRunArgs.slice(0, rawDashDash) : rawSkillsRunArgs;
         const scriptArgs: string[] = [];
         const resolvedDeviceId = deviceId ?? getOpt(optSegment, "--device-id");
-        const resolvedReceiverPackage = receiverPackage ?? getOpt(optSegment, "--receiver-package");
+        const resolvedOperatorPackage = operatorPackage ?? getOpt(optSegment, "--receiver-package");
         const localTimeoutMs = getNumberOpt(rawOptSegment, "--timeout-ms") ?? getNumberOpt(rawOptSegment, "--timeout");
         const effectiveTimeoutMs = localTimeoutMs ?? timeoutMs;
         const invalidTimeoutResult = getInvalidTimeoutResult(effectiveTimeoutMs, { format });
@@ -809,7 +809,7 @@ Usage:
           scriptArgs,
           effectiveTimeoutMs,
           expectContains,
-          resolvedReceiverPackage,
+          resolvedOperatorPackage,
           { ...out, skipValidate, deviceId: resolvedDeviceId, logger }
         );
       }
@@ -836,21 +836,21 @@ COMMANDS["recording"] = {
   group: "Recording",
   summary: "Manage recording sessions on the Operator app",
   help: "clawperator recording\n\nUsage:\n  clawperator recording start|stop|pull|parse ... ('record' is an alias)\n",
-  topLevelBlock: `  recording start [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]
+  topLevelBlock: `  recording start [--session-id <id>] [--device-id <serial>] [--operator-package <pkg>]
                                             Start a recording session on the Operator app ('record' is an alias)
-  recording stop  [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]
+  recording stop  [--session-id <id>] [--device-id <serial>] [--operator-package <pkg>]
                                             Stop the active recording session and finalize the on-device file ('record' is an alias)
   recording pull  [--session-id <id>] [--out <dir>] [--device-id <serial>]
                                             Pull the on-device NDJSON recording to host (default: ./recordings/, 'record' is an alias)
   recording parse --input <file> [--out <file>]
                                             Parse a raw NDJSON recording into a step log JSON ('record' is an alias)`,
   handler: async (ctx) => {
-    const { rest, format, verbose, logger, deviceId, receiverPackage } = ctx;
+    const { rest, format, verbose, logger, deviceId, operatorPackage } = ctx;
     const out = { format, verbose, logger };
     const sub = rest[0];
     const runOpts = {
       deviceId: deviceId ?? getOpt(rest, "--device-id"),
-      receiverPackage: receiverPackage ?? getOpt(rest, "--receiver-package"),
+      operatorPackage: operatorPackage ?? getOpt(rest, "--receiver-package"),
     };
     if (sub === "start") {
       return (await import("./commands/record.js")).cmdRecordStart({
@@ -935,7 +935,7 @@ COMMANDS["doctor"] = {
   doctor --check-only
                                             Keep doctor non-blocking by always exiting 0 (for CI/automation)`,
   handler: async (ctx) => {
-    const { rest, format, verbose, logger, deviceId, receiverPackage } = ctx;
+    const { rest, format, verbose, logger, deviceId, operatorPackage } = ctx;
     const out = { format, verbose, logger };
     const isJson = hasFlag(rest, "--json") || format === "json";
     return (await import("./commands/doctor.js")).cmdDoctor({
@@ -945,7 +945,7 @@ COMMANDS["doctor"] = {
       full: hasFlag(rest, "--full"),
       checkOnly: hasFlag(rest, "--check-only"),
       deviceId: deviceId ?? getOpt(rest, "--device-id"),
-      receiverPackage: receiverPackage ?? getOpt(rest, "--receiver-package"),
+      operatorPackage: operatorPackage ?? getOpt(rest, "--receiver-package"),
       logger,
     });
   },
@@ -957,15 +957,15 @@ COMMANDS["grant-device-permissions"] = {
   group: "Diagnostics",
   summary: "Re-grant accessibility and notification permissions",
   help: HELP_GRANT_DEVICE_PERMISSIONS,
-  topLevelBlock: `  grant-device-permissions [--device-id <id>] [--receiver-package <package>]
+  topLevelBlock: `  grant-device-permissions [--device-id <id>] [--operator-package <package>]
                                             Re-grant accessibility and notification permissions (remediation only)`,
   handler: async (ctx) => {
-    const { rest, format, verbose, logger, deviceId, receiverPackage } = ctx;
+    const { rest, format, verbose, logger, deviceId, operatorPackage } = ctx;
     const out = { format, verbose, logger };
     return (await import("./commands/grantDevicePermissions.js")).cmdGrantDevicePermissions({
       ...out,
       deviceId: deviceId ?? getOpt(rest, "--device-id"),
-      receiverPackage: receiverPackage ?? getOpt(rest, "--receiver-package"),
+      operatorPackage: operatorPackage ?? getOpt(rest, "--receiver-package"),
     });
   },
 };
@@ -978,16 +978,16 @@ COMMANDS["version"] = {
   help: HELP_VERSION,
   topLevelBlock: `  version
                                             Show the CLI version
-  version --check-compat [--device-id <id>] [--receiver-package <package>]
+  version --check-compat [--device-id <id>] [--operator-package <package>]
                                             Compare the CLI version with the installed Operator APK version`,
   handler: async (ctx) => {
-    const { rest, format, verbose, logger, deviceId, receiverPackage } = ctx;
+    const { rest, format, verbose, logger, deviceId, operatorPackage } = ctx;
     const out = { format, verbose, logger };
     return (await import("./commands/version.js")).cmdVersion({
       ...out,
       checkCompat: hasFlag(rest, "--check-compat"),
       deviceId: deviceId ?? getOpt(rest, "--device-id"),
-      receiverPackage: receiverPackage ?? getOpt(rest, "--receiver-package"),
+      operatorPackage: operatorPackage ?? getOpt(rest, "--receiver-package"),
     });
   },
 };
@@ -1071,7 +1071,7 @@ export function generateTopLevelHelp(commands: Record<string, CommandDef>): stri
     "",
     "Global options:",
     "  --device-id <id>, --device <id>           Target Android device serial",
-    "  --receiver-package <package>, --operator-package <package>",
+    "  --operator-package <package>, --receiver-package <package>",
     "                                            Target Operator package for broadcast dispatch",
     "  --output <json|pretty>, --format <json|pretty>",
     "                                            Output format (default: json)",

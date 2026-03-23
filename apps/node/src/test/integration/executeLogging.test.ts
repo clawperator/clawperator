@@ -97,7 +97,7 @@ describe("CLI execute logging integration", () => {
       executionPath,
       "--device-id",
       "device-123",
-      "--receiver-package",
+      "--operator-package",
       "com.test.operator.dev",
       "--output",
       "json",

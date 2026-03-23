@@ -78,7 +78,7 @@ export async function runAndroidInstall(config: RuntimeConfig): Promise<DoctorCh
 }
 
 export async function runAndroidLaunch(config: RuntimeConfig): Promise<DoctorCheckResult> {
-  const mainActivity = `${config.receiverPackage}/clawperator.activity.MainActivity`;
+  const mainActivity = `${config.operatorPackage}/clawperator.activity.MainActivity`;
   const { code, stderr } = await runAdb(config, ["shell", "am", "start", "-n", mainActivity]);
 
   if (code !== 0) {

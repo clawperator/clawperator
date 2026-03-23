@@ -22,19 +22,19 @@ export async function cmdOperatorSetup(options: {
   format: OutputOptions["format"];
   apkPath: string;
   deviceId?: string;
-  receiverPackage?: string;
+  operatorPackage?: string;
   logger?: Logger;
 }): Promise<string> {
-  const receiverPackage =
-    options.receiverPackage ?? process.env.CLAWPERATOR_RECEIVER_PACKAGE;
+  const operatorPackage =
+    options.operatorPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE;
   const config = getDefaultRuntimeConfig({
     deviceId: options.deviceId,
-    receiverPackage,
+    operatorPackage,
     adbPath: process.env.ADB_PATH,
     logger: options.logger,
   });
 
-  const result = await setupOperator(config, options.apkPath, receiverPackage);
+  const result = await setupOperator(config, options.apkPath, operatorPackage);
 
   // Install phase failure.
   if (!result.install.ok) {
@@ -43,7 +43,7 @@ export async function cmdOperatorSetup(options: {
       {
         code: isNotFound ? ERROR_CODES.OPERATOR_APK_NOT_FOUND : ERROR_CODES.OPERATOR_INSTALL_FAILED,
         message: result.install.error ?? "APK install failed.",
-        receiverPackage: result.receiverPackage,
+        operatorPackage: result.operatorPackage,
         install: result.install,
       },
       options
@@ -64,7 +64,7 @@ export async function cmdOperatorSetup(options: {
         {
           code: ERROR_CODES.OPERATOR_GRANT_FAILED,
           message: permFailed.error ?? "Failed to grant required device permissions.",
-          receiverPackage: result.receiverPackage,
+          operatorPackage: result.operatorPackage,
           install: result.install,
           permissions: {
             accessibility,
@@ -83,7 +83,7 @@ export async function cmdOperatorSetup(options: {
       {
         code: ERROR_CODES.OPERATOR_VERIFY_FAILED,
         message: result.verification.error ?? "Operator verification failed after install.",
-        receiverPackage: result.receiverPackage,
+        operatorPackage: result.operatorPackage,
         install: result.install,
         permissions: result.permissions
           ? {
@@ -103,7 +103,7 @@ export async function cmdOperatorSetup(options: {
 
   return formatSuccess(
     {
-      receiverPackage: result.receiverPackage,
+      operatorPackage: result.operatorPackage,
       install: result.install,
       permissions: result.permissions
         ? {

@@ -24,7 +24,7 @@ export interface DoctorReport {
   ok: boolean;
   criticalOk?: boolean;
   deviceId?: string;
-  receiverPackage?: string;
+  operatorPackage?: string;
   checks: DoctorCheckResult[];
   nextActions?: string[];
 }

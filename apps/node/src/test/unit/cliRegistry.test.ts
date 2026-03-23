@@ -124,7 +124,7 @@ describe("flag aliases - --timeout works like --timeout-ms", () => {
   });
 });
 
-describe("flag aliases - --operator-package works like --receiver-package", () => {
+describe("flag aliases - --receiver-package works as alias for --operator-package", () => {
   it("--operator-package is accepted by getGlobalOpts (passed through to operator setup failure)", async () => {
     const { stdout } = await runCli([
       "--operator-package", "com.clawperator.operator.dev",
@@ -132,8 +132,8 @@ describe("flag aliases - --operator-package works like --receiver-package", () =
       "--apk", "/nonexistent/test.apk",
     ]);
     const obj = JSON.parse(stdout);
-    // Should fail with OPERATOR_APK_NOT_FOUND and echo back the receiverPackage
-    assert.strictEqual(obj.receiverPackage, "com.clawperator.operator.dev");
+    // Should fail with OPERATOR_APK_NOT_FOUND and echo back the operatorPackage
+    assert.strictEqual(obj.operatorPackage, "com.clawperator.operator.dev");
   });
 
 });

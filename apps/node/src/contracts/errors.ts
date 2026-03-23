@@ -99,7 +99,7 @@ export interface TimeoutDiagnostics {
   lastCorrelatedEvents?: string[];
   broadcastDispatchStatus?: string;
   deviceId?: string;
-  receiverPackage?: string;
+  operatorPackage?: string;
 }
 
 export interface BroadcastDiagnostics {
@@ -108,7 +108,7 @@ export interface BroadcastDiagnostics {
   lastCorrelatedEvents?: string[];
   broadcastDispatchStatus?: string;
   deviceId?: string;
-  receiverPackage?: string;
+  operatorPackage?: string;
 }
 
 export function isClawperatorError(e: unknown): e is ClawperatorError {

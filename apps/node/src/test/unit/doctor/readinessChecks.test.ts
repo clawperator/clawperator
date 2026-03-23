@@ -11,7 +11,7 @@ describe("checkApkPresence", () => {
         const config = getDefaultRuntimeConfig({
             runner,
             deviceId: "test-device",
-            receiverPackage: "com.test.operator",
+            operatorPackage: "com.test.operator",
         });
 
         runner.queueResult({ code: 0, stdout: "", stderr: "" });
@@ -29,7 +29,7 @@ describe("checkApkPresence", () => {
         const config = getDefaultRuntimeConfig({
             runner,
             deviceId: "test-device",
-            receiverPackage: "com.test.operator",
+            operatorPackage: "com.test.operator",
         });
 
         runner.queueResult({ code: 1, stdout: "", stderr: "cmd: Can't find service: package", error: new Error("shell failed") });
@@ -48,7 +48,7 @@ describe("runHandshake", () => {
             config: getDefaultRuntimeConfig({
                 runner,
                 deviceId: "test-device",
-                receiverPackage: "com.test.operator",
+                operatorPackage: "com.test.operator",
             }),
             runner,
         };

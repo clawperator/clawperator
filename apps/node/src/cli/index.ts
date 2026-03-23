@@ -14,7 +14,7 @@ import {
 
 function getGlobalOpts(argv: string[]): {
   deviceId?: string;
-  receiverPackage?: string;
+  operatorPackage?: string;
   timeoutMs?: number;
   logLevel?: "debug" | "info" | "warn" | "error";
   output: "json" | "pretty";
@@ -23,7 +23,7 @@ function getGlobalOpts(argv: string[]): {
 } {
   const rest: string[] = [];
   let deviceId: string | undefined;
-  let receiverPackage: string | undefined;
+  let operatorPackage: string | undefined;
   let timeoutMs: number | undefined;
   let logLevel: "debug" | "info" | "warn" | "error" | undefined;
   let output: "json" | "pretty" = "json";
@@ -35,10 +35,10 @@ function getGlobalOpts(argv: string[]): {
       // --device is the new canonical for --device-id (old name still works)
       deviceId = argv[++i];
     } else if (argv[i] === "--receiver-package" && argv[i + 1]) {
-      receiverPackage = argv[++i];
+      // --receiver-package is an alias for --operator-package (old name still works)
+      operatorPackage = argv[++i];
     } else if (argv[i] === "--operator-package" && argv[i + 1]) {
-      // --operator-package is the new canonical for --receiver-package
-      receiverPackage = argv[++i];
+      operatorPackage = argv[++i];
     } else if ((argv[i] === "--output" || argv[i] === "--format") && argv[i + 1]) {
       output = argv[++i] === "pretty" ? "pretty" : "json";
     } else if (argv[i] === "--json") {
@@ -71,7 +71,7 @@ function getGlobalOpts(argv: string[]): {
       rest.push(argv[i]);
     }
   }
-  return { deviceId, receiverPackage, timeoutMs, logLevel, output, verbose, rest };
+  return { deviceId, operatorPackage, timeoutMs, logLevel, output, verbose, rest };
 }
 
 async function main(): Promise<void> {
@@ -131,7 +131,7 @@ async function main(): Promise<void> {
           verbose: out.verbose,
           logger,
           deviceId: global.deviceId,
-          receiverPackage: global.receiverPackage,
+          operatorPackage: global.operatorPackage,
           timeoutMs: global.timeoutMs,
         };
         const handlerResult = await def.handler(ctx);
