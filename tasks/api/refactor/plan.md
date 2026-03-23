@@ -1730,19 +1730,34 @@ Example:
 are specific to this command (not shared with the Phase 3 `--text`/`--id`
 selector flags, since they populate `labelMatcher` not `matcher`).
 
-### `--follow` on logs (design only - not scheduled)
+### `logs` command (design only - not scheduled)
+
+There is no `logs` command today. The unified logging problem definition
+(`tasks/log/unified/problem-definition.md`) describes the prerequisite
+infrastructure: a unified logger that routes lifecycle events, skill
+progress, and terminal output through a single NDJSON log surface. Until
+that infrastructure exists, there is nothing meaningful for a `logs`
+command to stream or query.
+
+The CLI surface is designed here so it is settled when the unified
+logger ships.
 
 ```bash
+# Stream log output (like tail -f)
 clawperator logs --follow
 clawperator logs -f
+
+# Query recent logs (future - not designed yet)
+clawperator logs
 ```
 
 - `-f` is the universal short form (tail -f, docker logs -f, kubectl logs -f)
-- Streams log output until interrupted (Ctrl+C)
-- **Not implemented in any phase of this refactor.** Requires streaming
-  infrastructure that does not exist yet. The surface design is recorded
-  here so it is settled when that infrastructure is built. There is no
-  existing `logs` command - this is an entirely new command.
+- `--follow` streams NDJSON log output until interrupted (Ctrl+C)
+- **Not implemented in any phase of this refactor.** Depends on the
+  unified logging infrastructure described in the problem definition.
+- Future subcommands or query flags (time range, event type filtering,
+  skill ID filtering) are not designed here - they depend on the unified
+  logger's event schema being settled first.
 
 ---
 
