@@ -2792,7 +2792,7 @@ installer are:
 | :--- | :--- | :--- |
 | `CLAWPERATOR_SKILLS_REGISTRY` | CLI and installer | Overrides the path to the local skills registry JSON |
 | `CLAWPERATOR_INSTALL_APK` | installer | Pre-seeds the installer's "install APK now?" decision for non-interactive runs |
-| `CLAWPERATOR_OPERATOR_PACKAGE` | installer | Overrides the default Operator package used during installer setup |
+| `CLAWPERATOR_OPERATOR_PACKAGE` | CLI, installer, skills | Default Android Operator package when `--operator-package` is omitted (also passed to skill scripts) |
 
 ### `CLAWPERATOR_INSTALL_APK`
 
@@ -3451,7 +3451,7 @@ These flags are parsed globally. Command support varies by path.
 | `--help` | Show help |
 | `--version` | Show version |
 
-Default receiver package: `com.clawperator.operator`. Use `--operator-package com.clawperator.operator.dev` for local debug APKs.
+The default Operator package is `com.clawperator.operator`. Use `--operator-package com.clawperator.operator.dev` for local debug builds.
 
 ---
 
@@ -3716,7 +3716,7 @@ clawperator type <text> --selector '<json>' [--device <id>] [--operator-package 
 |------|-------------|
 | `--selector <json>` | `NodeMatcher` JSON (required) |
 | `--submit` | Press Enter after typing |
-| `--clear` | No effect on the device today: the Operator runtime still does not clear the field before typing. Node accepts the flag (same long-standing behavior as the `clear` field on `enter_text` in JSON). |
+| `--clear` | No effect today (field is not cleared before typing on device). |
 
 Text may be supplied as a positional argument or via `--text <text>`. Synonym: `fill` (accepted, not in help).
 
@@ -4088,7 +4088,7 @@ clawperator version --check-compat [--device <id>] [--operator-package <package>
 | `--device <id>` | Target device serial |
 | `--operator-package <package>` | Target Operator package |
 
-`clawperator version --check-compat` reports the CLI version, installed APK version, APK `versionCode`, receiver package, compatibility verdict, and remediation guidance when versions do not match.
+`clawperator version --check-compat` reports the CLI version, installed APK version, APK `versionCode`, Operator package, compatibility verdict, and remediation guidance when versions do not match.
 
 ---
 
@@ -4235,7 +4235,7 @@ These codes are returned by the flat CLI commands when required arguments are mi
 
 | Code | Description |
 |------|-------------|
-| `BROADCAST_FAILED` | ADB broadcast to the receiver package failed |
+| `BROADCAST_FAILED` | ADB broadcast to the Operator package failed |
 | `PAYLOAD_TOO_LARGE` | Execution payload exceeds the 64,000 byte limit |
 | `DOCTOR_FAILED` | Doctor check runner encountered an unexpected error |
 
@@ -4754,12 +4754,12 @@ Server-Sent Events stream. Emits two event types:
 | Variable | Description |
 |----------|-------------|
 | `ADB_PATH` | Override path to `adb` binary |
-| `CLAWPERATOR_OPERATOR_PACKAGE` | Default receiver package (fallback if not passed as option) |
+| `CLAWPERATOR_OPERATOR_PACKAGE` | Default Android Operator package when `--operator-package` is omitted (CLI, installer, skills; see [Environment variables](environment-variables.md)) |
 | `CLAWPERATOR_SKILLS_REGISTRY` | Path to `skills-registry.json`. If unset, defaults to `./skills/skills-registry.json` relative to the working directory. After `skills install`, set to `~/.clawperator/skills/skills/skills-registry.json`. |
 
 ---
 
-## Receiver Packages
+## Operator packages
 
 | Variant | Package ID |
 |---------|-----------|
@@ -7101,7 +7101,7 @@ Use it when:
 
 ## `CLAWPERATOR_OPERATOR_PACKAGE`
 
-Sets the default receiver package for commands that dispatch to the Android
+Sets the default Operator package for commands that dispatch to the Android
 Operator APK. Also injected into skill scripts via `CLAWPERATOR_OPERATOR_PACKAGE`
 so skills know which Operator package to target.
 

@@ -240,7 +240,7 @@ Usage:
 
 Notes:
   - Default Operator package: com.clawperator.operator
-  - Use --operator-package com.clawperator.operator.dev for local debug APKs. --operator-package is an accepted alias.
+  - Use --operator-package com.clawperator.operator.dev for local debug APKs. --receiver-package is a legacy alias (see global options).
   - Exit code 0 means all critical checks passed, including the warning-only multi-device ambiguity case.
   - Exit code 1 means a genuine failure such as no device, APK not installed, or handshake failure.
   - If handshake times out, rerun with --verbose and compare the installed APK package with --operator-package.
@@ -254,7 +254,7 @@ Usage:
 
   Notes:
   - Default Operator package: com.clawperator.operator
-  - Use --operator-package com.clawperator.operator.dev for local debug APKs. --operator-package is an accepted alias.
+  - Use --operator-package com.clawperator.operator.dev for local debug APKs. --receiver-package is a legacy alias (see global options).
   - --check-compat compares the CLI version with the installed APK version on the device.
 `;
 
@@ -265,7 +265,7 @@ Usage:
 
 Notes:
   - Default Operator package: com.clawperator.operator
-  - Use --operator-package com.clawperator.operator.dev for local debug APKs. --operator-package is an accepted alias.
+  - Use --operator-package com.clawperator.operator.dev for local debug APKs. --receiver-package is a legacy alias (see global options).
   - Grants accessibility, notification posting, and notification listener permissions via adb.
   - This command is for crash recovery only. Use it when the Operator APK crashes and Android revokes permissions.
   - For normal setup, always use clawperator operator setup instead.

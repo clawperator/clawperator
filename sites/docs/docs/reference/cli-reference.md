@@ -22,7 +22,7 @@ These flags are parsed globally. Command support varies by path.
 | `--help` | Show help |
 | `--version` | Show version |
 
-Default receiver package: `com.clawperator.operator`. Use `--operator-package com.clawperator.operator.dev` for local debug APKs.
+The default Operator package is `com.clawperator.operator`. Use `--operator-package com.clawperator.operator.dev` for local debug builds.
 
 ---
 
@@ -659,7 +659,7 @@ clawperator version --check-compat [--device <id>] [--operator-package <package>
 | `--device <id>` | Target device serial |
 | `--operator-package <package>` | Target Operator package |
 
-`clawperator version --check-compat` reports the CLI version, installed APK version, APK `versionCode`, receiver package, compatibility verdict, and remediation guidance when versions do not match.
+`clawperator version --check-compat` reports the CLI version, installed APK version, APK `versionCode`, Operator package, compatibility verdict, and remediation guidance when versions do not match.
 
 ---
 

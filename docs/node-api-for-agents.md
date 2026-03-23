@@ -1051,7 +1051,7 @@ installer are:
 | :--- | :--- | :--- |
 | `CLAWPERATOR_SKILLS_REGISTRY` | CLI and installer | Overrides the path to the local skills registry JSON |
 | `CLAWPERATOR_INSTALL_APK` | installer | Pre-seeds the installer's "install APK now?" decision for non-interactive runs |
-| `CLAWPERATOR_OPERATOR_PACKAGE` | installer | Overrides the default Operator package used during installer setup |
+| `CLAWPERATOR_OPERATOR_PACKAGE` | CLI, installer, skills | Default Android Operator package when `--operator-package` is omitted (also passed to skill scripts) |
 
 ### `CLAWPERATOR_INSTALL_APK`
 

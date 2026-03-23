@@ -415,12 +415,12 @@ Server-Sent Events stream. Emits two event types:
 | Variable | Description |
 |----------|-------------|
 | `ADB_PATH` | Override path to `adb` binary |
-| `CLAWPERATOR_OPERATOR_PACKAGE` | Default receiver package (fallback if not passed as option) |
+| `CLAWPERATOR_OPERATOR_PACKAGE` | Default Android Operator package when `--operator-package` is omitted (CLI, installer, skills; see [Environment variables](environment-variables.md)) |
 | `CLAWPERATOR_SKILLS_REGISTRY` | Path to `skills-registry.json`. If unset, defaults to `./skills/skills-registry.json` relative to the working directory. After `skills install`, set to `~/.clawperator/skills/skills/skills-registry.json`. |
 
 ---
 
-## Receiver Packages
+## Operator packages
 
 | Variant | Package ID |
 |---------|-----------|

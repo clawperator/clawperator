@@ -42,7 +42,7 @@ Use it when:
 
 ## `CLAWPERATOR_OPERATOR_PACKAGE`
 
-Sets the default receiver package for commands that dispatch to the Android
+Sets the default Operator package for commands that dispatch to the Android
 Operator APK. Also injected into skill scripts via `CLAWPERATOR_OPERATOR_PACKAGE`
 so skills know which Operator package to target.
 

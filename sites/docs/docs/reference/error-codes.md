@@ -131,7 +131,7 @@ These codes are returned by the flat CLI commands when required arguments are mi
 
 | Code | Description |
 |------|-------------|
-| `BROADCAST_FAILED` | ADB broadcast to the receiver package failed |
+| `BROADCAST_FAILED` | ADB broadcast to the Operator package failed |
 | `PAYLOAD_TOO_LARGE` | Execution payload exceeds the 64,000 byte limit |
 | `DOCTOR_FAILED` | Doctor check runner encountered an unexpected error |
 
