@@ -366,6 +366,16 @@ describe("operator setup CLI output", () => {
     assert.match(obj.message ?? "", /'observe screenshot' has been removed/);
     assert.strictEqual(obj.suggestion, "screenshot");
   });
+
+  it("nested `action click` returns UNKNOWN_COMMAND redirect to `click`", async () => {
+    const { stdout, code } = await runCli(["action", "click", "--selector"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string; suggestion?: string };
+    assert.strictEqual(obj.code, "UNKNOWN_COMMAND");
+    assert.match(obj.message ?? "", /'action click' has been removed/);
+    assert.match(obj.message ?? "", /Use 'click' instead/);
+    assert.strictEqual(obj.suggestion, "click");
+  });
 });
 
 describe("promoted flat commands - help and missing-arg errors", () => {

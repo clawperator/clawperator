@@ -893,7 +893,7 @@ separable for review:
    - `--device` (canonical), `--device-id` (accepted silently)
    - `--json` (canonical), `--output json` (accepted silently)
    - `--timeout` (canonical), `--timeout-ms` (accepted silently)
-   - `--operator-package` (canonical), `--operator-package` (accepted silently).
+   - `--operator-package` (canonical), `--receiver-package` (accepted silently as legacy alias).
      `--package` was considered and deliberately dropped - see Design Decisions.
 
 6. **Remove `action` and `observe` parent commands**
