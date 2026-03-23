@@ -552,6 +552,11 @@ but leaves the codebase harder to maintain after the refactor than before it.
    const COMMANDS: Record<string, CommandDef> = { ... };
    ```
 
+   `serve` is the only current command that may return `void`. It is a
+   long-running command that starts the HTTP server and then keeps the process
+   alive. Every other registry handler should return a string result that the
+   dispatcher prints to stdout.
+
    The registry is the canonical source for:
    - Dispatch: loop over COMMANDS keys + synonyms instead of a switch
    - Help generation: `--help` output is built from registry entries, not
