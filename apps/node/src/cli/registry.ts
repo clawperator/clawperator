@@ -334,13 +334,7 @@ COMMANDS["operator"] = {
         return (await import("./commands/operatorSetup.js")).cmdOperatorSetup({
           ...out,
           apkPath,
-          // Note: getGlobalOpts scans all of argv linearly (including post-command
-          // tokens), so deviceId/receiverPackage are always populated from the context
-          // when the caller used --device-id/--receiver-package anywhere in argv.
-          // The ?? getOpt(rest, ...) fallbacks below are therefore dead code under
-          // normal invocation. They are kept as a safety net for any future call
-          // path that bypasses getGlobalOpts, and will be cleaned up in Phase 2
-          // once the full argv handling is audited.
+          // TODO(Phase 2): ?? getOpt fallbacks are dead code - see plan.md "Carried-forward debt"
           deviceId: deviceId ?? getOpt(rest, "--device-id"),
           receiverPackage: receiverPackage ?? getOpt(rest, "--receiver-package"),
         });
@@ -797,10 +791,7 @@ Usage:
       } else {
         const dashDash = rest.indexOf("--");
         const optSegment = dashDash >= 0 ? rest.slice(0, dashDash) : rest;
-        // TODO(Phase 2): ctx.rest is already post-"skills run", so rawSkillsRunArgs
-        // is approximately rest.slice(1). The getCommandArgs full-argv traversal is
-        // redundant now that the registry pre-strips the command prefix. Simplify once
-        // the argv handling audit in Phase 2 lands.
+        // TODO(Phase 2): getCommandArgs redundant - see plan.md "Carried-forward debt"
         const rawSkillsRunArgs = getCommandArgs(argv, ["skills", "run"]) ?? [];
         const rawDashDash = rawSkillsRunArgs.indexOf("--");
         const rawOptSegment = rawDashDash >= 0 ? rawSkillsRunArgs.slice(0, rawDashDash) : rawSkillsRunArgs;

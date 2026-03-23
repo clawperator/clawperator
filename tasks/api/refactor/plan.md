@@ -986,6 +986,32 @@ Did you mean:
    - Tests spawn `dist/cli/index.js` as a subprocess, so `npm run build` must
      run before `npm run test`.
 
+### Carried-forward debt from Phase 0/1
+
+These items were deferred during Phase 0/1 and must be addressed in Phase 2.
+Search for `TODO(Phase 2)` in `apps/node/src/` to locate them in code.
+
+1. **Dead-code `?? getOpt(rest, ...)` fallbacks in registry.ts** - Every handler
+   passes `deviceId: deviceId ?? getOpt(rest, "--device-id")` as a safety net.
+   Because `getGlobalOpts` scans all of argv linearly (including post-command
+   tokens), the `getOpt` branch is unreachable under normal invocation. Once the
+   Phase 2 argv handling audit confirms no bypass paths exist, remove the
+   fallbacks. If a bypass path is found, document it instead.
+
+2. **`getCommandArgs` redundancy in `skills run`** - The handler calls
+   `getCommandArgs(argv, ["skills", "run"])` to get the raw pre-`--` segment.
+   With the registry, `ctx.rest` is already post-`"skills run"`, making the
+   full-argv traversal redundant. Simplify to derive `rawOptSegment` from
+   `ctx.rest` directly once the argv audit confirms correctness.
+
+3. **Exit-code heuristic in `index.ts`** - The
+   `startsWith("{") && includes('"code"') && !includes('"envelope"')` check for
+   setting exit code 1 is brittle. It holds today because all error payloads are
+   bare `{ code, message }` and all success payloads carry `"envelope"`. If any
+   new Phase 2 command returns a success shape without `"envelope"`, this will
+   incorrectly set exit code 1. Audit all new handler return shapes against this
+   heuristic before landing Phase 2.
+
 ### Risk
 
 Low-medium. Breaking change to CLI surface, but zero external users and only
