@@ -957,6 +957,7 @@ Branch agent logic on codes from `envelope.errorCode` (top-level Android result 
 | `NODE_NOT_FOUND` | `data.error` | Selector matched no UI element |
 | `RESULT_ENVELOPE_TIMEOUT` | `error.code` | Command dispatched but no result received; `details` includes command/task correlation plus last payload action context, elapsed timing, and `logPath` when persistent logging is enabled |
 | `OPERATOR_NOT_INSTALLED` | `error.code` | Requested [Clawperator Operator Android app](../getting-started/android-operator-apk.md) package is missing on the device; `exec` and `doctor` fail fast instead of timing out |
+| `OPERATOR_VARIANT_MISMATCH` | `error.code` | Installed release vs debug Operator APK variant does not match `--operator-package` (for example `.dev` installed while the CLI targets release, or the reverse) |
 | `DEVICE_UNAUTHORIZED` | `error.code` | Device not authorized for ADB |
 | `VERSION_INCOMPATIBLE` | `error.code` | CLI and installed [Clawperator Operator Android app](../getting-started/android-operator-apk.md) versions do not match exactly after ignoring the trailing debug suffix |
 | `APK_VERSION_UNREADABLE` | `error.code` | The device package dump did not expose a readable [Clawperator Operator Android app](../getting-started/android-operator-apk.md) version |
@@ -970,6 +971,8 @@ Branch agent logic on codes from `envelope.errorCode` (top-level Android result 
 | `GESTURE_FAILED` | `data.error` | `scroll` step: the OS rejected the gesture dispatch. The accessibility service was running but Android declined to execute the swipe gesture. Step returns `success: false`. |
 
 Primary top-level error taxonomy: `apps/node/src/contracts/errors.ts`. This table also includes runtime-only step error strings where they are still surfaced directly by callers.
+
+Breaking rename: integrations that matched `RECEIVER_VARIANT_MISMATCH` must switch to `OPERATOR_VARIANT_MISMATCH` (same meaning: release vs debug Operator APK mismatch for `--operator-package`).
 
 For agent-side recovery strategy, use
 [Error Handling Guide](../reference/error-handling.md).

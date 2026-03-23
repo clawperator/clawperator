@@ -53,7 +53,7 @@ export async function checkApkPresence(config: RuntimeConfig): Promise<DoctorChe
       return {
         id: "readiness.apk.presence",
         status: "warn",
-        code: ERROR_CODES.RECEIVER_VARIANT_MISMATCH,
+        code: ERROR_CODES.OPERATOR_VARIANT_MISMATCH,
         summary: `Wrong Operator variant installed.`,
         detail: `Expected ${config.operatorPackage} but found ${otherVariant}.`,
         fix: {

@@ -172,7 +172,7 @@ describe("DoctorService", () => {
     const apkPresence = report.checks.find(check => check.id === "readiness.apk.presence");
     assert.ok(apkPresence);
     assert.strictEqual(apkPresence.status, "warn");
-    assert.strictEqual(apkPresence.code, ERROR_CODES.RECEIVER_VARIANT_MISMATCH);
+    assert.strictEqual(apkPresence.code, ERROR_CODES.OPERATOR_VARIANT_MISMATCH);
     assert.ok(!report.checks.some(check => check.id === "readiness.version.compatibility"));
     assert.ok(!report.checks.some(check => check.id === "readiness.handshake"));
   });

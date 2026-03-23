@@ -74,7 +74,7 @@ These codes are produced by `clawperator doctor` and related checks.
 | `DEVICE_UNAUTHORIZED` | Device is connected but has not authorized this host for ADB |
 | `DEVICE_OFFLINE` | Device is listed by ADB but is offline |
 | `DEVICE_SHELL_UNAVAILABLE` | ADB shell is not available on the device |
-| `RECEIVER_VARIANT_MISMATCH` | The installed APK variant (debug/release) does not match the expected variant |
+| `OPERATOR_VARIANT_MISMATCH` | The installed APK variant (debug/release) does not match the expected variant |
 | `DEVICE_DEV_OPTIONS_DISABLED` | Developer options are not enabled on the device |
 | `DEVICE_USB_DEBUGGING_DISABLED` | USB debugging is not enabled on the device |
 | `DEVICE_ACCESSIBILITY_NOT_RUNNING` | The Clawperator accessibility service is not running |

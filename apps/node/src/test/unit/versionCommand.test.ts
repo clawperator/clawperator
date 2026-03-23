@@ -92,7 +92,7 @@ describe("cmdVersion", () => {
     const parsed = JSON.parse(output);
 
     assert.strictEqual(parsed.compatible, false);
-    assert.strictEqual(parsed.error.code, ERROR_CODES.RECEIVER_VARIANT_MISMATCH);
+    assert.strictEqual(parsed.error.code, ERROR_CODES.OPERATOR_VARIANT_MISMATCH);
     assert.match(parsed.error.message, /Expected com\.clawperator\.operator\.dev/);
   });
 
@@ -112,7 +112,7 @@ describe("cmdVersion", () => {
     const parsed = JSON.parse(output);
 
     assert.strictEqual(parsed.compatible, false);
-    assert.strictEqual(parsed.error.code, ERROR_CODES.RECEIVER_VARIANT_MISMATCH);
+    assert.strictEqual(parsed.error.code, ERROR_CODES.OPERATOR_VARIANT_MISMATCH);
     assert.match(parsed.error.message, /Expected com\.clawperator\.operator but found installed variant com\.clawperator\.operator\.dev/);
   });
 
@@ -149,7 +149,7 @@ describe("probeVersionCompatibility", () => {
     const result = await probeVersionCompatibility(config);
 
     assert.strictEqual(result.compatible, false);
-    assert.strictEqual(result.error?.code, ERROR_CODES.RECEIVER_VARIANT_MISMATCH);
+    assert.strictEqual(result.error?.code, ERROR_CODES.OPERATOR_VARIANT_MISMATCH);
     assert.ok(result.remediation?.includes("Use --operator-package com.clawperator.operator"));
   });
 
@@ -188,7 +188,7 @@ describe("probeVersionCompatibility", () => {
     const result = await probeVersionCompatibility(config);
 
     assert.strictEqual(result.compatible, false);
-    assert.strictEqual(result.error?.code, ERROR_CODES.RECEIVER_VARIANT_MISMATCH);
+    assert.strictEqual(result.error?.code, ERROR_CODES.OPERATOR_VARIANT_MISMATCH);
     assert.ok(result.remediation?.includes("Use --operator-package com.clawperator.operator.dev"));
   });
 

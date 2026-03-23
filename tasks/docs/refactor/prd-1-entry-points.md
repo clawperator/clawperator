@@ -117,7 +117,7 @@ fix: {
 }
 ```
 
-Only add `docsUrl` to checks where a specific, stable docs page exists. The initial set: `OPERATOR_NOT_INSTALLED`, `RECEIVER_VARIANT_MISMATCH`, and `DEVICE_DEV_OPTIONS_DISABLED`. Do not add it to all checks as a bulk change.
+Only add `docsUrl` to checks where a specific, stable docs page exists. The initial set: `OPERATOR_NOT_INSTALLED`, `OPERATOR_VARIANT_MISMATCH`, and `DEVICE_DEV_OPTIONS_DISABLED`. Do not add it to all checks as a bulk change.
 
 Required tests:
 - Unit test: `renderCheck` output for a check with `fix.docsUrl` includes the `Docs:` line.
@@ -271,7 +271,7 @@ Hardcoded docs URLs in doctor output will become stale if the docs site is restr
 PRD-2 restructures the docs and will rename pages. The implementing agent for PRD-2 must
 check and update all `docsUrl` values hardcoded in this PRD as part of that work. The
 three initial `docsUrl` values are in `readinessChecks.ts` for `OPERATOR_NOT_INSTALLED`,
-`RECEIVER_VARIANT_MISMATCH`, and `DEVICE_DEV_OPTIONS_DISABLED`. Document these as
+`OPERATOR_VARIANT_MISMATCH`, and `DEVICE_DEV_OPTIONS_DISABLED`. Document these as
 explicit search targets in the PRD-2 implementation notes.
 
 **Risk: `operator_event.sh` stub masking intent**

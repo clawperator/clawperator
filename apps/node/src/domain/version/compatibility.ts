@@ -226,7 +226,7 @@ export async function probeVersionCompatibility(config: RuntimeConfig): Promise<
         operatorPackage,
         compatible: false,
         error: {
-          code: ERROR_CODES.RECEIVER_VARIANT_MISMATCH,
+          code: ERROR_CODES.OPERATOR_VARIANT_MISMATCH,
           message: `Expected ${operatorPackage} but found installed variant ${receiverVariant.alternateVariant}.`,
           hint: "Use the installed receiver package or reinstall the correct APK variant.",
         },
