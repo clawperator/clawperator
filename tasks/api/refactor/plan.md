@@ -76,6 +76,9 @@ clawperator execute --execution '{"actions":          clawperator scroll-until -
 (no CLI flag)                                         clawperator click --text "X" --long
 (no CLI flag)                                         clawperator click --text "X" --focus
 (fixed 30s timeout)                                   clawperator wait --text "X" --timeout 5000
+(no CLI command)                                      clawperator close com.android.settings
+clawperator execute --execution <json>                clawperator exec <json-or-file>
+clawperator read --selector '{"textEquals":"X"}'      clawperator read --text "X" --all --json
 ```
 
 ### Flags
@@ -148,6 +151,9 @@ Synonyms are accepted by the parser but are not featured in documentation.
 | `type` | `fill` |
 | `press` | `press-key` |
 | `open` | `open-uri`, `open-url` |
+| `close` | `close-app` |
+| `exec` | `execute` |
+| `scroll-until` | `scroll-and-click` |
 | `recording` | `record` |
 
 Implementation: both names call the same handler. Help text shows only the
@@ -290,8 +296,10 @@ The following commands' behavior is unchanged by this refactor:
 - `skills *`, `emulator *`, `recording` / `record`
 - `serve` remains the same CLI entrypoint. Only the HTTP route paths exposed
   by `serve.ts` change (in Phase 4)
-- `execute` (the `--execution` flag name is deliberately not renamed; it is the
-  canonical interface for skill scripts and advanced agents)
+- `execute` is renamed to `exec` with `execute` as a synonym (see Designed
+  but Deferred section). `--execution` is renamed to `--payload` with
+  `--execution` as a silent alias. Behavior is unchanged; only the names
+  change. This is deferred to post-Phase 4 implementation.
 
 ---
 
@@ -1335,25 +1343,90 @@ fixed 30s behavior (execution timeout = 30000ms).
 
 ---
 
+### `close` (app termination)
+
+`close_app` is already a canonical action type. The Node layer already
+implements it via `adb shell am force-stop` as a pre-flight (see
+`runExecution.ts:180-237`). It is used in skills, doctor checks, and
+scaffold templates. The only thing missing is a CLI wrapper.
+
+**Designed surface:**
+
+```bash
+clawperator close com.android.settings
+clawperator close com.google.home --json
+```
+
+- Positional: package name (required)
+- `--app` flag: alternative to positional (same pattern as `open`)
+- No selector flags - `close` targets a package, not a UI element
+
+**Synonym:** `close-app` is accepted (matches execution payload naming).
+
+**Registry entry:** `close` gets its own entry with
+`positional: { name: "package", required: true }`.
+
+**Implementation:** builds an execution with a single `close_app` action,
+same pattern as `buildOpenAppExecution()` but with `close_app` type and
+`applicationId` param.
+
+### `exec` (replaces `execute`)
+
+`exec` is the canonical short form in CLI tools (docker exec, kubectl exec,
+npm exec). An agent guessing the command name will try `exec` before
+`execute`. With zero current users, the migration cost is zero.
+
+**Designed surface:**
+
+```bash
+clawperator exec <json-or-file> [--validate-only] [--dry-run] [--json]
+clawperator exec --payload <json-or-file> [--validate-only] [--dry-run] [--json]
+```
+
+- Primary name: `exec`. Synonym: `execute` (accepted silently).
+- Positional: the execution payload (JSON string or file path), replacing
+  the redundant `--execution` flag name.
+- `--payload` flag: alternative to positional (for when the JSON is complex
+  or the agent prefers named args).
+- `--execution` is accepted as a silent alias for `--payload` to preserve
+  backward compatibility with existing skill scripts.
+- `--validate-only` and `--dry-run` are unchanged.
+
+**Note:** `exec best-effort` subcommand retains its current form.
+
+### `read --all`
+
+```bash
+clawperator read --text "Price" --all --json
+```
+
+- `--all` returns all matching elements as a JSON array instead of the
+  first match only
+- Without `--all`, behavior is unchanged (first match, single value)
+- `--all` requires `--json` (error if used without it, since pretty output
+  for a list is ambiguous)
+
+### `--follow` on logs
+
+```bash
+clawperator logs --follow
+clawperator logs -f
+```
+
+- `-f` is the universal short form (tail -f, docker logs -f, kubectl logs -f)
+- Streams log output until interrupted (Ctrl+C)
+- Implementation requires streaming infrastructure; surface is designed now
+  so it fits cleanly when built
+
+---
+
 ## Items Rejected
 
 These were raised in the external review and rejected. The decisions are
-final for this refactoring.
+final.
 
-- **`app close <package>`**: No current `close-app` action exists in the
-  Android receiver. Adding it requires receiver changes beyond CLI dispatch.
-  Track as a separate feature.
-- **`exec run/validate/plan` replacing `execute`**: The current `execute`
-  command has a settled contract. Renaming it adds migration cost with
-  minimal discoverability gain since agents rarely type `execute` directly.
-  Revisit if feedback shows confusion.
 - **`device` namespace grouping `devices`/`doctor`/`version`**: Adds a
   namespace to three commands that work fine as flat top-level names.
   Contradicts the namespace rule.
 - **Selector string DSL** (e.g. `text=Login`): `--text` flag covers 80%+
   of cases. A parser adds complexity for marginal gain.
-- **`--follow` flag on logs**: Useful but requires streaming infrastructure.
-  Separate feature.
-- **`read --all`**: Return all matches as a list. Useful but adds output
-  format complexity. Track as a follow-up once the single-match contract
-  is established.
