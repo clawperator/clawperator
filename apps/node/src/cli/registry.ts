@@ -101,14 +101,14 @@ export interface CommandDef {
 const HELP_OPERATOR_SETUP = `clawperator operator setup
 
 Usage:
-  clawperator operator setup --apk <path> [--device-id <id>] [--receiver-package <package>] [--output <json|pretty>]
+  clawperator operator setup --apk <path> [--device <id>] [--operator-package <pkg>] [--json]
 
 Required:
   --apk <path>              Local filesystem path to the Operator APK file
 
 Optional:
-  --device-id <id>          Target Android device serial (required when multiple devices are connected)
-  --receiver-package <pkg>  Operator package identifier (required when both release and debug variants are installed)
+  --device <id>            Target Android device serial (required when multiple devices are connected)
+  --operator-package <pkg>  Operator package identifier (required when both release and debug variants are installed)
 
 Notes:
   - This is the canonical setup command for the Clawperator Operator APK.
@@ -118,7 +118,7 @@ Notes:
   - Verification phase: confirms the package is visible to the package manager.
   - Fails with a structured error if any phase fails. The error code identifies which phase failed.
   - If omitted, setup auto-detects the package only when exactly one known Operator variant is installed.
-  - If both release and debug variants are installed, pass --receiver-package explicitly.
+  - If both release and debug variants are installed, pass --operator-package explicitly.
   - Do not use raw adb install for normal setup. It leaves the device in a partial state without required permissions.
   - operator install remains a compatibility alias for operator setup.
   - Use clawperator grant-device-permissions only after the Operator APK crashes and Android revokes permissions.
@@ -127,33 +127,33 @@ Notes:
 const HELP_SNAPSHOT = `clawperator snapshot
 
 Usage:
-  clawperator snapshot [--device-id <id>] [--receiver-package <package>] [--timeout-ms <number>] [--output <json|pretty>] [--verbose]
+  clawperator snapshot [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json] [--verbose]
 
 Notes:
   - Captures a UI snapshot via the canonical execution path.
   - Default receiver package: com.clawperator.operator
-  - Use --receiver-package com.clawperator.operator.dev for local debug APKs.
-  - --timeout-ms overrides the execution timeout within policy limits.
+  - Use --operator-package com.clawperator.operator.dev for local debug APKs.
+  - --timeout overrides the execution timeout within policy limits.
 `;
 
 const HELP_SCREENSHOT = `clawperator screenshot
 
 Usage:
-  clawperator screenshot [--device-id <id>] [--receiver-package <package>] [--path <file>] [--timeout-ms <number>] [--output <json|pretty>] [--verbose]
+  clawperator screenshot [--device <id>] [--operator-package <pkg>] [--path <file>] [--timeout <ms>] [--json] [--verbose]
 
 Notes:
   - Captures a PNG screenshot via the canonical execution path.
   - Default receiver package: com.clawperator.operator
-  - Use --receiver-package com.clawperator.operator.dev for local debug APKs.
+  - Use --operator-package com.clawperator.operator.dev for local debug APKs.
   - --path writes the screenshot to the provided local filesystem path.
   - If --path is omitted, Clawperator writes to a generated temp file and returns that path in the result envelope.
-  - --timeout-ms overrides the execution timeout within policy limits.
+  - --timeout overrides the execution timeout within policy limits.
 `;
 
 const HELP_CLICK = `clawperator click
 
 Usage:
-  clawperator click --selector <json> [--device-id <id>] [--receiver-package <package>] [--output <json|pretty>]
+  clawperator click --selector <json> [--device <id>] [--operator-package <pkg>] [--json]
 
 Required:
   --selector <json>         JSON selector object, e.g. '{"textEquals":"Login"}'
@@ -161,42 +161,42 @@ Required:
 Notes:
   - Builds and runs a single click action via the execute path.
   - Default receiver package: com.clawperator.operator
-  - Use --receiver-package com.clawperator.operator.dev for local debug APKs.
+  - Use --operator-package com.clawperator.operator.dev for local debug APKs.
 `;
 
 const HELP_OPEN = `clawperator open
 
 Usage:
-  clawperator open <target> [--device-id <id>] [--receiver-package <package>] [--output <json|pretty>]
-  clawperator open --app <package-id> [--device-id <id>] [--receiver-package <package>]
-  clawperator open --uri <uri> [--device-id <id>] [--receiver-package <package>]
+  clawperator open <target> [--device <id>] [--operator-package <pkg>] [--json]
+  clawperator open --app <package-id> [--device <id>] [--operator-package <pkg>]
+  clawperator open --uri <uri> [--device <id>] [--operator-package <pkg>]
 
 Notes:
   - Target is auto-detected: https?:// -> open_uri, <scheme>:// -> open_uri, otherwise -> open_app.
   - --app forces package name interpretation.
   - --uri forces URI/URL interpretation.
   - Default receiver package: com.clawperator.operator
-  - Use --receiver-package com.clawperator.operator.dev for local debug APKs.
+  - Use --operator-package com.clawperator.operator.dev for local debug APKs.
 `;
 
 const HELP_TYPE = `clawperator type
 
 Usage:
-  clawperator type <text> --selector <json> [--submit] [--clear] [--device-id <id>] [--receiver-package <package>] [--output <json|pretty>]
-  clawperator type --text <value> --selector <json> [--submit] [--clear] [--device-id <id>] [--receiver-package <package>]
+  clawperator type <text> --selector <json> [--submit] [--clear] [--device <id>] [--operator-package <pkg>] [--json]
+  clawperator type --text <value> --selector <json> [--submit] [--clear] [--device <id>] [--operator-package <pkg>]
 
 Notes:
   - Builds and runs a single enter_text action via the execute path.
   - --submit sends Enter/Return after typing.
   - --clear clears the field before typing.
   - Default receiver package: com.clawperator.operator
-  - Use --receiver-package com.clawperator.operator.dev for local debug APKs.
+  - Use --operator-package com.clawperator.operator.dev for local debug APKs.
 `;
 
 const HELP_READ = `clawperator read
 
 Usage:
-  clawperator read --selector <json> [--device-id <id>] [--receiver-package <package>] [--output <json|pretty>]
+  clawperator read --selector <json> [--device <id>] [--operator-package <pkg>] [--json]
 
 Required:
   --selector <json>         JSON selector object, e.g. '{"resourceId":"android:id/title"}'
@@ -204,13 +204,13 @@ Required:
 Notes:
   - Builds and runs a single read_text action via the execute path.
   - Default receiver package: com.clawperator.operator
-  - Use --receiver-package com.clawperator.operator.dev for local debug APKs.
+  - Use --operator-package com.clawperator.operator.dev for local debug APKs.
 `;
 
 const HELP_WAIT = `clawperator wait
 
 Usage:
-  clawperator wait --selector <json> [--device-id <id>] [--receiver-package <package>] [--output <json|pretty>]
+  clawperator wait --selector <json> [--device <id>] [--operator-package <pkg>] [--json]
 
 Required:
   --selector <json>         JSON selector object, e.g. '{"textContains":"Loading"}'
@@ -218,50 +218,50 @@ Required:
 Notes:
   - Builds and runs a single wait_for_node action via the execute path.
   - Default receiver package: com.clawperator.operator
-  - Use --receiver-package com.clawperator.operator.dev for local debug APKs.
+  - Use --operator-package com.clawperator.operator.dev for local debug APKs.
 `;
 
 const HELP_PRESS = `clawperator press
 
 Usage:
-  clawperator press <key> [--device-id <id>] [--receiver-package <package>] [--output <json|pretty>]
-  clawperator press --key <key> [--device-id <id>] [--receiver-package <package>]
+  clawperator press <key> [--device <id>] [--operator-package <pkg>] [--json]
+  clawperator press --key <key> [--device <id>] [--operator-package <pkg>]
 
 Notes:
   - Builds and runs a single press_key action via the execute path.
   - Valid keys: back, home, recents
   - Default receiver package: com.clawperator.operator
-  - Use --receiver-package com.clawperator.operator.dev for local debug APKs.
+  - Use --operator-package com.clawperator.operator.dev for local debug APKs.
 `;
 
 const HELP_BACK = `clawperator back
 
 Usage:
-  clawperator back [--device-id <id>] [--receiver-package <package>] [--output <json|pretty>]
+  clawperator back [--device <id>] [--operator-package <pkg>] [--json]
 
 Notes:
   - Presses the Android back key. Equivalent to: clawperator press back
   - Default receiver package: com.clawperator.operator
-  - Use --receiver-package com.clawperator.operator.dev for local debug APKs.
+  - Use --operator-package com.clawperator.operator.dev for local debug APKs.
 `;
 
 const HELP_SCROLL = `clawperator scroll
 
 Usage:
-  clawperator scroll <direction> [--device-id <id>] [--receiver-package <package>] [--output <json|pretty>]
-  clawperator scroll --direction <direction> [--device-id <id>] [--receiver-package <package>]
+  clawperator scroll <direction> [--device <id>] [--operator-package <pkg>] [--json]
+  clawperator scroll --direction <direction> [--device <id>] [--operator-package <pkg>]
 
 Notes:
   - Builds and runs a single scroll action via the execute path.
   - Valid directions: down, up, left, right
   - Default receiver package: com.clawperator.operator
-  - Use --receiver-package com.clawperator.operator.dev for local debug APKs.
+  - Use --operator-package com.clawperator.operator.dev for local debug APKs.
 `;
 
 const HELP_SKILLS_INSTALL = `clawperator skills install
 
 Usage:
-  clawperator skills install [--output <json|pretty>]
+  clawperator skills install [--json]
 
 Notes:
   - Clones the skills repository to ~/.clawperator/skills/
@@ -273,7 +273,7 @@ Notes:
 const HELP_SKILLS_SYNC = `clawperator skills sync
 
 Usage:
-  clawperator skills sync --ref <git-ref> [--output <json|pretty>]
+  clawperator skills sync --ref <git-ref> [--json]
 
 Notes:
   - Fetches or clones ~/.clawperator/skills/ and pins the local registry to the requested git ref.
@@ -285,7 +285,7 @@ Notes:
 const HELP_SKILLS_NEW = `clawperator skills new
 
 Usage:
-  clawperator skills new <skill_id> [--summary <text>] [--output <json|pretty>]
+  clawperator skills new <skill_id> [--summary <text>] [--json]
 
 Notes:
   - Scaffolds a new local skill in the currently configured skills registry repo.
@@ -298,8 +298,8 @@ Notes:
 const HELP_SKILLS_VALIDATE = `clawperator skills validate
 
 Usage:
-  clawperator skills validate <skill_id> [--dry-run] [--output <json|pretty>]
-  clawperator skills validate --all [--dry-run] [--output <json|pretty>]
+  clawperator skills validate <skill_id> [--dry-run] [--json]
+  clawperator skills validate --all [--dry-run] [--json]
 
 Notes:
   - Use <skill_id> to validate one skill, or --all to validate every registry entry in one pass.
@@ -314,8 +314,8 @@ Notes:
 const HELP_SKILLS_COMPILE_ARTIFACT = `clawperator skills compile-artifact
 
 Usage:
-  clawperator skills compile-artifact <skill_id> --artifact <name> [--vars <json>] [--output <json|pretty>]
-  clawperator skills compile-artifact --skill-id <id> --artifact <name> [--vars <json>] [--output <json|pretty>]
+  clawperator skills compile-artifact <skill_id> --artifact <name> [--vars <json>] [--json]
+  clawperator skills compile-artifact --skill-id <id> --artifact <name> [--vars <json>] [--json]
 
 Notes:
   - Compiles a deterministic skill artifact into a validated execution payload.
@@ -329,14 +329,14 @@ Notes:
 const HELP_SKILLS_RUN = `clawperator skills run
 
 Usage:
-  clawperator skills run <skill_id> [--device-id <id>] [--receiver-package <pkg>] [--timeout-ms <n>] [--expect-contains <text>] [--skip-validate] [--output <json|pretty>] [-- <extra_args>]
+  clawperator skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--json] [-- <extra_args>]
 
 Notes:
   - Runs the selected skill script through the local skill wrapper.
-  - Use --device-id explicitly when more than one Android device is connected.
-  - --receiver-package sets the Operator package for this skill run (default: com.clawperator.operator).
+  - Use --device explicitly when more than one Android device is connected.
+  - --operator-package sets the Operator package for this skill run (default: com.clawperator.operator).
     Use com.clawperator.operator.dev for local debug APKs.
-  - --timeout-ms overrides the wrapper timeout for this run only.
+  - --timeout overrides the wrapper timeout for this run only.
   - --expect-contains turns the run into a lightweight output assertion.
   - If the assertion text is missing, the wrapper fails with SKILL_OUTPUT_ASSERTION_FAILED.
   - By default, the wrapper performs a pre-run dry-run validation gate before starting the skill script.
@@ -349,39 +349,39 @@ Notes:
 const HELP_DOCTOR = `clawperator doctor
 
 Usage:
-  clawperator doctor [--output <json|pretty>] [--device-id <id>] [--receiver-package <package>] [--verbose]
+  clawperator doctor [--json] [--device <id>] [--operator-package <pkg>] [--verbose]
   clawperator doctor --fix
   clawperator doctor --full
   clawperator doctor --check-only
 
 Notes:
   - Default receiver package: com.clawperator.operator
-  - Use --receiver-package com.clawperator.operator.dev for local debug APKs.
+  - Use --operator-package com.clawperator.operator.dev for local debug APKs.
   - Exit code 0 means all critical checks passed, including the warning-only multi-device ambiguity case.
   - Exit code 1 means a genuine failure such as no device, APK not installed, or handshake failure.
-  - If handshake times out, rerun with --verbose and compare the installed APK package with --receiver-package.
+  - If handshake times out, rerun with --verbose and compare the installed APK package with --operator-package.
 `;
 
 const HELP_VERSION = `clawperator version
 
 Usage:
   clawperator version
-  clawperator version --check-compat [--device-id <id>] [--receiver-package <package>] [--output <json|pretty>]
+  clawperator version --check-compat [--device <id>] [--operator-package <pkg>] [--json]
 
   Notes:
   - Default receiver package: com.clawperator.operator
-  - Use --receiver-package com.clawperator.operator.dev for local debug APKs.
+  - Use --operator-package com.clawperator.operator.dev for local debug APKs.
   - --check-compat compares the CLI version with the installed APK version on the device.
 `;
 
 const HELP_GRANT_DEVICE_PERMISSIONS = `clawperator grant-device-permissions
 
 Usage:
-  clawperator grant-device-permissions [--device-id <id>] [--receiver-package <package>] [--output <json|pretty>]
+  clawperator grant-device-permissions [--device <id>] [--operator-package <pkg>] [--json]
 
 Notes:
   - Default receiver package: com.clawperator.operator
-  - Use --receiver-package com.clawperator.operator.dev for local debug APKs.
+  - Use --operator-package com.clawperator.operator.dev for local debug APKs.
   - Grants accessibility, notification posting, and notification listener permissions via adb.
   - This command is for crash recovery only. Use it when the Operator APK crashes and Android revokes permissions.
   - For normal setup, always use clawperator operator setup instead.
@@ -390,15 +390,15 @@ Notes:
 const HELP_EMULATOR = `clawperator emulator
 
 Usage:
-  clawperator emulator list [--output <json|pretty>]
-  clawperator emulator inspect <name> [--output <json|pretty>]
-  clawperator emulator create [--name <name>] [--output <json|pretty>]
-  clawperator emulator start <name> [--output <json|pretty>]
-  clawperator emulator stop <name> [--output <json|pretty>]
-  clawperator emulator delete <name> [--output <json|pretty>]
-  clawperator emulator status [--output <json|pretty>]
-  clawperator emulator provision [--output <json|pretty>]
-  clawperator provision emulator [--output <json|pretty>]
+  clawperator emulator list [--json]
+  clawperator emulator inspect <name> [--json]
+  clawperator emulator create [--name <name>] [--json]
+  clawperator emulator start <name> [--json]
+  clawperator emulator stop <name> [--json]
+  clawperator emulator delete <name> [--json]
+  clawperator emulator status [--json]
+  clawperator emulator provision [--json]
+  clawperator provision emulator [--json]
 
 Notes:
   - Emulator provisioning prefers: running supported emulator, stopped supported AVD, then new AVD creation.
@@ -422,7 +422,7 @@ COMMANDS["operator"] = {
     setup: HELP_OPERATOR_SETUP,
     install: HELP_OPERATOR_SETUP,
   },
-  topLevelBlock: `  operator setup --apk <path> [--device-id <id>] [--receiver-package <package>]
+  topLevelBlock: `  operator setup --apk <path> [--device <id>] [--operator-package <pkg>]
                                             Install the Operator APK, grant required permissions, and verify readiness`,
   handler: async (ctx) => {
     const { rest, format, verbose, logger, deviceId, receiverPackage } = ctx;
@@ -462,7 +462,7 @@ COMMANDS["setup"] = {
     return JSON.stringify({
       code: "USAGE",
       message: "clawperator setup is not a valid top-level command. Use: clawperator operator setup --apk <path>",
-      canonical: "clawperator operator setup --apk <path> [--device-id <id>] [--receiver-package <package>]",
+      canonical: "clawperator operator setup --apk <path> [--device <id>] [--operator-package <pkg>]",
     });
   },
 };
@@ -477,7 +477,7 @@ COMMANDS["install"] = {
     return JSON.stringify({
       code: "USAGE",
       message: "clawperator install is not a valid command. Use: clawperator operator setup --apk <path>",
-      canonical: "clawperator operator setup --apk <path> [--device-id <id>] [--receiver-package <package>]",
+      canonical: "clawperator operator setup --apk <path> [--device <id>] [--operator-package <pkg>]",
     });
   },
 };
@@ -582,8 +582,8 @@ COMMANDS["packages"] = {
   name: "packages",
   group: "Device Management",
   summary: "List installed packages on a device",
-  help: "clawperator packages list\n\nUsage:\n  clawperator packages list [--device-id <id>] [--third-party]\n",
-  topLevelBlock: `  packages list [--device-id <id>] [--third-party]
+  help: "clawperator packages list\n\nUsage:\n  clawperator packages list [--device <id>] [--third-party]\n",
+  topLevelBlock: `  packages list [--device <id>] [--third-party]
                                             List installed package IDs on a device`,
   handler: async (ctx) => {
     const { rest, format, verbose, logger, deviceId } = ctx;
@@ -595,7 +595,7 @@ COMMANDS["packages"] = {
         thirdParty: hasFlag(rest, "--third-party"),
       });
     } else {
-      return JSON.stringify({ code: "USAGE", message: "packages list [--device-id <id>] [--third-party]" });
+      return JSON.stringify({ code: "USAGE", message: "packages list [--device <id>] [--third-party]" });
     }
   },
 };
@@ -605,10 +605,10 @@ COMMANDS["execute"] = {
   name: "execute",
   group: "Execution",
   summary: "Execute a validated command payload",
-  help: "clawperator execute\n\nUsage:\n  clawperator execute --execution <json-or-file> [--validate-only] [--dry-run] [--device-id <id>] [--receiver-package <package>]\n  clawperator execute best-effort --goal <text> [--device-id <id>] [--receiver-package <package>]\n",
-  topLevelBlock: `  execute --execution <json-or-file> [--validate-only] [--dry-run] [--device-id <id>] [--receiver-package <package>]
+  help: "clawperator execute\n\nUsage:\n  clawperator execute --execution <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <pkg>]\n  clawperator execute best-effort --goal <text> [--device <id>] [--operator-package <pkg>]\n",
+  topLevelBlock: `  execute --execution <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <pkg>]
                                             Execute a validated command payload or print a dry-run plan
-  execute best-effort --goal <text> [--device-id <id>] [--receiver-package <package>]
+  execute best-effort --goal <text> [--device <id>] [--operator-package <pkg>]
                                             Produce deterministic next-action suggestion from current UI`,
   handler: async (ctx) => {
     const { rest, format, verbose, logger, deviceId, receiverPackage, timeoutMs } = ctx;
@@ -617,7 +617,7 @@ COMMANDS["execute"] = {
       const goal = getOpt(rest, "--goal");
       return JSON.stringify({
         code: "NOT_IMPLEMENTED",
-        message: "execute best-effort is Stage 1 limited; use observe snapshot + agent reasoning for now",
+        message: "execute best-effort is Stage 1 limited; use snapshot + agent reasoning for now",
         goal,
       });
     } else {
@@ -646,7 +646,7 @@ COMMANDS["snapshot"] = {
   group: "Device Interaction",
   summary: "Capture UI snapshot from device",
   help: HELP_SNAPSHOT,
-  topLevelBlock: `  snapshot [--device-id <id>] [--receiver-package <package>]
+  topLevelBlock: `  snapshot [--device <id>] [--operator-package <pkg>]
                                             Capture current UI snapshot output`,
   handler: async (ctx) => {
     const { format, logger, deviceId, receiverPackage, timeoutMs } = ctx;
@@ -666,7 +666,7 @@ COMMANDS["screenshot"] = {
   group: "Device Interaction",
   summary: "Capture PNG screenshot from device",
   help: HELP_SCREENSHOT,
-  topLevelBlock: `  screenshot [--device-id <id>] [--receiver-package <package>] [--path <file>]
+  topLevelBlock: `  screenshot [--device <id>] [--operator-package <pkg>] [--path <file>]
                                             Capture current device screenshot (png)`,
   handler: async (ctx) => {
     const { rest, format, logger, deviceId, receiverPackage, timeoutMs } = ctx;
@@ -688,7 +688,7 @@ COMMANDS["click"] = {
   group: "Device Interaction",
   summary: "Run a single click action via execute path",
   help: HELP_CLICK,
-  topLevelBlock: `  click --selector <json> [--device-id <id>] [--receiver-package <package>]
+  topLevelBlock: `  click --selector <json> [--device <id>] [--operator-package <pkg>]
                                             Build and run single click action via execute path`,
   handler: async (ctx) => {
     const { rest, format, verbose, logger, deviceId, receiverPackage } = ctx;
@@ -712,7 +712,7 @@ COMMANDS["open"] = {
   group: "Device Interaction",
   summary: "Open a package, URL, or URI (auto-detected)",
   help: HELP_OPEN,
-  topLevelBlock: `  open <target> [--device-id <id>] [--receiver-package <package>]
+  topLevelBlock: `  open <target> [--device <id>] [--operator-package <pkg>]
                                             Open a package ID, URL, or URI (auto-detected)`,
   handler: async (ctx) => {
     const { rest, format, verbose, logger, deviceId, receiverPackage } = ctx;
@@ -759,7 +759,7 @@ COMMANDS["type"] = {
   group: "Device Interaction",
   summary: "Run a single enter_text action via execute path",
   help: HELP_TYPE,
-  topLevelBlock: `  type <text> --selector <json> [--submit] [--clear] [--device-id <id>] [--receiver-package <package>]
+  topLevelBlock: `  type <text> --selector <json> [--submit] [--clear] [--device <id>] [--operator-package <pkg>]
                                             Build and run single enter_text action via execute path`,
   handler: async (ctx) => {
     const { rest, format, verbose, logger, deviceId, receiverPackage } = ctx;
@@ -796,7 +796,7 @@ COMMANDS["read"] = {
   group: "Device Interaction",
   summary: "Run a single read_text action via execute path",
   help: HELP_READ,
-  topLevelBlock: `  read --selector <json> [--device-id <id>] [--receiver-package <package>]
+  topLevelBlock: `  read --selector <json> [--device <id>] [--operator-package <pkg>]
                                             Build and run single read_text action via execute path`,
   handler: async (ctx) => {
     const { rest, format, verbose, logger, deviceId, receiverPackage } = ctx;
@@ -819,7 +819,7 @@ COMMANDS["wait"] = {
   group: "Device Interaction",
   summary: "Run a single wait_for_node action via execute path",
   help: HELP_WAIT,
-  topLevelBlock: `  wait --selector <json> [--device-id <id>] [--receiver-package <package>]
+  topLevelBlock: `  wait --selector <json> [--device <id>] [--operator-package <pkg>]
                                             Build and run single wait_for_node action via execute path`,
   handler: async (ctx) => {
     const { rest, format, verbose, logger, deviceId, receiverPackage } = ctx;
@@ -843,7 +843,7 @@ COMMANDS["press"] = {
   group: "Device Interaction",
   summary: "Run a single press_key action via execute path",
   help: HELP_PRESS,
-  topLevelBlock: `  press <key> [--device-id <id>] [--receiver-package <package>]
+  topLevelBlock: `  press <key> [--device <id>] [--operator-package <pkg>]
                                             Build and run single press_key action (back|home|recents)`,
   handler: async (ctx) => {
     const { rest, format, verbose, logger, deviceId, receiverPackage } = ctx;
@@ -871,7 +871,7 @@ COMMANDS["back"] = {
   group: "Device Interaction",
   summary: "Press the Android back key",
   help: HELP_BACK,
-  topLevelBlock: `  back [--device-id <id>] [--receiver-package <package>]
+  topLevelBlock: `  back [--device <id>] [--operator-package <pkg>]
                                             Press the Android back key`,
   handler: async (ctx) => {
     const { format, verbose, logger, deviceId, receiverPackage } = ctx;
@@ -887,7 +887,7 @@ COMMANDS["scroll"] = {
   group: "Device Interaction",
   summary: "Run a single scroll action via execute path",
   help: HELP_SCROLL,
-  topLevelBlock: `  scroll <direction> [--device-id <id>] [--receiver-package <package>]
+  topLevelBlock: `  scroll <direction> [--device <id>] [--operator-package <pkg>]
                                             Build and run single scroll action (down|up|left|right)`,
   handler: async (ctx) => {
     const { rest, format, verbose, logger, deviceId, receiverPackage } = ctx;
@@ -958,7 +958,7 @@ Usage:
   clawperator skills new <skill_id> [--summary <text>]
   clawperator skills validate <skill_id> [--dry-run]
   clawperator skills validate --all [--dry-run]
-  clawperator skills run <skill_id> [--device-id <id>] [--receiver-package <pkg>] [--timeout-ms <n>] [--expect-contains <text>] [--skip-validate] [-- <extra_args>]
+  clawperator skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [-- <extra_args>]
   clawperator skills install
   clawperator skills update [--ref <git-ref>]
   clawperator skills sync --ref <git-ref>
@@ -986,7 +986,7 @@ Usage:
   skills validate <skill_id> [--dry-run]
   skills validate --all [--dry-run]
                                             Validate one local skill or the entire configured registry
-  skills run <skill_id> [--device-id <id>] [--receiver-package <pkg>] [--timeout-ms <n>] [--expect-contains <text>] [--skip-validate] [-- <extra_args>]
+  skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [-- <extra_args>]
                                             Invoke a skill script (convenience wrapper)
   skills install
                                             Clone skills repository to ~/.clawperator/skills/
@@ -1049,7 +1049,7 @@ Usage:
     } else if (rest[0] === "run") {
       const skillId = rest[1];
       if (!skillId) {
-        return JSON.stringify({ code: "USAGE", message: "skills run <skill_id> [--device-id <id>] [--receiver-package <pkg>] [--timeout-ms <n>] [--expect-contains <text>] [--skip-validate] [-- <extra_args>]" });
+        return JSON.stringify({ code: "USAGE", message: "skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [-- <extra_args>]" });
       } else {
         const dashDash = rest.indexOf("--");
         const optSegment = dashDash >= 0 ? rest.slice(0, dashDash) : rest;
@@ -1104,9 +1104,9 @@ COMMANDS["recording"] = {
   group: "Recording",
   summary: "Manage recording sessions on the Operator app",
   help: "clawperator recording\n\nUsage:\n  clawperator recording start|stop|pull|parse ... ('record' is an alias)\n",
-  topLevelBlock: `  recording start [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]
+  topLevelBlock: `  recording start [--session-id <id>] [--device-id <serial>] [--operator-package <pkg>]
                                             Start a recording session on the Operator app ('record' is an alias)
-  recording stop  [--session-id <id>] [--device-id <serial>] [--receiver-package <pkg>]
+  recording stop  [--session-id <id>] [--device-id <serial>] [--operator-package <pkg>]
                                             Stop the active recording session and finalize the on-device file ('record' is an alias)
   recording pull  [--session-id <id>] [--out <dir>] [--device-id <serial>]
                                             Pull the on-device NDJSON recording to host (default: ./recordings/, 'record' is an alias)
@@ -1225,7 +1225,7 @@ COMMANDS["grant-device-permissions"] = {
   group: "Diagnostics",
   summary: "Re-grant accessibility and notification permissions",
   help: HELP_GRANT_DEVICE_PERMISSIONS,
-  topLevelBlock: `  grant-device-permissions [--device-id <id>] [--receiver-package <package>]
+  topLevelBlock: `  grant-device-permissions [--device <id>] [--operator-package <pkg>]
                                             Re-grant accessibility and notification permissions (remediation only)`,
   handler: async (ctx) => {
     const { rest, format, verbose, logger, deviceId, receiverPackage } = ctx;
@@ -1246,7 +1246,7 @@ COMMANDS["version"] = {
   help: HELP_VERSION,
   topLevelBlock: `  version
                                             Show the CLI version
-  version --check-compat [--device-id <id>] [--receiver-package <package>]
+  version --check-compat [--device <id>] [--operator-package <pkg>]
                                             Compare the CLI version with the installed Operator APK version`,
   handler: async (ctx) => {
     const { rest, format, verbose, logger, deviceId, receiverPackage } = ctx;
@@ -1398,7 +1398,7 @@ export function generateTopLevelHelp(commands: Record<string, CommandDef>): stri
     "  - operator setup is the canonical setup command. operator install remains an alias.",
     "  - recording is the canonical command family; 'record' is a supported short alias.",
     "  - snapshot, screenshot, click, open, type, read, wait, press, back, scroll are flat top-level commands.",
-    "  - The default receiver package is com.clawperator.operator. Use --receiver-package com.clawperator.operator.dev for local debug builds.",
+    "  - The default receiver package is com.clawperator.operator. Use --operator-package com.clawperator.operator.dev for local debug builds.",
     "  - Terminal result semantics are driven by [Clawperator-Result].",
     ""
   );

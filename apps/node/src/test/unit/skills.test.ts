@@ -1399,7 +1399,7 @@ describe("runSkill", () => {
     const { stdout } = await runCli(["skills", "run", "--timeout-ms", "5000", "--output", "json"]);
     const parsed = JSON.parse(stdout) as { code?: string; message?: string };
     assert.strictEqual(parsed.code, "USAGE");
-    assert.ok(parsed.message?.includes("--timeout-ms"));
+    assert.ok(parsed.message?.includes("--timeout"));
   });
 
   it("CLI skills run can assert output content", async () => {

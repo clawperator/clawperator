@@ -116,7 +116,7 @@ describe("CLI help", () => {
     const { stdout, code } = await runCli(["snapshot", "--help"]);
     assert.strictEqual(code, 0);
     assert.match(stdout, /clawperator snapshot/);
-    assert.match(stdout, /--timeout-ms <number>/);
+    assert.match(stdout, /--timeout <ms>/);
     assert.doesNotMatch(stdout, /skills compile-artifact/);
   });
 
@@ -165,7 +165,7 @@ describe("CLI help", () => {
     const { stdout, code } = await runCli(["skills", "run", "--help"]);
     assert.strictEqual(code, 0);
     assert.match(stdout, /clawperator skills run/);
-    assert.match(stdout, /--timeout-ms <n>/);
+    assert.match(stdout, /--timeout <ms>/);
     assert.match(stdout, /--expect-contains <text>/);
     assert.match(stdout, /SKILL_OUTPUT_ASSERTION_FAILED/);
     assert.doesNotMatch(stdout, /clawperator action/);
@@ -175,7 +175,7 @@ describe("CLI help", () => {
     const { stdout, code } = await runCli(["snapshot", "--help"]);
     assert.strictEqual(code, 0);
     assert.match(stdout, /clawperator snapshot/);
-    assert.match(stdout, /--timeout-ms <number>/);
+    assert.match(stdout, /--timeout <ms>/);
     assert.doesNotMatch(stdout, /skills compile-artifact/);
   });
 

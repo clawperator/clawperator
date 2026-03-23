@@ -5,7 +5,7 @@ export function buildScrollExecution(direction: string): Execution {
         commandId: `scroll-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
         taskId: "cli-action-scroll",
         source: "clawperator-cli",
-        timeoutMs: 15000,
+        timeoutMs: 30000,
         expectedFormat: "android-ui-automator",
         actions: [
             {
