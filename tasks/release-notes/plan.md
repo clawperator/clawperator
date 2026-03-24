@@ -15,7 +15,8 @@ Automate the generation, formatting, and distribution of release notes across th
 ### 1. New Agent Skill: `release-notes-generate`
 Located at: `.agents/skills/release-notes-generate/`
 
-This skill will be composed of two parts:
+This skill relies on the agent's *intrinsic LLM reasoning* combined with a deterministic helper script to fetch git data. The agent executes the script, reads the raw commits, and uses its LLM to synthesize the final markdown.
+
 *   **Helper Script (`scripts/gather_commits.py`)**
     *   **Arguments:** `--start-ref` (e.g., `v0.1.0`), `--end-ref` (e.g., `v0.2.0` or `HEAD`). If omitted, defaults to the last tag and `HEAD`.
     *   **Execution:** Runs `git log` between the refs.
@@ -27,10 +28,11 @@ This skill will be composed of two parts:
     *   **Metadata:** Extracts the commit date of the `--end-ref` (or today's date if `HEAD`).
     *   **Output:** A structured JSON or Markdown digest of categorized commits and the release date.
 *   **Skill Instructions (`SKILL.md`)**
-    *   Guides the agent to invoke `gather_commits.py`.
-    *   Instructs the agent to digest the output into user-friendly release notes, ignoring skills (which are in a separate repo) and internal chore/refactor noise.
-    *   Enforces the standard format: `## [<version>] - <YYYY-MM-DD>`.
-    *   Directs the agent to safely insert the generated block into `CHANGELOG.md`, maintaining chronological order or replacing the `[Unreleased]` block.
+    *   Defines exactly what the agent should do when invoked.
+    *   **Step 1:** Guides the agent to invoke `gather_commits.py` to get the raw data.
+    *   **Step 2 (LLM Synthesis):** Explicitly prompts the agent's LLM to read the script's output, ignore skills/chore/refactor noise, and synthesize the remaining commits into user-friendly release notes.
+    *   **Step 3 (Formatting):** Enforces the standard format: `## [<version>] - <YYYY-MM-DD>`.
+    *   **Step 4 (Writing):** Directs the agent to safely insert the generated block into `CHANGELOG.md`, maintaining chronological order or replacing the `[Unreleased]` block.
 
 ### 2. Root `CHANGELOG.md` Updates
 *   Maintain the standard [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
@@ -48,6 +50,19 @@ This skill will be composed of two parts:
     *   Use this extracted block as the `body_path` for the GitHub Release.
 *   **Skill: `release-update-published-version`**:
     *   Update `scripts/update_published_version.py` to also bump the `extra: version:` value in `sites/docs/mkdocs.yml` when the public docs are updated.
+
+---
+
+## Agent Invocation Model (AGENTS.md & Workflow)
+
+Skills do not make LLM calls themselves; they are instructions *for* the agent (the LLM). To make this robust:
+1.  **Agent Trigger:** The user or the `release-orchestrator` skill will prompt an agent: "Run the `release-notes-generate` skill for version X".
+2.  **Skill Context:** The agent reads `.agents/skills/release-notes-generate/SKILL.md`. This file acts as the "system prompt" for the current task.
+3.  **Data Fetching:** The agent executes `gather_commits.py` using a bash tool.
+4.  **LLM Processing:** The script outputs raw commit subjects and bodies. The agent receives this in its context window. The `SKILL.md` instructions guide the agent on how to filter, group, and rewrite this raw data into the target format.
+5.  **File Modification:** The agent uses its file-editing tools (`replace` or `write_file`) to apply the generated notes to `CHANGELOG.md`.
+
+This relies entirely on the agent's innate capabilities to execute shell commands, synthesize text, and edit files, orchestrated by the strict instructions in `SKILL.md`.
 
 ---
 
