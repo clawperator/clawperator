@@ -105,6 +105,43 @@ export function getInvalidTimeoutResult(timeoutMs: number | undefined, options: 
   return undefined;
 }
 
+/**
+ * `read --all` and `read-value --all` need machine-readable stdout; require JSON output and an
+ * explicit `--json` or `--output json` / `--format json` (implicit default json is not enough).
+ */
+export function readAllRequiresExplicitJsonError(options: {
+  command: "read" | "read-value";
+  format: "json" | "pretty";
+  explicitJsonOutput: boolean;
+}): string | undefined {
+  const { command, format, explicitJsonOutput } = options;
+  if (format !== "json") {
+    return formatError(
+      {
+        code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+        message:
+          command === "read"
+            ? 'read --all requires JSON output. Use --json or --output json (not --output pretty).\n\nExample:\n  clawperator read --text "Price" --all --json'
+            : "read-value --all requires JSON output. Use --json or --output json (not --output pretty).",
+      },
+      { format },
+    );
+  }
+  if (!explicitJsonOutput) {
+    return formatError(
+      {
+        code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+        message:
+          command === "read"
+            ? 'read --all requires explicit JSON output. Pass --json, --output json, or --format json.\n\nExample:\n  clawperator read --text "Price" --all --json'
+            : 'read-value --all requires explicit JSON output. Pass --json, --output json, or --format json.\n\nExample:\n  clawperator read-value --label "Battery" --all --json',
+      },
+      { format },
+    );
+  }
+  return undefined;
+}
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -113,6 +150,7 @@ export type HandlerContext = {
   argv: string[];
   rest: string[];
   format: "json" | "pretty";
+  explicitJsonOutput: boolean;
   verbose: boolean;
   logger: Logger;
   deviceId?: string;
@@ -422,7 +460,7 @@ Options:
 Notes:
   - Reads the value associated with a labeled UI element (e.g., "85%" next to "Battery").
   - The --label* flags populate labelMatcher, not matcher.
-  - --all requires JSON output: --json, --output json, or --format json (rejected with --output pretty).
+  - --all requires an explicit JSON output flag: --json, --output json, or --format json (implicit default json is not enough; --output pretty is rejected).
   - Synonym: read-kv
 
 Examples:
@@ -465,7 +503,7 @@ Options:
 Notes:
   - Returns the text content of the first matching element.
   - --all returns all matching elements' text as a JSON array of strings.
-  - --all requires JSON output: --json, --output json, or --format json (rejected with --output pretty).
+  - --all requires an explicit JSON output flag: --json, --output json, or --format json (implicit default json is not enough; --output pretty is rejected).
   - Multiple simple flags combine with AND semantics.
 
 Examples:
@@ -910,11 +948,11 @@ Usage:
   clawperator exec --payload <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>]
   clawperator exec best-effort --goal <text> [--device <id>] [--operator-package <package>]
 
-Payload (required unless using --payload):
-  <json-or-file>            Inline JSON or path to a JSON file (see Notes)
+Payload (one of):
+  <json-or-file>            Positional: inline JSON or path to a JSON file (see Notes)
 
 Options:
-  --payload <json-or-file>  Alternative to positional payload (primary flag)
+  --payload <json-or-file>  Same as positional payload (primary named form)
   --execution <json-or-file>  Alias for --payload (backward compatibility)
   --validate-only           Validate payload without executing
   --dry-run                 Print execution plan without running
@@ -1173,7 +1211,7 @@ COMMANDS["read"] = {
   topLevelBlock: `  read --text <text> | --id <id> | --role <role> [--device <id>] [--json]
                                             Read text from the first matching UI element`,
   handler: async (ctx) => {
-    const { rest, format, logger, deviceId, operatorPackage } = ctx;
+    const { rest, format, explicitJsonOutput, logger, deviceId, operatorPackage } = ctx;
     if (!hasElementSelectorFlag(rest)) {
       return makeMissingSelectorError("read", format);
     }
@@ -1181,17 +1219,10 @@ COMMANDS["read"] = {
     if (!resolved.ok) {
       return formatError(resolved.error, { format });
     }
-    // --all requires JSON output mode (--json, --output json, --format json, or default json)
     const readAll = hasFlag(rest, "--all");
-    if (readAll && format !== "json") {
-      return formatError(
-        {
-          code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
-          message:
-            'read --all requires JSON output. Use --json or --output json (not --output pretty).\n\nExample:\n  clawperator read --text "Price" --all --json',
-        },
-        { format },
-      );
+    if (readAll) {
+      const err = readAllRequiresExplicitJsonError({ command: "read", format, explicitJsonOutput });
+      if (err) return err;
     }
     // Resolve container matcher (optional)
     const containerResult = resolveContainerMatcherFromCli(rest);
@@ -1644,19 +1675,12 @@ COMMANDS["read-value"] = {
   help: HELP_READ_VALUE,
   topLevelBlock: `  read-value --label <text> [--json]         Read the value associated with a labeled element`,
   handler: async (ctx) => {
-    const { rest, format, logger, deviceId, operatorPackage, timeoutMs } = ctx;
+    const { rest, format, explicitJsonOutput, logger, deviceId, operatorPackage, timeoutMs } = ctx;
 
-    // --all requires JSON output mode (--json, --output json, --format json, or default json)
     const readAll = hasFlag(rest, "--all");
-    if (readAll && format !== "json") {
-      return formatError(
-        {
-          code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
-          message:
-            "read-value --all requires JSON output. Use --json or --output json (not --output pretty).",
-        },
-        { format },
-      );
+    if (readAll) {
+      const err = readAllRequiresExplicitJsonError({ command: "read-value", format, explicitJsonOutput });
+      if (err) return err;
     }
 
     // Build labelMatcher from --label* flags

@@ -1388,9 +1388,10 @@ This is a prerequisite, not optional cleanup.
    - `exec` becomes primary, `execute` becomes synonym
    - `--payload` becomes primary flag, `--execution` becomes alias
    - Positional: execution payload (JSON string or file path)
-   - Parsing rule: trim leading whitespace, then if the value starts
-     with `{` or `[`, parse as inline JSON. Otherwise treat as a file
-     path and load the file contents. Error precedence: unreadable
+   - Parsing rule: trim leading whitespace. If the value starts with `{`,
+     parse as inline JSON. If it starts with `[`, try reading it as a file
+     path first; if the file is missing, parse the string as inline JSON.
+     Any other string is read as a file path. Error precedence: unreadable
      file path -> invalid JSON content -> missing payload.
    - `exec best-effort` subcommand unchanged
    - Behavior identical to current `execute`
@@ -1518,6 +1519,7 @@ APK change before the CLI change is meaningful.
 - `wait --text "X" --timeout 5000` waits up to 5 seconds
 - `read --text "X" --all --json` returns array of matches
 - `read --text "X" --all --output json` returns array of matches (JSON output mode)
+- `read --text "X" --all` without `--json` / `--output json` / `--format json` errors (implicit default json is not enough)
 - `read --text "X" --all` with `--output pretty` errors
 - `sleep 2000` pauses for 2 seconds
 - `sleep` without duration: error with usage example
@@ -1855,7 +1857,7 @@ clawperator read --text "Price" --all --json
   content of each matching node), e.g. `["$4.99", "$7.99"]`. No node
   metadata - agents needing that should use `snapshot --json` and filter.
 - Without `--all`, behavior is unchanged (first match, single value)
-- `--all` requires JSON output mode (`--json`, `--output json`, `--format json`, or default json; error with `--output pretty`, since pretty output for a list is ambiguous)
+- `--all` requires an explicit JSON output flag (`--json`, `--output json`, or `--format json`). Implicit default json is not enough; `--output pretty` errors since pretty output for a list is ambiguous
 
 **Android Implementation:** Add `all: Boolean = false` to `UiAction.ReadText`
 data class. Update `AgentCommandParser` to parse `all` from params.

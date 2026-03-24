@@ -56,7 +56,7 @@ workflow (also available as `record` alias), use [Android Recording Format for A
 | `read --desc-contains <sub>` | Read from the first element whose content description contains the substring |
 | `read --role <role>` | Read from the first element with the given role |
 | `read --selector <json>` | Read using raw `NodeMatcher` JSON (advanced only; mutually exclusive with simple flags) |
-| `read ... --all` (JSON output) | Read every on-screen match: step `data.text` is a string containing a JSON array of quoted labels (see `read_text` behavior note). Requires JSON output (`--json`, `--output json`, or default json; not `--output pretty`). |
+| `read ... --all` (JSON output) | Read every on-screen match: step `data.text` is a string containing a JSON array of quoted labels (see `read_text` behavior note). Requires an explicit JSON output flag: `--json`, `--output json`, or `--format json` (implicit default json is not enough; `--output pretty` is rejected). |
 | `read ... --container-text <text>` | Restrict search to elements within a container with exact visible text |
 | `read ... --container-text-contains <sub>` | Restrict search to elements within a container with partial text match |
 | `read ... --container-id <id>` | Restrict search to elements within a container with the given resource ID |
@@ -93,7 +93,7 @@ workflow (also available as `record` alias), use [Android Recording Format for A
 | `wait-for-navigation ...` | Synonym for `wait-for-nav` |
 | `read-value --label <text>` | Read value associated with a labeled element (e.g., "85%" next to "Battery") |
 | `read-value --label-id <id>` | Read value by matching label's resource ID |
-| `read-value --label <text> --all` (JSON output) | Read all matching values as JSON array (same JSON output requirement as `read --all`) |
+| `read-value --label <text> --all` (JSON output) | Read all matching values as JSON array (same explicit JSON output requirement as `read --all`) |
 | `read-kv ...` | Synonym for `read-value` |
 | `skills list` | List available skills |
 | `skills get <skill_id>` | Show skill metadata |
@@ -140,7 +140,7 @@ Multiple simple flags combine with AND semantics: `--text "Login" --role button`
 
 For `type`, `--text` is reserved for the text to type. Identify the target with `--id`, `--role`, `--desc`, `--text-contains`, `--desc-contains`, or `--selector` (advanced).
 
-**`read`:** `--all` returns every on-screen node that matches the selector. It requires JSON output mode (`--json`, `--output json`, `--format json`, or default json; the CLI rejects `--output pretty`). The matching labels are in `stepResults[].data.text` as a **string** that contains JSON array syntax (for example `["Wi-Fi","Wi-Fi Direct"]`); parse it with `JSON.parse` in your agent. An empty match set is `"[]"`. Do not combine `all: true` with `validator` in raw executions: the Android runtime uses the multi-match path only when `all` is false or omitted for validator flows.
+**`read`:** `--all` returns every on-screen node that matches the selector. It requires an explicit JSON output flag (`--json`, `--output json`, or `--format json`). Implicit default json output is not sufficient: the CLI rejects `read ... --all` when no output flag is passed, and rejects `--output pretty`. The matching labels are in `stepResults[].data.text` as a **string** that contains JSON array syntax (for example `["Wi-Fi","Wi-Fi Direct"]`); parse it with `JSON.parse` in your agent. An empty match set is `"[]"`. Do not combine `all: true` with `validator` in raw executions: the Android runtime uses the multi-match path only when `all` is false or omitted for validator flows.
 
 **`wait`:** Optional `--timeout <ms>` (positive; omit for default) caps wall-clock wait time on the device (see global options note above).
 
@@ -205,7 +205,7 @@ The `read-value` command reads the value associated with a labeled UI element (e
 | `--label <text>` | Match label by exact visible text (maps to `labelMatcher.textEquals`) |
 | `--label-id <id>` | Match label by Android resource ID (maps to `labelMatcher.resourceId`) |
 | `--label-desc <text>` | Match label by exact content description (maps to `labelMatcher.contentDescEquals`) |
-| `--all` | Sends `all: true` in action params (requires JSON output mode, like `read --all`). The Operator APK currently ignores this field and still returns a single label-value pair. |
+| `--all` | Sends `all: true` in action params (requires an explicit JSON output flag, like `read --all`). The Operator APK currently ignores this field and still returns a single label-value pair. |
 | `--timeout <ms>` | Optional; overrides the execution timeout within policy limits (same as `exec --timeout`). Default timeout is 30000ms. |
 | `--validate-only` | Validate the built execution payload without running it on a device (same semantics as `exec`) |
 | `--dry-run` | Print the validated execution plan without running it on a device |

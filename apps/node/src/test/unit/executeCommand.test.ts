@@ -351,6 +351,20 @@ describe("clawperator read-value CLI", () => {
     assert.match(result.message, /--json|JSON output/i);
   });
 
+  it("errors when --all is used without explicit json (implicit default json)", async () => {
+    const { stdout, code } = await runCli([
+      "read-value",
+      "--label",
+      "X",
+      "--all",
+      "--validate-only",
+    ]);
+    assert.notStrictEqual(code, 0);
+    const result = JSON.parse(stdout);
+    assert.strictEqual(result.code, "EXECUTION_VALIDATION_FAILED");
+    assert.match(result.message, /explicit JSON output/i);
+  });
+
   it("returns MISSING_ARGUMENT when no label flags", async () => {
     const { stdout, code } = await runCli(["read-value", "--json"]);
     assert.notStrictEqual(code, 0);
