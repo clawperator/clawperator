@@ -451,7 +451,9 @@ Selector flags (at least one required; combine for AND matching):
 
 Notes:
   - Waits until the first matching element appears.
-  - --timeout overrides the default wait timeout.
+  - --timeout sets the wait duration (not the execution envelope timeout).
+  - Execution timeout is set to max(waitTimeout + 5000, globalTimeout) to prevent early termination.
+  - Default wait timeout is 30000ms (30 seconds) when --timeout is not specified.
   - Multiple simple flags combine with AND semantics.
 
 Examples:
@@ -1066,8 +1068,14 @@ COMMANDS["wait"] = {
                                             Wait until a matching UI element appears`,
   handler: async (ctx) => {
     const { rest, format, logger, deviceId, operatorPackage, timeoutMs } = ctx;
-    const invalidTimeout = getInvalidTimeoutResult(timeoutMs, { format });
-    if (invalidTimeout) return invalidTimeout;
+    // For wait, the global --timeout flag sets the wait duration (not execution envelope timeout)
+    // Validation: timeoutMs must be non-negative if specified
+    if (timeoutMs !== undefined && (!Number.isFinite(timeoutMs) || timeoutMs < 0)) {
+      return JSON.stringify({
+        code: "EXECUTION_VALIDATION_FAILED",
+        message: "--timeout must be a non-negative number",
+      });
+    }
     if (!hasElementSelectorFlag(rest)) {
       return makeMissingSelectorError("wait");
     }
@@ -1078,6 +1086,7 @@ COMMANDS["wait"] = {
     return (await import("./commands/action.js")).cmdActionWait({
       format,
       matcher: resolved.matcher,
+      waitTimeoutMs: timeoutMs,
       deviceId,
       operatorPackage,
       logger,
