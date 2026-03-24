@@ -57,6 +57,10 @@ workflow (also available as `record` alias), use [Android Recording Format for A
 | `read --role <role>` | Read from the first element with the given role |
 | `read --selector <json>` | Read using raw `NodeMatcher` JSON (advanced only; mutually exclusive with simple flags) |
 | `read ... --all --json` | Read every on-screen match: step `data.text` is a string containing a JSON array of quoted labels (see `read_text` behavior note). Requires `--json`. |
+| `read ... --container-text <text>` | Restrict search to elements within a container with exact visible text |
+| `read ... --container-id <id>` | Restrict search to elements within a container with the given resource ID |
+| `read ... --container-role <role>` | Restrict search to elements within a container with the given role |
+| `read ... --container-selector '<json>'` | Restrict search to elements within a container matched by raw JSON |
 | `wait --text <text>` | Wait until an element with exact visible text appears |
 | `wait --text-contains <sub>` | Wait until an element whose visible text contains the substring appears |
 | `wait --id <resource-id>` | Wait until an element with the given resource ID appears |
@@ -144,6 +148,22 @@ The `scroll` command accepts `--container-*` flags to restrict scrolling to a sp
 | `--container-role <value>` | Container by element role |
 | `--container-selector <json>` | Container by raw JSON NodeMatcher; mutually exclusive with `--container-*` flags |
 
+### Container Flags (read)
+
+The `read` command accepts `--container-*` flags to restrict the search to elements within a specific container's subtree. When a container is specified, only elements that are descendants of the matched container are considered.
+
+| Flag | Description |
+| :--- | :--- |
+| `--container-text <value>` | Container with exact visible text |
+| `--container-text-contains <value>` | Container with partial text match |
+| `--container-id <value>` | Container by Android resource ID |
+| `--container-desc <value>` | Container by exact content description |
+| `--container-desc-contains <value>` | Container by partial content description |
+| `--container-role <value>` | Container by element role |
+| `--container-selector <json>` | Container by raw JSON NodeMatcher; mutually exclusive with `--container-*` flags |
+
+**Error handling:** If the container matcher finds no element, the step fails with `CONTAINER_NOT_FOUND`.
+
 ### Quick Examples
 
 ```bash
@@ -170,6 +190,9 @@ clawperator wait --text "Done" --timeout 15000 --device <device_id> --json
 
 # Read all matching labels (JSON array string in step data.text)
 clawperator read --role text --all --json --device <device_id>
+
+# Read within a specific container (scope search to container subtree)
+clawperator read --text "Price" --container-role list --device <device_id> --json
 
 # Scroll within a specific container
 clawperator scroll down --container-id "com.example:id/recycler_view" --device <device_id> --json
