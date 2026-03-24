@@ -49,7 +49,7 @@ This eliminates the false editing surface (`sites/docs/docs/`), makes drift arch
 5. If the target cannot be resolved to any known output path, fail the build.
 6. Absolute links (https://, #anchors within same page) are untouched.
 
-**Validation:** The build must fail on any unresolvable relative link. `assemble_docs.sh` logs all rewritten links when run with `--verbose`.
+**Validation:** The build must fail on any unresolvable relative link. `assemble.sh` logs all rewritten links when run with `--verbose`.
 
 ### Code vs authored precedence
 
@@ -364,7 +364,7 @@ docs/                    (authored, committed, structure = output structure)
   + apps/node/src/       (code inputs)
   + ../clawperator-skills/docs/  (cross-repo source)
          |
-         v  assemble_docs.sh (deterministic script)
+         v  .agents/skills/docs-generate/scripts/assemble.sh
 
 sites/docs/.build/       (gitignored staging directory)
          |
@@ -374,7 +374,7 @@ sites/docs/site/         (gitignored final HTML)
   + llms-full.txt        (generated, copied to static/)
 ```
 
-### Assembly steps (`assemble_docs.sh`)
+### Assembly steps (`.agents/skills/docs-generate/scripts/assemble.sh`)
 
 This is a new deterministic script (not agent-driven). It runs as the first step of `docs_build.sh`.
 
@@ -484,10 +484,21 @@ cross_repo:
 
 **`diff_report.py` / `build_inventory.py`** - May be retired. The churn gating was designed to prevent large agent-driven rewrites of committed generated output. With no committed generated output, the primary use case is gone. Churn control for authored docs is handled by normal PR review.
 
-**`docs-generate` skill** - Scope dramatically reduced. No longer responsible for copying authored pages. Only needed when:
-- Generating code-derived content (`api/cli.md`) from code
-- Expanding code-derived markers in authored pages
-- The skill becomes a wrapper around the deterministic generator scripts, not a full-tree generation agent.
+**`docs-generate` skill** - Rearchitected. Becomes the home for all docs build tooling. The skill's `scripts/` directory contains:
+
+| Script | Purpose |
+|--------|---------|
+| `assemble.sh` (or `.py`) | Entry point: deterministic assembly (copy authored, copy cross-repo, generate code-derived, expand markers, validate staging) |
+| `generate_cli_reference.py` | Generate `api/cli.md` from `registry.ts` + command modules |
+| `generate_error_table.py` | Generate error code table for marker expansion in `api/errors.md` |
+| `generate_selector_table.py` | Generate selector flag table for marker expansion in `api/selectors.md` |
+
+These replace agent-driven generation with deterministic scripts. `docs_build.sh` calls `.agents/skills/docs-generate/scripts/assemble.sh` as its first step.
+
+The skill SKILL.md is updated to document:
+- The assembly pipeline and its phases
+- How to add new code-derived or cross-repo pages
+- How to add new marker expansions
 
 **`docs-validate` skill** - Simplified. Validates that:
 - All pages in `mkdocs.yml` nav exist in `docs/` (authored) or are defined in `source-map.yaml` (generated/cross-repo)
@@ -498,17 +509,6 @@ cross_repo:
 
 **`llms-full.txt`** - Generated at build time from assembled `.build/` directory, written to `sites/docs/static/llms-full.txt` and `sites/landing/public/llms-full.txt`.
 
-### New scripts to create
-
-| Script | Purpose |
-|--------|---------|
-| `assemble_docs.sh` (or `.py`) | Deterministic assembly: copy authored pages, copy cross-repo, generate code-derived, expand markers, validate staging |
-| `generate_cli_reference.py` | Generate `api/cli.md` from `registry.ts` + command modules |
-| `generate_error_table.py` | Generate error code table for marker expansion in `api/errors.md` |
-| `generate_selector_table.py` | Generate selector flag table for marker expansion in `api/selectors.md` |
-
-These replace the agent-driven generation with deterministic scripts.
-
 ---
 
 ## 7. Internal Docs Handling
@@ -517,7 +517,7 @@ These replace the agent-driven generation with deterministic scripts.
 
 Internal docs are excluded by **not being in `mkdocs.yml` nav**.
 
-The assembly script (`assemble_docs.sh`) only copies files referenced in `mkdocs.yml` nav to the build staging directory. Files in `docs/` that are not in the nav are never copied, never built, and never published.
+The assembly script (`assemble.sh`) only copies files referenced in `mkdocs.yml` nav to the build staging directory. Files in `docs/` that are not in the nav are never copied, never built, and never published.
 
 No frontmatter flags. No `docs/internal/` directory. No special markers. If a file in `docs/` is not in `mkdocs.yml` nav, it is internal. This is enforced architecturally: internal files physically do not exist in the staging directory that MkDocs reads from.
 
@@ -572,12 +572,12 @@ Set up the new build pipeline before writing any content.
    - `docs/skills/` (cross-repo copies)
    - `sites/docs/.build/` (staging directory)
 3. Remove `sites/docs/docs/` from git tracking (git rm -r, add to `.gitignore`)
-4. Write `assemble_docs.sh` - deterministic assembly script (copy authored, copy cross-repo with link rewriting, generate code-derived, expand markers, validate staging)
-5. Write generator scripts: `generate_cli_reference.py`, `generate_error_table.py`, `generate_selector_table.py`
+4. Write `.agents/skills/docs-generate/scripts/assemble.sh` - deterministic assembly script (copy authored, copy cross-repo with link rewriting, generate code-derived, expand markers, validate staging)
+5. Write generator scripts in `.agents/skills/docs-generate/scripts/`: `generate_cli_reference.py`, `generate_error_table.py`, `generate_selector_table.py`
 6. Rewrite `source-map.yaml` to reduced assembly manifest (code-derived, markers, cross-repo only)
 7. Rewrite `mkdocs.yml`: new nav tree, `docs_dir: .build`, add `mkdocs-redirects` plugin with redirect map
 8. Add `mkdocs-redirects` to `sites/docs/requirements.txt`
-9. Update `docs_build.sh` to call `assemble_docs.sh` before MkDocs build
+9. Update `docs_build.sh` to call `.agents/skills/docs-generate/scripts/assemble.sh` before MkDocs build
 10. Update `generate_llms_full.py` to read from `.build/`, walk `mkdocs.yml` nav order
 11. Update `validate_docs_routes.py`: add inner-page relative link validation, point at `.build/`
 12. Simplify `validate_source_of_truth.py` (only validates code-derived pages) or remove
@@ -623,7 +623,7 @@ Priority order (most impactful first):
 
 ### Phase 4: Build and Validate
 
-1. Run `assemble_docs.sh` to produce `sites/docs/.build/`
+1. Run `assemble.sh` to produce `sites/docs/.build/`
 2. Run `./scripts/docs_build.sh` (which now calls assembly + MkDocs build + llms-full generation + validation)
 3. Rewrite `llms.txt` (both `sites/docs/static/llms.txt` and `sites/landing/public/llms.txt`)
 4. Run `validate_docs_routes.py` (with new relative link checking)
@@ -658,7 +658,7 @@ Priority order (most impactful first):
 - [ ] `sites/docs/.build/` is gitignored
 - [ ] `docs/api/cli.md` is gitignored (code-derived)
 - [ ] `docs/skills/` is gitignored (cross-repo copies)
-- [ ] `assemble_docs.sh` produces a complete staging directory deterministically
+- [ ] `assemble.sh` produces a complete staging directory deterministically
 - [ ] MkDocs `docs_dir` points to `.build/`
 - [ ] `source-map.yaml` only contains code-derived, marker, and cross-repo entries (no authored copy pages)
 

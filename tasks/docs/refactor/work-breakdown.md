@@ -41,9 +41,9 @@ Everything else depends on this phase. Must complete before content authoring be
 
 ### Task 1.2: Write assembly script
 
-**Goal:** Create `assemble_docs.sh` - the deterministic script that builds the staging directory.
+**Goal:** Create the deterministic assembly script that builds the staging directory.
 
-**Location:** `scripts/assemble_docs.sh` (or `.py` if the implementer prefers Python for link rewriting logic)
+**Location:** `.agents/skills/docs-generate/scripts/assemble.sh` (or `.py` if the implementer prefers Python for link rewriting logic)
 
 **Inputs:**
 - `sites/docs/mkdocs.yml` (nav tree - determines which authored pages to copy)
@@ -81,20 +81,22 @@ Supports `--verbose` flag to log all link rewrites and source resolutions.
 
 **Goal:** Create deterministic Python scripts that generate docs content from TypeScript source.
 
+**Location:** All scripts live in `.agents/skills/docs-generate/scripts/`
+
 **Scripts to create:**
 
-1. **`scripts/generate_cli_reference.py`**
+1. **`generate_cli_reference.py`**
    - Input: `apps/node/src/cli/registry.ts`, `apps/node/src/cli/commands/`
    - Output: Complete `api/cli.md` page with every command, flag, alias
    - Must parse the `COMMANDS` object in `registry.ts` to extract: command name, summary, help text, flags, aliases
    - Output format: markdown with page schema from plan Section 2
 
-2. **`scripts/generate_error_table.py`**
+2. **`generate_error_table.py`**
    - Input: `apps/node/src/contracts/errors.ts`
    - Output: Markdown table of error codes with code, meaning, and HTTP status
    - For marker expansion in `api/errors.md`
 
-3. **`scripts/generate_selector_table.py`**
+3. **`generate_selector_table.py`**
    - Input: `apps/node/src/cli/selectorFlags.ts`
    - Output: Markdown table of selector flags with flag name, type, description, mutual exclusion rules
    - For marker expansion in `api/selectors.md`
@@ -120,7 +122,7 @@ Supports `--verbose` flag to log all link rewrites and source resolutions.
 - No authored `mode: copy` entries remain
 - `code_derived`, `markers`, and `cross_repo` sections are present and correct
 - File is valid YAML
-- `assemble_docs.sh` can parse it
+- Assembly script can parse it
 
 **Depends on:** Task 1.2 (assembly script defines the schema it reads)
 
@@ -154,7 +156,7 @@ Supports `--verbose` flag to log all link rewrites and source resolutions.
 **Changes:**
 
 1. **`scripts/docs_build.sh`:**
-   - Add call to `assemble_docs.sh` as first step (before MkDocs build)
+   - Add call to `.agents/skills/docs-generate/scripts/assemble.sh` as first step (before MkDocs build)
    - Remove or skip `validate_source_of_truth.py` call (drift is no longer possible for authored pages)
    - MkDocs build reads from `.build/`
    - `generate_llms_full.py` reads from `.build/`
@@ -185,7 +187,7 @@ Supports `--verbose` flag to log all link rewrites and source resolutions.
 **Steps:**
 1. Create minimal placeholder pages in `docs/` for all 20 nav entries (e.g., `# Page Title\n\nPlaceholder.`)
 2. Create placeholder skills docs in `../clawperator-skills/docs/` with target filenames
-3. Run `assemble_docs.sh` - verify `.build/` is complete
+3. Run assembly script - verify `.build/` is complete
 4. Run `docs_build.sh` - verify site builds
 5. Verify `llms-full.txt` contains all 20 pages
 6. Verify redirects work for at least 3 old URLs
@@ -468,7 +470,7 @@ Write this last, after all other pages exist, so all links are valid.
 **Goal:** Run the complete pipeline, fix any issues, produce final artifacts.
 
 **Steps:**
-1. Run `assemble_docs.sh` - verify `.build/` is complete
+1. Run assembly script - verify `.build/` is complete
 2. Run `docs_build.sh` - verify site builds with zero warnings
 3. Verify `llms-full.txt` contains all 20 pages in correct nav order
 4. Rewrite `llms.txt`:
