@@ -26,16 +26,6 @@ function runCli(
   });
 }
 
-async function getFirstConnectedDeviceSerial(): Promise<string> {
-  const { stdout } = await runCli(["devices"]);
-  const result = JSON.parse(stdout) as { devices?: Array<{ serial?: string }> };
-  const serial = result.devices?.find((device) => device.serial)?.serial;
-  if (!serial) {
-    throw new Error("Expected at least one connected device for the scroll-until CLI test");
-  }
-  return serial;
-}
-
 describe("CLI help", () => {
   it("shows operator setup help for operator setup --help", async () => {
     const { stdout, code } = await runCli(["operator", "setup", "--help"]);
@@ -490,8 +480,7 @@ describe("promoted flat commands - help and missing-arg errors", () => {
   });
 
   it("scroll-until accepts --direction as an alias for the positional direction", async () => {
-    const deviceId = await getFirstConnectedDeviceSerial();
-    const { stdout } = await runCli(["scroll-until", "--direction", "up", "--text", "Settings", "--device", deviceId]);
+    const { stdout } = await runCli(["scroll-until", "--direction", "up", "--text", "Settings", "--device", "test-device"]);
     const obj = JSON.parse(stdout) as { code?: string; message?: string };
     assert.notStrictEqual(obj.code, "USAGE");
     assert.doesNotMatch(obj.message ?? "", /unrecognized flag '--direction'/);
