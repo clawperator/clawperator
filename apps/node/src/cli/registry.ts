@@ -1,4 +1,5 @@
 import { ERROR_CODES } from "../contracts/errors.js";
+import { LIMITS } from "../contracts/limits.js";
 import { formatError } from "./output.js";
 import type { Logger } from "../adapters/logger.js";
 import {
@@ -527,7 +528,7 @@ Required:
 
 Notes:
   - Pauses execution for the specified duration.
-  - Duration must be >= 0 and <= MAX_EXECUTION_TIMEOUT_MS.
+  - Duration must be >= 0 and <= ${LIMITS.MAX_EXECUTION_TIMEOUT_MS}ms.
   - Execution timeout is set to max(durationMs + 5000, globalTimeout, 30000).
   - No selector flags - this is a raw timer.
 
@@ -1261,7 +1262,13 @@ COMMANDS["sleep"] = {
     if (!Number.isFinite(durationMs) || durationMs < 0) {
       return JSON.stringify({
         code: "EXECUTION_VALIDATION_FAILED",
-        message: "Duration must be a non-negative number",
+        message: `Duration must be a non-negative number (got: ${durationStr})`,
+      });
+    }
+    if (durationMs > LIMITS.MAX_EXECUTION_TIMEOUT_MS) {
+      return JSON.stringify({
+        code: "EXECUTION_VALIDATION_FAILED",
+        message: `Duration must be <= ${LIMITS.MAX_EXECUTION_TIMEOUT_MS}ms (got: ${durationMs}ms)`,
       });
     }
 

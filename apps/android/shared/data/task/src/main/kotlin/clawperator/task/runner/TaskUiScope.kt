@@ -70,12 +70,13 @@ interface TaskUiScope {
 
     /**
      * Gets the text content of ALL UI elements that match the specified NodeMatcher criteria.
-     * Retries according to the retry configuration until at least one matching element is found.
+     * Returns an empty list when no elements match; does not retry on empty results, only on
+     * exceptions (e.g. UI tree unavailable).
      *
      * @param matcher NodeMatcher containing the criteria to match
      * @param retry Retry configuration (defaults to no retry)
-     * @return List of text content from all matching elements (may be empty if no matches)
-     * @throws Exception if retry exhaustion fails
+     * @return List of text content from all matching elements; may be empty if none match
+     * @throws Exception if the UI tree cannot be retrieved after all retry attempts
      */
     suspend fun getAllText(
         matcher: NodeMatcher,
