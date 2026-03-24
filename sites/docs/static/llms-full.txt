@@ -1933,7 +1933,9 @@ The `wait-for-nav` command waits for app or screen navigation to complete.
 | `--validate-only` | Validate the built execution payload without running it on a device (same semantics as `exec`) |
 | `--dry-run` | Print the validated execution plan without running it on a device |
 
-**Requirements:** At least one of `--app` or a selector flag is required. `--timeout` is always required.
+**Requirements:** At least one of `--app` or a selector flag is required. `--timeout` is always required (1-30000ms).
+
+**Timeout note:** The maximum navigation timeout is capped at 30000ms (30 seconds). For waits longer than 30 seconds, consider breaking the action into multiple shorter waits or use structured polling from your agent. The execution envelope timeout is automatically set to `max(navTimeout + 5000, 30000)` to prevent premature expiration while the action is still waiting. This required `--timeout` is the action wait cap only; it is not the same as the global `--timeout` execution override used by `exec` and `read-value`.
 
 ### `read-value` flags
 
@@ -1944,7 +1946,8 @@ The `read-value` command reads the value associated with a labeled UI element (e
 | `--label <text>` | Match label by exact visible text (maps to `labelMatcher.textEquals`) |
 | `--label-id <id>` | Match label by Android resource ID (maps to `labelMatcher.resourceId`) |
 | `--label-desc <text>` | Match label by exact content description (maps to `labelMatcher.contentDescEquals`) |
-| `--all` | Sends `all: true` in action params (JSON output mode only; same rules as `read --all`). The Operator APK currently ignores this field and still returns a single label-value pair. |
+| `--all` | Sends `all: true` in action params (requires JSON output mode, like `read --all`). The Operator APK currently ignores this field and still returns a single label-value pair. |
+| `--timeout <ms>` | Optional; overrides the execution timeout within policy limits (same as `exec --timeout`). Default timeout is 30000ms. |
 | `--validate-only` | Validate the built execution payload without running it on a device (same semantics as `exec`) |
 | `--dry-run` | Print the validated execution plan without running it on a device |
 

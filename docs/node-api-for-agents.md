@@ -194,7 +194,7 @@ The `wait-for-nav` command waits for app or screen navigation to complete.
 
 **Requirements:** At least one of `--app` or a selector flag is required. `--timeout` is always required (1-30000ms).
 
-**Timeout note:** The maximum navigation timeout is capped at 30000ms (30 seconds). For waits longer than 30 seconds, consider breaking the action into multiple shorter waits or use structured polling from your agent. The execution envelope timeout is automatically set to `max(navTimeout + 5000, 30000)` to prevent premature expiration while the action is still waiting.
+**Timeout note:** The maximum navigation timeout is capped at 30000ms (30 seconds). For waits longer than 30 seconds, consider breaking the action into multiple shorter waits or use structured polling from your agent. The execution envelope timeout is automatically set to `max(navTimeout + 5000, 30000)` to prevent premature expiration while the action is still waiting. This required `--timeout` is the action wait cap only; it is not the same as the global `--timeout` execution override used by `exec` and `read-value`.
 
 ### `read-value` flags
 
