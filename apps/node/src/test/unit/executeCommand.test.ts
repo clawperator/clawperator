@@ -357,4 +357,21 @@ describe("clawperator read-value CLI", () => {
     const result = JSON.parse(stdout);
     assert.strictEqual(result.code, "MISSING_ARGUMENT");
   });
+
+  it("accepts --timeout flag and applies override just like exec", async () => {
+    const { stdout, code } = await runCli([
+      "read-value",
+      "--label",
+      "Battery",
+      "--timeout",
+      "5000",
+      "--validate-only",
+      "--json",
+    ]);
+    assert.strictEqual(code, 0);
+    const result = JSON.parse(stdout);
+    assert.strictEqual(result.ok, true);
+    // read-value respects --timeout override, just like exec and snapshot do
+    assert.strictEqual(result.execution.timeoutMs, 5000);
+  });
 });
