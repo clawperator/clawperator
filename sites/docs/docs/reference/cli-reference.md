@@ -194,19 +194,25 @@ clawperator packages list [--device <id>] [--third-party]
 Execute a validated command payload. The CLI also accepts `execute` as a synonym.
 
 ```
-clawperator exec --execution <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>] [--timeout <ms>]
+clawperator exec <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>] [--timeout <ms>]
+clawperator exec --payload <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>] [--timeout <ms>]
 ```
+
+| Source | Description |
+|--------|-------------|
+| `<json-or-file>` (positional) | Inline JSON (when it starts with `{` or `[`) or path to a JSON file; primary form |
+| `--payload <json-or-file>` | Same as positional when you prefer a named argument |
+| `--execution <json-or-file>` | Alias for `--payload` (backward compatibility) |
 
 | Flag | Description |
 |------|-------------|
-| `--execution <json-or-file>` | Execution payload as inline JSON or a path to a JSON file (required) |
 | `--validate-only` | Validate and normalize the payload without dispatching to any device |
 | `--dry-run` | Print the execution plan without dispatching to any device |
 | `--device <id>` | Target device serial |
 | `--operator-package <package>` | Target Operator package |
 | `--timeout <ms>` | Override execution timeout within policy limits |
 
-The `--execution` value must conform to the `Execution` contract (see [api-overview.md](./api-overview.md)).
+The payload must conform to the `Execution` contract (see [api-overview.md](./api-overview.md)).
 
 With `--validate-only`, Clawperator validates the payload, applies any
 `--timeout` override, and returns the normalized execution without touching

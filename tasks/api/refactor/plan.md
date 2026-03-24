@@ -1528,7 +1528,7 @@ APK change before the CLI change is meaningful.
 - `wait-for-nav --timeout 50000`: error (max 30000ms)
 - `wait-for-navigation` works as synonym
 - `read-value --label "Battery" --json` reads associated value
-- `read-value` without `--label`: error with usage example
+- `read-value` without any of `--label`, `--label-id`, or `--label-desc`: error with usage example
 - `read-kv` works as synonym
 - All smoke scripts and core skills still pass
 

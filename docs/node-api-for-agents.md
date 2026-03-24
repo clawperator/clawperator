@@ -1191,7 +1191,7 @@ For agent-side recovery strategy, use
 - **No hidden retries:** If an action fails, the error is returned immediately. Retry logic belongs in the agent.
 - **Deterministic results:** Exactly one terminal envelope per `commandId`. Timeouts return `RESULT_ENVELOPE_TIMEOUT` with diagnostics, payload-side action context, and `logPath` when persistent logging is enabled.
 - **Execution granularity:** Group multiple actions in one execution only when they are atomic - when the agent does not need to observe state or make a decision between them. For flows where intermediate state matters, use separate executions with `snapshot` between each. See [Execution Model](../reference/execution-model.md) for the full guidance.
-- **Timeout override:** `--timeout <ms>` overrides the execution timeout for `exec`, `snapshot`, and `screenshot` within policy limits.
+- **Timeout override:** `--timeout <ms>` overrides the execution timeout for `exec`, `snapshot`, `screenshot`, and `read-value` within policy limits.
 - **Screenshot output path:** `screenshot --path <file>` writes the PNG to the requested local path and still returns the final `data.path` in the result envelope. `<file>` must be a non-empty local filesystem path.
 - **Device targeting:** Specify `--device <id>` when multiple devices are connected. Omit for single-device setups.
 - **Emulator reuse over creation:** Provisioning never creates duplicate AVDs when a supported running or stopped emulator already exists.
@@ -1202,9 +1202,9 @@ For agent-side recovery strategy, use
 
 - Payload validation happens automatically at execution time. Invalid payloads
   fail fast with `EXECUTION_VALIDATION_FAILED` before any device action runs.
-- `clawperator exec --execution <json-or-file> --validate-only` validates
-  and normalizes a payload without dispatching it to any device.
-- `clawperator exec --execution <json-or-file> --dry-run` validates the
+- `clawperator exec <json-or-file> --validate-only` (or `exec --payload <json-or-file> --validate-only`) validates
+  and normalizes a payload without dispatching it to any device. The `--execution` flag is an alias for `--payload`.
+- `clawperator exec <json-or-file> --dry-run` (or `exec --payload ... --dry-run`) validates the
   payload and prints a plan summary without requiring a device connection.
   This is useful for local payload development and CI checks.
 - If you want the lowest-risk contract check on a live device, use a minimal
@@ -1213,7 +1213,7 @@ For agent-side recovery strategy, use
 ### `--dry-run` output format
 
 ```bash
-clawperator exec --execution '{"commandId":"test","taskId":"task","source":"cli","expectedFormat":"android-ui-automator","timeoutMs":10000,"actions":[{"id":"s1","type":"sleep","params":{"durationMs":500}}]}' --dry-run
+clawperator exec '{"commandId":"test","taskId":"task","source":"cli","expectedFormat":"android-ui-automator","timeoutMs":10000,"actions":[{"id":"s1","type":"sleep","params":{"durationMs":500}}]}' --dry-run
 ```
 
 **Success response:**
@@ -1338,7 +1338,7 @@ Skills can be invoked three ways:
 3. **Artifact compile + exec** (for skills with `.recipe.json` artifacts):
    ```bash
    clawperator skills compile-artifact <skill_id> --artifact <name> --vars '{"KEY":"value"}'
-   clawperator exec --execution <compiled_output>
+   clawperator exec <compiled_output>
    ```
 
 ### Skills Run Response

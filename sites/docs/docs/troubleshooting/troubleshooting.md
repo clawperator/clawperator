@@ -510,7 +510,7 @@ Instead of `skills run`, test the skill's execution payload directly:
 clawperator skills compile-artifact <skill_id> --artifact main --output json
 
 # 2. Save to file and run manually
-clawperator exec --execution ./skill-execution.json --device <serial>
+clawperator exec ./skill-execution.json --device <serial>
 ```
 
 This bypasses the skills wrapper and helps identify whether the issue is the skill logic or the skills runtime.

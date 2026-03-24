@@ -897,7 +897,7 @@ COMMANDS["packages"] = {
   },
 };
 
-// exec (synonym: execute)
+// exec (synonym: execute). Payload: positional <json-or-file>, --payload, or --execution (alias). Public CLI reference must stay aligned.
 COMMANDS["exec"] = {
   name: "exec",
   synonyms: ["execute"],

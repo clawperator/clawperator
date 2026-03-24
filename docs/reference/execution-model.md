@@ -141,13 +141,13 @@ Payloads are schema-validated before any device action is dispatched.
 Current behavior:
 
 - invalid payloads fail fast with `EXECUTION_VALIDATION_FAILED`
-- `clawperator exec --execution <json-or-file> --validate-only` validates and
-  normalizes the payload without dispatching to any device
+- `clawperator exec <json-or-file> --validate-only` (or `exec --payload <json-or-file> --validate-only`) validates and
+  normalizes the payload without dispatching to any device. `--execution` is an alias for `--payload`.
 
 Example:
 
 ```bash
-clawperator exec --execution /path/to/execution.json --validate-only --output json
+clawperator exec /path/to/execution.json --validate-only --output json
 ```
 
 Use a live-device smoke payload only when you want to validate both the

@@ -2932,7 +2932,7 @@ For agent-side recovery strategy, use
 - **No hidden retries:** If an action fails, the error is returned immediately. Retry logic belongs in the agent.
 - **Deterministic results:** Exactly one terminal envelope per `commandId`. Timeouts return `RESULT_ENVELOPE_TIMEOUT` with diagnostics, payload-side action context, and `logPath` when persistent logging is enabled.
 - **Execution granularity:** Group multiple actions in one execution only when they are atomic - when the agent does not need to observe state or make a decision between them. For flows where intermediate state matters, use separate executions with `snapshot` between each. See [Execution Model](../reference/execution-model.md) for the full guidance.
-- **Timeout override:** `--timeout <ms>` overrides the execution timeout for `exec`, `snapshot`, and `screenshot` within policy limits.
+- **Timeout override:** `--timeout <ms>` overrides the execution timeout for `exec`, `snapshot`, `screenshot`, and `read-value` within policy limits.
 - **Screenshot output path:** `screenshot --path <file>` writes the PNG to the requested local path and still returns the final `data.path` in the result envelope. `<file>` must be a non-empty local filesystem path.
 - **Device targeting:** Specify `--device <id>` when multiple devices are connected. Omit for single-device setups.
 - **Emulator reuse over creation:** Provisioning never creates duplicate AVDs when a supported running or stopped emulator already exists.
@@ -2943,9 +2943,9 @@ For agent-side recovery strategy, use
 
 - Payload validation happens automatically at execution time. Invalid payloads
   fail fast with `EXECUTION_VALIDATION_FAILED` before any device action runs.
-- `clawperator exec --execution <json-or-file> --validate-only` validates
-  and normalizes a payload without dispatching it to any device.
-- `clawperator exec --execution <json-or-file> --dry-run` validates the
+- `clawperator exec <json-or-file> --validate-only` (or `exec --payload <json-or-file> --validate-only`) validates
+  and normalizes a payload without dispatching it to any device. The `--execution` flag is an alias for `--payload`.
+- `clawperator exec <json-or-file> --dry-run` (or `exec --payload ... --dry-run`) validates the
   payload and prints a plan summary without requiring a device connection.
   This is useful for local payload development and CI checks.
 - If you want the lowest-risk contract check on a live device, use a minimal
@@ -2954,7 +2954,7 @@ For agent-side recovery strategy, use
 ### `--dry-run` output format
 
 ```bash
-clawperator exec --execution '{"commandId":"test","taskId":"task","source":"cli","expectedFormat":"android-ui-automator","timeoutMs":10000,"actions":[{"id":"s1","type":"sleep","params":{"durationMs":500}}]}' --dry-run
+clawperator exec '{"commandId":"test","taskId":"task","source":"cli","expectedFormat":"android-ui-automator","timeoutMs":10000,"actions":[{"id":"s1","type":"sleep","params":{"durationMs":500}}]}' --dry-run
 ```
 
 **Success response:**
@@ -3079,7 +3079,7 @@ Skills can be invoked three ways:
 3. **Artifact compile + exec** (for skills with `.recipe.json` artifacts):
    ```bash
    clawperator skills compile-artifact <skill_id> --artifact <name> --vars '{"KEY":"value"}'
-   clawperator exec --execution <compiled_output>
+   clawperator exec <compiled_output>
    ```
 
 ### Skills Run Response
@@ -3837,19 +3837,25 @@ clawperator packages list [--device <id>] [--third-party]
 Execute a validated command payload. The CLI also accepts `execute` as a synonym.
 
 ```
-clawperator exec --execution <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>] [--timeout <ms>]
+clawperator exec <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>] [--timeout <ms>]
+clawperator exec --payload <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>] [--timeout <ms>]
 ```
+
+| Source | Description |
+|--------|-------------|
+| `<json-or-file>` (positional) | Inline JSON (when it starts with `{` or `[`) or path to a JSON file; primary form |
+| `--payload <json-or-file>` | Same as positional when you prefer a named argument |
+| `--execution <json-or-file>` | Alias for `--payload` (backward compatibility) |
 
 | Flag | Description |
 |------|-------------|
-| `--execution <json-or-file>` | Execution payload as inline JSON or a path to a JSON file (required) |
 | `--validate-only` | Validate and normalize the payload without dispatching to any device |
 | `--dry-run` | Print the execution plan without dispatching to any device |
 | `--device <id>` | Target device serial |
 | `--operator-package <package>` | Target Operator package |
 | `--timeout <ms>` | Override execution timeout within policy limits |
 
-The `--execution` value must conform to the `Execution` contract (see [api-overview.md](./api-overview.md)).
+The payload must conform to the `Execution` contract (see [api-overview.md](./api-overview.md)).
 
 With `--validate-only`, Clawperator validates the payload, applies any
 `--timeout` override, and returns the normalized execution without touching
@@ -6116,13 +6122,13 @@ Payloads are schema-validated before any device action is dispatched.
 Current behavior:
 
 - invalid payloads fail fast with `EXECUTION_VALIDATION_FAILED`
-- `clawperator exec --execution <json-or-file> --validate-only` validates and
-  normalizes the payload without dispatching to any device
+- `clawperator exec <json-or-file> --validate-only` (or `exec --payload <json-or-file> --validate-only`) validates and
+  normalizes the payload without dispatching to any device. `--execution` is an alias for `--payload`.
 
 Example:
 
 ```bash
-clawperator exec --execution /path/to/execution.json --validate-only --output json
+clawperator exec /path/to/execution.json --validate-only --output json
 ```
 
 Use a live-device smoke payload only when you want to validate both the
@@ -8156,7 +8162,7 @@ Instead of `skills run`, test the skill's execution payload directly:
 clawperator skills compile-artifact <skill_id> --artifact main --output json
 
 # 2. Save to file and run manually
-clawperator exec --execution ./skill-execution.json --device <serial>
+clawperator exec ./skill-execution.json --device <serial>
 ```
 
 This bypasses the skills wrapper and helps identify whether the issue is the skill logic or the skills runtime.
