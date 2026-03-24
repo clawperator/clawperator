@@ -15,36 +15,49 @@
 
 ## 1a. Architectural Constraints
 
-These rules prevent drift between the two manifest files and the generation pipeline.
+### Source structure = output structure
 
-**Authority hierarchy:**
+Authored docs live in `docs/` and are structured to match the final published layout directly. There is no intermediate "generated docs" directory committed to git. The build pipeline assembles a staging directory from authored sources + code-derived content + cross-repo copies, and MkDocs reads from that staging directory.
+
+This eliminates the false editing surface (`sites/docs/docs/`), makes drift architecturally impossible for authored pages, and means agents edit the file that gets published.
+
+### Authority hierarchy
+
 - `mkdocs.yml` is the canonical navigation and page ordering.
-- `source-map.yaml` is a flat composition manifest keyed by output path. It must align exactly with `mkdocs.yml` and must not define independent structure, ordering, or sectioning.
-- If the two files disagree, `mkdocs.yml` wins. The build should fail.
+- `source-map.yaml` is reduced to a build assembly manifest. It defines only:
+  - Code-derived pages (what code files generate what output)
+  - Cross-repo copies (what skills docs map to what output paths, with link rewrite rules)
+  - Marker expansion specs (what authored pages contain `<!-- CODE-DERIVED: xxx -->` markers)
+- Authored pages that map 1:1 from `docs/` to output need no entry in `source-map.yaml`. Their presence in `mkdocs.yml` nav is sufficient.
+- If a page is in `mkdocs.yml` nav but missing from both `docs/` and `source-map.yaml`, the build fails.
 
-**Link rewriting:**
-- All relative links in source docs must be rewritten during generation to match final output paths defined in `source-map.yaml`.
-- Intra-repo links: resolved via output path lookup in source-map.
-- Cross-repo links (clawperator-skills): resolved via the same source-map mapping table.
+### Link correctness
+
+- Authored intra-repo links: correct by construction because source paths match output paths. A link from `docs/api/actions.md` to `../setup.md` resolves identically in source and output.
+- Cross-repo links (skills docs copied from `../clawperator-skills/docs/`): rewritten at build time by the assembly script using a mapping table derived from `source-map.yaml`.
 - Unresolvable links: must fail the build. No silent broken links.
 
-**Code vs authored precedence (curated pages):**
+### Code vs authored precedence
+
 - Code-derived data is authoritative for structure, enumerations, and schemas.
 - Authored content augments but cannot override code definitions.
-- If code adds a new error code or selector flag, the curated page must include it. The generator should warn (or fail) on mismatch.
+- If code adds a new error code or selector flag, the expanded page must include it. The generator should warn (or fail) on mismatch.
+- Marker-based injection: authored files may contain `<!-- CODE-DERIVED: <id> -->` markers. The assembly script replaces these with generated content from code sources. The authored file (with marker) is committed. The expanded file (with injected content) exists only in the build staging directory.
 
-**Page boundary constraints:**
+### Page boundary constraints
+
 - `api/overview.md` must not exceed: one screen of concepts, one result envelope definition, one execution flow description. All detailed mechanics live in dedicated pages.
 - Core reference pages (actions, selectors, errors) are explicitly designed to be used together. Cross-referencing between them is expected and acceptable. The "self-contained" principle means minimizing cross-dependencies, not eliminating them.
 
-**Build failure conditions:**
-- Any relative link that cannot be resolved to an output page
-- Any code-derived enum (error code, selector flag) absent from its target curated page
-- Any page in `mkdocs.yml` nav missing from disk
-- Any page on disk in `sites/docs/docs/` absent from `mkdocs.yml` nav (excluding redirects)
-- Any `source-map.yaml` output path not present in `mkdocs.yml` nav
+### Build failure conditions
 
-**Terminology consistency:**
+- Any relative link that cannot be resolved to an output page
+- Any code-derived enum (error code, selector flag) absent from its target page after marker expansion
+- Any page in `mkdocs.yml` nav missing from the assembled staging directory
+- Any page in the staging directory absent from `mkdocs.yml` nav (excluding redirects)
+
+### Terminology consistency
+
 - Canonical terms must be used throughout. No synonyms.
   - "operator" (not "receiver")
   - "action" (not "command" when referring to execution payload actions)
@@ -53,13 +66,13 @@ These rules prevent drift between the two manifest files and the generation pipe
   - "timeout" flag is `--timeout` (not `--timeout-ms`)
 - Each term is defined at first use on the page that owns the concept. Other pages use the term without redefining it.
 
-**Source file deletion criteria:**
-- A source file may only be deleted after:
-  1. Its content exists in exactly one target page
-  2. `docs-validate` passes
-  3. `llms-full.txt` includes the migrated content
-  4. `./scripts/docs_build.sh` succeeds
-- Until all four conditions are met, the old source file remains.
+### Old source file deletion criteria
+
+During the refactor, old source files (e.g., `docs/node-api-for-agents.md`) being replaced by new files in the target structure may only be deleted after:
+1. Their content exists in exactly one target page in `docs/`
+2. `./scripts/docs_build.sh` succeeds
+3. `llms-full.txt` includes the migrated content
+4. All validation passes
 
 ---
 
@@ -158,88 +171,115 @@ nav:
 
 ## 4. File-Level Classification
 
-### Source docs in `docs/`
+After the refactor, `docs/` is restructured to match the published output layout directly. New files are written to their target paths inside `docs/`. Old files that are fully absorbed are deleted. Internal files remain in `docs/` but are not in `mkdocs.yml` nav and are not copied to the build staging directory.
 
-| File | Classification | Disposition |
-|------|---------------|-------------|
-| `docs/index.md` | MODIFY | Rewrite as minimal routing page: 4 sections, links to machine-facing entrypoints, no link dumps |
-| `docs/agent-quickstart.md` | DELETE | Absorbed into `setup.md` |
-| `docs/first-time-setup.md` | MODIFY | Core of new `setup.md` - rewrite as single linear path |
-| `docs/openclaw-first-run.md` | DELETE | OpenClaw-specific steps folded into `setup.md` as a short callout |
-| `docs/running-clawperator-on-android.md` | DELETE | Actuator model to `api/overview.md`; setup steps to `setup.md` |
-| `docs/project-overview.md` | DELETE | Mission absorbed into `api/overview.md` (2-3 lines); rest deleted |
-| `docs/terminology.md` | DELETE | Terms defined inline where used; no standalone glossary |
-| `docs/android-operator-apk.md` | DELETE | Package variants to `setup.md` and `api/devices.md` |
-| `docs/architecture.md` | DELETE | Two-layer model absorbed into `api/overview.md` |
-| `docs/node-api-for-agents.md` | DELETE | Split: execution model to `api/overview.md`, CLI to `api/cli.md`, actions to `api/actions.md`, selectors to `api/selectors.md`, errors to `api/errors.md`, serve to `api/serve.md` |
-| `docs/snapshot-format.md` | MODIFY | Becomes `api/snapshot.md` - update for current contract |
-| `docs/navigation-patterns.md` | MODIFY | Becomes `api/navigation.md` - update CLI examples to flat commands |
-| `docs/multi-device-workflows.md` | DELETE | Merged into `api/devices.md` |
-| `docs/compatibility.md` | KEEP | Becomes `troubleshooting/compatibility.md` - minimal changes |
-| `docs/troubleshooting.md` | MODIFY | Becomes `troubleshooting/operator.md` - absorb crash-logs content |
-| `docs/known-issues.md` | KEEP | Becomes `troubleshooting/known-issues.md` - minimal changes |
-| `docs/crash-logs.md` | DELETE | Merged into `troubleshooting/operator.md` |
-| `docs/conformance-apk.md` | INTERNAL | Not in public docs; remains in repo |
-| `docs/release-procedure.md` | INTERNAL | Not in public docs; remains in repo |
-| `docs/release-reference.md` | INTERNAL | Not in public docs; remains in repo |
-| `docs/site-hosting.md` | INTERNAL | Not in public docs; remains in repo |
+### Target `docs/` layout (post-refactor)
 
-### Source docs in `docs/ai-agents/`
+```
+docs/
+  index.md                          (authored)
+  setup.md                          (authored)
+  api/
+    overview.md                     (authored)
+    cli.md                          (code-derived, generated at build time, gitignored)
+    actions.md                      (authored)
+    selectors.md                    (authored + CODE-DERIVED marker for flag table)
+    snapshot.md                     (authored)
+    errors.md                       (authored + CODE-DERIVED marker for error code table)
+    devices.md                      (authored)
+    doctor.md                       (authored)
+    timeouts.md                     (authored)
+    environment.md                  (authored)
+    serve.md                        (authored)
+    navigation.md                   (authored)
+    recording.md                    (authored)
+  skills/                           (cross-repo, copied at build time, gitignored)
+    overview.md
+    authoring.md
+    development.md
+    runtime.md
+  troubleshooting/
+    operator.md                     (authored)
+    known-issues.md                 (authored)
+    compatibility.md                (authored)
+  design/                           (internal, not published)
+    node-api-design.md
+    operator-llm-playbook.md
+    skill-design.md
+    generative-engine-optimization.md
+    node-api-design-guiding-principles.md
+  conformance-apk.md                (internal, not published)
+  release-procedure.md              (internal, not published)
+  release-reference.md              (internal, not published)
+  site-hosting.md                   (internal, not published)
+```
 
-| File | Classification | Disposition |
-|------|---------------|-------------|
-| `docs/ai-agents/android-recording.md` | MODIFY | Becomes `api/recording.md` - remove persona framing, update contract |
+### Old files: disposition
 
-### Source docs in `docs/reference/`
+These files exist in the current `docs/` tree and must be handled during the refactor.
 
-| File | Classification | Disposition |
-|------|---------------|-------------|
-| `docs/reference/action-types.md` | MODIFY | Becomes `api/actions.md` - absorb from `node-api-for-agents.md`, add new flat commands, extract selectors to `api/selectors.md` |
-| `docs/reference/execution-model.md` | DELETE | Absorbed into `api/overview.md` |
-| `docs/reference/timeout-budgeting.md` | MODIFY | Becomes `api/timeouts.md` - update examples to new CLI surface |
-| `docs/reference/device-and-package-model.md` | MODIFY | Becomes `api/devices.md` - absorb multi-device content |
-| `docs/reference/error-handling.md` | DELETE | Merged into `api/errors.md` |
-| `docs/reference/node-api-doctor.md` | MODIFY | Becomes `api/doctor.md` - update for docsUrl and current behavior |
-| `docs/reference/environment-variables.md` | MODIFY | Becomes `api/environment.md` - update env var names |
+| Old File | Action | New Location |
+|----------|--------|-------------|
+| `docs/index.md` | Rewrite in place | `docs/index.md` |
+| `docs/agent-quickstart.md` | DELETE | Content absorbed into `docs/setup.md` |
+| `docs/first-time-setup.md` | DELETE | Replaced by `docs/setup.md` |
+| `docs/openclaw-first-run.md` | DELETE | Content absorbed into `docs/setup.md` |
+| `docs/running-clawperator-on-android.md` | DELETE | Content split to `docs/setup.md` and `docs/api/overview.md` |
+| `docs/project-overview.md` | DELETE | Mission absorbed into `docs/api/overview.md` |
+| `docs/terminology.md` | DELETE | Terms defined inline where used |
+| `docs/android-operator-apk.md` | DELETE | Content absorbed into `docs/setup.md` and `docs/api/devices.md` |
+| `docs/architecture.md` | DELETE | Two-layer model absorbed into `docs/api/overview.md` |
+| `docs/node-api-for-agents.md` | DELETE | Split across `docs/api/` pages |
+| `docs/snapshot-format.md` | DELETE | Replaced by `docs/api/snapshot.md` |
+| `docs/navigation-patterns.md` | DELETE | Replaced by `docs/api/navigation.md` |
+| `docs/multi-device-workflows.md` | DELETE | Merged into `docs/api/devices.md` |
+| `docs/compatibility.md` | MOVE | To `docs/troubleshooting/compatibility.md` |
+| `docs/troubleshooting.md` | DELETE | Replaced by `docs/troubleshooting/operator.md` (absorbs crash-logs) |
+| `docs/known-issues.md` | MOVE | To `docs/troubleshooting/known-issues.md` |
+| `docs/crash-logs.md` | DELETE | Merged into `docs/troubleshooting/operator.md` |
+| `docs/reference/action-types.md` | DELETE | Replaced by `docs/api/actions.md` |
+| `docs/reference/execution-model.md` | DELETE | Absorbed into `docs/api/overview.md` |
+| `docs/reference/timeout-budgeting.md` | DELETE | Replaced by `docs/api/timeouts.md` |
+| `docs/reference/device-and-package-model.md` | DELETE | Replaced by `docs/api/devices.md` |
+| `docs/reference/error-handling.md` | DELETE | Merged into `docs/api/errors.md` |
+| `docs/reference/node-api-doctor.md` | DELETE | Replaced by `docs/api/doctor.md` |
+| `docs/reference/environment-variables.md` | DELETE | Replaced by `docs/api/environment.md` |
+| `docs/ai-agents/android-recording.md` | DELETE | Replaced by `docs/api/recording.md` |
+| `docs/skills/skill-from-recording.md` | DELETE | Merged into skills/authoring in cross-repo |
+| `docs/conformance-apk.md` | KEEP (internal) | Stays, not published |
+| `docs/release-procedure.md` | KEEP (internal) | Stays, not published |
+| `docs/release-reference.md` | KEEP (internal) | Stays, not published |
+| `docs/site-hosting.md` | KEEP (internal) | Stays, not published |
+| `docs/design/*.md` (all 5) | KEEP (internal) | Stay, not published |
 
-### Source docs in `docs/design/`
+After the refactor, the `docs/reference/`, `docs/ai-agents/`, and `docs/skills/` directories are empty and can be deleted.
 
-| File | Classification | Disposition |
-|------|---------------|-------------|
-| `docs/design/node-api-design.md` | INTERNAL | Remove from public docs. Keep in repo. |
-| `docs/design/operator-llm-playbook.md` | INTERNAL | Remove from public docs. Keep in repo. |
-| `docs/design/skill-design.md` | INTERNAL | Remove from public docs. Keep in repo. |
-| `docs/design/generative-engine-optimization.md` | INTERNAL | Remove from public docs. Keep in repo. |
-| `docs/design/node-api-design-guiding-principles.md` | INTERNAL | Remove from public docs. Keep in repo. |
+### Cross-repo sources in `../clawperator-skills/docs/`
 
-### Source docs in `docs/skills/`
+These files are the canonical source for skills docs. They are copied (with link rewriting) to `docs/skills/` at build time. The `docs/skills/` directory is gitignored.
 
-| File | Classification | Disposition |
-|------|---------------|-------------|
-| `docs/skills/skill-from-recording.md` | DELETE | Merged into `skills/authoring.md` |
+| Source File | Target | Notes |
+|------------|--------|-------|
+| `usage-model.md` | `docs/skills/overview.md` | Tighten to contract style, update CLI examples |
+| `skill-authoring-guidelines.md` | `docs/skills/authoring.md` | Absorb `skill-from-recording.md` + `blocked-terms-policy.md` |
+| `skill-development-workflow.md` | `docs/skills/development.md` | Update CLI examples |
+| `device-prep-and-runtime-tips.md` | `docs/skills/runtime.md` | Update CLI examples |
+| `blocked-terms-policy.md` | DELETE | Absorbed into `skill-authoring-guidelines.md` |
+| `skill-from-recording.md` (in this repo) | DELETE | Absorbed into `skill-authoring-guidelines.md` |
 
-### Source docs in `../clawperator-skills/docs/`
-
-| File | Classification | Disposition |
-|------|---------------|-------------|
-| `usage-model.md` | MODIFY | Becomes `skills/overview.md` - tighten to contract style |
-| `skill-development-workflow.md` | MODIFY | Becomes `skills/development.md` - update CLI examples |
-| `skill-authoring-guidelines.md` | MODIFY | Becomes `skills/authoring.md` - absorb recording + blocked-terms |
-| `device-prep-and-runtime-tips.md` | MODIFY | Becomes `skills/runtime.md` - update CLI examples |
-| `blocked-terms-policy.md` | DELETE | Absorbed into `skills/authoring.md` |
+Note: The source files in `../clawperator-skills/docs/` must be renamed/restructured to match target filenames. After the refactor, the skills repo files should be named `overview.md`, `authoring.md`, `development.md`, `runtime.md`.
 
 ### Code-derived sources in `apps/node/`
 
-| Source | Classification | Role |
-|--------|---------------|------|
-| `apps/node/src/cli/registry.ts` | KEEP | Primary generator input for `api/cli.md` |
-| `apps/node/src/cli/selectorFlags.ts` | KEEP | Generator input for `api/selectors.md` |
-| `apps/node/src/cli/commands/serve.ts` | KEEP | Source for `api/serve.md` |
-| `apps/node/src/contracts/errors.ts` | KEEP | Generator input for error codes in `api/errors.md` |
-| `apps/node/src/contracts/result.ts` | KEEP | Source for result envelope in `api/overview.md` |
-| `apps/node/src/contracts/execution.ts` | KEEP | Source for execution payload in `api/overview.md` |
-| `apps/node/src/contracts/selectors.ts` | KEEP | Source for matcher contract in `api/selectors.md` |
-| `apps/node/src/contracts/doctor.ts` | KEEP | Source for doctor report in `api/doctor.md` |
+| Source | Role |
+|--------|------|
+| `apps/node/src/cli/registry.ts` | Primary input for generating `docs/api/cli.md` |
+| `apps/node/src/cli/selectorFlags.ts` | Input for `<!-- CODE-DERIVED: selector-flags -->` marker in `docs/api/selectors.md` |
+| `apps/node/src/contracts/errors.ts` | Input for `<!-- CODE-DERIVED: error-codes -->` marker in `docs/api/errors.md` |
+| `apps/node/src/contracts/result.ts` | Reference for result envelope in `docs/api/overview.md` (authored, not injected) |
+| `apps/node/src/contracts/execution.ts` | Reference for execution payload in `docs/api/overview.md` (authored, not injected) |
+| `apps/node/src/contracts/selectors.ts` | Reference for matcher contract in `docs/api/selectors.md` (authored, not injected) |
+| `apps/node/src/contracts/doctor.ts` | Reference for doctor report in `docs/api/doctor.md` (authored, not injected) |
 
 ---
 
@@ -257,13 +297,13 @@ nav:
 
 ### Rejected from codex-plan
 
-1. **Remove `source-map.yaml` entirely**: Too disruptive. The docs-generate skill, docs-validate skill, and `generate_llms_full.py` all depend on it. Rewriting the entire pipeline is not justified when source-map.yaml can be updated to match the new structure. The dual-manifest concern is valid but deferred.
+1. **Remove `source-map.yaml` entirely**: Partially adopted. The file is dramatically reduced in scope (only tracks code-derived pages, cross-repo copies, and marker expansions) but not eliminated. It still serves as the assembly manifest for the build pipeline. The dual-manifest problem is largely resolved because authored pages no longer appear in source-map.yaml.
 
 2. **Split setup into 3 pages** (install-and-verify, first-command, operator-apk): For agents, one linear page is better. One fetch, one path, no navigation decisions.
 
 3. **Keep skills at 6 pages**: `skill-from-recording.md` and `blocked-terms-policy.md` are small enough to merge into `skills/authoring.md`. Fewer pages = less retrieval ambiguity.
 
-4. **`docs/internal/` directory + frontmatter flag**: Overengineering for pre-alpha. Current "not in source-map = not published" convention works.
+4. **`docs/internal/` directory + frontmatter flag**: Internal docs stay in `docs/` (in their existing locations like `docs/design/`). They are excluded from publishing by not being in `mkdocs.yml` nav and not being copied to the build staging directory. No new mechanism needed.
 
 5. **Merge timeouts into execution contract**: Would make `api/overview.md` too heavy. Timeout budgeting is distinct operational guidance.
 
@@ -275,79 +315,167 @@ nav:
 
 ## 6. Pipeline / Generation Plan
 
-### Current Pipeline
+### Current Pipeline (being replaced)
 
 ```
-source-map.yaml  -->  docs-generate skill  -->  sites/docs/docs/  -->  mkdocs build  -->  site/
-                                            -->  generate_llms_full.py  -->  llms-full.txt
+source-map.yaml  -->  docs-generate skill (agent)  -->  sites/docs/docs/ (committed)  -->  mkdocs build  -->  site/
+                                                    -->  generate_llms_full.py          -->  llms-full.txt
 ```
 
-### Pipeline After Refactor
+Problems: `sites/docs/docs/` is committed but generated (false editing surface, drift risk). Agent-driven generation is non-deterministic. Full-tree copy for 80% of pages that need no transformation.
 
-Same flow, updated inputs:
+### New Pipeline
 
-1. **`source-map.yaml`** - Full rewrite. 4 sections, 20 pages. Modes:
-   - `api/cli.md`: `mode: code-derived` from `registry.ts` + command modules
-   - `api/errors.md`: `mode: curated` - merges code-derived error codes with authored recovery guidance
-   - `api/selectors.md`: `mode: curated` - merges code-derived flag definitions with authored matcher contract
-   - All other pages: `mode: copy` from a single authored source file
-   - Temporarily increase churn limits (`max_changed_files`, `max_line_churn`, `max_percent_churn`) for the refactor. Restore maintenance-safe values after landing.
+```
+docs/                    (authored, committed, structure = output structure)
+  + source-map.yaml      (assembly manifest for non-trivial pages only)
+  + apps/node/src/       (code inputs)
+  + ../clawperator-skills/docs/  (cross-repo source)
+         |
+         v  assemble_docs.sh (deterministic script)
 
-2. **`mkdocs.yml`** - Full nav rewrite matching Section 3. Add `mkdocs-redirects` plugin:
-   - Add `mkdocs-redirects` to `sites/docs/requirements.txt`
-   - Add redirect map covering all old page paths to new destinations. This is a one-time migration artifact - after the refactor lands, the map is static and does not require ongoing maintenance:
-     ```yaml
-     plugins:
-       - search
-       - redirects:
-           redirect_maps:
-             'getting-started/first-time-setup.md': 'setup.md'
-             'getting-started/running-clawperator-on-android.md': 'setup.md'
-             'getting-started/openclaw-first-run.md': 'setup.md'
-             'getting-started/project-overview.md': 'api/overview.md'
-             'getting-started/terminology.md': 'api/overview.md'
-             'getting-started/android-operator-apk.md': 'api/devices.md'
-             'ai-agents/agent-quickstart.md': 'setup.md'
-             'ai-agents/node-api-for-agents.md': 'api/overview.md'
-             'ai-agents/android-recording.md': 'api/recording.md'
-             'ai-agents/navigation-patterns.md': 'api/navigation.md'
-             'ai-agents/multi-device-workflows.md': 'api/devices.md'
-             'architecture/architecture.md': 'api/overview.md'
-             'reference/api-overview.md': 'api/overview.md'
-             'reference/cli-reference.md': 'api/cli.md'
-             'reference/action-types.md': 'api/actions.md'
-             'reference/execution-model.md': 'api/overview.md'
-             'reference/timeout-budgeting.md': 'api/timeouts.md'
-             'reference/device-and-package-model.md': 'api/devices.md'
-             'reference/snapshot-format.md': 'api/snapshot.md'
-             'reference/error-codes.md': 'api/errors.md'
-             'reference/error-handling.md': 'api/errors.md'
-             'reference/node-api-doctor.md': 'api/doctor.md'
-             'reference/environment-variables.md': 'api/environment.md'
-             'design/node-api-design.md': 'api/overview.md'
-             'design/operator-llm-playbook.md': 'api/overview.md'
-             'design/skill-design.md': 'skills/overview.md'
-             'troubleshooting/troubleshooting.md': 'troubleshooting/operator.md'
-             'troubleshooting/crash-logs.md': 'troubleshooting/operator.md'
-             'skills/usage-model.md': 'skills/overview.md'
-             'skills/skill-from-recording.md': 'skills/authoring.md'
-             'skills/skill-development-workflow.md': 'skills/development.md'
-             'skills/skill-authoring-guidelines.md': 'skills/authoring.md'
-             'skills/device-prep-and-runtime-tips.md': 'skills/runtime.md'
-             'skills/blocked-terms-policy.md': 'skills/authoring.md'
-     ```
+sites/docs/.build/       (gitignored staging directory)
+         |
+         v  mkdocs build
 
-3. **`generate_llms_full.py`** - Update to walk `mkdocs.yml` nav order for page concatenation instead of source-map section order. This ensures `llms-full.txt` matches the canonical navigation.
+sites/docs/site/         (gitignored final HTML)
+  + llms-full.txt        (generated, copied to static/)
+```
 
-4. **`docs-generate` skill** - Update SKILL.md with new page list, source mapping, and churn thresholds.
+### Assembly steps (`assemble_docs.sh`)
 
-5. **`docs-validate` skill** - No structural changes needed. Source-map-driven validation still works after the source-map rewrite.
+This is a new deterministic script (not agent-driven). It runs as the first step of `docs_build.sh`.
 
-6. **`validate_docs_routes.py`** - Add inner-page relative link validation (`check_inner_page_links`).
+1. **Clean staging:** Remove `sites/docs/.build/`, create fresh.
+2. **Copy authored pages:** Copy all files from `docs/` that are referenced in `mkdocs.yml` nav to `sites/docs/.build/` preserving directory structure. Internal files (not in nav) are skipped.
+3. **Copy cross-repo pages:** Copy skills docs from `../clawperator-skills/docs/` to `sites/docs/.build/skills/`, rewriting relative links using mapping table from `source-map.yaml`.
+4. **Generate code-derived pages:** Run generator scripts to produce `sites/docs/.build/api/cli.md` from `registry.ts` and command modules.
+5. **Expand code-derived markers:** For authored pages containing `<!-- CODE-DERIVED: <id> -->` markers, copy to staging with markers replaced by generated content. Currently applies to:
+   - `api/errors.md`: `<!-- CODE-DERIVED: error-codes -->` expanded from `contracts/errors.ts`
+   - `api/selectors.md`: `<!-- CODE-DERIVED: selector-flags -->` expanded from `cli/selectorFlags.ts`
+6. **Validate staging:** Verify every page in `mkdocs.yml` nav exists in `.build/`. Fail if any are missing.
 
-7. **`llms.txt`** - Rewrite both `sites/docs/static/llms.txt` and `sites/landing/public/llms.txt` to point at canonical pages.
+### What changes in existing components
 
-8. **`llms-full.txt`** - Regenerate from final nav order after all source pages are written.
+**`source-map.yaml`** - Dramatically simplified. No longer lists every page. Only defines:
+```yaml
+# Assembly manifest - only non-trivial pages need entries
+code_derived:
+  - output: api/cli.md
+    generator: scripts/generate_cli_reference.py
+    sources:
+      - apps/node/src/cli/registry.ts
+      - apps/node/src/cli/commands/
+
+markers:
+  - page: api/errors.md
+    marker: error-codes
+    generator: scripts/generate_error_table.py
+    sources:
+      - apps/node/src/contracts/errors.ts
+  - page: api/selectors.md
+    marker: selector-flags
+    generator: scripts/generate_selector_table.py
+    sources:
+      - apps/node/src/cli/selectorFlags.ts
+
+cross_repo:
+  - source_root: ../clawperator-skills/docs
+    target_dir: skills
+    files:
+      - source: overview.md
+      - source: authoring.md
+      - source: development.md
+      - source: runtime.md
+    link_rewrites:
+      # source-relative link -> output-relative link
+      # (defined as needed for cross-repo links that break)
+```
+
+**`sites/docs/docs/`** - Deleted from git. The entire directory is removed from version control. Add to `.gitignore`.
+
+**`sites/docs/.build/`** - New gitignored staging directory. MkDocs `docs_dir` points here.
+
+**`docs/api/cli.md`** - Gitignored. Fully code-derived, generated at build time. Add `docs/api/cli.md` to `.gitignore`.
+
+**`docs/skills/`** - Gitignored. Cross-repo copies, generated at build time. Add `docs/skills/` to `.gitignore`.
+
+**`mkdocs.yml`** - Full nav rewrite matching Section 3. `docs_dir` changes to `.build/`. Add `mkdocs-redirects` plugin:
+- Add `mkdocs-redirects` to `sites/docs/requirements.txt`
+- Add redirect map (one-time migration, static after landing):
+  ```yaml
+  plugins:
+    - search
+    - redirects:
+        redirect_maps:
+          'getting-started/first-time-setup.md': 'setup.md'
+          'getting-started/running-clawperator-on-android.md': 'setup.md'
+          'getting-started/openclaw-first-run.md': 'setup.md'
+          'getting-started/project-overview.md': 'api/overview.md'
+          'getting-started/terminology.md': 'api/overview.md'
+          'getting-started/android-operator-apk.md': 'api/devices.md'
+          'ai-agents/agent-quickstart.md': 'setup.md'
+          'ai-agents/node-api-for-agents.md': 'api/overview.md'
+          'ai-agents/android-recording.md': 'api/recording.md'
+          'ai-agents/navigation-patterns.md': 'api/navigation.md'
+          'ai-agents/multi-device-workflows.md': 'api/devices.md'
+          'architecture/architecture.md': 'api/overview.md'
+          'reference/api-overview.md': 'api/overview.md'
+          'reference/cli-reference.md': 'api/cli.md'
+          'reference/action-types.md': 'api/actions.md'
+          'reference/execution-model.md': 'api/overview.md'
+          'reference/timeout-budgeting.md': 'api/timeouts.md'
+          'reference/device-and-package-model.md': 'api/devices.md'
+          'reference/snapshot-format.md': 'api/snapshot.md'
+          'reference/error-codes.md': 'api/errors.md'
+          'reference/error-handling.md': 'api/errors.md'
+          'reference/node-api-doctor.md': 'api/doctor.md'
+          'reference/environment-variables.md': 'api/environment.md'
+          'design/node-api-design.md': 'api/overview.md'
+          'design/operator-llm-playbook.md': 'api/overview.md'
+          'design/skill-design.md': 'skills/overview.md'
+          'troubleshooting/troubleshooting.md': 'troubleshooting/operator.md'
+          'troubleshooting/crash-logs.md': 'troubleshooting/operator.md'
+          'skills/usage-model.md': 'skills/overview.md'
+          'skills/skill-from-recording.md': 'skills/authoring.md'
+          'skills/skill-development-workflow.md': 'skills/development.md'
+          'skills/skill-authoring-guidelines.md': 'skills/authoring.md'
+          'skills/device-prep-and-runtime-tips.md': 'skills/runtime.md'
+          'skills/blocked-terms-policy.md': 'skills/authoring.md'
+  ```
+
+**`generate_llms_full.py`** - Update to read from `.build/` directory, walk `mkdocs.yml` nav order.
+
+**`validate_docs_routes.py`** - Add inner-page relative link validation. Update to validate against `.build/` directory.
+
+**`validate_source_of_truth.py`** - Dramatically simplified or removed. Drift is no longer possible for authored pages (source = output). Only needed for code-derived pages and cross-repo copies, which can be validated by checking that generator inputs haven't changed without re-running assembly.
+
+**`diff_report.py` / `build_inventory.py`** - May be retired. The churn gating was designed to prevent large agent-driven rewrites of committed generated output. With no committed generated output, the primary use case is gone. Churn control for authored docs is handled by normal PR review.
+
+**`docs-generate` skill** - Scope dramatically reduced. No longer responsible for copying authored pages. Only needed when:
+- Generating code-derived content (`api/cli.md`) from code
+- Expanding code-derived markers in authored pages
+- The skill becomes a wrapper around the deterministic generator scripts, not a full-tree generation agent.
+
+**`docs-validate` skill** - Simplified. Validates that:
+- All pages in `mkdocs.yml` nav exist in `docs/` (authored) or are defined in `source-map.yaml` (generated/cross-repo)
+- Code-derived generators are up to date (code inputs haven't changed without regeneration)
+- No authored page accidentally edits a gitignored path
+
+**`llms.txt`** - Rewrite both `sites/docs/static/llms.txt` and `sites/landing/public/llms.txt` to point at canonical pages.
+
+**`llms-full.txt`** - Generated at build time from assembled `.build/` directory, written to `sites/docs/static/llms-full.txt` and `sites/landing/public/llms-full.txt`.
+
+### New scripts to create
+
+| Script | Purpose |
+|--------|---------|
+| `assemble_docs.sh` (or `.py`) | Deterministic assembly: copy authored pages, copy cross-repo, generate code-derived, expand markers, validate staging |
+| `generate_cli_reference.py` | Generate `api/cli.md` from `registry.ts` + command modules |
+| `generate_error_table.py` | Generate error code table for marker expansion in `api/errors.md` |
+| `generate_selector_table.py` | Generate selector flag table for marker expansion in `api/selectors.md` |
+
+These replace the agent-driven generation with deterministic scripts.
 
 ---
 
@@ -355,15 +483,15 @@ Same flow, updated inputs:
 
 ### Policy
 
-Internal docs are excluded by **not being in `source-map.yaml`**.
+Internal docs are excluded by **not being in `mkdocs.yml` nav**.
 
-No frontmatter flags. No `docs/internal/` directory. No special markers. If a file in `docs/` is not listed in `source-map.yaml`, it is internal. The generated output and public site only contain what the source-map specifies.
+The assembly script (`assemble_docs.sh`) only copies files referenced in `mkdocs.yml` nav to the build staging directory. Files in `docs/` that are not in the nav are never copied, never built, and never published.
 
-This is the existing de facto behavior. This refactor formalizes it by also removing `docs/design/` pages from the source-map.
+No frontmatter flags. No `docs/internal/` directory. No special markers. If a file in `docs/` is not in `mkdocs.yml` nav, it is internal. This is enforced architecturally: internal files physically do not exist in the staging directory that MkDocs reads from.
 
 ### Internal Docs Inventory (Post-Refactor)
 
-Files in `docs/` that are NOT in `source-map.yaml` and NOT published:
+Files in `docs/` that are NOT in `mkdocs.yml` nav and NOT published:
 
 - `docs/conformance-apk.md`
 - `docs/release-procedure.md`
@@ -402,6 +530,7 @@ This refactor answers the question: `api/overview.md` is a single authored sourc
 - `tasks/docs/refactor/prd-1-entry-points.md`
 - `tasks/docs/refactor/prd-2-structure.md`
 - `tasks/docs/refactor/chat-session.md`
+- `tasks/docs/refactor/docs-pipeline-proposal.md`
 
 ### Landing Page Update - SEPARATE
 
@@ -411,38 +540,56 @@ Follow-up PR after docs refactor lands.
 
 ## 9. Execution Sequence
 
-### Phase 1: Infrastructure
+### Phase 1: Pipeline Infrastructure
 
-1. Add `mkdocs-redirects` to `sites/docs/requirements.txt`
-2. Rewrite `source-map.yaml` with new 4-section, 20-page structure (increase churn limits)
-3. Rewrite `mkdocs.yml` nav tree and add redirect maps
-4. Add `check_inner_page_links` to `validate_docs_routes.py`
+Set up the new build pipeline before writing any content.
+
+1. Create `docs/api/` and `docs/troubleshooting/` directories
+2. Add `.gitignore` entries:
+   - `docs/api/cli.md` (code-derived)
+   - `docs/skills/` (cross-repo copies)
+   - `sites/docs/.build/` (staging directory)
+3. Remove `sites/docs/docs/` from git tracking (git rm -r, add to `.gitignore`)
+4. Write `assemble_docs.sh` - deterministic assembly script (copy authored, copy cross-repo with link rewriting, generate code-derived, expand markers, validate staging)
+5. Write generator scripts: `generate_cli_reference.py`, `generate_error_table.py`, `generate_selector_table.py`
+6. Rewrite `source-map.yaml` to reduced assembly manifest (code-derived, markers, cross-repo only)
+7. Rewrite `mkdocs.yml`: new nav tree, `docs_dir: .build`, add `mkdocs-redirects` plugin with redirect map
+8. Add `mkdocs-redirects` to `sites/docs/requirements.txt`
+9. Update `docs_build.sh` to call `assemble_docs.sh` before MkDocs build
+10. Update `generate_llms_full.py` to read from `.build/`, walk `mkdocs.yml` nav order
+11. Update `validate_docs_routes.py`: add inner-page relative link validation, point at `.build/`
+12. Simplify `validate_source_of_truth.py` (only validates code-derived pages) or remove
+13. Verify pipeline works end-to-end with placeholder content
 
 ### Phase 2: Write Source Docs
 
-Author the 20 target pages. Each uses contract-first style, new flat CLI surface, no historical references, no duplication.
+Author the 20 target pages directly in `docs/` in their final locations. Each uses contract-first style, new flat CLI surface, no historical references, no duplication.
+
+Pages are written to `docs/` in the target structure. Skills pages are written to `../clawperator-skills/docs/` with renamed filenames matching the target.
 
 Priority order (most impactful first):
-1. `setup.md` - single setup path
-2. `api/overview.md` - execution model, result envelope, core concepts
-3. `api/actions.md` - all action types with new commands
-4. `api/selectors.md` - selector flags, matcher contract, container targeting
-5. `api/errors.md` - all error codes with recovery guidance
-6. `api/cli.md` - regenerate from code
-7. `api/devices.md` - device targeting + multi-device
-8. `api/snapshot.md` - snapshot format
-9. `api/doctor.md` - readiness checks
-10. `api/timeouts.md` - timeout budgeting
-11. `api/environment.md` - environment variables
-12. `api/serve.md` - HTTP/SSE server contract
-13. `api/navigation.md` - navigation patterns
-14. `api/recording.md` - recording format
-15. `skills/overview.md` - usage model
-16. `skills/authoring.md` - authoring guidelines + recording + blocked-terms
-17. `skills/development.md` - development workflow
-18. `skills/runtime.md` - device prep and runtime
-19. `troubleshooting/operator.md` - troubleshooting + crash logs
-20. `index.md` - minimal routing page (write last, after all targets exist)
+1. `docs/setup.md` - single setup path
+2. `docs/api/overview.md` - execution model, result envelope, core concepts
+3. `docs/api/actions.md` - all action types with new commands
+4. `docs/api/selectors.md` - selector flags, matcher contract, container targeting (with `<!-- CODE-DERIVED: selector-flags -->` marker)
+5. `docs/api/errors.md` - all error codes with recovery guidance (with `<!-- CODE-DERIVED: error-codes -->` marker)
+6. `docs/api/cli.md` - generated by `generate_cli_reference.py` (not hand-authored)
+7. `docs/api/devices.md` - device targeting + multi-device
+8. `docs/api/snapshot.md` - snapshot format
+9. `docs/api/doctor.md` - readiness checks
+10. `docs/api/timeouts.md` - timeout budgeting
+11. `docs/api/environment.md` - environment variables
+12. `docs/api/serve.md` - HTTP/SSE server contract
+13. `docs/api/navigation.md` - navigation patterns
+14. `docs/api/recording.md` - recording format
+15. `../clawperator-skills/docs/overview.md` - usage model (renamed from `usage-model.md`)
+16. `../clawperator-skills/docs/authoring.md` - authoring guidelines + recording + blocked-terms (renamed, absorbs content)
+17. `../clawperator-skills/docs/development.md` - development workflow (renamed from `skill-development-workflow.md`)
+18. `../clawperator-skills/docs/runtime.md` - device prep and runtime (renamed from `device-prep-and-runtime-tips.md`)
+19. `docs/troubleshooting/operator.md` - troubleshooting + crash logs
+20. `docs/index.md` - minimal routing page (write last, after all targets exist)
+
+`docs/troubleshooting/known-issues.md` and `docs/troubleshooting/compatibility.md` are moved from their current locations with minimal changes.
 
 ### Phase 3: Code Changes
 
@@ -452,23 +599,25 @@ Priority order (most impactful first):
 4. Unit tests for doctor changes (T1-T4 from PRD-1)
 5. `~/.clawperator/AGENTS.md` generation in `install.sh`
 
-### Phase 4: Generate and Validate
+### Phase 4: Build and Validate
 
-1. Run docs-generate skill to produce `sites/docs/docs/`
-2. Update `generate_llms_full.py` to walk `mkdocs.yml` nav order
-3. Generate `llms-full.txt`
-4. Rewrite `llms.txt` (both `sites/docs/static/llms.txt` and `sites/landing/public/llms.txt`)
-5. Run `./scripts/docs_build.sh`
-6. Run docs-validate skill
-7. Run `validate_docs_routes.py` (with new relative link checking)
-8. Run `npm --prefix apps/node run build && npm --prefix apps/node run test`
-9. Verify `llms-full.txt` is coherent top-to-bottom
+1. Run `assemble_docs.sh` to produce `sites/docs/.build/`
+2. Run `./scripts/docs_build.sh` (which now calls assembly + MkDocs build + llms-full generation + validation)
+3. Rewrite `llms.txt` (both `sites/docs/static/llms.txt` and `sites/landing/public/llms.txt`)
+4. Run `validate_docs_routes.py` (with new relative link checking)
+5. Run `npm --prefix apps/node run build && npm --prefix apps/node run test`
+6. Verify `llms-full.txt` is coherent top-to-bottom
 
 ### Phase 5: Cleanup
 
-1. Delete absorbed source files from `docs/` per the deletion criteria in Section 1a (all four conditions must be met before removing any source file)
-2. Delete task files listed in Section 8
-3. Restore churn limits in `source-map.yaml` to maintenance-safe values
+1. Delete old source files per the deletion criteria in Section 1a:
+   - Remove old `docs/reference/`, `docs/ai-agents/`, `docs/skills/` directories (content migrated to new locations)
+   - Remove absorbed files: `docs/agent-quickstart.md`, `docs/first-time-setup.md`, `docs/openclaw-first-run.md`, `docs/running-clawperator-on-android.md`, `docs/project-overview.md`, `docs/terminology.md`, `docs/android-operator-apk.md`, `docs/architecture.md`, `docs/node-api-for-agents.md`, `docs/snapshot-format.md`, `docs/navigation-patterns.md`, `docs/multi-device-workflows.md`, `docs/crash-logs.md`, `docs/troubleshooting.md`, `docs/compatibility.md`, `docs/known-issues.md`
+2. Delete old skills repo files that were renamed/absorbed: `usage-model.md`, `skill-authoring-guidelines.md`, `skill-development-workflow.md`, `device-prep-and-runtime-tips.md`, `blocked-terms-policy.md`, `skill-from-recording.md`
+3. Delete task files listed in Section 8
+4. Delete `tasks/docs/refactor/docs-pipeline-proposal.md`
+5. Update `CLAUDE.md` to reflect new docs structure and pipeline
+6. Update `docs-generate` and `docs-validate` skill SKILL.md files to reflect new pipeline
 
 ---
 
@@ -476,21 +625,29 @@ Priority order (most impactful first):
 
 ### Build and Test
 
-- [ ] `./scripts/docs_build.sh` succeeds with zero warnings
+- [ ] `./scripts/docs_build.sh` succeeds with zero warnings (includes assembly + MkDocs build + llms-full generation + route validation)
 - [ ] `npm --prefix apps/node run build` succeeds
 - [ ] `npm --prefix apps/node run test` passes
 - [ ] Doctor `docsUrl` unit tests pass (T1-T4)
 
+### Pipeline Architecture
+
+- [ ] `sites/docs/docs/` does not exist in git (removed from tracking, in `.gitignore`)
+- [ ] `sites/docs/.build/` is gitignored
+- [ ] `docs/api/cli.md` is gitignored (code-derived)
+- [ ] `docs/skills/` is gitignored (cross-repo copies)
+- [ ] `assemble_docs.sh` produces a complete staging directory deterministically
+- [ ] MkDocs `docs_dir` points to `.build/`
+- [ ] `source-map.yaml` only contains code-derived, marker, and cross-repo entries (no authored copy pages)
+
 ### Structural Integrity
 
-- [ ] Every page in `mkdocs.yml` nav exists on disk in `sites/docs/docs/`
-- [ ] No page on disk in `sites/docs/docs/` is absent from `mkdocs.yml` (excluding redirects)
-- [ ] Every `source-map.yaml` output path is present in `mkdocs.yml` nav
+- [ ] Every page in `mkdocs.yml` nav exists in assembled `sites/docs/.build/`
+- [ ] No unexpected page in `.build/` is absent from `mkdocs.yml` nav (excluding redirects)
 - [ ] No page appears in more than one nav section
 - [ ] No two pages cover the same concept as primary content
-- [ ] All relative links in generated pages resolve to valid output pages
+- [ ] All relative links in assembled pages resolve to valid output pages
 - [ ] `validate_docs_routes.py` passes including inner-page relative link checks
-- [ ] `docs-validate` skill passes
 
 ### Machine-Facing Artifacts
 
@@ -502,12 +659,13 @@ Priority order (most impactful first):
 
 - [ ] All CLI examples use flat commands (`snapshot`, `click`, `press`, not `observe snapshot`, `action click`, `action press-key`)
 - [ ] All flag references use canonical names (`--device`, `--json`, `--timeout`, `--operator-package`)
-- [ ] Zero occurrences of "receiver" in `sites/docs/docs/` (replaced by "operator")
-- [ ] Zero occurrences of deprecated command forms in `sites/docs/docs/`
-- [ ] Zero occurrences of deprecated flag names (`--timeout-ms`, `--output json` without `--json` context) in `sites/docs/docs/`
-- [ ] Selector mutual exclusion rules documented in `api/selectors.md`
-- [ ] New error codes (`MISSING_SELECTOR`, `MISSING_ARGUMENT`, `UNKNOWN_COMMAND` with `suggestion`) documented in `api/errors.md`
-- [ ] `serve` command HTTP/SSE contract documented in `api/serve.md`
+- [ ] Zero occurrences of "receiver" in authored docs under `docs/` (replaced by "operator")
+- [ ] Zero occurrences of deprecated command forms in authored docs
+- [ ] Zero occurrences of deprecated flag names (`--timeout-ms`, `--output json` without `--json` context) in authored docs
+- [ ] Selector mutual exclusion rules documented in `docs/api/selectors.md`
+- [ ] New error codes (`MISSING_SELECTOR`, `MISSING_ARGUMENT`, `UNKNOWN_COMMAND` with `suggestion`) documented in `docs/api/errors.md`
+- [ ] `serve` command HTTP/SSE contract documented in `docs/api/serve.md`
+- [ ] Code-derived markers (`<!-- CODE-DERIVED: error-codes -->`, `<!-- CODE-DERIVED: selector-flags -->`) expand correctly in assembled output
 
 ### Surface Area Reduction
 
@@ -516,4 +674,5 @@ Priority order (most impactful first):
 - [ ] Zero "recommended paths" sections
 - [ ] Zero standalone architecture/design pages in public nav
 - [ ] `node-api-for-agents.md` does not exist as a public page
-- [ ] `reference/api-overview.md` does not exist in curated form
+- [ ] `reference/api-overview.md` does not exist
+- [ ] Old `docs/reference/`, `docs/ai-agents/` directories are removed
