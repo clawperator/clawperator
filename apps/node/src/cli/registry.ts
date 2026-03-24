@@ -1542,14 +1542,14 @@ COMMANDS["wait-for-nav"] = {
   topLevelBlock: `  wait-for-nav --app <package> --timeout <ms> [--device <id>] [--json]
                                             Wait for app or screen navigation to complete`,
   handler: async (ctx) => {
-    const { rest, format, logger, deviceId, operatorPackage, timeoutMs: globalTimeoutMs } = ctx;
+    const { rest, format, logger, deviceId, operatorPackage, timeoutMs: navTimeoutMs } = ctx;
 
     // Parse --app flag
     const expectedPackage = getOpt(rest, "--app");
 
-    // Parse --timeout (required, action-level)
-    const timeoutStr = getOpt(rest, "--timeout");
-    if (!timeoutStr) {
+    // --timeout is required (action-level wait duration)
+    // It's parsed by getGlobalOpts and passed via ctx.timeoutMs
+    if (navTimeoutMs === undefined) {
       return formatError(
         {
           code: ERROR_CODES.MISSING_ARGUMENT,
@@ -1558,7 +1558,6 @@ COMMANDS["wait-for-nav"] = {
         { format },
       );
     }
-    const navTimeoutMs = Number(timeoutStr);
     if (!Number.isFinite(navTimeoutMs) || navTimeoutMs <= 0) {
       return formatError(
         {
@@ -1607,17 +1606,12 @@ COMMANDS["wait-for-nav"] = {
       navTimeoutMs,
     );
 
-    // Override execution timeout if global timeout is larger
-    if (globalTimeoutMs !== undefined && globalTimeoutMs > execution.timeoutMs) {
-      execution.timeoutMs = globalTimeoutMs;
-    }
-
     return (await import("./commands/execute.js")).cmdExecute({
       format,
       execution: JSON.stringify(execution),
       deviceId,
       operatorPackage,
-      timeoutMs: globalTimeoutMs,
+      timeoutMs: execution.timeoutMs,
       logger,
     });
   },
