@@ -2046,7 +2046,7 @@ edit or replace the plan above, which stays the original design record.
 | Phase 2 | Done | Flat verbs, global flags, `action` / `observe` removed from registry with did-you-mean, docs and smoke updates |
 | Phase 3 | Done | Selector shorthand flags on click/type/read/wait; `--container-*` (incl. `-contains` variants) on scroll; MISSING_SELECTOR lists full flag surface incl. `--desc-contains`; duplicate value flags rejected; docs updated |
 | Phase 4 | Partial | Exit-code and help polish in flight; full deliverable set not complete |
-| Phase 5A | Not done | Extended commands: scroll-until, close, --long/--focus on click, wait --timeout, read --all, sleep |
+| Phase 5A | Done | Extended commands: scroll-until, close, --long/--focus on click, wait --timeout, read --all, sleep. Includes Android-side `timeoutMs` support for `wait_for_node` and `all` flag for `read_text`. See deviations #6 and #7 for unscheduled changes bundled in this phase. |
 | Phase 5B | Not done | Higher-risk: exec rename, wait-for-nav, read-value; requires ActionParams contract alignment first |
 | Phase 5C | Not done | read-within: container-scoped read; requires APK change to UiAction.ReadText before CLI change |
 
