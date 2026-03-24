@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import kotlin.time.Duration
@@ -1172,15 +1173,24 @@ class UiActionEngineDefaultTest : ActionTest {
     @Test
     fun `execute read_text with container succeeds`() =
         actionTest {
+            var capturedMatcher: NodeMatcher? = null
+            var capturedContainer: NodeMatcher? = null
             val uiScope = object : RecordingTaskUiScope() {
                 override suspend fun getTextWithinContainer(
                     matcher: NodeMatcher,
                     containerMatcher: NodeMatcher,
                     retry: TaskRetry,
-                ): String = "Found in container"
+                ): String {
+                    capturedMatcher = matcher
+                    capturedContainer = containerMatcher
+                    return "Found in container"
+                }
             }
             val taskScope = RecordingTaskScope(uiScope)
             val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+
+            val expectedMatcher = NodeMatcher(textContains = "Item")
+            val expectedContainer = NodeMatcher(resourceId = "com.example:id/list")
 
             val result =
                 engine.execute(
@@ -1192,8 +1202,8 @@ class UiActionEngineDefaultTest : ActionTest {
                         actions = listOf(
                             UiAction.ReadText(
                                 id = "rt-container",
-                                matcher = NodeMatcher(textContains = "Item"),
-                                container = NodeMatcher(resourceId = "com.example:id/list"),
+                                matcher = expectedMatcher,
+                                container = expectedContainer,
                             ),
                         ),
                     ),
@@ -1204,21 +1214,30 @@ class UiActionEngineDefaultTest : ActionTest {
             assertEquals(true, stepResult.success)
             assertEquals("Found in container", stepResult.data["text"])
             assertEquals("none", stepResult.data["validator"])
-            assertEquals(true, stepResult.data["container"]?.contains("com.example:id/list") == true)
+            assertEquals(expectedMatcher, capturedMatcher)
+            assertEquals(expectedContainer, capturedContainer)
+            assertTrue(stepResult.data.containsKey("container"))
+            assertFalse(stepResult.data["container"].isNullOrBlank())
         }
 
     @Test
     fun `execute read_text with container not found fails`() =
         actionTest {
+            var capturedContainer: NodeMatcher? = null
             val uiScope = object : RecordingTaskUiScope() {
                 override suspend fun getTextWithinContainer(
                     matcher: NodeMatcher,
                     containerMatcher: NodeMatcher,
                     retry: TaskRetry,
-                ): String = throw IllegalStateException("Container not found for: $containerMatcher")
+                ): String {
+                    capturedContainer = containerMatcher
+                    throw IllegalStateException("Container not found for: $containerMatcher")
+                }
             }
             val taskScope = RecordingTaskScope(uiScope)
             val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+
+            val expectedContainer = NodeMatcher(resourceId = "com.example:id/nonexistent")
 
             val result =
                 engine.execute(
@@ -1231,7 +1250,7 @@ class UiActionEngineDefaultTest : ActionTest {
                             UiAction.ReadText(
                                 id = "rt-container-missing",
                                 matcher = NodeMatcher(textContains = "Item"),
-                                container = NodeMatcher(resourceId = "com.example:id/nonexistent"),
+                                container = expectedContainer,
                             ),
                         ),
                     ),
@@ -1241,20 +1260,30 @@ class UiActionEngineDefaultTest : ActionTest {
             assertEquals("read_text", stepResult.actionType)
             assertEquals(false, stepResult.success)
             assertEquals("CONTAINER_NOT_FOUND", stepResult.data["error"])
+            assertEquals(expectedContainer, capturedContainer)
         }
 
     @Test
     fun `execute read_text with all and container succeeds`() =
         actionTest {
+            var capturedMatcher: NodeMatcher? = null
+            var capturedContainer: NodeMatcher? = null
             val uiScope = object : RecordingTaskUiScope() {
                 override suspend fun getAllTextWithinContainer(
                     matcher: NodeMatcher,
                     containerMatcher: NodeMatcher,
                     retry: TaskRetry,
-                ): List<String> = listOf("Item 1", "Item 2", "Item 3")
+                ): List<String> {
+                    capturedMatcher = matcher
+                    capturedContainer = containerMatcher
+                    return listOf("Item 1", "Item 2", "Item 3")
+                }
             }
             val taskScope = RecordingTaskScope(uiScope)
             val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+
+            val expectedMatcher = NodeMatcher(role = "text")
+            val expectedContainer = NodeMatcher(resourceId = "com.example:id/list")
 
             val result =
                 engine.execute(
@@ -1266,9 +1295,9 @@ class UiActionEngineDefaultTest : ActionTest {
                         actions = listOf(
                             UiAction.ReadText(
                                 id = "rt-all-container",
-                                matcher = NodeMatcher(role = "text"),
+                                matcher = expectedMatcher,
                                 all = true,
-                                container = NodeMatcher(resourceId = "com.example:id/list"),
+                                container = expectedContainer,
                             ),
                         ),
                     ),
@@ -1280,7 +1309,10 @@ class UiActionEngineDefaultTest : ActionTest {
             assertEquals("true", stepResult.data["all"])
             assertEquals("3", stepResult.data["count"])
             assertEquals("[\"Item 1\",\"Item 2\",\"Item 3\"]", stepResult.data["text"])
-            assertEquals(true, stepResult.data["container"]?.contains("com.example:id/list") == true)
+            assertEquals(expectedMatcher, capturedMatcher)
+            assertEquals(expectedContainer, capturedContainer)
+            assertTrue(stepResult.data.containsKey("container"))
+            assertFalse(stepResult.data["container"].isNullOrBlank())
         }
 }
 
