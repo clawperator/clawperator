@@ -1264,6 +1264,50 @@ class UiActionEngineDefaultTest : ActionTest {
         }
 
     @Test
+    fun `execute read_text with all and container not found fails`() =
+        actionTest {
+            var capturedContainer: NodeMatcher? = null
+            val uiScope = object : RecordingTaskUiScope() {
+                override suspend fun getAllTextWithinContainer(
+                    matcher: NodeMatcher,
+                    containerMatcher: NodeMatcher,
+                    retry: TaskRetry,
+                ): List<String> {
+                    capturedContainer = containerMatcher
+                    throw IllegalStateException("Container not found for: $containerMatcher")
+                }
+            }
+            val taskScope = RecordingTaskScope(uiScope)
+            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+
+            val expectedContainer = NodeMatcher(resourceId = "com.example:id/nonexistent")
+
+            val result =
+                engine.execute(
+                    taskScope = taskScope,
+                    plan = UiActionPlan(
+                        commandId = "cmd",
+                        taskId = "task",
+                        source = "test",
+                        actions = listOf(
+                            UiAction.ReadText(
+                                id = "rt-all-container-missing",
+                                matcher = NodeMatcher(role = "text"),
+                                all = true,
+                                container = expectedContainer,
+                            ),
+                        ),
+                    ),
+                )
+
+            val stepResult = result.stepResults.single()
+            assertEquals("read_text", stepResult.actionType)
+            assertEquals(false, stepResult.success)
+            assertEquals("CONTAINER_NOT_FOUND", stepResult.data["error"])
+            assertEquals(expectedContainer, capturedContainer)
+        }
+
+    @Test
     fun `execute read_text with all and container succeeds`() =
         actionTest {
             var capturedMatcher: NodeMatcher? = null
