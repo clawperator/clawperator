@@ -56,7 +56,7 @@ workflow (also available as `record` alias), use [Android Recording Format for A
 | `read --desc-contains <sub>` | Read from the first element whose content description contains the substring |
 | `read --role <role>` | Read from the first element with the given role |
 | `read --selector <json>` | Read using raw `NodeMatcher` JSON (advanced only; mutually exclusive with simple flags) |
-| `read --text <text> --all --json` | Read all matching elements' text as a JSON array (requires `--json`) |
+| `read ... --all --json` | Read every on-screen match: step `data.text` is a string containing a JSON array of quoted labels (see `read_text` behavior note). Requires `--json`. |
 | `wait --text <text>` | Wait until an element with exact visible text appears |
 | `wait --text-contains <sub>` | Wait until an element whose visible text contains the substring appears |
 | `wait --id <resource-id>` | Wait until an element with the given resource ID appears |
@@ -104,6 +104,8 @@ workflow (also available as `record` alias), use [Android Recording Format for A
 
 For agent callers, `--json` is the canonical output flag. `--output pretty` is for human inspection.
 
+**`wait` and global `--timeout`:** On the `wait` command only, `--timeout <ms>` sets how long the device may poll for a matching node. It is written to `wait_for_node.params.timeoutMs` and the Node layer raises execution `timeoutMs` to at least `max(waitTimeoutMs + 5000, 30000)` so the outer envelope does not expire before the wait finishes. On other commands, `--timeout` still sets the execution envelope timeout as usual.
+
 ### Selector Flags (click, type, read, wait)
 
 All element-targeting commands accept these flags instead of raw JSON:
@@ -121,6 +123,10 @@ All element-targeting commands accept these flags instead of raw JSON:
 Multiple simple flags combine with AND semantics: `--text "Login" --role button` matches elements with both properties.
 
 For `type`, `--text` is reserved for the text to type. Identify the target with `--id`, `--role`, `--desc`, `--text-contains`, `--desc-contains`, or `--selector` (advanced).
+
+**`read`:** `--all` returns every on-screen node that matches the selector. It requires `--json` (CLI rejects pretty mode). Do not combine `all: true` with `validator` in raw executions: the Android runtime uses the multi-match path only when `all` is false or omitted for validator flows.
+
+**`wait`:** Optional `--timeout <ms>` (non-negative) caps wall-clock wait time on the device (see global options note above).
 
 ### Container Flags (scroll)
 
@@ -159,6 +165,9 @@ clawperator read --id "com.solaxcloud.starter:id/tv_pb_title" --device <device_i
 
 # Wait for element by text
 clawperator wait --text "Done" --timeout 15000 --device <device_id> --json
+
+# Read all matching labels (JSON array string in step data.text)
+clawperator read --role text --all --json --device <device_id>
 
 # Scroll within a specific container
 clawperator scroll down --container-id "com.example:id/recycler_view" --device <device_id> --json
@@ -395,8 +404,8 @@ Combine fields to increase specificity when a single field is ambiguous:
 | `close_app` | `applicationId: string` | - |
 | `click` | `matcher: NodeMatcher` | `clickType: "default" \| "long_click" \| "focus"` (default: `"default"`) |
 | `enter_text` | `matcher: NodeMatcher`, `text: string` | `submit: boolean` (default: `false`), `clear: boolean` (accepted by Node contract but currently ignored by Android runtime, so do not rely on it to clear existing text) |
-| `read_text` | `matcher: NodeMatcher` | `all: boolean` (return all matches as array), `validator: "temperature" \| "version" \| "regex"`, `validatorPattern: string` (required when `validator` is `"regex"`), `retry: object` |
-| `wait_for_node` | `matcher: NodeMatcher` | `retry: object` - controls polling attempts and backoff delays (see `retry` object shape below). There is no per-action `timeoutMs`; the outer execution `timeoutMs` is the only wall-clock limit. |
+| `read_text` | `matcher: NodeMatcher` | `all: boolean` (default `false`; when `true`, returns all matches - see behavior note), `validator: "temperature" \| "version" \| "regex"`, `validatorPattern: string` (required when `validator` is `"regex"`), `retry: object` |
+| `wait_for_node` | `matcher: NodeMatcher` | `retry: object` (see `retry` object shape below), optional `timeoutMs: number` (1-120000 on the Operator wire) - wall-clock cap for the wait loop on device, in addition to the outer execution `timeoutMs` |
 | `snapshot_ui` | - | `retry: object` |
 | `take_screenshot` | - | `path: string`, `retry: object` |
 | `sleep` | `durationMs: number` | - |
@@ -418,8 +427,8 @@ Combine fields to increase specificity when a single field is ambiguous:
 | `screenshot` | `take_screenshot` |
 | `click` (any Phase 3 selector flag or `--selector <json>`) | `click` |
 | `type` (element selector flags or `--selector <json>`; typed text is positional or `--text`) | `enter_text` |
-| `read` (any Phase 3 selector flag or `--selector <json>`) | `read_text` |
-| `wait` (any Phase 3 selector flag or `--selector <json>`) | `wait_for_node` |
+| `read` (any Phase 3 selector flag or `--selector <json>`) | `read_text` (`--all` sets `params.all`) |
+| `wait` (any Phase 3 selector flag or `--selector <json>`) | `wait_for_node` (`--timeout` sets `params.timeoutMs`) |
 | `open <package-id>` | `open_app` |
 | `open <url\|uri>` | `open_uri` |
 | `press <back\|home\|recents>` | `press_key` |
@@ -446,6 +455,8 @@ Combine fields to increase specificity when a single field is ambiguous:
 }
 ```
 `maxAttempts` is capped at 10. `initialDelayMs` and `maxDelayMs` are capped at 30,000 and 60,000 ms respectively. Omit the `retry` field to use the action's default preset. For `wait_for_node`, the default is `UiReadiness` (`maxAttempts=5`, `initialDelayMs=500`, `maxDelayMs=3000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`).
+
+**`wait_for_node` and `timeoutMs`:** When `params.timeoutMs` is present, the Operator applies a wall-clock limit around the wait loop (Kotlin `withTimeout` around the existing retry-driven poll). If the node is not found in time, the step fails with a timeout error message that includes the matcher and `timeoutMs`. The device parser accepts `timeoutMs` in the range 1-120000 ms. On success, step `data` may include `timeout_ms` (string) echoing the configured cap when `timeoutMs` was set. The outer execution `timeoutMs` must still be large enough for the wait to finish (the CLI `wait` command extends the envelope when you pass `--timeout`).
 
 **`open_app`:** Opens the app's default launch activity by `applicationId`.
 
@@ -541,7 +552,11 @@ Android intent builder.
 }
 ```
 
-**`read_text`:** Validates extracted text using optional validators.
+**`read_text`:** Reads visible text from nodes matching `matcher`. Optional validators apply only when `all` is false or omitted.
+
+**`read_text` with `all: true`:** The Operator collects every on-screen node that matches `matcher`, takes each node's visible label (blank labels are skipped), and returns them in one step. Step `data.text` is still a string (envelope `data` values are strings), but its content is a JSON array literal, for example `["Price A","Price B"]`. Agents should parse that string as JSON to obtain the list. Step `data` also includes `all: "true"` and `count: "<n>"` as strings. Newlines or rare characters in labels are escaped for JSON; if you need full node metadata, use `snapshot_ui` and filter locally.
+
+**`read_text` validators** (single-match mode only): Validates extracted text using optional validators.
 
 Supported validators:
 
@@ -1000,10 +1015,10 @@ Typical `data` keys by action type:
 | `close_app` | `application_id` |
 | `click` | `click_types` |
 | `enter_text` | `text` (text typed), `submit` (`"true"` or `"false"`) |
-| `read_text` | `text` (extracted text value), `validator` (`"none"` or validator type) |
+| `read_text` | `text` (single value, or JSON array literal string when `all` was true), `validator`, and when `all` is true also `all`, `count` |
 | `snapshot_ui` | `actual_format`, `foreground_package` (when available), `has_overlay`, `overlay_package` (when available), `window_count`, `text` (snapshot content - see note below) |
 | `take_screenshot` | `path` (local screenshot file path after Node capture) |
-| `wait_for_node` | `resource_id`, `label` (matched node details) |
+| `wait_for_node` | `resource_id`, `label` (matched node details), `timeout_ms` (when a per-action timeout was configured) |
 | `scroll_and_click` | `max_swipes`, `direction`, `click_types`, `click_after` (`"true"` or `"false"`) |
 | `scroll` | `scroll_outcome` (`"moved"`, `"edge_reached"`, or `"gesture_failed"`), `direction`, `distance_ratio`, `settle_delay_ms`, `resolved_container` (resourceId of auto-detected container, when present) |
 | `scroll_until` | `termination_reason` (see behavior note), `scrolls_executed`, `direction`, `click_after`, `click_types`, `resolved_container` (when present) |
@@ -1016,7 +1031,7 @@ For any failed step: `success: false` and `data.error` contains the error code s
 
 **Snapshot content delivery:** The UI hierarchy is produced by the Android runtime and written to device logcat. The Node layer reads logcat after execution and injects the raw XML into `data.text`. `data.actual_format` is `"hierarchy_xml"` on successful snapshot steps. Snapshot steps may also include best-effort accessibility-window metadata such as `foreground_package`, `has_overlay`, `overlay_package`, and `window_count`.
 
-**`read_text` value:** The extracted text value is in `data.text`.
+**`read_text` value:** The extracted text value is in `data.text`. For `all: true`, parse `data.text` as JSON to recover the string array.
 
 ## Snapshot Output Format
 
