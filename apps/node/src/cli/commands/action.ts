@@ -112,12 +112,13 @@ export async function cmdActionClick(options: {
 export async function cmdActionRead(options: {
   format: OutputOptions["format"];
   matcher: NodeMatcher;
+  readAll?: boolean;
   deviceId?: string;
   operatorPackage?: string;
   logger?: Logger;
 }): Promise<string> {
   try {
-    const execution = buildReadExecution(options.matcher);
+    const execution = buildReadExecution(options.matcher, options.readAll);
     const result = await runExecution(execution, {
       deviceId: options.deviceId,
       operatorPackage: options.operatorPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,

@@ -420,14 +420,20 @@ Selector flags (at least one required; combine for AND matching):
   --role <role>           Element role
   --selector <json>       Raw NodeMatcher JSON (advanced; mutually exclusive with simple flags)
 
+Options:
+  --all                   Return all matches as a JSON array (requires --json)
+
 Notes:
   - Returns the text content of the first matching element.
+  - --all returns all matching elements' text as a JSON array of strings.
+  - --all requires --json (error in pretty mode since array output is ambiguous).
   - Multiple simple flags combine with AND semantics.
 
 Examples:
   clawperator read --id "com.example:id/battery_level"
   clawperator read --text "Battery"
   clawperator read --role switch --desc "Wi-Fi"
+  clawperator read --text "Price" --all --json
   Advanced (raw NodeMatcher JSON): clawperator read --selector '{"resourceId":"com.example:id/status"}'
 `;
 
@@ -1049,9 +1055,18 @@ COMMANDS["read"] = {
     if (!resolved.ok) {
       return formatError(resolved.error, { format });
     }
+    // --all requires --json
+    const readAll = hasFlag(rest, "--all");
+    if (readAll && format !== "json") {
+      return JSON.stringify({
+        code: "EXECUTION_VALIDATION_FAILED",
+        message: "read --all requires --json.\n\nExample:\n  clawperator read --text \"Price\" --all --json",
+      });
+    }
     return (await import("./commands/action.js")).cmdActionRead({
       format,
       matcher: resolved.matcher,
+      readAll,
       deviceId,
       operatorPackage,
       logger,
