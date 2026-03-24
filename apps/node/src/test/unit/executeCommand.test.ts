@@ -1,6 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert";
 import { spawn } from "node:child_process";
+import { writeFileSync, unlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { cmdExecute } from "../../cli/commands/execute.js";
@@ -154,6 +156,35 @@ describe("cmdExecute --dry-run", () => {
   });
 });
 
+describe("cmdExecute inline JSON vs file path", () => {
+  it("reads payload from disk when the path starts with [ and exists", async () => {
+    const minimal = {
+      commandId: "bracket-file",
+      taskId: "bracket-file",
+      source: "test",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 30000,
+      actions: [{ id: "a1", type: "sleep", params: { durationMs: 1 } }],
+    };
+    const p = join(tmpdir(), `[exec-bracket-${Date.now()}].json`);
+    writeFileSync(p, JSON.stringify(minimal), "utf-8");
+    try {
+      const output = await cmdExecute({ format: "json", validateOnly: true, execution: p });
+      const result = JSON.parse(output);
+      assert.strictEqual(result.ok, true);
+      assert.strictEqual(result.execution.commandId, "bracket-file");
+    } finally {
+      unlinkSync(p);
+    }
+  });
+
+  it("parses inline JSON when [ prefix is not an existing file path", async () => {
+    const output = await cmdExecute({ format: "json", validateOnly: true, execution: "[1]" });
+    const result = JSON.parse(output);
+    assert.strictEqual(result.code, "EXECUTION_VALIDATION_FAILED");
+  });
+});
+
 describe("clawperator exec CLI", () => {
   it("surfaces action context for invalid fixture files before device contact", async () => {
     const fixturePath = join(packageRoot, "src", "test", "fixtures", "execution-invalid-action-0.json");
@@ -238,6 +269,24 @@ describe("clawperator wait-for-nav CLI", () => {
     const result = JSON.parse(stdout);
     assert.strictEqual(result.code, "MISSING_ARGUMENT");
   });
+
+  it("rejects empty --app even when a selector is present", async () => {
+    const { stdout, code } = await runCli([
+      "wait-for-nav",
+      "--app",
+      "",
+      "--text",
+      "Settings",
+      "--timeout",
+      "5000",
+      "--validate-only",
+      "--json",
+    ]);
+    assert.notStrictEqual(code, 0);
+    const result = JSON.parse(stdout);
+    assert.strictEqual(result.code, "EXECUTION_VALIDATION_FAILED");
+    assert.match(result.message, /--app/);
+  });
 });
 
 describe("clawperator read-value CLI", () => {
@@ -272,12 +321,34 @@ describe("clawperator read-value CLI", () => {
     assert.strictEqual(result.execution.actions[0].params.all, true);
   });
 
-  it("errors when --all is used without --json", async () => {
-    const { stdout, code } = await runCli(["read-value", "--label", "X", "--all"]);
+  it("sets all:true when --all with --output json (no literal --json)", async () => {
+    const { stdout, code } = await runCli([
+      "--output",
+      "json",
+      "read-value",
+      "--label",
+      "X",
+      "--all",
+      "--validate-only",
+    ]);
+    assert.strictEqual(code, 0);
+    const result = JSON.parse(stdout);
+    assert.strictEqual(result.execution.actions[0].params.all, true);
+  });
+
+  it("errors when --all is used with pretty output", async () => {
+    const { stdout, code } = await runCli([
+      "--output",
+      "pretty",
+      "read-value",
+      "--label",
+      "X",
+      "--all",
+    ]);
     assert.notStrictEqual(code, 0);
     const result = JSON.parse(stdout);
     assert.strictEqual(result.code, "EXECUTION_VALIDATION_FAILED");
-    assert.match(result.message, /--json/);
+    assert.match(result.message, /--json|JSON output/i);
   });
 
   it("returns MISSING_ARGUMENT when no label flags", async () => {

@@ -1517,7 +1517,8 @@ APK change before the CLI change is meaningful.
 - `click --text "X" --long --focus` errors
 - `wait --text "X" --timeout 5000` waits up to 5 seconds
 - `read --text "X" --all --json` returns array of matches
-- `read --text "X" --all` without `--json` errors
+- `read --text "X" --all --output json` returns array of matches (JSON output mode)
+- `read --text "X" --all` with `--output pretty` errors
 - `sleep 2000` pauses for 2 seconds
 - `sleep` without duration: error with usage example
 - `sleep -1` or `sleep 999999999`: validation error
@@ -1854,8 +1855,7 @@ clawperator read --text "Price" --all --json
   content of each matching node), e.g. `["$4.99", "$7.99"]`. No node
   metadata - agents needing that should use `snapshot --json` and filter.
 - Without `--all`, behavior is unchanged (first match, single value)
-- `--all` requires `--json` (error if used without it, since pretty output
-  for a list is ambiguous)
+- `--all` requires JSON output mode (`--json`, `--output json`, `--format json`, or default json; error with `--output pretty`, since pretty output for a list is ambiguous)
 
 **Android Implementation:** Add `all: Boolean = false` to `UiAction.ReadText`
 data class. Update `AgentCommandParser` to parse `all` from params.

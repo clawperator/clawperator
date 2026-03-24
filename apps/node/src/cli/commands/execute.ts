@@ -19,12 +19,45 @@ export async function cmdExecute(options: {
 }): Promise<string> {
   let payload: unknown;
   const raw = options.execution.trim();
-  // Detect inline JSON vs file path: if it starts with '{' or '[', parse as JSON
-  if (raw.startsWith("{") || raw.startsWith("[")) {
+  // Inline object JSON vs file path: '{' is unambiguous for objects.
+  if (raw.startsWith("{")) {
     try {
       payload = JSON.parse(raw);
     } catch {
       return formatError({ code: ERROR_CODES.EXECUTION_VALIDATION_FAILED, message: "Invalid JSON content" }, options);
+    }
+  } else if (raw.startsWith("[")) {
+    // Paths can start with '['; prefer file read when the path exists, else treat as inline JSON array.
+    try {
+      const content = await readFile(raw, "utf-8");
+      try {
+        payload = JSON.parse(content);
+      } catch (e) {
+        return formatError(
+          {
+            code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+            message: `Invalid JSON content in execution file: ${(e as Error).message}`,
+          },
+          options
+        );
+      }
+    } catch (e) {
+      const err = e as NodeJS.ErrnoException;
+      if (err.code === "ENOENT") {
+        try {
+          payload = JSON.parse(raw);
+        } catch {
+          return formatError({ code: ERROR_CODES.EXECUTION_VALIDATION_FAILED, message: "Invalid JSON content" }, options);
+        }
+      } else {
+        return formatError(
+          {
+            code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+            message: `Failed to read execution file: ${err.message}`,
+          },
+          options
+        );
+      }
     }
   } else {
     // Treat as file path: error precedence is unreadable file -> invalid JSON content

@@ -30,7 +30,7 @@ workflow (also available as `record` alias), use [Android Recording Format for A
 | `emulator status` | List running Android emulators and boot state |
 | `emulator provision` | Reuse or create a supported Android emulator and return its ADB serial |
 | `provision emulator` | Alias of `emulator provision` |
-| `exec <json\|file>` | Run a full execution payload (JSON string or file path). `execute` is a synonym; `--payload` and `--execution` are accepted as named alternatives to the positional arg. |
+| `exec <json\|file>` | Run a full execution payload (JSON string or file path). Inline values starting with `{` parse as JSON; values starting with `[` try a file path first, then parse as a JSON array if the path is missing. `execute` is a synonym; `--payload` and `--execution` are named alternatives to the positional arg. |
 | `snapshot` | Capture UI hierarchy dump (`hierarchy_xml`) |
 | `screenshot [--path <file>]` | Capture device screen as PNG |
 | `open <package-id\|url\|uri>` | Open an app, URL, or URI (auto-detects target type) |
@@ -56,7 +56,7 @@ workflow (also available as `record` alias), use [Android Recording Format for A
 | `read --desc-contains <sub>` | Read from the first element whose content description contains the substring |
 | `read --role <role>` | Read from the first element with the given role |
 | `read --selector <json>` | Read using raw `NodeMatcher` JSON (advanced only; mutually exclusive with simple flags) |
-| `read ... --all --json` | Read every on-screen match: step `data.text` is a string containing a JSON array of quoted labels (see `read_text` behavior note). Requires `--json`. |
+| `read ... --all` (JSON output) | Read every on-screen match: step `data.text` is a string containing a JSON array of quoted labels (see `read_text` behavior note). Requires JSON output (`--json`, `--output json`, or default json; not `--output pretty`). |
 | `read ... --container-text <text>` | Restrict search to elements within a container with exact visible text |
 | `read ... --container-text-contains <sub>` | Restrict search to elements within a container with partial text match |
 | `read ... --container-id <id>` | Restrict search to elements within a container with the given resource ID |
@@ -93,7 +93,7 @@ workflow (also available as `record` alias), use [Android Recording Format for A
 | `wait-for-navigation ...` | Synonym for `wait-for-nav` |
 | `read-value --label <text>` | Read value associated with a labeled element (e.g., "85%" next to "Battery") |
 | `read-value --label-id <id>` | Read value by matching label's resource ID |
-| `read-value --label <text> --all --json` | Read all matching values as JSON array |
+| `read-value --label <text> --all` (JSON output) | Read all matching values as JSON array (same JSON output requirement as `read --all`) |
 | `read-kv ...` | Synonym for `read-value` |
 | `skills list` | List available skills |
 | `skills get <skill_id>` | Show skill metadata |
@@ -140,7 +140,7 @@ Multiple simple flags combine with AND semantics: `--text "Login" --role button`
 
 For `type`, `--text` is reserved for the text to type. Identify the target with `--id`, `--role`, `--desc`, `--text-contains`, `--desc-contains`, or `--selector` (advanced).
 
-**`read`:** `--all` returns every on-screen node that matches the selector. It requires `--json` (CLI rejects pretty mode). The matching labels are in `stepResults[].data.text` as a **string** that contains JSON array syntax (for example `["Wi-Fi","Wi-Fi Direct"]`); parse it with `JSON.parse` in your agent. An empty match set is `"[]"`. Do not combine `all: true` with `validator` in raw executions: the Android runtime uses the multi-match path only when `all` is false or omitted for validator flows.
+**`read`:** `--all` returns every on-screen node that matches the selector. It requires JSON output mode (`--json`, `--output json`, `--format json`, or default json; the CLI rejects `--output pretty`). The matching labels are in `stepResults[].data.text` as a **string** that contains JSON array syntax (for example `["Wi-Fi","Wi-Fi Direct"]`); parse it with `JSON.parse` in your agent. An empty match set is `"[]"`. Do not combine `all: true` with `validator` in raw executions: the Android runtime uses the multi-match path only when `all` is false or omitted for validator flows.
 
 **`wait`:** Optional `--timeout <ms>` (positive; omit for default) caps wall-clock wait time on the device (see global options note above).
 
@@ -203,7 +203,7 @@ The `read-value` command reads the value associated with a labeled UI element (e
 | `--label <text>` | Match label by exact visible text (maps to `labelMatcher.textEquals`) |
 | `--label-id <id>` | Match label by Android resource ID (maps to `labelMatcher.resourceId`) |
 | `--label-desc <text>` | Match label by exact content description (maps to `labelMatcher.contentDescEquals`) |
-| `--all` | Sends `all: true` in action params (requires an explicit `--json` flag). The Operator APK currently ignores this field and still returns a single label-value pair. |
+| `--all` | Sends `all: true` in action params (JSON output mode only; same rules as `read --all`). The Operator APK currently ignores this field and still returns a single label-value pair. |
 | `--validate-only` | Validate the built execution payload without running it on a device (same semantics as `exec`) |
 | `--dry-run` | Print the validated execution plan without running it on a device |
 

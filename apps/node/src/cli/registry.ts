@@ -417,12 +417,12 @@ Label selector flags (at least one required):
   --label-desc <text>     Match label by exact content description (maps to labelMatcher.contentDescEquals)
 
 Options:
-  --all                   Return all matches as a JSON array (requires --json)
+  --all                   Return all matches as a JSON array (JSON output mode only)
 
 Notes:
   - Reads the value associated with a labeled UI element (e.g., "85%" next to "Battery").
   - The --label* flags populate labelMatcher, not matcher.
-  - --all requires --json (error in pretty mode since array output is ambiguous).
+  - --all requires JSON output: --json, --output json, or --format json (rejected with --output pretty).
   - Synonym: read-kv
 
 Examples:
@@ -460,12 +460,12 @@ Container selector flags (all optional; restrict search to container subtree):
   --container-selector <json>       Container by raw NodeMatcher JSON (mutually exclusive with other --container-* flags)
 
 Options:
-  --all                   Return all matches as a JSON array (requires --json)
+  --all                   Return all matches as a JSON array (JSON output mode only)
 
 Notes:
   - Returns the text content of the first matching element.
   - --all returns all matching elements' text as a JSON array of strings.
-  - --all requires --json (error in pretty mode since array output is ambiguous).
+  - --all requires JSON output: --json, --output json, or --format json (rejected with --output pretty).
   - Multiple simple flags combine with AND semantics.
 
 Examples:
@@ -911,7 +911,7 @@ Usage:
   clawperator exec best-effort --goal <text> [--device <id>] [--operator-package <package>]
 
 Payload (required unless using --payload):
-  <json-or-file>            Inline JSON (starts with { or [) or path to JSON file
+  <json-or-file>            Inline JSON or path to a JSON file (see Notes)
 
 Options:
   --payload <json-or-file>  Alternative to positional payload (primary flag)
@@ -920,7 +920,7 @@ Options:
   --dry-run                 Print execution plan without running
 
 Notes:
-  - The payload is parsed as inline JSON if it starts with '{' or '[', otherwise treated as a file path.
+  - Leading '{' is always parsed as inline JSON. Leading '[' tries the string as a file path first; if the file is missing, it is parsed as an inline JSON array. Any other string is read as a file path.
   - Error precedence: unreadable file path -> invalid JSON content -> missing payload.
   - 'execute' is accepted as a synonym for 'exec'.
   - '--execution' is accepted as an alias for '--payload'.
@@ -1173,7 +1173,7 @@ COMMANDS["read"] = {
   topLevelBlock: `  read --text <text> | --id <id> | --role <role> [--device <id>] [--json]
                                             Read text from the first matching UI element`,
   handler: async (ctx) => {
-    const { argv, rest, format, logger, deviceId, operatorPackage } = ctx;
+    const { rest, format, logger, deviceId, operatorPackage } = ctx;
     if (!hasElementSelectorFlag(rest)) {
       return makeMissingSelectorError("read", format);
     }
@@ -1181,14 +1181,14 @@ COMMANDS["read"] = {
     if (!resolved.ok) {
       return formatError(resolved.error, { format });
     }
-    // --all requires explicit --json flag
+    // --all requires JSON output mode (--json, --output json, --format json, or default json)
     const readAll = hasFlag(rest, "--all");
-    const hasExplicitJson = argv.includes("--json");
-    if (readAll && !hasExplicitJson) {
+    if (readAll && format !== "json") {
       return formatError(
         {
           code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
-          message: 'read --all requires --json.\n\nExample:\n  clawperator read --text "Price" --all --json',
+          message:
+            'read --all requires JSON output. Use --json or --output json (not --output pretty).\n\nExample:\n  clawperator read --text "Price" --all --json',
         },
         { format },
       );
@@ -1545,8 +1545,23 @@ COMMANDS["wait-for-nav"] = {
   handler: async (ctx) => {
     const { rest, format, logger, deviceId, operatorPackage, timeoutMs: navTimeoutMs } = ctx;
 
-    // Parse --app flag
-    const expectedPackage = getOpt(rest, "--app");
+    // Parse --app flag (reject present-but-empty like --app "" so we do not silently ignore package filter)
+    const appIdx = rest.indexOf("--app");
+    let expectedPackage: string | undefined;
+    if (appIdx >= 0) {
+      const next = rest[appIdx + 1];
+      if (next === undefined || next.trim() === "" || next.startsWith("--")) {
+        return formatError(
+          {
+            code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+            message:
+              "wait-for-nav --app requires a non-empty package id.\n\nExample:\n  clawperator wait-for-nav --app com.android.settings --timeout 5000",
+          },
+          { format },
+        );
+      }
+      expectedPackage = next;
+    }
 
     // --timeout is required (action-level wait duration)
     // It's parsed by getGlobalOpts and passed via ctx.timeoutMs
@@ -1629,16 +1644,16 @@ COMMANDS["read-value"] = {
   help: HELP_READ_VALUE,
   topLevelBlock: `  read-value --label <text> [--json]         Read the value associated with a labeled element`,
   handler: async (ctx) => {
-    const { argv, rest, format, logger, deviceId, operatorPackage, timeoutMs } = ctx;
+    const { rest, format, logger, deviceId, operatorPackage, timeoutMs } = ctx;
 
-    // --all requires explicit --json flag
+    // --all requires JSON output mode (--json, --output json, --format json, or default json)
     const readAll = hasFlag(rest, "--all");
-    const hasExplicitJson = argv.includes("--json");
-    if (readAll && !hasExplicitJson) {
+    if (readAll && format !== "json") {
       return formatError(
         {
           code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
-          message: "read-value --all requires --json",
+          message:
+            "read-value --all requires JSON output. Use --json or --output json (not --output pretty).",
         },
         { format },
       );

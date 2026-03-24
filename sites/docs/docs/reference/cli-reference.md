@@ -200,7 +200,7 @@ clawperator exec --payload <json-or-file> [--validate-only] [--dry-run] [--devic
 
 | Source | Description |
 |--------|-------------|
-| `<json-or-file>` (positional) | Inline JSON (when it starts with `{` or `[`) or path to a JSON file; primary form |
+| `<json-or-file>` (positional) | Inline object JSON when it starts with `{`. When it starts with `[`, the CLI tries that string as a file path first, otherwise parses it as an inline JSON array. Any other string is read as a file path; primary form |
 | `--payload <json-or-file>` | Same as positional when you prefer a named argument |
 | `--execution <json-or-file>` | Alias for `--payload` (backward compatibility) |
 
