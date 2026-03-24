@@ -154,6 +154,8 @@ export async function startServer(options: ServeOptions): Promise<Server> {
     }
   });
 
+
+
   app.post("/snapshot", async (req, res) => {
     if (!req.body || typeof req.body !== "object") {
       res.status(400).json({ ok: false, error: { code: "INVALID_BODY", message: "Invalid or missing JSON body" } });

@@ -10,6 +10,7 @@ export interface ActionParams {
   durationMs?: number;
   path?: string;
   matcher?: NodeMatcher;
+  coordinate?: { x: number; y: number };
   text?: string;
   submit?: boolean;
   clear?: boolean;

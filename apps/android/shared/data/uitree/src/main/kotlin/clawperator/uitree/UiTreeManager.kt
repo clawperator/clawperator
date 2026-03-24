@@ -1,5 +1,7 @@
 package clawperator.uitree
 
+import clawperator.uitree.UiTreeClickTypes
+
 interface UiTreeManager {
     /**
      * Programmatically clicks the [uiNode] using the specified click types.
@@ -10,6 +12,19 @@ interface UiTreeManager {
      */
     suspend fun triggerClick(
         uiNode: UiNode,
+        clickTypes: UiTreeClickTypes = UiTreeClickTypes.Default,
+    ): Boolean
+
+    /**
+     * Performs a click gesture at raw screen coordinates.
+     *
+     * @param x X coordinate in pixels
+     * @param y Y coordinate in pixels
+     * @param clickTypes The types of clicks to attempt in order (defaults to regular Click)
+     */
+    suspend fun clickAt(
+        x: Float,
+        y: Float,
         clickTypes: UiTreeClickTypes = UiTreeClickTypes.Default,
     ): Boolean
 

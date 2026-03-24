@@ -45,6 +45,34 @@ class UiTreeManagerAndroid(
         return false
     }
 
+    override suspend fun clickAt(
+        x: Float,
+        y: Float,
+        clickTypes: UiTreeClickTypes,
+    ): Boolean {
+        val service = accessibilityServiceManager.currentAccessibilityService ?: return false
+
+        for (clickType in clickTypes.ordered) {
+            val success =
+                when (clickType) {
+                    UiTreeClickType.Click -> service.dispatchSingleTap(x, y)
+                    UiTreeClickType.LongClick -> service.dispatchLongPress(x, y)
+                    UiTreeClickType.Focus -> {
+                        Log.w("[UiTreeManager] Focus click type is not supported for raw coordinates at ($x,$y)")
+                        false
+                    }
+                }
+
+            if (success) {
+                Log.d("[UiTreeManager] Successfully performed $clickType at ($x,$y)")
+                return true
+            }
+        }
+
+        Log.d("[UiTreeManager] All coordinate click types failed at ($x,$y)")
+        return false
+    }
+
     override suspend fun setText(
         uiNode: UiNode,
         text: String,

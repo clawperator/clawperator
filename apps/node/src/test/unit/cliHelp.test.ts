@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert";
 import { spawn } from "node:child_process";
+import { rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -406,6 +407,201 @@ describe("promoted flat commands - help and missing-arg errors", () => {
     const obj = JSON.parse(stdout) as { code?: string; message?: string };
     assert.strictEqual(obj.code, "MISSING_SELECTOR");
     assert.match(obj.message ?? "", /click requires a selector/);
+  });
+
+  it("click --coordinate with invalid values returns EXECUTION_VALIDATION_FAILED with exit 1", async () => {
+    const { stdout, code } = await runCli(["click", "--coordinate", "100", "pagedown"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "EXECUTION_VALIDATION_FAILED");
+    assert.match(obj.message ?? "", /--coordinate requires two non-negative integers/);
+  });
+
+  it("click rejects repeated --coordinate flags with exit 1", async () => {
+    const { stdout, code } = await runCli(["click", "--coordinate", "10", "20", "--coordinate", "30", "40"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "EXECUTION_VALIDATION_FAILED");
+    assert.match(obj.message ?? "", /--coordinate must not appear more than once/);
+  });
+
+  it("click --coordinate with negative coordinates returns EXECUTION_VALIDATION_FAILED with exit 1", async () => {
+    const { stdout, code } = await runCli(["click", "--coordinate", "-10", "20"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "EXECUTION_VALIDATION_FAILED");
+    assert.match(obj.message ?? "", /--coordinate requires two non-negative integers/);
+  });
+
+  it("click --coordinate with fractional coordinates returns EXECUTION_VALIDATION_FAILED with exit 1", async () => {
+    const { stdout, code } = await runCli(["click", "--coordinate", "10.5", "20"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "EXECUTION_VALIDATION_FAILED");
+    assert.match(obj.message ?? "", /--coordinate requires two non-negative integers/);
+  });
+
+  it("click --coordinate rejects mixing with text selector (exit 1)", async () => {
+    const { stdout, code } = await runCli(["click", "--coordinate", "100", "200", "--text", "Login"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "EXECUTION_VALIDATION_FAILED");
+    assert.match(obj.message ?? "", /use --coordinate OR a selector, not both/);
+  });
+
+  it("click rejects unsupported execution flags like --all (exit 1)", async () => {
+    const { stdout, code } = await runCli(["click", "--text", "Wi-Fi", "--all"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "USAGE");
+    assert.match(obj.message ?? "", /unrecognized flag '--all'/);
+  });
+
+  it("click rejects dry-run-style execution flags (exit 1)", async () => {
+    const dryRunResult = await runCli(["click", "--text", "Wi-Fi", "--dry-run"]);
+    assert.strictEqual(dryRunResult.code, 1, dryRunResult.stdout);
+    const dryRunObj = JSON.parse(dryRunResult.stdout) as { code?: string; message?: string };
+    assert.strictEqual(dryRunObj.code, "USAGE");
+    assert.match(dryRunObj.message ?? "", /unrecognized flag '--dry-run'/);
+
+    const validateOnlyResult = await runCli(["click", "--text", "Wi-Fi", "--validate-only"]);
+    assert.strictEqual(validateOnlyResult.code, 1, validateOnlyResult.stdout);
+    const validateOnlyObj = JSON.parse(validateOnlyResult.stdout) as { code?: string; message?: string };
+    assert.strictEqual(validateOnlyObj.code, "USAGE");
+    assert.match(validateOnlyObj.message ?? "", /unrecognized flag '--validate-only'/);
+  });
+
+  it("snapshot rejects dry-run flags instead of executing", async () => {
+    const { stdout, code } = await runCli(["snapshot", "--dry-run"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "USAGE");
+    assert.match(obj.message ?? "", /unrecognized flag '--dry-run'/);
+  });
+
+  it("scroll-until accepts --direction as an alias for the positional direction", async () => {
+    const { stdout } = await runCli(["scroll-until", "--direction", "up", "--text", "Settings", "--device", "test-device"]);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.notStrictEqual(obj.code, "USAGE");
+    assert.doesNotMatch(obj.message ?? "", /unrecognized flag '--direction'/);
+  });
+
+  it("open accepts --app without unknown-flag rejection", async () => {
+    const { stdout, code } = await runCli(["open", "--app"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "MISSING_ARGUMENT");
+    assert.doesNotMatch(obj.message ?? "", /unrecognized flag/);
+  });
+
+  it("close accepts --app without unknown-flag rejection", async () => {
+    const { stdout, code } = await runCli(["close", "--app"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "MISSING_ARGUMENT");
+    assert.doesNotMatch(obj.message ?? "", /unrecognized flag/);
+  });
+
+  it("close rejects dry-run flags instead of force-stopping the app", async () => {
+    const { stdout, code } = await runCli(["close", "com.android.settings", "--dry-run"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "USAGE");
+    assert.match(obj.message ?? "", /unrecognized flag '--dry-run'/);
+  });
+
+  it("close rejects typoed dash-prefixed arguments instead of swallowing them", async () => {
+    const { stdout, code } = await runCli(["close", "--ap"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "USAGE");
+    assert.match(obj.message ?? "", /unrecognized flag '--ap'/);
+  });
+
+  it("exec best-effort accepts --goal without unknown-flag rejection", async () => {
+    const { stdout, code } = await runCli(["exec", "best-effort", "--goal", "wifi settings"]);
+    assert.strictEqual(code, 0, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; goal?: string; message?: string };
+    assert.strictEqual(obj.code, "NOT_IMPLEMENTED");
+    assert.strictEqual(obj.goal, "wifi settings");
+    assert.doesNotMatch(obj.message ?? "", /unrecognized flag/);
+  });
+
+  it("exec rejects --goal for normal payload execution", async () => {
+    const { stdout, code } = await runCli(["exec", "--goal", "wifi"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "USAGE");
+    assert.match(obj.message ?? "", /unrecognized flag '--goal'/);
+  });
+
+  it("exec rejects typoed dash-prefixed flags before treating them as payloads", async () => {
+    const { stdout, code } = await runCli(["exec", "--goa", "wifi"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "USAGE");
+    assert.match(obj.message ?? "", /unrecognized flag '--goa'/);
+  });
+
+  it("exec validate-only accepts a dash-prefixed payload path", async () => {
+    const payloadPath = join(packageRoot, "--plan-payload.json");
+    await writeFile(
+      payloadPath,
+      JSON.stringify({
+        commandId: "cmd-plan",
+        taskId: "task-plan",
+        source: "test",
+        expectedFormat: "android-ui-automator",
+        timeoutMs: 5000,
+        actions: [{ id: "sleep-1", type: "sleep", params: { durationMs: 0 } }],
+      }),
+    );
+
+    try {
+      const { stdout, code } = await runCli(["exec", "--validate-only", "--payload", "--plan-payload.json"]);
+      assert.strictEqual(code, 0, stdout);
+      const obj = JSON.parse(stdout) as { ok?: boolean; validated?: boolean; message?: string };
+      assert.strictEqual(obj.ok, true);
+      assert.strictEqual(obj.validated, true);
+      assert.doesNotMatch(obj.message ?? "", /unrecognized flag/);
+    } finally {
+      await rm(payloadPath, { force: true });
+    }
+  });
+
+  it("exec validate-only accepts a dash-prefixed positional payload path", async () => {
+    const payloadPath = join(packageRoot, "--plan-positional.json");
+    await writeFile(
+      payloadPath,
+      JSON.stringify({
+        commandId: "cmd-plan-positional",
+        taskId: "task-plan-positional",
+        source: "test",
+        expectedFormat: "android-ui-automator",
+        timeoutMs: 5000,
+        actions: [{ id: "sleep-1", type: "sleep", params: { durationMs: 0 } }],
+      }),
+    );
+
+    try {
+      const { stdout, code } = await runCli(["exec", "--validate-only", "--plan-positional.json"]);
+      assert.strictEqual(code, 0, stdout);
+      const obj = JSON.parse(stdout) as { ok?: boolean; validated?: boolean; message?: string };
+      assert.strictEqual(obj.ok, true);
+      assert.strictEqual(obj.validated, true);
+      assert.doesNotMatch(obj.message ?? "", /unrecognized flag/);
+    } finally {
+      await rm(payloadPath, { force: true });
+    }
+  });
+
+  it("recording pull accepts --out without unknown-flag rejection", async () => {
+    const { stdout, code } = await runCli(["recording", "pull", "--out"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "USAGE");
+    assert.match(obj.message ?? "", /--out requires a value/);
+    assert.doesNotMatch(obj.message ?? "", /unrecognized flag/);
   });
 
   it("open --help shows open help", async () => {
