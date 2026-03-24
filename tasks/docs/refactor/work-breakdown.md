@@ -249,9 +249,21 @@ Old docs to extract useful content from (but verify against code):
 - Run `clawperator doctor` to verify
 - Run first command (`clawperator snapshot`)
 
+**Agent and OpenClaw emphasis:** The primary consumer of this page is an agent (especially OpenClaw) performing first-time setup autonomously. The page must:
+- Include an explicit "Agent / OpenClaw Setup" section that covers:
+  - How OpenClaw invokes Clawperator (brain/hand relationship)
+  - The exact sequence an agent should execute to go from fresh install to verified working state
+  - How to confirm success programmatically (`clawperator doctor --json`, checking exit codes)
+  - Common first-run failure modes an agent will hit and how to recover without human intervention
+- Ensure every step has a machine-verifiable success condition (exit code, JSON output field, or command to run)
+- Not assume a human is reading - instructions must be unambiguous enough for an agent to execute literally
+- Call out where `--device` and `--operator-package` flags are needed (agent will likely have multiple devices or debug APK)
+
+The page is one linear path, but it must serve agents as its primary audience. Human-friendly prose is secondary to precise, executable steps.
+
 **Sources to draw from:** `docs/first-time-setup.md`, `docs/agent-quickstart.md`, `docs/openclaw-first-run.md`, `docs/running-clawperator-on-android.md`, `docs/android-operator-apk.md`
 
-**Key constraint:** One path. No branching. No "if you're using OpenClaw" vs "if you're an agent." The page should read as a linear checklist.
+**Key constraint:** One path. No branching into separate "human" vs "agent" tracks. But the single path must be agent-executable throughout.
 
 **Depends on:** Phase 1 complete
 
