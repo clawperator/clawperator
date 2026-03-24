@@ -491,7 +491,8 @@ Write this last, after all other pages exist, so all links are valid.
 **Goal:** Remove old files and update repo metadata.
 
 **Steps:**
-1. Delete old authored source files (per plan Section 9, Phase 5):
+1. Move internal docs to `docs/internal/`: `conformance-apk.md`, `release-procedure.md`, `release-reference.md`, `site-hosting.md`, `design/` (entire directory)
+2. Delete old authored source files (per plan Section 9, Phase 5):
    - `docs/reference/` directory
    - `docs/ai-agents/` directory
    - `docs/skills/` directory (the authored one, not the gitignored cross-repo copy)

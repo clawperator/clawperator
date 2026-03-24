@@ -515,25 +515,28 @@ The skill SKILL.md is updated to document:
 
 ### Policy
 
-Internal docs are excluded by **not being in `mkdocs.yml` nav**.
+Internal docs live in `docs/internal/`. This directory is:
+- Never listed in `mkdocs.yml` nav
+- Never copied to the build staging directory by the assembly script
+- Structurally invisible to the public docs site
 
-The assembly script (`assemble.sh`) only copies files referenced in `mkdocs.yml` nav to the build staging directory. Files in `docs/` that are not in the nav are never copied, never built, and never published.
+The `docs/internal/` convention gives agents and contributors a clear signal: everything outside `docs/internal/` is public, everything inside is contributor-only. No cross-referencing `mkdocs.yml` required to determine a file's status.
 
-No frontmatter flags. No `docs/internal/` directory. No special markers. If a file in `docs/` is not in `mkdocs.yml` nav, it is internal. This is enforced architecturally: internal files physically do not exist in the staging directory that MkDocs reads from.
+The assembly script enforces this: it skips `docs/internal/` entirely and only copies files referenced in `mkdocs.yml` nav.
 
-### Internal Docs Inventory (Post-Refactor)
+### Internal Docs (Post-Refactor)
 
-Files in `docs/` that are NOT in `mkdocs.yml` nav and NOT published:
+Files moved to `docs/internal/`:
 
-- `docs/conformance-apk.md`
-- `docs/release-procedure.md`
-- `docs/release-reference.md`
-- `docs/site-hosting.md`
-- `docs/design/node-api-design.md`
-- `docs/design/operator-llm-playbook.md`
-- `docs/design/skill-design.md`
-- `docs/design/generative-engine-optimization.md`
-- `docs/design/node-api-design-guiding-principles.md`
+- `docs/internal/conformance-apk.md`
+- `docs/internal/release-procedure.md`
+- `docs/internal/release-reference.md`
+- `docs/internal/site-hosting.md`
+- `docs/internal/design/node-api-design.md`
+- `docs/internal/design/operator-llm-playbook.md`
+- `docs/internal/design/skill-design.md`
+- `docs/internal/design/generative-engine-optimization.md`
+- `docs/internal/design/node-api-design-guiding-principles.md`
 
 ---
 
@@ -632,7 +635,8 @@ Priority order (most impactful first):
 
 ### Phase 5: Cleanup
 
-1. Delete old source files per the deletion criteria in Section 1a:
+1. Move internal docs to `docs/internal/`: `conformance-apk.md`, `release-procedure.md`, `release-reference.md`, `site-hosting.md`, `design/` (entire directory)
+2. Delete old source files per the deletion criteria in Section 1a:
    - Remove old `docs/reference/`, `docs/ai-agents/`, `docs/skills/` directories (content migrated to new locations)
    - Remove absorbed files: `docs/agent-quickstart.md`, `docs/first-time-setup.md`, `docs/openclaw-first-run.md`, `docs/running-clawperator-on-android.md`, `docs/project-overview.md`, `docs/terminology.md`, `docs/android-operator-apk.md`, `docs/architecture.md`, `docs/node-api-for-agents.md`, `docs/snapshot-format.md`, `docs/navigation-patterns.md`, `docs/multi-device-workflows.md`, `docs/crash-logs.md`, `docs/troubleshooting.md`, `docs/compatibility.md`, `docs/known-issues.md`
 2. Delete old skills repo files that were renamed/absorbed: `usage-model.md`, `skill-authoring-guidelines.md`, `skill-development-workflow.md`, `device-prep-and-runtime-tips.md`, `blocked-terms-policy.md`, `skill-from-recording.md`
