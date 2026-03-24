@@ -1,0 +1,8 @@
+{
+  "commandId": "cli-test-cmd",
+  "taskId": "cli-test-task",
+  "source": "unit-test",
+  "expectedFormat": "android-ui-automator",
+  "timeoutMs": 30000,
+  "actions": [{ "id": "s1", "type": "sleep", "params": { "durationMs": 1 } }]
+}

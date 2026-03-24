@@ -30,7 +30,7 @@ workflow (also available as `record` alias), use [Android Recording Format for A
 | `emulator status` | List running Android emulators and boot state |
 | `emulator provision` | Reuse or create a supported Android emulator and return its ADB serial |
 | `provision emulator` | Alias of `emulator provision` |
-| `exec --execution <json\|file>` | Run a full execution payload (see `--validate-only` and `--dry-run` below). `execute` is a supported synonym. |
+| `exec <json\|file>` | Run a full execution payload (JSON string or file path). Inline values starting with `{` parse as JSON; values starting with `[` try a file path first, then parse as a JSON array if the path is missing. `execute` is a synonym; `--payload` and `--execution` are named alternatives to the positional arg. |
 | `snapshot` | Capture UI hierarchy dump (`hierarchy_xml`) |
 | `screenshot [--path <file>]` | Capture device screen as PNG |
 | `open <package-id\|url\|uri>` | Open an app, URL, or URI (auto-detects target type) |
@@ -56,7 +56,7 @@ workflow (also available as `record` alias), use [Android Recording Format for A
 | `read --desc-contains <sub>` | Read from the first element whose content description contains the substring |
 | `read --role <role>` | Read from the first element with the given role |
 | `read --selector <json>` | Read using raw `NodeMatcher` JSON (advanced only; mutually exclusive with simple flags) |
-| `read ... --all --json` | Read every on-screen match: step `data.text` is a string containing a JSON array of quoted labels (see `read_text` behavior note). Requires `--json`. |
+| `read ... --all` (JSON output) | Read every on-screen match: step `data.text` is a string containing a JSON array of quoted labels (see `read_text` behavior note). Requires an explicit JSON output flag: `--json`, `--output json`, or `--format json` (implicit default json is not enough; `--output pretty` is rejected). |
 | `read ... --container-text <text>` | Restrict search to elements within a container with exact visible text |
 | `read ... --container-text-contains <sub>` | Restrict search to elements within a container with partial text match |
 | `read ... --container-id <id>` | Restrict search to elements within a container with the given resource ID |
@@ -88,6 +88,13 @@ workflow (also available as `record` alias), use [Android Recording Format for A
 | `close --app <package>` | Same as `close <package>` |
 | `close-app <package>` | Synonym for `close` |
 | `sleep <ms>` | Pause execution for a duration in milliseconds |
+| `wait-for-nav --app <package> --timeout <ms>` | Wait for app/screen navigation to complete (waits until app is in foreground) |
+| `wait-for-nav --text <text> --timeout <ms>` | Wait for navigation until element appears |
+| `wait-for-navigation ...` | Synonym for `wait-for-nav` |
+| `read-value --label <text>` | Read value associated with a labeled element (e.g., "85%" next to "Battery") |
+| `read-value --label-id <id>` | Read value by matching label's resource ID |
+| `read-value --label <text> --all` (JSON output) | Read all matching values as JSON array (same explicit JSON output requirement as `read --all`) |
+| `read-kv ...` | Synonym for `read-value` |
 | `skills list` | List available skills |
 | `skills get <skill_id>` | Show skill metadata |
 | `skills search [--app <pkg>] [--intent <i>] [--keyword <k>]` | Search skills by app, intent, or keyword (at least one filter required) |
@@ -133,7 +140,7 @@ Multiple simple flags combine with AND semantics: `--text "Login" --role button`
 
 For `type`, `--text` is reserved for the text to type. Identify the target with `--id`, `--role`, `--desc`, `--text-contains`, `--desc-contains`, or `--selector` (advanced).
 
-**`read`:** `--all` returns every on-screen node that matches the selector. It requires `--json` (CLI rejects pretty mode). The matching labels are in `stepResults[].data.text` as a **string** that contains JSON array syntax (for example `["Wi-Fi","Wi-Fi Direct"]`); parse it with `JSON.parse` in your agent. An empty match set is `"[]"`. Do not combine `all: true` with `validator` in raw executions: the Android runtime uses the multi-match path only when `all` is false or omitted for validator flows.
+**`read`:** `--all` returns every on-screen node that matches the selector. It requires an explicit JSON output flag (`--json`, `--output json`, or `--format json`). Implicit default json output is not sufficient: the CLI rejects `read ... --all` when no output flag is passed, and rejects `--output pretty`. The matching labels are in `stepResults[].data.text` as a **string** that contains JSON array syntax (for example `["Wi-Fi","Wi-Fi Direct"]`); parse it with `JSON.parse` in your agent. An empty match set is `"[]"`. Do not combine `all: true` with `validator` in raw executions: the Android runtime uses the multi-match path only when `all` is false or omitted for validator flows.
 
 **`wait`:** Optional `--timeout <ms>` (positive; omit for default) caps wall-clock wait time on the device (see global options note above).
 
@@ -167,6 +174,44 @@ The `read` command accepts `--container-*` flags to restrict the search to eleme
 
 **Error handling:** If the container matcher finds no element, the step fails with `CONTAINER_NOT_FOUND`. If the container matches but the element selector matches nothing inside that subtree, the step fails with `NODE_NOT_FOUND`.
 
+### `wait-for-nav` flags
+
+The `wait-for-nav` command waits for app or screen navigation to complete.
+
+| Flag | Description |
+| :--- | :--- |
+| `--app <package>` | Wait until this app is in the foreground (maps to `expectedPackage`) |
+| `--timeout <ms>` | **Required.** Maximum navigation wait time (1-30000ms). Execution timeout is set to `max(navTimeout + 5000, 30000)` to ensure the envelope does not expire before the wait completes. |
+| `--text <value>` | Wait until element with exact visible text appears after nav (maps to `expectedNode.textEquals`) |
+| `--text-contains <value>` | Wait until element with partial text match appears (maps to `expectedNode.textContains`) |
+| `--id <value>` | Wait until element with this resource ID appears (maps to `expectedNode.resourceId`) |
+| `--desc <value>` | Wait until element with this content description appears (maps to `expectedNode.contentDescEquals`) |
+| `--desc-contains <value>` | Wait until element with partial content description appears (maps to `expectedNode.contentDescContains`) |
+| `--role <value>` | Wait until element with this role appears (maps to `expectedNode.role`) |
+| `--selector <json>` | Raw JSON NodeMatcher for expectedNode; mutually exclusive with simple flags |
+| `--validate-only` | Validate the built execution payload without running it on a device (same semantics as `exec`) |
+| `--dry-run` | Print the validated execution plan without running it on a device |
+
+**Requirements:** At least one of `--app` or a selector flag is required. `--timeout` is always required (1-30000ms).
+
+**Timeout note:** The maximum navigation timeout is capped at 30000ms (30 seconds). For waits longer than 30 seconds, consider breaking the action into multiple shorter waits or use structured polling from your agent. The execution envelope timeout is automatically set to `max(navTimeout + 5000, 30000)` to prevent premature expiration while the action is still waiting. This required `--timeout` is the action wait cap only; it is not the same as the global `--timeout` execution override used by `exec` and `read-value`.
+
+### `read-value` flags
+
+The `read-value` command reads the value associated with a labeled UI element (e.g., reading "85%" next to the "Battery" label). This uses the `read_key_value_pair` action type.
+
+| Flag | Description |
+| :--- | :--- |
+| `--label <text>` | Match label by exact visible text (maps to `labelMatcher.textEquals`) |
+| `--label-id <id>` | Match label by Android resource ID (maps to `labelMatcher.resourceId`) |
+| `--label-desc <text>` | Match label by exact content description (maps to `labelMatcher.contentDescEquals`) |
+| `--all` | Sends `all: true` in action params (requires an explicit JSON output flag, like `read --all`). The Operator APK currently ignores this field and still returns a single label-value pair. |
+| `--timeout <ms>` | Optional; overrides the execution timeout within policy limits (same as `exec --timeout`). Default timeout is 30000ms. |
+| `--validate-only` | Validate the built execution payload without running it on a device (same semantics as `exec`) |
+| `--dry-run` | Print the validated execution plan without running it on a device |
+
+**Requirements:** At least one of `--label`, `--label-id`, or `--label-desc` is required.
+
 ### Quick Examples
 
 ```bash
@@ -196,6 +241,18 @@ clawperator read --role text --all --json --device <device_id>
 
 # Read within a specific container (scope search to container subtree)
 clawperator read --text "Price" --container-role list --device <device_id> --json
+
+# Wait for app navigation to complete
+clawperator wait-for-nav --app com.google.home --timeout 5000 --device <device_id> --json
+
+# Wait for element to appear after navigation
+clawperator wait-for-nav --text "Settings" --timeout 5000 --device <device_id> --json
+
+# Read value associated with a label
+clawperator read-value --label "Battery" --device <device_id> --json
+
+# Read all values for a label
+clawperator read-value --label "Price" --all --json --device <device_id>
 
 # Scroll within a specific container
 clawperator scroll down --container-id "com.example:id/recycler_view" --device <device_id> --json
@@ -1137,7 +1194,7 @@ For agent-side recovery strategy, use
 - **No hidden retries:** If an action fails, the error is returned immediately. Retry logic belongs in the agent.
 - **Deterministic results:** Exactly one terminal envelope per `commandId`. Timeouts return `RESULT_ENVELOPE_TIMEOUT` with diagnostics, payload-side action context, and `logPath` when persistent logging is enabled.
 - **Execution granularity:** Group multiple actions in one execution only when they are atomic - when the agent does not need to observe state or make a decision between them. For flows where intermediate state matters, use separate executions with `snapshot` between each. See [Execution Model](../reference/execution-model.md) for the full guidance.
-- **Timeout override:** `--timeout <ms>` overrides the execution timeout for `exec`, `snapshot`, and `screenshot` within policy limits.
+- **Timeout override:** `--timeout <ms>` overrides the execution timeout for `exec`, `snapshot`, `screenshot`, and `read-value` within policy limits.
 - **Screenshot output path:** `screenshot --path <file>` writes the PNG to the requested local path and still returns the final `data.path` in the result envelope. `<file>` must be a non-empty local filesystem path.
 - **Device targeting:** Specify `--device <id>` when multiple devices are connected. Omit for single-device setups.
 - **Emulator reuse over creation:** Provisioning never creates duplicate AVDs when a supported running or stopped emulator already exists.
@@ -1148,9 +1205,9 @@ For agent-side recovery strategy, use
 
 - Payload validation happens automatically at execution time. Invalid payloads
   fail fast with `EXECUTION_VALIDATION_FAILED` before any device action runs.
-- `clawperator exec --execution <json-or-file> --validate-only` validates
-  and normalizes a payload without dispatching it to any device.
-- `clawperator exec --execution <json-or-file> --dry-run` validates the
+- `clawperator exec <json-or-file> --validate-only` (or `exec --payload <json-or-file> --validate-only`) validates
+  and normalizes a payload without dispatching it to any device. The `--execution` flag is an alias for `--payload`.
+- `clawperator exec <json-or-file> --dry-run` (or `exec --payload ... --dry-run`) validates the
   payload and prints a plan summary without requiring a device connection.
   This is useful for local payload development and CI checks.
 - If you want the lowest-risk contract check on a live device, use a minimal
@@ -1159,7 +1216,7 @@ For agent-side recovery strategy, use
 ### `--dry-run` output format
 
 ```bash
-clawperator exec --execution '{"commandId":"test","taskId":"task","source":"cli","expectedFormat":"android-ui-automator","timeoutMs":10000,"actions":[{"id":"s1","type":"sleep","params":{"durationMs":500}}]}' --dry-run
+clawperator exec '{"commandId":"test","taskId":"task","source":"cli","expectedFormat":"android-ui-automator","timeoutMs":10000,"actions":[{"id":"s1","type":"sleep","params":{"durationMs":500}}]}' --dry-run
 ```
 
 **Success response:**
@@ -1284,7 +1341,7 @@ Skills can be invoked three ways:
 3. **Artifact compile + exec** (for skills with `.recipe.json` artifacts):
    ```bash
    clawperator skills compile-artifact <skill_id> --artifact <name> --vars '{"KEY":"value"}'
-   clawperator exec --execution <compiled_output>
+   clawperator exec <compiled_output>
    ```
 
 ### Skills Run Response

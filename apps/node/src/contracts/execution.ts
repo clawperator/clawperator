@@ -35,6 +35,13 @@ export interface ActionParams {
   retry?: Record<string, unknown>;
   scrollRetry?: Record<string, unknown>;
   clickRetry?: Record<string, unknown>;
+  // wait_for_navigation params
+  expectedPackage?: string;
+  expectedNode?: NodeMatcher;
+  /** Action-level timeout in milliseconds (distinct from execution-level timeoutMs) */
+  timeoutMs?: number;
+  // read_key_value_pair params
+  labelMatcher?: NodeMatcher;
 }
 
 export interface ExecutionAction {

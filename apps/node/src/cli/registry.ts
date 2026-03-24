@@ -105,6 +105,43 @@ export function getInvalidTimeoutResult(timeoutMs: number | undefined, options: 
   return undefined;
 }
 
+/**
+ * `read --all` and `read-value --all` need machine-readable stdout; require JSON output and an
+ * explicit `--json` or `--output json` / `--format json` (implicit default json is not enough).
+ */
+export function readAllRequiresExplicitJsonError(options: {
+  command: "read" | "read-value";
+  format: "json" | "pretty";
+  explicitJsonOutput: boolean;
+}): string | undefined {
+  const { command, format, explicitJsonOutput } = options;
+  if (format !== "json") {
+    return formatError(
+      {
+        code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+        message:
+          command === "read"
+            ? 'read --all requires JSON output. Use --json or --output json (not --output pretty).\n\nExample:\n  clawperator read --text "Price" --all --json'
+            : "read-value --all requires JSON output. Use --json or --output json (not --output pretty).",
+      },
+      { format },
+    );
+  }
+  if (!explicitJsonOutput) {
+    return formatError(
+      {
+        code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+        message:
+          command === "read"
+            ? 'read --all requires explicit JSON output. Pass --json, --output json, or --format json.\n\nExample:\n  clawperator read --text "Price" --all --json'
+            : 'read-value --all requires explicit JSON output. Pass --json, --output json, or --format json.\n\nExample:\n  clawperator read-value --label "Battery" --all --json',
+      },
+      { format },
+    );
+  }
+  return undefined;
+}
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -113,6 +150,7 @@ export type HandlerContext = {
   argv: string[];
   rest: string[];
   format: "json" | "pretty";
+  explicitJsonOutput: boolean;
   verbose: boolean;
   logger: Logger;
   deviceId?: string;
@@ -403,6 +441,34 @@ Examples:
   Advanced (raw NodeMatcher JSON): clawperator type "hi" --selector '{"resourceId":"com.example:id/search_box"}'
 `;
 
+const HELP_READ_VALUE = `clawperator read-value
+
+Usage:
+  clawperator read-value --label <text> [--json]
+  clawperator read-value --label-id <id> [--json]
+  clawperator read-value --label-desc <text> [--json]
+  clawperator read-value --label <text> --all --json
+
+Label selector flags (at least one required):
+  --label <text>          Match label by exact visible text (maps to labelMatcher.textEquals)
+  --label-id <id>         Match label by Android resource ID (maps to labelMatcher.resourceId)
+  --label-desc <text>     Match label by exact content description (maps to labelMatcher.contentDescEquals)
+
+Options:
+  --all                   Return all matches as a JSON array (JSON output mode only)
+
+Notes:
+  - Reads the value associated with a labeled UI element (e.g., "85%" next to "Battery").
+  - The --label* flags populate labelMatcher, not matcher.
+  - --all requires an explicit JSON output flag: --json, --output json, or --format json (implicit default json is not enough; --output pretty is rejected).
+  - Synonym: read-kv
+
+Examples:
+  clawperator read-value --label "Battery" --json
+  clawperator read-value --label-id "com.foo:id/battery_label" --json
+  clawperator read-value --label "Wi-Fi" --all --json
+`;
+
 const HELP_READ = `clawperator read
 
 Usage:
@@ -432,12 +498,12 @@ Container selector flags (all optional; restrict search to container subtree):
   --container-selector <json>       Container by raw NodeMatcher JSON (mutually exclusive with other --container-* flags)
 
 Options:
-  --all                   Return all matches as a JSON array (requires --json)
+  --all                   Return all matches as a JSON array (JSON output mode only)
 
 Notes:
   - Returns the text content of the first matching element.
   - --all returns all matching elements' text as a JSON array of strings.
-  - --all requires --json (error in pretty mode since array output is ambiguous).
+  - --all requires an explicit JSON output flag: --json, --output json, or --format json (implicit default json is not enough; --output pretty is rejected).
   - Multiple simple flags combine with AND semantics.
 
 Examples:
@@ -479,6 +545,39 @@ Examples:
   clawperator wait --id "com.example:id/progress" --timeout 10000
   clawperator wait --role button --text-contains "OK"
   Advanced (raw NodeMatcher JSON): clawperator wait --selector '{"textEquals":"Done"}'
+`;
+
+const HELP_WAIT_FOR_NAV = `clawperator wait-for-nav
+
+Usage:
+  clawperator wait-for-nav --app <package> --timeout <ms> [--device <id>] [--operator-package <pkg>] [--json]
+  clawperator wait-for-nav --text <text> --timeout <ms> [--device <id>] [--operator-package <pkg>] [--json]
+  clawperator wait-for-nav --app <package> --text "Home" --timeout 5000 [--device <id>] [--operator-package <pkg>] [--json]
+
+Options:
+  --app <package>         Wait until this app is in the foreground
+  --timeout <ms>          Required. Maximum time to wait (1-30000ms)
+
+Selector flags (optional if --app is provided; required otherwise):
+  --text <text>           Wait until element with exact visible text appears
+  --text-contains <text>  Wait until element with partial text match appears
+  --id <resource-id>      Wait until element with this Android resource ID appears
+  --desc <text>           Wait until element with exact content description appears
+  --desc-contains <text>  Wait until element with partial content description appears
+  --role <role>           Wait until element with this role appears
+  --selector <json>       Raw NodeMatcher JSON (advanced; mutually exclusive with simple flags)
+
+Notes:
+  - Waits for an app/screen transition to complete.
+  - Either --app or a selector flag (or both) is required.
+  - --timeout is required and sets the navigation wait duration.
+  - Execution timeout is set to max(navTimeout + 5000, globalTimeout).
+  - Synonym: wait-for-navigation
+
+Examples:
+  clawperator wait-for-nav --app com.google.home --timeout 5000
+  clawperator wait-for-nav --text "Settings" --timeout 5000
+  clawperator wait-for-nav --app com.foo.bar --text "Home" --timeout 5000
 `;
 
 const HELP_PRESS = `clawperator press
@@ -836,14 +935,35 @@ COMMANDS["packages"] = {
   },
 };
 
-// exec (synonym: execute)
+// exec (synonym: execute). Payload: positional <json-or-file>, --payload, or --execution (alias). Public CLI reference must stay aligned.
 COMMANDS["exec"] = {
   name: "exec",
   synonyms: ["execute"],
   group: "Execution",
   summary: "Execute a validated command payload",
-  help: "clawperator exec\n\nUsage:\n  clawperator exec --execution <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>]\n  clawperator exec best-effort --goal <text> [--device <id>] [--operator-package <package>]\n\n`execute` is accepted as a synonym for `exec`.\n",
-  topLevelBlock: `  exec --execution <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>]
+  help: `clawperator exec
+
+Usage:
+  clawperator exec <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>]
+  clawperator exec --payload <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>]
+  clawperator exec best-effort --goal <text> [--device <id>] [--operator-package <package>]
+
+Payload (one of):
+  <json-or-file>            Positional: inline JSON or path to a JSON file (see Notes)
+
+Options:
+  --payload <json-or-file>  Same as positional payload (primary named form)
+  --execution <json-or-file>  Alias for --payload (backward compatibility)
+  --validate-only           Validate payload without executing
+  --dry-run                 Print execution plan without running
+
+Notes:
+  - Leading '{' is always parsed as inline JSON. Leading '[' tries the string as a file path first; if the file is missing, it is parsed as an inline JSON array. Any other string is read as a file path.
+  - Error precedence: unreadable file path -> invalid JSON content -> missing payload.
+  - 'execute' is accepted as a synonym for 'exec'.
+  - '--execution' is accepted as an alias for '--payload'.
+`,
+  topLevelBlock: `  exec <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>]
                                             Execute a validated command payload or print a dry-run plan
   exec best-effort --goal <text> [--device <id>] [--operator-package <package>]
                                             Produce deterministic next-action suggestion from current UI`,
@@ -858,13 +978,19 @@ COMMANDS["exec"] = {
         goal,
       });
     } else {
-      const execution = getOpt(rest, "--execution");
-      if (!execution) {
-        return JSON.stringify({ code: "USAGE", message: "exec requires --execution <json-or-file>" });
+      // Support --payload (primary), --execution (alias), or positional argument
+      let payloadSource: string | undefined = getOpt(rest, "--payload") ?? getOpt(rest, "--execution");
+      if (!payloadSource) {
+        // Check for positional argument (first non-flag token)
+        const positionals = barePositionalTokens(rest, ["--payload", "--execution"], ["--validate-only", "--dry-run"]);
+        payloadSource = positionals[0];
+      }
+      if (!payloadSource) {
+        return formatError({ code: ERROR_CODES.MISSING_ARGUMENT, message: "exec requires a payload. Use: clawperator exec <json-or-file> or clawperator exec --payload <json-or-file>" }, { format });
       } else {
         return (await import("./commands/execute.js")).cmdExecute({
           ...out,
-          execution,
+          execution: payloadSource,
           deviceId,
           operatorPackage,
           timeoutMs,
@@ -1085,7 +1211,7 @@ COMMANDS["read"] = {
   topLevelBlock: `  read --text <text> | --id <id> | --role <role> [--device <id>] [--json]
                                             Read text from the first matching UI element`,
   handler: async (ctx) => {
-    const { rest, format, logger, deviceId, operatorPackage } = ctx;
+    const { rest, format, explicitJsonOutput, logger, deviceId, operatorPackage } = ctx;
     if (!hasElementSelectorFlag(rest)) {
       return makeMissingSelectorError("read", format);
     }
@@ -1093,16 +1219,10 @@ COMMANDS["read"] = {
     if (!resolved.ok) {
       return formatError(resolved.error, { format });
     }
-    // --all requires --json
     const readAll = hasFlag(rest, "--all");
-    if (readAll && format !== "json") {
-      return formatError(
-        {
-          code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
-          message: 'read --all requires --json.\n\nExample:\n  clawperator read --text "Price" --all --json',
-        },
-        { format },
-      );
+    if (readAll) {
+      const err = readAllRequiresExplicitJsonError({ command: "read", format, explicitJsonOutput });
+      if (err) return err;
     }
     // Resolve container matcher (optional)
     const containerResult = resolveContainerMatcherFromCli(rest);
@@ -1442,6 +1562,198 @@ COMMANDS["scroll-and-click"] = {
   topLevelBlock: `  scroll-and-click [<direction>] --text <text> [--device <id>] [--json]
                                             Scroll until target is visible, then click it`,
   handler: async (ctx) => scrollUntilHandler(ctx, true),
+};
+
+// wait-for-nav (synonym: wait-for-navigation)
+COMMANDS["wait-for-nav"] = {
+  name: "wait-for-nav",
+  synonyms: ["wait-for-navigation"],
+  group: "Device Interaction",
+  summary: "Wait for app or screen navigation to complete",
+  help: HELP_WAIT_FOR_NAV,
+  topLevelBlock: `  wait-for-nav --app <package> --timeout <ms> [--device <id>] [--json]
+                                            Wait for app or screen navigation to complete`,
+  handler: async (ctx) => {
+    const { rest, format, logger, deviceId, operatorPackage, timeoutMs: navTimeoutMs } = ctx;
+
+    // Parse --app flag (reject present-but-empty like --app "" so we do not silently ignore package filter)
+    const appIdx = rest.indexOf("--app");
+    let expectedPackage: string | undefined;
+    if (appIdx >= 0) {
+      const next = rest[appIdx + 1];
+      if (next === undefined || next.trim() === "" || next.startsWith("--")) {
+        return formatError(
+          {
+            code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+            message:
+              "wait-for-nav --app requires a non-empty package id.\n\nExample:\n  clawperator wait-for-nav --app com.android.settings --timeout 5000",
+          },
+          { format },
+        );
+      }
+      expectedPackage = next;
+    }
+
+    // --timeout is required (action-level wait duration)
+    // It's parsed by getGlobalOpts and passed via ctx.timeoutMs
+    if (navTimeoutMs === undefined) {
+      return formatError(
+        {
+          code: ERROR_CODES.MISSING_ARGUMENT,
+          message: "wait-for-nav requires --timeout <ms>.\n\nUsage:\n  clawperator wait-for-nav --app <package> --timeout <ms>\n  clawperator wait-for-nav --text <text> --timeout <ms>\n\nExample:\n  clawperator wait-for-nav --app com.google.home --timeout 5000",
+        },
+        { format },
+      );
+    }
+    if (!Number.isFinite(navTimeoutMs) || navTimeoutMs <= 0) {
+      return formatError(
+        {
+          code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+          message: "wait-for-nav --timeout must be a positive number of milliseconds",
+        },
+        { format },
+      );
+    }
+    if (navTimeoutMs > 30000) {
+      return formatError(
+        {
+          code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+          message: "wait-for-nav --timeout must not exceed 30000ms",
+        },
+        { format },
+      );
+    }
+
+    // Resolve selector flags (optional if --app is provided)
+    let expectedNode: import("../contracts/selectors.js").NodeMatcher | undefined;
+    const hasSelector = hasElementSelectorFlag(rest);
+    if (hasSelector) {
+      const matcherResult = resolveElementMatcherFromCli(rest);
+      if (!matcherResult.ok) {
+        return formatError(matcherResult.error, { format });
+      }
+      expectedNode = matcherResult.matcher;
+    }
+
+    // Require at least one of --app or selector
+    if (!expectedPackage && !expectedNode) {
+      return formatError(
+        {
+          code: ERROR_CODES.MISSING_ARGUMENT,
+          message: "wait-for-nav requires --app or a selector, and --timeout.\n\nUsage:\n  clawperator wait-for-nav --app <package> --timeout <ms>\n  clawperator wait-for-nav --text <text> --timeout <ms>\n\nExample:\n  clawperator wait-for-nav --app com.google.home --timeout 5000",
+        },
+        { format },
+      );
+    }
+
+    // Build execution and run
+    const execution = (await import("../domain/actions/waitForNav.js")).buildWaitForNavExecution(
+      expectedPackage,
+      expectedNode,
+      navTimeoutMs,
+    );
+
+    return (await import("./commands/execute.js")).cmdExecute({
+      format,
+      execution: JSON.stringify(execution),
+      deviceId,
+      operatorPackage,
+      timeoutMs: execution.timeoutMs,
+      validateOnly: hasFlag(rest, "--validate-only"),
+      dryRun: hasFlag(rest, "--dry-run"),
+      logger,
+    });
+  },
+};
+
+// read-value (synonym: read-kv)
+COMMANDS["read-value"] = {
+  name: "read-value",
+  synonyms: ["read-kv"],
+  group: "Device Interaction",
+  summary: "Read the value associated with a labeled element",
+  help: HELP_READ_VALUE,
+  topLevelBlock: `  read-value --label <text> [--json]         Read the value associated with a labeled element`,
+  handler: async (ctx) => {
+    const { rest, format, explicitJsonOutput, logger, deviceId, operatorPackage, timeoutMs } = ctx;
+
+    const readAll = hasFlag(rest, "--all");
+    if (readAll) {
+      const err = readAllRequiresExplicitJsonError({ command: "read-value", format, explicitJsonOutput });
+      if (err) return err;
+    }
+
+    // Build labelMatcher from --label* flags
+    const labelMatcher: import("../contracts/selectors.js").NodeMatcher = {};
+    const labelText = getOpt(rest, "--label");
+    const labelId = getOpt(rest, "--label-id");
+    const labelDesc = getOpt(rest, "--label-desc");
+
+    if (labelText !== undefined) {
+      if (labelText.trim() === "") {
+        return formatError(
+          {
+            code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+            message: "read-value --label value must not be empty",
+          },
+          { format },
+        );
+      }
+      labelMatcher.textEquals = labelText;
+    }
+    if (labelId !== undefined) {
+      if (labelId.trim() === "") {
+        return formatError(
+          {
+            code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+            message: "read-value --label-id value must not be empty",
+          },
+          { format },
+        );
+      }
+      labelMatcher.resourceId = labelId;
+    }
+    if (labelDesc !== undefined) {
+      if (labelDesc.trim() === "") {
+        return formatError(
+          {
+            code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+            message: "read-value --label-desc value must not be empty",
+          },
+          { format },
+        );
+      }
+      labelMatcher.contentDescEquals = labelDesc;
+    }
+
+    // Require at least one label flag
+    if (Object.keys(labelMatcher).length === 0) {
+      return formatError(
+        {
+          code: ERROR_CODES.MISSING_ARGUMENT,
+          message: "read-value requires a label selector.\n\nUsage:\n  clawperator read-value --label <text> --json\n\nExample:\n  clawperator read-value --label \"Battery\" --json",
+        },
+        { format },
+      );
+    }
+
+    // Build execution and run
+    const execution = (await import("../domain/actions/readValue.js")).buildReadValueExecution(
+      labelMatcher,
+      readAll,
+    );
+
+    return (await import("./commands/execute.js")).cmdExecute({
+      format,
+      execution: JSON.stringify(execution),
+      deviceId,
+      operatorPackage,
+      timeoutMs,
+      validateOnly: hasFlag(rest, "--validate-only"),
+      dryRun: hasFlag(rest, "--dry-run"),
+      logger,
+    });
+  },
 };
 
 // skills

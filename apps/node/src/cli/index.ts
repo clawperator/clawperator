@@ -19,6 +19,8 @@ function getGlobalOpts(argv: string[]): {
   timeoutMs?: number;
   logLevel?: "debug" | "info" | "warn" | "error";
   output: "json" | "pretty";
+  /** True when the user set JSON output via --json or an explicit --output/--format json (not the CLI default). */
+  explicitJsonOutput: boolean;
   verbose: boolean;
   rest: string[];
 } {
@@ -28,6 +30,7 @@ function getGlobalOpts(argv: string[]): {
   let timeoutMs: number | undefined;
   let logLevel: "debug" | "info" | "warn" | "error" | undefined;
   let output: "json" | "pretty" = "json";
+  let explicitJsonOutput = false;
   let verbose = false;
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--") {
@@ -56,10 +59,15 @@ function getGlobalOpts(argv: string[]): {
       operatorPackage = value;
       i++;
     } else if ((argv[i] === "--output" || argv[i] === "--format") && argv[i + 1]) {
-      output = argv[++i] === "pretty" ? "pretty" : "json";
+      const next = argv[++i];
+      output = next === "pretty" ? "pretty" : "json";
+      if (next === "json") {
+        explicitJsonOutput = true;
+      }
     } else if (argv[i] === "--json") {
       // --json sets output to json (new canonical shorthand)
       output = "json";
+      explicitJsonOutput = true;
     } else if (argv[i] === "--timeout-ms") {
       if (!argv[i + 1]) {
         throw new UsageError("--timeout-ms requires a value");
@@ -87,7 +95,7 @@ function getGlobalOpts(argv: string[]): {
       rest.push(argv[i]);
     }
   }
-  return { deviceId, operatorPackage, timeoutMs, logLevel, output, verbose, rest };
+  return { deviceId, operatorPackage, timeoutMs, logLevel, output, explicitJsonOutput, verbose, rest };
 }
 
 /** Tokens after the first `--` are forwarded verbatim (e.g. to skill scripts); exclude them from global meta-flag detection. */
@@ -151,6 +159,7 @@ async function main(): Promise<void> {
           argv,
           rest,
           format: out.format,
+          explicitJsonOutput: global.explicitJsonOutput,
           verbose: out.verbose,
           logger,
           deviceId: global.deviceId,

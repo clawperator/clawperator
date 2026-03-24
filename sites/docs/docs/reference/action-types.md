@@ -511,6 +511,7 @@ Reads a Settings-style label and its adjacent value. Finds the node matching `la
 | Param | Type | Required | Description |
 |-------|------|----------|-------------|
 | `labelMatcher` | NodeMatcher | yes | Selector for the label node |
+| `all` | `boolean` | no | The Node execution schema allows this flag (for example when using `read-value --all --json`). The Android Operator currently ignores it and always returns a single label-value pair. Default `false`. |
 
 **Result data on success:**
 
