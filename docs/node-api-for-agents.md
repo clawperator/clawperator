@@ -41,6 +41,8 @@ workflow (also available as `record` alias), use [Android Recording Format for A
 | `click --desc-contains <sub>` | Tap the first element whose content description contains the substring |
 | `click --role <role>` | Tap the first element with the given role |
 | `click --selector <json>` | Tap using raw `NodeMatcher` JSON (advanced only; mutually exclusive with simple flags) |
+| `click --text <text> --long` | Long press the matching element |
+| `click --text <text> --focus` | Set input focus without clicking (mutually exclusive with `--long`) |
 | `type <text> --role <role>` | Type into the first element with the given role |
 | `type <text> --id <resource-id>` | Type into the first element with the given resource ID |
 | `type <text> --desc <text>` | Type into the first element with the given content description |
@@ -54,6 +56,7 @@ workflow (also available as `record` alias), use [Android Recording Format for A
 | `read --desc-contains <sub>` | Read from the first element whose content description contains the substring |
 | `read --role <role>` | Read from the first element with the given role |
 | `read --selector <json>` | Read using raw `NodeMatcher` JSON (advanced only; mutually exclusive with simple flags) |
+| `read --text <text> --all --json` | Read all matching elements' text as a JSON array (requires `--json`) |
 | `wait --text <text>` | Wait until an element with exact visible text appears |
 | `wait --text-contains <sub>` | Wait until an element whose visible text contains the substring appears |
 | `wait --id <resource-id>` | Wait until an element with the given resource ID appears |
@@ -71,6 +74,13 @@ workflow (also available as `record` alias), use [Android Recording Format for A
 | `scroll <dir> --container-desc-contains <sub>` | Scroll within a container matched by partial content description |
 | `scroll <dir> --container-role <role>` | Scroll within a container matched by role |
 | `scroll <dir> --container-selector <json>` | Scroll within a container using raw `NodeMatcher` JSON (advanced only) |
+| `scroll-until [<dir>] --text <text>` | Scroll until target element is visible (direction defaults to `down`) |
+| `scroll-until [<dir>] --text <text> --click` | Scroll until visible, then click (action type: `scroll_and_click`) |
+| `scroll-and-click [<dir>] --text <text>` | Synonym for `scroll-until --click` |
+| `close <package>` | Force-stop an Android application |
+| `close --app <package>` | Same as `close <package>` |
+| `close-app <package>` | Synonym for `close` |
+| `sleep <ms>` | Pause execution for a duration in milliseconds |
 | `skills list` | List available skills |
 | `skills get <skill_id>` | Show skill metadata |
 | `skills search [--app <pkg>] [--intent <i>] [--keyword <k>]` | Search skills by app, intent, or keyword (at least one filter required) |
@@ -385,7 +395,7 @@ Combine fields to increase specificity when a single field is ambiguous:
 | `close_app` | `applicationId: string` | - |
 | `click` | `matcher: NodeMatcher` | `clickType: "default" \| "long_click" \| "focus"` (default: `"default"`) |
 | `enter_text` | `matcher: NodeMatcher`, `text: string` | `submit: boolean` (default: `false`), `clear: boolean` (accepted by Node contract but currently ignored by Android runtime, so do not rely on it to clear existing text) |
-| `read_text` | `matcher: NodeMatcher` | `validator: "temperature" \| "version" \| "regex"`, `validatorPattern: string` (required when `validator` is `"regex"`), `retry: object` |
+| `read_text` | `matcher: NodeMatcher` | `all: boolean` (return all matches as array), `validator: "temperature" \| "version" \| "regex"`, `validatorPattern: string` (required when `validator` is `"regex"`), `retry: object` |
 | `wait_for_node` | `matcher: NodeMatcher` | `retry: object` - controls polling attempts and backoff delays (see `retry` object shape below). There is no per-action `timeoutMs`; the outer execution `timeoutMs` is the only wall-clock limit. |
 | `snapshot_ui` | - | `retry: object` |
 | `take_screenshot` | - | `path: string`, `retry: object` |
@@ -415,6 +425,11 @@ Combine fields to increase specificity when a single field is ambiguous:
 | `press <back\|home\|recents>` | `press_key` |
 | `back` | `press_key` (key: `back`) |
 | `scroll <direction>` | `scroll` |
+| `scroll-until [<direction>] --text <text>` | `scroll_until` |
+| `scroll-until [<direction>] --text <text> --click` | `scroll_and_click` |
+| `scroll-and-click [<direction>] --text <text>` | `scroll_and_click` |
+| `close <package>` | `close_app` |
+| `sleep <ms>` | `sleep` |
 
 ### Action behavior notes
 
