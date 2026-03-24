@@ -1168,6 +1168,120 @@ class UiActionEngineDefaultTest : ActionTest {
             assertEquals("VALIDATOR_MISMATCH", stepResult.data["error"])
             assertEquals("abc", stepResult.data["raw_text"])
         }
+
+    @Test
+    fun `execute read_text with container succeeds`() =
+        actionTest {
+            val uiScope = object : RecordingTaskUiScope() {
+                override suspend fun getTextWithinContainer(
+                    matcher: NodeMatcher,
+                    containerMatcher: NodeMatcher,
+                    retry: TaskRetry,
+                ): String = "Found in container"
+            }
+            val taskScope = RecordingTaskScope(uiScope)
+            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+
+            val result =
+                engine.execute(
+                    taskScope = taskScope,
+                    plan = UiActionPlan(
+                        commandId = "cmd",
+                        taskId = "task",
+                        source = "test",
+                        actions = listOf(
+                            UiAction.ReadText(
+                                id = "rt-container",
+                                matcher = NodeMatcher(textContains = "Item"),
+                                container = NodeMatcher(resourceId = "com.example:id/list"),
+                            ),
+                        ),
+                    ),
+                )
+
+            val stepResult = result.stepResults.single()
+            assertEquals("read_text", stepResult.actionType)
+            assertEquals(true, stepResult.success)
+            assertEquals("Found in container", stepResult.data["text"])
+            assertEquals("none", stepResult.data["validator"])
+            assertEquals(true, stepResult.data["container"]?.contains("com.example:id/list") == true)
+        }
+
+    @Test
+    fun `execute read_text with container not found fails`() =
+        actionTest {
+            val uiScope = object : RecordingTaskUiScope() {
+                override suspend fun getTextWithinContainer(
+                    matcher: NodeMatcher,
+                    containerMatcher: NodeMatcher,
+                    retry: TaskRetry,
+                ): String = throw IllegalStateException("Container not found for: $containerMatcher")
+            }
+            val taskScope = RecordingTaskScope(uiScope)
+            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+
+            val result =
+                engine.execute(
+                    taskScope = taskScope,
+                    plan = UiActionPlan(
+                        commandId = "cmd",
+                        taskId = "task",
+                        source = "test",
+                        actions = listOf(
+                            UiAction.ReadText(
+                                id = "rt-container-missing",
+                                matcher = NodeMatcher(textContains = "Item"),
+                                container = NodeMatcher(resourceId = "com.example:id/nonexistent"),
+                            ),
+                        ),
+                    ),
+                )
+
+            val stepResult = result.stepResults.single()
+            assertEquals("read_text", stepResult.actionType)
+            assertEquals(false, stepResult.success)
+            assertEquals("CONTAINER_NOT_FOUND", stepResult.data["error"])
+        }
+
+    @Test
+    fun `execute read_text with all and container succeeds`() =
+        actionTest {
+            val uiScope = object : RecordingTaskUiScope() {
+                override suspend fun getAllTextWithinContainer(
+                    matcher: NodeMatcher,
+                    containerMatcher: NodeMatcher,
+                    retry: TaskRetry,
+                ): List<String> = listOf("Item 1", "Item 2", "Item 3")
+            }
+            val taskScope = RecordingTaskScope(uiScope)
+            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+
+            val result =
+                engine.execute(
+                    taskScope = taskScope,
+                    plan = UiActionPlan(
+                        commandId = "cmd",
+                        taskId = "task",
+                        source = "test",
+                        actions = listOf(
+                            UiAction.ReadText(
+                                id = "rt-all-container",
+                                matcher = NodeMatcher(role = "text"),
+                                all = true,
+                                container = NodeMatcher(resourceId = "com.example:id/list"),
+                            ),
+                        ),
+                    ),
+                )
+
+            val stepResult = result.stepResults.single()
+            assertEquals("read_text", stepResult.actionType)
+            assertEquals(true, stepResult.success)
+            assertEquals("true", stepResult.data["all"])
+            assertEquals("3", stepResult.data["count"])
+            assertEquals("[\"Item 1\",\"Item 2\",\"Item 3\"]", stepResult.data["text"])
+            assertEquals(true, stepResult.data["container"]?.contains("com.example:id/list") == true)
+        }
 }
 
 private class RecordingTaskScope(

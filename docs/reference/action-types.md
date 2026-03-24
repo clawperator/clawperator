@@ -14,7 +14,7 @@ For the execution envelope structure, timeout policy, and result semantics, see 
 | [`scroll_and_click`](#scroll_and_click) | Scroll to and tap a node | `matcher`, `container`, `direction` |
 | [`scroll_until`](#scroll_until) | Bounded scroll loop | `matcher` (optional), `maxScrolls`, `maxDurationMs` |
 | [`scroll`](#scroll) | Single scroll gesture | `container` (optional), `direction` |
-| [`read_text`](#read_text) | Read text from UI node(s) | `matcher`, `all` (optional), `validator` (optional) |
+| [`read_text`](#read_text) | Read text from UI node(s) | `matcher`, `container` (optional), `all` (optional), `validator` (optional) |
 | [`enter_text`](#enter_text) | Type text into a UI node | `matcher`, `text` |
 | [`wait_for_node`](#wait_for_node) | Wait for a node to appear | `matcher`, `retry` (optional), `timeoutMs` (optional) |
 | [`wait_for_navigation`](#wait_for_navigation) | Wait for screen transition | `expectedPackage` or `expectedNode` |
