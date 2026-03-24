@@ -481,6 +481,39 @@ Examples:
   Advanced (raw NodeMatcher JSON): clawperator wait --selector '{"textEquals":"Done"}'
 `;
 
+const HELP_WAIT_FOR_NAV = `clawperator wait-for-nav
+
+Usage:
+  clawperator wait-for-nav --app <package> --timeout <ms> [--device <id>] [--operator-package <pkg>] [--json]
+  clawperator wait-for-nav --text <text> --timeout <ms> [--device <id>] [--operator-package <pkg>] [--json]
+  clawperator wait-for-nav --app <package> --text "Home" --timeout 5000 [--device <id>] [--operator-package <pkg>] [--json]
+
+Options:
+  --app <package>         Wait until this app is in the foreground
+  --timeout <ms>          Required. Maximum time to wait (1-30000ms)
+
+Selector flags (optional if --app is provided; required otherwise):
+  --text <text>           Wait until element with exact visible text appears
+  --text-contains <text>  Wait until element with partial text match appears
+  --id <resource-id>      Wait until element with this Android resource ID appears
+  --desc <text>           Wait until element with exact content description appears
+  --desc-contains <text>  Wait until element with partial content description appears
+  --role <role>           Wait until element with this role appears
+  --selector <json>       Raw NodeMatcher JSON (advanced; mutually exclusive with simple flags)
+
+Notes:
+  - Waits for an app/screen transition to complete.
+  - Either --app or a selector flag (or both) is required.
+  - --timeout is required and sets the navigation wait duration.
+  - Execution timeout is set to max(navTimeout + 5000, globalTimeout).
+  - Synonym: wait-for-navigation
+
+Examples:
+  clawperator wait-for-nav --app com.google.home --timeout 5000
+  clawperator wait-for-nav --text "Settings" --timeout 5000
+  clawperator wait-for-nav --app com.foo.bar --text "Home" --timeout 5000
+`;
+
 const HELP_PRESS = `clawperator press
 
 Usage:
@@ -1469,6 +1502,97 @@ COMMANDS["scroll-and-click"] = {
   topLevelBlock: `  scroll-and-click [<direction>] --text <text> [--device <id>] [--json]
                                             Scroll until target is visible, then click it`,
   handler: async (ctx) => scrollUntilHandler(ctx, true),
+};
+
+// wait-for-nav (synonym: wait-for-navigation)
+COMMANDS["wait-for-nav"] = {
+  name: "wait-for-nav",
+  synonyms: ["wait-for-navigation"],
+  group: "Device Interaction",
+  summary: "Wait for app or screen navigation to complete",
+  help: HELP_WAIT_FOR_NAV,
+  topLevelBlock: `  wait-for-nav --app <package> --timeout <ms> [--device <id>] [--json]
+                                            Wait for app or screen navigation to complete`,
+  handler: async (ctx) => {
+    const { rest, format, logger, deviceId, operatorPackage, timeoutMs: globalTimeoutMs } = ctx;
+
+    // Parse --app flag
+    const expectedPackage = getOpt(rest, "--app");
+
+    // Parse --timeout (required, action-level)
+    const timeoutStr = getOpt(rest, "--timeout");
+    if (!timeoutStr) {
+      return formatError(
+        {
+          code: ERROR_CODES.MISSING_ARGUMENT,
+          message: "wait-for-nav requires --timeout <ms>.\n\nUsage:\n  clawperator wait-for-nav --app <package> --timeout <ms>\n  clawperator wait-for-nav --text <text> --timeout <ms>\n\nExample:\n  clawperator wait-for-nav --app com.google.home --timeout 5000",
+        },
+        { format },
+      );
+    }
+    const navTimeoutMs = Number(timeoutStr);
+    if (!Number.isFinite(navTimeoutMs) || navTimeoutMs <= 0) {
+      return formatError(
+        {
+          code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+          message: "wait-for-nav --timeout must be a positive number of milliseconds",
+        },
+        { format },
+      );
+    }
+    if (navTimeoutMs > 30000) {
+      return formatError(
+        {
+          code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+          message: "wait-for-nav --timeout must not exceed 30000ms",
+        },
+        { format },
+      );
+    }
+
+    // Resolve selector flags (optional if --app is provided)
+    let expectedNode: import("../contracts/selectors.js").NodeMatcher | undefined;
+    const hasSelector = hasElementSelectorFlag(rest);
+    if (hasSelector) {
+      const matcherResult = resolveElementMatcherFromCli(rest);
+      if (!matcherResult.ok) {
+        return formatError(matcherResult.error, { format });
+      }
+      expectedNode = matcherResult.matcher;
+    }
+
+    // Require at least one of --app or selector
+    if (!expectedPackage && !expectedNode) {
+      return formatError(
+        {
+          code: ERROR_CODES.MISSING_ARGUMENT,
+          message: "wait-for-nav requires --app or a selector, and --timeout.\n\nUsage:\n  clawperator wait-for-nav --app <package> --timeout <ms>\n  clawperator wait-for-nav --text <text> --timeout <ms>\n\nExample:\n  clawperator wait-for-nav --app com.google.home --timeout 5000",
+        },
+        { format },
+      );
+    }
+
+    // Build execution and run
+    const execution = (await import("../domain/actions/waitForNav.js")).buildWaitForNavExecution(
+      expectedPackage,
+      expectedNode,
+      navTimeoutMs,
+    );
+
+    // Override execution timeout if global timeout is larger
+    if (globalTimeoutMs !== undefined && globalTimeoutMs > execution.timeoutMs) {
+      execution.timeoutMs = globalTimeoutMs;
+    }
+
+    return (await import("./commands/execute.js")).cmdExecute({
+      format,
+      execution: JSON.stringify(execution),
+      deviceId,
+      operatorPackage,
+      timeoutMs: globalTimeoutMs,
+      logger,
+    });
+  },
 };
 
 // skills
