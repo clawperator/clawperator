@@ -267,6 +267,11 @@ async function main(): Promise<void> {
           }
           if (arg.startsWith("--")) {
             if (!knownFlags.has(arg) && allowsLeadingPositional && !consumedPositional) {
+              const nextArg = restBeforeForward[i + 1];
+              if (nextArg !== undefined && !nextArg.startsWith("--")) {
+                firstUnknownFlag = arg;
+                break;
+              }
               consumedPositional = true;
               continue;
             }
