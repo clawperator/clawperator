@@ -1584,7 +1584,7 @@ skill fix alongside (or immediately after) the CLI change that caused it.
 ## Sequencing
 
 ```
-Phase 0 -> Phase 1 -> Phase 2 -> Phase 3 -> Phase 5A -> Phase 4 -> Phase 5B -> Phase 5C (APK-gated)
+Phase 0 -> Phase 1 -> Phase 2 -> Phase 3 -> Phase 5A -> Phase 5C -> Phase 5B -> Phase 4
 ```
 
 Phase 0 and Phase 1 can collapse into a single PR if the implementing agent
@@ -1602,36 +1602,39 @@ already exist in their flat form.
 
 The revised sequencing is:
 
-  Phase 0 -> Phase 1 -> Phase 2 -> Phase 3 -> Phase 5A -> Phase 4 -> Phase 5B -> Phase 5C (APK-gated)
+  Phase 0 -> Phase 1 -> Phase 2 -> Phase 3 -> Phase 5A -> Phase 5C -> Phase 5B -> Phase 4
 
-Phase 5A should land before Phase 4. The help-text rewrite in Phase 4 is
-most efficient when written over the final command surface. Landing 5A
-first (close, scroll-until, sleep, --long/--focus, wait --timeout,
-read --all) means Phase 4 only needs to be done once over the complete
-surface, rather than extended again after 5A adds new commands.
+Phase 5A landed with Android changes (UiAction.ReadText `all` flag,
+UiAction.WaitForNode `timeoutMs`). Phase 5C is scheduled immediately
+after while the Kotlin context and device environment are fresh. The APK
+change for 5C is smaller than what shipped in 5A (one new nullable field
+on ReadText, container-scoping logic already present in Scroll). Batching
+the two APK changes avoids cold-starting the Android build environment a
+second time later.
 
-Phase 4 (structured help, --json everywhere, --device global) is then a
-stable documentation and polish pass that lands on the full 5A surface
-before Phase 5B introduces higher-risk changes.
+Phase 5C (`read --container-*`) requires an APK change as a hard
+prerequisite. Implement the APK change first (separate commit), verify
+on device, then land the Node/CLI change. Do not merge the Node side
+without the APK side installed on the test device.
 
-Phase 5B (`exec` rename, `wait-for-nav`, `read-value`) lands after
-Phase 4. These are higher-risk contract changes and benefit from a clean,
-tested baseline established by Phase 4.
+Phase 5B (`exec` rename alignment, `wait-for-nav`, `read-value`) lands
+after 5C. These are higher-risk: `wait-for-nav` and `read-value` require
+the ActionParams contract change as a precondition (update
+`contracts/execution.ts` to add `expectedPackage`, `expectedNode`,
+action-level `timeoutMs`, and `labelMatcher` before building the
+handlers). 5B deliverables are independent of each other after that
+precondition is met.
+
+Phase 4 (help rewrite, error polish) lands last, over the complete final
+surface. With 5A, 5B, and 5C all shipped, Phase 4 writes consistent help
+text for every command in one pass: scroll-until, close, sleep,
+--long/--focus, wait --timeout, read --all, read --container-*,
+wait-for-nav, read-value, exec/--payload. Writing it earlier would
+require re-doing the pass when later phases add commands.
 
 Phase 5 depends on Phase 3 (selector flags) and Phase 1 (registry).
-Within Phase 5, complete all 5A deliverables before starting 5B. 5A
-deliverables are independent of each other and can land as separate PRs.
-`scroll-until` is the largest; `close`, `--long`/`--focus`,
-`wait --timeout`, `read --all`, and `sleep` are each small enough for a
-single commit. 5B deliverables (`exec` rename, `wait-for-nav`,
-`read-value`) are also independent but require the ActionParams contract
-change as a precondition for the latter two.
-
-Phase 5C (`read --container-*`) is independent of 5A and 5B in terms of
-code but requires an APK change as a hard prerequisite. It can be worked
-in parallel with any phase as long as the APK change lands before the CLI
-change is considered done. Do not merge the Node side of 5C without the
-APK side.
+5B deliverables (`wait-for-nav`, `read-value`) require the ActionParams
+contract alignment as a precondition for the latter two - do not skip it.
 
 Docs work (`tasks/docs/refactor/`) begins only after Phase 5 is complete.
 
