@@ -403,6 +403,34 @@ Examples:
   Advanced (raw NodeMatcher JSON): clawperator type "hi" --selector '{"resourceId":"com.example:id/search_box"}'
 `;
 
+const HELP_READ_VALUE = `clawperator read-value
+
+Usage:
+  clawperator read-value --label <text> [--json]
+  clawperator read-value --label-id <id> [--json]
+  clawperator read-value --label-desc <text> [--json]
+  clawperator read-value --label <text> --all --json
+
+Label selector flags (at least one required):
+  --label <text>          Match label by exact visible text (maps to labelMatcher.textEquals)
+  --label-id <id>         Match label by Android resource ID (maps to labelMatcher.resourceId)
+  --label-desc <text>     Match label by exact content description (maps to labelMatcher.contentDescEquals)
+
+Options:
+  --all                   Return all matches as a JSON array (requires --json)
+
+Notes:
+  - Reads the value associated with a labeled UI element (e.g., "85%" next to "Battery").
+  - The --label* flags populate labelMatcher, not matcher.
+  - --all requires --json (error in pretty mode since array output is ambiguous).
+  - Synonym: read-kv
+
+Examples:
+  clawperator read-value --label "Battery" --json
+  clawperator read-value --label-id "com.foo:id/battery_label" --json
+  clawperator read-value --label "Wi-Fi" --all --json
+`;
+
 const HELP_READ = `clawperator read
 
 Usage:
@@ -1590,6 +1618,103 @@ COMMANDS["wait-for-nav"] = {
       deviceId,
       operatorPackage,
       timeoutMs: globalTimeoutMs,
+      logger,
+    });
+  },
+};
+
+// read-value (synonym: read-kv)
+COMMANDS["read-value"] = {
+  name: "read-value",
+  synonyms: ["read-kv"],
+  group: "Device Interaction",
+  summary: "Read the value associated with a labeled element",
+  help: HELP_READ_VALUE,
+  topLevelBlock: `  read-value --label <text> [--json]         Read the value associated with a labeled element`,
+  handler: async (ctx) => {
+    const { rest, format, logger, deviceId, operatorPackage, timeoutMs } = ctx;
+
+    // Check for --all flag
+    const readAll = hasFlag(rest, "--all");
+    if (readAll && !format === !(format === "json")) {
+      // This check is a bit weird, let me fix it
+    }
+    if (readAll && format !== "json") {
+      return formatError(
+        {
+          code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+          message: "read-value --all requires --json",
+        },
+        { format },
+      );
+    }
+
+    // Build labelMatcher from --label* flags
+    const labelMatcher: import("../contracts/selectors.js").NodeMatcher = {};
+    const labelText = getOpt(rest, "--label");
+    const labelId = getOpt(rest, "--label-id");
+    const labelDesc = getOpt(rest, "--label-desc");
+
+    if (labelText !== undefined) {
+      if (labelText.trim() === "") {
+        return formatError(
+          {
+            code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+            message: "read-value --label value must not be empty",
+          },
+          { format },
+        );
+      }
+      labelMatcher.textEquals = labelText;
+    }
+    if (labelId !== undefined) {
+      if (labelId.trim() === "") {
+        return formatError(
+          {
+            code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+            message: "read-value --label-id value must not be empty",
+          },
+          { format },
+        );
+      }
+      labelMatcher.resourceId = labelId;
+    }
+    if (labelDesc !== undefined) {
+      if (labelDesc.trim() === "") {
+        return formatError(
+          {
+            code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+            message: "read-value --label-desc value must not be empty",
+          },
+          { format },
+        );
+      }
+      labelMatcher.contentDescEquals = labelDesc;
+    }
+
+    // Require at least one label flag
+    if (Object.keys(labelMatcher).length === 0) {
+      return formatError(
+        {
+          code: ERROR_CODES.MISSING_ARGUMENT,
+          message: "read-value requires a label selector.\n\nUsage:\n  clawperator read-value --label <text> --json\n\nExample:\n  clawperator read-value --label \"Battery\" --json",
+        },
+        { format },
+      );
+    }
+
+    // Build execution and run
+    const execution = (await import("../domain/actions/readValue.js")).buildReadValueExecution(
+      labelMatcher,
+      readAll,
+    );
+
+    return (await import("./commands/execute.js")).cmdExecute({
+      format,
+      execution: JSON.stringify(execution),
+      deviceId,
+      operatorPackage,
+      timeoutMs,
       logger,
     });
   },
