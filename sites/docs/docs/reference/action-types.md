@@ -300,6 +300,7 @@ Reads text from matching UI nodes, with optional validation in single-match mode
 |-------|------|----------|-------------|
 | `matcher` | NodeMatcher | yes | Selector for the target node(s) |
 | `all` | `boolean` | no | When `true`, return every on-screen match (see result shape below). Default `false`. |
+| `container` | NodeMatcher | no | When provided, restricts search to elements within the matched container's subtree |
 | `validator` | `string` | no | `"temperature"`, `"version"`, or `"regex"` (ignored when `all` is `true` on Android) |
 | `validatorPattern` | `string` | conditional | Required when `validator` is `"regex"` |
 
@@ -324,6 +325,7 @@ Reads text from matching UI nodes, with optional validation in single-match mode
 | Error | Meaning |
 |-------|---------|
 | `NODE_NOT_FOUND` | Selector matched no UI element |
+| `CONTAINER_NOT_FOUND` | Container selector (if provided) matched no UI element |
 | `VALIDATOR_MISMATCH` | Extracted text failed validation |
 
 **Validator mismatch response:**
@@ -354,6 +356,9 @@ Reads text from matching UI nodes, with optional validation in single-match mode
 
 // All matching labels (CLI: read ... --all --json)
 { "id": "read_all", "type": "read_text", "params": { "matcher": { "role": "text" }, "all": true } }
+
+// Container-scoped read (CLI: read ... --container-role list)
+{ "id": "read_container", "type": "read_text", "params": { "matcher": { "textEquals": "Price" }, "container": { "role": "list" } } }
 ```
 
 ---
