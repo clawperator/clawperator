@@ -58,6 +58,8 @@ const actionParamsSchema = z.object({
   timeoutMs: z.number().optional(),
   // read_key_value_pair params
   labelMatcher: nodeMatcherSchema.optional(),
+  // read_text params
+  all: z.boolean().optional(),
 
 }).strict();
 

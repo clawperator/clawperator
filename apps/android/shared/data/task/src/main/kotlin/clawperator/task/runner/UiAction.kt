@@ -30,6 +30,7 @@ sealed interface UiAction {
         override val id: String,
         val matcher: NodeMatcher,
         val retry: TaskRetry = TaskRetryPresets.UiReadiness,
+        val timeoutMs: Long? = null,
     ) : UiAction
 
     data class Click(
@@ -99,6 +100,7 @@ sealed interface UiAction {
         val retry: TaskRetry = TaskRetryPresets.UiReadiness,
         val validator: UiTextValidator? = null,
         val validatorPattern: String? = null,
+        val all: Boolean = false,
     ) : UiAction
 
     data class SnapshotUi(

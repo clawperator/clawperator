@@ -34,12 +34,15 @@ interface TaskUiScope {
      *
      * @param matcher NodeMatcher containing the criteria to match
      * @param retry Retry configuration (defaults to no retry)
+     * @param timeoutMs Optional wall-clock timeout in milliseconds. If provided, overrides retry
+     *        timing and fails if node not found within timeout.
      * @return TaskUiNode representing the first matching UI element
-     * @throws Exception if no matching element is found after all retry attempts
+     * @throws Exception if no matching element is found after all retry attempts or timeout
      */
     suspend fun waitForNode(
         matcher: NodeMatcher,
         retry: TaskRetry = TaskRetry.None,
+        timeoutMs: Long? = null,
     ): TaskUiNode
 
     /**
@@ -64,6 +67,21 @@ interface TaskUiScope {
         matcher: NodeMatcher,
         retry: TaskRetry = TaskRetry.None,
     ): String
+
+    /**
+     * Gets the text content of ALL UI elements that match the specified NodeMatcher criteria.
+     * Returns an empty list when no elements match; does not retry on empty results, only on
+     * exceptions (e.g. UI tree unavailable).
+     *
+     * @param matcher NodeMatcher containing the criteria to match
+     * @param retry Retry configuration (defaults to no retry)
+     * @return List of text content from all matching elements; may be empty if none match
+     * @throws Exception if the UI tree cannot be retrieved after all retry attempts
+     */
+    suspend fun getAllText(
+        matcher: NodeMatcher,
+        retry: TaskRetry = TaskRetry.None,
+    ): List<String>
 
     /**
      * Clicks a UI element that matches the specified NodeMatcher criteria.

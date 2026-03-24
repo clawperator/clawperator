@@ -1,4 +1,5 @@
 import { ERROR_CODES } from "../contracts/errors.js";
+import { LIMITS } from "../contracts/limits.js";
 import { formatError } from "./output.js";
 import type { Logger } from "../adapters/logger.js";
 import {
@@ -331,9 +332,14 @@ Selector flags (at least one required; combine for AND matching):
   --role <role>           Element role (button, textfield, text, switch, checkbox, image, etc.)
   --selector <json>       Raw NodeMatcher JSON (advanced; mutually exclusive with simple flags)
 
+Options:
+  --long      Perform a long press (clickType: long_click)
+  --focus     Set input focus without clicking (clickType: focus)
+
 Notes:
   - Performs a tap on the first matching element.
   - Multiple simple flags combine with AND semantics.
+  - --long and --focus are mutually exclusive.
   - Exits with MISSING_SELECTOR if no selector flag is provided.
   - Synonym: tap (accepted, not in help)
 
@@ -341,6 +347,7 @@ Examples:
   clawperator click --text "Wi-Fi"
   clawperator click --role button --text-contains "Submit"
   clawperator click --id "com.example:id/btn_ok"
+  clawperator click --text "Settings" --long
   Advanced (raw NodeMatcher JSON): clawperator click --selector '{"textEquals":"Wi-Fi","role":"text"}'
 `;
 
@@ -414,14 +421,20 @@ Selector flags (at least one required; combine for AND matching):
   --role <role>           Element role
   --selector <json>       Raw NodeMatcher JSON (advanced; mutually exclusive with simple flags)
 
+Options:
+  --all                   Return all matches as a JSON array (requires --json)
+
 Notes:
   - Returns the text content of the first matching element.
+  - --all returns all matching elements' text as a JSON array of strings.
+  - --all requires --json (error in pretty mode since array output is ambiguous).
   - Multiple simple flags combine with AND semantics.
 
 Examples:
   clawperator read --id "com.example:id/battery_level"
   clawperator read --text "Battery"
   clawperator read --role switch --desc "Wi-Fi"
+  clawperator read --text "Price" --all --json
   Advanced (raw NodeMatcher JSON): clawperator read --selector '{"resourceId":"com.example:id/status"}'
 `;
 
@@ -445,7 +458,9 @@ Selector flags (at least one required; combine for AND matching):
 
 Notes:
   - Waits until the first matching element appears.
-  - --timeout overrides the default wait timeout.
+  - --timeout sets the wait duration (not the execution envelope timeout); must be a positive number of milliseconds when provided (omit it to use the default).
+  - Execution timeout is set to max(waitTimeout + 5000, globalTimeout) to prevent early termination.
+  - Default wait timeout is 30000ms (30 seconds) when --timeout is not specified.
   - Multiple simple flags combine with AND semantics.
 
 Examples:
@@ -479,6 +494,50 @@ Notes:
   - Presses the Android back key. Equivalent to 'clawperator press back'.
 `;
 
+const HELP_CLOSE = `clawperator close
+
+Usage:
+  clawperator close <package> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
+  clawperator close --app <package> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
+
+Required:
+  <package>             Android application package ID (e.g., com.android.settings)
+  --app <package>       Alternative to positional argument
+
+Synonym:
+  close-app             Same as close
+
+Notes:
+  - Force-stops the specified application via adb.
+  - The close_app action runs as a pre-flight in the Node layer before broadcast dispatch.
+  - Requires the target app to be installed (does not need to be running).
+
+Examples:
+  clawperator close com.android.settings
+  clawperator close com.google.android.apps.chromecast.app --json
+  clawperator close-app com.android.settings
+`;
+
+const HELP_SLEEP = `clawperator sleep
+
+Usage:
+  clawperator sleep <ms> [--device <id>] [--operator-package <pkg>] [--json]
+
+Required:
+  <ms>                    Duration in milliseconds (non-negative)
+
+Notes:
+  - Pauses execution for the specified duration.
+  - Duration must be >= 0 and <= ${LIMITS.MAX_EXECUTION_TIMEOUT_MS}ms.
+  - Execution timeout is set to max(durationMs + 5000, globalTimeout, 30000).
+  - No selector flags - this is a raw timer.
+
+Examples:
+  clawperator sleep 2000
+  clawperator sleep 500 --json
+  clawperator sleep 0
+`;
+
 const HELP_SCROLL = `clawperator scroll
 
 Usage:
@@ -506,6 +565,52 @@ Examples:
   clawperator scroll down
   clawperator scroll up --container-id "com.example:id/list_view"
   clawperator scroll down --container-role list
+`;
+
+const HELP_SCROLL_UNTIL = `clawperator scroll-until
+
+Usage:
+  clawperator scroll-until [<direction>] --text <text> [--click] [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
+  clawperator scroll-until [<direction>] --id <resource-id> [--click] [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
+
+Valid directions:
+  down, up, left, right (default: down)
+
+Selector flags (one is required):
+  --text <text>           Target element with exact visible text
+  --text-contains <text>  Target element with partial text match
+  --id <resource-id>      Target element by Android resource ID
+  --desc <text>           Target element by exact content description
+  --desc-contains <text>  Target element by partial content description
+  --role <role>           Target element by element role
+  --selector <json>       Target element by raw NodeMatcher JSON (mutually exclusive with simple flags)
+
+Container selector flags (all optional; restrict scroll to a specific scrollable container):
+  --container-text <text>           Container with exact visible text
+  --container-text-contains <text>  Container with partial text match
+  --container-id <resource-id>      Container by Android resource ID
+  --container-desc <text>           Container by exact content description
+  --container-desc-contains <text>  Container by partial content description
+  --container-role <role>           Container by element role
+  --container-selector <json>       Container by raw NodeMatcher JSON
+
+Options:
+  --click    Click the target element after scrolling to it (becomes scroll_and_click action)
+
+Notes:
+  - Synonym: scroll-and-click (implies --click)
+  - Without --click, the action type is scroll_until (scroll until element is visible).
+  - With --click, the action type is scroll_and_click (scroll until visible, then click).
+  - scroll_and_click uses different defaults than raw scroll_until (see agent guide); use exec JSON if you need scroll_until + clickAfter.
+  - If a selector is provided but the target never appears, the step fails (data.error TARGET_NOT_FOUND) and --json exits non-zero.
+  - Tuning parameters (maxScrolls, maxDurationMs, etc.) are not exposed as CLI flags.
+    Use 'clawperator exec' with raw JSON for advanced tuning.
+
+Examples:
+  clawperator scroll-until --text "About phone"
+  clawperator scroll-until --text "Living room" --click
+  clawperator scroll-until up --text "Settings" --container-id "com.foo:id/list"
+  clawperator scroll-and-click --text "Submit"  (same as scroll-until --text "Submit" --click)
 `;
 
 const HELP_EMULATOR = `clawperator emulator
@@ -817,15 +922,34 @@ COMMANDS["click"] = {
   handler: async (ctx) => {
     const { rest, format, logger, deviceId, operatorPackage } = ctx;
     if (!hasElementSelectorFlag(rest)) {
-      return makeMissingSelectorError("click");
+      return makeMissingSelectorError("click", format);
     }
     const resolved = resolveElementMatcherFromCli(rest);
     if (!resolved.ok) {
       return formatError(resolved.error, { format });
     }
+
+    // Check for --long and --focus flags (mutually exclusive)
+    const hasLong = hasFlag(rest, "--long");
+    const hasFocus = hasFlag(rest, "--focus");
+    if (hasLong && hasFocus) {
+      return formatError(
+        {
+          code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+          message:
+            "--long and --focus are mutually exclusive.\n\nUse --long for a long press, or --focus to set input focus.",
+        },
+        { format },
+      );
+    }
+    let clickType: "default" | "long_click" | "focus" = "default";
+    if (hasLong) clickType = "long_click";
+    if (hasFocus) clickType = "focus";
+
     return (await import("./commands/action.js")).cmdActionClick({
       format,
       matcher: resolved.matcher,
+      clickType,
       deviceId,
       operatorPackage,
       logger,
@@ -952,15 +1076,27 @@ COMMANDS["read"] = {
   handler: async (ctx) => {
     const { rest, format, logger, deviceId, operatorPackage } = ctx;
     if (!hasElementSelectorFlag(rest)) {
-      return makeMissingSelectorError("read");
+      return makeMissingSelectorError("read", format);
     }
     const resolved = resolveElementMatcherFromCli(rest);
     if (!resolved.ok) {
       return formatError(resolved.error, { format });
     }
+    // --all requires --json
+    const readAll = hasFlag(rest, "--all");
+    if (readAll && format !== "json") {
+      return formatError(
+        {
+          code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+          message: 'read --all requires --json.\n\nExample:\n  clawperator read --text "Price" --all --json',
+        },
+        { format },
+      );
+    }
     return (await import("./commands/action.js")).cmdActionRead({
       format,
       matcher: resolved.matcher,
+      readAll,
       deviceId,
       operatorPackage,
       logger,
@@ -977,10 +1113,20 @@ COMMANDS["wait"] = {
                                             Wait until a matching UI element appears`,
   handler: async (ctx) => {
     const { rest, format, logger, deviceId, operatorPackage, timeoutMs } = ctx;
-    const invalidTimeout = getInvalidTimeoutResult(timeoutMs, { format });
-    if (invalidTimeout) return invalidTimeout;
+    // For wait, the global --timeout flag sets the wait duration (not execution envelope timeout)
+    // Validation: when specified, must be a positive finite duration (0 is rejected; omit --timeout for the default)
+    if (timeoutMs !== undefined && (!Number.isFinite(timeoutMs) || timeoutMs <= 0)) {
+      return formatError(
+        {
+          code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+          message:
+            "--timeout must be a positive number of milliseconds when specified. Omit --timeout to use the default wait cap.",
+        },
+        { format },
+      );
+    }
     if (!hasElementSelectorFlag(rest)) {
-      return makeMissingSelectorError("wait");
+      return makeMissingSelectorError("wait", format);
     }
     const resolved = resolveElementMatcherFromCli(rest);
     if (!resolved.ok) {
@@ -989,6 +1135,7 @@ COMMANDS["wait"] = {
     return (await import("./commands/action.js")).cmdActionWait({
       format,
       matcher: resolved.matcher,
+      waitTimeoutMs: timeoutMs,
       deviceId,
       operatorPackage,
       logger,
@@ -1053,6 +1200,110 @@ COMMANDS["back"] = {
   },
 };
 
+const closeHandler = async (ctx: HandlerContext): Promise<string | void> => {
+  const { rest, format, logger, deviceId, operatorPackage, timeoutMs } = ctx;
+  const invalidTimeout = getInvalidTimeoutResult(timeoutMs, { format });
+  if (invalidTimeout) return invalidTimeout;
+
+  const appFlag = getOpt(rest, "--app");
+  const bare = barePositionalTokens(rest, ["--app"], []);
+  if (appFlag !== undefined && bare.length > 0) {
+    return formatError(
+      {
+        code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+        message:
+          "close: pass the package as a positional argument or via --app, not both.\n\nSee: clawperator close --help",
+      },
+      { format },
+    );
+  }
+  const applicationId = appFlag ?? bare[0];
+  if (!applicationId || applicationId.trim().length === 0) {
+    return JSON.stringify({
+      code: "MISSING_ARGUMENT",
+      message:
+        "close requires a package name.\n\nUsage:\n  clawperator close <package>\n  clawperator close --app <package>\n\nExamples:\n  clawperator close com.android.settings\n  clawperator close com.google.android.apps.chromecast.app --json",
+    });
+  }
+  return (await import("./commands/action.js")).cmdCloseApp({
+    format,
+    applicationId,
+    deviceId,
+    operatorPackage,
+    timeoutMs,
+    logger,
+  });
+};
+
+COMMANDS["close"] = {
+  name: "close",
+  synonyms: ["close-app"],
+  group: "Device Interaction",
+  summary: "Force-stop an Android application",
+  help: HELP_CLOSE,
+  topLevelBlock: `  close <package> [--device <id>] [--json]    Force-stop an Android application`,
+  handler: async (ctx) => closeHandler(ctx),
+};
+
+COMMANDS["sleep"] = {
+  name: "sleep",
+  group: "Device Interaction",
+  summary: "Pause execution for a duration",
+  help: HELP_SLEEP,
+  topLevelBlock: `  sleep <ms> [--device <id>] [--json]         Pause execution for a duration`,
+  handler: async (ctx) => {
+    const { rest, format, logger, deviceId, operatorPackage, timeoutMs } = ctx;
+
+    // Parse positional duration (handle negative numbers which look like flags)
+    // Check rest[0] first since barePositionalTokens skips tokens starting with "-"
+    let durationStr: string | undefined;
+    if (rest[0] && !rest[0].startsWith("--")) {
+      durationStr = rest[0];
+    } else {
+      const bare = barePositionalTokens(rest, [], []);
+      durationStr = bare[0];
+    }
+    if (!durationStr) {
+      return formatError(
+        {
+          code: "MISSING_ARGUMENT",
+          message:
+            "sleep requires a duration in milliseconds.\n\nUsage:\n  clawperator sleep <ms>\n\nExample:\n  clawperator sleep 2000",
+        },
+        { format },
+      );
+    }
+    const durationMs = Number(durationStr);
+    if (!Number.isFinite(durationMs) || durationMs < 0) {
+      return formatError(
+        {
+          code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+          message: `Duration must be a non-negative number (got: ${durationStr})`,
+        },
+        { format },
+      );
+    }
+    if (durationMs > LIMITS.MAX_EXECUTION_TIMEOUT_MS) {
+      return formatError(
+        {
+          code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+          message: `Duration must be <= ${LIMITS.MAX_EXECUTION_TIMEOUT_MS}ms (got: ${durationMs}ms)`,
+        },
+        { format },
+      );
+    }
+
+    return (await import("./commands/action.js")).cmdSleep({
+      format,
+      durationMs,
+      globalTimeoutMs: timeoutMs,
+      deviceId,
+      operatorPackage,
+      logger,
+    });
+  },
+};
+
 COMMANDS["scroll"] = {
   name: "scroll",
   group: "Device Interaction",
@@ -1099,6 +1350,81 @@ COMMANDS["scroll"] = {
       logger,
     });
   },
+};
+
+// scroll-until (and synonym scroll-and-click)
+const scrollUntilHandler = async (ctx: HandlerContext, clickAfterDefault: boolean): Promise<string | void> => {
+  const { rest, format, logger, deviceId, operatorPackage, timeoutMs } = ctx;
+  const invalidTimeout = getInvalidTimeoutResult(timeoutMs, { format });
+  if (invalidTimeout) return invalidTimeout;
+
+  // Check for selector flags
+  if (!hasElementSelectorFlag(rest)) {
+    return makeMissingSelectorError("scroll-until", format);
+  }
+
+  // Parse direction (positional or defaults to "down")
+  const scrollUntilValueFlags = [...ELEMENT_SELECTOR_VALUE_FLAGS, ...CONTAINER_SELECTOR_VALUE_FLAGS, "--click"];
+  const bare = barePositionalTokens(rest, scrollUntilValueFlags, []);
+  const direction = bare[0] ?? "down";
+  const validDirections = ["down", "up", "left", "right"];
+  if (!validDirections.includes(direction)) {
+    return formatError(
+      {
+        code: "MISSING_ARGUMENT",
+        message: `Invalid direction: ${direction}. Valid directions: ${validDirections.join(", ")}`,
+      },
+      { format },
+    );
+  }
+
+  // Resolve element matcher
+  const matcherResult = resolveElementMatcherFromCli(rest);
+  if (!matcherResult.ok) {
+    return formatError(matcherResult.error, { format });
+  }
+
+  // Resolve container matcher (optional)
+  const containerResult = resolveContainerMatcherFromCli(rest);
+  if (!containerResult.ok) {
+    return formatError(containerResult.error, { format });
+  }
+
+  // Check for --click flag
+  const clickAfter = clickAfterDefault || hasFlag(rest, "--click");
+
+  return (await import("./commands/action.js")).cmdScrollUntil({
+    format,
+    direction,
+    matcher: matcherResult.matcher,
+    container: containerResult.container,
+    clickAfter,
+    deviceId,
+    operatorPackage,
+    timeoutMs,
+    logger,
+  });
+};
+
+COMMANDS["scroll-until"] = {
+  name: "scroll-until",
+  group: "Device Interaction",
+  summary: "Scroll until a target element is visible",
+  help: HELP_SCROLL_UNTIL,
+  topLevelBlock: `  scroll-until [<direction>] --text <text> [--click] [--device <id>] [--json]
+                                            Scroll until a target element is visible (optionally click it)`,
+  handler: async (ctx) => scrollUntilHandler(ctx, false),
+};
+
+COMMANDS["scroll-and-click"] = {
+  name: "scroll-and-click",
+  synonyms: [],
+  group: "Device Interaction",
+  summary: "Scroll until target is visible, then click it (alias for scroll-until --click)",
+  help: HELP_SCROLL_UNTIL,
+  topLevelBlock: `  scroll-and-click [<direction>] --text <text> [--device <id>] [--json]
+                                            Scroll until target is visible, then click it`,
+  handler: async (ctx) => scrollUntilHandler(ctx, true),
 };
 
 // skills

@@ -355,6 +355,13 @@ describe("makeMissingSelectorError", () => {
     const obj = JSON.parse(json);
     assert.match(obj.message, /read requires a selector/);
   });
+
+  it("pretty format indents JSON for terminal readability", () => {
+    const out = makeMissingSelectorError("wait", "pretty");
+    assert.ok(out.includes("\n"), "expected pretty-printed multiline JSON");
+    const obj = JSON.parse(out) as { code: string };
+    assert.strictEqual(obj.code, "MISSING_SELECTOR");
+  });
 });
 
 // ---------------------------------------------------------------------------

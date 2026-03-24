@@ -10,6 +10,7 @@ import {
   finalizeSuccessfulScreenshotCapture,
   injectServiceUnavailableHint,
   markExtractionFailedSnapshotSteps,
+  reconcileEnvelopeStatusAfterPostProcessing,
   runCloseAppPreflight,
   runExecution,
 } from "../../domain/executions/runExecution.js";
@@ -305,6 +306,54 @@ describe("injectServiceUnavailableHint", () => {
     injectServiceUnavailableHint(envelope, "device-123");
 
     assert.strictEqual(envelope.hint, undefined);
+  });
+});
+
+describe("reconcileEnvelopeStatusAfterPostProcessing", () => {
+  it("marks envelope failed from first failed step and sets error", () => {
+    const envelope: ResultEnvelope = {
+      commandId: "c",
+      taskId: "t",
+      status: "success",
+      stepResults: [
+        { id: "a1", actionType: "scroll_until", success: false, data: { error: "TARGET_NOT_FOUND" } },
+      ],
+      error: null,
+    };
+    reconcileEnvelopeStatusAfterPostProcessing(envelope);
+    assert.strictEqual(envelope.status, "failed");
+    assert.strictEqual(envelope.error, "Step a1 (scroll_until) failed: TARGET_NOT_FOUND");
+  });
+
+  it("marks envelope success when all steps succeed after normalization", () => {
+    const envelope: ResultEnvelope = {
+      commandId: "c",
+      taskId: "t",
+      status: "failed",
+      stepResults: [{ id: "close-1", actionType: "close_app", success: true, data: { application_id: "com.example" } }],
+      error: "stale",
+      errorCode: "X",
+      hint: "stale",
+    };
+    reconcileEnvelopeStatusAfterPostProcessing(envelope);
+    assert.strictEqual(envelope.status, "success");
+    assert.strictEqual(envelope.error, null);
+    assert.strictEqual(envelope.errorCode, undefined);
+    assert.strictEqual(envelope.hint, undefined);
+  });
+
+  it("no-ops when stepResults is empty", () => {
+    const envelope: ResultEnvelope = {
+      commandId: "c",
+      taskId: "t",
+      status: "failed",
+      stepResults: [],
+      error: "Accessibility service is not available",
+      errorCode: "SERVICE_UNAVAILABLE",
+    };
+    reconcileEnvelopeStatusAfterPostProcessing(envelope);
+    assert.strictEqual(envelope.status, "failed");
+    assert.strictEqual(envelope.error, "Accessibility service is not available");
   });
 });
 

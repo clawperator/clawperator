@@ -9,6 +9,8 @@
 import type { NodeMatcher } from "../contracts/selectors.js";
 import { ERROR_CODES } from "../contracts/errors.js";
 import type { ClawperatorError } from "../contracts/errors.js";
+import type { OutputFormat } from "./output.js";
+import { formatError } from "./output.js";
 
 // ---------------------------------------------------------------------------
 // Flag name constants
@@ -349,10 +351,13 @@ const SELECTOR_FLAG_LIST = `Use one of:
   --role <role>           Element role
   --selector <json>       Raw JSON (advanced)`;
 
-/** Build the Phase 3 missing-selector JSON string for a given command. */
-export function makeMissingSelectorError(command: string): string {
-  return JSON.stringify({
-    code: "MISSING_SELECTOR",
-    message: `${command} requires a selector.\n${SELECTOR_FLAG_LIST}\nExample:\n  clawperator ${command} --text "Wi-Fi"`,
-  });
+/** Build the Phase 3 missing-selector error for a given command (respects output format). */
+export function makeMissingSelectorError(command: string, format: OutputFormat = "json"): string {
+  return formatError(
+    {
+      code: "MISSING_SELECTOR",
+      message: `${command} requires a selector.\n${SELECTOR_FLAG_LIST}\nExample:\n  clawperator ${command} --text "Wi-Fi"`,
+    },
+    { format },
+  );
 }

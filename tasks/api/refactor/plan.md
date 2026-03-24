@@ -1335,6 +1335,8 @@ a separate commit.
    - For `wait`, `--timeout` sets wait duration (not execution timeout)
    - Execution timeout set to `max(waitTimeout + 5000, globalTimeout)`
    - Default without `--timeout`: current 30s behavior
+   - **Android implementation required:** Add `timeoutMs: Long?` to `UiAction.WaitForNode`,
+     update parser and engine to respect action-level timeout
 
 5. **`read --all` flag**
 
@@ -1348,6 +1350,8 @@ a separate commit.
      need that should use `snapshot --json` and filter.
    - `--all` requires `--json` (error without it)
    - Without `--all`: unchanged single-match behavior
+   - **Android implementation required:** Add `all: Boolean` to `UiAction.ReadText`,
+     update parser, engine, and TaskUiScope to query and return all matching nodes
 
 6. **`sleep` command**
 
@@ -1580,7 +1584,7 @@ skill fix alongside (or immediately after) the CLI change that caused it.
 ## Sequencing
 
 ```
-Phase 0 -> Phase 1 -> Phase 2 -> Phase 3 -> Phase 5A -> Phase 4 -> Phase 5B -> Phase 5C (APK-gated)
+Phase 0 -> Phase 1 -> Phase 2 -> Phase 3 -> Phase 5A -> Phase 5C -> Phase 5B -> Phase 4
 ```
 
 Phase 0 and Phase 1 can collapse into a single PR if the implementing agent
@@ -1598,36 +1602,39 @@ already exist in their flat form.
 
 The revised sequencing is:
 
-  Phase 0 -> Phase 1 -> Phase 2 -> Phase 3 -> Phase 5A -> Phase 4 -> Phase 5B -> Phase 5C (APK-gated)
+  Phase 0 -> Phase 1 -> Phase 2 -> Phase 3 -> Phase 5A -> Phase 5C -> Phase 5B -> Phase 4
 
-Phase 5A should land before Phase 4. The help-text rewrite in Phase 4 is
-most efficient when written over the final command surface. Landing 5A
-first (close, scroll-until, sleep, --long/--focus, wait --timeout,
-read --all) means Phase 4 only needs to be done once over the complete
-surface, rather than extended again after 5A adds new commands.
+Phase 5A landed with Android changes (UiAction.ReadText `all` flag,
+UiAction.WaitForNode `timeoutMs`). Phase 5C is scheduled immediately
+after while the Kotlin context and device environment are fresh. The APK
+change for 5C is smaller than what shipped in 5A (one new nullable field
+on ReadText, container-scoping logic already present in Scroll). Batching
+the two APK changes avoids cold-starting the Android build environment a
+second time later.
 
-Phase 4 (structured help, --json everywhere, --device global) is then a
-stable documentation and polish pass that lands on the full 5A surface
-before Phase 5B introduces higher-risk changes.
+Phase 5C (`read --container-*`) requires an APK change as a hard
+prerequisite. Implement the APK change first (separate commit), verify
+on device, then land the Node/CLI change. Do not merge the Node side
+without the APK side installed on the test device.
 
-Phase 5B (`exec` rename, `wait-for-nav`, `read-value`) lands after
-Phase 4. These are higher-risk contract changes and benefit from a clean,
-tested baseline established by Phase 4.
+Phase 5B (`exec` rename alignment, `wait-for-nav`, `read-value`) lands
+after 5C. These are higher-risk: `wait-for-nav` and `read-value` require
+the ActionParams contract change as a precondition (update
+`contracts/execution.ts` to add `expectedPackage`, `expectedNode`,
+action-level `timeoutMs`, and `labelMatcher` before building the
+handlers). 5B deliverables are independent of each other after that
+precondition is met.
+
+Phase 4 (help rewrite, error polish) lands last, over the complete final
+surface. With 5A, 5B, and 5C all shipped, Phase 4 writes consistent help
+text for every command in one pass: scroll-until, close, sleep,
+--long/--focus, wait --timeout, read --all, read --container-*,
+wait-for-nav, read-value, exec/--payload. Writing it earlier would
+require re-doing the pass when later phases add commands.
 
 Phase 5 depends on Phase 3 (selector flags) and Phase 1 (registry).
-Within Phase 5, complete all 5A deliverables before starting 5B. 5A
-deliverables are independent of each other and can land as separate PRs.
-`scroll-until` is the largest; `close`, `--long`/`--focus`,
-`wait --timeout`, `read --all`, and `sleep` are each small enough for a
-single commit. 5B deliverables (`exec` rename, `wait-for-nav`,
-`read-value`) are also independent but require the ActionParams contract
-change as a precondition for the latter two.
-
-Phase 5C (`read --container-*`) is independent of 5A and 5B in terms of
-code but requires an APK change as a hard prerequisite. It can be worked
-in parallel with any phase as long as the APK change lands before the CLI
-change is considered done. Do not merge the Node side of 5C without the
-APK side.
+5B deliverables (`wait-for-nav`, `read-value`) require the ActionParams
+contract alignment as a precondition for the latter two - do not skip it.
 
 Docs work (`tasks/docs/refactor/`) begins only after Phase 5 is complete.
 
@@ -1766,10 +1773,16 @@ This is the one command where `--timeout` has command-specific meaning,
 because no agent using `wait --timeout 5000` means "set the execution
 envelope to 5 seconds but wait for the element for 30 seconds."
 
-**Implementation:** the builder sets the execution `timeoutMs` to
+**Node Implementation:** the builder sets the execution `timeoutMs` to
 `max(waitTimeout + 5000, globalTimeout)` to ensure the execution envelope
 does not kill the wait prematurely. The 5-second buffer accounts for
-command overhead.
+command overhead. Also sets `params.timeoutMs` on the action.
+
+**Android Implementation:** Add `timeoutMs: Long? = null` to `UiAction.WaitForNode`
+data class. Update `AgentCommandParser` to parse `timeoutMs` from params.
+Update `TaskUiScope.waitForNode()` to accept optional timeout and wrap
+the wait operation with `kotlinx.coroutines.withTimeout(timeoutMs)` (not
+`withTimeoutOrNull`). Update `UiActionEngine` to pass the timeout through.
 
 **Default:** when `--timeout` is not provided, `wait` uses the current
 fixed 30s behavior (execution timeout = 30000ms).
@@ -1843,6 +1856,15 @@ clawperator read --text "Price" --all --json
 - Without `--all`, behavior is unchanged (first match, single value)
 - `--all` requires `--json` (error if used without it, since pretty output
   for a list is ambiguous)
+
+**Android Implementation:** Add `all: Boolean = false` to `UiAction.ReadText`
+data class. Update `AgentCommandParser` to parse `all` from params.
+Update `TaskUiScope` to add `getAllText(matcher, retry): List<String>`
+method that queries all matching nodes (not just first). Update
+`TaskUiScopeDefault` to implement multi-match text extraction using
+existing UI tree query. Update `UiActionEngine.executeReadText()` to:
+- Call `getAllText()` when `all=true`, return `text` as JSON array string
+- Call `getText()` when `all=false`, return single `text` value (unchanged)
 
 ### `sleep` (execution pause)
 
@@ -2027,7 +2049,7 @@ edit or replace the plan above, which stays the original design record.
 | Phase 2 | Done | Flat verbs, global flags, `action` / `observe` removed from registry with did-you-mean, docs and smoke updates |
 | Phase 3 | Done | Selector shorthand flags on click/type/read/wait; `--container-*` (incl. `-contains` variants) on scroll; MISSING_SELECTOR lists full flag surface incl. `--desc-contains`; duplicate value flags rejected; docs updated |
 | Phase 4 | Partial | Exit-code and help polish in flight; full deliverable set not complete |
-| Phase 5A | Not done | Extended commands: scroll-until, close, --long/--focus on click, wait --timeout, read --all, sleep |
+| Phase 5A | Done | Extended commands: scroll-until, close, --long/--focus on click, wait --timeout, read --all, sleep. Includes Android-side `timeoutMs` support for `wait_for_node` and `all` flag for `read_text`. See deviations #6 and #7 for unscheduled changes bundled in this phase. |
 | Phase 5B | Not done | Higher-risk: exec rename, wait-for-nav, read-value; requires ActionParams contract alignment first |
 | Phase 5C | Not done | read-within: container-scoped read; requires APK change to UiAction.ReadText before CLI change |
 
@@ -2064,6 +2086,17 @@ edit or replace the plan above, which stays the original design record.
    early:** `exec` is canonical with `execute` as a supported synonym; help and
    compatibility text document both. Phase 5 may still align other naming (`--payload`
    vs `--execution`) per the plan.
+
+6. **`reconcileEnvelopeStatusAfterPostProcessing` (Phase 5A branch)**  
+   Post-processing reconciles top-level envelope `status` with per-step `success`
+   so an envelope that still said `success` while a step failed is normalized to
+   `failed` and the CLI exits non-zero. This is a **cross-cutting** behavior change
+   (not limited to Phase 5A verbs). PR description should call it out explicitly.
+
+7. **`scroll-and-click` in the registry**  
+   The plan wording suggests a synonym/alias only. **As implemented:** a dedicated
+   `scroll-and-click` `COMMANDS` entry with its own `topLevelBlock` so it appears
+   in top-level help (better discoverability than a hidden synonym).
 
 ### Small follow-ups (non-deviation)
 

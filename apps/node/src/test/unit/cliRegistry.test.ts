@@ -249,6 +249,58 @@ describe("record synonym dispatches to recording handler", () => {
   });
 });
 
+describe("sleep command validation", () => {
+  it("sleep without duration returns MISSING_ARGUMENT", async () => {
+    const { stdout, code } = await runCli(["sleep", "--json"]);
+    assert.notStrictEqual(code, 0);
+    const obj = JSON.parse(stdout);
+    assert.strictEqual(obj.code, "MISSING_ARGUMENT");
+    assert.match(obj.message, /sleep requires a duration/);
+  });
+
+  it("sleep with negative duration returns EXECUTION_VALIDATION_FAILED", async () => {
+    const { stdout, code } = await runCli(["sleep", "-1", "--json"]);
+    assert.notStrictEqual(code, 0);
+    const obj = JSON.parse(stdout);
+    assert.strictEqual(obj.code, "EXECUTION_VALIDATION_FAILED");
+    assert.match(obj.message, /non-negative/);
+  });
+
+  it("sleep over MAX_EXECUTION_TIMEOUT_MS returns EXECUTION_VALIDATION_FAILED", async () => {
+    const { stdout, code } = await runCli(["sleep", "120001", "--json"]);
+    assert.notStrictEqual(code, 0);
+    const obj = JSON.parse(stdout);
+    assert.strictEqual(obj.code, "EXECUTION_VALIDATION_FAILED");
+    assert.match(obj.message, /120000ms/);
+    assert.match(obj.message, /120001ms/);
+  });
+
+  it("sleep with non-numeric duration returns EXECUTION_VALIDATION_FAILED", async () => {
+    const { stdout, code } = await runCli(["sleep", "abc", "--json"]);
+    assert.notStrictEqual(code, 0);
+    const obj = JSON.parse(stdout);
+    assert.strictEqual(obj.code, "EXECUTION_VALIDATION_FAILED");
+    assert.match(obj.message, /non-negative/);
+  });
+});
+
+describe("wait command --timeout validation", () => {
+  it("wait with --timeout 0 returns EXECUTION_VALIDATION_FAILED", async () => {
+    const { stdout, code } = await runCli([
+      "wait",
+      "--text",
+      "x",
+      "--timeout",
+      "0",
+      "--json",
+    ]);
+    assert.notStrictEqual(code, 0);
+    const obj = JSON.parse(stdout);
+    assert.strictEqual(obj.code, "EXECUTION_VALIDATION_FAILED");
+    assert.match(obj.message, /positive/);
+  });
+});
+
 describe("didYouMean tie-breaking", () => {
   // Minimal fake command map used across both cases.
   const fakeBase = { summary: "s", help: "h", group: "g", handler: async () => "" } as const;

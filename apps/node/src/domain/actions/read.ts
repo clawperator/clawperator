@@ -1,8 +1,15 @@
 import type { Execution } from "../../contracts/execution.js";
 import type { NodeMatcher } from "../../contracts/selectors.js";
 
-export function buildReadExecution(selector: NodeMatcher): Execution {
+export function buildReadExecution(
+  selector: NodeMatcher,
+  readAll?: boolean,
+): Execution {
   const commandId = `read-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  const params: Record<string, unknown> = { matcher: selector };
+  if (readAll) {
+    params.all = true;
+  }
   return {
     commandId,
     taskId: commandId,
@@ -13,7 +20,7 @@ export function buildReadExecution(selector: NodeMatcher): Execution {
       {
         id: "read",
         type: "read_text",
-        params: { matcher: selector },
+        params,
       },
     ],
     mode: "direct",

@@ -1,19 +1,31 @@
 import type { Execution } from "../../contracts/execution.js";
 import type { NodeMatcher } from "../../contracts/selectors.js";
 
-export function buildWaitExecution(selector: NodeMatcher): Execution {
+export function buildWaitExecution(
+  selector: NodeMatcher,
+  waitTimeoutMs?: number,
+): Execution {
   const commandId = `wait-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  const actionParams: Record<string, unknown> = { matcher: selector };
+  if (waitTimeoutMs !== undefined) {
+    actionParams.timeoutMs = waitTimeoutMs;
+  }
+  // Execution timeout = max(waitTimeout + 5000, defaultTimeout) to prevent envelope killing wait early
+  const defaultTimeout = 30_000;
+  const executionTimeoutMs = waitTimeoutMs !== undefined
+    ? Math.max(waitTimeoutMs + 5000, defaultTimeout)
+    : defaultTimeout;
   return {
     commandId,
     taskId: commandId,
     source: "clawperator-action",
     expectedFormat: "android-ui-automator",
-    timeoutMs: 30_000,
+    timeoutMs: executionTimeoutMs,
     actions: [
       {
         id: "wait",
         type: "wait_for_node",
-        params: { matcher: selector },
+        params: actionParams,
       },
     ],
     mode: "direct",

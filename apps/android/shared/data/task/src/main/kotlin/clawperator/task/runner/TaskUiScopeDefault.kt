@@ -199,56 +199,72 @@ class TaskUiScopeDefault(
     private suspend fun findNodeByMatcher(
         matcher: NodeMatcher,
         uiTree: UiTree,
-    ): UiNode? =
+    ): UiNode? = findAllNodesByMatcher(matcher, uiTree).firstOrNull()
+
+    private suspend fun findAllNodesByMatcher(
+        matcher: NodeMatcher,
+        uiTree: UiTree,
+    ): List<UiNode> =
         withContext(coroutineScopeIo.coroutineContext) {
-            // Find all nodes that match the criteria
-            val matchingNodes =
-                UiTreeTraversal.findAll(uiTree) { uiNode ->
-                    val taskUiNode =
-                        TaskUiNode(
-                            resourceId = uiNode.resourceId,
-                            label = uiNode.label,
-                            contentDescription = uiNode.contentDescription,
-                            clickable = uiNode.isClickable,
-                            role = uiNode.role.name.lowercase(),
-                            bounds = uiNode.bounds,
-                            debugPath = uiNode.id.value,
-                        )
-                    matcher.matches(taskUiNode)
-                }
-            matchingNodes.firstOrNull()
+            UiTreeTraversal.findAll(uiTree) { uiNode ->
+                val taskUiNode =
+                    TaskUiNode(
+                        resourceId = uiNode.resourceId,
+                        label = uiNode.label,
+                        contentDescription = uiNode.contentDescription,
+                        clickable = uiNode.isClickable,
+                        role = uiNode.role.name.lowercase(),
+                        bounds = uiNode.bounds,
+                        debugPath = uiNode.id.value,
+                    )
+                matcher.matches(taskUiNode)
+            }
         }
 
     override suspend fun waitForNode(
         matcher: NodeMatcher,
         retry: TaskRetry,
-    ): TaskUiNode =
-        withRetry(retry, "waitForNode($matcher)") {
-            Log.d("$TAG Waiting for node matching: $matcher")
+        timeoutMs: Long?,
+    ): TaskUiNode {
+        val operation: suspend () -> TaskUiNode = {
+            withRetry(retry, "waitForNode($matcher)") {
+                Log.d("$TAG Waiting for node matching: $matcher")
 
-            val uiTreeRaw =
-                uiTreeInspector.getCurrentUiTree()
-                    ?: throw IllegalStateException("UI tree not available")
+                val uiTreeRaw =
+                    uiTreeInspector.getCurrentUiTree()
+                        ?: throw IllegalStateException("UI tree not available")
 
-            val uiTree = uiTreeFilterer.filterOnScreenOnly(uiTreeRaw)
+                val uiTree = uiTreeFilterer.filterOnScreenOnly(uiTreeRaw)
 
-            val uiNode =
-                findNodeByMatcher(matcher, uiTree)
-                    ?: throw IllegalStateException("No UI node found matching criteria: $matcher")
+                val uiNode =
+                    findNodeByMatcher(matcher, uiTree)
+                        ?: throw IllegalStateException("No UI node found matching criteria: $matcher")
 
-            val taskUiNode =
-                TaskUiNode(
-                    resourceId = uiNode.resourceId,
-                    label = uiNode.label,
-                    contentDescription = uiNode.contentDescription,
-                    clickable = uiNode.isClickable,
-                    role = uiNode.role.name.lowercase(),
-                    bounds = uiNode.bounds,
-                    debugPath = uiNode.id.value,
-                )
-            Log.d("$TAG Found matching node: $taskUiNode")
-            taskUiNode
+                val taskUiNode =
+                    TaskUiNode(
+                        resourceId = uiNode.resourceId,
+                        label = uiNode.label,
+                        contentDescription = uiNode.contentDescription,
+                        clickable = uiNode.isClickable,
+                        role = uiNode.role.name.lowercase(),
+                        bounds = uiNode.bounds,
+                        debugPath = uiNode.id.value,
+                    )
+                Log.d("$TAG Found matching node: $taskUiNode")
+                taskUiNode
+            }
         }
+
+        return if (timeoutMs != null) {
+            try {
+                kotlinx.coroutines.withTimeout(timeoutMs) { operation() }
+            } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+                throw IllegalStateException("Timeout waiting for node matching: $matcher (timeoutMs=$timeoutMs)")
+            }
+        } else {
+            operation()
+        }
+    }
 
     override suspend fun readKeyValuePair(
         labelMatcher: NodeMatcher,
@@ -289,6 +305,27 @@ class TaskUiScopeDefault(
 
             Log.d("$TAG Got text from matching node: '$text'")
             text
+        }
+
+    override suspend fun getAllText(
+        matcher: NodeMatcher,
+        retry: TaskRetry,
+    ): List<String> =
+        withRetry(retry, "getAllText($matcher)") {
+            Log.d("$TAG Getting all text for nodes matching: $matcher")
+
+            val uiTreeRaw =
+                uiTreeInspector.getCurrentUiTree()
+                    ?: throw IllegalStateException("UI tree not available")
+
+            val uiTree = uiTreeFilterer.filterOnScreenOnly(uiTreeRaw)
+
+            val uiNodes = findAllNodesByMatcher(matcher, uiTree)
+
+            val texts = uiNodes.map { it.label }.filter { it.isNotBlank() }
+
+            Log.d("$TAG Got text from ${texts.size} matching nodes")
+            texts
         }
 
     override suspend fun click(

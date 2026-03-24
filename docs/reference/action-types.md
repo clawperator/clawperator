@@ -14,9 +14,9 @@ For the execution envelope structure, timeout policy, and result semantics, see 
 | [`scroll_and_click`](#scroll_and_click) | Scroll to and tap a node | `matcher`, `container`, `direction` |
 | [`scroll_until`](#scroll_until) | Bounded scroll loop | `matcher` (optional), `maxScrolls`, `maxDurationMs` |
 | [`scroll`](#scroll) | Single scroll gesture | `container` (optional), `direction` |
-| [`read_text`](#read_text) | Read text from a UI node | `matcher`, `validator` (optional) |
+| [`read_text`](#read_text) | Read text from UI node(s) | `matcher`, `all` (optional), `validator` (optional) |
 | [`enter_text`](#enter_text) | Type text into a UI node | `matcher`, `text` |
-| [`wait_for_node`](#wait_for_node) | Wait for a node to appear | `matcher`, `timeoutMs` (via execution) |
+| [`wait_for_node`](#wait_for_node) | Wait for a node to appear | `matcher`, `retry` (optional), `timeoutMs` (optional) |
 | [`wait_for_navigation`](#wait_for_navigation) | Wait for screen transition | `expectedPackage` or `expectedNode` |
 | [`read_key_value_pair`](#read_key_value_pair) | Read Settings-style label + value | `labelMatcher` |
 | [`open_uri`](#open_uri) | Open a URI | `uri` |
@@ -292,14 +292,15 @@ Single scroll gesture with outcome reporting. No target element, does not click.
 
 ### `read_text`
 
-Reads text from a UI node with optional validation.
+Reads text from matching UI nodes, with optional validation in single-match mode.
 
 **Parameters:**
 
 | Param | Type | Required | Description |
 |-------|------|----------|-------------|
-| `matcher` | NodeMatcher | yes | Selector for the target node |
-| `validator` | `string` | no | `"temperature"`, `"version"`, or `"regex"` |
+| `matcher` | NodeMatcher | yes | Selector for the target node(s) |
+| `all` | `boolean` | no | When `true`, return every on-screen match (see result shape below). Default `false`. |
+| `validator` | `string` | no | `"temperature"`, `"version"`, or `"regex"` (ignored when `all` is `true` on Android) |
 | `validatorPattern` | `string` | conditional | Required when `validator` is `"regex"` |
 
 **Supported validators:**
@@ -314,8 +315,9 @@ Reads text from a UI node with optional validation.
 
 | Key | Value |
 |-----|-------|
-| `text` | The extracted text value |
+| `text` | Single match: the extracted text. `all: true`: a string containing a JSON array literal of labels, for example `["A","B"]` (parse as JSON). |
 | `validator` | `"none"` or the validator used |
+| `all`, `count` | Present when `all` is `true`: `"true"` and match count as decimal strings |
 
 **Result data on failure:**
 
@@ -349,6 +351,9 @@ Reads text from a UI node with optional validation.
 
 // Regex validator
 { "id": "regex_check", "type": "read_text", "params": { "matcher": { "resourceId": "com.example:id/order_id" }, "validator": "regex", "validatorPattern": "^ORD-[0-9]{6}$" } }
+
+// All matching labels (CLI: read ... --all --json)
+{ "id": "read_all", "type": "read_text", "params": { "matcher": { "role": "text" }, "all": true } }
 ```
 
 ---
@@ -405,6 +410,7 @@ Polls until a node matching the matcher appears in the UI tree.
 |-------|------|----------|-------------|
 | `matcher` | NodeMatcher | yes | Selector for the target node |
 | `retry` | `object` | no | Retry config (default: `maxAttempts=5`, `initialDelayMs=500`) |
+| `timeoutMs` | `number` | no | Wall-clock cap in ms for the wait on device (Operator accepts 1-120000). Wraps the retry loop with a coroutine timeout. |
 
 **Result data on success:**
 
@@ -412,12 +418,14 @@ Polls until a node matching the matcher appears in the UI tree.
 |-----|-------|
 | `resource_id` | Matched node resource ID |
 | `label` | Matched node text/label |
+| `timeout_ms` | When `timeoutMs` was set, echo of the configured cap (string) |
 
 **Result data on failure:**
 
 | Error | Meaning |
 |-------|---------|
 | `NODE_NOT_FOUND` | Node did not appear during retry period |
+| (execution / step failure) | Wall-clock `timeoutMs` exceeded: failure message describes timeout and matcher |
 
 **Example:**
 
@@ -427,6 +435,19 @@ Polls until a node matching the matcher appears in the UI tree.
   "type": "wait_for_node",
   "params": {
     "matcher": { "textEquals": "Loading complete" }
+  }
+}
+```
+
+**Example with per-action timeout (CLI: `wait ... --timeout <ms>`):**
+
+```json
+{
+  "id": "wait2",
+  "type": "wait_for_node",
+  "params": {
+    "matcher": { "textEquals": "Done" },
+    "timeoutMs": 15000
   }
 }
 ```

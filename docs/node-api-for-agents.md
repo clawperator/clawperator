@@ -41,6 +41,8 @@ workflow (also available as `record` alias), use [Android Recording Format for A
 | `click --desc-contains <sub>` | Tap the first element whose content description contains the substring |
 | `click --role <role>` | Tap the first element with the given role |
 | `click --selector <json>` | Tap using raw `NodeMatcher` JSON (advanced only; mutually exclusive with simple flags) |
+| `click --text <text> --long` | Long press the matching element |
+| `click --text <text> --focus` | Set input focus without clicking (mutually exclusive with `--long`) |
 | `type <text> --role <role>` | Type into the first element with the given role |
 | `type <text> --id <resource-id>` | Type into the first element with the given resource ID |
 | `type <text> --desc <text>` | Type into the first element with the given content description |
@@ -54,6 +56,7 @@ workflow (also available as `record` alias), use [Android Recording Format for A
 | `read --desc-contains <sub>` | Read from the first element whose content description contains the substring |
 | `read --role <role>` | Read from the first element with the given role |
 | `read --selector <json>` | Read using raw `NodeMatcher` JSON (advanced only; mutually exclusive with simple flags) |
+| `read ... --all --json` | Read every on-screen match: step `data.text` is a string containing a JSON array of quoted labels (see `read_text` behavior note). Requires `--json`. |
 | `wait --text <text>` | Wait until an element with exact visible text appears |
 | `wait --text-contains <sub>` | Wait until an element whose visible text contains the substring appears |
 | `wait --id <resource-id>` | Wait until an element with the given resource ID appears |
@@ -71,6 +74,13 @@ workflow (also available as `record` alias), use [Android Recording Format for A
 | `scroll <dir> --container-desc-contains <sub>` | Scroll within a container matched by partial content description |
 | `scroll <dir> --container-role <role>` | Scroll within a container matched by role |
 | `scroll <dir> --container-selector <json>` | Scroll within a container using raw `NodeMatcher` JSON (advanced only) |
+| `scroll-until [<dir>] --text <text>` | Scroll until target element is visible (direction defaults to `down`; uses `scroll_until` on the wire) |
+| `scroll-until [<dir>] --text <text> --click` | Scroll until visible, then click (action type: `scroll_and_click`, not `scroll_until` with `clickAfter`) |
+| `scroll-and-click [<dir>] --text <text>` | Synonym for `scroll-until --click` |
+| `close <package>` | Force-stop an Android application |
+| `close --app <package>` | Same as `close <package>` |
+| `close-app <package>` | Synonym for `close` |
+| `sleep <ms>` | Pause execution for a duration in milliseconds |
 | `skills list` | List available skills |
 | `skills get <skill_id>` | Show skill metadata |
 | `skills search [--app <pkg>] [--intent <i>] [--keyword <k>]` | Search skills by app, intent, or keyword (at least one filter required) |
@@ -94,6 +104,10 @@ workflow (also available as `record` alias), use [Android Recording Format for A
 
 For agent callers, `--json` is the canonical output flag. `--output pretty` is for human inspection.
 
+**`--json` exit codes:** Plain validation errors return JSON with a top-level `code` and exit `1`. When the CLI prints a device wrapper object that includes `envelope`, it exits `1` if `envelope.status` is `failed` or if any `envelope.stepResults` entry has `success: false` (after Node post-processing such as `close_app` preflight reconciliation). Otherwise it exits `0`. Shell scripts should not rely on `$?` alone without checking `envelope` and each step.
+
+**`wait` and global `--timeout`:** On the `wait` command only, `--timeout <ms>` sets how long the device may poll for a matching node. When provided, it must be a **positive** number of milliseconds (the CLI rejects `--timeout 0`; omit `--timeout` to use the default wait cap). It is written to `wait_for_node.params.timeoutMs` and the Node layer raises execution `timeoutMs` to at least `max(waitTimeoutMs + 5000, 30000)` so the outer envelope does not expire before the wait finishes. On other commands, `--timeout` still sets the execution envelope timeout as usual.
+
 ### Selector Flags (click, type, read, wait)
 
 All element-targeting commands accept these flags instead of raw JSON:
@@ -111,6 +125,10 @@ All element-targeting commands accept these flags instead of raw JSON:
 Multiple simple flags combine with AND semantics: `--text "Login" --role button` matches elements with both properties.
 
 For `type`, `--text` is reserved for the text to type. Identify the target with `--id`, `--role`, `--desc`, `--text-contains`, `--desc-contains`, or `--selector` (advanced).
+
+**`read`:** `--all` returns every on-screen node that matches the selector. It requires `--json` (CLI rejects pretty mode). The matching labels are in `stepResults[].data.text` as a **string** that contains JSON array syntax (for example `["Wi-Fi","Wi-Fi Direct"]`); parse it with `JSON.parse` in your agent. An empty match set is `"[]"`. Do not combine `all: true` with `validator` in raw executions: the Android runtime uses the multi-match path only when `all` is false or omitted for validator flows.
+
+**`wait`:** Optional `--timeout <ms>` (positive; omit for default) caps wall-clock wait time on the device (see global options note above).
 
 ### Container Flags (scroll)
 
@@ -149,6 +167,9 @@ clawperator read --id "com.solaxcloud.starter:id/tv_pb_title" --device <device_i
 
 # Wait for element by text
 clawperator wait --text "Done" --timeout 15000 --device <device_id> --json
+
+# Read all matching labels (JSON array string in step data.text)
+clawperator read --role text --all --json --device <device_id>
 
 # Scroll within a specific container
 clawperator scroll down --container-id "com.example:id/recycler_view" --device <device_id> --json
@@ -385,8 +406,8 @@ Combine fields to increase specificity when a single field is ambiguous:
 | `close_app` | `applicationId: string` | - |
 | `click` | `matcher: NodeMatcher` | `clickType: "default" \| "long_click" \| "focus"` (default: `"default"`) |
 | `enter_text` | `matcher: NodeMatcher`, `text: string` | `submit: boolean` (default: `false`), `clear: boolean` (accepted by Node contract but currently ignored by Android runtime, so do not rely on it to clear existing text) |
-| `read_text` | `matcher: NodeMatcher` | `validator: "temperature" \| "version" \| "regex"`, `validatorPattern: string` (required when `validator` is `"regex"`), `retry: object` |
-| `wait_for_node` | `matcher: NodeMatcher` | `retry: object` - controls polling attempts and backoff delays (see `retry` object shape below). There is no per-action `timeoutMs`; the outer execution `timeoutMs` is the only wall-clock limit. |
+| `read_text` | `matcher: NodeMatcher` | `all: boolean` (default `false`; when `true`, returns all matches - see behavior note), `validator: "temperature" \| "version" \| "regex"`, `validatorPattern: string` (required when `validator` is `"regex"`), `retry: object` |
+| `wait_for_node` | `matcher: NodeMatcher` | `retry: object` (see `retry` object shape below), optional `timeoutMs: number` (1-120000 on the Operator wire) - wall-clock cap for the wait loop on device, in addition to the outer execution `timeoutMs` |
 | `snapshot_ui` | - | `retry: object` |
 | `take_screenshot` | - | `path: string`, `retry: object` |
 | `sleep` | `durationMs: number` | - |
@@ -408,13 +429,18 @@ Combine fields to increase specificity when a single field is ambiguous:
 | `screenshot` | `take_screenshot` |
 | `click` (any Phase 3 selector flag or `--selector <json>`) | `click` |
 | `type` (element selector flags or `--selector <json>`; typed text is positional or `--text`) | `enter_text` |
-| `read` (any Phase 3 selector flag or `--selector <json>`) | `read_text` |
-| `wait` (any Phase 3 selector flag or `--selector <json>`) | `wait_for_node` |
+| `read` (any Phase 3 selector flag or `--selector <json>`) | `read_text` (`--all` sets `params.all`) |
+| `wait` (any Phase 3 selector flag or `--selector <json>`) | `wait_for_node` (`--timeout` sets `params.timeoutMs`) |
 | `open <package-id>` | `open_app` |
 | `open <url\|uri>` | `open_uri` |
 | `press <back\|home\|recents>` | `press_key` |
 | `back` | `press_key` (key: `back`) |
 | `scroll <direction>` | `scroll` |
+| `scroll-until [<direction>] --text <text>` | `scroll_until` |
+| `scroll-until [<direction>] --text <text> --click` | `scroll_and_click` |
+| `scroll-and-click [<direction>] --text <text>` | `scroll_and_click` |
+| `close <package>` | `close_app` |
+| `sleep <ms>` | `sleep` |
 
 ### Action behavior notes
 
@@ -431,6 +457,8 @@ Combine fields to increase specificity when a single field is ambiguous:
 }
 ```
 `maxAttempts` is capped at 10. `initialDelayMs` and `maxDelayMs` are capped at 30,000 and 60,000 ms respectively. Omit the `retry` field to use the action's default preset. For `wait_for_node`, the default is `UiReadiness` (`maxAttempts=5`, `initialDelayMs=500`, `maxDelayMs=3000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`).
+
+**`wait_for_node` and `timeoutMs`:** When `params.timeoutMs` is present, the Operator applies a wall-clock limit around the wait loop (Kotlin `withTimeout` around the existing retry-driven poll). If the node is not found in time, the step fails with a timeout error message that includes the matcher and `timeoutMs`. The device parser coerces `timeoutMs` into the range 1-120000 ms (a wire value of `0` becomes 1 ms on the Operator). The CLI `wait` command rejects `--timeout 0` instead of sending that edge case. On success, step `data` may include `timeout_ms` (string) echoing the configured cap when `timeoutMs` was set. The outer execution `timeoutMs` must still be large enough for the wait to finish (the CLI `wait` command extends the envelope when you pass `--timeout`).
 
 **`open_app`:** Opens the app's default launch activity by `applicationId`.
 
@@ -526,7 +554,11 @@ Android intent builder.
 }
 ```
 
-**`read_text`:** Validates extracted text using optional validators.
+**`read_text`:** Reads visible text from nodes matching `matcher`. Optional validators apply only when `all` is false or omitted.
+
+**`read_text` with `all: true`:** The Operator collects every on-screen node that matches `matcher`, takes each node's visible label (blank labels are skipped), and returns them in one step. Step `data.text` is still a string (envelope `data` values are strings), but its content is a JSON array literal, for example `["Price A","Price B"]`. Agents should parse that string as JSON to obtain the list. Step `data` also includes `all: "true"` and `count: "<n>"` as strings. Newlines or rare characters in labels are escaped for JSON; if you need full node metadata, use `snapshot_ui` and filter locally.
+
+**`read_text` validators** (single-match mode only): Validates extracted text using optional validators.
 
 Supported validators:
 
@@ -846,20 +878,18 @@ becomes visible. This gives agents a one-step "scroll top-level list until
 visible, then click" path without switching to `scroll_and_click`.
 *Note on `clickAfter` firing:* The click only fires if the loop terminates with `TARGET_FOUND`.
 
+**CLI `scroll-until --click` vs raw `scroll_until`:** The CLI maps `--click` to a `scroll_and_click` action (default `maxSwipes` 10 and the scroll-and-click engine), not to `scroll_until` with `clickAfter: true`. Raw `scroll_until` uses different defaults (`maxScrolls` 20, bounded scroll-until loop). Prefer raw `scroll_until` with `clickAfter: true` when you need scroll-until caps and semantics.
+
 **Termination reasons (`data.termination_reason`):**
-- `TARGET_FOUND` - the provided `target` matcher became visible in the current UI tree. `success: true`.
-- `EDGE_REACHED` - scrolling stopped because no further movement was detected. `success: true`.
-- `MAX_SCROLLS_REACHED` - hit `maxScrolls` cap. `success: true`. Normal for infinite feeds.
-- `MAX_DURATION_REACHED` - hit `maxDurationMs` cap. `success: true`. Normal for infinite feeds.
-- `NO_POSITION_CHANGE` - no content movement across `noPositionChangeThreshold` consecutive scrolls. `success: true`.
+- `TARGET_FOUND` - the provided `matcher` became visible in the on-screen filtered UI tree. Step `success: true`.
+- When **`params.matcher` is set**, any other terminal reason means the target was not found in time. The step is `success: false`, `data.error` is `TARGET_NOT_FOUND`, and the top-level envelope is `failed` after Node reconciliation. Treat this as a hard miss, not a successful scroll.
+- When **no `matcher`** is provided, the loop is exploratory pagination only. Then `EDGE_REACHED`, `MAX_SCROLLS_REACHED`, `MAX_DURATION_REACHED`, and `NO_POSITION_CHANGE` are normal terminal states with step `success: true` (not errors). Agents scrolling infinite feeds should expect capped terminals and handle them without treating the action as failed.
 - `CONTAINER_NOT_FOUND` - container resolution failed. `success: false`.
 - `CONTAINER_NOT_SCROLLABLE` - container is not scrollable. `success: false`.
 - `CONTAINER_LOST` - container disappeared mid-loop (e.g., app navigated away). `success: false`.
 
-`MAX_SCROLLS_REACHED`, `MAX_DURATION_REACHED`, and `NO_POSITION_CHANGE` are clean terminal states, not errors. Agents scrolling infinite feeds should expect these and handle them without treating the action as failed.
-
 When no `matcher` is provided, `scroll_until` behaves as a pure bounded
-pagination loop and returns one of the non-target terminal reasons above.
+pagination loop and returns one of the non-target terminal reasons above with `success: true`.
 
 **Current runtime caveats:**
 - Some Android screens expose off-screen descendants in the raw `snapshot_ui` XML. `scroll_until.matcher` does not use raw XML presence alone; it checks Clawperator's on-screen filtered tree. On heavily clipped or nested layouts, a target may appear in the raw snapshot near the bottom edge but still finish as `EDGE_REACHED` until it is more fully on-screen.
@@ -894,12 +924,17 @@ When a scroll loop might trigger navigation, heavy UI re-layout, or clipped list
 { "id": "su1", "actionType": "scroll_until", "success": true, "data": { "termination_reason": "TARGET_FOUND", "scrolls_executed": "5", "direction": "down", "click_after": "true", "click_types": "default", "resolved_container": "com.android.settings:id/recycler_view" } }
 ```
 
-**`scroll_until` example step result (finite list, reached bottom):**
+**`scroll_until` example step result (finite list, reached bottom, no matcher):**
 ```json
 { "id": "su1", "actionType": "scroll_until", "success": true, "data": { "termination_reason": "EDGE_REACHED", "scrolls_executed": "12", "direction": "down" } }
 ```
 
-**`scroll_until` example step result (infinite feed, hit cap):**
+**`scroll_until` example step result (matcher set, target never found):**
+```json
+{ "id": "su1", "actionType": "scroll_until", "success": false, "data": { "termination_reason": "EDGE_REACHED", "error": "TARGET_NOT_FOUND", "scrolls_executed": "3", "direction": "down" } }
+```
+
+**`scroll_until` example step result (infinite feed, hit cap, no matcher):**
 ```json
 { "id": "su1", "actionType": "scroll_until", "success": true, "data": { "termination_reason": "MAX_SCROLLS_REACHED", "scrolls_executed": "20", "direction": "down" } }
 ```
@@ -985,10 +1020,10 @@ Typical `data` keys by action type:
 | `close_app` | `application_id` |
 | `click` | `click_types` |
 | `enter_text` | `text` (text typed), `submit` (`"true"` or `"false"`) |
-| `read_text` | `text` (extracted text value), `validator` (`"none"` or validator type) |
+| `read_text` | `text` (single value, or JSON array literal string when `all` was true), `validator`, and when `all` is true also `all`, `count` |
 | `snapshot_ui` | `actual_format`, `foreground_package` (when available), `has_overlay`, `overlay_package` (when available), `window_count`, `text` (snapshot content - see note below) |
 | `take_screenshot` | `path` (local screenshot file path after Node capture) |
-| `wait_for_node` | `resource_id`, `label` (matched node details) |
+| `wait_for_node` | `resource_id`, `label` (matched node details), `timeout_ms` (when a per-action timeout was configured) |
 | `scroll_and_click` | `max_swipes`, `direction`, `click_types`, `click_after` (`"true"` or `"false"`) |
 | `scroll` | `scroll_outcome` (`"moved"`, `"edge_reached"`, or `"gesture_failed"`), `direction`, `distance_ratio`, `settle_delay_ms`, `resolved_container` (resourceId of auto-detected container, when present) |
 | `scroll_until` | `termination_reason` (see behavior note), `scrolls_executed`, `direction`, `click_after`, `click_types`, `resolved_container` (when present) |
@@ -1001,7 +1036,7 @@ For any failed step: `success: false` and `data.error` contains the error code s
 
 **Snapshot content delivery:** The UI hierarchy is produced by the Android runtime and written to device logcat. The Node layer reads logcat after execution and injects the raw XML into `data.text`. `data.actual_format` is `"hierarchy_xml"` on successful snapshot steps. Snapshot steps may also include best-effort accessibility-window metadata such as `foreground_package`, `has_overlay`, `overlay_package`, and `window_count`.
 
-**`read_text` value:** The extracted text value is in `data.text`.
+**`read_text` value:** The extracted text value is in `data.text`. For `all: true`, parse `data.text` as JSON to recover the string array.
 
 ## Snapshot Output Format
 

@@ -592,8 +592,9 @@ class UiActionEngineDefaultTest : ActionTest {
 
             val stepResult = result.stepResults.single()
             assertEquals("scroll_until", stepResult.actionType)
-            assertEquals(true, stepResult.success)
+            assertEquals(false, stepResult.success)
             assertEquals("EDGE_REACHED", stepResult.data["termination_reason"])
+            assertEquals("TARGET_NOT_FOUND", stepResult.data["error"])
             assertEquals("true", stepResult.data["click_after"])
             assertEquals(false, uiScope.clickCalled)
         }
@@ -1245,6 +1246,7 @@ open class RecordingTaskUiScope(
     override suspend fun waitForNode(
         matcher: NodeMatcher,
         retry: TaskRetry,
+        timeoutMs: Long?,
     ): TaskUiNode {
         if (waitForNodeThrows != null) {
             throw waitForNodeThrows
@@ -1258,6 +1260,11 @@ open class RecordingTaskUiScope(
             debugPath = "0/0",
         )
     }
+
+    override suspend fun getAllText(
+        matcher: NodeMatcher,
+        retry: TaskRetry,
+    ): List<String> = listOf("Title Text 1", "Title Text 2")
 
     override suspend fun getText(
         matcher: NodeMatcher,
