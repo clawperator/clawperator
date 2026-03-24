@@ -13,6 +13,33 @@ import {
 } from "./registry.js";
 import { shouldCliStdoutForceExitCode1 } from "./stdoutExitCode.js";
 
+function levenshteinDistance(s1: string, s2: string): number {
+  const track = Array(s2.length + 1).fill(null).map(() =>
+    Array(s1.length + 1).fill(null));
+  for (let i = 0; i <= s1.length; i += 1) {
+    track[0][i] = i;
+  }
+  for (let j = 0; j <= s2.length; j += 1) {
+    track[j][0] = j;
+  }
+  for (let j = 1; j <= s2.length; j += 1) {
+    for (let i = 1; i <= s1.length; i += 1) {
+      const indicator = s1[i - 1] === s2[j - 1] ? 0 : 1;
+      track[j][i] = Math.min(
+        track[j][i - 1] + 1,
+        track[j - 1][i] + 1,
+        track[j - 1][i - 1] + indicator);
+    }
+  }
+  return track[s2.length][s1.length];
+}
+
+function similarityRatio(s1: string, s2: string): number {
+  const dist = levenshteinDistance(s1, s2);
+  const maxLen = Math.max(s1.length, s2.length);
+  return 1 - (dist / maxLen);
+}
+
 function getGlobalOpts(argv: string[]): {
   deviceId?: string;
   operatorPackage?: string;
@@ -38,19 +65,11 @@ function getGlobalOpts(argv: string[]): {
       // callers like `skills run` can forward them to subprocess scripts.
       rest.push(...argv.slice(i));
       break;
-    } else if (argv[i] === "--device-id" && argv[i + 1]) {
-      deviceId = argv[++i];
     } else if (argv[i] === "--device" && argv[i + 1]) {
-      // --device is the new canonical for --device-id (old name still works)
       deviceId = argv[++i];
-    } else if (argv[i] === "--receiver-package") {
-      const value = argv[i + 1];
-      if (value === undefined || value.trim().length === 0 || value.startsWith("-")) {
-        throw new UsageError("--receiver-package requires a value");
-      }
-      // --receiver-package is an alias for --operator-package (old name still works)
-      operatorPackage = value;
-      i++;
+    } else if (argv[i] === "--device-id" && argv[i + 1]) {
+      // legacy alias
+      deviceId = argv[++i];
     } else if (argv[i] === "--operator-package") {
       const value = argv[i + 1];
       if (value === undefined || value.trim().length === 0 || value.startsWith("-")) {
@@ -58,25 +77,32 @@ function getGlobalOpts(argv: string[]): {
       }
       operatorPackage = value;
       i++;
+    } else if (argv[i] === "--receiver-package") {
+      const value = argv[i + 1];
+      if (value === undefined || value.trim().length === 0 || value.startsWith("-")) {
+        throw new UsageError("--receiver-package requires a value");
+      }
+      // legacy alias
+      operatorPackage = value;
+      i++;
+    } else if (argv[i] === "--json") {
+      // json is explicit
+      output = "json";
+      explicitJsonOutput = true;
     } else if ((argv[i] === "--output" || argv[i] === "--format") && argv[i + 1]) {
       const next = argv[++i];
       output = next === "pretty" ? "pretty" : "json";
       if (next === "json") {
         explicitJsonOutput = true;
       }
-    } else if (argv[i] === "--json") {
-      // --json sets output to json (new canonical shorthand)
-      output = "json";
-      explicitJsonOutput = true;
+    } else if (argv[i] === "--timeout") {
+      if (!argv[i + 1]) {
+        throw new UsageError("--timeout requires a value");
+      }
+      timeoutMs = Number(argv[++i]);
     } else if (argv[i] === "--timeout-ms") {
       if (!argv[i + 1]) {
         throw new UsageError("--timeout-ms requires a value");
-      }
-      timeoutMs = Number(argv[++i]);
-    } else if (argv[i] === "--timeout") {
-      // --timeout is the new canonical for --timeout-ms
-      if (!argv[i + 1]) {
-        throw new UsageError("--timeout requires a value");
       }
       timeoutMs = Number(argv[++i]);
     } else if (argv[i] === "--log-level") {
@@ -155,20 +181,57 @@ async function main(): Promise<void> {
     } else {
       const def = COMMANDS[cmd] ?? Object.values(COMMANDS).find((c) => c.synonyms?.includes(cmd));
       if (def) {
-        const ctx: HandlerContext = {
-          argv,
-          rest,
-          format: out.format,
-          explicitJsonOutput: global.explicitJsonOutput,
-          verbose: out.verbose,
-          logger,
-          deviceId: global.deviceId,
-          operatorPackage: global.operatorPackage,
-          timeoutMs: global.timeoutMs,
-        };
-        const handlerResult = await def.handler(ctx);
-        if (handlerResult !== undefined) {
-          result = handlerResult;
+        const globalFlags = [
+          "--device", "--device-id", "--operator-package", "--receiver-package",
+          "--json", "--output", "--format", "--log-level", "--timeout", "--timeout-ms",
+          "--verbose", "--help", "--version", "--all" // --all needs to be known globally or picked up from help
+        ];
+        const knownFlagsMatch = Array.from(def.help.matchAll(/--[a-z0-9-]+/g)).map(m => m[0]);
+        const knownFlags = new Set([...knownFlagsMatch, ...globalFlags]);
+        
+        let firstUnknownFlag: string | undefined;
+        // Don't flag-check after `--` (forwarded args)
+        const restBeforeForward = argvPrefixBeforeForwardSeparator(rest);
+        for (const arg of restBeforeForward) {
+          if (arg.startsWith("--") && !knownFlags.has(arg)) {
+            firstUnknownFlag = arg;
+            break;
+          }
+        }
+
+        if (firstUnknownFlag) {
+          let bestMatch: string | undefined;
+          let bestScore = 0;
+          for (const flag of knownFlags) {
+            const score = similarityRatio(firstUnknownFlag, flag);
+            if (score > bestScore) {
+              bestScore = score;
+              bestMatch = flag;
+            }
+          }
+          if (bestMatch && bestScore >= 0.3) {
+            result = JSON.stringify({ code: "USAGE", message: `unrecognized flag '${firstUnknownFlag}'. Did you mean '${bestMatch}'?` });
+            usageParseError = true;
+          } else {
+            result = JSON.stringify({ code: "USAGE", message: `unrecognized flag '${firstUnknownFlag}'` });
+            usageParseError = true;
+          }
+        } else {
+          const ctx: HandlerContext = {
+            argv,
+            rest,
+            format: out.format,
+            explicitJsonOutput: global.explicitJsonOutput,
+            verbose: out.verbose,
+            logger,
+            deviceId: global.deviceId,
+            operatorPackage: global.operatorPackage,
+            timeoutMs: global.timeoutMs,
+          };
+          const handlerResult = await def.handler(ctx);
+          if (handlerResult !== undefined) {
+            result = handlerResult;
+          }
         }
       } else {
         result = didYouMean(cmd, rest, COMMANDS);
