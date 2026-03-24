@@ -284,6 +284,23 @@ describe("sleep command validation", () => {
   });
 });
 
+describe("wait command --timeout validation", () => {
+  it("wait with --timeout 0 returns EXECUTION_VALIDATION_FAILED", async () => {
+    const { stdout, code } = await runCli([
+      "wait",
+      "--text",
+      "x",
+      "--timeout",
+      "0",
+      "--json",
+    ]);
+    assert.notStrictEqual(code, 0);
+    const obj = JSON.parse(stdout);
+    assert.strictEqual(obj.code, "EXECUTION_VALIDATION_FAILED");
+    assert.match(obj.message, /positive/);
+  });
+});
+
 describe("didYouMean tie-breaking", () => {
   // Minimal fake command map used across both cases.
   const fakeBase = { summary: "s", help: "h", group: "g", handler: async () => "" } as const;

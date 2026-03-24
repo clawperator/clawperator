@@ -458,7 +458,7 @@ Selector flags (at least one required; combine for AND matching):
 
 Notes:
   - Waits until the first matching element appears.
-  - --timeout sets the wait duration (not the execution envelope timeout).
+  - --timeout sets the wait duration (not the execution envelope timeout); must be a positive number of milliseconds when provided (omit it to use the default).
   - Execution timeout is set to max(waitTimeout + 5000, globalTimeout) to prevent early termination.
   - Default wait timeout is 30000ms (30 seconds) when --timeout is not specified.
   - Multiple simple flags combine with AND semantics.
@@ -922,7 +922,7 @@ COMMANDS["click"] = {
   handler: async (ctx) => {
     const { rest, format, logger, deviceId, operatorPackage } = ctx;
     if (!hasElementSelectorFlag(rest)) {
-      return makeMissingSelectorError("click");
+      return makeMissingSelectorError("click", format);
     }
     const resolved = resolveElementMatcherFromCli(rest);
     if (!resolved.ok) {
@@ -933,10 +933,14 @@ COMMANDS["click"] = {
     const hasLong = hasFlag(rest, "--long");
     const hasFocus = hasFlag(rest, "--focus");
     if (hasLong && hasFocus) {
-      return JSON.stringify({
-        code: "EXECUTION_VALIDATION_FAILED",
-        message: "--long and --focus are mutually exclusive.\n\nUse --long for a long press, or --focus to set input focus.",
-      });
+      return formatError(
+        {
+          code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+          message:
+            "--long and --focus are mutually exclusive.\n\nUse --long for a long press, or --focus to set input focus.",
+        },
+        { format },
+      );
     }
     let clickType: "default" | "long_click" | "focus" = "default";
     if (hasLong) clickType = "long_click";
@@ -1072,7 +1076,7 @@ COMMANDS["read"] = {
   handler: async (ctx) => {
     const { rest, format, logger, deviceId, operatorPackage } = ctx;
     if (!hasElementSelectorFlag(rest)) {
-      return makeMissingSelectorError("read");
+      return makeMissingSelectorError("read", format);
     }
     const resolved = resolveElementMatcherFromCli(rest);
     if (!resolved.ok) {
@@ -1081,10 +1085,13 @@ COMMANDS["read"] = {
     // --all requires --json
     const readAll = hasFlag(rest, "--all");
     if (readAll && format !== "json") {
-      return JSON.stringify({
-        code: "EXECUTION_VALIDATION_FAILED",
-        message: "read --all requires --json.\n\nExample:\n  clawperator read --text \"Price\" --all --json",
-      });
+      return formatError(
+        {
+          code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+          message: 'read --all requires --json.\n\nExample:\n  clawperator read --text "Price" --all --json',
+        },
+        { format },
+      );
     }
     return (await import("./commands/action.js")).cmdActionRead({
       format,
@@ -1107,15 +1114,19 @@ COMMANDS["wait"] = {
   handler: async (ctx) => {
     const { rest, format, logger, deviceId, operatorPackage, timeoutMs } = ctx;
     // For wait, the global --timeout flag sets the wait duration (not execution envelope timeout)
-    // Validation: timeoutMs must be non-negative if specified
-    if (timeoutMs !== undefined && (!Number.isFinite(timeoutMs) || timeoutMs < 0)) {
-      return JSON.stringify({
-        code: "EXECUTION_VALIDATION_FAILED",
-        message: "--timeout must be a non-negative number",
-      });
+    // Validation: when specified, must be a positive finite duration (0 is rejected; omit --timeout for the default)
+    if (timeoutMs !== undefined && (!Number.isFinite(timeoutMs) || timeoutMs <= 0)) {
+      return formatError(
+        {
+          code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+          message:
+            "--timeout must be a positive number of milliseconds when specified. Omit --timeout to use the default wait cap.",
+        },
+        { format },
+      );
     }
     if (!hasElementSelectorFlag(rest)) {
-      return makeMissingSelectorError("wait");
+      return makeMissingSelectorError("wait", format);
     }
     const resolved = resolveElementMatcherFromCli(rest);
     if (!resolved.ok) {
@@ -1253,23 +1264,33 @@ COMMANDS["sleep"] = {
       durationStr = bare[0];
     }
     if (!durationStr) {
-      return JSON.stringify({
-        code: "MISSING_ARGUMENT",
-        message: "sleep requires a duration in milliseconds.\n\nUsage:\n  clawperator sleep <ms>\n\nExample:\n  clawperator sleep 2000",
-      });
+      return formatError(
+        {
+          code: "MISSING_ARGUMENT",
+          message:
+            "sleep requires a duration in milliseconds.\n\nUsage:\n  clawperator sleep <ms>\n\nExample:\n  clawperator sleep 2000",
+        },
+        { format },
+      );
     }
     const durationMs = Number(durationStr);
     if (!Number.isFinite(durationMs) || durationMs < 0) {
-      return JSON.stringify({
-        code: "EXECUTION_VALIDATION_FAILED",
-        message: `Duration must be a non-negative number (got: ${durationStr})`,
-      });
+      return formatError(
+        {
+          code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+          message: `Duration must be a non-negative number (got: ${durationStr})`,
+        },
+        { format },
+      );
     }
     if (durationMs > LIMITS.MAX_EXECUTION_TIMEOUT_MS) {
-      return JSON.stringify({
-        code: "EXECUTION_VALIDATION_FAILED",
-        message: `Duration must be <= ${LIMITS.MAX_EXECUTION_TIMEOUT_MS}ms (got: ${durationMs}ms)`,
-      });
+      return formatError(
+        {
+          code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+          message: `Duration must be <= ${LIMITS.MAX_EXECUTION_TIMEOUT_MS}ms (got: ${durationMs}ms)`,
+        },
+        { format },
+      );
     }
 
     return (await import("./commands/action.js")).cmdSleep({
@@ -1339,7 +1360,7 @@ const scrollUntilHandler = async (ctx: HandlerContext, clickAfterDefault: boolea
 
   // Check for selector flags
   if (!hasElementSelectorFlag(rest)) {
-    return makeMissingSelectorError("scroll-until");
+    return makeMissingSelectorError("scroll-until", format);
   }
 
   // Parse direction (positional or defaults to "down")
@@ -1348,10 +1369,13 @@ const scrollUntilHandler = async (ctx: HandlerContext, clickAfterDefault: boolea
   const direction = bare[0] ?? "down";
   const validDirections = ["down", "up", "left", "right"];
   if (!validDirections.includes(direction)) {
-    return JSON.stringify({
-      code: "MISSING_ARGUMENT",
-      message: `Invalid direction: ${direction}. Valid directions: ${validDirections.join(", ")}`,
-    });
+    return formatError(
+      {
+        code: "MISSING_ARGUMENT",
+        message: `Invalid direction: ${direction}. Valid directions: ${validDirections.join(", ")}`,
+      },
+      { format },
+    );
   }
 
   // Resolve element matcher

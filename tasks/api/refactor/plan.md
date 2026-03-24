@@ -2084,6 +2084,17 @@ edit or replace the plan above, which stays the original design record.
    compatibility text document both. Phase 5 may still align other naming (`--payload`
    vs `--execution`) per the plan.
 
+6. **`reconcileEnvelopeStatusAfterPostProcessing` (Phase 5A branch)**  
+   Post-processing reconciles top-level envelope `status` with per-step `success`
+   so an envelope that still said `success` while a step failed is normalized to
+   `failed` and the CLI exits non-zero. This is a **cross-cutting** behavior change
+   (not limited to Phase 5A verbs). PR description should call it out explicitly.
+
+7. **`scroll-and-click` in the registry**  
+   The plan wording suggests a synonym/alias only. **As implemented:** a dedicated
+   `scroll-and-click` `COMMANDS` entry with its own `topLevelBlock` so it appears
+   in top-level help (better discoverability than a hidden synonym).
+
 ### Small follow-ups (non-deviation)
 
 - Top-level `clawperator --help` lists **`--json`** as a global JSON output shorthand

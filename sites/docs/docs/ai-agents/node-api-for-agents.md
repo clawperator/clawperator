@@ -106,7 +106,7 @@ For agent callers, `--json` is the canonical output flag. `--output pretty` is f
 
 **`--json` exit codes:** Plain validation errors return JSON with a top-level `code` and exit `1`. When the CLI prints a device wrapper object that includes `envelope`, it exits `1` if `envelope.status` is `failed` or if any `envelope.stepResults` entry has `success: false` (after Node post-processing such as `close_app` preflight reconciliation). Otherwise it exits `0`. Shell scripts should not rely on `$?` alone without checking `envelope` and each step.
 
-**`wait` and global `--timeout`:** On the `wait` command only, `--timeout <ms>` sets how long the device may poll for a matching node. It is written to `wait_for_node.params.timeoutMs` and the Node layer raises execution `timeoutMs` to at least `max(waitTimeoutMs + 5000, 30000)` so the outer envelope does not expire before the wait finishes. On other commands, `--timeout` still sets the execution envelope timeout as usual.
+**`wait` and global `--timeout`:** On the `wait` command only, `--timeout <ms>` sets how long the device may poll for a matching node. When provided, it must be a **positive** number of milliseconds (the CLI rejects `--timeout 0`; omit `--timeout` to use the default wait cap). It is written to `wait_for_node.params.timeoutMs` and the Node layer raises execution `timeoutMs` to at least `max(waitTimeoutMs + 5000, 30000)` so the outer envelope does not expire before the wait finishes. On other commands, `--timeout` still sets the execution envelope timeout as usual.
 
 ### Selector Flags (click, type, read, wait)
 
@@ -128,7 +128,7 @@ For `type`, `--text` is reserved for the text to type. Identify the target with 
 
 **`read`:** `--all` returns every on-screen node that matches the selector. It requires `--json` (CLI rejects pretty mode). The matching labels are in `stepResults[].data.text` as a **string** that contains JSON array syntax (for example `["Wi-Fi","Wi-Fi Direct"]`); parse it with `JSON.parse` in your agent. An empty match set is `"[]"`. Do not combine `all: true` with `validator` in raw executions: the Android runtime uses the multi-match path only when `all` is false or omitted for validator flows.
 
-**`wait`:** Optional `--timeout <ms>` (non-negative) caps wall-clock wait time on the device (see global options note above).
+**`wait`:** Optional `--timeout <ms>` (positive; omit for default) caps wall-clock wait time on the device (see global options note above).
 
 ### Container Flags (scroll)
 
@@ -458,7 +458,7 @@ Combine fields to increase specificity when a single field is ambiguous:
 ```
 `maxAttempts` is capped at 10. `initialDelayMs` and `maxDelayMs` are capped at 30,000 and 60,000 ms respectively. Omit the `retry` field to use the action's default preset. For `wait_for_node`, the default is `UiReadiness` (`maxAttempts=5`, `initialDelayMs=500`, `maxDelayMs=3000`, `backoffMultiplier=2.0`, `jitterRatio=0.15`).
 
-**`wait_for_node` and `timeoutMs`:** When `params.timeoutMs` is present, the Operator applies a wall-clock limit around the wait loop (Kotlin `withTimeout` around the existing retry-driven poll). If the node is not found in time, the step fails with a timeout error message that includes the matcher and `timeoutMs`. The device parser accepts `timeoutMs` in the range 1-120000 ms. On success, step `data` may include `timeout_ms` (string) echoing the configured cap when `timeoutMs` was set. The outer execution `timeoutMs` must still be large enough for the wait to finish (the CLI `wait` command extends the envelope when you pass `--timeout`).
+**`wait_for_node` and `timeoutMs`:** When `params.timeoutMs` is present, the Operator applies a wall-clock limit around the wait loop (Kotlin `withTimeout` around the existing retry-driven poll). If the node is not found in time, the step fails with a timeout error message that includes the matcher and `timeoutMs`. The device parser coerces `timeoutMs` into the range 1-120000 ms (a wire value of `0` becomes 1 ms on the Operator). The CLI `wait` command rejects `--timeout 0` instead of sending that edge case. On success, step `data` may include `timeout_ms` (string) echoing the configured cap when `timeoutMs` was set. The outer execution `timeoutMs` must still be large enough for the wait to finish (the CLI `wait` command extends the envelope when you pass `--timeout`).
 
 **`open_app`:** Opens the app's default launch activity by `applicationId`.
 

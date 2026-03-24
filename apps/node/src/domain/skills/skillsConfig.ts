@@ -35,13 +35,16 @@ function quoteCommandPart(part: string): string {
  * This is resolved relative to this module's location, not process.cwd().
  */
 function getSiblingBuildPath(): string | undefined {
-  // This file is at: apps/node/src/domain/skills/skillsConfig.ts
-  // We need to find: apps/node/dist/cli/index.js
-  // In compiled output: dist/domain/skills/skillsConfig.js
+  // Compiled: apps/node/dist/domain/skills/skillsConfig.js -> dist/cli/index.js (two levels up)
+  // Source (rare): apps/node/src/domain/skills -> apps/node/dist/cli/index.js
   const moduleDir = dirname(fileURLToPath(import.meta.url));
-  const siblingCli = resolve(moduleDir, "..", "..", "..", "cli", "index.js");
-  if (existsSync(siblingCli)) {
-    return siblingCli;
+  const fromDist = resolve(moduleDir, "..", "..", "cli", "index.js");
+  if (existsSync(fromDist)) {
+    return fromDist;
+  }
+  const fromSrc = resolve(moduleDir, "..", "..", "..", "dist", "cli", "index.js");
+  if (existsSync(fromSrc)) {
+    return fromSrc;
   }
   return undefined;
 }

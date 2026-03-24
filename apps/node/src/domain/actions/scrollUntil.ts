@@ -9,9 +9,10 @@ export function buildScrollUntilExecution(
   timeoutMs = 30000,
 ): Execution {
   const actionType = clickAfter ? "scroll_and_click" : "scroll_until";
+  const commandId = `scroll-until-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
   return {
-    commandId: `scroll-until-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-    taskId: "cli-action-scroll-until",
+    commandId,
+    taskId: commandId,
     source: "clawperator-cli",
     timeoutMs,
     expectedFormat: "android-ui-automator",

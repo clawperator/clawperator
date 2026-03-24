@@ -1,9 +1,10 @@
 import type { Execution } from "../../contracts/execution.js";
 
 export function buildCloseAppExecution(applicationId: string, timeoutMs = 30000): Execution {
+  const commandId = `close-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
   return {
-    commandId: `close-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-    taskId: "cli-action-close",
+    commandId,
+    taskId: commandId,
     source: "clawperator-cli",
     timeoutMs,
     expectedFormat: "android-ui-automator",
