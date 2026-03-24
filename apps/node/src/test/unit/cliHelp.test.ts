@@ -26,6 +26,16 @@ function runCli(
   });
 }
 
+async function getFirstConnectedDeviceSerial(): Promise<string> {
+  const { stdout } = await runCli(["devices"]);
+  const result = JSON.parse(stdout) as { devices?: Array<{ serial?: string }> };
+  const serial = result.devices?.find((device) => device.serial)?.serial;
+  if (!serial) {
+    throw new Error("Expected at least one connected device for the scroll-until CLI test");
+  }
+  return serial;
+}
+
 describe("CLI help", () => {
   it("shows operator setup help for operator setup --help", async () => {
     const { stdout, code } = await runCli(["operator", "setup", "--help"]);
@@ -479,6 +489,14 @@ describe("promoted flat commands - help and missing-arg errors", () => {
     assert.match(obj.message ?? "", /unrecognized flag '--dry-run'/);
   });
 
+  it("scroll-until accepts --direction as an alias for the positional direction", async () => {
+    const deviceId = await getFirstConnectedDeviceSerial();
+    const { stdout } = await runCli(["scroll-until", "--direction", "up", "--text", "Settings", "--device", deviceId]);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.notStrictEqual(obj.code, "USAGE");
+    assert.doesNotMatch(obj.message ?? "", /unrecognized flag '--direction'/);
+  });
+
   it("open accepts --app without unknown-flag rejection", async () => {
     const { stdout, code } = await runCli(["open", "--app"]);
     assert.strictEqual(code, 1, stdout);
@@ -493,6 +511,14 @@ describe("promoted flat commands - help and missing-arg errors", () => {
     const obj = JSON.parse(stdout) as { code?: string; message?: string };
     assert.strictEqual(obj.code, "MISSING_ARGUMENT");
     assert.doesNotMatch(obj.message ?? "", /unrecognized flag/);
+  });
+
+  it("close rejects dry-run flags instead of force-stopping the app", async () => {
+    const { stdout, code } = await runCli(["close", "com.android.settings", "--dry-run"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "USAGE");
+    assert.match(obj.message ?? "", /unrecognized flag '--dry-run'/);
   });
 
   it("close rejects typoed dash-prefixed arguments instead of swallowing them", async () => {

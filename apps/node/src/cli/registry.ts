@@ -1171,7 +1171,7 @@ COMMANDS["open"] = {
   name: "open",
   synonyms: ["open-uri", "open-url"],
   group: "Device Interaction",
-  supportedFlags: ["--app", "--validate-only", "--dry-run"],
+  supportedFlags: ["--app"],
   summary: "Open an app, URL, or URI on the device",
   help: HELP_OPEN,
   topLevelBlock: `  open <package-id|url|uri> [--device <id>] [--operator-package <pkg>] [--json]
@@ -1221,7 +1221,7 @@ COMMANDS["type"] = {
   name: "type",
   synonyms: ["fill"],
   group: "Device Interaction",
-  supportedFlags: ["--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--submit", "--clear", "--validate-only", "--dry-run"],
+  supportedFlags: ["--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--submit", "--clear"],
   summary: "Type text into the first matching UI element",
   help: HELP_TYPE,
   topLevelBlock: `  type <text> --role <role> | --id <id> [--device <id>] [--operator-package <pkg>] [--json]
@@ -1281,7 +1281,7 @@ COMMANDS["type"] = {
 COMMANDS["read"] = {
   name: "read",
   group: "Device Interaction",
-  supportedFlags: ["--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--all", "--container-text", "--container-text-contains", "--container-id", "--container-desc", "--container-desc-contains", "--container-role", "--container-selector", "--validate-only", "--dry-run"],
+  supportedFlags: ["--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--all", "--container-text", "--container-text-contains", "--container-id", "--container-desc", "--container-desc-contains", "--container-role", "--container-selector"],
   summary: "Read text from the first matching UI element",
   help: HELP_READ,
   topLevelBlock: `  read --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>] [--json]
@@ -1320,7 +1320,7 @@ COMMANDS["read"] = {
 COMMANDS["wait"] = {
   name: "wait",
   group: "Device Interaction",
-  supportedFlags: ["--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--validate-only", "--dry-run"],
+  supportedFlags: ["--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector"],
   summary: "Wait until a matching UI element appears",
   help: HELP_WAIT,
   topLevelBlock: `  wait --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
@@ -1361,7 +1361,7 @@ COMMANDS["press"] = {
   name: "press",
   synonyms: ["press-key"],
   group: "Device Interaction",
-  supportedFlags: ["--key", "--validate-only", "--dry-run"],
+  supportedFlags: ["--key"],
   summary: "Press a hardware key on the device",
   help: HELP_PRESS,
   topLevelBlock: `  press <back|home|recents> [--device <id>] [--operator-package <pkg>] [--json]
@@ -1400,7 +1400,7 @@ COMMANDS["press"] = {
 COMMANDS["back"] = {
   name: "back",
   group: "Device Interaction",
-  supportedFlags: ["--validate-only", "--dry-run"],
+  supportedFlags: [],
   summary: "Press the Android back key",
   help: HELP_BACK,
   topLevelBlock: `  back [--device <id>] [--operator-package <pkg>] [--json]               Press the Android back key`,
@@ -1455,7 +1455,7 @@ COMMANDS["close"] = {
   name: "close",
   synonyms: ["close-app"],
   group: "Device Interaction",
-  supportedFlags: ["--app", "--validate-only", "--dry-run"],
+  supportedFlags: ["--app"],
   summary: "Force-stop an Android application",
   help: HELP_CLOSE,
   topLevelBlock: `  close <package> [--device <id>] [--operator-package <pkg>] [--json]    Force-stop an Android application`,
@@ -1465,7 +1465,7 @@ COMMANDS["close"] = {
 COMMANDS["sleep"] = {
   name: "sleep",
   group: "Device Interaction",
-  supportedFlags: ["--validate-only", "--dry-run"],
+  supportedFlags: [],
   summary: "Pause execution for a duration",
   help: HELP_SLEEP,
   topLevelBlock: `  sleep <ms> [--device <id>] [--operator-package <pkg>] [--json]         Pause execution for a duration`,
@@ -1525,7 +1525,7 @@ COMMANDS["sleep"] = {
 COMMANDS["scroll"] = {
   name: "scroll",
   group: "Device Interaction",
-  supportedFlags: ["--direction", "--container-text", "--container-text-contains", "--container-id", "--container-desc", "--container-desc-contains", "--container-role", "--container-selector", "--validate-only", "--dry-run"],
+  supportedFlags: ["--direction", "--container-text", "--container-text-contains", "--container-id", "--container-desc", "--container-desc-contains", "--container-role", "--container-selector"],
   summary: "Scroll the screen in a direction",
   help: HELP_SCROLL,
   topLevelBlock: `  scroll <down|up|left|right> [--container-id <id>] [--device <id>] [--operator-package <pkg>] [--json]
@@ -1582,10 +1582,35 @@ const scrollUntilHandler = async (ctx: HandlerContext, clickAfterDefault: boolea
     return makeMissingSelectorError("scroll-until", format);
   }
 
-  // Parse direction (positional or defaults to "down")
-  const scrollUntilValueFlags = [...ELEMENT_SELECTOR_VALUE_FLAGS, ...CONTAINER_SELECTOR_VALUE_FLAGS, "--click"];
+  // Parse direction (positional, --direction, or defaults to "down")
+  const directionIdx = rest.indexOf("--direction");
+  let directionFlag: string | undefined;
+  if (directionIdx >= 0) {
+    const next = rest[directionIdx + 1];
+    if (next === undefined || next.startsWith("-")) {
+      return formatError(
+        {
+          code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+          message: "scroll-until --direction requires a value.\n\nSee: clawperator scroll-until --help",
+        },
+        { format },
+      );
+    }
+    directionFlag = next;
+  }
+  const scrollUntilValueFlags = [...ELEMENT_SELECTOR_VALUE_FLAGS, ...CONTAINER_SELECTOR_VALUE_FLAGS, "--click", "--direction"];
   const bare = barePositionalTokens(rest, scrollUntilValueFlags, []);
-  const direction = bare[0] ?? "down";
+  if (directionFlag !== undefined && bare.length > 0) {
+    return formatError(
+      {
+        code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+        message:
+          "scroll-until: pass direction as a positional argument or via --direction, not both.\n\nSee: clawperator scroll-until --help",
+      },
+      { format },
+    );
+  }
+  const direction = directionFlag ?? bare[0] ?? "down";
   const validDirections = ["down", "up", "left", "right"];
   if (!validDirections.includes(direction)) {
     return formatError(
@@ -1628,7 +1653,7 @@ const scrollUntilHandler = async (ctx: HandlerContext, clickAfterDefault: boolea
 COMMANDS["scroll-until"] = {
   name: "scroll-until",
   group: "Device Interaction",
-  supportedFlags: ["--click", "--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--container-text", "--container-text-contains", "--container-id", "--container-desc", "--container-desc-contains", "--container-role", "--container-selector", "--validate-only", "--dry-run"],
+  supportedFlags: ["--click", "--direction", "--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--container-text", "--container-text-contains", "--container-id", "--container-desc", "--container-desc-contains", "--container-role", "--container-selector"],
   summary: "Scroll until a target element is visible",
   help: HELP_SCROLL_UNTIL,
   topLevelBlock: `  scroll-until [<direction>] --text <text> [--click] [--device <id>] [--operator-package <pkg>] [--json]
@@ -1640,7 +1665,7 @@ COMMANDS["scroll-and-click"] = {
   name: "scroll-and-click",
   synonyms: [],
   group: "Device Interaction",
-  supportedFlags: ["--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--container-text", "--container-text-contains", "--container-id", "--container-desc", "--container-desc-contains", "--container-role", "--container-selector", "--validate-only", "--dry-run"],
+  supportedFlags: ["--direction", "--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--container-text", "--container-text-contains", "--container-id", "--container-desc", "--container-desc-contains", "--container-role", "--container-selector"],
   summary: "Scroll until target is visible, then click it (alias for scroll-until --click)",
   help: HELP_SCROLL_UNTIL,
   topLevelBlock: `  scroll-and-click [<direction>] --text <text> [--device <id>] [--operator-package <pkg>] [--json]
