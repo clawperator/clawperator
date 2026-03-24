@@ -1314,6 +1314,96 @@ class UiActionEngineDefaultTest : ActionTest {
             assertTrue(stepResult.data.containsKey("container"))
             assertFalse(stepResult.data["container"].isNullOrBlank())
         }
+
+    @Test
+    fun `execute read_text with container and validator succeeds`() =
+        actionTest {
+            val uiScope = object : RecordingTaskUiScope() {
+                override suspend fun getValidatedTextWithinContainer(
+                    matcher: NodeMatcher,
+                    containerMatcher: NodeMatcher,
+                    retry: TaskRetry,
+                    validator: (String) -> Boolean,
+                ): String {
+                    val value = "20.5°C"
+                    if (!validator(value)) {
+                        throw IllegalStateException("Validation failed for text '$value'")
+                    }
+                    return value
+                }
+            }
+            val taskScope = RecordingTaskScope(uiScope)
+            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+
+            val result =
+                engine.execute(
+                    taskScope = taskScope,
+                    plan = UiActionPlan(
+                        commandId = "cmd",
+                        taskId = "task",
+                        source = "test",
+                        actions = listOf(
+                            UiAction.ReadText(
+                                id = "rt-container-validator",
+                                matcher = NodeMatcher(textContains = "Temp"),
+                                container = NodeMatcher(resourceId = "com.example:id/list"),
+                                validator = UiTextValidator.Temperature,
+                            ),
+                        ),
+                    ),
+                )
+
+            val stepResult = result.stepResults.single()
+            assertEquals("read_text", stepResult.actionType)
+            assertEquals(true, stepResult.success)
+            assertEquals("20.5°C", stepResult.data["text"])
+            assertEquals("temperature", stepResult.data["validator"])
+        }
+
+    @Test
+    fun `execute read_text with container and validator fails`() =
+        actionTest {
+            val uiScope = object : RecordingTaskUiScope() {
+                override suspend fun getValidatedTextWithinContainer(
+                    matcher: NodeMatcher,
+                    containerMatcher: NodeMatcher,
+                    retry: TaskRetry,
+                    validator: (String) -> Boolean,
+                ): String {
+                    val value = "not a temperature"
+                    if (!validator(value)) {
+                        throw IllegalStateException("Validation failed for text '$value' from matching UI node within container")
+                    }
+                    return value
+                }
+            }
+            val taskScope = RecordingTaskScope(uiScope)
+            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+
+            val result =
+                engine.execute(
+                    taskScope = taskScope,
+                    plan = UiActionPlan(
+                        commandId = "cmd",
+                        taskId = "task",
+                        source = "test",
+                        actions = listOf(
+                            UiAction.ReadText(
+                                id = "rt-container-validator-fail",
+                                matcher = NodeMatcher(textContains = "Temp"),
+                                container = NodeMatcher(resourceId = "com.example:id/list"),
+                                validator = UiTextValidator.Temperature,
+                            ),
+                        ),
+                    ),
+                )
+
+            val stepResult = result.stepResults.single()
+            assertEquals("read_text", stepResult.actionType)
+            assertEquals(false, stepResult.success)
+            assertEquals("VALIDATOR_MISMATCH", stepResult.data["error"])
+            assertEquals("not a temperature", stepResult.data["raw_text"])
+        }
 }
 
 private class RecordingTaskScope(
@@ -1428,6 +1518,19 @@ open class RecordingTaskUiScope(
         containerMatcher: NodeMatcher,
         retry: TaskRetry,
     ): List<String> = listOf("Title Text 1 in Container", "Title Text 2 in Container")
+
+    override suspend fun getValidatedTextWithinContainer(
+        matcher: NodeMatcher,
+        containerMatcher: NodeMatcher,
+        retry: TaskRetry,
+        validator: (String) -> Boolean,
+    ): String {
+        val value = "22.5 C"
+        if (!validator(value)) {
+            throw IllegalStateException("Validation failed for text '$value' from matching UI node within container")
+        }
+        return value
+    }
 
     var readKeyValuePairResult: Pair<String, String> = Pair("Label", "Value")
     var readKeyValuePairThrows: IllegalStateException? = null

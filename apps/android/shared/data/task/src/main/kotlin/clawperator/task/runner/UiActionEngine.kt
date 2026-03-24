@@ -463,13 +463,38 @@ class UiActionEngineDefault(
                 // Single-match mode
                 val text =
                     if (container != null) {
-                        // Container-scoped read (validator not supported with container)
+                        // Container-scoped read with validator support
                         taskScope.ui {
-                            getTextWithinContainer(
-                                matcher = action.matcher,
-                                containerMatcher = container,
-                                retry = action.retry,
-                            )
+                            when (action.validator) {
+                                null -> getTextWithinContainer(
+                                    matcher = action.matcher,
+                                    containerMatcher = container,
+                                    retry = action.retry,
+                                )
+                                UiTextValidator.Temperature ->
+                                    getValidatedTextWithinContainer(
+                                        matcher = action.matcher,
+                                        containerMatcher = container,
+                                        retry = action.retry,
+                                        validator = TaskValidators.TemperatureValidator,
+                                    )
+                                UiTextValidator.Version ->
+                                    getValidatedTextWithinContainer(
+                                        matcher = action.matcher,
+                                        containerMatcher = container,
+                                        retry = action.retry,
+                                        validator = TaskValidators.VersionValidator,
+                                    )
+                                UiTextValidator.Regex -> {
+                                    val regex = Regex(checkNotNull(action.validatorPattern) { "validatorPattern required for Regex validator" })
+                                    getValidatedTextWithinContainer(
+                                        matcher = action.matcher,
+                                        containerMatcher = container,
+                                        retry = action.retry,
+                                        validator = { it.matches(regex) },
+                                    )
+                                }
+                            }
                         }
                     } else {
                         // Non-container read (original behavior with validator support)

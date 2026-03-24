@@ -85,6 +85,25 @@ interface TaskUiScope {
     ): String
 
     /**
+     * Gets the text content of a UI element that matches the specified NodeMatcher criteria,
+     * searching only within the subtree of the container matched by [containerMatcher],
+     * and validates it against the provided validator function.
+     *
+     * @param matcher NodeMatcher containing the criteria to match for the target element
+     * @param containerMatcher NodeMatcher for the container element whose subtree to search within
+     * @param retry Retry configuration (defaults to no retry)
+     * @param validator Lambda function that validates the text content
+     * @return The validated text content of the matching element
+     * @throws Exception if container not found, no matching element found, text cannot be extracted, or validation fails
+     */
+    suspend fun getValidatedTextWithinContainer(
+        matcher: NodeMatcher,
+        containerMatcher: NodeMatcher,
+        retry: TaskRetry = TaskRetry.None,
+        validator: (String) -> Boolean,
+    ): String
+
+    /**
      * Gets the text content of ALL UI elements that match the specified NodeMatcher criteria.
      * Returns an empty list when no elements match; does not retry on empty results, only on
      * exceptions (e.g. UI tree unavailable).
