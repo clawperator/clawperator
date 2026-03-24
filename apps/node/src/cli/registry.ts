@@ -1026,7 +1026,7 @@ Notes:
 COMMANDS["snapshot"] = {
   name: "snapshot",
   group: "Device Interaction",
-  supportedFlags: ["--validate-only", "--dry-run"],
+  supportedFlags: [],
   summary: "Get current Android UI hierarchy as XML",
   help: HELP_SNAPSHOT,
   topLevelBlock: `  snapshot [--device <id>] [--operator-package <pkg>] [--json]            Get current Android UI hierarchy as XML`,
@@ -1047,7 +1047,7 @@ COMMANDS["snapshot"] = {
 COMMANDS["screenshot"] = {
   name: "screenshot",
   group: "Device Interaction",
-  supportedFlags: ["--path", "--validate-only", "--dry-run"],
+  supportedFlags: ["--path"],
   summary: "Capture a screenshot from the device",
   help: HELP_SCREENSHOT,
   topLevelBlock: `  screenshot [--device <id>] [--operator-package <pkg>] [--path <file>] [--json]
@@ -1081,6 +1081,13 @@ COMMANDS["click"] = {
     const { rest, format, logger, deviceId, operatorPackage } = ctx;
     
     let coordinate: { x: number; y: number } | undefined;
+    const coordFlags = rest.filter((token) => token === "--coordinate");
+    if (coordFlags.length > 1) {
+      return formatError({
+        code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+        message: "--coordinate must not appear more than once",
+      }, { format });
+    }
     const coordIdx = rest.indexOf("--coordinate");
     if (coordIdx >= 0) {
       const xStr = rest[coordIdx + 1];

@@ -417,6 +417,14 @@ describe("promoted flat commands - help and missing-arg errors", () => {
     assert.match(obj.message ?? "", /--coordinate requires two non-negative integers/);
   });
 
+  it("click rejects repeated --coordinate flags with exit 1", async () => {
+    const { stdout, code } = await runCli(["click", "--coordinate", "10", "20", "--coordinate", "30", "40"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "EXECUTION_VALIDATION_FAILED");
+    assert.match(obj.message ?? "", /--coordinate must not appear more than once/);
+  });
+
   it("click --coordinate with negative coordinates returns EXECUTION_VALIDATION_FAILED with exit 1", async () => {
     const { stdout, code } = await runCli(["click", "--coordinate", "-10", "20"]);
     assert.strictEqual(code, 1, stdout);
@@ -461,6 +469,14 @@ describe("promoted flat commands - help and missing-arg errors", () => {
     const validateOnlyObj = JSON.parse(validateOnlyResult.stdout) as { code?: string; message?: string };
     assert.strictEqual(validateOnlyObj.code, "USAGE");
     assert.match(validateOnlyObj.message ?? "", /unrecognized flag '--validate-only'/);
+  });
+
+  it("snapshot rejects dry-run flags instead of executing", async () => {
+    const { stdout, code } = await runCli(["snapshot", "--dry-run"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "USAGE");
+    assert.match(obj.message ?? "", /unrecognized flag '--dry-run'/);
   });
 
   it("open accepts --app without unknown-flag rejection", async () => {
