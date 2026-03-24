@@ -737,7 +737,7 @@ export const COMMANDS: Record<string, CommandDef> = {};
 // operator
 COMMANDS["operator"] = {
   name: "operator",
-  group: "Setup & Diagnostics",
+  group: "Setup",
   summary: "Install the Operator APK and configure the device",
   help: HELP_OPERATOR_SETUP,
   subtopics: {
@@ -776,7 +776,7 @@ COMMANDS["operator"] = {
 // setup
 COMMANDS["setup"] = {
   name: "setup",
-  group: "Setup & Diagnostics",
+  group: "Setup",
   summary: "Alias guidance - use operator setup instead",
   help: HELP_OPERATOR_SETUP,
   handler: async (_ctx) => {
@@ -791,7 +791,7 @@ COMMANDS["setup"] = {
 // install
 COMMANDS["install"] = {
   name: "install",
-  group: "Setup & Diagnostics",
+  group: "Setup",
   summary: "Alias guidance - use operator setup instead",
   help: HELP_OPERATOR_SETUP,
   handler: async (_ctx) => {
@@ -925,7 +925,7 @@ COMMANDS["packages"] = {
 COMMANDS["exec"] = {
   name: "exec",
   synonyms: ["execute"],
-  group: "Execution & Automation",
+  group: "Execution",
   summary: "Execute a validated command payload",
   help: `clawperator exec
 
@@ -1778,7 +1778,7 @@ COMMANDS["read-value"] = {
 // skills
 COMMANDS["skills"] = {
   name: "skills",
-  group: "Execution & Automation",
+  group: "Execution",
   summary: "Manage and run automation skills",
   help: `clawperator skills
 
@@ -1993,7 +1993,7 @@ COMMANDS["recording"] = {
 // serve
 COMMANDS["serve"] = {
   name: "serve",
-  group: "Execution & Automation",
+  group: "Execution",
   summary: "Start local HTTP/SSE server for remote control",
   help: "clawperator serve\n\nUsage:\n  clawperator serve [--port <number>] [--host <string>]\n\nNotes:\n  - Default host: 127.0.0.1\n",
   topLevelBlock: `  serve [--port <number>] [--host <string>]
@@ -2022,7 +2022,7 @@ COMMANDS["serve"] = {
 // doctor
 COMMANDS["doctor"] = {
   name: "doctor",
-  group: "Setup & Diagnostics",
+  group: "Setup",
   summary: "Run environment and runtime checks",
   help: HELP_DOCTOR,
   topLevelBlock: `  doctor [--json]
@@ -2053,7 +2053,7 @@ COMMANDS["doctor"] = {
 // grant-device-permissions
 COMMANDS["grant-device-permissions"] = {
   name: "grant-device-permissions",
-  group: "Setup & Diagnostics",
+  group: "Setup",
   summary: "Re-grant accessibility and notification permissions",
   help: HELP_GRANT_DEVICE_PERMISSIONS,
   topLevelBlock: `  grant-device-permissions [--device <id>] [--operator-package <package>]
@@ -2072,7 +2072,7 @@ COMMANDS["grant-device-permissions"] = {
 // version
 COMMANDS["version"] = {
   name: "version",
-  group: "Setup & Diagnostics",
+  group: "Setup",
   summary: "Show the CLI version",
   help: HELP_VERSION,
   topLevelBlock: `  version
@@ -2193,9 +2193,9 @@ export function generateTopLevelHelp(commands: Record<string, CommandDef>): stri
   const groupOrder = [
     "Device Interaction",
     "Device Management",
-    "Execution & Automation",
+    "Execution",
     "Recording",
-    "Setup & Diagnostics"
+    "Setup"
   ];
 
   const groups: Record<string, string[]> = {};

@@ -210,11 +210,11 @@ async function main(): Promise<void> {
               bestMatch = flag;
             }
           }
+          // TODO: Phase 4 follow-up - Flag suggestion architecture is fragile long-term.
+          // Extracting known flags from rendered help text via regex is brittle. Replace
+          // with a formal per-command flag registry / allowlist.
           if (bestMatch && bestScore > 0.75) {
             result = JSON.stringify({ code: "USAGE", message: `unrecognized flag '${firstUnknownFlag}'. Did you mean '${bestMatch}'?` });
-            usageParseError = true;
-          } else if (firstUnknownFlag === "--body") {
-            result = JSON.stringify({ code: "USAGE", message: `unrecognized flag '--body'. Did you mean '--text'?` });
             usageParseError = true;
           } else {
             result = JSON.stringify({ code: "USAGE", message: `unrecognized flag '${firstUnknownFlag}'` });
