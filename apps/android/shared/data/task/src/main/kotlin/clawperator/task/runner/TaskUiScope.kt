@@ -69,6 +69,22 @@ interface TaskUiScope {
     ): String
 
     /**
+     * Gets the text content of a UI element that matches the specified NodeMatcher criteria,
+     * searching only within the subtree of the container matched by [containerMatcher].
+     *
+     * @param matcher NodeMatcher containing the criteria to match for the target element
+     * @param containerMatcher NodeMatcher for the container element whose subtree to search within
+     * @param retry Retry configuration (defaults to no retry)
+     * @return The text content of the matching element
+     * @throws Exception if container not found, or no matching element found within container, or text cannot be extracted
+     */
+    suspend fun getTextWithinContainer(
+        matcher: NodeMatcher,
+        containerMatcher: NodeMatcher,
+        retry: TaskRetry = TaskRetry.None,
+    ): String
+
+    /**
      * Gets the text content of ALL UI elements that match the specified NodeMatcher criteria.
      * Returns an empty list when no elements match; does not retry on empty results, only on
      * exceptions (e.g. UI tree unavailable).
@@ -80,6 +96,23 @@ interface TaskUiScope {
      */
     suspend fun getAllText(
         matcher: NodeMatcher,
+        retry: TaskRetry = TaskRetry.None,
+    ): List<String>
+
+    /**
+     * Gets the text content of ALL UI elements that match the specified NodeMatcher criteria,
+     * searching only within the subtree of the container matched by [containerMatcher].
+     * Returns an empty list when no elements match.
+     *
+     * @param matcher NodeMatcher containing the criteria to match for target elements
+     * @param containerMatcher NodeMatcher for the container element whose subtree to search within
+     * @param retry Retry configuration (defaults to no retry)
+     * @return List of text content from all matching elements within the container; may be empty
+     * @throws Exception if the UI tree cannot be retrieved after all retry attempts
+     */
+    suspend fun getAllTextWithinContainer(
+        matcher: NodeMatcher,
+        containerMatcher: NodeMatcher,
         retry: TaskRetry = TaskRetry.None,
     ): List<String>
 

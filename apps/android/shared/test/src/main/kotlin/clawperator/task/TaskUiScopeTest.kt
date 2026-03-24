@@ -110,6 +110,85 @@ class TaskUiScopeTest(
         }.map { it.label }.filter { it.isNotBlank() }
     }
 
+    override suspend fun getTextWithinContainer(
+        matcher: NodeMatcher,
+        containerMatcher: NodeMatcher,
+        retry: TaskRetry,
+    ): String {
+        // Find the container node
+        val containerNode =
+            clawperator.uitree.UiTreeTraversal.findFirst(currentUiTree) { uiNode ->
+                val taskUiNode =
+                    TaskUiNode(
+                        resourceId = uiNode.resourceId,
+                        label = uiNode.label,
+                        clickable = uiNode.isClickable,
+                        role = uiNode.role.name.lowercase(),
+                        bounds = uiNode.bounds,
+                        debugPath = uiNode.id.value,
+                    )
+                containerMatcher.matches(taskUiNode)
+            } ?: throw IllegalStateException("Container not found for: $containerMatcher")
+
+        // Create a sub-tree rooted at the container
+        val subTree = clawperator.uitree.UiTree(root = containerNode, windowId = currentUiTree.windowId)
+
+        // Find the target node within the container subtree
+        val targetNode =
+            clawperator.uitree.UiTreeTraversal.findFirst(subTree) { uiNode ->
+                val taskUiNode =
+                    TaskUiNode(
+                        resourceId = uiNode.resourceId,
+                        label = uiNode.label,
+                        clickable = uiNode.isClickable,
+                        role = uiNode.role.name.lowercase(),
+                        bounds = uiNode.bounds,
+                        debugPath = uiNode.id.value,
+                    )
+                matcher.matches(taskUiNode)
+            } ?: throw IllegalStateException("No UI node found matching criteria: $matcher within container: $containerMatcher")
+
+        return targetNode.label
+    }
+
+    override suspend fun getAllTextWithinContainer(
+        matcher: NodeMatcher,
+        containerMatcher: NodeMatcher,
+        retry: TaskRetry,
+    ): List<String> {
+        // Find the container node
+        val containerNode =
+            clawperator.uitree.UiTreeTraversal.findFirst(currentUiTree) { uiNode ->
+                val taskUiNode =
+                    TaskUiNode(
+                        resourceId = uiNode.resourceId,
+                        label = uiNode.label,
+                        clickable = uiNode.isClickable,
+                        role = uiNode.role.name.lowercase(),
+                        bounds = uiNode.bounds,
+                        debugPath = uiNode.id.value,
+                    )
+                containerMatcher.matches(taskUiNode)
+            } ?: throw IllegalStateException("Container not found for: $containerMatcher")
+
+        // Create a sub-tree rooted at the container
+        val subTree = clawperator.uitree.UiTree(root = containerNode, windowId = currentUiTree.windowId)
+
+        // Find all matching nodes within the container subtree
+        return clawperator.uitree.UiTreeTraversal.findAll(subTree) { uiNode ->
+            val taskUiNode =
+                TaskUiNode(
+                    resourceId = uiNode.resourceId,
+                    label = uiNode.label,
+                    clickable = uiNode.isClickable,
+                    role = uiNode.role.name.lowercase(),
+                    bounds = uiNode.bounds,
+                    debugPath = uiNode.id.value,
+                )
+            matcher.matches(taskUiNode)
+        }.map { it.label }.filter { it.isNotBlank() }
+    }
+
     override suspend fun click(
         matcher: NodeMatcher,
         clickTypes: UiTreeClickTypes,

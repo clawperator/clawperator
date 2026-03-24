@@ -1271,6 +1271,18 @@ open class RecordingTaskUiScope(
         retry: TaskRetry,
     ): String = "Title Text"
 
+    override suspend fun getTextWithinContainer(
+        matcher: NodeMatcher,
+        containerMatcher: NodeMatcher,
+        retry: TaskRetry,
+    ): String = "Title Text in Container"
+
+    override suspend fun getAllTextWithinContainer(
+        matcher: NodeMatcher,
+        containerMatcher: NodeMatcher,
+        retry: TaskRetry,
+    ): List<String> = listOf("Title Text 1 in Container", "Title Text 2 in Container")
+
     var readKeyValuePairResult: Pair<String, String> = Pair("Label", "Value")
     var readKeyValuePairThrows: IllegalStateException? = null
 
