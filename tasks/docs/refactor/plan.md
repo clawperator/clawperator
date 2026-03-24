@@ -29,32 +29,64 @@ This eliminates the false editing surface (`sites/docs/docs/`), makes drift arch
   - Cross-repo copies (what skills docs map to what output paths, with link rewrite rules)
   - Marker expansion specs (what authored pages contain `<!-- CODE-DERIVED: xxx -->` markers)
 - Authored pages that map 1:1 from `docs/` to output need no entry in `source-map.yaml`. Their presence in `mkdocs.yml` nav is sufficient.
-- If a page is in `mkdocs.yml` nav but missing from both `docs/` and `source-map.yaml`, the build fails.
 
-### Link correctness
+**Hard invariant (enforced by assembly script):**
+- Every page in `mkdocs.yml` nav must have exactly one source: authored (`docs/`), `code_derived` (source-map), or `cross_repo` (source-map).
+- `source-map.yaml` must not define output paths absent from `mkdocs.yml` nav.
+- No two entries may produce the same output path.
+- Violations fail the build.
 
-- Authored intra-repo links: correct by construction because source paths match output paths. A link from `docs/api/actions.md` to `../setup.md` resolves identically in source and output.
-- Cross-repo links (skills docs copied from `../clawperator-skills/docs/`): rewritten at build time by the assembly script using a mapping table derived from `source-map.yaml`.
-- Unresolvable links: must fail the build. No silent broken links.
+### Link rewriting rules
+
+**Authored intra-repo links:** Correct by construction. Source paths match output paths, so a link from `docs/api/actions.md` to `../setup.md` resolves identically in source and output. No rewriting needed.
+
+**Cross-repo links** (skills docs from `../clawperator-skills/docs/`): Rewritten at build time by the assembly script. Algorithm:
+
+1. Resolve each relative link against the source file's location in the source repo.
+2. Look up the resolved source path in the `cross_repo` section of `source-map.yaml` to find its output path.
+3. If the target is an authored page in `docs/`, map directly (paths are identical).
+4. Rewrite the link to be relative to the output file's location in `.build/`.
+5. If the target cannot be resolved to any known output path, fail the build.
+6. Absolute links (https://, #anchors within same page) are untouched.
+
+**Validation:** The build must fail on any unresolvable relative link. `assemble_docs.sh` logs all rewritten links when run with `--verbose`.
 
 ### Code vs authored precedence
 
 - Code-derived data is authoritative for structure, enumerations, and schemas.
 - Authored content augments but cannot override code definitions.
-- If code adds a new error code or selector flag, the expanded page must include it. The generator should warn (or fail) on mismatch.
-- Marker-based injection: authored files may contain `<!-- CODE-DERIVED: <id> -->` markers. The assembly script replaces these with generated content from code sources. The authored file (with marker) is committed. The expanded file (with injected content) exists only in the build staging directory.
+
+**Marker-based pages** (`api/errors.md`, `api/selectors.md`):
+- Authored files contain `<!-- CODE-DERIVED: <id> -->` markers. The assembly script replaces these with generated content from code sources. The authored file (with marker) is committed. The expanded file (with injected content) exists only in the build staging directory.
+- Generator output is authoritative for enumerations (error codes, selector flags).
+- Build must fail if:
+  - A `<!-- CODE-DERIVED: ... -->` marker remains unexpanded in the staging output.
+  - The generator produces entries that the authored prose references by name but does not match (stale renames).
+- The authored prose around markers provides semantics (recovery guidance, usage notes). It augments the generated table but cannot redefine what the code declares.
 
 ### Page boundary constraints
 
 - `api/overview.md` must not exceed: one screen of concepts, one result envelope definition, one execution flow description. All detailed mechanics live in dedicated pages.
 - Core reference pages (actions, selectors, errors) are explicitly designed to be used together. Cross-referencing between them is expected and acceptable. The "self-contained" principle means minimizing cross-dependencies, not eliminating them.
 
+### Nav structural constraints
+
+- Maximum 2 levels deep (section > page). No sub-sub-sections.
+- Target ~6 pages per section (soft limit; API section is larger by design).
+- Total target: ~20 pages. Growth beyond 25 requires justification.
+- These constraints keep `llms-full.txt` coherent and retrieval predictable.
+
 ### Build failure conditions
 
-- Any relative link that cannot be resolved to an output page
-- Any code-derived enum (error code, selector flag) absent from its target page after marker expansion
-- Any page in `mkdocs.yml` nav missing from the assembled staging directory
-- Any page in the staging directory absent from `mkdocs.yml` nav (excluding redirects)
+The build must fail if any of these are true:
+
+- Any relative link cannot be resolved to an output page
+- Any `<!-- CODE-DERIVED: ... -->` marker remains unexpanded in staging output
+- Any page in `mkdocs.yml` nav is missing from the assembled staging directory
+- Any page in the staging directory is absent from `mkdocs.yml` nav (excluding redirects)
+- Any `source-map.yaml` entry defines an output path not present in `mkdocs.yml` nav
+- Any `mkdocs.yml` nav path appears more than once
+- Any two source-map entries produce the same output path
 
 ### Terminology consistency
 

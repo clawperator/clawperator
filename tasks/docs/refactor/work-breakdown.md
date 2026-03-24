@@ -54,23 +54,22 @@ Everything else depends on this phase. Must complete before content authoring be
 
 **Output:** Fully assembled `sites/docs/.build/` directory ready for MkDocs.
 
-**Behavior:**
-1. Remove `sites/docs/.build/` if it exists, create fresh
-2. Parse `mkdocs.yml` nav to get list of all page paths
-3. For each page path in nav:
-   - If the page exists at `docs/<path>`: copy to `.build/<path>`
-   - If the page is defined in `source-map.yaml` as `code_derived`: run its generator script, write output to `.build/<path>`
-   - If the page is defined in `source-map.yaml` as `cross_repo`: copy from source repo with link rewriting to `.build/<path>`
-   - If the page exists at `docs/<path>` AND has a `markers` entry in `source-map.yaml`: copy to `.build/<path>` with marker expansion
-   - Otherwise: fail with error
-4. For authored pages with `<!-- CODE-DERIVED: <id> -->` markers: run the associated generator, replace marker with output
-5. For cross-repo pages: rewrite relative links using `link_rewrites` mapping from `source-map.yaml`
-6. Verify every nav page exists in `.build/`. Fail if any missing.
+**Behavior (clear phase boundaries):**
+
+1. **resolve_pages** - Parse `mkdocs.yml` nav to get all page paths. For each, determine source: authored (`docs/`), `code_derived` (source-map), or `cross_repo` (source-map). Fail if any page has no source. Fail if source-map defines outputs not in nav. Fail if duplicate output paths exist.
+2. **clean_staging** - Remove `sites/docs/.build/` if exists, create fresh.
+3. **copy_authored** - Copy authored pages from `docs/` to `.build/` preserving structure.
+4. **generate_code_derived** - Run generator scripts for code-derived pages, write to `.build/`.
+5. **apply_markers** - For authored pages with `<!-- CODE-DERIVED: <id> -->` markers, run associated generator, replace marker in the `.build/` copy. Fail if any marker remains unexpanded.
+6. **copy_cross_repo** - Copy skills docs from source repo to `.build/`, rewriting relative links per mapping table. Link rewriting algorithm: resolve relative link against source location, look up resolved path in source-map to find output path, rewrite to be relative to output file location, fail if unresolvable.
+7. **validate_build** - Verify every nav page exists in `.build/`. Verify no unexpected pages exist. Verify no unexpanded markers. Log summary.
+
+Supports `--verbose` flag to log all link rewrites and source resolutions.
 
 **Acceptance:**
 - Script runs without error when called with placeholder authored pages
 - `.build/` contains exactly the pages listed in nav
-- Script exits non-zero if any page is missing
+- Script exits non-zero on: missing page, orphan source-map entry, duplicate output path, unexpanded marker, unresolvable link
 - Cross-repo links are rewritten correctly
 - Markers are expanded correctly
 
