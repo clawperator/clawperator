@@ -74,8 +74,8 @@ workflow (also available as `record` alias), use [Android Recording Format for A
 | `scroll <dir> --container-desc-contains <sub>` | Scroll within a container matched by partial content description |
 | `scroll <dir> --container-role <role>` | Scroll within a container matched by role |
 | `scroll <dir> --container-selector <json>` | Scroll within a container using raw `NodeMatcher` JSON (advanced only) |
-| `scroll-until [<dir>] --text <text>` | Scroll until target element is visible (direction defaults to `down`) |
-| `scroll-until [<dir>] --text <text> --click` | Scroll until visible, then click (action type: `scroll_and_click`) |
+| `scroll-until [<dir>] --text <text>` | Scroll until target element is visible (direction defaults to `down`; uses `scroll_until` on the wire) |
+| `scroll-until [<dir>] --text <text> --click` | Scroll until visible, then click (action type: `scroll_and_click`, not `scroll_until` with `clickAfter`) |
 | `scroll-and-click [<dir>] --text <text>` | Synonym for `scroll-until --click` |
 | `close <package>` | Force-stop an Android application |
 | `close --app <package>` | Same as `close <package>` |
@@ -104,6 +104,8 @@ workflow (also available as `record` alias), use [Android Recording Format for A
 
 For agent callers, `--json` is the canonical output flag. `--output pretty` is for human inspection.
 
+**`--json` exit codes:** Plain validation errors return JSON with a top-level `code` and exit `1`. When the CLI prints a device wrapper object that includes `envelope`, it exits `1` if `envelope.status` is `failed` or if any `envelope.stepResults` entry has `success: false` (after Node post-processing such as `close_app` preflight reconciliation). Otherwise it exits `0`. Shell scripts should not rely on `$?` alone without checking `envelope` and each step.
+
 **`wait` and global `--timeout`:** On the `wait` command only, `--timeout <ms>` sets how long the device may poll for a matching node. It is written to `wait_for_node.params.timeoutMs` and the Node layer raises execution `timeoutMs` to at least `max(waitTimeoutMs + 5000, 30000)` so the outer envelope does not expire before the wait finishes. On other commands, `--timeout` still sets the execution envelope timeout as usual.
 
 ### Selector Flags (click, type, read, wait)
@@ -124,7 +126,7 @@ Multiple simple flags combine with AND semantics: `--text "Login" --role button`
 
 For `type`, `--text` is reserved for the text to type. Identify the target with `--id`, `--role`, `--desc`, `--text-contains`, `--desc-contains`, or `--selector` (advanced).
 
-**`read`:** `--all` returns every on-screen node that matches the selector. It requires `--json` (CLI rejects pretty mode). Do not combine `all: true` with `validator` in raw executions: the Android runtime uses the multi-match path only when `all` is false or omitted for validator flows.
+**`read`:** `--all` returns every on-screen node that matches the selector. It requires `--json` (CLI rejects pretty mode). The matching labels are in `stepResults[].data.text` as a **string** that contains JSON array syntax (for example `["Wi-Fi","Wi-Fi Direct"]`); parse it with `JSON.parse` in your agent. An empty match set is `"[]"`. Do not combine `all: true` with `validator` in raw executions: the Android runtime uses the multi-match path only when `all` is false or omitted for validator flows.
 
 **`wait`:** Optional `--timeout <ms>` (non-negative) caps wall-clock wait time on the device (see global options note above).
 
@@ -876,20 +878,18 @@ becomes visible. This gives agents a one-step "scroll top-level list until
 visible, then click" path without switching to `scroll_and_click`.
 *Note on `clickAfter` firing:* The click only fires if the loop terminates with `TARGET_FOUND`.
 
+**CLI `scroll-until --click` vs raw `scroll_until`:** The CLI maps `--click` to a `scroll_and_click` action (default `maxSwipes` 10 and the scroll-and-click engine), not to `scroll_until` with `clickAfter: true`. Raw `scroll_until` uses different defaults (`maxScrolls` 20, bounded scroll-until loop). Prefer raw `scroll_until` with `clickAfter: true` when you need scroll-until caps and semantics.
+
 **Termination reasons (`data.termination_reason`):**
-- `TARGET_FOUND` - the provided `target` matcher became visible in the current UI tree. `success: true`.
-- `EDGE_REACHED` - scrolling stopped because no further movement was detected. `success: true`.
-- `MAX_SCROLLS_REACHED` - hit `maxScrolls` cap. `success: true`. Normal for infinite feeds.
-- `MAX_DURATION_REACHED` - hit `maxDurationMs` cap. `success: true`. Normal for infinite feeds.
-- `NO_POSITION_CHANGE` - no content movement across `noPositionChangeThreshold` consecutive scrolls. `success: true`.
+- `TARGET_FOUND` - the provided `matcher` became visible in the on-screen filtered UI tree. Step `success: true`.
+- When **`params.matcher` is set**, any other terminal reason means the target was not found in time. The step is `success: false`, `data.error` is `TARGET_NOT_FOUND`, and the top-level envelope is `failed` after Node reconciliation. Treat this as a hard miss, not a successful scroll.
+- When **no `matcher`** is provided, the loop is exploratory pagination only. Then `EDGE_REACHED`, `MAX_SCROLLS_REACHED`, `MAX_DURATION_REACHED`, and `NO_POSITION_CHANGE` are normal terminal states with step `success: true` (not errors). Agents scrolling infinite feeds should expect capped terminals and handle them without treating the action as failed.
 - `CONTAINER_NOT_FOUND` - container resolution failed. `success: false`.
 - `CONTAINER_NOT_SCROLLABLE` - container is not scrollable. `success: false`.
 - `CONTAINER_LOST` - container disappeared mid-loop (e.g., app navigated away). `success: false`.
 
-`MAX_SCROLLS_REACHED`, `MAX_DURATION_REACHED`, and `NO_POSITION_CHANGE` are clean terminal states, not errors. Agents scrolling infinite feeds should expect these and handle them without treating the action as failed.
-
 When no `matcher` is provided, `scroll_until` behaves as a pure bounded
-pagination loop and returns one of the non-target terminal reasons above.
+pagination loop and returns one of the non-target terminal reasons above with `success: true`.
 
 **Current runtime caveats:**
 - Some Android screens expose off-screen descendants in the raw `snapshot_ui` XML. `scroll_until.matcher` does not use raw XML presence alone; it checks Clawperator's on-screen filtered tree. On heavily clipped or nested layouts, a target may appear in the raw snapshot near the bottom edge but still finish as `EDGE_REACHED` until it is more fully on-screen.
@@ -924,12 +924,17 @@ When a scroll loop might trigger navigation, heavy UI re-layout, or clipped list
 { "id": "su1", "actionType": "scroll_until", "success": true, "data": { "termination_reason": "TARGET_FOUND", "scrolls_executed": "5", "direction": "down", "click_after": "true", "click_types": "default", "resolved_container": "com.android.settings:id/recycler_view" } }
 ```
 
-**`scroll_until` example step result (finite list, reached bottom):**
+**`scroll_until` example step result (finite list, reached bottom, no matcher):**
 ```json
 { "id": "su1", "actionType": "scroll_until", "success": true, "data": { "termination_reason": "EDGE_REACHED", "scrolls_executed": "12", "direction": "down" } }
 ```
 
-**`scroll_until` example step result (infinite feed, hit cap):**
+**`scroll_until` example step result (matcher set, target never found):**
+```json
+{ "id": "su1", "actionType": "scroll_until", "success": false, "data": { "termination_reason": "EDGE_REACHED", "error": "TARGET_NOT_FOUND", "scrolls_executed": "3", "direction": "down" } }
+```
+
+**`scroll_until` example step result (infinite feed, hit cap, no matcher):**
 ```json
 { "id": "su1", "actionType": "scroll_until", "success": true, "data": { "termination_reason": "MAX_SCROLLS_REACHED", "scrolls_executed": "20", "direction": "down" } }
 ```

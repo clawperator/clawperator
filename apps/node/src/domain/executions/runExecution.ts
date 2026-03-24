@@ -117,6 +117,30 @@ export function injectServiceUnavailableHint(envelope: ResultEnvelope, deviceId:
   envelope.hint = `Accessibility service not running. Run 'clawperator doctor --fix --device ${deviceId}' to diagnose and repair, or 'clawperator operator setup --apk <path-to-apk> --device ${deviceId}' to reinstall.`;
 }
 
+/**
+ * Align top-level envelope `status` / `error` with the final `stepResults` after Node-side
+ * post-processing (close_app preflight normalization, snapshot attachment, etc.).
+ * Does not alter Android-only failure envelopes that have no steps (e.g. service unavailable).
+ */
+export function reconcileEnvelopeStatusAfterPostProcessing(envelope: ResultEnvelope): void {
+  if (envelope.stepResults.length === 0) {
+    return;
+  }
+  const firstFailed = envelope.stepResults.find(s => !s.success);
+  if (firstFailed !== undefined) {
+    envelope.status = "failed";
+    const errKey = firstFailed.data?.error;
+    const detail = errKey !== undefined && errKey !== "" ? `: ${errKey}` : "";
+    envelope.error = `Step ${firstFailed.id} (${firstFailed.actionType}) failed${detail}`;
+    delete envelope.hint;
+  } else {
+    envelope.status = "success";
+    envelope.error = null;
+    delete envelope.errorCode;
+    delete envelope.hint;
+  }
+}
+
 export interface TimeoutErrorDetails {
   commandId?: string;
   taskId?: string;
@@ -484,6 +508,7 @@ async function performExecution(
         }
       }
 
+      reconcileEnvelopeStatusAfterPostProcessing(result.envelope);
       injectServiceUnavailableHint(result.envelope, deviceId);
 
       emitResult(deviceId, result.envelope);

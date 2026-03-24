@@ -600,6 +600,8 @@ Notes:
   - Synonym: scroll-and-click (implies --click)
   - Without --click, the action type is scroll_until (scroll until element is visible).
   - With --click, the action type is scroll_and_click (scroll until visible, then click).
+  - scroll_and_click uses different defaults than raw scroll_until (see agent guide); use exec JSON if you need scroll_until + clickAfter.
+  - If a selector is provided but the target never appears, the step fails (data.error TARGET_NOT_FOUND) and --json exits non-zero.
   - Tuning parameters (maxScrolls, maxDurationMs, etc.) are not exposed as CLI flags.
     Use 'clawperator exec' with raw JSON for advanced tuning.
 

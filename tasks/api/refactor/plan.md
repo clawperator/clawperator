@@ -1778,8 +1778,8 @@ command overhead. Also sets `params.timeoutMs` on the action.
 **Android Implementation:** Add `timeoutMs: Long? = null` to `UiAction.WaitForNode`
 data class. Update `AgentCommandParser` to parse `timeoutMs` from params.
 Update `TaskUiScope.waitForNode()` to accept optional timeout and wrap
-retry loop with `withTimeout(timeoutMs)`. Update `UiActionEngine` to pass
-the timeout through.
+the wait operation with `kotlinx.coroutines.withTimeout(timeoutMs)` (not
+`withTimeoutOrNull`). Update `UiActionEngine` to pass the timeout through.
 
 **Default:** when `--timeout` is not provided, `wait` uses the current
 fixed 30s behavior (execution timeout = 30000ms).

@@ -6,6 +6,9 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+# Android UI engine unit tests live in Gradle module :shared:test (not :shared:data:task).
+# Example: ./gradlew :shared:test:testDebugUnitTest --tests "*UiActionEngineDefaultTest*"
+
 # 0) Build node CLI
 npm --prefix apps/node run build
 

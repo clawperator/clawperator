@@ -67,4 +67,34 @@ describe("shouldCliStdoutForceExitCode1", () => {
 }`;
     assert.strictEqual(shouldCliStdoutForceExitCode1(pretty, false), true);
   });
+
+  it("forces exit 1 when envelope.status is failed", () => {
+    assert.strictEqual(
+      shouldCliStdoutForceExitCode1(
+        '{"envelope":{"status":"failed","stepResults":[],"error":"boom"},"deviceId":"d"}',
+        false,
+      ),
+      true,
+    );
+  });
+
+  it("forces exit 1 when envelope has a failed step", () => {
+    assert.strictEqual(
+      shouldCliStdoutForceExitCode1(
+        '{"envelope":{"status":"success","stepResults":[{"id":"a1","actionType":"read_text","success":false,"data":{}}],"error":null},"deviceId":"d"}',
+        false,
+      ),
+      true,
+    );
+  });
+
+  it("does not force exit 1 when envelope steps all succeeded", () => {
+    assert.strictEqual(
+      shouldCliStdoutForceExitCode1(
+        '{"envelope":{"status":"success","stepResults":[{"id":"a1","actionType":"sleep","success":true,"data":{}}],"error":null},"deviceId":"d"}',
+        false,
+      ),
+      false,
+    );
+  });
 });
