@@ -16,6 +16,8 @@ Everything else depends on this phase. Must complete before content authoring be
 
 **Goal:** Eliminate `sites/docs/docs/` from git tracking and set up gitignore entries for the new pipeline.
 
+**Prerequisite (DONE):** `docs/skills/skill-from-recording.md` has been moved to `../clawperator-skills/docs/skill-from-recording.md` (commit 058021d in this repo, 41abd7b in skills repo).
+
 **Steps:**
 1. `git rm -r sites/docs/docs/` - remove generated docs from git
 2. Add to `sites/docs/.gitignore`:
@@ -397,9 +399,7 @@ Each page should follow the page schema and use current CLI surface.
 
 Must also define: skill = deterministic wrapper, clawperator = execution substrate, agent = planner (explicitly, in `overview.md`).
 
-Delete old files from skills repo after new ones are written: `usage-model.md`, `skill-authoring-guidelines.md`, `skill-development-workflow.md`, `device-prep-and-runtime-tips.md`, `blocked-terms-policy.md`
-
-Also delete `docs/skills/skill-from-recording.md` from this repo (content absorbed into skills repo `authoring.md`).
+Delete old files from skills repo after new ones are written: `usage-model.md`, `skill-authoring-guidelines.md`, `skill-development-workflow.md`, `device-prep-and-runtime-tips.md`, `blocked-terms-policy.md`, `skill-from-recording.md` (moved from this repo in Task 1.1, now absorbed into `authoring.md`).
 
 **Depends on:** Phase 1 complete
 
