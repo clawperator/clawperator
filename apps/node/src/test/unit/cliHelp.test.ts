@@ -413,7 +413,23 @@ describe("promoted flat commands - help and missing-arg errors", () => {
     assert.strictEqual(code, 1, stdout);
     const obj = JSON.parse(stdout) as { code?: string; message?: string };
     assert.strictEqual(obj.code, "EXECUTION_VALIDATION_FAILED");
-    assert.match(obj.message ?? "", /--coordinate requires two numbers/);
+    assert.match(obj.message ?? "", /--coordinate requires two non-negative integers/);
+  });
+
+  it("click --coordinate with negative coordinates returns EXECUTION_VALIDATION_FAILED with exit 1", async () => {
+    const { stdout, code } = await runCli(["click", "--coordinate", "-10", "20"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "EXECUTION_VALIDATION_FAILED");
+    assert.match(obj.message ?? "", /--coordinate requires two non-negative integers/);
+  });
+
+  it("click --coordinate with fractional coordinates returns EXECUTION_VALIDATION_FAILED with exit 1", async () => {
+    const { stdout, code } = await runCli(["click", "--coordinate", "10.5", "20"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "EXECUTION_VALIDATION_FAILED");
+    assert.match(obj.message ?? "", /--coordinate requires two non-negative integers/);
   });
 
   it("click --coordinate rejects mixing with text selector (exit 1)", async () => {

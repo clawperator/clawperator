@@ -1050,18 +1050,21 @@ COMMANDS["click"] = {
     if (coordIdx >= 0) {
       const xStr = rest[coordIdx + 1];
       const yStr = rest[coordIdx + 2];
-      if (!xStr || !yStr || xStr.startsWith("-") || yStr.startsWith("-")) {
-        return formatError({
-          code: "EXECUTION_VALIDATION_FAILED",
-          message: "--coordinate requires two numbers (x y)",
-        }, { format });
-      }
       const x = Number(xStr);
       const y = Number(yStr);
-      if (isNaN(x) || isNaN(y)) {
+      if (
+        !xStr ||
+        !yStr ||
+        xStr.startsWith("-") ||
+        yStr.startsWith("-") ||
+        !Number.isInteger(x) ||
+        !Number.isInteger(y) ||
+        x < 0 ||
+        y < 0
+      ) {
         return formatError({
           code: "EXECUTION_VALIDATION_FAILED",
-          message: "--coordinate requires two numbers (x y)",
+          message: "--coordinate requires two non-negative integers (x y)",
         }, { format });
       }
       coordinate = { x, y };

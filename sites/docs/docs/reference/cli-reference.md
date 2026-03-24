@@ -283,7 +283,7 @@ clawperator click --selector '<json>' [--device <id>] [--operator-package <pkg>]
 | `--desc <text>` | Exact content description (`contentDescEquals`) |
 | `--desc-contains <text>` | Partial content description (`contentDescContains`) |
 | `--role <role>` | Element role (`role`) |
-| `--coordinate <x> <y>` | Tap a specific screen coordinate (pixels) |
+| `--coordinate <x> <y>` | Tap a specific screen coordinate (non-negative integers) |
 | `--selector <json>` | Raw `NodeMatcher` JSON (advanced; mutually exclusive with the simple flags above) |
 
 At least one of the selector mechanisms above is required. Prefer `--text`, `--id`, `--role`, `--coordinate`, or `--desc` over `--selector` when a single field is enough.

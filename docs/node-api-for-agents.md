@@ -41,7 +41,7 @@ workflow (also available as `record` alias), use [Android Recording Format for A
 | `click --desc-contains <sub>` | Tap the first element whose content description contains the substring |
 | `click --role <role>` | Tap the first element with the given role |
 | `click --selector <json>` | Tap using raw `NodeMatcher` JSON (advanced only; mutually exclusive with simple flags) |
-| `click --coordinate <x> <y>` | Tap a specific screen coordinate (mutually exclusive with selectors) |
+| `click --coordinate <x> <y>` | Tap a specific screen coordinate (non-negative integers; mutually exclusive with selectors) |
 | `click --text <text> --long` | Long press the matching element |
 | `click --text <text> --focus` | Set input focus without clicking (mutually exclusive with `--long`) |
 | `type <text> --role <role>` | Type into the first element with the given role |
