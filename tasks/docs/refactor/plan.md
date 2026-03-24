@@ -10,6 +10,8 @@
 - Contract-first: schemas, shapes, and enumerations over prose explanations.
 - Self-contained pages: an agent should resolve its question from a single page fetch.
 - No persona sections. No "recommended paths." No "getting started vs reference" split.
+- **Code is the source of truth.** Existing documentation is advisory only and not presumed accurate. Where docs and code conflict, code wins. Every authored page must be verified against the current implementation before it is finalized.
+- **All canonical public docs live in one repo.** Skills docs, API docs, and setup docs are all authored in the main repo under `docs/`. The skills repo contains lightweight pointers only.
 
 ---
 
@@ -17,7 +19,9 @@
 
 ### Source structure = output structure
 
-Authored docs live in `docs/` and are structured to match the final published layout directly. There is no intermediate "generated docs" directory committed to git. The build pipeline assembles a staging directory from authored sources + code-derived content + cross-repo copies, and MkDocs reads from that staging directory.
+Authored docs live in `docs/` and are structured to match the final published layout directly. There is no intermediate "generated docs" directory committed to git. The build pipeline assembles a staging directory from authored sources + code-derived content, and MkDocs reads from that staging directory.
+
+All canonical public docs - including skills docs - are authored in this repo under `docs/`. The `../clawperator-skills` repo contains only lightweight pointer docs (README, links to the docs site). This eliminates cross-repo copying, cross-repo link rewriting, and the associated drift risk.
 
 This eliminates the false editing surface (`sites/docs/docs/`), makes drift architecturally impossible for authored pages, and means agents edit the file that gets published.
 
@@ -26,30 +30,22 @@ This eliminates the false editing surface (`sites/docs/docs/`), makes drift arch
 - `mkdocs.yml` is the canonical navigation and page ordering.
 - `source-map.yaml` is reduced to a build assembly manifest. It defines only:
   - Code-derived pages (what code files generate what output)
-  - Cross-repo copies (what skills docs map to what output paths, with link rewrite rules)
   - Marker expansion specs (what authored pages contain `<!-- CODE-DERIVED: xxx -->` markers)
 - Authored pages that map 1:1 from `docs/` to output need no entry in `source-map.yaml`. Their presence in `mkdocs.yml` nav is sufficient.
 
 **Hard invariant (enforced by assembly script):**
-- Every page in `mkdocs.yml` nav must have exactly one source: authored (`docs/`), `code_derived` (source-map), or `cross_repo` (source-map).
+- Every page in `mkdocs.yml` nav must have exactly one source: authored (`docs/`) or `code_derived` (source-map).
 - `source-map.yaml` must not define output paths absent from `mkdocs.yml` nav.
 - No two entries may produce the same output path.
 - Violations fail the build.
 
-### Link rewriting rules
+### Link correctness
 
-**Authored intra-repo links:** Correct by construction. Source paths match output paths, so a link from `docs/api/actions.md` to `../setup.md` resolves identically in source and output. No rewriting needed.
+All authored docs live in `docs/` with paths matching the output structure. Relative links are correct by construction - a link from `docs/api/actions.md` to `../setup.md` resolves identically in source and in the assembled `.build/` output. No link rewriting is needed.
 
-**Cross-repo links** (skills docs from `../clawperator-skills/docs/`): Rewritten at build time by the assembly script. Algorithm:
+Absolute links (https://, #anchors within same page) are untouched.
 
-1. Resolve each relative link against the source file's location in the source repo.
-2. Look up the resolved source path in the `cross_repo` section of `source-map.yaml` to find its output path.
-3. If the target is an authored page in `docs/`, map directly (paths are identical).
-4. Rewrite the link to be relative to the output file's location in `.build/`.
-5. If the target cannot be resolved to any known output path, fail the build.
-6. Absolute links (https://, #anchors within same page) are untouched.
-
-**Validation:** The build must fail on any unresolvable relative link. `assemble.sh` logs all rewritten links when run with `--verbose`.
+**Validation:** The build must fail on any unresolvable relative link.
 
 ### Code vs authored precedence
 
@@ -101,10 +97,37 @@ The build must fail if any of these are true:
 ### Old source file deletion criteria
 
 During the refactor, old source files (e.g., `docs/node-api-for-agents.md`) being replaced by new files in the target structure may only be deleted after:
-1. Their content exists in exactly one target page in `docs/`
+1. All target pages that depend on the old file's content are complete
 2. `./scripts/docs_build.sh` succeeds
 3. `llms-full.txt` includes the migrated content
 4. All validation passes
+
+Example: do not delete the five setup-related legacy docs until `setup.md`, `api/overview.md`, `api/devices.md`, and `troubleshooting/operator.md` are all complete, since setup-adjacent material may feed into all of them.
+
+### Migration mode rules
+
+These rules apply during the refactor and are dropped after it lands.
+
+1. **Reference snapshot:** Before any content rewriting begins, copy all current public docs sources into `tasks/docs/refactor/reference/` as a read-only migration snapshot. This folder is not published, not linked in nav, and not treated as source of truth. It exists purely so implementing agents can reference old content without risk of editing it. Delete after the refactor lands. Mark the directory clearly: *"Reference snapshot only. May contain stale or incorrect documentation. Do not publish. Do not treat as authoritative over code."*
+
+2. **Code is authoritative, old docs are not.** Existing documentation is advisory reference material only. For every authored page:
+   - The current implementation in code is the primary source of truth.
+   - Where docs and code conflict, code wins.
+   - If behavior is unclear from code, inspect tests and command help output before writing docs.
+   - Do not preserve wording from old docs unless it is verified against code.
+   - Each commit message or PR description should note what code was verified against (e.g., "Verified against: `apps/node/src/cli/registry.ts`, `apps/node/src/contracts/errors.ts`").
+
+3. **One page at a time.** Work one target page at a time. For each page:
+   - Gather source material (old docs from reference snapshot + code).
+   - Verify behavior against code.
+   - Draft the page.
+   - Review the page against the plan and current implementation.
+   - Run relevant validation (`docs_build.sh` or subset).
+   - Commit.
+   - For complex pages (`setup.md`, `api/actions.md`, `api/selectors.md`, `api/errors.md`): draft commit, then review/fixup commit.
+   - Use small, liberal commits. Do not batch multiple authored pages into one commit.
+
+4. **No mass deletion until validation passes.** Old source files remain available (in their original locations and in the reference snapshot) until all dependent target pages are complete and validated.
 
 ---
 
@@ -225,7 +248,7 @@ docs/
     serve.md                        (authored)
     navigation.md                   (authored)
     recording.md                    (authored)
-  skills/                           (cross-repo, copied at build time, gitignored)
+  skills/                           (authored)
     overview.md
     authoring.md
     development.md
@@ -234,16 +257,17 @@ docs/
     operator.md                     (authored)
     known-issues.md                 (authored)
     compatibility.md                (authored)
-  design/                           (internal, not published)
-    node-api-design.md
-    operator-llm-playbook.md
-    skill-design.md
-    generative-engine-optimization.md
-    node-api-design-guiding-principles.md
-  conformance-apk.md                (internal, not published)
-  release-procedure.md              (internal, not published)
-  release-reference.md              (internal, not published)
-  site-hosting.md                   (internal, not published)
+  internal/                         (internal, not published - clear structural signal)
+    conformance-apk.md
+    release-procedure.md
+    release-reference.md
+    site-hosting.md
+    design/
+      node-api-design.md
+      operator-llm-playbook.md
+      skill-design.md
+      generative-engine-optimization.md
+      node-api-design-guiding-principles.md
 ```
 
 ### Old files: disposition
@@ -277,29 +301,31 @@ These files exist in the current `docs/` tree and must be handled during the ref
 | `docs/reference/node-api-doctor.md` | DELETE | Replaced by `docs/api/doctor.md` |
 | `docs/reference/environment-variables.md` | DELETE | Replaced by `docs/api/environment.md` |
 | `docs/ai-agents/android-recording.md` | DELETE | Replaced by `docs/api/recording.md` |
-| `docs/skills/skill-from-recording.md` | DELETE | Merged into skills/authoring in cross-repo |
+| `docs/skills/skill-from-recording.md` | DELETE | Already moved to skills repo (058021d), content absorbed into `docs/skills/authoring.md` |
 | `docs/conformance-apk.md` | KEEP (internal) | Stays, not published |
 | `docs/release-procedure.md` | KEEP (internal) | Stays, not published |
 | `docs/release-reference.md` | KEEP (internal) | Stays, not published |
 | `docs/site-hosting.md` | KEEP (internal) | Stays, not published |
 | `docs/design/*.md` (all 5) | KEEP (internal) | Stay, not published |
 
-After the refactor, the `docs/reference/`, `docs/ai-agents/`, and `docs/skills/` directories are empty and can be deleted.
+After the refactor, the `docs/reference/`, `docs/ai-agents/` directories are empty and can be deleted.
 
-### Cross-repo sources in `../clawperator-skills/docs/`
+### Skills docs consolidation
 
-These files are the canonical source for skills docs. They are copied (with link rewriting) to `docs/skills/` at build time. The `docs/skills/` directory is gitignored.
+Skills docs are now authored in the main repo at `docs/skills/`. The `../clawperator-skills` repo retains only lightweight pointer docs (README with links to the docs site).
 
-| Source File | Target | Notes |
-|------------|--------|-------|
-| `usage-model.md` | `docs/skills/overview.md` | Tighten to contract style, update CLI examples |
-| `skill-authoring-guidelines.md` | `docs/skills/authoring.md` | Absorb `skill-from-recording.md` + `blocked-terms-policy.md` |
-| `skill-development-workflow.md` | `docs/skills/development.md` | Update CLI examples |
-| `device-prep-and-runtime-tips.md` | `docs/skills/runtime.md` | Update CLI examples |
-| `blocked-terms-policy.md` | DELETE | Absorbed into `skill-authoring-guidelines.md` |
-| `skill-from-recording.md` (in this repo) | DELETE | Absorbed into `skill-authoring-guidelines.md` |
+Content sources for the new `docs/skills/` pages:
 
-Note: The source files in `../clawperator-skills/docs/` must be renamed/restructured to match target filenames. After the refactor, the skills repo files should be named `overview.md`, `authoring.md`, `development.md`, `runtime.md`.
+| New File | Primary Source | Also Absorbs |
+|----------|---------------|-------------|
+| `docs/skills/overview.md` | `../clawperator-skills/docs/usage-model.md` | - |
+| `docs/skills/authoring.md` | `../clawperator-skills/docs/skill-authoring-guidelines.md` | `skill-from-recording.md` (already in skills repo), `blocked-terms-policy.md` |
+| `docs/skills/development.md` | `../clawperator-skills/docs/skill-development-workflow.md` | - |
+| `docs/skills/runtime.md` | `../clawperator-skills/docs/device-prep-and-runtime-tips.md` | - |
+
+After authoring the new pages in `docs/skills/`, update the skills repo:
+- Replace current docs with lightweight pointers to `https://docs.clawperator.com/skills/`
+- Keep repo-local contributor guidance (README, CONTRIBUTING if any)
 
 ### Code-derived sources in `apps/node/`
 
@@ -329,13 +355,13 @@ Note: The source files in `../clawperator-skills/docs/` must be renamed/restruct
 
 ### Rejected from codex-plan
 
-1. **Remove `source-map.yaml` entirely**: Partially adopted. The file is dramatically reduced in scope (only tracks code-derived pages, cross-repo copies, and marker expansions) but not eliminated. It still serves as the assembly manifest for the build pipeline. The dual-manifest problem is largely resolved because authored pages no longer appear in source-map.yaml.
+1. **Remove `source-map.yaml` entirely**: Partially adopted. The file is dramatically reduced in scope (only tracks code-derived pages and marker expansions) but not eliminated. It still serves as the assembly manifest for the build pipeline. The dual-manifest problem is resolved because authored pages no longer appear in source-map.yaml and cross-repo copying was eliminated by consolidating skills docs into the main repo.
 
 2. **Split setup into 3 pages** (install-and-verify, first-command, operator-apk): For agents, one linear page is better. One fetch, one path, no navigation decisions.
 
 3. **Keep skills at 6 pages**: `skill-from-recording.md` and `blocked-terms-policy.md` are small enough to merge into `skills/authoring.md`. Fewer pages = less retrieval ambiguity.
 
-4. **`docs/internal/` directory + frontmatter flag**: Internal docs stay in `docs/` (in their existing locations like `docs/design/`). They are excluded from publishing by not being in `mkdocs.yml` nav and not being copied to the build staging directory. No new mechanism needed.
+4. **Frontmatter flag for internal docs**: Rejected the frontmatter flag, but adopted the `docs/internal/` directory convention. Provides a clear structural signal without requiring agents to check metadata.
 
 5. **Merge timeouts into execution contract**: Would make `api/overview.md` too heavy. Timeout budgeting is distinct operational guidance.
 
@@ -360,9 +386,8 @@ Problems: `sites/docs/docs/` is committed but generated (false editing surface, 
 
 ```
 docs/                    (authored, committed, structure = output structure)
-  + source-map.yaml      (assembly manifest for non-trivial pages only)
-  + apps/node/src/       (code inputs)
-  + ../clawperator-skills/docs/  (cross-repo source)
+  + source-map.yaml      (assembly manifest for code-derived pages only)
+  + apps/node/src/       (code inputs for generators)
          |
          v  .agents/skills/docs-generate/scripts/assemble.sh
 
@@ -378,20 +403,21 @@ sites/docs/site/         (gitignored final HTML)
 
 This is a new deterministic script (not agent-driven). It runs as the first step of `docs_build.sh`.
 
-1. **Clean staging:** Remove `sites/docs/.build/`, create fresh.
-2. **Copy authored pages:** Copy all files from `docs/` that are referenced in `mkdocs.yml` nav to `sites/docs/.build/` preserving directory structure. Internal files (not in nav) are skipped.
-3. **Copy cross-repo pages:** Copy skills docs from `../clawperator-skills/docs/` to `sites/docs/.build/skills/`, rewriting relative links using mapping table from `source-map.yaml`.
-4. **Generate code-derived pages:** Run generator scripts to produce `sites/docs/.build/api/cli.md` from `registry.ts` and command modules.
-5. **Expand code-derived markers:** For authored pages containing `<!-- CODE-DERIVED: <id> -->` markers, copy to staging with markers replaced by generated content. Currently applies to:
+1. **resolve_pages:** Parse `mkdocs.yml` nav to get all page paths. For each, determine source: authored (`docs/`) or `code_derived` (source-map). Fail if any page has no source. Fail if source-map defines outputs not in nav.
+2. **clean_staging:** Remove `sites/docs/.build/`, create fresh.
+3. **copy_authored:** Copy all authored pages from `docs/` that are referenced in `mkdocs.yml` nav to `sites/docs/.build/` preserving directory structure. Internal files (`docs/internal/`) are skipped.
+4. **generate_code_derived:** Run generator scripts to produce `sites/docs/.build/api/cli.md` from `registry.ts` and command modules.
+5. **apply_markers:** For authored pages containing `<!-- CODE-DERIVED: <id> -->` markers, replace markers in the `.build/` copy with generated content. Fail if any marker remains unexpanded. Currently applies to:
    - `api/errors.md`: `<!-- CODE-DERIVED: error-codes -->` expanded from `contracts/errors.ts`
    - `api/selectors.md`: `<!-- CODE-DERIVED: selector-flags -->` expanded from `cli/selectorFlags.ts`
-6. **Validate staging:** Verify every page in `mkdocs.yml` nav exists in `.build/`. Fail if any are missing.
+6. **validate_build:** Verify every page in `mkdocs.yml` nav exists in `.build/`. Verify no unexpected pages exist. Verify no unexpanded markers remain. Fail on violations.
 
 ### What changes in existing components
 
 **`source-map.yaml`** - Dramatically simplified. No longer lists every page. Only defines:
 ```yaml
-# Assembly manifest - only non-trivial pages need entries
+# Assembly manifest - only code-derived and marker pages need entries
+# Authored pages are discovered from mkdocs.yml nav + docs/ directory
 code_derived:
   - output: api/cli.md
     generator: scripts/generate_cli_reference.py
@@ -410,18 +436,6 @@ markers:
     generator: scripts/generate_selector_table.py
     sources:
       - apps/node/src/cli/selectorFlags.ts
-
-cross_repo:
-  - source_root: ../clawperator-skills/docs
-    target_dir: skills
-    files:
-      - source: overview.md
-      - source: authoring.md
-      - source: development.md
-      - source: runtime.md
-    link_rewrites:
-      # source-relative link -> output-relative link
-      # (defined as needed for cross-repo links that break)
 ```
 
 **`sites/docs/docs/`** - Deleted from git. The entire directory is removed from version control. Add to `.gitignore`.
@@ -430,7 +444,7 @@ cross_repo:
 
 **`docs/api/cli.md`** - Gitignored. Fully code-derived, generated at build time. Add `docs/api/cli.md` to `.gitignore`.
 
-**`docs/skills/`** - Gitignored. Cross-repo copies, generated at build time. Add `docs/skills/` to `.gitignore`.
+**`docs/skills/`** - Authored in this repo. Not gitignored. Skills docs are consolidated here from the skills repo.
 
 **`mkdocs.yml`** - Full nav rewrite matching Section 3. `docs_dir` changes to `.build/`. Add `mkdocs-redirects` plugin:
 - Add `mkdocs-redirects` to `sites/docs/requirements.txt`
@@ -501,7 +515,7 @@ The skill SKILL.md is updated to document:
 - How to add new marker expansions
 
 **`docs-validate` skill** - Simplified. Validates that:
-- All pages in `mkdocs.yml` nav exist in `docs/` (authored) or are defined in `source-map.yaml` (generated/cross-repo)
+- All pages in `mkdocs.yml` nav exist in `docs/` (authored) or are defined in `source-map.yaml` (code-derived)
 - Code-derived generators are up to date (code inputs haven't changed without regeneration)
 - No authored page accidentally edits a gitignored path
 
@@ -565,19 +579,23 @@ These items were tracked separately but are now part of this plan:
 
 ## 9. Execution Sequence
 
+### Phase 0: Migration Prep
+
+1. Create reference snapshot: copy all current public docs sources into `tasks/docs/refactor/reference/` as read-only migration material
+2. Add `README.md` to reference directory: *"Reference snapshot only. May contain stale or incorrect documentation. Do not publish. Do not treat as authoritative over code."*
+
 ### Phase 1: Pipeline Infrastructure
 
 Set up the new build pipeline before writing any content.
 
-1. Create `docs/api/` and `docs/troubleshooting/` directories
+1. Create `docs/api/`, `docs/skills/`, and `docs/troubleshooting/` directories
 2. Add `.gitignore` entries:
    - `docs/api/cli.md` (code-derived)
-   - `docs/skills/` (cross-repo copies)
    - `sites/docs/.build/` (staging directory)
 3. Remove `sites/docs/docs/` from git tracking (git rm -r, add to `.gitignore`)
-4. Write `.agents/skills/docs-generate/scripts/assemble.sh` - deterministic assembly script (copy authored, copy cross-repo with link rewriting, generate code-derived, expand markers, validate staging)
+4. Write `.agents/skills/docs-generate/scripts/assemble.sh` - deterministic assembly script with clear phase boundaries (resolve_pages, clean_staging, copy_authored, generate_code_derived, apply_markers, validate_build)
 5. Write generator scripts in `.agents/skills/docs-generate/scripts/`: `generate_cli_reference.py`, `generate_error_table.py`, `generate_selector_table.py`
-6. Rewrite `source-map.yaml` to reduced assembly manifest (code-derived, markers, cross-repo only)
+6. Rewrite `source-map.yaml` to reduced assembly manifest (code-derived and markers only)
 7. Rewrite `mkdocs.yml`: new nav tree, `docs_dir: .build`, add `mkdocs-redirects` plugin with redirect map
 8. Add `mkdocs-redirects` to `sites/docs/requirements.txt`
 9. Update `docs_build.sh` to call `.agents/skills/docs-generate/scripts/assemble.sh` before MkDocs build
@@ -588,9 +606,9 @@ Set up the new build pipeline before writing any content.
 
 ### Phase 2: Write Source Docs
 
-Author the 20 target pages directly in `docs/` in their final locations. Each uses contract-first style, new flat CLI surface, no historical references, no duplication.
+Author the 20 target pages directly in `docs/` in their final locations. Each uses contract-first style, new flat CLI surface, no historical references, no duplication. All pages - including skills docs - are authored in this repo.
 
-Pages are written to `docs/` in the target structure. Skills pages are written to `../clawperator-skills/docs/` with renamed filenames matching the target.
+Follow migration mode rules: one page at a time, verify against code, commit after each page.
 
 Priority order (most impactful first):
 1. `docs/setup.md` - single setup path
@@ -607,10 +625,10 @@ Priority order (most impactful first):
 12. `docs/api/serve.md` - HTTP/SSE server contract
 13. `docs/api/navigation.md` - navigation patterns
 14. `docs/api/recording.md` - recording format
-15. `../clawperator-skills/docs/overview.md` - usage model (renamed from `usage-model.md`)
-16. `../clawperator-skills/docs/authoring.md` - authoring guidelines + recording + blocked-terms (renamed, absorbs content)
-17. `../clawperator-skills/docs/development.md` - development workflow (renamed from `skill-development-workflow.md`)
-18. `../clawperator-skills/docs/runtime.md` - device prep and runtime (renamed from `device-prep-and-runtime-tips.md`)
+15. `docs/skills/overview.md` - usage model (source: `../clawperator-skills/docs/usage-model.md`)
+16. `docs/skills/authoring.md` - authoring guidelines + recording + blocked-terms (source: skills repo files, absorbs multiple)
+17. `docs/skills/development.md` - development workflow (source: `../clawperator-skills/docs/skill-development-workflow.md`)
+18. `docs/skills/runtime.md` - device prep and runtime (source: `../clawperator-skills/docs/device-prep-and-runtime-tips.md`)
 19. `docs/troubleshooting/operator.md` - troubleshooting + crash logs
 20. `docs/index.md` - minimal routing page (write last, after all targets exist)
 
@@ -637,13 +655,13 @@ Priority order (most impactful first):
 
 1. Move internal docs to `docs/internal/`: `conformance-apk.md`, `release-procedure.md`, `release-reference.md`, `site-hosting.md`, `design/` (entire directory)
 2. Delete old source files per the deletion criteria in Section 1a:
-   - Remove old `docs/reference/`, `docs/ai-agents/`, `docs/skills/` directories (content migrated to new locations)
+   - Remove old `docs/reference/`, `docs/ai-agents/` directories (content migrated to new locations)
    - Remove absorbed files: `docs/agent-quickstart.md`, `docs/first-time-setup.md`, `docs/openclaw-first-run.md`, `docs/running-clawperator-on-android.md`, `docs/project-overview.md`, `docs/terminology.md`, `docs/android-operator-apk.md`, `docs/architecture.md`, `docs/node-api-for-agents.md`, `docs/snapshot-format.md`, `docs/navigation-patterns.md`, `docs/multi-device-workflows.md`, `docs/crash-logs.md`, `docs/troubleshooting.md`, `docs/compatibility.md`, `docs/known-issues.md`
-2. Delete old skills repo files that were renamed/absorbed: `usage-model.md`, `skill-authoring-guidelines.md`, `skill-development-workflow.md`, `device-prep-and-runtime-tips.md`, `blocked-terms-policy.md`, `skill-from-recording.md`
-3. Delete task files listed in Section 8
-4. Delete `tasks/docs/refactor/docs-pipeline-proposal.md`
-5. Update `CLAUDE.md` to reflect new docs structure and pipeline
-6. Update `docs-generate` and `docs-validate` skill SKILL.md files to reflect new pipeline
+3. Update skills repo: replace current docs with lightweight pointers to `https://docs.clawperator.com/skills/`
+4. Delete reference snapshot: `tasks/docs/refactor/reference/`
+5. Delete task files listed in Section 8
+6. Update `CLAUDE.md` to reflect new docs structure and pipeline
+7. Update `docs-generate` and `docs-validate` skill SKILL.md files to reflect new pipeline
 
 ---
 
@@ -661,10 +679,10 @@ Priority order (most impactful first):
 - [ ] `sites/docs/docs/` does not exist in git (removed from tracking, in `.gitignore`)
 - [ ] `sites/docs/.build/` is gitignored
 - [ ] `docs/api/cli.md` is gitignored (code-derived)
-- [ ] `docs/skills/` is gitignored (cross-repo copies)
+- [ ] `docs/skills/` is authored (not gitignored, not cross-repo)
 - [ ] `assemble.sh` produces a complete staging directory deterministically
 - [ ] MkDocs `docs_dir` points to `.build/`
-- [ ] `source-map.yaml` only contains code-derived, marker, and cross-repo entries (no authored copy pages)
+- [ ] `source-map.yaml` only contains code-derived and marker entries (no authored copy pages, no cross-repo)
 
 ### Structural Integrity
 

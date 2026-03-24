@@ -8,6 +8,68 @@ Tasks are ordered by dependency. Tasks within the same phase can be parallelized
 
 ---
 
+## Hard Rules
+
+These rules apply to all implementation work during this refactor.
+
+### Code is the source of truth
+
+Existing documentation is advisory only and not presumed accurate. For every authored page:
+- The current implementation in code is the primary source of truth
+- Existing docs (including the reference snapshot) are only supporting reference material
+- Where docs and code conflict, code wins
+- If behavior is unclear from code, inspect tests and command help output before writing docs
+- Do not preserve wording from old docs unless it is verified against code
+- Each commit message should note what code was verified against (e.g., "Verified against: `apps/node/src/cli/registry.ts`")
+
+### Reference for verifying behavior
+
+| Topic | Verify against |
+|-------|---------------|
+| CLI commands and flags | `apps/node/src/cli/registry.ts` |
+| Selector flags | `apps/node/src/cli/selectorFlags.ts` |
+| Action types | `apps/node/src/contracts/execution.ts`, `apps/node/src/contracts/selectors.ts` |
+| Error codes | `apps/node/src/contracts/errors.ts` |
+| Result envelope | `apps/node/src/contracts/result.ts` |
+| Doctor checks | `apps/node/src/domain/doctor/checks/` |
+| Serve command | `apps/node/src/cli/commands/serve.ts` |
+
+### Implementation discipline
+
+- Work one target page at a time
+- For each page:
+  1. Gather source material (old docs from reference snapshot + code)
+  2. Verify behavior against code
+  3. Draft the page
+  4. Review the page against the plan and current implementation
+  5. Run relevant validation
+  6. Commit
+- For complex pages (`setup.md`, `api/actions.md`, `api/selectors.md`, `api/errors.md`): draft commit, then review/fixup commit
+- Use small, liberal commits. Do not batch multiple authored pages into one commit.
+
+---
+
+## Phase 0: Migration Prep
+
+### Task 0.1: Create reference snapshot
+
+**Goal:** Preserve a read-only copy of all current public docs before any rewriting begins.
+
+**Steps:**
+1. Create `tasks/docs/refactor/reference/`
+2. Copy all current public docs sources into it (everything that appears in the current `source-map.yaml` or `mkdocs.yml`)
+3. Add `README.md` to the directory with text: *"Reference snapshot only. May contain stale or incorrect documentation. Do not publish. Do not treat as authoritative over code."*
+4. Commit
+
+**Acceptance:**
+- Reference snapshot exists with all current public doc sources
+- README clearly marks it as non-authoritative
+- Original files remain untouched
+
+**Depends on:** Nothing.
+
+---
+
 ## Phase 1: Pipeline Infrastructure
 
 Everything else depends on this phase. Must complete before content authoring begins.
@@ -23,18 +85,17 @@ Everything else depends on this phase. Must complete before content authoring be
 2. Add to `sites/docs/.gitignore`:
    ```
    .build/
+   docs/
    ```
 3. Add to `docs/.gitignore` (create if needed):
    ```
    api/cli.md
-   skills/
    ```
-4. Add `sites/docs/docs/` to `sites/docs/.gitignore`
-5. Create empty directories: `docs/api/`, `docs/troubleshooting/`
+4. Create empty directories: `docs/api/`, `docs/skills/`, `docs/troubleshooting/`
 
 **Acceptance:**
 - `git status` shows `sites/docs/docs/` removed
-- `docs/api/` and `docs/troubleshooting/` exist
+- `docs/api/`, `docs/skills/`, and `docs/troubleshooting/` exist
 - Gitignore entries are in place
 
 **Depends on:** Nothing.
@@ -58,21 +119,19 @@ Everything else depends on this phase. Must complete before content authoring be
 
 **Behavior (clear phase boundaries):**
 
-1. **resolve_pages** - Parse `mkdocs.yml` nav to get all page paths. For each, determine source: authored (`docs/`), `code_derived` (source-map), or `cross_repo` (source-map). Fail if any page has no source. Fail if source-map defines outputs not in nav. Fail if duplicate output paths exist.
+1. **resolve_pages** - Parse `mkdocs.yml` nav to get all page paths. For each, determine source: authored (`docs/`) or `code_derived` (source-map). Fail if any page has no source. Fail if source-map defines outputs not in nav. Fail if duplicate output paths exist.
 2. **clean_staging** - Remove `sites/docs/.build/` if exists, create fresh.
-3. **copy_authored** - Copy authored pages from `docs/` to `.build/` preserving structure.
+3. **copy_authored** - Copy authored pages from `docs/` to `.build/` preserving structure. Skip `docs/internal/`.
 4. **generate_code_derived** - Run generator scripts for code-derived pages, write to `.build/`.
 5. **apply_markers** - For authored pages with `<!-- CODE-DERIVED: <id> -->` markers, run associated generator, replace marker in the `.build/` copy. Fail if any marker remains unexpanded.
-6. **copy_cross_repo** - Copy skills docs from source repo to `.build/`, rewriting relative links per mapping table. Link rewriting algorithm: resolve relative link against source location, look up resolved path in source-map to find output path, rewrite to be relative to output file location, fail if unresolvable.
-7. **validate_build** - Verify every nav page exists in `.build/`. Verify no unexpected pages exist. Verify no unexpanded markers. Log summary.
+6. **validate_build** - Verify every nav page exists in `.build/`. Verify no unexpected pages exist. Verify no unexpanded markers. Log summary.
 
 Supports `--verbose` flag to log all link rewrites and source resolutions.
 
 **Acceptance:**
 - Script runs without error when called with placeholder authored pages
 - `.build/` contains exactly the pages listed in nav
-- Script exits non-zero on: missing page, orphan source-map entry, duplicate output path, unexpanded marker, unresolvable link
-- Cross-repo links are rewritten correctly
+- Script exits non-zero on: missing page, orphan source-map entry, duplicate output path, unexpanded marker
 - Markers are expanded correctly
 
 **Depends on:** Task 1.1 (gitignore setup)
@@ -118,11 +177,12 @@ Supports `--verbose` flag to log all link rewrites and source resolutions.
 
 **Current state:** ~40 page entries with modes (copy, code-derived, curated), sources, rules, sections.
 
-**Target state:** Only defines code-derived pages, marker expansions, and cross-repo copies. See plan Section 6 for exact schema.
+**Target state:** Only defines code-derived pages and marker expansions. No cross-repo section (skills docs are now authored in this repo). See plan Section 6 for exact schema.
 
 **Acceptance:**
 - No authored `mode: copy` entries remain
-- `code_derived`, `markers`, and `cross_repo` sections are present and correct
+- No `cross_repo` section
+- `code_derived` and `markers` sections are present and correct
 - File is valid YAML
 - Assembly script can parse it
 
@@ -216,26 +276,7 @@ Every page must follow:
 - Canonical terminology ("operator" not "receiver", "selector" not "matcher")
 - No historical context, no deprecated behavior, no migration notes
 - Current state only
-
-### Reference: where to find current behavior
-
-When authoring pages, read the actual code to verify behavior. Do not trust old docs.
-
-- CLI commands and flags: `apps/node/src/cli/registry.ts`
-- Selector flags: `apps/node/src/cli/selectorFlags.ts`
-- Action types: `apps/node/src/contracts/execution.ts`, `apps/node/src/contracts/selectors.ts`
-- Error codes: `apps/node/src/contracts/errors.ts`
-- Result envelope: `apps/node/src/contracts/result.ts`
-- Doctor checks: `apps/node/src/domain/doctor/checks/`
-- Serve command: `apps/node/src/cli/commands/serve.ts`
-
-Old docs to extract useful content from (but verify against code):
-- `docs/node-api-for-agents.md`
-- `docs/reference/action-types.md`
-- `docs/reference/execution-model.md`
-- `docs/first-time-setup.md`
-- `docs/navigation-patterns.md`
-- `docs/reference/error-handling.md`
+- Verified against code (see Hard Rules section for verification reference table)
 
 ---
 
@@ -389,17 +430,25 @@ Each page should follow the page schema and use current CLI surface.
 
 ---
 
-### Task 2.8: Skills docs (cross-repo)
+### Task 2.8: Skills docs (consolidated into main repo)
 
-**Output:** Updated files in `../clawperator-skills/docs/`:
-- `overview.md` (renamed from `usage-model.md`, tightened to contract style)
-- `authoring.md` (renamed from `skill-authoring-guidelines.md`, absorbs `skill-from-recording.md` and `blocked-terms-policy.md`)
-- `development.md` (renamed from `skill-development-workflow.md`, updated CLI examples)
-- `runtime.md` (renamed from `device-prep-and-runtime-tips.md`, updated CLI examples)
+**Output:** New files in `docs/skills/`:
+- `docs/skills/overview.md` - what skills are, how they run, runtime model
+- `docs/skills/authoring.md` - authoring guidelines, recording-to-skill conversion, blocked terms
+- `docs/skills/development.md` - development workflow
+- `docs/skills/runtime.md` - device prep and runtime tips
 
-Must also define: skill = deterministic wrapper, clawperator = execution substrate, agent = planner (explicitly, in `overview.md`).
+**Source material** (in `../clawperator-skills/docs/`):
+- `usage-model.md` -> `overview.md`
+- `skill-authoring-guidelines.md` + `skill-from-recording.md` + `blocked-terms-policy.md` -> `authoring.md`
+- `skill-development-workflow.md` -> `development.md`
+- `device-prep-and-runtime-tips.md` -> `runtime.md`
 
-Delete old files from skills repo after new ones are written: `usage-model.md`, `skill-authoring-guidelines.md`, `skill-development-workflow.md`, `device-prep-and-runtime-tips.md`, `blocked-terms-policy.md`, `skill-from-recording.md` (moved from this repo in Task 1.1, now absorbed into `authoring.md`).
+Must explicitly define in `overview.md`: skill = deterministic wrapper, clawperator = execution substrate, agent = planner.
+
+All content must be verified against actual skill implementation, not just copied from old docs.
+
+**After authoring:** Update `../clawperator-skills/docs/` to contain only lightweight pointers to `https://docs.clawperator.com/skills/` and repo-local contributor guidance.
 
 **Depends on:** Phase 1 complete
 
@@ -507,18 +556,19 @@ Write this last, after all other pages exist, so all links are valid.
 2. Delete old authored source files (per plan Section 9, Phase 5):
    - `docs/reference/` directory
    - `docs/ai-agents/` directory
-   - `docs/skills/` directory (the authored one, not the gitignored cross-repo copy)
    - Individual files: `agent-quickstart.md`, `first-time-setup.md`, `openclaw-first-run.md`, `running-clawperator-on-android.md`, `project-overview.md`, `terminology.md`, `android-operator-apk.md`, `architecture.md`, `node-api-for-agents.md`, `snapshot-format.md`, `navigation-patterns.md`, `multi-device-workflows.md`, `crash-logs.md`, `troubleshooting.md`, `compatibility.md`, `known-issues.md`
-2. Delete old skills repo files: `usage-model.md`, `skill-authoring-guidelines.md`, `skill-development-workflow.md`, `device-prep-and-runtime-tips.md`, `blocked-terms-policy.md`
-3. Update `CLAUDE.md`:
+3. Update skills repo: replace docs with lightweight pointers to `https://docs.clawperator.com/skills/`
+4. Delete reference snapshot: `tasks/docs/refactor/reference/`
+5. Update `CLAUDE.md`:
    - Update docs architecture description
    - Update validation commands for new pipeline
    - Remove references to `sites/docs/docs/` as generated output
    - Update `docs-generate` and `docs-validate` skill descriptions
-4. Update `.agents/skills/docs-generate/SKILL.md` for new pipeline scope
-5. Update `.agents/skills/docs-validate/SKILL.md` for new validation scope
-6. Retire or simplify `diff_report.py`, `build_inventory.py`, `validate_source_of_truth.py`
-7. Run full build one final time to verify nothing broke
+   - Note that skills docs are canonical in this repo, not the skills repo
+6. Update `.agents/skills/docs-generate/SKILL.md` for new pipeline scope
+7. Update `.agents/skills/docs-validate/SKILL.md` for new validation scope
+8. Retire or simplify `diff_report.py`, `build_inventory.py`, `validate_source_of_truth.py`
+9. Run full build one final time to verify nothing broke
 
 **Depends on:** Task 4.1 (validation passes)
 
@@ -527,7 +577,10 @@ Write this last, after all other pages exist, so all links are valid.
 ## Dependency Graph
 
 ```
-Phase 1 (Pipeline)
+Phase 0 (Prep)
+  0.1 (reference snapshot)
+
+Phase 1 (Pipeline) - depends on 0.1
   1.1 (gitignore) ──┐
   1.2 (assembly)  ──┤
   1.3 (generators) ─┤──→ 1.6 (build scripts) ──→ 1.7 (verify pipeline)
