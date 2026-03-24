@@ -194,6 +194,7 @@ class AgentCommandParserDefault : AgentCommandParser {
                     validator = validator,
                     validatorPattern = validatorPattern,
                     all = params.booleanOrDefault("all", false),
+                    container = params.parseMatcherOrNull("container"),
                 )
             }
             "enter_text", "type_text" ->

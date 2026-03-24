@@ -101,6 +101,7 @@ sealed interface UiAction {
         val validator: UiTextValidator? = null,
         val validatorPattern: String? = null,
         val all: Boolean = false,
+        val container: NodeMatcher? = null,
     ) : UiAction
 
     data class SnapshotUi(

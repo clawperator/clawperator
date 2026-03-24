@@ -168,6 +168,7 @@ Recommended next action:
 
 Meaning:
 - the selector did not match any current UI node
+- for `read_text` with `container`, the container matched but the target selector matched no node inside that subtree
 
 Usually recoverable:
 - often
@@ -181,6 +182,7 @@ Recommended next action:
 
 Meaning:
 - the requested or auto-detected scroll container could not be resolved
+- for `read_text` with `container`, the container selector matched no UI element
 
 Usually recoverable:
 - often

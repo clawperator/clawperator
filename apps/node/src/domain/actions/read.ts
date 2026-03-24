@@ -4,11 +4,15 @@ import type { NodeMatcher } from "../../contracts/selectors.js";
 export function buildReadExecution(
   selector: NodeMatcher,
   readAll?: boolean,
+  container?: NodeMatcher,
 ): Execution {
   const commandId = `read-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
   const params: Record<string, unknown> = { matcher: selector };
   if (readAll) {
     params.all = true;
+  }
+  if (container !== undefined) {
+    params.container = container;
   }
   return {
     commandId,

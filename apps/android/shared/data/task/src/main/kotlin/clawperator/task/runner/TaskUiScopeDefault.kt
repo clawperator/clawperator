@@ -328,6 +328,116 @@ class TaskUiScopeDefault(
             texts
         }
 
+    override suspend fun getTextWithinContainer(
+        matcher: NodeMatcher,
+        containerMatcher: NodeMatcher,
+        retry: TaskRetry,
+    ): String =
+        withRetry(retry, "getTextWithinContainer(matcher=$matcher, container=$containerMatcher)") {
+            Log.d("$TAG Getting text for node matching: $matcher within container: $containerMatcher")
+
+            val uiTreeRaw =
+                uiTreeInspector.getCurrentUiTree()
+                    ?: throw IllegalStateException("UI tree not available")
+
+            val uiTree = uiTreeFilterer.filterOnScreenOnly(uiTreeRaw)
+
+            // Find the container node
+            val containerNode =
+                findNodeByMatcher(containerMatcher, uiTree)
+                    ?: throw IllegalStateException("Container not found for: $containerMatcher")
+
+            // Create a sub-tree rooted at the container to search within
+            val subTree = UiTree(root = containerNode, windowId = uiTree.windowId)
+
+            // Search for target within the container's subtree
+            val uiNode =
+                findNodeByMatcher(matcher, subTree)
+                    ?: throw IllegalStateException("No UI node found matching criteria: $matcher within container: $containerMatcher")
+
+            val text = uiNode.label
+            if (text.isBlank()) {
+                throw IllegalStateException("Matching UI node has no text content")
+            }
+
+            Log.d("$TAG Got text from matching node within container: '$text'")
+            text
+        }
+
+    override suspend fun getValidatedTextWithinContainer(
+        matcher: NodeMatcher,
+        containerMatcher: NodeMatcher,
+        retry: TaskRetry,
+        validator: (String) -> Boolean,
+    ): String =
+        withRetry(retry, "getValidatedTextWithinContainer(matcher=$matcher, container=$containerMatcher)") {
+            Log.d("$TAG Getting validated text for node matching: $matcher within container: $containerMatcher")
+
+            val uiTreeRaw =
+                uiTreeInspector.getCurrentUiTree()
+                    ?: throw IllegalStateException("UI tree not available")
+
+            val uiTree = uiTreeFilterer.filterOnScreenOnly(uiTreeRaw)
+
+            // Find the container node
+            val containerNode =
+                findNodeByMatcher(containerMatcher, uiTree)
+                    ?: throw IllegalStateException("Container not found for: $containerMatcher")
+
+            // Create a sub-tree rooted at the container to search within
+            val subTree = UiTree(root = containerNode, windowId = uiTree.windowId)
+
+            // Search for target within the container's subtree
+            val uiNode =
+                findNodeByMatcher(matcher, subTree)
+                    ?: throw IllegalStateException("No UI node found matching criteria: $matcher within container: $containerMatcher")
+
+            val text = uiNode.label
+            if (text.isBlank()) {
+                throw IllegalStateException("Matching UI node has no text content")
+            }
+
+            // Validate the text
+            if (!validator(text)) {
+                Log.d("$TAG Validation failed for text '$text' from matching node within container")
+                throw IllegalStateException("Validation failed for text '$text' from matching UI node within container")
+            }
+
+            Log.d("$TAG Got validated text from matching node within container: '$text'")
+            text
+        }
+
+    override suspend fun getAllTextWithinContainer(
+        matcher: NodeMatcher,
+        containerMatcher: NodeMatcher,
+        retry: TaskRetry,
+    ): List<String> =
+        withRetry(retry, "getAllTextWithinContainer(matcher=$matcher, container=$containerMatcher)") {
+            Log.d("$TAG Getting all text for nodes matching: $matcher within container: $containerMatcher")
+
+            val uiTreeRaw =
+                uiTreeInspector.getCurrentUiTree()
+                    ?: throw IllegalStateException("UI tree not available")
+
+            val uiTree = uiTreeFilterer.filterOnScreenOnly(uiTreeRaw)
+
+            // Find the container node
+            val containerNode =
+                findNodeByMatcher(containerMatcher, uiTree)
+                    ?: throw IllegalStateException("Container not found for: $containerMatcher")
+
+            // Create a sub-tree rooted at the container to search within
+            val subTree = UiTree(root = containerNode, windowId = uiTree.windowId)
+
+            // Search for all targets within the container's subtree
+            val uiNodes = findAllNodesByMatcher(matcher, subTree)
+
+            val texts = uiNodes.map { it.label }.filter { it.isNotBlank() }
+
+            Log.d("$TAG Got text from ${texts.size} matching nodes within container")
+            texts
+        }
+
     override suspend fun click(
         matcher: NodeMatcher,
         clickTypes: UiTreeClickTypes,

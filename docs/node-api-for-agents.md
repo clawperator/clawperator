@@ -57,6 +57,13 @@ workflow (also available as `record` alias), use [Android Recording Format for A
 | `read --role <role>` | Read from the first element with the given role |
 | `read --selector <json>` | Read using raw `NodeMatcher` JSON (advanced only; mutually exclusive with simple flags) |
 | `read ... --all --json` | Read every on-screen match: step `data.text` is a string containing a JSON array of quoted labels (see `read_text` behavior note). Requires `--json`. |
+| `read ... --container-text <text>` | Restrict search to elements within a container with exact visible text |
+| `read ... --container-text-contains <sub>` | Restrict search to elements within a container with partial text match |
+| `read ... --container-id <id>` | Restrict search to elements within a container with the given resource ID |
+| `read ... --container-desc <text>` | Restrict search to elements within a container with exact content description |
+| `read ... --container-desc-contains <sub>` | Restrict search to elements within a container with partial content description |
+| `read ... --container-role <role>` | Restrict search to elements within a container with the given role |
+| `read ... --container-selector '<json>'` | Restrict search to elements within a container matched by raw JSON (mutually exclusive with other `--container-*` flags) |
 | `wait --text <text>` | Wait until an element with exact visible text appears |
 | `wait --text-contains <sub>` | Wait until an element whose visible text contains the substring appears |
 | `wait --id <resource-id>` | Wait until an element with the given resource ID appears |
@@ -144,6 +151,22 @@ The `scroll` command accepts `--container-*` flags to restrict scrolling to a sp
 | `--container-role <value>` | Container by element role |
 | `--container-selector <json>` | Container by raw JSON NodeMatcher; mutually exclusive with `--container-*` flags |
 
+### Container Flags (read)
+
+The `read` command accepts `--container-*` flags to restrict the search to elements within a specific container's subtree. When a container is specified, only elements that are descendants of the matched container are considered.
+
+| Flag | Description |
+| :--- | :--- |
+| `--container-text <value>` | Container with exact visible text |
+| `--container-text-contains <value>` | Container with partial text match |
+| `--container-id <value>` | Container by Android resource ID |
+| `--container-desc <value>` | Container by exact content description |
+| `--container-desc-contains <value>` | Container by partial content description |
+| `--container-role <value>` | Container by element role |
+| `--container-selector <json>` | Container by raw JSON NodeMatcher; mutually exclusive with `--container-*` flags |
+
+**Error handling:** If the container matcher finds no element, the step fails with `CONTAINER_NOT_FOUND`. If the container matches but the element selector matches nothing inside that subtree, the step fails with `NODE_NOT_FOUND`.
+
 ### Quick Examples
 
 ```bash
@@ -170,6 +193,9 @@ clawperator wait --text "Done" --timeout 15000 --device <device_id> --json
 
 # Read all matching labels (JSON array string in step data.text)
 clawperator read --role text --all --json --device <device_id>
+
+# Read within a specific container (scope search to container subtree)
+clawperator read --text "Price" --container-role list --device <device_id> --json
 
 # Scroll within a specific container
 clawperator scroll down --container-id "com.example:id/recycler_view" --device <device_id> --json
@@ -406,7 +432,7 @@ Combine fields to increase specificity when a single field is ambiguous:
 | `close_app` | `applicationId: string` | - |
 | `click` | `matcher: NodeMatcher` | `clickType: "default" \| "long_click" \| "focus"` (default: `"default"`) |
 | `enter_text` | `matcher: NodeMatcher`, `text: string` | `submit: boolean` (default: `false`), `clear: boolean` (accepted by Node contract but currently ignored by Android runtime, so do not rely on it to clear existing text) |
-| `read_text` | `matcher: NodeMatcher` | `all: boolean` (default `false`; when `true`, returns all matches - see behavior note), `validator: "temperature" \| "version" \| "regex"`, `validatorPattern: string` (required when `validator` is `"regex"`), `retry: object` |
+| `read_text` | `matcher: NodeMatcher` | `container: NodeMatcher` (scopes search to container subtree), `all: boolean` (default `false`; when `true`, returns all matches - see behavior note), `validator: "temperature" \| "version" \| "regex"`, `validatorPattern: string` (required when `validator` is `"regex"`), `retry: object` |
 | `wait_for_node` | `matcher: NodeMatcher` | `retry: object` (see `retry` object shape below), optional `timeoutMs: number` (1-120000 on the Operator wire) - wall-clock cap for the wait loop on device, in addition to the outer execution `timeoutMs` |
 | `snapshot_ui` | - | `retry: object` |
 | `take_screenshot` | - | `path: string`, `retry: object` |
@@ -554,7 +580,7 @@ Android intent builder.
 }
 ```
 
-**`read_text`:** Reads visible text from nodes matching `matcher`. Optional validators apply only when `all` is false or omitted.
+**`read_text`:** Reads visible text from nodes matching `matcher`. Optional validators apply only when `all` is false or omitted. When `container` is set, the runtime still runs single-match validators against the text read from the node found inside that subtree.
 
 **`read_text` with `all: true`:** The Operator collects every on-screen node that matches `matcher`, takes each node's visible label (blank labels are skipped), and returns them in one step. Step `data.text` is still a string (envelope `data` values are strings), but its content is a JSON array literal, for example `["Price A","Price B"]`. Agents should parse that string as JSON to obtain the list. Step `data` also includes `all: "true"` and `count: "<n>"` as strings. Newlines or rare characters in labels are escaped for JSON; if you need full node metadata, use `snapshot_ui` and filter locally.
 
@@ -1082,7 +1108,7 @@ Branch agent logic on codes from `envelope.errorCode` (top-level Android result 
 | `ANDROID_SYSTEM_IMAGE_INSTALL_FAILED` | `error.code` | System image install or SDK license acceptance failed |
 | `EMULATOR_STOP_FAILED` | `error.code` | Emulator stop request failed |
 | `EMULATOR_DELETE_FAILED` | `error.code` | Emulator deletion failed |
-| `NODE_NOT_FOUND` | `data.error` | Selector matched no UI element |
+| `NODE_NOT_FOUND` | `data.error` | Selector matched no UI element. For `read_text` with `container`, this also applies when the container matched but `matcher` matched no node inside that subtree. |
 | `RESULT_ENVELOPE_TIMEOUT` | `error.code` | Command dispatched but no result received; `details` includes command/task correlation plus last payload action context, elapsed timing, and `logPath` when persistent logging is enabled |
 | `OPERATOR_NOT_INSTALLED` | `error.code` | Requested [Clawperator Operator Android app](../getting-started/android-operator-apk.md) package is missing on the device; `exec` and `doctor` fail fast instead of timing out |
 | `OPERATOR_VARIANT_MISMATCH` | `error.code` | Installed release vs debug Operator APK variant does not match `--operator-package` (for example `.dev` installed while the CLI targets release, or the reverse) |
@@ -1094,7 +1120,7 @@ Branch agent logic on codes from `envelope.errorCode` (top-level Android result 
 | `NODE_NOT_CLICKABLE` | `data.error` | Reserved error code. Intended for "element found but not interactable", but not currently emitted consistently by the Android and Node runtimes. |
 | `SNAPSHOT_EXTRACTION_FAILED` | `data.error` | `snapshot_ui` step completed but the Node layer did not attach any snapshot text to the step during post-processing. The most common cause is a Node binary packaging mismatch or other logcat extraction issue. Rebuild or reinstall the npm package and check version compatibility. |
 | `GLOBAL_ACTION_FAILED` | `data.error` | `press_key` step result when the OS reports `performGlobalAction` returned false. Rare soft failure - the accessibility service was running but Android declined to execute the action. |
-| `CONTAINER_NOT_FOUND` | `data.error` | `scroll` step could not locate a scrollable container. Either no scrollable node is present on screen, or the provided `container` matcher matched nothing. |
+| `CONTAINER_NOT_FOUND` | `data.error` | `scroll` step could not locate a scrollable container. Either no scrollable node is present on screen, or the provided `container` matcher matched nothing. For `read_text` with `container`, the step fails with this code when the container matcher matched no UI element. |
 | `CONTAINER_NOT_SCROLLABLE` | `data.error` | `scroll` step found the matched container but it is not scrollable and no scrollable descendant was found. With the default `findFirstScrollableChild: true`, the runtime already walks one level down before raising this error. |
 | `GESTURE_FAILED` | `data.error` | `scroll` step: the OS rejected the gesture dispatch. The accessibility service was running but Android declined to execute the swipe gesture. Step returns `success: false`. |
 

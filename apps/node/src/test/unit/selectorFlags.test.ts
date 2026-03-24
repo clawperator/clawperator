@@ -471,6 +471,14 @@ describe("CLI: click --help shows Phase 3 selector flags", () => {
     assert.match(stdout, /--container-role/);
   });
 
+  it("read --help documents --container flags", async () => {
+    const { stdout, code } = await runCli(["read", "--help"]);
+    assert.strictEqual(code, 0);
+    assert.match(stdout, /--container-text/);
+    assert.match(stdout, /--container-id/);
+    assert.match(stdout, /--container-role/);
+  });
+
   it("type --help documents --role and --id flags for selector", async () => {
     const { stdout, code } = await runCli(["type", "--help"]);
     assert.strictEqual(code, 0);

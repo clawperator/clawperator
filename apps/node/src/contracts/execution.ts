@@ -28,6 +28,8 @@ export interface ActionParams {
   /** scroll_and_click: when false, scroll until visible but do not click */
   clickAfter?: boolean;
   validator?: string;
+  /** read_text: when true, return all matches */
+  all?: boolean;
   /** press_key: back | home | recents */
   key?: string;
   retry?: Record<string, unknown>;

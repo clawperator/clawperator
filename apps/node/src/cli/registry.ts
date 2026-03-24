@@ -411,6 +411,7 @@ Usage:
   clawperator read --role <role> [--device <id>] [--operator-package <pkg>] [--json]
   clawperator read --desc <text> [--device <id>] [--operator-package <pkg>] [--json]
   clawperator read --selector '<json>' [--device <id>] [--operator-package <pkg>] [--json]
+  clawperator read --id <resource-id> --container-id <container-id> [--device <id>] [--json]
 
 Selector flags (at least one required; combine for AND matching):
   --text <text>           Exact visible text
@@ -420,6 +421,15 @@ Selector flags (at least one required; combine for AND matching):
   --desc-contains <text>  Partial content description
   --role <role>           Element role
   --selector <json>       Raw NodeMatcher JSON (advanced; mutually exclusive with simple flags)
+
+Container selector flags (all optional; restrict search to container subtree):
+  --container-text <text>           Container with exact visible text
+  --container-text-contains <text>  Container with partial text match
+  --container-id <resource-id>      Container by Android resource ID
+  --container-desc <text>           Container by exact content description
+  --container-desc-contains <text>  Container by partial content description
+  --container-role <role>           Container by element role
+  --container-selector <json>       Container by raw NodeMatcher JSON (mutually exclusive with other --container-* flags)
 
 Options:
   --all                   Return all matches as a JSON array (requires --json)
@@ -435,6 +445,7 @@ Examples:
   clawperator read --text "Battery"
   clawperator read --role switch --desc "Wi-Fi"
   clawperator read --text "Price" --all --json
+  clawperator read --text "Item" --container-role list --json
   Advanced (raw NodeMatcher JSON): clawperator read --selector '{"resourceId":"com.example:id/status"}'
 `;
 
@@ -1093,10 +1104,16 @@ COMMANDS["read"] = {
         { format },
       );
     }
+    // Resolve container matcher (optional)
+    const containerResult = resolveContainerMatcherFromCli(rest);
+    if (!containerResult.ok) {
+      return formatError(containerResult.error, { format });
+    }
     return (await import("./commands/action.js")).cmdActionRead({
       format,
       matcher: resolved.matcher,
       readAll,
+      container: containerResult.container,
       deviceId,
       operatorPackage,
       logger,
