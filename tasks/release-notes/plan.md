@@ -20,21 +20,21 @@ This skill will be composed of two parts:
     *   **Arguments:** `--start-ref` (e.g., `v0.1.0`), `--end-ref` (e.g., `v0.2.0` or `HEAD`). If omitted, defaults to the last tag and `HEAD`.
     *   **Execution:** Runs `git log` between the refs.
     *   **Categorization:** Analyzes file paths in each commit to group them:
-        *   `apps/android/**` -> Android App
         *   `apps/node/**` -> Node API
         *   `docs/**`, `sites/**` -> Documentation & Website
+        *   `apps/android/**` -> Android App
         *   Everything else -> Core / General
     *   **Metadata:** Extracts the commit date of the `--end-ref` (or today's date if `HEAD`).
     *   **Output:** A structured JSON or Markdown digest of categorized commits and the release date.
 *   **Skill Instructions (`SKILL.md`)**
     *   Guides the agent to invoke `gather_commits.py`.
-    *   Instructs the agent to digest the output into user-friendly release notes.
+    *   Instructs the agent to digest the output into user-friendly release notes, ignoring skills (which are in a separate repo) and internal chore/refactor noise.
     *   Enforces the standard format: `## [<version>] - <YYYY-MM-DD>`.
     *   Directs the agent to safely insert the generated block into `CHANGELOG.md`, maintaining chronological order or replacing the `[Unreleased]` block.
 
 ### 2. Root `CHANGELOG.md` Updates
 *   Maintain the standard [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
-*   Within each version block, implement surface-level sub-headings (e.g., `### Android`, `### Node API`, `### Documentation`).
+*   Within each version block, implement surface-level sub-headings in a specific order: Node API & CLI, Documentation & Website, and Android Operator APK.
 
 ### 3. Documentation Site Versioning & Changelog
 *   **Version Variable:** Add `extra: version: "<current_version>"` to `sites/docs/mkdocs.yml`.
@@ -48,6 +48,32 @@ This skill will be composed of two parts:
     *   Use this extracted block as the `body_path` for the GitHub Release.
 *   **Skill: `release-update-published-version`**:
     *   Update `scripts/update_published_version.py` to also bump the `extra: version:` value in `sites/docs/mkdocs.yml` when the public docs are updated.
+
+---
+
+## Target Release Notes Format
+
+The LLM will be instructed to synthesize commits into human-readable bullet points, grouping related PRs and filtering out internal chore/refactor noise. The generated release notes should strictly follow this format (note the specific order of sections and exclusion of skills):
+
+```markdown
+## [<version>] - <YYYY-MM-DD>
+
+This release introduces... (High-level summary of the release)
+
+### 🤖 Node API & CLI
+- **Added:** ...
+- **Changed:** ...
+- **Fixed:** ...
+
+### 📚 Documentation & Website
+- **Added:** ...
+- **Changed:** ...
+- **Fixed:** ...
+
+### 📱 Android Operator APK
+- **Added:** ...
+- **Fixed:** ...
+```
 
 ---
 
