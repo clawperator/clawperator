@@ -375,10 +375,8 @@ Selector flags (choose one):
   --text <string>        Click element with matching visible text
   --id <string>          Click element with matching resource ID
   --coordinate <x> <y>   Click at exact coordinates (pixels)
-  --class-name <string>  Click first element of matching class
   --desc <string>        Click element with matching content description
   --role <string>        Click element of matching role (e.g. button)
-  --xpath <string>       Click element matching XPath expression
   --selector <json>      Click using advanced NodeMatcher JSON
 
 Options:
@@ -482,8 +480,6 @@ Selector flags (choose one):
 
 Options:
   --all                  Return all matches as a JSON array (JSON output mode only)
-  --read-text            Read text (default)
-  --read-value           Read accessible value instead of text
   --timeout <ms>         Max time to wait for element
   --json                 Output as JSON
 
@@ -570,6 +566,7 @@ Valid keys:
   recents    Open recent apps
 
 Options:
+  --key <name>           System key to press (alias for positional arg)
   --timeout <ms>         Max time to wait
   --json                 Output as JSON
 
@@ -654,6 +651,7 @@ Container selector flags (optional, restrict scroll to specific container):
   --container-role <role> Container by element role
 
 Options:
+  --direction <dir>      Direction to scroll (alias for positional arg)
   --timeout <ms>         Max time to wait (default: 30000ms)
   --json                 Output as JSON
 
@@ -692,6 +690,7 @@ Container selector flags (all optional; restrict scroll to a specific scrollable
   --container-selector <json>       Container by raw NodeMatcher JSON
 
 Options:
+  --direction <dir>      Direction to scroll (alias for positional arg)
   --click    Click the target element after scrolling to it (becomes scroll_and_click action)
 
 Notes:

@@ -349,8 +349,6 @@ const SELECTOR_FLAG_LIST = `Use one of:
   --desc <text>           Content description
   --desc-contains <text>  Partial content description
   --role <role>           Element role
-  --class-name <string>   Element class name
-  --xpath <string>        XPath expression
   --coordinate <x> <y>    Exact coordinates (pixels)
   --selector <json>       Raw JSON (advanced)`;
 
