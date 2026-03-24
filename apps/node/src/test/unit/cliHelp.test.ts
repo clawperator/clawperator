@@ -449,6 +449,20 @@ describe("promoted flat commands - help and missing-arg errors", () => {
     assert.match(obj.message ?? "", /unrecognized flag '--all'/);
   });
 
+  it("click rejects dry-run-style execution flags (exit 1)", async () => {
+    const dryRunResult = await runCli(["click", "--text", "Wi-Fi", "--dry-run"]);
+    assert.strictEqual(dryRunResult.code, 1, dryRunResult.stdout);
+    const dryRunObj = JSON.parse(dryRunResult.stdout) as { code?: string; message?: string };
+    assert.strictEqual(dryRunObj.code, "USAGE");
+    assert.match(dryRunObj.message ?? "", /unrecognized flag '--dry-run'/);
+
+    const validateOnlyResult = await runCli(["click", "--text", "Wi-Fi", "--validate-only"]);
+    assert.strictEqual(validateOnlyResult.code, 1, validateOnlyResult.stdout);
+    const validateOnlyObj = JSON.parse(validateOnlyResult.stdout) as { code?: string; message?: string };
+    assert.strictEqual(validateOnlyObj.code, "USAGE");
+    assert.match(validateOnlyObj.message ?? "", /unrecognized flag '--validate-only'/);
+  });
+
   it("open accepts --app without unknown-flag rejection", async () => {
     const { stdout, code } = await runCli(["open", "--app"]);
     assert.strictEqual(code, 1, stdout);
@@ -465,6 +479,14 @@ describe("promoted flat commands - help and missing-arg errors", () => {
     assert.doesNotMatch(obj.message ?? "", /unrecognized flag/);
   });
 
+  it("close rejects typoed dash-prefixed arguments instead of swallowing them", async () => {
+    const { stdout, code } = await runCli(["close", "--ap"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "USAGE");
+    assert.match(obj.message ?? "", /unrecognized flag '--ap'/);
+  });
+
   it("exec best-effort accepts --goal without unknown-flag rejection", async () => {
     const { stdout, code } = await runCli(["exec", "best-effort", "--goal", "wifi settings"]);
     assert.strictEqual(code, 0, stdout);
@@ -472,6 +494,14 @@ describe("promoted flat commands - help and missing-arg errors", () => {
     assert.strictEqual(obj.code, "NOT_IMPLEMENTED");
     assert.strictEqual(obj.goal, "wifi settings");
     assert.doesNotMatch(obj.message ?? "", /unrecognized flag/);
+  });
+
+  it("exec rejects --goal for normal payload execution", async () => {
+    const { stdout, code } = await runCli(["exec", "--goal", "wifi"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "USAGE");
+    assert.match(obj.message ?? "", /unrecognized flag '--goal'/);
   });
 
   it("exec validate-only accepts a dash-prefixed payload path", async () => {
@@ -489,7 +519,7 @@ describe("promoted flat commands - help and missing-arg errors", () => {
     );
 
     try {
-      const { stdout, code } = await runCli(["exec", "--validate-only", "--payload", "--plan.json"]);
+      const { stdout, code } = await runCli(["exec", "--validate-only", "--payload", "--plan-payload.json"]);
       assert.strictEqual(code, 0, stdout);
       const obj = JSON.parse(stdout) as { ok?: boolean; validated?: boolean; message?: string };
       assert.strictEqual(obj.ok, true);

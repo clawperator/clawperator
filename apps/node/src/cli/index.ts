@@ -95,14 +95,6 @@ const FLAG_VALUE_ARITY = new Map<string, number>([
 
 const COMMANDS_ALLOW_LEADING_POSITIONAL = new Set([
   "exec",
-  "open",
-  "close",
-  "type",
-  "press",
-  "sleep",
-  "scroll",
-  "scroll-until",
-  "scroll-and-click",
 ]);
 
 function getGlobalOpts(argv: string[]): {
@@ -262,6 +254,10 @@ async function main(): Promise<void> {
         for (let i = 0; i < restBeforeForward.length; i += 1) {
           const arg = restBeforeForward[i];
           if (arg === "--") {
+            break;
+          }
+          if (cmd === "exec" && rest[0] !== "best-effort" && arg === "--goal") {
+            firstUnknownFlag = arg;
             break;
           }
           const valueArity = FLAG_VALUE_ARITY.get(arg);

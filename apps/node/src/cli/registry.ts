@@ -940,7 +940,10 @@ COMMANDS["exec"] = {
   name: "exec",
   synonyms: ["execute"],
   group: "Execution",
-  supportedFlags: ["--payload", "--execution", "--validate-only", "--dry-run", "--goal"],
+  supportedFlags: (rest) =>
+    rest[0] === "best-effort"
+      ? ["--payload", "--execution", "--validate-only", "--dry-run", "--goal"]
+      : ["--payload", "--execution", "--validate-only", "--dry-run"],
   summary: "Execute a validated command payload",
   help: `clawperator exec
 
@@ -1069,7 +1072,7 @@ COMMANDS["click"] = {
   name: "click",
   synonyms: ["tap"],
   group: "Device Interaction",
-  supportedFlags: ["--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--coordinate", "--long", "--focus", "--validate-only", "--dry-run"],
+  supportedFlags: ["--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--coordinate", "--long", "--focus"],
   summary: "Tap the first matching UI element",
   help: HELP_CLICK,
   topLevelBlock: `  click --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>] [--json]
