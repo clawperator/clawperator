@@ -181,7 +181,7 @@ The `wait-for-nav` command waits for app or screen navigation to complete.
 | Flag | Description |
 | :--- | :--- |
 | `--app <package>` | Wait until this app is in the foreground (maps to `expectedPackage`) |
-| `--timeout <ms>` | **Required.** Maximum navigation wait time (1-30000ms). Execution timeout is set to `max(navTimeout + 5000, globalTimeout)`. |
+| `--timeout <ms>` | **Required.** Maximum navigation wait time (1-30000ms). Execution timeout is set to `max(navTimeout + 5000, 30000)` to ensure the envelope does not expire before the wait completes. |
 | `--text <value>` | Wait until element with exact visible text appears after nav (maps to `expectedNode.textEquals`) |
 | `--text-contains <value>` | Wait until element with partial text match appears (maps to `expectedNode.textContains`) |
 | `--id <value>` | Wait until element with this resource ID appears (maps to `expectedNode.resourceId`) |

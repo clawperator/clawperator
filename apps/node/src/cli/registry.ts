@@ -1173,7 +1173,7 @@ COMMANDS["read"] = {
   topLevelBlock: `  read --text <text> | --id <id> | --role <role> [--device <id>] [--json]
                                             Read text from the first matching UI element`,
   handler: async (ctx) => {
-    const { rest, format, logger, deviceId, operatorPackage } = ctx;
+    const { argv, rest, format, logger, deviceId, operatorPackage } = ctx;
     if (!hasElementSelectorFlag(rest)) {
       return makeMissingSelectorError("read", format);
     }
@@ -1181,9 +1181,10 @@ COMMANDS["read"] = {
     if (!resolved.ok) {
       return formatError(resolved.error, { format });
     }
-    // --all requires --json
+    // --all requires explicit --json flag
     const readAll = hasFlag(rest, "--all");
-    if (readAll && format !== "json") {
+    const hasExplicitJson = argv.includes("--json");
+    if (readAll && !hasExplicitJson) {
       return formatError(
         {
           code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
@@ -1612,6 +1613,8 @@ COMMANDS["wait-for-nav"] = {
       deviceId,
       operatorPackage,
       timeoutMs: execution.timeoutMs,
+      validateOnly: hasFlag(rest, "--validate-only"),
+      dryRun: hasFlag(rest, "--dry-run"),
       logger,
     });
   },
@@ -1626,14 +1629,12 @@ COMMANDS["read-value"] = {
   help: HELP_READ_VALUE,
   topLevelBlock: `  read-value --label <text> [--json]         Read the value associated with a labeled element`,
   handler: async (ctx) => {
-    const { rest, format, logger, deviceId, operatorPackage, timeoutMs } = ctx;
+    const { argv, rest, format, logger, deviceId, operatorPackage, timeoutMs } = ctx;
 
-    // Check for --all flag
+    // --all requires explicit --json flag
     const readAll = hasFlag(rest, "--all");
-    if (readAll && !format === !(format === "json")) {
-      // This check is a bit weird, let me fix it
-    }
-    if (readAll && format !== "json") {
+    const hasExplicitJson = argv.includes("--json");
+    if (readAll && !hasExplicitJson) {
       return formatError(
         {
           code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
@@ -1709,6 +1710,8 @@ COMMANDS["read-value"] = {
       deviceId,
       operatorPackage,
       timeoutMs,
+      validateOnly: hasFlag(rest, "--validate-only"),
+      dryRun: hasFlag(rest, "--dry-run"),
       logger,
     });
   },

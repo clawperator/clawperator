@@ -511,13 +511,18 @@ Reads a Settings-style label and its adjacent value. Finds the node matching `la
 | Param | Type | Required | Description |
 |-------|------|----------|-------------|
 | `labelMatcher` | NodeMatcher | yes | Selector for the label node |
+| `all` | `boolean` | no | When `true`, return all matching label-value pairs (see result shape below). Default `false`. |
 
-**Result data on success:**
+**Result data on success (single match, `all: false` or omitted):**
 
 | Key | Value |
 |-----|-------|
 | `label` | The label text |
 | `value` | The adjacent value text |
+
+**Result data on success (`all: true`):**
+
+Step `data.text` is a string containing a JSON array of objects with `label` and `value` fields, for example `[{"label":"Battery","value":"85%"},{"label":"Storage","value":"128GB"}]`. Parse it with `JSON.parse` to obtain the list. Step `data` also includes `all: "true"` and `count: "<n>"` as strings.
 
 **Result data on failure:**
 
