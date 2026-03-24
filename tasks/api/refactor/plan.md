@@ -1335,6 +1335,8 @@ a separate commit.
    - For `wait`, `--timeout` sets wait duration (not execution timeout)
    - Execution timeout set to `max(waitTimeout + 5000, globalTimeout)`
    - Default without `--timeout`: current 30s behavior
+   - **Android implementation required:** Add `timeoutMs: Long?` to `UiAction.WaitForNode`,
+     update parser and engine to respect action-level timeout
 
 5. **`read --all` flag**
 
@@ -1348,6 +1350,8 @@ a separate commit.
      need that should use `snapshot --json` and filter.
    - `--all` requires `--json` (error without it)
    - Without `--all`: unchanged single-match behavior
+   - **Android implementation required:** Add `all: Boolean` to `UiAction.ReadText`,
+     update parser, engine, and TaskUiScope to query and return all matching nodes
 
 6. **`sleep` command**
 
@@ -1766,10 +1770,16 @@ This is the one command where `--timeout` has command-specific meaning,
 because no agent using `wait --timeout 5000` means "set the execution
 envelope to 5 seconds but wait for the element for 30 seconds."
 
-**Implementation:** the builder sets the execution `timeoutMs` to
+**Node Implementation:** the builder sets the execution `timeoutMs` to
 `max(waitTimeout + 5000, globalTimeout)` to ensure the execution envelope
 does not kill the wait prematurely. The 5-second buffer accounts for
-command overhead.
+command overhead. Also sets `params.timeoutMs` on the action.
+
+**Android Implementation:** Add `timeoutMs: Long? = null` to `UiAction.WaitForNode`
+data class. Update `AgentCommandParser` to parse `timeoutMs` from params.
+Update `TaskUiScope.waitForNode()` to accept optional timeout and wrap
+retry loop with `withTimeout(timeoutMs)`. Update `UiActionEngine` to pass
+the timeout through.
 
 **Default:** when `--timeout` is not provided, `wait` uses the current
 fixed 30s behavior (execution timeout = 30000ms).
@@ -1843,6 +1853,15 @@ clawperator read --text "Price" --all --json
 - Without `--all`, behavior is unchanged (first match, single value)
 - `--all` requires `--json` (error if used without it, since pretty output
   for a list is ambiguous)
+
+**Android Implementation:** Add `all: Boolean = false` to `UiAction.ReadText`
+data class. Update `AgentCommandParser` to parse `all` from params.
+Update `TaskUiScope` to add `getAllText(matcher, retry): List<String>`
+method that queries all matching nodes (not just first). Update
+`TaskUiScopeDefault` to implement multi-match text extraction using
+existing UI tree query. Update `UiActionEngine.executeReadText()` to:
+- Call `getAllText()` when `all=true`, return `text` as JSON array string
+- Call `getText()` when `all=false`, return single `text` value (unchanged)
 
 ### `sleep` (execution pause)
 
