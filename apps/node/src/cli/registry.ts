@@ -429,7 +429,7 @@ Container selector flags (all optional; restrict search to container subtree):
   --container-desc <text>           Container by exact content description
   --container-desc-contains <text>  Container by partial content description
   --container-role <role>           Container by element role
-  --container-selector <json>       Container by raw NodeMatcher JSON
+  --container-selector <json>       Container by raw NodeMatcher JSON (mutually exclusive with other --container-* flags)
 
 Options:
   --all                   Return all matches as a JSON array (requires --json)

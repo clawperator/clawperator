@@ -58,9 +58,12 @@ workflow (also available as `record` alias), use [Android Recording Format for A
 | `read --selector <json>` | Read using raw `NodeMatcher` JSON (advanced only; mutually exclusive with simple flags) |
 | `read ... --all --json` | Read every on-screen match: step `data.text` is a string containing a JSON array of quoted labels (see `read_text` behavior note). Requires `--json`. |
 | `read ... --container-text <text>` | Restrict search to elements within a container with exact visible text |
+| `read ... --container-text-contains <sub>` | Restrict search to elements within a container with partial text match |
 | `read ... --container-id <id>` | Restrict search to elements within a container with the given resource ID |
+| `read ... --container-desc <text>` | Restrict search to elements within a container with exact content description |
+| `read ... --container-desc-contains <sub>` | Restrict search to elements within a container with partial content description |
 | `read ... --container-role <role>` | Restrict search to elements within a container with the given role |
-| `read ... --container-selector '<json>'` | Restrict search to elements within a container matched by raw JSON |
+| `read ... --container-selector '<json>'` | Restrict search to elements within a container matched by raw JSON (mutually exclusive with other `--container-*` flags) |
 | `wait --text <text>` | Wait until an element with exact visible text appears |
 | `wait --text-contains <sub>` | Wait until an element whose visible text contains the substring appears |
 | `wait --id <resource-id>` | Wait until an element with the given resource ID appears |
@@ -429,7 +432,7 @@ Combine fields to increase specificity when a single field is ambiguous:
 | `close_app` | `applicationId: string` | - |
 | `click` | `matcher: NodeMatcher` | `clickType: "default" \| "long_click" \| "focus"` (default: `"default"`) |
 | `enter_text` | `matcher: NodeMatcher`, `text: string` | `submit: boolean` (default: `false`), `clear: boolean` (accepted by Node contract but currently ignored by Android runtime, so do not rely on it to clear existing text) |
-| `read_text` | `matcher: NodeMatcher` | `all: boolean` (default `false`; when `true`, returns all matches - see behavior note), `validator: "temperature" \| "version" \| "regex"`, `validatorPattern: string` (required when `validator` is `"regex"`), `retry: object` |
+| `read_text` | `matcher: NodeMatcher` | `container: NodeMatcher` (scopes search to container subtree), `all: boolean` (default `false`; when `true`, returns all matches - see behavior note), `validator: "temperature" \| "version" \| "regex"` (ignored when `container` is set), `validatorPattern: string` (required when `validator` is `"regex"`), `retry: object` |
 | `wait_for_node` | `matcher: NodeMatcher` | `retry: object` (see `retry` object shape below), optional `timeoutMs: number` (1-120000 on the Operator wire) - wall-clock cap for the wait loop on device, in addition to the outer execution `timeoutMs` |
 | `snapshot_ui` | - | `retry: object` |
 | `take_screenshot` | - | `path: string`, `retry: object` |
