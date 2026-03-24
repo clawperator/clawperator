@@ -448,6 +448,40 @@ describe("promoted flat commands - help and missing-arg errors", () => {
     assert.match(obj.message ?? "", /unrecognized flag '--all'/);
   });
 
+  it("open accepts --app without unknown-flag rejection", async () => {
+    const { stdout, code } = await runCli(["open", "--app"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "MISSING_ARGUMENT");
+    assert.doesNotMatch(obj.message ?? "", /unrecognized flag/);
+  });
+
+  it("close accepts --app without unknown-flag rejection", async () => {
+    const { stdout, code } = await runCli(["close", "--app"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "MISSING_ARGUMENT");
+    assert.doesNotMatch(obj.message ?? "", /unrecognized flag/);
+  });
+
+  it("exec best-effort accepts --goal without unknown-flag rejection", async () => {
+    const { stdout, code } = await runCli(["exec", "best-effort", "--goal", "wifi settings"]);
+    assert.strictEqual(code, 0, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; goal?: string; message?: string };
+    assert.strictEqual(obj.code, "NOT_IMPLEMENTED");
+    assert.strictEqual(obj.goal, "wifi settings");
+    assert.doesNotMatch(obj.message ?? "", /unrecognized flag/);
+  });
+
+  it("recording pull accepts --out without unknown-flag rejection", async () => {
+    const { stdout, code } = await runCli(["recording", "pull", "--out"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "USAGE");
+    assert.match(obj.message ?? "", /--out requires a value/);
+    assert.doesNotMatch(obj.message ?? "", /unrecognized flag/);
+  });
+
   it("open --help shows open help", async () => {
     const { stdout, code } = await runCli(["open", "--help"]);
     assert.strictEqual(code, 0);

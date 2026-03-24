@@ -167,6 +167,7 @@ export interface CommandDef {
   subtopics?: Record<string, string>;
   topLevelBlock?: string;
   group: string;
+  supportedFlags?: string[] | ((rest: string[]) => string[]);
   handler: (ctx: HandlerContext) => Promise<string | void>;
 }
 
@@ -738,6 +739,11 @@ export const COMMANDS: Record<string, CommandDef> = {};
 COMMANDS["operator"] = {
   name: "operator",
   group: "Setup",
+  supportedFlags: (rest) => {
+    const sub = rest[0];
+    if (sub === "setup" || sub === "install") return ["--apk"];
+    return [];
+  },
   summary: "Install the Operator APK and configure the device",
   help: HELP_OPERATOR_SETUP,
   subtopics: {
@@ -807,6 +813,7 @@ COMMANDS["install"] = {
 COMMANDS["devices"] = {
   name: "devices",
   group: "Device Management",
+  supportedFlags: [],
   summary: "List connected Android devices",
   help: "clawperator devices\n\nUsage:\n  clawperator devices\n\nNotes:\n  - Lists all connected Android devices detected via adb.\n",
   topLevelBlock: `  devices                                   List connected Android devices`,
@@ -820,6 +827,11 @@ COMMANDS["devices"] = {
 COMMANDS["emulator"] = {
   name: "emulator",
   group: "Device Management",
+  supportedFlags: (rest) => {
+    const sub = rest[0];
+    if (sub === "create") return ["--name"];
+    return [];
+  },
   summary: "Manage Android emulators (AVDs)",
   help: HELP_EMULATOR,
   subtopics: {
@@ -882,6 +894,7 @@ COMMANDS["emulator"] = {
 COMMANDS["provision"] = {
   name: "provision",
   group: "Device Management",
+  supportedFlags: [],
   summary: "Provision an Android emulator",
   help: HELP_EMULATOR,
   subtopics: {
@@ -902,6 +915,7 @@ COMMANDS["provision"] = {
 COMMANDS["packages"] = {
   name: "packages",
   group: "Device Management",
+  supportedFlags: ["--third-party"],
   summary: "List installed packages on a device",
   help: "clawperator packages list\n\nUsage:\n  clawperator packages list [--device <id>] [--operator-package <pkg>] [--third-party]\n",
   topLevelBlock: `  packages list [--device <id>] [--operator-package <pkg>] [--third-party]
@@ -926,6 +940,7 @@ COMMANDS["exec"] = {
   name: "exec",
   synonyms: ["execute"],
   group: "Execution",
+  supportedFlags: ["--payload", "--execution", "--validate-only", "--dry-run", "--goal"],
   summary: "Execute a validated command payload",
   help: `clawperator exec
 
@@ -994,6 +1009,7 @@ Notes:
 COMMANDS["snapshot"] = {
   name: "snapshot",
   group: "Device Interaction",
+  supportedFlags: ["--validate-only", "--dry-run"],
   summary: "Get current Android UI hierarchy as XML",
   help: HELP_SNAPSHOT,
   topLevelBlock: `  snapshot [--device <id>] [--operator-package <pkg>] [--json]            Get current Android UI hierarchy as XML`,
@@ -1014,6 +1030,7 @@ COMMANDS["snapshot"] = {
 COMMANDS["screenshot"] = {
   name: "screenshot",
   group: "Device Interaction",
+  supportedFlags: ["--path", "--validate-only", "--dry-run"],
   summary: "Capture a screenshot from the device",
   help: HELP_SCREENSHOT,
   topLevelBlock: `  screenshot [--device <id>] [--operator-package <pkg>] [--path <file>] [--json]
@@ -1038,6 +1055,7 @@ COMMANDS["click"] = {
   name: "click",
   synonyms: ["tap"],
   group: "Device Interaction",
+  supportedFlags: ["--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--coordinate", "--long", "--focus", "--validate-only", "--dry-run"],
   summary: "Tap the first matching UI element",
   help: HELP_CLICK,
   topLevelBlock: `  click --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>] [--json]
@@ -1120,6 +1138,7 @@ COMMANDS["open"] = {
   name: "open",
   synonyms: ["open-uri", "open-url"],
   group: "Device Interaction",
+  supportedFlags: ["--app", "--validate-only", "--dry-run"],
   summary: "Open an app, URL, or URI on the device",
   help: HELP_OPEN,
   topLevelBlock: `  open <package-id|url|uri> [--device <id>] [--operator-package <pkg>] [--json]
@@ -1169,6 +1188,7 @@ COMMANDS["type"] = {
   name: "type",
   synonyms: ["fill"],
   group: "Device Interaction",
+  supportedFlags: ["--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--submit", "--clear", "--validate-only", "--dry-run"],
   summary: "Type text into the first matching UI element",
   help: HELP_TYPE,
   topLevelBlock: `  type <text> --role <role> | --id <id> [--device <id>] [--operator-package <pkg>] [--json]
@@ -1228,6 +1248,7 @@ COMMANDS["type"] = {
 COMMANDS["read"] = {
   name: "read",
   group: "Device Interaction",
+  supportedFlags: ["--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--all", "--container-text", "--container-text-contains", "--container-id", "--container-desc", "--container-desc-contains", "--container-role", "--container-selector", "--validate-only", "--dry-run"],
   summary: "Read text from the first matching UI element",
   help: HELP_READ,
   topLevelBlock: `  read --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>] [--json]
@@ -1266,6 +1287,7 @@ COMMANDS["read"] = {
 COMMANDS["wait"] = {
   name: "wait",
   group: "Device Interaction",
+  supportedFlags: ["--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--validate-only", "--dry-run"],
   summary: "Wait until a matching UI element appears",
   help: HELP_WAIT,
   topLevelBlock: `  wait --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
@@ -1306,6 +1328,7 @@ COMMANDS["press"] = {
   name: "press",
   synonyms: ["press-key"],
   group: "Device Interaction",
+  supportedFlags: ["--key", "--validate-only", "--dry-run"],
   summary: "Press a hardware key on the device",
   help: HELP_PRESS,
   topLevelBlock: `  press <back|home|recents> [--device <id>] [--operator-package <pkg>] [--json]
@@ -1344,6 +1367,7 @@ COMMANDS["press"] = {
 COMMANDS["back"] = {
   name: "back",
   group: "Device Interaction",
+  supportedFlags: ["--validate-only", "--dry-run"],
   summary: "Press the Android back key",
   help: HELP_BACK,
   topLevelBlock: `  back [--device <id>] [--operator-package <pkg>] [--json]               Press the Android back key`,
@@ -1398,6 +1422,7 @@ COMMANDS["close"] = {
   name: "close",
   synonyms: ["close-app"],
   group: "Device Interaction",
+  supportedFlags: ["--app", "--validate-only", "--dry-run"],
   summary: "Force-stop an Android application",
   help: HELP_CLOSE,
   topLevelBlock: `  close <package> [--device <id>] [--operator-package <pkg>] [--json]    Force-stop an Android application`,
@@ -1407,6 +1432,7 @@ COMMANDS["close"] = {
 COMMANDS["sleep"] = {
   name: "sleep",
   group: "Device Interaction",
+  supportedFlags: ["--validate-only", "--dry-run"],
   summary: "Pause execution for a duration",
   help: HELP_SLEEP,
   topLevelBlock: `  sleep <ms> [--device <id>] [--operator-package <pkg>] [--json]         Pause execution for a duration`,
@@ -1466,6 +1492,7 @@ COMMANDS["sleep"] = {
 COMMANDS["scroll"] = {
   name: "scroll",
   group: "Device Interaction",
+  supportedFlags: ["--direction", "--container-text", "--container-text-contains", "--container-id", "--container-desc", "--container-desc-contains", "--container-role", "--container-selector", "--validate-only", "--dry-run"],
   summary: "Scroll the screen in a direction",
   help: HELP_SCROLL,
   topLevelBlock: `  scroll <down|up|left|right> [--container-id <id>] [--device <id>] [--operator-package <pkg>] [--json]
@@ -1568,6 +1595,7 @@ const scrollUntilHandler = async (ctx: HandlerContext, clickAfterDefault: boolea
 COMMANDS["scroll-until"] = {
   name: "scroll-until",
   group: "Device Interaction",
+  supportedFlags: ["--click", "--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--container-text", "--container-text-contains", "--container-id", "--container-desc", "--container-desc-contains", "--container-role", "--container-selector", "--validate-only", "--dry-run"],
   summary: "Scroll until a target element is visible",
   help: HELP_SCROLL_UNTIL,
   topLevelBlock: `  scroll-until [<direction>] --text <text> [--click] [--device <id>] [--operator-package <pkg>] [--json]
@@ -1579,6 +1607,7 @@ COMMANDS["scroll-and-click"] = {
   name: "scroll-and-click",
   synonyms: [],
   group: "Device Interaction",
+  supportedFlags: ["--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--container-text", "--container-text-contains", "--container-id", "--container-desc", "--container-desc-contains", "--container-role", "--container-selector", "--validate-only", "--dry-run"],
   summary: "Scroll until target is visible, then click it (alias for scroll-until --click)",
   help: HELP_SCROLL_UNTIL,
   topLevelBlock: `  scroll-and-click [<direction>] --text <text> [--device <id>] [--operator-package <pkg>] [--json]
@@ -1591,6 +1620,7 @@ COMMANDS["wait-for-nav"] = {
   name: "wait-for-nav",
   synonyms: ["wait-for-navigation"],
   group: "Device Interaction",
+  supportedFlags: ["--app", "--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--validate-only", "--dry-run"],
   summary: "Wait for app or screen navigation to complete",
   help: HELP_WAIT_FOR_NAV,
   topLevelBlock: `  wait-for-nav --app <package> --timeout <ms> [--device <id>] [--operator-package <pkg>] [--json]
@@ -1693,6 +1723,7 @@ COMMANDS["read-value"] = {
   name: "read-value",
   synonyms: ["read-kv"],
   group: "Device Interaction",
+  supportedFlags: ["--label", "--label-id", "--label-desc", "--all", "--validate-only", "--dry-run"],
   summary: "Read the value associated with a labeled element",
   help: HELP_READ_VALUE,
   topLevelBlock: `  read-value --label <text> [--json]         Read the value associated with a labeled element`,
@@ -1782,6 +1813,16 @@ COMMANDS["read-value"] = {
 COMMANDS["skills"] = {
   name: "skills",
   group: "Execution",
+  supportedFlags: (rest) => {
+    const sub = rest[0];
+    if (sub === "search") return ["--app", "--intent", "--keyword"];
+    if (sub === "compile-artifact") return ["--skill-id", "--artifact", "--vars"];
+    if (sub === "new") return ["--summary"];
+    if (sub === "validate") return ["--all", "--dry-run"];
+    if (sub === "run") return ["--device", "--device-id", "--operator-package", "--receiver-package", "--timeout", "--timeout-ms", "--expect-contains", "--skip-validate"];
+    if (sub === "sync" || sub === "update") return ["--ref"];
+    return [];
+  },
   summary: "Manage and run automation skills",
   help: `clawperator skills
 
@@ -1936,6 +1977,13 @@ COMMANDS["recording"] = {
   name: "recording",
   synonyms: ["record"],
   group: "Recording",
+  supportedFlags: (rest) => {
+    const sub = rest[0];
+    if (sub === "start" || sub === "stop") return ["--session-id"];
+    if (sub === "pull") return ["--session-id", "--out"];
+    if (sub === "parse") return ["--input", "--out"];
+    return [];
+  },
   summary: "Manage recording sessions on the Operator app",
   help: "clawperator recording\n\nUsage:\n  clawperator recording start|stop|pull|parse ... ('record' is an alias)\n",
   topLevelBlock: `  recording start [--session-id <id>] [--device <serial>] [--operator-package <pkg>]
@@ -1997,6 +2045,7 @@ COMMANDS["recording"] = {
 COMMANDS["serve"] = {
   name: "serve",
   group: "Execution",
+  supportedFlags: ["--port", "--host"],
   summary: "Start local HTTP/SSE server for remote control",
   help: "clawperator serve\n\nUsage:\n  clawperator serve [--port <number>] [--host <string>]\n\nNotes:\n  - Default host: 127.0.0.1\n",
   topLevelBlock: `  serve [--port <number>] [--host <string>]
@@ -2026,6 +2075,7 @@ COMMANDS["serve"] = {
 COMMANDS["doctor"] = {
   name: "doctor",
   group: "Setup",
+  supportedFlags: ["--fix", "--full", "--check-only"],
   summary: "Run environment and runtime checks",
   help: HELP_DOCTOR,
   topLevelBlock: `  doctor [--json]
@@ -2057,6 +2107,7 @@ COMMANDS["doctor"] = {
 COMMANDS["grant-device-permissions"] = {
   name: "grant-device-permissions",
   group: "Setup",
+  supportedFlags: [],
   summary: "Re-grant accessibility and notification permissions",
   help: HELP_GRANT_DEVICE_PERMISSIONS,
   topLevelBlock: `  grant-device-permissions [--device <id>] [--operator-package <package>]
@@ -2076,6 +2127,7 @@ COMMANDS["grant-device-permissions"] = {
 COMMANDS["version"] = {
   name: "version",
   group: "Setup",
+  supportedFlags: ["--check-compat"],
   summary: "Show the CLI version",
   help: HELP_VERSION,
   topLevelBlock: `  version
@@ -2275,4 +2327,14 @@ export function resolveHelpFromRegistry(rest: string[], commands: Record<string,
     }
   }
   return def.help;
+}
+
+export function resolveSupportedFlagsFromRegistry(def: CommandDef, rest: string[]): string[] {
+  if (Array.isArray(def.supportedFlags)) {
+    return def.supportedFlags;
+  }
+  if (typeof def.supportedFlags === "function") {
+    return def.supportedFlags(rest);
+  }
+  return [];
 }

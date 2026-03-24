@@ -9,6 +9,7 @@ import {
   didYouMean,
   generateTopLevelHelp,
   resolveHelpFromRegistry,
+  resolveSupportedFlagsFromRegistry,
   type HandlerContext,
 } from "./registry.js";
 import { shouldCliStdoutForceExitCode1 } from "./stdoutExitCode.js";
@@ -186,16 +187,8 @@ async function main(): Promise<void> {
           "--json", "--output", "--format", "--log-level", "--timeout", "--timeout-ms",
           "--verbose", "--help", "--version"
         ];
-        const helpTextToUse = resolveHelpFromRegistry([cmd, ...rest], COMMANDS) + " " + (def.topLevelBlock || "");
-        const knownFlagsMatch = Array.from(helpTextToUse.matchAll(/--[a-z0-9-]+/g)).map(m => m[0]);
-        const knownFlags = new Set([...knownFlagsMatch, ...globalFlags]);
-        
-        // All Device Interaction commands, plus exec and skills validate, use the generic execution runner
-        // which natively supports payload validation modifiers.
-        if (def.group === "Device Interaction" || def.name === "exec" || def.name === "skills") {
-          knownFlags.add("--validate-only");
-          knownFlags.add("--dry-run");
-        }
+        const localFlags = resolveSupportedFlagsFromRegistry(def, rest);
+        const knownFlags = new Set([...localFlags, ...globalFlags]);
         
         let firstUnknownFlag: string | undefined;
         // Don't flag-check after `--` (forwarded args)
@@ -217,9 +210,6 @@ async function main(): Promise<void> {
               bestMatch = flag;
             }
           }
-          // TODO: Phase 4 follow-up - Flag suggestion architecture is fragile long-term.
-          // Extracting known flags from rendered help text via regex is brittle. Replace
-          // with a formal per-command flag registry / allowlist.
           if (bestMatch && bestScore > 0.75) {
             result = JSON.stringify({ code: "USAGE", message: `unrecognized flag '${firstUnknownFlag}'. Did you mean '${bestMatch}'?` });
             usageParseError = true;
