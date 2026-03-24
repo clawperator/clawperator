@@ -13,6 +13,56 @@
 
 ---
 
+## 1a. Architectural Constraints
+
+These rules prevent drift between the two manifest files and the generation pipeline.
+
+**Authority hierarchy:**
+- `mkdocs.yml` is the canonical navigation and page ordering.
+- `source-map.yaml` is a flat composition manifest keyed by output path. It must align exactly with `mkdocs.yml` and must not define independent structure, ordering, or sectioning.
+- If the two files disagree, `mkdocs.yml` wins. The build should fail.
+
+**Link rewriting:**
+- All relative links in source docs must be rewritten during generation to match final output paths defined in `source-map.yaml`.
+- Intra-repo links: resolved via output path lookup in source-map.
+- Cross-repo links (clawperator-skills): resolved via the same source-map mapping table.
+- Unresolvable links: must fail the build. No silent broken links.
+
+**Code vs authored precedence (curated pages):**
+- Code-derived data is authoritative for structure, enumerations, and schemas.
+- Authored content augments but cannot override code definitions.
+- If code adds a new error code or selector flag, the curated page must include it. The generator should warn (or fail) on mismatch.
+
+**Page boundary constraints:**
+- `api/overview.md` must not exceed: one screen of concepts, one result envelope definition, one execution flow description. All detailed mechanics live in dedicated pages.
+- Core reference pages (actions, selectors, errors) are explicitly designed to be used together. Cross-referencing between them is expected and acceptable. The "self-contained" principle means minimizing cross-dependencies, not eliminating them.
+
+**Build failure conditions:**
+- Any relative link that cannot be resolved to an output page
+- Any code-derived enum (error code, selector flag) absent from its target curated page
+- Any page in `mkdocs.yml` nav missing from disk
+- Any page on disk in `sites/docs/docs/` absent from `mkdocs.yml` nav (excluding redirects)
+- Any `source-map.yaml` output path not present in `mkdocs.yml` nav
+
+**Terminology consistency:**
+- Canonical terms must be used throughout. No synonyms.
+  - "operator" (not "receiver")
+  - "action" (not "command" when referring to execution payload actions)
+  - "selector" (not "matcher" unless referring to the internal `NodeMatcher` type specifically)
+  - "device" flag is `--device` (not `--device-id` as primary)
+  - "timeout" flag is `--timeout` (not `--timeout-ms`)
+- Each term is defined at first use on the page that owns the concept. Other pages use the term without redefining it.
+
+**Source file deletion criteria:**
+- A source file may only be deleted after:
+  1. Its content exists in exactly one target page
+  2. `docs-validate` passes
+  3. `llms-full.txt` includes the migrated content
+  4. `./scripts/docs_build.sh` succeeds
+- Until all four conditions are met, the old source file remains.
+
+---
+
 ## 2. Target Docs Structure
 
 ### Design Rationale
@@ -96,7 +146,7 @@ nav:
 | `api/serve.md` | HTTP/SSE server contract, endpoints, usage | `serve.ts` command, parts of `node-api-for-agents.md` |
 | `api/navigation.md` | Observe-decide-act loops, scrolling patterns, overlay handling, OEM variation | `navigation-patterns.md` |
 | `api/recording.md` | Android recording format, current limitations, step candidate contract | `android-recording.md` |
-| `skills/overview.md` | What skills are, how they run, runtime model | `usage-model.md` |
+| `skills/overview.md` | What skills are, how they run, runtime model. Must explicitly define: skill = deterministic wrapper, clawperator = execution substrate, agent = planner. | `usage-model.md` |
 | `skills/authoring.md` | Authoring guidelines, recording-to-skill conversion, blocked terms | `skill-authoring-guidelines.md`, `skill-from-recording.md`, `blocked-terms-policy.md` |
 | `skills/development.md` | Development workflow | `skill-development-workflow.md` |
 | `skills/runtime.md` | Device prep and runtime tips | `device-prep-and-runtime-tips.md` |
@@ -245,7 +295,7 @@ Same flow, updated inputs:
 
 2. **`mkdocs.yml`** - Full nav rewrite matching Section 3. Add `mkdocs-redirects` plugin:
    - Add `mkdocs-redirects` to `sites/docs/requirements.txt`
-   - Add redirect map covering all old page paths to new destinations:
+   - Add redirect map covering all old page paths to new destinations. This is a one-time migration artifact - after the refactor lands, the map is static and does not require ongoing maintenance:
      ```yaml
      plugins:
        - search
@@ -416,7 +466,7 @@ Priority order (most impactful first):
 
 ### Phase 5: Cleanup
 
-1. Delete absorbed source files from `docs/` where content is fully migrated (prevents drift)
+1. Delete absorbed source files from `docs/` per the deletion criteria in Section 1a (all four conditions must be met before removing any source file)
 2. Delete task files listed in Section 8
 3. Restore churn limits in `source-map.yaml` to maintenance-safe values
 
@@ -435,8 +485,10 @@ Priority order (most impactful first):
 
 - [ ] Every page in `mkdocs.yml` nav exists on disk in `sites/docs/docs/`
 - [ ] No page on disk in `sites/docs/docs/` is absent from `mkdocs.yml` (excluding redirects)
+- [ ] Every `source-map.yaml` output path is present in `mkdocs.yml` nav
 - [ ] No page appears in more than one nav section
 - [ ] No two pages cover the same concept as primary content
+- [ ] All relative links in generated pages resolve to valid output pages
 - [ ] `validate_docs_routes.py` passes including inner-page relative link checks
 - [ ] `docs-validate` skill passes
 
