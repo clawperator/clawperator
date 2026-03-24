@@ -30,7 +30,7 @@ workflow (also available as `record` alias), use [Android Recording Format for A
 | `emulator status` | List running Android emulators and boot state |
 | `emulator provision` | Reuse or create a supported Android emulator and return its ADB serial |
 | `provision emulator` | Alias of `emulator provision` |
-| `exec --execution <json\|file>` | Run a full execution payload (see `--validate-only` and `--dry-run` below). `execute` is a supported synonym. |
+| `exec <json\|file>` | Run a full execution payload (JSON string or file path). `execute` is a synonym; `--payload` and `--execution` are accepted as named alternatives to the positional arg. |
 | `snapshot` | Capture UI hierarchy dump (`hierarchy_xml`) |
 | `screenshot [--path <file>]` | Capture device screen as PNG |
 | `open <package-id\|url\|uri>` | Open an app, URL, or URI (auto-detects target type) |
@@ -88,6 +88,13 @@ workflow (also available as `record` alias), use [Android Recording Format for A
 | `close --app <package>` | Same as `close <package>` |
 | `close-app <package>` | Synonym for `close` |
 | `sleep <ms>` | Pause execution for a duration in milliseconds |
+| `wait-for-nav --app <package> --timeout <ms>` | Wait for app/screen navigation to complete (waits until app is in foreground) |
+| `wait-for-nav --text <text> --timeout <ms>` | Wait for navigation until element appears |
+| `wait-for-navigation ...` | Synonym for `wait-for-nav` |
+| `read-value --label <text>` | Read value associated with a labeled element (e.g., "85%" next to "Battery") |
+| `read-value --label-id <id>` | Read value by matching label's resource ID |
+| `read-value --label <text> --all --json` | Read all matching values as JSON array |
+| `read-kv ...` | Synonym for `read-value` |
 | `skills list` | List available skills |
 | `skills get <skill_id>` | Show skill metadata |
 | `skills search [--app <pkg>] [--intent <i>] [--keyword <k>]` | Search skills by app, intent, or keyword (at least one filter required) |
@@ -167,6 +174,37 @@ The `read` command accepts `--container-*` flags to restrict the search to eleme
 
 **Error handling:** If the container matcher finds no element, the step fails with `CONTAINER_NOT_FOUND`. If the container matches but the element selector matches nothing inside that subtree, the step fails with `NODE_NOT_FOUND`.
 
+### `wait-for-nav` flags
+
+The `wait-for-nav` command waits for app or screen navigation to complete.
+
+| Flag | Description |
+| :--- | :--- |
+| `--app <package>` | Wait until this app is in the foreground (maps to `expectedPackage`) |
+| `--timeout <ms>` | **Required.** Maximum navigation wait time (1-30000ms). Execution timeout is set to `max(navTimeout + 5000, globalTimeout)`. |
+| `--text <value>` | Wait until element with exact visible text appears after nav (maps to `expectedNode.textEquals`) |
+| `--text-contains <value>` | Wait until element with partial text match appears (maps to `expectedNode.textContains`) |
+| `--id <value>` | Wait until element with this resource ID appears (maps to `expectedNode.resourceId`) |
+| `--desc <value>` | Wait until element with this content description appears (maps to `expectedNode.contentDescEquals`) |
+| `--desc-contains <value>` | Wait until element with partial content description appears (maps to `expectedNode.contentDescContains`) |
+| `--role <value>` | Wait until element with this role appears (maps to `expectedNode.role`) |
+| `--selector <json>` | Raw JSON NodeMatcher for expectedNode; mutually exclusive with simple flags |
+
+**Requirements:** At least one of `--app` or a selector flag is required. `--timeout` is always required.
+
+### `read-value` flags
+
+The `read-value` command reads the value associated with a labeled UI element (e.g., reading "85%" next to the "Battery" label). This uses the `read_key_value_pair` action type.
+
+| Flag | Description |
+| :--- | :--- |
+| `--label <text>` | Match label by exact visible text (maps to `labelMatcher.textEquals`) |
+| `--label-id <id>` | Match label by Android resource ID (maps to `labelMatcher.resourceId`) |
+| `--label-desc <text>` | Match label by exact content description (maps to `labelMatcher.contentDescEquals`) |
+| `--all` | Return all matches as a JSON array (requires `--json`) |
+
+**Requirements:** At least one of `--label`, `--label-id`, or `--label-desc` is required.
+
 ### Quick Examples
 
 ```bash
@@ -196,6 +234,18 @@ clawperator read --role text --all --json --device <device_id>
 
 # Read within a specific container (scope search to container subtree)
 clawperator read --text "Price" --container-role list --device <device_id> --json
+
+# Wait for app navigation to complete
+clawperator wait-for-nav --app com.google.home --timeout 5000 --device <device_id> --json
+
+# Wait for element to appear after navigation
+clawperator wait-for-nav --text "Settings" --timeout 5000 --device <device_id> --json
+
+# Read value associated with a label
+clawperator read-value --label "Battery" --device <device_id> --json
+
+# Read all values for a label
+clawperator read-value --label "Price" --all --json --device <device_id>
 
 # Scroll within a specific container
 clawperator scroll down --container-id "com.example:id/recycler_view" --device <device_id> --json
