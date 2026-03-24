@@ -1,5 +1,6 @@
 package clawperator.task.runner
 
+import action.math.geometry.Point
 import clawperator.uitree.ToggleState
 import clawperator.uitree.UiTreeClickTypes
 import kotlin.time.Duration
@@ -145,7 +146,8 @@ interface TaskUiScope {
      * @throws Exception if no matching element is found or click fails
      */
     suspend fun click(
-        matcher: NodeMatcher,
+        matcher: NodeMatcher? = null,
+        coordinate: Point? = null,
         clickTypes: UiTreeClickTypes = UiTreeClickTypes.Default,
         retry: TaskRetry = TaskRetry.None,
     )
@@ -288,7 +290,11 @@ interface TaskUiScope {
     ) {
         scrollIntoView(target, container, direction, maxSwipes, distanceRatio, settleDelay, scrollRetry, findFirstScrollableChild)
         if (clickAfter) {
-            click(target, clickTypes, clickRetry)
+            click(
+                matcher = target,
+                clickTypes = clickTypes,
+                retry = clickRetry,
+            )
         }
     }
 

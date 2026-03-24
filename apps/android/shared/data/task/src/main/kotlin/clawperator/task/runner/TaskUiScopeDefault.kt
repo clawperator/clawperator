@@ -3,6 +3,7 @@ package clawperator.task.runner
 // Helper function to get current task status from coroutine context
 import action.log.Log
 import action.time.getCurrentTimeMillis
+import action.math.geometry.Point
 import clawperator.uitree.ToggleState
 import clawperator.uitree.UiNode
 import clawperator.uitree.UiRole
@@ -439,15 +440,17 @@ class TaskUiScopeDefault(
         }
 
     override suspend fun click(
-        matcher: NodeMatcher,
+        matcher: NodeMatcher?,
+        coordinate: Point?,
         clickTypes: UiTreeClickTypes,
         retry: TaskRetry,
     ) = withRetry(
         retry = retry,
-        operation = "click($matcher)",
+        operation = if (coordinate != null) "click(${coordinate.shortString})" else "click($matcher)",
         successPayload = { _, elapsedMs, attempt ->
             payload(
-                "matcher" to matcher.toString(),
+                "matcher" to matcher?.toString(),
+                "coordinate" to coordinate?.shortString,
                 "click_type" to clickTypes.toString(),
                 "elapsed_ms" to elapsedMs,
                 "attempt" to attempt,
@@ -462,13 +465,25 @@ class TaskUiScopeDefault(
                     else -> "timeout"
                 }
             payload(
-                "matcher" to matcher.toString(),
+                "matcher" to matcher?.toString(),
+                "coordinate" to coordinate?.shortString,
                 "failure_point" to failurePoint,
                 "attempt" to attempt,
             )
         },
     ) {
-        Log.d("$TAG Clicking node matching: $matcher")
+        if (coordinate != null) {
+            Log.d("$TAG Clicking coordinate: ${coordinate.shortString}")
+            val clickSuccessful = uiTreeManager.clickAt(coordinate.x.toFloat(), coordinate.y.toFloat(), clickTypes)
+            if (!clickSuccessful) {
+                throw IllegalStateException("Click at coordinate ${coordinate.shortString} failed")
+            }
+            Log.d("$TAG Successfully clicked coordinate ${coordinate.shortString}")
+            return@withRetry Unit
+        }
+
+        val targetMatcher = matcher ?: throw IllegalStateException("click requires matcher or coordinate")
+        Log.d("$TAG Clicking node matching: $targetMatcher")
 
         val uiTreeRaw =
             uiTreeInspector.getCurrentUiTree()
@@ -477,8 +492,8 @@ class TaskUiScopeDefault(
         val uiTree = uiTreeFilterer.filterOnScreenOnly(uiTreeRaw)
 
         val uiNode =
-            findNodeByMatcher(matcher, uiTree)
-                ?: throw IllegalStateException("No UI node found matching criteria: $matcher")
+            findNodeByMatcher(targetMatcher, uiTree)
+                ?: throw IllegalStateException("No UI node found matching criteria: $targetMatcher")
 
         val clickSuccessful = uiTreeManager.triggerClick(uiNode, clickTypes)
         if (!clickSuccessful) {

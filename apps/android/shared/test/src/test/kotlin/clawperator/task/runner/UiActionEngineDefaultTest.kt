@@ -58,6 +58,36 @@ class UiActionEngineDefaultTest : ActionTest {
         }
 
     @Test
+    fun `execute click with coordinates uses raw coordinate tap`() =
+        actionTest {
+            val uiScope = RecordingTaskUiScope()
+            val taskScope = RecordingTaskScope(uiScope)
+            val developerOptionsManager = DeveloperOptionsManagerMock()
+            val engine = UiActionEngineDefault(developerOptionsManager, UiGlobalActionDispatcherMock())
+
+            val result =
+                engine.execute(
+                    taskScope = taskScope,
+                    plan =
+                        UiActionPlan(
+                            commandId = "cmd-click-coordinate",
+                            taskId = "task-click-coordinate",
+                            source = "test",
+                            actions =
+                                listOf(
+                                    UiAction.Click(
+                                        id = "step-click",
+                                        coordinate = action.math.geometry.Point(120, 240),
+                                    ),
+                                ),
+                        ),
+                )
+
+            assertEquals(1, result.stepResults.size)
+            assertEquals(action.math.geometry.Point(120, 240), uiScope.clickCoordinate)
+        }
+
+    @Test
     fun `execute snapshot_ui returns overlay metadata when available`() =
         actionTest {
             val uiScope = RecordingTaskUiScope()
@@ -1555,6 +1585,7 @@ open class RecordingTaskUiScope(
     var scrollIntoViewCalled: Boolean = false
     var scrollOnceCalled: Boolean = false
     var clickCalled: Boolean = false
+    var clickCoordinate: action.math.geometry.Point? = null
 
     override suspend fun getValidatedText(
         matcher: NodeMatcher,
@@ -1633,11 +1664,13 @@ open class RecordingTaskUiScope(
     }
 
     override suspend fun click(
-        matcher: NodeMatcher,
+        matcher: NodeMatcher?,
+        coordinate: action.math.geometry.Point?,
         clickTypes: UiTreeClickTypes,
         retry: TaskRetry,
     ) {
         clickCalled = true
+        clickCoordinate = coordinate
     }
 
     override suspend fun scrollOnce(

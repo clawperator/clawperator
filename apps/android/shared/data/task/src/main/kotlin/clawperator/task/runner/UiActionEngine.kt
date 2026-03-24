@@ -213,6 +213,7 @@ class UiActionEngineDefault(
         taskScope.ui {
             click(
                 matcher = action.matcher,
+                coordinate = action.coordinate,
                 clickTypes = action.clickTypes,
                 retry = action.retry,
             )
@@ -221,9 +222,10 @@ class UiActionEngineDefault(
             id = action.id,
             actionType = "click",
             data =
-                mapOf(
-                    "click_types" to action.clickTypes.toWireValue(),
-                ),
+                buildMap {
+                    action.coordinate?.let { put("coordinate", it.shortString) }
+                    put("click_types", action.clickTypes.toWireValue())
+                },
         )
     }
 

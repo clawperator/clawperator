@@ -982,9 +982,23 @@ Notes:
       // Support --payload (primary), --execution (alias), or positional argument
       let payloadSource: string | undefined = getOpt(rest, "--payload") ?? getOpt(rest, "--execution");
       if (!payloadSource) {
-        // Check for positional argument (first non-flag token)
-        const positionals = barePositionalTokens(rest, ["--payload", "--execution"], ["--validate-only", "--dry-run"]);
-        payloadSource = positionals[0];
+        // Check for positional argument (first non-flag token), including dash-prefixed
+        // file paths that have already passed the unknown-flag preflight.
+        const skipFlags = new Set(["--payload", "--execution", "--validate-only", "--dry-run"]);
+        for (let i = 0; i < rest.length; i += 1) {
+          const token = rest[i];
+          if (token === "--") {
+            break;
+          }
+          if (skipFlags.has(token)) {
+            if (token === "--payload" || token === "--execution") {
+              i += 1;
+            }
+            continue;
+          }
+          payloadSource = token;
+          break;
+        }
       }
       if (!payloadSource) {
         return formatError({ code: ERROR_CODES.MISSING_ARGUMENT, message: "exec requires a payload. Use: clawperator exec <json-or-file> or clawperator exec --payload <json-or-file>" }, { format });
@@ -1121,6 +1135,15 @@ COMMANDS["click"] = {
     let clickType: "default" | "long_click" | "focus" = "default";
     if (hasLong) clickType = "long_click";
     if (hasFocus) clickType = "focus";
+    if (coordinate && clickType === "focus") {
+      return formatError(
+        {
+          code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+          message: "--focus is not supported with --coordinate",
+        },
+        { format },
+      );
+    }
 
     return (await import("./commands/action.js")).cmdActionClick({
       format,

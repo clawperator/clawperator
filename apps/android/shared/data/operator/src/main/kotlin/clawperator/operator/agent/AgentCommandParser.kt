@@ -1,5 +1,6 @@
 package clawperator.operator.agent
 
+import action.math.geometry.Point
 import clawperator.task.runner.NodeMatcher
 import clawperator.task.runner.TaskRetry
 import clawperator.task.runner.TaskRetryPresets
@@ -111,12 +112,19 @@ class AgentCommandParserDefault : AgentCommandParser {
                     timeoutMs = params.longOrNull("timeoutMs")?.coerceIn(1L, 120_000L),
                 )
             "click" ->
-                UiAction.Click(
-                    id = id,
-                    matcher = params.parseMatcherRequired("matcher"),
-                    clickTypes = params.parseClickTypes(),
-                    retry = params.parseRetryOrDefault(defaultRetry = TaskRetryPresets.UiReadiness),
-                )
+                {
+                    val matcher = params.parseMatcherOrNull("matcher")
+                    val coordinate = params.parsePointOrNull("coordinate")
+                    require(matcher != null || coordinate != null) { "click requires matcher or coordinate" }
+                    require(!(matcher != null && coordinate != null)) { "click matcher and coordinate are mutually exclusive" }
+                    UiAction.Click(
+                        id = id,
+                        matcher = matcher,
+                        coordinate = coordinate,
+                        clickTypes = params.parseClickTypes(),
+                        retry = params.parseRetryOrDefault(defaultRetry = TaskRetryPresets.UiReadiness),
+                    )
+                }
             "scroll_and_click" ->
                 UiAction.ScrollAndClick(
                     id = id,
@@ -326,6 +334,14 @@ class AgentCommandParserDefault : AgentCommandParser {
             contentDescEquals = contentDescEquals,
             contentDescContains = contentDescContains,
         )
+    }
+
+    private fun JsonObject.parsePointOrNull(key: String): Point? {
+        val pointObject = this[key]?.jsonObject ?: return null
+        val x = pointObject.intOrNull("x") ?: error("$key.x is required")
+        val y = pointObject.intOrNull("y") ?: error("$key.y is required")
+        require(x >= 0 && y >= 0) { "$key must contain non-negative integers" }
+        return Point(x, y)
     }
 
     private fun JsonObject.stringRequired(

@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert";
 import { spawn } from "node:child_process";
+import { rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -471,6 +472,58 @@ describe("promoted flat commands - help and missing-arg errors", () => {
     assert.strictEqual(obj.code, "NOT_IMPLEMENTED");
     assert.strictEqual(obj.goal, "wifi settings");
     assert.doesNotMatch(obj.message ?? "", /unrecognized flag/);
+  });
+
+  it("exec validate-only accepts a dash-prefixed payload path", async () => {
+    const payloadPath = join(packageRoot, "--plan-payload.json");
+    await writeFile(
+      payloadPath,
+      JSON.stringify({
+        commandId: "cmd-plan",
+        taskId: "task-plan",
+        source: "test",
+        expectedFormat: "android-ui-automator",
+        timeoutMs: 5000,
+        actions: [{ id: "sleep-1", type: "sleep", params: { durationMs: 0 } }],
+      }),
+    );
+
+    try {
+      const { stdout, code } = await runCli(["exec", "--validate-only", "--payload", "--plan.json"]);
+      assert.strictEqual(code, 0, stdout);
+      const obj = JSON.parse(stdout) as { ok?: boolean; validated?: boolean; message?: string };
+      assert.strictEqual(obj.ok, true);
+      assert.strictEqual(obj.validated, true);
+      assert.doesNotMatch(obj.message ?? "", /unrecognized flag/);
+    } finally {
+      await rm(payloadPath, { force: true });
+    }
+  });
+
+  it("exec validate-only accepts a dash-prefixed positional payload path", async () => {
+    const payloadPath = join(packageRoot, "--plan-positional.json");
+    await writeFile(
+      payloadPath,
+      JSON.stringify({
+        commandId: "cmd-plan-positional",
+        taskId: "task-plan-positional",
+        source: "test",
+        expectedFormat: "android-ui-automator",
+        timeoutMs: 5000,
+        actions: [{ id: "sleep-1", type: "sleep", params: { durationMs: 0 } }],
+      }),
+    );
+
+    try {
+      const { stdout, code } = await runCli(["exec", "--validate-only", "--plan-positional.json"]);
+      assert.strictEqual(code, 0, stdout);
+      const obj = JSON.parse(stdout) as { ok?: boolean; validated?: boolean; message?: string };
+      assert.strictEqual(obj.ok, true);
+      assert.strictEqual(obj.validated, true);
+      assert.doesNotMatch(obj.message ?? "", /unrecognized flag/);
+    } finally {
+      await rm(payloadPath, { force: true });
+    }
   });
 
   it("recording pull accepts --out without unknown-flag rejection", async () => {

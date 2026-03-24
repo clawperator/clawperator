@@ -66,6 +66,36 @@ class AgentCommandParserDefaultTest {
     }
 
     @Test
+    fun `parse click action with coordinates`() {
+        val payload =
+            """
+            {
+              "commandId": "cmd-click-1",
+              "taskId": "task-click-1",
+              "source": "debug",
+              "actions": [
+                {
+                  "id": "step-1",
+                  "type": "click",
+                  "params": { "coordinate": { "x": 120, "y": 240 } }
+                }
+              ]
+            }
+            """.trimIndent()
+
+        val result = parser.parse(payload)
+        assertTrue(result.isSuccess)
+
+        val command = result.getOrThrow()
+        assertEquals(1, command.actions.size)
+        assertIs<UiAction.Click>(command.actions[0])
+
+        val click = command.actions[0] as UiAction.Click
+        assertEquals(null, click.matcher)
+        assertEquals(action.math.geometry.Point(120, 240), click.coordinate)
+    }
+
+    @Test
     fun `parse start and stop recording actions`() {
         val payload =
             """

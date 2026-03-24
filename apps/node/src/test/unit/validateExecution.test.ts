@@ -33,6 +33,50 @@ describe("validateExecution", () => {
     assert.strictEqual(ex.actions[0].id, "snap-1");
   });
 
+  it("accepts click actions with coordinates", () => {
+    const ex = validateExecution({
+      commandId: "cmd-click-1",
+      taskId: "task-click-1",
+      source: "test",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 8000,
+      actions: [
+        {
+          id: "click-1",
+          type: "click",
+          params: { coordinate: { x: 120, y: 240 } },
+        },
+      ],
+    });
+
+    assert.strictEqual(ex.actions[0].type, "click");
+    assert.deepStrictEqual(ex.actions[0].params?.coordinate, { x: 120, y: 240 });
+  });
+
+  it("rejects click actions that mix matcher and coordinate", () => {
+    assert.throws(
+      () =>
+        validateExecution({
+          commandId: "cmd-click-2",
+          taskId: "task-click-2",
+          source: "test",
+          expectedFormat: "android-ui-automator",
+          timeoutMs: 8000,
+          actions: [
+            {
+              id: "click-2",
+              type: "click",
+              params: {
+                matcher: { textEquals: "Login" },
+                coordinate: { x: 120, y: 240 },
+              },
+            },
+          ],
+        }),
+      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
+    );
+  });
+
   it("normalizes action type alias (type_text -> enter_text)", () => {
     const ex = validateExecution({
       commandId: "c",

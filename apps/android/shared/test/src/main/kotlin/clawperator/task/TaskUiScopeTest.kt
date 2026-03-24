@@ -236,12 +236,18 @@ class TaskUiScopeTest(
     }
 
     override suspend fun click(
-        matcher: NodeMatcher,
+        matcher: NodeMatcher?,
+        coordinate: action.math.geometry.Point?,
         clickTypes: UiTreeClickTypes,
         retry: TaskRetry,
     ) {
+        if (coordinate != null) {
+            println("[TaskUiScopeTest] Clicked coordinate: ${coordinate.shortString}")
+            return
+        }
+
         val node =
-            findNodeByMatcher(matcher)
+            findNodeByMatcher(matcher ?: throw IllegalStateException("click requires matcher or coordinate"))
                 ?: throw IllegalStateException("No node found matching criteria")
 
         if (!node.isClickable) {
