@@ -440,6 +440,14 @@ describe("promoted flat commands - help and missing-arg errors", () => {
     assert.match(obj.message ?? "", /use --coordinate OR a selector, not both/);
   });
 
+  it("click rejects unsupported execution flags like --all (exit 1)", async () => {
+    const { stdout, code } = await runCli(["click", "--text", "Wi-Fi", "--all"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "USAGE");
+    assert.match(obj.message ?? "", /unrecognized flag '--all'/);
+  });
+
   it("open --help shows open help", async () => {
     const { stdout, code } = await runCli(["open", "--help"]);
     assert.strictEqual(code, 0);

@@ -184,11 +184,18 @@ async function main(): Promise<void> {
         const globalFlags = [
           "--device", "--device-id", "--operator-package", "--receiver-package",
           "--json", "--output", "--format", "--log-level", "--timeout", "--timeout-ms",
-          "--verbose", "--help", "--version", "--all", "--validate-only", "--dry-run"
+          "--verbose", "--help", "--version"
         ];
         const helpTextToUse = resolveHelpFromRegistry([cmd, ...rest], COMMANDS) + " " + (def.topLevelBlock || "");
         const knownFlagsMatch = Array.from(helpTextToUse.matchAll(/--[a-z0-9-]+/g)).map(m => m[0]);
         const knownFlags = new Set([...knownFlagsMatch, ...globalFlags]);
+        
+        // All Device Interaction commands, plus exec and skills validate, use the generic execution runner
+        // which natively supports payload validation modifiers.
+        if (def.group === "Device Interaction" || def.name === "exec" || def.name === "skills") {
+          knownFlags.add("--validate-only");
+          knownFlags.add("--dry-run");
+        }
         
         let firstUnknownFlag: string | undefined;
         // Don't flag-check after `--` (forwarded args)
