@@ -112,14 +112,15 @@ export async function cmdCloseApp(options: {
 
 export async function cmdActionClick(options: {
   format: OutputOptions["format"];
-  matcher: NodeMatcher;
+  matcher?: NodeMatcher;
+  coordinate?: { x: number; y: number };
   clickType?: "default" | "long_click" | "focus";
   deviceId?: string;
   operatorPackage?: string;
   logger?: Logger;
 }): Promise<string> {
   try {
-    const execution = buildClickExecution(options.matcher, options.clickType);
+    const execution = buildClickExecution(options.matcher, options.clickType, options.coordinate);
     const result = await runExecution(execution, {
       deviceId: options.deviceId,
       operatorPackage: options.operatorPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,

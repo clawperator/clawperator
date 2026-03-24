@@ -154,6 +154,29 @@ export async function startServer(options: ServeOptions): Promise<Server> {
     }
   });
 
+  // Legacy route migrations
+  app.post("/observe/snapshot", (_req, res) => {
+    res.status(404).json({
+      ok: false,
+      error: {
+        code: "UNKNOWN_COMMAND",
+        message: "'/observe/snapshot' has been removed. Use '/snapshot' instead.",
+        suggestion: "/snapshot",
+      },
+    });
+  });
+
+  app.post("/observe/screenshot", (_req, res) => {
+    res.status(404).json({
+      ok: false,
+      error: {
+        code: "UNKNOWN_COMMAND",
+        message: "'/observe/screenshot' has been removed. Use '/screenshot' instead.",
+        suggestion: "/screenshot",
+      },
+    });
+  });
+
   app.post("/snapshot", async (req, res) => {
     if (!req.body || typeof req.body !== "object") {
       res.status(400).json({ ok: false, error: { code: "INVALID_BODY", message: "Invalid or missing JSON body" } });

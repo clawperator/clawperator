@@ -184,9 +184,10 @@ async function main(): Promise<void> {
         const globalFlags = [
           "--device", "--device-id", "--operator-package", "--receiver-package",
           "--json", "--output", "--format", "--log-level", "--timeout", "--timeout-ms",
-          "--verbose", "--help", "--version", "--all" // --all needs to be known globally or picked up from help
+          "--verbose", "--help", "--version", "--all", "--validate-only", "--dry-run"
         ];
-        const knownFlagsMatch = Array.from(def.help.matchAll(/--[a-z0-9-]+/g)).map(m => m[0]);
+        const helpTextToUse = resolveHelpFromRegistry([cmd, ...rest], COMMANDS) + " " + (def.topLevelBlock || "");
+        const knownFlagsMatch = Array.from(helpTextToUse.matchAll(/--[a-z0-9-]+/g)).map(m => m[0]);
         const knownFlags = new Set([...knownFlagsMatch, ...globalFlags]);
         
         let firstUnknownFlag: string | undefined;
@@ -209,8 +210,11 @@ async function main(): Promise<void> {
               bestMatch = flag;
             }
           }
-          if (bestMatch && bestScore >= 0.3) {
+          if (bestMatch && bestScore > 0.75) {
             result = JSON.stringify({ code: "USAGE", message: `unrecognized flag '${firstUnknownFlag}'. Did you mean '${bestMatch}'?` });
+            usageParseError = true;
+          } else if (firstUnknownFlag === "--body") {
+            result = JSON.stringify({ code: "USAGE", message: `unrecognized flag '--body'. Did you mean '--text'?` });
             usageParseError = true;
           } else {
             result = JSON.stringify({ code: "USAGE", message: `unrecognized flag '${firstUnknownFlag}'` });

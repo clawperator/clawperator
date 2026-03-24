@@ -2,6 +2,7 @@ import { ERROR_CODES } from "../contracts/errors.js";
 import { LIMITS } from "../contracts/limits.js";
 import { formatError } from "./output.js";
 import type { Logger } from "../adapters/logger.js";
+import type { NodeMatcher } from "../contracts/selectors.js";
 import {
   resolveElementMatcherFromCli,
   resolveContainerMatcherFromCli,
@@ -176,7 +177,7 @@ export interface CommandDef {
 const HELP_OPERATOR_SETUP = `clawperator operator setup
 
 Usage:
-  clawperator operator setup --apk <path> [--device <id>] [--operator-package <pkg>] [--operator-package <package>] [--output <json|pretty>]
+  clawperator operator setup --apk <path> [--device <id>] [--operator-package <package>] [--output <json|pretty>]
 
 Required:
   --apk <path>              Local filesystem path to the Operator APK file
@@ -271,7 +272,7 @@ Notes:
 const HELP_SKILLS_RUN = `clawperator skills run
 
 Usage:
-  clawperator skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--json] [--output <json|pretty>] [-- <extra_args>]
+  clawperator skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--json] [--output <json|pretty>] [-- <extra_args>]
 
 Notes:
   - Runs the selected skill script through the local skill wrapper.
@@ -292,7 +293,7 @@ Notes:
 const HELP_DOCTOR = `clawperator doctor
 
 Usage:
-  clawperator doctor [--output <json|pretty>] [--device <id>] [--operator-package <pkg>] [--operator-package <package>] [--verbose]
+  clawperator doctor [--output <json|pretty>] [--device <id>] [--operator-package <package>] [--verbose]
   clawperator doctor --fix
   clawperator doctor --full
   clawperator doctor --check-only
@@ -309,7 +310,7 @@ const HELP_VERSION = `clawperator version
 
 Usage:
   clawperator version
-  clawperator version --check-compat [--device <id>] [--operator-package <pkg>] [--operator-package <package>] [--output <json|pretty>]
+  clawperator version --check-compat [--device <id>] [--operator-package <package>] [--output <json|pretty>]
 
   Notes:
   - Default Operator package: com.clawperator.operator
@@ -320,7 +321,7 @@ Usage:
 const HELP_GRANT_DEVICE_PERMISSIONS = `clawperator grant-device-permissions
 
 Usage:
-  clawperator grant-device-permissions [--device <id>] [--operator-package <pkg>] [--operator-package <package>] [--output <json|pretty>]
+  clawperator grant-device-permissions [--device <id>] [--operator-package <package>] [--output <json|pretty>]
 
 Notes:
   - Default Operator package: com.clawperator.operator
@@ -506,11 +507,11 @@ Examples:
 const HELP_WAIT = `clawperator wait
 
 Usage:
-  clawperator wait --text <text> [--device <id>] [--operator-package <pkg>] [--operator-package <pkg>] [--timeout <ms>] [--json]
-  clawperator wait --id <resource-id> [--device <id>] [--operator-package <pkg>] [--operator-package <pkg>] [--timeout <ms>] [--json]
-  clawperator wait --role <role> [--device <id>] [--operator-package <pkg>] [--operator-package <pkg>] [--timeout <ms>] [--json]
-  clawperator wait --desc <text> [--device <id>] [--operator-package <pkg>] [--operator-package <pkg>] [--timeout <ms>] [--json]
-  clawperator wait --selector '<json>' [--device <id>] [--operator-package <pkg>] [--operator-package <pkg>] [--timeout <ms>] [--json]
+  clawperator wait --text <text> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
+  clawperator wait --id <resource-id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
+  clawperator wait --role <role> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
+  clawperator wait --desc <text> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
+  clawperator wait --selector '<json>' [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
 
 Selector flags (at least one required; combine for AND matching):
   --text <text>           Exact visible text
@@ -597,8 +598,8 @@ Examples:
 const HELP_CLOSE = `clawperator close
 
 Usage:
-  clawperator close <package> [--device <id>] [--operator-package <pkg>] [--operator-package <pkg>] [--timeout <ms>] [--json]
-  clawperator close --app <package> [--device <id>] [--operator-package <pkg>] [--operator-package <pkg>] [--timeout <ms>] [--json]
+  clawperator close <package> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
+  clawperator close --app <package> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
 
 Required:
   <package>             Android application package ID (e.g., com.android.settings)
@@ -621,7 +622,7 @@ Examples:
 const HELP_SLEEP = `clawperator sleep
 
 Usage:
-  clawperator sleep <ms> [--device <id>] [--operator-package <pkg>] [--operator-package <pkg>] [--json]
+  clawperator sleep <ms> [--device <id>] [--operator-package <pkg>] [--json]
 
 Required:
   <ms>                    Duration in milliseconds (non-negative)
@@ -666,8 +667,8 @@ Examples:
 const HELP_SCROLL_UNTIL = `clawperator scroll-until
 
 Usage:
-  clawperator scroll-until [<direction>] --text <text> [--click] [--device <id>] [--operator-package <pkg>] [--operator-package <pkg>] [--timeout <ms>] [--json]
-  clawperator scroll-until [<direction>] --id <resource-id> [--click] [--device <id>] [--operator-package <pkg>] [--operator-package <pkg>] [--timeout <ms>] [--json]
+  clawperator scroll-until [<direction>] --text <text> [--click] [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
+  clawperator scroll-until [<direction>] --id <resource-id> [--click] [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
 
 Valid directions:
   down, up, left, right (default: down)
@@ -744,7 +745,7 @@ COMMANDS["operator"] = {
     setup: HELP_OPERATOR_SETUP,
     install: HELP_OPERATOR_SETUP,
   },
-  topLevelBlock: `  operator setup --apk <path> [--device <id>] [--operator-package <pkg>] [--operator-package <package>]
+  topLevelBlock: `  operator setup --apk <path> [--device <id>] [--operator-package <package>]
                                             Install the Operator APK, grant required permissions, and verify readiness`,
   handler: async (ctx) => {
     const { rest, format, verbose, logger, deviceId, operatorPackage } = ctx;
@@ -783,7 +784,7 @@ COMMANDS["setup"] = {
     return JSON.stringify({
       code: "USAGE",
       message: "clawperator setup is not a valid top-level command. Use: clawperator operator setup --apk <path>",
-      canonical: "clawperator operator setup --apk <path> [--device <id>] [--operator-package <pkg>] [--operator-package <package>]",
+      canonical: "clawperator operator setup --apk <path> [--device <id>] [--operator-package <package>]",
     });
   },
 };
@@ -798,7 +799,7 @@ COMMANDS["install"] = {
     return JSON.stringify({
       code: "USAGE",
       message: "clawperator install is not a valid command. Use: clawperator operator setup --apk <path>",
-      canonical: "clawperator operator setup --apk <path> [--device <id>] [--operator-package <pkg>] [--operator-package <package>]",
+      canonical: "clawperator operator setup --apk <path> [--device <id>] [--operator-package <package>]",
     });
   },
 };
@@ -930,9 +931,9 @@ COMMANDS["exec"] = {
   help: `clawperator exec
 
 Usage:
-  clawperator exec <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <pkg>] [--operator-package <package>]
-  clawperator exec --payload <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <pkg>] [--operator-package <package>]
-  clawperator exec best-effort --goal <text> [--device <id>] [--operator-package <pkg>] [--operator-package <package>]
+  clawperator exec <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>]
+  clawperator exec --payload <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>]
+  clawperator exec best-effort --goal <text> [--device <id>] [--operator-package <package>]
 
 Payload (one of):
   <json-or-file>            Positional: inline JSON or path to a JSON file (see Notes)
@@ -949,9 +950,9 @@ Notes:
   - 'execute' is accepted as a synonym for 'exec'.
   - '--execution' is accepted as an alias for '--payload'.
 `,
-  topLevelBlock: `  exec <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <pkg>] [--operator-package <package>]
+  topLevelBlock: `  exec <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>]
                                             Execute a validated command payload or print a dry-run plan
-  exec best-effort --goal <text> [--device <id>] [--operator-package <pkg>] [--operator-package <package>]
+  exec best-effort --goal <text> [--device <id>] [--operator-package <package>]
                                             Produce deterministic next-action suggestion from current UI`,
   handler: async (ctx) => {
     const { rest, format, verbose, logger, deviceId, operatorPackage, timeoutMs } = ctx;
@@ -1044,12 +1045,44 @@ COMMANDS["click"] = {
                                             Tap the first matching UI element`,
   handler: async (ctx) => {
     const { rest, format, logger, deviceId, operatorPackage } = ctx;
-    if (!hasElementSelectorFlag(rest)) {
-      return makeMissingSelectorError("click", format);
+    
+    let coordinate: { x: number; y: number } | undefined;
+    const coordIdx = rest.indexOf("--coordinate");
+    if (coordIdx >= 0) {
+      const xStr = rest[coordIdx + 1];
+      const yStr = rest[coordIdx + 2];
+      if (!xStr || !yStr || xStr.startsWith("-") || yStr.startsWith("-")) {
+        return formatError({
+          code: "EXECUTION_VALIDATION_FAILED",
+          message: "--coordinate requires two numbers (x y)",
+        }, { format });
+      }
+      const x = Number(xStr);
+      const y = Number(yStr);
+      if (isNaN(x) || isNaN(y)) {
+        return formatError({
+          code: "EXECUTION_VALIDATION_FAILED",
+          message: "--coordinate requires two numbers (x y)",
+        }, { format });
+      }
+      coordinate = { x, y };
     }
-    const resolved = resolveElementMatcherFromCli(rest);
-    if (!resolved.ok) {
-      return formatError(resolved.error, { format });
+
+    let resolvedMatcher: NodeMatcher | undefined;
+    if (!coordinate) {
+      if (!hasElementSelectorFlag(rest)) {
+        return makeMissingSelectorError("click", format);
+      }
+      const resolved = resolveElementMatcherFromCli(rest);
+      if (!resolved.ok) {
+        return formatError(resolved.error, { format });
+      }
+      resolvedMatcher = resolved.matcher;
+    } else if (hasElementSelectorFlag(rest)) {
+      return formatError({
+        code: "EXECUTION_VALIDATION_FAILED",
+        message: "use --coordinate OR a selector, not both",
+      }, { format });
     }
 
     // Check for --long and --focus flags (mutually exclusive)
@@ -1071,7 +1104,8 @@ COMMANDS["click"] = {
 
     return (await import("./commands/action.js")).cmdActionClick({
       format,
-      matcher: resolved.matcher,
+      matcher: resolvedMatcher,
+      coordinate,
       clickType,
       deviceId,
       operatorPackage,
@@ -1758,7 +1792,7 @@ Usage:
   clawperator skills new <skill_id> [--summary <text>]
   clawperator skills validate <skill_id> [--dry-run]
   clawperator skills validate --all [--dry-run]
-  clawperator skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--json] [--output <json|pretty>] [-- <extra_args>]
+  clawperator skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--json] [--output <json|pretty>] [-- <extra_args>]
   clawperator skills install
   clawperator skills update [--ref <git-ref>]
   clawperator skills sync --ref <git-ref>
@@ -1786,7 +1820,7 @@ Usage:
   skills validate <skill_id> [--dry-run]
   skills validate --all [--dry-run]
                                             Validate one local skill or the entire configured registry
-  skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--json] [--output <json|pretty>] [-- <extra_args>]
+  skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--json] [--output <json|pretty>] [-- <extra_args>]
                                             Invoke a skill script (convenience wrapper)
   skills install
                                             Clone skills repository to ~/.clawperator/skills/
@@ -1852,7 +1886,7 @@ Usage:
         return JSON.stringify({
           code: "USAGE",
           message:
-            "skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--json] [--output <json|pretty>] [-- <extra_args>]",
+            "skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--json] [--output <json|pretty>] [-- <extra_args>]",
         });
       } else {
         const dashDash = rest.indexOf("--");
@@ -2023,7 +2057,7 @@ COMMANDS["grant-device-permissions"] = {
   group: "Setup & Diagnostics",
   summary: "Re-grant accessibility and notification permissions",
   help: HELP_GRANT_DEVICE_PERMISSIONS,
-  topLevelBlock: `  grant-device-permissions [--device <id>] [--operator-package <pkg>] [--operator-package <package>]
+  topLevelBlock: `  grant-device-permissions [--device <id>] [--operator-package <package>]
                                             Re-grant accessibility and notification permissions (remediation only)`,
   handler: async (ctx) => {
     const { format, verbose, logger, deviceId, operatorPackage } = ctx;
@@ -2044,7 +2078,7 @@ COMMANDS["version"] = {
   help: HELP_VERSION,
   topLevelBlock: `  version
                                             Show the CLI version
-  version --check-compat [--device <id>] [--operator-package <pkg>] [--operator-package <package>]
+  version --check-compat [--device <id>] [--operator-package <package>]
                                             Compare the CLI version with the installed Operator APK version`,
   handler: async (ctx) => {
     const { rest, format, verbose, logger, deviceId, operatorPackage } = ctx;

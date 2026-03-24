@@ -408,6 +408,22 @@ describe("promoted flat commands - help and missing-arg errors", () => {
     assert.match(obj.message ?? "", /click requires a selector/);
   });
 
+  it("click --coordinate with invalid values returns EXECUTION_VALIDATION_FAILED with exit 1", async () => {
+    const { stdout, code } = await runCli(["click", "--coordinate", "100", "pagedown"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "EXECUTION_VALIDATION_FAILED");
+    assert.match(obj.message ?? "", /--coordinate requires two numbers/);
+  });
+
+  it("click --coordinate rejects mixing with text selector (exit 1)", async () => {
+    const { stdout, code } = await runCli(["click", "--coordinate", "100", "200", "--text", "Login"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "EXECUTION_VALIDATION_FAILED");
+    assert.match(obj.message ?? "", /use --coordinate OR a selector, not both/);
+  });
+
   it("open --help shows open help", async () => {
     const { stdout, code } = await runCli(["open", "--help"]);
     assert.strictEqual(code, 0);

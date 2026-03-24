@@ -349,6 +349,9 @@ const SELECTOR_FLAG_LIST = `Use one of:
   --desc <text>           Content description
   --desc-contains <text>  Partial content description
   --role <role>           Element role
+  --class-name <string>   Element class name
+  --xpath <string>        XPath expression
+  --coordinate <x> <y>    Exact coordinates (pixels)
   --selector <json>       Raw JSON (advanced)`;
 
 /** Build the Phase 3 missing-selector error for a given command (respects output format). */
@@ -356,7 +359,7 @@ export function makeMissingSelectorError(command: string, format: OutputFormat =
   return formatError(
     {
       code: "MISSING_SELECTOR",
-      message: `${command} requires a selector.\n${SELECTOR_FLAG_LIST}\nExample:\n  clawperator ${command} --text "Wi-Fi"`,
+      message: `${command} requires a selector.\n\n${SELECTOR_FLAG_LIST}\n\nExamples:\n  clawperator ${command} --text "Wi-Fi"\n  clawperator ${command} --id "button_submit"`,
     },
     { format },
   );
