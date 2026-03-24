@@ -189,6 +189,8 @@ The `wait-for-nav` command waits for app or screen navigation to complete.
 | `--desc-contains <value>` | Wait until element with partial content description appears (maps to `expectedNode.contentDescContains`) |
 | `--role <value>` | Wait until element with this role appears (maps to `expectedNode.role`) |
 | `--selector <json>` | Raw JSON NodeMatcher for expectedNode; mutually exclusive with simple flags |
+| `--validate-only` | Validate the built execution payload without running it on a device (same semantics as `exec`) |
+| `--dry-run` | Print the validated execution plan without running it on a device |
 
 **Requirements:** At least one of `--app` or a selector flag is required. `--timeout` is always required.
 
@@ -201,7 +203,9 @@ The `read-value` command reads the value associated with a labeled UI element (e
 | `--label <text>` | Match label by exact visible text (maps to `labelMatcher.textEquals`) |
 | `--label-id <id>` | Match label by Android resource ID (maps to `labelMatcher.resourceId`) |
 | `--label-desc <text>` | Match label by exact content description (maps to `labelMatcher.contentDescEquals`) |
-| `--all` | Return all matches as a JSON array (requires `--json`) |
+| `--all` | Sends `all: true` in action params (requires an explicit `--json` flag). The Operator APK currently ignores this field and still returns a single label-value pair. |
+| `--validate-only` | Validate the built execution payload without running it on a device (same semantics as `exec`) |
+| `--dry-run` | Print the validated execution plan without running it on a device |
 
 **Requirements:** At least one of `--label`, `--label-id`, or `--label-desc` is required.
 
