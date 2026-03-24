@@ -41,6 +41,8 @@ Review every modified file before accepting the bump. Be especially careful with
 - `scripts/fake_adb.sh`
 - skill docs that contain command examples
 
+Doctor release download copy in tests should follow production: build expected strings with `getCliVersion()`, `getOperatorApkDownloadUrl()`, and `getOperatorApkSha256Url()` from `apps/node/src/domain/version/compatibility.ts` instead of hard-coding versioned download URLs. That keeps `release-set-code-version-number` from failing on `DoctorService` tests after each bump.
+
 Confirm the bump only touched code-facing surfaces and did not leak into public docs.
 
 ## Required Validation

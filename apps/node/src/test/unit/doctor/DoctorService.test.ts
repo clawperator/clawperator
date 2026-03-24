@@ -8,6 +8,11 @@ import { getDefaultRuntimeConfig } from "../../../adapters/android-bridge/runtim
 import { FakeProcessRunner } from "../fakes/FakeProcessRunner.js";
 import { ERROR_CODES } from "../../../contracts/errors.js";
 import { createLogger } from "../../../adapters/logger.js";
+import {
+  getCliVersion,
+  getOperatorApkDownloadUrl,
+  getOperatorApkSha256Url,
+} from "../../../domain/version/compatibility.js";
 
 describe("DoctorService", () => {
   it("treats missing APK as a critical failure and skips the handshake", async () => {
@@ -226,8 +231,9 @@ describe("DoctorService", () => {
 
     const apkPresence = report.checks.find(check => check.id === "readiness.apk.presence");
     assert.ok(apkPresence);
+    const cliVersion = getCliVersion();
     assert.deepStrictEqual(apkPresence.fix?.steps.map(step => step.value), [
-      "Download the exact release APK from https://downloads.clawperator.com/operator/v0.5.1/operator-v0.5.1.apk and the checksum from https://downloads.clawperator.com/operator/v0.5.1/operator-v0.5.1.apk.sha256.",
+      `Download the exact release APK from ${getOperatorApkDownloadUrl(cliVersion)} and the checksum from ${getOperatorApkSha256Url(cliVersion)}.`,
       "clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device test-device-1",
     ]);
   });
