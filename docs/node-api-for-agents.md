@@ -432,7 +432,7 @@ Combine fields to increase specificity when a single field is ambiguous:
 | `close_app` | `applicationId: string` | - |
 | `click` | `matcher: NodeMatcher` | `clickType: "default" \| "long_click" \| "focus"` (default: `"default"`) |
 | `enter_text` | `matcher: NodeMatcher`, `text: string` | `submit: boolean` (default: `false`), `clear: boolean` (accepted by Node contract but currently ignored by Android runtime, so do not rely on it to clear existing text) |
-| `read_text` | `matcher: NodeMatcher` | `container: NodeMatcher` (scopes search to container subtree), `all: boolean` (default `false`; when `true`, returns all matches - see behavior note), `validator: "temperature" \| "version" \| "regex"` (ignored when `container` is set), `validatorPattern: string` (required when `validator` is `"regex"`), `retry: object` |
+| `read_text` | `matcher: NodeMatcher` | `container: NodeMatcher` (scopes search to container subtree), `all: boolean` (default `false`; when `true`, returns all matches - see behavior note), `validator: "temperature" \| "version" \| "regex"`, `validatorPattern: string` (required when `validator` is `"regex"`), `retry: object` |
 | `wait_for_node` | `matcher: NodeMatcher` | `retry: object` (see `retry` object shape below), optional `timeoutMs: number` (1-120000 on the Operator wire) - wall-clock cap for the wait loop on device, in addition to the outer execution `timeoutMs` |
 | `snapshot_ui` | - | `retry: object` |
 | `take_screenshot` | - | `path: string`, `retry: object` |
