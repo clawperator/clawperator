@@ -6,14 +6,16 @@ describe("buildReadExecution", () => {
   it("creates execution with matcher only", () => {
     const execution = buildReadExecution({ textEquals: "Test" });
     assert.strictEqual(execution.actions.length, 1);
-    assert.deepStrictEqual(execution.actions[0].params.matcher, { textEquals: "Test" });
-    assert.strictEqual(execution.actions[0].params.all, undefined);
-    assert.strictEqual(execution.actions[0].params.container, undefined);
+    const action = execution.actions[0]!;
+    assert.deepStrictEqual(action.params?.matcher, { textEquals: "Test" });
+    assert.strictEqual(action.params?.all, undefined);
+    assert.strictEqual(action.params?.container, undefined);
   });
 
   it("includes all flag when readAll is true", () => {
     const execution = buildReadExecution({ textEquals: "Test" }, true);
-    assert.strictEqual(execution.actions[0].params.all, true);
+    const action = execution.actions[0]!;
+    assert.strictEqual(action.params?.all, true);
   });
 
   it("includes container when provided", () => {
@@ -22,7 +24,8 @@ describe("buildReadExecution", () => {
       false,
       { resourceId: "com.example:id/list" }
     );
-    assert.deepStrictEqual(execution.actions[0].params.container, { resourceId: "com.example:id/list" });
+    const action = execution.actions[0]!;
+    assert.deepStrictEqual(action.params?.container, { resourceId: "com.example:id/list" });
   });
 
   it("includes both all and container when provided", () => {
@@ -31,12 +34,14 @@ describe("buildReadExecution", () => {
       true,
       { role: "list" }
     );
-    assert.strictEqual(execution.actions[0].params.all, true);
-    assert.deepStrictEqual(execution.actions[0].params.container, { role: "list" });
+    const action = execution.actions[0]!;
+    assert.strictEqual(action.params?.all, true);
+    assert.deepStrictEqual(action.params?.container, { role: "list" });
   });
 
   it("does not include container property when container is undefined", () => {
     const execution = buildReadExecution({ textEquals: "Test" }, false, undefined);
-    assert.strictEqual("container" in execution.actions[0].params, false);
+    const action = execution.actions[0]!;
+    assert.strictEqual("container" in (action.params ?? {}), false);
   });
 });
