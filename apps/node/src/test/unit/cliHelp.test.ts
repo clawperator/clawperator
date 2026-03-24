@@ -131,7 +131,7 @@ describe("CLI help", () => {
   it("shows validate-only in top-level exec help", async () => {
     const { stdout, code } = await runCli(["--help"]);
     assert.strictEqual(code, 0);
-    assert.match(stdout, /exec --execution <json-or-file> \[--validate-only\]/);
+    assert.match(stdout, /exec <json-or-file> \[--validate-only\]/);
   });
 
   it("exec best-effort points at flat `snapshot`, not nested `observe snapshot` (exit 0)", async () => {

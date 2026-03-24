@@ -842,8 +842,29 @@ COMMANDS["exec"] = {
   synonyms: ["execute"],
   group: "Execution",
   summary: "Execute a validated command payload",
-  help: "clawperator exec\n\nUsage:\n  clawperator exec --execution <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>]\n  clawperator exec best-effort --goal <text> [--device <id>] [--operator-package <package>]\n\n`execute` is accepted as a synonym for `exec`.\n",
-  topLevelBlock: `  exec --execution <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>]
+  help: `clawperator exec
+
+Usage:
+  clawperator exec <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>]
+  clawperator exec --payload <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>]
+  clawperator exec best-effort --goal <text> [--device <id>] [--operator-package <package>]
+
+Payload (required unless using --payload):
+  <json-or-file>            Inline JSON (starts with { or [) or path to JSON file
+
+Options:
+  --payload <json-or-file>  Alternative to positional payload (primary flag)
+  --execution <json-or-file>  Alias for --payload (backward compatibility)
+  --validate-only           Validate payload without executing
+  --dry-run                 Print execution plan without running
+
+Notes:
+  - The payload is parsed as inline JSON if it starts with '{' or '[', otherwise treated as a file path.
+  - Error precedence: unreadable file path -> invalid JSON content -> missing payload.
+  - 'execute' is accepted as a synonym for 'exec'.
+  - '--execution' is accepted as an alias for '--payload'.
+`,
+  topLevelBlock: `  exec <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>]
                                             Execute a validated command payload or print a dry-run plan
   exec best-effort --goal <text> [--device <id>] [--operator-package <package>]
                                             Produce deterministic next-action suggestion from current UI`,
@@ -858,13 +879,19 @@ COMMANDS["exec"] = {
         goal,
       });
     } else {
-      const execution = getOpt(rest, "--execution");
-      if (!execution) {
-        return JSON.stringify({ code: "USAGE", message: "exec requires --execution <json-or-file>" });
+      // Support --payload (primary), --execution (alias), or positional argument
+      let payloadSource: string | undefined = getOpt(rest, "--payload") ?? getOpt(rest, "--execution");
+      if (!payloadSource) {
+        // Check for positional argument (first non-flag token)
+        const positionals = barePositionalTokens(rest, ["--payload", "--execution"], ["--validate-only", "--dry-run"]);
+        payloadSource = positionals[0];
+      }
+      if (!payloadSource) {
+        return formatError({ code: ERROR_CODES.MISSING_ARGUMENT, message: "exec requires a payload. Use: clawperator exec <json-or-file> or clawperator exec --payload <json-or-file>" }, { format });
       } else {
         return (await import("./commands/execute.js")).cmdExecute({
           ...out,
-          execution,
+          execution: payloadSource,
           deviceId,
           operatorPackage,
           timeoutMs,

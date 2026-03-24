@@ -19,19 +19,29 @@ export async function cmdExecute(options: {
 }): Promise<string> {
   let payload: unknown;
   const raw = options.execution.trim();
-  if (raw.startsWith("{")) {
+  // Detect inline JSON vs file path: if it starts with '{' or '[', parse as JSON
+  if (raw.startsWith("{") || raw.startsWith("[")) {
     try {
       payload = JSON.parse(raw);
     } catch {
-      return formatError({ code: ERROR_CODES.EXECUTION_VALIDATION_FAILED, message: "Invalid JSON for --execution" }, options);
+      return formatError({ code: ERROR_CODES.EXECUTION_VALIDATION_FAILED, message: "Invalid JSON content" }, options);
     }
   } else {
+    // Treat as file path: error precedence is unreadable file -> invalid JSON content
+    let content: string;
     try {
-      const content = await readFile(raw, "utf-8");
+      content = await readFile(raw, "utf-8");
+    } catch (e) {
+      return formatError(
+        { code: ERROR_CODES.EXECUTION_VALIDATION_FAILED, message: `Failed to read execution file: ${(e as Error).message}` },
+        options
+      );
+    }
+    try {
       payload = JSON.parse(content);
     } catch (e) {
       return formatError(
-        { code: ERROR_CODES.EXECUTION_VALIDATION_FAILED, message: `Failed to read or parse execution file: ${(e as Error).message}` },
+        { code: ERROR_CODES.EXECUTION_VALIDATION_FAILED, message: `Invalid JSON content in execution file: ${(e as Error).message}` },
         options
       );
     }
