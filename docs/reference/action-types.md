@@ -324,7 +324,7 @@ Reads text from matching UI nodes, with optional validation in single-match mode
 
 | Error | Meaning |
 |-------|---------|
-| `NODE_NOT_FOUND` | Selector matched no UI element |
+| `NODE_NOT_FOUND` | Selector matched no UI element, or (when `container` is set) the container matched but `matcher` matched no node inside that subtree |
 | `CONTAINER_NOT_FOUND` | Container selector (if provided) matched no UI element |
 | `VALIDATOR_MISMATCH` | Extracted text failed validation |
 

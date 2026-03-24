@@ -563,6 +563,15 @@ class UiActionEngineDefault(
                     data = mapOf("error" to "CONTAINER_NOT_FOUND"),
                 )
             }
+            // Container matched but the target matcher hit nothing inside its subtree
+            if (msg.contains("No UI node found matching criteria") && msg.contains("within container")) {
+                return UiActionStepResult(
+                    id = action.id,
+                    actionType = "read_text",
+                    success = false,
+                    data = mapOf("error" to "NODE_NOT_FOUND"),
+                )
+            }
             throw e
         } catch (e: IllegalArgumentException) {
             // Regex constructor throws PatternSyntaxException (extends IllegalArgumentException)

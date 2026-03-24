@@ -165,7 +165,7 @@ The `read` command accepts `--container-*` flags to restrict the search to eleme
 | `--container-role <value>` | Container by element role |
 | `--container-selector <json>` | Container by raw JSON NodeMatcher; mutually exclusive with `--container-*` flags |
 
-**Error handling:** If the container matcher finds no element, the step fails with `CONTAINER_NOT_FOUND`.
+**Error handling:** If the container matcher finds no element, the step fails with `CONTAINER_NOT_FOUND`. If the container matches but the element selector matches nothing inside that subtree, the step fails with `NODE_NOT_FOUND`.
 
 ### Quick Examples
 
@@ -580,7 +580,7 @@ Android intent builder.
 }
 ```
 
-**`read_text`:** Reads visible text from nodes matching `matcher`. Optional validators apply only when `all` is false or omitted.
+**`read_text`:** Reads visible text from nodes matching `matcher`. Optional validators apply only when `all` is false or omitted. When `container` is set, the runtime still runs single-match validators against the text read from the node found inside that subtree.
 
 **`read_text` with `all: true`:** The Operator collects every on-screen node that matches `matcher`, takes each node's visible label (blank labels are skipped), and returns them in one step. Step `data.text` is still a string (envelope `data` values are strings), but its content is a JSON array literal, for example `["Price A","Price B"]`. Agents should parse that string as JSON to obtain the list. Step `data` also includes `all: "true"` and `count: "<n>"` as strings. Newlines or rare characters in labels are escaped for JSON; if you need full node metadata, use `snapshot_ui` and filter locally.
 
@@ -1108,7 +1108,7 @@ Branch agent logic on codes from `envelope.errorCode` (top-level Android result 
 | `ANDROID_SYSTEM_IMAGE_INSTALL_FAILED` | `error.code` | System image install or SDK license acceptance failed |
 | `EMULATOR_STOP_FAILED` | `error.code` | Emulator stop request failed |
 | `EMULATOR_DELETE_FAILED` | `error.code` | Emulator deletion failed |
-| `NODE_NOT_FOUND` | `data.error` | Selector matched no UI element |
+| `NODE_NOT_FOUND` | `data.error` | Selector matched no UI element. For `read_text` with `container`, this also applies when the container matched but `matcher` matched no node inside that subtree. |
 | `RESULT_ENVELOPE_TIMEOUT` | `error.code` | Command dispatched but no result received; `details` includes command/task correlation plus last payload action context, elapsed timing, and `logPath` when persistent logging is enabled |
 | `OPERATOR_NOT_INSTALLED` | `error.code` | Requested [Clawperator Operator Android app](../getting-started/android-operator-apk.md) package is missing on the device; `exec` and `doctor` fail fast instead of timing out |
 | `OPERATOR_VARIANT_MISMATCH` | `error.code` | Installed release vs debug Operator APK variant does not match `--operator-package` (for example `.dev` installed while the CLI targets release, or the reverse) |
@@ -1120,7 +1120,7 @@ Branch agent logic on codes from `envelope.errorCode` (top-level Android result 
 | `NODE_NOT_CLICKABLE` | `data.error` | Reserved error code. Intended for "element found but not interactable", but not currently emitted consistently by the Android and Node runtimes. |
 | `SNAPSHOT_EXTRACTION_FAILED` | `data.error` | `snapshot_ui` step completed but the Node layer did not attach any snapshot text to the step during post-processing. The most common cause is a Node binary packaging mismatch or other logcat extraction issue. Rebuild or reinstall the npm package and check version compatibility. |
 | `GLOBAL_ACTION_FAILED` | `data.error` | `press_key` step result when the OS reports `performGlobalAction` returned false. Rare soft failure - the accessibility service was running but Android declined to execute the action. |
-| `CONTAINER_NOT_FOUND` | `data.error` | `scroll` step could not locate a scrollable container. Either no scrollable node is present on screen, or the provided `container` matcher matched nothing. |
+| `CONTAINER_NOT_FOUND` | `data.error` | `scroll` step could not locate a scrollable container. Either no scrollable node is present on screen, or the provided `container` matcher matched nothing. For `read_text` with `container`, the step fails with this code when the container matcher matched no UI element. |
 | `CONTAINER_NOT_SCROLLABLE` | `data.error` | `scroll` step found the matched container but it is not scrollable and no scrollable descendant was found. With the default `findFirstScrollableChild: true`, the runtime already walks one level down before raising this error. |
 | `GESTURE_FAILED` | `data.error` | `scroll` step: the OS rejected the gesture dispatch. The accessibility service was running but Android declined to execute the swipe gesture. Step returns `success: false`. |
 
