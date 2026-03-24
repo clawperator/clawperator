@@ -64,6 +64,7 @@ class TaskUiScopeTest(
     override suspend fun waitForNode(
         matcher: NodeMatcher,
         retry: TaskRetry,
+        timeoutMs: Long?,
     ): TaskUiNode {
         val node =
             findNodeByMatcher(matcher)
@@ -88,6 +89,25 @@ class TaskUiScopeTest(
                 ?: throw IllegalStateException("No node found matching criteria")
 
         return node.label
+    }
+
+    override suspend fun getAllText(
+        matcher: NodeMatcher,
+        retry: TaskRetry,
+    ): List<String> {
+        // Find all matching nodes and return their non-blank labels
+        return clawperator.uitree.UiTreeTraversal.findAll(currentUiTree) { uiNode ->
+            val taskUiNode =
+                TaskUiNode(
+                    resourceId = uiNode.resourceId,
+                    label = uiNode.label,
+                    clickable = uiNode.isClickable,
+                    role = uiNode.role.name.lowercase(),
+                    bounds = uiNode.bounds,
+                    debugPath = uiNode.id.value,
+                )
+            matcher.matches(taskUiNode)
+        }.map { it.label }.filter { it.isNotBlank() }
     }
 
     override suspend fun click(

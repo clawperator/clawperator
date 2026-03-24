@@ -1245,6 +1245,7 @@ open class RecordingTaskUiScope(
     override suspend fun waitForNode(
         matcher: NodeMatcher,
         retry: TaskRetry,
+        timeoutMs: Long?,
     ): TaskUiNode {
         if (waitForNodeThrows != null) {
             throw waitForNodeThrows
@@ -1258,6 +1259,11 @@ open class RecordingTaskUiScope(
             debugPath = "0/0",
         )
     }
+
+    override suspend fun getAllText(
+        matcher: NodeMatcher,
+        retry: TaskRetry,
+    ): List<String> = listOf("Title Text 1", "Title Text 2")
 
     override suspend fun getText(
         matcher: NodeMatcher,

@@ -191,17 +191,18 @@ class UiActionEngineDefault(
     ): UiActionStepResult {
         val node =
             taskScope.ui {
-                waitForNode(action.matcher, action.retry)
+                waitForNode(action.matcher, action.retry, action.timeoutMs)
             }
 
         return UiActionStepResult(
             id = action.id,
             actionType = "wait_for_node",
             data =
-                mapOf(
-                    "resource_id" to (node.resourceId ?: ""),
-                    "label" to node.label,
-                ),
+                buildMap {
+                    put("resource_id", node.resourceId ?: "")
+                    put("label", node.label)
+                    action.timeoutMs?.let { put("timeout_ms", it.toString()) }
+                },
         )
     }
 
@@ -410,42 +411,69 @@ class UiActionEngineDefault(
         action: UiAction.ReadText,
     ): UiActionStepResult {
         return try {
-            val text =
-                taskScope.ui {
-                    when (action.validator) {
-                        null -> getText(matcher = action.matcher, retry = action.retry)
-                        UiTextValidator.Temperature ->
-                            getValidatedText(
-                                matcher = action.matcher,
-                                retry = action.retry,
-                                validator = TaskValidators.TemperatureValidator,
-                            )
-                        UiTextValidator.Version ->
-                            getValidatedText(
-                                matcher = action.matcher,
-                                retry = action.retry,
-                                validator = TaskValidators.VersionValidator,
-                            )
-                        UiTextValidator.Regex -> {
-                            val regex = Regex(checkNotNull(action.validatorPattern) { "validatorPattern required for Regex validator" })
-                            getValidatedText(
-                                matcher = action.matcher,
-                                retry = action.retry,
-                                validator = { it.matches(regex) },
-                            )
-                        }
-                    }
+            if (action.all) {
+                // Multi-match mode: get all matching nodes' text
+                val texts = taskScope.ui {
+                    getAllText(matcher = action.matcher, retry = action.retry)
                 }
 
-            UiActionStepResult(
-                id = action.id,
-                actionType = "read_text",
-                data =
-                    mapOf(
-                        "text" to text,
-                        "validator" to (action.validator?.name?.lowercase() ?: "none"),
-                    ),
-            )
+                // Return as JSON array string
+                val jsonArray = texts.joinToString(
+                    prefix = "[",
+                    postfix = "]",
+                    separator = ",",
+                ) { "\"${it.replace("\\", "\\\\").replace("\"", "\\\"")}\"" }
+
+                UiActionStepResult(
+                    id = action.id,
+                    actionType = "read_text",
+                    data =
+                        mapOf(
+                            "text" to jsonArray,
+                            "all" to "true",
+                            "count" to texts.size.toString(),
+                            "validator" to "none",
+                        ),
+                )
+            } else {
+                // Single-match mode (original behavior)
+                val text =
+                    taskScope.ui {
+                        when (action.validator) {
+                            null -> getText(matcher = action.matcher, retry = action.retry)
+                            UiTextValidator.Temperature ->
+                                getValidatedText(
+                                    matcher = action.matcher,
+                                    retry = action.retry,
+                                    validator = TaskValidators.TemperatureValidator,
+                                )
+                            UiTextValidator.Version ->
+                                getValidatedText(
+                                    matcher = action.matcher,
+                                    retry = action.retry,
+                                    validator = TaskValidators.VersionValidator,
+                                )
+                            UiTextValidator.Regex -> {
+                                val regex = Regex(checkNotNull(action.validatorPattern) { "validatorPattern required for Regex validator" })
+                                getValidatedText(
+                                    matcher = action.matcher,
+                                    retry = action.retry,
+                                    validator = { it.matches(regex) },
+                                )
+                            }
+                        }
+                    }
+
+                UiActionStepResult(
+                    id = action.id,
+                    actionType = "read_text",
+                    data =
+                        mapOf(
+                            "text" to text,
+                            "validator" to (action.validator?.name?.lowercase() ?: "none"),
+                        ),
+                )
+            }
         } catch (e: IllegalStateException) {
             val msg = e.message ?: ""
             // All validators should return VALIDATOR_MISMATCH on validation failure.

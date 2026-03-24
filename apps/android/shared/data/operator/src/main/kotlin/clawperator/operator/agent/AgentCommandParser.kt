@@ -108,6 +108,7 @@ class AgentCommandParserDefault : AgentCommandParser {
                     id = id,
                     matcher = params.parseMatcherRequired("matcher"),
                     retry = params.parseRetryOrDefault(defaultRetry = TaskRetryPresets.UiReadiness),
+                    timeoutMs = params.longOrNull("timeoutMs")?.coerceIn(1L, 120_000L),
                 )
             "click" ->
                 UiAction.Click(
@@ -192,6 +193,7 @@ class AgentCommandParserDefault : AgentCommandParser {
                     retry = params.parseRetryOrDefault(defaultRetry = TaskRetryPresets.UiReadiness),
                     validator = validator,
                     validatorPattern = validatorPattern,
+                    all = params.booleanOrDefault("all", false),
                 )
             }
             "enter_text", "type_text" ->
