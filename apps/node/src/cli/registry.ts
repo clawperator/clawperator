@@ -517,6 +517,26 @@ Examples:
   clawperator close-app com.android.settings
 `;
 
+const HELP_SLEEP = `clawperator sleep
+
+Usage:
+  clawperator sleep <ms> [--device <id>] [--operator-package <pkg>] [--json]
+
+Required:
+  <ms>                    Duration in milliseconds (non-negative)
+
+Notes:
+  - Pauses execution for the specified duration.
+  - Duration must be >= 0 and <= MAX_EXECUTION_TIMEOUT_MS.
+  - Execution timeout is set to max(durationMs + 5000, globalTimeout, 30000).
+  - No selector flags - this is a raw timer.
+
+Examples:
+  clawperator sleep 2000
+  clawperator sleep 500 --json
+  clawperator sleep 0
+`;
+
 const HELP_SCROLL = `clawperator scroll
 
 Usage:
@@ -1209,6 +1229,49 @@ COMMANDS["close"] = {
   help: HELP_CLOSE,
   topLevelBlock: `  close <package> [--device <id>] [--json]    Force-stop an Android application`,
   handler: async (ctx) => closeHandler(ctx),
+};
+
+COMMANDS["sleep"] = {
+  name: "sleep",
+  group: "Device Interaction",
+  summary: "Pause execution for a duration",
+  help: HELP_SLEEP,
+  topLevelBlock: `  sleep <ms> [--device <id>] [--json]         Pause execution for a duration`,
+  handler: async (ctx) => {
+    const { rest, format, logger, deviceId, operatorPackage, timeoutMs } = ctx;
+
+    // Parse positional duration (handle negative numbers which look like flags)
+    // Check rest[0] first since barePositionalTokens skips tokens starting with "-"
+    let durationStr: string | undefined;
+    if (rest[0] && !rest[0].startsWith("--")) {
+      durationStr = rest[0];
+    } else {
+      const bare = barePositionalTokens(rest, [], []);
+      durationStr = bare[0];
+    }
+    if (!durationStr) {
+      return JSON.stringify({
+        code: "MISSING_ARGUMENT",
+        message: "sleep requires a duration in milliseconds.\n\nUsage:\n  clawperator sleep <ms>\n\nExample:\n  clawperator sleep 2000",
+      });
+    }
+    const durationMs = Number(durationStr);
+    if (!Number.isFinite(durationMs) || durationMs < 0) {
+      return JSON.stringify({
+        code: "EXECUTION_VALIDATION_FAILED",
+        message: "Duration must be a non-negative number",
+      });
+    }
+
+    return (await import("./commands/action.js")).cmdSleep({
+      format,
+      durationMs,
+      globalTimeoutMs: timeoutMs,
+      deviceId,
+      operatorPackage,
+      logger,
+    });
+  },
 };
 
 COMMANDS["scroll"] = {
