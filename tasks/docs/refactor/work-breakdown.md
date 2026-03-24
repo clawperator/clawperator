@@ -2,9 +2,17 @@
 
 Parent plan: `tasks/docs/refactor/plan.md`
 
-This document decomposes the plan into discrete, implementable tasks. Each task is designed to be completable by a single agent in one session with clear inputs, outputs, and acceptance criteria.
+This work ships as **3 PRs**, strictly sequenced. Each PR is independently shippable and leaves the build in a working state.
 
-Tasks are ordered by dependency. Tasks within the same phase can be parallelized where noted.
+| PR | Scope | Key Deliverable |
+|----|-------|----------------|
+| PR-1 | Pipeline + skeleton | New build pipeline works, old URLs redirect, placeholder pages |
+| PR-2 | Core content + code | 9 critical pages + doctor docsUrl + AGENTS.md |
+| PR-3 | Remaining content + cleanup | 11 secondary pages + delete old files + finalize llms artifacts |
+
+Each PR contains multiple tasks. Tasks within a PR are ordered by dependency. Tasks within the same phase can be parallelized where noted.
+
+This is a migration, not a perfection pass. Prioritize coherent structure, correct core documentation, and a deterministic build pipeline. Do not over-polish secondary pages. Prefer shipping a clean, correct system that can be refined in follow-ups.
 
 ---
 
@@ -70,9 +78,9 @@ Existing documentation is advisory only and not presumed accurate. For every aut
 
 ---
 
-## Phase 1: Pipeline Infrastructure
+## PR-1: Pipeline + Skeleton
 
-Everything else depends on this phase. Must complete before content authoring begins.
+Everything else depends on this PR. Must merge before content authoring begins in PR-2.
 
 ### Task 1.1: Remove committed generated docs and set up gitignore
 
@@ -247,27 +255,31 @@ Supports `--verbose` flag to log all link rewrites and source resolutions.
 **Goal:** Verify the complete pipeline works with placeholder content before any real authoring begins.
 
 **Steps:**
-1. Create minimal placeholder pages in `docs/` for all 20 nav entries (e.g., `# Page Title\n\nPlaceholder.`)
-2. Create placeholder skills docs in `../clawperator-skills/docs/` with target filenames
-3. Run assembly script - verify `.build/` is complete
-4. Run `docs_build.sh` - verify site builds
-5. Verify `llms-full.txt` contains all 20 pages
-6. Verify redirects work for at least 3 old URLs
-7. Remove placeholder content
+1. Create minimal placeholder pages in `docs/` for all 20 nav entries (e.g., `# Page Title\n\nPlaceholder - content coming in PR-2/PR-3.`)
+2. Run assembly script - verify `.build/` is complete
+3. Run `docs_build.sh` - verify site builds
+4. Verify `llms-full.txt` contains all 20 pages
+5. Verify redirects work for at least 5 old URLs
+6. Do NOT remove placeholder content - they remain until replaced by real content in PR-2/PR-3
 
 **Acceptance:**
 - Full pipeline runs without error
 - All 20 pages appear in built site
 - `llms-full.txt` contains all 20 pages in correct order
-- At least 3 redirects resolve correctly
+- At least 5 redirects resolve correctly
+- Placeholders remain in place for PR-2/PR-3 to replace
 
-**Depends on:** All of Phase 1 (1.1-1.6)
+**Depends on:** All of PR-1 (1.1-1.6)
+
+**PR-1 is complete after this task passes. Open PR, get review, merge.**
 
 ---
 
-## Phase 2: Content Authoring
+## PR-2: Core Content + Code Changes
 
-All tasks in this phase can be parallelized. Each task produces one or more authored pages written directly to `docs/` in their final locations.
+The 9 highest-impact pages + code changes. These are the pages agents hit first and most often, requiring the most verification against code.
+
+After PR-1 merges, create a new branch from main for PR-2.
 
 Every page must follow:
 - Contract-first style (see page schema in plan Section 2)
@@ -282,7 +294,7 @@ Every page must follow:
 
 ### Task 2.1: Setup page
 
-**Output:** `docs/setup.md`
+**Output:** `docs/setup.md` (replaces placeholder from PR-1)
 
 **Content:** Single linear path from zero to first successful command. Covers:
 - Install CLI (`curl | sh` or npm)
@@ -304,17 +316,17 @@ Every page must follow:
 
 The page is one linear path, but it must serve agents as its primary audience. Human-friendly prose is secondary to precise, executable steps.
 
-**Sources to draw from:** `docs/first-time-setup.md`, `docs/agent-quickstart.md`, `docs/openclaw-first-run.md`, `docs/running-clawperator-on-android.md`, `docs/android-operator-apk.md`
+**Sources to draw from:** `tasks/docs/refactor/reference/` copies of `first-time-setup.md`, `agent-quickstart.md`, `openclaw-first-run.md`, `running-clawperator-on-android.md`, `android-operator-apk.md`. Verify all steps against actual CLI behavior.
 
 **Key constraint:** One path. No branching into separate "human" vs "agent" tracks. But the single path must be agent-executable throughout.
 
-**Depends on:** Phase 1 complete
+**Depends on:** PR-1 merged
 
 ---
 
 ### Task 2.2: API Overview
 
-**Output:** `docs/api/overview.md`
+**Output:** `docs/api/overview.md` (replaces placeholder)
 
 **Content:** Execution model, result envelope contract, core concepts. Must not exceed one screen of concepts + one envelope definition + one execution flow description. All detailed mechanics go to dedicated pages.
 
@@ -325,15 +337,15 @@ Covers:
 - How status + stepResults relate
 - Pointer to dedicated pages for actions, selectors, errors, etc.
 
-**Sources:** `docs/reference/execution-model.md`, `docs/architecture.md`, `docs/project-overview.md`, relevant parts of `docs/node-api-for-agents.md`. Verify against `apps/node/src/contracts/execution.ts` and `apps/node/src/contracts/result.ts`.
+**Sources:** Reference copies of `execution-model.md`, `architecture.md`, `project-overview.md`, `node-api-for-agents.md`. Verify against `apps/node/src/contracts/execution.ts` and `apps/node/src/contracts/result.ts`.
 
-**Depends on:** Phase 1 complete
+**Depends on:** PR-1 merged
 
 ---
 
 ### Task 2.3: Actions page
 
-**Output:** `docs/api/actions.md`
+**Output:** `docs/api/actions.md` (replaces placeholder)
 
 **Content:** Every action type with parameters, outputs, and failure modes. Tabular format.
 
@@ -343,15 +355,15 @@ For each action: name, required params, optional params, output shape, common fa
 
 Reference selectors page for selector parameters (do not duplicate selector docs here - just note "see Selectors").
 
-**Sources:** `docs/reference/action-types.md`, relevant parts of `docs/node-api-for-agents.md`. Verify against `apps/node/src/contracts/execution.ts`.
+**Sources:** Reference copies of `action-types.md`, `node-api-for-agents.md`. Verify against `apps/node/src/contracts/execution.ts`.
 
-**Depends on:** Phase 1 complete
+**Depends on:** PR-1 merged
 
 ---
 
 ### Task 2.4: Selectors page
 
-**Output:** `docs/api/selectors.md`
+**Output:** `docs/api/selectors.md` (replaces placeholder)
 
 **Content:** NodeMatcher contract, selector flags, shorthand vs JSON, container targeting, mutual exclusion rules.
 
@@ -365,15 +377,15 @@ Covers:
 - NodeMatcher type definition
 - Container matching semantics
 
-**Sources:** `apps/node/src/cli/selectorFlags.ts`, `apps/node/src/contracts/selectors.ts`, relevant parts of `docs/node-api-for-agents.md` and `docs/reference/action-types.md`.
+**Sources:** `apps/node/src/cli/selectorFlags.ts`, `apps/node/src/contracts/selectors.ts`. Reference copies of `node-api-for-agents.md` and `action-types.md` for context.
 
-**Depends on:** Phase 1 complete
+**Depends on:** PR-1 merged
 
 ---
 
 ### Task 2.5: Errors page
 
-**Output:** `docs/api/errors.md`
+**Output:** `docs/api/errors.md` (replaces placeholder)
 
 **Content:** Every error code with meaning and recovery action in a single page.
 
@@ -385,15 +397,15 @@ Authored sections cover:
 - Recovery actions keyed to error classes
 - New error codes from the refactor: `MISSING_SELECTOR`, `MISSING_ARGUMENT`, `UNKNOWN_COMMAND` (with `suggestion` field), `OPERATOR_NOT_INSTALLED`, `OPERATOR_VARIANT_MISMATCH`
 
-**Sources:** `apps/node/src/contracts/errors.ts`, `docs/reference/error-handling.md`, relevant parts of `docs/node-api-for-agents.md`.
+**Sources:** `apps/node/src/contracts/errors.ts` (primary). Reference copy of `error-handling.md` for recovery guidance patterns.
 
-**Depends on:** Phase 1 complete
+**Depends on:** PR-1 merged
 
 ---
 
 ### Task 2.6: Devices page
 
-**Output:** `docs/api/devices.md`
+**Output:** `docs/api/devices.md` (replaces placeholder)
 
 **Content:** Device targeting, package model, multi-device rules.
 
@@ -405,81 +417,37 @@ Covers:
 - Multi-device deterministic patterns: always pass `--device` when multiple connected
 - Cold-start device enumeration
 
-**Sources:** `docs/reference/device-and-package-model.md`, `docs/multi-device-workflows.md`.
+**Sources:** Reference copies of `device-and-package-model.md`, `multi-device-workflows.md`. Verify against CLI help output and `registry.ts`.
 
-**Depends on:** Phase 1 complete
-
----
-
-### Task 2.7: Remaining API pages (batch)
-
-These pages are smaller and can be authored as a batch.
-
-**Outputs:**
-- `docs/api/snapshot.md` - Snapshot output format (from `docs/snapshot-format.md`)
-- `docs/api/doctor.md` - Readiness checks, fix behavior (from `docs/reference/node-api-doctor.md`)
-- `docs/api/timeouts.md` - Timeout budgeting (from `docs/reference/timeout-budgeting.md`)
-- `docs/api/environment.md` - All environment variables (from `docs/reference/environment-variables.md`, update "RECEIVER" to "OPERATOR")
-- `docs/api/serve.md` - HTTP/SSE server contract (from `apps/node/src/cli/commands/serve.ts` and `registry.ts`)
-- `docs/api/navigation.md` - Navigation patterns (from `docs/navigation-patterns.md`, update CLI examples)
-- `docs/api/recording.md` - Recording format (from `docs/ai-agents/android-recording.md`, remove persona framing)
-
-Each page should follow the page schema and use current CLI surface.
-
-**Depends on:** Phase 1 complete
+**Depends on:** PR-1 merged
 
 ---
 
-### Task 2.8: Skills docs (consolidated into main repo)
+### Task 2.7: Doctor page
 
-**Output:** New files in `docs/skills/`:
-- `docs/skills/overview.md` - what skills are, how they run, runtime model
-- `docs/skills/authoring.md` - authoring guidelines, recording-to-skill conversion, blocked terms
-- `docs/skills/development.md` - development workflow
-- `docs/skills/runtime.md` - device prep and runtime tips
+**Output:** `docs/api/doctor.md` (replaces placeholder)
 
-**Source material** (in `../clawperator-skills/docs/`):
-- `usage-model.md` -> `overview.md`
-- `skill-authoring-guidelines.md` + `skill-from-recording.md` + `blocked-terms-policy.md` -> `authoring.md`
-- `skill-development-workflow.md` -> `development.md`
-- `device-prep-and-runtime-tips.md` -> `runtime.md`
+**Content:** Readiness checks, what they validate, fix behavior, remediation steps.
 
-Must explicitly define in `overview.md`: skill = deterministic wrapper, clawperator = execution substrate, agent = planner.
+**Sources:** Reference copy of `node-api-doctor.md`. Verify against `apps/node/src/domain/doctor/checks/` and `apps/node/src/cli/commands/doctor.ts`.
 
-All content must be verified against actual skill implementation, not just copied from old docs.
-
-**After authoring:** Update `../clawperator-skills/docs/` to contain only lightweight pointers to `https://docs.clawperator.com/skills/` and repo-local contributor guidance.
-
-**Depends on:** Phase 1 complete
+**Depends on:** PR-1 merged
 
 ---
 
-### Task 2.9: Troubleshooting pages
+### Task 2.8: Serve page
 
-**Outputs:**
-- `docs/troubleshooting/operator.md` - Operator app troubleshooting + crash log access (from `docs/troubleshooting.md` + `docs/crash-logs.md`)
-- `docs/troubleshooting/known-issues.md` - move from `docs/known-issues.md`, minimal changes
-- `docs/troubleshooting/compatibility.md` - move from `docs/compatibility.md`, minimal changes
+**Output:** `docs/api/serve.md` (replaces placeholder)
 
-**Depends on:** Phase 1 complete
+**Content:** HTTP/SSE server contract, endpoints, usage patterns.
 
----
+**Sources:** `apps/node/src/cli/commands/serve.ts`, `registry.ts`. Reference copy of `node-api-for-agents.md` for any existing serve documentation.
 
-### Task 2.10: Index page
-
-**Output:** `docs/index.md`
-
-**Content:** Minimal routing page. 4 sections (Setup, API, Skills, Troubleshooting). Links to `llms.txt` and `llms-full.txt`. No link dumps, no duplicate subsections, no persona split.
-
-Write this last, after all other pages exist, so all links are valid.
-
-**Depends on:** Tasks 2.1-2.9 complete
+**Depends on:** PR-1 merged
 
 ---
 
-## Phase 3: Code Changes
-
-### Task 3.1: Doctor docsUrl
+### Task 2.9: Doctor docsUrl code changes
 
 **Goal:** Add `docsUrl` field to doctor output so agents can find relevant docs for each check.
 
@@ -498,11 +466,11 @@ Write this last, after all other pages exist, so all links are valid.
 - `npm --prefix apps/node run test` passes
 - Doctor output includes docsUrl for relevant checks
 
-**Depends on:** Phase 1 complete (need final page URLs)
+**Depends on:** Task 2.7 (doctor page must exist for URLs to be valid)
 
 ---
 
-### Task 3.2: AGENTS.md from install.sh
+### Task 2.10: AGENTS.md from install.sh
 
 **Goal:** Generate `~/.clawperator/AGENTS.md` during CLI installation.
 
@@ -520,40 +488,112 @@ Write this last, after all other pages exist, so all links are valid.
 - File contains valid URLs pointing to new page structure
 - File uses flat CLI commands (not old nested forms)
 
-**Depends on:** Phase 2 complete (need final page URLs)
+**Depends on:** Task 2.1 (setup page must exist for URLs)
 
 ---
 
-## Phase 4: Build, Validate, and Ship
+### PR-2 Validation (before opening PR)
 
-### Task 4.1: Final build and validation
+1. `./scripts/docs_build.sh` succeeds
+2. `npm --prefix apps/node run build && npm --prefix apps/node run test` passes
+3. All 9 content pages verified against code (commit messages cite sources)
+4. Zero occurrences of "receiver", deprecated command forms, or deprecated flag names in new pages
+5. Doctor docsUrl unit tests pass
+6. Remaining 11 pages are still placeholders (expected - they ship in PR-3)
 
-**Goal:** Run the complete pipeline, fix any issues, produce final artifacts.
+**PR-2 is complete after validation passes. Open PR, get review, merge.**
+
+---
+
+## PR-3: Remaining Content + Cleanup
+
+Secondary API pages, skills pages, troubleshooting pages, index page, llms artifacts, old file deletion, and repo metadata updates.
+
+After PR-2 merges, create a new branch from main for PR-3.
+
+Same authoring rules as PR-2 (see Hard Rules section).
+
+---
+
+### Task 3.1: Remaining API pages
+
+**Outputs** (each replaces its placeholder):
+- `docs/api/snapshot.md` - Snapshot output format. Source: reference copy of `snapshot-format.md`. Verify against actual snapshot output.
+- `docs/api/timeouts.md` - Timeout budgeting. Source: reference copy of `timeout-budgeting.md`. Update examples to flat CLI.
+- `docs/api/environment.md` - All environment variables. Source: reference copy of `environment-variables.md`. Update "RECEIVER" to "OPERATOR".
+- `docs/api/navigation.md` - Navigation patterns. Source: reference copy of `navigation-patterns.md`. Update CLI examples.
+- `docs/api/recording.md` - Recording format. Source: reference copy of `android-recording.md`. Remove persona framing.
+
+Each page should follow the page schema and use current CLI surface.
+
+**Depends on:** PR-2 merged
+
+---
+
+### Task 3.2: Skills docs
+
+**Output:** New files in `docs/skills/` (each replaces its placeholder):
+- `docs/skills/overview.md` - what skills are, how they run, runtime model
+- `docs/skills/authoring.md` - authoring guidelines, recording-to-skill conversion, blocked terms
+- `docs/skills/development.md` - development workflow
+- `docs/skills/runtime.md` - device prep and runtime tips
+
+**Source material** (in `../clawperator-skills/docs/`):
+- `usage-model.md` -> `overview.md`
+- `skill-authoring-guidelines.md` + `skill-from-recording.md` + `blocked-terms-policy.md` -> `authoring.md`
+- `skill-development-workflow.md` -> `development.md`
+- `device-prep-and-runtime-tips.md` -> `runtime.md`
+
+Must explicitly define in `overview.md`: skill = deterministic wrapper, clawperator = execution substrate, agent = planner.
+
+All content must be verified against actual skill implementation, not just copied from old docs.
+
+**Depends on:** PR-2 merged
+
+---
+
+### Task 3.3: Troubleshooting pages
+
+**Outputs** (each replaces its placeholder):
+- `docs/troubleshooting/operator.md` - Operator app troubleshooting + crash log access (from reference copies of `troubleshooting.md` + `crash-logs.md`)
+- `docs/troubleshooting/known-issues.md` - move from `docs/known-issues.md`, minimal changes
+- `docs/troubleshooting/compatibility.md` - move from `docs/compatibility.md`, minimal changes
+
+**Depends on:** PR-2 merged
+
+---
+
+### Task 3.4: Index page
+
+**Output:** `docs/index.md` (replaces placeholder)
+
+**Content:** Minimal routing page. 4 sections (Setup, API, Skills, Troubleshooting). Links to `llms.txt` and `llms-full.txt`. No link dumps, no duplicate subsections, no persona split.
+
+Write this last, after all other pages exist, so all links are valid.
+
+**Depends on:** Tasks 3.1-3.3 complete
+
+---
+
+### Task 3.5: Finalize llms artifacts
 
 **Steps:**
-1. Run assembly script - verify `.build/` is complete
-2. Run `docs_build.sh` - verify site builds with zero warnings
-3. Verify `llms-full.txt` contains all 20 pages in correct nav order
-4. Rewrite `llms.txt`:
-   - `sites/docs/static/llms.txt` - all canonical page URLs
-   - `sites/landing/public/llms.txt` - same content
-5. Run `validate_docs_routes.py` - verify all links and routes
-6. Run `npm --prefix apps/node run build && npm --prefix apps/node run test`
-7. Grep authored docs for terminology violations: "receiver", "observe snapshot", "action click", "--timeout-ms", "--device-id" (without "--device" context)
-8. Verify at least 5 redirects resolve correctly in the built site
-9. Review `llms-full.txt` top-to-bottom for coherence
+1. Rewrite `llms.txt` (both `sites/docs/static/llms.txt` and `sites/landing/public/llms.txt`) with all canonical page URLs
+2. Run `generate_llms_full.py` to produce final `llms-full.txt`
+3. Verify `llms-full.txt` contains all 20 pages in nav order
+4. Review `llms-full.txt` top-to-bottom for coherence
 
-**Depends on:** All of Phase 1, 2, 3
+**Depends on:** Tasks 3.1-3.4 complete
 
 ---
 
-### Task 4.2: Cleanup
+### Task 3.6: Cleanup
 
-**Goal:** Remove old files and update repo metadata.
+**Goal:** Remove old files, update repo metadata.
 
 **Steps:**
 1. Move internal docs to `docs/internal/`: `conformance-apk.md`, `release-procedure.md`, `release-reference.md`, `site-hosting.md`, `design/` (entire directory)
-2. Delete old authored source files (per plan Section 9, Phase 5):
+2. Delete old authored source files:
    - `docs/reference/` directory
    - `docs/ai-agents/` directory
    - Individual files: `agent-quickstart.md`, `first-time-setup.md`, `openclaw-first-run.md`, `running-clawperator-on-android.md`, `project-overview.md`, `terminology.md`, `android-operator-apk.md`, `architecture.md`, `node-api-for-agents.md`, `snapshot-format.md`, `navigation-patterns.md`, `multi-device-workflows.md`, `crash-logs.md`, `troubleshooting.md`, `compatibility.md`, `known-issues.md`
@@ -568,41 +608,61 @@ Write this last, after all other pages exist, so all links are valid.
 6. Update `.agents/skills/docs-generate/SKILL.md` for new pipeline scope
 7. Update `.agents/skills/docs-validate/SKILL.md` for new validation scope
 8. Retire or simplify `diff_report.py`, `build_inventory.py`, `validate_source_of_truth.py`
-9. Run full build one final time to verify nothing broke
 
-**Depends on:** Task 4.1 (validation passes)
+**Depends on:** Tasks 3.1-3.5 complete
+
+---
+
+### PR-3 Validation (before opening PR)
+
+1. `./scripts/docs_build.sh` succeeds with zero warnings
+2. `npm --prefix apps/node run build && npm --prefix apps/node run test` passes
+3. `llms-full.txt` contains all 20 pages, coherent top-to-bottom
+4. Every URL in `llms.txt` resolves to a built HTML page
+5. Zero placeholder pages remain
+6. Zero occurrences of "receiver" in authored docs
+7. No old docs remain outside `docs/internal/`
+8. All relative links resolve
+9. Grep for deprecated terms: "observe snapshot", "action click", "--timeout-ms" returns zero
+10. At least 5 redirects resolve correctly
+11. Skills repo updated with pointer docs
+12. `CLAUDE.md` reflects new reality
+13. Run full build one final time after cleanup to verify nothing broke
+
+**PR-3 is complete after validation passes. Open PR, get review, merge.**
 
 ---
 
 ## Dependency Graph
 
 ```
-Phase 0 (Prep)
+PR-1: Pipeline + Skeleton
   0.1 (reference snapshot)
-
-Phase 1 (Pipeline) - depends on 0.1
+    |
   1.1 (gitignore) ──┐
   1.2 (assembly)  ──┤
-  1.3 (generators) ─┤──→ 1.6 (build scripts) ──→ 1.7 (verify pipeline)
+  1.3 (generators) ─┤──→ 1.6 (build scripts) ──→ 1.7 (verify + placeholders)
   1.4 (source-map) ─┤
   1.5 (mkdocs.yml) ─┘
+    |
+  [merge PR-1]
 
-Phase 2 (Content) - all depend on 1.7, parallelizable within phase
-  2.1 (setup)
-  2.2 (overview)    ──┐
-  2.3 (actions)     ──┤
-  2.4 (selectors)   ──┤
-  2.5 (errors)      ──┤──→ 2.10 (index page)
-  2.6 (devices)     ──┤
-  2.7 (remaining)   ──┤
-  2.8 (skills)      ──┤
-  2.9 (troubleshoot)──┘
+PR-2: Core Content + Code (branch from main after PR-1 merges)
+  2.1 (setup)       ──→ 2.10 (AGENTS.md)
+  2.2 (overview)
+  2.3 (actions)
+  2.4 (selectors)
+  2.5 (errors)
+  2.6 (devices)
+  2.7 (doctor)       ──→ 2.9 (doctor docsUrl code)
+  2.8 (serve)
+    |
+  [merge PR-2]
 
-Phase 3 (Code)
-  3.1 (doctor docsUrl) - depends on Phase 1
-  3.2 (AGENTS.md)      - depends on Phase 2
-
-Phase 4 (Ship)
-  4.1 (validate) - depends on Phase 1, 2, 3
-  4.2 (cleanup)  - depends on 4.1
+PR-3: Remaining Content + Cleanup (branch from main after PR-2 merges)
+  3.1 (remaining API) ──┐
+  3.2 (skills)        ──┤──→ 3.4 (index) ──→ 3.5 (llms) ──→ 3.6 (cleanup)
+  3.3 (troubleshoot)  ──┘
+    |
+  [merge PR-3]
 ```

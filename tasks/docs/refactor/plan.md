@@ -579,89 +579,128 @@ These items were tracked separately but are now part of this plan:
 
 ## 9. Execution Sequence
 
-### Phase 0: Migration Prep
+This work ships as 3 PRs, strictly sequenced. Each PR is independently shippable and leaves the build in a working state.
 
-1. Create reference snapshot: copy all current public docs sources into `tasks/docs/refactor/reference/` as read-only migration material
-2. Add `README.md` to reference directory: *"Reference snapshot only. May contain stale or incorrect documentation. Do not publish. Do not treat as authoritative over code."*
+This is a migration, not a perfection pass. Prioritize coherent structure, correct core documentation, and a deterministic build pipeline. Do not over-polish secondary pages in the first pass. Prefer shipping a clean, correct, strongly structured system that can be refined in follow-up PRs.
 
-### Phase 1: Pipeline Infrastructure
+### PR-1: Pipeline + skeleton
 
-Set up the new build pipeline before writing any content.
+**Scope:** Phase 0 (migration prep) + Phase 1 (infrastructure) + placeholder content for all 20 pages.
 
-1. Create `docs/api/`, `docs/skills/`, and `docs/troubleshooting/` directories
-2. Add `.gitignore` entries:
-   - `docs/api/cli.md` (code-derived)
-   - `sites/docs/.build/` (staging directory)
-3. Remove `sites/docs/docs/` from git tracking (git rm -r, add to `.gitignore`)
-4. Write `.agents/skills/docs-generate/scripts/assemble.sh` - deterministic assembly script with clear phase boundaries (resolve_pages, clean_staging, copy_authored, generate_code_derived, apply_markers, validate_build)
-5. Write generator scripts in `.agents/skills/docs-generate/scripts/`: `generate_cli_reference.py`, `generate_error_table.py`, `generate_selector_table.py`
-6. Rewrite `source-map.yaml` to reduced assembly manifest (code-derived and markers only)
-7. Rewrite `mkdocs.yml`: new nav tree, `docs_dir: .build`, add `mkdocs-redirects` plugin with redirect map
-8. Add `mkdocs-redirects` to `sites/docs/requirements.txt`
-9. Update `docs_build.sh` to call `.agents/skills/docs-generate/scripts/assemble.sh` before MkDocs build
-10. Update `generate_llms_full.py` to read from `.build/`, walk `mkdocs.yml` nav order
-11. Update `validate_docs_routes.py`: add inner-page relative link validation, point at `.build/`
-12. Simplify `validate_source_of_truth.py` (only validates code-derived pages) or remove
-13. Verify pipeline works end-to-end with placeholder content
+**Goal:** New build pipeline works end-to-end. Old URLs redirect. Site serves placeholder pages. No content judgment needed in review.
 
-### Phase 2: Write Source Docs
+Steps:
+1. Create reference snapshot: copy all current public docs sources into `tasks/docs/refactor/reference/` with README marking it non-authoritative
+2. Create `docs/api/`, `docs/skills/`, and `docs/troubleshooting/` directories
+3. Add `.gitignore` entries: `docs/api/cli.md`, `sites/docs/.build/`, `sites/docs/docs/`
+4. `git rm -r sites/docs/docs/` - remove generated docs from git
+5. Write `.agents/skills/docs-generate/scripts/assemble.sh` with clear phase boundaries (resolve_pages, clean_staging, copy_authored, generate_code_derived, apply_markers, validate_build)
+6. Write generator scripts in `.agents/skills/docs-generate/scripts/`: `generate_cli_reference.py`, `generate_error_table.py`, `generate_selector_table.py`
+7. Rewrite `source-map.yaml` to reduced assembly manifest (code-derived and markers only)
+8. Rewrite `mkdocs.yml`: new nav tree, `docs_dir: .build`, add `mkdocs-redirects` plugin with redirect map
+9. Add `mkdocs-redirects` to `sites/docs/requirements.txt`
+10. Update `docs_build.sh` to call assembly script before MkDocs build
+11. Update `generate_llms_full.py` to read from `.build/`, walk `mkdocs.yml` nav order
+12. Update `validate_docs_routes.py`: add inner-page relative link validation, point at `.build/`
+13. Simplify or remove `validate_source_of_truth.py`
+14. Create placeholder pages in `docs/` for all 20 nav entries (minimal: `# Page Title\n\nPlaceholder - content coming in PR-2/PR-3.`)
+15. Verify pipeline works end-to-end: assembly, MkDocs build, llms-full generation, redirects
 
-Author the 20 target pages directly in `docs/` in their final locations. Each uses contract-first style, new flat CLI surface, no historical references, no duplication. All pages - including skills docs - are authored in this repo.
+**Estimated scope:** ~15-20 files. Pure infrastructure.
 
-Follow migration mode rules: one page at a time, verify against code, commit after each page.
+**Acceptance:**
+- `./scripts/docs_build.sh` succeeds
+- `sites/docs/.build/` contains all 20 pages
+- `llms-full.txt` generates in nav order
+- At least 5 old URL redirects resolve correctly
+- No `sites/docs/docs/` in git
 
-Priority order (most impactful first):
-1. `docs/setup.md` - single setup path
+### PR-2: Core content + code changes
+
+**Scope:** The 9 highest-impact authored pages + code-derived CLI reference + doctor/AGENTS.md code changes. These are the pages agents hit first and most often, and the pages requiring the most verification against code.
+
+**Goal:** The critical API surface is documented accurately. Agents can perform setup, execute commands, use selectors, handle errors, and target devices using only the new docs.
+
+Follow migration mode rules throughout: one page at a time, verify against code, commit after each page.
+
+Pages (in authoring order):
+1. `docs/setup.md` - single setup path (agent/OpenClaw-friendly)
 2. `docs/api/overview.md` - execution model, result envelope, core concepts
-3. `docs/api/actions.md` - all action types with new commands
+3. `docs/api/actions.md` - all action types with params, outputs, failure modes
 4. `docs/api/selectors.md` - selector flags, matcher contract, container targeting (with `<!-- CODE-DERIVED: selector-flags -->` marker)
 5. `docs/api/errors.md` - all error codes with recovery guidance (with `<!-- CODE-DERIVED: error-codes -->` marker)
-6. `docs/api/cli.md` - generated by `generate_cli_reference.py` (not hand-authored)
+6. `docs/api/cli.md` - verify generated output from `generate_cli_reference.py`
 7. `docs/api/devices.md` - device targeting + multi-device
-8. `docs/api/snapshot.md` - snapshot format
-9. `docs/api/doctor.md` - readiness checks
-10. `docs/api/timeouts.md` - timeout budgeting
-11. `docs/api/environment.md` - environment variables
-12. `docs/api/serve.md` - HTTP/SSE server contract
-13. `docs/api/navigation.md` - navigation patterns
-14. `docs/api/recording.md` - recording format
-15. `docs/skills/overview.md` - usage model (source: `../clawperator-skills/docs/usage-model.md`)
-16. `docs/skills/authoring.md` - authoring guidelines + recording + blocked-terms (source: skills repo files, absorbs multiple)
-17. `docs/skills/development.md` - development workflow (source: `../clawperator-skills/docs/skill-development-workflow.md`)
-18. `docs/skills/runtime.md` - device prep and runtime (source: `../clawperator-skills/docs/device-prep-and-runtime-tips.md`)
-19. `docs/troubleshooting/operator.md` - troubleshooting + crash logs
-20. `docs/index.md` - minimal routing page (write last, after all targets exist)
+8. `docs/api/doctor.md` - readiness checks
+9. `docs/api/serve.md` - HTTP/SSE server contract
 
-`docs/troubleshooting/known-issues.md` and `docs/troubleshooting/compatibility.md` are moved from their current locations with minimal changes.
+Code changes:
+10. Doctor `docsUrl` in fix type (`apps/node/src/contracts/doctor.ts`)
+11. Doctor `docsUrl` rendering (`apps/node/src/cli/commands/doctor.ts`)
+12. Populate `docsUrl` in readiness checks (`apps/node/src/domain/doctor/checks/`)
+13. Unit tests for doctor changes (T1-T4)
+14. `~/.clawperator/AGENTS.md` generation in `install.sh`
 
-### Phase 3: Code Changes
+**Estimated scope:** ~12-15 files. High-stakes content requiring careful review.
 
-1. Doctor `docsUrl` in fix type (`apps/node/src/contracts/doctor.ts`)
-2. Doctor `docsUrl` rendering (`apps/node/src/cli/commands/doctor.ts`)
-3. Populate `docsUrl` in readiness checks (`apps/node/src/domain/doctor/checks/`) - use new page URLs
-4. Unit tests for doctor changes (T1-T4 from PRD-1)
-5. `~/.clawperator/AGENTS.md` generation in `install.sh`
+**Acceptance:**
+- `./scripts/docs_build.sh` succeeds
+- `npm --prefix apps/node run build && npm --prefix apps/node run test` passes
+- Doctor `docsUrl` unit tests pass
+- All 9 pages verified against code (commit messages cite sources)
+- Zero occurrences of "receiver", deprecated command forms, or deprecated flag names in new pages
+- Selector mutual exclusion rules documented
+- New error codes documented
 
-### Phase 4: Build and Validate
+### PR-3: Remaining content + cleanup
 
-1. Run `assemble.sh` to produce `sites/docs/.build/`
-2. Run `./scripts/docs_build.sh` (which now calls assembly + MkDocs build + llms-full generation + validation)
-3. Rewrite `llms.txt` (both `sites/docs/static/llms.txt` and `sites/landing/public/llms.txt`)
-4. Run `validate_docs_routes.py` (with new relative link checking)
-5. Run `npm --prefix apps/node run build && npm --prefix apps/node run test`
-6. Verify `llms-full.txt` is coherent top-to-bottom
+**Scope:** Secondary API pages, skills pages, troubleshooting pages, index page, llms artifacts, old file deletion, and repo metadata updates.
 
-### Phase 5: Cleanup
+**Goal:** All 20 pages are final content. Old docs deleted. Repo is clean. llms artifacts are finalized.
 
-1. Move internal docs to `docs/internal/`: `conformance-apk.md`, `release-procedure.md`, `release-reference.md`, `site-hosting.md`, `design/` (entire directory)
-2. Delete old source files per the deletion criteria in Section 1a:
-   - Remove old `docs/reference/`, `docs/ai-agents/` directories (content migrated to new locations)
-   - Remove absorbed files: `docs/agent-quickstart.md`, `docs/first-time-setup.md`, `docs/openclaw-first-run.md`, `docs/running-clawperator-on-android.md`, `docs/project-overview.md`, `docs/terminology.md`, `docs/android-operator-apk.md`, `docs/architecture.md`, `docs/node-api-for-agents.md`, `docs/snapshot-format.md`, `docs/navigation-patterns.md`, `docs/multi-device-workflows.md`, `docs/crash-logs.md`, `docs/troubleshooting.md`, `docs/compatibility.md`, `docs/known-issues.md`
-3. Update skills repo: replace current docs with lightweight pointers to `https://docs.clawperator.com/skills/`
-4. Delete reference snapshot: `tasks/docs/refactor/reference/`
-5. Delete task files listed in Section 8
-6. Update `CLAUDE.md` to reflect new docs structure and pipeline
-7. Update `docs-generate` and `docs-validate` skill SKILL.md files to reflect new pipeline
+Remaining content pages:
+1. `docs/api/snapshot.md` - snapshot format
+2. `docs/api/timeouts.md` - timeout budgeting
+3. `docs/api/environment.md` - environment variables
+4. `docs/api/navigation.md` - navigation patterns
+5. `docs/api/recording.md` - recording format
+6. `docs/skills/overview.md` - usage model
+7. `docs/skills/authoring.md` - authoring guidelines + recording + blocked-terms
+8. `docs/skills/development.md` - development workflow
+9. `docs/skills/runtime.md` - device prep and runtime
+10. `docs/troubleshooting/operator.md` - troubleshooting + crash logs
+11. `docs/index.md` - minimal routing page (write last)
+
+Move with minimal changes:
+12. `docs/troubleshooting/known-issues.md` (from `docs/known-issues.md`)
+13. `docs/troubleshooting/compatibility.md` (from `docs/compatibility.md`)
+
+Finalize artifacts:
+14. Rewrite `llms.txt` (both `sites/docs/static/llms.txt` and `sites/landing/public/llms.txt`)
+15. Verify `llms-full.txt` is coherent top-to-bottom
+
+Cleanup:
+16. Move internal docs to `docs/internal/`: `conformance-apk.md`, `release-procedure.md`, `release-reference.md`, `site-hosting.md`, `design/` (entire directory)
+17. Delete old source files:
+    - Remove `docs/reference/`, `docs/ai-agents/` directories
+    - Remove absorbed files: `agent-quickstart.md`, `first-time-setup.md`, `openclaw-first-run.md`, `running-clawperator-on-android.md`, `project-overview.md`, `terminology.md`, `android-operator-apk.md`, `architecture.md`, `node-api-for-agents.md`, `snapshot-format.md`, `navigation-patterns.md`, `multi-device-workflows.md`, `crash-logs.md`, `troubleshooting.md`, `compatibility.md`, `known-issues.md`
+18. Update skills repo: replace docs with lightweight pointers to `https://docs.clawperator.com/skills/`
+19. Delete reference snapshot: `tasks/docs/refactor/reference/`
+20. Update `CLAUDE.md` to reflect new docs structure and pipeline
+21. Update `docs-generate` and `docs-validate` skill SKILL.md files
+22. Retire or simplify `diff_report.py`, `build_inventory.py`, `validate_source_of_truth.py`
+23. Delete task files listed in Section 8
+
+**Estimated scope:** ~25+ files but mostly mechanical. Secondary pages are simpler (less multi-source absorption, more straightforward moves/rewrites).
+
+**Acceptance:**
+- All acceptance criteria from Section 10 pass
+- `./scripts/docs_build.sh` succeeds with zero warnings
+- `llms-full.txt` contains all 20 pages, coherent top-to-bottom
+- No old docs remain outside `docs/internal/`
+- No placeholder pages remain
+- Skills repo updated with pointer docs
+- `CLAUDE.md` reflects new reality
 
 ---
 
