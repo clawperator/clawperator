@@ -18,16 +18,3 @@ Reason:
 Consequence:
 - keep `devices`, `doctor`, and `version` as top-level commands
 - do not reintroduce a `device` namespace in future CLI work
-
-### No selector string DSL
-
-Rejected a compact selector DSL such as `text=Login`.
-
-Reason:
-- `--text`, `--id`, `--desc`, and `--role` cover the common cases directly
-- a parser would add complexity without enough payoff
-- simple flags are easier for agents to guess and recover from
-
-Consequence:
-- keep `--selector <json>` as the advanced escape hatch only
-- prefer simple selector flags in docs, help text, and examples
