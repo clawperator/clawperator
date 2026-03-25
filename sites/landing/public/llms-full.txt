@@ -47,7 +47,7 @@ This page is generated from the Node CLI registry and command sources.
 | `devices` | `devices` | - | - | List connected Android devices |
 | `emulator` | `emulator list`<br>`emulator inspect <name>`<br>`emulator create [--name <name>]`<br>`emulator start <name>`<br>`emulator stop <name>`<br>`emulator delete <name>`<br>`emulator status`<br>`emulator provision` | - | --name<br>Subcommands: list, inspect, create, start, stop, delete, status, provision | Manage Android emulators (AVDs) |
 | `provision` | - | - | -<br>Subcommands: emulator | Provision an Android emulator |
-| `packages` | `packages list [--device <id>] [--operator-package <pkg>] [--third-party]` | - | --third-party, --device, --operator-package, --payload, --execution | List installed packages on a device |
+| `packages` | `packages list [--device <id>] [--operator-package <pkg>] [--third-party]` | - | --third-party, --device, --operator-package | List installed packages on a device |
 | `exec` | `exec <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>]`<br>`exec best-effort --goal <text> [--device <id>] [--operator-package <package>]` | execute | --payload, --execution, --validate-only, --dry-run, --goal, --device, --operator-package | Execute a validated command payload |
 | `snapshot` | `snapshot [--device <id>] [--operator-package <pkg>] [--json]` | - | --device, --operator-package, --json | Get current Android UI hierarchy as XML |
 | `screenshot` | `screenshot [--device <id>] [--operator-package <pkg>] [--path <file>] [--json]` | - | --path, --device, --operator-package, --json | Capture a screenshot from the device |
@@ -57,10 +57,10 @@ This page is generated from the Node CLI registry and command sources.
 | `read` | `read --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>] [--json]` | - | --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --all, --container-text, --container-text-contains, --container-id, --container-desc, --container-desc-contains, --container-role, --container-selector, --device, --operator-package, --json | Read text from the first matching UI element |
 | `wait` | `wait --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]` | - | --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --device, --operator-package, --timeout, --json | Wait until a matching UI element appears |
 | `press` | `press <back|home|recents> [--device <id>] [--operator-package <pkg>] [--json]` | press-key | --key, --device, --operator-package, --json, --help | Press a hardware key on the device |
-| `back` | `back [--device <id>] [--operator-package <pkg>] [--json]` | - | --device, --operator-package, --json, --app, --help | Press the Android back key |
+| `back` | `back [--device <id>] [--operator-package <pkg>] [--json]` | - | --device, --operator-package, --json | Press the Android back key |
 | `close` | `close <package> [--device <id>] [--operator-package <pkg>] [--json]` | close-app | --app, --device, --operator-package, --json | Force-stop an Android application |
 | `sleep` | `sleep <ms> [--device <id>] [--operator-package <pkg>] [--json]` | - | --device, --operator-package, --json | Pause execution for a duration |
-| `scroll` | `scroll <down|up|left|right> [--container-id <id>] [--device <id>] [--operator-package <pkg>] [--json]` | - | --direction, --container-text, --container-text-contains, --container-id, --container-desc, --container-desc-contains, --container-role, --container-selector, --device, --operator-package, --json, --help, --click | Scroll the screen in a direction |
+| `scroll` | `scroll <down|up|left|right> [--container-id <id>] [--device <id>] [--operator-package <pkg>] [--json]` | - | --direction, --container-text, --container-text-contains, --container-id, --container-desc, --container-desc-contains, --container-role, --container-selector, --device, --operator-package, --json, --help | Scroll the screen in a direction |
 | `scroll-until` | `scroll-until [<direction>] --text <text> [--click] [--device <id>] [--operator-package <pkg>] [--json]` | - | --click, --direction, --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --container-text, --container-text-contains, --container-id, --container-desc, --container-desc-contains, --container-role, --container-selector, --device, --operator-package, --json | Scroll until a target element is visible |
 | `scroll-and-click` | `scroll-and-click [<direction>] --text <text> [--device <id>] [--operator-package <pkg>] [--json]` | - | --direction, --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --container-text, --container-text-contains, --container-id, --container-desc, --container-desc-contains, --container-role, --container-selector, --click, --device, --operator-package, --json | Scroll until target is visible, then click it (alias for scroll-until --click) |
 | `wait-for-nav` | `wait-for-nav --app <package> --timeout <ms> [--device <id>] [--operator-package <pkg>] [--json]` | wait-for-navigation | --app, --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --validate-only, --dry-run, --timeout, --device, --operator-package, --json | Wait for app or screen navigation to complete |
@@ -70,7 +70,7 @@ This page is generated from the Node CLI registry and command sources.
 | `serve` | `serve [--port <number>] [--host <string>]` | - | --port, --host | Start local HTTP/SSE server for remote control |
 | `doctor` | `doctor [--json]`<br>`doctor --fix`<br>`doctor --full`<br>`doctor --check-only` | - | --fix, --full, --check-only, --json, --format, --output | Run environment and runtime checks |
 | `grant-device-permissions` | `grant-device-permissions [--device <id>] [--operator-package <package>]` | - | --device, --operator-package | Re-grant accessibility and notification permissions |
-| `version` | `version`<br>`version --check-compat [--device <id>] [--operator-package <package>]` | - | --check-compat, --device, --operator-package, --help, --device-id, --receiver-package, --json, --output, --log-level, --timeout, --timeout-ms, --verbose, --version | Show the CLI version |
+| `version` | `version`<br>`version --check-compat [--device <id>] [--operator-package <package>]` | - | --check-compat, --device, --operator-package | Show the CLI version |
 
 ## Setup
 
@@ -81,7 +81,7 @@ This page is generated from the Node CLI registry and command sources.
 | `install` | - | - | --apk, --device, --operator-package | Alias guidance - use operator setup instead |
 | `doctor` | `doctor [--json]`<br>`doctor --fix`<br>`doctor --full`<br>`doctor --check-only` | - | --fix, --full, --check-only, --json, --format, --output | Run environment and runtime checks |
 | `grant-device-permissions` | `grant-device-permissions [--device <id>] [--operator-package <package>]` | - | --device, --operator-package | Re-grant accessibility and notification permissions |
-| `version` | `version`<br>`version --check-compat [--device <id>] [--operator-package <package>]` | - | --check-compat, --device, --operator-package, --help, --device-id, --receiver-package, --json, --output, --log-level, --timeout, --timeout-ms, --verbose, --version | Show the CLI version |
+| `version` | `version`<br>`version --check-compat [--device <id>] [--operator-package <package>]` | - | --check-compat, --device, --operator-package | Show the CLI version |
 
 ### `operator`
 
@@ -124,7 +124,7 @@ This page is generated from the Node CLI registry and command sources.
 - Summary: Show the CLI version
 - Syntax: `version`, `version --check-compat [--device <id>] [--operator-package <package>]`
 - Aliases: -
-- Flags: `--check-compat`, `--device`, `--operator-package`, `--help`, `--device-id`, `--receiver-package`, `--json`, `--output`, `--log-level`, `--timeout`, `--timeout-ms`, `--verbose`, `--version`
+- Flags: `--check-compat`, `--device`, `--operator-package`
 
 ## Device Management
 
@@ -133,7 +133,7 @@ This page is generated from the Node CLI registry and command sources.
 | `devices` | `devices` | - | - | List connected Android devices |
 | `emulator` | `emulator list`<br>`emulator inspect <name>`<br>`emulator create [--name <name>]`<br>`emulator start <name>`<br>`emulator stop <name>`<br>`emulator delete <name>`<br>`emulator status`<br>`emulator provision` | - | --name<br>Subcommands: list, inspect, create, start, stop, delete, status, provision | Manage Android emulators (AVDs) |
 | `provision` | - | - | -<br>Subcommands: emulator | Provision an Android emulator |
-| `packages` | `packages list [--device <id>] [--operator-package <pkg>] [--third-party]` | - | --third-party, --device, --operator-package, --payload, --execution | List installed packages on a device |
+| `packages` | `packages list [--device <id>] [--operator-package <pkg>] [--third-party]` | - | --third-party, --device, --operator-package | List installed packages on a device |
 
 ### `devices`
 
@@ -163,7 +163,7 @@ This page is generated from the Node CLI registry and command sources.
 - Summary: List installed packages on a device
 - Syntax: `packages list [--device <id>] [--operator-package <pkg>] [--third-party]`
 - Aliases: -
-- Flags: `--third-party`, `--device`, `--operator-package`, `--payload`, `--execution`
+- Flags: `--third-party`, `--device`, `--operator-package`
 
 ## Execution
 
@@ -207,10 +207,10 @@ This page is generated from the Node CLI registry and command sources.
 | `read` | `read --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>] [--json]` | - | --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --all, --container-text, --container-text-contains, --container-id, --container-desc, --container-desc-contains, --container-role, --container-selector, --device, --operator-package, --json | Read text from the first matching UI element |
 | `wait` | `wait --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]` | - | --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --device, --operator-package, --timeout, --json | Wait until a matching UI element appears |
 | `press` | `press <back|home|recents> [--device <id>] [--operator-package <pkg>] [--json]` | press-key | --key, --device, --operator-package, --json, --help | Press a hardware key on the device |
-| `back` | `back [--device <id>] [--operator-package <pkg>] [--json]` | - | --device, --operator-package, --json, --app, --help | Press the Android back key |
+| `back` | `back [--device <id>] [--operator-package <pkg>] [--json]` | - | --device, --operator-package, --json | Press the Android back key |
 | `close` | `close <package> [--device <id>] [--operator-package <pkg>] [--json]` | close-app | --app, --device, --operator-package, --json | Force-stop an Android application |
 | `sleep` | `sleep <ms> [--device <id>] [--operator-package <pkg>] [--json]` | - | --device, --operator-package, --json | Pause execution for a duration |
-| `scroll` | `scroll <down|up|left|right> [--container-id <id>] [--device <id>] [--operator-package <pkg>] [--json]` | - | --direction, --container-text, --container-text-contains, --container-id, --container-desc, --container-desc-contains, --container-role, --container-selector, --device, --operator-package, --json, --help, --click | Scroll the screen in a direction |
+| `scroll` | `scroll <down|up|left|right> [--container-id <id>] [--device <id>] [--operator-package <pkg>] [--json]` | - | --direction, --container-text, --container-text-contains, --container-id, --container-desc, --container-desc-contains, --container-role, --container-selector, --device, --operator-package, --json, --help | Scroll the screen in a direction |
 | `scroll-until` | `scroll-until [<direction>] --text <text> [--click] [--device <id>] [--operator-package <pkg>] [--json]` | - | --click, --direction, --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --container-text, --container-text-contains, --container-id, --container-desc, --container-desc-contains, --container-role, --container-selector, --device, --operator-package, --json | Scroll until a target element is visible |
 | `scroll-and-click` | `scroll-and-click [<direction>] --text <text> [--device <id>] [--operator-package <pkg>] [--json]` | - | --direction, --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --container-text, --container-text-contains, --container-id, --container-desc, --container-desc-contains, --container-role, --container-selector, --click, --device, --operator-package, --json | Scroll until target is visible, then click it (alias for scroll-until --click) |
 | `wait-for-nav` | `wait-for-nav --app <package> --timeout <ms> [--device <id>] [--operator-package <pkg>] [--json]` | wait-for-navigation | --app, --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --validate-only, --dry-run, --timeout, --device, --operator-package, --json | Wait for app or screen navigation to complete |
@@ -277,7 +277,7 @@ This page is generated from the Node CLI registry and command sources.
 - Summary: Press the Android back key
 - Syntax: `back [--device <id>] [--operator-package <pkg>] [--json]`
 - Aliases: -
-- Flags: `--device`, `--operator-package`, `--json`, `--app`, `--help`
+- Flags: `--device`, `--operator-package`, `--json`
 
 ### `close`
 
@@ -298,7 +298,7 @@ This page is generated from the Node CLI registry and command sources.
 - Summary: Scroll the screen in a direction
 - Syntax: `scroll <down|up|left|right> [--container-id <id>] [--device <id>] [--operator-package <pkg>] [--json]`
 - Aliases: -
-- Flags: `--direction`, `--container-text`, `--container-text-contains`, `--container-id`, `--container-desc`, `--container-desc-contains`, `--container-role`, `--container-selector`, `--device`, `--operator-package`, `--json`, `--help`, `--click`
+- Flags: `--direction`, `--container-text`, `--container-text-contains`, `--container-id`, `--container-desc`, `--container-desc-contains`, `--container-role`, `--container-selector`, `--device`, `--operator-package`, `--json`, `--help`
 
 ### `scroll-until`
 

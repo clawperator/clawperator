@@ -42,11 +42,13 @@ def extract_command_bodies(text: str) -> list[tuple[str, str]]:
     matches = list(re.finditer(r'COMMANDS\["([^"]+)"\]\s*=\s*{', text))
     if not matches:
         raise ValueError("Could not find any command definitions in registry.ts")
-    for index, match in enumerate(matches):
+    for match in matches:
         name = match.group(1)
-        start = match.start()
-        end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
-        body = text[start:end]
+        body_start = match.end()
+        close_match = re.search(r"(?m)^};\s*$", text[body_start:])
+        if not close_match:
+            raise ValueError(f"Could not find the end of command definition for {name}")
+        body = text[body_start:body_start + close_match.start()]
         bodies.append((name, body))
     return bodies
 
