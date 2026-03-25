@@ -186,6 +186,12 @@ Valid body rules enforced by the route:
 - `deviceId`, when present, must be a string
 - `operatorPackage`, when present, must be a non-empty string
 
+Operator package resolution:
+
+- if `operatorPackage` is present in the request, the server uses it verbatim
+- otherwise it falls back to `process.env.CLAWPERATOR_OPERATOR_PACKAGE` when that env var is non-empty
+- otherwise it uses `com.clawperator.operator`
+
 Then `runExecution()` applies full execution validation. See [Actions](actions.md), [Selectors](selectors.md), and [API Overview](overview.md).
 
 ### Success response
@@ -272,6 +278,11 @@ This route builds a synthetic execution with:
 }
 ```
 
+Notes:
+
+- body must still be a JSON object, but `{}` is valid
+- omitted `operatorPackage` follows the same fallback chain as `/execute`
+
 ### Success response
 
 ```json
@@ -322,6 +333,7 @@ Route validation:
 
 - request body must be a JSON object
 - `path`, when present, must be a non-empty string
+- omitted `operatorPackage` follows the same fallback chain as `/execute`
 
 ### Success response
 
@@ -425,6 +437,7 @@ Argument mapping:
 
 - if `deviceId` is a non-empty string, it is prepended to the script argument list
 - `args[]` are appended after that, stringified with `String()`
+- if `timeoutMs` is omitted, `runSkill()` uses its default timeout of `120000ms`
 
 ### Success response
 
@@ -444,6 +457,7 @@ Behavior:
 
 - if `expectContains` is provided and `output` does not contain that substring, the route returns HTTP `400`
 - if the skill exits non-zero, the route returns HTTP `400` for most failures or `404` when the skill ID does not exist
+- successful responses always include `exitCode: 0`
 
 ## Emulator Endpoints
 
@@ -675,6 +689,13 @@ Two classes of failures exist:
 2. Route-local HTTP validation failures for malformed or missing request bodies
 
 For long-term agent logic, prefer branching on the enum-backed errors above. Route-local validation failures should be treated as “fix the request body and retry” rather than as durable cross-surface contract codes.
+
+Examples of route-local validation failures:
+
+- malformed JSON body -> HTTP `400`
+- body is missing or not a JSON object on POST routes -> HTTP `400`
+- `/execute` without `execution` -> HTTP `400`
+- `/screenshot` with blank `path` -> HTTP `400`
 
 ## Related Pages
 
