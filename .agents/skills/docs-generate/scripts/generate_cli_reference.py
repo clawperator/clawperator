@@ -87,7 +87,12 @@ def parse_subcommands(body: str) -> list[str]:
     match = re.search(r"subtopics:\s*{([^}]*)}", body, re.S)
     if not match:
         return []
-    return re.findall(r"^\s*([A-Za-z0-9_.-]+):", match.group(1), re.M)
+    subcommands: list[str] = []
+    for quoted, bare in re.findall(r'^\s*(?:"([^"]+)"|([A-Za-z0-9_.-]+)):', match.group(1), re.M):
+        subcommand = quoted or bare
+        if subcommand and subcommand not in subcommands:
+            subcommands.append(subcommand)
+    return subcommands
 
 
 def parse_command_info(name: str, body: str) -> CommandInfo:

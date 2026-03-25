@@ -58,6 +58,20 @@ COMMANDS["second"] = {
         self.assertNotIn('COMMANDS["second"]', bodies[0][1])
         self.assertIn('summary: "Second command"', bodies[1][1])
 
+    def test_parse_subcommands_handles_quoted_keys(self) -> None:
+        body = """
+  subtopics: {
+    install: "Install the skill",
+    "compile-artifact": "Compile an artifact",
+    run: "Run the skill",
+  },
+"""
+
+        self.assertEqual(
+            cli_reference.parse_subcommands(body),
+            ["install", "compile-artifact", "run"],
+        )
+
 
 class GenerateSelectorTableTests(unittest.TestCase):
     def test_known_flag_uses_explicit_documentation(self) -> None:
