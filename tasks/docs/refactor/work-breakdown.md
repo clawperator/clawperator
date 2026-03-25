@@ -221,7 +221,7 @@ Supports `--verbose` flag to log all link rewrites and source resolutions.
 
 ### Task 1.6: Update build and validation scripts
 
-**Goal:** Update `docs_build.sh`, `generate_llms_full.py`, and `validate_docs_routes.py` for the new pipeline.
+**Goal:** Update `docs_build.sh`, `generate_llms_full.py`, `validate_docs_routes.py`, and the sitemap script for the new pipeline.
 
 **Changes:**
 
@@ -229,28 +229,57 @@ Supports `--verbose` flag to log all link rewrites and source resolutions.
    - Add call to `.agents/skills/docs-generate/scripts/assemble.sh` as first step (before MkDocs build)
    - Remove or skip `validate_source_of_truth.py` call (drift is no longer possible for authored pages)
    - MkDocs build reads from `.build/`
-   - `generate_llms_full.py` reads from `.build/`
+   - Update or remove `sitemaps-generate` script call - it currently reads `source-map.yaml` in the old format with `sections[].pages[]` structure. Either update for new source-map format or remove if MkDocs-native `sitemap.xml` is sufficient.
+   - Update `validate_docs_routes.py` invocation: change `--generated-docs-dir` to point at `.build/`
 
-2. **`generate_llms_full.py`:**
-   - Read pages from `sites/docs/.build/` instead of `sites/docs/docs/`
-   - Walk `mkdocs.yml` nav order instead of source-map sections
-   - Write to same output locations
+2. **`generate_llms_full.py`** (significant rewrite - this generates the primary artifact):
+   - Current implementation parses `source-map.yaml` sections with `title` and `pages` lists. New implementation must parse `mkdocs.yml` nav structure (nested YAML with different schema).
+   - Read page content from `sites/docs/.build/` instead of `sites/docs/docs/`
+   - Preserve all three output paths: `sites/docs/site/llms-full.txt`, `sites/docs/static/llms-full.txt`, `sites/landing/public/llms-full.txt`
+   - Handle nested nav entries correctly: section titles from nav dict keys, page paths from nav dict values
+   - This is a structural rewrite, not a trivial path change.
 
-3. **`validate_docs_routes.py`:**
+3. **`validate_docs_routes.py`** (significant update):
+   - Current implementation discovers expected routes from `source-map.yaml`. Must be updated to discover routes from `mkdocs.yml` nav.
+   - Update `--generated-docs-dir` flag to point at `.build/` directory
    - Add inner-page relative link validation (`check_inner_page_links`)
-   - Validate against `.build/` directory
-   - Check all links in generated docs resolve to built files
+   - Check all links in assembled docs resolve to built files
 
 **Acceptance:**
 - `docs_build.sh` runs end-to-end with placeholder content (assembly + MkDocs build + llms-full + validation)
-- `llms-full.txt` is generated in nav order
+- `llms-full.txt` is generated in correct nav order from `mkdocs.yml` (not source-map sections)
+- `llms-full.txt` written to all three output paths
 - Relative link validation catches broken links
+- Sitemap is generated (either via updated script or MkDocs native)
 
 **Depends on:** Tasks 1.2, 1.3, 1.4, 1.5 (all pipeline components must exist)
 
 ---
 
-### Task 1.7: End-to-end pipeline verification
+### Task 1.7: Add docs build to CI
+
+**Goal:** Ensure docs build is validated on every PR to main. Currently `pull-request.yml` runs Android tests, Node tests, and validation scripts but does NOT build docs. Since Cloudflare deploys on merge to main, a broken docs build in any PR means a broken live site.
+
+**Changes to `.github/workflows/pull-request.yml`:**
+
+Add a `docs-build` job:
+- Checkout code
+- Set up Python 3
+- Run `./scripts/docs_build.sh`
+- Fail the job if the build fails
+
+**Note:** The build does not require a device or Android SDK. It only needs Python 3 and the MkDocs dependencies (installed by `docs_build.sh` into a venv).
+
+**Acceptance:**
+- `pull-request.yml` includes a `docs-build` job
+- The job runs `docs_build.sh` and fails on error
+- The job passes on this PR
+
+**Depends on:** Task 1.6 (build scripts must be updated first)
+
+---
+
+### Task 1.8: End-to-end pipeline verification
 
 **Goal:** Verify the complete pipeline works with placeholder content before any real authoring begins.
 
@@ -268,8 +297,9 @@ Supports `--verbose` flag to log all link rewrites and source resolutions.
 - `llms-full.txt` contains all 20 pages in correct order
 - At least 5 redirects resolve correctly
 - Placeholders remain in place for PR-2/PR-3 to replace
+- CI docs-build job passes
 
-**Depends on:** All of PR-1 (1.1-1.6)
+**Depends on:** All of PR-1 (1.1-1.7)
 
 **PR-1 is complete after this task passes. Open PR, get review, merge.**
 
@@ -641,7 +671,7 @@ PR-1: Pipeline + Skeleton
     |
   1.1 (gitignore) ──┐
   1.2 (assembly)  ──┤
-  1.3 (generators) ─┤──→ 1.6 (build scripts) ──→ 1.7 (verify + placeholders)
+  1.3 (generators) ─┤──→ 1.6 (build scripts) ──→ 1.7 (CI) ──→ 1.8 (verify + placeholders)
   1.4 (source-map) ─┤
   1.5 (mkdocs.yml) ─┘
     |

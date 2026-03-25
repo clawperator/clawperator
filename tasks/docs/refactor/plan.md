@@ -490,13 +490,25 @@ markers:
           'skills/blocked-terms-policy.md': 'skills/authoring.md'
   ```
 
-**`generate_llms_full.py`** - Update to read from `.build/` directory, walk `mkdocs.yml` nav order.
+**`generate_llms_full.py`** - Significant rewrite. This script generates `llms-full.txt`, the primary artifact of the entire docs system. Current implementation walks `source-map.yaml` sections with `title` and `pages` lists, reads from `sites/docs/docs/`. Must be rewritten to:
+- Parse `mkdocs.yml` nav structure (nested YAML, different format from source-map sections)
+- Read page content from `sites/docs/.build/` instead of `sites/docs/docs/`
+- Preserve the three output locations: `sites/docs/site/llms-full.txt`, `sites/docs/static/llms-full.txt`, `sites/landing/public/llms-full.txt`
+- Handle nested nav entries correctly (section titles from nav keys, page paths from nav values)
 
-**`validate_docs_routes.py`** - Add inner-page relative link validation. Update to validate against `.build/` directory.
+This is not a trivial path change - it is a structural rewrite of the input parsing.
 
-**`validate_source_of_truth.py`** - Dramatically simplified or removed. Drift is no longer possible for authored pages (source = output). Only needed for code-derived pages and cross-repo copies, which can be validated by checking that generator inputs haven't changed without re-running assembly.
+**`validate_docs_routes.py`** - Significant update. Current implementation takes `--generated-docs-dir` pointing at `sites/docs/docs/` and `--source-map` to discover expected routes. Must be updated to:
+- Discover expected routes from `mkdocs.yml` nav instead of (or in addition to) source-map
+- Validate against `.build/` directory instead of `sites/docs/docs/`
+- Add inner-page relative link validation (`check_inner_page_links`)
+- Update `--generated-docs-dir` flag to point at `.build/` (or rename the flag for clarity)
 
-**`diff_report.py` / `build_inventory.py`** - May be retired. The churn gating was designed to prevent large agent-driven rewrites of committed generated output. With no committed generated output, the primary use case is gone. Churn control for authored docs is handled by normal PR review.
+**`sitemaps-generate` skill** - The `generate_sitemap_metadata.py` script currently runs after MkDocs build and patches `sitemap.xml` using `source-map.yaml`. Since `source-map.yaml` is being dramatically reduced, this script must be updated to work with the new format or removed if MkDocs-native sitemap generation is sufficient. Evaluate during PR-1 implementation.
+
+**`validate_source_of_truth.py`** - Dramatically simplified or removed. Drift is no longer possible for authored pages (source = output). Only needed for code-derived pages, which can be validated by checking that generator inputs haven't changed without re-running assembly.
+
+**`diff_report.py` / `build_inventory.py` / `write_build_metadata.py`** - May be retired. The churn gating was designed to prevent large agent-driven rewrites of committed generated output. With no committed generated output, the primary use case is gone. Churn control for authored docs is handled by normal PR review.
 
 **`docs-generate` skill** - Rearchitected. Becomes the home for all docs build tooling. The skill's `scripts/` directory contains:
 
@@ -599,12 +611,13 @@ Steps:
 7. Rewrite `source-map.yaml` to reduced assembly manifest (code-derived and markers only)
 8. Rewrite `mkdocs.yml`: new nav tree, `docs_dir: .build`, add `mkdocs-redirects` plugin with redirect map
 9. Add `mkdocs-redirects` to `sites/docs/requirements.txt`
-10. Update `docs_build.sh` to call assembly script before MkDocs build
-11. Update `generate_llms_full.py` to read from `.build/`, walk `mkdocs.yml` nav order
-12. Update `validate_docs_routes.py`: add inner-page relative link validation, point at `.build/`
+10. Update `docs_build.sh` to call assembly script before MkDocs build; update or remove `sitemaps-generate` script call (it currently depends on old source-map format); update `validate_docs_routes.py` invocation flags
+11. Rewrite `generate_llms_full.py` to parse `mkdocs.yml` nav (not source-map sections), read from `.build/`, preserve three output paths. This is a structural rewrite, not a path change.
+12. Update `validate_docs_routes.py`: discover expected routes from `mkdocs.yml` nav, validate against `.build/`, add inner-page relative link validation
 13. Simplify or remove `validate_source_of_truth.py`
 14. Create placeholder pages in `docs/` for all 20 nav entries (minimal: `# Page Title\n\nPlaceholder - content coming in PR-2/PR-3.`)
-15. Verify pipeline works end-to-end: assembly, MkDocs build, llms-full generation, redirects
+15. Add `docs-build` job to `.github/workflows/pull-request.yml` - install Python deps, run `docs_build.sh`, fail on error. This is critical: Cloudflare deploys on merge to main, so a broken build in any PR means a broken live site.
+16. Verify pipeline works end-to-end: assembly, MkDocs build, llms-full generation, redirects
 
 **Estimated scope:** ~15-20 files. Pure infrastructure.
 
@@ -614,6 +627,7 @@ Steps:
 - `llms-full.txt` generates in nav order
 - At least 5 old URL redirects resolve correctly
 - No `sites/docs/docs/` in git
+- CI `docs-build` job passes on the PR
 
 ### PR-2: Core content + code changes
 
