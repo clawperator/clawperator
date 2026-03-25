@@ -21,6 +21,29 @@ Define the canonical `ExecutionAction.type` values, the exact parameters each ac
 | `StepResult.data` is a string map | Node may attach known keys such as `text`, `path`, `warn`, `application_id`, `error`, or `message`, but most actions do not have a richer static success schema. |
 | CLI coverage is narrower than raw JSON | Some advanced fields in `ActionParams` are accepted only through `clawperator exec` JSON, not through flat CLI flags. |
 
+## Retry Object Shape
+
+Several actions accept `retry`, `scrollRetry`, or `clickRetry` objects in raw `clawperator exec` JSON. Node accepts these fields as part of `ActionParams`, and Android parses them into a retry policy with these keys:
+
+```json
+{
+  "maxAttempts": 4,
+  "initialDelayMs": 400,
+  "maxDelayMs": 2000,
+  "backoffMultiplier": 2,
+  "jitterRatio": 0.15
+}
+```
+
+Meaning:
+
+- `maxAttempts` counts the initial attempt, so `1` means no retry.
+- `initialDelayMs` is the delay before the first retry.
+- `maxDelayMs` caps exponential backoff growth.
+- `backoffMultiplier` must be `>= 1.0`.
+- `jitterRatio` must be in `[0.0, 1.0]`.
+- if you omit a retry object, Android applies an action-specific default such as `UiReadiness`, `UiScroll`, `AppLaunch`, `AppClose`, or `None`.
+
 ## Canonical Types And Input Aliases
 
 Canonical public action types:
@@ -111,6 +134,7 @@ Success condition for that payload:
 | `matcher` | any non-empty `NodeMatcher` |
 | `coordinate` | `{ "x": <int >= 0>, "y": <int >= 0> }` |
 | `clickType` | optional string; CLI builders use `"default"`, `"long_click"`, or `"focus"` |
+| `retry` | optional retry object in raw `exec` JSON; Android defaults to `UiReadiness` |
 
 Rules:
 
@@ -149,16 +173,18 @@ Example:
 | `container` | optional `NodeMatcher` |
 | `distanceRatio` | optional number in `[0.0, 1.0]` |
 | `settleDelayMs` | optional number in `[0, 10000]` |
-| `maxSwipes` | accepted by `ActionParams`, but not validated or populated by the built-in CLI builders in this repo |
-| `findFirstScrollableChild` | accepted by `ActionParams`, but not validated or populated by the built-in CLI builders in this repo |
-| `retry`, `scrollRetry`, `clickRetry` | accepted as arbitrary JSON objects; Node does not currently validate their inner shape |
+| `findFirstScrollableChild` | optional boolean in raw `exec` JSON; Android defaults to `true` |
+| `retry` | optional retry object in raw `exec` JSON; Android defaults to `None` for plain scroll |
 
 Semantics:
 
 - if `direction` is omitted in raw JSON, Node validation allows omission
-- the flat CLI always sets a direction
+- Android defaults omitted `direction` to `down`
+- the flat CLI always sets a direction explicitly
 - `container` scopes the scroll to a matched scrollable container
 - `distanceRatio` and `settleDelayMs` are advanced tuning fields for raw JSON execution
+- if `findFirstScrollableChild == true` and the matched container is not itself scrollable, Android walks down to the first scrollable descendant
+- `retry` covers container resolution and repeated UI-tree fetches during the scroll operation
 
 Success data:
 
@@ -198,14 +224,18 @@ Example:
 | `maxScrolls` | optional integer in `[1, 200]` |
 | `maxDurationMs` | optional number in `[0, 120000]` |
 | `noPositionChangeThreshold` | optional integer in `[1, 20]` |
-| `findFirstScrollableChild` | accepted by `ActionParams`, but not constrained by current Node validation |
-| `maxSwipes`, `retry`, `scrollRetry`, `clickRetry` | accepted by `ActionParams`, but not constrained by current Node validation for this action |
+| `findFirstScrollableChild` | optional boolean in raw `exec` JSON; Android defaults to `true` |
+| `clickType` | optional string in raw `exec` JSON; Android parses the same click types used by `click` |
 
 Semantics:
 
 - without `clickAfter`, the action scrolls until the target becomes visible or the loop terminates
 - with `clickAfter: true`, the same action requires `matcher` and turns into “scroll then click”
 - the flat CLI exposes only the core controls; advanced tuning requires raw JSON via `clawperator exec`
+- Android defaults omitted `direction` to `down`, `distanceRatio` to `0.7`, `settleDelayMs` to `250`, `maxScrolls` to `20`, `maxDurationMs` to `10000`, `noPositionChangeThreshold` to `3`, and `findFirstScrollableChild` to `true`
+- `maxScrolls` is the hard cap on how many scroll steps Android will attempt
+- `maxDurationMs` is the wall-clock cap for the full loop
+- `noPositionChangeThreshold` stops the loop after that many consecutive non-moving scrolls
 
 Success data:
 
@@ -240,13 +270,23 @@ Example:
 | `direction` | optional string in `down`, `up`, `left`, `right` |
 | `matcher` | required `NodeMatcher` |
 | `container` | optional `NodeMatcher` |
-| `clickAfter` | optional boolean; CLI-built payloads set it to `true`, but the action type itself already implies click-after semantics |
-| `distanceRatio`, `settleDelayMs`, `maxSwipes`, `retry`, `scrollRetry`, `clickRetry` | accepted through `ActionParams`; current Node validation enforces only the required `matcher` |
+| `clickAfter` | optional boolean in raw `exec` JSON; Android defaults it to `true` |
+| `maxSwipes` | optional integer in raw `exec` JSON; Android defaults it to `10` and clamps it to `[1, 50]` |
+| `distanceRatio` | optional number in raw `exec` JSON; Android defaults it to `0.7` and clamps it to `[0.0, 1.0]` |
+| `settleDelayMs` | optional number in raw `exec` JSON; Android defaults it to `250` and clamps it to `[0, 10000]` |
+| `findFirstScrollableChild` | optional boolean in raw `exec` JSON; Android defaults it to `true` |
+| `clickType` | optional string in raw `exec` JSON; Android parses the same click types used by `click` |
+| `scrollRetry` | optional retry object in raw `exec` JSON; Android defaults to `UiScroll` |
+| `clickRetry` | optional retry object in raw `exec` JSON; Android defaults to `UiReadiness` |
 
 Semantics:
 
 - this is the canonical action type produced by `scroll-until --click` and `scroll-and-click`
-- unlike raw `scroll_until`, it always represents “find target, then click target”
+- unlike raw `scroll_until`, this action is optimized for “scroll to target, then click target”
+- `maxSwipes` is the safety cap on how many swipes Android performs before failing
+- `scrollRetry` applies to scrolling and view refresh between swipes
+- `clickRetry` applies only to the final click after the target is visible
+- setting `clickAfter: false` is accepted in raw `exec` JSON and makes Android stop after revealing the target, but the flat CLI does not emit that variant for `scroll_and_click`
 
 Success data:
 
@@ -280,13 +320,14 @@ Example:
 | `container` | optional `NodeMatcher` |
 | `validator` | optional string; current validation adds special behavior only for `"regex"` |
 | `validatorPattern` | required non-empty valid regex string when `validator == "regex"` |
-| `retry`, `scrollRetry`, `clickRetry` | accepted as arbitrary JSON objects with no Node-side shape validation |
+| `retry` | optional retry object in raw `exec` JSON; Android defaults to `UiReadiness` |
 
 Semantics:
 
 - if `validator` is omitted, no validator-specific Node rule runs
 - if `validator == "regex"`, `validatorPattern` must exist and compile as a regex
 - other validator strings are accepted by the current Node schema, but this repo does not add extra Node-side validation semantics for them
+- `all: true` asks Android to return all matching text values instead of only the first match
 
 Success data:
 
@@ -319,6 +360,7 @@ Example:
 | Required | `labelMatcher` |
 | `labelMatcher` | required `NodeMatcher` |
 | `all` | optional boolean |
+| `retry` | optional retry object in raw `exec` JSON; Android defaults to `UiReadiness` |
 
 Semantics:
 
@@ -355,6 +397,7 @@ Example:
 | `text` | required non-empty string |
 | `submit` | optional boolean |
 | `clear` | optional boolean |
+| `retry` | optional retry object in raw `exec` JSON; Android defaults to `UiReadiness` |
 
 Semantics:
 
@@ -391,6 +434,7 @@ Example:
 | --- | --- |
 | Required | `key` |
 | `key` | case-insensitive string in `back`, `home`, `recents` |
+| `retry` | optional retry object in raw `exec` JSON; Android defaults to `None` |
 
 Success data:
 
@@ -419,6 +463,7 @@ Example:
 | Required | `matcher` |
 | `matcher` | required `NodeMatcher` |
 | `timeoutMs` | optional positive number; when built by the CLI, it comes from `--timeout` |
+| `retry` | optional retry object in raw `exec` JSON; Android defaults to `UiReadiness` |
 
 Semantics:
 
@@ -487,7 +532,7 @@ Example:
 | Field | Valid values |
 | --- | --- |
 | Required | none |
-| Optional | none in the current public contract |
+| `retry` | optional retry object in raw `exec` JSON; Android defaults to `UiReadiness` |
 
 Semantics:
 
@@ -519,6 +564,7 @@ Example:
 | --- | --- |
 | Required | none |
 | `path` | optional non-empty string |
+| `retry` | optional retry object in raw `exec` JSON; Android defaults to `None` |
 
 Semantics:
 
@@ -552,6 +598,7 @@ Example:
 | --- | --- |
 | Required | `applicationId` |
 | `applicationId` | required non-empty package id string |
+| `retry` | optional retry object in raw `exec` JSON; Android defaults to `AppClose` |
 
 Semantics:
 
@@ -585,6 +632,7 @@ Example:
 | --- | --- |
 | Required | `durationMs` |
 | `durationMs` | required number `>= 0` and `<= MAX_EXECUTION_TIMEOUT_MS` |
+| `retry` | optional retry object in raw `exec` JSON; Android defaults to `None` |
 
 Semantics:
 
@@ -616,6 +664,7 @@ Example:
 | --- | --- |
 | Required | `applicationId` |
 | `applicationId` | required non-empty package id string |
+| `retry` | optional retry object in raw `exec` JSON; Android defaults to `AppLaunch` |
 
 Success data:
 
@@ -643,6 +692,7 @@ Example:
 | --- | --- |
 | Required | `uri` |
 | `uri` | required non-empty string, max length enforced by `MAX_URI_LENGTH` |
+| `retry` | optional retry object in raw `exec` JSON; Android defaults to `AppLaunch` |
 
 Success data:
 
@@ -670,6 +720,7 @@ Example:
 | --- | --- |
 | Required | none |
 | `sessionId` | optional non-blank string |
+| `retry` | optional retry object in raw `exec` JSON; Android defaults to `None` |
 
 Success data:
 
@@ -698,6 +749,7 @@ Example:
 | --- | --- |
 | Required | none |
 | `sessionId` | optional non-blank string |
+| `retry` | optional retry object in raw `exec` JSON; Android defaults to `None` |
 
 Success data:
 
@@ -748,6 +800,33 @@ Example:
 | `take_screenshot` | `data.path` |
 | `close_app` | `data.application_id` when Node pre-flight succeeded |
 | all others | no fixed success keys guaranteed by Node |
+
+Concrete success example for `take_screenshot`:
+
+```json
+{
+  "id": "shot-1",
+  "actionType": "take_screenshot",
+  "success": true,
+  "data": {
+    "path": "/tmp/settings.png"
+  }
+}
+```
+
+Concrete success example for `snapshot_ui`:
+
+```json
+{
+  "id": "snap-1",
+  "actionType": "snapshot_ui",
+  "success": true,
+  "data": {
+    "text": "<hierarchy rotation=\"0\">...</hierarchy>",
+    "warn": "snapshot captured without a preceding sleep step; UI may not have settled - consider adding a sleep step between click and snapshot_ui"
+  }
+}
+```
 
 For failures, inspect:
 
