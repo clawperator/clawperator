@@ -4,14 +4,45 @@ Compiled from the MkDocs navigation tree and assembled docs staging directory.
 
 # Docs Home
 
-Clawperator public docs are organized into Setup, API, Skills, and Troubleshooting.
+Clawperator is a deterministic actuator tool for Android device automation.
 
-Machine-readable entrypoints:
+## Agent Entry Points
 
-- [llms.txt](https://docs.clawperator.com/llms.txt)
-- [llms-full.txt](https://docs.clawperator.com/llms-full.txt)
+- [llms.txt](https://docs.clawperator.com/llms.txt) - compact machine entrypoint
+- [llms-full.txt](https://docs.clawperator.com/llms-full.txt) - full machine-readable docs corpus
 
-Use the section pages in the nav for the current canonical surface.
+## Setup
+
+- [Setup](setup.md) - install the CLI, prepare a device, install the Operator APK, verify readiness, and run the first snapshot
+
+## API
+
+- [Overview](api/overview.md) - execution payload, result envelope, and branching model
+- [CLI Reference](api/cli.md) - generated command and flag reference
+- [Actions](api/actions.md) - canonical action types and parameter semantics
+- [Selectors](api/selectors.md) - `NodeMatcher` contract and CLI selector mapping
+- [Snapshot Format](api/snapshot.md) - where `snapshot_ui` XML lives and how extraction works
+- [Errors](api/errors.md) - public error-code contract and recovery patterns
+- [Devices](api/devices.md) - device discovery and deterministic targeting
+- [Doctor](api/doctor.md) - doctor report contract and readiness checks
+- [Timeouts](api/timeouts.md) - execution and action timeout budgeting
+- [Environment Variables](api/environment.md) - current `CLAWPERATOR_*` and runtime environment controls
+- [Serve API](api/serve.md) - local HTTP and SSE contract
+- [Navigation Patterns](api/navigation.md) - composed navigation workflows for agents
+- [Recording Format](api/recording.md) - raw NDJSON recording schema and parsed step log
+
+## Skills
+
+- [Overview](skills/overview.md) - registry model, discovery, and wrapper execution
+- [Authoring](skills/authoring.md) - scaffolded files, artifacts, and validation
+- [Development Workflow](skills/development.md) - local iteration loop for skills
+- [Device Prep and Runtime](skills/runtime.md) - runtime environment, timeout, and output rules
+
+## Troubleshooting
+
+- [Operator App](troubleshooting/operator.md) - installation, permission, handshake, and crash recovery
+- [Known Issues](troubleshooting/known-issues.md) - currently verified known issues page
+- [Version Compatibility](troubleshooting/compatibility.md) - CLI and Operator APK version alignment
 
 ---
 
@@ -2100,9 +2131,214 @@ clawperator read-value --label "Battery" --json
 
 # Snapshot Format
 
-Placeholder - content coming in PR-2/PR-3.
+## Purpose
 
-This page will describe the snapshot output shape and parsing contract.
+Define what `snapshot_ui` returns, where the XML hierarchy is attached in the result envelope, what extraction failures look like, and what parts of the snapshot contract an agent can rely on.
+
+## Sources
+
+- Snapshot extraction: `apps/node/src/domain/executions/snapshotHelper.ts`
+- Snapshot post-processing: `apps/node/src/domain/executions/runExecution.ts`
+- Hard limits: `apps/node/src/contracts/limits.ts`
+- Snapshot builder: `apps/node/src/domain/observe/snapshot.ts`
+
+## What `snapshot_ui` Returns
+
+`snapshot_ui` is the canonical read-only UI observation action. The Android runtime writes the hierarchy dump to logcat, then the Node layer extracts the XML and attaches it to the successful step result as `data.text`.
+
+For CLI `snapshot --json`, success means:
+
+- exit code `0`
+- `envelope.status == "success"`
+- `envelope.stepResults[0].actionType == "snapshot_ui"`
+- `envelope.stepResults[0].success == true`
+- `envelope.stepResults[0].data.text` is present
+
+The default one-step builder used by `clawperator snapshot` is:
+
+```json
+{
+  "commandId": "snapshot-1700000000000-abcd123",
+  "taskId": "snapshot-1700000000000-abcd123",
+  "source": "clawperator-observe",
+  "expectedFormat": "android-ui-automator",
+  "timeoutMs": 30000,
+  "actions": [
+    {
+      "id": "snap",
+      "type": "snapshot_ui"
+    }
+  ],
+  "mode": "direct"
+}
+```
+
+## How Snapshot Data Flows
+
+The current flow is:
+
+1. Android executes `snapshot_ui`.
+2. Android writes the hierarchy dump into logcat lines that include the marker `[TaskScope] UI Hierarchy:`.
+3. Node reads those logcat lines after execution.
+4. `extractSnapshotsFromLogs()` reconstructs one or more XML documents from the log stream.
+5. `attachSnapshotsToStepResults()` walks backward through successful `snapshot_ui` steps and attaches the extracted XML as `stepResults[i].data.text`.
+6. `markExtractionFailedSnapshotSteps()` converts any still-successful snapshot step with missing `data.text` into a failed step with `data.error = "SNAPSHOT_EXTRACTION_FAILED"`.
+
+Important boundaries:
+
+- Node does not parse the XML into a typed object. It treats the hierarchy as opaque text.
+- When multiple snapshots exist in one execution, Node attaches the most recent extracted snapshot to the most recent successful `snapshot_ui` step, walking backward through both lists.
+- If no successful `snapshot_ui` steps exist, extraction output is ignored.
+
+## Envelope Placement
+
+Successful `snapshot_ui` data lives inside the step result, not in a separate top-level field:
+
+```json
+{
+  "envelope": {
+    "commandId": "snapshot-1700000000000-abcd123",
+    "taskId": "snapshot-1700000000000-abcd123",
+    "status": "success",
+    "stepResults": [
+      {
+        "id": "snap",
+        "actionType": "snapshot_ui",
+        "success": true,
+        "data": {
+          "text": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><hierarchy rotation=\"0\">...</hierarchy>"
+        }
+      }
+    ],
+    "error": null
+  },
+  "deviceId": "<device_serial>",
+  "terminalSource": "clawperator_result",
+  "isCanonicalTerminal": true
+}
+```
+
+## The XML Format
+
+Node's contract is that `data.text` contains the raw XML hierarchy string. Node does not validate individual XML attributes, but the extracted content follows Android UI Automator style hierarchy dumps with a `<hierarchy>` root and nested `<node>` elements.
+
+Typical node attributes visible in current snapshots include:
+
+| XML attribute | Meaning | Related selector field |
+| --- | --- | --- |
+| `resource-id` | Android resource id, often `package:id/name` | `resourceId` |
+| `text` | visible text | `textEquals`, `textContains` |
+| `content-desc` | accessibility label | `contentDescEquals`, `contentDescContains` |
+| `class` | widget class name such as `android.widget.TextView` | none |
+| `bounds` | screen rectangle in `"[x1,y1][x2,y2]"` form | none |
+| `package` | package name for the node | none |
+| `clickable` | `"true"` or `"false"` | none |
+| `enabled` | `"true"` or `"false"` | none |
+| `scrollable` | `"true"` or `"false"` | none |
+
+Important limits on what to infer:
+
+- `data.text` is the only Node-guaranteed snapshot field today.
+- `NodeMatcher.role` is a Clawperator selector concept documented in [Selectors](selectors.md), not a direct XML attribute.
+- A node appearing in the XML does not guarantee it is currently reachable on screen. Use `bounds`, scrolling, and follow-up actions to confirm reachability.
+
+## Realistic XML Fragment
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<hierarchy rotation="0">
+  <node
+    index="0"
+    text=""
+    resource-id="com.android.settings:id/recycler_view"
+    class="androidx.recyclerview.widget.RecyclerView"
+    package="com.android.settings"
+    content-desc=""
+    clickable="false"
+    enabled="true"
+    scrollable="true"
+    bounds="[0,884][1080,2196]">
+    <node
+      index="0"
+      text="Connected devices"
+      resource-id="android:id/title"
+      class="android.widget.TextView"
+      package="com.android.settings"
+      content-desc=""
+      clickable="false"
+      enabled="true"
+      bounds="[216,1503][661,1573]" />
+  </node>
+</hierarchy>
+```
+
+## Extraction Failure
+
+If a `snapshot_ui` step initially succeeds but Node cannot attach `data.text`, Node rewrites that step into a failure:
+
+```json
+{
+  "id": "snap",
+  "actionType": "snapshot_ui",
+  "success": false,
+  "data": {
+    "error": "SNAPSHOT_EXTRACTION_FAILED",
+    "message": "UI hierarchy extraction produced no output for this step. Check clawperator version compatibility and logcat extraction health."
+  }
+}
+```
+
+This is not just a warning. It changes the step to `success: false`, and later envelope reconciliation can change the whole execution to `status: "failed"`.
+
+Typical recovery:
+
+1. Run `clawperator version --check-compat`.
+2. Run `clawperator doctor --json`.
+3. Re-run the snapshot with `--verbose` if you need to inspect log correlation.
+
+## Settle Warning
+
+Node also adds a best-effort warning to successful snapshots when the immediately preceding action was `click` or `scroll_and_click`:
+
+```json
+{
+  "warn": "snapshot captured without a preceding sleep step; UI may not have settled - consider adding a sleep step between click and snapshot_ui"
+}
+```
+
+This warning appears only when:
+
+- the snapshot step is successful
+- Node can map the step id back to the original action order
+- the previous action in that execution was `click` or `scroll_and_click`
+
+Any intervening action such as `sleep`, `wait_for_node`, or `read_text` suppresses this warning because it may already provide settling time.
+
+## Snapshot Line Limit
+
+`LIMITS.MAX_SNAPSHOT_LINES` is `2000`.
+
+This is the current hard limit documented in `apps/node/src/contracts/limits.ts`. Treat it as the upper bound for snapshot extraction and downstream handling. If you depend on very large hierarchies, do not assume more than 2000 lines of XML will remain safe across versions.
+
+## Successful Step Example
+
+```json
+{
+  "id": "snap",
+  "actionType": "snapshot_ui",
+  "success": true,
+  "data": {
+    "text": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><hierarchy rotation=\"0\"><node index=\"0\" text=\"Settings\" resource-id=\"com.android.settings:id/action_bar\" class=\"android.widget.TextView\" package=\"com.android.settings\" content-desc=\"\" clickable=\"false\" enabled=\"true\" bounds=\"[0,0][1080,176]\" /></hierarchy>"
+  }
+}
+```
+
+## What To Rely On
+
+- rely on `stepResults[i].data.text` as the canonical snapshot payload
+- rely on `SNAPSHOT_EXTRACTION_FAILED` when text extraction failed after execution
+- treat `data.warn` as advisory only
+- use [Selectors](selectors.md) to map XML attributes into actionable selector objects
 
 ---
 
@@ -3262,17 +3498,516 @@ Recommended doctor loop:
 
 # Timeouts
 
-Placeholder - content coming in PR-2/PR-3.
+## Purpose
 
-This page will explain how Clawperator budgets execution and action-level timeouts.
+Define the timeout budgeting model for Clawperator executions: execution-level timeout, action-level timeout on wait actions, builder inflation rules, and the runtime's best-effort ceiling.
+
+## Sources
+
+- Limits: `apps/node/src/contracts/limits.ts`
+- Validation: `apps/node/src/domain/executions/validateExecution.ts`
+- Runtime enforcement: `apps/node/src/domain/executions/runExecution.ts`
+- Wait builders: `apps/node/src/domain/actions/wait.ts`, `apps/node/src/domain/actions/waitForNav.ts`
+- Snapshot builder: `apps/node/src/domain/observe/snapshot.ts`
+- Sleep builder: `apps/node/src/domain/actions/sleep.ts`
+
+## Two Timeout Levels
+
+Clawperator currently has two timeout layers that matter to agents:
+
+| Level | Field | Scope |
+| --- | --- | --- |
+| execution-level | top-level `execution.timeoutMs` | whole payload |
+| action-level | `params.timeoutMs` on some actions | one action's internal wait window |
+
+The key rule is:
+
+- the action-level timeout must fit inside the execution-level timeout
+- builder helpers intentionally inflate the execution-level timeout above the action-level wait so Node does not kill the whole run before the wait action has a chance to finish
+
+## Execution-Level Timeout
+
+The execution-level timeout is always the top-level `timeoutMs` on the execution payload.
+
+Current hard limits:
+
+- minimum: `1000`
+- maximum: `120000`
+
+Those values come from:
+
+- `LIMITS.MIN_EXECUTION_TIMEOUT_MS = 1000`
+- `LIMITS.MAX_EXECUTION_TIMEOUT_MS = 120000`
+
+If the caller provides a non-finite timeout or a value outside that range, Node returns a top-level validation failure:
+
+```json
+{
+  "code": "EXECUTION_VALIDATION_FAILED",
+  "message": "timeoutMs must be between 1000 and 120000"
+}
+```
+
+At runtime, `runExecution()` waits for the Android result envelope using:
+
+- `execution.timeoutMs + 5000`
+
+That extra `5000` milliseconds is a transport buffer for the envelope write and logcat capture. It does not change the documented execution budget. Agents should still reason from the top-level `execution.timeoutMs`.
+
+If the runtime exceeds the budget and Node never receives a valid result envelope, the caller gets a top-level `RESULT_ENVELOPE_TIMEOUT` error, not a normal success wrapper.
+
+## Action-Level Timeout
+
+Only some actions use `params.timeoutMs` today. The main public case is `wait_for_navigation`, and the flat CLI `wait` builder also carries a wait-specific timeout value in `params.timeoutMs` for `wait_for_node`.
+
+Current validated action-level rules:
+
+| Action | Field | Valid values |
+| --- | --- | --- |
+| `wait_for_navigation` | `params.timeoutMs` | required, `> 0`, `<= 30000` |
+| `wait_for_node` via builder | `params.timeoutMs` | optional in raw schema, builder sets it when `--timeout` is passed |
+
+For `wait_for_navigation`, invalid values fail validation before dispatch:
+
+```json
+{
+  "code": "EXECUTION_VALIDATION_FAILED",
+  "message": "wait_for_navigation params.timeoutMs must not exceed 30000",
+  "details": {
+    "path": "actions.0.params.timeoutMs",
+    "actionId": "wait-for-nav",
+    "actionType": "wait_for_navigation"
+  }
+}
+```
+
+Relationship between the two levels:
+
+- action-level timeout controls how long the wait action should keep waiting for its condition
+- execution-level timeout controls how long the full payload is allowed to exist
+- when the action timeout is close to or greater than the execution timeout, the execution may fail early at the envelope layer
+
+## Builder Inflation Rules
+
+The flat CLI builders intentionally inflate execution timeouts so the wait action has room to finish.
+
+### `wait_for_node`
+
+`buildWaitExecution()` uses:
+
+- default execution timeout: `30000`
+- if `waitTimeoutMs` is provided: `max(waitTimeoutMs + 5000, 30000)`
+
+So:
+
+- `clawperator wait --text "Done" --timeout 5000` becomes execution timeout `30000`
+- `clawperator wait --text "Done" --timeout 45000` becomes execution timeout `50000`
+
+### `wait_for_navigation`
+
+`buildWaitForNavExecution()` uses the same pattern:
+
+- default execution timeout: `30000`
+- if `navTimeoutMs` is provided: `max(navTimeoutMs + 5000, 30000)`
+
+So:
+
+- `clawperator wait-for-nav --app com.android.settings --timeout 5000` gets execution timeout `30000`
+- `clawperator wait-for-nav --app com.android.settings --timeout 25000` gets execution timeout `30000`
+- `clawperator wait-for-nav --app com.android.settings --timeout 30000` gets execution timeout `35000`
+
+### `sleep`
+
+`buildSleepExecution()` uses:
+
+- `max(durationMs + 5000, globalTimeoutMs ?? 0, 30000)`
+
+This is the same design principle: the whole execution must last longer than the single action's internal work.
+
+### `snapshot_ui`
+
+`buildSnapshotExecution()` defaults to `30000`. It has no separate action-level timeout field.
+
+## Best-Effort Runtime Ceiling
+
+`LIMITS.MAX_BEST_EFFORT_RUNTIME_MS` is `180000`.
+
+This limit belongs to the best-effort execution mode documented elsewhere in the codebase. It is not the same as the standard direct execution timeout range. For normal direct executions, agents should still keep top-level `timeoutMs` inside `1000..120000`.
+
+What this means operationally:
+
+- best-effort workflows may be allowed to run longer internally
+- direct execution payloads still validate against the normal execution timeout max
+- do not assume that setting `timeoutMs` above `120000` becomes valid just because best-effort runtime is higher
+
+## Concrete Budget Examples
+
+### Example 1: Simple snapshot
+
+```json
+{
+  "commandId": "snap-1",
+  "taskId": "snap-1",
+  "source": "agent",
+  "expectedFormat": "android-ui-automator",
+  "timeoutMs": 30000,
+  "actions": [
+    { "id": "snap", "type": "snapshot_ui" }
+  ]
+}
+```
+
+Good budget because:
+
+- single cheap action
+- no action-level timeout
+- default `30000` leaves room for dispatch and envelope handling
+
+### Example 2: Navigation wait
+
+```json
+{
+  "commandId": "nav-1",
+  "taskId": "nav-1",
+  "source": "agent",
+  "expectedFormat": "android-ui-automator",
+  "timeoutMs": 35000,
+  "actions": [
+    {
+      "id": "open",
+      "type": "open_app",
+      "params": {
+        "applicationId": "com.android.settings"
+      }
+    },
+    {
+      "id": "wait",
+      "type": "wait_for_navigation",
+      "params": {
+        "expectedPackage": "com.android.settings",
+        "timeoutMs": 30000
+      }
+    }
+  ]
+}
+```
+
+Why `35000` is the right budget here:
+
+- the wait action itself is allowed to wait for up to `30000`
+- the builder rule adds a `5000` cushion
+- keeping execution timeout equal to `30000` would be too tight for open-app dispatch plus navigation wait plus envelope return
+
+### Example 3: Multi-step read after click
+
+```json
+{
+  "commandId": "read-after-click",
+  "taskId": "read-after-click",
+  "source": "agent",
+  "expectedFormat": "android-ui-automator",
+  "timeoutMs": 45000,
+  "actions": [
+    {
+      "id": "click-1",
+      "type": "click",
+      "params": {
+        "matcher": { "textEquals": "Settings" }
+      }
+    },
+    {
+      "id": "sleep-1",
+      "type": "sleep",
+      "params": {
+        "durationMs": 1500
+      }
+    },
+    {
+      "id": "wait-1",
+      "type": "wait_for_node",
+      "params": {
+        "matcher": { "textEquals": "Connected devices" },
+        "timeoutMs": 10000
+      }
+    },
+    {
+      "id": "snap-1",
+      "type": "snapshot_ui"
+    }
+  ]
+}
+```
+
+Reasonable because:
+
+- the action-level wait is `10000`
+- the click and sleep consume part of the same overall budget
+- the final snapshot still needs time for extraction and envelope return
+
+## Common Mistakes
+
+### Execution timeout too close to wait timeout
+
+Bad:
+
+- `wait_for_navigation.params.timeoutMs = 30000`
+- `execution.timeoutMs = 30000`
+
+Risk:
+
+- the envelope wait can expire before the action has enough time to finish cleanly
+
+Better:
+
+- use the builder pattern: `max(actionTimeout + 5000, 30000)`
+
+### Forgetting multi-step cost
+
+A `click -> sleep -> wait -> snapshot` workflow needs more than the wait action's own timeout. Budget for the whole sequence, not just the longest single step.
+
+### Treating the `+5000` buffer as extra application time
+
+The builder cushion is there to stop the envelope layer from killing the run too early. It is not a guarantee that Android will continue useful work for exactly 5 extra seconds.
+
+### Passing out-of-range values
+
+- execution timeout above `120000` fails validation
+- `wait-for-nav --timeout` above `30000` fails validation
+- non-finite values fail validation
+
+## Practical Rules
+
+- default to `30000` for simple one-step or two-step payloads
+- for `wait_for_navigation`, set `execution.timeoutMs` to at least `actionTimeout + 5000`
+- for multi-step flows, add budget for earlier actions and the final envelope
+- if you hit `RESULT_ENVELOPE_TIMEOUT`, verify health with [Doctor](doctor.md) before only increasing the timeout
 
 ---
 
 # Environment Variables
 
-Placeholder - content coming in PR-2/PR-3.
+## Purpose
 
-This page will list the current runtime and CLI environment variables.
+Document the environment variables currently read by the Node CLI and runtime, especially the `CLAWPERATOR_*` variables used in headless automation and CI where repeating flags is impractical.
+
+## Sources
+
+- Global CLI bootstrap: `apps/node/src/cli/index.ts`
+- Runtime config: `apps/node/src/adapters/android-bridge/runtimeConfig.ts`
+- Execution and command modules: `apps/node/src/cli/commands/`, `apps/node/src/domain/executions/runExecution.ts`
+- Skills config: `apps/node/src/domain/skills/skillsConfig.ts`
+- Skills registry loader: `apps/node/src/adapters/skills-repo/localSkillsRegistry.ts`
+- Serve command fallback: `apps/node/src/cli/commands/serve.ts`
+
+## Precedence Rule
+
+Where both a CLI flag and an environment variable exist, the explicit CLI flag wins.
+
+Common examples:
+
+- `--operator-package` overrides `CLAWPERATOR_OPERATOR_PACKAGE`
+- `--log-level` overrides `CLAWPERATOR_LOG_LEVEL`
+- `skills run --timeout` overrides any default timeout behavior for that single run
+
+If no matching flag exists, the environment variable is the highest caller-controlled input for that setting.
+
+## Complete Table
+
+| Variable | What it controls | Where it is read | Default if unset |
+| --- | --- | --- | --- |
+| `CLAWPERATOR_OPERATOR_PACKAGE` | default Operator package for execution, doctor, recording, serve, and skill wrapper runs | many command modules, `runExecution.ts`, `skillsConfig.ts`, `serve.ts` | `com.clawperator.operator` |
+| `CLAWPERATOR_LOG_DIR` | structured log directory for the CLI logger | `cli/index.ts`, `adapters/logger.ts` | logger-specific default under the user home directory |
+| `CLAWPERATOR_LOG_LEVEL` | logger threshold | `cli/index.ts`, `adapters/logger.ts` | logger default level |
+| `CLAWPERATOR_SKILLS_REGISTRY` | path to the active skills registry JSON | `adapters/skills-repo/localSkillsRegistry.ts` | `skills/skills-registry.json` relative to current working directory, with one fallback when loading |
+| `CLAWPERATOR_BIN` | command used by skill scripts when the wrapper injects the CLI path | `domain/skills/skillsConfig.ts` | local sibling build if present, otherwise global `clawperator` |
+| `ADB_PATH` | adb binary path for runtime and CLI commands | device, doctor, record, operator setup, serve, and execution modules | `adb` |
+| `ANDROID_HOME` | Android SDK root for resolving emulator/sdkmanager/avdmanager binaries | `runtimeConfig.ts` | no SDK-root override |
+| `ANDROID_SDK_ROOT` | fallback Android SDK root for resolving emulator/sdkmanager/avdmanager binaries | `runtimeConfig.ts` | no SDK-root override |
+
+## `CLAWPERATOR_OPERATOR_PACKAGE`
+
+This is the main runtime default for Operator package selection.
+
+When used:
+
+- device execution commands fall back to it when `--operator-package` is omitted
+- `doctor`, `record`, `grant-device-permissions`, `operator setup`, `version --check-compat`, and `serve` all read it
+- `skills run` uses it when the caller did not pass `--operator-package`
+
+When unset:
+
+- the runtime default package is `com.clawperator.operator`
+
+When set:
+
+- every command that does not get an explicit `--operator-package` uses the environment value instead
+
+Example:
+
+```bash
+export CLAWPERATOR_OPERATOR_PACKAGE=com.clawperator.operator.dev
+clawperator snapshot --json --device <device_serial>
+```
+
+That command runs against the debug Operator package even though no `--operator-package` flag was passed.
+
+## `CLAWPERATOR_LOG_DIR`
+
+Controls where the CLI's structured logger writes log files.
+
+When unset:
+
+- the logger uses its built-in default directory under the user's home directory
+
+When set:
+
+- logs are written to the specified directory instead
+
+This variable affects logging only. It does not change device behavior or result envelopes.
+
+## `CLAWPERATOR_LOG_LEVEL`
+
+Controls the logger threshold when `--log-level` is not passed.
+
+Accepted CLI values for the corresponding flag are:
+
+- `debug`
+- `info`
+- `warn`
+- `error`
+
+If both are present:
+
+- `--log-level` wins over `CLAWPERATOR_LOG_LEVEL`
+
+## `CLAWPERATOR_SKILLS_REGISTRY`
+
+Defines the path to the active `skills-registry.json`.
+
+Used by:
+
+- `clawperator skills list`
+- `clawperator skills get`
+- `clawperator skills search`
+- `clawperator skills run`
+- `clawperator skills validate`
+- `clawperator skills compile-artifact`
+- `clawperator skills new`
+
+When unset:
+
+- `getRegistryPath()` defaults to `skills/skills-registry.json` relative to the current working directory
+- `loadRegistry()` warns and then fails if that default file does not exist
+
+When set:
+
+- Node reads the configured file directly
+- if the configured file is missing, commands fail with `REGISTRY_READ_FAILED`
+
+Example:
+
+```bash
+export CLAWPERATOR_SKILLS_REGISTRY="$HOME/.clawperator/skills/skills/skills-registry.json"
+clawperator skills list --json
+```
+
+## `CLAWPERATOR_BIN`
+
+This variable is for skill subprocesses, not for the main CLI bootstrap.
+
+`skills run` resolves a command string and injects it into the child process environment as `CLAWPERATOR_BIN`.
+
+Resolution order:
+
+1. explicit `CLAWPERATOR_BIN`
+2. local sibling build if present
+3. global `clawperator`
+
+When unset:
+
+- the wrapper prefers the local compiled CLI from the current checkout when available
+
+When set:
+
+- the skill script receives that exact command path instead
+
+This is useful when you need a skill to call a particular CLI binary during testing.
+
+## `ADB_PATH`
+
+Overrides the adb executable used by the runtime.
+
+Used by:
+
+- `devices`
+- `doctor`
+- `grant-device-permissions`
+- `operator setup`
+- `record ...`
+- `serve`
+- `runExecution()`
+
+When unset:
+
+- Node uses `adb` and relies on the process `PATH`
+
+When set:
+
+- Node uses the provided executable path or command name
+
+Example:
+
+```bash
+export ADB_PATH=/opt/android/platform-tools/adb
+clawperator devices --json
+```
+
+There is no primary CLI flag that overrides `ADB_PATH`.
+
+## `ANDROID_HOME` and `ANDROID_SDK_ROOT`
+
+These are not `CLAWPERATOR_*` variables, but the runtime reads them when resolving Android SDK tools.
+
+They affect:
+
+- `emulator`
+- `sdkmanager`
+- `avdmanager`
+
+Resolution behavior:
+
+- `runtimeConfig.ts` checks `ANDROID_HOME` first
+- if unset, it checks `ANDROID_SDK_ROOT`
+- if neither produces a usable tool path, the runtime falls back to bare command names like `emulator`, `sdkmanager`, and `avdmanager`
+
+These variables matter mainly for emulator and SDK provisioning flows, not normal device execution against an already available adb target.
+
+## Effective Defaults Summary
+
+```json
+{
+  "CLAWPERATOR_OPERATOR_PACKAGE": "com.clawperator.operator",
+  "CLAWPERATOR_BIN": "local sibling build if present, otherwise global clawperator",
+  "CLAWPERATOR_SKILLS_REGISTRY": "skills/skills-registry.json relative to cwd",
+  "ADB_PATH": "adb"
+}
+```
+
+## Interaction With CLI Flags
+
+Most common overrides:
+
+| CLI flag | Overrides |
+| --- | --- |
+| `--operator-package` | `CLAWPERATOR_OPERATOR_PACKAGE` |
+| `--log-level` | `CLAWPERATOR_LOG_LEVEL` |
+| `--device` | no environment variable equivalent |
+| `--timeout` | per-command timeout behavior, not an environment default |
+
+Practical rule:
+
+- use environment variables for workspace-wide defaults
+- use flags for per-command determinism
 
 ---
 
@@ -4054,17 +4789,658 @@ Examples of route-local validation failures:
 
 # Navigation Patterns
 
-Placeholder - content coming in PR-2/PR-3.
+## Purpose
 
-This page will cover observe, decide, act loops, scrolling patterns, and navigation recovery.
+Show how agents compose `open_app`, `open_uri`, `wait_for_navigation`, and `snapshot_ui` into deterministic navigation workflows.
+
+This page focuses on composition. For full per-action parameter rules, use [Actions](actions.md).
+
+## Sources
+
+- Builders: `apps/node/src/domain/actions/openApp.ts`, `apps/node/src/domain/actions/openUri.ts`, `apps/node/src/domain/actions/waitForNav.ts`
+- Validation: `apps/node/src/domain/executions/validateExecution.ts`
+- Shared contract: `apps/node/src/contracts/execution.ts`
+- Limits: `apps/node/src/contracts/limits.ts`
+- CLI command surface: `apps/node/src/cli/registry.ts`
+
+## Why Compose Navigation
+
+Neither `open_app` nor `open_uri` proves that the target screen is ready. In current Clawperator, deterministic navigation usually means:
+
+1. trigger navigation
+2. wait for the expected package or expected node
+3. observe the resulting screen
+
+The normal three-step shape is:
+
+- `open_app` or `open_uri`
+- `wait_for_navigation`
+- `snapshot_ui`
+
+## `open_app`
+
+`open_app` requires:
+
+- `params.applicationId`
+
+Validation rule:
+
+- blank or missing `applicationId` fails with `EXECUTION_VALIDATION_FAILED`
+
+Builder example:
+
+```json
+{
+  "commandId": "open_app_1700000000000",
+  "taskId": "cli-action-open-app",
+  "source": "clawperator-cli",
+  "timeoutMs": 15000,
+  "expectedFormat": "android-ui-automator",
+  "actions": [
+    {
+      "id": "a1",
+      "type": "open_app",
+      "params": {
+        "applicationId": "com.android.settings"
+      }
+    }
+  ]
+}
+```
+
+What to verify after `open_app`:
+
+- do not rely on the open action alone
+- follow with `wait_for_navigation` using `expectedPackage`
+- then confirm the target screen with `snapshot_ui` or another read action
+
+## `open_uri`
+
+`open_uri` requires:
+
+- `params.uri`
+
+Validation rules:
+
+- blank or missing `uri` fails
+- maximum length is `2048` characters (`LIMITS.MAX_URI_LENGTH`)
+
+Builder example:
+
+```json
+{
+  "commandId": "open_uri_1700000000000",
+  "taskId": "cli-action-open-uri",
+  "source": "clawperator-cli",
+  "timeoutMs": 15000,
+  "expectedFormat": "android-ui-automator",
+  "actions": [
+    {
+      "id": "a1",
+      "type": "open_uri",
+      "params": {
+        "uri": "https://clawperator.com"
+      }
+    }
+  ]
+}
+```
+
+What Node validates versus what it does not:
+
+- Node validates presence and max length
+- Node does not enforce a URI scheme whitelist in `validateExecution.ts`
+
+What to verify after `open_uri`:
+
+- use `wait_for_navigation` if you expect a package or visible node
+- use `snapshot_ui` to confirm the actual screen reached
+
+## `wait_for_navigation`
+
+`wait_for_navigation` is the navigation-specific confirmation step.
+
+Current public parameters:
+
+| Field | Valid values | Meaning |
+| --- | --- | --- |
+| `expectedPackage` | optional non-blank string | wait until that package is foreground |
+| `expectedNode` | optional `NodeMatcher` | wait until a target node is present |
+| `timeoutMs` | required number, `> 0`, `<= 30000` | wait window for navigation confirmation |
+
+Validation rules:
+
+- at least one of `expectedPackage` or `expectedNode` is required
+- `timeoutMs` is required
+- `timeoutMs` must be positive
+- `timeoutMs` must not exceed `30000`
+
+Builder inflation rule:
+
+- execution timeout becomes `max(timeoutMs + 5000, 30000)`
+
+Example:
+
+```json
+{
+  "id": "wait-for-nav",
+  "type": "wait_for_navigation",
+  "params": {
+    "expectedPackage": "com.android.settings",
+    "expectedNode": {
+      "textEquals": "Connected devices"
+    },
+    "timeoutMs": 5000
+  }
+}
+```
+
+CLI rule for `wait-for-nav`:
+
+- `--timeout` is required
+- at least one of `--app` or a selector is required
+
+## Common Navigation Sequence
+
+The recommended pattern for deterministic app navigation is:
+
+1. `open_app`
+2. `wait_for_navigation`
+3. `snapshot_ui`
+
+Example payload:
+
+```json
+{
+  "commandId": "settings-nav-1",
+  "taskId": "settings-nav-1",
+  "source": "agent",
+  "expectedFormat": "android-ui-automator",
+  "timeoutMs": 30000,
+  "actions": [
+    {
+      "id": "open",
+      "type": "open_app",
+      "params": {
+        "applicationId": "com.android.settings"
+      }
+    },
+    {
+      "id": "wait",
+      "type": "wait_for_navigation",
+      "params": {
+        "expectedPackage": "com.android.settings",
+        "timeoutMs": 5000
+      }
+    },
+    {
+      "id": "snap",
+      "type": "snapshot_ui"
+    }
+  ]
+}
+```
+
+Machine-checkable success conditions:
+
+- `envelope.status == "success"`
+- `stepResults[0].actionType == "open_app"` and `stepResults[0].success == true`
+- `stepResults[1].actionType == "wait_for_navigation"` and `stepResults[1].success == true`
+- `stepResults[2].actionType == "snapshot_ui"` and `stepResults[2].success == true`
+- `stepResults[2].data.text` exists
+
+## Complete JSON Example
+
+```json
+{
+  "envelope": {
+    "commandId": "settings-nav-1",
+    "taskId": "settings-nav-1",
+    "status": "success",
+    "stepResults": [
+      {
+        "id": "open",
+        "actionType": "open_app",
+        "success": true,
+        "data": {}
+      },
+      {
+        "id": "wait",
+        "actionType": "wait_for_navigation",
+        "success": true,
+        "data": {}
+      },
+      {
+        "id": "snap",
+        "actionType": "snapshot_ui",
+        "success": true,
+        "data": {
+          "text": "<hierarchy rotation=\"0\">...</hierarchy>"
+        }
+      }
+    ],
+    "error": null
+  },
+  "deviceId": "<device_serial>",
+  "terminalSource": "clawperator_result",
+  "isCanonicalTerminal": true
+}
+```
+
+## Common Failure Modes
+
+### App not installed
+
+There is no dedicated Node validation code for "target app is missing" on `open_app`. This is a runtime problem and usually surfaces as a failed step or unexpected navigation result.
+
+What to do:
+
+- inspect `stepResults[0]`
+- follow with `snapshot_ui` or `wait_for_navigation` to see where the device actually landed
+
+### Navigation timeout
+
+When `wait_for_navigation` never sees the expected package or node inside its timeout:
+
+- the wait step fails at runtime
+- the overall envelope becomes `status: "failed"`
+
+Recovery:
+
+- increase the action timeout only if the app truly needs more time
+- verify the expectation is correct
+- use [Snapshot Format](snapshot.md) or [Selectors](selectors.md) to inspect the actual screen
+
+### Wrong package on screen
+
+If `open_uri` hands off to a chooser, browser, or another app, `expectedPackage` may not match what actually reached the foreground.
+
+Recovery:
+
+- use `expectedNode` when package alone is too coarse
+- capture a snapshot and branch on the observed foreground UI
+
+## Recommended Pattern
+
+- use `open_app` or `open_uri` only as the trigger
+- use `wait_for_navigation` as the readiness gate
+- use `snapshot_ui` as the final confirmation step
+
+That three-step flow is the most reliable current navigation pattern for agents.
 
 ---
 
 # Recording Format
 
-Placeholder - content coming in PR-2/PR-3.
+## Purpose
 
-This page will document the current recording payload shape and step candidate contract.
+Document the current recording workflow, the raw NDJSON schema written by the Operator app, and the parsed step-log format produced by `clawperator record parse`.
+
+## Sources
+
+- Raw event schema: `apps/node/src/domain/recording/recordingEventTypes.ts`
+- Parser behavior: `apps/node/src/domain/recording/parseRecording.ts`
+- Pull behavior: `apps/node/src/domain/recording/pullRecording.ts`
+- CLI commands: `apps/node/src/cli/commands/record.ts`, `apps/node/src/cli/registry.ts`
+- Public error codes: `apps/node/src/contracts/errors.ts`
+
+## Recording Lifecycle
+
+The current flow is:
+
+1. `clawperator record start [--session-id <id>]`
+2. interact with the device
+3. `clawperator record stop [--session-id <id>]`
+4. `clawperator record pull [--session-id <id>] [--out <dir>]`
+5. `clawperator record parse --input <file> [--out <file>]`
+
+Notes:
+
+- `record` is a top-level alias for `recording`
+- `pull` defaults to `./recordings/` when `--out` is omitted
+- `parse` writes `<input>.steps.json` when `--out` is omitted
+
+## CLI Commands
+
+### Start
+
+```bash
+clawperator record start [--session-id <id>] [--device <serial>] [--operator-package <pkg>]
+```
+
+Current builder payload:
+
+```json
+{
+  "commandId": "start_recording_1700000000000",
+  "taskId": "cli-record-start",
+  "source": "clawperator-cli",
+  "timeoutMs": 10000,
+  "expectedFormat": "android-ui-automator",
+  "actions": [
+    {
+      "id": "a1",
+      "type": "start_recording",
+      "params": {
+        "sessionId": "optional-session-id"
+      }
+    }
+  ]
+}
+```
+
+### Stop
+
+```bash
+clawperator record stop [--session-id <id>] [--device <serial>] [--operator-package <pkg>]
+```
+
+Current builder payload:
+
+```json
+{
+  "commandId": "stop_recording_1700000000000",
+  "taskId": "cli-record-stop",
+  "source": "clawperator-cli",
+  "timeoutMs": 15000,
+  "expectedFormat": "android-ui-automator",
+  "actions": [
+    {
+      "id": "a1",
+      "type": "stop_recording",
+      "params": {
+        "sessionId": "optional-session-id"
+      }
+    }
+  ]
+}
+```
+
+### Pull
+
+```bash
+clawperator record pull [--session-id <id>] [--out <dir>] [--device <serial>] [--operator-package <pkg>]
+```
+
+Successful response shape:
+
+```json
+{
+  "ok": true,
+  "localPath": "./recordings/demo-session.ndjson",
+  "sessionId": "demo-session"
+}
+```
+
+### Parse
+
+```bash
+clawperator record parse --input <file> [--out <file>]
+```
+
+Successful response shape:
+
+```json
+{
+  "ok": true,
+  "outputFile": "./recordings/demo-session.steps.json",
+  "stepCount": 2,
+  "warnings": [
+    "seq 3: scroll event dropped (not extracted in v1)"
+  ]
+}
+```
+
+## NDJSON Format
+
+A recording file is newline-delimited JSON with:
+
+1. one header line
+2. zero or more event lines
+
+The first non-empty line must be a `recording_header`.
+
+### Header Line
+
+Current header schema:
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `type` | `"recording_header"` | fixed discriminator |
+| `schemaVersion` | `number` | current parser supports only `1` |
+| `sessionId` | `string` | recording id |
+| `startedAt` | `number` | epoch milliseconds |
+| `operatorPackage` | `string` | Operator package that produced the recording |
+
+Example:
+
+```json
+{"type":"recording_header","schemaVersion":1,"sessionId":"demo-session","startedAt":1710000000000,"operatorPackage":"com.clawperator.operator.dev"}
+```
+
+### Event Types
+
+Current raw event union:
+
+- `window_change`
+- `click`
+- `scroll`
+- `press_key`
+- `text_change`
+
+Every event must include:
+
+- `ts`
+- `seq`
+- `type`
+
+### `window_change`
+
+| Field | Type |
+| --- | --- |
+| `ts` | `number` |
+| `seq` | `number` |
+| `type` | `"window_change"` |
+| `packageName` | `string` |
+| `className` | `string \| null` |
+| `title` | `string \| null` |
+| `snapshot` | `string \| null \| undefined` |
+
+Example:
+
+```json
+{"ts":1710000000000,"seq":0,"type":"window_change","packageName":"com.android.settings","className":"com.android.settings.Settings","title":"Settings","snapshot":"<hierarchy .../>"}
+```
+
+### `click`
+
+| Field | Type |
+| --- | --- |
+| `ts` | `number` |
+| `seq` | `number` |
+| `type` | `"click"` |
+| `packageName` | `string` |
+| `resourceId` | `string \| null` |
+| `text` | `string \| null` |
+| `contentDesc` | `string \| null` |
+| `bounds.left` | `number` |
+| `bounds.top` | `number` |
+| `bounds.right` | `number` |
+| `bounds.bottom` | `number` |
+| `snapshot` | `string \| null \| undefined` |
+
+Example:
+
+```json
+{"ts":1710000000800,"seq":1,"type":"click","packageName":"com.android.settings","resourceId":"android:id/title","text":"Connected devices","contentDesc":null,"bounds":{"left":216,"top":1503,"right":661,"bottom":1573},"snapshot":"<hierarchy .../>"}
+```
+
+### `scroll`
+
+| Field | Type |
+| --- | --- |
+| `ts` | `number` |
+| `seq` | `number` |
+| `type` | `"scroll"` |
+| `packageName` | `string` |
+| `resourceId` | `string \| null` |
+| `scrollX` | `number` |
+| `scrollY` | `number` |
+| `maxScrollX` | `number` |
+| `maxScrollY` | `number` |
+| `snapshot` | `string \| null \| undefined` |
+
+### `press_key`
+
+| Field | Type |
+| --- | --- |
+| `ts` | `number` |
+| `seq` | `number` |
+| `type` | `"press_key"` |
+| `key` | `"back"` |
+| `snapshot` | `string \| null \| undefined` |
+
+Important:
+
+- the current schema only allows `key: "back"`
+
+### `text_change`
+
+| Field | Type |
+| --- | --- |
+| `ts` | `number` |
+| `seq` | `number` |
+| `type` | `"text_change"` |
+| `packageName` | `string` |
+| `resourceId` | `string \| null` |
+| `text` | `string` |
+| `snapshot` | `string \| null \| undefined` |
+
+## Parse Output Shape
+
+`record parse` does not replay the whole NDJSON one-to-one. It normalizes it into a smaller step log:
+
+```json
+{
+  "sessionId": "demo-session",
+  "schemaVersion": 1,
+  "steps": [
+    {
+      "seq": 0,
+      "type": "open_app",
+      "packageName": "com.android.settings",
+      "uiStateBefore": "<hierarchy .../>"
+    },
+    {
+      "seq": 1,
+      "type": "click",
+      "packageName": "com.android.settings",
+      "resourceId": "android:id/title",
+      "text": "Connected devices",
+      "contentDesc": null,
+      "bounds": {
+        "left": 216,
+        "top": 1503,
+        "right": 661,
+        "bottom": 1573
+      },
+      "uiStateBefore": "<hierarchy .../>"
+    }
+  ],
+  "_warnings": [
+    "seq 3: scroll event dropped (not extracted in v1)"
+  ]
+}
+```
+
+Current parsed step types:
+
+- `open_app`
+- `click`
+
+Current normalization rules in `parseRecording.ts`:
+
+- the first `window_change` becomes one `open_app` step
+- every `click` becomes one `click` step
+- `scroll` events are dropped and produce warnings
+- `text_change` events are dropped silently
+- `press_key` events are dropped silently, but they do affect subsequent `window_change` handling
+
+## Parser Warnings
+
+The parser currently emits warnings for:
+
+- `window_change` or `click` events missing `snapshot`
+- dropped `scroll` events
+
+Warnings are written into `_warnings` in the parsed step log and also surfaced by `record parse` in its success wrapper when present.
+
+## Pull Semantics
+
+`pullRecording()` determines the session id like this:
+
+1. use `--session-id` if provided
+2. otherwise read `/sdcard/Android/data/<operatorPackage>/files/recordings/latest`
+
+Session ids are accepted only if they match:
+
+```text
+^[a-zA-Z0-9_-]+$
+```
+
+The pulled file path is:
+
+```text
+/sdcard/Android/data/<operatorPackage>/files/recordings/<sessionId>.ndjson
+```
+
+## Error Codes
+
+Only document codes that exist in `apps/node/src/contracts/errors.ts`.
+
+| Code | When it happens |
+| --- | --- |
+| `RECORDING_ALREADY_IN_PROGRESS` | runtime rejected `record start` because a session is already active |
+| `RECORDING_NOT_IN_PROGRESS` | runtime rejected `record stop` because no session is active |
+| `RECORDING_SESSION_NOT_FOUND` | `record pull` could not resolve a session id or the provided id was invalid |
+| `RECORDING_PULL_FAILED` | adb pull failed |
+| `RECORDING_PARSE_FAILED` | malformed file, invalid header, bad event fields, bad NDJSON, or unknown event type |
+| `RECORDING_SCHEMA_VERSION_UNSUPPORTED` | header schema version was not `1` |
+
+## Common Failure Modes
+
+### `RECORDING_SESSION_NOT_FOUND`
+
+Typical causes:
+
+- no `latest` file on device
+- invalid `--session-id` characters
+- trying to pull before a recording was started
+
+### `RECORDING_PARSE_FAILED`
+
+Typical causes:
+
+- empty file
+- missing header
+- malformed JSON on any line
+- event object missing required fields
+- unsupported event `type`
+
+### `RECORDING_SCHEMA_VERSION_UNSUPPORTED`
+
+The parser is strict:
+
+- only `schemaVersion: 1` is accepted
+
+Agents should branch on this code and stop rather than trying to guess how to parse a newer schema.
+
+## What Agents Should Rely On
+
+- raw recording files are NDJSON, header first
+- `record parse` currently extracts only `open_app` and `click` steps
+- warnings are significant because they explain dropped or degraded data
+- use parsed output as a deterministic summary, not as a promise that every raw event was preserved
 
 ---
 
@@ -4072,33 +5448,890 @@ This page will document the current recording payload shape and step candidate c
 
 # Skills Overview
 
-Placeholder - content coming in PR-2/PR-3.
+## Purpose
 
-This page will define skill, Clawperator, and agent roles at a high level.
+Explain what Clawperator skills are, how the registry model works, how skills are discovered, and what the `skills run` wrapper actually does.
+
+## Sources
+
+- Registry contract: `apps/node/src/contracts/skills.ts`
+- Registry loading: `apps/node/src/adapters/skills-repo/localSkillsRegistry.ts`
+- Runtime wrapper: `apps/node/src/domain/skills/runSkill.ts`
+- Listing and search: `apps/node/src/domain/skills/listSkills.ts`, `apps/node/src/domain/skills/searchSkills.ts`
+- CLI surface: `apps/node/src/cli/commands/skills.ts`, `apps/node/src/cli/registry.ts`
+- Serve API wrapper: `apps/node/src/cli/commands/serve.ts`
+
+## What Skills Are
+
+Skills are deterministic wrappers around repeatable workflows.
+
+Current role split:
+
+- Clawperator is the execution substrate
+- a skill defines a reusable wrapper or artifact
+- the agent decides when to invoke the skill and how to interpret the result
+
+Skills are registry-driven. They are not discovered by folder scanning alone.
+
+## Skill Structure
+
+The registry contract for one skill is:
+
+```json
+{
+  "id": "com.android.settings.capture-overview",
+  "applicationId": "com.android.settings",
+  "intent": "capture-overview",
+  "summary": "Capture a Settings overview snapshot",
+  "path": "skills/com.android.settings.capture-overview",
+  "skillFile": "skills/com.android.settings.capture-overview/SKILL.md",
+  "scripts": [
+    "skills/com.android.settings.capture-overview/scripts/run.js",
+    "skills/com.android.settings.capture-overview/scripts/run.sh"
+  ],
+  "artifacts": [
+    "skills/com.android.settings.capture-overview/artifacts/overview.recipe.json"
+  ]
+}
+```
+
+Meaning of the fields:
+
+| Field | Meaning |
+| --- | --- |
+| `id` | canonical registry id |
+| `applicationId` | app package the skill is primarily associated with |
+| `intent` | short intent name derived from the id |
+| `summary` | one-line description |
+| `path` | skill directory relative to the skills repo root |
+| `skillFile` | `SKILL.md` path |
+| `scripts` | runnable script paths |
+| `artifacts` | deterministic recipe payload files |
+
+## Registry
+
+The registry file is a JSON object with:
+
+```json
+{
+  "schemaVersion": "optional string",
+  "generatedAt": "optional string",
+  "skills": [
+    {
+      "id": "com.android.settings.capture-overview",
+      "applicationId": "com.android.settings",
+      "intent": "capture-overview",
+      "summary": "Capture a Settings overview snapshot",
+      "path": "skills/com.android.settings.capture-overview",
+      "skillFile": "skills/com.android.settings.capture-overview/SKILL.md",
+      "scripts": [
+        "skills/com.android.settings.capture-overview/scripts/run.js"
+      ],
+      "artifacts": []
+    }
+  ]
+}
+```
+
+Registry resolution:
+
+- if `CLAWPERATOR_SKILLS_REGISTRY` is set, Node uses that path
+- otherwise it defaults to `skills/skills-registry.json` relative to the current working directory
+
+## Discovery
+
+Current discovery commands:
+
+```bash
+clawperator skills list
+clawperator skills search --app <package_id>
+clawperator skills search --intent <intent>
+clawperator skills search --keyword <text>
+clawperator skills get <skill_id>
+```
+
+### `skills list`
+
+Success response:
+
+```json
+{
+  "skills": [
+    {
+      "id": "com.android.settings.capture-overview",
+      "applicationId": "com.android.settings",
+      "intent": "capture-overview",
+      "summary": "Capture a Settings overview snapshot",
+      "path": "skills/com.android.settings.capture-overview",
+      "skillFile": "skills/com.android.settings.capture-overview/SKILL.md",
+      "scripts": [
+        "skills/com.android.settings.capture-overview/scripts/run.js"
+      ],
+      "artifacts": []
+    }
+  ],
+  "count": 1
+}
+```
+
+### `skills search`
+
+Search filters are exact for `--app` and `--intent`, and case-insensitive substring matching for `--keyword` against:
+
+- `id`
+- `summary`
+- `applicationId`
+
+## Execution
+
+Current execution command:
+
+```bash
+clawperator skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--json] [-- <extra_args>]
+```
+
+What the wrapper does:
+
+1. resolves the CLI binary and operator package environment for the child process
+2. validates the skill with `--dry-run` unless `--skip-validate` is passed
+3. loads the registry entry
+4. chooses a script, preferring `.js` over `.sh`
+5. spawns the script
+6. captures stdout and stderr
+7. enforces a timeout
+
+Argument passing rules:
+
+- if `--device` was provided, the wrapper prepends that device id as the first script argument
+- arguments after `--` are forwarded to the script unchanged
+- `CLAWPERATOR_BIN` and `CLAWPERATOR_OPERATOR_PACKAGE` are injected into the script environment
+
+Default timeout:
+
+- `120000` milliseconds
+
+## `skills run` Success Shape
+
+```json
+{
+  "skillId": "com.android.settings.capture-overview",
+  "output": "RESULT|status=success|snapshot=/tmp/settings.xml\n",
+  "exitCode": 0,
+  "durationMs": 15842,
+  "timeoutMs": 120000
+}
+```
+
+Important:
+
+- `output` is raw stdout from the script
+- the wrapper does not impose a structured stdout format on the skill itself
+
+## `skills run` Failure Shape
+
+```json
+{
+  "code": "SKILL_EXECUTION_FAILED",
+  "message": "Skill com.android.settings.capture-overview exited with code 2",
+  "skillId": "com.android.settings.capture-overview",
+  "exitCode": 2,
+  "stdout": "RESULT|status=partial|snapshot=/tmp/settings.xml\n",
+  "stderr": "Timed out waiting for expected node\n",
+  "timeoutMs": 120000
+}
+```
+
+## Serve API Context
+
+The local HTTP server exposes:
+
+- `GET /skills`
+- `GET /skills/:skillId`
+- `POST /skills/:skillId/run`
+
+The serve wrapper uses the same underlying registry and `runSkill()` runtime, with route-local request validation layered on top.
+
+## Error Codes
+
+The skills contract defines its own stable codes in `apps/node/src/contracts/skills.ts`.
+
+Common ones:
+
+| Code | Meaning |
+| --- | --- |
+| `REGISTRY_READ_FAILED` | registry file missing, unreadable, or invalid |
+| `SKILL_NOT_FOUND` | requested id is not in the registry |
+| `SKILL_SCRIPT_NOT_FOUND` | registry exists but the chosen script file does not |
+| `SKILL_EXECUTION_FAILED` | subprocess exited non-zero or failed to spawn |
+| `SKILL_EXECUTION_TIMEOUT` | wrapper timeout elapsed |
+| `SKILL_OUTPUT_ASSERTION_FAILED` | `--expect-contains` was set and the output did not contain the text |
+
+## Practical Model
+
+- use `skills list`, `skills search`, and `skills get` to discover what is available
+- use `skills run` when you want the wrapper's validation, timeout, and env injection
+- use skill output as deterministic wrapper output, not as autonomous reasoning
 
 ---
 
-# Skill Authoring
+# Authoring
 
-Placeholder - content coming in PR-2/PR-3.
+## Purpose
 
-This page will cover skill structure, recording conversion, and blocked terms policy.
+Document the current authoring contract for local skills: scaffolded files, `SKILL.md`, run scripts, artifact compilation, and validation.
+
+## Sources
+
+- Scaffold implementation: `apps/node/src/domain/skills/scaffoldSkill.ts`
+- Artifact compilation: `apps/node/src/domain/skills/compileArtifact.ts`
+- Validation: `apps/node/src/domain/skills/validateSkill.ts`
+- Runtime invocation: `apps/node/src/domain/skills/runSkill.ts`
+- Runtime env resolution: `apps/node/src/domain/skills/skillsConfig.ts`
+- CLI surface: `apps/node/src/cli/commands/skills.ts`
+
+## What A New Skill Contains
+
+`clawperator skills new <skill_id>` creates:
+
+- `SKILL.md`
+- `skill.json`
+- `scripts/run.js`
+- `scripts/run.sh`
+
+and appends a new entry to the active skills registry.
+
+## Skill ID Rules
+
+The scaffold command requires `skill_id` to contain at least one dot.
+
+Why:
+
+- the scaffold derives `applicationId` from everything before the final dot
+- it derives `intent` from everything after the final dot
+
+Example:
+
+| Skill id | Derived `applicationId` | Derived `intent` |
+| --- | --- | --- |
+| `com.android.settings.capture-overview` | `com.android.settings` | `capture-overview` |
+
+If the id has no dot, scaffolding fails with `SKILL_ID_INVALID`.
+
+## `SKILL.md` Format
+
+The current scaffold writes `SKILL.md` with YAML frontmatter:
+
+```markdown
+---
+name: com.android.settings.capture-overview
+description: |-
+  Capture a Settings overview snapshot
+---
+
+Starter scaffold for `com.android.settings.capture-overview`.
+```
+
+Current reality:
+
+- the scaffold always writes `name` and `description`
+- the validator does not currently parse the internals of `SKILL.md`
+- validation only checks that the file exists at the path referenced by the registry
+
+So the minimum current contract is:
+
+- `SKILL.md` exists
+- the registry entry points to it correctly
+
+The scaffold's usage section is a starting point, not a machine-enforced schema.
+
+## `skill.json` Contract
+
+`skill.json` is stricter than `SKILL.md`. Validation compares its parsed fields against the registry entry.
+
+Important current rule:
+
+- `skill.json` metadata must match the registry entry exactly for these fields:
+  - `id`
+  - `applicationId`
+  - `intent`
+  - `summary`
+  - `path`
+  - `skillFile`
+  - `scripts`
+  - `artifacts`
+
+If any of those differ, validation fails with `SKILL_VALIDATION_FAILED`.
+
+## Run Script Contract
+
+Current runtime rules from `runSkill.ts`:
+
+- the wrapper loads the registry entry
+- it chooses the first `.js` script if present
+- otherwise it chooses the first `.sh` script
+- if neither exists, it uses the first script entry
+
+Invocation rules:
+
+- `.js` scripts are run with `process.execPath`
+- other scripts are spawned directly
+- stdout and stderr are captured separately
+- success requires subprocess exit code `0`
+
+The scaffolded `run.js` contract is:
+
+```text
+node run.js <device_id> [operator_package]
+```
+
+The scaffolded `run.sh` just forwards to `run.js`.
+
+Current wrapper expectations:
+
+- device id is passed as the first positional arg when the caller used `skills run --device ...`
+- `CLAWPERATOR_BIN` is available in the environment
+- `CLAWPERATOR_OPERATOR_PACKAGE` is available in the environment
+
+There are no special stdout markers enforced by `runSkill.ts`. Any stdout contract beyond "raw output string" is skill-defined.
+
+## Artifact Compilation
+
+Current compile command:
+
+```bash
+clawperator skills compile-artifact <skill_id> --artifact <name> [--vars <json>]
+```
+
+What `compileArtifact()` does:
+
+1. load the registry
+2. find the skill
+3. resolve the artifact path
+4. parse `--vars` JSON into string values
+5. add deterministic `COMMAND_ID` and `TASK_ID` if they were not supplied
+6. substitute `{{VAR}}` placeholders in the artifact template
+7. parse the result as JSON
+8. validate it as an execution payload
+9. set `execution.mode = "artifact_compiled"`
+
+Placeholder rules:
+
+- every placeholder must have a non-empty value
+- values are JSON-escaped before substitution
+- missing vars fail with `COMPILE_VAR_MISSING`
+
+Deterministic id rule:
+
+- if `COMMAND_ID` and `TASK_ID` are absent, the compiler derives them from a sha256 hash of `skillId`, normalized artifact name, and sorted vars
+
+Compile success example:
+
+```json
+{
+  "execution": {
+    "commandId": "cmd-1a2b3c4d5e6f",
+    "taskId": "task-1a2b3c4d5e6f",
+    "source": "com.android.settings.capture-overview",
+    "expectedFormat": "android-ui-automator",
+    "timeoutMs": 30000,
+    "actions": [
+      {
+        "id": "snap",
+        "type": "snapshot_ui"
+      }
+    ],
+    "mode": "artifact_compiled"
+  }
+}
+```
+
+## Validation
+
+Current validation commands:
+
+```bash
+clawperator skills validate <skill_id> [--dry-run]
+clawperator skills validate --all [--dry-run]
+```
+
+Validation checks:
+
+- registry entry exists
+- `skill.json` exists
+- `SKILL.md` exists
+- every listed script exists
+- every listed artifact exists
+- parsed `skill.json` matches the registry entry
+
+With `--dry-run`:
+
+- if artifacts exist, each artifact is parsed and validated as an execution payload
+- if no artifacts exist, dry-run returns success with `payloadValidation: "skipped"`
+
+Dry-run skipped example:
+
+```json
+{
+  "valid": true,
+  "dryRun": {
+    "payloadValidation": "skipped",
+    "reason": "skill has no pre-compiled artifacts; payload is generated at runtime by the skill script"
+  }
+}
+```
+
+## Scaffolding
+
+Create a new skill:
+
+```bash
+clawperator skills new com.example.app.do-thing --summary "Do one deterministic workflow"
+```
+
+Success response shape:
+
+```json
+{
+  "created": true,
+  "skillId": "com.example.app.do-thing",
+  "registryPath": "/path/to/skills-registry.json",
+  "skillPath": "/path/to/skills/com.example.app.do-thing",
+  "files": [
+    "/path/to/skills/com.example.app.do-thing/SKILL.md",
+    "/path/to/skills/com.example.app.do-thing/skill.json",
+    "/path/to/skills/com.example.app.do-thing/scripts/run.js",
+    "/path/to/skills/com.example.app.do-thing/scripts/run.sh"
+  ]
+}
+```
+
+## Blocked Terms
+
+Repository policy reserves the local blocked-terms file at:
+
+```text
+~/.clawperator/blocked-terms.txt
+```
+
+Important boundary:
+
+- this path is part of the repo's safety guidance and related skills docs
+- the current `apps/node/src/domain/skills/*` implementation does not read or enforce blocked terms during `skills run`, `skills validate`, or `skills new`
+
+So for authoring:
+
+- treat blocked terms as local Git hygiene
+- do not assume the Node skill runtime will reject sensitive strings automatically
+
+## Practical Authoring Rules
+
+- keep `skill.json` and the registry in sync
+- let `skills validate --dry-run` prove artifact payloads
+- use `skills compile-artifact` when a workflow should compile into deterministic execution JSON
+- treat `SKILL.md` as required documentation, but do not overstate its current machine enforcement
 
 ---
 
 # Development Workflow
 
-Placeholder - content coming in PR-2/PR-3.
+## Purpose
 
-This page will cover local iteration, validation, and packaging steps.
+Show the current local iteration loop for skills: scaffold, edit, validate, run, and sync.
+
+## Sources
+
+- CLI skill commands: `apps/node/src/cli/commands/skills.ts`, `apps/node/src/cli/registry.ts`
+- Runtime wrapper: `apps/node/src/domain/skills/runSkill.ts`
+- Validation: `apps/node/src/domain/skills/validateSkill.ts`
+- Registry resolution: `apps/node/src/domain/skills/skillsConfig.ts`, `apps/node/src/adapters/skills-repo/localSkillsRegistry.ts`
+- Serve API skill endpoint: `apps/node/src/cli/commands/serve.ts`
+
+## Local Development Flow
+
+Recommended current loop:
+
+1. scaffold the skill
+2. edit `skill.json`, `SKILL.md`, scripts, and any artifacts
+3. validate the skill
+4. run the skill locally on a chosen device
+5. tighten assertions or artifact payloads
+6. sync the local skills repo if you need a different upstream ref
+
+## Step 1: Scaffold
+
+```bash
+clawperator skills new com.example.app.do-thing --summary "Do one deterministic workflow"
+```
+
+This gives you:
+
+- registry entry
+- `SKILL.md`
+- `skill.json`
+- `scripts/run.js`
+- `scripts/run.sh`
+
+## Step 2: Validate Structure
+
+Single skill:
+
+```bash
+clawperator skills validate com.example.app.do-thing --dry-run
+```
+
+All skills:
+
+```bash
+clawperator skills validate --all --dry-run
+```
+
+Why `--dry-run` matters:
+
+- it validates artifact payload JSON against the execution schema when artifacts exist
+- it catches missing files and metadata mismatches before device execution
+
+## Step 3: Run Locally
+
+Use explicit device targeting when more than one device is connected:
+
+```bash
+clawperator skills run com.example.app.do-thing --device <device_serial> --operator-package com.clawperator.operator.dev --timeout 90000 --json
+```
+
+Argument rules:
+
+- `--device <serial>` becomes the first positional script argument
+- arguments after `--` are forwarded unchanged to the script
+
+Example with forwarded args:
+
+```bash
+clawperator skills run com.example.app.do-thing --device <device_serial> -- --mode smoke --limit 3
+```
+
+## Step 4: Verify Output
+
+Current wrapper success data:
+
+```json
+{
+  "skillId": "com.example.app.do-thing",
+  "output": "RESULT|status=success\n",
+  "exitCode": 0,
+  "durationMs": 8421
+}
+```
+
+Current wrapper failure data can include partial output:
+
+```json
+{
+  "code": "SKILL_EXECUTION_FAILED",
+  "message": "Skill com.example.app.do-thing exited with code 1",
+  "stdout": "RESULT|status=partial\n",
+  "stderr": "Expected node not found\n"
+}
+```
+
+During development, inspect:
+
+- `output`
+- `stdout`
+- `stderr`
+- wrapper timeout
+- the actual device state after the run
+
+## `--expect-contains`
+
+For lightweight output assertions:
+
+```bash
+clawperator skills run com.example.app.do-thing --device <device_serial> --expect-contains RESULT
+```
+
+Behavior:
+
+- the wrapper still runs the full skill
+- after success, it checks whether stdout contains the expected substring
+- if not, it fails with `SKILL_OUTPUT_ASSERTION_FAILED`
+
+This is useful for smoke checks in CI or local iteration when the script emits stable markers.
+
+## HTTP Testing Pattern
+
+When using `clawperator serve`, the matching route is:
+
+```http
+POST /skills/:skillId/run
+```
+
+Request body:
+
+```json
+{
+  "deviceId": "<device_serial>",
+  "args": ["--mode", "smoke"],
+  "timeoutMs": 90000,
+  "expectContains": "RESULT"
+}
+```
+
+This is useful for local HTTP-based tests of the same wrapper contract.
+
+## Skill Sync
+
+Current sync commands:
+
+```bash
+clawperator skills install
+clawperator skills update [--ref <git-ref>]
+clawperator skills sync --ref <git-ref>
+```
+
+Behavior:
+
+- `skills install` syncs `main`
+- `skills update` syncs the given ref or defaults to `main`
+- `skills sync --ref ...` pins the local skills repo to a specific git ref
+
+Success response includes whether sync occurred and the registry path.
+
+## Common Development Issues
+
+### `REGISTRY_READ_FAILED`
+
+Cause:
+
+- `CLAWPERATOR_SKILLS_REGISTRY` missing or wrong
+- registry file does not exist
+
+Fix:
+
+- set the env var to the correct registry
+- or run `clawperator skills install`
+
+### `SKILL_SCRIPT_NOT_FOUND`
+
+Cause:
+
+- registry entry points to a script that does not exist
+
+Fix:
+
+- update `skill.json` and the registry entry together
+- rerun `skills validate`
+
+### `SKILL_VALIDATION_FAILED`
+
+Cause:
+
+- missing files
+- `skill.json` does not match the registry
+- artifact payload violates execution schema in `--dry-run`
+
+Fix:
+
+- inspect the returned `details`
+- correct metadata or payload shape
+
+### `SKILL_EXECUTION_TIMEOUT`
+
+Cause:
+
+- wrapper hit the timeout before the child exited
+
+Fix:
+
+- increase `--timeout` only if the workflow really needs it
+- otherwise inspect whether the skill is hanging on an invalid selector or external state
+
+## Recommended Local Loop
+
+```bash
+clawperator skills new com.example.app.do-thing --summary "Describe it"
+clawperator skills validate com.example.app.do-thing --dry-run
+clawperator skills run com.example.app.do-thing --device <device_serial> --operator-package com.clawperator.operator.dev --json
+```
+
+Repeat until:
+
+- validation passes
+- wrapper exits `0`
+- output contains the signals your agent will actually consume
 
 ---
 
 # Device Prep and Runtime
 
-Placeholder - content coming in PR-2/PR-3.
+## Purpose
 
-This page will cover setup details that affect skill execution on Android devices.
+Define what must be true before a skill run is reliable: device readiness, wrapper environment, timeout behavior, multi-device targeting, and output capture.
+
+## Sources
+
+- Skill runtime: `apps/node/src/domain/skills/runSkill.ts`
+- Skill config: `apps/node/src/domain/skills/skillsConfig.ts`
+- CLI skill wrapper: `apps/node/src/cli/commands/skills.ts`
+
+## Device Prep Checklist
+
+Before `clawperator skills run`, the target should already satisfy the normal Clawperator readiness path:
+
+1. device visible to adb
+2. expected Operator package installed
+3. accessibility service running
+4. version compatibility healthy
+
+Recommended verification:
+
+```bash
+clawperator doctor --json --device <device_serial> --operator-package com.clawperator.operator.dev
+```
+
+Treat the device as ready only when:
+
+- exit code `0`
+- `criticalOk == true`
+
+For first-time setup, use [Setup](../setup.md). For runtime recovery, use [Operator App](../troubleshooting/operator.md).
+
+## Runtime Environment Passed To Skill Scripts
+
+The wrapper injects these environment variables:
+
+| Variable | Meaning |
+| --- | --- |
+| `CLAWPERATOR_BIN` | command the skill should use when it needs to invoke Clawperator |
+| `CLAWPERATOR_OPERATOR_PACKAGE` | Operator package the skill should target on its internal CLI calls |
+
+Resolution behavior:
+
+- `CLAWPERATOR_BIN` uses explicit env override first, then a local sibling build, then global `clawperator`
+- `CLAWPERATOR_OPERATOR_PACKAGE` uses the explicit wrapper flag first, then environment, then `com.clawperator.operator`
+
+The wrapper also preserves the rest of `process.env` when spawning the child process.
+
+## How Device Id Is Passed
+
+`runSkill()` itself does not invent a device id. The CLI wrapper decides argument passing.
+
+Current `skills run` behavior:
+
+- if `--device <serial>` is present, the wrapper prepends that serial as the first child argument
+- then it appends any forwarded args after `--`
+
+That means most scripts should expect:
+
+```text
+argv[2] = <device_serial>
+```
+
+when they are run through the wrapper with explicit device targeting.
+
+## Timeout Behavior
+
+Default skill timeout:
+
+- `120000` milliseconds
+
+This comes from `runSkill.ts` and applies to the subprocess wrapper, not to any single Clawperator action inside the skill.
+
+Override it with:
+
+```bash
+clawperator skills run <skill_id> --timeout 90000
+```
+
+If the child does not exit in time:
+
+- the wrapper sends `SIGTERM`
+- the command fails with `SKILL_EXECUTION_TIMEOUT`
+
+## Multi-Device Skill Execution
+
+When more than one device is connected:
+
+- always pass `--device <serial>`
+
+Example:
+
+```bash
+clawperator skills run com.android.settings.capture-overview --device <device_serial> --operator-package com.clawperator.operator.dev
+```
+
+Why:
+
+- the wrapper forwards the selected device id into the child script
+- the child script can then pass that same serial into its internal Clawperator calls
+
+Without explicit targeting, skill behavior depends on what the script itself does. The wrapper does not auto-add a device argument unless one was provided.
+
+## Output and Logging
+
+`runSkill()` captures:
+
+- stdout
+- stderr
+- exit code
+- total duration
+
+Success wrapper fields:
+
+| Field | Meaning |
+| --- | --- |
+| `skillId` | invoked registry id |
+| `output` | raw stdout |
+| `exitCode` | child exit code |
+| `durationMs` | total wrapper runtime |
+
+Failure wrapper fields may also include:
+
+| Field | Meaning |
+| --- | --- |
+| `stdout` | partial stdout captured before failure |
+| `stderr` | partial stderr captured before failure |
+| `exitCode` | non-zero child exit code when available |
+
+In pretty mode, the CLI also prints a one-line banner with:
+
+- CLI version
+- APK status
+- log path
+- docs hint
+
+That banner is a convenience layer from `cmdSkillsRun()`, not part of the JSON wrapper contract.
+
+## Runtime Success Example
+
+```json
+{
+  "skillId": "com.android.settings.capture-overview",
+  "output": "RESULT|status=success|snapshot=/tmp/settings.xml\n",
+  "exitCode": 0,
+  "durationMs": 15321,
+  "timeoutMs": 120000
+}
+```
+
+## Runtime Failure Example
+
+```json
+{
+  "code": "SKILL_EXECUTION_TIMEOUT",
+  "message": "Skill com.android.settings.capture-overview timed out after 120000ms",
+  "skillId": "com.android.settings.capture-overview",
+  "stdout": "RESULT|status=partial\n",
+  "stderr": "still waiting for target node\n",
+  "timeoutMs": 120000
+}
+```
+
+## Practical Runtime Rules
+
+- gate device readiness with `doctor` before blaming the skill
+- pass `--device` explicitly in multi-device environments
+- pass `--operator-package com.clawperator.operator.dev` for local debug APK workflows
+- inspect partial stdout and stderr on failures before rerunning blindly
 
 ---
 
@@ -4106,24 +6339,412 @@ This page will cover setup details that affect skill execution on Android device
 
 # Operator App
 
-Placeholder - content coming in PR-2/PR-3.
+## Purpose
 
-This page will cover app launch, permissions, crash recovery, and log collection.
+Diagnose installation, permission, handshake, and crash-recovery problems involving the Clawperator Operator APK.
+
+## Sources
+
+- Setup command: `apps/node/src/cli/commands/operatorSetup.ts`
+- Setup phases: `apps/node/src/domain/device/setupOperator.ts`
+- Permission grants: `apps/node/src/domain/device/grantPermissions.ts`
+- Readiness checks: `apps/node/src/domain/doctor/checks/readinessChecks.ts`
+- Error codes: `apps/node/src/contracts/errors.ts`
+
+## Operator Setup Phases
+
+`clawperator operator setup` is a three-phase workflow:
+
+1. install APK
+2. grant accessibility and notification permissions
+3. verify the package is installed
+
+Failures are surfaced with distinct structured codes:
+
+| Phase | Code |
+| --- | --- |
+| local APK path missing | `OPERATOR_APK_NOT_FOUND` |
+| adb install failed | `OPERATOR_INSTALL_FAILED` |
+| permission grant failed | `OPERATOR_GRANT_FAILED` |
+| post-install verification failed | `OPERATOR_VERIFY_FAILED` |
+
+## Installation Failures
+
+### `OPERATOR_APK_NOT_FOUND`
+
+Meaning:
+
+- the local file given to `--apk` does not exist
+
+Fix:
+
+- verify the path on disk
+- rerun `clawperator operator setup --apk <path>`
+
+### `OPERATOR_INSTALL_FAILED`
+
+Meaning:
+
+- `adb install -r <apkPath>` returned non-zero
+
+The error payload includes the install phase details from `setupOperator()`.
+
+Typical fixes:
+
+- confirm the device is connected and in adb state `device`
+- rerun with the intended package variant
+- verify the APK itself is buildable or downloadable
+
+### `OPERATOR_VERIFY_FAILED`
+
+Meaning:
+
+- install completed, but `pm list packages` could not confirm the expected package afterward
+
+Typical causes:
+
+- multiple variants installed and package selection ambiguous
+- wrong package expected after install
+
+## Permission Issues
+
+### `OPERATOR_GRANT_FAILED`
+
+Meaning:
+
+- one of the permission grant steps failed after install
+
+Current permission steps are:
+
+- accessibility service enablement
+- notification permission grant
+- notification listener enablement
+
+Important implementation details:
+
+- notification permission grant may be marked as skipped but still treated as okay for known Android responses like "already granted" or "unknown permission"
+- accessibility and notification listener grants must succeed
+
+### `DEVICE_ACCESSIBILITY_NOT_RUNNING`
+
+This usually appears from doctor or handshake flows when the APK is installed but the accessibility service is not active.
+
+Recovery:
+
+```bash
+clawperator grant-device-permissions --device <device_serial> --operator-package <package>
+clawperator doctor --json --device <device_serial> --operator-package <package>
+```
+
+If that does not recover the device:
+
+- reopen Android Accessibility Settings
+- ensure the Clawperator accessibility service is enabled
+- rerun `doctor`
+
+## Variant Mismatch
+
+### `OPERATOR_VARIANT_MISMATCH`
+
+Meaning:
+
+- the device has one known Operator package installed, but it is not the package currently requested
+
+Typical cases:
+
+| Requested | Installed | Fix |
+| --- | --- | --- |
+| `com.clawperator.operator` | `com.clawperator.operator.dev` | pass `--operator-package com.clawperator.operator.dev` or reinstall release |
+| `com.clawperator.operator.dev` | `com.clawperator.operator` | pass `--operator-package com.clawperator.operator` or reinstall debug |
+
+Use `clawperator doctor --json` to confirm which variant the readiness check found.
+
+## Handshake Failures
+
+### `RESULT_ENVELOPE_TIMEOUT`
+
+Meaning:
+
+- Node sent the command, but no `[Clawperator-Result]` envelope was received before the timeout
+
+The doctor handshake check uses:
+
+- Android payload timeout: `5000`
+- envelope wait timeout: `7000`
+
+Recommended recovery:
+
+```bash
+clawperator grant-device-permissions --device <device_serial> --operator-package <package>
+clawperator snapshot --device <device_serial> --operator-package <package> --timeout 5000 --verbose
+clawperator doctor --json --device <device_serial> --operator-package <package>
+```
+
+### `BROADCAST_FAILED`
+
+Meaning:
+
+- adb broadcast dispatch to the Operator package failed before a result envelope could be read
+
+This is different from envelope timeout:
+
+- timeout means dispatch happened but result was missing
+- broadcast failure means the dispatch itself failed
+
+## Crash Recovery
+
+There is no dedicated "operator crashed" error code in the Node API. In practice, a crash often looks like one of these:
+
+- `RESULT_ENVELOPE_TIMEOUT`
+- `DEVICE_ACCESSIBILITY_NOT_RUNNING`
+- handshake fails after a previously healthy setup
+
+Recovery sequence:
+
+1. rerun `clawperator doctor --json --device <serial> --operator-package <pkg>`
+2. if accessibility is down, run `clawperator grant-device-permissions ...`
+3. if package presence is wrong or missing, rerun `clawperator operator setup --apk <path> ...`
+4. rerun `doctor`
+5. confirm with `clawperator snapshot --json ...`
+
+## Crash Logs Access
+
+The Node CLI does not currently expose a dedicated crash-log command. Use adb logcat directly.
+
+Useful commands:
+
+```bash
+adb -s <device_serial> logcat
+adb -s <device_serial> logcat | rg 'clawperator|AndroidRuntime|FATAL EXCEPTION'
+adb -s <device_serial> logcat -d
+```
+
+For command-specific correlation, also use:
+
+```bash
+clawperator snapshot --device <device_serial> --operator-package <package> --verbose
+```
+
+That helps line up CLI execution with Android-side logging.
+
+## Recommended Recovery Order
+
+Use this order for a broken Operator state:
+
+1. verify device connectivity with `clawperator devices`
+2. run `clawperator doctor --json --device <serial> --operator-package <pkg>`
+3. fix permissions with `clawperator grant-device-permissions ...` if accessibility is the problem
+4. rerun `clawperator operator setup --apk <path> ...` if install or variant state is wrong
+5. rerun `doctor`
+6. confirm with `clawperator snapshot --json ...`
+
+## What Success Looks Like
+
+Treat the Operator as recovered only when:
+
+- `doctor --json` returns `criticalOk: true`
+- `readiness.apk.presence` passes
+- `readiness.handshake` passes
+- a follow-up `snapshot` returns `envelope.status == "success"`
 
 ---
 
 # Known Issues
 
-Placeholder - content coming in PR-2/PR-3.
+## Current Status
 
-This page will list active limitations and workarounds.
+No known issues are documented on this page at this time.
+
+Reason for the minimal page:
+
+- the old reference snapshot contained issues that are not fully verifiable from the current `apps/node/src/` surface alone
+- this docs refactor documents only issues we can verify against current implementation
+
+## Where To Track New Issues
+
+- GitHub issues for project-level bugs and regressions
+- [Operator App](operator.md) for operational recovery guidance
+- [Version Compatibility](compatibility.md) for CLI and APK mismatch problems
+
+If a current issue becomes reproducible and code-verifiable, add it here with:
+
+- exact trigger
+- affected surface
+- workaround
+- recovery or follow-up path
 
 ---
 
 # Version Compatibility
 
-Placeholder - content coming in PR-2/PR-3.
+## Purpose
 
-This page will cover CLI and Operator package compatibility rules.
+Define how the CLI checks compatibility with the installed Operator APK, what counts as compatible, which errors can be returned, and how to recover when versions do not align.
+
+## Sources
+
+- Compatibility probe: `apps/node/src/domain/version/compatibility.ts`
+- Doctor readiness check: `apps/node/src/domain/doctor/checks/readinessChecks.ts`
+- Error codes: `apps/node/src/contracts/errors.ts`
+
+## Compatibility Rule
+
+Current compatibility is exact normalized version equality between:
+
+- CLI version from `package.json`
+- installed APK `versionName` from `adb shell dumpsys package <operatorPackage>`
+
+Normalization rule:
+
+- versions are trimmed and any trailing `-d` is removed before comparison
+
+Examples:
+
+| CLI | APK | Compatible |
+| --- | --- | --- |
+| `0.1.0` | `0.1.0` | yes |
+| `0.1.0-d` | `0.1.0` | yes |
+| `0.1.1` | `0.1.0` | no |
+
+## How Compatibility Is Checked
+
+Doctor uses the readiness check id:
+
+```text
+readiness.version.compatibility
+```
+
+That check calls `probeVersionCompatibility()` and converts the result into a `DoctorCheckResult`.
+
+Passing doctor example:
+
+```json
+{
+  "id": "readiness.version.compatibility",
+  "status": "pass",
+  "summary": "CLI 0.1.0 is compatible with installed APK 0.1.0.",
+  "evidence": {
+    "cliVersion": "0.1.0",
+    "apkVersion": "0.1.0",
+    "apkVersionCode": 1,
+    "operatorPackage": "com.clawperator.operator.dev"
+  }
+}
+```
+
+Failing doctor example:
+
+```json
+{
+  "id": "readiness.version.compatibility",
+  "status": "fail",
+  "code": "VERSION_INCOMPATIBLE",
+  "summary": "CLI and installed APK versions are not compatible.",
+  "detail": "CLI version 0.1.1 is not compatible with installed APK version 0.1.0.",
+  "evidence": {
+    "cliVersion": "0.1.1",
+    "apkVersion": "0.1.0",
+    "operatorPackage": "com.clawperator.operator"
+  }
+}
+```
+
+## Version Probing Flow
+
+`probeVersionCompatibility()` performs these checks:
+
+1. read CLI version from package metadata
+2. parse the CLI version using the strict `x.y.z` compatibility regex after normalization
+3. confirm the requested Operator package is installed
+4. if the requested package is missing, check whether the alternate known variant is installed
+5. read installed package info via adb
+6. parse `versionName` and optional `versionCode`
+7. compare normalized CLI and APK versions
+
+Important consequences:
+
+- compatibility is not "same major version" or "same minor version"
+- it is exact normalized equality
+
+## Error Codes
+
+These are the compatibility-specific codes currently returned from this flow:
+
+| Code | Meaning |
+| --- | --- |
+| `VERSION_INCOMPATIBLE` | CLI and installed APK versions do not match after normalization |
+| `APK_VERSION_UNREADABLE` | package metadata could not provide `versionName` |
+| `APK_VERSION_INVALID` | APK version string exists but is not parseable as compatibility version |
+| `CLI_VERSION_INVALID` | CLI version metadata is missing or not parseable |
+
+Other closely related codes that may block compatibility checks before version comparison:
+
+| Code | Meaning |
+| --- | --- |
+| `OPERATOR_NOT_INSTALLED` | expected package is not installed |
+| `OPERATOR_VARIANT_MISMATCH` | the other known package variant is installed instead |
+| `DEVICE_SHELL_UNAVAILABLE` | adb shell could not read package state |
+
+## Parse Rules
+
+The accepted compatibility format is:
+
+```text
+<major>.<minor>.<patch>
+```
+
+Examples:
+
+- valid: `0.1.0`
+- valid after normalization: `0.1.0-d`
+- invalid: `main`
+- invalid: `0.1`
+
+## Recovery
+
+### When versions are incompatible
+
+The probe returns remediation guidance to align CLI and APK versions.
+
+Typical recovery options:
+
+1. reinstall the CLI
+2. install the matching APK version
+3. for debug package workflows, rebuild and reinstall the debug APK from the same checkout
+
+Release install path:
+
+- download the version-matched APK URL generated from the CLI version
+- download the matching sha256 URL
+- install with `clawperator operator setup --apk ...`
+
+### When the wrong variant is installed
+
+If the debug package is installed but the release package was requested, or vice versa:
+
+- pass the installed package via `--operator-package`
+- or reinstall the intended variant
+
+### When CLI metadata is invalid
+
+If `CLI_VERSION_INVALID` occurs:
+
+- reinstall the CLI package
+
+### When APK metadata is unreadable or invalid
+
+If `APK_VERSION_UNREADABLE` or `APK_VERSION_INVALID` occurs:
+
+- reinstall the Operator APK
+- rerun `clawperator doctor --json`
+
+## Machine-Checkable Success Condition
+
+Treat compatibility as healthy only when:
+
+- `readiness.version.compatibility.status == "pass"`
+- or `clawperator version --check-compat --json` shows `compatible: true`
+
+Do not infer compatibility from app presence alone.
 
 ---

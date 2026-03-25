@@ -80,7 +80,7 @@ CLI tools, mobile automation, and common English verbs.
 Clawperator ("CLI tool for automating Android devices") and nothing else. What
 commands would it try? Those commands should work.
 
-Anti-pattern (removed - do not use): nested command families such as `action *` and `observe snapshot` are not supported. They are not documented here as runnable examples because agents and crawlers sometimes copy code blocks verbatim.
+Anti-pattern (removed - do not use): deprecated nested command families are not supported. They are not documented here as runnable examples because agents and crawlers sometimes copy code blocks verbatim.
 
 Good (current):
 ```
@@ -179,7 +179,7 @@ the shortest unambiguous name.
 
 - `--device` not `--device-id`
 - `--json` not `--output json`
-- `--timeout` not `--timeout-ms`
+- use the canonical timeout flag form only
 - `--operator-package` not `--operator-package` ("receiver" is an Android
   implementation detail; "operator" is Clawperator's own terminology)
 - `--text` not `--text-equals`

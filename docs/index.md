@@ -1,10 +1,41 @@
 # Docs Home
 
-Clawperator public docs are organized into Setup, API, Skills, and Troubleshooting.
+Clawperator is a deterministic actuator tool for Android device automation.
 
-Machine-readable entrypoints:
+## Agent Entry Points
 
-- [llms.txt](https://docs.clawperator.com/llms.txt)
-- [llms-full.txt](https://docs.clawperator.com/llms-full.txt)
+- [llms.txt](https://docs.clawperator.com/llms.txt) - compact machine entrypoint
+- [llms-full.txt](https://docs.clawperator.com/llms-full.txt) - full machine-readable docs corpus
 
-Use the section pages in the nav for the current canonical surface.
+## Setup
+
+- [Setup](setup.md) - install the CLI, prepare a device, install the Operator APK, verify readiness, and run the first snapshot
+
+## API
+
+- [Overview](api/overview.md) - execution payload, result envelope, and branching model
+- [CLI Reference](api/cli.md) - generated command and flag reference
+- [Actions](api/actions.md) - canonical action types and parameter semantics
+- [Selectors](api/selectors.md) - `NodeMatcher` contract and CLI selector mapping
+- [Snapshot Format](api/snapshot.md) - where `snapshot_ui` XML lives and how extraction works
+- [Errors](api/errors.md) - public error-code contract and recovery patterns
+- [Devices](api/devices.md) - device discovery and deterministic targeting
+- [Doctor](api/doctor.md) - doctor report contract and readiness checks
+- [Timeouts](api/timeouts.md) - execution and action timeout budgeting
+- [Environment Variables](api/environment.md) - current `CLAWPERATOR_*` and runtime environment controls
+- [Serve API](api/serve.md) - local HTTP and SSE contract
+- [Navigation Patterns](api/navigation.md) - composed navigation workflows for agents
+- [Recording Format](api/recording.md) - raw NDJSON recording schema and parsed step log
+
+## Skills
+
+- [Overview](skills/overview.md) - registry model, discovery, and wrapper execution
+- [Authoring](skills/authoring.md) - scaffolded files, artifacts, and validation
+- [Development Workflow](skills/development.md) - local iteration loop for skills
+- [Device Prep and Runtime](skills/runtime.md) - runtime environment, timeout, and output rules
+
+## Troubleshooting
+
+- [Operator App](troubleshooting/operator.md) - installation, permission, handshake, and crash recovery
+- [Known Issues](troubleshooting/known-issues.md) - currently verified known issues page
+- [Version Compatibility](troubleshooting/compatibility.md) - CLI and Operator APK version alignment

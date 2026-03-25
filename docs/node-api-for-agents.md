@@ -115,7 +115,7 @@ workflow (also available as `record` alias), use [Android Recording Format for A
 | `doctor` | Run environment diagnostics |
 | `version` | Print the CLI version or check CLI / Clawperator Operator Android app compatibility |
 
-**Global options:** `--device <id>` (canonical; `--device-id` accepted), `--operator-package <pkg>`, `--json` (canonical; `--output json` accepted), `--timeout <ms>` (canonical; `--timeout-ms` accepted), `--log-level <debug|info|warn|error>`, `--verbose`
+**Global options:** `--device <id>` (canonical; `--device-id` accepted), `--operator-package <pkg>`, `--json` (canonical; `--output json` accepted), `--timeout <ms>` (canonical form), `--log-level <debug|info|warn|error>`, `--verbose`
 
 For agent callers, `--json` is the canonical output flag. `--output pretty` is for human inspection.
 
