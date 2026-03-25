@@ -14,6 +14,7 @@ plugins:
   - redirects:
       redirect_maps:
         'getting-started/first-time-setup.md': 'setup.md'
+        'getting-started/index.md': 'setup.md'
         'getting-started/running-clawperator-on-android.md': 'setup.md'
         'getting-started/openclaw-first-run.md': 'setup.md'
         'getting-started/project-overview.md': 'api/overview.md'
