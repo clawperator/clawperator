@@ -222,3 +222,11 @@ Practical rule:
 
 - use environment variables for workspace-wide defaults
 - use flags for per-command determinism
+
+## Related Pages
+
+- [Setup](../setup.md)
+- [Devices](devices.md)
+- [Doctor](doctor.md)
+- [Serve API](serve.md)
+- [Skills Overview](../skills/overview.md)

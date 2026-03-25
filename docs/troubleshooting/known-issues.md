@@ -21,3 +21,10 @@ If a current issue becomes reproducible and code-verifiable, add it here with:
 - affected surface
 - workaround
 - recovery or follow-up path
+
+## Related Pages
+
+- [Operator App](operator.md)
+- [Version Compatibility](compatibility.md)
+- [Doctor](../api/doctor.md)
+- [Errors](../api/errors.md)

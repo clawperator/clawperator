@@ -169,3 +169,11 @@ Treat compatibility as healthy only when:
 - or `clawperator version --check-compat --json` shows `compatible: true`
 
 Do not infer compatibility from app presence alone.
+
+## Related Pages
+
+- [Setup](../setup.md)
+- [Doctor](../api/doctor.md)
+- [Devices](../api/devices.md)
+- [Operator App](operator.md)
+- [Errors](../api/errors.md)

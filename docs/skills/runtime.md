@@ -169,3 +169,11 @@ That banner is a convenience layer from `cmdSkillsRun()`, not part of the JSON w
 - pass `--device` explicitly in multi-device environments
 - pass `--operator-package com.clawperator.operator.dev` for local debug APK workflows
 - inspect partial stdout and stderr on failures before rerunning blindly
+
+## Related Pages
+
+- [Setup](../setup.md)
+- [Doctor](../api/doctor.md)
+- [Devices](../api/devices.md)
+- [Skills Overview](overview.md)
+- [Development Workflow](development.md)

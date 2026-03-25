@@ -369,3 +369,10 @@ Agents should branch on this code and stop rather than trying to guess how to pa
 - `record parse` currently extracts only `open_app` and `click` steps
 - warnings are significant because they explain dropped or degraded data
 - use parsed output as a deterministic summary, not as a promise that every raw event was preserved
+
+## Related Pages
+
+- [API Overview](overview.md)
+- [Errors](errors.md)
+- [Serve API](serve.md)
+- [Skills Authoring](../skills/authoring.md)

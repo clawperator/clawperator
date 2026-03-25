@@ -207,3 +207,11 @@ Treat the Operator as recovered only when:
 - `readiness.apk.presence` passes
 - `readiness.handshake` passes
 - a follow-up `snapshot` returns `envelope.status == "success"`
+
+## Related Pages
+
+- [Setup](../setup.md)
+- [Doctor](../api/doctor.md)
+- [Devices](../api/devices.md)
+- [Errors](../api/errors.md)
+- [Version Compatibility](compatibility.md)

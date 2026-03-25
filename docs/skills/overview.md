@@ -223,3 +223,11 @@ Common ones:
 - use `skills list`, `skills search`, and `skills get` to discover what is available
 - use `skills run` when you want the wrapper's validation, timeout, and env injection
 - use skill output as deterministic wrapper output, not as autonomous reasoning
+
+## Related Pages
+
+- [Authoring](authoring.md)
+- [Development Workflow](development.md)
+- [Device Prep and Runtime](runtime.md)
+- [Environment Variables](../api/environment.md)
+- [Serve API](../api/serve.md)

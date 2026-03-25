@@ -208,3 +208,11 @@ This is the current hard limit documented in `apps/node/src/contracts/limits.ts`
 - rely on `SNAPSHOT_EXTRACTION_FAILED` when text extraction failed after execution
 - treat `data.warn` as advisory only
 - use [Selectors](selectors.md) to map XML attributes into actionable selector objects
+
+## Related Pages
+
+- [API Overview](overview.md)
+- [Actions](actions.md)
+- [Selectors](selectors.md)
+- [Errors](errors.md)
+- [Navigation Patterns](navigation.md)

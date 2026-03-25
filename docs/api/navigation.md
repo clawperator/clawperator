@@ -278,3 +278,11 @@ Recovery:
 - use `snapshot_ui` as the final confirmation step
 
 That three-step flow is the most reliable current navigation pattern for agents.
+
+## Related Pages
+
+- [Actions](actions.md)
+- [Snapshot Format](snapshot.md)
+- [Timeouts](timeouts.md)
+- [Selectors](selectors.md)
+- [Errors](errors.md)

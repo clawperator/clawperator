@@ -44,6 +44,13 @@ Clawperator is a deterministic actuator tool for Android device automation.
 - [Known Issues](troubleshooting/known-issues.md) - currently verified known issues page
 - [Version Compatibility](troubleshooting/compatibility.md) - CLI and Operator APK version alignment
 
+## Related Pages
+
+- [Setup](setup.md)
+- [API Overview](api/overview.md)
+- [Skills Overview](skills/overview.md)
+- [Operator App](troubleshooting/operator.md)
+
 ---
 
 # Setup
@@ -2340,6 +2347,14 @@ This is the current hard limit documented in `apps/node/src/contracts/limits.ts`
 - treat `data.warn` as advisory only
 - use [Selectors](selectors.md) to map XML attributes into actionable selector objects
 
+## Related Pages
+
+- [API Overview](overview.md)
+- [Actions](actions.md)
+- [Selectors](selectors.md)
+- [Errors](errors.md)
+- [Navigation Patterns](navigation.md)
+
 ---
 
 # Errors
@@ -3782,6 +3797,14 @@ The builder cushion is there to stop the envelope layer from killing the run too
 - for multi-step flows, add budget for earlier actions and the final envelope
 - if you hit `RESULT_ENVELOPE_TIMEOUT`, verify health with [Doctor](doctor.md) before only increasing the timeout
 
+## Related Pages
+
+- [API Overview](overview.md)
+- [Actions](actions.md)
+- [Errors](errors.md)
+- [Doctor](doctor.md)
+- [Navigation Patterns](navigation.md)
+
 ---
 
 # Environment Variables
@@ -4008,6 +4031,14 @@ Practical rule:
 
 - use environment variables for workspace-wide defaults
 - use flags for per-command determinism
+
+## Related Pages
+
+- [Setup](../setup.md)
+- [Devices](devices.md)
+- [Doctor](doctor.md)
+- [Serve API](serve.md)
+- [Skills Overview](../skills/overview.md)
 
 ---
 
@@ -5068,6 +5099,14 @@ Recovery:
 
 That three-step flow is the most reliable current navigation pattern for agents.
 
+## Related Pages
+
+- [Actions](actions.md)
+- [Snapshot Format](snapshot.md)
+- [Timeouts](timeouts.md)
+- [Selectors](selectors.md)
+- [Errors](errors.md)
+
 ---
 
 # Recording Format
@@ -5442,6 +5481,13 @@ Agents should branch on this code and stop rather than trying to guess how to pa
 - warnings are significant because they explain dropped or degraded data
 - use parsed output as a deterministic summary, not as a promise that every raw event was preserved
 
+## Related Pages
+
+- [API Overview](overview.md)
+- [Errors](errors.md)
+- [Serve API](serve.md)
+- [Skills Authoring](../skills/authoring.md)
+
 ---
 
 # Skills
@@ -5671,6 +5717,14 @@ Common ones:
 - use `skills list`, `skills search`, and `skills get` to discover what is available
 - use `skills run` when you want the wrapper's validation, timeout, and env injection
 - use skill output as deterministic wrapper output, not as autonomous reasoning
+
+## Related Pages
+
+- [Authoring](authoring.md)
+- [Development Workflow](development.md)
+- [Device Prep and Runtime](runtime.md)
+- [Environment Variables](../api/environment.md)
+- [Serve API](../api/serve.md)
 
 ---
 
@@ -5930,6 +5984,14 @@ So for authoring:
 - use `skills compile-artifact` when a workflow should compile into deterministic execution JSON
 - treat `SKILL.md` as required documentation, but do not overstate its current machine enforcement
 
+## Related Pages
+
+- [Skills Overview](overview.md)
+- [Development Workflow](development.md)
+- [Device Prep and Runtime](runtime.md)
+- [Actions](../api/actions.md)
+- [API Overview](../api/overview.md)
+
 ---
 
 # Development Workflow
@@ -6159,6 +6221,14 @@ Repeat until:
 - wrapper exits `0`
 - output contains the signals your agent will actually consume
 
+## Related Pages
+
+- [Skills Overview](overview.md)
+- [Authoring](authoring.md)
+- [Device Prep and Runtime](runtime.md)
+- [Setup](../setup.md)
+- [Serve API](../api/serve.md)
+
 ---
 
 # Device Prep and Runtime
@@ -6332,6 +6402,14 @@ That banner is a convenience layer from `cmdSkillsRun()`, not part of the JSON w
 - pass `--device` explicitly in multi-device environments
 - pass `--operator-package com.clawperator.operator.dev` for local debug APK workflows
 - inspect partial stdout and stderr on failures before rerunning blindly
+
+## Related Pages
+
+- [Setup](../setup.md)
+- [Doctor](../api/doctor.md)
+- [Devices](../api/devices.md)
+- [Skills Overview](overview.md)
+- [Development Workflow](development.md)
 
 ---
 
@@ -6547,6 +6625,14 @@ Treat the Operator as recovered only when:
 - `readiness.handshake` passes
 - a follow-up `snapshot` returns `envelope.status == "success"`
 
+## Related Pages
+
+- [Setup](../setup.md)
+- [Doctor](../api/doctor.md)
+- [Devices](../api/devices.md)
+- [Errors](../api/errors.md)
+- [Version Compatibility](compatibility.md)
+
 ---
 
 # Known Issues
@@ -6572,6 +6658,13 @@ If a current issue becomes reproducible and code-verifiable, add it here with:
 - affected surface
 - workaround
 - recovery or follow-up path
+
+## Related Pages
+
+- [Operator App](operator.md)
+- [Version Compatibility](compatibility.md)
+- [Doctor](../api/doctor.md)
+- [Errors](../api/errors.md)
 
 ---
 
@@ -6746,5 +6839,13 @@ Treat compatibility as healthy only when:
 - or `clawperator version --check-compat --json` shows `compatible: true`
 
 Do not infer compatibility from app presence alone.
+
+## Related Pages
+
+- [Setup](../setup.md)
+- [Doctor](../api/doctor.md)
+- [Devices](../api/devices.md)
+- [Operator App](operator.md)
+- [Errors](../api/errors.md)
 
 ---

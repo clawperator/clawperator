@@ -224,3 +224,11 @@ Repeat until:
 - validation passes
 - wrapper exits `0`
 - output contains the signals your agent will actually consume
+
+## Related Pages
+
+- [Skills Overview](overview.md)
+- [Authoring](authoring.md)
+- [Device Prep and Runtime](runtime.md)
+- [Setup](../setup.md)
+- [Serve API](../api/serve.md)
