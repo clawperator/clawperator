@@ -5,7 +5,7 @@ You are implementing PR-1 of the Clawperator docs refactor. This is pure infrast
 
 ## Branch
 
-Work on the `docs-refactor/phase-1` branch, created from `main` at commit 7a15048.
+Work on the `docs-refactor-phase-1` branch, created from `main` at commit 7a15048.
 
 ## Plan and Work Breakdown
 
@@ -152,7 +152,7 @@ No `site:`, `repos:`, `rules:`, `sections:` blocks. No `mode: copy` entries. No 
 
 Complete rewrite. Key changes:
 1. `docs_dir: .build` (not `docs`)
-2. New nav tree (exactly 20 pages in 4 sections + home + setup at top level):
+2. New nav tree (exactly 22 pages in 4 sections + home + setup at top level):
 
 ```yaml
 nav:
@@ -262,7 +262,7 @@ Placeholder - content coming in PR-2.
 Then run the full pipeline:
 1. Assembly script - verify `.build/` is complete
 2. `./scripts/docs_build.sh` - verify full build succeeds
-3. Verify `llms-full.txt` contains all 20 pages
+3. Verify `llms-full.txt` contains all 22 pages
 4. Verify at least 5 redirects work
 5. Do NOT remove placeholders - they stay until PR-2/PR-3 replaces them
 
@@ -281,10 +281,10 @@ Then run the full pipeline:
 ## Validation (before declaring done)
 
 Run `./scripts/docs_build.sh` end-to-end. It must pass. Then verify:
-- [ ] `sites/docs/.build/` contains exactly 20 markdown files matching the nav
-- [ ] `llms-full.txt` contains all 20 pages in nav order
+- [ ] `sites/docs/.build/` contains exactly 22 markdown files matching the nav
+- [ ] `llms-full.txt` contains all 22 pages in nav order
 - [ ] `git status` shows no `sites/docs/docs/` tracked files
 - [ ] At least 5 old URL redirects produce redirect HTML files in `sites/docs/site/`
 - [ ] CI workflow file has docs-build job
-- [ ] No placeholder content in `llms-full.txt` is missing (all 20 pages present)
+- [ ] No placeholder content in `llms-full.txt` is missing (all 22 pages present)
 ```

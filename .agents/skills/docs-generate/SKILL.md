@@ -1,6 +1,6 @@
 ---
 name: docs-generate
-description: Regenerate the Clawperator public docs site from the canonical sources in clawperator/docs, clawperator/apps/node, and clawperator-skills/docs. Use when Codex needs to inventory doc sources, update sites/docs/source-map.yaml, refresh sites/docs/docs/*.md with minimal churn, review docs diffs, or emit docs build metadata for docs.clawperator.com.
+description: Regenerate the Clawperator public docs site from the canonical sources in clawperator/docs, clawperator/apps/node, and clawperator-skills/docs. Use when Codex needs to inventory doc sources, update sites/docs/source-map.yaml, assemble sites/docs/.build/, review docs diffs, or emit docs build metadata for docs.clawperator.com.
 ---
 
 # Docs Generate

@@ -69,7 +69,7 @@ Absolute links (https://, #anchors within same page) are untouched.
 
 - Maximum 2 levels deep (section > page). No sub-sub-sections.
 - Target ~6 pages per section (soft limit; API section is larger by design).
-- Total target: ~20 pages. Growth beyond 25 requires justification.
+- Total target: ~22 pages. Growth beyond 25 requires justification.
 - These constraints keep `llms-full.txt` coherent and retrieval predictable.
 
 ### Build failure conditions
@@ -193,7 +193,7 @@ nav:
     - Version Compatibility: troubleshooting/compatibility.md
 ```
 
-**20 pages total.** Down from 33 current pages (39% reduction).
+**22 pages total.** Down from 33 current pages (33% reduction).
 
 ### Page Descriptions
 
@@ -599,7 +599,7 @@ This is a migration, not a perfection pass. Prioritize coherent structure, corre
 
 ### PR-1: Pipeline + skeleton
 
-**Scope:** Phase 0 (migration prep) + Phase 1 (infrastructure) + placeholder content for all 20 pages.
+**Scope:** Phase 0 (migration prep) + Phase 1 (infrastructure) + placeholder content for all 22 pages.
 
 **Goal:** New build pipeline works end-to-end. Old URLs redirect. Site serves placeholder pages. No content judgment needed in review.
 
@@ -627,7 +627,7 @@ Steps:
 
 **Acceptance:**
 - `./scripts/docs_build.sh` succeeds
-- `sites/docs/.build/` contains all 20 pages
+- `sites/docs/.build/` contains all 22 pages
 - `llms-full.txt` generates in nav order
 - At least 5 old URL redirects resolve correctly
 - No `sites/docs/docs/` in git
@@ -676,7 +676,7 @@ Code changes:
 
 **Scope:** Secondary API pages, skills pages, troubleshooting pages, index page, llms artifacts, old file deletion, and repo metadata updates.
 
-**Goal:** All 20 pages are final content. Old docs deleted. Repo is clean. llms artifacts are finalized.
+**Goal:** All 22 pages are final content. Old docs deleted. Repo is clean. llms artifacts are finalized.
 
 **Recommended model:** default. Secondary pages need accurate content but are less complex than PR-2. Cleanup tasks (moves, deletes, metadata updates) are mechanical. Default balances quality with throughput.
 
@@ -718,7 +718,7 @@ Cleanup:
 **Acceptance:**
 - All acceptance criteria from Section 10 pass
 - `./scripts/docs_build.sh` succeeds with zero warnings
-- `llms-full.txt` contains all 20 pages, coherent top-to-bottom
+- `llms-full.txt` contains all 22 pages, coherent top-to-bottom
 - No old docs remain outside `docs/internal/`
 - No placeholder pages remain
 - Skills repo updated with pointer docs
@@ -757,7 +757,7 @@ Cleanup:
 ### Machine-Facing Artifacts
 
 - [ ] Every URL in `llms.txt` resolves to a built HTML page
-- [ ] `llms-full.txt` contains all 20 pages in nav order, no missing sections
+- [ ] `llms-full.txt` contains all 22 pages in nav order, no missing sections
 - [ ] `llms-full.txt` is coherent top-to-bottom (no orphaned cross-references, no undefined terms)
 
 ### Content Accuracy

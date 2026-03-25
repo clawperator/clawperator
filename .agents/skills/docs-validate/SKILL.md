@@ -1,6 +1,6 @@
 ---
 name: docs-validate
-description: Validate that docs changes respect the canonical source-of-truth boundaries and that generated docs were not edited directly. Use when reviewing docs diffs, before `./scripts/docs_build.sh`, or when `sites/docs/docs/` changed and you need to confirm the matching authored sources changed too.
+description: Validate that docs changes respect the canonical source-of-truth boundaries and that generated docs were not edited directly. Use when reviewing docs diffs, before `./scripts/docs_build.sh`, or when `sites/docs/.build/` and `sites/docs/site/` need to be checked against their authored and code-derived sources.
 ---
 
 # Docs Validate

@@ -129,8 +129,6 @@ def main() -> None:
         f"# install.sh (v{version})",
     )
 
-    subprocess.run(["cp", "docs/android-operator-apk.md", "sites/docs/docs/getting-started/android-operator-apk.md"], cwd=repo_root, check=True)
-    subprocess.run(["cp", "docs/compatibility.md", "sites/docs/docs/troubleshooting/compatibility.md"], cwd=repo_root, check=True)
     subprocess.run(["./scripts/docs_build.sh"], cwd=repo_root, check=True)
 
     commit_message = f"docs(release): update published version to {version}"
@@ -141,8 +139,6 @@ def main() -> None:
             "docs/android-operator-apk.md",
             "docs/compatibility.md",
             "docs/release-procedure.md",
-            "sites/docs/docs/getting-started/android-operator-apk.md",
-            "sites/docs/docs/troubleshooting/compatibility.md",
             "sites/docs/static/llms-full.txt",
             "sites/landing/public/install.sh",
             "sites/landing/public/llms-full.txt",
