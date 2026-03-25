@@ -22,6 +22,10 @@ def docs_site_dir() -> Path:
     return repo_root() / "sites" / "docs"
 
 
+def authored_docs_dir() -> Path:
+    return repo_root() / "docs"
+
+
 def load_nav_entries(mkdocs_path: Path) -> list[tuple[str, list[tuple[str, str]]]]:
     if not mkdocs_path.exists():
         raise FileNotFoundError(f"Missing MkDocs config: {mkdocs_path}")
@@ -67,6 +71,26 @@ def load_nav_entries(mkdocs_path: Path) -> list[tuple[str, list[tuple[str, str]]
     return ordered
 
 
+def collect_nav_page_paths(nav_entries: list[tuple[str, list[tuple[str, str]]]]) -> set[str]:
+    paths: set[str] = set()
+    for _, pages in nav_entries:
+        for _, page_path in pages:
+            paths.add(page_path)
+    return paths
+
+
+def collect_extra_authored_docs(docs_dir: Path, nav_page_paths: set[str]) -> list[Path]:
+    extra_docs: list[Path] = []
+    for md_file in sorted(docs_dir.rglob("*.md")):
+        relative_path = md_file.relative_to(docs_dir).as_posix()
+        if relative_path in nav_page_paths:
+            continue
+        if any(part in {"site", ".build"} for part in md_file.relative_to(docs_dir).parts):
+            continue
+        extra_docs.append(md_file)
+    return extra_docs
+
+
 def read_page(build_dir: Path, page_path: str) -> str:
     resolved = (build_dir / page_path).resolve()
     if build_dir.resolve() not in resolved.parents and resolved != build_dir.resolve():
@@ -76,11 +100,15 @@ def read_page(build_dir: Path, page_path: str) -> str:
     return resolved.read_text(encoding="utf-8").rstrip("\n")
 
 
-def render_llms_full(build_dir: Path, nav_entries: list[tuple[str, list[tuple[str, str]]]]) -> str:
+def render_llms_full(
+    build_dir: Path,
+    nav_entries: list[tuple[str, list[tuple[str, str]]]],
+    extra_docs: list[Path],
+) -> str:
     lines: list[str] = [
         "# Clawperator Documentation",
         "",
-        "Compiled from the MkDocs navigation tree and assembled docs staging directory.",
+        "Compiled from the MkDocs navigation tree, assembled docs staging directory, and authored docs corpus.",
         "",
     ]
 
@@ -97,12 +125,26 @@ def render_llms_full(build_dir: Path, nav_entries: list[tuple[str, list[tuple[st
             lines.append("---")
             lines.append("")
 
+    if extra_docs:
+        lines.append("# Additional Authored Docs")
+        lines.append("")
+        for doc_path in extra_docs:
+            relative_path = doc_path.relative_to(authored_docs_dir()).as_posix()
+            doc_content = doc_path.read_text(encoding="utf-8").rstrip("\n")
+            lines.append(f"## `{relative_path}`")
+            lines.append("")
+            lines.append(doc_content)
+            lines.append("")
+            lines.append("---")
+            lines.append("")
+
     return "\n".join(lines).rstrip() + "\n"
 
 
 def main() -> int:
     root = repo_root()
     docs_dir = docs_site_dir()
+    authored_docs = authored_docs_dir()
     build_dir = docs_dir / ".build"
     mkdocs_path = docs_dir / "mkdocs.yml"
     output_paths = [
@@ -112,7 +154,8 @@ def main() -> int:
     ]
 
     nav_entries = load_nav_entries(mkdocs_path)
-    rendered = render_llms_full(build_dir, nav_entries)
+    extra_docs = collect_extra_authored_docs(authored_docs, collect_nav_page_paths(nav_entries))
+    rendered = render_llms_full(build_dir, nav_entries, extra_docs)
 
     for output_path in output_paths:
         output_path.parent.mkdir(parents=True, exist_ok=True)

@@ -82,4 +82,4 @@ Do not leave deleted docs referenced in the docs site manifest or navigation.
 - `.agents/skills/docs-generate/scripts/assemble.py`
   - Deterministic docs staging assembly.
 - `.agents/skills/docs-generate/scripts/generate_llms_full.py`
-  - Build the primary `llms-full.txt` artifact from `mkdocs.yml` and `.build/`.
+  - Build the primary `llms-full.txt` artifact from `mkdocs.yml`, `.build/`, and any authored docs not already covered by the nav.

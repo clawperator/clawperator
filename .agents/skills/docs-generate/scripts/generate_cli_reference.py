@@ -14,6 +14,7 @@ class CommandInfo:
     aliases: list[str]
     group: str
     summary: str
+    syntax: list[str]
     flags: list[str]
     subcommands: list[str]
 
@@ -59,6 +60,24 @@ def parse_supported_flags(body: str) -> list[str]:
     return list(dict.fromkeys(collected))
 
 
+def parse_top_level_block(name: str, body: str) -> list[str]:
+    match = re.search(r"topLevelBlock:\s*`(.*?)`", body, re.S)
+    if not match:
+        return []
+
+    syntax: list[str] = []
+    for raw_line in match.group(1).splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        if not line.startswith(name):
+            continue
+        syntax_text = re.split(r"\s{2,}", line, maxsplit=1)[0].strip()
+        if syntax_text and syntax_text not in syntax:
+            syntax.append(syntax_text)
+    return syntax
+
+
 def parse_subcommands(body: str) -> list[str]:
     match = re.search(r"subtopics:\s*{([^}]*)}", body, re.S)
     if not match:
@@ -73,6 +92,7 @@ def parse_command_info(name: str, body: str) -> CommandInfo:
     if not group_match or not summary_match:
         raise ValueError(f"Failed to parse required metadata for command {name}")
     aliases = parse_string_list(aliases_match.group(1)) if aliases_match else []
+    syntax = parse_top_level_block(name, body)
     flags = parse_supported_flags(body)
     subcommands = parse_subcommands(body)
     return CommandInfo(
@@ -80,6 +100,7 @@ def parse_command_info(name: str, body: str) -> CommandInfo:
         aliases=aliases,
         group=group_match.group(1),
         summary=summary_match.group(1),
+        syntax=syntax,
         flags=flags,
         subcommands=subcommands,
     )
@@ -87,16 +108,17 @@ def parse_command_info(name: str, body: str) -> CommandInfo:
 
 def render_table(commands: list[CommandInfo]) -> str:
     lines = [
-        "| Command | Aliases | Flags | Summary |",
-        "| --- | --- | --- | --- |",
+        "| Command | Syntax | Aliases | Flags | Summary |",
+        "| --- | --- | --- | --- | --- |",
     ]
     for command in commands:
+        syntax_text = "<br>".join(f"`{item}`" for item in command.syntax) if command.syntax else "-"
         alias_text = ", ".join(command.aliases) if command.aliases else "-"
         flag_text = ", ".join(command.flags) if command.flags else "-"
         if command.subcommands:
             flag_text = f"{flag_text}<br>Subcommands: {', '.join(command.subcommands)}"
         lines.append(
-            f"| `{command.name}` | {alias_text} | {flag_text} | {command.summary} |"
+            f"| `{command.name}` | {syntax_text} | {alias_text} | {flag_text} | {command.summary} |"
         )
     return "\n".join(lines)
 
@@ -109,6 +131,7 @@ def render_group(group: str, commands: list[CommandInfo]) -> str:
                 f"### `{command.name}`",
                 "",
                 f"- Summary: {command.summary}",
+                f"- Syntax: {', '.join(f'`{item}`' for item in command.syntax) if command.syntax else '-'}",
                 f"- Aliases: {', '.join(f'`{alias}`' for alias in command.aliases) if command.aliases else '-'}",
                 f"- Flags: {', '.join(f'`{flag}`' for flag in command.flags) if command.flags else '-'}",
             ]
