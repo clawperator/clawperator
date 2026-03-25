@@ -46,10 +46,10 @@ Design consequence:
 - CLI parsing changes must preserve both the structured JSON contract and the exit-code contract. Test valid, invalid, and missing-value cases for any new flag.
 
 ## Key Docs
-- `docs/node-api-for-agents.md` - API contract, CLI reference, error codes
-- `docs/first-time-setup.md` - Device setup and APK installation
-- `docs/architecture.md` - System design
-- `docs/troubleshooting.md` - Common issues
+- `docs/setup.md` - Device setup and APK installation
+- `docs/api/overview.md` - API contract and execution model
+- `docs/api/actions.md` - Action types and parameter semantics
+- `docs/api/errors.md` - Error codes and recovery patterns
 - `docs/internal/design/` - Internal design documents
 
 ## Public Sites
