@@ -2100,7 +2100,7 @@ Success condition for recovery:
 
 This appears when Node successfully sends the command but the execution still fails at dispatch time or during one of the steps.
 
-Example:
+Per-step example:
 
 ```json
 {
@@ -2120,6 +2120,25 @@ Example:
         }
       }
     ]
+  },
+  "deviceId": "emulator-5554",
+  "terminalSource": "clawperator_result",
+  "isCanonicalTerminal": true
+}
+```
+
+Envelope-level example with `errorCode`:
+
+```json
+{
+  "envelope": {
+    "commandId": "snapshot-1",
+    "taskId": "snapshot-1",
+    "status": "failed",
+    "stepResults": [],
+    "error": "Accessibility service is not available",
+    "errorCode": "SERVICE_UNAVAILABLE",
+    "hint": "Accessibility service not running. Run 'clawperator doctor --fix --device emulator-5554' to diagnose and repair, or 'clawperator operator setup --apk <path-to-apk> --device emulator-5554' to reinstall."
   },
   "deviceId": "emulator-5554",
   "terminalSource": "clawperator_result",
@@ -2223,8 +2242,10 @@ Use these fields in order:
 Notes:
 
 - `errorCode` is optional on the envelope. Older APK behavior and some unclassified failures may leave it unset.
+- envelope `errorCode` may contain Android-emitted values such as `SERVICE_UNAVAILABLE` that are not part of Node's public `errors.ts` enum
 - per-step failures do not use the envelope `errorCode`; they usually expose the actionable code in `stepResults[i].data.error`
 - `StepResult.data` values are strings, so treat `data.error` and `data.message` as string fields
+- Node post-processing can turn some Android-internal failure markers into success results, for example normalizing `UNSUPPORTED_RUNTIME_CLOSE` into a successful `close_app` step when adb pre-flight already succeeded
 
 ## Recovery Patterns
 
@@ -2381,6 +2402,7 @@ What this means for agents:
 
 - if the code is in `errors.ts`, you can branch on it as part of the public contract
 - if the code is not in `errors.ts`, treat it as a CLI-specific usage object and prefer fixing the command shape rather than building long-term logic around that string
+- similarly, Android may emit envelope `errorCode` values outside the Node enum; branch on them when present in the envelope, but do not confuse them with the documented Node-side top-level `code` contract
 
 ## Related Pages
 
