@@ -44,6 +44,7 @@ Rules enforced by Node:
 - empty matcher objects are invalid
 - blank strings are rejected before or during validation depending on how the matcher was built
 - selector objects are strict in execution validation, so unknown keys are rejected
+- when the shared CLI parser sees no selector flags at all, it returns an empty matcher object and the command decides whether selectors are required for that command
 
 Concrete payload example:
 
@@ -172,6 +173,13 @@ Why invalid:
 
 `click`, `read`, `wait`, `scroll-until`, `scroll-and-click`, and `wait-for-nav` all use the shared selector parser from `selectorFlags.ts`. That means they share the same shorthand-to-JSON mapping and the same mutual-exclusion rules.
 
+Required-vs-optional behavior is decided by the command after parsing:
+
+- `click`, `read`, and `wait` require an element selector unless `click` is using `--coordinate`
+- `wait-for-nav` accepts either `--app` or a selector, but still requires at least one of them
+- `scroll` has no target selector and uses only optional container selector flags
+- `scroll-until` and `scroll-and-click` require a target selector
+
 ### `type`
 
 `type` is slightly different because `--text` means “text to enter”, not “textEquals selector”. For element targeting, `type` uses:
@@ -200,6 +208,8 @@ clawperator type "hello world" --role textfield
 | `--label-desc` | `contentDescEquals` |
 
 At least one of those flags is required.
+
+Blank label values are rejected, and if you provide none of the three label flags the command returns a usage error before execution is built.
 
 Concrete execution fragment:
 
