@@ -29,6 +29,12 @@ Examples:
 | `0.1.0-d` | `0.1.0` | yes |
 | `0.1.1` | `0.1.0` | no |
 
+The accepted parse format after normalization is the literal regex:
+
+```text
+^(\d+)\.(\d+)\.(\d+)$
+```
+
 ## How Compatibility Is Checked
 
 Doctor uses the readiness check id:
@@ -72,6 +78,48 @@ Failing doctor example:
 }
 ```
 
+Direct CLI compatibility checks use `clawperator version --check-compat --json` and return a top-level probe result:
+
+```bash
+clawperator version --check-compat --json --device <device_serial> --operator-package com.clawperator.operator.dev
+```
+
+Compatible response:
+
+```json
+{
+  "cliVersion": "0.1.0",
+  "apkVersion": "0.1.0",
+  "apkVersionCode": 1,
+  "operatorPackage": "com.clawperator.operator.dev",
+  "compatible": true
+}
+```
+
+Incompatible response:
+
+```json
+{
+  "cliVersion": "0.1.1",
+  "apkVersion": "0.1.0",
+  "apkVersionCode": 1,
+  "operatorPackage": "com.clawperator.operator",
+  "compatible": false,
+  "error": {
+    "code": "VERSION_INCOMPATIBLE",
+    "message": "CLI 0.1.1 is not compatible with installed APK 0.1.0.",
+    "hint": "Clawperator requires the exact same version between the CLI and APK, ignoring only the debug suffix."
+  },
+  "remediation": [
+    "Download the matching APK: https://downloads.clawperator.com/operator/v0.1.1/operator-v0.1.1.apk",
+    "Download the checksum: https://downloads.clawperator.com/operator/v0.1.1/operator-v0.1.1.apk.sha256",
+    "Verify the checksum: sha256sum -c operator-v0.1.1.apk.sha256",
+    "Install the matching APK: clawperator operator setup --apk operator-v0.1.1.apk --device <device_id>",
+    "If you are using the release package, the versioned download above is the exact APK to install."
+  ]
+}
+```
+
 ## Version Probing Flow
 
 `probeVersionCompatibility()` performs these checks:
@@ -88,6 +136,22 @@ Important consequences:
 
 - compatibility is not "same major version" or "same minor version"
 - it is exact normalized equality
+
+## Verification Pattern
+
+Use both surfaces when diagnosing version state:
+
+```bash
+clawperator version --check-compat --json --device <device_serial> --operator-package <package>
+clawperator doctor --json --device <device_serial> --operator-package <package>
+```
+
+Check:
+
+- `compatible` from `version --check-compat`
+- `error.code` and `remediation` from `version --check-compat` when `compatible` is `false`
+- the doctor check with `id == "readiness.version.compatibility"`
+- `criticalOk` from doctor, because compatibility is a critical readiness check
 
 ## Error Codes
 
@@ -123,6 +187,12 @@ Examples:
 - invalid: `main`
 - invalid: `0.1`
 
+Exact normalization examples:
+
+- `0.1.0-d` normalizes to `0.1.0`
+- `0.1.0` stays `0.1.0`
+- `0.1.0-debug` is invalid because only the trailing `-d` suffix is stripped
+
 ## Recovery
 
 ### When versions are incompatible
@@ -141,6 +211,11 @@ Release install path:
 - download the matching sha256 URL
 - install with `clawperator operator setup --apk ...`
 
+The generated release URLs are exact:
+
+- download: `https://downloads.clawperator.com/operator/v<version>/operator-v<version>.apk`
+- checksum: `https://downloads.clawperator.com/operator/v<version>/operator-v<version>.apk.sha256`
+
 ### When the wrong variant is installed
 
 If the debug package is installed but the release package was requested, or vice versa:
@@ -154,12 +229,44 @@ If `CLI_VERSION_INVALID` occurs:
 
 - reinstall the CLI package
 
+Concrete failure shapes:
+
+```json
+{
+  "code": "CLI_VERSION_INVALID",
+  "message": "CLI version metadata is missing or unreadable."
+}
+```
+
+```json
+{
+  "code": "CLI_VERSION_INVALID",
+  "message": "CLI version main is not parseable for compatibility checks."
+}
+```
+
 ### When APK metadata is unreadable or invalid
 
 If `APK_VERSION_UNREADABLE` or `APK_VERSION_INVALID` occurs:
 
 - reinstall the Operator APK
 - rerun `clawperator doctor --json`
+
+Concrete failure shapes:
+
+```json
+{
+  "code": "APK_VERSION_UNREADABLE",
+  "message": "Could not read the installed APK version for com.clawperator.operator.dev."
+}
+```
+
+```json
+{
+  "code": "APK_VERSION_INVALID",
+  "message": "Installed APK version main is not parseable for compatibility checks."
+}
+```
 
 ## Machine-Checkable Success Condition
 
