@@ -12,6 +12,7 @@ export interface DoctorCheckResult {
     title: string;
     platform: "mac" | "linux" | "win" | "any";
     steps: Array<{ kind: "shell" | "manual"; value: string }>;
+    docsUrl?: string;
   };
   deviceGuidance?: {
     screen: string;

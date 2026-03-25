@@ -13,6 +13,7 @@ import {
   hasListedPackage,
   probeVersionCompatibility,
 } from "../../version/compatibility.js";
+import { DOCTOR_DOCS_URLS } from "../docsUrls.js";
 
 export async function checkApkPresence(config: RuntimeConfig): Promise<DoctorCheckResult> {
   const packageList = await runAdb(config, ["shell", "pm", "list", "packages", config.operatorPackage]);
@@ -63,6 +64,7 @@ export async function checkApkPresence(config: RuntimeConfig): Promise<DoctorChe
             { kind: "manual", value: `Use --operator-package ${otherVariant} or reinstall the correct APK` },
             { kind: "manual", value: `Public installs typically use com.clawperator.operator; local debug builds use com.clawperator.operator.dev` },
           ],
+          docsUrl: DOCTOR_DOCS_URLS.operator,
         },
       };
     }
@@ -92,6 +94,7 @@ export async function checkApkPresence(config: RuntimeConfig): Promise<DoctorChe
             value: `clawperator operator setup --apk ${getOperatorPackageApkPath(config.operatorPackage)} --device ${config.deviceId}${config.operatorPackage !== "com.clawperator.operator" ? ` --operator-package ${config.operatorPackage}` : ""}`,
           },
         ],
+        docsUrl: DOCTOR_DOCS_URLS.setup,
       },
     };
   }
@@ -165,6 +168,7 @@ export async function checkVersionCompatibility(config: RuntimeConfig): Promise<
         title: "Align CLI and APK versions",
         platform: "any",
         steps: result.remediation.map(step => ({ kind: "manual" as const, value: step })),
+        docsUrl: DOCTOR_DOCS_URLS.compatibility,
       }
       : undefined,
     evidence: {
@@ -222,6 +226,7 @@ export async function runHandshake(
           steps: [
             { kind: "shell", value: `clawperator grant-device-permissions${deviceFlag}${pkgFlag}` },
           ],
+          docsUrl: DOCTOR_DOCS_URLS.operator,
         },
         deviceGuidance: {
           screen: "Accessibility Settings",
@@ -256,6 +261,7 @@ export async function runHandshake(
           { kind: "shell", value: `clawperator grant-device-permissions${deviceFlag}${pkgFlag}` },
           { kind: "shell", value: `clawperator snapshot${deviceFlag}${pkgFlag} --timeout 5000 --verbose` },
         ],
+        docsUrl: DOCTOR_DOCS_URLS.operator,
       },
       deviceGuidance: {
         screen: "Accessibility Settings",

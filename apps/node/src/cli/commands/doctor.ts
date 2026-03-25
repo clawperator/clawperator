@@ -109,6 +109,9 @@ function renderCheck(lines: string[], check: DoctorCheckResult): void {
     for (const step of check.fix.steps) {
       lines.push(`      - ${step.value}`);
     }
+    if (check.fix.docsUrl) {
+      lines.push(`      Docs: ${check.fix.docsUrl}`);
+    }
   }
   if (check.status !== "pass" && check.deviceGuidance) {
     lines.push(`    On device (${check.deviceGuidance.screen}):`);

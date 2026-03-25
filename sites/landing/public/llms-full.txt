@@ -17,9 +17,271 @@ Use the section pages in the nav for the current canonical surface.
 
 # Setup
 
-Placeholder - content coming in PR-2/PR-3.
+## Purpose
 
-This page will cover installation, device preparation, APK installation, permissions, doctor verification, and the first snapshot command.
+Get from an empty host to a first successful `clawperator snapshot --json` with one deterministic path and machine-checkable success conditions.
+
+## Prerequisites
+
+| Requirement | Minimum | Machine check |
+| --- | --- | --- |
+| Node.js | v22+ | `node -v` |
+| adb | On `PATH` | `adb version` |
+| Android target | One device or emulator visible to adb | `clawperator devices` |
+
+## 1. Install the CLI
+
+Recommended - the installer handles Node, adb, CLI, APK download, and device setup in one step:
+
+```bash
+curl -fsSL https://clawperator.com/install.sh | bash
+```
+
+If the installer succeeds, skip to [5. Verify readiness with doctor](#5-verify-readiness-with-doctor).
+
+Alternatively, install the CLI only via npm (Node.js 22+ required):
+
+```bash
+npm install -g clawperator
+```
+
+Success conditions:
+
+- `clawperator version` exits `0` and prints a version string.
+- If you used `install.sh`, the installer also downloads the current release APK to `~/.clawperator/downloads/operator.apk`.
+
+## 2. Prepare the Android target
+
+Required device state:
+
+1. Enable Developer options (Settings > About phone > tap Build Number 7 times).
+2. Enable USB debugging (Settings > Developer options > USB debugging).
+3. Connect the device via USB, or boot an emulator via Android Studio or `clawperator emulator create`.
+4. Accept the adb authorization prompt if Android shows one.
+
+Emulators have USB debugging enabled by default. Physical devices require steps 1-2 and the RSA key acceptance in step 4.
+
+Success condition:
+
+```bash
+clawperator devices
+```
+
+Expected output shape:
+
+```json
+{"devices":[{"serial":"<device_serial>","state":"device"}]}
+```
+
+If state is `unauthorized`, unlock the device and accept the USB debugging prompt. If state is `offline`, restart adb:
+
+```bash
+adb kill-server && adb start-server
+```
+
+If more than one target is connected, record the serial you will use and pass `--device <serial>` on every later command.
+
+## 3. Install the Operator APK
+
+```bash
+clawperator operator setup --apk ~/.clawperator/downloads/operator.apk
+```
+
+With explicit device targeting:
+
+```bash
+clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device <device_serial>
+```
+
+For a local debug APK instead of the release APK:
+
+```bash
+clawperator operator setup \
+  --apk <local_debug_apk_path> \
+  --device <device_serial> \
+  --operator-package com.clawperator.operator.dev
+```
+
+| Variant | Package name | When to use |
+| --- | --- | --- |
+| Release | `com.clawperator.operator` | Default. Installed by the installer. |
+| Debug | `com.clawperator.operator.dev` | Local development, built from source. |
+
+The CLI auto-detects which variant is installed when exactly one is present. If both are installed, pass `--operator-package` explicitly.
+
+Behavior:
+
+- Installs the APK on the device via adb.
+- Grants accessibility and notification permissions.
+- Verifies that the package is visible to the package manager.
+
+Success condition:
+
+- Command exits without a structured error object.
+- A follow-up `clawperator doctor --json` no longer reports `OPERATOR_NOT_INSTALLED` for `readiness.apk.presence`.
+
+Do not use raw `adb install` for setup. The CLI setup command is the only path that performs install, permission grant, and verification as one operation.
+
+## 4. Re-grant permissions (recovery only)
+
+```bash
+clawperator grant-device-permissions --device <device_serial>
+```
+
+Use this only after the Operator APK crashes or Android revokes accessibility / notification permissions. For the first install, use `clawperator operator setup`.
+
+## 5. Verify readiness with doctor
+
+```bash
+clawperator doctor --json
+```
+
+With explicit targeting:
+
+```bash
+clawperator doctor --json --device <device_serial> --operator-package com.clawperator.operator.dev
+```
+
+### Doctor checks
+
+| Check ID | What it verifies |
+| --- | --- |
+| `host.node.version` | Node.js >= 22 |
+| `host.adb.presence` | adb is installed and on PATH |
+| `host.adb.server` | adb server starts successfully |
+| `device.discovery` | At least one device is connected and in state `device` |
+| `device.capability` | Device shell is available (SDK version, screen size) |
+| `readiness.apk.presence` | Operator APK is installed on the device |
+| `readiness.settings.dev_options` | Developer options enabled |
+| `readiness.settings.usb_debugging` | USB debugging enabled |
+| `readiness.version.compatibility` | CLI version is compatible with installed APK version |
+| `readiness.handshake` | Node can dispatch a command and receive a result envelope from the Operator |
+| `readiness.smoke` | End-to-end test: open Settings, capture UI snapshot |
+
+### DoctorReport shape
+
+```json
+{
+  "ok": true,
+  "criticalOk": true,
+  "deviceId": "<device_serial>",
+  "operatorPackage": "com.clawperator.operator",
+  "checks": [
+    {
+      "id": "host.node.version",
+      "status": "pass",
+      "summary": "Node version v22.x.x is compatible."
+    }
+  ],
+  "nextActions": []
+}
+```
+
+Failed checks include additional fields:
+
+```json
+{
+  "id": "readiness.handshake",
+  "status": "fail",
+  "code": "RESULT_ENVELOPE_TIMEOUT",
+  "summary": "Handshake timed out.",
+  "detail": "No [Clawperator-Result] envelope received within 7000ms.",
+  "fix": {
+    "title": "Grant accessibility permissions via adb",
+    "platform": "any",
+    "steps": [
+      { "kind": "shell", "value": "clawperator grant-device-permissions --device <device_serial>" }
+    ]
+  }
+}
+```
+
+### Success conditions
+
+- Exit code `0` means all critical checks passed.
+- JSON has `"criticalOk": true`.
+- `checks[]` contains only `"pass"` or non-critical `"warn"` statuses.
+- Each check has `status`: `"pass"`, `"warn"`, or `"fail"`.
+
+### Doctor flags
+
+- `doctor --fix` automatically executes shell-type remediation steps from failed checks. Manual steps are still reported. Use this for unattended recovery loops.
+- `doctor --check-only` always exits `0` regardless of failures. Do not use it as the setup gate.
+
+See [Doctor](api/doctor.md) for the full report contract and [Errors](api/errors.md) for recovery by code.
+
+## 6. Run the first command
+
+```bash
+clawperator snapshot --json
+```
+
+With explicit targeting:
+
+```bash
+clawperator snapshot --json --device <device_serial> --operator-package com.clawperator.operator.dev
+```
+
+Success conditions:
+
+- Exit code `0`.
+- `envelope.status` is `"success"`.
+- `envelope.stepResults[0].actionType` is `"snapshot_ui"`.
+- `envelope.stepResults[0].success` is `true`.
+- `envelope.stepResults[0].data.text` contains the XML hierarchy.
+
+If the snapshot step succeeds but `data.text` is missing, Node converts that step into `SNAPSHOT_EXTRACTION_FAILED`.
+
+## Agent sequence
+
+### Brain / hand model
+
+Clawperator is the hand. The agent is the brain. The agent decides what to do, then calls the Node CLI or the local serve API with explicit commands and waits for a structured result envelope.
+
+### Programmatic first-run sequence
+
+1. Run `clawperator doctor --json [--device <serial>] [--operator-package <pkg>]`.
+2. If `readiness.apk.presence` fails, run `clawperator operator setup --apk <path> ...`.
+3. If `readiness.handshake` fails after a known-good install, run `clawperator grant-device-permissions ...`.
+4. For multiple failures, `clawperator doctor --json --fix ...` auto-executes shell remediation steps.
+5. Re-run `clawperator doctor --json ...` and require `criticalOk: true`.
+6. Run `clawperator snapshot --json ...`.
+7. Branch only on structured fields: `criticalOk`, `checks[].code`, `envelope.status`, `envelope.errorCode`, `stepResults[].success`.
+
+### How to confirm success without a human
+
+- Treat `doctor --json` as ready only when `criticalOk` is `true`.
+- Treat a device command as successful only when `envelope.status` is `"success"` and every `stepResults[].success` is `true`.
+- Prefer exact codes over message matching. Examples: `NO_DEVICES`, `OPERATOR_NOT_INSTALLED`, `RESULT_ENVELOPE_TIMEOUT`.
+
+### Common first-run failures and recovery
+
+| Code | Meaning | Recovery |
+| --- | --- | --- |
+| `NO_DEVICES` | No adb target in state `device` | Connect or boot a target, rerun `clawperator devices` then `doctor`. |
+| `DEVICE_UNAUTHORIZED` | adb key prompt not accepted | Accept the prompt on the device screen, rerun `doctor`. |
+| `DEVICE_OFFLINE` | Device unreachable | `adb kill-server && adb start-server`, rerun `doctor`. |
+| `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED` | More than one target connected | Pick a serial from `clawperator devices`, pass `--device <serial>` to all commands. |
+| `OPERATOR_NOT_INSTALLED` | Expected package missing | `clawperator operator setup --apk <path> [--device <serial>]`. |
+| `OPERATOR_VARIANT_MISMATCH` | Release/debug package mismatch | Pass `--operator-package <installed-package>` or reinstall the intended APK. |
+| `DEVICE_ACCESSIBILITY_NOT_RUNNING` | Handshake returned a runtime failure | `clawperator grant-device-permissions [--device <serial>]`, rerun `doctor` and `snapshot`. |
+| `RESULT_ENVELOPE_TIMEOUT` | Broadcast sent, no result envelope arrived | Re-grant permissions, rerun `snapshot --timeout 5000 --verbose`, verify `--operator-package`. |
+| `VERSION_INCOMPATIBLE` | CLI and APK version mismatch | Reinstall CLI (`npm install -g clawperator@latest`) or APK to align versions. |
+
+### When to pass `--device` and `--operator-package`
+
+- `--device <serial>`: required when more than one target is connected.
+- `--operator-package <package>`: required when both release and debug variants are installed on the same device.
+
+For deterministic automation, always pass both flags explicitly.
+
+## Related pages
+
+- [API Overview](api/overview.md)
+- [Devices](api/devices.md)
+- [Doctor](api/doctor.md)
+- [Errors](api/errors.md)
+- [Troubleshooting](troubleshooting/operator.md)
 
 ---
 
@@ -27,9 +289,295 @@ This page will cover installation, device preparation, APK installation, permiss
 
 # API Overview
 
-Placeholder - content coming in PR-2/PR-3.
+## Purpose
 
-This page will summarize the execution model, result envelope, and pointers to the dedicated reference pages.
+Define the smallest end-to-end contract an agent needs to use Clawperator correctly: the execution payload, the CLI success wrapper, the `[Clawperator-Result]` envelope, and the exact fields to branch on.
+
+## What Clawperator Is
+
+Clawperator is a deterministic Android actuator. The agent is the planner. Clawperator accepts an explicit execution payload, validates it, resolves one target device and Operator package, dispatches the actions, and returns a structured result.
+
+This page is intentionally narrow:
+
+- Use [Actions](actions.md) for action-by-action parameter semantics
+- Use [Selectors](selectors.md) for `NodeMatcher` and selector flags
+- Use [Errors](errors.md) for exact error codes and recovery
+- Use [Devices](devices.md) for target selection rules
+
+## Execution Payload
+
+Authoritative source: `apps/node/src/contracts/execution.ts`
+
+Top-level execution fields:
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `commandId` | `string` | Caller-generated correlation id for the whole run. |
+| `taskId` | `string` | Caller-generated task id. |
+| `source` | `string` | Caller label, such as `serve-api` or `clawperator-action`. |
+| `expectedFormat` | `"android-ui-automator"` | Required constant. |
+| `timeoutMs` | `number` | Execution-level timeout for the whole payload. Current Node limits require `1000 <= timeoutMs <= 120000`. |
+| `actions` | `ExecutionAction[]` | Ordered action list. |
+| `mode` | `"artifact_compiled" | "direct"` | Optional runtime mode marker. |
+
+Each action has:
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `id` | `string` | Step correlation id. |
+| `type` | `string` | Canonical action type such as `click` or `snapshot_ui`. |
+| `params` | `ActionParams` | Optional action-specific parameters. |
+
+Minimum valid payload example:
+
+```json
+{
+  "commandId": "cmd-001",
+  "taskId": "task-001",
+  "source": "agent-loop",
+  "expectedFormat": "android-ui-automator",
+  "timeoutMs": 30000,
+  "actions": [
+    {
+      "id": "snap-1",
+      "type": "snapshot_ui"
+    }
+  ],
+  "mode": "direct"
+}
+```
+
+Success conditions for a valid payload before dispatch:
+
+- `expectedFormat` is exactly `"android-ui-automator"`
+- `timeoutMs` is between `1000` and `120000` milliseconds
+- `actions` is non-empty
+- every `actions[i].type` is a supported canonical action type after alias normalization
+- on a live execution path, `commandId` and `taskId` are echoed back in the result envelope for correlation
+
+## Execution Limits
+
+Current Node-side validation limits are:
+
+- at most `50` actions per execution
+- at most `64000` serialized payload bytes
+- `timeoutMs` must stay in `1000..120000`
+
+If validation fails on limits, shorten the action list, split a large workflow into multiple executions, or avoid embedding oversized inline artifacts in the payload.
+
+## Result Envelope
+
+Authoritative source: `apps/node/src/contracts/result.ts`
+
+The Android runtime emits a `[Clawperator-Result]` envelope. The Node CLI wraps that envelope in a top-level success object for most device commands:
+
+```json
+{
+  "envelope": {
+    "commandId": "cmd-001",
+    "taskId": "task-001",
+    "status": "success",
+    "stepResults": [
+      {
+        "id": "snap-1",
+        "actionType": "snapshot_ui",
+        "success": true,
+        "data": {
+          "text": "<hierarchy/>"
+        }
+      }
+    ],
+    "error": null
+  },
+  "deviceId": "<device_serial>",
+  "terminalSource": "clawperator_result",
+  "isCanonicalTerminal": true
+}
+```
+
+Inside that wrapper, the canonical envelope shape is:
+
+```json
+{
+  "commandId": "<command_id>",
+  "taskId": "<task_id>",
+  "status": "success",
+  "stepResults": [
+    {
+      "id": "<step_id>",
+      "actionType": "<action_type>",
+      "success": true,
+      "data": {}
+    }
+  ],
+  "error": null,
+  "errorCode": null,
+  "hint": "<optional_hint>"
+}
+```
+
+Field meanings:
+
+| Field | Meaning |
+| --- | --- |
+| `status` | Top-level outcome after Node post-processing. `"failed"` means at least one step failed or the runtime returned a top-level failure. |
+| `stepResults[].success` | Per-step success bit. |
+| `stepResults[].data` | Action-specific string map. Keys and values are strings after parsing and post-processing. |
+| `error` | Human-readable top-level failure summary. |
+| `errorCode` | Stable top-level code when available. Prefer this over matching `error`. Current runtime envelopes may also surface Android-emitted strings such as `SERVICE_UNAVAILABLE`, so do not assume this field is limited to the Node enum in `errors.ts`. |
+| `hint` | Optional recovery hint injected by Node. |
+
+Failure wrapper example from the CLI:
+
+```json
+{
+  "code": "EXECUTION_VALIDATION_FAILED",
+  "message": "wait_for_navigation requires params.timeoutMs > 0",
+  "details": {
+    "path": "actions.0.params.timeoutMs",
+    "actionId": "wait-1",
+    "actionType": "wait_for_navigation"
+  }
+}
+```
+
+Non-runtime success wrappers from `clawperator exec`:
+
+```json
+{
+  "ok": true,
+  "validated": true,
+  "execution": {
+    "commandId": "cmd-001",
+    "taskId": "task-001",
+    "source": "agent-loop",
+    "expectedFormat": "android-ui-automator",
+    "timeoutMs": 30000,
+    "actions": [
+      { "id": "snap-1", "type": "snapshot_ui" }
+    ]
+  }
+}
+```
+
+```json
+{
+  "ok": true,
+  "dryRun": true,
+  "plan": {
+    "commandId": "cmd-001",
+    "timeoutMs": 30000,
+    "actionCount": 1,
+    "actions": [
+      { "id": "snap-1", "type": "snapshot_ui" }
+    ]
+  }
+}
+```
+
+## Surface Differences
+
+Use the wrapper shape that matches the surface you called:
+
+| Surface | Success shape |
+| --- | --- |
+| CLI device execution commands | `{ "envelope": ..., "deviceId": "...", "terminalSource": "clawperator_result", "isCanonicalTerminal": true }` |
+| `clawperator exec --validate` | `{ "ok": true, "validated": true, "execution": ... }` |
+| `clawperator exec --dry-run` | `{ "ok": true, "dryRun": true, "plan": ... }` |
+| `clawperator serve` execution endpoints | `{ "ok": true, "deviceId": "...", "terminalSource": "...", "envelope": ... }` |
+
+`isCanonicalTerminal` is a CLI wrapper field. HTTP serve execution responses do not include it.
+
+## How To Branch On Results
+
+Branch in this order:
+
+1. If the CLI returned a top-level object with `code` and no `envelope`, treat it as a host-side failure. Do not retry unchanged.
+2. If `envelope.status == "failed"` and `envelope.errorCode` is present, branch on `envelope.errorCode`.
+3. If `envelope.status == "failed"` and `envelope.stepResults` contains a failed step, branch on the first `stepResults[i].success == false` and inspect `stepResults[i].data.error`.
+4. If `envelope.status == "success"` and every `stepResults[i].success == true`, treat the command as successful.
+5. If the top-level object is `{ ok: true, validated: true, ... }` or `{ ok: true, dryRun: true, ... }`, treat it as a pre-dispatch contract success, not a device execution result.
+
+Exact machine-checkable success condition for most CLI device commands:
+
+- process exit code `0`
+- top-level JSON contains `envelope`
+- `envelope.status == "success"`
+- every `envelope.stepResults[i].success == true`
+- `terminalSource == "clawperator_result"`
+- `isCanonicalTerminal == true`
+
+## How `status` and `stepResults` Relate
+
+- If any `stepResults[].success` is `false`, Node reconciles `status` to `"failed"` and sets `error` from the first failed step.
+- If all steps succeed, Node reconciles `status` to `"success"`, clears top-level error state, and removes `hint`.
+- A top-level failure can also arrive with zero steps, for example when Android returns a failure envelope before a normal step list exists, such as `SERVICE_UNAVAILABLE`.
+- Execution timeout is different: `runExecution()` returns a top-level host-side error object such as `RESULT_ENVELOPE_TIMEOUT`, not a zero-step success-wrapper envelope.
+- Node may modify step data after the runtime returns. Examples:
+  - `snapshot_ui` success steps get `data.text` attached from extracted log output
+  - missing snapshot text is converted into `SNAPSHOT_EXTRACTION_FAILED`
+  - successful `take_screenshot` steps get `data.path`
+  - successful pre-flight `close_app` steps are normalized to `data.application_id`
+
+## Execution Flow
+
+1. Agent constructs an execution payload with stable `commandId`, `taskId`, and ordered `actions`.
+2. Node validates the payload size and action schema before any adb dispatch.
+3. Node resolves one target device and one Operator package.
+4. Node sends the payload to Android and waits for a `[Clawperator-Result]` envelope.
+5. Node post-processes known cases such as snapshot extraction, screenshot capture, settle warnings, and `close_app` normalization.
+6. CLI commands return a JSON wrapper containing the envelope, `deviceId`, `terminalSource`, and `isCanonicalTerminal`.
+
+## Worked Example
+
+Command:
+
+```bash
+clawperator snapshot --json --device <device_serial>
+```
+
+Success output shape:
+
+```json
+{
+  "envelope": {
+    "commandId": "snapshot-1700000000000-abcd123",
+    "taskId": "snapshot-1700000000000-abcd123",
+    "status": "success",
+    "stepResults": [
+      {
+        "id": "snap",
+        "actionType": "snapshot_ui",
+        "success": true,
+        "data": {
+          "text": "<hierarchy rotation=\"0\">...</hierarchy>"
+        }
+      }
+    ],
+    "error": null
+  },
+  "deviceId": "<device_serial>",
+  "terminalSource": "clawperator_result",
+  "isCanonicalTerminal": true
+}
+```
+
+Agent-side success test:
+
+- `envelope.status == "success"`
+- `envelope.stepResults[0].actionType == "snapshot_ui"`
+- `envelope.stepResults[0].success == true`
+- `"text" in envelope.stepResults[0].data`
+
+## Related Pages
+
+- [Actions](actions.md)
+- [Selectors](selectors.md)
+- [Errors](errors.md)
+- [Devices](devices.md)
+- [Doctor](doctor.md)
+- [Serve API](serve.md)
+- [Setup](../setup.md)
 
 ---
 
@@ -345,15 +893,977 @@ This page is generated from the Node CLI registry and command sources.
 
 # Actions
 
-Placeholder - content coming in PR-2/PR-3.
+## Purpose
 
-Each action, its required inputs, outputs, and common failure modes will live here.
+Define the canonical `ExecutionAction.type` values, the exact parameters each action accepts, which values are validated by Node, and what success and failure data an agent can rely on.
+
+## Sources
+
+- Canonical action types: `apps/node/src/contracts/aliases.ts`
+- Shared parameter shape: `apps/node/src/contracts/execution.ts`
+- Validation rules: `apps/node/src/domain/executions/validateExecution.ts`
+- CLI-built payload defaults: `apps/node/src/domain/actions/` and `apps/node/src/domain/observe/`
+- Android payload parsing: `apps/android/shared/data/operator/src/main/kotlin/clawperator/operator/agent/AgentCommandParser.kt`
+- Android action/result behavior: `apps/android/shared/data/task/src/main/kotlin/clawperator/task/runner/UiAction.kt` and `UiActionEngine.kt`
+
+## General Rules
+
+| Rule | Meaning |
+| --- | --- |
+| Canonical action names only | Stored payloads should use canonical types such as `open_uri`, `wait_for_node`, and `take_screenshot`. Input aliases are normalized before validation. |
+| `params` is optional at the schema level | Action-specific validation then decides whether it is actually required. |
+| Selectors live on a separate page | `matcher`, `container`, `expectedNode`, and `labelMatcher` all use the [Selectors](selectors.md) `NodeMatcher` contract. |
+| `StepResult.data` is a string map | Node may attach known keys such as `text`, `path`, `warn`, `application_id`, `error`, or `message`, but most actions do not have a richer static success schema. |
+| CLI coverage is narrower than raw JSON | Some advanced fields in `ActionParams` are accepted only through `clawperator exec` JSON, not through flat CLI flags. |
+| Runtime details are not always Node guarantees | When this page calls out Android-returned success keys, treat them as current runtime behavior verified from Android code, not as a stricter Node-side schema guarantee. |
+
+## Retry Object Shape
+
+Several actions accept `retry`, `scrollRetry`, or `clickRetry` objects in raw `clawperator exec` JSON. Node accepts these fields as part of `ActionParams`, and Android parses them into a retry policy with these keys:
+
+```json
+{
+  "maxAttempts": 4,
+  "initialDelayMs": 400,
+  "maxDelayMs": 2000,
+  "backoffMultiplier": 2,
+  "jitterRatio": 0.15
+}
+```
+
+Meaning:
+
+- `maxAttempts` counts the initial attempt, so `1` means no retry.
+- `initialDelayMs` is the delay before the first retry.
+- `maxDelayMs` caps exponential backoff growth.
+- `backoffMultiplier` must be `>= 1.0`.
+- `jitterRatio` must be in `[0.0, 1.0]`.
+- Android clamps `maxAttempts` to `1..10`.
+- Android clamps `initialDelayMs` to `0..30000`.
+- Android clamps `maxDelayMs` to `initialDelayMs..60000`.
+- Android clamps `backoffMultiplier` to `1.0..5.0`.
+- Android clamps `jitterRatio` to `0.0..1.0`.
+- if you omit a retry object, Android applies an action-specific default such as `UiReadiness`, `UiScroll`, `AppLaunch`, `AppClose`, or `None`.
+
+## Canonical Types And Input Aliases
+
+Canonical public action types:
+
+```text
+open_app
+open_uri
+close_app
+start_recording
+stop_recording
+wait_for_node
+click
+scroll_and_click
+scroll
+scroll_until
+read_text
+enter_text
+snapshot_ui
+take_screenshot
+sleep
+press_key
+wait_for_navigation
+read_key_value_pair
+```
+
+Input aliases normalized by Node before validation:
+
+| Alias | Canonical type |
+| --- | --- |
+| `open_url` | `open_uri` |
+| `tap` | `click` |
+| `press` | `click` |
+| `wait_for`, `find`, `find_node` | `wait_for_node` |
+| `read` | `read_text` |
+| `snapshot` | `snapshot_ui` |
+| `screenshot`, `capture_screenshot` | `take_screenshot` |
+| `type_text`, `text_entry`, `input_text` | `enter_text` |
+| `key_press` | `press_key` |
+
+## Full Payload Example
+
+```json
+{
+  "commandId": "open-settings-and-snapshot",
+  "taskId": "open-settings-and-snapshot",
+  "source": "agent-loop",
+  "expectedFormat": "android-ui-automator",
+  "timeoutMs": 30000,
+  "actions": [
+    {
+      "id": "open-1",
+      "type": "open_app",
+      "params": {
+        "applicationId": "com.android.settings"
+      }
+    },
+    {
+      "id": "wait-1",
+      "type": "wait_for_navigation",
+      "params": {
+        "expectedPackage": "com.android.settings",
+        "timeoutMs": 5000
+      }
+    },
+    {
+      "id": "snap-1",
+      "type": "snapshot_ui"
+    }
+  ],
+  "mode": "direct"
+}
+```
+
+Success condition for that payload:
+
+- `envelope.status == "success"`
+- every `envelope.stepResults[i].success == true`
+- `envelope.stepResults[2].actionType == "snapshot_ui"`
+- `"text" in envelope.stepResults[2].data`
+
+## Action Reference
+
+### `click`
+
+| Field | Valid values |
+| --- | --- |
+| Required | exactly one of `params.matcher` or `params.coordinate` |
+| `matcher` | any non-empty `NodeMatcher` |
+| `coordinate` | `{ "x": <int >= 0>, "y": <int >= 0> }` |
+| `clickType` | optional string; CLI builders use `"default"`, `"long_click"`, or `"focus"` |
+| `retry` | optional retry object in raw `exec` JSON; Android defaults to `UiReadiness` |
+
+Rules:
+
+- `matcher` and `coordinate` are mutually exclusive.
+- `clickType = "focus"` is invalid with `coordinate`.
+- CLI defaults to `"default"` and omits the field from the payload.
+
+Success data:
+
+- no Node-guaranteed success keys
+
+Common failures:
+
+- `EXECUTION_VALIDATION_FAILED` for missing selector, dual selector modes, invalid coordinates, or unsupported `clickType` combinations
+- runtime step failures such as `NODE_NOT_FOUND`, `NODE_NOT_CLICKABLE`, `GESTURE_FAILED`
+
+Example:
+
+```json
+{
+  "id": "click-1",
+  "type": "click",
+  "params": {
+    "matcher": { "textEquals": "Settings" },
+    "clickType": "long_click"
+  }
+}
+```
+
+### `scroll`
+
+| Field | Valid values |
+| --- | --- |
+| Required | none |
+| `direction` | optional string in `down`, `up`, `left`, `right` |
+| `container` | optional `NodeMatcher` |
+| `distanceRatio` | optional number in `[0.0, 1.0]` |
+| `settleDelayMs` | optional number in `[0, 10000]` |
+| `findFirstScrollableChild` | optional boolean in raw `exec` JSON; Android defaults to `true` |
+| `retry` | optional retry object in raw `exec` JSON; Android defaults to `None` for plain scroll |
+
+Semantics:
+
+- if `direction` is omitted in raw JSON, Node validation allows omission
+- Android defaults omitted `direction` to `down`
+- the flat CLI always sets a direction explicitly
+- `container` scopes the scroll to a matched scrollable container
+- `distanceRatio` and `settleDelayMs` are advanced tuning fields for raw JSON execution
+- if `findFirstScrollableChild == true` and the matched container is not itself scrollable, Android walks down to the first scrollable descendant
+- `retry` covers container resolution and repeated UI-tree fetches during the scroll operation
+
+Success data:
+
+- no Node-guaranteed success keys
+
+Common failures:
+
+- `EXECUTION_VALIDATION_FAILED` for invalid `direction`, `distanceRatio`, or `settleDelayMs`
+- runtime step failures such as `CONTAINER_NOT_FOUND`, `CONTAINER_NOT_SCROLLABLE`, `GESTURE_FAILED`
+
+Example:
+
+```json
+{
+  "id": "scroll-1",
+  "type": "scroll",
+  "params": {
+    "direction": "down",
+    "container": { "resourceId": "android:id/list" },
+    "distanceRatio": 0.7,
+    "settleDelayMs": 250
+  }
+}
+```
+
+### `scroll_until`
+
+| Field | Valid values |
+| --- | --- |
+| Required | none at schema level; `matcher` becomes required when `clickAfter == true` |
+| `direction` | optional string in `down`, `up`, `left`, `right` |
+| `matcher` | optional `NodeMatcher` |
+| `container` | optional `NodeMatcher` |
+| `clickAfter` | optional boolean |
+| `distanceRatio` | optional number in `[0.0, 1.0]` |
+| `settleDelayMs` | optional number in `[0, 10000]` |
+| `maxScrolls` | optional integer in `[1, 200]` |
+| `maxDurationMs` | optional number in `[0, 120000]` |
+| `noPositionChangeThreshold` | optional integer in `[1, 20]` |
+| `findFirstScrollableChild` | optional boolean in raw `exec` JSON; Android defaults to `true` |
+| `clickType` | optional string in raw `exec` JSON; Android parses the same click types used by `click` |
+
+Semantics:
+
+- without `clickAfter`, the action scrolls until the target becomes visible or the loop terminates
+- with `clickAfter: true`, the same action requires `matcher` and turns into “scroll then click”
+- the flat CLI exposes only the core controls; advanced tuning requires raw JSON via `clawperator exec`
+- Android defaults omitted `direction` to `down`, `distanceRatio` to `0.7`, `settleDelayMs` to `250`, `maxScrolls` to `20`, `maxDurationMs` to `10000`, `noPositionChangeThreshold` to `3`, and `findFirstScrollableChild` to `true`
+- `maxScrolls` is the hard cap on how many scroll steps Android will attempt
+- `maxDurationMs` is the wall-clock cap for the full loop
+- `noPositionChangeThreshold` stops the loop after that many consecutive non-moving scrolls
+
+Success data:
+
+- no Node-guaranteed success keys
+
+Common failures:
+
+- `EXECUTION_VALIDATION_FAILED` for invalid direction or out-of-range tuning fields
+- runtime step failures such as `NODE_NOT_FOUND`, `CONTAINER_NOT_FOUND`, `CONTAINER_NOT_SCROLLABLE`
+
+Example:
+
+```json
+{
+  "id": "scroll-until-1",
+  "type": "scroll_until",
+  "params": {
+    "direction": "down",
+    "matcher": { "textEquals": "About phone" },
+    "maxScrolls": 25,
+    "maxDurationMs": 10000,
+    "noPositionChangeThreshold": 3
+  }
+}
+```
+
+### `scroll_and_click`
+
+| Field | Valid values |
+| --- | --- |
+| Required | `matcher` |
+| `direction` | optional string in `down`, `up`, `left`, `right` |
+| `matcher` | required `NodeMatcher` |
+| `container` | optional `NodeMatcher` |
+| `clickAfter` | optional boolean in raw `exec` JSON; Android defaults it to `true` |
+| `maxSwipes` | optional integer in raw `exec` JSON; Android defaults it to `10` and clamps it to `[1, 50]` |
+| `distanceRatio` | optional number in raw `exec` JSON; Android defaults it to `0.7` and clamps it to `[0.0, 1.0]` |
+| `settleDelayMs` | optional number in raw `exec` JSON; Android defaults it to `250` and clamps it to `[0, 10000]` |
+| `findFirstScrollableChild` | optional boolean in raw `exec` JSON; Android defaults it to `true` |
+| `clickType` | optional string in raw `exec` JSON; Android parses the same click types used by `click` |
+| `scrollRetry` | optional retry object in raw `exec` JSON; Android defaults to `UiScroll` |
+| `clickRetry` | optional retry object in raw `exec` JSON; Android defaults to `UiReadiness` |
+
+Semantics:
+
+- this is the canonical action type produced by `scroll-until --click` and `scroll-and-click`
+- unlike raw `scroll_until`, this action is optimized for “scroll to target, then click target”
+- `maxSwipes` is the safety cap on how many swipes Android performs before failing
+- `scrollRetry` applies to scrolling and view refresh between swipes
+- `clickRetry` applies only to the final click after the target is visible
+- setting `clickAfter: false` is accepted in raw `exec` JSON and makes Android stop after revealing the target, but the flat CLI does not emit that variant for `scroll_and_click`
+
+Success data:
+
+- no Node-guaranteed success keys
+
+Common failures:
+
+- `EXECUTION_VALIDATION_FAILED` if `matcher` is absent
+- runtime scroll or click failures, including `NODE_NOT_FOUND`
+
+Example:
+
+```json
+{
+  "id": "scroll-click-1",
+  "type": "scroll_and_click",
+  "params": {
+    "matcher": { "textEquals": "Submit" },
+    "direction": "down"
+  }
+}
+```
+
+### `read_text`
+
+| Field | Valid values |
+| --- | --- |
+| Required | `matcher` |
+| `matcher` | required `NodeMatcher` |
+| `all` | optional boolean; when `true`, request all matches instead of the first match |
+| `container` | optional `NodeMatcher` |
+| `validator` | optional string; current validation adds special behavior only for `"regex"` |
+| `validatorPattern` | required non-empty valid regex string when `validator == "regex"` |
+| `retry` | optional retry object in raw `exec` JSON; Android defaults to `UiReadiness` |
+
+Semantics:
+
+- if `validator` is omitted, no validator-specific Node rule runs
+- if `validator == "regex"`, `validatorPattern` must exist and compile as a regex
+- other validator strings are accepted by the current Node schema, but this repo does not add extra Node-side validation semantics for them
+- current Android parser accepts only `temperature`, `version`, and `regex`; any other validator string is rejected at runtime
+- `all: true` asks Android to return all matching text values instead of only the first match
+
+Success data:
+
+- no Node-guaranteed success keys
+
+Common failures:
+
+- `EXECUTION_VALIDATION_FAILED` for missing `matcher` or invalid regex configuration
+- runtime failures such as `NODE_NOT_FOUND`
+
+Example:
+
+```json
+{
+  "id": "read-1",
+  "type": "read_text",
+  "params": {
+    "matcher": { "textContains": "Order" },
+    "validator": "regex",
+    "validatorPattern": "^ORD-[0-9]{6}$",
+    "all": false
+  }
+}
+```
+
+### `read_key_value_pair`
+
+| Field | Valid values |
+| --- | --- |
+| Required | `labelMatcher` |
+| `labelMatcher` | required `NodeMatcher` |
+| `all` | optional boolean |
+| `retry` | optional retry object in raw `exec` JSON; Android defaults to `UiReadiness` |
+
+Semantics:
+
+- built by the flat `read-value` CLI command
+- uses a label matcher rather than a generic element matcher
+
+Success data:
+
+- no Node-guaranteed success keys
+
+Common failures:
+
+- `EXECUTION_VALIDATION_FAILED` when `labelMatcher` is absent
+
+Example:
+
+```json
+{
+  "id": "read-value-1",
+  "type": "read_key_value_pair",
+  "params": {
+    "labelMatcher": { "textEquals": "Battery" },
+    "all": false
+  }
+}
+```
+
+### `enter_text`
+
+| Field | Valid values |
+| --- | --- |
+| Required | `matcher`, `text` |
+| `matcher` | required `NodeMatcher` |
+| `text` | required non-empty string |
+| `submit` | optional boolean |
+| `retry` | optional retry object in raw `exec` JSON; Android defaults to `UiReadiness` |
+
+Semantics:
+
+- `submit` defaults to `false` in the built-in CLI builders
+- the shared `ActionParams` schema still includes `clear`, but the current Android parser and `UiAction.EnterText` model do not consume it, so do not rely on it
+
+Success data:
+
+- Node does not declare a richer static schema here
+- current Android runtime behavior returns `data.text` and `data.submit`
+
+Common failures:
+
+- `EXECUTION_VALIDATION_FAILED` for missing matcher or blank text
+- runtime failures such as `NODE_NOT_FOUND`
+
+Example:
+
+```json
+{
+  "id": "type-1",
+  "type": "enter_text",
+  "params": {
+    "matcher": { "resourceId": "com.example:id/search" },
+    "text": "hello world",
+    "submit": false
+  }
+}
+```
+
+### `press_key`
+
+| Field | Valid values |
+| --- | --- |
+| Required | `key` |
+| `key` | case-insensitive string in `back`, `home`, `recents` |
+| `retry` | optional retry object in raw `exec` JSON; Android defaults to `None` |
+
+Success data:
+
+- no Node-guaranteed success keys
+
+Common failures:
+
+- `EXECUTION_VALIDATION_FAILED` for missing or unsupported key
+
+Example:
+
+```json
+{
+  "id": "press-1",
+  "type": "press_key",
+  "params": {
+    "key": "back"
+  }
+}
+```
+
+### `wait_for_node`
+
+| Field | Valid values |
+| --- | --- |
+| Required | `matcher` |
+| `matcher` | required `NodeMatcher` |
+| `timeoutMs` | optional number; the current Android parser clamps a provided value to `1..120000`; when built by the CLI, it comes from `--timeout` |
+| `retry` | optional retry object in raw `exec` JSON; Android defaults to `UiReadiness` |
+
+Semantics:
+
+- the action-level `timeoutMs` is distinct from the execution-level `timeoutMs`
+- current Node validation does not add a stricter positivity check for this field
+- the builder inflates the execution timeout to `max(actionTimeout + 5000, 30000)` so the envelope does not expire before the wait finishes
+
+Success data:
+
+- no Node-guaranteed success keys
+
+Common failures:
+
+- `EXECUTION_VALIDATION_FAILED` when `matcher` is missing
+- runtime failure when the target never appears
+
+Example:
+
+```json
+{
+  "id": "wait-1",
+  "type": "wait_for_node",
+  "params": {
+    "matcher": { "textEquals": "Settings" },
+    "timeoutMs": 5000
+  }
+}
+```
+
+### `wait_for_navigation`
+
+| Field | Valid values |
+| --- | --- |
+| Required | at least one of `expectedPackage` or `expectedNode`, plus `timeoutMs` |
+| `expectedPackage` | optional non-empty string up to matcher-length limits |
+| `expectedNode` | optional `NodeMatcher` |
+| `timeoutMs` | required number in `(0, 30000]` |
+
+Semantics:
+
+- at least one navigation target must be present
+- the CLI builder inflates execution timeout to `max(timeoutMs + 5000, 30000)`
+
+Success data:
+
+- no Node-guaranteed success keys
+
+Common failures:
+
+- `EXECUTION_VALIDATION_FAILED` for missing target, missing timeout, or timeout above `30000`
+
+Example:
+
+```json
+{
+  "id": "wait-nav-1",
+  "type": "wait_for_navigation",
+  "params": {
+    "expectedPackage": "com.android.settings",
+    "timeoutMs": 5000
+  }
+}
+```
+
+### `snapshot_ui`
+
+| Field | Valid values |
+| --- | --- |
+| Required | none |
+| `retry` | optional retry object in raw `exec` JSON; Android defaults to `UiReadiness` |
+
+Semantics:
+
+- the old `format` parameter is explicitly rejected as removed
+- built-in builders set execution timeout to `30000` unless overridden
+
+Success data:
+
+- `data.text` contains the extracted XML hierarchy
+- `data.warn` may be added when a snapshot immediately follows `click` or `scroll_and_click` without an intervening sleep
+
+Common failures:
+
+- `SNAPSHOT_EXTRACTION_FAILED`
+- `RESULT_ENVELOPE_TIMEOUT`
+
+Example:
+
+```json
+{
+  "id": "snap-1",
+  "type": "snapshot_ui"
+}
+```
+
+### `take_screenshot`
+
+| Field | Valid values |
+| --- | --- |
+| Required | none |
+| `path` | optional non-empty string |
+| `retry` | optional retry object in raw `exec` JSON; Android defaults to `None` |
+
+Semantics:
+
+- if `path` is present, it must not be blank
+- built-in builders set execution timeout to `30000` unless overridden
+
+Success data:
+
+- `data.path` after Node finalizes the screenshot capture
+
+Common failures:
+
+- `EXECUTION_VALIDATION_FAILED` for blank path
+- timeout or runtime screenshot capture failures
+
+Example:
+
+```json
+{
+  "id": "shot-1",
+  "type": "take_screenshot",
+  "params": {
+    "path": "/tmp/settings.png"
+  }
+}
+```
+
+### `close_app`
+
+| Field | Valid values |
+| --- | --- |
+| Required | `applicationId` |
+| `applicationId` | required non-empty package id string |
+| `retry` | optional retry object in raw `exec` JSON; Android defaults to `AppClose` |
+
+Semantics:
+
+- built-in builders default execution timeout to `30000`
+- Node runs a pre-flight adb force-stop and may normalize an Android-side unsupported close into success
+
+Success data:
+
+- `data.application_id` when pre-flight close succeeded
+
+Common failures:
+
+- `EXECUTION_VALIDATION_FAILED` for missing `applicationId`
+- adb force-stop failure or package/runtime failures
+
+Example:
+
+```json
+{
+  "id": "close-1",
+  "type": "close_app",
+  "params": {
+    "applicationId": "com.android.settings"
+  }
+}
+```
+
+### `sleep`
+
+| Field | Valid values |
+| --- | --- |
+| Required | `durationMs` |
+| `durationMs` | required number `>= 0` and `<= MAX_EXECUTION_TIMEOUT_MS` |
+| `retry` | optional retry object in raw `exec` JSON; Android defaults to `None` |
+
+Semantics:
+
+- builder sets execution timeout to `max(durationMs + 5000, globalTimeout, 30000)`
+
+Success data:
+
+- no Node-guaranteed success keys
+
+Common failures:
+
+- `EXECUTION_VALIDATION_FAILED` for negative or oversized duration
+
+Example:
+
+```json
+{
+  "id": "sleep-1",
+  "type": "sleep",
+  "params": {
+    "durationMs": 1500
+  }
+}
+```
+
+### `open_app`
+
+| Field | Valid values |
+| --- | --- |
+| Required | `applicationId` |
+| `applicationId` | required non-empty package id string |
+| `retry` | optional retry object in raw `exec` JSON; Android defaults to `AppLaunch` |
+
+Success data:
+
+- no Node-guaranteed success keys
+
+Common failures:
+
+- `EXECUTION_VALIDATION_FAILED` for missing `applicationId`
+
+Example:
+
+```json
+{
+  "id": "open-1",
+  "type": "open_app",
+  "params": {
+    "applicationId": "com.android.settings"
+  }
+}
+```
+
+### `open_uri`
+
+| Field | Valid values |
+| --- | --- |
+| Required | `uri` |
+| `uri` | required non-empty string, max length enforced by `MAX_URI_LENGTH` |
+| `retry` | optional retry object in raw `exec` JSON; Android defaults to `AppLaunch` |
+
+Success data:
+
+- no Node-guaranteed success keys
+
+Common failures:
+
+- `EXECUTION_VALIDATION_FAILED` for missing or blank `uri`
+
+Example:
+
+```json
+{
+  "id": "open-uri-1",
+  "type": "open_uri",
+  "params": {
+    "uri": "https://clawperator.com"
+  }
+}
+```
+
+### `start_recording`
+
+| Field | Valid values |
+| --- | --- |
+| Required | none |
+| `sessionId` | optional non-blank string |
+| `retry` | optional retry object in raw `exec` JSON; Android defaults to `None` |
+
+Success data:
+
+- no Node-guaranteed success keys
+
+Common failures:
+
+- `EXECUTION_VALIDATION_FAILED` for blank `sessionId`
+- recording-state runtime errors such as `RECORDING_ALREADY_IN_PROGRESS`
+
+Example:
+
+```json
+{
+  "id": "record-start-1",
+  "type": "start_recording",
+  "params": {
+    "sessionId": "session-001"
+  }
+}
+```
+
+### `stop_recording`
+
+| Field | Valid values |
+| --- | --- |
+| Required | none |
+| `sessionId` | optional non-blank string |
+| `retry` | optional retry object in raw `exec` JSON; Android defaults to `None` |
+
+Success data:
+
+- no Node-guaranteed success keys
+
+Common failures:
+
+- `EXECUTION_VALIDATION_FAILED` for blank `sessionId`
+- recording-state runtime errors such as `RECORDING_NOT_IN_PROGRESS`
+
+Example:
+
+```json
+{
+  "id": "record-stop-1",
+  "type": "stop_recording",
+  "params": {
+    "sessionId": "session-001"
+  }
+}
+```
+
+## CLI To Action Mapping
+
+| CLI command | Canonical action type | Notes |
+| --- | --- | --- |
+| `click` | `click` | `tap` is a CLI synonym |
+| `type` | `enter_text` | built from selector + text |
+| `read` | `read_text` | supports optional container matcher |
+| `read-value` | `read_key_value_pair` | built from label selector flags |
+| `wait` | `wait_for_node` | action timeout comes from `--timeout` |
+| `wait-for-nav` | `wait_for_navigation` | requires `--timeout` |
+| `snapshot` | `snapshot_ui` | no action params |
+| `screenshot` | `take_screenshot` | optional `path` |
+| `close` | `close_app` | `close-app` is a CLI synonym |
+| `sleep` | `sleep` | duration is positional |
+| `open` | `open_app` or `open_uri` | dispatch depends on target string |
+| `press`, `back` | `press_key` | `back` hardcodes `key = "back"` |
+| `scroll` | `scroll` | container flags optional |
+| `scroll-until` | `scroll_until` or `scroll_and_click` | `--click` switches to `scroll_and_click` |
+| `scroll-and-click` | `scroll_and_click` | alias that implies click-after |
+
+## Result Data You Can Rely On
+
+| Action type | Success keys Node guarantees |
+| --- | --- |
+| `snapshot_ui` | `data.text`; optional `data.warn` |
+| `take_screenshot` | `data.path` |
+| `close_app` | `data.application_id` when Node pre-flight succeeded |
+| all others | no fixed success keys guaranteed by Node |
+
+Concrete success example for `take_screenshot`:
+
+```json
+{
+  "id": "shot-1",
+  "actionType": "take_screenshot",
+  "success": true,
+  "data": {
+    "path": "/tmp/settings.png"
+  }
+}
+```
+
+Concrete success example for `snapshot_ui`:
+
+```json
+{
+  "id": "snap-1",
+  "actionType": "snapshot_ui",
+  "success": true,
+  "data": {
+    "text": "<hierarchy rotation=\"0\">...</hierarchy>",
+    "warn": "snapshot captured without a preceding sleep step; UI may not have settled - consider adding a sleep step between click and snapshot_ui"
+  }
+}
+```
+
+For failures, inspect:
+
+- `envelope.status`
+- first failed `stepResults[i].success == false`
+- `stepResults[i].data.error`
+- `stepResults[i].data.message`
+
+## Related Pages
+
+- [Selectors](selectors.md)
+- [Errors](errors.md)
+- [API Overview](overview.md)
+- [Snapshot Format](snapshot.md)
 
 ---
 
 # Selectors
 
-Placeholder - content coming in PR-2/PR-3.
+## Purpose
+
+Define the `NodeMatcher` contract used across execution payloads, explain how CLI selector flags map into that contract, and document the mutual-exclusion rules that prevent ambiguous selector input.
+
+## Sources
+
+- Contract shape: `apps/node/src/contracts/selectors.ts`
+- Shared matcher limits: `apps/node/src/contracts/limits.ts`
+- Execution validation: `apps/node/src/domain/executions/validateExecution.ts`
+- CLI selector parsing: `apps/node/src/cli/selectorFlags.ts`
+- `read-value` label selector handling: `apps/node/src/cli/registry.ts`
+
+## `NodeMatcher` Contract
+
+The raw selector object shared by `matcher`, `container`, `expectedNode`, and `labelMatcher` is:
+
+```json
+{
+  "resourceId": "optional string",
+  "role": "optional string",
+  "textEquals": "optional string",
+  "textContains": "optional string",
+  "contentDescEquals": "optional string",
+  "contentDescContains": "optional string"
+}
+```
+
+Meaning of each field:
+
+| Field | Match behavior |
+| --- | --- |
+| `resourceId` | exact Android resource ID match |
+| `role` | exact accessibility role match |
+| `textEquals` | exact visible-text match |
+| `textContains` | substring visible-text match |
+| `contentDescEquals` | exact content-description match |
+| `contentDescContains` | substring content-description match |
+
+Rules enforced by Node:
+
+- a matcher may contain one field or several fields
+- multiple fields combine into one object, so the runtime receives all of them together
+- empty matcher objects are invalid
+- each matcher string value must be at most `512` characters (`LIMITS.MAX_MATCHER_VALUE_LENGTH`)
+- blank strings are rejected before or during validation depending on how the matcher was built
+- selector objects are strict in execution validation, so unknown keys are rejected
+- when the shared CLI parser sees no selector flags at all, it returns an empty matcher object and the command decides whether selectors are required for that command
+
+Concrete payload example:
+
+```json
+{
+  "matcher": {
+    "role": "button",
+    "textContains": "Settings"
+  }
+}
+```
+
+Success condition for that selector object:
+
+- the object uses only the six supported matcher keys
+- at least one value is non-empty
+
+## Where Selectors Appear
+
+`NodeMatcher` is reused in several action parameters:
+
+| Action parameter | Meaning |
+| --- | --- |
+| `params.matcher` | primary target node for actions such as `click`, `read_text`, `enter_text`, `wait_for_node`, `scroll_until`, and `scroll_and_click` |
+| `params.container` | optional ancestor or scrollable container constraint |
+| `params.expectedNode` | navigation target for `wait_for_navigation` |
+| `params.labelMatcher` | label node for `read_key_value_pair` |
+
+Example execution fragment:
+
+```json
+{
+  "id": "read-1",
+  "type": "read_text",
+  "params": {
+    "matcher": { "textEquals": "Battery" },
+    "container": { "resourceId": "android:id/list" }
+  }
+}
+```
+
+## CLI Selector Forms
+
+For most commands, the CLI offers two equivalent ways to build a `NodeMatcher`:
+
+1. Shorthand flags such as `--text`, `--text-contains`, `--id`, `--desc`, `--desc-contains`, and `--role`
+2. Raw JSON via `--selector '<json>'`
+
+Container selectors follow the same pattern:
+
+1. Shorthand flags such as `--container-text`, `--container-id`, and `--container-role`
+2. Raw JSON via `--container-selector '<json>'`
+
+The parser resolves shorthand flags into the same `NodeMatcher` object used by raw JSON. For example:
+
+```bash
+clawperator wait --text "Done" --role button
+```
+
+becomes the matcher:
+
+```json
+{
+  "textEquals": "Done",
+  "role": "button"
+}
+```
+
+## Selector Flags
 
 | Flag | Description | Notes |
 | --- | --- | --- |
@@ -372,7 +1882,219 @@ Placeholder - content coming in PR-2/PR-3.
 | `--container-desc-contains` | Match a container by partial content description. | Mutually exclusive with raw selector JSON on the same matcher. |
 | `--container-role` | Match a container by accessibility role. | Mutually exclusive with raw selector JSON on the same matcher. |
 
-This page will define the NodeMatcher contract, selector flag behavior, and matching rules.
+Even without the generated table, the authored contract is:
+
+- `--text` maps to `textEquals`
+- `--text-contains` maps to `textContains`
+- `--id` maps to `resourceId`
+- `--desc` maps to `contentDescEquals`
+- `--desc-contains` maps to `contentDescContains`
+- `--role` maps to `role`
+- `--selector` accepts a raw `NodeMatcher` JSON object
+- `--container-text` maps to `container.textEquals`
+- `--container-text-contains` maps to `container.textContains`
+- `--container-id` maps to `container.resourceId`
+- `--container-desc` maps to `container.contentDescEquals`
+- `--container-desc-contains` maps to `container.contentDescContains`
+- `--container-role` maps to `container.role`
+- `--container-selector` accepts a raw `NodeMatcher` JSON object for `params.container`
+
+## Mutual Exclusion And Validation Rules
+
+Element selector rules:
+
+- `--selector` is mutually exclusive with all shorthand element selector flags
+- duplicate value flags such as repeating `--text` or `--id` are rejected
+- `--selector` must be valid JSON
+- `--selector` must parse to a JSON object, not an array or scalar
+- blank values such as `--text ""` or `--selector ""` are rejected
+- `click --coordinate <x> <y>` is mutually exclusive with every element selector flag
+- `click --coordinate ... --focus` is invalid because coordinate clicks do not support `clickType = "focus"`
+
+Container selector rules:
+
+- `--container-selector` is mutually exclusive with all `--container-*` shorthand flags
+- duplicate container flags such as repeating `--container-id` are rejected
+- `--container-selector` must be valid JSON
+- `--container-selector` must parse to a JSON object
+- blank values such as `--container-text ""` are rejected
+- if no container flags are present, Node omits `params.container`
+
+Validation examples:
+
+Valid:
+
+```bash
+clawperator read --text "Price" --container-id "android:id/list" --json
+```
+
+Invalid:
+
+```bash
+clawperator read --text "Price" --selector '{"textEquals":"Price"}'
+```
+
+Why invalid:
+
+- the CLI parser rejects mixing `--selector` with shorthand element flags
+
+Structured validation example:
+
+```json
+{
+  "code": "EXECUTION_VALIDATION_FAILED",
+  "message": "use --selector OR the simple flags, not both"
+}
+```
+
+## Command-Specific Notes
+
+### Most commands
+
+`click`, `read`, `wait`, `scroll-until`, `scroll-and-click`, and `wait-for-nav` all use the shared selector parser from `selectorFlags.ts`. That means they share the same shorthand-to-JSON mapping and the same mutual-exclusion rules.
+
+Required-vs-optional behavior is decided by the command after parsing:
+
+- `click`, `read`, and `wait` require an element selector unless `click` is using `--coordinate`
+- `wait-for-nav` accepts either `--app` or a selector, but still requires at least one of them
+- `scroll` has no target selector and uses only optional container selector flags
+- `scroll-until` and `scroll-and-click` require a target selector
+
+### `type`
+
+`type` is slightly different because `--text` means “text to enter”, not “textEquals selector”. For element targeting, `type` uses:
+
+- `--id`
+- `--desc`
+- `--desc-contains`
+- `--role`
+- `--text-contains`
+- `--selector`
+
+Example:
+
+```bash
+clawperator type "hello world" --role textfield
+```
+
+### `read-value`
+
+`read-value` does not use the general selector parser. It builds `labelMatcher` from three dedicated flags:
+
+| CLI flag | `labelMatcher` field |
+| --- | --- |
+| `--label` | `textEquals` |
+| `--label-id` | `resourceId` |
+| `--label-desc` | `contentDescEquals` |
+
+At least one of those flags is required.
+
+Blank label values are rejected, and if you provide none of the three label flags the command returns a usage error before execution is built.
+
+Concrete execution fragment:
+
+```json
+{
+  "id": "read-value-1",
+  "type": "read_key_value_pair",
+  "params": {
+    "labelMatcher": {
+      "textEquals": "Battery"
+    }
+  }
+}
+```
+
+## Container Matching Semantics
+
+Container selectors narrow an action to a matched ancestor or scrollable region instead of searching the full screen.
+
+Current uses:
+
+- `read` attaches the matcher as `params.container`
+- `scroll` attaches the matcher as `params.container`
+- `scroll_until` attaches the matcher as `params.container`
+- `scroll_and_click` attaches the matcher as `params.container`
+
+If no container selector is provided:
+
+- `read_text` searches without container scoping
+- scroll actions let Android choose the relevant on-screen scrollable container
+
+Example:
+
+```bash
+clawperator scroll-until --text "About phone" --container-id "android:id/list"
+```
+
+becomes:
+
+```json
+{
+  "type": "scroll_until",
+  "params": {
+    "matcher": { "textEquals": "About phone" },
+    "container": { "resourceId": "android:id/list" }
+  }
+}
+```
+
+## JSON Examples
+
+Exact text:
+
+```json
+{ "textEquals": "Wi-Fi" }
+```
+
+Partial text plus role:
+
+```json
+{ "textContains": "Sign", "role": "button" }
+```
+
+Raw container selector:
+
+```json
+{ "resourceId": "android:id/list" }
+```
+
+Navigation target:
+
+```json
+{
+  "expectedPackage": "com.android.settings",
+  "expectedNode": { "textEquals": "Settings" }
+}
+```
+
+## CLI Examples
+
+```bash
+clawperator click --text "Wi-Fi"
+```
+
+```bash
+clawperator read --selector '{"resourceId":"android:id/title"}' --json
+```
+
+```bash
+clawperator wait --text-contains "Done" --timeout 10000 --json
+```
+
+```bash
+clawperator scroll-until --text "About phone" --container-id "android:id/list"
+```
+
+```bash
+clawperator read-value --label "Battery" --json
+```
+
+## Related Pages
+
+- [Actions](actions.md)
+- [Errors](errors.md)
+- [API Overview](overview.md)
 
 ---
 
@@ -386,7 +2108,102 @@ This page will describe the snapshot output shape and parsing contract.
 
 # Errors
 
-Placeholder - content coming in PR-2/PR-3.
+## Purpose
+
+Document the public error-code contract, show where failures appear in CLI output versus result envelopes, and give concrete recovery steps for the most common host, validation, and runtime failures.
+
+## Sources
+
+- Public error-code enum: `apps/node/src/contracts/errors.ts`
+- Result envelope shape: `apps/node/src/contracts/result.ts`
+- Execution validation: `apps/node/src/domain/executions/validateExecution.ts`
+- CLI formatting: `apps/node/src/cli/output.ts`
+
+## Two Failure Shapes
+
+Clawperator surfaces failures in two main shapes.
+
+### 1. Top-level CLI error object
+
+This appears when Node fails before it can return an execution envelope, for example during argument parsing, payload validation, device selection, or host checks.
+
+Example:
+
+```json
+{
+  "code": "EXECUTION_VALIDATION_FAILED",
+  "message": "open_uri requires params.uri",
+  "details": {
+    "path": "actions.0.params.uri",
+    "actionId": "open-1",
+    "actionType": "open_uri"
+  }
+}
+```
+
+Success condition for recovery:
+
+- you change the command or payload
+- rerunning no longer returns a top-level `{ "code": ... }` object
+
+### 2. Result envelope failure
+
+This appears when Node successfully sends the command but the execution still fails at dispatch time or during one of the steps.
+
+Per-step example:
+
+```json
+{
+  "envelope": {
+    "commandId": "read-1",
+    "taskId": "read-1",
+    "status": "failed",
+    "error": "Step a1 (read_text) failed: NODE_NOT_FOUND",
+    "stepResults": [
+      {
+        "id": "a1",
+        "actionType": "read_text",
+        "success": false,
+        "data": {
+          "error": "NODE_NOT_FOUND",
+          "message": "No matching node found"
+        }
+      }
+    ]
+  },
+  "deviceId": "emulator-5554",
+  "terminalSource": "clawperator_result",
+  "isCanonicalTerminal": true
+}
+```
+
+Envelope-level example with `errorCode`:
+
+```json
+{
+  "envelope": {
+    "commandId": "snapshot-1",
+    "taskId": "snapshot-1",
+    "status": "failed",
+    "stepResults": [],
+    "error": "Accessibility service is not available",
+    "errorCode": "SERVICE_UNAVAILABLE",
+    "hint": "Accessibility service not running. Run 'clawperator doctor --fix --device emulator-5554' to diagnose and repair, or 'clawperator operator setup --apk <path-to-apk> --device emulator-5554' to reinstall."
+  },
+  "deviceId": "emulator-5554",
+  "terminalSource": "clawperator_result",
+  "isCanonicalTerminal": true
+}
+```
+
+Success condition for recovery:
+
+- `envelope.status == "success"`
+- every `stepResults[i].success == true`
+
+## Public Error Codes
+
+Only the codes defined in `apps/node/src/contracts/errors.ts` are part of the public error-code contract documented on this page.
 
 | Code | Derived label | Notes |
 | --- | --- | --- |
@@ -455,23 +2272,991 @@ Placeholder - content coming in PR-2/PR-3.
 | `PAYLOAD_TOO_LARGE` | Payload too large | - |
 | `DOCTOR_FAILED` | Doctor failed | - |
 
-This page will explain error classes, recovery patterns, and code-derived error codes.
+## Fast Triage
+
+1. If the output is a top-level object with `code`, treat it as a Node-side failure before or outside the Android result envelope.
+2. If `envelope.status == "failed"` and `stepResults` is empty, treat it as a dispatch, service, or envelope failure.
+3. If `envelope.status == "failed"` and one step has `success == false`, branch on the first failed step's `data.error`.
+4. Prefer exact codes over string-matching the human-readable `message` or `error`.
+
+## What To Trust
+
+Use these fields in order:
+
+| Situation | Fields to inspect first |
+| --- | --- |
+| Top-level CLI error object | `code`, then `details`, then `message` |
+| Envelope-level runtime failure | `envelope.errorCode`, then `envelope.hint`, then `envelope.error` |
+| Per-step action failure | `stepResults[i].data.error`, then `stepResults[i].data.message` |
+
+Notes:
+
+- `errorCode` is optional on the envelope. Older APK behavior and some unclassified failures may leave it unset.
+- envelope `errorCode` may contain Android-emitted values such as `SERVICE_UNAVAILABLE` that are not part of Node's public `errors.ts` enum
+- per-step failures do not use the envelope `errorCode`; they usually expose the actionable code in `stepResults[i].data.error`
+- `StepResult.data` values are strings, so treat `data.error` and `data.message` as string fields
+- Node post-processing can turn some Android-internal failure markers into success results, for example normalizing `UNSUPPORTED_RUNTIME_CLOSE` into a successful `close_app` step when adb pre-flight already succeeded
+
+## Recovery Patterns
+
+| Family | Typical codes | What to do next |
+| --- | --- | --- |
+| Device targeting | `NO_DEVICES`, `DEVICE_NOT_FOUND`, `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED` | Run `clawperator devices`, pick one device, and retry with `--device <serial>` |
+| Operator setup | `OPERATOR_NOT_INSTALLED`, `OPERATOR_VARIANT_MISMATCH`, `OPERATOR_INSTALL_FAILED`, `OPERATOR_GRANT_FAILED`, `OPERATOR_VERIFY_FAILED` | Install or repair the expected Operator APK, then rerun the command |
+| Host tooling | `ADB_NOT_FOUND`, `ADB_SERVER_FAILED`, `HOST_DEPENDENCY_MISSING`, `ANDROID_SDK_TOOL_MISSING`, `SCRCPY_NOT_FOUND` | Repair the host environment before retrying |
+| Payload or flag validation | `MISSING_ARGUMENT`, `EXECUTION_VALIDATION_FAILED`, `EXECUTION_ACTION_UNSUPPORTED`, `PAYLOAD_TOO_LARGE` | Change the command or payload. Do not retry unchanged |
+| Dispatch or service availability | `RESULT_ENVELOPE_TIMEOUT`, `RESULT_ENVELOPE_MALFORMED`, `BROADCAST_FAILED`, `DEVICE_ACCESSIBILITY_NOT_RUNNING`, `DEVICE_SHELL_UNAVAILABLE` | Run `clawperator doctor --json`, repair the reported issue, then retry |
+| UI lookup or gesture | `NODE_NOT_FOUND`, `NODE_NOT_CLICKABLE`, `CONTAINER_NOT_FOUND`, `CONTAINER_NOT_SCROLLABLE`, `GESTURE_FAILED`, `SECURITY_BLOCK_DETECTED` | Refresh state with `snapshot`, wait for UI readiness, or adjust selectors and scroll strategy |
+| Recording state | `RECORDING_ALREADY_IN_PROGRESS`, `RECORDING_NOT_IN_PROGRESS`, `RECORDING_SESSION_NOT_FOUND`, `RECORDING_PULL_FAILED`, `RECORDING_PARSE_FAILED`, `RECORDING_SCHEMA_VERSION_UNSUPPORTED` | Repair recording state or use the right session before retrying |
+
+## Key Cases
+
+### `EXECUTION_VALIDATION_FAILED`
+
+Use this when the command or payload is structurally wrong before Android execution starts.
+
+Common triggers:
+
+- missing required action fields such as `open_uri.params.uri`
+- invalid ranges such as `scroll_until.maxScrolls > 200`
+- selector parser violations such as mixing `--selector` with shorthand flags
+- invalid JSON payloads for `clawperator exec`
+
+Typical output:
+
+```json
+{
+  "code": "EXECUTION_VALIDATION_FAILED",
+  "message": "scroll_until params.maxScrolls must be an integer in [1, 200]",
+  "details": {
+    "path": "actions.0.params.maxScrolls",
+    "actionId": "scroll-1",
+    "actionType": "scroll_until"
+  }
+}
+```
+
+Recovery:
+
+- fix the payload
+- rerun validation
+- do not retry unchanged
+
+### `MISSING_ARGUMENT`
+
+Use this for CLI commands that are missing a required positional argument or required flag value.
+
+Common triggers:
+
+- `exec` without a payload
+- `wait-for-nav` without `--timeout`
+- `read-value` without any label selector flags
+
+Example:
+
+```json
+{
+  "code": "MISSING_ARGUMENT",
+  "message": "wait-for-nav requires --timeout <ms>."
+}
+```
+
+Recovery:
+
+- add the missing argument or flag
+- rerun the command
+
+### `RESULT_ENVELOPE_TIMEOUT`
+
+Use this when Node dispatched the command but did not receive a valid `[Clawperator-Result]` envelope before the execution timeout expired.
+
+Typical fields:
+
+```json
+{
+  "code": "RESULT_ENVELOPE_TIMEOUT",
+  "message": "Timed out waiting for [Clawperator-Result]",
+  "details": {
+    "commandId": "snapshot-1",
+    "taskId": "snapshot-1",
+    "lastActionId": "a1",
+    "lastActionType": "snapshot_ui",
+    "lastActionCaveat": "payload-last only; Android execution position is unknown",
+    "elapsedMs": 30000,
+    "timeoutMs": 30000
+  }
+}
+```
+
+Recovery:
+
+- run `clawperator doctor --json`
+- confirm the accessibility service and operator package are healthy
+- increase timeout only if the action legitimately needs more wall-clock time
+
+### `OPERATOR_NOT_INSTALLED`
+
+Use this when the requested operator package is not installed on the selected device.
+
+Typical recovery:
+
+```bash
+clawperator operator setup --apk <path-to-apk> --device <device_serial> --operator-package <package_name>
+```
+
+If you are doing local branch validation, prefer the debug package:
+
+- `com.clawperator.operator.dev`
+
+### `OPERATOR_VARIANT_MISMATCH`
+
+Use this when the device has an installed Operator APK, but it is the other known package variant than the one requested.
+
+Recovery options:
+
+- pass the installed package via `--operator-package`
+- or reinstall the intended APK variant
+
+### `NODE_NOT_FOUND`
+
+This usually appears as a per-step failure in `stepResults[i].data.error`, not as the top-level CLI `code`.
+
+Common triggers:
+
+- the selector never matched
+- the app navigated somewhere unexpected
+- the UI had not settled before the action ran
+- the target was inside a different scroll container
+
+Recovery:
+
+- run `snapshot` or `read --json` to inspect current UI state
+- add `wait` or `sleep` before the failing action when appropriate
+- tighten or loosen the selector based on what the snapshot actually shows
+- add a container selector or a scroll step if the target is off-screen
+
+### `DEVICE_ACCESSIBILITY_NOT_RUNNING`
+
+This is a doctor- and readiness-related failure indicating the Operator accessibility service is not active.
+
+Recovery:
+
+- run `clawperator doctor --fix --device <serial>`
+- if needed, reinstall the Operator package and re-enable accessibility access
+
+## Legacy CLI Usage Objects
+
+Some CLI handlers and tests still emit usage-style objects with string codes that are not part of `apps/node/src/contracts/errors.ts`. Treat those as command-line usage failures, not as public stable error codes.
+
+What this means for agents:
+
+- if the code is in `errors.ts`, you can branch on it as part of the public contract
+- if the code is not in `errors.ts`, treat it as a CLI-specific usage object and prefer fixing the command shape rather than building long-term logic around that string
+- similarly, Android may emit envelope `errorCode` values outside the Node enum; branch on them when present in the envelope, but do not confuse them with the documented Node-side top-level `code` contract
+
+## Related Pages
+
+- [API Overview](overview.md)
+- [Actions](actions.md)
+- [Selectors](selectors.md)
+- [Setup](../setup.md)
+- [Devices](devices.md)
+- [Doctor](doctor.md)
+- [Operator App Troubleshooting](../troubleshooting/operator.md)
 
 ---
 
 # Devices
 
-Placeholder - content coming in PR-2/PR-3.
+## Purpose
 
-This page will cover device resolution, multi-device rules, and Operator package selection.
+Define the `clawperator devices` output shape, document how Node resolves a target device for execution, and explain how `--device` and `--operator-package` keep routing deterministic across multiple connected targets.
+
+## Sources
+
+- Device listing: `apps/node/src/domain/devices/listDevices.ts`
+- Device resolution: `apps/node/src/domain/devices/resolveDevice.ts`
+- CLI wrapper: `apps/node/src/cli/commands/devices.ts`
+
+## `clawperator devices`
+
+`clawperator devices` is a direct listing of `adb devices` output after Node parses each non-empty line into:
+
+```json
+{
+  "serial": "device serial",
+  "state": "adb state"
+}
+```
+
+Successful CLI response:
+
+```json
+{
+  "devices": [
+    {
+      "serial": "emulator-5554",
+      "state": "device"
+    },
+    {
+      "serial": "R58N12345AB",
+      "state": "unauthorized"
+    }
+  ]
+}
+```
+
+Meaning:
+
+- `serial` is the adb device identifier used by `--device`
+- `state` is whatever adb reported for that serial
+- Node keeps all listed devices in this command output, even if they are not valid execution targets
+- this command is observational only; it does not apply `resolveDevice.ts` selection rules
+
+The HTTP server uses the same listing behavior on `GET /devices` and returns:
+
+```json
+{
+  "ok": true,
+  "devices": [
+    { "serial": "emulator-5554", "state": "device" }
+  ]
+}
+```
+
+## Which Devices Count As Executable Targets
+
+For actual command execution, Node filters the `devices` list down to entries where:
+
+- `state == "device"`
+
+That means:
+
+- `device` is eligible for auto-selection or explicit selection
+- `offline`, `unauthorized`, and other adb states are visible in `clawperator devices` output but are not execution targets
+
+Concrete example:
+
+```json
+{
+  "devices": [
+    { "serial": "emulator-5554", "state": "device" },
+    { "serial": "R58N12345AB", "state": "offline" }
+  ]
+}
+```
+
+Execution consequence:
+
+- Node can route commands to `emulator-5554`
+- Node will reject `R58N12345AB` until it returns to adb state `device`
+
+## `--device`
+
+Primary flag:
+
+```text
+--device <serial>
+```
+
+Accepted legacy alias:
+
+```text
+--device-id <serial>
+```
+
+Use `--device` when:
+
+- more than one connected target is in adb state `device`
+- you want deterministic routing even if another emulator or physical device appears later
+- you are scripting `exec`, `serve`, `doctor`, or setup calls and do not want auto-selection
+
+## Resolution Rules
+
+`resolveDevice.ts` applies these exact rules:
+
+| Connected targets with `state == "device"` | `--device` provided | Result |
+| --- | --- | --- |
+| `0` | no | fail with `NO_DEVICES` |
+| `1` | no | auto-select the only connected serial |
+| `>1` | no | fail with `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED` |
+| any | yes, serial exists in state `device` | use that serial |
+| any | yes, serial missing or not in state `device` | fail with `DEVICE_NOT_FOUND` |
+
+Concrete examples:
+
+Auto-select single connected device:
+
+```json
+{
+  "devices": [
+    { "serial": "emulator-5554", "state": "device" }
+  ]
+}
+```
+
+Result:
+
+- commands run on `emulator-5554` even without `--device`
+
+Multiple connected devices without `--device`:
+
+```json
+{
+  "devices": [
+    { "serial": "emulator-5554", "state": "device" },
+    { "serial": "R58N12345AB", "state": "device" }
+  ]
+}
+```
+
+Result:
+
+- Node returns `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED`
+- `details.devices` includes the connected serials
+
+Requested serial not usable:
+
+```json
+{
+  "code": "DEVICE_NOT_FOUND",
+  "message": "Device R58N12345AB not found or not in device state",
+  "details": {
+    "connected": ["emulator-5554"]
+  }
+}
+```
+
+## Deterministic Routing Pattern
+
+For automation, prefer this pattern even when only one device is currently connected:
+
+1. Run `clawperator devices`
+2. Select the intended `serial`
+3. Reuse that `serial` through all subsequent commands with `--device <serial>`
+
+Example:
+
+```bash
+clawperator snapshot --json --device emulator-5554
+```
+
+Success condition:
+
+- later commands continue using the same target even if a second device appears
+
+## Operator Package Selection
+
+Device routing and operator package selection are separate decisions.
+
+Primary flag:
+
+```text
+--operator-package <package>
+```
+
+Common package values:
+
+| Package | Typical use |
+| --- | --- |
+| `com.clawperator.operator` | release Operator APK |
+| `com.clawperator.operator.dev` | local debug Operator APK |
+
+Use `--operator-package com.clawperator.operator.dev` when:
+
+- the installed APK is a local debug build
+- `doctor` reports `OPERATOR_VARIANT_MISMATCH`
+- you are validating branch-local CLI changes against the debug Operator app
+
+Recommended deterministic pairing:
+
+```bash
+clawperator snapshot --json --device emulator-5554 --operator-package com.clawperator.operator.dev
+```
+
+## Common Failure Modes
+
+### `NO_DEVICES`
+
+No connected targets in adb state `device`.
+
+Recovery:
+
+- connect a device or boot an emulator
+- confirm `clawperator devices` shows at least one entry with `state: "device"`
+
+### `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED`
+
+More than one connected target is in adb state `device`, and you did not pass `--device`.
+
+Recovery:
+
+- choose one serial from `details.devices`
+- rerun with `--device <serial>`
+
+### `DEVICE_NOT_FOUND`
+
+You passed `--device`, but the requested serial was not present in adb state `device`.
+
+Recovery:
+
+- rerun `clawperator devices`
+- check that the serial matches exactly
+- confirm the requested device is not `offline` or `unauthorized`
+
+If you see the serial in `clawperator devices` output but its state is not `device`, the fix is to repair that adb state first rather than retrying the same command.
+
+## Example Commands
+
+List devices:
+
+```bash
+clawperator devices
+```
+
+Doctor on one target:
+
+```bash
+clawperator doctor --json --device <device_serial>
+```
+
+Snapshot against the debug Operator package:
+
+```bash
+clawperator snapshot --json --device <device_serial> --operator-package com.clawperator.operator.dev
+```
+
+Execute a payload on one target:
+
+```bash
+clawperator exec payload.json --device <device_serial>
+```
+
+## Related Pages
+
+- [Setup](../setup.md)
+- [Doctor](doctor.md)
+- [Errors](errors.md)
+- [Serve](serve.md)
 
 ---
 
 # Doctor
 
-Placeholder - content coming in PR-2/PR-3.
+## Purpose
 
-This page will describe readiness checks, remediation flow, and fix behavior.
+Define the `clawperator doctor` report contract, the exact check sequence, critical-versus-advisory behavior, exit-code rules, and the remediation fields an agent can execute directly.
+
+## Sources
+
+- Report contract: `apps/node/src/contracts/doctor.ts`
+- CLI behavior and pretty output: `apps/node/src/cli/commands/doctor.ts`
+- Check sequencing and `nextActions`: `apps/node/src/domain/doctor/DoctorService.ts`
+- Critical check list: `apps/node/src/domain/doctor/criticalChecks.ts`
+- Check implementations: `apps/node/src/domain/doctor/checks/`
+
+## Command
+
+```bash
+clawperator doctor [--json] [--device <serial>] [--operator-package <pkg>] [--fix] [--full] [--check-only]
+```
+
+Flags:
+
+| Flag | Valid values | Effect |
+| --- | --- | --- |
+| `--device` | adb serial | targets one device explicitly |
+| `--operator-package` | package name string | overrides the default operator package for package checks, launch, and handshake |
+| `--fix` | flag | executes shell-type remediation steps during finalization |
+| `--full` | flag | adds Java/build/install/launch/smoke checks |
+| `--check-only` | flag | forces exit code `0` regardless of failures |
+| `--json` | flag | returns the full `DoctorReport` JSON object |
+
+Defaults:
+
+- without `--operator-package`, doctor uses `process.env.CLAWPERATOR_OPERATOR_PACKAGE` if set, otherwise the runtime default package
+- without `--device`, doctor tries discovery first and may auto-resolve one connected device
+- without `--full`, doctor skips Java/build/install/launch/smoke checks
+- without `--fix`, doctor reports remediation steps but does not run them
+
+## `DoctorReport` Contract
+
+`DoctorReport` is:
+
+```json
+{
+  "ok": true,
+  "criticalOk": true,
+  "deviceId": "optional string",
+  "operatorPackage": "optional string",
+  "checks": [
+    {
+      "id": "host.node.version",
+      "status": "pass",
+      "code": "optional string",
+      "summary": "summary string",
+      "detail": "optional detail",
+      "fix": {
+        "title": "fix title",
+        "platform": "mac",
+        "steps": [
+          { "kind": "shell", "value": "command" },
+          { "kind": "manual", "value": "instruction" }
+        ],
+        "docsUrl": "optional URL"
+      },
+      "deviceGuidance": {
+        "screen": "screen name",
+        "steps": ["manual on-device step"]
+      },
+      "evidence": {}
+    }
+  ],
+  "nextActions": ["optional command or instruction"]
+}
+```
+
+Field meaning:
+
+| Field | Meaning |
+| --- | --- |
+| `ok` | currently the same value as `criticalOk`; true only when all critical checks avoided `fail` |
+| `criticalOk` | true when every critical check status is not `fail` |
+| `deviceId` | resolved device serial, if doctor could determine one |
+| `operatorPackage` | package used for doctor checks |
+| `checks` | ordered list of `DoctorCheckResult` entries |
+| `nextActions` | deduplicated shell commands or manual instructions collected from failing/warning checks, plus a success hint when everything passed |
+
+## How `nextActions` Is Built
+
+`DoctorService.finalize()` builds `nextActions` in this order:
+
+1. If all checks passed, add:
+   - `Docs: https://docs.clawperator.com/getting-started/first-time-setup/`
+   - `Try: clawperator snapshot --device <resolved_device>` or the placeholder form if no device was resolved
+2. For each non-pass check with `fix.steps`:
+   - if `--fix` was not used, append each shell or manual step value
+   - if `--fix` was used, execute `shell` steps best-effort and append only `manual` step values
+3. For each non-pass check with `deviceGuidance`, append:
+   - `On device, open <screen> and follow the listed steps.`
+4. Deduplicate the final list.
+
+Machine-checkable implication:
+
+- `nextActions` is remediation guidance, not proof of success
+- with `--fix`, `nextActions` can be less complete because attempted shell steps are omitted even if execution failed
+- always gate on `criticalOk` and `checks[]`, not on whether `nextActions` is empty
+
+## `DoctorCheckResult` Contract
+
+Each entry in `checks[]` has:
+
+| Field | Valid values | Meaning |
+| --- | --- | --- |
+| `id` | string | stable check identifier such as `device.discovery` |
+| `status` | `pass`, `warn`, `fail` | check outcome |
+| `code` | optional error code or runtime string | machine-usable reason for warnings or failures |
+| `summary` | string | one-line status summary |
+| `detail` | optional string | longer explanation or stderr |
+| `fix.title` | string | remediation summary |
+| `fix.platform` | `mac`, `linux`, `win`, `any` | host platform scope for remediation |
+| `fix.steps[].kind` | `shell`, `manual` | whether the step can be executed directly or requires human action |
+| `fix.steps[].value` | string | command or manual instruction |
+| `fix.docsUrl` | optional URL | direct docs link for that failure family |
+| `deviceGuidance.screen` | string | Android screen where the user should go |
+| `deviceGuidance.steps[]` | string array | manual on-device guidance |
+| `evidence` | optional object | structured proof such as versions, serials, or display metrics |
+
+## Passing JSON Example
+
+```json
+{
+  "ok": true,
+  "criticalOk": true,
+  "deviceId": "emulator-5554",
+  "operatorPackage": "com.clawperator.operator.dev",
+  "checks": [
+    {
+      "id": "host.node.version",
+      "status": "pass",
+      "summary": "Node version v22.12.0 is compatible."
+    },
+    {
+      "id": "host.adb.presence",
+      "status": "pass",
+      "summary": "adb is installed.",
+      "evidence": {
+        "version": "Android Debug Bridge version 1.0.41"
+      }
+    },
+    {
+      "id": "device.discovery",
+      "status": "pass",
+      "summary": "Device emulator-5554 is connected and reachable.",
+      "evidence": {
+        "serial": "emulator-5554"
+      }
+    },
+    {
+      "id": "device.capability",
+      "status": "pass",
+      "summary": "Device shell is available.",
+      "evidence": {
+        "sdk": "34",
+        "wmSize": "Physical size: 1080x2400",
+        "wmDensity": "Physical density: 420"
+      }
+    },
+    {
+      "id": "readiness.apk.presence",
+      "status": "pass",
+      "summary": "Operator APK (com.clawperator.operator.dev) is installed."
+    },
+    {
+      "id": "readiness.version.compatibility",
+      "status": "pass",
+      "summary": "CLI 0.1.0 is compatible with installed APK 0.1.0.",
+      "evidence": {
+        "cliVersion": "0.1.0",
+        "apkVersion": "0.1.0",
+        "apkVersionCode": 1,
+        "operatorPackage": "com.clawperator.operator.dev"
+      }
+    },
+    {
+      "id": "readiness.handshake",
+      "status": "pass",
+      "summary": "Handshake successful.",
+      "detail": "Node successfully dispatched a command and received a valid result envelope."
+    }
+  ],
+  "nextActions": [
+    "Docs: https://docs.clawperator.com/getting-started/first-time-setup/",
+    "Try: clawperator snapshot --device emulator-5554"
+  ]
+}
+```
+
+Success conditions:
+
+- exit code is `0` unless `--check-only` changed it
+- `criticalOk == true`
+- every critical check has `status != "fail"`
+
+## Failing JSON Example
+
+```json
+{
+  "ok": false,
+  "criticalOk": false,
+  "deviceId": "emulator-5554",
+  "operatorPackage": "com.clawperator.operator.dev",
+  "checks": [
+    {
+      "id": "readiness.handshake",
+      "status": "fail",
+      "code": "RESULT_ENVELOPE_TIMEOUT",
+      "summary": "Handshake timed out.",
+      "detail": "No [Clawperator-Result] envelope received within 7000ms. Broadcast dispatch: broadcast_sent. Operator package: com.clawperator.operator.dev. Device: emulator-5554. Re-run with --verbose to inspect correlated Android log lines.",
+      "fix": {
+        "title": "Grant accessibility permissions via adb",
+        "platform": "any",
+        "steps": [
+          {
+            "kind": "shell",
+            "value": "clawperator grant-device-permissions --device emulator-5554 --operator-package com.clawperator.operator.dev"
+          },
+          {
+            "kind": "shell",
+            "value": "clawperator snapshot --device emulator-5554 --operator-package com.clawperator.operator.dev --timeout 5000 --verbose"
+          }
+        ],
+        "docsUrl": "https://docs.clawperator.com/troubleshooting/operator/"
+      },
+      "deviceGuidance": {
+        "screen": "Accessibility Settings",
+        "steps": [
+          "Ensure Clawperator Accessibility Service is ON in Android Settings"
+        ]
+      }
+    }
+  ],
+  "nextActions": [
+    "clawperator grant-device-permissions --device emulator-5554 --operator-package com.clawperator.operator.dev",
+    "clawperator snapshot --device emulator-5554 --operator-package com.clawperator.operator.dev --timeout 5000 --verbose",
+    "On device, open Accessibility Settings and follow the listed steps."
+  ]
+}
+```
+
+Failure conditions:
+
+- exit code is `1` unless `--check-only` was passed
+- `criticalOk == false`
+- at least one critical check has `status == "fail"`
+
+## Warning JSON Example
+
+The main advisory-only case in current code is multiple connected devices without `--device`:
+
+```json
+{
+  "ok": true,
+  "criticalOk": true,
+  "checks": [
+    {
+      "id": "device.discovery",
+      "status": "warn",
+      "code": "MULTIPLE_DEVICES_DEVICE_ID_REQUIRED",
+      "summary": "Multiple devices connected.",
+      "detail": "Specify --device to target a single device.",
+      "evidence": {
+        "devices": ["emulator-5554", "R58N12345AB"]
+      }
+    }
+  ]
+}
+```
+
+Meaning:
+
+- the host environment is usable, so `criticalOk` stays `true`
+- doctor still cannot continue into device-specific checks without an explicit target
+- the next deterministic step is to rerun doctor with `--device <serial>`
+
+## Check Sequence
+
+Doctor runs checks in this order:
+
+| Order | Check IDs | When they run |
+| --- | --- | --- |
+| 1 | `host.node.version`, `host.adb.presence`, `host.adb.server` | always |
+| 2 | `host.java.version`, `build.android.assemble` | only with `--full` |
+| 3 | `device.discovery` | always |
+| 4 | device resolution via `resolveDevice.ts` | after discovery when doctor still needs a target device |
+| 5 | `build.android.install`, `build.android.launch` | only with `--full` and after device resolution |
+| 6 | `device.capability` | after device resolution |
+| 7 | `readiness.apk.presence` | after device capability |
+| 8 | `readiness.version.compatibility` | only if APK presence passed |
+| 9 | `readiness.settings.dev_options`, `readiness.settings.usb_debugging` | after device capability and APK presence checks; these still run even when version compatibility was skipped |
+| 10 | `readiness.handshake` | only if APK presence passed and version compatibility passed |
+| 11 | `readiness.smoke` | only with `--full`, and only if APK presence and version compatibility passed |
+
+Halting rule:
+
+- doctor stops early only when a critical check returns `status == "fail"`
+- warnings do not halt
+- a `device.discovery` warning for `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED` causes early finalization later because no device can be resolved for subsequent device-specific checks
+
+## Critical Vs Advisory
+
+Critical checks are any checks whose ID starts with one of these prefixes:
+
+```text
+host.node.version
+host.adb.presence
+host.adb.server
+host.java.version
+device.discovery
+device.capability
+build.android.assemble
+build.android.install
+build.android.launch
+readiness.apk.presence
+readiness.version.compatibility
+readiness.handshake
+readiness.smoke
+```
+
+Advisory behavior:
+
+- checks not matching those prefixes can still appear as `warn`
+- advisory warnings remain in `checks[]` but do not set `criticalOk` to `false`
+- in current code, `readiness.settings.*` checks are warn-only when they fail
+
+Important special case:
+
+- `device.discovery` with `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED` is a `warn`, not a `fail`
+- even so, you still cannot proceed to device-specific execution without passing `--device`
+
+## Exit Codes
+
+`cmdDoctor` sets the exit code like this:
+
+| Condition | Exit code |
+| --- | --- |
+| `--check-only` passed | `0` |
+| otherwise and `(report.criticalOk ?? report.ok) == true` | `0` |
+| otherwise | `1` |
+
+Machine-checkable success gate:
+
+- require exit code `0`
+- require `criticalOk == true`
+- also require that you either resolved one device or intentionally handled the `device.discovery` multi-device warning before issuing device commands
+
+## `--fix` Behavior
+
+`--fix` does not change the report shape. It changes how doctor handles `fix.steps` during finalization:
+
+- `shell` steps are executed best-effort through the runtime shell runner
+- `manual` steps are still only reported
+- when `--fix` is active, attempted `shell` steps are omitted from `nextActions` whether they succeeded or failed
+- when `--fix` is not active, `shell` and `manual` steps are both copied into `nextActions`
+- failed auto-fix attempts are intentionally swallowed so diagnostics remain deterministic
+
+Use `--fix` when:
+
+- you want unattended recovery loops for shell-based remediations
+- you still plan to rerun `doctor --json` afterward to verify `criticalOk == true`
+
+Do not treat `--fix` alone as success. The success gate remains the follow-up report.
+
+## Pretty Output
+
+Pretty output is grouped into:
+
+- critical checks
+- advisory checks
+- count of additional passed non-critical checks
+- final summary line
+- `Next actions:` section
+
+For a failing check, pretty output includes:
+
+- `summary`
+- `detail` when present
+- `fix.title`
+- each `fix.steps[].value`
+- `Docs: <fix.docsUrl>` when present
+- on-device guidance grouped under `On device (<screen>):`
+
+## Check Reference
+
+| Check ID | Statuses seen in current code | Typical codes | What it verifies |
+| --- | --- | --- | --- |
+| `host.node.version` | `pass`, `fail` | `NODE_TOO_OLD` | Node.js major version is at least 22 |
+| `host.adb.presence` | `pass`, `fail` | `ADB_NOT_FOUND` | adb exists and can report a version |
+| `host.adb.server` | `pass`, `fail` | `ADB_SERVER_FAILED` | adb server can start |
+| `host.java.version` | `pass`, `fail` | `HOST_DEPENDENCY_MISSING` or no explicit code | Java 17 or 21 is available for full Android build checks |
+| `build.android.assemble` | `pass`, `fail` | `ANDROID_BUILD_FAILED` | `./gradlew :app:assembleDebug` succeeds |
+| `device.discovery` | `pass`, `warn`, `fail` | `NO_DEVICES`, `DEVICE_UNAUTHORIZED`, `DEVICE_OFFLINE`, `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED`, `DEVICE_NOT_FOUND` | device discovery succeeded and the environment is targetable, or explains why explicit `--device` selection is still required |
+| `build.android.install` | `pass`, `fail` | `ANDROID_INSTALL_FAILED` | `./gradlew :app:installDebug` succeeds |
+| `build.android.launch` | `pass`, `fail` | `ANDROID_APP_LAUNCH_FAILED` | Operator main activity launches |
+| `device.capability` | `pass`, `fail` | `DEVICE_SHELL_UNAVAILABLE` or no explicit code | shell access, SDK version, screen size, and density are readable |
+| `readiness.apk.presence` | `pass`, `warn`, `fail` | `DEVICE_SHELL_UNAVAILABLE`, `OPERATOR_VARIANT_MISMATCH`, `OPERATOR_NOT_INSTALLED` | requested operator package is installed |
+| `readiness.version.compatibility` | `pass`, `fail` | `VERSION_INCOMPATIBLE`, `APK_VERSION_UNREADABLE`, `APK_VERSION_INVALID`, `CLI_VERSION_INVALID` | CLI and installed APK are compatible |
+| `readiness.settings.dev_options` | `pass`, `warn` | `DEVICE_DEV_OPTIONS_DISABLED` | developer options setting is enabled |
+| `readiness.settings.usb_debugging` | `pass`, `warn` | `DEVICE_USB_DEBUGGING_DISABLED` | USB debugging setting is enabled |
+| `readiness.handshake` | `pass`, `fail` | `DEVICE_ACCESSIBILITY_NOT_RUNNING`, `RESULT_ENVELOPE_TIMEOUT`, `BROADCAST_FAILED`, `OPERATOR_NOT_INSTALLED` | Node can dispatch and receive a valid result envelope |
+| `readiness.smoke` | `pass`, `fail` | `SMOKE_OPEN_SETTINGS_FAILED` | smoke execution can open Settings and produce at least one successful `snapshot_ui` step |
+
+## Common Failure Recovery
+
+### `NO_DEVICES`
+
+Meaning:
+
+- `checkDeviceDiscovery` saw no adb entries at all
+
+Recovery:
+
+- connect a device or boot an emulator
+- rerun `clawperator devices`
+- rerun `clawperator doctor --json`
+
+### `DEVICE_UNAUTHORIZED`
+
+Meaning:
+
+- the target device is visible to adb but waiting for RSA authorization
+
+Recovery:
+
+- unlock the device
+- accept the USB debugging prompt
+- rerun doctor
+
+### `DEVICE_OFFLINE`
+
+Meaning:
+
+- adb sees the device but it is not currently usable
+
+Recovery:
+
+```bash
+adb kill-server
+adb start-server
+```
+
+Then rerun doctor.
+
+### `OPERATOR_NOT_INSTALLED`
+
+Meaning:
+
+- the requested package was not found by `pm list packages`
+
+Recovery:
+
+- if using release APKs, install the exact version doctor points to
+- run the generated `clawperator operator setup --apk ...` command from `nextActions`
+
+### `OPERATOR_VARIANT_MISMATCH`
+
+Meaning:
+
+- the requested package is missing, but the alternate known package variant is installed
+
+Recovery:
+
+- either pass `--operator-package` for the installed variant
+- or reinstall the intended variant
+
+### `RESULT_ENVELOPE_TIMEOUT`
+
+Meaning:
+
+- handshake broadcast was sent, but no `[Clawperator-Result]` envelope arrived within 7000ms
+
+Recovery:
+
+- run `clawperator grant-device-permissions --device <serial> [--operator-package <pkg>]`
+- rerun `clawperator snapshot --device <serial> [--operator-package <pkg>] --timeout 5000 --verbose`
+- verify accessibility service is enabled
+
+### `DEVICE_ACCESSIBILITY_NOT_RUNNING`
+
+Meaning:
+
+- handshake returned an envelope, but the runtime reported an accessibility-related failure
+
+Recovery:
+
+- run `clawperator grant-device-permissions ...`
+- follow `deviceGuidance.screen == "Accessibility Settings"`
+- rerun doctor
+
+## Agent Sequence
+
+Recommended doctor loop:
+
+1. Run `clawperator doctor --json [--device <serial>] [--operator-package <pkg>]`.
+2. Require exit code `0` and `criticalOk == true` before treating the environment as ready.
+3. If `criticalOk == false`, iterate through `checks[]` in order and branch on the first critical `fail`.
+4. If `fix.steps[].kind == "shell"` and you trust the environment, either execute them yourself or rerun doctor with `--fix`.
+5. If `deviceGuidance` is present, surface `deviceGuidance.screen` and `deviceGuidance.steps[]` to the human operator.
+6. Rerun `doctor --json` after remediation and require `criticalOk == true`.
+7. Only then move on to device commands such as `snapshot`.
+
+## Related Pages
+
+- [Setup](../setup.md)
+- [Devices](devices.md)
+- [Errors](errors.md)
+- [Operator App Troubleshooting](../troubleshooting/operator.md)
+- [Version Compatibility](../troubleshooting/compatibility.md)
 
 ---
 
@@ -493,9 +3278,777 @@ This page will list the current runtime and CLI environment variables.
 
 # Serve API
 
-Placeholder - content coming in PR-2/PR-3.
+## Purpose
 
-This page will describe the server endpoints and remote control usage.
+Define the local HTTP and SSE contract exposed by `clawperator serve`, including request bodies, success responses, status-code mapping, and how the serve layer wraps `runExecution`, skill, and emulator operations.
+
+## Sources
+
+- HTTP server and handlers: `apps/node/src/cli/commands/serve.ts`
+- Execution result contract: `apps/node/src/domain/executions/runExecution.ts`
+- Result envelope: `apps/node/src/contracts/result.ts`
+- Skills registry contract: `apps/node/src/contracts/skills.ts`
+- SSE event names: `apps/node/src/domain/observe/events.ts`
+- Emulator response types: `apps/node/src/domain/android-emulators/types.ts`
+
+## Start The Server
+
+```bash
+clawperator serve [--host <string>] [--port <number>]
+```
+
+Defaults:
+
+| Field | Value |
+| --- | --- |
+| host | `127.0.0.1` |
+| port | `3000` |
+| JSON request body limit | `100kb` |
+
+When the server starts successfully, it listens until the process exits. There is no structured JSON startup response because this is a long-running command.
+
+## Response Shapes
+
+Most REST endpoints return one of these shapes.
+
+Important boundary:
+
+- `/execute`, `/snapshot`, and `/screenshot` pass through `runExecution()` results on success and on cross-surface execution failures
+- malformed request bodies and route-local validation failures are serve-layer wrappers only and are not part of the shared execution contract
+
+### Success wrapper
+
+```json
+{
+  "ok": true
+}
+```
+
+and then endpoint-specific fields such as `devices`, `skills`, `avds`, `output`, or emulator state.
+
+### Execution result passthrough
+
+`/execute`, `/snapshot`, and `/screenshot` return the `runExecution()` result object directly:
+
+Successful shape:
+
+```json
+{
+  "ok": true,
+  "deviceId": "emulator-5554",
+  "terminalSource": "clawperator_result",
+  "envelope": {
+    "commandId": "serve-snap-1710000000000",
+    "taskId": "serve-snap-1710000000000",
+    "status": "success",
+    "stepResults": [
+      {
+        "id": "snap",
+        "actionType": "snapshot_ui",
+        "success": true,
+        "data": {
+          "text": "<hierarchy rotation=\"0\">...</hierarchy>"
+        }
+      }
+    ],
+    "error": null
+  }
+}
+```
+
+Failure shape:
+
+```json
+{
+  "ok": false,
+  "error": {
+    "code": "DEVICE_NOT_FOUND",
+    "message": "Device emulator-9999 not found or not in device state",
+    "details": {
+      "connected": ["emulator-5554"]
+    }
+  }
+}
+```
+
+Success conditions for execution endpoints:
+
+- HTTP status is `200`
+- response body has `"ok": true`
+- `envelope.status == "success"`
+- every `envelope.stepResults[i].success == true`
+
+## Endpoint Summary
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/devices` | list adb-visible devices |
+| `POST` | `/execute` | run a caller-supplied execution payload |
+| `POST` | `/snapshot` | run a synthetic one-step `snapshot_ui` execution |
+| `POST` | `/screenshot` | run a synthetic one-step `take_screenshot` execution |
+| `GET` | `/skills` | list all skills or search by query |
+| `GET` | `/skills/:skillId` | fetch one skill registry entry |
+| `POST` | `/skills/:skillId/run` | run one skill script |
+| `GET` | `/android/emulators` | list configured AVDs |
+| `GET` | `/android/emulators/running` | list running emulators |
+| `GET` | `/android/emulators/:name` | inspect one configured AVD |
+| `POST` | `/android/emulators/create` | create an AVD |
+| `POST` | `/android/emulators/:name/start` | start an AVD and wait for boot |
+| `POST` | `/android/emulators/:name/stop` | stop a running AVD |
+| `DELETE` | `/android/emulators/:name` | delete an AVD |
+| `POST` | `/android/provision/emulator` | create or reuse a supported emulator and boot it |
+| `GET` | `/events` | subscribe to SSE execution events |
+
+## `GET /devices`
+
+Returns the same parsed adb listing used by [Devices](devices.md).
+
+Success response:
+
+```json
+{
+  "ok": true,
+  "devices": [
+    {
+      "serial": "emulator-5554",
+      "state": "device"
+    },
+    {
+      "serial": "R58N12345AB",
+      "state": "unauthorized"
+    }
+  ]
+}
+```
+
+Meaning:
+
+- this is observational output only
+- it does not apply the execution-time `resolveDevice()` filtering rules
+
+Failure behavior:
+
+- server-side listing failures return HTTP `500`
+- this route does not use the `errors.ts` status mapping table
+
+## `POST /execute`
+
+### Request body
+
+```json
+{
+  "execution": {
+    "commandId": "open-settings",
+    "taskId": "open-settings",
+    "source": "agent-http",
+    "expectedFormat": "android-ui-automator",
+    "timeoutMs": 30000,
+    "actions": [
+      {
+        "id": "a1",
+        "type": "open_app",
+        "params": {
+          "applicationId": "com.android.settings"
+        }
+      },
+      {
+        "id": "a2",
+        "type": "snapshot_ui"
+      }
+    ]
+  },
+  "deviceId": "emulator-5554",
+  "operatorPackage": "com.clawperator.operator.dev"
+}
+```
+
+Valid body rules enforced by the route:
+
+- request body must be a JSON object
+- `execution` is required
+- `deviceId`, when present, must be a string
+- `operatorPackage`, when present, must be a non-empty string
+
+Operator package resolution:
+
+- if `operatorPackage` is present in the request, the server uses it verbatim
+- otherwise it falls back to `process.env.CLAWPERATOR_OPERATOR_PACKAGE` when that env var is non-empty
+- otherwise it uses `com.clawperator.operator`
+
+Then `runExecution()` applies full execution validation. See [Actions](actions.md), [Selectors](selectors.md), and [API Overview](overview.md).
+
+Representative serve-layer `400` wrappers for this route:
+
+```json
+{
+  "ok": false,
+  "error": {
+    "code": "MISSING_EXECUTION",
+    "message": "Missing 'execution' in body"
+  }
+}
+```
+
+### Success response
+
+```json
+{
+  "ok": true,
+  "deviceId": "emulator-5554",
+  "terminalSource": "clawperator_result",
+  "envelope": {
+    "commandId": "open-settings",
+    "taskId": "open-settings",
+    "status": "success",
+    "stepResults": [
+      {
+        "id": "a1",
+        "actionType": "open_app",
+        "success": true,
+        "data": {}
+      },
+      {
+        "id": "a2",
+        "actionType": "snapshot_ui",
+        "success": true,
+        "data": {
+          "text": "<hierarchy rotation=\"0\">...</hierarchy>"
+        }
+      }
+    ],
+    "error": null
+  }
+}
+```
+
+### Failure response
+
+Validation failure example:
+
+```json
+{
+  "ok": false,
+  "error": {
+    "code": "EXECUTION_VALIDATION_FAILED",
+    "message": "press_key requires params.key",
+    "details": {
+      "path": "actions.0.params.key",
+      "actionId": "k1",
+      "actionType": "press_key"
+    }
+  }
+}
+```
+
+Device-resolution failure example:
+
+```json
+{
+  "ok": false,
+  "error": {
+    "code": "DEVICE_NOT_FOUND",
+    "message": "Device non-existent not found or not in device state",
+    "details": {
+      "connected": ["emulator-5554"]
+    }
+  }
+}
+```
+
+## `POST /snapshot`
+
+This route builds a synthetic execution with:
+
+- `source: "serve-api"`
+- `expectedFormat: "android-ui-automator"`
+- `timeoutMs: 30000`
+- one action: `{ "id": "snap", "type": "snapshot_ui" }`
+
+### Request body
+
+```json
+{
+  "deviceId": "emulator-5554",
+  "operatorPackage": "com.clawperator.operator.dev"
+}
+```
+
+Notes:
+
+- body must still be a JSON object, but `{}` is valid
+- omitted `operatorPackage` follows the same fallback chain as `/execute`
+
+### Success response
+
+```json
+{
+  "ok": true,
+  "deviceId": "emulator-5554",
+  "terminalSource": "clawperator_result",
+  "envelope": {
+    "commandId": "serve-snap-1710000000000",
+    "taskId": "serve-snap-1710000000000",
+    "status": "success",
+    "stepResults": [
+      {
+        "id": "snap",
+        "actionType": "snapshot_ui",
+        "success": true,
+        "data": {
+          "text": "<hierarchy rotation=\"0\">...</hierarchy>"
+        }
+      }
+    ],
+    "error": null
+  }
+}
+```
+
+## `POST /screenshot`
+
+This route builds a synthetic execution with:
+
+- `source: "serve-api"`
+- `expectedFormat: "android-ui-automator"`
+- `timeoutMs: 30000`
+- one action: `{ "id": "shot", "type": "take_screenshot" }`
+- optional `params.path` when `path` was supplied
+
+### Request body
+
+```json
+{
+  "deviceId": "emulator-5554",
+  "operatorPackage": "com.clawperator.operator.dev",
+  "path": "/tmp/settings.png"
+}
+```
+
+Route validation:
+
+- request body must be a JSON object
+- `path`, when present, must be a non-empty string
+- omitted `operatorPackage` follows the same fallback chain as `/execute`
+
+### Success response
+
+```json
+{
+  "ok": true,
+  "deviceId": "emulator-5554",
+  "terminalSource": "clawperator_result",
+  "envelope": {
+    "commandId": "serve-shot-1710000000000",
+    "taskId": "serve-shot-1710000000000",
+    "status": "success",
+    "stepResults": [
+      {
+        "id": "shot",
+        "actionType": "take_screenshot",
+        "success": true,
+        "data": {
+          "path": "/tmp/settings.png"
+        }
+      }
+    ],
+    "error": null
+  }
+}
+```
+
+## `GET /skills`
+
+Without query parameters, returns every registry entry:
+
+```json
+{
+  "ok": true,
+  "skills": [
+    {
+      "id": "com.test.echo",
+      "applicationId": "com.example",
+      "intent": "echo text",
+      "summary": "Echo test skill",
+      "path": "skills/com.test.echo",
+      "skillFile": "skills/com.test.echo/SKILL.md",
+      "scripts": ["skills/com.test.echo/run.js"],
+      "artifacts": []
+    }
+  ],
+  "count": 1
+}
+```
+
+Optional query parameters:
+
+| Query key | Type | Match behavior |
+| --- | --- | --- |
+| `app` | string | exact `applicationId` match |
+| `intent` | string | exact `intent` match |
+| `keyword` | string | case-insensitive substring match across `id`, `summary`, and `applicationId` |
+
+## `GET /skills/:skillId`
+
+Success response:
+
+```json
+{
+  "ok": true,
+  "skill": {
+    "id": "com.test.echo",
+    "applicationId": "com.example",
+    "intent": "echo text",
+    "summary": "Echo test skill",
+    "path": "skills/com.test.echo",
+    "skillFile": "skills/com.test.echo/SKILL.md",
+    "scripts": ["skills/com.test.echo/run.js"],
+    "artifacts": []
+  }
+}
+```
+
+## `POST /skills/:skillId/run`
+
+### Request body
+
+```json
+{
+  "deviceId": "emulator-5554",
+  "args": ["hello", "api"],
+  "timeoutMs": 4321,
+  "expectContains": "TEST_OUTPUT:hello"
+}
+```
+
+Validation rules:
+
+- body must be a JSON object
+- `deviceId`, when present, must be a string
+- `args`, when present, must be an array
+- `timeoutMs`, when present, must be a positive integer
+- `expectContains`, when present, must be a string
+
+Argument mapping:
+
+- if `deviceId` is a non-empty string, it is prepended to the script argument list
+- `args[]` are appended after that, stringified with `String()`
+- if `timeoutMs` is omitted, `runSkill()` uses its default timeout of `120000ms`
+
+### Success response
+
+```json
+{
+  "ok": true,
+  "skillId": "com.test.echo",
+  "output": "TEST_OUTPUT:hello\nTEST_OUTPUT:api\n",
+  "exitCode": 0,
+  "durationMs": 18,
+  "timeoutMs": 4321,
+  "expectedSubstring": "TEST_OUTPUT:hello"
+}
+```
+
+Behavior:
+
+- if `expectContains` is provided and `output` does not contain that substring, the route returns HTTP `400`
+- `expectContains` is an assertion helper for tests and agent loops that need a simple stdout substring gate
+- if the skill ID does not exist, the route returns HTTP `404`
+- if skill registry loading fails, the route returns HTTP `500` with `REGISTRY_READ_FAILED`
+- other `runSkill()` failures, including non-zero exit and timeout, return HTTP `400`
+- successful responses always include `exitCode: 0`
+
+Failure examples:
+
+Output assertion failure:
+
+```json
+{
+  "ok": false,
+  "error": {
+    "code": "SKILL_OUTPUT_ASSERTION_FAILED",
+    "message": "Skill com.test.echo output did not include expected text",
+    "skillId": "com.test.echo",
+    "output": "TEST_OUTPUT:api\n",
+    "expectedSubstring": "TEST_OUTPUT:hello",
+    "timeoutMs": 4321
+  }
+}
+```
+
+Non-zero skill exit:
+
+```json
+{
+  "ok": false,
+  "error": {
+    "code": "SKILL_EXECUTION_FAILED",
+    "message": "Skill com.test.echo exited with code 2",
+    "skillId": "com.test.echo",
+    "exitCode": 2,
+    "stdout": "partial output\n",
+    "stderr": "fatal error\n",
+    "timeoutMs": 4321
+  }
+}
+```
+
+## Global Serve-Layer Failures
+
+These wrappers come from Express middleware rather than a specific endpoint handler:
+
+| HTTP status | Code | When it appears |
+| --- | --- | --- |
+| `400` | `INVALID_JSON` | request body is malformed JSON |
+| `413` | `PAYLOAD_TOO_LARGE` | request body exceeds the `100kb` Express limit |
+| `500` | `INTERNAL_SERVER_ERROR` | unhandled server-side exception reached the catch-all middleware |
+
+Many individual route handlers also return `INTERNAL_ERROR` from local `catch` blocks. Treat both `INTERNAL_ERROR` and `INTERNAL_SERVER_ERROR` as host-side `500` failures rather than as stable execution-contract codes.
+
+## Emulator Endpoints
+
+### `GET /android/emulators`
+
+Lists configured AVDs, merged with running-state information:
+
+```json
+{
+  "ok": true,
+  "avds": [
+    {
+      "name": "clawperator-pixel",
+      "exists": true,
+      "running": false,
+      "apiLevel": 35,
+      "abi": "arm64-v8a",
+      "playStore": true,
+      "deviceProfile": "pixel_8",
+      "systemImage": "system-images;android-35;google_apis_playstore;arm64-v8a",
+      "supported": true,
+      "unsupportedReasons": []
+    }
+  ]
+}
+```
+
+### `GET /android/emulators/running`
+
+```json
+{
+  "ok": true,
+  "devices": [
+    {
+      "type": "emulator",
+      "avdName": "clawperator-pixel",
+      "serial": "emulator-5554",
+      "booted": true,
+      "supported": true,
+      "unsupportedReasons": []
+    }
+  ]
+}
+```
+
+### `GET /android/emulators/:name`
+
+Returns one `ConfiguredAvd` object merged into the success wrapper:
+
+```json
+{
+  "ok": true,
+  "name": "clawperator-pixel",
+  "exists": true,
+  "running": false,
+  "apiLevel": 35,
+  "abi": "arm64-v8a",
+  "playStore": true,
+  "deviceProfile": "pixel_8",
+  "systemImage": "system-images;android-35;google_apis_playstore;arm64-v8a",
+  "supported": true,
+  "unsupportedReasons": []
+}
+```
+
+### `POST /android/emulators/create`
+
+Request body:
+
+```json
+{
+  "name": "clawperator-pixel",
+  "apiLevel": 35,
+  "abi": "arm64-v8a",
+  "deviceProfile": "pixel_8",
+  "playStore": true
+}
+```
+
+Defaults when omitted:
+
+| Field | Default |
+| --- | --- |
+| `name` | `DEFAULT_EMULATOR_AVD_NAME` (`clawperator-pixel`) |
+| `apiLevel` | `SUPPORTED_EMULATOR_API_LEVEL` (`35`) |
+| `abi` | `arm64-v8a` |
+| `deviceProfile` | `DEFAULT_EMULATOR_DEVICE_PROFILE` (`pixel_7`) |
+| `playStore` | `true` unless explicitly `false` |
+
+Success response:
+
+```json
+{
+  "ok": true,
+  "name": "clawperator-pixel",
+  "exists": true,
+  "running": false,
+  "apiLevel": 35,
+  "abi": "arm64-v8a",
+  "playStore": true,
+  "deviceProfile": "pixel_8",
+  "systemImage": "system-images;android-35;google_apis_playstore;arm64-v8a",
+  "supported": true,
+  "unsupportedReasons": []
+}
+```
+
+### `POST /android/emulators/:name/start`
+
+Success response:
+
+```json
+{
+  "ok": true,
+  "type": "emulator",
+  "avdName": "clawperator-pixel",
+  "serial": "emulator-5554",
+  "booted": true
+}
+```
+
+Behavior:
+
+- verifies the AVD exists
+- rejects already-running AVDs
+- starts the emulator, waits for adb registration, waits for boot completion, then enables developer settings
+
+### `POST /android/emulators/:name/stop`
+
+```json
+{
+  "ok": true,
+  "avdName": "clawperator-pixel",
+  "stopped": true
+}
+```
+
+### `DELETE /android/emulators/:name`
+
+```json
+{
+  "ok": true,
+  "avdName": "clawperator-pixel",
+  "deleted": true
+}
+```
+
+### `POST /android/provision/emulator`
+
+This route calls `provisionEmulator()` and may reuse a supported running emulator, start an existing supported AVD, or create and start a new one.
+
+Success response:
+
+```json
+{
+  "ok": true,
+  "type": "emulator",
+  "avdName": "clawperator-pixel",
+  "serial": "emulator-5554",
+  "booted": true,
+  "created": false,
+  "started": true,
+  "reused": true
+}
+```
+
+Meaning of flags:
+
+- `created`: a new AVD had to be created
+- `started`: the emulator process was started during this request
+- `reused`: an existing supported emulator or AVD was reused
+
+## `GET /events` SSE Stream
+
+The server responds with:
+
+- `Content-Type: text/event-stream`
+- `Cache-Control: no-cache`
+- `Connection: keep-alive`
+
+Initial heartbeat event:
+
+```text
+event: heartbeat
+data: {"code":"CONNECTED","message":"Clawperator SSE stream active"}
+```
+
+Execution-related events:
+
+| Event name | Data shape |
+| --- | --- |
+| `clawperator:result` | `{ "deviceId": "<serial>", "envelope": <ResultEnvelope> }` |
+| `clawperator:execution` | `{ "deviceId": "<serial>", "input": <unknown>, "result": <RunExecutionResult> }` |
+
+Use `/events` when:
+
+- you want push-style result observation instead of polling
+- you need both raw execution outcomes and envelope-only results
+
+## HTTP Status Mapping
+
+When a handler returns an enum-backed error from `errors.ts`, `serve.ts` maps it to HTTP status like this:
+
+| Error code | HTTP status |
+| --- | --- |
+| `EXECUTION_CONFLICT_IN_FLIGHT` | `423` |
+| `DEVICE_NOT_FOUND` | `404` |
+| `NO_DEVICES` | `404` |
+| `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED` | `400` |
+| `EXECUTION_VALIDATION_FAILED` | `400` |
+| `PAYLOAD_TOO_LARGE` | `413` |
+| `RESULT_ENVELOPE_TIMEOUT` | `504` |
+| `EMULATOR_NOT_FOUND` | `404` |
+| `EMULATOR_NOT_RUNNING` | `404` |
+| `EMULATOR_UNSUPPORTED` | `409` |
+| `EMULATOR_ALREADY_RUNNING` | `409` |
+| anything else | `500` |
+
+Machine-checkable rule:
+
+- for execution endpoints, use both HTTP status and `error.code`
+- branch primarily on `error.code`, not only on the HTTP status
+
+## Error Handling Notes
+
+Two classes of failures exist:
+
+1. Stable enum-backed failures from `apps/node/src/contracts/errors.ts`
+2. Route-local HTTP validation failures for malformed or missing request bodies
+
+For long-term agent logic, prefer branching on the enum-backed errors above. Route-local validation failures should be treated as “fix the request body and retry” rather than as durable cross-surface contract codes.
+
+Examples of route-local validation failures:
+
+- malformed JSON body -> HTTP `400`
+- body is missing or not a JSON object on POST routes -> HTTP `400`
+- `/execute` without `execution` -> HTTP `400`
+- `/screenshot` with blank `path` -> HTTP `400`
+
+## Related Pages
+
+- [API Overview](overview.md)
+- [Actions](actions.md)
+- [Selectors](selectors.md)
+- [Devices](devices.md)
+- [Errors](errors.md)
 
 ---
 
