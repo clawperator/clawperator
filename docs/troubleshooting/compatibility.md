@@ -257,7 +257,7 @@ Concrete failure shapes:
 ```json
 {
   "code": "APK_VERSION_UNREADABLE",
-  "message": "Could not read the installed APK version for com.clawperator.operator.dev."
+  "message": "Could not find version metadata for com.clawperator.operator.dev in dumpsys output."
 }
 ```
 

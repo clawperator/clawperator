@@ -2471,13 +2471,17 @@ Any intervening action such as `sleep`, `wait_for_node`, or `read_text` suppress
 
 `LIMITS.MAX_SNAPSHOT_LINES` is `2000`.
 
-This is the current hard limit documented in `apps/node/src/contracts/limits.ts`. Treat it as the upper bound for snapshot extraction and downstream handling. If you depend on very large hierarchies, do not assume more than 2000 lines of XML will remain safe across versions.
+This constant is defined in `apps/node/src/contracts/limits.ts`, but the current Node extraction path in `snapshotHelper.ts` does not actively clamp snapshots to 2000 lines. Treat it as a documented size-limit constant, not as a currently enforced truncation rule in extraction.
 
 The same limits file also defines:
 
 - `MAX_SNAPSHOT_BYTES = 262144`
 
-This page's primary hard gate is the line limit because that is the explicit snapshot-specific limit called out in the Phase 3 task, but large XML payloads should stay within both limits.
+Operationally:
+
+- do not assume Node will truncate at 2000 lines today
+- do assume very large hierarchies are higher risk across extraction, payload handling, and downstream consumers
+- keep large XML payloads within the documented size constants when possible
 
 ## Successful Step Example
 
@@ -4136,7 +4140,7 @@ Define every environment variable the Node CLI reads, its exact default, where i
 - Android SDK tool resolution (reads `ANDROID_HOME`, `ANDROID_SDK_ROOT`): `apps/node/src/adapters/android-bridge/runtimeConfig.ts`
 - Skill binary and package resolution (reads `CLAWPERATOR_BIN`, `CLAWPERATOR_OPERATOR_PACKAGE`): `apps/node/src/domain/skills/skillsConfig.ts`
 - Skills registry path (reads `CLAWPERATOR_SKILLS_REGISTRY`): `apps/node/src/adapters/skills-repo/localSkillsRegistry.ts`
-- Per-command operator package and adb path: every device-targeting command in `apps/node/src/cli/commands/`
+- Per-command operator package and adb path: `apps/node/src/cli/registry.ts` plus device-targeting handlers in `apps/node/src/cli/commands/`
 - Execution runtime (reads `CLAWPERATOR_OPERATOR_PACKAGE`, `ADB_PATH`): `apps/node/src/domain/executions/runExecution.ts`
 
 ## Precedence Rule
@@ -4255,18 +4259,18 @@ clawperator snapshot --json --log-level debug
 
 Defines the path to the active `skills-registry.json` used by all skill commands.
 
-Read by: `skills list`, `skills get`, `skills search`, `skills run`, `skills validate`, `skills compile-artifact`, `skills scaffold`, and the `/skills` serve endpoints.
+Read by: `skills list`, `skills get`, `skills search`, `skills run`, `skills validate`, `skills compile-artifact`, `skills new`, and the `/skills` serve endpoints.
 
 Default when unset: `<cwd>/skills/skills-registry.json` where `<cwd>` is `process.cwd()`.
 
 Fallback behavior in `loadRegistry()`:
 
-1. Try the configured path (env var or explicit argument)
-2. If no explicit path and no env var: try `<cwd>/skills/skills-registry.json`
-3. If that fails: try `<cwd>/../../skills/skills-registry.json` (covers running from `apps/node/`)
-4. If all fail: throw an error suggesting `clawperator skills sync`
+1. If `CLAWPERATOR_SKILLS_REGISTRY` is set, try that configured path
+2. Otherwise try the default path `<cwd>/skills/skills-registry.json`
+3. Only when an explicit `registryPath` argument was passed and that read fails, also try `<cwd>/../../skills/skills-registry.json` (covers running from `apps/node/`)
+4. If the default-path read fails with no env var and no explicit `registryPath`, `loadRegistry()` throws immediately and suggests `clawperator skills install`
 
-After `clawperator skills sync`, the registry lives at `~/.clawperator/skills/skills/skills-registry.json`. Set the env var to point there:
+After `clawperator skills install` or `clawperator skills sync`, the registry lives at `~/.clawperator/skills/skills/skills-registry.json`. Set the env var to point there:
 
 ```bash
 export CLAWPERATOR_SKILLS_REGISTRY="$HOME/.clawperator/skills/skills/skills-registry.json"
@@ -4274,6 +4278,12 @@ clawperator skills list --json
 ```
 
 Error case: if the path does not exist, skill commands fail with `REGISTRY_READ_FAILED`. The error message includes the path that was tried.
+
+Current recovery rules:
+
+- missing default path with no env var: run `clawperator skills install`
+- wrong `CLAWPERATOR_SKILLS_REGISTRY` path: fix the env var or rerun `clawperator skills install`
+- explicit caller-supplied registry path that only exists from `apps/node/`: the `../../skills/skills-registry.json` fallback may still succeed
 
 ## `CLAWPERATOR_BIN`
 
@@ -8421,7 +8431,7 @@ Current permission steps are:
 
 Important implementation details:
 
-- notification permission grant may be marked as skipped but still treated as okay for known Android responses like "already granted" or "unknown permission"
+- notification permission grant may be marked as skipped but still treated as okay for known Android responses like "already granted", "unknown permission", or "not a changeable permission type"
 - accessibility and notification listener grants must succeed
 
 Exact failure shape:
@@ -8429,7 +8439,7 @@ Exact failure shape:
 ```json
 {
   "code": "OPERATOR_GRANT_FAILED",
-  "message": "Failed to enable accessibility service",
+  "message": "Could not set accessibility_enabled",
   "operatorPackage": "com.clawperator.operator.dev",
   "install": {
     "ok": true
@@ -8437,7 +8447,7 @@ Exact failure shape:
   "permissions": {
     "accessibility": {
       "ok": false,
-      "error": "Failed to enable accessibility service"
+      "error": "Could not set accessibility_enabled"
     },
     "notification": {
       "ok": true,
@@ -8965,7 +8975,7 @@ Concrete failure shapes:
 ```json
 {
   "code": "APK_VERSION_UNREADABLE",
-  "message": "Could not read the installed APK version for com.clawperator.operator.dev."
+  "message": "Could not find version metadata for com.clawperator.operator.dev in dumpsys output."
 }
 ```
 

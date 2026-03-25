@@ -11,7 +11,7 @@ Define every environment variable the Node CLI reads, its exact default, where i
 - Android SDK tool resolution (reads `ANDROID_HOME`, `ANDROID_SDK_ROOT`): `apps/node/src/adapters/android-bridge/runtimeConfig.ts`
 - Skill binary and package resolution (reads `CLAWPERATOR_BIN`, `CLAWPERATOR_OPERATOR_PACKAGE`): `apps/node/src/domain/skills/skillsConfig.ts`
 - Skills registry path (reads `CLAWPERATOR_SKILLS_REGISTRY`): `apps/node/src/adapters/skills-repo/localSkillsRegistry.ts`
-- Per-command operator package and adb path: every device-targeting command in `apps/node/src/cli/commands/`
+- Per-command operator package and adb path: `apps/node/src/cli/registry.ts` plus device-targeting handlers in `apps/node/src/cli/commands/`
 - Execution runtime (reads `CLAWPERATOR_OPERATOR_PACKAGE`, `ADB_PATH`): `apps/node/src/domain/executions/runExecution.ts`
 
 ## Precedence Rule
@@ -130,18 +130,18 @@ clawperator snapshot --json --log-level debug
 
 Defines the path to the active `skills-registry.json` used by all skill commands.
 
-Read by: `skills list`, `skills get`, `skills search`, `skills run`, `skills validate`, `skills compile-artifact`, `skills scaffold`, and the `/skills` serve endpoints.
+Read by: `skills list`, `skills get`, `skills search`, `skills run`, `skills validate`, `skills compile-artifact`, `skills new`, and the `/skills` serve endpoints.
 
 Default when unset: `<cwd>/skills/skills-registry.json` where `<cwd>` is `process.cwd()`.
 
 Fallback behavior in `loadRegistry()`:
 
-1. Try the configured path (env var or explicit argument)
-2. If no explicit path and no env var: try `<cwd>/skills/skills-registry.json`
-3. If that fails: try `<cwd>/../../skills/skills-registry.json` (covers running from `apps/node/`)
-4. If all fail: throw an error suggesting `clawperator skills sync`
+1. If `CLAWPERATOR_SKILLS_REGISTRY` is set, try that configured path
+2. Otherwise try the default path `<cwd>/skills/skills-registry.json`
+3. Only when an explicit `registryPath` argument was passed and that read fails, also try `<cwd>/../../skills/skills-registry.json` (covers running from `apps/node/`)
+4. If the default-path read fails with no env var and no explicit `registryPath`, `loadRegistry()` throws immediately and suggests `clawperator skills install`
 
-After `clawperator skills sync`, the registry lives at `~/.clawperator/skills/skills/skills-registry.json`. Set the env var to point there:
+After `clawperator skills install` or `clawperator skills sync`, the registry lives at `~/.clawperator/skills/skills/skills-registry.json`. Set the env var to point there:
 
 ```bash
 export CLAWPERATOR_SKILLS_REGISTRY="$HOME/.clawperator/skills/skills/skills-registry.json"
@@ -149,6 +149,12 @@ clawperator skills list --json
 ```
 
 Error case: if the path does not exist, skill commands fail with `REGISTRY_READ_FAILED`. The error message includes the path that was tried.
+
+Current recovery rules:
+
+- missing default path with no env var: run `clawperator skills install`
+- wrong `CLAWPERATOR_SKILLS_REGISTRY` path: fix the env var or rerun `clawperator skills install`
+- explicit caller-supplied registry path that only exists from `apps/node/`: the `../../skills/skills-registry.json` fallback may still succeed
 
 ## `CLAWPERATOR_BIN`
 

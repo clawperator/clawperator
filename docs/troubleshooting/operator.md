@@ -173,7 +173,7 @@ Current permission steps are:
 
 Important implementation details:
 
-- notification permission grant may be marked as skipped but still treated as okay for known Android responses like "already granted" or "unknown permission"
+- notification permission grant may be marked as skipped but still treated as okay for known Android responses like "already granted", "unknown permission", or "not a changeable permission type"
 - accessibility and notification listener grants must succeed
 
 Exact failure shape:
@@ -181,7 +181,7 @@ Exact failure shape:
 ```json
 {
   "code": "OPERATOR_GRANT_FAILED",
-  "message": "Failed to enable accessibility service",
+  "message": "Could not set accessibility_enabled",
   "operatorPackage": "com.clawperator.operator.dev",
   "install": {
     "ok": true
@@ -189,7 +189,7 @@ Exact failure shape:
   "permissions": {
     "accessibility": {
       "ok": false,
-      "error": "Failed to enable accessibility service"
+      "error": "Could not set accessibility_enabled"
     },
     "notification": {
       "ok": true,

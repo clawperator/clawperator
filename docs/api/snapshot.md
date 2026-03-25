@@ -268,13 +268,17 @@ Any intervening action such as `sleep`, `wait_for_node`, or `read_text` suppress
 
 `LIMITS.MAX_SNAPSHOT_LINES` is `2000`.
 
-This is the current hard limit documented in `apps/node/src/contracts/limits.ts`. Treat it as the upper bound for snapshot extraction and downstream handling. If you depend on very large hierarchies, do not assume more than 2000 lines of XML will remain safe across versions.
+This constant is defined in `apps/node/src/contracts/limits.ts`, but the current Node extraction path in `snapshotHelper.ts` does not actively clamp snapshots to 2000 lines. Treat it as a documented size-limit constant, not as a currently enforced truncation rule in extraction.
 
 The same limits file also defines:
 
 - `MAX_SNAPSHOT_BYTES = 262144`
 
-This page's primary hard gate is the line limit because that is the explicit snapshot-specific limit called out in the Phase 3 task, but large XML payloads should stay within both limits.
+Operationally:
+
+- do not assume Node will truncate at 2000 lines today
+- do assume very large hierarchies are higher risk across extraction, payload handling, and downstream consumers
+- keep large XML payloads within the documented size constants when possible
 
 ## Successful Step Example
 
