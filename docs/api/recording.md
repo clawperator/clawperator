@@ -27,6 +27,8 @@ Notes:
 - `record` is a top-level alias for `recording`
 - `pull` defaults to `./recordings/` when `--out` is omitted
 - `parse` writes `<input>.steps.json` when `--out` is omitted
+- `record start` builder timeout is `10000`
+- `record stop` builder timeout is `15000`
 
 ## CLI Commands
 
@@ -57,6 +59,39 @@ Current builder payload:
 }
 ```
 
+Exact builder literals:
+
+- `taskId: "cli-record-start"`
+- `source: "clawperator-cli"`
+- `timeoutMs: 10000`
+- action id: `a1`
+
+Verification:
+
+```bash
+clawperator record start --session-id demo-session --device <device_serial> --json
+```
+
+Expected success wrapper shape:
+
+```json
+{
+  "envelope": {
+    "status": "success",
+    "stepResults": [
+      {
+        "actionType": "start_recording",
+        "success": true,
+        "data": {}
+      }
+    ]
+  },
+  "deviceId": "<device_serial>",
+  "terminalSource": "clawperator_result",
+  "isCanonicalTerminal": true
+}
+```
+
 ### Stop
 
 ```bash
@@ -84,6 +119,36 @@ Current builder payload:
 }
 ```
 
+Exact builder literals:
+
+- `taskId: "cli-record-stop"`
+- `source: "clawperator-cli"`
+- `timeoutMs: 15000`
+- action id: `a1`
+
+Verification:
+
+```bash
+clawperator record stop --session-id demo-session --device <device_serial> --json
+```
+
+Expected success wrapper shape:
+
+```json
+{
+  "envelope": {
+    "status": "success",
+    "stepResults": [
+      {
+        "actionType": "stop_recording",
+        "success": true,
+        "data": {}
+      }
+    ]
+  }
+}
+```
+
 ### Pull
 
 ```bash
@@ -99,6 +164,22 @@ Successful response shape:
   "sessionId": "demo-session"
 }
 ```
+
+Exact default:
+
+- if `--out` is omitted, `registry.ts` sets `outputDir` to `./recordings/`
+
+Verification:
+
+```bash
+clawperator record pull --session-id demo-session --device <device_serial> --json
+```
+
+Check:
+
+- `ok == true`
+- `sessionId == "demo-session"`
+- `localPath` ends with `/demo-session.ndjson`
 
 ### Parse
 
@@ -119,6 +200,23 @@ Successful response shape:
 }
 ```
 
+Exact default output-file rule from `cmdRecordParse()`:
+
+- if input ends with `.ndjson`, output is `<input without .ndjson>.steps.json`
+- otherwise output is `<input>.steps.json`
+
+Verification:
+
+```bash
+clawperator record parse --input ./recordings/demo-session.ndjson --json
+```
+
+Check:
+
+- `ok == true`
+- `outputFile == "./recordings/demo-session.steps.json"`
+- `stepCount` matches the parsed `steps.length`
+
 ## NDJSON Format
 
 A recording file is newline-delimited JSON with:
@@ -127,6 +225,13 @@ A recording file is newline-delimited JSON with:
 2. zero or more event lines
 
 The first non-empty line must be a `recording_header`.
+
+Verification pattern - minimum valid file skeleton:
+
+```json
+{"type":"recording_header","schemaVersion":1,"sessionId":"demo-session","startedAt":1710000000000,"operatorPackage":"com.clawperator.operator.dev"}
+{"ts":1710000000001,"seq":0,"type":"window_change","packageName":"com.android.settings","className":"com.android.settings.Settings","title":"Settings","snapshot":"<hierarchy .../>"}
+```
 
 ### Header Line
 
@@ -231,6 +336,7 @@ Example:
 Important:
 
 - the current schema only allows `key: "back"`
+- any other `key` value causes `RECORDING_PARSE_FAILED`
 
 ### `text_change`
 
@@ -294,6 +400,18 @@ Current normalization rules in `parseRecording.ts`:
 - `text_change` events are dropped silently
 - `press_key` events are dropped silently, but they do affect subsequent `window_change` handling
 
+Verification:
+
+```bash
+clawperator record parse --input ./recordings/demo-session.ndjson --json
+```
+
+Then open the written `.steps.json` file and confirm:
+
+- `schemaVersion == 1`
+- `steps[0].type == "open_app"` when the first raw event was `window_change`
+- `_warnings` is present only when parser warnings were generated
+
 ## Parser Warnings
 
 The parser currently emits warnings for:
@@ -302,6 +420,11 @@ The parser currently emits warnings for:
 - dropped `scroll` events
 
 Warnings are written into `_warnings` in the parsed step log and also surfaced by `record parse` in its success wrapper when present.
+
+This is an exact optional-field rule:
+
+- if there are no warnings, `_warnings` is omitted from the parsed JSON
+- if there are warnings, `_warnings` is present and `record parse` also copies them into the top-level `warnings` array of its success wrapper
 
 ## Pull Semantics
 
@@ -316,11 +439,19 @@ Session ids are accepted only if they match:
 ^[a-zA-Z0-9_-]+$
 ```
 
+This is the exact safe session-id pattern from `pullRecording.ts`.
+
 The pulled file path is:
 
 ```text
 /sdcard/Android/data/<operatorPackage>/files/recordings/<sessionId>.ndjson
 ```
+
+Error cases:
+
+- invalid `--session-id` format: `RECORDING_SESSION_NOT_FOUND`
+- no `latest` pointer file or empty pointer file: `RECORDING_SESSION_NOT_FOUND`
+- adb pull failure: `RECORDING_PULL_FAILED`
 
 ## Error Codes
 
@@ -335,6 +466,10 @@ Only document codes that exist in `apps/node/src/contracts/errors.ts`.
 | `RECORDING_PARSE_FAILED` | malformed file, invalid header, bad event fields, bad NDJSON, or unknown event type |
 | `RECORDING_SCHEMA_VERSION_UNSUPPORTED` | header schema version was not `1` |
 
+Related CLI usage error:
+
+- `record parse` without `--input` returns a top-level `USAGE` object from `registry.ts`, not a `RECORDING_PARSE_FAILED` error code
+
 ## Common Failure Modes
 
 ### `RECORDING_SESSION_NOT_FOUND`
@@ -344,6 +479,15 @@ Typical causes:
 - no `latest` file on device
 - invalid `--session-id` characters
 - trying to pull before a recording was started
+
+Typical failure shape:
+
+```json
+{
+  "code": "RECORDING_SESSION_NOT_FOUND",
+  "message": "No recording session found on device. Start a recording first."
+}
+```
 
 ### `RECORDING_PARSE_FAILED`
 
@@ -355,6 +499,15 @@ Typical causes:
 - event object missing required fields
 - unsupported event `type`
 
+Typical failure shape:
+
+```json
+{
+  "code": "RECORDING_PARSE_FAILED",
+  "message": "Malformed NDJSON at line 3"
+}
+```
+
 ### `RECORDING_SCHEMA_VERSION_UNSUPPORTED`
 
 The parser is strict:
@@ -363,12 +516,22 @@ The parser is strict:
 
 Agents should branch on this code and stop rather than trying to guess how to parse a newer schema.
 
+Typical failure shape:
+
+```json
+{
+  "code": "RECORDING_SCHEMA_VERSION_UNSUPPORTED",
+  "message": "Unsupported recording schema version: 2"
+}
+```
+
 ## What Agents Should Rely On
 
 - raw recording files are NDJSON, header first
 - `record parse` currently extracts only `open_app` and `click` steps
 - warnings are significant because they explain dropped or degraded data
 - use parsed output as a deterministic summary, not as a promise that every raw event was preserved
+- verify recording state with the returned JSON wrappers instead of assuming `record start` or `record stop` worked from exit code alone
 
 ## Related Pages
 
