@@ -10,14 +10,24 @@ Define what `snapshot_ui` returns, where the XML hierarchy is attached in the re
 - Snapshot post-processing: `apps/node/src/domain/executions/runExecution.ts`
 - Hard limits: `apps/node/src/contracts/limits.ts`
 - Snapshot builder: `apps/node/src/domain/observe/snapshot.ts`
+- Action contract summary: `docs/api/actions.md`
 
 ## What `snapshot_ui` Returns
 
 `snapshot_ui` is the canonical read-only UI observation action. The Android runtime writes the hierarchy dump to logcat, then the Node layer extracts the XML and attaches it to the successful step result as `data.text`.
 
-For CLI `snapshot --json`, success means:
+The built-in `clawperator snapshot` command constructs a one-step execution with these exact literals:
+
+- `source: "clawperator-observe"`
+- `expectedFormat: "android-ui-automator"`
+- `timeoutMs: 30000` when `buildSnapshotExecution()` is called without an override
+- one action with `id: "snap"` and `type: "snapshot_ui"`
+- `mode: "direct"`
+
+For CLI `snapshot --json`, machine-checkable success means:
 
 - exit code `0`
+- top-level JSON has `envelope`
 - `envelope.status == "success"`
 - `envelope.stepResults[0].actionType == "snapshot_ui"`
 - `envelope.stepResults[0].success == true`
@@ -52,12 +62,14 @@ The current flow is:
 4. `extractSnapshotsFromLogs()` reconstructs one or more XML documents from the log stream.
 5. `attachSnapshotsToStepResults()` walks backward through successful `snapshot_ui` steps and attaches the extracted XML as `stepResults[i].data.text`.
 6. `markExtractionFailedSnapshotSteps()` converts any still-successful snapshot step with missing `data.text` into a failed step with `data.error = "SNAPSHOT_EXTRACTION_FAILED"`.
+7. `addSettleWarnings()` may attach `data.warn` if the snapshot action immediately follows `click` or `scroll_and_click`.
 
 Important boundaries:
 
 - Node does not parse the XML into a typed object. It treats the hierarchy as opaque text.
 - When multiple snapshots exist in one execution, Node attaches the most recent extracted snapshot to the most recent successful `snapshot_ui` step, walking backward through both lists.
 - If no successful `snapshot_ui` steps exist, extraction output is ignored.
+- Node only reads logcat for snapshot extraction when the result envelope already contains at least one `snapshot_ui` step.
 
 ## Envelope Placement
 
@@ -87,6 +99,31 @@ Successful `snapshot_ui` data lives inside the step result, not in a separate to
 }
 ```
 
+Verification pattern - confirm the snapshot contract is active:
+
+```bash
+clawperator snapshot --json --device <device_serial>
+```
+
+Check these exact fields:
+
+```json
+{
+  "envelope": {
+    "status": "success",
+    "stepResults": [
+      {
+        "actionType": "snapshot_ui",
+        "success": true,
+        "data": {
+          "text": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><hierarchy rotation=\"0\">...</hierarchy>"
+        }
+      }
+    ]
+  }
+}
+```
+
 ## The XML Format
 
 Node's contract is that `data.text` contains the raw XML hierarchy string. Node does not validate individual XML attributes, but the extracted content follows Android UI Automator style hierarchy dumps with a `<hierarchy>` root and nested `<node>` elements.
@@ -107,9 +144,15 @@ Typical node attributes visible in current snapshots include:
 
 Important limits on what to infer:
 
-- `data.text` is the only Node-guaranteed snapshot field today.
+- `data.text` is the only Node-guaranteed snapshot success field today.
 - `NodeMatcher.role` is a Clawperator selector concept documented in [Selectors](selectors.md), not a direct XML attribute.
 - A node appearing in the XML does not guarantee it is currently reachable on screen. Use `bounds`, scrolling, and follow-up actions to confirm reachability.
+
+Current runtime note:
+
+- Android-side code currently also emits keys such as `actual_format`, `foreground_package`, `has_overlay`, `overlay_package`, and `window_count`
+- those keys are not documented as Node-guaranteed success fields in the current Node contract
+- agents should rely on `data.text` first and treat other snapshot metadata as opportunistic runtime data
 
 ## Realistic XML Fragment
 
@@ -165,6 +208,35 @@ Typical recovery:
 2. Run `clawperator doctor --json`.
 3. Re-run the snapshot with `--verbose` if you need to inspect log correlation.
 
+Verification pattern - confirm extraction failure handling:
+
+```bash
+clawperator snapshot --json --device <device_serial>
+```
+
+If extraction failed, branch on:
+
+```json
+{
+  "envelope": {
+    "status": "failed",
+    "stepResults": [
+      {
+        "actionType": "snapshot_ui",
+        "success": false,
+        "data": {
+          "error": "SNAPSHOT_EXTRACTION_FAILED"
+        }
+      }
+    ]
+  }
+}
+```
+
+Related error case:
+
+- if the command never returns an envelope at all, the caller gets a top-level `RESULT_ENVELOPE_TIMEOUT` error instead of a snapshot step result
+
 ## Settle Warning
 
 Node also adds a best-effort warning to successful snapshots when the immediately preceding action was `click` or `scroll_and_click`:
@@ -189,6 +261,12 @@ Any intervening action such as `sleep`, `wait_for_node`, or `read_text` suppress
 
 This is the current hard limit documented in `apps/node/src/contracts/limits.ts`. Treat it as the upper bound for snapshot extraction and downstream handling. If you depend on very large hierarchies, do not assume more than 2000 lines of XML will remain safe across versions.
 
+The same limits file also defines:
+
+- `MAX_SNAPSHOT_BYTES = 262144`
+
+This page's primary hard gate is the line limit because that is the explicit snapshot-specific limit called out in the Phase 3 task, but large XML payloads should stay within both limits.
+
 ## Successful Step Example
 
 ```json
@@ -206,7 +284,9 @@ This is the current hard limit documented in `apps/node/src/contracts/limits.ts`
 
 - rely on `stepResults[i].data.text` as the canonical snapshot payload
 - rely on `SNAPSHOT_EXTRACTION_FAILED` when text extraction failed after execution
+- rely on `RESULT_ENVELOPE_TIMEOUT` when no usable result envelope returned at all
 - treat `data.warn` as advisory only
+- treat Android-emitted metadata fields beyond `text` as runtime details, not as Node-guaranteed contract fields
 - use [Selectors](selectors.md) to map XML attributes into actionable selector objects
 
 ## Related Pages
