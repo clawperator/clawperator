@@ -27,7 +27,7 @@ npm install -g clawperator
 
 Success conditions:
 
-- `clawperator --version` prints a version string.
+- `clawperator version` prints a version string.
 - If you used `install.sh`, the installer also downloads the current release APK to `~/.clawperator/downloads/operator.apk`.
 
 ## 2. Prepare the Android target
@@ -127,7 +127,8 @@ Success conditions:
 
 Important behavior:
 
-- `doctor --check-only` always exits `0`. Do not use it as the setup gate.
+- `doctor --fix` automatically executes shell-type remediation steps from failed checks. Manual steps are still reported. Use this for unattended recovery loops.
+- `doctor --check-only` always exits `0` regardless of failures. Do not use it as the setup gate.
 - A warning for `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED` means the host is healthy, but automation is still non-deterministic until you add `--device`.
 
 See [Doctor](api/doctor.md) for the full report contract and [Errors](api/errors.md) for recovery by code.
@@ -167,9 +168,10 @@ Clawperator is the hand. The agent is the brain. The agent decides what to do, t
 1. Run `clawperator doctor --json [--device <serial>] [--operator-package <pkg>]`.
 2. If `readiness.apk.presence` fails, run `clawperator operator setup --apk <path> ...`.
 3. If `readiness.handshake` fails after a known-good install, run `clawperator grant-device-permissions ...`.
-4. Re-run `clawperator doctor --json ...` and require `criticalOk: true`.
-5. Run `clawperator snapshot --json ...`.
-6. Branch only on structured fields such as `criticalOk`, `checks[].code`, `envelope.status`, `envelope.errorCode`, and `stepResults[].success`.
+4. For multiple failures, `clawperator doctor --json --fix ...` auto-executes shell remediation steps.
+5. Re-run `clawperator doctor --json ...` and require `criticalOk: true`.
+6. Run `clawperator snapshot --json ...`.
+7. Branch only on structured fields such as `criticalOk`, `checks[].code`, `envelope.status`, `envelope.errorCode`, and `stepResults[].success`.
 
 ### How to confirm success without a human
 
