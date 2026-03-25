@@ -133,7 +133,22 @@ Documentation must:
 - Verify against code before writing
 - Produce final-form content immediately (no placeholders)
 - Commit after each document
+- Treat the first commit as a draft - reread it, improve it, commit again
 - Prefer incremental correctness over batch completion
+
+## How to Verify Against Code
+
+For every claim in the documentation, there must be a code path that confirms it.
+
+- CLI command names and flags: read `apps/node/src/cli/registry.ts`
+- Action types and parameters: read `apps/node/src/contracts/execution.ts`
+- Selector flags and behavior: read `apps/node/src/cli/selectorFlags.ts` and `apps/node/src/contracts/selectors.ts`
+- Error codes and meanings: read `apps/node/src/contracts/errors.ts`
+- Result envelope shape: read `apps/node/src/contracts/result.ts`
+- Doctor checks: read `apps/node/src/domain/doctor/checks/`
+- Serve endpoints: read `apps/node/src/cli/commands/serve.ts`
+
+Do not write documentation from memory or from existing docs alone. Open the code file, read it, and write the docs from what you see. If the code contradicts existing docs, the code is correct.
 
 ---
 
