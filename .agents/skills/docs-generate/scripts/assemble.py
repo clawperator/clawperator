@@ -102,11 +102,6 @@ def source_map_entries(source_map: object) -> tuple[dict[str, dict], list[dict]]
     return code_outputs, marker_entries
 
 
-def ensure_relative_path(path: str) -> None:
-    if path.startswith("..") or os.path.isabs(path):
-        raise ValueError(f"Path must be relative to docs root: {path}")
-
-
 def generator_path(generator: str) -> Path:
     path = Path(generator)
     if not path.is_absolute():

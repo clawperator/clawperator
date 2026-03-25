@@ -17,7 +17,7 @@ Use the section pages in the nav for the current canonical surface.
 
 # Setup
 
-Placeholder for the linear setup path.
+Placeholder - content coming in PR-2/PR-3.
 
 This page will cover installation, device preparation, APK installation, permissions, doctor verification, and the first snapshot command.
 
@@ -27,7 +27,7 @@ This page will cover installation, device preparation, APK installation, permiss
 
 # API Overview
 
-Placeholder for the high-level API contract.
+Placeholder - content coming in PR-2/PR-3.
 
 This page will summarize the execution model, result envelope, and pointers to the dedicated reference pages.
 
@@ -315,7 +315,7 @@ This page is generated from the Node CLI registry and command sources.
 
 # Actions
 
-Placeholder for the action reference.
+Placeholder - content coming in PR-2/PR-3.
 
 Each action, its required inputs, outputs, and common failure modes will live here.
 
@@ -323,7 +323,7 @@ Each action, its required inputs, outputs, and common failure modes will live he
 
 # Selectors
 
-Placeholder for the selector contract.
+Placeholder - content coming in PR-2/PR-3.
 
 | Flag | Description | Notes |
 | --- | --- | --- |
@@ -348,7 +348,7 @@ This page will define the NodeMatcher contract, selector flag behavior, and matc
 
 # Snapshot Format
 
-Placeholder for the snapshot format reference.
+Placeholder - content coming in PR-2/PR-3.
 
 This page will describe the snapshot output shape and parsing contract.
 
@@ -356,7 +356,7 @@ This page will describe the snapshot output shape and parsing contract.
 
 # Errors
 
-Placeholder for the error reference.
+Placeholder - content coming in PR-2/PR-3.
 
 | Code | Meaning | Notes |
 | --- | --- | --- |
@@ -431,7 +431,7 @@ This page will explain error classes, recovery patterns, and code-derived error 
 
 # Devices
 
-Placeholder for device targeting and package model guidance.
+Placeholder - content coming in PR-2/PR-3.
 
 This page will cover device resolution, multi-device rules, and Operator package selection.
 
@@ -439,7 +439,7 @@ This page will cover device resolution, multi-device rules, and Operator package
 
 # Doctor
 
-Placeholder for the doctor command reference.
+Placeholder - content coming in PR-2/PR-3.
 
 This page will describe readiness checks, remediation flow, and fix behavior.
 
@@ -447,7 +447,7 @@ This page will describe readiness checks, remediation flow, and fix behavior.
 
 # Timeouts
 
-Placeholder for timeout budgeting guidance.
+Placeholder - content coming in PR-2/PR-3.
 
 This page will explain how Clawperator budgets execution and action-level timeouts.
 
@@ -455,7 +455,7 @@ This page will explain how Clawperator budgets execution and action-level timeou
 
 # Environment Variables
 
-Placeholder for the environment variable reference.
+Placeholder - content coming in PR-2/PR-3.
 
 This page will list the current runtime and CLI environment variables.
 
@@ -463,7 +463,7 @@ This page will list the current runtime and CLI environment variables.
 
 # Serve API
 
-Placeholder for the HTTP and SSE server contract.
+Placeholder - content coming in PR-2/PR-3.
 
 This page will describe the server endpoints and remote control usage.
 
@@ -471,7 +471,7 @@ This page will describe the server endpoints and remote control usage.
 
 # Navigation Patterns
 
-Placeholder for navigation guidance.
+Placeholder - content coming in PR-2/PR-3.
 
 This page will cover observe, decide, act loops, scrolling patterns, and navigation recovery.
 
@@ -479,7 +479,7 @@ This page will cover observe, decide, act loops, scrolling patterns, and navigat
 
 # Recording Format
 
-Placeholder for the Android recording format.
+Placeholder - content coming in PR-2/PR-3.
 
 This page will document the current recording payload shape and step candidate contract.
 
@@ -489,7 +489,7 @@ This page will document the current recording payload shape and step candidate c
 
 # Skills Overview
 
-Placeholder for the skills runtime model.
+Placeholder - content coming in PR-2/PR-3.
 
 This page will define skill, Clawperator, and agent roles at a high level.
 
@@ -497,7 +497,7 @@ This page will define skill, Clawperator, and agent roles at a high level.
 
 # Skill Authoring
 
-Placeholder for skill authoring guidance.
+Placeholder - content coming in PR-2/PR-3.
 
 This page will cover skill structure, recording conversion, and blocked terms policy.
 
@@ -505,7 +505,7 @@ This page will cover skill structure, recording conversion, and blocked terms po
 
 # Development Workflow
 
-Placeholder for skill development workflow guidance.
+Placeholder - content coming in PR-2/PR-3.
 
 This page will cover local iteration, validation, and packaging steps.
 
@@ -513,7 +513,7 @@ This page will cover local iteration, validation, and packaging steps.
 
 # Device Prep and Runtime
 
-Placeholder for device prep and runtime tips.
+Placeholder - content coming in PR-2/PR-3.
 
 This page will cover setup details that affect skill execution on Android devices.
 
@@ -523,7 +523,7 @@ This page will cover setup details that affect skill execution on Android device
 
 # Operator App
 
-Placeholder for Operator app troubleshooting.
+Placeholder - content coming in PR-2/PR-3.
 
 This page will cover app launch, permissions, crash recovery, and log collection.
 
@@ -531,7 +531,7 @@ This page will cover app launch, permissions, crash recovery, and log collection
 
 # Known Issues
 
-Placeholder for current known issues.
+Placeholder - content coming in PR-2/PR-3.
 
 This page will list active limitations and workarounds.
 
@@ -539,7 +539,7 @@ This page will list active limitations and workarounds.
 
 # Version Compatibility
 
-Placeholder for version compatibility guidance.
+Placeholder - content coming in PR-2/PR-3.
 
 This page will cover CLI and Operator package compatibility rules.
 

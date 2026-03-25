@@ -272,7 +272,7 @@ def docs_sources_by_output(source_map_path):
 
 
 def generated_docs_fallback(output_path):
-    return f"sites/docs/docs/{output_path}"
+    return f"sites/docs/.build/{output_path}"
 
 
 def patch_docs_sitemap(repo_root, sitemap_path, source_map_path):

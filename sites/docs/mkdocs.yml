@@ -10,6 +10,7 @@ theme:
   custom_dir: overrides
 
 plugins:
+  - search
   - redirects:
       redirect_maps:
         'getting-started/first-time-setup.md': 'setup.md'

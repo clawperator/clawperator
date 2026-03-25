@@ -1,5 +1,5 @@
 # Version Compatibility
 
-Placeholder for version compatibility guidance.
+Placeholder - content coming in PR-2/PR-3.
 
 This page will cover CLI and Operator package compatibility rules.

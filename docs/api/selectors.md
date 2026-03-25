@@ -1,6 +1,6 @@
 # Selectors
 
-Placeholder for the selector contract.
+Placeholder - content coming in PR-2/PR-3.
 
 <!-- CODE-DERIVED: selector-flags -->
 
