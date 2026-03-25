@@ -514,7 +514,7 @@ Typical failure shape:
 ```json
 {
   "code": "RECORDING_ALREADY_IN_PROGRESS",
-  "message": "Recording already in progress"
+  "message": "Recording is already in progress"
 }
 ```
 
@@ -542,7 +542,7 @@ Typical failure shape:
 ```json
 {
   "code": "RECORDING_NOT_IN_PROGRESS",
-  "message": "No recording in progress"
+  "message": "Recording is not in progress"
 }
 ```
 
@@ -588,6 +588,29 @@ Verification pattern:
 clawperator devices --json
 clawperator record pull --session-id demo-session --device <device_serial> --json
 ```
+
+## Runtime Step Errors Outside The Public Node Error Enum
+
+`record start` and `record stop` can also surface Android runtime step errors that are not part of `apps/node/src/contracts/errors.ts`.
+
+Current examples from `RecordingManager.kt` and `UiActionEngine.kt`:
+
+- `RECORDING_STORAGE_UNAVAILABLE`
+- `RECORDING_START_FAILED`
+- `RECORDING_STOP_FAILED`
+
+These values appear inside `envelope.stepResults[].data.error`, not as top-level Node `code` values.
+
+Branching rule:
+
+- top-level `code` is the public Node error contract documented in `contracts/errors.ts`
+- `stepResults[].data.error` may also contain Android runtime-specific strings that are useful for recovery but are not part of the public top-level enum
+
+Typical recovery:
+
+- `RECORDING_STORAGE_UNAVAILABLE`: verify the Operator app can access its external files directory, then retry `record start`
+- `RECORDING_START_FAILED`: check the supplied `sessionId` and retry with a safe id matching `^[a-zA-Z0-9_-]+$`
+- `RECORDING_STOP_FAILED`: retry `record stop`, then inspect device state if finalization keeps timing out
 
 ### `RECORDING_PARSE_FAILED`
 

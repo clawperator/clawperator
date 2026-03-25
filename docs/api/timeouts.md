@@ -13,6 +13,7 @@ Define the timeout budgeting model for Clawperator executions: execution-level t
 - Snapshot builder: `apps/node/src/domain/observe/snapshot.ts`
 - Sleep builder: `apps/node/src/domain/actions/sleep.ts`
 - `exec` validation and override path: `apps/node/src/cli/commands/execute.ts`
+- `exec best-effort` CLI routing: `apps/node/src/cli/registry.ts`
 
 ## Two Timeout Levels
 
@@ -294,7 +295,7 @@ Agent guidance:
 {
   "commandId": "snap-1",
   "taskId": "snap-1",
-  "source": "agent",
+  "source": "clawperator-observe",
   "expectedFormat": "android-ui-automator",
   "timeoutMs": 30000,
   "actions": [
@@ -316,7 +317,7 @@ Good budget because:
 {
   "commandId": "nav-1",
   "taskId": "nav-1",
-  "source": "agent",
+  "source": "clawperator-action",
   "expectedFormat": "android-ui-automator",
   "timeoutMs": 35000,
   "actions": [
@@ -351,7 +352,7 @@ Why `35000` is the right budget here:
 {
   "commandId": "read-after-click",
   "taskId": "read-after-click",
-  "source": "agent",
+  "source": "clawperator-action",
   "expectedFormat": "android-ui-automator",
   "timeoutMs": 45000,
   "actions": [

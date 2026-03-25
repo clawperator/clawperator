@@ -225,7 +225,7 @@ Current public parameters:
 
 | Field | Valid values | Meaning |
 | --- | --- | --- |
-| `expectedPackage` | optional non-blank string | wait until that package is foreground |
+| `expectedPackage` | optional non-blank string, `<= 512` characters | wait until that package is foreground |
 | `expectedNode` | optional `NodeMatcher` | wait until a target node is present |
 | `timeoutMs` | required number, `> 0`, `<= 30000` | wait window for navigation confirmation |
 
@@ -352,7 +352,7 @@ Machine-checkable success conditions:
 - `stepResults[0].actionType == "open_app"` and `stepResults[0].success == true`
 - `stepResults[0].data.application_id == "com.android.settings"`
 - `stepResults[1].actionType == "wait_for_navigation"` and `stepResults[1].success == true`
-- `stepResults[1].data.resolved_package == "com.android.settings"`
+- when waiting by `expectedPackage`, `stepResults[1].data.resolved_package == "com.android.settings"`
 - `stepResults[2].actionType == "snapshot_ui"` and `stepResults[2].success == true`
 - `stepResults[2].data.text` exists
 
@@ -454,6 +454,7 @@ Runtime detail:
 
 - `wait_for_navigation` timeout failures use `data.error: "NAVIGATION_TIMEOUT"`
 - when the runtime observed a foreground package before the timeout expired, it may also include `data.last_package`
+- on success, `data.resolved_package` is present when the runtime had a foreground package value to report
 
 ### Wrong package on screen
 

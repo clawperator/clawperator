@@ -144,18 +144,23 @@ clawperator snapshot --json --log-level debug
 
 ## `CLAWPERATOR_SKILLS_REGISTRY`
 
-Defines the path to the active `skills-registry.json` used by all skill commands.
+Defines the path to the active `skills-registry.json` used by all skill commands when they do not pass an explicit registry-path argument into `loadRegistry()`.
 
 Read by: `skills list`, `skills get`, `skills search`, `skills run`, `skills validate`, `skills compile-artifact`, `skills new`, and the `/skills` serve endpoints.
 
 Default when unset: `<cwd>/skills/skills-registry.json` where `<cwd>` is `process.cwd()`.
 
-Fallback behavior in `loadRegistry()`:
+Current `loadRegistry()` precedence is:
 
-1. If `CLAWPERATOR_SKILLS_REGISTRY` is set, try that configured path
-2. Otherwise try the default path `<cwd>/skills/skills-registry.json`
-3. Only when an explicit `registryPath` argument was passed and that read fails, also try `<cwd>/../../skills/skills-registry.json` (covers running from `apps/node/`)
-4. If the default-path read fails with no env var and no explicit `registryPath`, `loadRegistry()` throws immediately and suggests `clawperator skills install`
+1. explicit `registryPath` argument, when a caller supplied one
+2. `CLAWPERATOR_SKILLS_REGISTRY`
+3. default path `<cwd>/skills/skills-registry.json`
+
+Fallback behavior after that initial choice:
+
+1. If an explicit `registryPath` argument was passed and that read fails, also try `<cwd>/../../skills/skills-registry.json` (covers running from `apps/node/`)
+2. If `CLAWPERATOR_SKILLS_REGISTRY` is set and that read fails, `loadRegistry()` throws a configured-path error immediately
+3. If the default-path read fails with no env var and no explicit `registryPath`, `loadRegistry()` throws immediately and suggests `clawperator skills install`
 
 After `clawperator skills install` or `clawperator skills sync`, the registry lives at `~/.clawperator/skills/skills/skills-registry.json`. Set the env var to point there:
 
