@@ -84,6 +84,23 @@ Field meaning:
 | `checks` | ordered list of `DoctorCheckResult` entries |
 | `nextActions` | deduplicated shell commands or manual instructions collected from failing/warning checks, plus a success hint when everything passed |
 
+## How `nextActions` Is Built
+
+`DoctorService.finalize()` builds `nextActions` in this order:
+
+1. If all checks passed, add:
+   - `Docs: https://docs.clawperator.com/getting-started/first-time-setup/`
+   - `Try: clawperator snapshot --device <resolved_device>` or the placeholder form if no device was resolved
+2. For each non-pass check with `fix.steps`, append each shell or manual step value.
+3. For each non-pass check with `deviceGuidance`, append:
+   - `On device, open <screen> and follow the listed steps.`
+4. Deduplicate the final list.
+
+Machine-checkable implication:
+
+- `nextActions` is remediation guidance, not proof of success
+- always gate on `criticalOk` and `checks[]`, not on whether `nextActions` is empty
+
 ## `DoctorCheckResult` Contract
 
 Each entry in `checks[]` has:
@@ -231,6 +248,35 @@ Failure conditions:
 - exit code is `1` unless `--check-only` was passed
 - `criticalOk == false`
 - at least one critical check has `status == "fail"`
+
+## Warning JSON Example
+
+The main advisory-only case in current code is multiple connected devices without `--device`:
+
+```json
+{
+  "ok": true,
+  "criticalOk": true,
+  "checks": [
+    {
+      "id": "device.discovery",
+      "status": "warn",
+      "code": "MULTIPLE_DEVICES_DEVICE_ID_REQUIRED",
+      "summary": "Multiple devices connected.",
+      "detail": "Specify --device to target a single device.",
+      "evidence": {
+        "devices": ["emulator-5554", "R58N12345AB"]
+      }
+    }
+  ]
+}
+```
+
+Meaning:
+
+- the host environment is usable, so `criticalOk` stays `true`
+- doctor still cannot continue into device-specific checks without an explicit target
+- the next deterministic step is to rerun doctor with `--device <serial>`
 
 ## Check Sequence
 
