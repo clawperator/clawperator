@@ -119,23 +119,6 @@ becomes the matcher:
 
 <!-- CODE-DERIVED: selector-flags -->
 
-Even without the generated table, the authored contract is:
-
-- `--text` maps to `textEquals`
-- `--text-contains` maps to `textContains`
-- `--id` maps to `resourceId`
-- `--desc` maps to `contentDescEquals`
-- `--desc-contains` maps to `contentDescContains`
-- `--role` maps to `role`
-- `--selector` accepts a raw `NodeMatcher` JSON object
-- `--container-text` maps to `container.textEquals`
-- `--container-text-contains` maps to `container.textContains`
-- `--container-id` maps to `container.resourceId`
-- `--container-desc` maps to `container.contentDescEquals`
-- `--container-desc-contains` maps to `container.contentDescContains`
-- `--container-role` maps to `container.role`
-- `--container-selector` accepts a raw `NodeMatcher` JSON object for `params.container`
-
 ## Mutual Exclusion And Validation Rules
 
 Element selector rules:
