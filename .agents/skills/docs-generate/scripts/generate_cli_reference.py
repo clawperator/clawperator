@@ -1,0 +1,179 @@
+#!/usr/bin/env python3
+
+from __future__ import annotations
+
+import re
+import subprocess
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+
+
+@dataclass(frozen=True)
+class CommandInfo:
+    name: str
+    aliases: list[str]
+    group: str
+    summary: str
+    flags: list[str]
+    subcommands: list[str]
+
+
+def repo_root() -> Path:
+    return Path(__file__).resolve().parents[4]
+
+
+def registry_path() -> Path:
+    return repo_root() / "apps" / "node" / "src" / "cli" / "registry.ts"
+
+
+def commands_dir() -> Path:
+    return repo_root() / "apps" / "node" / "src" / "cli" / "commands"
+
+
+def read_text(path: Path) -> str:
+    if not path.exists():
+        raise FileNotFoundError(f"Missing source file: {path}")
+    return path.read_text(encoding="utf-8")
+
+
+def extract_command_bodies(text: str) -> list[tuple[str, str]]:
+    bodies: list[tuple[str, str]] = []
+    matches = list(re.finditer(r'COMMANDS\["([^"]+)"\]\s*=\s*{', text))
+    if not matches:
+        raise ValueError("Could not find any command definitions in registry.ts")
+    for index, match in enumerate(matches):
+        name = match.group(1)
+        start = match.start()
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
+        body = text[start:end]
+        bodies.append((name, body))
+    return bodies
+
+
+def parse_string_list(raw: str) -> list[str]:
+    return re.findall(r'"([^"]+)"', raw)
+
+
+def parse_supported_flags(body: str) -> list[str]:
+    collected = re.findall(r"--[A-Za-z0-9][A-Za-z0-9-]*", body)
+    return list(dict.fromkeys(collected))
+
+
+def parse_subcommands(body: str) -> list[str]:
+    match = re.search(r"subtopics:\s*{([^}]*)}", body, re.S)
+    if not match:
+        return []
+    return re.findall(r"^\s*([A-Za-z0-9_.-]+):", match.group(1), re.M)
+
+
+def parse_command_info(name: str, body: str) -> CommandInfo:
+    aliases_match = re.search(r"synonyms:\s*\[([^\]]*)\]", body, re.S)
+    group_match = re.search(r'group:\s*"([^"]+)"', body)
+    summary_match = re.search(r'summary:\s*"([^"]+)"', body)
+    if not group_match or not summary_match:
+        raise ValueError(f"Failed to parse required metadata for command {name}")
+    aliases = parse_string_list(aliases_match.group(1)) if aliases_match else []
+    flags = parse_supported_flags(body)
+    subcommands = parse_subcommands(body)
+    return CommandInfo(
+        name=name,
+        aliases=aliases,
+        group=group_match.group(1),
+        summary=summary_match.group(1),
+        flags=flags,
+        subcommands=subcommands,
+    )
+
+
+def humanize_flag(flag: str) -> str:
+    mapping = {
+        "--selector": "Advanced raw NodeMatcher JSON.",
+        "--text": "Exact visible text selector or text input where the command defines that meaning.",
+        "--text-contains": "Partial visible text selector.",
+        "--id": "Android resource ID selector.",
+        "--desc": "Exact content description selector.",
+        "--desc-contains": "Partial content description selector.",
+        "--role": "Element role selector.",
+        "--coordinate": "Exact screen coordinate target.",
+        "--container-selector": "Raw NodeMatcher JSON for a container.",
+        "--container-text": "Exact visible text on the container.",
+        "--container-text-contains": "Partial text match on the container.",
+        "--container-id": "Container resource ID selector.",
+        "--container-desc": "Exact content description on the container.",
+        "--container-desc-contains": "Partial content description on the container.",
+        "--container-role": "Container role selector.",
+    }
+    return mapping.get(flag, "Command option exposed by the CLI registry.")
+
+
+def render_table(commands: list[CommandInfo]) -> str:
+    lines = [
+        "| Command | Aliases | Flags | Summary |",
+        "| --- | --- | --- | --- |",
+    ]
+    for command in commands:
+        alias_text = ", ".join(command.aliases) if command.aliases else "-"
+        flag_text = ", ".join(command.flags) if command.flags else "-"
+        if command.subcommands:
+            flag_text = f"{flag_text}<br>Subcommands: {', '.join(command.subcommands)}"
+        lines.append(
+            f"| `{command.name}` | {alias_text} | {flag_text} | {command.summary} |"
+        )
+    return "\n".join(lines)
+
+
+def render_group(group: str, commands: list[CommandInfo]) -> str:
+    lines = [f"## {group}", "", render_table(commands), ""]
+    for command in commands:
+        lines.extend(
+            [
+                f"### `{command.name}`",
+                "",
+                f"- Summary: {command.summary}",
+                f"- Aliases: {', '.join(f'`{alias}`' for alias in command.aliases) if command.aliases else '-'}",
+                f"- Flags: {', '.join(f'`{flag}`' for flag in command.flags) if command.flags else '-'}",
+            ]
+        )
+        if command.subcommands:
+            lines.append(f"- Subcommands: {', '.join(f'`{item}`' for item in command.subcommands)}")
+        lines.append("")
+    return "\n".join(lines)
+
+
+def main() -> int:
+    registry = registry_path()
+    if not registry.exists():
+        raise FileNotFoundError(f"Missing source file: {registry}")
+    if not commands_dir().exists():
+        raise FileNotFoundError(f"Missing command directory: {commands_dir()}")
+
+    text = read_text(registry)
+    commands: list[CommandInfo] = []
+    for name, body in extract_command_bodies(text):
+        commands.append(parse_command_info(name, body))
+
+    grouped: dict[str, list[CommandInfo]] = {}
+    for command in commands:
+        grouped.setdefault(command.group, []).append(command)
+
+    lines = [
+        "# CLI Reference",
+        "",
+        "This page is generated from the Node CLI registry and command sources.",
+        "",
+        "## Command Summary",
+        "",
+        render_table(commands),
+        "",
+    ]
+
+    for group in grouped:
+        lines.append(render_group(group, grouped[group]))
+
+    sys.stdout.write("\n".join(lines).rstrip() + "\n")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

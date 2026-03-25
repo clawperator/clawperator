@@ -11,29 +11,26 @@ Use this skill to validate that docs changes came from the right source files.
 
 This skill guards the docs source-of-truth contract:
 
-- `sites/docs/docs/` is generated output
+- `docs/` contains authored public docs
+- `sites/docs/.build/` is generated staging output
 - `sites/docs/site/` is build output
-- authored docs live in `docs/`, `apps/node/src/`, and `../clawperator-skills/docs/`
 
-If generated docs changed without a corresponding canonical source change, this
-skill should fail.
+If the assembled docs or built site do not match the authored and code-derived
+sources, this skill should fail.
 
 ## Workflow
 
-1. Read `sites/docs/source-map.yaml` to identify the source files for any
-   changed generated page.
-2. Run the validator script:
-   - `.agents/skills/docs-validate/scripts/validate_source_of_truth.py --repo-root <clawperator> --skills-root <clawperator-skills>`
-3. If it fails:
-   - move the docs fix into the canonical source file
-   - regenerate the docs output through the docs workflow
-   - rerun this skill
-4. If it passes:
-   - continue to docs generation or docs site build validation
+1. Run the docs build:
+   - `./scripts/docs_build.sh`
+2. If it fails:
+   - move the docs fix into the canonical source file or generator
+   - rerun the build
+3. If it passes:
+   - the docs site and machine-facing artifacts are in sync
 
 ## Notes
 
 - This skill is complementary to the normal docs route validator in
   `scripts/validate_docs_routes.py`.
-- Use the repo-local `docs-generate` skill to regenerate `sites/docs/docs/`
-  after correcting authored sources.
+- Use the repo-local `docs-generate` skill to regenerate the staging output
+  after correcting authored sources or code-derived generators.

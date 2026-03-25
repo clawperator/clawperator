@@ -4,36 +4,34 @@ This site contains the canonical technical documentation for Clawperator, a dete
 
 ## Key pages
 
+- Docs home: https://docs.clawperator.com/
+- Setup: https://docs.clawperator.com/setup/
+- API overview: https://docs.clawperator.com/api/overview/
+- CLI reference: https://docs.clawperator.com/api/cli/
+- Actions: https://docs.clawperator.com/api/actions/
+- Selectors: https://docs.clawperator.com/api/selectors/
+- Snapshot format: https://docs.clawperator.com/api/snapshot/
+- Errors: https://docs.clawperator.com/api/errors/
+- Devices: https://docs.clawperator.com/api/devices/
+- Doctor: https://docs.clawperator.com/api/doctor/
+- Timeouts: https://docs.clawperator.com/api/timeouts/
+- Environment variables: https://docs.clawperator.com/api/environment/
+- Serve API: https://docs.clawperator.com/api/serve/
+- Navigation patterns: https://docs.clawperator.com/api/navigation/
+- Recording format: https://docs.clawperator.com/api/recording/
+- Skills overview: https://docs.clawperator.com/skills/overview/
+- Skill authoring: https://docs.clawperator.com/skills/authoring/
+- Skill development workflow: https://docs.clawperator.com/skills/development/
+- Device prep and runtime: https://docs.clawperator.com/skills/runtime/
+- Operator troubleshooting: https://docs.clawperator.com/troubleshooting/operator/
+- Known issues: https://docs.clawperator.com/troubleshooting/known-issues/
+- Version compatibility: https://docs.clawperator.com/troubleshooting/compatibility/
 - Full compiled docs on docs host: https://docs.clawperator.com/llms-full.txt
 - Full compiled docs on landing host: https://clawperator.com/llms-full.txt
-- Docs home: https://docs.clawperator.com/
-- Agent quickstart: https://docs.clawperator.com/ai-agents/agent-quickstart/
-- Node API agent guide: https://docs.clawperator.com/ai-agents/node-api-for-agents/
-- Navigation patterns: https://docs.clawperator.com/ai-agents/navigation-patterns/
-- Multi-device workflows: https://docs.clawperator.com/ai-agents/multi-device-workflows/
-- Execution model: https://docs.clawperator.com/reference/execution-model/
-- Timeout budgeting: https://docs.clawperator.com/reference/timeout-budgeting/
-- Device and package model: https://docs.clawperator.com/reference/device-and-package-model/
-- Snapshot format: https://docs.clawperator.com/reference/snapshot-format/
-- API overview: https://docs.clawperator.com/reference/api-overview/
-- CLI reference: https://docs.clawperator.com/reference/cli-reference/
-- Error codes: https://docs.clawperator.com/reference/error-codes/
-- Error handling guide: https://docs.clawperator.com/reference/error-handling/
-- Environment variables: https://docs.clawperator.com/reference/environment-variables/
-- First-time setup: https://docs.clawperator.com/getting-started/first-time-setup/
-- Troubleshooting: https://docs.clawperator.com/troubleshooting/troubleshooting/
-- Skill development workflow: https://docs.clawperator.com/skills/skill-development-workflow/
-- Skill authoring guidelines: https://docs.clawperator.com/skills/skill-authoring-guidelines/
-- Architecture: https://docs.clawperator.com/architecture/architecture/
-
-## GitHub
-
-- Main repository: https://github.com/clawperator/clawperator
-- Skills repository: https://github.com/clawperator/clawperator-skills
 
 ## Guidance for agents
 
 - Prefer this docs site over the marketing homepage for technical behavior.
 - The Node API is strict and contract-driven.
 - Clawperator executes validated actions and returns structured results.
-- Reasoning and planning stay in the external agent.
+- Reasoning and planning stay outside this runtime.

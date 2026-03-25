@@ -1,11 +1,18 @@
 #!/usr/bin/env python3
 
+from __future__ import annotations
+
 import argparse
 import re
 import sys
 from pathlib import Path
 from posixpath import normpath
 from urllib.parse import urlparse
+
+try:
+    import yaml
+except ImportError as exc:
+    raise ImportError("PyYAML is required to run validate_docs_routes.py") from exc
 
 
 DOCS_HOST = "docs.clawperator.com"
@@ -19,28 +26,46 @@ REQUIRED_SITE_FILES = [
 ]
 
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Validate that expected docs routes and machine-facing files exist in the built docs site."
     )
     parser.add_argument("--site-dir", required=True, help="Built docs site directory, usually sites/docs/site")
-    parser.add_argument("--source-map", required=True, help="Path to sites/docs/source-map.yaml")
-    parser.add_argument(
-        "--generated-docs-dir",
-        required=True,
-        help="Path to generated markdown docs, usually sites/docs/docs",
-    )
+    parser.add_argument("--generated-docs-dir", required=True, help="Path to assembled markdown docs, usually sites/docs/.build")
     parser.add_argument("--llms-txt", required=True, help="Path to sites/docs/static/llms.txt")
+    parser.add_argument("--mkdocs-yml", default="sites/docs/mkdocs.yml", help="Path to sites/docs/mkdocs.yml")
     return parser.parse_args()
 
 
-def parse_source_map_outputs(source_map_path: Path) -> list[str]:
-    outputs: list[str] = []
-    for raw_line in source_map_path.read_text(encoding="utf-8").splitlines():
-        stripped = raw_line.strip()
-        if stripped.startswith("- output:"):
-            outputs.append(stripped.split(":", 1)[1].strip())
-    return outputs
+def nav_paths(mkdocs_yml: Path) -> list[str]:
+    if not mkdocs_yml.exists():
+        raise FileNotFoundError(f"Missing MkDocs config: {mkdocs_yml}")
+    data = yaml.safe_load(mkdocs_yml.read_text(encoding="utf-8"))
+    nav = data.get("nav")
+    if not isinstance(nav, list):
+        raise ValueError(f"{mkdocs_yml} does not contain a list nav")
+
+    paths: list[str] = []
+
+    def walk(node: object) -> None:
+        if isinstance(node, list):
+            for item in node:
+                walk(item)
+            return
+        if not isinstance(node, dict):
+            raise ValueError(f"Unexpected nav entry type: {type(node)!r}")
+        for _, value in node.items():
+            if isinstance(value, str):
+                if value.startswith(("http://", "https://")):
+                    continue
+                paths.append(value)
+            elif isinstance(value, list):
+                walk(value)
+            else:
+                raise ValueError(f"Unsupported nav value: {type(value)!r}")
+
+    walk(nav)
+    return paths
 
 
 def markdown_output_to_site_path(output: str) -> str:
@@ -64,22 +89,16 @@ def docs_url_to_site_path(url: str) -> str | None:
 
 
 def iter_markdown_link_hrefs(text: str) -> list[str]:
-    """
-    Extract markdown link hrefs while supporting URLs that contain parentheses.
-
-    We manually walk from the opening '(' and balance nested parentheses until the
-    matching closing ')', instead of relying on a naive `[^)]` regex.
-    """
     hrefs: list[str] = []
     for match in re.finditer(r"\[([^\]]+)\]\(", text):
-        start = match.end()  # position just after '('
+        start = match.end()
         depth = 1
         i = start
         while i < len(text) and depth > 0:
-            c = text[i]
-            if c == "(":
+            ch = text[i]
+            if ch == "(":
                 depth += 1
-            elif c == ")":
+            elif ch == ")":
                 depth -= 1
                 if depth == 0:
                     hrefs.append(text[start:i].strip())
@@ -120,38 +139,24 @@ def generated_doc_link_to_site_path(page_path: Path, generated_docs_dir: Path, h
 
 
 def check_inner_page_links(generated_docs_dir: Path, site_dir: Path) -> list[str]:
-    """
-    Check all relative markdown links in authored docs pages.
-    Validates that link targets exist as built HTML files.
-    """
     errors: list[str] = []
     for md_file in sorted(generated_docs_dir.rglob("*.md")):
         text = md_file.read_text(encoding="utf-8")
         for href in iter_markdown_link_hrefs(text):
-            raw = href.split("#")[0].strip()
-            # Skip external URLs, anchors-only, and non-md links
-            if not raw or raw.startswith("http") or raw.startswith("mailto:") or raw.startswith("tel:"):
+            raw = href.split("#", 1)[0].split("?", 1)[0].strip()
+            if not raw or raw.startswith("#") or raw.startswith("http") or raw.startswith("mailto:") or raw.startswith("tel:"):
                 continue
-            if raw.startswith("#"):
-                continue
-            # Only check .md relative links
             if not raw.endswith(".md"):
                 continue
-            # Resolve the link relative to the current file
             resolved_md = (md_file.parent / raw).resolve()
-            # Convert to site path
             try:
                 rel_path = resolved_md.relative_to(generated_docs_dir)
-                site_path = markdown_output_to_site_path(str(rel_path))
-                if not (site_dir / site_path).exists():
-                    errors.append(
-                        f"inner-page-link: {md_file.relative_to(generated_docs_dir)} -> {raw}"
-                    )
-            except (ValueError, OSError):
-                # If we can't resolve, the target is outside the docs dir or doesn't exist
-                errors.append(
-                    f"inner-page-link: {md_file.relative_to(generated_docs_dir)} -> {raw} (unresolvable)"
-                )
+            except ValueError:
+                errors.append(f"inner-page-link: {md_file.relative_to(generated_docs_dir)} -> {raw} (unresolvable)")
+                continue
+            site_path = markdown_output_to_site_path(str(rel_path))
+            if not (site_dir / site_path).exists():
+                errors.append(f"inner-page-link: {md_file.relative_to(generated_docs_dir)} -> {raw}")
     return errors
 
 
@@ -166,17 +171,15 @@ def validate_existing_paths(site_dir: Path, relative_paths: list[str], label: st
 def main() -> int:
     args = parse_args()
     site_dir = Path(args.site_dir).resolve()
-    source_map_path = Path(args.source_map).resolve()
     generated_docs_dir = Path(args.generated_docs_dir).resolve()
     llms_txt_path = Path(args.llms_txt).resolve()
+    mkdocs_yml = Path(args.mkdocs_yml).resolve()
 
     failures: list[str] = []
-
     failures.extend(validate_existing_paths(site_dir, REQUIRED_SITE_FILES, "required site file"))
 
-    source_map_outputs = parse_source_map_outputs(source_map_path)
-    expected_page_paths = [markdown_output_to_site_path(output) for output in source_map_outputs]
-    failures.extend(validate_existing_paths(site_dir, expected_page_paths, "source-map page"))
+    expected_page_paths = [markdown_output_to_site_path(output) for output in nav_paths(mkdocs_yml)]
+    failures.extend(validate_existing_paths(site_dir, expected_page_paths, "nav page"))
 
     generated_doc_targets: list[str] = []
     for markdown_path in sorted(generated_docs_dir.rglob("*.md")):
@@ -187,15 +190,10 @@ def main() -> int:
     failures.extend(validate_existing_paths(site_dir, generated_doc_targets, "generated docs link"))
 
     llms_urls = re.findall(r"https://[^\s)]+", llms_txt_path.read_text(encoding="utf-8"))
-    llms_targets = [
-        target for url in llms_urls
-        if (target := docs_url_to_site_path(url)) is not None
-    ]
+    llms_targets = [target for url in llms_urls if (target := docs_url_to_site_path(url)) is not None]
     failures.extend(validate_existing_paths(site_dir, llms_targets, "llms.txt route"))
 
-    # Check inner-page relative links in authored docs
-    inner_page_failures = check_inner_page_links(generated_docs_dir, site_dir)
-    failures.extend(inner_page_failures)
+    failures.extend(check_inner_page_links(generated_docs_dir, site_dir))
 
     if failures:
         print("Docs route validation failed:", file=sys.stderr)
@@ -204,7 +202,7 @@ def main() -> int:
         return 1
 
     print(
-        f"Docs route validation passed: {len(expected_page_paths)} source-map pages, "
+        f"Docs route validation passed: {len(expected_page_paths)} nav pages, "
         f"{len(generated_doc_targets)} generated-doc links, {len(llms_targets)} llms.txt routes, "
         f"inner-page links checked."
     )
@@ -212,4 +210,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())

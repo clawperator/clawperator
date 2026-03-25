@@ -1,92 +1,126 @@
 #!/usr/bin/env python3
 
-import os
+from __future__ import annotations
+
 import sys
+from pathlib import Path
 
 try:
     import yaml
 except ImportError as exc:
     raise ImportError(
         "PyYAML is required to run generate_llms_full.py. "
-        "Please install it (e.g., 'pip install PyYAML') or add it to sites/docs/requirements.txt."
+        "Please install it (e.g. via sites/docs/requirements.txt)."
     ) from exc
 
-def main():
-    # Locate the repository root (and sites/docs) relative to this script's path,
-    # so the script can be run from any current working directory.
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    repo_root = os.path.abspath(os.path.join(script_dir, "..", "..", "..", ".."))
-    docs_site_dir = os.path.join(repo_root, "sites", "docs")
-    
-    docs_dir = os.path.join(docs_site_dir, "docs")
-    source_map_path = os.path.join(docs_site_dir, "source-map.yaml")
-    output_paths = [
-        os.path.join(docs_site_dir, "site", "llms-full.txt"),
-        os.path.join(docs_site_dir, "static", "llms-full.txt"),
-        os.path.join(repo_root, "sites", "landing", "public", "llms-full.txt"),
-    ]
-    
-    with open(source_map_path, "r", encoding="utf-8") as f:
-        source_map = yaml.safe_load(f)
-        
-    if not isinstance(source_map, dict):
-        raise ValueError(f"Failed to load a valid dictionary from {source_map_path}")
-        
-    compiled_content = []
-    
-    compiled_content.append("# Clawperator Full Documentation")
-    compiled_content.append("This document contains all the technical documentation for Clawperator, compiled into a single file for easy digestion by AI agents.\n")
-    
-    missing_pages = []
-    
-    for section in source_map.get("sections", []):
-        section_title = section.get("title")
-        if section_title:
-            compiled_content.append(f"\n# {section_title}\n")
-            
-        for page in section.get("pages", []):
-            page_output = page.get("output")
-            page_title = page.get("title")
-            
-            if not page_output:
-                continue
-                
-            page_path = os.path.abspath(os.path.join(docs_dir, page_output))
-            
-            # Guard against path traversal
-            if not page_path.startswith(os.path.abspath(docs_dir)):
-                print(f"Error: Invalid page output path attempts traversal: {page_output}")
-                missing_pages.append(page_output)
-                continue
-            
-            if not os.path.exists(page_path):
-                print(f"Error: File not found: {page_path}")
-                missing_pages.append(page_output)
-                continue
-                
-            with open(page_path, "r", encoding="utf-8") as pf:
-                page_content = pf.read().rstrip("\n")
-                
-            # If the page doesn't start with a markdown header, add the title
-            if not page_content.lstrip().startswith("#"):
-                compiled_content.append(f"\n## {page_title}\n")
+
+def repo_root() -> Path:
+    return Path(__file__).resolve().parents[4]
+
+
+def docs_site_dir() -> Path:
+    return repo_root() / "sites" / "docs"
+
+
+def load_nav_entries(mkdocs_path: Path) -> list[tuple[str, list[tuple[str, str]]]]:
+    if not mkdocs_path.exists():
+        raise FileNotFoundError(f"Missing MkDocs config: {mkdocs_path}")
+    data = yaml.safe_load(mkdocs_path.read_text(encoding="utf-8"))
+    nav = data.get("nav")
+    if not isinstance(nav, list):
+        raise ValueError(f"{mkdocs_path} does not contain a list nav")
+
+    top_level: list[tuple[str, str]] = []
+    sections: list[tuple[str, list[tuple[str, str]]]] = []
+
+    def walk(node: object, section_name: str | None = None) -> None:
+        if isinstance(node, list):
+            for item in node:
+                walk(item, section_name)
+            return
+        if not isinstance(node, dict):
+            raise ValueError(f"Unexpected nav entry type: {type(node)!r}")
+        for title, value in node.items():
+            if isinstance(value, str):
+                if value.startswith(("http://", "https://")):
+                    continue
+                if section_name is None:
+                    top_level.append((title, value))
+                else:
+                    for section_title, pages in sections:
+                        if section_title == section_name:
+                            pages.append((title, value))
+                            break
+                    else:
+                        raise ValueError(f"Internal nav error for section {section_name!r}")
+            elif isinstance(value, list):
+                sections.append((title, []))
+                walk(value, title)
             else:
-                compiled_content.append("\n")
-                
-            compiled_content.append(page_content)
-            compiled_content.append("\n---")
-            
-    if missing_pages:
-        print(f"Error: Failed to generate llms-full.txt due to {len(missing_pages)} missing pages.")
-        sys.exit(1)
-        
-    rendered = "\n".join(compiled_content)
+                raise ValueError(f"Unsupported nav value for {title!r}: {type(value)!r}")
+
+    walk(nav, None)
+    ordered: list[tuple[str, list[tuple[str, str]]]] = []
+    if top_level:
+        ordered.append(("__top_level__", top_level))
+    ordered.extend(sections)
+    return ordered
+
+
+def read_page(build_dir: Path, page_path: str) -> str:
+    resolved = (build_dir / page_path).resolve()
+    if build_dir.resolve() not in resolved.parents and resolved != build_dir.resolve():
+        raise ValueError(f"Page path escapes build directory: {page_path}")
+    if not resolved.exists():
+        raise FileNotFoundError(f"Missing built page: {resolved}")
+    return resolved.read_text(encoding="utf-8").rstrip("\n")
+
+
+def render_llms_full(build_dir: Path, nav_entries: list[tuple[str, list[tuple[str, str]]]]) -> str:
+    lines: list[str] = [
+        "# Clawperator Documentation",
+        "",
+        "Compiled from the MkDocs navigation tree and assembled docs staging directory.",
+        "",
+    ]
+
+    for section_title, pages in nav_entries:
+        if section_title != "__top_level__":
+            lines.append(f"# {section_title}")
+            lines.append("")
+        for page_title, page_path in pages:
+            page_content = read_page(build_dir, page_path)
+            if not page_content.lstrip().startswith("#"):
+                lines.append(f"## {page_title}")
+            lines.append(page_content)
+            lines.append("")
+            lines.append("---")
+            lines.append("")
+
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def main() -> int:
+    root = repo_root()
+    docs_dir = docs_site_dir()
+    build_dir = docs_dir / ".build"
+    mkdocs_path = docs_dir / "mkdocs.yml"
+    output_paths = [
+        docs_dir / "site" / "llms-full.txt",
+        docs_dir / "static" / "llms-full.txt",
+        root / "sites" / "landing" / "public" / "llms-full.txt",
+    ]
+
+    nav_entries = load_nav_entries(mkdocs_path)
+    rendered = render_llms_full(build_dir, nav_entries)
 
     for output_path in output_paths:
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        with open(output_path, "w", encoding="utf-8") as out_f:
-            out_f.write(rendered)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(rendered, encoding="utf-8")
         print(f"Successfully generated {output_path}")
 
+    return 0
+
+
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

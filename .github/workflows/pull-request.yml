@@ -9,6 +9,22 @@ on:
       - main
 
 jobs:
+  docs-build:
+    name: Build Docs Site
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run docs build
+        run: ./scripts/docs_build.sh
+
   android-unit-tests:
     name: Run Android Unit Tests
     runs-on: ubuntu-latest
