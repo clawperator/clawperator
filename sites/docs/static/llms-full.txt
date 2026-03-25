@@ -3605,6 +3605,7 @@ Define the timeout budgeting model for Clawperator executions: execution-level t
 - Wait builders: `apps/node/src/domain/actions/wait.ts`, `apps/node/src/domain/actions/waitForNav.ts`
 - Snapshot builder: `apps/node/src/domain/observe/snapshot.ts`
 - Sleep builder: `apps/node/src/domain/actions/sleep.ts`
+- `exec` validation and override path: `apps/node/src/cli/commands/execute.ts`
 
 ## Two Timeout Levels
 
@@ -3651,6 +3652,40 @@ That extra `5000` milliseconds is a transport buffer for the envelope write and 
 
 If the runtime exceeds the budget and Node never receives a valid result envelope, the caller gets a top-level `RESULT_ENVELOPE_TIMEOUT` error, not a normal success wrapper.
 
+Verification pattern - confirm a timeout value was accepted without dispatching:
+
+```bash
+clawperator exec --validate-only --execution '{"commandId":"timeout-check","taskId":"timeout-check","source":"docs","expectedFormat":"android-ui-automator","timeoutMs":30000,"actions":[{"id":"snap","type":"snapshot_ui"}]}'
+```
+
+Expected success shape:
+
+```json
+{
+  "ok": true,
+  "validated": true,
+  "execution": {
+    "commandId": "timeout-check",
+    "taskId": "timeout-check",
+    "source": "docs",
+    "expectedFormat": "android-ui-automator",
+    "timeoutMs": 30000,
+    "actions": [
+      {
+        "id": "snap",
+        "type": "snapshot_ui"
+      }
+    ]
+  }
+}
+```
+
+Error cases for execution-level timeout:
+
+- non-finite timeout: `EXECUTION_VALIDATION_FAILED` with `message: "timeoutMs must be a finite number"`
+- timeout below `1000` or above `120000`: `EXECUTION_VALIDATION_FAILED` with `message: "timeoutMs must be between 1000 and 120000"`
+- live execution that runs too long: top-level `RESULT_ENVELOPE_TIMEOUT`
+
 ## Action-Level Timeout
 
 Only some actions use `params.timeoutMs` today. The main public case is `wait_for_navigation`, and the flat CLI `wait` builder also carries a wait-specific timeout value in `params.timeoutMs` for `wait_for_node`.
@@ -3660,7 +3695,12 @@ Current validated action-level rules:
 | Action | Field | Valid values |
 | --- | --- | --- |
 | `wait_for_navigation` | `params.timeoutMs` | required, `> 0`, `<= 30000` |
-| `wait_for_node` via builder | `params.timeoutMs` | optional in raw schema, builder sets it when `--timeout` is passed |
+| `wait_for_node` via CLI builder | `params.timeoutMs` | optional in raw schema, set by `buildWaitExecution()` when `--timeout` is passed |
+
+Important boundary:
+
+- `validateExecution.ts` does not currently enforce a numeric range for `wait_for_node.params.timeoutMs`
+- the current public timeout contract for `wait_for_node` comes from the CLI builder in `apps/node/src/domain/actions/wait.ts`, not from a dedicated `waitForNode.ts` module
 
 For `wait_for_navigation`, invalid values fail validation before dispatch:
 
@@ -3682,6 +3722,34 @@ Relationship between the two levels:
 - execution-level timeout controls how long the full payload is allowed to exist
 - when the action timeout is close to or greater than the execution timeout, the execution may fail early at the envelope layer
 
+Verification pattern - confirm `wait-for-nav` action timeout is encoded:
+
+```bash
+clawperator wait-for-nav --app com.android.settings --timeout 5000 --validate-only
+```
+
+Expected validated execution shape:
+
+```json
+{
+  "ok": true,
+  "validated": true,
+  "execution": {
+    "timeoutMs": 30000,
+    "actions": [
+      {
+        "id": "wait-for-nav",
+        "type": "wait_for_navigation",
+        "params": {
+          "expectedPackage": "com.android.settings",
+          "timeoutMs": 5000
+        }
+      }
+    ]
+  }
+}
+```
+
 ## Builder Inflation Rules
 
 The flat CLI builders intentionally inflate execution timeouts so the wait action has room to finish.
@@ -3698,6 +3766,12 @@ So:
 - `clawperator wait --text "Done" --timeout 5000` becomes execution timeout `30000`
 - `clawperator wait --text "Done" --timeout 45000` becomes execution timeout `50000`
 
+Exact builder literals:
+
+- `source: "clawperator-action"`
+- action id: `wait`
+- action type: `wait_for_node`
+
 ### `wait_for_navigation`
 
 `buildWaitForNavExecution()` uses the same pattern:
@@ -3711,6 +3785,12 @@ So:
 - `clawperator wait-for-nav --app com.android.settings --timeout 25000` gets execution timeout `30000`
 - `clawperator wait-for-nav --app com.android.settings --timeout 30000` gets execution timeout `35000`
 
+Exact builder literals:
+
+- `source: "clawperator-action"`
+- action id: `wait-for-nav`
+- action type: `wait_for_navigation`
+
 ### `sleep`
 
 `buildSleepExecution()` uses:
@@ -3723,17 +3803,25 @@ This is the same design principle: the whole execution must last longer than the
 
 `buildSnapshotExecution()` defaults to `30000`. It has no separate action-level timeout field.
 
+Exact snapshot builder literals:
+
+- `source: "clawperator-observe"`
+- action id: `snap`
+- action type: `snapshot_ui`
+- `mode: "direct"`
+
 ## Best-Effort Runtime Ceiling
 
 `LIMITS.MAX_BEST_EFFORT_RUNTIME_MS` is `180000`.
 
-This limit belongs to the best-effort execution mode documented elsewhere in the codebase. It is not the same as the standard direct execution timeout range. For normal direct executions, agents should still keep top-level `timeoutMs` inside `1000..120000`.
+This limit belongs to the best-effort execution mode constants. It is not the same as the standard direct execution timeout range. For normal direct executions, agents should still keep top-level `timeoutMs` inside `1000..120000`.
 
 What this means operationally:
 
 - best-effort workflows may be allowed to run longer internally
 - direct execution payloads still validate against the normal execution timeout max
 - do not assume that setting `timeoutMs` above `120000` becomes valid just because best-effort runtime is higher
+- current CLI behavior still reports `exec best-effort` as stage-1 limited, so this constant should be treated as a runtime ceiling, not as a signal that best-effort is the preferred public path
 
 ## Concrete Budget Examples
 
@@ -3756,7 +3844,8 @@ Good budget because:
 
 - single cheap action
 - no action-level timeout
-- default `30000` leaves room for dispatch and envelope handling
+- `30000` is the literal default used by `buildSnapshotExecution()`
+- the runtime still gets its separate `+5000` envelope buffer internally
 
 ### Example 2: Navigation wait
 
@@ -3839,6 +3928,32 @@ Reasonable because:
 - the click and sleep consume part of the same overall budget
 - the final snapshot still needs time for extraction and envelope return
 
+Verification pattern - inspect the plan without dispatching:
+
+```bash
+clawperator exec --dry-run --execution '{"commandId":"read-after-click","taskId":"read-after-click","source":"docs","expectedFormat":"android-ui-automator","timeoutMs":45000,"actions":[{"id":"click-1","type":"click","params":{"matcher":{"textEquals":"Settings"}}},{"id":"sleep-1","type":"sleep","params":{"durationMs":1500}},{"id":"wait-1","type":"wait_for_node","params":{"matcher":{"textEquals":"Connected devices"},"timeoutMs":10000}},{"id":"snap-1","type":"snapshot_ui"}]}'
+```
+
+Expected success shape:
+
+```json
+{
+  "ok": true,
+  "dryRun": true,
+  "plan": {
+    "commandId": "read-after-click",
+    "timeoutMs": 45000,
+    "actionCount": 4,
+    "actions": [
+      { "id": "click-1", "type": "click" },
+      { "id": "sleep-1", "type": "sleep" },
+      { "id": "wait-1", "type": "wait_for_node" },
+      { "id": "snap-1", "type": "snapshot_ui" }
+    ]
+  }
+}
+```
+
 ## Common Mistakes
 
 ### Execution timeout too close to wait timeout
@@ -3867,7 +3982,9 @@ The builder cushion is there to stop the envelope layer from killing the run too
 ### Passing out-of-range values
 
 - execution timeout above `120000` fails validation
+- execution timeout below `1000` fails validation
 - `wait-for-nav --timeout` above `30000` fails validation
+- `wait-for-nav` without `--timeout` fails with `MISSING_ARGUMENT`
 - non-finite values fail validation
 
 ## Practical Rules
@@ -3876,6 +3993,7 @@ The builder cushion is there to stop the envelope layer from killing the run too
 - for `wait_for_navigation`, set `execution.timeoutMs` to at least `actionTimeout + 5000`
 - for multi-step flows, add budget for earlier actions and the final envelope
 - if you hit `RESULT_ENVELOPE_TIMEOUT`, verify health with [Doctor](doctor.md) before only increasing the timeout
+- use `--validate-only` or `--dry-run` to confirm the final timeout value before you spend a live device run
 
 ## Related Pages
 
