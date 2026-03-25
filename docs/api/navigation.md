@@ -13,6 +13,7 @@ This page focuses on composition. For full per-action parameter rules, use [Acti
 - Shared contract: `apps/node/src/contracts/execution.ts`
 - Limits: `apps/node/src/contracts/limits.ts`
 - CLI command surface: `apps/node/src/cli/registry.ts`
+- Selector parsing: `apps/node/src/cli/selectorFlags.ts`
 
 ## Why Compose Navigation
 
@@ -27,6 +28,12 @@ The normal three-step shape is:
 - `open_app` or `open_uri`
 - `wait_for_navigation`
 - `snapshot_ui`
+
+Verification pattern - preview a composed navigation payload without dispatching:
+
+```bash
+clawperator exec --dry-run --execution '{"commandId":"settings-nav-1","taskId":"settings-nav-1","source":"docs","expectedFormat":"android-ui-automator","timeoutMs":30000,"actions":[{"id":"open","type":"open_app","params":{"applicationId":"com.android.settings"}},{"id":"wait","type":"wait_for_navigation","params":{"expectedPackage":"com.android.settings","timeoutMs":5000}},{"id":"snap","type":"snapshot_ui"}]}'
+```
 
 ## `open_app`
 
@@ -59,11 +66,61 @@ Builder example:
 }
 ```
 
+Exact builder literals from `buildOpenAppExecution()`:
+
+- `taskId: "cli-action-open-app"`
+- `source: "clawperator-cli"`
+- `timeoutMs: 15000`
+- action id: `a1`
+
+CLI routing pattern:
+
+```bash
+clawperator open com.android.settings
+```
+
+The `open` command treats a non-URI target as an app package and dispatches to `open_app`.
+
+Verification:
+
+```bash
+clawperator open com.android.settings --validate-only
+```
+
+Expected success shape:
+
+```json
+{
+  "ok": true,
+  "validated": true,
+  "execution": {
+    "taskId": "cli-action-open-app",
+    "source": "clawperator-cli",
+    "timeoutMs": 15000,
+    "actions": [
+      {
+        "id": "a1",
+        "type": "open_app",
+        "params": {
+          "applicationId": "com.android.settings"
+        }
+      }
+    ]
+  }
+}
+```
+
 What to verify after `open_app`:
 
 - do not rely on the open action alone
 - follow with `wait_for_navigation` using `expectedPackage`
 - then confirm the target screen with `snapshot_ui` or another read action
+
+Error cases:
+
+- missing or blank `applicationId` in raw JSON: `EXECUTION_VALIDATION_FAILED`
+- missing `open` target on the CLI: `MISSING_ARGUMENT`
+- both positional target and `--app` on the CLI: `EXECUTION_VALIDATION_FAILED`
 
 ## `open_uri`
 
@@ -97,6 +154,50 @@ Builder example:
 }
 ```
 
+Exact builder literals from `buildOpenUriExecution()`:
+
+- `taskId: "cli-action-open-uri"`
+- `source: "clawperator-cli"`
+- `timeoutMs: 15000`
+- action id: `a1`
+
+CLI routing pattern:
+
+```bash
+clawperator open https://clawperator.com
+```
+
+The `open` command uses `isOpenCliUriTarget()` and routes to `open_uri` when the target matches a URI-with-scheme pattern.
+
+Verification:
+
+```bash
+clawperator open https://clawperator.com --validate-only
+```
+
+Expected success shape:
+
+```json
+{
+  "ok": true,
+  "validated": true,
+  "execution": {
+    "taskId": "cli-action-open-uri",
+    "source": "clawperator-cli",
+    "timeoutMs": 15000,
+    "actions": [
+      {
+        "id": "a1",
+        "type": "open_uri",
+        "params": {
+          "uri": "https://clawperator.com"
+        }
+      }
+    ]
+  }
+}
+```
+
 What Node validates versus what it does not:
 
 - Node validates presence and max length
@@ -106,6 +207,12 @@ What to verify after `open_uri`:
 
 - use `wait_for_navigation` if you expect a package or visible node
 - use `snapshot_ui` to confirm the actual screen reached
+
+Error cases:
+
+- blank or missing URI in raw JSON: `EXECUTION_VALIDATION_FAILED`
+- URI longer than `2048` characters: `EXECUTION_VALIDATION_FAILED`
+- missing `open` target on the CLI: `MISSING_ARGUMENT`
 
 ## `wait_for_navigation`
 
@@ -130,6 +237,13 @@ Builder inflation rule:
 
 - execution timeout becomes `max(timeoutMs + 5000, 30000)`
 
+Exact builder literals from `buildWaitForNavExecution()`:
+
+- `source: "clawperator-action"`
+- action id: `wait-for-nav`
+- action type: `wait_for_navigation`
+- default execution timeout when `navTimeoutMs` is omitted: `30000`
+
 Example:
 
 ```json
@@ -150,6 +264,43 @@ CLI rule for `wait-for-nav`:
 
 - `--timeout` is required
 - at least one of `--app` or a selector is required
+
+CLI validation failures:
+
+- missing `--timeout`: `MISSING_ARGUMENT`
+- `--timeout <= 0`: `EXECUTION_VALIDATION_FAILED`
+- `--timeout > 30000`: `EXECUTION_VALIDATION_FAILED`
+- blank `--app` value: `EXECUTION_VALIDATION_FAILED`
+- no `--app` and no selector: `MISSING_ARGUMENT`
+
+Verification:
+
+```bash
+clawperator wait-for-nav --app com.android.settings --timeout 5000 --validate-only
+```
+
+Expected validated execution shape:
+
+```json
+{
+  "ok": true,
+  "validated": true,
+  "execution": {
+    "source": "clawperator-action",
+    "timeoutMs": 30000,
+    "actions": [
+      {
+        "id": "wait-for-nav",
+        "type": "wait_for_navigation",
+        "params": {
+          "expectedPackage": "com.android.settings",
+          "timeoutMs": 5000
+        }
+      }
+    ]
+  }
+}
+```
 
 ## Common Navigation Sequence
 
@@ -200,6 +351,12 @@ Machine-checkable success conditions:
 - `stepResults[2].actionType == "snapshot_ui"` and `stepResults[2].success == true`
 - `stepResults[2].data.text` exists
 
+Verification command:
+
+```bash
+clawperator exec --execution '{"commandId":"settings-nav-1","taskId":"settings-nav-1","source":"docs","expectedFormat":"android-ui-automator","timeoutMs":30000,"actions":[{"id":"open","type":"open_app","params":{"applicationId":"com.android.settings"}},{"id":"wait","type":"wait_for_navigation","params":{"expectedPackage":"com.android.settings","timeoutMs":5000}},{"id":"snap","type":"snapshot_ui"}]}' --device <device_serial> --json
+```
+
 ## Complete JSON Example
 
 ```json
@@ -248,6 +405,7 @@ What to do:
 
 - inspect `stepResults[0]`
 - follow with `snapshot_ui` or `wait_for_navigation` to see where the device actually landed
+- if the Operator package itself is missing instead of the target app, the execution fails earlier with `OPERATOR_NOT_INSTALLED`
 
 ### Navigation timeout
 
@@ -262,6 +420,25 @@ Recovery:
 - verify the expectation is correct
 - use [Snapshot Format](snapshot.md) or [Selectors](selectors.md) to inspect the actual screen
 
+Typical failure branch:
+
+```json
+{
+  "envelope": {
+    "status": "failed",
+    "stepResults": [
+      {
+        "actionType": "wait_for_navigation",
+        "success": false,
+        "data": {
+          "error": "NODE_NOT_FOUND"
+        }
+      }
+    ]
+  }
+}
+```
+
 ### Wrong package on screen
 
 If `open_uri` hands off to a chooser, browser, or another app, `expectedPackage` may not match what actually reached the foreground.
@@ -270,6 +447,16 @@ Recovery:
 
 - use `expectedNode` when package alone is too coarse
 - capture a snapshot and branch on the observed foreground UI
+
+### Envelope timeout during navigation
+
+If the entire payload runs too long, the caller gets a top-level `RESULT_ENVELOPE_TIMEOUT` error rather than a failed `wait_for_navigation` step.
+
+Recovery:
+
+- check whether the execution-level timeout was budgeted correctly
+- use the builder rule `max(actionTimeout + 5000, 30000)` as the minimum
+- verify device health with [Doctor](doctor.md) if the timeout is unexpected
 
 ## Recommended Pattern
 
