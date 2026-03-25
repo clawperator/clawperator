@@ -123,13 +123,13 @@ def parse_markdown_links(markdown_path: Path) -> list[str]:
     return links
 
 
-def resolve_relative_markdown_link(page_path: Path, generated_docs_dir: Path, href: str) -> str | None:
+def resolve_relative_markdown_link(page_path: Path, generated_docs_dir: Path, href: str) -> tuple[str | None, str | None]:
     clean_href = href.split("#", 1)[0].split("?", 1)[0].strip()
     if not clean_href:
-        return None
+        return None, None
 
     if clean_href.startswith("/"):
-        return clean_href.lstrip("/")
+        return clean_href.lstrip("/"), None
 
     relative_page = page_path.relative_to(generated_docs_dir)
     relative_target = Path(relative_page.parent, clean_href)
@@ -147,11 +147,14 @@ def resolve_relative_markdown_link(page_path: Path, generated_docs_dir: Path, hr
     for candidate in candidate_paths:
         if any(part == ".." for part in candidate.parts):
             continue
-        return markdown_output_to_site_path(str(candidate))
-    return None
+        candidate_md = generated_docs_dir / candidate
+        if candidate_md.exists():
+            return markdown_output_to_site_path(str(candidate)), None
+
+    return None, f"unresolvable relative markdown link: {href}"
 
 
-def generated_doc_link_to_site_path(page_path: Path, generated_docs_dir: Path, href: str) -> str | None:
+def generated_doc_link_to_site_path(page_path: Path, generated_docs_dir: Path, href: str) -> tuple[str | None, str | None]:
     return resolve_relative_markdown_link(page_path, generated_docs_dir, href)
 
 
@@ -163,13 +166,16 @@ def check_inner_page_links(generated_docs_dir: Path, site_dir: Path) -> list[str
             raw = href.split("#", 1)[0].split("?", 1)[0].strip()
             if not raw or raw.startswith("#") or raw.startswith("http") or raw.startswith("mailto:") or raw.startswith("tel:"):
                 continue
-            target = resolve_relative_markdown_link(md_file, generated_docs_dir, raw)
-            if target is None or target.startswith("/"):
+            target, error = resolve_relative_markdown_link(md_file, generated_docs_dir, raw)
+            if error is not None:
+                errors.append(f"inner-page-link: {md_file.relative_to(generated_docs_dir)} -> {raw} ({error})")
+                continue
+            if target is None:
                 continue
             resolved_site_path = Path(target)
             candidate_site_path = site_dir / resolved_site_path
             if not candidate_site_path.exists():
-                errors.append(f"inner-page-link: {md_file.relative_to(generated_docs_dir)} -> {raw} (unresolvable)")
+                errors.append(f"inner-page-link: {md_file.relative_to(generated_docs_dir)} -> {raw} (missing {resolved_site_path})")
                 continue
     return errors
 
@@ -198,7 +204,10 @@ def main() -> int:
     generated_doc_targets: list[str] = []
     for markdown_path in sorted(generated_docs_dir.rglob("*.md")):
         for href in parse_markdown_links(markdown_path):
-            target = generated_doc_link_to_site_path(markdown_path, generated_docs_dir, href)
+            target, error = generated_doc_link_to_site_path(markdown_path, generated_docs_dir, href)
+            if error is not None:
+                failures.append(f"generated docs link: {markdown_path.relative_to(generated_docs_dir)} -> {href} ({error})")
+                continue
             if target is not None:
                 generated_doc_targets.append(target)
     failures.extend(validate_existing_paths(site_dir, generated_doc_targets, "generated docs link"))
