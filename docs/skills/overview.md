@@ -369,8 +369,7 @@ If the expected text is present, the success payload echoes the assertion:
   "skillId": "com.android.settings.capture-overview",
   "output": "RESULT|status=success|snapshot=/tmp/settings.xml\n",
   "exitCode": 0,
-  "durationMs": 15842,
-  "timeoutMs": 120000
+  "durationMs": 15842
 }
 ```
 
@@ -503,6 +502,11 @@ The local HTTP server exposes:
 - `POST /skills/:skillId/run`
 
 The serve wrapper uses the same underlying registry and `runSkill()` runtime, with route-local request validation layered on top.
+
+Important boundary:
+
+- the serve route calls `runSkill()` directly
+- it does not go through the full CLI `cmdSkillsRun()` path, so it does not include the CLI pre-run validation gate or the CLI banner behavior
 
 ## Error Codes
 

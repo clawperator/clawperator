@@ -160,7 +160,7 @@ Successful response shape:
 ```json
 {
   "ok": true,
-  "localPath": "./recordings/demo-session.ndjson",
+  "localPath": "recordings/demo-session.ndjson",
   "sessionId": "demo-session"
 }
 ```
@@ -216,6 +216,7 @@ Check:
 - `ok == true`
 - `outputFile == "./recordings/demo-session.steps.json"`
 - `stepCount` matches the parsed `steps.length`
+- `stdout` contains the JSON result, while `stderr` also receives a human-readable step summary from `printStepSummary()`
 
 ## NDJSON Format
 

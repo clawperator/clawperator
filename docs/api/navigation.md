@@ -81,6 +81,11 @@ clawperator open com.android.settings
 
 The `open` command treats a non-URI target as an app package and dispatches to `open_app`.
 
+Exact classification rule from `isOpenCliUriTarget()`:
+
+- `open` routes to `open_uri` only when the target matches `[a-z][a-z0-9+\\-.]*://`
+- otherwise `open` treats the target as an app package and routes to `open_app`
+
 Verification:
 
 ```bash

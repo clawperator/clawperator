@@ -5250,6 +5250,11 @@ clawperator open com.android.settings
 
 The `open` command treats a non-URI target as an app package and dispatches to `open_app`.
 
+Exact classification rule from `isOpenCliUriTarget()`:
+
+- `open` routes to `open_uri` only when the target matches `[a-z][a-z0-9+\\-.]*://`
+- otherwise `open` treats the target as an app package and routes to `open_app`
+
 Verification:
 
 ```bash
@@ -5799,7 +5804,7 @@ Successful response shape:
 ```json
 {
   "ok": true,
-  "localPath": "./recordings/demo-session.ndjson",
+  "localPath": "recordings/demo-session.ndjson",
   "sessionId": "demo-session"
 }
 ```
@@ -5855,6 +5860,7 @@ Check:
 - `ok == true`
 - `outputFile == "./recordings/demo-session.steps.json"`
 - `stepCount` matches the parsed `steps.length`
+- `stdout` contains the JSON result, while `stderr` also receives a human-readable step summary from `printStepSummary()`
 
 ## NDJSON Format
 
@@ -6554,8 +6560,7 @@ If the expected text is present, the success payload echoes the assertion:
   "skillId": "com.android.settings.capture-overview",
   "output": "RESULT|status=success|snapshot=/tmp/settings.xml\n",
   "exitCode": 0,
-  "durationMs": 15842,
-  "timeoutMs": 120000
+  "durationMs": 15842
 }
 ```
 
@@ -6688,6 +6693,11 @@ The local HTTP server exposes:
 - `POST /skills/:skillId/run`
 
 The serve wrapper uses the same underlying registry and `runSkill()` runtime, with route-local request validation layered on top.
+
+Important boundary:
+
+- the serve route calls `runSkill()` directly
+- it does not go through the full CLI `cmdSkillsRun()` path, so it does not include the CLI pre-run validation gate or the CLI banner behavior
 
 ## Error Codes
 
@@ -6857,6 +6867,24 @@ Important current rule:
 
 If any of those differ, validation fails with `SKILL_VALIDATION_FAILED`.
 
+Literal authored `skill.json` example:
+
+```json
+{
+  "id": "com.example.demo.capture-state",
+  "applicationId": "com.example.demo",
+  "intent": "capture-state",
+  "summary": "TODO: describe com.example.demo.capture-state",
+  "path": "skills/com.example.demo.capture-state",
+  "skillFile": "skills/com.example.demo.capture-state/SKILL.md",
+  "scripts": [
+    "skills/com.example.demo.capture-state/scripts/run.js",
+    "skills/com.example.demo.capture-state/scripts/run.sh"
+  ],
+  "artifacts": []
+}
+```
+
 Use `clawperator skills validate <skill_id> --json` to verify the file paths and metadata match:
 
 ```bash
@@ -6936,7 +6964,7 @@ The scaffold writes an exact default `run.js` payload shape:
 
 ```json
 {
-  "commandId": "com.example.demo.capture-state-" ,
+  "commandId": "com.example.demo.capture-state-<Date.now()>",
   "taskId": "com.example.demo.capture-state",
   "source": "com.example.demo.capture-state",
   "expectedFormat": "android-ui-automator",
@@ -7769,8 +7797,40 @@ This is useful for local HTTP-based tests of the same wrapper contract.
 Verification pattern:
 
 - send `POST /skills/:skillId/run` with `deviceId`, `args`, `timeoutMs`, and `expectContains`
-- expect the same `skillId`, `output`, `exitCode`, `durationMs`, and `timeoutMs` fields as the CLI wrapper
-- handle `SKILL_OUTPUT_ASSERTION_FAILED`, `SKILL_EXECUTION_FAILED`, and `SKILL_EXECUTION_TIMEOUT` the same way you would in CLI JSON mode
+- success response shape is:
+
+```json
+{
+  "ok": true,
+  "skillId": "com.example.app.do-thing",
+  "output": "RESULT|status=success\n",
+  "exitCode": 0,
+  "durationMs": 8421,
+  "timeoutMs": 90000,
+  "expectedSubstring": "RESULT"
+}
+```
+
+- failure response shape is:
+
+```json
+{
+  "ok": false,
+  "error": {
+    "code": "SKILL_EXECUTION_FAILED",
+    "message": "Skill com.example.app.do-thing exited with code 1",
+    "skillId": "com.example.app.do-thing",
+    "exitCode": 1,
+    "stdout": "RESULT|status=partial\n",
+    "stderr": "Expected node not found\n"
+  }
+}
+```
+
+- unlike CLI `skills run`, this route calls `runSkill()` directly
+- it does not run the CLI pre-validation gate from `cmdSkillsRun()`
+- it does not inject the CLI wrapper banner
+- handle `error.code` values such as `SKILL_OUTPUT_ASSERTION_FAILED`, `SKILL_EXECUTION_FAILED`, and `SKILL_EXECUTION_TIMEOUT` through the nested `error` object, not as the top-level response object
 
 ## Skill Sync
 

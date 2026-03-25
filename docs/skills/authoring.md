@@ -133,6 +133,24 @@ Important current rule:
 
 If any of those differ, validation fails with `SKILL_VALIDATION_FAILED`.
 
+Literal authored `skill.json` example:
+
+```json
+{
+  "id": "com.example.demo.capture-state",
+  "applicationId": "com.example.demo",
+  "intent": "capture-state",
+  "summary": "TODO: describe com.example.demo.capture-state",
+  "path": "skills/com.example.demo.capture-state",
+  "skillFile": "skills/com.example.demo.capture-state/SKILL.md",
+  "scripts": [
+    "skills/com.example.demo.capture-state/scripts/run.js",
+    "skills/com.example.demo.capture-state/scripts/run.sh"
+  ],
+  "artifacts": []
+}
+```
+
 Use `clawperator skills validate <skill_id> --json` to verify the file paths and metadata match:
 
 ```bash
@@ -212,7 +230,7 @@ The scaffold writes an exact default `run.js` payload shape:
 
 ```json
 {
-  "commandId": "com.example.demo.capture-state-" ,
+  "commandId": "com.example.demo.capture-state-<Date.now()>",
   "taskId": "com.example.demo.capture-state",
   "source": "com.example.demo.capture-state",
   "expectedFormat": "android-ui-automator",
