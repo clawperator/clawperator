@@ -2,13 +2,14 @@
 
 Parent plan: `tasks/docs/refactor/plan.md`
 
-This work ships as **3 PRs**, strictly sequenced. Each PR is independently shippable and leaves the build in a working state.
+This work ships as **4 PRs**, strictly sequenced. Each PR is independently shippable and leaves the build in a working state.
 
 | PR | Scope | Key Deliverable | Model |
 |----|-------|----------------|-------|
 | PR-1 | Pipeline + skeleton | New build pipeline works, old URLs redirect, placeholder pages | fast |
 | PR-2 | Core content + code | 9 critical pages + doctor docsUrl + AGENTS.md | thinking |
-| PR-3 | Remaining content + cleanup | 11 secondary pages + delete old files + finalize llms artifacts | default |
+| PR-3 | Remaining content | 11 secondary pages + index rewrite | default |
+| PR-4 | Cleanup + finalization | Delete old files, move internal docs, finalize llms, update repo metadata | fast |
 
 Each PR contains multiple tasks. Tasks within a PR are ordered by dependency. Tasks within the same phase can be parallelized where noted.
 
@@ -539,11 +540,11 @@ Covers:
 
 ---
 
-## PR-3: Remaining Content + Cleanup
+## PR-3: Remaining Content
 
-Secondary API pages, skills pages, troubleshooting pages, index page, llms artifacts, old file deletion, and repo metadata updates.
+Secondary API pages, skills pages, troubleshooting pages, and index page rewrite.
 
-**Recommended model:** default. Secondary pages need accurate content but are less complex than PR-2. Cleanup tasks are mechanical. Default balances quality with throughput.
+**Recommended model:** default. Secondary pages need accurate content but are less complex than PR-2.
 
 After PR-2 merges, create a new branch from main for PR-3.
 
@@ -611,61 +612,115 @@ Write this last, after all other pages exist, so all links are valid.
 
 ---
 
-### Task 3.5: Finalize llms artifacts
+### PR-3 Validation (before opening PR)
 
-**Steps:**
-1. Rewrite `llms.txt` (both `sites/docs/static/llms.txt` and `sites/landing/public/llms.txt`) with all canonical page URLs
-2. Run `generate_llms_full.py` to produce final `llms-full.txt`
-3. Verify `llms-full.txt` contains all 20 pages in nav order
-4. Review `llms-full.txt` top-to-bottom for coherence
+1. `./scripts/docs_build.sh` succeeds
+2. All 11 content pages + index verified against code (commit messages cite sources)
+3. Zero placeholder pages remain
+4. Zero occurrences of "receiver" in authored docs
+5. All relative links resolve
+6. Grep for deprecated terms: "observe snapshot", "action click", "--timeout-ms" returns zero
+7. `llms-full.txt` contains all 22 pages in correct order
 
-**Depends on:** Tasks 3.1-3.4 complete
+**PR-3 is complete after validation passes. Open PR, get review, merge.**
 
 ---
 
-### Task 3.6: Cleanup
+## PR-4: Cleanup + Finalization
 
-**Goal:** Remove old files, update repo metadata.
+Old file deletion, internal docs moves, llms artifact finalization, repo metadata updates.
+
+**Recommended model:** fast. This is mechanical cleanup - moves, deletes, metadata updates. No content judgment needed.
+
+After PR-3 merges, create a new branch from main for PR-4.
+
+---
+
+### Task 4.1: Finalize llms artifacts
 
 **Steps:**
-1. Move internal docs to `docs/internal/`: `conformance-apk.md`, `release-procedure.md`, `release-reference.md`, `site-hosting.md`, `design/` (entire directory)
-2. Delete old authored source files:
-   - `docs/reference/` directory
-   - `docs/ai-agents/` directory
-   - Individual files: `agent-quickstart.md`, `first-time-setup.md`, `openclaw-first-run.md`, `running-clawperator-on-android.md`, `project-overview.md`, `terminology.md`, `android-operator-apk.md`, `architecture.md`, `node-api-for-agents.md`, `snapshot-format.md`, `navigation-patterns.md`, `multi-device-workflows.md`, `crash-logs.md`, `troubleshooting.md`, `compatibility.md`, `known-issues.md`
-3. Update skills repo: replace docs with lightweight pointers to `https://docs.clawperator.com/skills/`
-4. Delete reference snapshot: `tasks/docs/refactor/reference/`
-5. Update `CLAUDE.md`:
+1. Review `llms.txt` (both `sites/docs/static/llms.txt` and `sites/landing/public/llms.txt`) - update if any URLs changed during PR-2/PR-3
+2. Run `generate_llms_full.py` to produce final `llms-full.txt`
+3. Verify `llms-full.txt` contains all 22 pages in nav order
+4. Review `llms-full.txt` top-to-bottom for coherence
+
+**Depends on:** PR-3 merged
+
+---
+
+### Task 4.2: Move internal docs
+
+**Goal:** Move non-public docs to `docs/internal/` so they are excluded from the public site.
+
+**Steps:**
+1. Create `docs/internal/`
+2. Move: `conformance-apk.md`, `release-procedure.md`, `release-reference.md`, `site-hosting.md`, `design/` (entire directory)
+
+**Depends on:** Nothing (can run in parallel with 4.1)
+
+---
+
+### Task 4.3: Delete old source files
+
+**Goal:** Remove all authored source files that have been absorbed into the new structure.
+
+**Steps:**
+1. Delete `docs/reference/` directory
+2. Delete `docs/ai-agents/` directory
+3. Delete individual absorbed files: `agent-quickstart.md`, `first-time-setup.md`, `openclaw-first-run.md`, `running-clawperator-on-android.md`, `project-overview.md`, `terminology.md`, `android-operator-apk.md`, `architecture.md`, `node-api-for-agents.md`, `snapshot-format.md`, `navigation-patterns.md`, `multi-device-workflows.md`, `crash-logs.md`, `troubleshooting.md`, `compatibility.md`, `known-issues.md`
+
+**Depends on:** PR-3 merged (content must be authored before old sources are deleted)
+
+---
+
+### Task 4.4: Update skills repo
+
+**Steps:**
+1. Replace `../clawperator-skills/docs/` content with lightweight pointers to `https://docs.clawperator.com/skills/`
+
+**Depends on:** Task 3.2 (skills pages must exist)
+
+---
+
+### Task 4.5: Update repo metadata
+
+**Steps:**
+1. Update `CLAUDE.md`:
    - Update docs architecture description
    - Update validation commands for new pipeline
    - Remove references to `sites/docs/docs/` as generated output
    - Update `docs-generate` and `docs-validate` skill descriptions
    - Note that skills docs are canonical in this repo, not the skills repo
-6. Update `.agents/skills/docs-generate/SKILL.md` for new pipeline scope
-7. Update `.agents/skills/docs-validate/SKILL.md` for new validation scope
-8. Retire or simplify `diff_report.py`, `build_inventory.py`, `validate_source_of_truth.py`
+2. Update `.agents/skills/docs-generate/SKILL.md` for final pipeline scope
+3. Update `.agents/skills/docs-validate/SKILL.md` for final validation scope
 
-**Depends on:** Tasks 3.1-3.5 complete
+**Depends on:** Tasks 4.2-4.3 complete (file moves/deletes must land before metadata references them)
 
 ---
 
-### PR-3 Validation (before opening PR)
+### Task 4.6: Delete refactor artifacts
+
+**Steps:**
+1. Delete reference snapshot: `tasks/docs/refactor/reference/`
+2. Delete task files: `tasks/docs/refactor/plan.md`, `tasks/docs/refactor/work-breakdown.md`
+
+**Depends on:** All of PR-4 (4.1-4.5) complete
+
+---
+
+### PR-4 Validation (before opening PR)
 
 1. `./scripts/docs_build.sh` succeeds with zero warnings
-2. `npm --prefix apps/node run build && npm --prefix apps/node run test` passes
-3. `llms-full.txt` contains all 20 pages, coherent top-to-bottom
-4. Every URL in `llms.txt` resolves to a built HTML page
-5. Zero placeholder pages remain
-6. Zero occurrences of "receiver" in authored docs
-7. No old docs remain outside `docs/internal/`
-8. All relative links resolve
-9. Grep for deprecated terms: "observe snapshot", "action click", "--timeout-ms" returns zero
-10. At least 5 redirects resolve correctly
-11. Skills repo updated with pointer docs
-12. `CLAUDE.md` reflects new reality
-13. Run full build one final time after cleanup to verify nothing broke
+2. `llms-full.txt` contains all 22 pages, coherent top-to-bottom
+3. Every URL in `llms.txt` resolves to a built HTML page
+4. No old docs remain outside `docs/internal/`
+5. At least 5 redirects resolve correctly
+6. Skills repo updated with pointer docs
+7. `CLAUDE.md` reflects new reality
+8. No reference snapshot or task files remain
+9. Run full build one final time after cleanup to verify nothing broke
 
-**PR-3 is complete after validation passes. Open PR, get review, merge.**
+**PR-4 is complete after validation passes. Open PR, get review, merge.**
 
 ---
 
@@ -695,10 +750,18 @@ PR-2: Core Content + Code (branch from main after PR-1 merges)
     |
   [merge PR-2]
 
-PR-3: Remaining Content + Cleanup (branch from main after PR-2 merges)
+PR-3: Remaining Content (branch from main after PR-2 merges)
   3.1 (remaining API) ──┐
-  3.2 (skills)        ──┤──→ 3.4 (index) ──→ 3.5 (llms) ──→ 3.6 (cleanup)
+  3.2 (skills)        ──┤──→ 3.4 (index)
   3.3 (troubleshoot)  ──┘
     |
   [merge PR-3]
+
+PR-4: Cleanup + Finalization (branch from main after PR-3 merges)
+  4.1 (llms finalize) ──┐
+  4.2 (internal moves) ─┤
+  4.3 (delete old)     ─┤──→ 4.5 (repo metadata) ──→ 4.6 (delete refactor artifacts)
+  4.4 (skills repo)   ──┘
+    |
+  [merge PR-4]
 ```
