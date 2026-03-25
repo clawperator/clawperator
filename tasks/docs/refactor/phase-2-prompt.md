@@ -15,7 +15,7 @@ The north star document is your primary guide. Reread it before starting each pa
 
 ## Branch
 
-Work on the `docs-refactor/phase-2` branch, created from `main`.
+Work on the `docs-refactor-phase-2` branch, created from `main`.
 
 ## The One Rule That Matters Most
 
