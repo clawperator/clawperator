@@ -43,6 +43,18 @@ Meaning:
 - `serial` is the adb device identifier used by `--device`
 - `state` is whatever adb reported for that serial
 - Node keeps all listed devices in this command output, even if they are not valid execution targets
+- this command is observational only; it does not apply `resolveDevice.ts` selection rules
+
+The HTTP server uses the same listing behavior on `GET /devices` and returns:
+
+```json
+{
+  "ok": true,
+  "devices": [
+    { "serial": "emulator-5554", "state": "device" }
+  ]
+}
+```
 
 ## Which Devices Count As Executable Targets
 
@@ -223,6 +235,8 @@ Recovery:
 - rerun `clawperator devices`
 - check that the serial matches exactly
 - confirm the requested device is not `offline` or `unauthorized`
+
+If you see the serial in `clawperator devices` output but its state is not `device`, the fix is to repair that adb state first rather than retrying the same command.
 
 ## Example Commands
 
