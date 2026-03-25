@@ -595,6 +595,8 @@ This work ships as 3 PRs, strictly sequenced. Each PR is independently shippable
 
 This is a migration, not a perfection pass. Prioritize coherent structure, correct core documentation, and a deterministic build pipeline. Do not over-polish secondary pages in the first pass. Prefer shipping a clean, correct, strongly structured system that can be refined in follow-up PRs.
 
+**Review artifact:** For content PRs (PR-2 and PR-3), `llms-full.txt` is the canonical review artifact - not the HTML site. Reviewing the concatenated text file gives the most accurate picture of what agents will consume. The HTML site is a projection and may obscure structural issues visible in the flat text.
+
 ### PR-1: Pipeline + skeleton
 
 **Scope:** Phase 0 (migration prep) + Phase 1 (infrastructure) + placeholder content for all 20 pages.
