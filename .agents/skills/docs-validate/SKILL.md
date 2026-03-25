@@ -32,5 +32,7 @@ sources, this skill should fail.
 
 - This skill is complementary to the normal docs route validator in
   `scripts/validate_docs_routes.py`.
+- The old source-of-truth checker is retired and is not part of
+  `./scripts/docs_build.sh`.
 - Use the repo-local `docs-generate` skill to regenerate the staging output
   after correcting authored sources or code-derived generators.

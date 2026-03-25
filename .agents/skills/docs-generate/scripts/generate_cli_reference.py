@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import re
-import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -84,27 +83,6 @@ def parse_command_info(name: str, body: str) -> CommandInfo:
         flags=flags,
         subcommands=subcommands,
     )
-
-
-def humanize_flag(flag: str) -> str:
-    mapping = {
-        "--selector": "Advanced raw NodeMatcher JSON.",
-        "--text": "Exact visible text selector or text input where the command defines that meaning.",
-        "--text-contains": "Partial visible text selector.",
-        "--id": "Android resource ID selector.",
-        "--desc": "Exact content description selector.",
-        "--desc-contains": "Partial content description selector.",
-        "--role": "Element role selector.",
-        "--coordinate": "Exact screen coordinate target.",
-        "--container-selector": "Raw NodeMatcher JSON for a container.",
-        "--container-text": "Exact visible text on the container.",
-        "--container-text-contains": "Partial text match on the container.",
-        "--container-id": "Container resource ID selector.",
-        "--container-desc": "Exact content description on the container.",
-        "--container-desc-contains": "Partial content description on the container.",
-        "--container-role": "Container role selector.",
-    }
-    return mapping.get(flag, "Command option exposed by the CLI registry.")
 
 
 def render_table(commands: list[CommandInfo]) -> str:
