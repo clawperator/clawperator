@@ -102,6 +102,22 @@ def source_map_entries(source_map: object) -> tuple[dict[str, dict], list[dict]]
     return code_outputs, marker_entries
 
 
+def validate_source_list(entries: list[dict], kind: str) -> None:
+    for entry in entries:
+        sources = entry.get("sources")
+        if not isinstance(sources, list) or not sources:
+            raise ValueError(f"{kind} entry must include a non-empty sources list: {entry!r}")
+        for raw_source in sources:
+            if not isinstance(raw_source, str) or not raw_source.strip():
+                raise ValueError(f"{kind} entry has an invalid source path: {entry!r}")
+            source_path = Path(raw_source)
+            if source_path.is_absolute() or str(source_path).startswith(".."):
+                raise ValueError(f"{kind} entry source must be relative to repo root: {raw_source}")
+            resolved = repo_root() / source_path
+            if not resolved.exists():
+                raise FileNotFoundError(f"{kind} entry source not found: {resolved}")
+
+
 def generator_path(generator: str) -> Path:
     path = Path(generator)
     if not path.is_absolute():
@@ -157,6 +173,8 @@ def main() -> int:
     source_map_data = load_yaml(source_map_path)
     nav_entries = nav_page_entries(nav_data.get("nav"))
     code_outputs, marker_entries = source_map_entries(source_map_data)
+    validate_source_list(list(code_outputs.values()), "code_derived")
+    validate_source_list(marker_entries, "marker")
 
     if args.verbose:
         print(f"resolve_pages: loaded {len(nav_entries)} nav pages")
