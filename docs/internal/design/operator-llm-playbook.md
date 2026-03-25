@@ -141,6 +141,6 @@ Notes:
 
 ## 6) Where to update docs
 
-- Skill model/design: `docs/design/skill-design.md`
-- Secondary runtime playbook and conventions: `docs/design/operator-llm-playbook.md` (this file)
+- Skill model/design: `docs/internal/design/skill-design.md`
+- Secondary runtime playbook and conventions: `docs/internal/design/operator-llm-playbook.md` (this file)
 - App-specific skill packages: `skills/<applicationId>.<intent>/...`

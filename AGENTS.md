@@ -50,7 +50,7 @@ Design consequence:
 - `docs/first-time-setup.md` - Device setup and APK installation
 - `docs/architecture.md` - System design
 - `docs/troubleshooting.md` - Common issues
-- `docs/design/` - Internal design documents
+- `docs/internal/design/` - Internal design documents
 
 ## Public Sites
 - Clawperator has two public website surfaces with different build systems and purposes:
@@ -121,7 +121,7 @@ confirm it succeeds end to end.
 
 Documentation updates should be considered part of the feature or bug-fix work, not optional follow-up. At minimum, agents should update:
 - `docs/` for API shape, contract, error code, result-envelope, setup/install/device-prep, troubleshooting, or other authored public docs changes
-- `docs/design/` when internal design guidance, engineering expectations, or skill-authoring guidance changed in a durable way
+- `docs/internal/design/` when internal design guidance, engineering expectations, or skill-authoring guidance changed in a durable way
 
 Docs must not over-promise behavior. When code, validators, scripts, and docs disagree, fix the implementation or narrow the docs so they accurately describe the current shipped behavior. Do not document aspirational or partially implemented behavior as if it already exists.
 

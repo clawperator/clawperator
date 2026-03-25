@@ -362,7 +362,7 @@ Runtime should execute against cached/pinned skill content, not live network fet
 
 Skill compilation requirements are defined in:
 
-- `docs/design/skill-design.md`
+- `docs/internal/design/skill-design.md`
 
 When skill artifacts are missing/stale, runtime can still execute direct executions supplied by the agent.
 
@@ -399,7 +399,7 @@ Key principles:
 3. Alias table is explicit and versioned (no fuzzy guessing in parser).
 
 Design principles, naming rules, synonym policy, and a pre-merge checklist
-for new commands and flags are in `docs/design/node-api-design-guiding-principles.md`.
+for new commands and flags are in `docs/internal/design/node-api-design-guiding-principles.md`.
 
 Note: the "Shipped Commands" section above reflects the current CLI surface
 and will be updated as the command surface evolves.
