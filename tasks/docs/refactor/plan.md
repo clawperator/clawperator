@@ -597,7 +597,7 @@ This is a migration, not a perfection pass. Prioritize coherent structure, corre
 
 **Review artifact:** For content PRs (PR-2 and PR-3), `llms-full.txt` is the canonical review artifact - not the HTML site. Reviewing the concatenated text file gives the most accurate picture of what agents will consume. The HTML site is a projection and may obscure structural issues visible in the flat text.
 
-### PR-1: Pipeline + skeleton
+### PR-1: Pipeline + skeleton [DONE]
 
 **Scope:** Phase 0 (migration prep) + Phase 1 (infrastructure) + placeholder content for all 22 pages.
 
