@@ -358,19 +358,19 @@ Placeholder - content coming in PR-2/PR-3.
 | Flag | Description | Notes |
 | --- | --- | --- |
 | `--selector` | Raw NodeMatcher JSON for an element. | Mutually exclusive with shorthand element selector flags. |
-| `--text` | Element selector flag. | May be combined with other shorthand selector flags. |
-| `--text-contains` | Element selector flag. | May be combined with other shorthand selector flags. |
-| `--id` | Element selector flag. | May be combined with other shorthand selector flags. |
-| `--desc` | Element selector flag. | May be combined with other shorthand selector flags. |
-| `--desc-contains` | Element selector flag. | May be combined with other shorthand selector flags. |
-| `--role` | Element selector flag. | May be combined with other shorthand selector flags. |
+| `--text` | Match an element by exact text. | May be combined with other shorthand selector flags. |
+| `--text-contains` | Match an element by partial text. | May be combined with other shorthand selector flags. |
+| `--id` | Match an element by resource id. | May be combined with other shorthand selector flags. |
+| `--desc` | Match an element by exact content description. | May be combined with other shorthand selector flags. |
+| `--desc-contains` | Match an element by partial content description. | May be combined with other shorthand selector flags. |
+| `--role` | Match an element by accessibility role. | May be combined with other shorthand selector flags. |
 | `--container-selector` | Raw NodeMatcher JSON for a container. | Mutually exclusive with raw selector JSON on the same matcher. |
-| `--container-text` | Container selector flag. | Mutually exclusive with raw selector JSON on the same matcher. |
-| `--container-text-contains` | Container selector flag. | Mutually exclusive with raw selector JSON on the same matcher. |
-| `--container-id` | Container selector flag. | Mutually exclusive with raw selector JSON on the same matcher. |
-| `--container-desc` | Container selector flag. | Mutually exclusive with raw selector JSON on the same matcher. |
-| `--container-desc-contains` | Container selector flag. | Mutually exclusive with raw selector JSON on the same matcher. |
-| `--container-role` | Container selector flag. | Mutually exclusive with raw selector JSON on the same matcher. |
+| `--container-text` | Match a container by exact text. | Mutually exclusive with raw selector JSON on the same matcher. |
+| `--container-text-contains` | Match a container by partial text. | Mutually exclusive with raw selector JSON on the same matcher. |
+| `--container-id` | Match a container by resource id. | Mutually exclusive with raw selector JSON on the same matcher. |
+| `--container-desc` | Match a container by exact content description. | Mutually exclusive with raw selector JSON on the same matcher. |
+| `--container-desc-contains` | Match a container by partial content description. | Mutually exclusive with raw selector JSON on the same matcher. |
+| `--container-role` | Match a container by accessibility role. | Mutually exclusive with raw selector JSON on the same matcher. |
 
 This page will define the NodeMatcher contract, selector flag behavior, and matching rules.
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import warnings
 import sys
 from pathlib import Path
 
@@ -25,22 +26,85 @@ def parse_flags(text: str) -> list[str]:
     return flags
 
 
-def flag_description(flag: str) -> str:
-    if flag == "--selector":
-        return "Raw NodeMatcher JSON for an element."
-    if flag == "--container-selector":
-        return "Raw NodeMatcher JSON for a container."
-    if flag.startswith("--container-"):
-        return "Container selector flag."
-    return "Element selector flag."
+KNOWN_FLAG_DOCS: dict[str, tuple[str, str]] = {
+    "--selector": (
+        "Raw NodeMatcher JSON for an element.",
+        "Mutually exclusive with shorthand element selector flags.",
+    ),
+    "--text": (
+        "Match an element by exact text.",
+        "May be combined with other shorthand selector flags.",
+    ),
+    "--text-contains": (
+        "Match an element by partial text.",
+        "May be combined with other shorthand selector flags.",
+    ),
+    "--id": (
+        "Match an element by resource id.",
+        "May be combined with other shorthand selector flags.",
+    ),
+    "--desc": (
+        "Match an element by exact content description.",
+        "May be combined with other shorthand selector flags.",
+    ),
+    "--desc-contains": (
+        "Match an element by partial content description.",
+        "May be combined with other shorthand selector flags.",
+    ),
+    "--role": (
+        "Match an element by accessibility role.",
+        "May be combined with other shorthand selector flags.",
+    ),
+    "--container-selector": (
+        "Raw NodeMatcher JSON for a container.",
+        "Mutually exclusive with raw selector JSON on the same matcher.",
+    ),
+    "--container-text": (
+        "Match a container by exact text.",
+        "Mutually exclusive with raw selector JSON on the same matcher.",
+    ),
+    "--container-text-contains": (
+        "Match a container by partial text.",
+        "Mutually exclusive with raw selector JSON on the same matcher.",
+    ),
+    "--container-id": (
+        "Match a container by resource id.",
+        "Mutually exclusive with raw selector JSON on the same matcher.",
+    ),
+    "--container-desc": (
+        "Match a container by exact content description.",
+        "Mutually exclusive with raw selector JSON on the same matcher.",
+    ),
+    "--container-desc-contains": (
+        "Match a container by partial content description.",
+        "Mutually exclusive with raw selector JSON on the same matcher.",
+    ),
+    "--container-role": (
+        "Match a container by accessibility role.",
+        "Mutually exclusive with raw selector JSON on the same matcher.",
+    ),
+}
 
 
-def notes(flag: str) -> str:
+def describe_flag(flag: str) -> tuple[str, str]:
+    docs = KNOWN_FLAG_DOCS.get(flag)
+    if docs is not None:
+        return docs
+
+    warnings.warn(
+        f"Unrecognized selector flag {flag}; using fallback documentation.",
+        RuntimeWarning,
+        stacklevel=2,
+    )
     if flag.startswith("--container-"):
-        return "Mutually exclusive with raw selector JSON on the same matcher."
-    if flag == "--selector":
-        return "Mutually exclusive with shorthand element selector flags."
-    return "May be combined with other shorthand selector flags."
+        return (
+            "Container selector flag.",
+            "Mutually exclusive with raw selector JSON on the same matcher.",
+        )
+    return (
+        "Element selector flag.",
+        "May be combined with other shorthand selector flags.",
+    )
 
 
 def main() -> int:
@@ -53,7 +117,8 @@ def main() -> int:
         "| --- | --- | --- |",
     ]
     for flag in flags:
-        lines.append(f"| `{flag}` | {flag_description(flag)} | {notes(flag)} |")
+        description, note = describe_flag(flag)
+        lines.append(f"| `{flag}` | {description} | {note} |")
     sys.stdout.write("\n".join(lines) + "\n")
     return 0
 

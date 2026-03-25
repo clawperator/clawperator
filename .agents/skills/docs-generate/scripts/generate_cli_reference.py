@@ -44,6 +44,9 @@ def extract_command_bodies(text: str) -> list[tuple[str, str]]:
         raise ValueError("Could not find any command definitions in registry.ts")
     for match in matches:
         name = match.group(1)
+        # The registry keeps each command definition as a top-level object that ends with
+        # a standalone `};` line. The smoke test exercises that contract so adjacent helper
+        # code does not bleed into the parsed body.
         body_start = match.end()
         close_match = re.search(r"(?m)^};\s*$", text[body_start:])
         if not close_match:
