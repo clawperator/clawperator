@@ -64,6 +64,7 @@ Success conditions for a valid payload before dispatch:
 - `timeoutMs` is within the execution timeout limits
 - `actions` is non-empty
 - every `actions[i].type` is a supported canonical action type after alias normalization
+- on a live execution path, `commandId` and `taskId` are echoed back in the result envelope for correlation
 
 ## Result Envelope
 
@@ -141,6 +142,40 @@ Failure wrapper example from the CLI:
 }
 ```
 
+Non-runtime success wrappers from `clawperator exec`:
+
+```json
+{
+  "ok": true,
+  "validated": true,
+  "execution": {
+    "commandId": "cmd-001",
+    "taskId": "task-001",
+    "source": "agent-loop",
+    "expectedFormat": "android-ui-automator",
+    "timeoutMs": 30000,
+    "actions": [
+      { "id": "snap-1", "type": "snapshot_ui" }
+    ]
+  }
+}
+```
+
+```json
+{
+  "ok": true,
+  "dryRun": true,
+  "plan": {
+    "commandId": "cmd-001",
+    "timeoutMs": 30000,
+    "actionCount": 1,
+    "actions": [
+      { "id": "snap-1", "type": "snapshot_ui" }
+    ]
+  }
+}
+```
+
 ## How To Branch On Results
 
 Branch in this order:
@@ -149,6 +184,7 @@ Branch in this order:
 2. If `envelope.status == "failed"` and `envelope.errorCode` is present, branch on `envelope.errorCode`.
 3. If `envelope.status == "failed"` and `envelope.stepResults` contains a failed step, branch on the first `stepResults[i].success == false` and inspect `stepResults[i].data.error`.
 4. If `envelope.status == "success"` and every `stepResults[i].success == true`, treat the command as successful.
+5. If the top-level object is `{ ok: true, validated: true, ... }` or `{ ok: true, dryRun: true, ... }`, treat it as a pre-dispatch contract success, not a device execution result.
 
 Exact machine-checkable success condition for most CLI device commands:
 
