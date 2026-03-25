@@ -305,6 +305,20 @@ This is different from envelope timeout:
 
 If the broadcast diagnostics show the package is missing, the code can be `OPERATOR_NOT_INSTALLED` instead of `BROADCAST_FAILED`.
 
+Typical failure shape:
+
+```json
+{
+  "code": "BROADCAST_FAILED",
+  "message": "Failed to dispatch broadcast to Operator package.",
+  "details": {
+    "broadcastDispatchStatus": "failed",
+    "operatorPackage": "com.clawperator.operator.dev",
+    "deviceId": "<device_serial>"
+  }
+}
+```
+
 Recovery pattern:
 
 - if the package is missing, reinstall with `clawperator operator setup --apk <path> ...`

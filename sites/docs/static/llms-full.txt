@@ -58,13 +58,6 @@ Use:
 - [Known Issues](troubleshooting/known-issues.md) - currently verified known issues page
 - [Version Compatibility](troubleshooting/compatibility.md) - CLI and Operator APK version alignment
 
-## Related Pages
-
-- [Setup](setup.md)
-- [API Overview](api/overview.md)
-- [Skills Overview](skills/overview.md)
-- [Operator App](troubleshooting/operator.md)
-
 ---
 
 # Setup
@@ -3871,6 +3864,12 @@ Exact builder literals:
 - `max(durationMs + 5000, globalTimeoutMs ?? 0, 30000)`
 
 This is the same design principle: the whole execution must last longer than the single action's internal work.
+
+Exact builder literals:
+
+- `source: "clawperator-action"`
+- action id: `sleep`
+- action type: `sleep`
 
 ### `snapshot_ui`
 
@@ -8783,6 +8782,20 @@ This is different from envelope timeout:
 
 If the broadcast diagnostics show the package is missing, the code can be `OPERATOR_NOT_INSTALLED` instead of `BROADCAST_FAILED`.
 
+Typical failure shape:
+
+```json
+{
+  "code": "BROADCAST_FAILED",
+  "message": "Failed to dispatch broadcast to Operator package.",
+  "details": {
+    "broadcastDispatchStatus": "failed",
+    "operatorPackage": "com.clawperator.operator.dev",
+    "deviceId": "<device_serial>"
+  }
+}
+```
+
 Recovery pattern:
 
 - if the package is missing, reinstall with `clawperator operator setup --apk <path> ...`
@@ -9208,6 +9221,16 @@ Concrete failure shapes:
   "message": "Installed APK version main is not parseable for compatibility checks."
 }
 ```
+
+### When adb shell access is unavailable
+
+If `DEVICE_SHELL_UNAVAILABLE` occurs:
+
+- verify the device is still connected and authorized in `clawperator devices --json`
+- confirm adb shell works directly with `adb -s <device_serial> shell true`
+- rerun `clawperator doctor --json --device <device_serial> --operator-package <package>`
+
+This code blocks compatibility probing before version metadata can be read from the device.
 
 ## Machine-Checkable Success Condition
 

@@ -252,6 +252,12 @@ Exact builder literals:
 
 This is the same design principle: the whole execution must last longer than the single action's internal work.
 
+Exact builder literals:
+
+- `source: "clawperator-action"`
+- action id: `sleep`
+- action type: `sleep`
+
 ### `snapshot_ui`
 
 `buildSnapshotExecution()` defaults to `30000`. It has no separate action-level timeout field.

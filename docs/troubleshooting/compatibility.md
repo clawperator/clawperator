@@ -269,6 +269,16 @@ Concrete failure shapes:
 }
 ```
 
+### When adb shell access is unavailable
+
+If `DEVICE_SHELL_UNAVAILABLE` occurs:
+
+- verify the device is still connected and authorized in `clawperator devices --json`
+- confirm adb shell works directly with `adb -s <device_serial> shell true`
+- rerun `clawperator doctor --json --device <device_serial> --operator-package <package>`
+
+This code blocks compatibility probing before version metadata can be read from the device.
+
 ## Machine-Checkable Success Condition
 
 Treat compatibility as healthy only when:
