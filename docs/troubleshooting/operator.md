@@ -282,6 +282,8 @@ Exact doctor failure shape:
 }
 ```
 
+The trailing `Re-run with --verbose to inspect correlated Android log lines.` sentence is conditional. `readinessChecks.ts` appends it only when correlated Android log lines were captured for the failure.
+
 Recommended recovery:
 
 ```bash

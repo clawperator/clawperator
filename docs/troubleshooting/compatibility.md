@@ -210,6 +210,7 @@ Release install path:
 - download the version-matched APK URL generated from the CLI version
 - download the matching sha256 URL
 - install with `clawperator operator setup --apk ...`
+- if you are targeting `com.clawperator.operator.dev`, include `--operator-package com.clawperator.operator.dev` on local install commands that need to target the debug package explicitly
 
 The generated release URLs are exact:
 

@@ -102,7 +102,10 @@ Expected live success shape:
       {
         "id": "a1",
         "actionType": "open_app",
-        "success": true
+        "success": true,
+        "data": {
+          "application_id": "com.android.settings"
+        }
       }
     ]
   }
@@ -186,7 +189,10 @@ Expected live success shape:
       {
         "id": "a1",
         "actionType": "open_uri",
-        "success": true
+        "success": true,
+        "data": {
+          "uri": "https://clawperator.com"
+        }
       }
     ]
   }
@@ -265,7 +271,7 @@ CLI rule for `wait-for-nav`:
 CLI validation failures:
 
 - missing `--timeout`: `MISSING_ARGUMENT`
-- `--timeout <= 0`: `EXECUTION_VALIDATION_FAILED`
+- non-finite `--timeout` or `--timeout <= 0`: `EXECUTION_VALIDATION_FAILED`
 - `--timeout > 30000`: `EXECUTION_VALIDATION_FAILED`
 - blank `--app` value: `EXECUTION_VALIDATION_FAILED`
 - no `--app` and no selector: `MISSING_ARGUMENT`
@@ -344,7 +350,9 @@ Machine-checkable success conditions:
 
 - `envelope.status == "success"`
 - `stepResults[0].actionType == "open_app"` and `stepResults[0].success == true`
+- `stepResults[0].data.application_id == "com.android.settings"`
 - `stepResults[1].actionType == "wait_for_navigation"` and `stepResults[1].success == true`
+- `stepResults[1].data.resolved_package == "com.android.settings"`
 - `stepResults[2].actionType == "snapshot_ui"` and `stepResults[2].success == true`
 - `stepResults[2].data.text` exists
 
@@ -367,13 +375,18 @@ clawperator exec --execution '{"commandId":"settings-nav-1","taskId":"settings-n
         "id": "open",
         "actionType": "open_app",
         "success": true,
-        "data": {}
+        "data": {
+          "application_id": "com.android.settings"
+        }
       },
       {
         "id": "wait",
         "actionType": "wait_for_navigation",
         "success": true,
-        "data": {}
+        "data": {
+          "resolved_package": "com.android.settings",
+          "elapsed_ms": "412"
+        }
       },
       {
         "id": "snap",
@@ -428,13 +441,19 @@ Typical failure branch:
         "actionType": "wait_for_navigation",
         "success": false,
         "data": {
-          "error": "NODE_NOT_FOUND"
+          "error": "NAVIGATION_TIMEOUT",
+          "last_package": "com.android.settings"
         }
       }
     ]
   }
 }
 ```
+
+Runtime detail:
+
+- `wait_for_navigation` timeout failures use `data.error: "NAVIGATION_TIMEOUT"`
+- when the runtime observed a foreground package before the timeout expired, it may also include `data.last_package`
 
 ### Wrong package on screen
 

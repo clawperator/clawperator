@@ -26,7 +26,7 @@ Notes:
 
 - `record` is a top-level alias for `recording`
 - `pull` defaults to `./recordings/` when `--out` is omitted
-- `parse` writes `<input>.steps.json` when `--out` is omitted
+- `parse` writes `<input without .ndjson>.steps.json` when the input ends with `.ndjson`, otherwise `<input>.steps.json`
 - `record start` builder timeout is `10000`
 - `record stop` builder timeout is `15000`
 
@@ -82,7 +82,10 @@ Expected success wrapper shape:
       {
         "actionType": "start_recording",
         "success": true,
-        "data": {}
+        "data": {
+          "sessionId": "demo-session",
+          "filePath": "/sdcard/Android/data/com.clawperator.operator.dev/files/recordings/demo-session.ndjson"
+        }
       }
     ]
   },
@@ -142,7 +145,11 @@ Expected success wrapper shape:
       {
         "actionType": "stop_recording",
         "success": true,
-        "data": {}
+        "data": {
+          "sessionId": "demo-session",
+          "filePath": "/sdcard/Android/data/com.clawperator.operator.dev/files/recordings/demo-session.ndjson",
+          "eventCount": "17"
+        }
       }
     ]
   }

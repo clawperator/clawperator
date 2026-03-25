@@ -2,7 +2,7 @@
 
 Clawperator is a deterministic actuator tool for Android device automation.
 
-Use this page as the human and agent index into the authored docs. The concrete machine entry points are `llms.txt` and `llms-full.txt`, while the command-verification entry points are `doctor --json`, `version --check-compat --json`, and the API-specific pages below.
+Use this page as the routing index into the authored docs. The concrete machine entry points are `llms.txt` and `llms-full.txt`.
 
 ## Agent Entry Points
 
@@ -25,14 +25,6 @@ Use:
 
 - [Setup](setup.md) - install the CLI, prepare a device, install the Operator APK, verify readiness, and run the first snapshot
 
-Fast verification entry point:
-
-```bash
-clawperator doctor --json
-```
-
-Check `criticalOk` before assuming the local environment is ready for API calls or skill runs.
-
 ## API
 
 - [Overview](api/overview.md) - execution payload, result envelope, and branching model
@@ -49,20 +41,6 @@ Check `criticalOk` before assuming the local environment is ready for API calls 
 - [Navigation Patterns](api/navigation.md) - composed navigation workflows for agents
 - [Recording Format](api/recording.md) - raw NDJSON recording schema and parsed step log
 
-Recommended API verification sequence:
-
-```bash
-clawperator doctor --json --device <device_serial> --operator-package <package>
-clawperator snapshot --json --device <device_serial> --operator-package <package>
-clawperator version --check-compat --json --device <device_serial> --operator-package <package>
-```
-
-Use those three commands to confirm:
-
-- readiness and next actions
-- live result-envelope success
-- CLI and APK version compatibility
-
 ## Skills
 
 - [Overview](skills/overview.md) - registry model, discovery, and wrapper execution
@@ -70,40 +48,11 @@ Use those three commands to confirm:
 - [Development Workflow](skills/development.md) - local iteration loop for skills
 - [Device Prep and Runtime](skills/runtime.md) - runtime environment, timeout, and output rules
 
-Recommended skills verification sequence:
-
-```bash
-clawperator skills list --json
-clawperator skills validate --all --dry-run --json
-clawperator skills run <skill_id> --device <device_serial> --json
-```
-
-Those commands prove:
-
-- the registry is readable
-- every registered skill passes structural validation
-- the wrapper can execute one skill and return machine-readable output
-
 ## Troubleshooting
 
 - [Operator App](troubleshooting/operator.md) - installation, permission, handshake, and crash recovery
 - [Known Issues](troubleshooting/known-issues.md) - currently verified known issues page
 - [Version Compatibility](troubleshooting/compatibility.md) - CLI and Operator APK version alignment
-
-Recommended troubleshooting entry points:
-
-```bash
-clawperator doctor --json --device <device_serial> --operator-package <package>
-clawperator version --check-compat --json --device <device_serial> --operator-package <package>
-```
-
-Common code-backed failure categories to branch on first:
-
-- `OPERATOR_NOT_INSTALLED`
-- `OPERATOR_VARIANT_MISMATCH`
-- `DEVICE_ACCESSIBILITY_NOT_RUNNING`
-- `RESULT_ENVELOPE_TIMEOUT`
-- `VERSION_INCOMPATIBLE`
 
 ## Related Pages
 

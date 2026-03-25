@@ -96,7 +96,20 @@ Controls where the CLI writes structured log files.
 
 Default: `~/.clawperator/logs`
 
-Log files are named `clawperator-YYYY-MM-DD.log` and contain NDJSON entries with `ts`, `level`, `event`, `commandId`, `taskId`, `deviceId`, and `message` fields.
+Log files are named `clawperator-YYYY-MM-DD.log` and contain NDJSON `LogEvent` objects.
+
+Guaranteed fields:
+
+- `ts`
+- `level`
+- `event`
+- `message`
+
+Optional fields, present only when the emitter supplied them:
+
+- `commandId`
+- `taskId`
+- `deviceId`
 
 There is no CLI flag to override this. To change the log directory, set the env var.
 

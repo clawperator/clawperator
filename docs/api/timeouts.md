@@ -106,6 +106,7 @@ Error cases for execution-level timeout:
 - non-finite timeout: `EXECUTION_VALIDATION_FAILED` with `message: "timeoutMs must be a finite number"`
 - timeout below `1000` or above `120000`: `EXECUTION_VALIDATION_FAILED` with `message: "timeoutMs must be between 1000 and 120000"`
 - live execution that runs too long: top-level `RESULT_ENVELOPE_TIMEOUT`
+- malformed terminal envelope during a live run: top-level `RESULT_ENVELOPE_MALFORMED`
 
 ## Action-Level Timeout
 
@@ -407,14 +408,46 @@ Expected success shape:
     "timeoutMs": 45000,
     "actionCount": 4,
     "actions": [
-      { "id": "click-1", "type": "click" },
-      { "id": "sleep-1", "type": "sleep" },
-      { "id": "wait-1", "type": "wait_for_node" },
-      { "id": "snap-1", "type": "snapshot_ui" }
+      {
+        "id": "click-1",
+        "type": "click",
+        "params": {
+          "matcher": {
+            "textEquals": "Settings"
+          }
+        }
+      },
+      {
+        "id": "sleep-1",
+        "type": "sleep",
+        "params": {
+          "durationMs": 1500
+        }
+      },
+      {
+        "id": "wait-1",
+        "type": "wait_for_node",
+        "params": {
+          "matcher": {
+            "textEquals": "Connected devices"
+          },
+          "timeoutMs": 10000
+        }
+      },
+      {
+        "id": "snap-1",
+        "type": "snapshot_ui"
+      }
     ]
   }
 }
 ```
+
+If a live run returns `RESULT_ENVELOPE_MALFORMED`, treat it as a transport-contract failure rather than a normal action timeout. Recovery:
+
+- rerun once to rule out transient logcat noise
+- if it repeats, check CLI and APK compatibility with `clawperator version --check-compat --json`
+- rerun the failing command with `--verbose` and inspect Android-side logs
 
 ## Common Mistakes
 

@@ -6,7 +6,7 @@ Compiled from the MkDocs navigation tree and assembled docs staging directory.
 
 Clawperator is a deterministic actuator tool for Android device automation.
 
-Use this page as the human and agent index into the authored docs. The concrete machine entry points are `llms.txt` and `llms-full.txt`, while the command-verification entry points are `doctor --json`, `version --check-compat --json`, and the API-specific pages below.
+Use this page as the routing index into the authored docs. The concrete machine entry points are `llms.txt` and `llms-full.txt`.
 
 ## Agent Entry Points
 
@@ -29,14 +29,6 @@ Use:
 
 - [Setup](setup.md) - install the CLI, prepare a device, install the Operator APK, verify readiness, and run the first snapshot
 
-Fast verification entry point:
-
-```bash
-clawperator doctor --json
-```
-
-Check `criticalOk` before assuming the local environment is ready for API calls or skill runs.
-
 ## API
 
 - [Overview](api/overview.md) - execution payload, result envelope, and branching model
@@ -53,20 +45,6 @@ Check `criticalOk` before assuming the local environment is ready for API calls 
 - [Navigation Patterns](api/navigation.md) - composed navigation workflows for agents
 - [Recording Format](api/recording.md) - raw NDJSON recording schema and parsed step log
 
-Recommended API verification sequence:
-
-```bash
-clawperator doctor --json --device <device_serial> --operator-package <package>
-clawperator snapshot --json --device <device_serial> --operator-package <package>
-clawperator version --check-compat --json --device <device_serial> --operator-package <package>
-```
-
-Use those three commands to confirm:
-
-- readiness and next actions
-- live result-envelope success
-- CLI and APK version compatibility
-
 ## Skills
 
 - [Overview](skills/overview.md) - registry model, discovery, and wrapper execution
@@ -74,40 +52,11 @@ Use those three commands to confirm:
 - [Development Workflow](skills/development.md) - local iteration loop for skills
 - [Device Prep and Runtime](skills/runtime.md) - runtime environment, timeout, and output rules
 
-Recommended skills verification sequence:
-
-```bash
-clawperator skills list --json
-clawperator skills validate --all --dry-run --json
-clawperator skills run <skill_id> --device <device_serial> --json
-```
-
-Those commands prove:
-
-- the registry is readable
-- every registered skill passes structural validation
-- the wrapper can execute one skill and return machine-readable output
-
 ## Troubleshooting
 
 - [Operator App](troubleshooting/operator.md) - installation, permission, handshake, and crash recovery
 - [Known Issues](troubleshooting/known-issues.md) - currently verified known issues page
 - [Version Compatibility](troubleshooting/compatibility.md) - CLI and Operator APK version alignment
-
-Recommended troubleshooting entry points:
-
-```bash
-clawperator doctor --json --device <device_serial> --operator-package <package>
-clawperator version --check-compat --json --device <device_serial> --operator-package <package>
-```
-
-Common code-backed failure categories to branch on first:
-
-- `OPERATOR_NOT_INSTALLED`
-- `OPERATOR_VARIANT_MISMATCH`
-- `DEVICE_ACCESSIBILITY_NOT_RUNNING`
-- `RESULT_ENVELOPE_TIMEOUT`
-- `VERSION_INCOMPATIBLE`
 
 ## Related Pages
 
@@ -3777,6 +3726,7 @@ Error cases for execution-level timeout:
 - non-finite timeout: `EXECUTION_VALIDATION_FAILED` with `message: "timeoutMs must be a finite number"`
 - timeout below `1000` or above `120000`: `EXECUTION_VALIDATION_FAILED` with `message: "timeoutMs must be between 1000 and 120000"`
 - live execution that runs too long: top-level `RESULT_ENVELOPE_TIMEOUT`
+- malformed terminal envelope during a live run: top-level `RESULT_ENVELOPE_MALFORMED`
 
 ## Action-Level Timeout
 
@@ -4078,14 +4028,46 @@ Expected success shape:
     "timeoutMs": 45000,
     "actionCount": 4,
     "actions": [
-      { "id": "click-1", "type": "click" },
-      { "id": "sleep-1", "type": "sleep" },
-      { "id": "wait-1", "type": "wait_for_node" },
-      { "id": "snap-1", "type": "snapshot_ui" }
+      {
+        "id": "click-1",
+        "type": "click",
+        "params": {
+          "matcher": {
+            "textEquals": "Settings"
+          }
+        }
+      },
+      {
+        "id": "sleep-1",
+        "type": "sleep",
+        "params": {
+          "durationMs": 1500
+        }
+      },
+      {
+        "id": "wait-1",
+        "type": "wait_for_node",
+        "params": {
+          "matcher": {
+            "textEquals": "Connected devices"
+          },
+          "timeoutMs": 10000
+        }
+      },
+      {
+        "id": "snap-1",
+        "type": "snapshot_ui"
+      }
     ]
   }
 }
 ```
+
+If a live run returns `RESULT_ENVELOPE_MALFORMED`, treat it as a transport-contract failure rather than a normal action timeout. Recovery:
+
+- rerun once to rule out transient logcat noise
+- if it repeats, check CLI and APK compatibility with `clawperator version --check-compat --json`
+- rerun the failing command with `--verbose` and inspect Android-side logs
 
 ## Common Mistakes
 
@@ -4236,7 +4218,20 @@ Controls where the CLI writes structured log files.
 
 Default: `~/.clawperator/logs`
 
-Log files are named `clawperator-YYYY-MM-DD.log` and contain NDJSON entries with `ts`, `level`, `event`, `commandId`, `taskId`, `deviceId`, and `message` fields.
+Log files are named `clawperator-YYYY-MM-DD.log` and contain NDJSON `LogEvent` objects.
+
+Guaranteed fields:
+
+- `ts`
+- `level`
+- `event`
+- `message`
+
+Optional fields, present only when the emitter supplied them:
+
+- `commandId`
+- `taskId`
+- `deviceId`
 
 There is no CLI flag to override this. To change the log directory, set the env var.
 
@@ -5285,7 +5280,10 @@ Expected live success shape:
       {
         "id": "a1",
         "actionType": "open_app",
-        "success": true
+        "success": true,
+        "data": {
+          "application_id": "com.android.settings"
+        }
       }
     ]
   }
@@ -5369,7 +5367,10 @@ Expected live success shape:
       {
         "id": "a1",
         "actionType": "open_uri",
-        "success": true
+        "success": true,
+        "data": {
+          "uri": "https://clawperator.com"
+        }
       }
     ]
   }
@@ -5448,7 +5449,7 @@ CLI rule for `wait-for-nav`:
 CLI validation failures:
 
 - missing `--timeout`: `MISSING_ARGUMENT`
-- `--timeout <= 0`: `EXECUTION_VALIDATION_FAILED`
+- non-finite `--timeout` or `--timeout <= 0`: `EXECUTION_VALIDATION_FAILED`
 - `--timeout > 30000`: `EXECUTION_VALIDATION_FAILED`
 - blank `--app` value: `EXECUTION_VALIDATION_FAILED`
 - no `--app` and no selector: `MISSING_ARGUMENT`
@@ -5527,7 +5528,9 @@ Machine-checkable success conditions:
 
 - `envelope.status == "success"`
 - `stepResults[0].actionType == "open_app"` and `stepResults[0].success == true`
+- `stepResults[0].data.application_id == "com.android.settings"`
 - `stepResults[1].actionType == "wait_for_navigation"` and `stepResults[1].success == true`
+- `stepResults[1].data.resolved_package == "com.android.settings"`
 - `stepResults[2].actionType == "snapshot_ui"` and `stepResults[2].success == true`
 - `stepResults[2].data.text` exists
 
@@ -5550,13 +5553,18 @@ clawperator exec --execution '{"commandId":"settings-nav-1","taskId":"settings-n
         "id": "open",
         "actionType": "open_app",
         "success": true,
-        "data": {}
+        "data": {
+          "application_id": "com.android.settings"
+        }
       },
       {
         "id": "wait",
         "actionType": "wait_for_navigation",
         "success": true,
-        "data": {}
+        "data": {
+          "resolved_package": "com.android.settings",
+          "elapsed_ms": "412"
+        }
       },
       {
         "id": "snap",
@@ -5611,13 +5619,19 @@ Typical failure branch:
         "actionType": "wait_for_navigation",
         "success": false,
         "data": {
-          "error": "NODE_NOT_FOUND"
+          "error": "NAVIGATION_TIMEOUT",
+          "last_package": "com.android.settings"
         }
       }
     ]
   }
 }
 ```
+
+Runtime detail:
+
+- `wait_for_navigation` timeout failures use `data.error: "NAVIGATION_TIMEOUT"`
+- when the runtime observed a foreground package before the timeout expired, it may also include `data.last_package`
 
 ### Wrong package on screen
 
@@ -5684,7 +5698,7 @@ Notes:
 
 - `record` is a top-level alias for `recording`
 - `pull` defaults to `./recordings/` when `--out` is omitted
-- `parse` writes `<input>.steps.json` when `--out` is omitted
+- `parse` writes `<input without .ndjson>.steps.json` when the input ends with `.ndjson`, otherwise `<input>.steps.json`
 - `record start` builder timeout is `10000`
 - `record stop` builder timeout is `15000`
 
@@ -5740,7 +5754,10 @@ Expected success wrapper shape:
       {
         "actionType": "start_recording",
         "success": true,
-        "data": {}
+        "data": {
+          "sessionId": "demo-session",
+          "filePath": "/sdcard/Android/data/com.clawperator.operator.dev/files/recordings/demo-session.ndjson"
+        }
       }
     ]
   },
@@ -5800,7 +5817,11 @@ Expected success wrapper shape:
       {
         "actionType": "stop_recording",
         "success": true,
-        "data": {}
+        "data": {
+          "sessionId": "demo-session",
+          "filePath": "/sdcard/Android/data/com.clawperator.operator.dev/files/recordings/demo-session.ndjson",
+          "eventCount": "17"
+        }
       }
     ]
   }
@@ -6442,6 +6463,8 @@ Recovery depends on how the path was chosen:
 - when `CLAWPERATOR_SKILLS_REGISTRY` points at a missing file, update the env var or run `clawperator skills install`
 - when no env var is set and the current working directory does not contain `skills/skills-registry.json`, run from the expected repo root or set `CLAWPERATOR_SKILLS_REGISTRY`
 - when the registry file exists but does not contain a `skills` array, fix the JSON because `loadRegistry()` rejects that shape with `Invalid registry: skills array required`
+
+Wrapper failure fields like `stdout` and `stderr` are optional. `runSkill.ts` includes them only when the child process actually emitted non-empty data on those streams.
 
 ## Discovery
 
@@ -8707,6 +8730,8 @@ Exact doctor failure shape:
 }
 ```
 
+The trailing `Re-run with --verbose to inspect correlated Android log lines.` sentence is conditional. `readinessChecks.ts` appends it only when correlated Android log lines were captured for the failure.
+
 Recommended recovery:
 
 ```bash
@@ -8860,7 +8885,7 @@ Use those outputs to decide where the issue belongs:
 
 ## Where To Track New Issues
 
-- GitHub issues for project-level bugs and regressions
+- GitHub issues for project-level bugs and regressions: `https://github.com/clawperator/clawperator/issues`
 - [Operator App](operator.md) for operational recovery guidance
 - [Version Compatibility](compatibility.md) for CLI and APK mismatch problems
 
@@ -9095,6 +9120,7 @@ Release install path:
 - download the version-matched APK URL generated from the CLI version
 - download the matching sha256 URL
 - install with `clawperator operator setup --apk ...`
+- if you are targeting `com.clawperator.operator.dev`, include `--operator-package com.clawperator.operator.dev` on local install commands that need to target the debug package explicitly
 
 The generated release URLs are exact:
 

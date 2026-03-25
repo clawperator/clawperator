@@ -47,7 +47,7 @@ Use those outputs to decide where the issue belongs:
 
 ## Where To Track New Issues
 
-- GitHub issues for project-level bugs and regressions
+- GitHub issues for project-level bugs and regressions: `https://github.com/clawperator/clawperator/issues`
 - [Operator App](operator.md) for operational recovery guidance
 - [Version Compatibility](compatibility.md) for CLI and APK mismatch problems
 

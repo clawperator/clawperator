@@ -146,6 +146,8 @@ Recovery depends on how the path was chosen:
 - when no env var is set and the current working directory does not contain `skills/skills-registry.json`, run from the expected repo root or set `CLAWPERATOR_SKILLS_REGISTRY`
 - when the registry file exists but does not contain a `skills` array, fix the JSON because `loadRegistry()` rejects that shape with `Invalid registry: skills array required`
 
+Wrapper failure fields like `stdout` and `stderr` are optional. `runSkill.ts` includes them only when the child process actually emitted non-empty data on those streams.
+
 ## Discovery
 
 Current discovery commands:
