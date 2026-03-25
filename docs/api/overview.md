@@ -27,7 +27,7 @@ Top-level execution fields:
 | `taskId` | `string` | Caller-generated task id. |
 | `source` | `string` | Caller label, such as `serve-api` or `clawperator-action`. |
 | `expectedFormat` | `"android-ui-automator"` | Required constant. |
-| `timeoutMs` | `number` | Execution-level timeout for the whole payload. |
+| `timeoutMs` | `number` | Execution-level timeout for the whole payload. Current Node limits require `1000 <= timeoutMs <= 120000`. |
 | `actions` | `ExecutionAction[]` | Ordered action list. |
 | `mode` | `"artifact_compiled" | "direct"` | Optional runtime mode marker. |
 
@@ -61,7 +61,7 @@ Minimum valid payload example:
 Success conditions for a valid payload before dispatch:
 
 - `expectedFormat` is exactly `"android-ui-automator"`
-- `timeoutMs` is within the execution timeout limits
+- `timeoutMs` is between `1000` and `120000` milliseconds
 - `actions` is non-empty
 - every `actions[i].type` is a supported canonical action type after alias normalization
 - on a live execution path, `commandId` and `taskId` are echoed back in the result envelope for correlation
@@ -186,6 +186,8 @@ Use the wrapper shape that matches the surface you called:
 | `clawperator exec --validate` | `{ "ok": true, "validated": true, "execution": ... }` |
 | `clawperator exec --dry-run` | `{ "ok": true, "dryRun": true, "plan": ... }` |
 | `clawperator serve` execution endpoints | `{ "ok": true, "deviceId": "...", "terminalSource": "...", "envelope": ... }` |
+
+`isCanonicalTerminal` is a CLI wrapper field. HTTP serve execution responses do not include it.
 
 ## How To Branch On Results
 

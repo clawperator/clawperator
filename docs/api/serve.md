@@ -473,7 +473,9 @@ Argument mapping:
 Behavior:
 
 - if `expectContains` is provided and `output` does not contain that substring, the route returns HTTP `400`
-- if the skill exits non-zero, the route returns HTTP `400` for most failures or `404` when the skill ID does not exist
+- if the skill ID does not exist, the route returns HTTP `404`
+- if skill registry loading fails, the route returns HTTP `500` with `REGISTRY_READ_FAILED`
+- other `runSkill()` failures, including non-zero exit and timeout, return HTTP `400`
 - successful responses always include `exitCode: 0`
 
 Failure examples:
@@ -510,6 +512,16 @@ Non-zero skill exit:
   }
 }
 ```
+
+## Global Serve-Layer Failures
+
+These wrappers come from Express middleware rather than a specific endpoint handler:
+
+| HTTP status | Code | When it appears |
+| --- | --- | --- |
+| `400` | `INVALID_JSON` | request body is malformed JSON |
+| `413` | `PAYLOAD_TOO_LARGE` | request body exceeds the `100kb` Express limit |
+| `500` | `INTERNAL_SERVER_ERROR` | unhandled server-side exception reached the catch-all middleware |
 
 ## Emulator Endpoints
 

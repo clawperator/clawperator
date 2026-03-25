@@ -316,7 +316,7 @@ Top-level execution fields:
 | `taskId` | `string` | Caller-generated task id. |
 | `source` | `string` | Caller label, such as `serve-api` or `clawperator-action`. |
 | `expectedFormat` | `"android-ui-automator"` | Required constant. |
-| `timeoutMs` | `number` | Execution-level timeout for the whole payload. |
+| `timeoutMs` | `number` | Execution-level timeout for the whole payload. Current Node limits require `1000 <= timeoutMs <= 120000`. |
 | `actions` | `ExecutionAction[]` | Ordered action list. |
 | `mode` | `"artifact_compiled" | "direct"` | Optional runtime mode marker. |
 
@@ -350,7 +350,7 @@ Minimum valid payload example:
 Success conditions for a valid payload before dispatch:
 
 - `expectedFormat` is exactly `"android-ui-automator"`
-- `timeoutMs` is within the execution timeout limits
+- `timeoutMs` is between `1000` and `120000` milliseconds
 - `actions` is non-empty
 - every `actions[i].type` is a supported canonical action type after alias normalization
 - on a live execution path, `commandId` and `taskId` are echoed back in the result envelope for correlation
@@ -475,6 +475,8 @@ Use the wrapper shape that matches the surface you called:
 | `clawperator exec --validate` | `{ "ok": true, "validated": true, "execution": ... }` |
 | `clawperator exec --dry-run` | `{ "ok": true, "dryRun": true, "plan": ... }` |
 | `clawperator serve` execution endpoints | `{ "ok": true, "deviceId": "...", "terminalSource": "...", "envelope": ... }` |
+
+`isCanonicalTerminal` is a CLI wrapper field. HTTP serve execution responses do not include it.
 
 ## How To Branch On Results
 
@@ -3019,7 +3021,7 @@ Doctor runs checks in this order:
 | 6 | `device.capability` | after device resolution |
 | 7 | `readiness.apk.presence` | after device capability |
 | 8 | `readiness.version.compatibility` | only if APK presence passed |
-| 9 | `readiness.settings.dev_options`, `readiness.settings.usb_debugging` | after version check gate is known |
+| 9 | `readiness.settings.dev_options`, `readiness.settings.usb_debugging` | after device capability and APK presence checks; these still run even when version compatibility was skipped |
 | 10 | `readiness.handshake` | only if APK presence passed and version compatibility passed |
 | 11 | `readiness.smoke` | only with `--full`, and only if APK presence and version compatibility passed |
 
@@ -3053,6 +3055,7 @@ Advisory behavior:
 
 - checks not matching those prefixes can still appear as `warn`
 - advisory warnings remain in `checks[]` but do not set `criticalOk` to `false`
+- in current code, `readiness.settings.*` checks are warn-only when they fail
 
 Important special case:
 
@@ -3731,7 +3734,9 @@ Argument mapping:
 Behavior:
 
 - if `expectContains` is provided and `output` does not contain that substring, the route returns HTTP `400`
-- if the skill exits non-zero, the route returns HTTP `400` for most failures or `404` when the skill ID does not exist
+- if the skill ID does not exist, the route returns HTTP `404`
+- if skill registry loading fails, the route returns HTTP `500` with `REGISTRY_READ_FAILED`
+- other `runSkill()` failures, including non-zero exit and timeout, return HTTP `400`
 - successful responses always include `exitCode: 0`
 
 Failure examples:
@@ -3768,6 +3773,16 @@ Non-zero skill exit:
   }
 }
 ```
+
+## Global Serve-Layer Failures
+
+These wrappers come from Express middleware rather than a specific endpoint handler:
+
+| HTTP status | Code | When it appears |
+| --- | --- | --- |
+| `400` | `INVALID_JSON` | request body is malformed JSON |
+| `413` | `PAYLOAD_TOO_LARGE` | request body exceeds the `100kb` Express limit |
+| `500` | `INTERNAL_SERVER_ERROR` | unhandled server-side exception reached the catch-all middleware |
 
 ## Emulator Endpoints
 

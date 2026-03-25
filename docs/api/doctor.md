@@ -295,7 +295,7 @@ Doctor runs checks in this order:
 | 6 | `device.capability` | after device resolution |
 | 7 | `readiness.apk.presence` | after device capability |
 | 8 | `readiness.version.compatibility` | only if APK presence passed |
-| 9 | `readiness.settings.dev_options`, `readiness.settings.usb_debugging` | after version check gate is known |
+| 9 | `readiness.settings.dev_options`, `readiness.settings.usb_debugging` | after device capability and APK presence checks; these still run even when version compatibility was skipped |
 | 10 | `readiness.handshake` | only if APK presence passed and version compatibility passed |
 | 11 | `readiness.smoke` | only with `--full`, and only if APK presence and version compatibility passed |
 
@@ -329,6 +329,7 @@ Advisory behavior:
 
 - checks not matching those prefixes can still appear as `warn`
 - advisory warnings remain in `checks[]` but do not set `criticalOk` to `false`
+- in current code, `readiness.settings.*` checks are warn-only when they fail
 
 Important special case:
 
