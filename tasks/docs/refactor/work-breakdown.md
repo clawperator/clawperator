@@ -4,11 +4,11 @@ Parent plan: `tasks/docs/refactor/plan.md`
 
 This work ships as **3 PRs**, strictly sequenced. Each PR is independently shippable and leaves the build in a working state.
 
-| PR | Scope | Key Deliverable |
-|----|-------|----------------|
-| PR-1 | Pipeline + skeleton | New build pipeline works, old URLs redirect, placeholder pages |
-| PR-2 | Core content + code | 9 critical pages + doctor docsUrl + AGENTS.md |
-| PR-3 | Remaining content + cleanup | 11 secondary pages + delete old files + finalize llms artifacts |
+| PR | Scope | Key Deliverable | Model |
+|----|-------|----------------|-------|
+| PR-1 | Pipeline + skeleton | New build pipeline works, old URLs redirect, placeholder pages | fast |
+| PR-2 | Core content + code | 9 critical pages + doctor docsUrl + AGENTS.md | thinking |
+| PR-3 | Remaining content + cleanup | 11 secondary pages + delete old files + finalize llms artifacts | default |
 
 Each PR contains multiple tasks. Tasks within a PR are ordered by dependency. Tasks within the same phase can be parallelized where noted.
 
@@ -81,6 +81,8 @@ Existing documentation is advisory only and not presumed accurate. For every aut
 ## PR-1: Pipeline + Skeleton
 
 Everything else depends on this PR. Must merge before content authoring begins in PR-2.
+
+**Recommended model:** fast. Mechanical infrastructure - scripts, config, gitignore, placeholders. No content judgment needed.
 
 ### Task 1.1: Remove committed generated docs and set up gitignore
 
@@ -308,6 +310,8 @@ Add a `docs-build` job:
 ## PR-2: Core Content + Code Changes
 
 The 9 highest-impact pages + code changes. These are the pages agents hit first and most often, requiring the most verification against code.
+
+**Recommended model:** thinking. High-stakes content requiring cross-referencing code against docs, verifying contract accuracy, and writing precise technical content. Code changes (doctor docsUrl) also need careful reasoning.
 
 After PR-1 merges, create a new branch from main for PR-2.
 
@@ -538,6 +542,8 @@ Covers:
 ## PR-3: Remaining Content + Cleanup
 
 Secondary API pages, skills pages, troubleshooting pages, index page, llms artifacts, old file deletion, and repo metadata updates.
+
+**Recommended model:** default. Secondary pages need accurate content but are less complex than PR-2. Cleanup tasks are mechanical. Default balances quality with throughput.
 
 After PR-2 merges, create a new branch from main for PR-3.
 

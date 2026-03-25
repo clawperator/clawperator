@@ -603,6 +603,8 @@ This is a migration, not a perfection pass. Prioritize coherent structure, corre
 
 **Goal:** New build pipeline works end-to-end. Old URLs redirect. Site serves placeholder pages. No content judgment needed in review.
 
+**Recommended model:** fast. This is mechanical infrastructure work - scripts, config files, gitignore, placeholders. No content judgment or code verification needed.
+
 Steps:
 1. Create reference snapshot: copy all current public docs sources into `tasks/docs/refactor/reference/` with README marking it non-authoritative
 2. Create `docs/api/`, `docs/skills/`, and `docs/troubleshooting/` directories
@@ -636,6 +638,8 @@ Steps:
 **Scope:** The 9 highest-impact authored pages + code-derived CLI reference + doctor/AGENTS.md code changes. These are the pages agents hit first and most often, and the pages requiring the most verification against code.
 
 **Goal:** The critical API surface is documented accurately. Agents can perform setup, execute commands, use selectors, handle errors, and target devices using only the new docs.
+
+**Recommended model:** thinking. These are the highest-stakes pages requiring cross-referencing code against docs, verifying contract accuracy, and writing precise technical content. Code changes (doctor docsUrl) also need careful reasoning.
 
 Follow migration mode rules throughout: one page at a time, verify against code, commit after each page.
 
@@ -673,6 +677,8 @@ Code changes:
 **Scope:** Secondary API pages, skills pages, troubleshooting pages, index page, llms artifacts, old file deletion, and repo metadata updates.
 
 **Goal:** All 20 pages are final content. Old docs deleted. Repo is clean. llms artifacts are finalized.
+
+**Recommended model:** default. Secondary pages need accurate content but are less complex than PR-2. Cleanup tasks (moves, deletes, metadata updates) are mechanical. Default balances quality with throughput.
 
 Remaining content pages:
 1. `docs/api/snapshot.md` - snapshot format
