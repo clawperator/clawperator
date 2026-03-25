@@ -3,18 +3,59 @@
 ```
 You are implementing PR-3 of the Clawperator docs refactor. This PR replaces 12 placeholder pages with real documentation and rewrites the index page. PR-1 (pipeline) and PR-2 (core content) are already merged. Read this prompt fully before starting any work.
 
-## Lessons From PR-2
+## Lessons From PR-2 and PR-3 Round 1
 
-PR-2 required two full passes to reach merge quality. The first pass produced pages with correct headings and scope but insufficient depth - thin parameter tables, missing JSON examples, phantom error codes, and sections with 2-3 sentences where 5-10 were needed. Those pages were rejected and rewritten.
+Both PR-2 and the first round of PR-3 required rewrites. The pattern was the same both times:
 
-The second pass succeeded because the agent:
-- read code files first and wrote docs from what the code actually does
-- included concrete JSON examples for every major contract
-- documented parameter semantics (valid values, defaults, ranges), not just parameter names
-- added machine-checkable success conditions at every step
-- worked one file at a time with a draft commit and a refinement commit
+- The agent batched all pages into a single commit instead of working one file at a time
+- Pages had correct headings and scope but insufficient depth
+- Default values were described vaguely instead of with exact values from code
+- JSON examples were missing entirely on some pages
+- Error cases and failure modes were omitted
+- No verification patterns were provided (how to confirm a setting took effect)
 
-You are expected to produce second-pass quality on your first attempt. The bar is set. Study the exemplars.
+The rewrite of `docs/api/environment.md` is the clearest example of the gap. Run this diff to see it:
+
+```bash
+git diff 7085589d9409eda87f73070103e35c04c22b1f82..cd8c63c4f7113dd15a00447cf26fda60fd354695 -- docs/api/environment.md
+```
+
+Here is what was wrong with the first version and what the rewrite fixed:
+
+### Wrong defaults replaced with exact values from code
+
+- First version: `CLAWPERATOR_LOG_DIR` default was "logger-specific default under the user home directory". Rewrite: `~/.clawperator/logs` (from `logger.ts` line 65).
+- First version: `CLAWPERATOR_LOG_LEVEL` default was "logger default level". Rewrite: `info` (from `normalizeLogLevel()` in `logger.ts` line 29).
+- First version: `CLAWPERATOR_SKILLS_REGISTRY` default was "skills/skills-registry.json relative to current working directory, with one fallback when loading". Rewrite: documents the full `loadRegistry()` fallback chain including the `../../skills/` fallback and notes that `skills sync` places the registry at `~/.clawperator/skills/skills/skills-registry.json`.
+
+If a default value exists as a literal string or constant in the code, write that literal. Do not paraphrase it.
+
+### JSON examples and verification patterns added
+
+- First version: zero JSON examples. Zero ways to confirm an env var took effect.
+- Rewrite: shows `clawperator doctor --json` output with `report.operatorPackage` reflecting the env var. Shows how `host.adb.presence` passing confirms `ADB_PATH` is working.
+
+Every page must include at least one machine-checkable way to verify the documented behavior.
+
+### Error cases documented
+
+- First version: never says what happens when a variable is set incorrectly.
+- Rewrite: `OPERATOR_NOT_INSTALLED` for wrong package name, `REGISTRY_READ_FAILED` for missing registry, `ADB_NOT_FOUND` for bad adb path, silent `info` fallback for invalid log level.
+
+If a setting can be wrong, document what happens and which error code surfaces.
+
+### Vague "where it is read" replaced with meaningful descriptions
+
+- First version: "many command modules, runExecution.ts, skillsConfig.ts, serve.ts"
+- Rewrite: "every device-targeting CLI command (snapshot, click, read, wait, scroll, doctor, record start, ...)"
+
+"Many" and "various" are not documentation. Name the things or describe the category precisely.
+
+### Agent-facing pattern section added
+
+- The rewrite includes a "Agent Configuration Pattern" section showing the three env vars an agent should set and explaining that `--device` is the only per-command flag still needed.
+
+The exemplar pages (`docs/setup.md`, `docs/api/actions.md`, and now `docs/api/environment.md`) all share these traits. Your pages must match.
 
 ## Required Reading Before You Touch Any File
 
@@ -26,7 +67,9 @@ Read these files IN THIS ORDER before writing anything:
 
 3. `docs/api/actions.md` - EXEMPLAR. This is the quality bar for reference pages. Study: per-action parameter tables with valid values and ranges, retry object shape with Android clamping rules, concrete JSON examples for every action, CLI-to-action mapping table, "Result Data You Can Rely On" summary. If actions.md documents valid values for `direction` as `down, up, left, right` and clamping ranges for `maxScrolls` as `[1, 200]`, your pages must document their parameters with equal precision.
 
-4. `tasks/docs/refactor/work-breakdown.md` - PR-3 section (Tasks 3.1-3.4)
+4. `docs/api/environment.md` - EXEMPLAR. This is the quality bar you are being held to for this round. Study: exact defaults from code (not paraphrased), JSON verification examples, error cases for each variable, agent configuration pattern. This page was rewritten from your first draft because your first draft had vague defaults, no JSON examples, and no error cases. Your remaining pages must not repeat those mistakes.
+
+5. `tasks/docs/refactor/work-breakdown.md` - PR-3 section (Tasks 3.1-3.4)
 
 If you skip the exemplars and produce thin pages, your work will be rejected. Read them.
 
@@ -50,24 +93,35 @@ Work on the `docs-refactor-phase-3` branch, created from `main` after PR-2 merge
 
 ## Commit Discipline
 
-For EACH page:
+This project uses Conventional Commits (`docs:`, `feat:`, `fix:`, `test:`).
 
-1. Read the authoritative code files listed in the page instructions below
-2. Read the reference snapshot for context (NOT as truth): `tasks/docs/refactor/reference/`
-3. Draft the page
+### Commit often. Very often.
+
+The workflow for EACH page is:
+
+1. Read the relevant code files (see verification table below)
+2. Read the reference snapshot for context (NOT as source of truth): `tasks/docs/refactor/reference/`
+3. Draft the page in `docs/`
 4. Run `./scripts/docs_build.sh` to verify the build passes
 5. Commit: `docs: draft <page-name> - verified against <source-files>`
-6. STOP. Reread what you just committed. Compare it against the code again. Ask yourself:
-   - Did I miss any parameters, flags, or fields?
+6. Reread what you just wrote. Compare it against the code again. Ask yourself:
+   - Did I miss any flags, parameters, or action types?
    - Did I copy wording from old docs without verifying it?
-   - Would an agent be able to construct valid commands from this page alone?
-   - Does every claim on this page have a code path I can point to?
-   - Compare to the exemplars: does my page have the same depth?
+   - Is there any claim here that I cannot point to a specific line of code for?
+   - Would an agent be able to construct a valid command from this page alone?
+   - Does every default value match the literal from code, or did I paraphrase it?
+   - Is there at least one JSON example showing the output shape?
+   - Did I document what happens when a setting is wrong (error codes, failure behavior)?
+   - Compare to the exemplars (`docs/setup.md`, `docs/api/actions.md`, `docs/api/environment.md`): does my page have the same depth?
 7. Fix issues found in the reread
 8. Commit: `docs: refine <page-name> - <what you fixed>`
 9. Move to the next page
 
-Do NOT batch multiple pages into one commit. Do NOT skip the reread step. Do NOT write documentation from memory or from your previous draft alone.
+Do NOT batch multiple pages into one commit. Each page gets at least one commit (draft), ideally two (draft + refinement).
+
+Do NOT skip the reread step. The first draft of every page in this project so far has had errors that the reread caught. Assume yours will too.
+
+Do NOT write documentation from memory or from your previous draft alone - open the code and verify.
 
 ## Terminology Rules (enforced)
 
@@ -483,12 +537,15 @@ Must return zero results.
 ## What Done Looks Like
 
 For each page:
+- Every default value is the exact literal from code, not a paraphrase
 - Every parameter's valid values are documented, not just the parameter name
 - At least one concrete JSON example for every major contract on the page
+- At least one verification pattern showing how to confirm the documented behavior
+- Error cases: what happens when a setting, argument, or state is wrong, with the exact error code
 - All error codes referenced on the page exist in `apps/node/src/contracts/errors.ts`
 - An agent could construct valid commands and parse responses using only this page and cross-referenced pages
 - `./scripts/docs_build.sh` passes
-- The page has comparable depth and specificity to `docs/setup.md` and `docs/api/actions.md`
+- The page has comparable depth and specificity to `docs/setup.md`, `docs/api/actions.md`, and `docs/api/environment.md`
 
 ## PR-3 Validation Checklist
 
