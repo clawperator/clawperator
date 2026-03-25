@@ -524,6 +524,8 @@ These wrappers come from Express middleware rather than a specific endpoint hand
 | `413` | `PAYLOAD_TOO_LARGE` | request body exceeds the `100kb` Express limit |
 | `500` | `INTERNAL_SERVER_ERROR` | unhandled server-side exception reached the catch-all middleware |
 
+Many individual route handlers also return `INTERNAL_ERROR` from local `catch` blocks. Treat both `INTERNAL_ERROR` and `INTERNAL_SERVER_ERROR` as host-side `500` failures rather than as stable execution-contract codes.
+
 ## Emulator Endpoints
 
 ### `GET /android/emulators`
@@ -606,10 +608,10 @@ Defaults when omitted:
 
 | Field | Default |
 | --- | --- |
-| `name` | `DEFAULT_EMULATOR_AVD_NAME` |
-| `apiLevel` | `SUPPORTED_EMULATOR_API_LEVEL` |
+| `name` | `DEFAULT_EMULATOR_AVD_NAME` (`clawperator-pixel`) |
+| `apiLevel` | `SUPPORTED_EMULATOR_API_LEVEL` (`35`) |
 | `abi` | `arm64-v8a` |
-| `deviceProfile` | `DEFAULT_EMULATOR_DEVICE_PROFILE` |
+| `deviceProfile` | `DEFAULT_EMULATOR_DEVICE_PROFILE` (`pixel_7`) |
 | `playStore` | `true` unless explicitly `false` |
 
 Success response:

@@ -397,7 +397,7 @@ For a failing check, pretty output includes:
 | `host.adb.server` | `pass`, `fail` | `ADB_SERVER_FAILED` | adb server can start |
 | `host.java.version` | `pass`, `fail` | `HOST_DEPENDENCY_MISSING` or no explicit code | Java 17 or 21 is available for full Android build checks |
 | `build.android.assemble` | `pass`, `fail` | `ANDROID_BUILD_FAILED` | `./gradlew :app:assembleDebug` succeeds |
-| `device.discovery` | `pass`, `warn`, `fail` | `NO_DEVICES`, `DEVICE_UNAUTHORIZED`, `DEVICE_OFFLINE`, `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED`, `DEVICE_NOT_FOUND` | a target device exists and is reachable |
+| `device.discovery` | `pass`, `warn`, `fail` | `NO_DEVICES`, `DEVICE_UNAUTHORIZED`, `DEVICE_OFFLINE`, `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED`, `DEVICE_NOT_FOUND` | device discovery succeeded and the environment is targetable, or explains why explicit `--device` selection is still required |
 | `build.android.install` | `pass`, `fail` | `ANDROID_INSTALL_FAILED` | `./gradlew :app:installDebug` succeeds |
 | `build.android.launch` | `pass`, `fail` | `ANDROID_APP_LAUNCH_FAILED` | Operator main activity launches |
 | `device.capability` | `pass`, `fail` | `DEVICE_SHELL_UNAVAILABLE` or no explicit code | shell access, SDK version, screen size, and density are readable |

@@ -355,6 +355,16 @@ Success conditions for a valid payload before dispatch:
 - every `actions[i].type` is a supported canonical action type after alias normalization
 - on a live execution path, `commandId` and `taskId` are echoed back in the result envelope for correlation
 
+## Execution Limits
+
+Current Node-side validation limits are:
+
+- at most `50` actions per execution
+- at most `64000` serialized payload bytes
+- `timeoutMs` must stay in `1000..120000`
+
+If validation fails on limits, shorten the action list, split a large workflow into multiple executions, or avoid embedding oversized inline artifacts in the payload.
+
 ## Result Envelope
 
 Authoritative source: `apps/node/src/contracts/result.ts`
@@ -928,6 +938,11 @@ Meaning:
 - `maxDelayMs` caps exponential backoff growth.
 - `backoffMultiplier` must be `>= 1.0`.
 - `jitterRatio` must be in `[0.0, 1.0]`.
+- Android clamps `maxAttempts` to `1..10`.
+- Android clamps `initialDelayMs` to `0..30000`.
+- Android clamps `maxDelayMs` to `initialDelayMs..60000`.
+- Android clamps `backoffMultiplier` to `1.0..5.0`.
+- Android clamps `jitterRatio` to `0.0..1.0`.
 - if you omit a retry object, Android applies an action-specific default such as `UiReadiness`, `UiScroll`, `AppLaunch`, `AppClose`, or `None`.
 
 ## Canonical Types And Input Aliases
@@ -1213,6 +1228,7 @@ Semantics:
 - if `validator` is omitted, no validator-specific Node rule runs
 - if `validator == "regex"`, `validatorPattern` must exist and compile as a regex
 - other validator strings are accepted by the current Node schema, but this repo does not add extra Node-side validation semantics for them
+- current Android parser accepts only `temperature`, `version`, and `regex`; any other validator string is rejected at runtime
 - `all: true` asks Android to return all matching text values instead of only the first match
 
 Success data:
@@ -1347,12 +1363,13 @@ Example:
 | --- | --- |
 | Required | `matcher` |
 | `matcher` | required `NodeMatcher` |
-| `timeoutMs` | optional positive number; when built by the CLI, it comes from `--timeout` |
+| `timeoutMs` | optional number; the current Android parser clamps a provided value to `1..120000`; when built by the CLI, it comes from `--timeout` |
 | `retry` | optional retry object in raw `exec` JSON; Android defaults to `UiReadiness` |
 
 Semantics:
 
 - the action-level `timeoutMs` is distinct from the execution-level `timeoutMs`
+- current Node validation does not add a stricter positivity check for this field
 - the builder inflates the execution timeout to `max(actionTimeout + 5000, 30000)` so the envelope does not expire before the wait finishes
 
 Success data:
@@ -3123,7 +3140,7 @@ For a failing check, pretty output includes:
 | `host.adb.server` | `pass`, `fail` | `ADB_SERVER_FAILED` | adb server can start |
 | `host.java.version` | `pass`, `fail` | `HOST_DEPENDENCY_MISSING` or no explicit code | Java 17 or 21 is available for full Android build checks |
 | `build.android.assemble` | `pass`, `fail` | `ANDROID_BUILD_FAILED` | `./gradlew :app:assembleDebug` succeeds |
-| `device.discovery` | `pass`, `warn`, `fail` | `NO_DEVICES`, `DEVICE_UNAUTHORIZED`, `DEVICE_OFFLINE`, `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED`, `DEVICE_NOT_FOUND` | a target device exists and is reachable |
+| `device.discovery` | `pass`, `warn`, `fail` | `NO_DEVICES`, `DEVICE_UNAUTHORIZED`, `DEVICE_OFFLINE`, `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED`, `DEVICE_NOT_FOUND` | device discovery succeeded and the environment is targetable, or explains why explicit `--device` selection is still required |
 | `build.android.install` | `pass`, `fail` | `ANDROID_INSTALL_FAILED` | `./gradlew :app:installDebug` succeeds |
 | `build.android.launch` | `pass`, `fail` | `ANDROID_APP_LAUNCH_FAILED` | Operator main activity launches |
 | `device.capability` | `pass`, `fail` | `DEVICE_SHELL_UNAVAILABLE` or no explicit code | shell access, SDK version, screen size, and density are readable |
@@ -3785,6 +3802,8 @@ These wrappers come from Express middleware rather than a specific endpoint hand
 | `413` | `PAYLOAD_TOO_LARGE` | request body exceeds the `100kb` Express limit |
 | `500` | `INTERNAL_SERVER_ERROR` | unhandled server-side exception reached the catch-all middleware |
 
+Many individual route handlers also return `INTERNAL_ERROR` from local `catch` blocks. Treat both `INTERNAL_ERROR` and `INTERNAL_SERVER_ERROR` as host-side `500` failures rather than as stable execution-contract codes.
+
 ## Emulator Endpoints
 
 ### `GET /android/emulators`
@@ -3867,10 +3886,10 @@ Defaults when omitted:
 
 | Field | Default |
 | --- | --- |
-| `name` | `DEFAULT_EMULATOR_AVD_NAME` |
-| `apiLevel` | `SUPPORTED_EMULATOR_API_LEVEL` |
+| `name` | `DEFAULT_EMULATOR_AVD_NAME` (`clawperator-pixel`) |
+| `apiLevel` | `SUPPORTED_EMULATOR_API_LEVEL` (`35`) |
 | `abi` | `arm64-v8a` |
-| `deviceProfile` | `DEFAULT_EMULATOR_DEVICE_PROFILE` |
+| `deviceProfile` | `DEFAULT_EMULATOR_DEVICE_PROFILE` (`pixel_7`) |
 | `playStore` | `true` unless explicitly `false` |
 
 Success response:

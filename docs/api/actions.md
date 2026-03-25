@@ -45,6 +45,11 @@ Meaning:
 - `maxDelayMs` caps exponential backoff growth.
 - `backoffMultiplier` must be `>= 1.0`.
 - `jitterRatio` must be in `[0.0, 1.0]`.
+- Android clamps `maxAttempts` to `1..10`.
+- Android clamps `initialDelayMs` to `0..30000`.
+- Android clamps `maxDelayMs` to `initialDelayMs..60000`.
+- Android clamps `backoffMultiplier` to `1.0..5.0`.
+- Android clamps `jitterRatio` to `0.0..1.0`.
 - if you omit a retry object, Android applies an action-specific default such as `UiReadiness`, `UiScroll`, `AppLaunch`, `AppClose`, or `None`.
 
 ## Canonical Types And Input Aliases
@@ -330,6 +335,7 @@ Semantics:
 - if `validator` is omitted, no validator-specific Node rule runs
 - if `validator == "regex"`, `validatorPattern` must exist and compile as a regex
 - other validator strings are accepted by the current Node schema, but this repo does not add extra Node-side validation semantics for them
+- current Android parser accepts only `temperature`, `version`, and `regex`; any other validator string is rejected at runtime
 - `all: true` asks Android to return all matching text values instead of only the first match
 
 Success data:
@@ -464,12 +470,13 @@ Example:
 | --- | --- |
 | Required | `matcher` |
 | `matcher` | required `NodeMatcher` |
-| `timeoutMs` | optional positive number; when built by the CLI, it comes from `--timeout` |
+| `timeoutMs` | optional number; the current Android parser clamps a provided value to `1..120000`; when built by the CLI, it comes from `--timeout` |
 | `retry` | optional retry object in raw `exec` JSON; Android defaults to `UiReadiness` |
 
 Semantics:
 
 - the action-level `timeoutMs` is distinct from the execution-level `timeoutMs`
+- current Node validation does not add a stricter positivity check for this field
 - the builder inflates the execution timeout to `max(actionTimeout + 5000, 30000)` so the envelope does not expire before the wait finishes
 
 Success data:

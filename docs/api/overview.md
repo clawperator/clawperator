@@ -66,6 +66,16 @@ Success conditions for a valid payload before dispatch:
 - every `actions[i].type` is a supported canonical action type after alias normalization
 - on a live execution path, `commandId` and `taskId` are echoed back in the result envelope for correlation
 
+## Execution Limits
+
+Current Node-side validation limits are:
+
+- at most `50` actions per execution
+- at most `64000` serialized payload bytes
+- `timeoutMs` must stay in `1000..120000`
+
+If validation fails on limits, shorten the action list, split a large workflow into multiple executions, or avoid embedding oversized inline artifacts in the payload.
+
 ## Result Envelope
 
 Authoritative source: `apps/node/src/contracts/result.ts`
