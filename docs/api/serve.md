@@ -33,6 +33,11 @@ When the server starts successfully, it listens until the process exits. There i
 
 Most REST endpoints return one of these shapes.
 
+Important boundary:
+
+- `/execute`, `/snapshot`, and `/screenshot` pass through `runExecution()` results on success and on cross-surface execution failures
+- malformed request bodies and route-local validation failures are serve-layer wrappers only and are not part of the shared execution contract
+
 ### Success wrapper
 
 ```json
@@ -193,6 +198,18 @@ Operator package resolution:
 - otherwise it uses `com.clawperator.operator`
 
 Then `runExecution()` applies full execution validation. See [Actions](actions.md), [Selectors](selectors.md), and [API Overview](overview.md).
+
+Representative serve-layer `400` wrappers for this route:
+
+```json
+{
+  "ok": false,
+  "error": {
+    "code": "MISSING_EXECUTION",
+    "message": "Missing 'execution' in body"
+  }
+}
+```
 
 ### Success response
 
@@ -458,6 +475,41 @@ Behavior:
 - if `expectContains` is provided and `output` does not contain that substring, the route returns HTTP `400`
 - if the skill exits non-zero, the route returns HTTP `400` for most failures or `404` when the skill ID does not exist
 - successful responses always include `exitCode: 0`
+
+Failure examples:
+
+Output assertion failure:
+
+```json
+{
+  "ok": false,
+  "error": {
+    "code": "SKILL_OUTPUT_ASSERTION_FAILED",
+    "message": "Skill com.test.echo output did not include expected text",
+    "skillId": "com.test.echo",
+    "output": "TEST_OUTPUT:api\n",
+    "expectedSubstring": "TEST_OUTPUT:hello",
+    "timeoutMs": 4321
+  }
+}
+```
+
+Non-zero skill exit:
+
+```json
+{
+  "ok": false,
+  "error": {
+    "code": "SKILL_EXECUTION_FAILED",
+    "message": "Skill com.test.echo exited with code 2",
+    "skillId": "com.test.echo",
+    "exitCode": 2,
+    "stdout": "partial output\n",
+    "stderr": "fatal error\n",
+    "timeoutMs": 4321
+  }
+}
+```
 
 ## Emulator Endpoints
 

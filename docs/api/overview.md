@@ -125,7 +125,7 @@ Field meanings:
 | `stepResults[].success` | Per-step success bit. |
 | `stepResults[].data` | Action-specific string map. Keys and values are strings after parsing and post-processing. |
 | `error` | Human-readable top-level failure summary. |
-| `errorCode` | Stable top-level code when available. Prefer this over matching `error`. |
+| `errorCode` | Stable top-level code when available. Prefer this over matching `error`. Current runtime envelopes may also surface Android-emitted strings such as `SERVICE_UNAVAILABLE`, so do not assume this field is limited to the Node enum in `errors.ts`. |
 | `hint` | Optional recovery hint injected by Node. |
 
 Failure wrapper example from the CLI:
@@ -176,6 +176,17 @@ Non-runtime success wrappers from `clawperator exec`:
 }
 ```
 
+## Surface Differences
+
+Use the wrapper shape that matches the surface you called:
+
+| Surface | Success shape |
+| --- | --- |
+| CLI device execution commands | `{ "envelope": ..., "deviceId": "...", "terminalSource": "clawperator_result", "isCanonicalTerminal": true }` |
+| `clawperator exec --validate` | `{ "ok": true, "validated": true, "execution": ... }` |
+| `clawperator exec --dry-run` | `{ "ok": true, "dryRun": true, "plan": ... }` |
+| `clawperator serve` execution endpoints | `{ "ok": true, "deviceId": "...", "terminalSource": "...", "envelope": ... }` |
+
 ## How To Branch On Results
 
 Branch in this order:
@@ -199,7 +210,8 @@ Exact machine-checkable success condition for most CLI device commands:
 
 - If any `stepResults[].success` is `false`, Node reconciles `status` to `"failed"` and sets `error` from the first failed step.
 - If all steps succeed, Node reconciles `status` to `"success"`, clears top-level error state, and removes `hint`.
-- A top-level failure can also arrive with zero steps, for example when dispatch fails, the result envelope times out, or parsing fails before a normal step list exists.
+- A top-level failure can also arrive with zero steps, for example when Android returns a failure envelope before a normal step list exists, such as `SERVICE_UNAVAILABLE`.
+- Execution timeout is different: `runExecution()` returns a top-level host-side error object such as `RESULT_ENVELOPE_TIMEOUT`, not a zero-step success-wrapper envelope.
 - Node may modify step data after the runtime returns. Examples:
   - `snapshot_ui` success steps get `data.text` attached from extracted log output
   - missing snapshot text is converted into `SNAPSHOT_EXTRACTION_FAILED`

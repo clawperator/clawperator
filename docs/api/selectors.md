@@ -7,6 +7,7 @@ Define the `NodeMatcher` contract used across execution payloads, explain how CL
 ## Sources
 
 - Contract shape: `apps/node/src/contracts/selectors.ts`
+- Shared matcher limits: `apps/node/src/contracts/limits.ts`
 - Execution validation: `apps/node/src/domain/executions/validateExecution.ts`
 - CLI selector parsing: `apps/node/src/cli/selectorFlags.ts`
 - `read-value` label selector handling: `apps/node/src/cli/registry.ts`
@@ -42,6 +43,7 @@ Rules enforced by Node:
 - a matcher may contain one field or several fields
 - multiple fields combine into one object, so the runtime receives all of them together
 - empty matcher objects are invalid
+- each matcher string value must be at most `512` characters (`LIMITS.MAX_MATCHER_VALUE_LENGTH`)
 - blank strings are rejected before or during validation depending on how the matcher was built
 - selector objects are strict in execution validation, so unknown keys are rejected
 - when the shared CLI parser sees no selector flags at all, it returns an empty matcher object and the command decides whether selectors are required for that command
@@ -126,7 +128,13 @@ Even without the generated table, the authored contract is:
 - `--desc-contains` maps to `contentDescContains`
 - `--role` maps to `role`
 - `--selector` accepts a raw `NodeMatcher` JSON object
-- container-prefixed forms map to the same fields on `params.container`
+- `--container-text` maps to `container.textEquals`
+- `--container-text-contains` maps to `container.textContains`
+- `--container-id` maps to `container.resourceId`
+- `--container-desc` maps to `container.contentDescEquals`
+- `--container-desc-contains` maps to `container.contentDescContains`
+- `--container-role` maps to `container.role`
+- `--container-selector` accepts a raw `NodeMatcher` JSON object for `params.container`
 
 ## Mutual Exclusion And Validation Rules
 
@@ -166,6 +174,15 @@ clawperator read --text "Price" --selector '{"textEquals":"Price"}'
 Why invalid:
 
 - the CLI parser rejects mixing `--selector` with shorthand element flags
+
+Structured validation example:
+
+```json
+{
+  "code": "EXECUTION_VALIDATION_FAILED",
+  "message": "use --selector OR the simple flags, not both"
+}
+```
 
 ## Command-Specific Notes
 

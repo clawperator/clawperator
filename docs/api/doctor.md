@@ -91,7 +91,9 @@ Field meaning:
 1. If all checks passed, add:
    - `Docs: https://docs.clawperator.com/getting-started/first-time-setup/`
    - `Try: clawperator snapshot --device <resolved_device>` or the placeholder form if no device was resolved
-2. For each non-pass check with `fix.steps`, append each shell or manual step value.
+2. For each non-pass check with `fix.steps`:
+   - if `--fix` was not used, append each shell or manual step value
+   - if `--fix` was used, execute `shell` steps best-effort and append only `manual` step values
 3. For each non-pass check with `deviceGuidance`, append:
    - `On device, open <screen> and follow the listed steps.`
 4. Deduplicate the final list.
@@ -99,6 +101,7 @@ Field meaning:
 Machine-checkable implication:
 
 - `nextActions` is remediation guidance, not proof of success
+- with `--fix`, `nextActions` can be less complete because attempted shell steps are omitted even if execution failed
 - always gate on `criticalOk` and `checks[]`, not on whether `nextActions` is empty
 
 ## `DoctorCheckResult` Contract
@@ -346,6 +349,7 @@ Machine-checkable success gate:
 
 - require exit code `0`
 - require `criticalOk == true`
+- also require that you either resolved one device or intentionally handled the `device.discovery` multi-device warning before issuing device commands
 
 ## `--fix` Behavior
 
@@ -353,7 +357,8 @@ Machine-checkable success gate:
 
 - `shell` steps are executed best-effort through the runtime shell runner
 - `manual` steps are still only reported
-- all steps still contribute to the returned `nextActions` if they are manual or if shell execution was not requested
+- when `--fix` is active, attempted `shell` steps are omitted from `nextActions` whether they succeeded or failed
+- when `--fix` is not active, `shell` and `manual` steps are both copied into `nextActions`
 - failed auto-fix attempts are intentionally swallowed so diagnostics remain deterministic
 
 Use `--fix` when:
@@ -400,7 +405,7 @@ For a failing check, pretty output includes:
 | `readiness.settings.dev_options` | `pass`, `warn` | `DEVICE_DEV_OPTIONS_DISABLED` | developer options setting is enabled |
 | `readiness.settings.usb_debugging` | `pass`, `warn` | `DEVICE_USB_DEBUGGING_DISABLED` | USB debugging setting is enabled |
 | `readiness.handshake` | `pass`, `fail` | `DEVICE_ACCESSIBILITY_NOT_RUNNING`, `RESULT_ENVELOPE_TIMEOUT`, `BROADCAST_FAILED`, `OPERATOR_NOT_INSTALLED` | Node can dispatch and receive a valid result envelope |
-| `readiness.smoke` | `pass`, `fail` | `SMOKE_OPEN_SETTINGS_FAILED` | settings app opens and snapshot succeeds |
+| `readiness.smoke` | `pass`, `fail` | `SMOKE_OPEN_SETTINGS_FAILED` | smoke execution can open Settings and produce at least one successful `snapshot_ui` step |
 
 ## Common Failure Recovery
 

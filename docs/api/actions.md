@@ -10,6 +10,8 @@ Define the canonical `ExecutionAction.type` values, the exact parameters each ac
 - Shared parameter shape: `apps/node/src/contracts/execution.ts`
 - Validation rules: `apps/node/src/domain/executions/validateExecution.ts`
 - CLI-built payload defaults: `apps/node/src/domain/actions/` and `apps/node/src/domain/observe/`
+- Android payload parsing: `apps/android/shared/data/operator/src/main/kotlin/clawperator/operator/agent/AgentCommandParser.kt`
+- Android action/result behavior: `apps/android/shared/data/task/src/main/kotlin/clawperator/task/runner/UiAction.kt` and `UiActionEngine.kt`
 
 ## General Rules
 
@@ -20,6 +22,7 @@ Define the canonical `ExecutionAction.type` values, the exact parameters each ac
 | Selectors live on a separate page | `matcher`, `container`, `expectedNode`, and `labelMatcher` all use the [Selectors](selectors.md) `NodeMatcher` contract. |
 | `StepResult.data` is a string map | Node may attach known keys such as `text`, `path`, `warn`, `application_id`, `error`, or `message`, but most actions do not have a richer static success schema. |
 | CLI coverage is narrower than raw JSON | Some advanced fields in `ActionParams` are accepted only through `clawperator exec` JSON, not through flat CLI flags. |
+| Runtime details are not always Node guarantees | When this page calls out Android-returned success keys, treat them as current runtime behavior verified from Android code, not as a stricter Node-side schema guarantee. |
 
 ## Retry Object Shape
 
@@ -396,17 +399,17 @@ Example:
 | `matcher` | required `NodeMatcher` |
 | `text` | required non-empty string |
 | `submit` | optional boolean |
-| `clear` | optional boolean |
 | `retry` | optional retry object in raw `exec` JSON; Android defaults to `UiReadiness` |
 
 Semantics:
 
 - `submit` defaults to `false` in the built-in CLI builders
-- `clear` defaults to `false` in the built-in CLI builders
+- the shared `ActionParams` schema still includes `clear`, but the current Android parser and `UiAction.EnterText` model do not consume it, so do not rely on it
 
 Success data:
 
-- no Node-guaranteed success keys
+- Node does not declare a richer static schema here
+- current Android runtime behavior returns `data.text` and `data.submit`
 
 Common failures:
 
@@ -422,7 +425,6 @@ Example:
   "params": {
     "matcher": { "resourceId": "com.example:id/search" },
     "text": "hello world",
-    "clear": true,
     "submit": false
   }
 }

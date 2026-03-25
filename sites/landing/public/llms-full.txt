@@ -414,7 +414,7 @@ Field meanings:
 | `stepResults[].success` | Per-step success bit. |
 | `stepResults[].data` | Action-specific string map. Keys and values are strings after parsing and post-processing. |
 | `error` | Human-readable top-level failure summary. |
-| `errorCode` | Stable top-level code when available. Prefer this over matching `error`. |
+| `errorCode` | Stable top-level code when available. Prefer this over matching `error`. Current runtime envelopes may also surface Android-emitted strings such as `SERVICE_UNAVAILABLE`, so do not assume this field is limited to the Node enum in `errors.ts`. |
 | `hint` | Optional recovery hint injected by Node. |
 
 Failure wrapper example from the CLI:
@@ -465,6 +465,17 @@ Non-runtime success wrappers from `clawperator exec`:
 }
 ```
 
+## Surface Differences
+
+Use the wrapper shape that matches the surface you called:
+
+| Surface | Success shape |
+| --- | --- |
+| CLI device execution commands | `{ "envelope": ..., "deviceId": "...", "terminalSource": "clawperator_result", "isCanonicalTerminal": true }` |
+| `clawperator exec --validate` | `{ "ok": true, "validated": true, "execution": ... }` |
+| `clawperator exec --dry-run` | `{ "ok": true, "dryRun": true, "plan": ... }` |
+| `clawperator serve` execution endpoints | `{ "ok": true, "deviceId": "...", "terminalSource": "...", "envelope": ... }` |
+
 ## How To Branch On Results
 
 Branch in this order:
@@ -488,7 +499,8 @@ Exact machine-checkable success condition for most CLI device commands:
 
 - If any `stepResults[].success` is `false`, Node reconciles `status` to `"failed"` and sets `error` from the first failed step.
 - If all steps succeed, Node reconciles `status` to `"success"`, clears top-level error state, and removes `hint`.
-- A top-level failure can also arrive with zero steps, for example when dispatch fails, the result envelope times out, or parsing fails before a normal step list exists.
+- A top-level failure can also arrive with zero steps, for example when Android returns a failure envelope before a normal step list exists, such as `SERVICE_UNAVAILABLE`.
+- Execution timeout is different: `runExecution()` returns a top-level host-side error object such as `RESULT_ENVELOPE_TIMEOUT`, not a zero-step success-wrapper envelope.
 - Node may modify step data after the runtime returns. Examples:
   - `snapshot_ui` success steps get `data.text` attached from extracted log output
   - missing snapshot text is converted into `SNAPSHOT_EXTRACTION_FAILED`
@@ -879,6 +891,8 @@ Define the canonical `ExecutionAction.type` values, the exact parameters each ac
 - Shared parameter shape: `apps/node/src/contracts/execution.ts`
 - Validation rules: `apps/node/src/domain/executions/validateExecution.ts`
 - CLI-built payload defaults: `apps/node/src/domain/actions/` and `apps/node/src/domain/observe/`
+- Android payload parsing: `apps/android/shared/data/operator/src/main/kotlin/clawperator/operator/agent/AgentCommandParser.kt`
+- Android action/result behavior: `apps/android/shared/data/task/src/main/kotlin/clawperator/task/runner/UiAction.kt` and `UiActionEngine.kt`
 
 ## General Rules
 
@@ -889,6 +903,7 @@ Define the canonical `ExecutionAction.type` values, the exact parameters each ac
 | Selectors live on a separate page | `matcher`, `container`, `expectedNode`, and `labelMatcher` all use the [Selectors](selectors.md) `NodeMatcher` contract. |
 | `StepResult.data` is a string map | Node may attach known keys such as `text`, `path`, `warn`, `application_id`, `error`, or `message`, but most actions do not have a richer static success schema. |
 | CLI coverage is narrower than raw JSON | Some advanced fields in `ActionParams` are accepted only through `clawperator exec` JSON, not through flat CLI flags. |
+| Runtime details are not always Node guarantees | When this page calls out Android-returned success keys, treat them as current runtime behavior verified from Android code, not as a stricter Node-side schema guarantee. |
 
 ## Retry Object Shape
 
@@ -1265,17 +1280,17 @@ Example:
 | `matcher` | required `NodeMatcher` |
 | `text` | required non-empty string |
 | `submit` | optional boolean |
-| `clear` | optional boolean |
 | `retry` | optional retry object in raw `exec` JSON; Android defaults to `UiReadiness` |
 
 Semantics:
 
 - `submit` defaults to `false` in the built-in CLI builders
-- `clear` defaults to `false` in the built-in CLI builders
+- the shared `ActionParams` schema still includes `clear`, but the current Android parser and `UiAction.EnterText` model do not consume it, so do not rely on it
 
 Success data:
 
-- no Node-guaranteed success keys
+- Node does not declare a richer static schema here
+- current Android runtime behavior returns `data.text` and `data.submit`
 
 Common failures:
 
@@ -1291,7 +1306,6 @@ Example:
   "params": {
     "matcher": { "resourceId": "com.example:id/search" },
     "text": "hello world",
-    "clear": true,
     "submit": false
   }
 }
@@ -1722,6 +1736,7 @@ Define the `NodeMatcher` contract used across execution payloads, explain how CL
 ## Sources
 
 - Contract shape: `apps/node/src/contracts/selectors.ts`
+- Shared matcher limits: `apps/node/src/contracts/limits.ts`
 - Execution validation: `apps/node/src/domain/executions/validateExecution.ts`
 - CLI selector parsing: `apps/node/src/cli/selectorFlags.ts`
 - `read-value` label selector handling: `apps/node/src/cli/registry.ts`
@@ -1757,6 +1772,7 @@ Rules enforced by Node:
 - a matcher may contain one field or several fields
 - multiple fields combine into one object, so the runtime receives all of them together
 - empty matcher objects are invalid
+- each matcher string value must be at most `512` characters (`LIMITS.MAX_MATCHER_VALUE_LENGTH`)
 - blank strings are rejected before or during validation depending on how the matcher was built
 - selector objects are strict in execution validation, so unknown keys are rejected
 - when the shared CLI parser sees no selector flags at all, it returns an empty matcher object and the command decides whether selectors are required for that command
@@ -1856,7 +1872,13 @@ Even without the generated table, the authored contract is:
 - `--desc-contains` maps to `contentDescContains`
 - `--role` maps to `role`
 - `--selector` accepts a raw `NodeMatcher` JSON object
-- container-prefixed forms map to the same fields on `params.container`
+- `--container-text` maps to `container.textEquals`
+- `--container-text-contains` maps to `container.textContains`
+- `--container-id` maps to `container.resourceId`
+- `--container-desc` maps to `container.contentDescEquals`
+- `--container-desc-contains` maps to `container.contentDescContains`
+- `--container-role` maps to `container.role`
+- `--container-selector` accepts a raw `NodeMatcher` JSON object for `params.container`
 
 ## Mutual Exclusion And Validation Rules
 
@@ -1896,6 +1918,15 @@ clawperator read --text "Price" --selector '{"textEquals":"Price"}'
 Why invalid:
 
 - the CLI parser rejects mixing `--selector` with shorthand element flags
+
+Structured validation example:
+
+```json
+{
+  "code": "EXECUTION_VALIDATION_FAILED",
+  "message": "use --selector OR the simple flags, not both"
+}
+```
 
 ## Command-Specific Notes
 
@@ -2784,7 +2815,9 @@ Field meaning:
 1. If all checks passed, add:
    - `Docs: https://docs.clawperator.com/getting-started/first-time-setup/`
    - `Try: clawperator snapshot --device <resolved_device>` or the placeholder form if no device was resolved
-2. For each non-pass check with `fix.steps`, append each shell or manual step value.
+2. For each non-pass check with `fix.steps`:
+   - if `--fix` was not used, append each shell or manual step value
+   - if `--fix` was used, execute `shell` steps best-effort and append only `manual` step values
 3. For each non-pass check with `deviceGuidance`, append:
    - `On device, open <screen> and follow the listed steps.`
 4. Deduplicate the final list.
@@ -2792,6 +2825,7 @@ Field meaning:
 Machine-checkable implication:
 
 - `nextActions` is remediation guidance, not proof of success
+- with `--fix`, `nextActions` can be less complete because attempted shell steps are omitted even if execution failed
 - always gate on `criticalOk` and `checks[]`, not on whether `nextActions` is empty
 
 ## `DoctorCheckResult` Contract
@@ -3039,6 +3073,7 @@ Machine-checkable success gate:
 
 - require exit code `0`
 - require `criticalOk == true`
+- also require that you either resolved one device or intentionally handled the `device.discovery` multi-device warning before issuing device commands
 
 ## `--fix` Behavior
 
@@ -3046,7 +3081,8 @@ Machine-checkable success gate:
 
 - `shell` steps are executed best-effort through the runtime shell runner
 - `manual` steps are still only reported
-- all steps still contribute to the returned `nextActions` if they are manual or if shell execution was not requested
+- when `--fix` is active, attempted `shell` steps are omitted from `nextActions` whether they succeeded or failed
+- when `--fix` is not active, `shell` and `manual` steps are both copied into `nextActions`
 - failed auto-fix attempts are intentionally swallowed so diagnostics remain deterministic
 
 Use `--fix` when:
@@ -3093,7 +3129,7 @@ For a failing check, pretty output includes:
 | `readiness.settings.dev_options` | `pass`, `warn` | `DEVICE_DEV_OPTIONS_DISABLED` | developer options setting is enabled |
 | `readiness.settings.usb_debugging` | `pass`, `warn` | `DEVICE_USB_DEBUGGING_DISABLED` | USB debugging setting is enabled |
 | `readiness.handshake` | `pass`, `fail` | `DEVICE_ACCESSIBILITY_NOT_RUNNING`, `RESULT_ENVELOPE_TIMEOUT`, `BROADCAST_FAILED`, `OPERATOR_NOT_INSTALLED` | Node can dispatch and receive a valid result envelope |
-| `readiness.smoke` | `pass`, `fail` | `SMOKE_OPEN_SETTINGS_FAILED` | settings app opens and snapshot succeeds |
+| `readiness.smoke` | `pass`, `fail` | `SMOKE_OPEN_SETTINGS_FAILED` | smoke execution can open Settings and produce at least one successful `snapshot_ui` step |
 
 ## Common Failure Recovery
 
@@ -3255,6 +3291,11 @@ When the server starts successfully, it listens until the process exits. There i
 
 Most REST endpoints return one of these shapes.
 
+Important boundary:
+
+- `/execute`, `/snapshot`, and `/screenshot` pass through `runExecution()` results on success and on cross-surface execution failures
+- malformed request bodies and route-local validation failures are serve-layer wrappers only and are not part of the shared execution contract
+
 ### Success wrapper
 
 ```json
@@ -3415,6 +3456,18 @@ Operator package resolution:
 - otherwise it uses `com.clawperator.operator`
 
 Then `runExecution()` applies full execution validation. See [Actions](actions.md), [Selectors](selectors.md), and [API Overview](overview.md).
+
+Representative serve-layer `400` wrappers for this route:
+
+```json
+{
+  "ok": false,
+  "error": {
+    "code": "MISSING_EXECUTION",
+    "message": "Missing 'execution' in body"
+  }
+}
+```
 
 ### Success response
 
@@ -3680,6 +3733,41 @@ Behavior:
 - if `expectContains` is provided and `output` does not contain that substring, the route returns HTTP `400`
 - if the skill exits non-zero, the route returns HTTP `400` for most failures or `404` when the skill ID does not exist
 - successful responses always include `exitCode: 0`
+
+Failure examples:
+
+Output assertion failure:
+
+```json
+{
+  "ok": false,
+  "error": {
+    "code": "SKILL_OUTPUT_ASSERTION_FAILED",
+    "message": "Skill com.test.echo output did not include expected text",
+    "skillId": "com.test.echo",
+    "output": "TEST_OUTPUT:api\n",
+    "expectedSubstring": "TEST_OUTPUT:hello",
+    "timeoutMs": 4321
+  }
+}
+```
+
+Non-zero skill exit:
+
+```json
+{
+  "ok": false,
+  "error": {
+    "code": "SKILL_EXECUTION_FAILED",
+    "message": "Skill com.test.echo exited with code 2",
+    "skillId": "com.test.echo",
+    "exitCode": 2,
+    "stdout": "partial output\n",
+    "stderr": "fatal error\n",
+    "timeoutMs": 4321
+  }
+}
+```
 
 ## Emulator Endpoints
 
