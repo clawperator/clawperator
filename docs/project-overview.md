@@ -34,15 +34,16 @@ This repository also contains two separate public website builds:
 Keep them distinct when editing:
 
 -   Landing-site root files such as `install.sh`, `robots.txt`, `llms.txt`, and `sitemap.xml` belong to `sites/landing/public/`.
--   Docs content should be changed in `docs/`, `apps/node/src/`, or `../clawperator-skills/docs/`, not directly in `sites/docs/docs/`.
+-   Docs content should be changed in `docs/`, `apps/node/src/`, or `../clawperator-skills/docs/`, not directly in `sites/docs/.build/` or `sites/docs/site/`.
 -   Docs-site root files such as `robots.txt` and `llms.txt` live in `sites/docs/static/` and are copied into the built site by `./scripts/docs_build.sh`.
+-   The docs build assembles staging output in `sites/docs/.build/` and publishes HTML under `sites/docs/site/`.
 -   Both public sites deploy automatically to Cloudflare after changes are merged to `main`.
 
 ## The Role of Skills
 Skills are reusable templates for app-specific workflows (e.g., "get thermostat temperature" or "check grocery prices").
 
 -   **Canonical Home:** `../clawperator-skills` (a dedicated sibling repository).
--   **Project-local maintenance skills:** Repository-specific Codex workflows live in `.agents/skills/`. For example, `.agents/skills/docs-generate/` regenerates the MkDocs site content in `sites/docs/docs/` from the canonical doc sources.
+-   **Project-local maintenance skills:** Repository-specific Codex workflows live in `.agents/skills/`. For example, `.agents/skills/docs-generate/` regenerates the MkDocs staging output in `sites/docs/.build/` from the canonical doc sources.
 -   **Nature of Skills:** Due to the dynamic nature of mobile apps (A/B tests, server-side flags, unexpected popups), skills are treated as **highly informed context** for the Agent rather than purely deterministic scripts.
 -   **Agent Responsibility:** The Agent uses skill templates as a baseline, modifying them at runtime to handle personal configurations (variable substitution) or UI drift.
 

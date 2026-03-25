@@ -25,7 +25,7 @@ This skill updates public release-facing surfaces such as:
 - `docs/compatibility.md`
 - `docs/release-procedure.md`
 - `sites/landing/public/install.sh`
-- generated docs copies under `sites/docs/docs/`
+- the generated docs staging/build outputs produced by `./scripts/docs_build.sh`
 - generated `llms-full.txt` artifacts
 
 It then rebuilds docs/site artifacts and creates a dedicated follow-up commit:

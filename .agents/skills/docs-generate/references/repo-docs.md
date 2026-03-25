@@ -5,7 +5,8 @@
 - Core docs: `docs/**/*.md`
 - Node API source of truth: `apps/node/src/**/*.ts`, `apps/node/package.json`
 - Skills docs: `../clawperator-skills/docs/**/*.md`
-- Public docs site output: `sites/docs/docs/**/*.md`
+- Public docs staging output: `sites/docs/.build/**/*.md`
+- Public docs site output: `sites/docs/site/**/*.md`
 - Public docs manifest: `sites/docs/source-map.yaml`
 
 ## Topic ownership
@@ -19,12 +20,10 @@
 
 ## Public docs generation contract
 
-- Generated output lives in `sites/docs/docs/`.
-- Scratch output lives in `sites/docs/.generated/`.
-- Inventory output lives in `sites/docs/docs_inventory.json`.
-- Build metadata lives in `sites/docs/docs_build.json`.
-- **Never edit `sites/docs/docs/` directly.** It is generated output. Fix errors in the source files listed above, then regenerate. Direct edits will be overwritten on the next run and hide the real defect.
-
+- Generated staging output lives in `sites/docs/.build/`.
+- Built site output lives in `sites/docs/site/`.
+- **Never edit `sites/docs/.build/` or `sites/docs/site/` directly.** They are generated outputs. Fix errors in the source files listed above, then regenerate. Direct edits will be overwritten on the next run and hide the real defect.
+- `source-map.yaml` `sources:` entries are validated by the assembly script and must point at real repo files or directories.
 ## Minimal-diff rules
 
 - Keep the current output path unless the manifest changes.

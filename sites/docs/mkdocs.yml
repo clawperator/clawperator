@@ -1,6 +1,6 @@
 site_name: Clawperator
 site_description: Deterministic actuator tool for device automation
-docs_dir: docs
+docs_dir: .build
 site_url: https://docs.clawperator.com/
 strict: true
 
@@ -9,52 +9,69 @@ theme:
   palette: default
   custom_dir: overrides
 
+plugins:
+  - search
+  - redirects:
+      redirect_maps:
+        'getting-started/first-time-setup.md': 'setup.md'
+        'getting-started/index.md': 'setup.md'
+        'getting-started/running-clawperator-on-android.md': 'setup.md'
+        'getting-started/openclaw-first-run.md': 'setup.md'
+        'getting-started/project-overview.md': 'api/overview.md'
+        'getting-started/terminology.md': 'api/overview.md'
+        'getting-started/android-operator-apk.md': 'api/devices.md'
+        'ai-agents/agent-quickstart.md': 'setup.md'
+        'ai-agents/node-api-for-agents.md': 'api/overview.md'
+        'ai-agents/android-recording.md': 'api/recording.md'
+        'ai-agents/navigation-patterns.md': 'api/navigation.md'
+        'ai-agents/multi-device-workflows.md': 'api/devices.md'
+        'architecture/architecture.md': 'api/overview.md'
+        'reference/api-overview.md': 'api/overview.md'
+        'reference/cli-reference.md': 'api/cli.md'
+        'reference/action-types.md': 'api/actions.md'
+        'reference/execution-model.md': 'api/overview.md'
+        'reference/timeout-budgeting.md': 'api/timeouts.md'
+        'reference/device-and-package-model.md': 'api/devices.md'
+        'reference/snapshot-format.md': 'api/snapshot.md'
+        'reference/error-codes.md': 'api/errors.md'
+        'reference/error-handling.md': 'api/errors.md'
+        'reference/node-api-doctor.md': 'api/doctor.md'
+        'reference/environment-variables.md': 'api/environment.md'
+        'design/node-api-design.md': 'api/overview.md'
+        'design/operator-llm-playbook.md': 'api/overview.md'
+        'design/skill-design.md': 'skills/overview.md'
+        'troubleshooting/troubleshooting.md': 'troubleshooting/operator.md'
+        'troubleshooting/crash-logs.md': 'troubleshooting/operator.md'
+        'skills/usage-model.md': 'skills/overview.md'
+        'skills/skill-from-recording.md': 'skills/authoring.md'
+        'skills/skill-development-workflow.md': 'skills/development.md'
+        'skills/skill-authoring-guidelines.md': 'skills/authoring.md'
+        'skills/device-prep-and-runtime-tips.md': 'skills/runtime.md'
+        'skills/blocked-terms-policy.md': 'skills/authoring.md'
+
 nav:
   - Docs Home: index.md
-  - clawperator.com: https://clawperator.com
-  - Getting Started:
-    - Running Clawperator on Android: getting-started/running-clawperator-on-android.md
-    - Clawperator Terminology: getting-started/terminology.md
-    - First-Time Setup: getting-started/first-time-setup.md
-    - OpenClaw First Run: getting-started/openclaw-first-run.md
-    - Project Overview: getting-started/project-overview.md
-    - Clawperator Operator Android app: getting-started/android-operator-apk.md
-  - For AI Agents:
-    - Agent Quickstart: ai-agents/agent-quickstart.md
-    - Android Recording Format for Agents: ai-agents/android-recording.md
-    - Node API - Agent Guide: ai-agents/node-api-for-agents.md
-    - Navigation Patterns for Agents: ai-agents/navigation-patterns.md
-    - Multi-Device Workflows for Agents: ai-agents/multi-device-workflows.md
-    - Execution Model: reference/execution-model.md
-    - Timeout Budgeting: reference/timeout-budgeting.md
-    - Device and Package Model: reference/device-and-package-model.md
-  - Reference:
-    - CLI Reference: reference/cli-reference.md
-    - API Overview: reference/api-overview.md
-    - Action Types: reference/action-types.md
-    - Execution Model: reference/execution-model.md
-    - Timeout Budgeting: reference/timeout-budgeting.md
-    - Device and Package Model: reference/device-and-package-model.md
-    - Clawperator Snapshot Format: reference/snapshot-format.md
-    - Error Codes: reference/error-codes.md
-    - Error Handling Guide: reference/error-handling.md
-    - Doctor: reference/node-api-doctor.md
-    - Environment Variables: reference/environment-variables.md
-  - Design and Rationale:
-    - System Overview: architecture/architecture.md
-    - Runtime Architecture and API Rationale: design/node-api-design.md
-    - Operator Automation Playbook: design/operator-llm-playbook.md
-
-  - Troubleshooting:
-    - Version Compatibility: troubleshooting/compatibility.md
-    - Troubleshooting the Operator App: troubleshooting/troubleshooting.md
-    - Known Issues: troubleshooting/known-issues.md
-    - Crash Logs: troubleshooting/crash-logs.md
+  - Setup: setup.md
+  - API:
+      - Overview: api/overview.md
+      - CLI Reference: api/cli.md
+      - Actions: api/actions.md
+      - Selectors: api/selectors.md
+      - Snapshot Format: api/snapshot.md
+      - Errors: api/errors.md
+      - Devices: api/devices.md
+      - Doctor: api/doctor.md
+      - Timeouts: api/timeouts.md
+      - Environment Variables: api/environment.md
+      - Serve API: api/serve.md
+      - Navigation Patterns: api/navigation.md
+      - Recording Format: api/recording.md
   - Skills:
-    - Usage Model: skills/usage-model.md
-    - Skill Authoring from Recordings: skills/skill-from-recording.md
-    - Skill Development Workflow: skills/skill-development-workflow.md
-    - Skill Authoring Guidelines: skills/skill-authoring-guidelines.md
-    - Skill Design: design/skill-design.md
-    - Device Prep and Runtime Tips: skills/device-prep-and-runtime-tips.md
-    - Blocked Terms Policy: skills/blocked-terms-policy.md
+      - Overview: skills/overview.md
+      - Authoring: skills/authoring.md
+      - Development Workflow: skills/development.md
+      - Device Prep and Runtime: skills/runtime.md
+  - Troubleshooting:
+      - Operator App: troubleshooting/operator.md
+      - Known Issues: troubleshooting/known-issues.md
+      - Version Compatibility: troubleshooting/compatibility.md

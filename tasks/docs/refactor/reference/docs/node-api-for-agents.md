@@ -30,7 +30,7 @@ workflow (also available as `record` alias), use [Android Recording Format for A
 | `emulator status` | List running Android emulators and boot state |
 | `emulator provision` | Reuse or create a supported Android emulator and return its ADB serial |
 | `provision emulator` | Alias of `emulator provision` |
-| `exec <json\|file>` | Run a full execution payload (JSON string or file path). Inline values starting with `{` parse as JSON; values starting with `[` try a file path first, then parse as a JSON array if the path is missing. `execute` is a synonym; `--payload` and `--execution` are named alternatives to the positional arg. |
+| `exec <json\|file>` | Run a full execution payload (JSON string or file path). Inline values starting with `{` parse as JSON; values starting with `[` try a file path first, then parse as a JSON array if the path is missing. Positional payload file paths may begin with `-` (for example `--plan.json`) and are still treated as payloads. `execute` is a synonym; `--payload` and `--execution` are named alternatives to the positional arg. |
 | `snapshot` | Capture UI hierarchy dump (`hierarchy_xml`) |
 | `screenshot [--path <file>]` | Capture device screen as PNG |
 | `open <package-id\|url\|uri>` | Open an app, URL, or URI (auto-detects target type) |
@@ -41,9 +41,9 @@ workflow (also available as `record` alias), use [Android Recording Format for A
 | `click --desc-contains <sub>` | Tap the first element whose content description contains the substring |
 | `click --role <role>` | Tap the first element with the given role |
 | `click --selector <json>` | Tap using raw `NodeMatcher` JSON (advanced only; mutually exclusive with simple flags) |
-| `click --coordinate <x> <y>` | Tap a specific screen coordinate (mutually exclusive with selectors) |
+| `click --coordinate <x> <y>` | Tap a specific screen coordinate (non-negative integers; mutually exclusive with selectors) |
 | `click --text <text> --long` | Long press the matching element |
-| `click --text <text> --focus` | Set input focus without clicking (mutually exclusive with `--long`) |
+| `click --text <text> --focus` | Set input focus without clicking (mutually exclusive with `--long`; selector-based only, not supported with `--coordinate`) |
 | `type <text> --role <role>` | Type into the first element with the given role |
 | `type <text> --id <resource-id>` | Type into the first element with the given resource ID |
 | `type <text> --desc <text>` | Type into the first element with the given content description |
@@ -488,7 +488,7 @@ Combine fields to increase specificity when a single field is ambiguous:
 | `open_app` | `applicationId: string` | - |
 | `open_uri` | `uri: string` | `retry: object` |
 | `close_app` | `applicationId: string` | - |
-| `click` | `matcher: NodeMatcher` | `clickType: "default" \| "long_click" \| "focus"` (default: `"default"`) |
+| `click` | `matcher: NodeMatcher` or `coordinate: { x: number, y: number }` | `clickType: "default" \| "long_click" \| "focus"` (default: `"default"`). `matcher` and `coordinate` are mutually exclusive, and `clickType: "focus"` is only valid with `matcher`. |
 | `enter_text` | `matcher: NodeMatcher`, `text: string` | `submit: boolean` (default: `false`), `clear: boolean` (accepted by Node contract but currently ignored by Android runtime, so do not rely on it to clear existing text) |
 | `read_text` | `matcher: NodeMatcher` | `container: NodeMatcher` (scopes search to container subtree), `all: boolean` (default `false`; when `true`, returns all matches - see behavior note), `validator: "temperature" \| "version" \| "regex"`, `validatorPattern: string` (required when `validator` is `"regex"`), `retry: object` |
 | `wait_for_node` | `matcher: NodeMatcher` | `retry: object` (see `retry` object shape below), optional `timeoutMs: number` (1-120000 on the Operator wire) - wall-clock cap for the wait loop on device, in addition to the outer execution `timeoutMs` |
@@ -564,7 +564,7 @@ Android intent builder.
 
 **`close_app`:** The Node layer intercepts `close_app` actions and runs `adb shell am force-stop <applicationId>` before dispatching to Android. When that pre-flight close succeeds, the Node layer normalizes the resulting `close_app` step into a successful step result so the envelope reflects the real observed outcome. If the pre-flight `force-stop` fails, the execution now fails with a structured error instead of pretending the app was closed. In practice, treat `close_app` as a supported force-stop action through the Node interface. When an agent is turning a recording into a reusable skill, `close_app` is the deliberate reset primitive for flows that need a fresh app baseline, but it should not be injected automatically for every recording.
 
-**`click`:** Finds the node matching `matcher` and performs the specified `clickType`. The default click type is `"default"` (standard accessibility click with gesture fallback). Use `"long_click"` for long-press targets and `"focus"` to focus without activating.
+**`click`:** Runs either a selector click (`params.matcher`) or a coordinate click (`params.coordinate`). Exactly one is required. The default click type is `"default"` (standard accessibility click with gesture fallback). Use `"long_click"` for long-press targets and `"focus"` to focus without activating. `clickType: "focus"` is only supported for selector-based clicks.
 
 **`click` example request (`/execute`):**
 ```json

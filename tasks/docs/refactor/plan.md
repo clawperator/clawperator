@@ -69,7 +69,7 @@ Absolute links (https://, #anchors within same page) are untouched.
 
 - Maximum 2 levels deep (section > page). No sub-sub-sections.
 - Target ~6 pages per section (soft limit; API section is larger by design).
-- Total target: ~20 pages. Growth beyond 25 requires justification.
+- Total target: ~22 pages. Growth beyond 25 requires justification.
 - These constraints keep `llms-full.txt` coherent and retrieval predictable.
 
 ### Build failure conditions
@@ -193,7 +193,7 @@ nav:
     - Version Compatibility: troubleshooting/compatibility.md
 ```
 
-**20 pages total.** Down from 33 current pages (39% reduction).
+**22 pages total.** Down from 33 current pages (33% reduction).
 
 ### Page Descriptions
 
@@ -591,15 +591,15 @@ These items were tracked separately but are now part of this plan:
 
 ## 9. Execution Sequence
 
-This work ships as 3 PRs, strictly sequenced. Each PR is independently shippable and leaves the build in a working state.
+This work ships as 4 PRs, strictly sequenced. Each PR is independently shippable and leaves the build in a working state.
 
 This is a migration, not a perfection pass. Prioritize coherent structure, correct core documentation, and a deterministic build pipeline. Do not over-polish secondary pages in the first pass. Prefer shipping a clean, correct, strongly structured system that can be refined in follow-up PRs.
 
 **Review artifact:** For content PRs (PR-2 and PR-3), `llms-full.txt` is the canonical review artifact - not the HTML site. Reviewing the concatenated text file gives the most accurate picture of what agents will consume. The HTML site is a projection and may obscure structural issues visible in the flat text.
 
-### PR-1: Pipeline + skeleton
+### PR-1: Pipeline + skeleton [DONE]
 
-**Scope:** Phase 0 (migration prep) + Phase 1 (infrastructure) + placeholder content for all 20 pages.
+**Scope:** Phase 0 (migration prep) + Phase 1 (infrastructure) + placeholder content for all 22 pages.
 
 **Goal:** New build pipeline works end-to-end. Old URLs redirect. Site serves placeholder pages. No content judgment needed in review.
 
@@ -627,7 +627,7 @@ Steps:
 
 **Acceptance:**
 - `./scripts/docs_build.sh` succeeds
-- `sites/docs/.build/` contains all 20 pages
+- `sites/docs/.build/` contains all 22 pages
 - `llms-full.txt` generates in nav order
 - At least 5 old URL redirects resolve correctly
 - No `sites/docs/docs/` in git
@@ -672,13 +672,13 @@ Code changes:
 - Selector mutual exclusion rules documented
 - New error codes documented
 
-### PR-3: Remaining content + cleanup
+### PR-3: Remaining content
 
-**Scope:** Secondary API pages, skills pages, troubleshooting pages, index page, llms artifacts, old file deletion, and repo metadata updates.
+**Scope:** Secondary API pages, skills pages, troubleshooting pages, and index page rewrite.
 
-**Goal:** All 20 pages are final content. Old docs deleted. Repo is clean. llms artifacts are finalized.
+**Goal:** All 22 pages are final content. Zero placeholder pages remain.
 
-**Recommended model:** default. Secondary pages need accurate content but are less complex than PR-2. Cleanup tasks (moves, deletes, metadata updates) are mechanical. Default balances quality with throughput.
+**Recommended model:** default. Secondary pages need accurate content but are less complex than PR-2.
 
 Remaining content pages:
 1. `docs/api/snapshot.md` - snapshot format
@@ -697,32 +697,45 @@ Move with minimal changes:
 12. `docs/troubleshooting/known-issues.md` (from `docs/known-issues.md`)
 13. `docs/troubleshooting/compatibility.md` (from `docs/compatibility.md`)
 
-Finalize artifacts:
-14. Rewrite `llms.txt` (both `sites/docs/static/llms.txt` and `sites/landing/public/llms.txt`)
-15. Verify `llms-full.txt` is coherent top-to-bottom
-
-Cleanup:
-16. Move internal docs to `docs/internal/`: `conformance-apk.md`, `release-procedure.md`, `release-reference.md`, `site-hosting.md`, `design/` (entire directory)
-17. Delete old source files:
-    - Remove `docs/reference/`, `docs/ai-agents/` directories
-    - Remove absorbed files: `agent-quickstart.md`, `first-time-setup.md`, `openclaw-first-run.md`, `running-clawperator-on-android.md`, `project-overview.md`, `terminology.md`, `android-operator-apk.md`, `architecture.md`, `node-api-for-agents.md`, `snapshot-format.md`, `navigation-patterns.md`, `multi-device-workflows.md`, `crash-logs.md`, `troubleshooting.md`, `compatibility.md`, `known-issues.md`
-18. Update skills repo: replace docs with lightweight pointers to `https://docs.clawperator.com/skills/`
-19. Delete reference snapshot: `tasks/docs/refactor/reference/`
-20. Update `CLAUDE.md` to reflect new docs structure and pipeline
-21. Update `docs-generate` and `docs-validate` skill SKILL.md files
-22. Retire or simplify `diff_report.py`, `build_inventory.py`, `validate_source_of_truth.py`
-23. Delete task files listed in Section 8
-
-**Estimated scope:** ~25+ files but mostly mechanical. Secondary pages are simpler (less multi-source absorption, more straightforward moves/rewrites).
+**Estimated scope:** ~13 files. Content authoring only.
 
 **Acceptance:**
-- All acceptance criteria from Section 10 pass
+- `./scripts/docs_build.sh` succeeds
+- All 11 content pages + index verified against code
+- Zero placeholder pages remain
+- Zero occurrences of "receiver" in authored docs
+- `llms-full.txt` contains all 22 pages in correct order
+
+### PR-4: Cleanup + finalization
+
+**Scope:** Old file deletion, internal docs moves, llms artifact finalization, repo metadata updates, refactor artifact cleanup.
+
+**Goal:** Repo is clean. Old docs deleted. Metadata reflects new reality. Refactor artifacts removed.
+
+**Recommended model:** fast. This is mechanical cleanup - moves, deletes, metadata updates. No content judgment needed.
+
+Steps:
+1. Finalize `llms.txt` and verify `llms-full.txt` coherence top-to-bottom
+2. Move internal docs to `docs/internal/`: `conformance-apk.md`, `release-procedure.md`, `release-reference.md`, `site-hosting.md`, `design/` (entire directory)
+3. Delete old source files:
+    - Remove `docs/reference/`, `docs/ai-agents/` directories
+    - Remove absorbed files: `agent-quickstart.md`, `first-time-setup.md`, `openclaw-first-run.md`, `running-clawperator-on-android.md`, `project-overview.md`, `terminology.md`, `android-operator-apk.md`, `architecture.md`, `node-api-for-agents.md`, `snapshot-format.md`, `navigation-patterns.md`, `multi-device-workflows.md`, `crash-logs.md`, `troubleshooting.md`, `compatibility.md`, `known-issues.md`
+4. Update skills repo: replace docs with lightweight pointers to `https://docs.clawperator.com/skills/`
+5. Update `CLAUDE.md` to reflect new docs structure and pipeline
+6. Update `docs-generate` and `docs-validate` skill SKILL.md files
+7. Delete reference snapshot: `tasks/docs/refactor/reference/`
+8. Delete task files listed in Section 8
+
+**Estimated scope:** ~20+ files but entirely mechanical.
+
+**Acceptance:**
 - `./scripts/docs_build.sh` succeeds with zero warnings
-- `llms-full.txt` contains all 20 pages, coherent top-to-bottom
+- `llms-full.txt` contains all 22 pages, coherent top-to-bottom
+- Every URL in `llms.txt` resolves to a built HTML page
 - No old docs remain outside `docs/internal/`
-- No placeholder pages remain
 - Skills repo updated with pointer docs
 - `CLAUDE.md` reflects new reality
+- No reference snapshot or task files remain
 
 ---
 
@@ -757,7 +770,7 @@ Cleanup:
 ### Machine-Facing Artifacts
 
 - [ ] Every URL in `llms.txt` resolves to a built HTML page
-- [ ] `llms-full.txt` contains all 20 pages in nav order, no missing sections
+- [ ] `llms-full.txt` contains all 22 pages in nav order, no missing sections
 - [ ] `llms-full.txt` is coherent top-to-bottom (no orphaned cross-references, no undefined terms)
 
 ### Content Accuracy
