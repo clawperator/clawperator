@@ -334,6 +334,32 @@ setup_skills_via_cli() {
     fi
 }
 
+write_agent_guide() {
+    local AGENT_GUIDE_PATH="$HOME/.clawperator/AGENTS.md"
+
+    mkdir -p "$HOME/.clawperator"
+
+    cat > "$AGENT_GUIDE_PATH" <<'EOF'
+# Clawperator
+
+Deterministic Android automation runtime for AI agents.
+
+## Quick start
+
+clawperator doctor --json    # verify readiness
+clawperator snapshot --json  # capture device state
+clawperator click --text "Settings" --json  # tap an element
+
+## Documentation
+
+- Docs index: https://docs.clawperator.com/llms.txt
+- Full docs: https://docs.clawperator.com/llms-full.txt
+- Setup guide: https://docs.clawperator.com/setup/
+EOF
+
+    echo -e "${GREEN}✅ Wrote agent guide to ${AGENT_GUIDE_PATH}.${NC}"
+}
+
 sha256_file() {
     local FILE_PATH=$1
 
@@ -675,6 +701,7 @@ main() {
     check_git || exit 1
     
     install_cli || exit 1
+    write_agent_guide
     
     # Use doctor to drive the rest of the installation
     run_doctor_and_fix || exit 1

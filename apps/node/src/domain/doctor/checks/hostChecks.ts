@@ -2,6 +2,7 @@ import { isAdbAvailable, runAdb } from "../../../adapters/android-bridge/adbClie
 import { type RuntimeConfig } from "../../../adapters/android-bridge/runtimeConfig.js";
 import { type DoctorCheckResult } from "../../../contracts/doctor.js";
 import { ERROR_CODES } from "../../../contracts/errors.js";
+import { DOCTOR_DOCS_URLS } from "../docsUrls.js";
 
 export async function checkNodeVersion(): Promise<DoctorCheckResult> {
   const version = process.version;
@@ -23,6 +24,7 @@ export async function checkNodeVersion(): Promise<DoctorCheckResult> {
           { kind: "shell", value: "nvm use 22" },
           { kind: "manual", value: "Alternatively, download from nodejs.org" }
         ],
+        docsUrl: DOCTOR_DOCS_URLS.setup,
       },
     };
   }
@@ -50,6 +52,7 @@ export async function checkAdbPresence(config: RuntimeConfig): Promise<DoctorChe
           { kind: "manual", value: "macOS: brew install --cask android-platform-tools" },
           { kind: "manual", value: "Linux: sudo apt update && sudo apt install android-tools-adb" }
         ],
+        docsUrl: DOCTOR_DOCS_URLS.setup,
       },
     };
   }
@@ -79,6 +82,7 @@ export async function checkAdbServer(config: RuntimeConfig): Promise<DoctorCheck
           { kind: "shell", value: "adb kill-server" },
           { kind: "shell", value: "adb start-server" }
         ],
+        docsUrl: DOCTOR_DOCS_URLS.setup,
       },
     };
   }

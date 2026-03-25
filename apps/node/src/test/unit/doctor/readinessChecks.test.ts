@@ -22,6 +22,7 @@ describe("checkApkPresence", () => {
         assert.strictEqual(result.status, "fail");
         assert.strictEqual(result.code, ERROR_CODES.OPERATOR_NOT_INSTALLED);
         assert.match(result.detail ?? "", /Package com\.test\.operator was not found/);
+        assert.strictEqual(result.fix?.docsUrl, "https://docs.clawperator.com/setup/");
     });
 
     it("fails when package queries cannot run", async () => {
