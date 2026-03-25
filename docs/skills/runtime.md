@@ -9,6 +9,7 @@ Define what must be true before a skill run is reliable: device readiness, wrapp
 - Skill runtime: `apps/node/src/domain/skills/runSkill.ts`
 - Skill config: `apps/node/src/domain/skills/skillsConfig.ts`
 - CLI skill wrapper: `apps/node/src/cli/commands/skills.ts`
+- Environment variables overview: `docs/api/environment.md`
 
 ## Device Prep Checklist
 
@@ -135,7 +136,7 @@ Top-level timeout parsing failures happen before the skill starts:
 ```json
 {
   "code": "USAGE",
-  "message": "--timeout-ms requires a value"
+  "message": "--timeout requires a value"
 }
 ```
 
@@ -217,7 +218,7 @@ The pretty banner contains these exact components:
 
 - CLI version from `getCliVersion()`
 - APK status derived from `checkApkPresence()`
-- log path, defaulting to `~/.clawperator/logs/clawperator-YYYY-MM-DD.log`
+- log path, defaulting to `~/.clawperator/logs/clawperator-YYYY-MM-DD.log` when `logger.logPath()` did not supply an override
 - docs hint: `https://docs.clawperator.com/llms.txt`
 
 Verification pattern:
@@ -233,8 +234,7 @@ Verification pattern:
   "skillId": "com.android.settings.capture-overview",
   "output": "RESULT|status=success|snapshot=/tmp/settings.xml\n",
   "exitCode": 0,
-  "durationMs": 15321,
-  "timeoutMs": 120000
+  "durationMs": 15321
 }
 ```
 
@@ -246,8 +246,7 @@ Verification pattern:
   "message": "Skill com.android.settings.capture-overview timed out after 120000ms",
   "skillId": "com.android.settings.capture-overview",
   "stdout": "RESULT|status=partial\n",
-  "stderr": "still waiting for target node\n",
-  "timeoutMs": 120000
+  "stderr": "still waiting for target node\n"
 }
 ```
 

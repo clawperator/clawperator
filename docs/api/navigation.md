@@ -84,31 +84,27 @@ The `open` command treats a non-URI target as an app package and dispatches to `
 Verification:
 
 ```bash
-clawperator open com.android.settings --validate-only
+clawperator open com.android.settings --json
 ```
 
-Expected success shape:
+Expected live success shape:
 
 ```json
 {
-  "ok": true,
-  "validated": true,
-  "execution": {
-    "taskId": "cli-action-open-app",
-    "source": "clawperator-cli",
-    "timeoutMs": 15000,
-    "actions": [
+  "envelope": {
+    "status": "success",
+    "stepResults": [
       {
         "id": "a1",
-        "type": "open_app",
-        "params": {
-          "applicationId": "com.android.settings"
-        }
+        "actionType": "open_app",
+        "success": true
       }
     ]
   }
 }
 ```
+
+If you want to verify the builder shape without dispatching, use the example payload above with `clawperator exec --validate-only --execution '<json>'`.
 
 What to verify after `open_app`:
 
@@ -172,31 +168,27 @@ The `open` command uses `isOpenCliUriTarget()` and routes to `open_uri` when the
 Verification:
 
 ```bash
-clawperator open https://clawperator.com --validate-only
+clawperator open https://clawperator.com --json
 ```
 
-Expected success shape:
+Expected live success shape:
 
 ```json
 {
-  "ok": true,
-  "validated": true,
-  "execution": {
-    "taskId": "cli-action-open-uri",
-    "source": "clawperator-cli",
-    "timeoutMs": 15000,
-    "actions": [
+  "envelope": {
+    "status": "success",
+    "stepResults": [
       {
         "id": "a1",
-        "type": "open_uri",
-        "params": {
-          "uri": "https://clawperator.com"
-        }
+        "actionType": "open_uri",
+        "success": true
       }
     ]
   }
 }
 ```
+
+If you want to verify the builder shape without dispatching, use the example payload above with `clawperator exec --validate-only --execution '<json>'`.
 
 What Node validates versus what it does not:
 

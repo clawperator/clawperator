@@ -5243,31 +5243,27 @@ The `open` command treats a non-URI target as an app package and dispatches to `
 Verification:
 
 ```bash
-clawperator open com.android.settings --validate-only
+clawperator open com.android.settings --json
 ```
 
-Expected success shape:
+Expected live success shape:
 
 ```json
 {
-  "ok": true,
-  "validated": true,
-  "execution": {
-    "taskId": "cli-action-open-app",
-    "source": "clawperator-cli",
-    "timeoutMs": 15000,
-    "actions": [
+  "envelope": {
+    "status": "success",
+    "stepResults": [
       {
         "id": "a1",
-        "type": "open_app",
-        "params": {
-          "applicationId": "com.android.settings"
-        }
+        "actionType": "open_app",
+        "success": true
       }
     ]
   }
 }
 ```
+
+If you want to verify the builder shape without dispatching, use the example payload above with `clawperator exec --validate-only --execution '<json>'`.
 
 What to verify after `open_app`:
 
@@ -5331,31 +5327,27 @@ The `open` command uses `isOpenCliUriTarget()` and routes to `open_uri` when the
 Verification:
 
 ```bash
-clawperator open https://clawperator.com --validate-only
+clawperator open https://clawperator.com --json
 ```
 
-Expected success shape:
+Expected live success shape:
 
 ```json
 {
-  "ok": true,
-  "validated": true,
-  "execution": {
-    "taskId": "cli-action-open-uri",
-    "source": "clawperator-cli",
-    "timeoutMs": 15000,
-    "actions": [
+  "envelope": {
+    "status": "success",
+    "stepResults": [
       {
         "id": "a1",
-        "type": "open_uri",
-        "params": {
-          "uri": "https://clawperator.com"
-        }
+        "actionType": "open_uri",
+        "success": true
       }
     ]
   }
 }
 ```
+
+If you want to verify the builder shape without dispatching, use the example payload above with `clawperator exec --validate-only --execution '<json>'`.
 
 What Node validates versus what it does not:
 
@@ -6469,7 +6461,7 @@ Top-level usage and lookup failures are exact:
 Current execution command:
 
 ```bash
-clawperator skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--json] [-- <extra_args>]
+clawperator skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--timeout-ms <ms>] [--expect-contains <text>] [--skip-validate] [--json] [-- <extra_args>]
 ```
 
 What the wrapper does:
@@ -6563,6 +6555,9 @@ Important:
 - the wrapper does not impose a structured stdout format on the skill itself
 - progress lines written by the skill to stdout remain inside `output` in JSON mode
 - pretty mode writes a banner before streaming live skill output, so use `--json` when another agent needs machine-readable output
+- in JSON mode, the wrapper returns one JSON object and does not stream live child stdout separately
+- `timeoutMs` is present only when the caller passed `--timeout` or `--timeout-ms`
+- `expectedSubstring` is present only when the caller passed `--expect-contains`
 
 ## `skills run` Failure Shape
 
@@ -6573,8 +6568,7 @@ Important:
   "skillId": "com.android.settings.capture-overview",
   "exitCode": 2,
   "stdout": "RESULT|status=partial|snapshot=/tmp/settings.xml\n",
-  "stderr": "Timed out waiting for expected node\n",
-  "timeoutMs": 120000
+  "stderr": "Timed out waiting for expected node\n"
 }
 ```
 
@@ -6980,6 +6974,7 @@ Notes on those literals:
 - `commandId` is `${skillId}-${Date.now()}`
 - the default `operatorPackage` fallback inside the scaffolded script is `com.clawperator.operator`
 - the child `execFileSync()` timeout inside scaffolded `run.js` is `120000`
+- the scaffolded script currently invokes the literal `"clawperator"` binary, not `process.env.CLAWPERATOR_BIN`
 
 The scaffolded `run.sh` just forwards to `run.js`.
 
@@ -6988,6 +6983,16 @@ Current wrapper expectations:
 - device id is passed as the first positional arg when the caller used `skills run --device ...`
 - `CLAWPERATOR_BIN` is available in the environment
 - `CLAWPERATOR_OPERATOR_PACKAGE` is available in the environment
+
+Important boundary:
+
+- the wrapper injects `CLAWPERATOR_BIN`, but the scaffolded default `run.js` does not currently read it
+- if you want branch-local skill execution to use the resolved wrapper binary, update the scaffolded script explicitly
+
+Current scaffold behavior on nested `clawperator exec` failure is also worth knowing:
+
+- if `execFileSync("clawperator", ...)` throws but produced stdout, the scaffolded script writes that stdout and exits `0`
+- only failures with no stdout fall through to `stderr` plus `exit 1`
 
 There are no special stdout markers enforced by `runSkill.ts`. Any stdout contract beyond "raw output string" is skill-defined.
 
@@ -7152,13 +7157,19 @@ Compile failures from `compileArtifact()` are exact:
 ```json
 {
   "code": "COMPILE_VALIDATION_FAILED",
-  "message": "actions[0].type must be a string",
+  "message": "[object Object]",
   "details": {
     "skillId": "com.google.android.apps.chromecast.app.get-climate",
     "artifactName": "climate-status"
   }
 }
 ```
+
+Current nuance:
+
+- `compileArtifact()` forwards `String(e)` from `validateExecution(JSON.parse(...))`
+- when the validator throws a structured object rather than a plain `Error`, the current message can degrade to a generic string such as `"[object Object]"`
+- rely on the error code plus the artifact payload itself, not just the message text
 
 Recovery pattern:
 
@@ -7618,12 +7629,18 @@ Exact wrapper rules to keep in mind:
 - `.js` scripts run with `process.execPath`
 - the wrapper chooses `.js` first, then `.sh`, then the first listed script
 - JSON mode suppresses the pretty banner so stdout stays machine-readable
+- `--timeout` and `--timeout-ms` are accepted timeout flags for the wrapper
 
 Verification pattern:
 
 ```bash
 clawperator skills run com.example.app.do-thing --device <device_serial> --operator-package com.clawperator.operator.dev --timeout 90000 --json
 ```
+
+First-time agent pitfall:
+
+- pretty mode streams live output and prints a banner first
+- JSON mode returns one parseable wrapper object with the child stdout captured under `output`
 
 ## Step 4: Verify Output
 
@@ -7935,6 +7952,7 @@ Define what must be true before a skill run is reliable: device readiness, wrapp
 - Skill runtime: `apps/node/src/domain/skills/runSkill.ts`
 - Skill config: `apps/node/src/domain/skills/skillsConfig.ts`
 - CLI skill wrapper: `apps/node/src/cli/commands/skills.ts`
+- Environment variables overview: `docs/api/environment.md`
 
 ## Device Prep Checklist
 
@@ -8061,7 +8079,7 @@ Top-level timeout parsing failures happen before the skill starts:
 ```json
 {
   "code": "USAGE",
-  "message": "--timeout-ms requires a value"
+  "message": "--timeout requires a value"
 }
 ```
 
@@ -8143,7 +8161,7 @@ The pretty banner contains these exact components:
 
 - CLI version from `getCliVersion()`
 - APK status derived from `checkApkPresence()`
-- log path, defaulting to `~/.clawperator/logs/clawperator-YYYY-MM-DD.log`
+- log path, defaulting to `~/.clawperator/logs/clawperator-YYYY-MM-DD.log` when `logger.logPath()` did not supply an override
 - docs hint: `https://docs.clawperator.com/llms.txt`
 
 Verification pattern:
@@ -8159,8 +8177,7 @@ Verification pattern:
   "skillId": "com.android.settings.capture-overview",
   "output": "RESULT|status=success|snapshot=/tmp/settings.xml\n",
   "exitCode": 0,
-  "durationMs": 15321,
-  "timeoutMs": 120000
+  "durationMs": 15321
 }
 ```
 
@@ -8172,8 +8189,7 @@ Verification pattern:
   "message": "Skill com.android.settings.capture-overview timed out after 120000ms",
   "skillId": "com.android.settings.capture-overview",
   "stdout": "RESULT|status=partial\n",
-  "stderr": "still waiting for target node\n",
-  "timeoutMs": 120000
+  "stderr": "still waiting for target node\n"
 }
 ```
 

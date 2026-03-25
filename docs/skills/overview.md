@@ -286,7 +286,7 @@ Top-level usage and lookup failures are exact:
 Current execution command:
 
 ```bash
-clawperator skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--json] [-- <extra_args>]
+clawperator skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--timeout-ms <ms>] [--expect-contains <text>] [--skip-validate] [--json] [-- <extra_args>]
 ```
 
 What the wrapper does:
@@ -380,6 +380,9 @@ Important:
 - the wrapper does not impose a structured stdout format on the skill itself
 - progress lines written by the skill to stdout remain inside `output` in JSON mode
 - pretty mode writes a banner before streaming live skill output, so use `--json` when another agent needs machine-readable output
+- in JSON mode, the wrapper returns one JSON object and does not stream live child stdout separately
+- `timeoutMs` is present only when the caller passed `--timeout` or `--timeout-ms`
+- `expectedSubstring` is present only when the caller passed `--expect-contains`
 
 ## `skills run` Failure Shape
 
@@ -390,8 +393,7 @@ Important:
   "skillId": "com.android.settings.capture-overview",
   "exitCode": 2,
   "stdout": "RESULT|status=partial|snapshot=/tmp/settings.xml\n",
-  "stderr": "Timed out waiting for expected node\n",
-  "timeoutMs": 120000
+  "stderr": "Timed out waiting for expected node\n"
 }
 ```
 

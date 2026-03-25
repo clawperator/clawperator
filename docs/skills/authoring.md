@@ -260,6 +260,7 @@ Notes on those literals:
 - `commandId` is `${skillId}-${Date.now()}`
 - the default `operatorPackage` fallback inside the scaffolded script is `com.clawperator.operator`
 - the child `execFileSync()` timeout inside scaffolded `run.js` is `120000`
+- the scaffolded script currently invokes the literal `"clawperator"` binary, not `process.env.CLAWPERATOR_BIN`
 
 The scaffolded `run.sh` just forwards to `run.js`.
 
@@ -268,6 +269,16 @@ Current wrapper expectations:
 - device id is passed as the first positional arg when the caller used `skills run --device ...`
 - `CLAWPERATOR_BIN` is available in the environment
 - `CLAWPERATOR_OPERATOR_PACKAGE` is available in the environment
+
+Important boundary:
+
+- the wrapper injects `CLAWPERATOR_BIN`, but the scaffolded default `run.js` does not currently read it
+- if you want branch-local skill execution to use the resolved wrapper binary, update the scaffolded script explicitly
+
+Current scaffold behavior on nested `clawperator exec` failure is also worth knowing:
+
+- if `execFileSync("clawperator", ...)` throws but produced stdout, the scaffolded script writes that stdout and exits `0`
+- only failures with no stdout fall through to `stderr` plus `exit 1`
 
 There are no special stdout markers enforced by `runSkill.ts`. Any stdout contract beyond "raw output string" is skill-defined.
 
@@ -432,13 +443,19 @@ Compile failures from `compileArtifact()` are exact:
 ```json
 {
   "code": "COMPILE_VALIDATION_FAILED",
-  "message": "actions[0].type must be a string",
+  "message": "[object Object]",
   "details": {
     "skillId": "com.google.android.apps.chromecast.app.get-climate",
     "artifactName": "climate-status"
   }
 }
 ```
+
+Current nuance:
+
+- `compileArtifact()` forwards `String(e)` from `validateExecution(JSON.parse(...))`
+- when the validator throws a structured object rather than a plain `Error`, the current message can degrade to a generic string such as `"[object Object]"`
+- rely on the error code plus the artifact payload itself, not just the message text
 
 Recovery pattern:
 

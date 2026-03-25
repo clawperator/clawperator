@@ -270,12 +270,18 @@ Exact wrapper rules to keep in mind:
 - `.js` scripts run with `process.execPath`
 - the wrapper chooses `.js` first, then `.sh`, then the first listed script
 - JSON mode suppresses the pretty banner so stdout stays machine-readable
+- `--timeout` and `--timeout-ms` are accepted timeout flags for the wrapper
 
 Verification pattern:
 
 ```bash
 clawperator skills run com.example.app.do-thing --device <device_serial> --operator-package com.clawperator.operator.dev --timeout 90000 --json
 ```
+
+First-time agent pitfall:
+
+- pretty mode streams live output and prints a banner first
+- JSON mode returns one parseable wrapper object with the child stdout captured under `output`
 
 ## Step 4: Verify Output
 
