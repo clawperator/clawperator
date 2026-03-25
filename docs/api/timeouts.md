@@ -28,6 +28,20 @@ The key rule is:
 - the action-level timeout must fit inside the execution-level timeout
 - builder helpers intentionally inflate the execution-level timeout above the action-level wait so Node does not kill the whole run before the wait action has a chance to finish
 
+## CLI Timeout Mapping
+
+The `--timeout` flag does not land in the same place on every command.
+
+Current CLI mappings:
+
+| Command | CLI flag | Where it ends up |
+| --- | --- | --- |
+| `clawperator wait --timeout <ms>` | global `--timeout` parsed into `ctx.timeoutMs` | `wait_for_node.params.timeoutMs`, with `buildWaitExecution()` inflating top-level `execution.timeoutMs` |
+| `clawperator wait-for-nav --timeout <ms>` | global `--timeout` parsed into `ctx.timeoutMs` | `wait_for_navigation.params.timeoutMs`, with `buildWaitForNavExecution()` inflating top-level `execution.timeoutMs` |
+| `clawperator exec --timeout <ms>` | `cmdExecute()` override | replaces top-level `execution.timeoutMs` after validation |
+
+Use `--validate-only` or `--dry-run` when you need to confirm which layer a CLI flag changed.
+
 ## Execution-Level Timeout
 
 The execution-level timeout is always the top-level `timeoutMs` on the execution payload.
@@ -157,6 +171,36 @@ Expected validated execution shape:
 }
 ```
 
+For `wait`, the equivalent CLI mapping is:
+
+```bash
+clawperator wait --text "Done" --timeout 5000 --validate-only
+```
+
+Expected shape:
+
+```json
+{
+  "ok": true,
+  "validated": true,
+  "execution": {
+    "timeoutMs": 30000,
+    "actions": [
+      {
+        "id": "wait",
+        "type": "wait_for_node",
+        "params": {
+          "matcher": {
+            "textEquals": "Done"
+          },
+          "timeoutMs": 5000
+        }
+      }
+    ]
+  }
+}
+```
+
 ## Builder Inflation Rules
 
 The flat CLI builders intentionally inflate execution timeouts so the wait action has room to finish.
@@ -228,7 +272,7 @@ What this means operationally:
 - best-effort workflows may be allowed to run longer internally
 - direct execution payloads still validate against the normal execution timeout max
 - do not assume that setting `timeoutMs` above `120000` becomes valid just because best-effort runtime is higher
-- current CLI behavior still reports `exec best-effort` as stage-1 limited, so this constant should be treated as a runtime ceiling, not as a signal that best-effort is the preferred public path
+- treat this constant as a runtime ceiling, not as a replacement for the normal direct-execution validation range
 
 ## Concrete Budget Examples
 

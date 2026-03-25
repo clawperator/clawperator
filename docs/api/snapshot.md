@@ -16,13 +16,15 @@ Define what `snapshot_ui` returns, where the XML hierarchy is attached in the re
 
 `snapshot_ui` is the canonical read-only UI observation action. The Android runtime writes the hierarchy dump to logcat, then the Node layer extracts the XML and attaches it to the successful step result as `data.text`.
 
-The built-in `clawperator snapshot` command constructs a one-step execution with these exact literals:
+The built-in `clawperator snapshot` command constructs a one-step execution with these exact defaults:
 
 - `source: "clawperator-observe"`
 - `expectedFormat: "android-ui-automator"`
 - `timeoutMs: 30000` when `buildSnapshotExecution()` is called without an override
 - one action with `id: "snap"` and `type: "snapshot_ui"`
 - `mode: "direct"`
+- `commandId` is generated as `snapshot-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+- `taskId` equals the generated `commandId`
 
 For CLI `snapshot --json`, machine-checkable success means:
 
@@ -33,7 +35,7 @@ For CLI `snapshot --json`, machine-checkable success means:
 - `envelope.stepResults[0].success == true`
 - `envelope.stepResults[0].data.text` is present
 
-The default one-step builder used by `clawperator snapshot` is:
+Example one-step payload from the `clawperator snapshot` builder:
 
 ```json
 {
@@ -64,12 +66,19 @@ The current flow is:
 6. `markExtractionFailedSnapshotSteps()` converts any still-successful snapshot step with missing `data.text` into a failed step with `data.error = "SNAPSHOT_EXTRACTION_FAILED"`.
 7. `addSettleWarnings()` may attach `data.warn` if the snapshot action immediately follows `click` or `scroll_and_click`.
 
+Debugging details that matter when extraction goes wrong:
+
+- `runExecution()` clears logcat before dispatch with `adb logcat -c`
+- after the execution finishes, Node dumps logcat with `adb logcat -d -v tag`
+- `snapshotHelper.ts` only extracts blocks from lines containing `[TaskScope] UI Hierarchy:`
+
 Important boundaries:
 
 - Node does not parse the XML into a typed object. It treats the hierarchy as opaque text.
 - When multiple snapshots exist in one execution, Node attaches the most recent extracted snapshot to the most recent successful `snapshot_ui` step, walking backward through both lists.
 - If no successful `snapshot_ui` steps exist, extraction output is ignored.
 - Node only reads logcat for snapshot extraction when the result envelope already contains at least one `snapshot_ui` step.
+- for direct snapshot executions like `clawperator snapshot`, the step `id` matches the action `id` (`"snap"`)
 
 ## Envelope Placement
 
@@ -206,7 +215,7 @@ Typical recovery:
 
 1. Run `clawperator version --check-compat`.
 2. Run `clawperator doctor --json`.
-3. Re-run the snapshot with `--verbose` if you need to inspect log correlation.
+3. Re-run the snapshot with `--verbose` if you need to inspect log correlation and the `[TaskScope] UI Hierarchy:` marker.
 
 Verification pattern - confirm extraction failure handling:
 
