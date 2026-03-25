@@ -123,7 +123,7 @@ def parse_markdown_links(markdown_path: Path) -> list[str]:
     return links
 
 
-def generated_doc_link_to_site_path(page_path: Path, generated_docs_dir: Path, href: str) -> str | None:
+def resolve_relative_markdown_link(page_path: Path, generated_docs_dir: Path, href: str) -> str | None:
     clean_href = href.split("#", 1)[0].split("?", 1)[0].strip()
     if not clean_href:
         return None
@@ -131,11 +131,28 @@ def generated_doc_link_to_site_path(page_path: Path, generated_docs_dir: Path, h
     if clean_href.startswith("/"):
         return clean_href.lstrip("/")
 
+    relative_page = page_path.relative_to(generated_docs_dir)
+    relative_target = Path(relative_page.parent, clean_href)
+
     if clean_href.endswith(".md"):
-        relative_page = page_path.relative_to(generated_docs_dir)
-        resolved_doc = normpath(str(relative_page.parent / clean_href))
-        return markdown_output_to_site_path(resolved_doc)
+        candidate_paths = [Path(normpath(str(relative_target)))]
+    elif clean_href.endswith("/"):
+        candidate_paths = [Path(normpath(str(relative_target / "index.md")))]
+    else:
+        candidate_paths = [
+            Path(normpath(str(relative_target.with_suffix(".md")))),
+            Path(normpath(str(relative_target / "index.md"))),
+        ]
+
+    for candidate in candidate_paths:
+        if any(part == ".." for part in candidate.parts):
+            continue
+        return markdown_output_to_site_path(str(candidate))
     return None
+
+
+def generated_doc_link_to_site_path(page_path: Path, generated_docs_dir: Path, href: str) -> str | None:
+    return resolve_relative_markdown_link(page_path, generated_docs_dir, href)
 
 
 def check_inner_page_links(generated_docs_dir: Path, site_dir: Path) -> list[str]:
@@ -146,17 +163,14 @@ def check_inner_page_links(generated_docs_dir: Path, site_dir: Path) -> list[str
             raw = href.split("#", 1)[0].split("?", 1)[0].strip()
             if not raw or raw.startswith("#") or raw.startswith("http") or raw.startswith("mailto:") or raw.startswith("tel:"):
                 continue
-            if not raw.endswith(".md"):
+            target = resolve_relative_markdown_link(md_file, generated_docs_dir, raw)
+            if target is None or target.startswith("/"):
                 continue
-            resolved_md = (md_file.parent / raw).resolve()
-            try:
-                rel_path = resolved_md.relative_to(generated_docs_dir)
-            except ValueError:
+            resolved_site_path = Path(target)
+            candidate_site_path = site_dir / resolved_site_path
+            if not candidate_site_path.exists():
                 errors.append(f"inner-page-link: {md_file.relative_to(generated_docs_dir)} -> {raw} (unresolvable)")
                 continue
-            site_path = markdown_output_to_site_path(str(rel_path))
-            if not (site_dir / site_path).exists():
-                errors.append(f"inner-page-link: {md_file.relative_to(generated_docs_dir)} -> {raw}")
     return errors
 
 

@@ -103,6 +103,7 @@ def source_map_entries(source_map: object) -> tuple[dict[str, dict], list[dict]]
 
 
 def validate_source_list(entries: list[dict], kind: str) -> None:
+    root = repo_root().resolve()
     for entry in entries:
         sources = entry.get("sources")
         if not isinstance(sources, list) or not sources:
@@ -111,9 +112,11 @@ def validate_source_list(entries: list[dict], kind: str) -> None:
             if not isinstance(raw_source, str) or not raw_source.strip():
                 raise ValueError(f"{kind} entry has an invalid source path: {entry!r}")
             source_path = Path(raw_source)
-            if source_path.is_absolute() or str(source_path).startswith(".."):
+            if source_path.is_absolute():
                 raise ValueError(f"{kind} entry source must be relative to repo root: {raw_source}")
-            resolved = repo_root() / source_path
+            resolved = (root / source_path).resolve()
+            if not resolved.is_relative_to(root):
+                raise ValueError(f"{kind} entry source must stay within the repo root: {raw_source}")
             if not resolved.exists():
                 raise FileNotFoundError(f"{kind} entry source not found: {resolved}")
 

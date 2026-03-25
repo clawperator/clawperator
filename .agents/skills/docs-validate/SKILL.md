@@ -9,14 +9,14 @@ Use this skill to validate that docs changes came from the right source files.
 
 ## Purpose
 
-This skill guards the docs source-of-truth contract:
+This skill checks the docs source-of-truth contract enforced by the build:
 
 - `docs/` contains authored public docs
 - `sites/docs/.build/` is generated staging output
 - `sites/docs/site/` is build output
 
-If the assembled docs or built site do not match the authored and code-derived
-sources, this skill should fail.
+If the assembled docs or built site violate those build invariants, this skill
+should fail.
 
 ## Workflow
 
