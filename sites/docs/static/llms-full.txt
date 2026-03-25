@@ -3633,6 +3633,7 @@ Define the timeout budgeting model for Clawperator executions: execution-level t
 - Snapshot builder: `apps/node/src/domain/observe/snapshot.ts`
 - Sleep builder: `apps/node/src/domain/actions/sleep.ts`
 - `exec` validation and override path: `apps/node/src/cli/commands/execute.ts`
+- `exec best-effort` CLI routing: `apps/node/src/cli/registry.ts`
 
 ## Two Timeout Levels
 
@@ -3914,7 +3915,7 @@ Agent guidance:
 {
   "commandId": "snap-1",
   "taskId": "snap-1",
-  "source": "agent",
+  "source": "clawperator-observe",
   "expectedFormat": "android-ui-automator",
   "timeoutMs": 30000,
   "actions": [
@@ -3936,7 +3937,7 @@ Good budget because:
 {
   "commandId": "nav-1",
   "taskId": "nav-1",
-  "source": "agent",
+  "source": "clawperator-action",
   "expectedFormat": "android-ui-automator",
   "timeoutMs": 35000,
   "actions": [
@@ -3971,7 +3972,7 @@ Why `35000` is the right budget here:
 {
   "commandId": "read-after-click",
   "taskId": "read-after-click",
-  "source": "agent",
+  "source": "clawperator-action",
   "expectedFormat": "android-ui-automator",
   "timeoutMs": 45000,
   "actions": [
@@ -4266,18 +4267,23 @@ clawperator snapshot --json --log-level debug
 
 ## `CLAWPERATOR_SKILLS_REGISTRY`
 
-Defines the path to the active `skills-registry.json` used by all skill commands.
+Defines the path to the active `skills-registry.json` used by all skill commands when they do not pass an explicit registry-path argument into `loadRegistry()`.
 
 Read by: `skills list`, `skills get`, `skills search`, `skills run`, `skills validate`, `skills compile-artifact`, `skills new`, and the `/skills` serve endpoints.
 
 Default when unset: `<cwd>/skills/skills-registry.json` where `<cwd>` is `process.cwd()`.
 
-Fallback behavior in `loadRegistry()`:
+Current `loadRegistry()` precedence is:
 
-1. If `CLAWPERATOR_SKILLS_REGISTRY` is set, try that configured path
-2. Otherwise try the default path `<cwd>/skills/skills-registry.json`
-3. Only when an explicit `registryPath` argument was passed and that read fails, also try `<cwd>/../../skills/skills-registry.json` (covers running from `apps/node/`)
-4. If the default-path read fails with no env var and no explicit `registryPath`, `loadRegistry()` throws immediately and suggests `clawperator skills install`
+1. explicit `registryPath` argument, when a caller supplied one
+2. `CLAWPERATOR_SKILLS_REGISTRY`
+3. default path `<cwd>/skills/skills-registry.json`
+
+Fallback behavior after that initial choice:
+
+1. If an explicit `registryPath` argument was passed and that read fails, also try `<cwd>/../../skills/skills-registry.json` (covers running from `apps/node/`)
+2. If `CLAWPERATOR_SKILLS_REGISTRY` is set and that read fails, `loadRegistry()` throws a configured-path error immediately
+3. If the default-path read fails with no env var and no explicit `registryPath`, `loadRegistry()` throws immediately and suggests `clawperator skills install`
 
 After `clawperator skills install` or `clawperator skills sync`, the registry lives at `~/.clawperator/skills/skills/skills-registry.json`. Set the env var to point there:
 
@@ -5403,7 +5409,7 @@ Current public parameters:
 
 | Field | Valid values | Meaning |
 | --- | --- | --- |
-| `expectedPackage` | optional non-blank string | wait until that package is foreground |
+| `expectedPackage` | optional non-blank string, `<= 512` characters | wait until that package is foreground |
 | `expectedNode` | optional `NodeMatcher` | wait until a target node is present |
 | `timeoutMs` | required number, `> 0`, `<= 30000` | wait window for navigation confirmation |
 
@@ -5530,7 +5536,7 @@ Machine-checkable success conditions:
 - `stepResults[0].actionType == "open_app"` and `stepResults[0].success == true`
 - `stepResults[0].data.application_id == "com.android.settings"`
 - `stepResults[1].actionType == "wait_for_navigation"` and `stepResults[1].success == true`
-- `stepResults[1].data.resolved_package == "com.android.settings"`
+- when waiting by `expectedPackage`, `stepResults[1].data.resolved_package == "com.android.settings"`
 - `stepResults[2].actionType == "snapshot_ui"` and `stepResults[2].success == true`
 - `stepResults[2].data.text` exists
 
@@ -5632,6 +5638,7 @@ Runtime detail:
 
 - `wait_for_navigation` timeout failures use `data.error: "NAVIGATION_TIMEOUT"`
 - when the runtime observed a foreground package before the timeout expired, it may also include `data.last_package`
+- on success, `data.resolved_package` is present when the runtime had a foreground package value to report
 
 ### Wrong package on screen
 
@@ -6186,7 +6193,7 @@ Typical failure shape:
 ```json
 {
   "code": "RECORDING_ALREADY_IN_PROGRESS",
-  "message": "Recording already in progress"
+  "message": "Recording is already in progress"
 }
 ```
 
@@ -6214,7 +6221,7 @@ Typical failure shape:
 ```json
 {
   "code": "RECORDING_NOT_IN_PROGRESS",
-  "message": "No recording in progress"
+  "message": "Recording is not in progress"
 }
 ```
 
@@ -6260,6 +6267,29 @@ Verification pattern:
 clawperator devices --json
 clawperator record pull --session-id demo-session --device <device_serial> --json
 ```
+
+## Runtime Step Errors Outside The Public Node Error Enum
+
+`record start` and `record stop` can also surface Android runtime step errors that are not part of `apps/node/src/contracts/errors.ts`.
+
+Current examples from `RecordingManager.kt` and `UiActionEngine.kt`:
+
+- `RECORDING_STORAGE_UNAVAILABLE`
+- `RECORDING_START_FAILED`
+- `RECORDING_STOP_FAILED`
+
+These values appear inside `envelope.stepResults[].data.error`, not as top-level Node `code` values.
+
+Branching rule:
+
+- top-level `code` is the public Node error contract documented in `contracts/errors.ts`
+- `stepResults[].data.error` may also contain Android runtime-specific strings that are useful for recovery but are not part of the public top-level enum
+
+Typical recovery:
+
+- `RECORDING_STORAGE_UNAVAILABLE`: verify the Operator app can access its external files directory, then retry `record start`
+- `RECORDING_START_FAILED`: check the supplied `sessionId` and retry with a safe id matching `^[a-zA-Z0-9_-]+$`
+- `RECORDING_STOP_FAILED`: retry `record stop`, then inspect device state if finalization keeps timing out
 
 ### `RECORDING_PARSE_FAILED`
 
