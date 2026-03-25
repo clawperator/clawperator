@@ -15,7 +15,7 @@ def source_path() -> Path:
     return repo_root() / "apps" / "node" / "src" / "contracts" / "errors.ts"
 
 
-def humanize(code: str) -> str:
+def derive_label(code: str) -> str:
     return code.lower().replace("_", " ").capitalize()
 
 
@@ -53,11 +53,11 @@ def main() -> int:
         raise FileNotFoundError(f"Missing source file: {path}")
     entries = parse_entries(path.read_text(encoding="utf-8"))
     lines = [
-        "| Code | Meaning | Notes |",
+        "| Code | Derived label | Notes |",
         "| --- | --- | --- |",
     ]
     for code, note in entries:
-        lines.append(f"| `{code}` | {humanize(code)} | {note or '-'} |")
+        lines.append(f"| `{code}` | {derive_label(code)} | {note or '-'} |")
     sys.stdout.write("\n".join(lines) + "\n")
     return 0
 

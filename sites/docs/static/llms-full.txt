@@ -358,7 +358,7 @@ This page will describe the snapshot output shape and parsing contract.
 
 Placeholder - content coming in PR-2/PR-3.
 
-| Code | Meaning | Notes |
+| Code | Derived label | Notes |
 | --- | --- | --- |
 | `HOST_DEPENDENCY_MISSING` | Host dependency missing | Host |
 | `ADB_NOT_FOUND` | Adb not found | Setup & Connectivity |
