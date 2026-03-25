@@ -219,6 +219,7 @@ The pretty banner contains these exact components:
 - CLI version from `getCliVersion()`
 - APK status derived from `checkApkPresence()`
 - log path, defaulting to `~/.clawperator/logs/clawperator-YYYY-MM-DD.log` when `logger.logPath()` did not supply an override
+- hint: `tail -f <logPath>`
 - docs hint: `https://docs.clawperator.com/llms.txt`
 
 Verification pattern:

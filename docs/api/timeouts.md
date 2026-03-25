@@ -69,7 +69,7 @@ At runtime, `runExecution()` waits for the Android result envelope using:
 
 - `execution.timeoutMs + 5000`
 
-That extra `5000` milliseconds is a transport buffer for the envelope write and logcat capture. It does not change the documented execution budget. Agents should still reason from the top-level `execution.timeoutMs`.
+That extra `5000` milliseconds is a buffer for envelope write. It does not change the documented execution budget. Agents should still reason from the top-level `execution.timeoutMs`.
 
 If the runtime exceeds the budget and Node never receives a valid result envelope, the caller gets a top-level `RESULT_ENVELOPE_TIMEOUT` error, not a normal success wrapper.
 
@@ -265,14 +265,25 @@ Exact snapshot builder literals:
 
 `LIMITS.MAX_BEST_EFFORT_RUNTIME_MS` is `180000`.
 
-This limit belongs to the best-effort execution mode constants. It is not the same as the standard direct execution timeout range. For normal direct executions, agents should still keep top-level `timeoutMs` inside `1000..120000`.
+This constant exists in `apps/node/src/contracts/limits.ts`, but the current CLI `exec best-effort` path is still `NOT_IMPLEMENTED` and returns:
 
-What this means operationally:
+```json
+{
+  "code": "NOT_IMPLEMENTED",
+  "message": "exec best-effort is Stage 1 limited; use snapshot + agent reasoning for now"
+}
+```
 
-- best-effort workflows may be allowed to run longer internally
-- direct execution payloads still validate against the normal execution timeout max
-- do not assume that setting `timeoutMs` above `120000` becomes valid just because best-effort runtime is higher
-- treat this constant as a runtime ceiling, not as a replacement for the normal direct-execution validation range
+What is implemented today:
+
+- normal direct executions validate `execution.timeoutMs` inside `1000..120000`
+- `validateExecution()` only accepts `mode: "direct"` or `mode: "artifact_compiled"`
+- `MAX_BEST_EFFORT_RUNTIME_MS` is a defined constant, not an active public execution contract for the current CLI path
+
+Agent guidance:
+
+- do not plan around `exec best-effort` yet
+- do not assume `timeoutMs > 120000` becomes valid because the constant exists
 
 ## Concrete Budget Examples
 

@@ -3740,7 +3740,7 @@ At runtime, `runExecution()` waits for the Android result envelope using:
 
 - `execution.timeoutMs + 5000`
 
-That extra `5000` milliseconds is a transport buffer for the envelope write and logcat capture. It does not change the documented execution budget. Agents should still reason from the top-level `execution.timeoutMs`.
+That extra `5000` milliseconds is a buffer for envelope write. It does not change the documented execution budget. Agents should still reason from the top-level `execution.timeoutMs`.
 
 If the runtime exceeds the budget and Node never receives a valid result envelope, the caller gets a top-level `RESULT_ENVELOPE_TIMEOUT` error, not a normal success wrapper.
 
@@ -3936,14 +3936,25 @@ Exact snapshot builder literals:
 
 `LIMITS.MAX_BEST_EFFORT_RUNTIME_MS` is `180000`.
 
-This limit belongs to the best-effort execution mode constants. It is not the same as the standard direct execution timeout range. For normal direct executions, agents should still keep top-level `timeoutMs` inside `1000..120000`.
+This constant exists in `apps/node/src/contracts/limits.ts`, but the current CLI `exec best-effort` path is still `NOT_IMPLEMENTED` and returns:
 
-What this means operationally:
+```json
+{
+  "code": "NOT_IMPLEMENTED",
+  "message": "exec best-effort is Stage 1 limited; use snapshot + agent reasoning for now"
+}
+```
 
-- best-effort workflows may be allowed to run longer internally
-- direct execution payloads still validate against the normal execution timeout max
-- do not assume that setting `timeoutMs` above `120000` becomes valid just because best-effort runtime is higher
-- treat this constant as a runtime ceiling, not as a replacement for the normal direct-execution validation range
+What is implemented today:
+
+- normal direct executions validate `execution.timeoutMs` inside `1000..120000`
+- `validateExecution()` only accepts `mode: "direct"` or `mode: "artifact_compiled"`
+- `MAX_BEST_EFFORT_RUNTIME_MS` is a defined constant, not an active public execution contract for the current CLI path
+
+Agent guidance:
+
+- do not plan around `exec best-effort` yet
+- do not assume `timeoutMs > 120000` becomes valid because the constant exists
 
 ## Concrete Budget Examples
 
@@ -4212,7 +4223,10 @@ Check `report.operatorPackage` in the JSON output:
 
 If `operatorPackage` shows the value you set, the env var is active.
 
-Error case: if the env var names a package that is not installed, commands that target a device will fail with `OPERATOR_NOT_INSTALLED` or `OPERATOR_VARIANT_MISMATCH`. Run `clawperator doctor --json` to diagnose.
+Error case:
+
+- if the env var names a package that is not installed, device-targeting commands fail with `OPERATOR_NOT_INSTALLED`
+- if only the alternate known Operator variant is installed, `clawperator doctor --json` reports `OPERATOR_VARIANT_MISMATCH` as a readiness warning
 
 Note: the CLI also accepts `--receiver-package` as a legacy alias for `--operator-package`. Both override the same env var. Do not use `--receiver-package` in new code.
 
@@ -6132,6 +6146,98 @@ Typical failure shape:
   "code": "RECORDING_SESSION_NOT_FOUND",
   "message": "No recording session found on device. Start a recording first."
 }
+```
+
+Recovery:
+
+- run `clawperator record start --session-id <id>` before trying to pull
+- if you expected the latest pointer to exist, stop the active recording first so the device writes the finished session metadata
+- if you passed `--session-id`, confirm it matches `^[a-zA-Z0-9_-]+$`
+
+### `RECORDING_ALREADY_IN_PROGRESS`
+
+Typical cause:
+
+- `record start` was called while the Operator runtime already had an active recording session
+
+Typical failure shape:
+
+```json
+{
+  "code": "RECORDING_ALREADY_IN_PROGRESS",
+  "message": "Recording already in progress"
+}
+```
+
+Recovery:
+
+- run `clawperator record stop --device <device_serial> --json`
+- then pull or parse the finished session before starting a new one
+- if your workflow uses explicit session ids, reuse the active session id instead of starting a second overlapping recording
+
+Verification pattern:
+
+```bash
+clawperator record stop --device <device_serial> --json
+clawperator record pull --device <device_serial> --json
+```
+
+### `RECORDING_NOT_IN_PROGRESS`
+
+Typical cause:
+
+- `record stop` was called when no recording session was active on the device
+
+Typical failure shape:
+
+```json
+{
+  "code": "RECORDING_NOT_IN_PROGRESS",
+  "message": "No recording in progress"
+}
+```
+
+Recovery:
+
+- start a recording first with `clawperator record start --session-id <id> --device <device_serial>`
+- only call `record stop` after the session has actually started
+
+Verification pattern:
+
+```bash
+clawperator record start --session-id demo-session --device <device_serial> --json
+clawperator record stop --session-id demo-session --device <device_serial> --json
+```
+
+### `RECORDING_PULL_FAILED`
+
+Typical causes:
+
+- adb transport failure during `adb pull`
+- disconnected device
+- remote recording file missing even though the session id resolved
+
+Typical failure shape:
+
+```json
+{
+  "code": "RECORDING_PULL_FAILED",
+  "message": "Failed to pull recording from device: adb: error: failed to stat remote object '/sdcard/Android/data/com.clawperator.operator.dev/files/recordings/demo-session.ndjson': No such file or directory"
+}
+```
+
+Recovery:
+
+- confirm the device is still visible in `clawperator devices --json`
+- rerun `clawperator record stop --session-id <id>` if the session may still be open
+- retry `record pull` with the exact `--session-id` you just stopped
+- if adb itself is failing, fix the transport problem before retrying
+
+Verification pattern:
+
+```bash
+clawperator devices --json
+clawperator record pull --session-id demo-session --device <device_serial> --json
 ```
 
 ### `RECORDING_PARSE_FAILED`
@@ -8232,6 +8338,7 @@ The pretty banner contains these exact components:
 - CLI version from `getCliVersion()`
 - APK status derived from `checkApkPresence()`
 - log path, defaulting to `~/.clawperator/logs/clawperator-YYYY-MM-DD.log` when `logger.logPath()` did not supply an override
+- hint: `tail -f <logPath>`
 - docs hint: `https://docs.clawperator.com/llms.txt`
 
 Verification pattern:
@@ -8719,7 +8826,7 @@ Reason for the minimal page:
 - the old reference snapshot contained issues that are not fully verifiable from the current `apps/node/src/` surface alone
 - this docs refactor documents only issues we can verify against current implementation
 
-This is an intentional state, not a placeholder contract. There is no Node API endpoint or CLI command that returns a machine-readable "known issues" list today.
+This is an intentional state, not a placeholder contract. We do not currently maintain a code-backed known-issues catalog in the Node API or CLI. Use `doctor`, `version --check-compat`, and command-specific error codes instead.
 
 ## Verification Boundary
 

@@ -13,7 +13,7 @@ Reason for the minimal page:
 - the old reference snapshot contained issues that are not fully verifiable from the current `apps/node/src/` surface alone
 - this docs refactor documents only issues we can verify against current implementation
 
-This is an intentional state, not a placeholder contract. There is no Node API endpoint or CLI command that returns a machine-readable "known issues" list today.
+This is an intentional state, not a placeholder contract. We do not currently maintain a code-backed known-issues catalog in the Node API or CLI. Use `doctor`, `version --check-compat`, and command-specific error codes instead.
 
 ## Verification Boundary
 

@@ -490,6 +490,98 @@ Typical failure shape:
 }
 ```
 
+Recovery:
+
+- run `clawperator record start --session-id <id>` before trying to pull
+- if you expected the latest pointer to exist, stop the active recording first so the device writes the finished session metadata
+- if you passed `--session-id`, confirm it matches `^[a-zA-Z0-9_-]+$`
+
+### `RECORDING_ALREADY_IN_PROGRESS`
+
+Typical cause:
+
+- `record start` was called while the Operator runtime already had an active recording session
+
+Typical failure shape:
+
+```json
+{
+  "code": "RECORDING_ALREADY_IN_PROGRESS",
+  "message": "Recording already in progress"
+}
+```
+
+Recovery:
+
+- run `clawperator record stop --device <device_serial> --json`
+- then pull or parse the finished session before starting a new one
+- if your workflow uses explicit session ids, reuse the active session id instead of starting a second overlapping recording
+
+Verification pattern:
+
+```bash
+clawperator record stop --device <device_serial> --json
+clawperator record pull --device <device_serial> --json
+```
+
+### `RECORDING_NOT_IN_PROGRESS`
+
+Typical cause:
+
+- `record stop` was called when no recording session was active on the device
+
+Typical failure shape:
+
+```json
+{
+  "code": "RECORDING_NOT_IN_PROGRESS",
+  "message": "No recording in progress"
+}
+```
+
+Recovery:
+
+- start a recording first with `clawperator record start --session-id <id> --device <device_serial>`
+- only call `record stop` after the session has actually started
+
+Verification pattern:
+
+```bash
+clawperator record start --session-id demo-session --device <device_serial> --json
+clawperator record stop --session-id demo-session --device <device_serial> --json
+```
+
+### `RECORDING_PULL_FAILED`
+
+Typical causes:
+
+- adb transport failure during `adb pull`
+- disconnected device
+- remote recording file missing even though the session id resolved
+
+Typical failure shape:
+
+```json
+{
+  "code": "RECORDING_PULL_FAILED",
+  "message": "Failed to pull recording from device: adb: error: failed to stat remote object '/sdcard/Android/data/com.clawperator.operator.dev/files/recordings/demo-session.ndjson': No such file or directory"
+}
+```
+
+Recovery:
+
+- confirm the device is still visible in `clawperator devices --json`
+- rerun `clawperator record stop --session-id <id>` if the session may still be open
+- retry `record pull` with the exact `--session-id` you just stopped
+- if adb itself is failing, fix the transport problem before retrying
+
+Verification pattern:
+
+```bash
+clawperator devices --json
+clawperator record pull --session-id demo-session --device <device_serial> --json
+```
+
 ### `RECORDING_PARSE_FAILED`
 
 Typical causes:

@@ -83,7 +83,10 @@ Check `report.operatorPackage` in the JSON output:
 
 If `operatorPackage` shows the value you set, the env var is active.
 
-Error case: if the env var names a package that is not installed, commands that target a device will fail with `OPERATOR_NOT_INSTALLED` or `OPERATOR_VARIANT_MISMATCH`. Run `clawperator doctor --json` to diagnose.
+Error case:
+
+- if the env var names a package that is not installed, device-targeting commands fail with `OPERATOR_NOT_INSTALLED`
+- if only the alternate known Operator variant is installed, `clawperator doctor --json` reports `OPERATOR_VARIANT_MISMATCH` as a readiness warning
 
 Note: the CLI also accepts `--receiver-package` as a legacy alias for `--operator-package`. Both override the same env var. Do not use `--receiver-package` in new code.
 
