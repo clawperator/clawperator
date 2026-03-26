@@ -130,15 +130,18 @@ Every generated block must follow this exact structure:
 
 Sections that have no user-facing changes are omitted entirely.
 
-**Date rule:** Use the annotated tag's creation date via `git for-each-ref --format='%(creatordate:short)' refs/tags/<end-tag>`. For lightweight tags this returns the commit's committer date, which is acceptable. If the tag ref does not exist the script must exit non-zero with a clear error — no fallback to today's date.
+**Date rule:** The script first tries `git for-each-ref --format='%(creatordate:short)' refs/tags/<end-ref>` for the release date. For annotated tags this is the tag creation date; for lightweight tags it is the commit's committer date — both are acceptable. If the end ref is not a tag (branch name or commit SHA), the script falls back to `git log -1 --format='%cs' <end-ref>` (committer date of that commit). If the ref resolves to no commits, the script exits non-zero with a clear error.
 
 ---
 
 ## Configurability
 
-The skill accepts positional tags `<start-tag> <end-tag>` (e.g., `v0.5.0` and `v0.5.1`). This supports both current-release and historical backfill use cases with the same invocation.
+The skill accepts `<start-tag> <end-ref>` where `<end-ref>` is a git tag, branch name, or commit SHA. This supports two workflows:
 
-**Git range semantics:** `START_TAG..END_TAG` means commits reachable from `END_TAG` but not from `START_TAG` — start is exclusive, end is inclusive. The script enumerates exactly the commits that went into the release represented by `END_TAG`.
+- **Pre-tag (recommended):** `$release-notes-author v0.5.1 main` — run before cutting the release tag. The CHANGELOG entry is merged first; the tag fires the workflow with the entry already present. Release date is the HEAD commit's committer date, which matches the date the tag will be cut.
+- **Post-tag / backfill:** `$release-notes-author v0.5.0 v0.5.1` — run after the tag exists. Release date is the annotated tag's creation date (or lightweight tag's committer date).
+
+**Git range semantics:** `START_TAG..END_REF` means commits reachable from `END_REF` but not from `START_TAG` — start is exclusive, end is inclusive. The script enumerates exactly the commits that will go into (or went into) the release.
 
 ---
 
