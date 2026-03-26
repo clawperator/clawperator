@@ -57,7 +57,7 @@ The script must:
 4. For each commit SHA:
    - Get the subject: `git log -1 --format="%s" "$SHA"`
    - Get the body: `git log -1 --format="%b" "$SHA"`
-   - Get changed files with `git diff-tree --no-commit-id --name-only -r -m "$SHA" | sort -u` so merge commits and direct commits are handled consistently. For renames and copies, `--name-only` emits both the old and new path; classify using the **new (destination) path** only — the old path is irrelevant to surface attribution
+   - Get changed files with `git diff-tree --no-commit-id --name-only --diff-filter=ACRM -r -m "$SHA" | sort -u`. The `--diff-filter=ACRM` (Added, Copied, Renamed-destination, Modified) ensures only destination paths are emitted — deleted-only paths and old rename sources are excluded, so no post-processing is needed to isolate the new path
    - Extract PR number if present in subject (pattern: `(#NNN)` at end of subject line)
    - For each changed file, assign a type using this hardcoded lookup (first match wins):
      ```
@@ -210,11 +210,7 @@ bash .agents/skills/release-notes-author/scripts/gather_commits.sh <start-tag> <
    - **Traceability:** before writing the CHANGELOG block, record in findings.md a mapping of every `keep` commit SHA → the bullet(s) it contributes to. Every `drop:*` commit must already be logged from step 4. No commit may be silently unaccounted for.
 6. Write the high-level summary sentence (one or two sentences describing the release as a whole).
 7. Assemble the full block per the format in `tasks/release-notes/plan.md`.
-8. Apply the upsert rule to `CHANGELOG.md`:
-   - Search for an existing `## [<version>]` header.
-   - **If found:** replace the entire block from that header up to (but not including) the next `## [` line with the newly generated block.
-   - **If not found:** insert the new block above the first existing `## [x.y.z]` entry (below any `## [Unreleased]` content).
-   - Never modify any other versioned entry.
+8. Apply the upsert rule to `CHANGELOG.md` exactly as specified in `tasks/release-notes/plan.md` § "CHANGELOG Insertion Rule (Upsert)". Do not re-derive the logic here — use the four-state table and insertion anchor definition from that section verbatim. Never modify any other versioned entry.
 9. Verify: confirm no duplicate version headers exist and entries are in descending chronological order.
 
 **Surface section order** (must appear in this order, omit if empty):
@@ -398,7 +394,7 @@ docs(changelog): backfill release notes for v0.5.0
        print(f"Error: CHANGELOG.md not found. Run release-notes-author before tagging.", file=sys.stderr)
        sys.exit(1)
 
-   pattern = rf'(## \[{re.escape(version)}\].*?)(?=\n## \[|\Z)'
+   pattern = rf'(##\s*\[{re.escape(version)}\].*?)(?=\n##\s|\Z)'
    match = re.search(pattern, content, re.DOTALL)
    if match:
        with open("release-notes.md", "a", encoding="utf-8") as out:

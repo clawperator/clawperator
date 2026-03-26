@@ -108,15 +108,16 @@ The skill accepts positional tags `<start-tag> <end-tag>` (e.g., `v0.5.0` and `v
 
 The skill is structurally idempotent. Behavior depends on file and block state:
 
+The **insertion anchor** is always the position immediately before the first `## [` line in the file. If no `## [` line exists, the anchor is the end of file.
+
 | State | Behavior |
 |-------|----------|
-| `CHANGELOG.md` does not exist | Create it with the standard header, `## [Unreleased]` placeholder, and the new block |
-| File exists, target `## [x.y.z]` block absent, `## [Unreleased]` present | Insert new block immediately after the `## [Unreleased]` section (below its content if any, above the next `## [`) |
-| File exists, target block absent, no `## [Unreleased]` | Insert new block at top of file after the header comment |
-| File exists, target `## [x.y.z]` block present | Replace existing block from its header line up to (but not including) the next `## [` line |
-| File exists, no prior version blocks and no `## [Unreleased]` | Append new block after the header comment |
+| `CHANGELOG.md` does not exist | Create the file with `# Changelog\n\n`, then apply the "no `## [` lines" case below |
+| File exists, target `## [x.y.z]` block present | Replace from its `## [x.y.z]` header line up to (not including) the next `## [` line |
+| File exists, target block absent, at least one `## [` line exists | Insert new block at the insertion anchor (before the first `## [` line) |
+| File exists, no `## [` lines at all | Append new block at end of file |
 
-Never delete or modify any other versioned entries. "Replace" means the entire block including the version header line.
+Never delete or modify any other versioned entries. "Replace" means the entire block including the version header line. An `## [Unreleased]` line is itself a `## [` line — if present, the new versioned block is inserted immediately before it only when the target block is absent; if absent, the same anchor rule applies.
 
 ---
 
