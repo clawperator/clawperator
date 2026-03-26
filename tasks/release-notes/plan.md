@@ -23,10 +23,12 @@ Surface classification is derived from **file diffs, not commit messages**. Comm
 |---------|--------------|---------------|
 | 🤖 Node API & CLI | `apps/node/**` | `apps/node/node_modules/**`, `apps/node/dist/**`, `apps/node/coverage/**` |
 | 📱 Android Operator APK | `apps/android/**` | `apps/android/build/**`, `apps/android/app/build/**`, `apps/android/**/generated/**` |
-| 📚 Documentation & Website | `docs/**`, `sites/docs/**`, `sites/landing/**` | `docs/internal/**` |
+| 📚 Documentation & Website | `docs/**`, `sites/docs/**`, `sites/landing/**` | `docs/internal/**`, `sites/docs/AGENTS.md`, `sites/docs/requirements.txt`, `sites/landing/public/sitemap.xml`, `sites/landing/public/landing-sitemap.xml` |
 | *(omit)* | `.agents/**`, `.github/**`, `tasks/**`, `gradle/**`, build/CI config, lock files | — |
 
 A commit touching multiple surfaces appears in each relevant section. Exclusion paths take precedence — a commit to `apps/node/node_modules/` is INFRA even though it is under `apps/node/`.
+
+**Classification vs synthesis:** Classification determines which surfaces a commit touched. It does not guarantee a changelog bullet. The synthesis step must further filter release-mechanic noise within a named surface (e.g., a version field bump in `package.json`, a regenerated `llms-full.txt`). Any non-INFRA commit dropped during synthesis must be logged in findings.md.
 
 ---
 
@@ -66,6 +68,7 @@ Every generated block must follow this exact structure:
 
 ### 📱 Android Operator APK
 - **Added:** ...
+- **Changed:** ...
 - **Fixed:** ...
 ```
 

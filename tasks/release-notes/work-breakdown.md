@@ -20,7 +20,7 @@ This work ships as **3 PRs**, sequenced. Do not start a PR until the previous on
 - **No raw commit messages in output.** Every bullet point in the final CHANGELOG must be a synthesized, user-facing sentence. Do not copy-paste commit subjects verbatim.
 - **One commit per logical step.** Do not batch unrelated changes. The expected commit messages are listed in each task below.
 - **findings.md is the running log.** Every phase must write or update `tasks/release-notes/findings.md` before committing. It is the paper trail — include script output, classification decisions, and any surprises.
-- **Rerun safety.** The skill must be safe to run multiple times. Overwrite the generated block, do not append duplicates.
+- **Rerun safety is structural, not content-identical.** The skill is safe to run multiple times in the sense that reruns never corrupt `CHANGELOG.md` (the upsert rule prevents duplicate blocks). However, the LLM synthesis step may produce different prose on rerun — that is expected and acceptable. Once a CHANGELOG entry is committed, it is the canonical form. Do not regenerate it without intent; editing the committed entry by hand is preferable to a full regeneration.
 - **Proceed on uncertainty, log it.** If a commit's surface is ambiguous, make a judgment call, note it in findings.md, and continue.
 
 ---
@@ -67,7 +67,9 @@ The script must:
               EXCLUDE apps/android/build/**, apps/android/app/build/**, apps/android/**/generated/**
 
      Docs:    INCLUDE docs/**, sites/docs/**, sites/landing/**
-              EXCLUDE docs/internal/**
+              EXCLUDE docs/internal/**,
+                      sites/docs/AGENTS.md, sites/docs/requirements.txt,
+                      sites/landing/public/sitemap.xml, sites/landing/public/landing-sitemap.xml
               (qualify as Docs only if at least one non-excluded file remains)
      ```
    - If no user-facing surface detected after applying exclusions, mark as `INFRA`
@@ -154,7 +156,11 @@ bash .agents/skills/release-notes-author/scripts/gather_commits.sh <start-tag> <
 3. The version is the end tag with the `v` prefix removed (e.g., `v0.5.1` → `0.5.1`).
 4. Review every commit block:
    - Skip any commit with `SURFACES: INFRA` entirely.
-   - Skip version-bump commits (`chore(build): set code version`) and published-version update commits (`docs(release): update published version`) even if they have surface tags — these are release mechanics, not user-facing changes.
+   - For every commit with a named surface, inspect the `FILES:` list to determine whether the changes are user-facing. Classification says what was touched; synthesis decides whether it warrants a bullet. Examples of non-bullet-worthy changes despite touching a named surface:
+     - `apps/node/package.json` with only a version field bump (release mechanic, not a feature)
+     - `sites/docs/static/llms-full.txt` or `sites/landing/public/llms-full.txt` updates that are regenerated site artifacts (no bullet unless the content change is substantive and user-driven)
+     - Any file where the entire change is a version string, timestamp, or auto-generated metadata
+   - When dropping a non-INFRA commit as noise, log it explicitly in findings.md under "Synthesis choices" with the SHA and reason. Never drop silently.
    - For all remaining commits, group by surface: node, docs, android.
 5. Synthesize each group into bullet points using the categories `Added`, `Changed`, `Fixed`. Rules:
    - Write in second-person imperative or past tense, user-facing (e.g., "Added `read-value` action for extracting text from UI elements").
@@ -347,8 +353,8 @@ docs(changelog): backfill release notes for v0.5.0
        with open("CHANGELOG.md", "r", encoding="utf-8") as f:
            content = f.read()
    except FileNotFoundError:
-       print(f"Warning: CHANGELOG.md not found, skipping changelog section.", file=sys.stderr)
-       sys.exit(0)
+       print(f"Error: CHANGELOG.md not found. Run release-notes-author before tagging.", file=sys.stderr)
+       sys.exit(1)
 
    pattern = rf'(## \[{re.escape(version)}\].*?)(?=\n## \[|\Z)'
    match = re.search(pattern, content, re.DOTALL)
@@ -358,18 +364,17 @@ docs(changelog): backfill release notes for v0.5.0
            out.write(match.group(1).strip())
            out.write("\n")
    else:
-       print(f"Warning: No CHANGELOG entry found for {version}.", file=sys.stderr)
+       print(f"Error: No CHANGELOG entry found for {version}. Run release-notes-author before tagging.", file=sys.stderr)
+       sys.exit(1)
    PY
    ```
 
-2. The step must not fail if `CHANGELOG.md` is missing or if no block exists for the version — it should warn to stderr and continue. This preserves backward compatibility for any release that predates the changelog.
-
-   **Operational note:** The warning-only fallback means a release can still ship without changelog content if the CHANGELOG entry was not authored before tagging. This is an accepted risk. The operational precondition is: run `release-notes-author` and merge the CHANGELOG entry before cutting the release tag.
+2. The step fails hard if `CHANGELOG.md` is missing or if no block exists for the version. This enforces the operational precondition: `release-notes-author` must be run and the CHANGELOG entry merged before cutting the release tag.
 
 ### Acceptance
 
 - GitHub Release body for a future release contains both the install links block and the changelog block separated by `---`.
-- If no CHANGELOG entry exists for the version, the workflow still succeeds (warning only).
+- If `CHANGELOG.md` is missing or has no entry for the version, the workflow step exits non-zero and the release fails with a clear error message.
 - No other steps in the workflow are modified.
 
 ### Expected commit
