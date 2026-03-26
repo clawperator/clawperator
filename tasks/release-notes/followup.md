@@ -7,7 +7,7 @@
 - Add optional impact scoring to help prioritize the most user-visible changes when a range has many `keep` commits.
 - Add a post-write ordering check so version blocks are validated after insertion and reordered if needed.
 - Split or rotate `tasks/release-notes/findings.md` by run or release to keep the audit trail manageable without losing traceability.
-- Keep linking every PR that landed in a release block, using the PR title and URL from `gh` so the note doubles as a review index.
+- The PR index migration now lives in `tasks/release-notes/list-prs.md`.
 
 ## Release PR Index
 

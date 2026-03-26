@@ -197,7 +197,7 @@ if run_script "$case6_out" "$case6_err"; then
   printf 'FAIL: gather_commits.sh with no args unexpectedly succeeded\n'
   failures=$((failures + 1))
 else
-  if grep -q '^usage: \.agents/skills/release-notes-author/scripts/gather_commits.sh <start-tag> <end-tag>$' "$case6_err"; then
+  if grep -q '^usage: \.agents/skills/release-notes-author/scripts/gather_commits.sh <start-tag> <end-ref>$' "$case6_err"; then
     printf 'PASS: gather_commits.sh with no args exits non-zero and prints usage\n'
   else
     printf 'FAIL: gather_commits.sh with no args did not print the expected usage line\n'

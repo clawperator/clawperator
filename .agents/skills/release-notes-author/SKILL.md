@@ -5,24 +5,31 @@ description: Generate and insert a CHANGELOG entry for a version range by gather
 
 # Release Notes Author
 
-Use this skill to turn a git tag range into a `CHANGELOG.md` entry. The deterministic shell script makes every keep/drop decision. You only synthesize prose from the script output.
+Use this skill to turn a git tag range into a `CHANGELOG.md` entry. The deterministic shell scripts make the keep/drop and PR-order decisions. You only synthesize prose from the script output.
 
 Run: $release-notes-author v0.5.0 v0.5.1
 
 Use the same invocation shape with the tags you are backfilling. It maps to the gather script below.
 
-1. Run the gather script and print the full output before proceeding.
+1. Run the gather commit script and print the full output before proceeding.
 
 ```bash
 cd "$(git rev-parse --show-toplevel)"
 bash .agents/skills/release-notes-author/scripts/gather_commits.sh <start-tag> <end-tag>
 ```
 
-2. Extract the release date from the `RELEASE_DATE:` line.
+2. Run the PR gather script and print the full output before proceeding.
 
-3. Derive the version by stripping the `v` prefix from the end tag. For example, `v0.5.1` becomes `0.5.1`.
+```bash
+cd "$(git rev-parse --show-toplevel)"
+bash .agents/skills/release-notes-author/scripts/gather_prs.sh <start-tag> <end-tag>
+```
 
-4. Process every commit block using only the `CLASSIFICATION:` line. Never re-derive keep/drop from the file list.
+3. Extract the release date from the `RELEASE_DATE:` line.
+
+4. Derive the version by stripping the `v` prefix from the end tag. For example, `v0.5.1` becomes `0.5.1`.
+
+5. Process every commit block using only the `CLASSIFICATION:` line. Never re-derive keep/drop from the file list.
 
 `drop:no-src` and `drop:infra` mean skip the commit, but log the SHA and classification in `tasks/release-notes/findings.md` as part of the classification summary table. Never skip silently.
 
@@ -38,7 +45,7 @@ bash .agents/skills/release-notes-author/scripts/gather_commits.sh <start-tag> <
 | `sites/docs/static/llms-full.txt` alone | generated | drop:no-src |
 | `docs/api/actions.md` + `llms-full.txt` | src + generated | keep |
 
-5. Synthesize `keep` commits into bullets.
+6. Synthesize `keep` commits into bullets.
 
 Write in past tense and keep the language user-facing. Never copy a commit subject verbatim. Ground every claim in the commit `SUBJECT`, `BODY`, and `FILES` only. Do not inspect diffs.
 
@@ -63,11 +70,11 @@ Every `keep` commit must produce at least one bullet or be explicitly escalated 
 
 Within each surface section, order bullets as Added, then Changed, then Fixed, then Removed.
 
-6. Write a one-or-two sentence summary.
+7. Write a one-or-two sentence summary.
 
 Apply these rules in order: if breaking changes exist, lead with them. If one surface dominates by count of `keep` commits, name it. Otherwise describe the most significant user-facing outcome, not implementation details.
 
-7. Assemble the changelog block in this format.
+8. Assemble the changelog block in this format.
 
 ```markdown
 ## [<version>] - <YYYY-MM-DD>
@@ -82,10 +89,16 @@ Apply these rules in order: if breaking changes exist, lead with them. If one su
 
 ### 📱 Android Operator APK
 - **Added:** ...
+
+Pull requests:
+- [PR title](link to PR)
+- [PR title](link to PR)
 ```
 
 Omit any surface section that has no `keep` bullets. Keep the surface section order exactly as shown here: Node, then Docs, then Android.
 
-8. Apply the upsert rule to `CHANGELOG.md` exactly as specified in `tasks/release-notes/plan.md` under `CHANGELOG Insertion Rule (Upsert)`. Do not re-derive the logic. Follow the five-state table verbatim.
+9. Append the `Pull requests:` section as the last subsection in each release block. Use the `gather_prs.sh` output verbatim for the list items, sorted from oldest landed PR to newest landed PR.
 
-9. Verify that no duplicate version headers exist and that entries remain in descending chronological order.
+10. Apply the upsert rule to `CHANGELOG.md` exactly as specified in `tasks/release-notes/list-prs.md` under `CHANGELOG Insertion Rule (Upsert)`. Do not re-derive the logic. Follow the five-state table verbatim.
+
+11. Verify that no duplicate version headers exist and that entries remain in descending chronological order.
