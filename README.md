@@ -62,7 +62,7 @@ clawperator snapshot --device <device_id> --json   # Capture UI tree
 clawperator exec payload.json --device <device_id>   # Run an execution (`execute` synonym; `--payload` / `--execution` optional)
 ```
 
-CLI device commands are flat (`snapshot`, `screenshot`, `click`, `open`, `type`, ...). When several devices are connected, pass `--device` (alias: `--device-id`). See [Node API for Agents](docs/node-api-for-agents.md) for flags, HTTP routes, and error codes.
+CLI device commands are flat (`snapshot`, `screenshot`, `click`, `open`, `type`, ...). When several devices are connected, pass `--device` (alias: `--device-id`). See [API Overview](docs/api/overview.md) for flags, HTTP routes, and error codes.
 
 ## Requirements
 
@@ -94,10 +94,10 @@ When updating website content, make sure you are editing the correct surface. Th
 
 Both public sites deploy automatically to Cloudflare after changes are merged to `main`.
 
-- [First-Time Setup](docs/first-time-setup.md) - Device prep, APK install, accessibility
-- [Node API for Agents](docs/node-api-for-agents.md) - CLI, HTTP API, execution contract
-- [Architecture](docs/architecture.md) - System design
-- [Troubleshooting](docs/troubleshooting.md) - Common issues
+- [Setup](docs/setup.md) - Device prep, APK install, accessibility
+- [API Overview](docs/api/overview.md) - CLI, HTTP API, execution contract
+- [Runtime Architecture](docs/internal/design/node-api-design.md) - System design
+- [Operator Troubleshooting](docs/troubleshooting/operator.md) - Common issues
 
 ## For Developers
 
