@@ -35,14 +35,17 @@ require_cmd git
 require_cmd sort
 
 git rev-parse -q --verify "refs/tags/$START_TAG" >/dev/null || die "tag '$START_TAG' not found"
+START_COMMIT="$(git rev-parse -q --verify "refs/tags/$START_TAG^{commit}")"
 
 # Resolve release date: prefer annotated/lightweight tag creation date; fall back to
 # committer date when END_TAG is a branch name or commit SHA (pre-tag workflow).
 release_date="$(git for-each-ref --format='%(creatordate:short)' "refs/tags/$END_TAG")"
 if [[ -z "$release_date" ]]; then
-  release_date="$(git log -1 --format='%cs' "$END_TAG" 2>/dev/null)" || true
+  release_date="$(git log -1 --format='%cs' "${END_TAG}^{commit}" 2>/dev/null)" || true
   [[ -n "$release_date" ]] || die "ref '$END_TAG' not found or resolves to no commits"
 fi
+
+END_COMMIT="$(git rev-parse -q --verify "${END_TAG}^{commit}")"
 
 printf 'RELEASE_DATE: %s\n' "$release_date"
 
@@ -247,4 +250,4 @@ while IFS= read -r sha; do
   fi
 
   printf '=== END ===\n'
-done < <(git log --reverse --format="%H" "$START_TAG..$END_TAG")
+done < <(git log --reverse --format="%H" "$START_COMMIT..$END_COMMIT")
