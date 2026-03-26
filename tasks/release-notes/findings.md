@@ -6,7 +6,7 @@
 
 - Command: `bash .agents/skills/release-notes-author/scripts/gather_commits.sh v0.5.0 v0.5.1`
 - Release date: `2026-03-26`
-- The range produced 11 commit blocks.
+- The range produced 12 commit blocks.
 - The key classification anchors were:
   - `b2f7234` - `drop:no-src`
   - `0e90073` - `drop:infra`
@@ -38,8 +38,8 @@
 
 - PR-1 did not include CHANGELOG synthesis yet, so there were no merge or prose decisions to log.
 - I added a synthetic deleted-src fixture in `test_gather_commits.sh` because the live repo history did not expose the deleted-src case the plan wanted to spot-check.
+- I added a synthetic Android build-config fixture in `test_gather_commits.sh` after validating that Android config-only paths were being misclassified as `keep`.
 
 ### Draft entry
 
 - Not applicable for PR-1.
-

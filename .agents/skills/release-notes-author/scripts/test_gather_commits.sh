@@ -54,6 +54,11 @@ path_type() {
     apps/node/package.json|\
       sites/docs/mkdocs.yml|\
       sites/docs/source-map.yaml|\
+      apps/android/build.gradle.kts|\
+      apps/android/app/build.gradle.kts|\
+      apps/android/settings.gradle.kts|\
+      apps/android/gradle.properties|\
+      apps/android/local.properties|\
       gradle/**|\
       build.gradle.kts|\
       settings.gradle.kts|\
@@ -101,7 +106,7 @@ case1_err="$(mktemp)"
 if run_script "$case1_out" "$case1_err" v0.5.0 v0.5.1; then
   first_line="$(first_non_empty_line "$case1_out")"
   if [[ "$first_line" =~ ^RELEASE_DATE:\ [0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
-    printf 'PASS: gather_commits.sh emits RELEASE_DATE first\n'
+  printf 'PASS: gather_commits.sh emits RELEASE_DATE first\n'
   else
     printf 'FAIL: gather_commits.sh first non-empty line was: %s\n' "$first_line"
     failures=$((failures + 1))
@@ -204,6 +209,40 @@ else
   printf 'PASS: gather_commits.sh with an invalid tag exits non-zero\n'
 fi
 rm -f "$case8_out" "$case8_err"
+
+android_fixture_repo="$(mktemp -d)"
+android_fixture_out="$(mktemp)"
+android_fixture_err="$(mktemp)"
+(
+  cd "$android_fixture_repo" || exit 1
+  git init -q
+  git config user.name "Release Notes Test"
+  git config user.email "release-notes-test@example.com"
+  mkdir -p apps/android
+  printf 'plugins {\n}\n' > apps/android/build.gradle.kts
+  git add apps/android/build.gradle.kts
+  git commit -q -m "feat: add android build config"
+  git tag v0.4.0
+  printf 'plugins {\n    id(\"com.android.application\")\n}\n' > apps/android/build.gradle.kts
+  git add apps/android/build.gradle.kts
+  git commit -q -m "chore: tweak android build config"
+  git tag v0.5.0
+)
+
+if run_script_in_repo "$android_fixture_repo" "$android_fixture_out" "$android_fixture_err" v0.4.0 v0.5.0; then
+  if grep -q '^CLASSIFICATION: drop:no-src$' "$android_fixture_out" && \
+    grep -q '^  apps/android/build.gradle.kts  \[config\]$' "$android_fixture_out"; then
+    printf 'PASS: synthetic android config fixture is classified as drop:no-src\n'
+  else
+    printf 'FAIL: synthetic android config fixture was not classified as drop:no-src\n'
+    failures=$((failures + 1))
+  fi
+else
+  printf 'FAIL: synthetic android config fixture invocation failed\n'
+  failures=$((failures + 1))
+fi
+rm -rf "$android_fixture_repo"
+rm -f "$android_fixture_out" "$android_fixture_err"
 
 fixture_repo="$(mktemp -d)"
 fixture_out="$(mktemp)"
