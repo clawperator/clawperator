@@ -40,7 +40,7 @@ Do not rely on stale task notes or the global `clawperator` binary.
 
 ## Required Markdown Outputs
 
-Write durable markdown files under `tasks/agent-first-run-test/` as you work:
+Write durable markdown files under `/runs/agent-first-run-test/{date-time}-{model-name}/` as you work:
 
 - `execution-log.md`
   - chronological notebook of what you tried
@@ -50,6 +50,8 @@ Write durable markdown files under `tasks/agent-first-run-test/` as you work:
   - include API strengths, API gaps, documentation gaps, naming mismatches, and recovery guidance
 - `skill-draft.md`
   - write this only if the exploration reveals a reusable flow that should be turned into a new skill
+
+Use a single run folder per session, with a timestamped name and the model name in the directory name.
 
 If the session produces a reusable workflow, create the resulting skill folder under `.agents/skills/` and note the skill name plus touched files in `execution-log.md`.
 
