@@ -57,7 +57,7 @@ The script must:
 4. For each commit SHA:
    - Get the subject: `git log -1 --format="%s" "$SHA"`
    - Get the body: `git log -1 --format="%b" "$SHA"`
-   - Get changed files with `git diff-tree --no-commit-id --name-only -r -m "$SHA" | sort -u` so merge commits and direct commits are handled consistently
+   - Get changed files with `git diff-tree --no-commit-id --name-only -r -m "$SHA" | sort -u` so merge commits and direct commits are handled consistently. For renames and copies, `--name-only` emits both the old and new path; classify using the **new (destination) path** only — the old path is irrelevant to surface attribution
    - Extract PR number if present in subject (pattern: `(#NNN)` at end of subject line)
    - For each changed file, assign a type using this hardcoded lookup (first match wins):
      ```
@@ -200,8 +200,9 @@ bash .agents/skills/release-notes-author/scripts/gather_commits.sh <start-tag> <
      | `sites/docs/static/llms-full.txt` alone | generated | drop:no-src |
      | `docs/api/actions.md` + `llms-full.txt` | src + generated | keep (src present) |
 5. Synthesize `keep` commits into bullet points using the categories `Added`, `Changed`, `Fixed`. Rules:
-   - Write in second-person imperative or past tense, user-facing (e.g., "Added `read-value` action for extracting text from UI elements").
+   - Write in **past tense**, user-facing (e.g., "Added `read-value` action for extracting text from UI elements"). Use past tense consistently — do not mix with imperative.
    - Never copy a raw commit subject verbatim. Rewrite it as a user-facing benefit.
+   - All claims must be grounded in the commit's `SUBJECT`, `BODY`, or `FILES` list from the script output. Do not invent features, behaviors, or capabilities not evidenced there.
    - Merge related commits into a single bullet where appropriate; note the merged SHAs in findings.md.
    - Multi-surface commits appear in each relevant section. The wording may differ per section to reflect what changed in that surface specifically.
    - If a section has no `keep` commits, omit the section entirely.
@@ -416,6 +417,7 @@ docs(changelog): backfill release notes for v0.5.0
 
 - GitHub Release body for a future release contains both the install links block and the changelog block separated by `---`.
 - If `CHANGELOG.md` is missing or has no entry for the version, the workflow step exits non-zero and the release fails with a clear error message.
+- The extraction regex matches `## [0.5.1]` with optional surrounding whitespace and is tested against at least one formatting variation (e.g. extra blank lines between blocks) and one negative case (version not present) before merging.
 - No other steps in the workflow are modified.
 
 ### Expected commit

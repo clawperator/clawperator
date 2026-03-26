@@ -106,12 +106,17 @@ The skill accepts positional tags `<start-tag> <end-tag>` (e.g., `v0.5.0` and `v
 
 ## CHANGELOG Insertion Rule (Upsert)
 
-The skill is idempotent. The rule depends on whether a `## [x.y.z]` block for the target version already exists:
+The skill is structurally idempotent. Behavior depends on file and block state:
 
-- **Block absent:** Insert the new block immediately above the first existing `## [x.y.z]` entry (i.e., below any `## [Unreleased]` content).
-- **Block present:** Replace the entire existing block — from its `## [x.y.z]` header line up to (but not including) the next `## [` line — with the newly generated block.
+| State | Behavior |
+|-------|----------|
+| `CHANGELOG.md` does not exist | Create it with the standard header, `## [Unreleased]` placeholder, and the new block |
+| File exists, target `## [x.y.z]` block absent, `## [Unreleased]` present | Insert new block immediately after the `## [Unreleased]` section (below its content if any, above the next `## [`) |
+| File exists, target block absent, no `## [Unreleased]` | Insert new block at top of file after the header comment |
+| File exists, target `## [x.y.z]` block present | Replace existing block from its header line up to (but not including) the next `## [` line |
+| File exists, no prior version blocks and no `## [Unreleased]` | Append new block after the header comment |
 
-Never delete or modify any other versioned entries. If the `[Unreleased]` block contains meaningful content, preserve it.
+Never delete or modify any other versioned entries. "Replace" means the entire block including the version header line.
 
 ---
 
