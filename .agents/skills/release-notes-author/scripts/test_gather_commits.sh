@@ -52,8 +52,14 @@ path_type() {
       printf 'generated'
       ;;
     apps/node/package.json|\
+      apps/node/tsconfig.json|\
+      apps/node/tsconfig.*.json|\
       sites/docs/mkdocs.yml|\
       sites/docs/source-map.yaml|\
+      sites/landing/next.config.js|\
+      sites/landing/next.config.cjs|\
+      sites/landing/next.config.mjs|\
+      sites/landing/next.config.ts|\
       *.gradle.kts|\
       gradle/**|\
       gradle.properties|\
@@ -166,6 +172,22 @@ if [[ "$(path_type "$case5_path")" == "infra" ]]; then
   printf 'PASS: %s is classified as infra\n' "$case5_path"
 else
   printf 'FAIL: %s was not classified as infra\n' "$case5_path"
+  failures=$((failures + 1))
+fi
+
+case5b_path='apps/node/tsconfig.json'
+if [[ "$(path_type "$case5b_path")" == "config" ]]; then
+  printf 'PASS: %s is classified as config\n' "$case5b_path"
+else
+  printf 'FAIL: %s was not classified as config\n' "$case5b_path"
+  failures=$((failures + 1))
+fi
+
+case5c_path='sites/landing/next.config.js'
+if [[ "$(path_type "$case5c_path")" == "config" ]]; then
+  printf 'PASS: %s is classified as config\n' "$case5c_path"
+else
+  printf 'FAIL: %s was not classified as config\n' "$case5c_path"
   failures=$((failures + 1))
 fi
 

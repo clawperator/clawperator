@@ -83,8 +83,14 @@ path_type() {
       printf 'generated'
       ;;
     apps/node/package.json|\
+      apps/node/tsconfig.json|\
+      apps/node/tsconfig.*.json|\
       sites/docs/mkdocs.yml|\
       sites/docs/source-map.yaml|\
+      sites/landing/next.config.js|\
+      sites/landing/next.config.cjs|\
+      sites/landing/next.config.mjs|\
+      sites/landing/next.config.ts|\
       *.gradle.kts|\
       gradle/**|\
       gradle.properties|\
