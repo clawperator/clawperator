@@ -67,7 +67,7 @@ The script must:
               EXCLUDE apps/android/build/**, apps/android/app/build/**, apps/android/**/generated/**
 
      Docs:    INCLUDE docs/**, sites/docs/**, sites/landing/**
-              EXCLUDE docs/internal/**, sites/docs/static/**
+              EXCLUDE docs/internal/**
               (qualify as Docs only if at least one non-excluded file remains)
      ```
    - If no user-facing surface detected after applying exclusions, mark as `INFRA`
@@ -363,6 +363,8 @@ docs(changelog): backfill release notes for v0.5.0
    ```
 
 2. The step must not fail if `CHANGELOG.md` is missing or if no block exists for the version — it should warn to stderr and continue. This preserves backward compatibility for any release that predates the changelog.
+
+   **Operational note:** The warning-only fallback means a release can still ship without changelog content if the CHANGELOG entry was not authored before tagging. This is an accepted risk. The operational precondition is: run `release-notes-author` and merge the CHANGELOG entry before cutting the release tag.
 
 ### Acceptance
 
