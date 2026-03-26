@@ -4,12 +4,13 @@ Parent plan: `tasks/release-notes/plan.md`
 
 Branch: `feat/release-notes`
 
-This work ships as **2 PRs**, sequenced. PR-1 delivers the skill. PR-2 delivers the CHANGELOG backfill using the skill.
+This work ships as **3 PRs**, sequenced. Do not start a PR until the previous one is merged.
 
 | PR | Scope | Phases |
 |----|-------|--------|
 | PR-1 | Skill implementation | Phase 1 + Phase 2 |
 | PR-2 | CHANGELOG backfill and findings | Phase 3 + Phase 4 |
+| PR-3 | Wire CHANGELOG into release workflow | Phase 5 |
 
 ---
 
@@ -50,22 +51,26 @@ Read these before writing any code:
 The script must:
 
 1. Accept positional args: `<start-tag> <end-tag>` (e.g., `v0.5.0 v0.5.1`).
-2. Print the release date line in a stable machine-readable form: `RELEASE_DATE: <YYYY-MM-DD>` using `git log -1 --format="%as" "$END_TAG"`.
+2. Print the release date line using the annotated tag's creation date (not the tagged commit's author date): `RELEASE_DATE: $(git for-each-ref --format='%(creatordate:short)' "refs/tags/$END_TAG")`. This is the correct "when was this version released" date for annotated tags.
 3. Iterate commits in chronological order (oldest first): `git log --reverse --format="%H" "$START_TAG..$END_TAG"`.
 4. For each commit SHA:
    - Get the subject: `git log -1 --format="%s" "$SHA"`
    - Get the body: `git log -1 --format="%b" "$SHA"`
    - Get changed files with `git diff-tree --no-commit-id --name-only -r -m "$SHA" | sort -u` so merge commits and direct commits are handled consistently
    - Extract PR number if present in subject (pattern: `(#NNN)` at end of subject line)
-   - Classify surfaces by checking changed files against these exact rules:
+   - Classify surfaces by checking changed files against these exact rules (exclusions take precedence over inclusions):
      ```
-     Node:    any file matching apps/node/*
-     Android: any file matching apps/android/*
-     Docs:    any file matching docs/*, sites/docs/*, or sites/landing/*
-              MINUS any file matching docs/internal/*
-              (a commit qualifies as Docs only if it has at least one non-internal docs file)
+     Node:    INCLUDE apps/node/**
+              EXCLUDE apps/node/node_modules/**, apps/node/dist/**, apps/node/coverage/**
+
+     Android: INCLUDE apps/android/**
+              EXCLUDE apps/android/build/**, apps/android/app/build/**, apps/android/**/generated/**
+
+     Docs:    INCLUDE docs/**, sites/docs/**, sites/landing/**
+              EXCLUDE docs/internal/**, sites/docs/static/**
+              (qualify as Docs only if at least one non-excluded file remains)
      ```
-   - If no user-facing surface detected, mark surfaces as `INFRA` (version bumps, CI, tasks, .agents changes, lock-file-only changes)
+   - If no user-facing surface detected after applying exclusions, mark as `INFRA`
 5. Print each commit in this format:
    ```
    === COMMIT <sha> ===
@@ -154,13 +159,20 @@ bash .agents/skills/release-notes-author/scripts/gather_commits.sh <start-tag> <
 5. Synthesize each group into bullet points using the categories `Added`, `Changed`, `Fixed`. Rules:
    - Write in second-person imperative or past tense, user-facing (e.g., "Added `read-value` action for extracting text from UI elements").
    - Never copy a raw commit subject verbatim. Rewrite it as a user-facing benefit.
-   - Merge related commits into a single bullet where appropriate.
+   - Merge related commits into a single bullet where appropriate; note the merged SHAs in findings.md.
+   - Multi-surface commits appear in each relevant section. The wording may differ per section to reflect what changed in that surface specifically.
+   - If dropping a commit as noise (lock files, generated content, infra-only), note the SHA and reason in findings.md under "Synthesis choices".
    - If a section has no non-infra changes, omit the section entirely.
    - Order within each section: Added first, then Changed, then Fixed.
+   - **Traceability:** before writing the CHANGELOG block, record in findings.md a mapping of every non-INFRA commit SHA → the bullet(s) it contributes to (or "dropped: <reason>"). This is the audit trail.
 6. Write the high-level summary sentence (one or two sentences describing the release as a whole).
 7. Assemble the full block per the format in `tasks/release-notes/plan.md`.
-8. Insert the block into `CHANGELOG.md` immediately below the `## [Unreleased]` line and above any existing versioned `## [x.y.z]` entry. Do not delete or modify any existing entries.
-9. Verify the insertion looks correct (no duplicate headers, correct chronological order).
+8. Apply the upsert rule to `CHANGELOG.md`:
+   - Search for an existing `## [<version>]` header.
+   - **If found:** replace the entire block from that header up to (but not including) the next `## [` line with the newly generated block.
+   - **If not found:** insert the new block above the first existing `## [x.y.z]` entry (below any `## [Unreleased]` content).
+   - Never modify any other versioned entry.
+9. Verify: confirm no duplicate version headers exist and entries are in descending chronological order.
 
 **Surface section order** (must appear in this order, omit if empty):
 1. `### 🤖 Node API & CLI`
@@ -247,9 +259,11 @@ feat(release-notes): add release-notes-author skill
 ### Acceptance
 
 - `CHANGELOG.md` contains a `## [0.5.1]` entry in correct position.
-- `tasks/release-notes/findings.md` exists with all four sections: script output, classification summary table, mismatches, synthesis choices, draft entry.
+- `tasks/release-notes/findings.md` exists with all five sections: script output, classification summary table, mismatches, synthesis choices (with commit→bullet mapping for every non-INFRA commit), and draft entry.
+- Every non-INFRA commit from the script output is accounted for in the commit→bullet mapping — either mapped to a bullet or explicitly dropped with a reason. No silent omissions.
 - No existing CHANGELOG entries were modified or deleted.
 - The entry contains no raw commit subjects.
+- Rerunning the skill produces the same CHANGELOG entry without creating a duplicate `## [0.5.1]` block.
 
 ### Expected commit
 
@@ -298,13 +312,68 @@ The `v0.5.0` release introduced significant breaking changes to the CLI and API 
 
 - `## [0.5.0]` entry exists in correct chronological position.
 - Entry captures the major API refactor and new action types under Node section.
-- findings.md updated with Phase 4 observations.
+- findings.md `## v0.5.0 Run` section contains the commit→bullet mapping for all non-INFRA commits. No silent omissions.
 - No existing entries modified.
+- Rerunning the skill produces the same entry without a duplicate `## [0.5.0]` block.
 
 ### Expected commit
 
 ```
 docs(changelog): backfill release notes for v0.5.0
+```
+
+---
+
+---
+
+## Phase 5: Wire CHANGELOG into GitHub Release
+
+**Goal:** Modify the "Create release notes" step in `.github/workflows/release-apk.yml` so that each GitHub Release body includes the corresponding CHANGELOG block, in addition to the existing install links and artifact metadata.
+
+**Prerequisite:** PR-2 merged — `CHANGELOG.md` must contain entries for `0.5.0` and `0.5.1` before this step is wired.
+
+**Context:** Read `.github/workflows/release-apk.yml` lines 145–175. The "Create release notes" step currently writes `release-notes.md` with install links only. This phase appends the changelog block to that file.
+
+### Steps
+
+1. In the "Create release notes" step, after the existing `cat <<'EOF' > release-notes.md` block, add a Python extraction step:
+
+   ```bash
+   python - <<'PY'
+   import re, sys
+
+   version = "${{ steps.release_meta.outputs.version }}"
+   try:
+       with open("CHANGELOG.md", "r", encoding="utf-8") as f:
+           content = f.read()
+   except FileNotFoundError:
+       print(f"Warning: CHANGELOG.md not found, skipping changelog section.", file=sys.stderr)
+       sys.exit(0)
+
+   pattern = rf'(## \[{re.escape(version)}\].*?)(?=\n## \[|\Z)'
+   match = re.search(pattern, content, re.DOTALL)
+   if match:
+       with open("release-notes.md", "a", encoding="utf-8") as out:
+           out.write("\n\n---\n\n")
+           out.write(match.group(1).strip())
+           out.write("\n")
+   else:
+       print(f"Warning: No CHANGELOG entry found for {version}.", file=sys.stderr)
+   PY
+   ```
+
+2. The step must not fail if `CHANGELOG.md` is missing or if no block exists for the version — it should warn to stderr and continue. This preserves backward compatibility for any release that predates the changelog.
+
+### Acceptance
+
+- GitHub Release body for a future release contains both the install links block and the changelog block separated by `---`.
+- If no CHANGELOG entry exists for the version, the workflow still succeeds (warning only).
+- No other steps in the workflow are modified.
+
+### Expected commit
+
+```
+feat(release): include CHANGELOG entry in GitHub Release body
 ```
 
 ---
@@ -316,7 +385,9 @@ The task is complete when:
 - [ ] `.agents/skills/release-notes-author/SKILL.md` exists
 - [ ] `.agents/skills/release-notes-author/scripts/gather_commits.sh` exists and is executable
 - [ ] `.agents/skills/release-notes-author/scripts/test_gather_commits.sh` exists and all cases pass
-- [ ] `CHANGELOG.md` contains entries for `0.5.1` and `0.5.0` in correct order
-- [ ] `tasks/release-notes/findings.md` contains observations from both runs
+- [ ] `CHANGELOG.md` contains entries for `0.5.1` and `0.5.0` in correct chronological order
+- [ ] `tasks/release-notes/findings.md` contains commit→bullet mapping for both runs with no silent omissions
 - [ ] All entries are user-facing prose, no raw commit subjects
-- [ ] All 4 expected commits exist with the specified messages
+- [ ] Rerunning the skill for an already-present version replaces the block without creating a duplicate
+- [ ] `.github/workflows/release-apk.yml` appends the CHANGELOG block to the release body
+- [ ] All 5 expected commits exist with the specified messages
