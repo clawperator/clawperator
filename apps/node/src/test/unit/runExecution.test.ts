@@ -774,6 +774,72 @@ describe("buildTimeoutError", () => {
     assert.match(event.envelope.hint ?? "", /No correlated Android log lines were captured/);
     assert.match(event.envelope.hint ?? "", /clawperator doctor --json --device device-123 --operator-package com\.test\.operator\.dev/);
   });
+
+  it("does not emit the timeout hint when correlated log lines were captured", async () => {
+    const originalSetTimeout = global.setTimeout;
+    try {
+      // Speed up waitForResultEnvelope: broadcast delay is 300ms, and execution timeout is 6000ms (1000 payload + 5000 buffer).
+      // We keep ordering: broadcast should happen before the timeout, but still fast for unit tests.
+      global.setTimeout = ((handler: (...args: any[]) => void, ms?: number, ...args: any[]) => {
+        const adjustedMs =
+          ms === 300 ? 5
+            : ms === 6000 ? 30
+              : ms;
+        return originalSetTimeout(handler, adjustedMs, ...args);
+      }) as typeof global.setTimeout;
+
+      const runner = new FakeProcessRunner();
+      runner.spawn = (() => {
+        const proc = new EventEmitter() as EventEmitter & {
+          stdout?: EventEmitter;
+          stderr?: EventEmitter;
+          kill: (signal?: string) => void;
+        };
+        proc.stdout = new EventEmitter();
+        proc.stderr = new EventEmitter();
+        proc.kill = () => undefined;
+
+        // Ensure we capture correlated TaskScopeDefault lines before the timeout fires.
+        originalSetTimeout(() => {
+          proc.stdout?.emit("data", Buffer.from("TaskScopeDefault: example\n"));
+        }, 10);
+
+        return proc;
+      }) as FakeProcessRunner["spawn"];
+
+      runner.queueResult({ code: 0, stdout: "List of devices attached\ndevice-123\tdevice\n", stderr: "" });
+      runner.queueResult({ code: 0, stdout: "package:com.test.operator.dev\n", stderr: "" });
+      runner.queueResult({ code: 0, stdout: "", stderr: "" }); // logcat -c
+      runner.queueResult({ code: 0, stdout: "", stderr: "" }); // broadcast
+
+      const resultEvent = once(clawperatorEvents, CLAW_EVENT_TYPES.RESULT);
+      const result = await runExecution(
+        {
+          commandId: "cmd-timeout-6",
+          taskId: "task-timeout-6",
+          source: "test",
+          expectedFormat: "android-ui-automator",
+          timeoutMs: 1000,
+          actions: [{ id: "snap-1", type: "snapshot_ui" }],
+        },
+        {
+          deviceId: "device-123",
+          operatorPackage: "com.test.operator.dev",
+          runner,
+        }
+      );
+
+      const [event] = await resultEvent;
+      assert.strictEqual(result.ok, false);
+      if (!result.ok) {
+        assert.strictEqual(result.error.hint, undefined);
+      }
+      assert.strictEqual(event.deviceId, "device-123");
+      assert.strictEqual(event.envelope.hint, undefined);
+    } finally {
+      global.setTimeout = originalSetTimeout;
+    }
+  });
 });
 
 describe("runExecution logging", () => {
