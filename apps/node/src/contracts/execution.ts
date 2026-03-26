@@ -10,6 +10,7 @@ export interface ActionParams {
   durationMs?: number;
   path?: string;
   matcher?: NodeMatcher;
+  coordinate?: { x: number; y: number };
   text?: string;
   submit?: boolean;
   clear?: boolean;
@@ -28,11 +29,20 @@ export interface ActionParams {
   /** scroll_and_click: when false, scroll until visible but do not click */
   clickAfter?: boolean;
   validator?: string;
+  /** read_text: when true, return all matches */
+  all?: boolean;
   /** press_key: back | home | recents */
   key?: string;
   retry?: Record<string, unknown>;
   scrollRetry?: Record<string, unknown>;
   clickRetry?: Record<string, unknown>;
+  // wait_for_navigation params
+  expectedPackage?: string;
+  expectedNode?: NodeMatcher;
+  /** Action-level timeout in milliseconds (distinct from execution-level timeoutMs) */
+  timeoutMs?: number;
+  // read_key_value_pair params
+  labelMatcher?: NodeMatcher;
 }
 
 export interface ExecutionAction {

@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import kotlin.time.Duration
@@ -54,6 +55,36 @@ class UiActionEngineDefaultTest : ActionTest {
             assertEquals("com.example.app", taskScope.openedApps.single())
             assertEquals(1, taskScope.logUiTreeCount)
             assertEquals("Title Text", result.stepResults.first { it.id == "step-read" }.data["text"])
+        }
+
+    @Test
+    fun `execute click with coordinates uses raw coordinate tap`() =
+        actionTest {
+            val uiScope = RecordingTaskUiScope()
+            val taskScope = RecordingTaskScope(uiScope)
+            val developerOptionsManager = DeveloperOptionsManagerMock()
+            val engine = UiActionEngineDefault(developerOptionsManager, UiGlobalActionDispatcherMock())
+
+            val result =
+                engine.execute(
+                    taskScope = taskScope,
+                    plan =
+                        UiActionPlan(
+                            commandId = "cmd-click-coordinate",
+                            taskId = "task-click-coordinate",
+                            source = "test",
+                            actions =
+                                listOf(
+                                    UiAction.Click(
+                                        id = "step-click",
+                                        coordinate = action.math.geometry.Point(120, 240),
+                                    ),
+                                ),
+                        ),
+                )
+
+            assertEquals(1, result.stepResults.size)
+            assertEquals(action.math.geometry.Point(120, 240), uiScope.clickCoordinate)
         }
 
     @Test
@@ -1168,6 +1199,330 @@ class UiActionEngineDefaultTest : ActionTest {
             assertEquals("VALIDATOR_MISMATCH", stepResult.data["error"])
             assertEquals("abc", stepResult.data["raw_text"])
         }
+
+    @Test
+    fun `execute read_text with container succeeds`() =
+        actionTest {
+            var capturedMatcher: NodeMatcher? = null
+            var capturedContainer: NodeMatcher? = null
+            val uiScope = object : RecordingTaskUiScope() {
+                override suspend fun getTextWithinContainer(
+                    matcher: NodeMatcher,
+                    containerMatcher: NodeMatcher,
+                    retry: TaskRetry,
+                ): String {
+                    capturedMatcher = matcher
+                    capturedContainer = containerMatcher
+                    return "Found in container"
+                }
+            }
+            val taskScope = RecordingTaskScope(uiScope)
+            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+
+            val expectedMatcher = NodeMatcher(textContains = "Item")
+            val expectedContainer = NodeMatcher(resourceId = "com.example:id/list")
+
+            val result =
+                engine.execute(
+                    taskScope = taskScope,
+                    plan = UiActionPlan(
+                        commandId = "cmd",
+                        taskId = "task",
+                        source = "test",
+                        actions = listOf(
+                            UiAction.ReadText(
+                                id = "rt-container",
+                                matcher = expectedMatcher,
+                                container = expectedContainer,
+                            ),
+                        ),
+                    ),
+                )
+
+            val stepResult = result.stepResults.single()
+            assertEquals("read_text", stepResult.actionType)
+            assertEquals(true, stepResult.success)
+            assertEquals("Found in container", stepResult.data["text"])
+            assertEquals("none", stepResult.data["validator"])
+            assertEquals(expectedMatcher, capturedMatcher)
+            assertEquals(expectedContainer, capturedContainer)
+            assertTrue(stepResult.data.containsKey("container"))
+            assertFalse(stepResult.data["container"].isNullOrBlank())
+        }
+
+    @Test
+    fun `execute read_text with container not found fails`() =
+        actionTest {
+            var capturedContainer: NodeMatcher? = null
+            val uiScope = object : RecordingTaskUiScope() {
+                override suspend fun getTextWithinContainer(
+                    matcher: NodeMatcher,
+                    containerMatcher: NodeMatcher,
+                    retry: TaskRetry,
+                ): String {
+                    capturedContainer = containerMatcher
+                    throw IllegalStateException("Container not found for: $containerMatcher")
+                }
+            }
+            val taskScope = RecordingTaskScope(uiScope)
+            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+
+            val expectedContainer = NodeMatcher(resourceId = "com.example:id/nonexistent")
+
+            val result =
+                engine.execute(
+                    taskScope = taskScope,
+                    plan = UiActionPlan(
+                        commandId = "cmd",
+                        taskId = "task",
+                        source = "test",
+                        actions = listOf(
+                            UiAction.ReadText(
+                                id = "rt-container-missing",
+                                matcher = NodeMatcher(textContains = "Item"),
+                                container = expectedContainer,
+                            ),
+                        ),
+                    ),
+                )
+
+            val stepResult = result.stepResults.single()
+            assertEquals("read_text", stepResult.actionType)
+            assertEquals(false, stepResult.success)
+            assertEquals("CONTAINER_NOT_FOUND", stepResult.data["error"])
+            assertEquals(expectedContainer, capturedContainer)
+        }
+
+    @Test
+    fun `execute read_text with container but target not in subtree fails with node_not_found`() =
+        actionTest {
+            var capturedContainer: NodeMatcher? = null
+            val uiScope = object : RecordingTaskUiScope() {
+                override suspend fun getTextWithinContainer(
+                    matcher: NodeMatcher,
+                    containerMatcher: NodeMatcher,
+                    retry: TaskRetry,
+                ): String {
+                    capturedContainer = containerMatcher
+                    throw IllegalStateException(
+                        "No UI node found matching criteria: $matcher within container: $containerMatcher",
+                    )
+                }
+            }
+            val taskScope = RecordingTaskScope(uiScope)
+            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+
+            val expectedContainer = NodeMatcher(resourceId = "com.example:id/list")
+
+            val result =
+                engine.execute(
+                    taskScope = taskScope,
+                    plan = UiActionPlan(
+                        commandId = "cmd",
+                        taskId = "task",
+                        source = "test",
+                        actions = listOf(
+                            UiAction.ReadText(
+                                id = "rt-container-no-target",
+                                matcher = NodeMatcher(textEquals = "Missing"),
+                                container = expectedContainer,
+                            ),
+                        ),
+                    ),
+                )
+
+            val stepResult = result.stepResults.single()
+            assertEquals("read_text", stepResult.actionType)
+            assertEquals(false, stepResult.success)
+            assertEquals("NODE_NOT_FOUND", stepResult.data["error"])
+            assertEquals(expectedContainer, capturedContainer)
+        }
+
+    @Test
+    fun `execute read_text with all and container not found fails`() =
+        actionTest {
+            var capturedContainer: NodeMatcher? = null
+            val uiScope = object : RecordingTaskUiScope() {
+                override suspend fun getAllTextWithinContainer(
+                    matcher: NodeMatcher,
+                    containerMatcher: NodeMatcher,
+                    retry: TaskRetry,
+                ): List<String> {
+                    capturedContainer = containerMatcher
+                    throw IllegalStateException("Container not found for: $containerMatcher")
+                }
+            }
+            val taskScope = RecordingTaskScope(uiScope)
+            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+
+            val expectedContainer = NodeMatcher(resourceId = "com.example:id/nonexistent")
+
+            val result =
+                engine.execute(
+                    taskScope = taskScope,
+                    plan = UiActionPlan(
+                        commandId = "cmd",
+                        taskId = "task",
+                        source = "test",
+                        actions = listOf(
+                            UiAction.ReadText(
+                                id = "rt-all-container-missing",
+                                matcher = NodeMatcher(role = "text"),
+                                all = true,
+                                container = expectedContainer,
+                            ),
+                        ),
+                    ),
+                )
+
+            val stepResult = result.stepResults.single()
+            assertEquals("read_text", stepResult.actionType)
+            assertEquals(false, stepResult.success)
+            assertEquals("CONTAINER_NOT_FOUND", stepResult.data["error"])
+            assertEquals(expectedContainer, capturedContainer)
+        }
+
+    @Test
+    fun `execute read_text with all and container succeeds`() =
+        actionTest {
+            var capturedMatcher: NodeMatcher? = null
+            var capturedContainer: NodeMatcher? = null
+            val uiScope = object : RecordingTaskUiScope() {
+                override suspend fun getAllTextWithinContainer(
+                    matcher: NodeMatcher,
+                    containerMatcher: NodeMatcher,
+                    retry: TaskRetry,
+                ): List<String> {
+                    capturedMatcher = matcher
+                    capturedContainer = containerMatcher
+                    return listOf("Item 1", "Item 2", "Item 3")
+                }
+            }
+            val taskScope = RecordingTaskScope(uiScope)
+            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+
+            val expectedMatcher = NodeMatcher(role = "text")
+            val expectedContainer = NodeMatcher(resourceId = "com.example:id/list")
+
+            val result =
+                engine.execute(
+                    taskScope = taskScope,
+                    plan = UiActionPlan(
+                        commandId = "cmd",
+                        taskId = "task",
+                        source = "test",
+                        actions = listOf(
+                            UiAction.ReadText(
+                                id = "rt-all-container",
+                                matcher = expectedMatcher,
+                                all = true,
+                                container = expectedContainer,
+                            ),
+                        ),
+                    ),
+                )
+
+            val stepResult = result.stepResults.single()
+            assertEquals("read_text", stepResult.actionType)
+            assertEquals(true, stepResult.success)
+            assertEquals("true", stepResult.data["all"])
+            assertEquals("3", stepResult.data["count"])
+            assertEquals("[\"Item 1\",\"Item 2\",\"Item 3\"]", stepResult.data["text"])
+            assertEquals(expectedMatcher, capturedMatcher)
+            assertEquals(expectedContainer, capturedContainer)
+            assertTrue(stepResult.data.containsKey("container"))
+            assertFalse(stepResult.data["container"].isNullOrBlank())
+        }
+
+    @Test
+    fun `execute read_text with container and validator succeeds`() =
+        actionTest {
+            val uiScope = object : RecordingTaskUiScope() {
+                override suspend fun getValidatedTextWithinContainer(
+                    matcher: NodeMatcher,
+                    containerMatcher: NodeMatcher,
+                    retry: TaskRetry,
+                    validator: (String) -> Boolean,
+                ): String {
+                    val value = "20.5°C"
+                    if (!validator(value)) {
+                        throw IllegalStateException("Validation failed for text '$value'")
+                    }
+                    return value
+                }
+            }
+            val taskScope = RecordingTaskScope(uiScope)
+            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+
+            val result =
+                engine.execute(
+                    taskScope = taskScope,
+                    plan = UiActionPlan(
+                        commandId = "cmd",
+                        taskId = "task",
+                        source = "test",
+                        actions = listOf(
+                            UiAction.ReadText(
+                                id = "rt-container-validator",
+                                matcher = NodeMatcher(textContains = "Temp"),
+                                container = NodeMatcher(resourceId = "com.example:id/list"),
+                                validator = UiTextValidator.Temperature,
+                            ),
+                        ),
+                    ),
+                )
+
+            val stepResult = result.stepResults.single()
+            assertEquals("read_text", stepResult.actionType)
+            assertEquals(true, stepResult.success)
+            assertEquals("20.5°C", stepResult.data["text"])
+            assertEquals("temperature", stepResult.data["validator"])
+        }
+
+    @Test
+    fun `execute read_text with container and validator fails`() =
+        actionTest {
+            val uiScope = object : RecordingTaskUiScope() {
+                override suspend fun getValidatedTextWithinContainer(
+                    matcher: NodeMatcher,
+                    containerMatcher: NodeMatcher,
+                    retry: TaskRetry,
+                    validator: (String) -> Boolean,
+                ): String {
+                    val value = "not a temperature"
+                    if (!validator(value)) {
+                        throw IllegalStateException("Validation failed for text '$value' from matching UI node within container")
+                    }
+                    return value
+                }
+            }
+            val taskScope = RecordingTaskScope(uiScope)
+            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+
+            val result =
+                engine.execute(
+                    taskScope = taskScope,
+                    plan = UiActionPlan(
+                        commandId = "cmd",
+                        taskId = "task",
+                        source = "test",
+                        actions = listOf(
+                            UiAction.ReadText(
+                                id = "rt-container-validator-fail",
+                                matcher = NodeMatcher(textContains = "Temp"),
+                                container = NodeMatcher(resourceId = "com.example:id/list"),
+                                validator = UiTextValidator.Temperature,
+                            ),
+                        ),
+                    ),
+                )
+
+            val stepResult = result.stepResults.single()
+            assertEquals("read_text", stepResult.actionType)
+            assertEquals(false, stepResult.success)
+            assertEquals("VALIDATOR_MISMATCH", stepResult.data["error"])
+            assertEquals("not a temperature", stepResult.data["raw_text"])
+        }
 }
 
 private class RecordingTaskScope(
@@ -1230,6 +1585,7 @@ open class RecordingTaskUiScope(
     var scrollIntoViewCalled: Boolean = false
     var scrollOnceCalled: Boolean = false
     var clickCalled: Boolean = false
+    var clickCoordinate: action.math.geometry.Point? = null
 
     override suspend fun getValidatedText(
         matcher: NodeMatcher,
@@ -1271,6 +1627,31 @@ open class RecordingTaskUiScope(
         retry: TaskRetry,
     ): String = "Title Text"
 
+    override suspend fun getTextWithinContainer(
+        matcher: NodeMatcher,
+        containerMatcher: NodeMatcher,
+        retry: TaskRetry,
+    ): String = "Title Text in Container"
+
+    override suspend fun getAllTextWithinContainer(
+        matcher: NodeMatcher,
+        containerMatcher: NodeMatcher,
+        retry: TaskRetry,
+    ): List<String> = listOf("Title Text 1 in Container", "Title Text 2 in Container")
+
+    override suspend fun getValidatedTextWithinContainer(
+        matcher: NodeMatcher,
+        containerMatcher: NodeMatcher,
+        retry: TaskRetry,
+        validator: (String) -> Boolean,
+    ): String {
+        val value = "22.5 C"
+        if (!validator(value)) {
+            throw IllegalStateException("Validation failed for text '$value' from matching UI node within container")
+        }
+        return value
+    }
+
     var readKeyValuePairResult: Pair<String, String> = Pair("Label", "Value")
     var readKeyValuePairThrows: IllegalStateException? = null
 
@@ -1283,11 +1664,13 @@ open class RecordingTaskUiScope(
     }
 
     override suspend fun click(
-        matcher: NodeMatcher,
+        matcher: NodeMatcher?,
+        coordinate: action.math.geometry.Point?,
         clickTypes: UiTreeClickTypes,
         retry: TaskRetry,
     ) {
         clickCalled = true
+        clickCoordinate = coordinate
     }
 
     override suspend fun scrollOnce(

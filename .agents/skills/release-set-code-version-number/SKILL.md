@@ -26,10 +26,9 @@ This skill updates code-facing surfaces only:
 - code/tests that should know about the new unreleased version
 - internal repo-maintenance skill docs
 
-It intentionally does **not** update public release-facing docs or website content such as:
-- `docs/android-operator-apk.md`
-- `docs/compatibility.md`
-- `docs/release-procedure.md`
+It intentionally does **not** update public release-facing docs and release-maintenance docs such as:
+- `docs/troubleshooting/compatibility.md`
+- `docs/internal/release-procedure.md`
 - `sites/docs/**`
 - `sites/landing/public/**`
 - `sites/landing/public/install.sh`
@@ -40,6 +39,8 @@ Review every modified file before accepting the bump. Be especially careful with
 - `apps/node/src/test/unit/versionCompatibility.test.ts`
 - `scripts/fake_adb.sh`
 - skill docs that contain command examples
+
+Doctor release download copy in tests should follow production: build expected strings with `getCliVersion()`, `getOperatorApkDownloadUrl()`, and `getOperatorApkSha256Url()` from `apps/node/src/domain/version/compatibility.ts` instead of hard-coding versioned download URLs. That keeps `release-set-code-version-number` from failing on `DoctorService` tests after each bump.
 
 Confirm the bump only touched code-facing surfaces and did not leak into public docs.
 

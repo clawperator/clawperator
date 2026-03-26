@@ -46,11 +46,25 @@ Design consequence:
 - CLI parsing changes must preserve both the structured JSON contract and the exit-code contract. Test valid, invalid, and missing-value cases for any new flag.
 
 ## Key Docs
-- `docs/node-api-for-agents.md` - API contract, CLI reference, error codes
-- `docs/first-time-setup.md` - Device setup and APK installation
-- `docs/architecture.md` - System design
-- `docs/troubleshooting.md` - Common issues
-- `docs/design/` - Internal design documents
+- `docs/setup.md` - Device setup and APK installation
+- `docs/api/overview.md` - API contract and execution model
+- `docs/api/actions.md` - Action types and parameter semantics
+- `docs/api/errors.md` - Error codes and recovery patterns
+- `docs/internal/design/` - Internal design documents
+
+## How to Verify Against Code
+For every claim in the documentation, there must be a code path that confirms it.
+- CLI command names and flags: read `apps/node/src/cli/registry.ts`
+- Selector flags and behavior: read `apps/node/src/cli/selectorFlags.ts` and `apps/node/src/contracts/selectors.ts`
+- Action types and parameters: read `apps/node/src/contracts/execution.ts`
+- Error codes and meanings: read `apps/node/src/contracts/errors.ts`
+- Result envelope shape: read `apps/node/src/contracts/result.ts`
+- Doctor checks: read `apps/node/src/domain/doctor/checks/`
+- Serve command: read `apps/node/src/cli/commands/serve.ts`
+
+Do not write documentation from memory or from existing docs alone. Open the
+code file and write the docs from what you see. If the code contradicts
+existing docs, the code is correct.
 
 ## Public Sites
 - Clawperator has two public website surfaces with different build systems and purposes:
@@ -58,7 +72,7 @@ Design consequence:
   - `sites/docs/` - MkDocs documentation site for `https://docs.clawperator.com`
 - Do not confuse the landing site with the docs site when making website changes:
   - marketing homepage, install entrypoints, and root-level files for `clawperator.com` belong in `sites/landing/`
-  - technical docs content for `docs.clawperator.com` belongs in `docs/`, `apps/node/src/`, `../clawperator-skills/docs/`, and is published through `sites/docs/`
+  - technical docs content for `docs.clawperator.com` belongs in `docs/` and `apps/node/src/`, and is published through `sites/docs/`
 - Root-level machine-facing files must be updated on the correct surface:
   - `clawperator.com/robots.txt`, `llms.txt`, `sitemap.xml`, `install.sh` come from `sites/landing/public/`
   - `docs.clawperator.com/robots.txt` and `llms.txt` come from `sites/docs/static/`
@@ -75,9 +89,11 @@ Design consequence:
 - Typical local layout is sibling repos:
   - `../clawperator` (this repo)
   - `../clawperator-skills` (skills repo)
+- Canonical skills documentation is authored in this repo at `docs/skills/`; the skills repo provides runtime/user-facing skill packages.
 - Repo-specific Codex skills live in `.agents/skills/` in this repository.
-- Current project-local skill:
-  - `.agents/skills/docs-generate/` - regenerates `sites/docs/docs/` from `docs/`, `apps/node`, and `../clawperator-skills/docs` using `sites/docs/source-map.yaml`
+- Current project-local skills:
+  - `.agents/skills/docs-build/` - compiles `sites/docs/.build/` from `docs/`, `apps/node/src/`, and `sites/docs/source-map.yaml`
+  - `.agents/skills/docs-author/` - guides authoring and updating documentation content in `docs/`
 - Clawperator runtime and Node API execute plans/actions; skill logic, recipes, and app-specific wrappers live in `../clawperator-skills`.
 - Keep the distinction clear:
   - `../clawperator-skills` contains runtime/user-facing skills consumed by Clawperator
@@ -87,41 +103,41 @@ Design consequence:
 
 ## Documentation Discipline
 
-`sites/docs/docs/` is generated output produced by the `docs-generate` skill. Never edit it directly - changes will be overwritten on the next run.
+`sites/docs/.build/` is generated staging output produced by the `docs-build`
+skill. Never edit it directly - changes will be overwritten on the next run.
 
-If your diff touches `sites/docs/docs/` before you have updated a canonical
-source file in `docs/`, `apps/node/src/`, or `../clawperator-skills/docs/`,
-stop and fix the source first. Generated docs are an output artifact, not an
-authored surface.
+If your diff touches `sites/docs/.build/` before you have updated a canonical
+source file in `docs/` or `apps/node/src/`, stop and fix the source first.
+Generated staging output is an artifact, not an authored surface.
 
 `sites/docs/site/` is deployable MkDocs build output. Do not hand-edit it either, except as a temporary local build artifact. Source-controlled docs-site root files live in `sites/docs/static/` and are copied into `sites/docs/site/` by `./scripts/docs_build.sh`.
 
-Items under `tasks/` should be treated as temporary working notes, not durable documentation. It is fine during iterative development to capture in-progress findings, plans, or draft documentation in `tasks/`, but before opening a PR we typically delete that task entry. By that point, any durable knowledge must have been migrated into its proper long-term home in `docs/`, `apps/node/src/`, or `../clawperator-skills/docs/` as appropriate.
+Items under `tasks/` should be treated as temporary working notes, not durable documentation. It is fine during iterative development to capture in-progress findings, plans, or draft documentation in `tasks/`, but before opening a PR we typically delete that task entry. By that point, any durable knowledge must have been migrated into its proper long-term home in `docs/` or `apps/node/src/` as appropriate.
 
 **Exception — multi-phase project files:** When a task file covers a sequenced series of PRs (e.g. PR-1 through PR-7), do not delete completed task entries between phases. Keep them in place, marked `[DONE]`, until the final PR in the project ships. An agent working on a later phase benefits from reading the full history: dependency rationale, implementation choices made in earlier phases, and acceptance criteria that later tasks reference. Delete the whole file only when all phases are complete.
 
 Do not rely on `tasks/` as the final home for agent-facing behavior notes, API caveats, validation expectations, or operational guidance. If an agent would need the information after the task folder is deleted, it belongs in the real docs.
 
-If you find an error in a generated page, check `sites/docs/source-map.yaml` to find the source file, fix it there, then re-run the skill to regenerate. Source locations:
-- Content errors: `docs/` or `../clawperator-skills/docs/`
+If you find an error in a generated page, check `sites/docs/source-map.yaml` to find the generator or marker source, fix it there, then re-run the skill to regenerate. Source locations:
+- Content errors: `docs/`
 - CLI/API reference errors: `apps/node/src/`
 
 Commit the source fix and the regenerated output together.
 
-If a change affects a public API, CLI command, error code, execution contract, setup flow, or user-visible runtime behavior, update the relevant authored docs in the same change. This usually includes `docs/node-api-for-agents.md`, `docs/first-time-setup.md`, `docs/troubleshooting.md`, and any other affected source doc, then regenerate `sites/docs/docs/` so the public docs stay aligned with the shipped behavior.
+If a change affects a public API, CLI command, error code, execution contract,
+setup flow, or user-visible runtime behavior, update the relevant authored docs
+in the same change. Then regenerate `sites/docs/.build/` and run
+`./scripts/docs_build.sh` so the public docs stay aligned with the shipped
+behavior.
 
-When docs need regeneration, use the repo docs-generation workflow rather than hand-editing generated pages. The project-local skill is `.agents/skills/docs-generate/`, and the public docs site build can be validated with `./scripts/docs_build.sh`.
+When docs need regeneration, use the repo docs-build workflow rather than hand-editing generated pages. The project-local skill is `.agents/skills/docs-build/`, and the public docs site build can be validated with `./scripts/docs_build.sh`. For authoring or updating documentation content, use the `docs-author` skill at `.agents/skills/docs-author/`.
 
-Before treating generated docs changes as valid, run the repo-local
-`.agents/skills/docs-validate/` skill. It fails when `sites/docs/docs/`
-changes without a corresponding canonical source change.
+Before treating docs changes as valid, run `./scripts/docs_build.sh` and
+confirm it succeeds end to end.
 
 Documentation updates should be considered part of the feature or bug-fix work, not optional follow-up. At minimum, agents should update:
-- `docs/node-api-for-agents.md` for API shape, contract, error code, result-envelope, or agent-behavior changes
-- `docs/first-time-setup.md` for setup/install/device-prep changes
-- `docs/troubleshooting.md` for new failure modes, recovery guidance, or recurring operator issues
-- `docs/design/` when internal design guidance, engineering expectations, or skill-authoring guidance changed in a durable way
-- `../clawperator-skills/docs/` and skill-local `SKILL.md` files when skill behavior, usage, or outputs changed
+- `docs/` for API shape, contract, error code, result-envelope, setup/install/device-prep, troubleshooting, or other authored public docs changes
+- `docs/internal/design/` when internal design guidance, engineering expectations, or skill-authoring guidance changed in a durable way
 
 Docs must not over-promise behavior. When code, validators, scripts, and docs disagree, fix the implementation or narrow the docs so they accurately describe the current shipped behavior. Do not document aspirational or partially implemented behavior as if it already exists.
 
@@ -129,10 +145,11 @@ Delete stale documentation instead of preserving it as historical context unless
 
 Clawperator is still pre-alpha. Documentation should focus on accurately describing the current behavior and current state of the project, not maintaining development history, previous versions, superseded behavior, or change logs unless a document is explicitly meant for release/version management. Prefer deleting or rewriting stale material over documenting how the system used to work.
 
-When removing a source doc, also remove its docs-site references and generated output:
+When removing a source doc, also remove its docs-site references and assembled
+output:
 - `sites/docs/source-map.yaml`
 - `sites/docs/mkdocs.yml`
-- `sites/docs/docs/` pages that would otherwise become dead links
+- any `sites/docs/.build/` pages that would otherwise become dead links
 
 ## Required Iteration Loop
 For non-trivial changes, do all steps before commit:

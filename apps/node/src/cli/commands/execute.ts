@@ -19,19 +19,62 @@ export async function cmdExecute(options: {
 }): Promise<string> {
   let payload: unknown;
   const raw = options.execution.trim();
+  // Inline object JSON vs file path: '{' is unambiguous for objects.
   if (raw.startsWith("{")) {
     try {
       payload = JSON.parse(raw);
     } catch {
-      return formatError({ code: ERROR_CODES.EXECUTION_VALIDATION_FAILED, message: "Invalid JSON for --execution" }, options);
+      return formatError({ code: ERROR_CODES.EXECUTION_VALIDATION_FAILED, message: "Invalid JSON content" }, options);
     }
-  } else {
+  } else if (raw.startsWith("[")) {
+    // Paths can start with '['; prefer file read when the path exists, else treat as inline JSON array.
     try {
       const content = await readFile(raw, "utf-8");
+      try {
+        payload = JSON.parse(content);
+      } catch (e) {
+        return formatError(
+          {
+            code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+            message: `Invalid JSON content in execution file: ${(e as Error).message}`,
+          },
+          options
+        );
+      }
+    } catch (e) {
+      const err = e as NodeJS.ErrnoException;
+      if (err.code === "ENOENT") {
+        try {
+          payload = JSON.parse(raw);
+        } catch {
+          return formatError({ code: ERROR_CODES.EXECUTION_VALIDATION_FAILED, message: "Invalid JSON content" }, options);
+        }
+      } else {
+        return formatError(
+          {
+            code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+            message: `Failed to read execution file: ${err.message}`,
+          },
+          options
+        );
+      }
+    }
+  } else {
+    // Treat as file path: error precedence is unreadable file -> invalid JSON content
+    let content: string;
+    try {
+      content = await readFile(raw, "utf-8");
+    } catch (e) {
+      return formatError(
+        { code: ERROR_CODES.EXECUTION_VALIDATION_FAILED, message: `Failed to read execution file: ${(e as Error).message}` },
+        options
+      );
+    }
+    try {
       payload = JSON.parse(content);
     } catch (e) {
       return formatError(
-        { code: ERROR_CODES.EXECUTION_VALIDATION_FAILED, message: `Failed to read or parse execution file: ${(e as Error).message}` },
+        { code: ERROR_CODES.EXECUTION_VALIDATION_FAILED, message: `Invalid JSON content in execution file: ${(e as Error).message}` },
         options
       );
     }

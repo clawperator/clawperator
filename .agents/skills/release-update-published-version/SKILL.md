@@ -21,11 +21,10 @@ Example:
 ```
 
 This skill updates public release-facing surfaces such as:
-- `docs/android-operator-apk.md`
-- `docs/compatibility.md`
-- `docs/release-procedure.md`
+- `docs/troubleshooting/compatibility.md` (versioned Operator APK remediation example)
+- `docs/internal/release-procedure.md` (versioned release command examples)
 - `sites/landing/public/install.sh`
-- generated docs copies under `sites/docs/docs/`
+- the generated docs staging/build outputs produced by `./scripts/docs_build.sh`
 - generated `llms-full.txt` artifacts
 
 It then rebuilds docs/site artifacts and creates a dedicated follow-up commit:

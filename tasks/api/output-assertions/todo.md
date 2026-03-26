@@ -1,5 +1,7 @@
 # Output Assertion Follow-up TODO
 
+Created: 2026-03-17
+
 ## Push output assertion logic into `runSkill`
 
 ### Problem

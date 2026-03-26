@@ -1,5 +1,7 @@
 # Unified Logging: Problem Definition
 
+Created: 2026-03-22
+
 Status: pre-planning. No implementation scheduled.
 Context: assumes PRD-1 through PRD-5.5 have shipped.
 
@@ -132,15 +134,39 @@ A unified logger would sit above all three, replacing the ad-hoc wiring of indiv
 - Implementation plan, API design, or module structure
 - Log forwarding to external systems (Datadog, CloudWatch, etc.)
 - Log rotation, compression, or retention policies (deferred in PRD-5)
-- A `clawperator logs` command (deferred in PRD-5). The CLI surface for
-  streaming is settled: `clawperator logs --follow` / `logs -f` (streams
-  NDJSON log output until Ctrl+C, matching tail -f / docker logs -f
-  conventions). Query and filter flags depend on the unified logger's
-  event schema and are not yet designed.
 - Structured logging protocol for skill scripts (deferred in PRD-5.5)
 
 These are downstream of getting the unified logger architecture right and should be
 planned once the core design is settled.
+
+---
+
+## Deferred Work Required
+
+### `clawperator logs`
+
+Status: deferred until the unified logger exists.
+
+Required work:
+
+- add a `logs` top-level command with the settled streaming form `clawperator logs --follow`
+- support the alias `logs -f`
+- stream NDJSON log output until Ctrl+C
+- keep query and filter flags out of scope until the logger event schema is defined
+- preserve the existing fail-open logging behavior if the log directory is unavailable
+
+Why this is deferred:
+
+- the command depends on the unified logger event schema
+- the logger design must settle the file and terminal routing rules before filters and queries can be defined
+- the CLI surface is intentionally frozen around streaming-only behavior for now
+
+Acceptance criteria:
+
+- `clawperator logs --follow` streams the current log file and exits cleanly on interrupt
+- `logs -f` behaves identically
+- the command is documented in the source-of-truth docs once implemented
+- no additional command groups or compatibility shims are introduced unless the logger design requires them
 
 ---
 

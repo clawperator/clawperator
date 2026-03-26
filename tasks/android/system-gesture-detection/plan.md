@@ -1,5 +1,7 @@
 # Android System Gesture Detection Plan
 
+Created: 2026-03-19
+
 ## Goal
 
 Implement reliable semantic detection for Android system navigation actions that do not consistently surface as raw `press_key` events during accessibility recording.

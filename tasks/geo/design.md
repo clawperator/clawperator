@@ -1,5 +1,7 @@
 # Cloudflare Browser Rendering GEO Audit Design
 
+Created: 2026-03-12
+
 ## Goal
 
 Add a repo-local agent workflow that uses Cloudflare Browser Rendering APIs to

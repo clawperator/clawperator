@@ -213,6 +213,7 @@ class UiActionEngineDefault(
         taskScope.ui {
             click(
                 matcher = action.matcher,
+                coordinate = action.coordinate,
                 clickTypes = action.clickTypes,
                 retry = action.retry,
             )
@@ -221,9 +222,10 @@ class UiActionEngineDefault(
             id = action.id,
             actionType = "click",
             data =
-                mapOf(
-                    "click_types" to action.clickTypes.toWireValue(),
-                ),
+                buildMap {
+                    action.coordinate?.let { put("coordinate", it.shortString) }
+                    put("click_types", action.clickTypes.toWireValue())
+                },
         )
     }
 
@@ -423,11 +425,23 @@ class UiActionEngineDefault(
         action: UiAction.ReadText,
     ): UiActionStepResult {
         return try {
+            val container = action.container
             if (action.all) {
                 // Multi-match mode: get all matching nodes' text
-                val texts = taskScope.ui {
-                    getAllText(matcher = action.matcher, retry = action.retry)
-                }
+                val texts =
+                    if (container != null) {
+                        taskScope.ui {
+                            getAllTextWithinContainer(
+                                matcher = action.matcher,
+                                containerMatcher = container,
+                                retry = action.retry,
+                            )
+                        }
+                    } else {
+                        taskScope.ui {
+                            getAllText(matcher = action.matcher, retry = action.retry)
+                        }
+                    }
 
                 // Return as JSON array string
                 val jsonArray = texts.joinToString(
@@ -445,33 +459,70 @@ class UiActionEngineDefault(
                             "all" to "true",
                             "count" to texts.size.toString(),
                             "validator" to "none",
-                        ),
+                        ) + if (container != null) mapOf("container" to container.toString()) else emptyMap(),
                 )
             } else {
-                // Single-match mode (original behavior)
+                // Single-match mode
                 val text =
-                    taskScope.ui {
-                        when (action.validator) {
-                            null -> getText(matcher = action.matcher, retry = action.retry)
-                            UiTextValidator.Temperature ->
-                                getValidatedText(
+                    if (container != null) {
+                        // Container-scoped read with validator support
+                        taskScope.ui {
+                            when (action.validator) {
+                                null -> getTextWithinContainer(
                                     matcher = action.matcher,
+                                    containerMatcher = container,
                                     retry = action.retry,
-                                    validator = TaskValidators.TemperatureValidator,
                                 )
-                            UiTextValidator.Version ->
-                                getValidatedText(
-                                    matcher = action.matcher,
-                                    retry = action.retry,
-                                    validator = TaskValidators.VersionValidator,
-                                )
-                            UiTextValidator.Regex -> {
-                                val regex = Regex(checkNotNull(action.validatorPattern) { "validatorPattern required for Regex validator" })
-                                getValidatedText(
-                                    matcher = action.matcher,
-                                    retry = action.retry,
-                                    validator = { it.matches(regex) },
-                                )
+                                UiTextValidator.Temperature ->
+                                    getValidatedTextWithinContainer(
+                                        matcher = action.matcher,
+                                        containerMatcher = container,
+                                        retry = action.retry,
+                                        validator = TaskValidators.TemperatureValidator,
+                                    )
+                                UiTextValidator.Version ->
+                                    getValidatedTextWithinContainer(
+                                        matcher = action.matcher,
+                                        containerMatcher = container,
+                                        retry = action.retry,
+                                        validator = TaskValidators.VersionValidator,
+                                    )
+                                UiTextValidator.Regex -> {
+                                    val regex = Regex(checkNotNull(action.validatorPattern) { "validatorPattern required for Regex validator" })
+                                    getValidatedTextWithinContainer(
+                                        matcher = action.matcher,
+                                        containerMatcher = container,
+                                        retry = action.retry,
+                                        validator = { it.matches(regex) },
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        // Non-container read (original behavior with validator support)
+                        taskScope.ui {
+                            when (action.validator) {
+                                null -> getText(matcher = action.matcher, retry = action.retry)
+                                UiTextValidator.Temperature ->
+                                    getValidatedText(
+                                        matcher = action.matcher,
+                                        retry = action.retry,
+                                        validator = TaskValidators.TemperatureValidator,
+                                    )
+                                UiTextValidator.Version ->
+                                    getValidatedText(
+                                        matcher = action.matcher,
+                                        retry = action.retry,
+                                        validator = TaskValidators.VersionValidator,
+                                    )
+                                UiTextValidator.Regex -> {
+                                    val regex = Regex(checkNotNull(action.validatorPattern) { "validatorPattern required for Regex validator" })
+                                    getValidatedText(
+                                        matcher = action.matcher,
+                                        retry = action.retry,
+                                        validator = { it.matches(regex) },
+                                    )
+                                }
                             }
                         }
                     }
@@ -483,7 +534,7 @@ class UiActionEngineDefault(
                         mapOf(
                             "text" to text,
                             "validator" to (action.validator?.name?.lowercase() ?: "none"),
-                        ),
+                        ) + if (container != null) mapOf("container" to container.toString()) else emptyMap(),
                 )
             }
         } catch (e: IllegalStateException) {
@@ -503,6 +554,24 @@ class UiActionEngineDefault(
                         "error" to "VALIDATOR_MISMATCH",
                         "raw_text" to rawText,
                     ),
+                )
+            }
+            // Check for container-related errors
+            if (msg.contains("Container not found")) {
+                return UiActionStepResult(
+                    id = action.id,
+                    actionType = "read_text",
+                    success = false,
+                    data = mapOf("error" to "CONTAINER_NOT_FOUND"),
+                )
+            }
+            // Container matched but the target matcher hit nothing inside its subtree
+            if (msg.contains("No UI node found matching criteria") && msg.contains("within container")) {
+                return UiActionStepResult(
+                    id = action.id,
+                    actionType = "read_text",
+                    success = false,
+                    data = mapOf("error" to "NODE_NOT_FOUND"),
                 )
             }
             throw e

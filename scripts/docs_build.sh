@@ -40,22 +40,15 @@ fi
 echo "Installing MkDocs dependencies..."
 pip install -r "$REQUIREMENTS_FILE"
 
-echo "Validating generated docs source-of-truth..."
-"$VENV_DIR/bin/python" "$REPO_ROOT/.agents/skills/docs-validate/scripts/validate_source_of_truth.py" \
-  --repo-root "$REPO_ROOT" \
-  --skills-root "$REPO_ROOT/../clawperator-skills"
+echo "Assembling docs staging directory..."
+"$VENV_DIR/bin/python" "$REPO_ROOT/.agents/skills/docs-build/scripts/assemble.py"
+
 # Run the build
 echo "Running MkDocs build..."
 mkdocs build
 
-echo "Patching docs sitemap metadata..."
-"$VENV_DIR/bin/python" "$REPO_ROOT/.agents/skills/sitemaps-generate/scripts/generate_sitemap_metadata.py" docs \
-  --repo-root "$REPO_ROOT" \
-  --sitemap-path "$DOCS_DIR/site/sitemap.xml" \
-  --source-map-path "$DOCS_DIR/source-map.yaml"
-
 echo "Generating llms-full.txt..."
-"$VENV_DIR/bin/python" "$REPO_ROOT/.agents/skills/docs-generate/scripts/generate_llms_full.py"
+"$VENV_DIR/bin/python" "$REPO_ROOT/.agents/skills/docs-build/scripts/generate_llms_full.py"
 
 STATIC_DIR="$DOCS_DIR/static"
 if [ -d "$STATIC_DIR" ]; then
@@ -64,11 +57,11 @@ if [ -d "$STATIC_DIR" ]; then
 fi
 
 echo "Validating docs routes and machine-facing files..."
-python3 "$REPO_ROOT/scripts/validate_docs_routes.py" \
+"$VENV_DIR/bin/python" "$REPO_ROOT/scripts/validate_docs_routes.py" \
   --site-dir "$DOCS_DIR/site" \
-  --source-map "$DOCS_DIR/source-map.yaml" \
-  --generated-docs-dir "$DOCS_DIR/docs" \
-  --llms-txt "$DOCS_DIR/static/llms.txt"
+  --generated-docs-dir "$DOCS_DIR/.build" \
+  --llms-txt "$DOCS_DIR/static/llms.txt" \
+  --mkdocs-yml "$DOCS_DIR/mkdocs.yml"
 
 # Verify build output
 if [ -d "site" ] && [ -f "site/index.html" ]; then

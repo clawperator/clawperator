@@ -1,5 +1,6 @@
 package clawperator.task.runner
 
+import action.math.geometry.Point
 import clawperator.uitree.UiTreeClickTypes
 
 /**
@@ -35,7 +36,8 @@ sealed interface UiAction {
 
     data class Click(
         override val id: String,
-        val matcher: NodeMatcher,
+        val matcher: NodeMatcher? = null,
+        val coordinate: Point? = null,
         val clickTypes: UiTreeClickTypes = UiTreeClickTypes.Default,
         val retry: TaskRetry = TaskRetryPresets.UiReadiness,
     ) : UiAction
@@ -101,6 +103,7 @@ sealed interface UiAction {
         val validator: UiTextValidator? = null,
         val validatorPattern: String? = null,
         val all: Boolean = false,
+        val container: NodeMatcher? = null,
     ) : UiAction
 
     data class SnapshotUi(

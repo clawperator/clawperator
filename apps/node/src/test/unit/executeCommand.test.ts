@@ -1,6 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert";
 import { spawn } from "node:child_process";
+import { writeFileSync, unlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { cmdExecute } from "../../cli/commands/execute.js";
@@ -154,6 +156,35 @@ describe("cmdExecute --dry-run", () => {
   });
 });
 
+describe("cmdExecute inline JSON vs file path", () => {
+  it("reads payload from disk when the path starts with [ and exists", async () => {
+    const minimal = {
+      commandId: "bracket-file",
+      taskId: "bracket-file",
+      source: "test",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 30000,
+      actions: [{ id: "a1", type: "sleep", params: { durationMs: 1 } }],
+    };
+    const p = join(tmpdir(), `[exec-bracket-${Date.now()}].json`);
+    writeFileSync(p, JSON.stringify(minimal), "utf-8");
+    try {
+      const output = await cmdExecute({ format: "json", validateOnly: true, execution: p });
+      const result = JSON.parse(output);
+      assert.strictEqual(result.ok, true);
+      assert.strictEqual(result.execution.commandId, "bracket-file");
+    } finally {
+      unlinkSync(p);
+    }
+  });
+
+  it("parses inline JSON when [ prefix is not an existing file path", async () => {
+    const output = await cmdExecute({ format: "json", validateOnly: true, execution: "[1]" });
+    const result = JSON.parse(output);
+    assert.strictEqual(result.code, "EXECUTION_VALIDATION_FAILED");
+  });
+});
+
 describe("clawperator exec CLI", () => {
   it("surfaces action context for invalid fixture files before device contact", async () => {
     const fixturePath = join(packageRoot, "src", "test", "fixtures", "execution-invalid-action-0.json");
@@ -169,5 +200,192 @@ describe("clawperator exec CLI", () => {
     const { stdout, code } = await runCli(["execute", "--execution", fixturePath]);
     assert.notStrictEqual(code, 0);
     assert.match(stdout, /actionId/);
+  });
+
+  const minimalInline = JSON.stringify({
+    commandId: "pos-1",
+    taskId: "pos-1",
+    source: "test",
+    expectedFormat: "android-ui-automator",
+    timeoutMs: 30000,
+    actions: [{ id: "a1", type: "sleep", params: { durationMs: 1 } }],
+  });
+
+  it("accepts positional inline JSON with --validate-only", async () => {
+    const { stdout, code } = await runCli(["exec", minimalInline, "--validate-only", "--json"]);
+    assert.strictEqual(code, 0);
+    const result = JSON.parse(stdout);
+    assert.strictEqual(result.ok, true);
+    assert.strictEqual(result.execution.commandId, "pos-1");
+  });
+
+  it("accepts --payload with --validate-only", async () => {
+    const { stdout, code } = await runCli(["exec", "--payload", minimalInline, "--validate-only", "--json"]);
+    assert.strictEqual(code, 0);
+    const result = JSON.parse(stdout);
+    assert.strictEqual(result.ok, true);
+  });
+
+  it("accepts positional file path with --validate-only", async () => {
+    const fixturePath = join(packageRoot, "src", "test", "fixtures", "execution-sleep-minimal.json");
+    const { stdout, code } = await runCli(["exec", fixturePath, "--validate-only", "--json"]);
+    assert.strictEqual(code, 0);
+    const result = JSON.parse(stdout);
+    assert.strictEqual(result.ok, true);
+    assert.strictEqual(result.execution.commandId, "cli-test-cmd");
+  });
+
+  it("returns MISSING_ARGUMENT when exec has no payload", async () => {
+    const { stdout, code } = await runCli(["exec", "--json"]);
+    assert.notStrictEqual(code, 0);
+    const result = JSON.parse(stdout);
+    assert.strictEqual(result.code, "MISSING_ARGUMENT");
+  });
+});
+
+describe("clawperator wait-for-nav CLI", () => {
+  it("builds wait_for_navigation with --app and --timeout (validate-only)", async () => {
+    const { stdout, code } = await runCli([
+      "wait-for-nav",
+      "--app",
+      "com.android.settings",
+      "--timeout",
+      "5000",
+      "--validate-only",
+      "--json",
+    ]);
+    assert.strictEqual(code, 0);
+    const result = JSON.parse(stdout);
+    assert.strictEqual(result.ok, true);
+    const action = result.execution.actions[0];
+    assert.strictEqual(action.type, "wait_for_navigation");
+    assert.strictEqual(action.params.expectedPackage, "com.android.settings");
+    assert.strictEqual(action.params.timeoutMs, 5000);
+  });
+
+  it("returns MISSING_ARGUMENT when --timeout is missing", async () => {
+    const { stdout, code } = await runCli(["wait-for-nav", "--app", "com.android.settings", "--json"]);
+    assert.notStrictEqual(code, 0);
+    const result = JSON.parse(stdout);
+    assert.strictEqual(result.code, "MISSING_ARGUMENT");
+  });
+
+  it("rejects empty --app even when a selector is present", async () => {
+    const { stdout, code } = await runCli([
+      "wait-for-nav",
+      "--app",
+      "",
+      "--text",
+      "Settings",
+      "--timeout",
+      "5000",
+      "--validate-only",
+      "--json",
+    ]);
+    assert.notStrictEqual(code, 0);
+    const result = JSON.parse(stdout);
+    assert.strictEqual(result.code, "EXECUTION_VALIDATION_FAILED");
+    assert.match(result.message, /--app/);
+  });
+});
+
+describe("clawperator read-value CLI", () => {
+  it("builds read_key_value_pair with --label (validate-only)", async () => {
+    const { stdout, code } = await runCli(["read-value", "--label", "Battery", "--validate-only", "--json"]);
+    assert.strictEqual(code, 0);
+    const result = JSON.parse(stdout);
+    assert.strictEqual(result.ok, true);
+    const action = result.execution.actions[0];
+    assert.strictEqual(action.type, "read_key_value_pair");
+    assert.deepStrictEqual(action.params.labelMatcher, { textEquals: "Battery" });
+  });
+
+  it("accepts read-kv synonym", async () => {
+    const { stdout, code } = await runCli(["read-kv", "--label", "Battery", "--validate-only", "--json"]);
+    assert.strictEqual(code, 0);
+    const result = JSON.parse(stdout);
+    assert.strictEqual(result.execution.actions[0].type, "read_key_value_pair");
+  });
+
+  it("sets all:true when --all and --json", async () => {
+    const { stdout, code } = await runCli([
+      "read-value",
+      "--label",
+      "X",
+      "--all",
+      "--validate-only",
+      "--json",
+    ]);
+    assert.strictEqual(code, 0);
+    const result = JSON.parse(stdout);
+    assert.strictEqual(result.execution.actions[0].params.all, true);
+  });
+
+  it("sets all:true when --all with --output json (no literal --json)", async () => {
+    const { stdout, code } = await runCli([
+      "--output",
+      "json",
+      "read-value",
+      "--label",
+      "X",
+      "--all",
+      "--validate-only",
+    ]);
+    assert.strictEqual(code, 0);
+    const result = JSON.parse(stdout);
+    assert.strictEqual(result.execution.actions[0].params.all, true);
+  });
+
+  it("errors when --all is used with pretty output", async () => {
+    const { stdout, code } = await runCli([
+      "--output",
+      "pretty",
+      "read-value",
+      "--label",
+      "X",
+      "--all",
+    ]);
+    assert.notStrictEqual(code, 0);
+    const result = JSON.parse(stdout);
+    assert.strictEqual(result.code, "EXECUTION_VALIDATION_FAILED");
+    assert.match(result.message, /--json|JSON output/i);
+  });
+
+  it("errors when --all is used without explicit json (implicit default json)", async () => {
+    const { stdout, code } = await runCli([
+      "read-value",
+      "--label",
+      "X",
+      "--all",
+      "--validate-only",
+    ]);
+    assert.notStrictEqual(code, 0);
+    const result = JSON.parse(stdout);
+    assert.strictEqual(result.code, "EXECUTION_VALIDATION_FAILED");
+    assert.match(result.message, /explicit JSON output/i);
+  });
+
+  it("returns MISSING_ARGUMENT when no label flags", async () => {
+    const { stdout, code } = await runCli(["read-value", "--json"]);
+    assert.notStrictEqual(code, 0);
+    const result = JSON.parse(stdout);
+    assert.strictEqual(result.code, "MISSING_ARGUMENT");
+  });
+
+  it("accepts --timeout flag and applies override just like exec", async () => {
+    const { stdout, code } = await runCli([
+      "read-value",
+      "--label",
+      "Battery",
+      "--timeout",
+      "5000",
+      "--validate-only",
+      "--json",
+    ]);
+    assert.strictEqual(code, 0);
+    const result = JSON.parse(stdout);
+    assert.strictEqual(result.ok, true);
+    // read-value respects --timeout override, just like exec and snapshot do
+    assert.strictEqual(result.execution.timeoutMs, 5000);
   });
 });

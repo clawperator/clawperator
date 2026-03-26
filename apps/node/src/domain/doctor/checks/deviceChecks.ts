@@ -3,6 +3,7 @@ import { type RuntimeConfig } from "../../../adapters/android-bridge/runtimeConf
 import { type DoctorCheckResult } from "../../../contracts/doctor.js";
 import { ERROR_CODES } from "../../../contracts/errors.js";
 import { listDevices } from "../../devices/listDevices.js";
+import { DOCTOR_DOCS_URLS } from "../docsUrls.js";
 
 export async function checkDeviceDiscovery(config: RuntimeConfig): Promise<DoctorCheckResult> {
   const devices = await listDevices(config);
@@ -47,6 +48,7 @@ export async function checkDeviceDiscovery(config: RuntimeConfig): Promise<Docto
           { kind: "shell", value: "adb kill-server" },
           { kind: "shell", value: "adb start-server" }
         ],
+        docsUrl: DOCTOR_DOCS_URLS.devices,
       },
     };
   }

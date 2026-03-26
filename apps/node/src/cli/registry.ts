@@ -2,6 +2,7 @@ import { ERROR_CODES } from "../contracts/errors.js";
 import { LIMITS } from "../contracts/limits.js";
 import { formatError } from "./output.js";
 import type { Logger } from "../adapters/logger.js";
+import type { NodeMatcher } from "../contracts/selectors.js";
 import {
   resolveElementMatcherFromCli,
   resolveContainerMatcherFromCli,
@@ -105,6 +106,43 @@ export function getInvalidTimeoutResult(timeoutMs: number | undefined, options: 
   return undefined;
 }
 
+/**
+ * `read --all` and `read-value --all` need machine-readable stdout; require JSON output and an
+ * explicit `--json` or `--output json` / `--format json` (implicit default json is not enough).
+ */
+export function readAllRequiresExplicitJsonError(options: {
+  command: "read" | "read-value";
+  format: "json" | "pretty";
+  explicitJsonOutput: boolean;
+}): string | undefined {
+  const { command, format, explicitJsonOutput } = options;
+  if (format !== "json") {
+    return formatError(
+      {
+        code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+        message:
+          command === "read"
+            ? 'read --all requires JSON output. Use --json or --output json (not --output pretty).\n\nExample:\n  clawperator read --text "Price" --all --json'
+            : "read-value --all requires JSON output. Use --json or --output json (not --output pretty).",
+      },
+      { format },
+    );
+  }
+  if (!explicitJsonOutput) {
+    return formatError(
+      {
+        code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+        message:
+          command === "read"
+            ? 'read --all requires explicit JSON output. Pass --json, --output json, or --format json.\n\nExample:\n  clawperator read --text "Price" --all --json'
+            : 'read-value --all requires explicit JSON output. Pass --json, --output json, or --format json.\n\nExample:\n  clawperator read-value --label "Battery" --all --json',
+      },
+      { format },
+    );
+  }
+  return undefined;
+}
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -113,6 +151,7 @@ export type HandlerContext = {
   argv: string[];
   rest: string[];
   format: "json" | "pretty";
+  explicitJsonOutput: boolean;
   verbose: boolean;
   logger: Logger;
   deviceId?: string;
@@ -128,6 +167,7 @@ export interface CommandDef {
   subtopics?: Record<string, string>;
   topLevelBlock?: string;
   group: string;
+  supportedFlags?: string[] | ((rest: string[]) => string[]);
   handler: (ctx: HandlerContext) => Promise<string | void>;
 }
 
@@ -292,150 +332,173 @@ Notes:
   - For normal setup, always use clawperator operator setup instead.
 `;
 
-const HELP_SNAPSHOT = `clawperator snapshot
+const HELP_SNAPSHOT = `clawperator snapshot — Get current Android UI hierarchy as XML
 
 Usage:
-  clawperator snapshot [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
-
-Notes:
-  - Returns the current Android UI hierarchy as XML.
-  - Output includes envelope, stepResults[0].actionType = "snapshot_ui", stepResults[0].data.text (XML).
-  - --timeout overrides the default execution timeout (default: 30000 ms).
-`;
-
-const HELP_SCREENSHOT = `clawperator screenshot
-
-Usage:
-  clawperator screenshot [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--path <file>] [--json]
-
-Notes:
-  - Captures a screenshot from the connected device.
-  - --path saves the PNG to the specified file path; if omitted, the image is base64-encoded in the output.
-  - --timeout overrides the default execution timeout.
-`;
-
-const HELP_CLICK = `clawperator click
-
-Usage:
-  clawperator click --text <text> [--device <id>] [--operator-package <pkg>] [--json]
-  clawperator click --id <resource-id> [--device <id>] [--operator-package <pkg>] [--json]
-  clawperator click --role <role> [--device <id>] [--operator-package <pkg>] [--json]
-  clawperator click --desc <text> [--device <id>] [--operator-package <pkg>] [--json]
-  clawperator click --selector '<json>' [--device <id>] [--operator-package <pkg>] [--json]
-
-Selector flags (at least one required; combine for AND matching):
-  --text <text>           Exact visible text
-  --text-contains <text>  Partial text match
-  --id <resource-id>      Android resource ID
-  --desc <text>           Exact content description
-  --desc-contains <text>  Partial content description
-  --role <role>           Element role (button, textfield, text, switch, checkbox, image, etc.)
-  --selector <json>       Raw NodeMatcher JSON (advanced; mutually exclusive with simple flags)
+  clawperator snapshot [--device <id>] [--operator-package <pkg>] [--json]
 
 Options:
-  --long      Perform a long press (clickType: long_click)
-  --focus     Set input focus without clicking (clickType: focus)
+  --timeout <ms>         Max time to wait for snapshot (default: 30000ms)
+  --json                 Output as JSON
 
-Notes:
-  - Performs a tap on the first matching element.
-  - Multiple simple flags combine with AND semantics.
-  - --long and --focus are mutually exclusive.
-  - Exits with MISSING_SELECTOR if no selector flag is provided.
-  - Synonym: tap (accepted, not in help)
+Also accepted as: --device-id
 
 Examples:
-  clawperator click --text "Wi-Fi"
-  clawperator click --role button --text-contains "Submit"
-  clawperator click --id "com.example:id/btn_ok"
-  clawperator click --text "Settings" --long
-  Advanced (raw NodeMatcher JSON): clawperator click --selector '{"textEquals":"Wi-Fi","role":"text"}'
+  clawperator snapshot
+  clawperator snapshot --device <device_serial> --json
 `;
 
-const HELP_OPEN = `clawperator open
+const HELP_SCREENSHOT = `clawperator screenshot — Capture device screen
 
 Usage:
-  clawperator open <package-id>        Open an Android app
-  clawperator open <url>               Open a URL in the browser
-  clawperator open <uri>               Open a deep link
+  clawperator screenshot [--path <file>] [--device <id>] [--operator-package <pkg>] [--json]
 
 Options:
-  --app <target>       Same as a single positional target (package, URL, or URI)
+  --path <file>          Save PNG to file path (if omitted, output is base64)
+  --timeout <ms>         Max time to wait (default: 30000ms)
+  --json                 Output as JSON
 
-Notes:
-  - Target detection: if the value contains a URI scheme (*://), it uses open_uri; otherwise open_app.
-  - --app does not force the app path: a URL or deep link passed with --app still opens as a URI.
-  - Synonyms: open-uri, open-url (accepted, not in help)
+Also accepted as: --device-id
+
+Examples:
+  clawperator screenshot --path /tmp/screen.png
+  clawperator screenshot --device <device_serial> --json
 `;
 
-const HELP_TYPE = `clawperator type
+const HELP_CLICK = `clawperator click — Tap a UI element by selector or coordinates
 
 Usage:
-  clawperator type <text> --role <role> [--device <id>] [--operator-package <pkg>] [--submit] [--clear] [--json]
-  clawperator type <text> --id <resource-id> [--device <id>] [--operator-package <pkg>] [--submit] [--clear] [--json]
-  clawperator type <text> --desc <text> [--device <id>] [--operator-package <pkg>] [--submit] [--clear] [--json]
-  clawperator type <text> --selector '<json>' [--device <id>] [--operator-package <pkg>] [--submit] [--clear] [--json]
+  clawperator click --text "Login" [--device <id>] [--operator-package <pkg>]
+  clawperator click --id "btn_submit" [--device <id>] [--operator-package <pkg>]
+  clawperator click --coordinate 100 200 [--device <id>] [--operator-package <pkg>]
+
+Selector flags (choose one):
+  --text <string>        Click element with matching visible text
+  --id <string>          Click element with matching resource ID
+  --coordinate <x> <y>   Click at exact coordinates (pixels)
+  --desc <string>        Click element with matching content description
+  --role <string>        Click element of matching role (e.g. button)
+  --selector <json>      Click using advanced NodeMatcher JSON
+
+Options:
+  --timeout <ms>         Max time to wait for element (default: 10000)
+  --json                 Output as JSON
+  --long                 Perform a long press (clickType: long_click)
+  --focus                Set input focus without clicking (clickType: focus)
+
+Also accepted as: --device-id, tap
+
+Examples:
+  clawperator click --text "Submit"
+  clawperator click --id "login_button" --device <device_serial>
+`;
+
+const HELP_OPEN = `clawperator open — Open an Android app or URL
+
+Usage:
+  clawperator open <package-id> [--device <id>] [--operator-package <pkg>]
+  clawperator open <url_or_uri> [--device <id>] [--operator-package <pkg>]
+
+Target types:
+  Package ID (e.g. com.android.settings) uses open_app
+  URL/URI (e.g. https://google.com) uses open_uri
+
+Options:
+  --app <target>         Alternative to positional target argument
+  --timeout <ms>         Max time to wait
+  --json                 Output as JSON
+
+Also accepted as: --device-id, open-uri, open-url
+
+Examples:
+  clawperator open com.android.settings
+  clawperator open https://clawperator.com
+`;
+
+const HELP_TYPE = `clawperator type — Type text into a UI element
+
+Usage:
+  clawperator type "hello world" --id "search_box" [--device <id>] [--operator-package <pkg>]
+  clawperator type "admin" --text "Username" [--device <id>] [--operator-package <pkg>]
 
 Text to type:
-  Positional argument or --text <text> (mutually exclusive; --text is reserved for text to type)
+  Positional argument (e.g. "hello world") or --text <string> if not using --text as a selector.
 
-Selector flags (at least one required; combine for AND matching):
-  --id <resource-id>      Android resource ID
-  --desc <text>           Exact content description
-  --desc-contains <text>  Partial content description
-  --role <role>           Element role (button, textfield, text, switch, checkbox, image, etc.)
-  --text-contains <text>  Partial text match
-  --selector <json>       Raw NodeMatcher JSON (advanced; mutually exclusive with simple flags)
+Selector flags (choose one):
+  --id <string>          Match element by resource ID
+  --role <string>        Match element by role
+  --desc <string>        Match element by content description
+  --selector <json>      Raw NodeMatcher JSON
 
 Options:
-  --submit             Press Enter after typing
-  --clear              No effect today (field is not cleared before typing on device)
+  --submit               Press Enter after typing
+  --clear                Clear existing text before typing
+  --timeout <ms>         Max time to wait for element
+  --json                 Output as JSON
 
-Notes:
-  - Types text into the first matching element.
-  - --text is used for the text content to type, not the element selector.
-    Use --id, --role, --desc, --text-contains, --desc-contains, or --selector (advanced) to identify the target.
-  - Synonym: fill (accepted, not in help)
+Also accepted as: --device-id, fill
 
 Examples:
   clawperator type "hello world" --role textfield
   clawperator type "search query" --id "com.example:id/search_box" --submit
-  clawperator type --text "hello" --role textfield
-  Advanced (raw NodeMatcher JSON): clawperator type "hi" --selector '{"resourceId":"com.example:id/search_box"}'
 `;
 
-const HELP_READ = `clawperator read
+const HELP_READ_VALUE = `clawperator read-value — Read value associated with a labeled element
 
 Usage:
-  clawperator read --text <text> [--device <id>] [--operator-package <pkg>] [--json]
-  clawperator read --id <resource-id> [--device <id>] [--operator-package <pkg>] [--json]
-  clawperator read --role <role> [--device <id>] [--operator-package <pkg>] [--json]
-  clawperator read --desc <text> [--device <id>] [--operator-package <pkg>] [--json]
-  clawperator read --selector '<json>' [--device <id>] [--operator-package <pkg>] [--json]
+  clawperator read-value --label "Battery" [--json]
+  clawperator read-value --label-id "battery_label" [--json]
 
-Selector flags (at least one required; combine for AND matching):
-  --text <text>           Exact visible text
-  --text-contains <text>  Partial text match
-  --id <resource-id>      Android resource ID
-  --desc <text>           Exact content description
-  --desc-contains <text>  Partial content description
-  --role <role>           Element role
-  --selector <json>       Raw NodeMatcher JSON (advanced; mutually exclusive with simple flags)
+Label selector flags (choose one):
+  --label <string>       Match label by exact visible text
+  --label-id <string>    Match label by Android resource ID
+  --label-desc <string>  Match label by exact content description
 
 Options:
-  --all                   Return all matches as a JSON array (requires --json)
+  --all                  Return all matches as a JSON array (JSON output mode only)
+  --timeout <ms>         Max time to wait
+  --json                 Output as JSON
 
-Notes:
-  - Returns the text content of the first matching element.
-  - --all returns all matching elements' text as a JSON array of strings.
-  - --all requires --json (error in pretty mode since array output is ambiguous).
-  - Multiple simple flags combine with AND semantics.
+Also accepted as: --device-id, read-kv
+
+Examples:
+  clawperator read-value --label "Battery" --json
+  clawperator read-value --label "Wi-Fi" --all --json
+`;
+
+const HELP_READ = `clawperator read — Read text content from a UI element
+
+Usage:
+  clawperator read --text "Price" [--device <id>] [--operator-package <pkg>]
+  clawperator read --id "tv_price" [--device <id>] [--operator-package <pkg>]
+
+Selector flags (choose one):
+  --text <string>        Match element by visible text
+  --id <string>          Match element by resource ID
+  --desc <string>        Match element by content description
+  --role <string>        Match element by role
+  --selector <json>      Match using advanced NodeMatcher JSON
+
+Options:
+  --all                  Return all matches as a JSON array (JSON output mode only)
+  --timeout <ms>         Max time to wait for element
+  --json                 Output as JSON
+
+Container selector flags (all optional):
+  --container-text <text>           Container with exact visible text
+  --container-text-contains <text>  Container with partial text match
+  --container-id <resource-id>      Container by Android resource ID
+  --container-desc <text>           Container by exact content description
+  --container-desc-contains <text>  Container by partial content description
+  --container-role <role>           Container by element role
+  --container-selector <json>       Container by raw NodeMatcher JSON
+
+Also accepted as: --device-id
 
 Examples:
   clawperator read --id "com.example:id/battery_level"
   clawperator read --text "Battery"
-  clawperator read --role switch --desc "Wi-Fi"
   clawperator read --text "Price" --all --json
-  Advanced (raw NodeMatcher JSON): clawperator read --selector '{"resourceId":"com.example:id/status"}'
 `;
 
 const HELP_WAIT = `clawperator wait
@@ -470,28 +533,64 @@ Examples:
   Advanced (raw NodeMatcher JSON): clawperator wait --selector '{"textEquals":"Done"}'
 `;
 
-const HELP_PRESS = `clawperator press
+const HELP_WAIT_FOR_NAV = `clawperator wait-for-nav — Wait for app or screen transition
 
 Usage:
-  clawperator press <key> [--device <id>] [--operator-package <pkg>] [--json]
+  clawperator wait-for-nav --app com.google.home --timeout 5000 [--device <id>] [--operator-package <pkg>]
+  clawperator wait-for-nav --text "Settings" --timeout 5000 [--device <id>] [--operator-package <pkg>]
+
+Required (choose one or both):
+  --app <package>        Wait until this app is in the foreground
+  --text <string>        Wait until element with exact visible text appears
+  --id <string>          Wait until element with this Android resource ID appears
+  ... (and other selector flags like --desc, --role)
+
+Options:
+  --timeout <ms>         Required. Maximum time to wait (1-30000ms)
+  --json                 Output as JSON
+
+Also accepted as: --device-id, wait-for-navigation
+
+Examples:
+  clawperator wait-for-nav --app com.google.home --timeout 5000
+  clawperator wait-for-nav --text "Settings" --timeout 5000
+`;
+
+const HELP_PRESS = `clawperator press — Send a system key event
+
+Usage:
+  clawperator press <key> [--device <id>] [--operator-package <pkg>]
 
 Valid keys:
   back       Navigate to previous screen
   home       Return to home screen
   recents    Open recent apps
 
-Notes:
-  - Key may be supplied as a positional argument or via --key <key>.
-  - Synonym: press-key (accepted, not in help)
+Options:
+  --key <name>           System key to press (alias for positional arg)
+  --timeout <ms>         Max time to wait
+  --json                 Output as JSON
+
+Also accepted as: --device-id, press-key
+
+Examples:
+  clawperator press home
+  clawperator press back
 `;
 
-const HELP_BACK = `clawperator back
+const HELP_BACK = `clawperator back — Navigate to the previous screen
 
 Usage:
   clawperator back [--device <id>] [--operator-package <pkg>] [--json]
 
-Notes:
-  - Presses the Android back key. Equivalent to 'clawperator press back'.
+Options:
+  --timeout <ms>         Max time to wait
+  --json                 Output as JSON
+
+Also accepted as: --device-id
+
+Examples:
+  clawperator back
 `;
 
 const HELP_CLOSE = `clawperator close
@@ -538,33 +637,30 @@ Examples:
   clawperator sleep 0
 `;
 
-const HELP_SCROLL = `clawperator scroll
+const HELP_SCROLL = `clawperator scroll — Scroll the screen in a given direction
 
 Usage:
-  clawperator scroll <direction> [--container-text <text>] [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
-  clawperator scroll <direction> [--container-id <resource-id>] [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
+  clawperator scroll down [--device <id>] [--operator-package <pkg>] [--json]
+  clawperator scroll up --container-id "list" [--device <id>] [--operator-package <pkg>]
 
 Valid directions:
   down, up, left, right
 
-Container selector flags (all optional; restrict scroll to a specific scrollable container):
-  --container-text <text>           Container with exact visible text
-  --container-text-contains <text>  Container with partial text match
-  --container-id <resource-id>      Container by Android resource ID
-  --container-desc <text>           Container by exact content description
-  --container-desc-contains <text>  Container by partial content description
-  --container-role <role>           Container by element role
-  --container-selector <json>       Container by raw NodeMatcher JSON (mutually exclusive with --container-* flags)
+Container selector flags (optional, restrict scroll to specific container):
+  --container-id <id>    Container by Android resource ID
+  --container-text <txt> Container with exact visible text
+  --container-role <role> Container by element role
 
-Notes:
-  - Direction may be supplied as a positional argument or via --direction <direction>.
-  - --timeout overrides the default execution timeout (default: 30000 ms).
-  - Without container flags, scrolls the default scrollable container on screen.
+Options:
+  --direction <dir>      Direction to scroll (alias for positional arg)
+  --timeout <ms>         Max time to wait (default: 30000ms)
+  --json                 Output as JSON
+
+Also accepted as: --device-id
 
 Examples:
   clawperator scroll down
   clawperator scroll up --container-id "com.example:id/list_view"
-  clawperator scroll down --container-role list
 `;
 
 const HELP_SCROLL_UNTIL = `clawperator scroll-until
@@ -595,6 +691,7 @@ Container selector flags (all optional; restrict scroll to a specific scrollable
   --container-selector <json>       Container by raw NodeMatcher JSON
 
 Options:
+  --direction <dir>      Direction to scroll (alias for positional arg)
   --click    Click the target element after scrolling to it (becomes scroll_and_click action)
 
 Notes:
@@ -641,7 +738,12 @@ export const COMMANDS: Record<string, CommandDef> = {};
 // operator
 COMMANDS["operator"] = {
   name: "operator",
-  group: "Device Setup",
+  group: "Setup",
+  supportedFlags: (rest) => {
+    const sub = rest[0];
+    if (sub === "setup" || sub === "install") return ["--apk"];
+    return [];
+  },
   summary: "Install the Operator APK and configure the device",
   help: HELP_OPERATOR_SETUP,
   subtopics: {
@@ -680,7 +782,7 @@ COMMANDS["operator"] = {
 // setup
 COMMANDS["setup"] = {
   name: "setup",
-  group: "Device Setup",
+  group: "Setup",
   summary: "Alias guidance - use operator setup instead",
   help: HELP_OPERATOR_SETUP,
   handler: async (_ctx) => {
@@ -695,7 +797,7 @@ COMMANDS["setup"] = {
 // install
 COMMANDS["install"] = {
   name: "install",
-  group: "Device Setup",
+  group: "Setup",
   summary: "Alias guidance - use operator setup instead",
   help: HELP_OPERATOR_SETUP,
   handler: async (_ctx) => {
@@ -711,6 +813,7 @@ COMMANDS["install"] = {
 COMMANDS["devices"] = {
   name: "devices",
   group: "Device Management",
+  supportedFlags: [],
   summary: "List connected Android devices",
   help: "clawperator devices\n\nUsage:\n  clawperator devices\n\nNotes:\n  - Lists all connected Android devices detected via adb.\n",
   topLevelBlock: `  devices                                   List connected Android devices`,
@@ -724,6 +827,11 @@ COMMANDS["devices"] = {
 COMMANDS["emulator"] = {
   name: "emulator",
   group: "Device Management",
+  supportedFlags: (rest) => {
+    const sub = rest[0];
+    if (sub === "create") return ["--name"];
+    return [];
+  },
   summary: "Manage Android emulators (AVDs)",
   help: HELP_EMULATOR,
   subtopics: {
@@ -786,6 +894,7 @@ COMMANDS["emulator"] = {
 COMMANDS["provision"] = {
   name: "provision",
   group: "Device Management",
+  supportedFlags: [],
   summary: "Provision an Android emulator",
   help: HELP_EMULATOR,
   subtopics: {
@@ -806,9 +915,10 @@ COMMANDS["provision"] = {
 COMMANDS["packages"] = {
   name: "packages",
   group: "Device Management",
+  supportedFlags: ["--third-party"],
   summary: "List installed packages on a device",
-  help: "clawperator packages list\n\nUsage:\n  clawperator packages list [--device <id>] [--third-party]\n",
-  topLevelBlock: `  packages list [--device <id>] [--third-party]
+  help: "clawperator packages list\n\nUsage:\n  clawperator packages list [--device <id>] [--operator-package <pkg>] [--third-party]\n",
+  topLevelBlock: `  packages list [--device <id>] [--operator-package <pkg>] [--third-party]
                                             List installed package IDs on a device`,
   handler: async (ctx) => {
     const { rest, format, verbose, logger, deviceId } = ctx;
@@ -820,19 +930,44 @@ COMMANDS["packages"] = {
         thirdParty: hasFlag(rest, "--third-party"),
       });
     } else {
-      return JSON.stringify({ code: "USAGE", message: "packages list [--device <id>] [--third-party]" });
+      return JSON.stringify({ code: "USAGE", message: "packages list [--device <id>] [--operator-package <pkg>] [--third-party]" });
     }
   },
 };
 
-// exec (synonym: execute)
+// exec (synonym: execute). Payload: positional <json-or-file>, --payload, or --execution (alias). Public CLI reference must stay aligned.
 COMMANDS["exec"] = {
   name: "exec",
   synonyms: ["execute"],
   group: "Execution",
+  supportedFlags: (rest) =>
+    rest[0] === "best-effort"
+      ? ["--payload", "--execution", "--validate-only", "--dry-run", "--goal"]
+      : ["--payload", "--execution", "--validate-only", "--dry-run"],
   summary: "Execute a validated command payload",
-  help: "clawperator exec\n\nUsage:\n  clawperator exec --execution <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>]\n  clawperator exec best-effort --goal <text> [--device <id>] [--operator-package <package>]\n\n`execute` is accepted as a synonym for `exec`.\n",
-  topLevelBlock: `  exec --execution <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>]
+  help: `clawperator exec
+
+Usage:
+  clawperator exec <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>]
+  clawperator exec --payload <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>]
+  clawperator exec best-effort --goal <text> [--device <id>] [--operator-package <package>]
+
+Payload (one of):
+  <json-or-file>            Positional: inline JSON or path to a JSON file (see Notes)
+
+Options:
+  --payload <json-or-file>  Same as positional payload (primary named form)
+  --execution <json-or-file>  Alias for --payload (backward compatibility)
+  --validate-only           Validate payload without executing
+  --dry-run                 Print execution plan without running
+
+Notes:
+  - Leading '{' is always parsed as inline JSON. Leading '[' tries the string as a file path first; if the file is missing, it is parsed as an inline JSON array. Any other string is read as a file path.
+  - Error precedence: unreadable file path -> invalid JSON content -> missing payload.
+  - 'execute' is accepted as a synonym for 'exec'.
+  - '--execution' is accepted as an alias for '--payload'.
+`,
+  topLevelBlock: `  exec <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>]
                                             Execute a validated command payload or print a dry-run plan
   exec best-effort --goal <text> [--device <id>] [--operator-package <package>]
                                             Produce deterministic next-action suggestion from current UI`,
@@ -847,13 +982,33 @@ COMMANDS["exec"] = {
         goal,
       });
     } else {
-      const execution = getOpt(rest, "--execution");
-      if (!execution) {
-        return JSON.stringify({ code: "USAGE", message: "exec requires --execution <json-or-file>" });
+      // Support --payload (primary), --execution (alias), or positional argument
+      let payloadSource: string | undefined = getOpt(rest, "--payload") ?? getOpt(rest, "--execution");
+      if (!payloadSource) {
+        // Check for positional argument (first non-flag token), including dash-prefixed
+        // file paths that have already passed the unknown-flag preflight.
+        const skipFlags = new Set(["--payload", "--execution", "--validate-only", "--dry-run"]);
+        for (let i = 0; i < rest.length; i += 1) {
+          const token = rest[i];
+          if (token === "--") {
+            break;
+          }
+          if (skipFlags.has(token)) {
+            if (token === "--payload" || token === "--execution") {
+              i += 1;
+            }
+            continue;
+          }
+          payloadSource = token;
+          break;
+        }
+      }
+      if (!payloadSource) {
+        return formatError({ code: ERROR_CODES.MISSING_ARGUMENT, message: "exec requires a payload. Use: clawperator exec <json-or-file> or clawperator exec --payload <json-or-file>" }, { format });
       } else {
         return (await import("./commands/execute.js")).cmdExecute({
           ...out,
-          execution,
+          execution: payloadSource,
           deviceId,
           operatorPackage,
           timeoutMs,
@@ -871,9 +1026,10 @@ COMMANDS["exec"] = {
 COMMANDS["snapshot"] = {
   name: "snapshot",
   group: "Device Interaction",
+  supportedFlags: [],
   summary: "Get current Android UI hierarchy as XML",
   help: HELP_SNAPSHOT,
-  topLevelBlock: `  snapshot [--device <id>] [--json]            Get current Android UI hierarchy as XML`,
+  topLevelBlock: `  snapshot [--device <id>] [--operator-package <pkg>] [--json]            Get current Android UI hierarchy as XML`,
   handler: async (ctx) => {
     const { format, logger, deviceId, operatorPackage, timeoutMs } = ctx;
     const invalidTimeout = getInvalidTimeoutResult(timeoutMs, { format });
@@ -891,9 +1047,10 @@ COMMANDS["snapshot"] = {
 COMMANDS["screenshot"] = {
   name: "screenshot",
   group: "Device Interaction",
+  supportedFlags: ["--path"],
   summary: "Capture a screenshot from the device",
   help: HELP_SCREENSHOT,
-  topLevelBlock: `  screenshot [--device <id>] [--path <file>] [--json]
+  topLevelBlock: `  screenshot [--device <id>] [--operator-package <pkg>] [--path <file>] [--json]
                                             Capture a screenshot from the device`,
   handler: async (ctx) => {
     const { rest, format, logger, deviceId, operatorPackage, timeoutMs } = ctx;
@@ -915,18 +1072,61 @@ COMMANDS["click"] = {
   name: "click",
   synonyms: ["tap"],
   group: "Device Interaction",
+  supportedFlags: ["--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--coordinate", "--long", "--focus"],
   summary: "Tap the first matching UI element",
   help: HELP_CLICK,
-  topLevelBlock: `  click --text <text> | --id <id> | --role <role> [--device <id>] [--json]
+  topLevelBlock: `  click --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>] [--json]
                                             Tap the first matching UI element`,
   handler: async (ctx) => {
     const { rest, format, logger, deviceId, operatorPackage } = ctx;
-    if (!hasElementSelectorFlag(rest)) {
-      return makeMissingSelectorError("click", format);
+    
+    let coordinate: { x: number; y: number } | undefined;
+    const coordFlags = rest.filter((token) => token === "--coordinate");
+    if (coordFlags.length > 1) {
+      return formatError({
+        code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+        message: "--coordinate must not appear more than once",
+      }, { format });
     }
-    const resolved = resolveElementMatcherFromCli(rest);
-    if (!resolved.ok) {
-      return formatError(resolved.error, { format });
+    const coordIdx = rest.indexOf("--coordinate");
+    if (coordIdx >= 0) {
+      const xStr = rest[coordIdx + 1];
+      const yStr = rest[coordIdx + 2];
+      const x = Number(xStr);
+      const y = Number(yStr);
+      if (
+        !xStr ||
+        !yStr ||
+        xStr.startsWith("-") ||
+        yStr.startsWith("-") ||
+        !Number.isInteger(x) ||
+        !Number.isInteger(y) ||
+        x < 0 ||
+        y < 0
+      ) {
+        return formatError({
+          code: "EXECUTION_VALIDATION_FAILED",
+          message: "--coordinate requires two non-negative integers (x y)",
+        }, { format });
+      }
+      coordinate = { x, y };
+    }
+
+    let resolvedMatcher: NodeMatcher | undefined;
+    if (!coordinate) {
+      if (!hasElementSelectorFlag(rest)) {
+        return makeMissingSelectorError("click", format);
+      }
+      const resolved = resolveElementMatcherFromCli(rest);
+      if (!resolved.ok) {
+        return formatError(resolved.error, { format });
+      }
+      resolvedMatcher = resolved.matcher;
+    } else if (hasElementSelectorFlag(rest)) {
+      return formatError({
+        code: "EXECUTION_VALIDATION_FAILED",
+        message: "use --coordinate OR a selector, not both",
+      }, { format });
     }
 
     // Check for --long and --focus flags (mutually exclusive)
@@ -945,10 +1145,20 @@ COMMANDS["click"] = {
     let clickType: "default" | "long_click" | "focus" = "default";
     if (hasLong) clickType = "long_click";
     if (hasFocus) clickType = "focus";
+    if (coordinate && clickType === "focus") {
+      return formatError(
+        {
+          code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+          message: "--focus is not supported with --coordinate",
+        },
+        { format },
+      );
+    }
 
     return (await import("./commands/action.js")).cmdActionClick({
       format,
-      matcher: resolved.matcher,
+      matcher: resolvedMatcher,
+      coordinate,
       clickType,
       deviceId,
       operatorPackage,
@@ -961,9 +1171,10 @@ COMMANDS["open"] = {
   name: "open",
   synonyms: ["open-uri", "open-url"],
   group: "Device Interaction",
+  supportedFlags: ["--app"],
   summary: "Open an app, URL, or URI on the device",
   help: HELP_OPEN,
-  topLevelBlock: `  open <package-id|url|uri> [--device <id>] [--json]
+  topLevelBlock: `  open <package-id|url|uri> [--device <id>] [--operator-package <pkg>] [--json]
                                             Open an app, URL, or URI on the device`,
   handler: async (ctx) => {
     const { rest, format, logger, deviceId, operatorPackage } = ctx;
@@ -1010,9 +1221,10 @@ COMMANDS["type"] = {
   name: "type",
   synonyms: ["fill"],
   group: "Device Interaction",
+  supportedFlags: ["--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--submit", "--clear"],
   summary: "Type text into the first matching UI element",
   help: HELP_TYPE,
-  topLevelBlock: `  type <text> --role <role> | --id <id> [--device <id>] [--json]
+  topLevelBlock: `  type <text> --role <role> | --id <id> [--device <id>] [--operator-package <pkg>] [--json]
                                             Type text into the first matching UI element`,
   handler: async (ctx) => {
     const { rest, format, logger, deviceId, operatorPackage } = ctx;
@@ -1069,12 +1281,13 @@ COMMANDS["type"] = {
 COMMANDS["read"] = {
   name: "read",
   group: "Device Interaction",
+  supportedFlags: ["--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--all", "--container-text", "--container-text-contains", "--container-id", "--container-desc", "--container-desc-contains", "--container-role", "--container-selector"],
   summary: "Read text from the first matching UI element",
   help: HELP_READ,
-  topLevelBlock: `  read --text <text> | --id <id> | --role <role> [--device <id>] [--json]
+  topLevelBlock: `  read --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>] [--json]
                                             Read text from the first matching UI element`,
   handler: async (ctx) => {
-    const { rest, format, logger, deviceId, operatorPackage } = ctx;
+    const { rest, format, explicitJsonOutput, logger, deviceId, operatorPackage } = ctx;
     if (!hasElementSelectorFlag(rest)) {
       return makeMissingSelectorError("read", format);
     }
@@ -1082,21 +1295,21 @@ COMMANDS["read"] = {
     if (!resolved.ok) {
       return formatError(resolved.error, { format });
     }
-    // --all requires --json
     const readAll = hasFlag(rest, "--all");
-    if (readAll && format !== "json") {
-      return formatError(
-        {
-          code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
-          message: 'read --all requires --json.\n\nExample:\n  clawperator read --text "Price" --all --json',
-        },
-        { format },
-      );
+    if (readAll) {
+      const err = readAllRequiresExplicitJsonError({ command: "read", format, explicitJsonOutput });
+      if (err) return err;
+    }
+    // Resolve container matcher (optional)
+    const containerResult = resolveContainerMatcherFromCli(rest);
+    if (!containerResult.ok) {
+      return formatError(containerResult.error, { format });
     }
     return (await import("./commands/action.js")).cmdActionRead({
       format,
       matcher: resolved.matcher,
       readAll,
+      container: containerResult.container,
       deviceId,
       operatorPackage,
       logger,
@@ -1107,9 +1320,10 @@ COMMANDS["read"] = {
 COMMANDS["wait"] = {
   name: "wait",
   group: "Device Interaction",
+  supportedFlags: ["--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector"],
   summary: "Wait until a matching UI element appears",
   help: HELP_WAIT,
-  topLevelBlock: `  wait --text <text> | --id <id> | --role <role> [--device <id>] [--timeout <ms>] [--json]
+  topLevelBlock: `  wait --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
                                             Wait until a matching UI element appears`,
   handler: async (ctx) => {
     const { rest, format, logger, deviceId, operatorPackage, timeoutMs } = ctx;
@@ -1147,9 +1361,10 @@ COMMANDS["press"] = {
   name: "press",
   synonyms: ["press-key"],
   group: "Device Interaction",
+  supportedFlags: ["--key"],
   summary: "Press a hardware key on the device",
   help: HELP_PRESS,
-  topLevelBlock: `  press <back|home|recents> [--device <id>] [--json]
+  topLevelBlock: `  press <back|home|recents> [--device <id>] [--operator-package <pkg>] [--json]
                                             Press a hardware key on the device`,
   handler: async (ctx) => {
     const { rest, format, logger, deviceId, operatorPackage } = ctx;
@@ -1185,9 +1400,10 @@ COMMANDS["press"] = {
 COMMANDS["back"] = {
   name: "back",
   group: "Device Interaction",
+  supportedFlags: [],
   summary: "Press the Android back key",
   help: HELP_BACK,
-  topLevelBlock: `  back [--device <id>] [--json]               Press the Android back key`,
+  topLevelBlock: `  back [--device <id>] [--operator-package <pkg>] [--json]               Press the Android back key`,
   handler: async (ctx) => {
     const { format, logger, deviceId, operatorPackage } = ctx;
     return (await import("./commands/action.js")).cmdActionPressKey({
@@ -1239,18 +1455,20 @@ COMMANDS["close"] = {
   name: "close",
   synonyms: ["close-app"],
   group: "Device Interaction",
+  supportedFlags: ["--app"],
   summary: "Force-stop an Android application",
   help: HELP_CLOSE,
-  topLevelBlock: `  close <package> [--device <id>] [--json]    Force-stop an Android application`,
+  topLevelBlock: `  close <package> [--device <id>] [--operator-package <pkg>] [--json]    Force-stop an Android application`,
   handler: async (ctx) => closeHandler(ctx),
 };
 
 COMMANDS["sleep"] = {
   name: "sleep",
   group: "Device Interaction",
+  supportedFlags: [],
   summary: "Pause execution for a duration",
   help: HELP_SLEEP,
-  topLevelBlock: `  sleep <ms> [--device <id>] [--json]         Pause execution for a duration`,
+  topLevelBlock: `  sleep <ms> [--device <id>] [--operator-package <pkg>] [--json]         Pause execution for a duration`,
   handler: async (ctx) => {
     const { rest, format, logger, deviceId, operatorPackage, timeoutMs } = ctx;
 
@@ -1307,9 +1525,10 @@ COMMANDS["sleep"] = {
 COMMANDS["scroll"] = {
   name: "scroll",
   group: "Device Interaction",
+  supportedFlags: ["--direction", "--container-text", "--container-text-contains", "--container-id", "--container-desc", "--container-desc-contains", "--container-role", "--container-selector"],
   summary: "Scroll the screen in a direction",
   help: HELP_SCROLL,
-  topLevelBlock: `  scroll <down|up|left|right> [--container-id <id>] [--device <id>] [--json]
+  topLevelBlock: `  scroll <down|up|left|right> [--container-id <id>] [--device <id>] [--operator-package <pkg>] [--json]
                                             Scroll the screen in a direction`,
   handler: async (ctx) => {
     const { rest, format, logger, deviceId, operatorPackage, timeoutMs } = ctx;
@@ -1363,10 +1582,35 @@ const scrollUntilHandler = async (ctx: HandlerContext, clickAfterDefault: boolea
     return makeMissingSelectorError("scroll-until", format);
   }
 
-  // Parse direction (positional or defaults to "down")
-  const scrollUntilValueFlags = [...ELEMENT_SELECTOR_VALUE_FLAGS, ...CONTAINER_SELECTOR_VALUE_FLAGS, "--click"];
+  // Parse direction (positional, --direction, or defaults to "down")
+  const directionIdx = rest.indexOf("--direction");
+  let directionFlag: string | undefined;
+  if (directionIdx >= 0) {
+    const next = rest[directionIdx + 1];
+    if (next === undefined || next.startsWith("-")) {
+      return formatError(
+        {
+          code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+          message: "scroll-until --direction requires a value.\n\nSee: clawperator scroll-until --help",
+        },
+        { format },
+      );
+    }
+    directionFlag = next;
+  }
+  const scrollUntilValueFlags = [...ELEMENT_SELECTOR_VALUE_FLAGS, ...CONTAINER_SELECTOR_VALUE_FLAGS, "--click", "--direction"];
   const bare = barePositionalTokens(rest, scrollUntilValueFlags, []);
-  const direction = bare[0] ?? "down";
+  if (directionFlag !== undefined && bare.length > 0) {
+    return formatError(
+      {
+        code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+        message:
+          "scroll-until: pass direction as a positional argument or via --direction, not both.\n\nSee: clawperator scroll-until --help",
+      },
+      { format },
+    );
+  }
+  const direction = directionFlag ?? bare[0] ?? "down";
   const validDirections = ["down", "up", "left", "right"];
   if (!validDirections.includes(direction)) {
     return formatError(
@@ -1409,9 +1653,10 @@ const scrollUntilHandler = async (ctx: HandlerContext, clickAfterDefault: boolea
 COMMANDS["scroll-until"] = {
   name: "scroll-until",
   group: "Device Interaction",
+  supportedFlags: ["--click", "--direction", "--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--container-text", "--container-text-contains", "--container-id", "--container-desc", "--container-desc-contains", "--container-role", "--container-selector"],
   summary: "Scroll until a target element is visible",
   help: HELP_SCROLL_UNTIL,
-  topLevelBlock: `  scroll-until [<direction>] --text <text> [--click] [--device <id>] [--json]
+  topLevelBlock: `  scroll-until [<direction>] --text <text> [--click] [--device <id>] [--operator-package <pkg>] [--json]
                                             Scroll until a target element is visible (optionally click it)`,
   handler: async (ctx) => scrollUntilHandler(ctx, false),
 };
@@ -1420,17 +1665,222 @@ COMMANDS["scroll-and-click"] = {
   name: "scroll-and-click",
   synonyms: [],
   group: "Device Interaction",
+  supportedFlags: ["--direction", "--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--container-text", "--container-text-contains", "--container-id", "--container-desc", "--container-desc-contains", "--container-role", "--container-selector"],
   summary: "Scroll until target is visible, then click it (alias for scroll-until --click)",
   help: HELP_SCROLL_UNTIL,
-  topLevelBlock: `  scroll-and-click [<direction>] --text <text> [--device <id>] [--json]
+  topLevelBlock: `  scroll-and-click [<direction>] --text <text> [--device <id>] [--operator-package <pkg>] [--json]
                                             Scroll until target is visible, then click it`,
   handler: async (ctx) => scrollUntilHandler(ctx, true),
+};
+
+// wait-for-nav (synonym: wait-for-navigation)
+COMMANDS["wait-for-nav"] = {
+  name: "wait-for-nav",
+  synonyms: ["wait-for-navigation"],
+  group: "Device Interaction",
+  supportedFlags: ["--app", "--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--validate-only", "--dry-run"],
+  summary: "Wait for app or screen navigation to complete",
+  help: HELP_WAIT_FOR_NAV,
+  topLevelBlock: `  wait-for-nav --app <package> --timeout <ms> [--device <id>] [--operator-package <pkg>] [--json]
+                                            Wait for app or screen navigation to complete`,
+  handler: async (ctx) => {
+    const { rest, format, logger, deviceId, operatorPackage, timeoutMs: navTimeoutMs } = ctx;
+
+    // Parse --app flag (reject present-but-empty like --app "" so we do not silently ignore package filter)
+    const appIdx = rest.indexOf("--app");
+    let expectedPackage: string | undefined;
+    if (appIdx >= 0) {
+      const next = rest[appIdx + 1];
+      if (next === undefined || next.trim() === "" || next.startsWith("--")) {
+        return formatError(
+          {
+            code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+            message:
+              "wait-for-nav --app requires a non-empty package id.\n\nExample:\n  clawperator wait-for-nav --app com.android.settings --timeout 5000",
+          },
+          { format },
+        );
+      }
+      expectedPackage = next;
+    }
+
+    // --timeout is required (action-level wait duration)
+    // It's parsed by getGlobalOpts and passed via ctx.timeoutMs
+    if (navTimeoutMs === undefined) {
+      return formatError(
+        {
+          code: ERROR_CODES.MISSING_ARGUMENT,
+          message: "wait-for-nav requires --timeout <ms>.\n\nUsage:\n  clawperator wait-for-nav --app <package> --timeout <ms>\n  clawperator wait-for-nav --text <text> --timeout <ms>\n\nExample:\n  clawperator wait-for-nav --app com.google.home --timeout 5000",
+        },
+        { format },
+      );
+    }
+    if (!Number.isFinite(navTimeoutMs) || navTimeoutMs <= 0) {
+      return formatError(
+        {
+          code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+          message: "wait-for-nav --timeout must be a positive number of milliseconds",
+        },
+        { format },
+      );
+    }
+    if (navTimeoutMs > 30000) {
+      return formatError(
+        {
+          code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+          message: "wait-for-nav --timeout must not exceed 30000ms",
+        },
+        { format },
+      );
+    }
+
+    // Resolve selector flags (optional if --app is provided)
+    let expectedNode: import("../contracts/selectors.js").NodeMatcher | undefined;
+    const hasSelector = hasElementSelectorFlag(rest);
+    if (hasSelector) {
+      const matcherResult = resolveElementMatcherFromCli(rest);
+      if (!matcherResult.ok) {
+        return formatError(matcherResult.error, { format });
+      }
+      expectedNode = matcherResult.matcher;
+    }
+
+    // Require at least one of --app or selector
+    if (!expectedPackage && !expectedNode) {
+      return formatError(
+        {
+          code: ERROR_CODES.MISSING_ARGUMENT,
+          message: "wait-for-nav requires --app or a selector, and --timeout.\n\nUsage:\n  clawperator wait-for-nav --app <package> --timeout <ms>\n  clawperator wait-for-nav --text <text> --timeout <ms>\n\nExample:\n  clawperator wait-for-nav --app com.google.home --timeout 5000",
+        },
+        { format },
+      );
+    }
+
+    // Build execution and run
+    const execution = (await import("../domain/actions/waitForNav.js")).buildWaitForNavExecution(
+      expectedPackage,
+      expectedNode,
+      navTimeoutMs,
+    );
+
+    return (await import("./commands/execute.js")).cmdExecute({
+      format,
+      execution: JSON.stringify(execution),
+      deviceId,
+      operatorPackage,
+      timeoutMs: execution.timeoutMs,
+      validateOnly: hasFlag(rest, "--validate-only"),
+      dryRun: hasFlag(rest, "--dry-run"),
+      logger,
+    });
+  },
+};
+
+// read-value (synonym: read-kv)
+COMMANDS["read-value"] = {
+  name: "read-value",
+  synonyms: ["read-kv"],
+  group: "Device Interaction",
+  supportedFlags: ["--label", "--label-id", "--label-desc", "--all", "--validate-only", "--dry-run"],
+  summary: "Read the value associated with a labeled element",
+  help: HELP_READ_VALUE,
+  topLevelBlock: `  read-value --label <text> [--json]         Read the value associated with a labeled element`,
+  handler: async (ctx) => {
+    const { rest, format, explicitJsonOutput, logger, deviceId, operatorPackage, timeoutMs } = ctx;
+
+    const readAll = hasFlag(rest, "--all");
+    if (readAll) {
+      const err = readAllRequiresExplicitJsonError({ command: "read-value", format, explicitJsonOutput });
+      if (err) return err;
+    }
+
+    // Build labelMatcher from --label* flags
+    const labelMatcher: import("../contracts/selectors.js").NodeMatcher = {};
+    const labelText = getOpt(rest, "--label");
+    const labelId = getOpt(rest, "--label-id");
+    const labelDesc = getOpt(rest, "--label-desc");
+
+    if (labelText !== undefined) {
+      if (labelText.trim() === "") {
+        return formatError(
+          {
+            code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+            message: "read-value --label value must not be empty",
+          },
+          { format },
+        );
+      }
+      labelMatcher.textEquals = labelText;
+    }
+    if (labelId !== undefined) {
+      if (labelId.trim() === "") {
+        return formatError(
+          {
+            code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+            message: "read-value --label-id value must not be empty",
+          },
+          { format },
+        );
+      }
+      labelMatcher.resourceId = labelId;
+    }
+    if (labelDesc !== undefined) {
+      if (labelDesc.trim() === "") {
+        return formatError(
+          {
+            code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+            message: "read-value --label-desc value must not be empty",
+          },
+          { format },
+        );
+      }
+      labelMatcher.contentDescEquals = labelDesc;
+    }
+
+    // Require at least one label flag
+    if (Object.keys(labelMatcher).length === 0) {
+      return formatError(
+        {
+          code: ERROR_CODES.MISSING_ARGUMENT,
+          message: "read-value requires a label selector.\n\nUsage:\n  clawperator read-value --label <text> --json\n\nExample:\n  clawperator read-value --label \"Battery\" --json",
+        },
+        { format },
+      );
+    }
+
+    // Build execution and run
+    const execution = (await import("../domain/actions/readValue.js")).buildReadValueExecution(
+      labelMatcher,
+      readAll,
+    );
+
+    return (await import("./commands/execute.js")).cmdExecute({
+      format,
+      execution: JSON.stringify(execution),
+      deviceId,
+      operatorPackage,
+      timeoutMs,
+      validateOnly: hasFlag(rest, "--validate-only"),
+      dryRun: hasFlag(rest, "--dry-run"),
+      logger,
+    });
+  },
 };
 
 // skills
 COMMANDS["skills"] = {
   name: "skills",
-  group: "Skills",
+  group: "Execution",
+  supportedFlags: (rest) => {
+    const sub = rest[0];
+    if (sub === "search") return ["--app", "--intent", "--keyword"];
+    if (sub === "compile-artifact") return ["--skill-id", "--artifact", "--vars"];
+    if (sub === "new") return ["--summary"];
+    if (sub === "validate") return ["--all", "--dry-run"];
+    if (sub === "run") return ["--device", "--device-id", "--operator-package", "--receiver-package", "--timeout", "--timeout-ms", "--expect-contains", "--skip-validate"];
+    if (sub === "sync" || sub === "update") return ["--ref"];
+    return [];
+  },
   summary: "Manage and run automation skills",
   help: `clawperator skills
 
@@ -1585,6 +2035,13 @@ COMMANDS["recording"] = {
   name: "recording",
   synonyms: ["record"],
   group: "Recording",
+  supportedFlags: (rest) => {
+    const sub = rest[0];
+    if (sub === "start" || sub === "stop") return ["--session-id"];
+    if (sub === "pull") return ["--session-id", "--out"];
+    if (sub === "parse") return ["--input", "--out"];
+    return [];
+  },
   summary: "Manage recording sessions on the Operator app",
   help: "clawperator recording\n\nUsage:\n  clawperator recording start|stop|pull|parse ... ('record' is an alias)\n",
   topLevelBlock: `  recording start [--session-id <id>] [--device <serial>] [--operator-package <pkg>]
@@ -1645,7 +2102,8 @@ COMMANDS["recording"] = {
 // serve
 COMMANDS["serve"] = {
   name: "serve",
-  group: "Server",
+  group: "Execution",
+  supportedFlags: ["--port", "--host"],
   summary: "Start local HTTP/SSE server for remote control",
   help: "clawperator serve\n\nUsage:\n  clawperator serve [--port <number>] [--host <string>]\n\nNotes:\n  - Default host: 127.0.0.1\n",
   topLevelBlock: `  serve [--port <number>] [--host <string>]
@@ -1674,7 +2132,8 @@ COMMANDS["serve"] = {
 // doctor
 COMMANDS["doctor"] = {
   name: "doctor",
-  group: "Diagnostics",
+  group: "Setup",
+  supportedFlags: ["--fix", "--full", "--check-only"],
   summary: "Run environment and runtime checks",
   help: HELP_DOCTOR,
   topLevelBlock: `  doctor [--json]
@@ -1705,7 +2164,8 @@ COMMANDS["doctor"] = {
 // grant-device-permissions
 COMMANDS["grant-device-permissions"] = {
   name: "grant-device-permissions",
-  group: "Diagnostics",
+  group: "Setup",
+  supportedFlags: [],
   summary: "Re-grant accessibility and notification permissions",
   help: HELP_GRANT_DEVICE_PERMISSIONS,
   topLevelBlock: `  grant-device-permissions [--device <id>] [--operator-package <package>]
@@ -1724,7 +2184,8 @@ COMMANDS["grant-device-permissions"] = {
 // version
 COMMANDS["version"] = {
   name: "version",
-  group: "Diagnostics",
+  group: "Setup",
+  supportedFlags: ["--check-compat"],
   summary: "Show the CLI version",
   help: HELP_VERSION,
   topLevelBlock: `  version
@@ -1842,29 +2303,53 @@ export function generateTopLevelHelp(commands: Record<string, CommandDef>): stri
     "Commands:",
   ];
 
-  // Track which topLevelBlocks we have already emitted (by group, to avoid duplicates from provision/emulator)
-  const emittedBlocks = new Set<string>();
+  const groupOrder = [
+    "Device Interaction",
+    "Device Management",
+    "Execution",
+    "Recording",
+    "Setup"
+  ];
+
+  const groups: Record<string, string[]> = {};
   for (const def of Object.values(commands)) {
-    if (def.topLevelBlock && !emittedBlocks.has(def.topLevelBlock)) {
-      emittedBlocks.add(def.topLevelBlock);
-      lines.push(def.topLevelBlock);
+    if (def.topLevelBlock) {
+      if (!groups[def.group]) groups[def.group] = [];
+      if (!groups[def.group].includes(def.topLevelBlock)) {
+        groups[def.group].push(def.topLevelBlock);
+      }
+    }
+  }
+
+  for (const groupName of groupOrder) {
+    if (groups[groupName] && groups[groupName].length > 0) {
+      lines.push("");
+      lines.push(`  --- ${groupName} ---`);
+      lines.push(...groups[groupName]);
+    }
+  }
+
+  // Any left over groups not in groupOrder
+  for (const groupName of Object.keys(groups)) {
+    if (!groupOrder.includes(groupName)) {
+      lines.push("");
+      lines.push(`  --- ${groupName} ---`);
+      lines.push(...groups[groupName]);
     }
   }
 
   lines.push(
     "",
     "Global options:",
-    "  --device <id>, --device-id <id>         Target Android device serial (<!--flag-->--device<!--/flag--> is canonical)",
-    "  --operator-package <package>, --receiver-package <package>",
-    "                                            Target Operator package for broadcast dispatch (--receiver-package is a legacy alias)",
-    "  --json                                    JSON output shorthand (same as --output json)",
-    "  --output <json|pretty>, --format <json|pretty>",
-    "                                            Output format (default: json)",
-    "  --log-level <debug|info|warn|error>       Persistent log level (default: info)",
-    "  --timeout-ms <n>, --timeout <n>           Override execution timeout within policy limits",
-    "  --verbose                                 Include debug diagnostics in output",
-    "  --help                                    Show help",
-    "  --version                                 Show version",
+    "  --device <id>                           Target Android device serial (Also accepted as: --device-id)",
+    "  --operator-package <package>            Target Operator package for broadcast dispatch (Also accepted as: --receiver-package)",
+    "  --json                                  JSON output shorthand (same as --output json)",
+    "  --output <json|pretty>                  Output format (default: json)",
+    "  --log-level <debug|info|warn|error>     Persistent log level (default: info)",
+    "  --timeout <n>                           Override execution timeout (Also accepted as: --timeout-ms)",
+    "  --verbose                               Include debug diagnostics in output",
+    "  --help                                  Show help",
+    "  --version                               Show version",
     "",
     "Notes:",
     "  - operator setup is the canonical setup command. operator install remains an alias.",
@@ -1900,4 +2385,14 @@ export function resolveHelpFromRegistry(rest: string[], commands: Record<string,
     }
   }
   return def.help;
+}
+
+export function resolveSupportedFlagsFromRegistry(def: CommandDef, rest: string[]): string[] {
+  if (Array.isArray(def.supportedFlags)) {
+    return def.supportedFlags;
+  }
+  if (typeof def.supportedFlags === "function") {
+    return def.supportedFlags(rest);
+  }
+  return [];
 }

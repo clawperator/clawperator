@@ -25,6 +25,13 @@ const nodeMatcherSchema = z
     { message: "Matcher must have at least one field" }
   );
 
+const coordinateSchema = z
+  .object({
+    x: z.number().int().nonnegative(),
+    y: z.number().int().nonnegative(),
+  })
+  .strict();
+
 const actionParamsSchema = z.object({
   applicationId: z.string().optional(),
   sessionId: z.string().optional(),
@@ -32,6 +39,7 @@ const actionParamsSchema = z.object({
   durationMs: z.number().optional(),
   path: z.string().optional(),
   matcher: nodeMatcherSchema.optional(),
+  coordinate: coordinateSchema.optional(),
   text: z.string().max(LIMITS.MAX_MATCHER_VALUE_LENGTH).optional(),
   submit: z.boolean().optional(),
   clear: z.boolean().optional(),
@@ -60,7 +68,6 @@ const actionParamsSchema = z.object({
   labelMatcher: nodeMatcherSchema.optional(),
   // read_text params
   all: z.boolean().optional(),
-
 }).strict();
 
 // NOTE: "doctor_ping" is intentionally excluded. It is an internal diagnostic action
@@ -164,9 +171,19 @@ const executionSchema = z.object({
         }
         break;
       case "click":
+        if (!params?.matcher && !params?.coordinate) {
+          addIssue(index, "click requires params.matcher or params.coordinate", ["params"]);
+        }
+        if (params?.matcher && params?.coordinate) {
+          addIssue(index, "click params.matcher and params.coordinate are mutually exclusive", ["params"]);
+        }
+        if (params?.coordinate && params?.clickType === "focus") {
+          addIssue(index, "click params.coordinate does not support clickType='focus'", ["params", "clickType"]);
+        }
+        break;
       case "wait_for_node":
         if (!params?.matcher) {
-          addIssue(index, `${action.type} requires params.matcher`, ["params", "matcher"]);
+          addIssue(index, "wait_for_node requires params.matcher", ["params", "matcher"]);
         }
         break;
       case "read_text":

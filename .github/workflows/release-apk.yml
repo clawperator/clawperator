@@ -171,8 +171,8 @@ jobs:
 
           - Stable APK URL: ${{ env.CLAWPERATOR_CLOUDFLARE_DOWNLOADS_BASE_URL }}/${{ steps.release_meta.outputs.artifact_prefix }}/${{ steps.release_meta.outputs.artifact_name }}
           - Latest APK URL: https://clawperator.com/operator.apk
-          - Setup guide: https://github.com/${{ github.repository }}/blob/${{ github.sha }}/docs/first-time-setup.md
-          - Release reference: https://github.com/${{ github.repository }}/blob/${{ github.sha }}/docs/release-reference.md
+          - Setup guide: https://github.com/${{ github.repository }}/blob/${{ github.sha }}/docs/setup.md
+          - Release reference: https://github.com/${{ github.repository }}/blob/${{ github.sha }}/docs/internal/release-reference.md
 
           ## Artifacts
 

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Zero-Shot Android Exploration"
+  short_description: "Run blind Android app exploration"
+  default_prompt: "Use $agent-first-run-test to run a zero-shot Android exploration session and write the execution log and findings in markdown."

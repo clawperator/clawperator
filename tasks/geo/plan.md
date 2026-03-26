@@ -1,5 +1,7 @@
 # Task: Cloudflare Browser Rendering GEO Audit
 
+Created: 2026-03-12
+
 ## Goal
 
 Add a repo-local workflow that lets an agent use Cloudflare Browser Rendering

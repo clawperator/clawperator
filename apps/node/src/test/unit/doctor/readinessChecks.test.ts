@@ -22,6 +22,7 @@ describe("checkApkPresence", () => {
         assert.strictEqual(result.status, "fail");
         assert.strictEqual(result.code, ERROR_CODES.OPERATOR_NOT_INSTALLED);
         assert.match(result.detail ?? "", /Package com\.test\.operator was not found/);
+        assert.strictEqual(result.fix?.docsUrl, "https://docs.clawperator.com/setup/");
     });
 
     it("fails when package queries cannot run", async () => {
@@ -97,6 +98,8 @@ describe("runHandshake", () => {
                 message: "Timeout details",
                 lastCorrelatedEvents: [],
                 broadcastDispatchStatus: "sent",
+                deviceId: "test-device",
+                operatorPackage: "com.test.operator",
             }
         });
 
@@ -105,6 +108,7 @@ describe("runHandshake", () => {
         assert.strictEqual(result.code, ERROR_CODES.RESULT_ENVELOPE_TIMEOUT);
         assert.match(result.detail ?? "", /Broadcast dispatch: sent/);
         assert.match(result.detail ?? "", /Operator package: com\.test\.operator/);
+        assert.match(result.detail ?? "", /APK\/CLI version mismatch/);
         assert.ok(result.fix?.steps.some(step => step.kind === "shell" && step.value.includes("clawperator snapshot")));
     });
 
