@@ -85,14 +85,8 @@ path_type() {
     apps/node/package.json|\
       sites/docs/mkdocs.yml|\
       sites/docs/source-map.yaml|\
-      apps/android/build.gradle.kts|\
-      apps/android/app/build.gradle.kts|\
-      apps/android/settings.gradle.kts|\
-      apps/android/gradle.properties|\
-      apps/android/local.properties|\
+      *.gradle.kts|\
       gradle/**|\
-      build.gradle.kts|\
-      settings.gradle.kts|\
       gradle.properties|\
       local.properties)
       printf 'config'

@@ -54,14 +54,8 @@ path_type() {
     apps/node/package.json|\
       sites/docs/mkdocs.yml|\
       sites/docs/source-map.yaml|\
-      apps/android/build.gradle.kts|\
-      apps/android/app/build.gradle.kts|\
-      apps/android/settings.gradle.kts|\
-      apps/android/gradle.properties|\
-      apps/android/local.properties|\
+      *.gradle.kts|\
       gradle/**|\
-      build.gradle.kts|\
-      settings.gradle.kts|\
       gradle.properties|\
       local.properties)
       printf 'config'
@@ -106,7 +100,7 @@ case1_err="$(mktemp)"
 if run_script "$case1_out" "$case1_err" v0.5.0 v0.5.1; then
   first_line="$(first_non_empty_line "$case1_out")"
   if [[ "$first_line" =~ ^RELEASE_DATE:\ [0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
-  printf 'PASS: gather_commits.sh emits RELEASE_DATE first\n'
+    printf 'PASS: gather_commits.sh emits RELEASE_DATE first\n'
   else
     printf 'FAIL: gather_commits.sh first non-empty line was: %s\n' "$first_line"
     failures=$((failures + 1))
