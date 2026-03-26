@@ -60,28 +60,30 @@ The script must:
    - Extract PR number if present in subject (pattern: `(#NNN)` at end of subject line)
    - For each changed file, assign a type using this hardcoded lookup (first match wins):
      ```
-     generated: apps/node/dist/**, apps/node/coverage/**, apps/node/package-lock.json,
+     infra:     apps/node/src/test/**, apps/android/app/src/test/**,
+                apps/android/app/src/androidTest/**,
+                apps/node/node_modules/**, apps/node/dist/**, apps/node/coverage/**,
+                apps/android/build/**, apps/android/app/build/**, apps/android/**/generated/**,
+                .agents/**, .github/**, tasks/**, docs/internal/**,
+                sites/docs/AGENTS.md, sites/docs/requirements.txt,
+                sites/landing/public/sitemap.xml, sites/landing/public/landing-sitemap.xml,
+                detekt*.yml, detekt-baseline.xml
+
+     generated: apps/node/package-lock.json,
                 sites/docs/static/llms-full.txt, sites/docs/static/llms.txt,
-                sites/landing/public/llms-full.txt, sites/landing/public/llms.txt,
-                sites/landing/public/sitemap.xml, sites/landing/public/landing-sitemap.xml
+                sites/landing/public/llms-full.txt, sites/landing/public/llms.txt
 
-     config:    apps/node/package.json, sites/docs/mkdocs.yml, sites/docs/source-map.yaml,
-                sites/docs/requirements.txt, sites/docs/AGENTS.md,
-                gradle/**, build.gradle.kts, settings.gradle.kts, *.properties,
-                gradle.properties, local.properties, detekt*.yml, detekt-baseline.xml
+     config:    apps/node/package.json,
+                sites/docs/mkdocs.yml, sites/docs/source-map.yaml,
+                gradle/**, build.gradle.kts, settings.gradle.kts,
+                gradle.properties, local.properties
 
-     infra:     .agents/**, .github/**, tasks/**, docs/internal/**,
-                apps/node/node_modules/**, apps/android/build/**,
-                apps/android/app/build/**, apps/android/**/generated/**
-
-     src:       everything else in a named surface (apps/node/**, apps/android/**, docs/**,
-                sites/docs/**, sites/landing/**)
+     src:       everything else in a named surface (default)
      ```
-   - Determine the surface(s) touched: a file contributes to a surface only if its type is `src` or `generated` (not `infra` or `config`), and it falls under that surface's path prefix. Surface = `node`, `android`, or `docs`.
+   - Determine the surface(s) touched: a file contributes to a named surface (`node`, `android`, `docs`) if its type is `src`, `generated`, or `config` (NOT `infra`) and it falls under that surface's path prefix. Files typed `infra` never contribute to any surface.
    - Determine the commit classification:
      - `keep` — at least one `src` file in any named surface
-     - `drop:generated-only` — named-surface files exist but all are `generated`
-     - `drop:config-only` — named-surface files exist but all are `config`
+     - `drop:no-src` — named-surface files exist (config and/or generated), but none are `src`
      - `drop:infra` — no named-surface files at all
 5. Print each commit in this exact format:
    ```
@@ -103,7 +105,7 @@ The script must:
    === COMMIT <sha> ===
    SUBJECT: chore(build): set code version to 0.5.1
    SURFACES: node
-   CLASSIFICATION: drop:config-only
+   CLASSIFICATION: drop:no-src
    FILES:
      apps/node/package.json  [config]
      apps/node/package-lock.json  [generated]
@@ -123,8 +125,9 @@ Create `.agents/skills/release-notes-author/scripts/test_gather_commits.sh`. It 
 
 - Pass: `gather_commits.sh v0.5.0 v0.5.1` exits 0 and `RELEASE_DATE:` is the first non-empty output line.
 - Pass: output contains at least one `=== COMMIT` block with a `CLASSIFICATION:` line.
-- Pass: a known config-only commit in the range (e.g., the version-bump commit) has `CLASSIFICATION: drop:config-only`.
-- Pass: a known src commit in the range has `CLASSIFICATION: keep`.
+- Pass: commit `b2f7234` (version-bump, touches `package.json` + test files) has `CLASSIFICATION: drop:no-src` — test files are `infra`, package.json is `config`, so no `src` files in any surface.
+- Pass: a known `src`-touching commit in the `v0.5.0→v0.5.1` range has `CLASSIFICATION: keep`.
+- Pass: `apps/node/src/test/unit/foo.test.ts` is annotated `[infra]`, not `[src]`.
 - Fail: `gather_commits.sh` with no args exits non-zero and prints usage to stderr.
 - Fail: `gather_commits.sh invalid-tag v0.5.1` exits non-zero.
 
@@ -134,9 +137,9 @@ Run tests as part of the Phase 1 commit — they must pass before committing.
 
 - Script runs from repo root without error.
 - `RELEASE_DATE:` is the first non-empty line of output, format `RELEASE_DATE: YYYY-MM-DD`.
-- Every commit block has a `CLASSIFICATION:` line (`keep`, `drop:config-only`, `drop:generated-only`, or `drop:infra`).
+- Every commit block has a `CLASSIFICATION:` line (`keep`, `drop:no-src`, or `drop:infra`).
 - Every file in the `FILES:` list has a type annotation (`[src]`, `[generated]`, `[config]`, or `[infra]`).
-- The version-bump commit in the `v0.5.0→v0.5.1` range shows `CLASSIFICATION: drop:config-only`.
+- The version-bump commit `b2f7234` shows `CLASSIFICATION: drop:no-src` (package.json is config, test files are infra — no src files).
 - A commit touching `apps/node/src/**` shows `CLASSIFICATION: keep`.
 - All six test cases in `test_gather_commits.sh` pass.
 
@@ -179,16 +182,17 @@ bash .agents/skills/release-notes-author/scripts/gather_commits.sh <start-tag> <
 2. From `RELEASE_DATE:` line, extract the date.
 3. The version is the end tag with the `v` prefix removed (e.g., `v0.5.1` → `0.5.1`).
 4. Review every commit block using only the `CLASSIFICATION:` line — do not re-derive keep/drop from the file list:
-   - `CLASSIFICATION: drop:*` → skip entirely, log SHA + reason in findings.md "Synthesis choices". Never drop silently.
+   - `CLASSIFICATION: drop:no-src` or `drop:infra` → skip entirely, log SHA + reason in findings.md "Synthesis choices". Never drop silently.
    - `CLASSIFICATION: keep` → include; group by surface using the `SURFACES:` line.
    - The SKILL.md must include this quick-reference table so the agent does not second-guess the script:
 
      | Path example | Type | Classification result |
      |---|---|---|
-     | `apps/node/src/cli/index.ts` | src | keep (if only change) |
-     | `apps/node/package.json` | config | drop:config-only (if only change) |
-     | `apps/node/package-lock.json` | generated | drop:generated-only (if only change) |
-     | `sites/docs/static/llms-full.txt` | generated | drop:generated-only (if only change) |
+     | `apps/node/src/cli/index.ts` | src | keep |
+     | `apps/node/src/test/unit/foo.test.ts` | infra | drop:infra (test files never keep) |
+     | `apps/node/package.json` alone | config | drop:no-src |
+     | `apps/node/package.json` + `package-lock.json` | config + generated | drop:no-src |
+     | `sites/docs/static/llms-full.txt` alone | generated | drop:no-src |
      | `docs/api/actions.md` + `llms-full.txt` | src + generated | keep (src present) |
 5. Synthesize `keep` commits into bullet points using the categories `Added`, `Changed`, `Fixed`. Rules:
    - Write in second-person imperative or past tense, user-facing (e.g., "Added `read-value` action for extracting text from UI elements").
@@ -251,7 +255,7 @@ feat(release-notes): add release-notes-author skill
    | Commit | Subject | Classification | Surfaces | Notes |
    |--------|---------|---------------|----------|-------|
    | abc1234 | feat(node): ... | keep | node | |
-   | def5678 | chore(build): set code version | drop:config-only | node | |
+   | def5678 | chore(build): set code version | drop:no-src | node | package.json [config] + test files [infra] |
 
    ### Mismatches
    List any commits where the subject line claimed one surface but the diff showed another.

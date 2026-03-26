@@ -34,16 +34,18 @@ Each changed file is typed as `src`, `generated`, or `config` by the script usin
 
 | Type | Paths |
 |------|-------|
-| `src` | `apps/node/src/**`, `apps/android/app/src/**`, authored `docs/**` (non-generated) |
-| `generated` | `apps/node/dist/**`, `sites/docs/static/llms-full.txt`, `sites/docs/static/llms.txt`, `sites/landing/public/llms-full.txt`, `sites/landing/public/llms.txt`, `apps/node/package-lock.json` |
+| `src` | `apps/node/src/**` (excl. `src/test/**`), `apps/android/app/src/main/**`, authored `docs/**` (non-generated) |
+| `generated` | `apps/node/dist/**`, `apps/node/package-lock.json`, `sites/docs/static/llms-full.txt`, `sites/docs/static/llms.txt`, `sites/landing/public/llms-full.txt`, `sites/landing/public/llms.txt` |
 | `config` | `apps/node/package.json`, `sites/docs/mkdocs.yml`, `sites/docs/source-map.yaml`, `gradle/**`, `build.gradle.kts`, `settings.gradle.kts`, `*.properties` |
+| `infra` | `apps/node/src/test/**`, `apps/android/app/src/test/**`, `apps/android/app/src/androidTest/**`, `.agents/**`, `.github/**`, `tasks/**`, `docs/internal/**`, `sites/docs/AGENTS.md`, `sites/docs/requirements.txt`, sitemap files, build output dirs |
 | `src` (default) | Anything in a named surface not matched above |
 
-Commit classification rule (deterministic, applied by the script):
-- **keep** — at least one `src` file in a named surface
-- **drop:generated-only** — all named-surface files are `generated`
-- **drop:config-only** — all named-surface files are `config`
-- **drop:infra** — no named surface (equivalent to INFRA)
+**Surface detection:** a file contributes to a named surface (`node`, `android`, `docs`) if it falls under that surface's path prefix AND its type is `src`, `generated`, or `config` (not `infra`). Files typed `infra` never contribute to any surface.
+
+**Commit classification rule** (deterministic, applied by the script):
+- **keep** — at least one `src` file in any named surface
+- **drop:no-src** — named-surface files exist, but all are `config` and/or `generated` (covers config-only, generated-only, and mixed)
+- **drop:infra** — no named-surface files at all
 
 The LLM reads `CLASSIFICATION:` and writes bullets for `keep` commits. It never decides whether a commit should be included.
 
