@@ -1258,6 +1258,51 @@ describe("runSkill", () => {
     assert.ok(result.output.includes("TEST_OUTPUT:no-args"));
   });
 
+  it("returns SKILL_OUTPUT_ASSERTION_FAILED when expectContains is missing from output", async () => {
+    const result = await runSkill(
+      "com.test.echo",
+      ["hello"],
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      "missing-value"
+    );
+    assert.ok(!result.ok);
+    assert.strictEqual(result.code, SKILL_OUTPUT_ASSERTION_FAILED);
+    assert.strictEqual(result.expectedSubstring, "missing-value");
+    assert.ok(result.output?.includes("TEST_OUTPUT:hello"));
+  });
+
+  it("succeeds when output includes expectContains", async () => {
+    const result = await runSkill(
+      "com.test.echo",
+      ["hello"],
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      "TEST_OUTPUT:hello"
+    );
+    assert.ok(result.ok, `Expected runSkill to succeed: ${"message" in result ? result.message : ""}`);
+    assert.strictEqual(result.skillId, "com.test.echo");
+  });
+
+  it("expectContains matches substrings across stdout chunk boundaries", async () => {
+    const result = await runSkill(
+      TEST_FIXTURE_SPLIT_WORD,
+      [],
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      "hello"
+    );
+    assert.ok(result.ok, `Expected split-word fixture with expectContains: ${"message" in result ? result.message : ""}`);
+    assert.strictEqual(result.skillId, TEST_FIXTURE_SPLIT_WORD);
+    assert.strictEqual(result.output, "hello\n");
+  });
+
   it("returns SKILL_EXECUTION_FAILED for non-zero exit", async () => {
     const result = await runSkill("com.test.fail", []);
     assert.ok(!result.ok);
@@ -1728,7 +1773,7 @@ describe("cmdSkillsRun preflight gate", () => {
         {
           format: "pretty",
           skipValidate: true,
-          runSkillImpl: async (_skillId, _args, _registryPath, _timeoutMs, _env, callbacks) => {
+          runSkillImpl: async (_skillId, _args, _registryPath, _timeoutMs, _env, callbacks, _expectContains) => {
             callbacks?.onOutput?.("chunk1\\n", "stdout");
             callbacks?.onOutput?.("chunk2\\n", "stdout");
             return {

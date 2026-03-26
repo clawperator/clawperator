@@ -9,6 +9,7 @@ import {
   SKILL_SCRIPT_NOT_FOUND,
   SKILL_EXECUTION_FAILED,
   SKILL_EXECUTION_TIMEOUT,
+  SKILL_OUTPUT_ASSERTION_FAILED,
 } from "../../contracts/skills.js";
 
 const DEFAULT_TIMEOUT_MS = 120_000;
@@ -29,6 +30,9 @@ export interface SkillRunError {
   exitCode?: number;
   stdout?: string;
   stderr?: string;
+  /** Present when code is SKILL_OUTPUT_ASSERTION_FAILED */
+  output?: string;
+  expectedSubstring?: string;
 }
 
 export interface SkillRunEnv {
@@ -50,7 +54,8 @@ export async function runSkill(
   registryPath?: string,
   timeoutMs?: number,
   env?: SkillRunEnv,
-  callbacks?: SkillRunCallbacks
+  callbacks?: SkillRunCallbacks,
+  expectContains?: string
 ): Promise<SkillRunResult | SkillRunError> {
   let resolvedPath: string;
   try {
@@ -206,6 +211,17 @@ export async function runSkill(
         event: "skills.run.complete",
         message: `Skill ${skillId} exited with code 0 after ${durationMs}ms`,
       });
+      if (expectContains !== undefined && !stdout.includes(expectContains)) {
+        finish({
+          ok: false,
+          code: SKILL_OUTPUT_ASSERTION_FAILED,
+          message: `Skill ${skillId} output did not include expected text`,
+          skillId,
+          output: stdout,
+          expectedSubstring: expectContains,
+        });
+        return;
+      }
       finish({
         ok: true,
         skillId,
