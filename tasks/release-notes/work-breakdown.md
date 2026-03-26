@@ -206,7 +206,7 @@ bash .agents/skills/release-notes-author/scripts/gather_commits.sh <start-tag> <
    - **Category rubric:** `Added` = new capability that did not exist; `Changed` = existing behavior modified; `Fixed` = defect corrected. A single commit may produce bullets in more than one category for distinct effects.
    - **Breaking changes:** if a commit is backward-incompatible (removes/renames a public API, changes a default), prefix the bullet `**Breaking:** **Changed:**`. Do not flatten breaking changes into generic bullets.
    - **Merging related commits:** merge only when commits implement the same feature or fix, evidenced by shared/adjacent `FILES` or cross-references in `BODY`. List all merged SHAs in findings.md. Never merge if doing so would suppress a distinct user-visible behavior.
-   - Multi-surface commits appear in each relevant section. The wording may differ per section to reflect what changed in that surface specifically.
+   - Multi-surface commits appear in each relevant section. Each bullet must be framed from that surface's perspective — see the multi-surface framing rule in `tasks/release-notes/plan.md` § "Synthesis Contract". Do not emit near-identical wording across sections; if the only cross-surface artifact is a generated file update, omit the redundant bullet.
    - If a section has no `keep` commits, omit the section entirely.
    - Order within each section: Added first, then Changed, then Fixed.
    - **Traceability:** before writing the CHANGELOG block, record in findings.md a mapping of every `keep` commit SHA → the bullet(s) it contributes to. Every `drop:*` commit must already be logged from step 4. No commit may be silently unaccounted for.
@@ -306,6 +306,7 @@ feat(release-notes): add release-notes-author skill
 - No existing CHANGELOG entries were modified or deleted.
 - The entry contains no raw commit subjects.
 - Rerunning the skill produces no duplicate `## [0.5.1]` block and the same sections are present/absent (structural idempotency). Bullet prose may differ between runs.
+- **Human review:** before committing, read the draft entry and verify: (a) the summary sentence accurately describes the release theme, (b) the most important user-visible changes are at the right prominence, (c) no section over-indexes on implementation details at the expense of user impact.
 
 ### Expected commit
 
@@ -358,6 +359,7 @@ The `v0.5.0` release introduced significant breaking changes to the CLI and API 
 - findings.md `## v0.5.0 Run` section accounts for every commit in script output: `keep` commits mapped to bullets (or escalated), `drop:*` commits logged. No silent omissions.
 - No existing entries modified.
 - Rerunning the skill produces no duplicate `## [0.5.0]` block and the same sections are present/absent. Bullet prose may differ between runs.
+- **Human review:** before committing, verify: (a) the summary sentence reflects the scale of the API refactor, (b) the flat command surface and registry-driven dispatch are named at appropriate prominence — not buried or genericised, (c) breaking changes carry the `**Breaking:**` prefix, (d) no section is over-populated with implementation noise at the expense of user-impact clarity.
 
 ### Expected commit
 

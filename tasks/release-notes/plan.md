@@ -26,6 +26,8 @@ Surface classification is derived from **file diffs, not commit messages**. Comm
 | 📚 Documentation & Website | `docs/**`, `sites/docs/**`, `sites/landing/**` | `docs/internal/**`, `sites/docs/AGENTS.md`, `sites/docs/requirements.txt`, `sites/landing/public/sitemap.xml`, `sites/landing/public/landing-sitemap.xml` |
 | *(omit)* | `.agents/**`, `.github/**`, `tasks/**`, `gradle/**`, build/CI config, lock files | — |
 
+**Note on the Documentation & Website surface:** `docs/**`, `sites/docs/**` (technical reference), and `sites/landing/**` (marketing/install site) are deliberately collapsed into one surface. This simplifies the current implementation. If future releases need to distinguish technical docs from the marketing site, split the surface by adding a `📦 Website` row and updating the lookup table in `gather_commits.sh`.
+
 A commit touching multiple surfaces appears in each relevant section. Exclusion paths take precedence — a commit to `apps/node/node_modules/` is INFRA even though it is under `apps/node/`.
 
 **Two-stage classification:** Surface detection (script) determines which surfaces a commit touched. File-type classification (also script) determines whether it warrants a bullet. The LLM synthesis step writes prose only — it does not make keep/drop decisions.
@@ -78,6 +80,8 @@ These rules constrain the LLM synthesis step. The agent must apply them consiste
 - A single commit may produce bullets in more than one category if it genuinely introduces distinct effects (e.g., removes a broken behavior and replaces it with a new one)
 
 **Breaking changes:** If a commit removes or renames a public API, changes a default in a backward-incompatible way, or requires callers to update their code, prefix the bullet with `**Breaking:**` before the category label. Example: `- **Breaking:** **Changed:** Renamed \`foo\` to \`bar\``. Surfacing breaking changes is mandatory — they must not be flattened into generic `Changed` bullets.
+
+**Multi-surface commits — per-surface framing:** A commit touching multiple surfaces appears in each relevant surface section, but each bullet must be framed from that surface's perspective. Do not emit near-identical wording across sections. If a commit changes both the Node implementation and its documentation, the Node bullet describes the behavior change; the Docs bullet describes what documentation was added or updated. If the only cross-surface artifact is a generated file update (e.g., `llms.txt` regenerated), omit the redundant surface bullet rather than duplicating.
 
 **"Related commits" definition:** Two or more commits are related when they implement the same feature or fix, evidenced by (a) shared or adjacent `FILES` entries in the same module or (b) explicit cross-referencing in their `BODY` text. When merging, list all contributing SHAs in findings.md. A commit may not be merged into another if doing so would suppress a distinct user-visible behavior — each distinct user-visible change must appear in at least one bullet.
 
