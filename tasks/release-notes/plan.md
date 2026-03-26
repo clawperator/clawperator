@@ -67,6 +67,26 @@ The script handles all keep/drop decisions deterministically. The agent writes p
 
 ---
 
+## Synthesis Contract
+
+These rules constrain the LLM synthesis step. The agent must apply them consistently.
+
+**Category rubric (one per bullet, determined by the change's effect):**
+- `Added` — a new capability, action, flag, option, endpoint, or behavior that did not exist before
+- `Changed` — an existing capability is modified, renamed, restructured, or now behaves differently
+- `Fixed` — a defect, error condition, or incorrect behavior is corrected
+- A single commit may produce bullets in more than one category if it genuinely introduces distinct effects (e.g., removes a broken behavior and replaces it with a new one)
+
+**Breaking changes:** If a commit removes or renames a public API, changes a default in a backward-incompatible way, or requires callers to update their code, prefix the bullet with `**Breaking:**` before the category label. Example: `- **Breaking:** **Changed:** Renamed \`foo\` to \`bar\``. Surfacing breaking changes is mandatory — they must not be flattened into generic `Changed` bullets.
+
+**"Related commits" definition:** Two or more commits are related when they implement the same feature or fix, evidenced by (a) shared or adjacent `FILES` entries in the same module or (b) explicit cross-referencing in their `BODY` text. When merging, list all contributing SHAs in findings.md. A commit may not be merged into another if doing so would suppress a distinct user-visible behavior — each distinct user-visible change must appear in at least one bullet.
+
+**Synthesis is bounded to script output:** Bullets must be grounded solely in each commit's `SUBJECT`, `BODY`, and `FILES` from the script output. The agent must not inspect the actual diff or any file outside the script output.
+
+**Root-level and out-of-surface files are intentionally excluded:** `README.md`, `CHANGELOG.md`, `scripts/**`, and root-level configs are classified `infra` by default and never contribute to any surface. This is a deliberate product boundary — changes to install scripts, root docs, and tooling configs do not appear in the changelog. If this boundary should change for a future release, update the lookup table in `gather_commits.sh` before running the skill.
+
+---
+
 ## Output Format
 
 Every generated block must follow this exact structure:
@@ -101,6 +121,8 @@ Sections that have no user-facing changes are omitted entirely.
 ## Configurability
 
 The skill accepts positional tags `<start-tag> <end-tag>` (e.g., `v0.5.0` and `v0.5.1`). This supports both current-release and historical backfill use cases with the same invocation.
+
+**Git range semantics:** `START_TAG..END_TAG` means commits reachable from `END_TAG` but not from `START_TAG` — start is exclusive, end is inclusive. The script enumerates exactly the commits that went into the release represented by `END_TAG`.
 
 ---
 

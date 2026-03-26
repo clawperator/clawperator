@@ -199,11 +199,13 @@ bash .agents/skills/release-notes-author/scripts/gather_commits.sh <start-tag> <
      | `apps/node/package.json` + `package-lock.json` | config + generated | drop:no-src |
      | `sites/docs/static/llms-full.txt` alone | generated | drop:no-src |
      | `docs/api/actions.md` + `llms-full.txt` | src + generated | keep (src present) |
-5. Synthesize `keep` commits into bullet points using the categories `Added`, `Changed`, `Fixed`. Rules:
+5. Synthesize `keep` commits into bullet points. Apply the full synthesis contract from `tasks/release-notes/plan.md` § "Synthesis Contract". Key rules:
    - Write in **past tense**, user-facing (e.g., "Added `read-value` action for extracting text from UI elements"). Use past tense consistently — do not mix with imperative.
    - Never copy a raw commit subject verbatim. Rewrite it as a user-facing benefit.
    - All claims must be grounded in the commit's `SUBJECT`, `BODY`, or `FILES` list from the script output. Do not invent features, behaviors, or capabilities not evidenced there.
-   - Merge related commits into a single bullet where appropriate; note the merged SHAs in findings.md.
+   - **Category rubric:** `Added` = new capability that did not exist; `Changed` = existing behavior modified; `Fixed` = defect corrected. A single commit may produce bullets in more than one category for distinct effects.
+   - **Breaking changes:** if a commit is backward-incompatible (removes/renames a public API, changes a default), prefix the bullet `**Breaking:** **Changed:**`. Do not flatten breaking changes into generic bullets.
+   - **Merging related commits:** merge only when commits implement the same feature or fix, evidenced by shared/adjacent `FILES` or cross-references in `BODY`. List all merged SHAs in findings.md. Never merge if doing so would suppress a distinct user-visible behavior.
    - Multi-surface commits appear in each relevant section. The wording may differ per section to reflect what changed in that surface specifically.
    - If a section has no `keep` commits, omit the section entirely.
    - Order within each section: Added first, then Changed, then Fixed.
@@ -351,7 +353,8 @@ The `v0.5.0` release introduced significant breaking changes to the CLI and API 
 ### Acceptance
 
 - `## [0.5.0]` entry exists in correct chronological position.
-- Entry captures the major API refactor and new action types under Node section.
+- Entry captures the major API refactor and new action types under the Node section. The flat command surface and registry-driven dispatch are named specifically — not flattened into generic `Changed` bullets.
+- Any backward-incompatible API changes in this range are marked `**Breaking:**` — this release introduced significant surface changes and must not omit them.
 - findings.md `## v0.5.0 Run` section accounts for every commit in script output: `keep` commits mapped to bullets (or escalated), `drop:*` commits logged. No silent omissions.
 - No existing entries modified.
 - Rerunning the skill produces no duplicate `## [0.5.0]` block and the same sections are present/absent. Bullet prose may differ between runs.
