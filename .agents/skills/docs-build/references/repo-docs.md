@@ -1,29 +1,31 @@
-# Clawperator docs generation reference
+# Clawperator docs build reference
 
 ## Canonical sources
 
-- Core docs: `docs/**/*.md`
+- Core docs (including skills docs): `docs/**/*.md`
+- Internal docs (not published): `docs/internal/**/*.md`
 - Node API source of truth: `apps/node/src/**/*.ts`, `apps/node/package.json`
-- Skills docs: `../clawperator-skills/docs/**/*.md`
 - Public docs staging output: `sites/docs/.build/**/*.md`
 - Public docs site output: `sites/docs/site/**/*.md`
 - Public docs manifest: `sites/docs/source-map.yaml`
 
 ## Topic ownership
 
-- Product overview, setup, troubleshooting, design docs:
+- All authored public docs (setup, API, skills, troubleshooting):
   - Source from `docs/`
 - CLI/API reference, commands, flags, contracts, result shapes:
   - Source from `apps/node/`
-- Skills authoring and runtime usage:
-  - Source from `../clawperator-skills/docs/`
+- Skills repo (`../clawperator-skills/docs/`):
+  - Contains only pointer docs linking to `https://docs.clawperator.com/skills/`
+  - Canonical skills documentation is authored in `docs/skills/` in this repo
 
-## Public docs generation contract
+## Public docs build contract
 
 - Generated staging output lives in `sites/docs/.build/`.
 - Built site output lives in `sites/docs/site/`.
 - **Never edit `sites/docs/.build/` or `sites/docs/site/` directly.** They are generated outputs. Fix errors in the source files listed above, then regenerate. Direct edits will be overwritten on the next run and hide the real defect.
 - `source-map.yaml` `sources:` entries are validated by the assembly script and must point at real repo files or directories.
+
 ## Minimal-diff rules
 
 - Keep the current output path unless the manifest changes.

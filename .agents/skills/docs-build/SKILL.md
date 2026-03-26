@@ -1,12 +1,15 @@
 ---
-name: docs-generate
-description: Regenerate the Clawperator public docs site from the canonical sources in clawperator/docs and clawperator/apps/node. Use when Codex needs to inventory doc sources, update sites/docs/source-map.yaml, assemble sites/docs/.build/, or review docs diffs.
+name: docs-build
+description: Build the Clawperator public docs site from authored markdown and code-derived inputs. Use when you need to assemble sites/docs/.build/, run the MkDocs build, generate llms-full.txt, or validate the docs pipeline.
 ---
 
-# Docs Generate
+# Docs Build
 
-Assemble the public docs site from authored markdown and code-derived inputs.
+Compile the public docs site from authored markdown and code-derived inputs.
 Treat `sites/docs/.build/` as generated staging output, not an authored surface.
+
+This skill is for the build pipeline only. For authoring or updating documentation
+content, use the `docs-author` skill.
 
 ## Source of Truth Contract
 
@@ -36,11 +39,11 @@ directory first.
    - Public docs site: `sites/docs/`
 2. Read `sites/docs/mkdocs.yml` and `sites/docs/source-map.yaml` before editing docs build logic.
 3. Run the deterministic assembly step:
-   - `.agents/skills/docs-generate/scripts/assemble.py`
+   - `.agents/skills/docs-build/scripts/assemble.py`
 4. If you need to inspect the generated CLI or marker output directly, run the relevant helper:
-   - `.agents/skills/docs-generate/scripts/generate_cli_reference.py`
-   - `.agents/skills/docs-generate/scripts/generate_error_table.py`
-   - `.agents/skills/docs-generate/scripts/generate_selector_table.py`
+   - `.agents/skills/docs-build/scripts/generate_cli_reference.py`
+   - `.agents/skills/docs-build/scripts/generate_error_table.py`
+   - `.agents/skills/docs-build/scripts/generate_selector_table.py`
 5. Validate the assembled docs and built site:
    - `./scripts/docs_build.sh`
 6. If the build fails, fix the underlying source or generator and rerun the build.
@@ -79,7 +82,7 @@ Do not leave deleted docs referenced in the docs site manifest or navigation.
 
 ## Resources
 
-- `.agents/skills/docs-generate/scripts/assemble.py`
+- `.agents/skills/docs-build/scripts/assemble.py`
   - Deterministic docs staging assembly.
-- `.agents/skills/docs-generate/scripts/generate_llms_full.py`
+- `.agents/skills/docs-build/scripts/generate_llms_full.py`
   - Build the primary `llms-full.txt` artifact from `mkdocs.yml` and `.build/`.

@@ -91,8 +91,9 @@ existing docs, the code is correct.
   - `../clawperator-skills` (skills repo)
 - Canonical skills documentation is authored in this repo at `docs/skills/`; the skills repo provides runtime/user-facing skill packages.
 - Repo-specific Codex skills live in `.agents/skills/` in this repository.
-- Current project-local skill:
-  - `.agents/skills/docs-generate/` - assembles `sites/docs/.build/` from `docs/`, `apps/node/src/`, and `sites/docs/source-map.yaml`
+- Current project-local skills:
+  - `.agents/skills/docs-build/` - compiles `sites/docs/.build/` from `docs/`, `apps/node/src/`, and `sites/docs/source-map.yaml`
+  - `.agents/skills/docs-author/` - guides authoring and updating documentation content in `docs/`
 - Clawperator runtime and Node API execute plans/actions; skill logic, recipes, and app-specific wrappers live in `../clawperator-skills`.
 - Keep the distinction clear:
   - `../clawperator-skills` contains runtime/user-facing skills consumed by Clawperator
@@ -102,7 +103,7 @@ existing docs, the code is correct.
 
 ## Documentation Discipline
 
-`sites/docs/.build/` is generated staging output produced by the `docs-generate`
+`sites/docs/.build/` is generated staging output produced by the `docs-build`
 skill. Never edit it directly - changes will be overwritten on the next run.
 
 If your diff touches `sites/docs/.build/` before you have updated a canonical
@@ -129,7 +130,7 @@ in the same change. Then regenerate `sites/docs/.build/` and run
 `./scripts/docs_build.sh` so the public docs stay aligned with the shipped
 behavior.
 
-When docs need regeneration, use the repo docs-generation workflow rather than hand-editing generated pages. The project-local skill is `.agents/skills/docs-generate/`, and the public docs site build can be validated with `./scripts/docs_build.sh`.
+When docs need regeneration, use the repo docs-build workflow rather than hand-editing generated pages. The project-local skill is `.agents/skills/docs-build/`, and the public docs site build can be validated with `./scripts/docs_build.sh`. For authoring or updating documentation content, use the `docs-author` skill at `.agents/skills/docs-author/`.
 
 Before treating docs changes as valid, run `./scripts/docs_build.sh` and
 confirm it succeeds end to end.
