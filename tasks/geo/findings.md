@@ -1,5 +1,7 @@
 # GEO Audit Findings
 
+Created: 2026-03-12
+
 ## Summary
 
 This task did not uncover evidence that `clawperator.com` or

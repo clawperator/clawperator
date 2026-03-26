@@ -1,5 +1,7 @@
 # Task: Doctor - SDK Installation Gap
 
+Created: 2026-03-11
+
 ## Finding
 
 The `doctor` command currently has no SDK installation logic. It assumes Android

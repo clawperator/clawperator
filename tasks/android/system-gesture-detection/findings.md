@@ -1,5 +1,7 @@
 # Android System Gesture Detection Findings
 
+Created: 2026-03-19
+
 This document captures runtime findings about how Android system navigation is exposed through accessibility during recording. It is the findings log for the dedicated system-gesture-detection task, and it should be read together with [plan.md](~/src/clawperator/tasks/android/system-gesture-detection/plan.md) when implementation begins.
 
 The main question is not just "did Back happen?", but "what accessibility evidence do we get when Back or Home happens under different navigation modes, and is that evidence strong enough to reconstruct replayable intent?"

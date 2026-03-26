@@ -1,5 +1,7 @@
 # Agent Prompt: Cloudflare Browser Rendering GEO Audit
 
+Created: 2026-03-12
+
 Use Cloudflare Browser Rendering REST APIs to audit the public agent-facing
 accessibility of:
 
