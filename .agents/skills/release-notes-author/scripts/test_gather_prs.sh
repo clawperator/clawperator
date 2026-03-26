@@ -134,7 +134,13 @@ set -euo pipefail
 
 case "$1 $2" in
   "repo view")
-    printf 'clawperator/clawperator\n'
+    if [[ "${3:-}" == "--json" && "${4:-}" == "nameWithOwner" && "${5:-}" == "--jq" && "${6:-}" == ".nameWithOwner" ]]; then
+      # Match the real helper invocation so the fixture fails if the output contract changes.
+      printf 'clawperator/clawperator\n'
+    else
+      printf 'unexpected repo view invocation: %s\n' "$*" >&2
+      exit 1
+    fi
     ;;
   "pr list")
     printf '%s\t42\n' "${FIXTURE_MERGE_SHA_1:-}"
