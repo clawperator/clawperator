@@ -180,6 +180,33 @@ jobs:
           - Cloudflare metadata pointer: `${{ steps.release_meta.outputs.latest_metadata_name }}`
           EOF
 
+          python - <<'PY'
+          import re, sys
+
+          version = "${{ steps.release_meta.outputs.version }}"
+          if not re.match(r'^\d+\.\d+\.\d+$', version):
+              print(f"Error: version '{version}' is not in 0.0.0 format; cannot match CHANGELOG entry.", file=sys.stderr)
+              sys.exit(1)
+
+          try:
+              with open("CHANGELOG.md", "r", encoding="utf-8") as f:
+                  content = f.read()
+          except FileNotFoundError:
+              print(f"Error: CHANGELOG.md not found. Run release-notes-author before tagging.", file=sys.stderr)
+              sys.exit(1)
+
+          pattern = rf'(##\s*\[{re.escape(version)}\].*?)(?=\n##\s|\Z)'
+          match = re.search(pattern, content, re.DOTALL)
+          if match:
+              with open("release-notes.md", "a", encoding="utf-8") as out:
+                  out.write("\n\n---\n\n")
+                  out.write(match.group(1).strip())
+                  out.write("\n")
+          else:
+              print(f"Error: No CHANGELOG entry found for {version}. Run release-notes-author before tagging.", file=sys.stderr)
+              sys.exit(1)
+          PY
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
