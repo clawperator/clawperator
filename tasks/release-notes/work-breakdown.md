@@ -88,15 +88,26 @@ cd "$(git rev-parse --show-toplevel)"
 bash .agents/skills/release-notes-author/scripts/gather_commits.sh v0.5.0 v0.5.1
 ```
 
+### Tests
+
+Create `.agents/skills/release-notes-author/scripts/test_gather_commits.sh`. It must:
+
+- Pass: `gather_commits.sh v0.5.0 v0.5.1` exits 0 and output contains `RELEASE_DATE:` on first non-empty line.
+- Pass: output for the range contains at least one `=== COMMIT` block.
+- Fail: `gather_commits.sh` with no args exits non-zero and prints usage to stderr.
+- Fail: `gather_commits.sh invalid-tag v0.5.1` exits non-zero (git will error; script must not silently produce empty output).
+
+Run tests as part of the Phase 1 commit — they must pass before committing.
+
 ### Acceptance
 
 - Script runs from repo root without error.
 - Output contains one `=== COMMIT ===` block per commit in range.
+- `RELEASE_DATE:` is the first non-empty line of output, format `RELEASE_DATE: YYYY-MM-DD`.
 - INFRA commits are marked clearly and do not leak into surface-tagged output.
 - A commit touching both `apps/node/` and `docs/` shows `SURFACES: node docs`.
 - A commit touching only `docs/internal/` shows `SURFACES: INFRA`.
-- Add regression coverage for valid values, invalid values, missing values, and exit-code behavior.
-- Structured output must remain stable enough for SKILL.md to parse the release date token without guessing.
+- All four test cases in `test_gather_commits.sh` pass.
 
 ### Expected commit
 
@@ -183,12 +194,33 @@ feat(release-notes): add release-notes-author skill
    ```bash
    bash .agents/skills/release-notes-author/scripts/gather_commits.sh v0.5.0 v0.5.1
    ```
-2. Create `tasks/release-notes/findings.md`. Record:
-   - Full script output (paste verbatim)
-   - Which commits were classified as INFRA and why
-   - Which commits contributed to which surfaces
-   - Any mismatches found (commit message claimed X surface but diff showed Y)
-   - The draft CHANGELOG entry before insertion
+2. Create `tasks/release-notes/findings.md`. Use this structure:
+
+   ```markdown
+   ## v0.5.1 Run
+
+   ### Script output
+   <paste full output verbatim>
+
+   ### Classification summary
+   | Commit | Subject | Surfaces | Notes |
+   |--------|---------|----------|-------|
+   | abc1234 | feat(node): ... | node | |
+   | def5678 | chore(build): ... | INFRA | version bump |
+
+   ### Mismatches
+   List any commits where the subject line claimed one surface but the diff showed another.
+   Example: "abc1234 subject says feat(node) but diff also touched docs/api/ → classified as node, docs"
+
+   ### Synthesis choices
+   Note any judgment calls made during synthesis:
+   - Which related commits were merged into a single bullet
+   - Any commits omitted as noise (lock files, generated content) and why
+   - Tone or wording decisions that were non-obvious
+
+   ### Draft entry (before insertion)
+   <paste the full markdown block before it was written to CHANGELOG.md>
+   ```
 3. Follow SKILL.md instructions to synthesize and insert the `## [0.5.1]` entry into `CHANGELOG.md`.
 4. Commit findings.md and CHANGELOG.md together.
 
@@ -215,7 +247,7 @@ feat(release-notes): add release-notes-author skill
 ### Acceptance
 
 - `CHANGELOG.md` contains a `## [0.5.1]` entry in correct position.
-- `tasks/release-notes/findings.md` exists with script output and classification notes.
+- `tasks/release-notes/findings.md` exists with all four sections: script output, classification summary table, mismatches, synthesis choices, draft entry.
 - No existing CHANGELOG entries were modified or deleted.
 - The entry contains no raw commit subjects.
 
@@ -239,11 +271,10 @@ The `v0.5.0` release introduced significant breaking changes to the CLI and API 
    ```bash
    bash .agents/skills/release-notes-author/scripts/gather_commits.sh v0.4.0 v0.5.0
    ```
-2. Update `tasks/release-notes/findings.md` with a new section for this run. Record:
-   - Full script output
-   - Classification decisions for any ambiguous commits
+2. Update `tasks/release-notes/findings.md` with a new `## v0.5.0 Run` section using the same structure as Phase 3. Additionally record:
+   - Any ambiguous commits and how they were resolved (this range is larger and more likely to have ambiguity)
    - Any cases where the commit message was misleading vs. the actual diff
-   - Observations about synthesis quality compared to Phase 3
+   - Observations about synthesis quality compared to Phase 3 (did the approach scale? anything the SKILL.md should say differently?)
 3. Follow SKILL.md instructions. Insert the `## [0.5.0]` entry into `CHANGELOG.md` below `## [0.5.1]` and above `## [0.1.0]`.
 4. Commit findings.md update and CHANGELOG.md together.
 
@@ -284,6 +315,7 @@ The task is complete when:
 
 - [ ] `.agents/skills/release-notes-author/SKILL.md` exists
 - [ ] `.agents/skills/release-notes-author/scripts/gather_commits.sh` exists and is executable
+- [ ] `.agents/skills/release-notes-author/scripts/test_gather_commits.sh` exists and all cases pass
 - [ ] `CHANGELOG.md` contains entries for `0.5.1` and `0.5.0` in correct order
 - [ ] `tasks/release-notes/findings.md` contains observations from both runs
 - [ ] All entries are user-facing prose, no raw commit subjects
