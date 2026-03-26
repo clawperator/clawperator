@@ -8,11 +8,15 @@ interface TimeoutGuidanceDiagnostics {
   lastCorrelatedEvents?: readonly string[];
 }
 
+function isBroadcastDispatchSent(status?: string): boolean {
+  return status?.split(":")[0] === "sent";
+}
+
 export function buildResultEnvelopeTimeoutHint(
   diagnostics: TimeoutGuidanceDiagnostics,
   context: TimeoutGuidanceContext
 ): string | undefined {
-  if (diagnostics.broadcastDispatchStatus !== "sent") {
+  if (!isBroadcastDispatchSent(diagnostics.broadcastDispatchStatus)) {
     return undefined;
   }
 

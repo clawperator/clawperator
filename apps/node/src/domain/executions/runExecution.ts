@@ -541,6 +541,10 @@ async function performExecution(
     }
     if ("timeout" in result && result.timeout && "diagnostics" in result) {
       const elapsedMs = Date.now() - dispatchStart;
+      const timeoutHint = buildResultEnvelopeTimeoutHint(result.diagnostics, {
+        deviceId: result.diagnostics.deviceId,
+        operatorPackage: result.diagnostics.operatorPackage,
+      });
       options.logger?.log({
         ts: new Date().toISOString(),
         level: "error",
@@ -551,6 +555,9 @@ async function performExecution(
         message: `Timeout waiting for result envelope after ${elapsedMs}ms`,
       });
       failureEnvelope.error = result.diagnostics.code;
+      if (timeoutHint !== undefined) {
+        failureEnvelope.hint = timeoutHint;
+      }
       emitResult(deviceId, failureEnvelope);
       return {
         execution,

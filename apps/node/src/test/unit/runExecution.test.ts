@@ -14,6 +14,7 @@ import {
   runCloseAppPreflight,
   runExecution,
 } from "../../domain/executions/runExecution.js";
+import { buildResultEnvelopeTimeoutHint } from "../../domain/executions/timeoutGuidance.js";
 import type { Execution } from "../../contracts/execution.js";
 import type { ResultEnvelope, StepResult } from "../../contracts/result.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
@@ -708,6 +709,19 @@ describe("buildTimeoutError", () => {
     );
 
     assert.strictEqual(error.hint, undefined);
+  });
+
+  it("builds a stable timeout hint when context fields are missing", () => {
+    const hint = buildResultEnvelopeTimeoutHint(
+      {
+        broadcastDispatchStatus: "sent: broadcast_sent",
+        lastCorrelatedEvents: [],
+      },
+      {}
+    );
+
+    assert.match(hint ?? "", /--device <device_id>/);
+    assert.match(hint ?? "", /--operator-package <package>/);
   });
 });
 
