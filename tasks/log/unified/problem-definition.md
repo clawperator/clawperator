@@ -1,5 +1,7 @@
 # Unified Logging: Problem Definition
 
+Created: 2026-03-22
+
 Status: pre-planning. No implementation scheduled.
 Context: assumes PRD-1 through PRD-5.5 have shipped.
 
