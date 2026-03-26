@@ -6,6 +6,13 @@ A single skill, `release-notes-author`, lives at `.agents/skills/release-notes-a
 
 Notes are written to `CHANGELOG.md` at the repository root. The GitHub Release body is sourced from the relevant CHANGELOG block during the existing release workflow.
 
+The team considered a forward-only changelog, but historical backfill is the chosen scope so the repo can establish a canonical release history before future releases rely on it.
+
+Why not `semantic-release` or `release-drafter`?
+- `semantic-release` is a strong opinionated release engine, but it assumes conventional-commit-driven versioning and a tighter release pipeline than this repo currently wants.
+- `release-drafter` is good at templated PR aggregation, but it depends on label discipline and does not naturally classify changes by file path across the repo surfaces we care about.
+- This custom skill keeps classification aligned with the repository's actual surface boundaries and keeps the generation step auditable in one place.
+
 ---
 
 ## Surface Boundaries
@@ -67,7 +74,7 @@ Sections that have no user-facing changes are omitted entirely. The date is the 
 
 ## Configurability
 
-The skill accepts `--start-tag` and `--end-tag` (e.g., `v0.5.0` and `v0.5.1`). This supports both current-release and historical backfill use cases with the same invocation.
+The skill accepts positional tags `<start-tag> <end-tag>` (e.g., `v0.5.0` and `v0.5.1`). This supports both current-release and historical backfill use cases with the same invocation.
 
 ---
 

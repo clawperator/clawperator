@@ -41,7 +41,7 @@ Read these before writing any code:
 
 ## Phase 1: gather_commits.sh
 
-**Goal:** Create a bash script that accepts `--start-tag` and `--end-tag`, iterates commits in that range, maps each commit's changed files to surfaces, and outputs structured text the agent can read and synthesize.
+**Goal:** Create a bash script that accepts positional `<start-tag> <end-tag>` arguments, iterates commits in that range, maps each commit's changed files to surfaces, and outputs structured text the agent can read and synthesize.
 
 **Location:** `.agents/skills/release-notes-author/scripts/gather_commits.sh`
 
@@ -50,12 +50,12 @@ Read these before writing any code:
 The script must:
 
 1. Accept positional args: `<start-tag> <end-tag>` (e.g., `v0.5.0 v0.5.1`).
-2. Print the release date from the end tag: `git log -1 --format="%as" "$END_TAG"`.
+2. Print the release date line in a stable machine-readable form: `RELEASE_DATE: <YYYY-MM-DD>` using `git log -1 --format="%as" "$END_TAG"`.
 3. Iterate commits in chronological order (oldest first): `git log --reverse --format="%H" "$START_TAG..$END_TAG"`.
 4. For each commit SHA:
    - Get the subject: `git log -1 --format="%s" "$SHA"`
    - Get the body: `git log -1 --format="%b" "$SHA"`
-   - Get changed files (works for both merge commits and direct commits): `git diff --name-only "$SHA^1" "$SHA" 2>/dev/null`
+   - Get changed files with `git diff-tree --no-commit-id --name-only -r -m "$SHA" | sort -u` so merge commits and direct commits are handled consistently
    - Extract PR number if present in subject (pattern: `(#NNN)` at end of subject line)
    - Classify surfaces by checking changed files against these exact rules:
      ```
@@ -95,6 +95,8 @@ bash .agents/skills/release-notes-author/scripts/gather_commits.sh v0.5.0 v0.5.1
 - INFRA commits are marked clearly and do not leak into surface-tagged output.
 - A commit touching both `apps/node/` and `docs/` shows `SURFACES: node docs`.
 - A commit touching only `docs/internal/` shows `SURFACES: INFRA`.
+- Add regression coverage for valid values, invalid values, missing values, and exit-code behavior.
+- Structured output must remain stable enough for SKILL.md to parse the release date token without guessing.
 
 ### Expected commit
 
@@ -159,6 +161,7 @@ bash .agents/skills/release-notes-author/scripts/gather_commits.sh <start-tag> <
 - SKILL.md contains frontmatter with correct `name` and `description`.
 - All steps are explicitly numbered with exact commands.
 - Format spec matches `tasks/release-notes/plan.md` exactly.
+- The invocation syntax matches the script contract in Phase 1.
 
 ### Expected commit
 
