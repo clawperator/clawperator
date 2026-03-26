@@ -222,24 +222,14 @@ export async function cmdSkillsRun(
               }
             },
             logger: options.logger,
-          });
+          }, expectContains);
         } finally {
           removeStdoutErrorListener();
           removeStderrErrorListener();
         }
       })()
-    : await runSkillImpl(skillId, args, undefined, timeoutMs, env, { logger: options.logger });
+    : await runSkillImpl(skillId, args, undefined, timeoutMs, env, { logger: options.logger }, expectContains);
   if (result.ok) {
-    if (expectContains && !result.output.includes(expectContains)) {
-      return formatError({
-        code: SKILL_OUTPUT_ASSERTION_FAILED,
-        message: `Skill ${skillId} output did not include expected text`,
-        skillId,
-        output: result.output,
-        expectedSubstring: expectContains,
-        timeoutMs: timeoutMs ?? undefined,
-      }, options);
-    }
     return formatSuccess({
       skillId: result.skillId,
       output: result.output,
@@ -247,6 +237,16 @@ export async function cmdSkillsRun(
       durationMs: result.durationMs,
       timeoutMs: timeoutMs ?? undefined,
       expectedSubstring: expectContains ?? undefined,
+    }, options);
+  }
+  if (result.code === SKILL_OUTPUT_ASSERTION_FAILED) {
+    return formatError({
+      code: SKILL_OUTPUT_ASSERTION_FAILED,
+      message: result.message,
+      skillId: result.skillId,
+      output: result.output,
+      expectedSubstring: result.expectedSubstring,
+      timeoutMs: timeoutMs ?? undefined,
     }, options);
   }
   return formatError({

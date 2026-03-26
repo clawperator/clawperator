@@ -455,29 +455,18 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       if (typeof deviceId === "string" && deviceId.length > 0) scriptArgs.push(deviceId);
       if (Array.isArray(args)) scriptArgs.push(...args.map(String));
 
+      const expectContainsArg =
+        typeof expectContains === "string" ? expectContains : undefined;
       const result = await runSkill(
         req.params.skillId,
         scriptArgs,
         undefined,
         typeof timeoutMs === "number" ? timeoutMs : undefined,
         undefined,
-        { logger: options.logger }
+        { logger: options.logger },
+        expectContainsArg
       );
       if (result.ok) {
-        if (typeof expectContains === "string" && !result.output.includes(expectContains)) {
-          res.status(400).json({
-            ok: false,
-            error: {
-              code: SKILL_OUTPUT_ASSERTION_FAILED,
-              message: `Skill ${req.params.skillId} output did not include expected text`,
-              skillId: req.params.skillId,
-              output: result.output,
-              expectedSubstring: expectContains,
-              timeoutMs: typeof timeoutMs === "number" ? timeoutMs : undefined,
-            },
-          });
-          return;
-        }
         res.json({
           ok: true,
           skillId: result.skillId,
@@ -486,6 +475,18 @@ export async function startServer(options: ServeOptions): Promise<Server> {
           durationMs: result.durationMs,
           timeoutMs: typeof timeoutMs === "number" ? timeoutMs : undefined,
           expectedSubstring: typeof expectContains === "string" ? expectContains : undefined,
+        });
+      } else if (result.code === SKILL_OUTPUT_ASSERTION_FAILED) {
+        res.status(400).json({
+          ok: false,
+          error: {
+            code: SKILL_OUTPUT_ASSERTION_FAILED,
+            message: result.message,
+            skillId: result.skillId,
+            output: result.output,
+            expectedSubstring: result.expectedSubstring,
+            timeoutMs: typeof timeoutMs === "number" ? timeoutMs : undefined,
+          },
         });
       } else {
         const status = result.code === SKILL_NOT_FOUND ? 404
