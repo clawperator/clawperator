@@ -95,7 +95,7 @@ The script must:
    === COMMIT <sha> ===
    SUBJECT: <subject>
    PR: #<number>         (omit if no PR number)
-   SURFACES: node docs   (named surfaces with src/generated files; omit if none)
+   SURFACES: node docs   (named surfaces with src/generated/config files; omit if none)
    CLASSIFICATION: keep
    FILES:
      apps/node/src/foo.ts  [src]
@@ -187,7 +187,7 @@ bash .agents/skills/release-notes-author/scripts/gather_commits.sh <start-tag> <
 2. From `RELEASE_DATE:` line, extract the date.
 3. The version is the end tag with the `v` prefix removed (e.g., `v0.5.1` → `0.5.1`).
 4. Review every commit block using only the `CLASSIFICATION:` line — do not re-derive keep/drop from the file list:
-   - `CLASSIFICATION: drop:no-src` or `drop:infra` → skip entirely, log SHA + reason in findings.md "Synthesis choices". Never drop silently.
+   - `CLASSIFICATION: drop:no-src` or `drop:infra` → skip entirely, log SHA + classification in findings.md **classification summary table**. Never drop silently.
    - `CLASSIFICATION: keep` → include; group by surface using the `SURFACES:` line.
    - The SKILL.md must include this quick-reference table so the agent does not second-guess the script:
 
@@ -302,7 +302,7 @@ feat(release-notes): add release-notes-author skill
 ### Acceptance
 
 - `CHANGELOG.md` contains a `## [0.5.1]` entry in correct position.
-- `tasks/release-notes/findings.md` exists with all five sections: script output, classification summary table, mismatches, synthesis choices (with commit→bullet mapping for every non-INFRA commit), and draft entry.
+- `tasks/release-notes/findings.md` exists with all five sections: script output, classification summary table, mismatches, synthesis choices (with commit→bullet mapping for every `keep` commit), and draft entry.
 - Every commit in the script output is accounted for in findings.md: `keep` commits map to a bullet (or are escalated with reason); `drop:*` commits are logged with their classification. No silent omissions.
 - No existing CHANGELOG entries were modified or deleted.
 - The entry contains no raw commit subjects.
