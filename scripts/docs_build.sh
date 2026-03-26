@@ -41,14 +41,14 @@ echo "Installing MkDocs dependencies..."
 pip install -r "$REQUIREMENTS_FILE"
 
 echo "Assembling docs staging directory..."
-"$VENV_DIR/bin/python" "$REPO_ROOT/.agents/skills/docs-generate/scripts/assemble.py"
+"$VENV_DIR/bin/python" "$REPO_ROOT/.agents/skills/docs-build/scripts/assemble.py"
 
 # Run the build
 echo "Running MkDocs build..."
 mkdocs build
 
 echo "Generating llms-full.txt..."
-"$VENV_DIR/bin/python" "$REPO_ROOT/.agents/skills/docs-generate/scripts/generate_llms_full.py"
+"$VENV_DIR/bin/python" "$REPO_ROOT/.agents/skills/docs-build/scripts/generate_llms_full.py"
 
 STATIC_DIR="$DOCS_DIR/static"
 if [ -d "$STATIC_DIR" ]; then

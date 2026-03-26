@@ -22,11 +22,11 @@ def load_module(relative_path: str, module_name: str):
 
 
 cli_reference = load_module(
-    ".agents/skills/docs-generate/scripts/generate_cli_reference.py",
+    ".agents/skills/docs-build/scripts/generate_cli_reference.py",
     "docs_generate_generate_cli_reference",
 )
 selector_table = load_module(
-    ".agents/skills/docs-generate/scripts/generate_selector_table.py",
+    ".agents/skills/docs-build/scripts/generate_selector_table.py",
     "docs_generate_generate_selector_table",
 )
 
