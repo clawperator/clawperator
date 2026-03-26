@@ -57,9 +57,13 @@ The script must:
 4. For each commit SHA:
    - Get the subject: `git log -1 --format="%s" "$SHA"`
    - Get the body: `git log -1 --format="%b" "$SHA"`
-   - Get changed files with `git diff-tree --no-commit-id --name-only --diff-filter=ACRM -r -m "$SHA" | sort -u`. The `--diff-filter=ACRM` (Added, Copied, Renamed-destination, Modified) ensures only destination paths are emitted — deleted-only paths and old rename sources are excluded, so no post-processing is needed to isolate the new path
+   - Get changed files using name-status format to capture both modifications and deletions:
+     ```bash
+     git diff-tree --no-commit-id --name-status --diff-filter=ACRMD -r -m "$SHA"
+     ```
+     This returns lines like `A path`, `M path`, `D path`, `R100 old new`. For renamed files, take only the destination path. Sort and deduplicate after extraction. The `D` entries are deleted files — annotate them as `[deleted]` in the FILES output.
    - Extract PR number if present in subject (pattern: `(#NNN)` at end of subject line)
-   - For each changed file, assign a type using this hardcoded lookup (first match wins):
+   - For each file path (whether added/modified or deleted), assign a type using this hardcoded lookup (first match wins):
      ```
      infra:     apps/node/src/test/**, apps/android/app/src/test/**,
                 apps/android/app/src/androidTest/**,
@@ -86,9 +90,9 @@ The script must:
                 files — covers CHANGELOG.md, README.md, scripts/**, root-level configs,
                 sites/docs/.build/**, sites/docs/site/**)
      ```
-   - Determine the surface(s) touched: a file contributes to a named surface (`node`, `android`, `docs`) if its type is `src`, `generated`, or `config` (NOT `infra`) and it falls under that surface's path prefix. Files typed `infra` never contribute to any surface.
+   - Determine the surface(s) touched: a file (whether added, modified, or deleted) contributes to a named surface (`node`, `android`, `docs`) if its type is `src`, `generated`, or `config` (NOT `infra`) and it falls under that surface's path prefix. Files typed `infra` never contribute to any surface.
    - Determine the commit classification:
-     - `keep` — at least one `src` file in any named surface
+     - `keep` — at least one `src` file (added, modified, renamed, OR deleted) in any named surface
      - `drop:no-src` — named-surface files exist (config and/or generated), but none are `src`
      - `drop:infra` — no named-surface files at all
 5. Print each commit in this exact format:
@@ -101,12 +105,13 @@ The script must:
    FILES:
      apps/node/src/foo.ts  [src]
      docs/api/bar.md  [src]
+     apps/node/src/commands/old-cmd.ts  [deleted][src]
      sites/docs/static/llms-full.txt  [generated]
    BODY:
      <body indented 2 spaces; omit section if empty>
    === END ===
    ```
-   For a dropped commit:
+   Deleted files appear in the FILES list with `[deleted]` prepended to their type annotation. For a dropped commit:
    ```
    === COMMIT <sha> ===
    SUBJECT: chore(build): set code version to 0.5.1
@@ -134,6 +139,7 @@ Create `.agents/skills/release-notes-author/scripts/test_gather_commits.sh`. It 
 - Pass: commit `b2f7234` (version-bump, touches `package.json` + test files) has `CLASSIFICATION: drop:no-src` — test files are `infra`, package.json is `config`, so no `src` files in any surface.
 - Pass: a known `src`-touching commit in the `v0.5.0→v0.5.1` range has `CLASSIFICATION: keep`.
 - Pass: `apps/node/src/test/unit/foo.test.ts` is annotated `[infra]`, not `[src]`.
+- Pass: if any commit in the `v0.4.0→v0.5.0` range deleted a named-surface src file, that file appears in the `FILES:` list annotated `[deleted][src]` and the commit is classified `keep`. (Identify such a commit when running Phase 4 and back-fill this test case with the actual SHA.)
 - Fail: `gather_commits.sh` with no args exits non-zero and prints usage to stderr.
 - Fail: `gather_commits.sh invalid-tag v0.5.1` exits non-zero.
 
@@ -195,6 +201,7 @@ bash .agents/skills/release-notes-author/scripts/gather_commits.sh <start-tag> <
      | Path example | Type | Classification result |
      |---|---|---|
      | `apps/node/src/cli/index.ts` | src | keep |
+     | `apps/node/src/cli/old-cmd.ts` (deleted) | [deleted][src] | keep (deleted src still counts) |
      | `apps/node/src/test/unit/foo.test.ts` | infra | drop:infra (test files never keep) |
      | `apps/node/package.json` alone | config | drop:no-src |
      | `apps/node/package.json` + `package-lock.json` | config + generated | drop:no-src |
@@ -204,9 +211,9 @@ bash .agents/skills/release-notes-author/scripts/gather_commits.sh <start-tag> <
    - Write in **past tense**, user-facing (e.g., "Added `read-value` action for extracting text from UI elements"). Use past tense consistently — do not mix with imperative.
    - Never copy a raw commit subject verbatim. Rewrite it as a user-facing benefit.
    - All claims must be grounded in the commit's `SUBJECT`, `BODY`, or `FILES` list from the script output. Do not invent features, behaviors, or capabilities not evidenced there.
-   - **Category rubric:** `Added` = new capability that did not exist; `Changed` = existing behavior modified; `Fixed` = defect corrected. A single commit may produce bullets in more than one category for distinct effects.
-   - **Breaking changes:** if a commit is backward-incompatible (removes/renames a public API, changes a default), prefix the bullet `**Breaking:** **Changed:**`. Do not flatten breaking changes into generic bullets.
-   - **Merging related commits:** merge only when commits implement the same feature or fix, evidenced by shared/adjacent `FILES` or cross-references in `BODY`. List all merged SHAs in findings.md. Never merge if doing so would suppress a distinct user-visible behavior.
+   - **Category rubric:** `Added` = new capability; `Changed` = existing behavior modified; `Fixed` = defect corrected; `Removed` = capability deleted (always `**Breaking:** **Removed:**`). A single commit may produce bullets in more than one category for distinct effects.
+   - **Breaking changes:** if a commit is backward-incompatible, prefix the bullet `**Breaking:**` before the category label. For `[deleted][src]` files: if the deleted file represents a user-facing capability with no replacement in the same commit, write `**Breaking:** **Removed:** ...`; if a replacement is present, write `**Breaking:** **Changed:** ...`. Only mark `**Breaking:**` when there is explicit evidence in SUBJECT/BODY, or when a deleted src file clearly represents a removed user-facing capability.
+   - **Merging related commits:** merge commits that share the same `PR:` number (deterministic). Outside same-PR commits, merge only when evidenced by shared/adjacent `FILES` or BODY cross-references. List all merged SHAs in findings.md. Never merge if doing so would suppress a distinct user-visible behavior.
    - Multi-surface commits appear in each relevant section. Each bullet must be framed from that surface's perspective — see the multi-surface framing rule in `tasks/release-notes/plan.md` § "Synthesis Contract". Do not emit near-identical wording across sections; if the only cross-surface artifact is a generated file update, omit the redundant bullet.
    - If a section has no `keep` commits, omit the section entirely.
    - Order within each section: Added first, then Changed, then Fixed.
@@ -421,7 +428,11 @@ docs(changelog): backfill release notes for v0.5.0
 
 - GitHub Release body for a future release contains both the install links block and the changelog block separated by `---`.
 - If `CHANGELOG.md` is missing or has no entry for the version, the workflow step exits non-zero and the release fails with a clear error message.
-- The extraction regex matches `## [0.5.1]` with optional surrounding whitespace and is tested against at least one formatting variation (e.g. extra blank lines between blocks) and one negative case (version not present) before merging.
+- The extraction regex is verified against these cases before merging:
+  - **Positive:** matches `## [0.5.1]` with extra blank lines between blocks (formatting variation)
+  - **Negative — version absent:** version `0.5.99` returns no match and exits non-zero
+  - **Negative — no prefix over-match:** version `0.5.1` does not accidentally match `## [0.5.10]` or `## [0.5.11]` — confirm `re.escape` + `\]` boundary prevents this
+  - **Negative — Unreleased not matched:** `## [Unreleased]` is not returned when requesting a numeric version
 - No other steps in the workflow are modified.
 
 ### Expected commit

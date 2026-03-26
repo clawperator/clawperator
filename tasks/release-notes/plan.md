@@ -4,6 +4,8 @@
 
 A single skill, `release-notes-author`, lives at `.agents/skills/release-notes-author/` in this repository. It gathers raw git data via a deterministic shell script, then the running agent synthesizes the data into formatted release notes. No external API calls and no separate LLM invocation — the agent executing the skill IS the LLM.
 
+**Scope of reliability:** This is a best-effort system grounded in commit metadata (subject, body, file paths). When commits are well-written, the output is reliably accurate. When commits are terse or misleading, the output is conservative — vague bullets rather than invented claims. This is the correct tradeoff for a bounded, auditable system.
+
 Notes are written to `CHANGELOG.md` at the repository root. Once a changelog entry exists, the GitHub Release workflow is updated (Phase 5) to extract the relevant block and append it to the release body alongside the existing install links and artifact metadata.
 
 The team considered a forward-only changelog, but historical backfill is the chosen scope so the repo can establish a canonical release history before future releases rely on it.
@@ -45,10 +47,14 @@ Each changed file is typed as `src`, `generated`, or `config` by the script usin
 
 **Surface detection:** a file contributes to a named surface (`node`, `android`, `docs`) if it falls under that surface's path prefix AND its type is `src`, `generated`, or `config` (not `infra`). Files typed `infra` never contribute to any surface.
 
+**Deleted files:** The script also captures deleted file paths (using `--diff-filter=D`) and emits them in the `FILES:` list annotated `[deleted]`. Deleted files are classified by path using the same lookup table. A deleted `src` file in a named surface contributes to surface detection and to the `keep` classification — so a commit that only removes a user-facing source file is still `keep`, not `drop`.
+
 **Commit classification rule** (deterministic, applied by the script):
-- **keep** — at least one `src` file in any named surface
+- **keep** — at least one `src` file (added, modified, renamed, OR deleted) in any named surface
 - **drop:no-src** — named-surface files exist, but all are `config` and/or `generated` (covers config-only, generated-only, and mixed)
 - **drop:infra** — no named-surface files at all
+
+**Android shared modules:** `apps/android/shared/**` is not explicitly listed in the file-type table and falls through to `src` by default under the Android surface. This is the intended behavior — shared Android modules are part of the shipped product.
 
 The LLM reads `CLASSIFICATION:` and writes bullets for `keep` commits. It never decides whether a commit should be included.
 
@@ -77,21 +83,22 @@ These rules constrain the LLM synthesis step. The agent must apply them consiste
 - `Added` — a new capability, action, flag, option, endpoint, or behavior that did not exist before
 - `Changed` — an existing capability is modified, renamed, restructured, or now behaves differently
 - `Fixed` — a defect, error condition, or incorrect behavior is corrected
-- A single commit may produce bullets in more than one category if it genuinely introduces distinct effects (e.g., removes a broken behavior and replaces it with a new one)
+- `Removed` — a capability that previously existed has been deleted; always prefix with `**Breaking:**`
+- A single commit may produce bullets in more than one category if it genuinely introduces distinct effects
 
-**Breaking changes:** If a commit removes or renames a public API, changes a default in a backward-incompatible way, or requires callers to update their code, prefix the bullet with `**Breaking:**` before the category label. Example: `- **Breaking:** **Changed:** Renamed \`foo\` to \`bar\``. Surfacing breaking changes is mandatory — they must not be flattened into generic `Changed` bullets.
+**Breaking changes:** If a commit removes or renames a public API, changes a default in a backward-incompatible way, or requires callers to update their code, prefix the bullet with `**Breaking:**` before the category label. Examples: `- **Breaking:** **Changed:** Renamed \`foo\` to \`bar\`` or `- **Breaking:** **Removed:** Removed \`foo\` action`. Surfacing breaking changes is mandatory — they must not be flattened into generic `Changed` bullets. Only mark `**Breaking:**` when there is explicit evidence in `SUBJECT` or `BODY` of backward incompatibility, or when a `[deleted][src]` file represents a user-facing capability (command, action, API) with no replacement evident in the same commit.
+
+**Deleted files in synthesis:** Files annotated `[deleted]` in the `FILES:` list were removed from the repository. A deleted `[src]` file in a named surface must produce a bullet. If the deletion removes a user-facing capability and no replacement is evident in the same commit, surface it as `**Breaking:** **Removed:**`. If the deletion is part of a refactor where the behavior was replaced or renamed (evidenced by other files in the same commit), surface it as `**Breaking:** **Changed:**` or incorporate it into another bullet with the replacement named. If the src file was purely internal and the deletion has no user-visible effect, escalate as "no user-facing change despite keep classification" in findings.md with the SHA and reason.
+
+**"Related commits" definition:** Two commits in the same PR (`PR:` line shows same number) must be merged into a single bullet group. Outside of same-PR commits, two commits may be merged when evidenced by (a) shared or adjacent `FILES` entries in the same module or (b) explicit cross-referencing in their `BODY` text. When merging, list all contributing SHAs in findings.md. A commit may not be merged into another if doing so would suppress a distinct user-visible behavior.
 
 **Multi-surface commits — per-surface framing:** A commit touching multiple surfaces appears in each relevant surface section, but each bullet must be framed from that surface's perspective. Do not emit near-identical wording across sections. If a commit changes both the Node implementation and its documentation, the Node bullet describes the behavior change; the Docs bullet describes what documentation was added or updated. If the only cross-surface artifact is a generated file update (e.g., `llms.txt` regenerated), omit the redundant surface bullet rather than duplicating.
 
-**"Related commits" definition:** Two or more commits are related when they implement the same feature or fix, evidenced by (a) shared or adjacent `FILES` entries in the same module or (b) explicit cross-referencing in their `BODY` text. When merging, list all contributing SHAs in findings.md. A commit may not be merged into another if doing so would suppress a distinct user-visible behavior — each distinct user-visible change must appear in at least one bullet.
-
-**Synthesis is bounded to script output:** Bullets must be grounded solely in each commit's `SUBJECT`, `BODY`, and `FILES` from the script output. The agent must not inspect the actual diff or any file outside the script output.
-
-**Summary sentence rubric:** The summary (one or two sentences) describes the release's dominant character for a developer deciding whether to upgrade. Apply in order: (1) if breaking changes exist, lead with them — "breaking changes to X"; (2) if one surface clearly dominates by count of `keep` commits, name it — "primarily a Node API release" or "documentation-focused release"; (3) describe the most significant user-visible outcome, not implementation details. Do not reproduce bullet content verbatim. Do not write a generic summary if the commits support something more specific.
-
 **Synthesis is bounded to script output:** Bullets must be grounded solely in each commit's `SUBJECT`, `BODY`, and `FILES` from the script output. The agent must not inspect the actual diff or any file outside the script output. When commit messages are thin and the evidence is weak, write a conservative bullet that acknowledges limited context rather than inferring behavior that is not evidenced.
 
-**Root-level and out-of-surface files are intentionally excluded:** `README.md`, `CHANGELOG.md`, `scripts/**`, and root-level configs are classified `infra` by default and never contribute to any surface. This is a deliberate product boundary — changes to install scripts, root docs, and tooling configs do not appear in the changelog. If this boundary should change for a future release, update the lookup table in `gather_commits.sh` before running the skill.
+**Summary sentence rubric:** The summary (one or two sentences) describes the release's dominant character for a developer deciding whether to upgrade. Apply in order: (1) if breaking changes exist, lead with them; (2) if one surface clearly dominates by count of `keep` commits, name it; (3) describe the most significant user-visible outcome, not implementation details. Do not reproduce bullet content verbatim.
+
+**Root-level and out-of-surface files are intentionally excluded:** `README.md`, `CHANGELOG.md`, `scripts/**`, and root-level configs are classified `infra` by default and never contribute to any surface. This is a deliberate product boundary. If this boundary should change for a future release, update the lookup table in `gather_commits.sh` before running the skill.
 
 ---
 
@@ -108,6 +115,7 @@ Every generated block must follow this exact structure:
 - **Added:** ...
 - **Changed:** ...
 - **Fixed:** ...
+- **Breaking:** **Removed:** ...
 
 ### 📚 Documentation & Website
 - **Added:** ...
