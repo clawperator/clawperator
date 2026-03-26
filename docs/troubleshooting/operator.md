@@ -278,11 +278,11 @@ Exact doctor failure shape:
   "status": "fail",
   "code": "RESULT_ENVELOPE_TIMEOUT",
   "summary": "Handshake timed out.",
-  "detail": "No [Clawperator-Result] envelope received within 7000ms. Broadcast dispatch: dispatched. Operator package: com.clawperator.operator.dev. Device: <device_serial>."
+  "detail": "No [Clawperator-Result] envelope received within 7000ms. Broadcast dispatch: sent. Operator package: com.clawperator.operator.dev. Device: <device_serial>. No correlated Android log lines were captured. This often indicates an APK/CLI version mismatch or an accessibility service issue. Run 'clawperator doctor --json --device <device_serial> --operator-package <package>' to diagnose."
 }
 ```
 
-The trailing `Re-run with --verbose to inspect correlated Android log lines.` sentence is conditional. `readinessChecks.ts` appends it only when correlated Android log lines were captured for the failure.
+The trailing `Re-run with --verbose to inspect correlated Android log lines.` sentence is conditional and still appears when correlated Android log lines were captured. When no correlated log lines were captured, the timeout detail now points toward version compatibility or accessibility setup.
 
 Recommended recovery:
 

@@ -661,6 +661,53 @@ describe("buildTimeoutError", () => {
     assert.strictEqual(error.broadcastDispatchStatus, "sent");
     assert.strictEqual(error.deviceId, "emulator-5554");
     assert.strictEqual(error.operatorPackage, "com.clawperator.operator.dev");
+    assert.strictEqual(error.hint, undefined);
+  });
+
+  it("adds a version-compatibility hint when no correlated events were captured", () => {
+    const error = buildTimeoutError(
+      {
+        commandId: "cmd-timeout-3",
+        taskId: "task-timeout-3",
+        actions: [{ id: "snap-1", type: "snapshot_ui" }],
+        timeoutMs: 2000,
+      },
+      {
+        code: ERROR_CODES.RESULT_ENVELOPE_TIMEOUT,
+        message: "Timed out waiting for result envelope",
+        lastCorrelatedEvents: [],
+        broadcastDispatchStatus: "sent",
+        deviceId: "emulator-5554",
+        operatorPackage: "com.clawperator.operator.dev",
+      },
+      55
+    );
+
+    assert.match(error.hint ?? "", /No correlated Android log lines were captured/);
+    assert.match(error.hint ?? "", /APK\/CLI version mismatch/);
+    assert.match(error.hint ?? "", /clawperator doctor --json --device emulator-5554 --operator-package com\.clawperator\.operator\.dev/);
+  });
+
+  it("does not add a version hint when broadcast dispatch failed", () => {
+    const error = buildTimeoutError(
+      {
+        commandId: "cmd-timeout-4",
+        taskId: "task-timeout-4",
+        actions: [{ id: "snap-1", type: "snapshot_ui" }],
+        timeoutMs: 2000,
+      },
+      {
+        code: ERROR_CODES.RESULT_ENVELOPE_TIMEOUT,
+        message: "Timed out waiting for result envelope",
+        lastCorrelatedEvents: [],
+        broadcastDispatchStatus: "failed: Target package not found",
+        deviceId: "emulator-5554",
+        operatorPackage: "com.clawperator.operator.dev",
+      },
+      55
+    );
+
+    assert.strictEqual(error.hint, undefined);
   });
 });
 

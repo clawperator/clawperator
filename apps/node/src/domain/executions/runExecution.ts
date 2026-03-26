@@ -20,6 +20,7 @@ import { LIMITS } from "../../contracts/limits.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
 import type { RuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 import type { Logger } from "../../adapters/logger.js";
+import { buildResultEnvelopeTimeoutHint } from "./timeoutGuidance.js";
 
 export interface RunExecutionOptions {
   deviceId?: string;
@@ -154,6 +155,7 @@ export interface TimeoutErrorDetails {
 
 export interface TimeoutErrorWithDetails extends TimeoutDiagnostics {
   details: TimeoutErrorDetails;
+  hint?: string;
   [k: string]: unknown;
 }
 
@@ -166,8 +168,13 @@ export function buildTimeoutError(
   // Node only knows the last action in the payload, not the action Android was
   // actually executing when the timeout elapsed.
   const lastAction = execution.actions.at(-1);
+  const hint = buildResultEnvelopeTimeoutHint(diagnostics, {
+    deviceId: diagnostics.deviceId,
+    operatorPackage: diagnostics.operatorPackage,
+  });
   const timeoutError: TimeoutErrorWithDetails = {
     ...diagnostics,
+    ...(hint !== undefined ? { hint } : {}),
     details: {
       ...(execution.commandId !== undefined ? { commandId: execution.commandId } : {}),
       ...(execution.taskId !== undefined ? { taskId: execution.taskId } : {}),

@@ -13,6 +13,7 @@ import {
   hasListedPackage,
   probeVersionCompatibility,
 } from "../../version/compatibility.js";
+import { buildResultEnvelopeTimeoutHint } from "../../executions/timeoutGuidance.js";
 import { DOCTOR_DOCS_URLS } from "../docsUrls.js";
 
 export async function checkApkPresence(config: RuntimeConfig): Promise<DoctorCheckResult> {
@@ -239,14 +240,19 @@ export async function runHandshake(
   if ("timeout" in result && result.timeout) {
     const deviceFlag = config.deviceId ? ` --device ${config.deviceId}` : "";
     const pkgFlag = config.operatorPackage ? ` --operator-package ${config.operatorPackage}` : "";
+    const timeoutHint = buildResultEnvelopeTimeoutHint(result.diagnostics, {
+      deviceId: config.deviceId,
+      operatorPackage: config.operatorPackage,
+    });
     const timeoutMessage = [
       `No [Clawperator-Result] envelope received within 7000ms.`,
       `Broadcast dispatch: ${result.diagnostics.broadcastDispatchStatus}.`,
-        `Operator package: ${config.operatorPackage}.`,
+      `Operator package: ${config.operatorPackage}.`,
       config.deviceId ? `Device: ${config.deviceId}.` : undefined,
       (result.diagnostics.lastCorrelatedEvents?.length ?? 0) > 0
         ? "Re-run with --verbose to inspect correlated Android log lines."
         : undefined,
+      timeoutHint,
     ].filter(Boolean).join(" ");
     return {
       id: "readiness.handshake",

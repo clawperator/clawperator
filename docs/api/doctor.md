@@ -214,7 +214,7 @@ Success conditions:
       "status": "fail",
       "code": "RESULT_ENVELOPE_TIMEOUT",
       "summary": "Handshake timed out.",
-      "detail": "No [Clawperator-Result] envelope received within 7000ms. Broadcast dispatch: broadcast_sent. Operator package: com.clawperator.operator.dev. Device: emulator-5554. Re-run with --verbose to inspect correlated Android log lines.",
+      "detail": "No [Clawperator-Result] envelope received within 7000ms. Broadcast dispatch: sent. Operator package: com.clawperator.operator.dev. Device: emulator-5554. No correlated Android log lines were captured. This often indicates an APK/CLI version mismatch or an accessibility service issue. Run 'clawperator doctor --json --device emulator-5554 --operator-package com.clawperator.operator.dev' to diagnose.",
       "fix": {
         "title": "Grant accessibility permissions via adb",
         "platform": "any",

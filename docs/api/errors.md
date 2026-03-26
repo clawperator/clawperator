@@ -211,13 +211,15 @@ Typical fields:
     "lastActionCaveat": "payload-last only; Android execution position is unknown",
     "elapsedMs": 30000,
     "timeoutMs": 30000
-  }
+  },
+  "hint": "No correlated Android log lines were captured. This often indicates an APK/CLI version mismatch or an accessibility service issue. Run 'clawperator doctor --json --device emulator-5554 --operator-package com.clawperator.operator.dev' to diagnose."
 }
 ```
 
 Recovery:
 
 - run `clawperator doctor --json`
+- if `hint` mentions no correlated Android log lines, treat it as a compatibility or accessibility diagnostic path rather than a generic retry
 - confirm the accessibility service and operator package are healthy
 - increase timeout only if the action legitimately needs more wall-clock time
 
