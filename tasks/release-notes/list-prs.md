@@ -13,6 +13,7 @@ Append a `Pull requests:` subsection to every release block in `CHANGELOG.md`, w
   - `Pull requests:`
   - one bullet per PR in landed order
   - each bullet as `[PR title](PR URL)`
+  - `None found` when a release truly has no landed PRs
 - Preserve the current changelog body exactly as generated; only add the new PR list section.
 - Update the release-notes task docs so the migration process and future automation live here instead of `tasks/release-notes/followup.md`.
 
@@ -24,6 +25,7 @@ Append a `Pull requests:` subsection to every release block in `CHANGELOG.md`, w
   - an empty or PR-less range
   - duplicate commit-to-PR resolution
 - Verify the helper emits PRs in the same landed order as the release-range history.
+- Verify the helper prints `None found` for a PR-less release range.
 - Run the release-notes skill end to end against a known release range and confirm the changelog block ends with the new PR index.
 - After the one-off migration, verify every release header in `CHANGELOG.md` has exactly one `Pull requests:` section and that the release blocks still remain in descending version/date order.
 

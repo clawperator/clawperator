@@ -39,22 +39,29 @@ END_COMMIT="$(git rev-parse -q --verify "${END_REF}^{commit}")"
 
 repo_slug="$(gh repo view --json nameWithOwner --jq '.nameWithOwner')"
 
-seen_prs="|"
-pr_numbers=()
+TMP_PR_MAP="$(mktemp "${TMPDIR:-/tmp}/release-notes-pr-map.XXXXXX")"
+cleanup_pr_map() {
+  rm -f "$TMP_PR_MAP"
+}
+trap cleanup_pr_map EXIT
 
-while IFS= read -r subject; do
-  [[ -n "$subject" ]] || continue
-  if [[ "$subject" =~ \(\#([0-9]+)\)$ ]]; then
-    pr_number="${BASH_REMATCH[1]}"
-    if [[ "$seen_prs" != *"|$pr_number|"* ]]; then
-      seen_prs="${seen_prs}${pr_number}|"
-      pr_numbers+=("$pr_number")
-    fi
+gh pr list --repo "$repo_slug" --state merged --limit 1000 --json mergeCommit,number --jq '.[] | select(.mergeCommit.oid != null) | [.mergeCommit.oid, (.number|tostring)] | @tsv' >"$TMP_PR_MAP"
+
+pr_numbers=()
+seen_prs="|"
+
+while IFS= read -r commit_sha; do
+  [[ -n "$commit_sha" ]] || continue
+  pr_number="$(awk -F '\t' -v sha="$commit_sha" '$1 == sha { print $2; exit }' "$TMP_PR_MAP")"
+  if [[ -n "$pr_number" && "$seen_prs" != *"|$pr_number|"* ]]; then
+    seen_prs="${seen_prs}${pr_number}|"
+    pr_numbers+=("$pr_number")
   fi
-done < <(git log --first-parent --reverse --format='%s' "$START_COMMIT..$END_COMMIT")
+done < <(git rev-list --first-parent --reverse "$START_COMMIT..$END_COMMIT")
 
 printf 'Pull requests:\n'
 if [[ "${#pr_numbers[@]}" -eq 0 ]]; then
+  printf 'None found\n'
   exit 0
 fi
 

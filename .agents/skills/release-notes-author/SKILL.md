@@ -97,7 +97,7 @@ Pull requests:
 
 Omit any surface section that has no `keep` bullets. Keep the surface section order exactly as shown here: Node, then Docs, then Android.
 
-9. Append the `Pull requests:` section as the last subsection in each release block. Use the `gather_prs.sh` output verbatim for the list items, sorted from oldest landed PR to newest landed PR.
+9. Append the `Pull requests:` section as the last subsection in each release block. Use the `gather_prs.sh` output verbatim for the list items, sorted from oldest landed PR to newest landed PR. If the helper prints `None found`, keep that line immediately under the heading.
 
 10. Apply the upsert rule to `CHANGELOG.md` exactly as specified in `tasks/release-notes/list-prs.md` under `CHANGELOG Insertion Rule (Upsert)`. Do not re-derive the logic. Follow the five-state table verbatim.
 

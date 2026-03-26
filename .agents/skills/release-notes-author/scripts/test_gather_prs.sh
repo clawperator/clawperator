@@ -56,7 +56,7 @@ rm -f "$case1_out" "$case1_err"
 case2_out="$(mktemp)"
 case2_err="$(mktemp)"
 if run_script "$case2_out" "$case2_err" v0.5.0 v0.5.1; then
-  expected_numbers=(119 121 122 123 124 125 126 127)
+  expected_numbers=(118 119 120 121 122 123 124 125 126 127)
   expected_count="${#expected_numbers[@]}"
   actual_count="$(grep -c '^-' "$case2_out" || true)"
   if [[ "$actual_count" -eq "$expected_count" ]]; then
@@ -85,15 +85,15 @@ rm -f "$case2_out" "$case2_err"
 
 case3_out="$(mktemp)"
 case3_err="$(mktemp)"
-if run_script "$case3_out" "$case3_err" v0.3.2 v0.4.0; then
-  if [[ "$(grep -c '^-' "$case3_out" || true)" -eq 0 ]]; then
-    printf 'PASS: gather_prs.sh emits an empty list when no PR-linked commits land in the range\n'
+if run_script "$case3_out" "$case3_err" v0.1.1 v0.1.2; then
+  if grep -q '^None found$' "$case3_out"; then
+    printf 'PASS: gather_prs.sh emits None found when no PR-linked commits land in the range\n'
   else
-    printf 'FAIL: expected an empty PR list for v0.3.2..v0.4.0\n'
+    printf 'FAIL: expected None found for a PR-less range\n'
     failures=$((failures + 1))
   fi
 else
-  printf 'FAIL: gather_prs.sh v0.3.2 v0.4.0 exited non-zero for empty-range check\n'
+  printf 'FAIL: gather_prs.sh v0.1.1 v0.1.2 exited non-zero for empty-range check\n'
   failures=$((failures + 1))
 fi
 rm -f "$case3_out" "$case3_err"
@@ -136,6 +136,10 @@ case "$1 $2" in
   "repo view")
     printf 'clawperator/clawperator\n'
     ;;
+  "pr list")
+    printf '%s\t42\n' "${FIXTURE_MERGE_SHA_1:-}"
+    printf '%s\t42\n' "${FIXTURE_MERGE_SHA_2:-}"
+    ;;
   "pr view")
     if [[ "$3" == "42" ]]; then
       printf 'Example title\thttps://example.com/pr/42\n'
@@ -158,18 +162,25 @@ chmod +x "$fixture_gh/gh"
   git config user.name "Release Notes Test"
   git config user.email "release-notes-test@example.com"
   mkdir -p src
+  printf 'base\n' > src/base.txt
+  git add src/base.txt
+  git commit -q -m "chore: baseline"
+  git tag v0.0.9
+  mkdir -p src
   printf 'one\n' > src/one.txt
   git add src/one.txt
   git commit -q -m "feat: first commit (#42)"
-  git tag v0.1.0
   printf 'two\n' > src/two.txt
   git add src/two.txt
   git commit -q -m "feat: second commit (#42)"
 )
 
-( PATH="$fixture_gh:$PATH"
+fixture_merge_sha_1="$(git -C "$fixture_repo" rev-list --first-parent --reverse HEAD | sed -n '2p')"
+fixture_merge_sha_2="$(git -C "$fixture_repo" rev-list --first-parent --reverse HEAD | sed -n '3p')"
+
+( 
   cd "$fixture_repo" || exit 1
-  bash "$SCRIPT" v0.1.0 HEAD >"$fixture_out" 2>"$fixture_err"
+  FIXTURE_MERGE_SHA_1="$fixture_merge_sha_1" FIXTURE_MERGE_SHA_2="$fixture_merge_sha_2" PATH="$fixture_gh:$PATH" bash "$SCRIPT" v0.0.9 HEAD >"$fixture_out" 2>"$fixture_err"
 ) && fixture_status=0 || fixture_status=$?
 
 if [[ "$fixture_status" -eq 0 ]]; then
