@@ -196,15 +196,17 @@ jobs:
               sys.exit(1)
 
           pattern = rf'(##\s*\[{re.escape(version)}\][ \t].*?)(?=\n##\s|\Z)'
-          match = re.search(pattern, content, re.DOTALL)
-          if match:
-              with open("release-notes.md", "a", encoding="utf-8") as out:
-                  out.write("\n\n---\n\n")
-                  out.write(match.group(1).strip())
-                  out.write("\n")
-          else:
+          matches = re.findall(pattern, content, re.DOTALL)
+          if len(matches) == 0:
               print(f"Error: No CHANGELOG entry found for {version}. Run release-notes-author before tagging.", file=sys.stderr)
               sys.exit(1)
+          if len(matches) > 1:
+              print(f"Error: Duplicate CHANGELOG entries found for {version}. Fix CHANGELOG.md before tagging.", file=sys.stderr)
+              sys.exit(1)
+          with open("release-notes.md", "a", encoding="utf-8") as out:
+              out.write("\n\n---\n\n")
+              out.write(matches[0].strip())
+              out.write("\n")
           PY
 
       - name: Create GitHub Release
