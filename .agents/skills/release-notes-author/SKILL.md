@@ -9,7 +9,7 @@ Use this skill to turn a git tag range into a `CHANGELOG.md` entry. The determin
 
 Run: $release-notes-author v0.5.0 v0.5.1
 
-Use the same invocation shape with the tags you are backfilling. It maps to the gather script below.
+Use the same invocation shape for any release range. It maps to the gather script below.
 
 1. Run the gather commit script and print the full output before proceeding.
 
