@@ -1,11 +1,11 @@
 ---
 name: release-notes-author
-description: Generate and insert a CHANGELOG entry for a version range by gathering git commit data and synthesizing it into user-facing release notes grouped by product surface.
+description: Generate and insert release notes into CHANGELOG.md for a version range by gathering git commit data and synthesizing them into user-facing sections grouped by product surface.
 ---
 
 # Release Notes Author
 
-Use this skill to turn a git tag range into a `CHANGELOG.md` entry. The deterministic shell scripts make the keep/drop and PR-order decisions. You only synthesize prose from the script output.
+Use this skill to turn a git tag range into a changelog entry in `CHANGELOG.md`. The deterministic shell scripts make the keep/drop and PR-order decisions. You only author the release notes from the script output.
 
 Run: $release-notes-author v0.5.0 v0.5.1
 
@@ -74,7 +74,7 @@ Within each surface section, order bullets as Added, then Changed, then Fixed, t
 
 Apply these rules in order: if breaking changes exist, lead with them. If one surface dominates by count of `keep` commits, name it. Otherwise describe the most significant user-facing outcome, not implementation details.
 
-8. Assemble the changelog block in this format.
+8. Assemble the release notes block in this format.
 
 ```markdown
 ## [<version>] - <YYYY-MM-DD>
