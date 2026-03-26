@@ -18,17 +18,21 @@ For now, only accept prerelease-stage versions in the `0.x.y` series. Do not pro
    - If the unreleased code version does not already match the intended release version, run `$release-set-code-version-number` first.
    - Treat the release version as the version that will be tagged and published.
    - Treat the next code version as the post-release unreleased version.
-2. Create the release.
+2. Verify CHANGELOG entry exists before tagging.
+   - Check that `CHANGELOG.md` contains a `## [<version>]` block for the intended release version.
+   - If the block is absent, run `$release-notes-author` for the appropriate tag range, review the generated entry, then merge it before proceeding.
+   - Do not proceed to step 3 until the CHANGELOG entry is on the main branch.
+3. Create the release.
    - Run `$release-create` for the intended release version.
    - Pass the exact release commit when needed.
    - Keep the release-create validations intact.
 3. Verify the release.
    - After the release workflows complete, run `$release-verify` for the same version.
    - Stop if any verification surface fails.
-4. Update published surfaces.
+5. Update published surfaces.
    - Once npm and GitHub Releases are live, run `$release-update-published-version` for the released version.
    - Keep the published-version commit separate from the code-version bump commit.
-5. Advance the unreleased code version.
+6. Advance the unreleased code version.
    - Run `$release-set-code-version-number` again for the next unreleased version.
    - Default to the next patch version unless the user explicitly asks for a different bump.
    - Keep the next version in the `0.x.y` series unless the user explicitly requests otherwise and the repo policy has changed.
