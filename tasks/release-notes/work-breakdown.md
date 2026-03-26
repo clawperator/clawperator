@@ -58,33 +58,55 @@ The script must:
    - Get the body: `git log -1 --format="%b" "$SHA"`
    - Get changed files with `git diff-tree --no-commit-id --name-only -r -m "$SHA" | sort -u` so merge commits and direct commits are handled consistently
    - Extract PR number if present in subject (pattern: `(#NNN)` at end of subject line)
-   - Classify surfaces by checking changed files against these exact rules (exclusions take precedence over inclusions):
+   - For each changed file, assign a type using this hardcoded lookup (first match wins):
      ```
-     Node:    INCLUDE apps/node/**
-              EXCLUDE apps/node/node_modules/**, apps/node/dist/**, apps/node/coverage/**
+     generated: apps/node/dist/**, apps/node/coverage/**, apps/node/package-lock.json,
+                sites/docs/static/llms-full.txt, sites/docs/static/llms.txt,
+                sites/landing/public/llms-full.txt, sites/landing/public/llms.txt,
+                sites/landing/public/sitemap.xml, sites/landing/public/landing-sitemap.xml
 
-     Android: INCLUDE apps/android/**
-              EXCLUDE apps/android/build/**, apps/android/app/build/**, apps/android/**/generated/**
+     config:    apps/node/package.json, sites/docs/mkdocs.yml, sites/docs/source-map.yaml,
+                sites/docs/requirements.txt, sites/docs/AGENTS.md,
+                gradle/**, build.gradle.kts, settings.gradle.kts, *.properties,
+                gradle.properties, local.properties, detekt*.yml, detekt-baseline.xml
 
-     Docs:    INCLUDE docs/**, sites/docs/**, sites/landing/**
-              EXCLUDE docs/internal/**,
-                      sites/docs/AGENTS.md, sites/docs/requirements.txt,
-                      sites/landing/public/sitemap.xml, sites/landing/public/landing-sitemap.xml
-              (qualify as Docs only if at least one non-excluded file remains)
+     infra:     .agents/**, .github/**, tasks/**, docs/internal/**,
+                apps/node/node_modules/**, apps/android/build/**,
+                apps/android/app/build/**, apps/android/**/generated/**
+
+     src:       everything else in a named surface (apps/node/**, apps/android/**, docs/**,
+                sites/docs/**, sites/landing/**)
      ```
-   - If no user-facing surface detected after applying exclusions, mark as `INFRA`
-5. Print each commit in this format:
+   - Determine the surface(s) touched: a file contributes to a surface only if its type is `src` or `generated` (not `infra` or `config`), and it falls under that surface's path prefix. Surface = `node`, `android`, or `docs`.
+   - Determine the commit classification:
+     - `keep` — at least one `src` file in any named surface
+     - `drop:generated-only` — named-surface files exist but all are `generated`
+     - `drop:config-only` — named-surface files exist but all are `config`
+     - `drop:infra` — no named-surface files at all
+5. Print each commit in this exact format:
    ```
    === COMMIT <sha> ===
    SUBJECT: <subject>
-   PR: #<number>         (omit this line if no PR number found)
-   SURFACES: node android docs   (space-separated, omit surfaces not touched)
-   SURFACES: INFRA               (if no user-facing surface)
+   PR: #<number>         (omit if no PR number)
+   SURFACES: node docs   (named surfaces with src/generated files; omit if none)
+   CLASSIFICATION: keep
    FILES:
-     apps/node/src/foo.ts
-     docs/api/bar.md
+     apps/node/src/foo.ts  [src]
+     docs/api/bar.md  [src]
+     sites/docs/static/llms-full.txt  [generated]
    BODY:
-     <body lines indented by 2 spaces, omit section if body is empty>
+     <body indented 2 spaces; omit section if empty>
+   === END ===
+   ```
+   For a dropped commit:
+   ```
+   === COMMIT <sha> ===
+   SUBJECT: chore(build): set code version to 0.5.1
+   SURFACES: node
+   CLASSIFICATION: drop:config-only
+   FILES:
+     apps/node/package.json  [config]
+     apps/node/package-lock.json  [generated]
    === END ===
    ```
 
@@ -99,22 +121,24 @@ bash .agents/skills/release-notes-author/scripts/gather_commits.sh v0.5.0 v0.5.1
 
 Create `.agents/skills/release-notes-author/scripts/test_gather_commits.sh`. It must:
 
-- Pass: `gather_commits.sh v0.5.0 v0.5.1` exits 0 and output contains `RELEASE_DATE:` on first non-empty line.
-- Pass: output for the range contains at least one `=== COMMIT` block.
+- Pass: `gather_commits.sh v0.5.0 v0.5.1` exits 0 and `RELEASE_DATE:` is the first non-empty output line.
+- Pass: output contains at least one `=== COMMIT` block with a `CLASSIFICATION:` line.
+- Pass: a known config-only commit in the range (e.g., the version-bump commit) has `CLASSIFICATION: drop:config-only`.
+- Pass: a known src commit in the range has `CLASSIFICATION: keep`.
 - Fail: `gather_commits.sh` with no args exits non-zero and prints usage to stderr.
-- Fail: `gather_commits.sh invalid-tag v0.5.1` exits non-zero (git will error; script must not silently produce empty output).
+- Fail: `gather_commits.sh invalid-tag v0.5.1` exits non-zero.
 
 Run tests as part of the Phase 1 commit — they must pass before committing.
 
 ### Acceptance
 
 - Script runs from repo root without error.
-- Output contains one `=== COMMIT ===` block per commit in range.
 - `RELEASE_DATE:` is the first non-empty line of output, format `RELEASE_DATE: YYYY-MM-DD`.
-- INFRA commits are marked clearly and do not leak into surface-tagged output.
-- A commit touching both `apps/node/` and `docs/` shows `SURFACES: node docs`.
-- A commit touching only `docs/internal/` shows `SURFACES: INFRA`.
-- All four test cases in `test_gather_commits.sh` pass.
+- Every commit block has a `CLASSIFICATION:` line (`keep`, `drop:config-only`, `drop:generated-only`, or `drop:infra`).
+- Every file in the `FILES:` list has a type annotation (`[src]`, `[generated]`, `[config]`, or `[infra]`).
+- The version-bump commit in the `v0.5.0→v0.5.1` range shows `CLASSIFICATION: drop:config-only`.
+- A commit touching `apps/node/src/**` shows `CLASSIFICATION: keep`.
+- All six test cases in `test_gather_commits.sh` pass.
 
 ### Expected commit
 
@@ -154,23 +178,26 @@ bash .agents/skills/release-notes-author/scripts/gather_commits.sh <start-tag> <
 1. Run the script. Print the full output before proceeding.
 2. From `RELEASE_DATE:` line, extract the date.
 3. The version is the end tag with the `v` prefix removed (e.g., `v0.5.1` → `0.5.1`).
-4. Review every commit block:
-   - Skip any commit with `SURFACES: INFRA` entirely.
-   - For every commit with a named surface, inspect the `FILES:` list to determine whether the changes are user-facing. Classification says what was touched; synthesis decides whether it warrants a bullet. Examples of non-bullet-worthy changes despite touching a named surface:
-     - `apps/node/package.json` with only a version field bump (release mechanic, not a feature)
-     - `sites/docs/static/llms-full.txt` or `sites/landing/public/llms-full.txt` updates that are regenerated site artifacts (no bullet unless the content change is substantive and user-driven)
-     - Any file where the entire change is a version string, timestamp, or auto-generated metadata
-   - When dropping a non-INFRA commit as noise, log it explicitly in findings.md under "Synthesis choices" with the SHA and reason. Never drop silently.
-   - For all remaining commits, group by surface: node, docs, android.
-5. Synthesize each group into bullet points using the categories `Added`, `Changed`, `Fixed`. Rules:
+4. Review every commit block using only the `CLASSIFICATION:` line — do not re-derive keep/drop from the file list:
+   - `CLASSIFICATION: drop:*` → skip entirely, log SHA + reason in findings.md "Synthesis choices". Never drop silently.
+   - `CLASSIFICATION: keep` → include; group by surface using the `SURFACES:` line.
+   - The SKILL.md must include this quick-reference table so the agent does not second-guess the script:
+
+     | Path example | Type | Classification result |
+     |---|---|---|
+     | `apps/node/src/cli/index.ts` | src | keep (if only change) |
+     | `apps/node/package.json` | config | drop:config-only (if only change) |
+     | `apps/node/package-lock.json` | generated | drop:generated-only (if only change) |
+     | `sites/docs/static/llms-full.txt` | generated | drop:generated-only (if only change) |
+     | `docs/api/actions.md` + `llms-full.txt` | src + generated | keep (src present) |
+5. Synthesize `keep` commits into bullet points using the categories `Added`, `Changed`, `Fixed`. Rules:
    - Write in second-person imperative or past tense, user-facing (e.g., "Added `read-value` action for extracting text from UI elements").
    - Never copy a raw commit subject verbatim. Rewrite it as a user-facing benefit.
    - Merge related commits into a single bullet where appropriate; note the merged SHAs in findings.md.
    - Multi-surface commits appear in each relevant section. The wording may differ per section to reflect what changed in that surface specifically.
-   - If dropping a commit as noise (lock files, generated content, infra-only), note the SHA and reason in findings.md under "Synthesis choices".
-   - If a section has no non-infra changes, omit the section entirely.
+   - If a section has no `keep` commits, omit the section entirely.
    - Order within each section: Added first, then Changed, then Fixed.
-   - **Traceability:** before writing the CHANGELOG block, record in findings.md a mapping of every non-INFRA commit SHA → the bullet(s) it contributes to (or "dropped: <reason>"). This is the audit trail.
+   - **Traceability:** before writing the CHANGELOG block, record in findings.md a mapping of every `keep` commit SHA → the bullet(s) it contributes to. Every `drop:*` commit must already be logged from step 4. No commit may be silently unaccounted for.
 6. Write the high-level summary sentence (one or two sentences describing the release as a whole).
 7. Assemble the full block per the format in `tasks/release-notes/plan.md`.
 8. Apply the upsert rule to `CHANGELOG.md`:
@@ -221,10 +248,10 @@ feat(release-notes): add release-notes-author skill
    <paste full output verbatim>
 
    ### Classification summary
-   | Commit | Subject | Surfaces | Notes |
-   |--------|---------|----------|-------|
-   | abc1234 | feat(node): ... | node | |
-   | def5678 | chore(build): ... | INFRA | version bump |
+   | Commit | Subject | Classification | Surfaces | Notes |
+   |--------|---------|---------------|----------|-------|
+   | abc1234 | feat(node): ... | keep | node | |
+   | def5678 | chore(build): set code version | drop:config-only | node | |
 
    ### Mismatches
    List any commits where the subject line claimed one surface but the diff showed another.

@@ -28,7 +28,24 @@ Surface classification is derived from **file diffs, not commit messages**. Comm
 
 A commit touching multiple surfaces appears in each relevant section. Exclusion paths take precedence — a commit to `apps/node/node_modules/` is INFRA even though it is under `apps/node/`.
 
-**Classification vs synthesis:** Classification determines which surfaces a commit touched. It does not guarantee a changelog bullet. The synthesis step must further filter release-mechanic noise within a named surface (e.g., a version field bump in `package.json`, a regenerated `llms-full.txt`). Any non-INFRA commit dropped during synthesis must be logged in findings.md.
+**Two-stage classification:** Surface detection (script) determines which surfaces a commit touched. File-type classification (also script) determines whether it warrants a bullet. The LLM synthesis step writes prose only — it does not make keep/drop decisions.
+
+Each changed file is typed as `src`, `generated`, or `config` by the script using a hardcoded table:
+
+| Type | Paths |
+|------|-------|
+| `src` | `apps/node/src/**`, `apps/android/app/src/**`, authored `docs/**` (non-generated) |
+| `generated` | `apps/node/dist/**`, `sites/docs/static/llms-full.txt`, `sites/docs/static/llms.txt`, `sites/landing/public/llms-full.txt`, `sites/landing/public/llms.txt`, `apps/node/package-lock.json` |
+| `config` | `apps/node/package.json`, `sites/docs/mkdocs.yml`, `sites/docs/source-map.yaml`, `gradle/**`, `build.gradle.kts`, `settings.gradle.kts`, `*.properties` |
+| `src` (default) | Anything in a named surface not matched above |
+
+Commit classification rule (deterministic, applied by the script):
+- **keep** — at least one `src` file in a named surface
+- **drop:generated-only** — all named-surface files are `generated`
+- **drop:config-only** — all named-surface files are `config`
+- **drop:infra** — no named surface (equivalent to INFRA)
+
+The LLM reads `CLASSIFICATION:` and writes bullets for `keep` commits. It never decides whether a commit should be included.
 
 ---
 
