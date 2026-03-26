@@ -38,7 +38,8 @@ Each changed file is typed as `src`, `generated`, or `config` by the script usin
 | `generated` | `apps/node/dist/**`, `apps/node/package-lock.json`, `sites/docs/static/llms-full.txt`, `sites/docs/static/llms.txt`, `sites/landing/public/llms-full.txt`, `sites/landing/public/llms.txt` |
 | `config` | `apps/node/package.json`, `sites/docs/mkdocs.yml`, `sites/docs/source-map.yaml`, `gradle/**`, `build.gradle.kts`, `settings.gradle.kts`, `*.properties` |
 | `infra` | `apps/node/src/test/**`, `apps/android/app/src/test/**`, `apps/android/app/src/androidTest/**`, `.agents/**`, `.github/**`, `tasks/**`, `docs/internal/**`, `sites/docs/AGENTS.md`, `sites/docs/requirements.txt`, sitemap files, build output dirs |
-| `src` (default) | Anything in a named surface not matched above |
+| `src` (default) | Anything in a named surface path not matched above |
+| `infra` (default) | Anything **not** under any named surface path and not matched above (e.g. `CHANGELOG.md`, `README.md`, `scripts/**`, root-level configs) |
 
 **Surface detection:** a file contributes to a named surface (`node`, `android`, `docs`) if it falls under that surface's path prefix AND its type is `src`, `generated`, or `config` (not `infra`). Files typed `infra` never contribute to any surface.
 
@@ -62,7 +63,7 @@ Two files only:
     gather_commits.sh    — deterministic data gathering; structured text output
 ```
 
-The script handles the deterministic work. The agent handles all judgment: synthesis, tone, signal vs. noise filtering, and writing the final CHANGELOG entry.
+The script handles all keep/drop decisions deterministically. The agent writes prose for `keep` commits and writes the final CHANGELOG entry. The agent does not filter or skip commits — that is the script's job.
 
 ---
 
@@ -91,7 +92,9 @@ Every generated block must follow this exact structure:
 - **Fixed:** ...
 ```
 
-Sections that have no user-facing changes are omitted entirely. The date is the annotated tag's creation date, not the tagged commit's author date: `git for-each-ref --format='%(creatordate:short)' refs/tags/<end-tag>`.
+Sections that have no user-facing changes are omitted entirely.
+
+**Date rule:** Use the annotated tag's creation date via `git for-each-ref --format='%(creatordate:short)' refs/tags/<end-tag>`. For lightweight tags this returns the commit's committer date, which is acceptable. If the tag ref does not exist the script must exit non-zero with a clear error — no fallback to today's date.
 
 ---
 

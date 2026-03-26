@@ -20,7 +20,8 @@ This work ships as **3 PRs**, sequenced. Do not start a PR until the previous on
 - **No raw commit messages in output.** Every bullet point in the final CHANGELOG must be a synthesized, user-facing sentence. Do not copy-paste commit subjects verbatim.
 - **One commit per logical step.** Do not batch unrelated changes. The expected commit messages are listed in each task below.
 - **findings.md is the running log.** Every phase must write or update `tasks/release-notes/findings.md` before committing. It is the paper trail — include script output, classification decisions, and any surprises.
-- **Rerun safety is structural, not content-identical.** The skill is safe to run multiple times in the sense that reruns never corrupt `CHANGELOG.md` (the upsert rule prevents duplicate blocks). However, the LLM synthesis step may produce different prose on rerun — that is expected and acceptable. Once a CHANGELOG entry is committed, it is the canonical form. Do not regenerate it without intent; editing the committed entry by hand is preferable to a full regeneration.
+- **Rerun safety is structural only.** Reruns never corrupt `CHANGELOG.md` — the upsert rule prevents duplicate blocks and the header/section structure is deterministic. Bullet prose may differ between runs; that is expected and acceptable. The structural guarantee is: same `## [x.y.z]` header, same sections present/absent (determined by which surfaces have `keep` commits), no duplicate version blocks. Once an entry is committed it is canonical — prefer hand-editing over full regeneration.
+- **The LLM does not filter commits.** Every `keep` commit must produce at least one bullet or be explicitly escalated (logged in findings.md as "no user-facing change despite keep classification" with the SHA and reason). The LLM cannot silently omit a `keep` commit. Drop decisions are the script's responsibility only.
 - **Proceed on uncertainty, log it.** If a commit's surface is ambiguous, make a judgment call, note it in findings.md, and continue.
 
 ---
@@ -51,7 +52,7 @@ Read these before writing any code:
 The script must:
 
 1. Accept positional args: `<start-tag> <end-tag>` (e.g., `v0.5.0 v0.5.1`).
-2. Print the release date line using the annotated tag's creation date (not the tagged commit's author date): `RELEASE_DATE: $(git for-each-ref --format='%(creatordate:short)' "refs/tags/$END_TAG")`. This is the correct "when was this version released" date for annotated tags.
+2. Print the release date line: `RELEASE_DATE: $(git for-each-ref --format='%(creatordate:short)' "refs/tags/$END_TAG")`. For annotated tags this is the tag creation date; for lightweight tags it falls back to the commit's committer date — both are acceptable. If the output is empty (tag does not exist), exit non-zero with `error: tag '<END_TAG>' not found`.
 3. Iterate commits in chronological order (oldest first): `git log --reverse --format="%H" "$START_TAG..$END_TAG"`.
 4. For each commit SHA:
    - Get the subject: `git log -1 --format="%s" "$SHA"`
@@ -78,7 +79,11 @@ The script must:
                 gradle/**, build.gradle.kts, settings.gradle.kts,
                 gradle.properties, local.properties
 
-     src:       everything else in a named surface (default)
+     src:       everything else IN a named surface path (default for in-surface files)
+
+     infra:     everything else NOT in any named surface path (default for out-of-surface
+                files — covers CHANGELOG.md, README.md, scripts/**, root-level configs,
+                sites/docs/.build/**, sites/docs/site/**)
      ```
    - Determine the surface(s) touched: a file contributes to a named surface (`node`, `android`, `docs`) if its type is `src`, `generated`, or `config` (NOT `infra`) and it falls under that surface's path prefix. Files typed `infra` never contribute to any surface.
    - Determine the commit classification:
@@ -263,9 +268,10 @@ feat(release-notes): add release-notes-author skill
 
    ### Synthesis choices
    Note any judgment calls made during synthesis:
-   - Which related commits were merged into a single bullet
-   - Any commits omitted as noise (lock files, generated content) and why
+   - Which related `keep` commits were merged into a single bullet (list all SHAs)
+   - Any `keep` commits escalated as "no user-facing change despite classification" (SHA + reason)
    - Tone or wording decisions that were non-obvious
+   - Note: `drop:*` commits are logged in the classification summary, not here
 
    ### Draft entry (before insertion)
    <paste the full markdown block before it was written to CHANGELOG.md>
@@ -297,10 +303,10 @@ feat(release-notes): add release-notes-author skill
 
 - `CHANGELOG.md` contains a `## [0.5.1]` entry in correct position.
 - `tasks/release-notes/findings.md` exists with all five sections: script output, classification summary table, mismatches, synthesis choices (with commit→bullet mapping for every non-INFRA commit), and draft entry.
-- Every non-INFRA commit from the script output is accounted for in the commit→bullet mapping — either mapped to a bullet or explicitly dropped with a reason. No silent omissions.
+- Every commit in the script output is accounted for in findings.md: `keep` commits map to a bullet (or are escalated with reason); `drop:*` commits are logged with their classification. No silent omissions.
 - No existing CHANGELOG entries were modified or deleted.
 - The entry contains no raw commit subjects.
-- Rerunning the skill produces the same CHANGELOG entry without creating a duplicate `## [0.5.1]` block.
+- Rerunning the skill produces no duplicate `## [0.5.1]` block and the same sections are present/absent (structural idempotency). Bullet prose may differ between runs.
 
 ### Expected commit
 
@@ -349,9 +355,9 @@ The `v0.5.0` release introduced significant breaking changes to the CLI and API 
 
 - `## [0.5.0]` entry exists in correct chronological position.
 - Entry captures the major API refactor and new action types under Node section.
-- findings.md `## v0.5.0 Run` section contains the commit→bullet mapping for all non-INFRA commits. No silent omissions.
+- findings.md `## v0.5.0 Run` section accounts for every commit in script output: `keep` commits mapped to bullets (or escalated), `drop:*` commits logged. No silent omissions.
 - No existing entries modified.
-- Rerunning the skill produces the same entry without a duplicate `## [0.5.0]` block.
+- Rerunning the skill produces no duplicate `## [0.5.0]` block and the same sections are present/absent. Bullet prose may differ between runs.
 
 ### Expected commit
 
@@ -380,6 +386,10 @@ docs(changelog): backfill release notes for v0.5.0
    import re, sys
 
    version = "${{ steps.release_meta.outputs.version }}"
+   if not re.match(r'^\d+\.\d+\.\d+$', version):
+       print(f"Error: version '{version}' is not in 0.0.0 format; cannot match CHANGELOG entry.", file=sys.stderr)
+       sys.exit(1)
+
    try:
        with open("CHANGELOG.md", "r", encoding="utf-8") as f:
            content = f.read()
