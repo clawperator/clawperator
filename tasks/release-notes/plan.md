@@ -22,7 +22,7 @@ Surface classification is derived from **file diffs, not commit messages**. Comm
 | Surface | Include paths | Exclude paths |
 |---------|--------------|---------------|
 | 🤖 Node API & CLI | `apps/node/**` | `apps/node/node_modules/**`, `apps/node/dist/**`, `apps/node/coverage/**` |
-| 📱 Android Operator APK | `apps/android/**` | `apps/android/build/**`, `apps/android/app/build/**`, `apps/android/**/generated/**` |
+| 📱 Android Operator APK | `apps/android/**` | `apps/android/app-conformance/**`, `apps/android/build/**`, `apps/android/app/build/**`, `apps/android/**/generated/**` |
 | 📚 Documentation & Website | `docs/**`, `sites/docs/**`, `sites/landing/**` | `docs/internal/**`, `sites/docs/AGENTS.md`, `sites/docs/requirements.txt`, `sites/landing/public/sitemap.xml`, `sites/landing/public/landing-sitemap.xml` |
 | *(omit)* | `.agents/**`, `.github/**`, `tasks/**`, `gradle/**`, build/CI config, lock files | — |
 
@@ -39,7 +39,7 @@ Each changed file is typed as `src`, `generated`, or `config` by the script usin
 | `src` | `apps/node/src/**` (excl. `src/test/**`), `apps/android/app/src/main/**`, authored `docs/**` (non-generated) |
 | `generated` | `apps/node/dist/**`, `apps/node/package-lock.json`, `sites/docs/static/llms-full.txt`, `sites/docs/static/llms.txt`, `sites/landing/public/llms-full.txt`, `sites/landing/public/llms.txt` |
 | `config` | `apps/node/package.json`, `sites/docs/mkdocs.yml`, `sites/docs/source-map.yaml`, `gradle/**`, `build.gradle.kts`, `settings.gradle.kts`, `*.properties` |
-| `infra` | `apps/node/src/test/**`, `apps/android/app/src/test/**`, `apps/android/app/src/androidTest/**`, `.agents/**`, `.github/**`, `tasks/**`, `docs/internal/**`, `sites/docs/AGENTS.md`, `sites/docs/requirements.txt`, sitemap files, build output dirs |
+| `infra` | `apps/node/src/test/**`, `apps/android/app/src/test/**`, `apps/android/app/src/androidTest/**`, `apps/android/app-conformance/**`, `.agents/**`, `.github/**`, `tasks/**`, `docs/internal/**`, `sites/docs/AGENTS.md`, `sites/docs/requirements.txt`, sitemap files, build output dirs |
 | `src` (default) | Anything in a named surface path not matched above |
 | `infra` (default) | Anything **not** under any named surface path and not matched above (e.g. `CHANGELOG.md`, `README.md`, `scripts/**`, root-level configs) |
 
@@ -86,6 +86,10 @@ These rules constrain the LLM synthesis step. The agent must apply them consiste
 **"Related commits" definition:** Two or more commits are related when they implement the same feature or fix, evidenced by (a) shared or adjacent `FILES` entries in the same module or (b) explicit cross-referencing in their `BODY` text. When merging, list all contributing SHAs in findings.md. A commit may not be merged into another if doing so would suppress a distinct user-visible behavior — each distinct user-visible change must appear in at least one bullet.
 
 **Synthesis is bounded to script output:** Bullets must be grounded solely in each commit's `SUBJECT`, `BODY`, and `FILES` from the script output. The agent must not inspect the actual diff or any file outside the script output.
+
+**Summary sentence rubric:** The summary (one or two sentences) describes the release's dominant character for a developer deciding whether to upgrade. Apply in order: (1) if breaking changes exist, lead with them — "breaking changes to X"; (2) if one surface clearly dominates by count of `keep` commits, name it — "primarily a Node API release" or "documentation-focused release"; (3) describe the most significant user-visible outcome, not implementation details. Do not reproduce bullet content verbatim. Do not write a generic summary if the commits support something more specific.
+
+**Synthesis is bounded to script output:** Bullets must be grounded solely in each commit's `SUBJECT`, `BODY`, and `FILES` from the script output. The agent must not inspect the actual diff or any file outside the script output. When commit messages are thin and the evidence is weak, write a conservative bullet that acknowledges limited context rather than inferring behavior that is not evidenced.
 
 **Root-level and out-of-surface files are intentionally excluded:** `README.md`, `CHANGELOG.md`, `scripts/**`, and root-level configs are classified `infra` by default and never contribute to any surface. This is a deliberate product boundary — changes to install scripts, root docs, and tooling configs do not appear in the changelog. If this boundary should change for a future release, update the lookup table in `gather_commits.sh` before running the skill.
 

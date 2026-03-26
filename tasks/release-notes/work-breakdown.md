@@ -63,6 +63,7 @@ The script must:
      ```
      infra:     apps/node/src/test/**, apps/android/app/src/test/**,
                 apps/android/app/src/androidTest/**,
+                apps/android/app-conformance/**,
                 apps/node/node_modules/**, apps/node/dist/**, apps/node/coverage/**,
                 apps/android/build/**, apps/android/app/build/**, apps/android/**/generated/**,
                 .agents/**, .github/**, tasks/**, docs/internal/**,
@@ -306,7 +307,8 @@ feat(release-notes): add release-notes-author skill
 - No existing CHANGELOG entries were modified or deleted.
 - The entry contains no raw commit subjects.
 - Rerunning the skill produces no duplicate `## [0.5.1]` block and the same sections are present/absent (structural idempotency). Bullet prose may differ between runs.
-- **Human review:** before committing, read the draft entry and verify: (a) the summary sentence accurately describes the release theme, (b) the most important user-visible changes are at the right prominence, (c) no section over-indexes on implementation details at the expense of user impact.
+- **Human review:** before committing, verify: (a) the summary sentence accurately describes the release theme per the rubric in `plan.md`; (b) the most important user-visible changes are at the right prominence; (c) no section over-indexes on implementation details at the expense of user impact; (d) no bullet makes a behavioral claim not evidenced by the commit's SUBJECT, BODY, or FILES.
+- **Drop spot-check:** manually sample at least two `drop:*` commits from the findings classification summary and confirm that the lookup table rules produce the correct type annotation for their key files. Log the result in findings.md.
 
 ### Expected commit
 
@@ -359,7 +361,8 @@ The `v0.5.0` release introduced significant breaking changes to the CLI and API 
 - findings.md `## v0.5.0 Run` section accounts for every commit in script output: `keep` commits mapped to bullets (or escalated), `drop:*` commits logged. No silent omissions.
 - No existing entries modified.
 - Rerunning the skill produces no duplicate `## [0.5.0]` block and the same sections are present/absent. Bullet prose may differ between runs.
-- **Human review:** before committing, verify: (a) the summary sentence reflects the scale of the API refactor, (b) the flat command surface and registry-driven dispatch are named at appropriate prominence — not buried or genericised, (c) breaking changes carry the `**Breaking:**` prefix, (d) no section is over-populated with implementation noise at the expense of user-impact clarity.
+- **Human review:** before committing, verify: (a) the summary sentence leads with breaking changes if present, and names the dominant surface per the rubric in `plan.md`; (b) the flat command surface and registry-driven dispatch are named at appropriate prominence — not buried or genericised; (c) breaking changes carry the `**Breaking:**` prefix; (d) no section is over-populated with implementation noise at the expense of user-impact clarity; (e) no bullet makes a behavioral claim not evidenced by the commit's SUBJECT, BODY, or FILES.
+- **Drop spot-check:** manually sample at least three `drop:*` commits from the findings classification summary (this range is larger — sample across all three classification outcomes if possible) and confirm the lookup table produces correct type annotations. Log results in findings.md.
 
 ### Expected commit
 
