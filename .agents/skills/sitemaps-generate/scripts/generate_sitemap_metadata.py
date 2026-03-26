@@ -145,7 +145,7 @@ def landing_manifest():
             "loc": f"{LANDING_BASE_URL}/operator.apk",
             "priority": "0.7",
             "sources": [
-                "docs/android-operator-apk.md",
+                "docs/setup.md",
             ],
         },
     ]

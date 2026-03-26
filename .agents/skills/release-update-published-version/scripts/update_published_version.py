@@ -27,12 +27,25 @@ def run(cmd: list[str], cwd: Path | None = None) -> str:
     return result.stdout
 
 
-def replace_required(path: Path, pattern: str, replacement: str) -> None:
+def replace_required(path: Path, pattern: str, replacement: str, *, fatal: bool = True) -> bool:
+    if not path.exists():
+        if fatal:
+            die(f"missing required file: {path}")
+        print(f"warning: optional file missing, skipping edit: {path}", file=sys.stderr)
+        return False
+
     content = path.read_text(encoding="utf-8")
     new_content, replacements = re.subn(pattern, replacement, content, flags=re.MULTILINE)
     if replacements == 0:
-        die(f"expected pattern not found in {path}")
-    path.write_text(new_content, encoding="utf-8")
+        if fatal:
+            die(f"expected pattern not found in {path}")
+        print(f"warning: optional pattern not found, skipping edit: {path}", file=sys.stderr)
+        return False
+
+    if new_content != content:
+        path.write_text(new_content, encoding="utf-8")
+        return True
+    return False
 
 
 def parse_version(version: str) -> tuple[int, int, int]:
@@ -42,36 +55,51 @@ def parse_version(version: str) -> tuple[int, int, int]:
     return tuple(int(part) for part in match.groups())
 
 
-def normalize_compatibility_examples(path: Path, version: str) -> None:
+def update_compatibility_versioned_apk_downloads(path: Path, version: str) -> bool:
+    """
+    Best-effort migration of release follow-up "version injection" into the
+    compatibility remediation example.
+
+    The original script targeted `docs/compatibility.md` and a different
+    markdown shape. The current public doc lives at
+    `docs/troubleshooting/compatibility.md` and contains hardcoded versioned
+    download URLs inside the failing-doctor remediation example.
+    """
+
+    if not path.exists():
+        print(f"warning: compatibility doc missing, skipping: {path}", file=sys.stderr)
+        return False
+
     content = path.read_text(encoding="utf-8")
-    matches = list(
-        re.finditer(
-            r"^- CLI `0\.1\.4` and app `([0-9]+\.[0-9]+\.[0-9]+)` - not compatible$",
-            content,
-            flags=re.MULTILINE,
-        )
+    changed = False
+
+    # Update versioned URLs inside the remediation bullet strings.
+    # Note: intentionally only matches numeric x.y.z versions (not `v<version>` templates).
+    url_apk_pat = r"(https://downloads\.clawperator\.com/operator/)v([0-9]+\.[0-9]+\.[0-9]+)/operator-v\2\.apk"
+    url_apk_repl = f"\\1v{version}/operator-v{version}.apk"
+    content, replacements = re.subn(url_apk_pat, url_apk_repl, content, flags=re.MULTILINE)
+    changed = changed or replacements > 0
+
+    url_sha_pat = (
+        r"(https://downloads\.clawperator\.com/operator/)v([0-9]+\.[0-9]+\.[0-9]+)/operator-v\2\.apk\.sha256"
     )
-    if not matches:
-        die(f"could not find compatibility example block in {path}")
+    url_sha_repl = f"\\1v{version}/operator-v{version}.apk.sha256"
+    content, replacements = re.subn(url_sha_pat, url_sha_repl, content, flags=re.MULTILINE)
+    changed = changed or replacements > 0
 
-    target_tuple = parse_version(version)
-    kept_versions: list[str] = []
-    for match in matches:
-        matched_version = match.group(1)
-        if parse_version(matched_version) <= target_tuple and matched_version not in kept_versions:
-            kept_versions.append(matched_version)
+    filename_apk_pat = r"operator-v([0-9]+\.[0-9]+\.[0-9]+)\.apk"
+    filename_apk_repl = f"operator-v{version}.apk"
+    content, replacements = re.subn(filename_apk_pat, filename_apk_repl, content, flags=re.MULTILINE)
+    changed = changed or replacements > 0
 
-    if version not in kept_versions:
-        kept_versions.append(version)
+    filename_sha_pat = r"operator-v([0-9]+\.[0-9]+\.[0-9]+)\.apk\.sha256"
+    filename_sha_repl = f"operator-v{version}.apk.sha256"
+    content, replacements = re.subn(filename_sha_pat, filename_sha_repl, content, flags=re.MULTILINE)
+    changed = changed or replacements > 0
 
-    replacement_block = "\n".join(
-        f"- CLI `0.1.4` and app `{matched_version}` - not compatible" for matched_version in kept_versions
-    )
-
-    start = matches[0].start()
-    end = matches[-1].end()
-    updated = content[:start] + replacement_block + content[end:]
-    path.write_text(updated, encoding="utf-8")
+    if changed:
+        path.write_text(content, encoding="utf-8")
+    return changed
 
 
 def main() -> None:
@@ -107,22 +135,33 @@ def main() -> None:
     if latest_npm_version != version:
         die(f"{version} is not the current npm release (latest is {latest_npm_version})")
 
-    replace_required(
-        repo_root / "docs" / "android-operator-apk.md",
-        r"Example for v[0-9]+\.[0-9]+\.[0-9]+:\n- \[https://downloads\.clawperator\.com/operator/v[0-9]+\.[0-9]+\.[0-9]+/operator-v[0-9]+\.[0-9]+\.[0-9]+\.apk\]\(https://downloads\.clawperator\.com/operator/v[0-9]+\.[0-9]+\.[0-9]+/operator-v[0-9]+\.[0-9]+\.[0-9]+\.apk\)",
-        f"Example for v{version}:\n- [https://downloads.clawperator.com/operator/v{version}/operator-v{version}.apk](https://downloads.clawperator.com/operator/v{version}/operator-v{version}.apk)",
-    )
-    normalize_compatibility_examples(repo_root / "docs" / "compatibility.md", version)
-    replace_required(
-        repo_root / "docs" / "release-procedure.md",
+    updated_docs: list[Path] = []
+
+    # The historical `docs/android-operator-apk.md` doc was removed/migrated.
+    # Release follow-ups should keep working even when that legacy input is
+    # not present.
+    update_compatibility_path = repo_root / "docs" / "troubleshooting" / "compatibility.md"
+    if update_compatibility_versioned_apk_downloads(update_compatibility_path, version):
+        updated_docs.append(update_compatibility_path)
+
+    release_procedure_path = repo_root / "docs" / "internal" / "release-procedure.md"
+    if replace_required(
+        release_procedure_path,
         r"\.agents/skills/release-create/scripts/create_release\.sh [0-9]+\.[0-9]+\.[0-9]+ \[commit_sha\]",
         f".agents/skills/release-create/scripts/create_release.sh {version} [commit_sha]",
-    )
-    replace_required(
-        repo_root / "docs" / "release-procedure.md",
+        fatal=False,
+    ):
+        updated_docs.append(release_procedure_path)
+
+    if replace_required(
+        release_procedure_path,
         r"\.agents/skills/release-verify/scripts/release_verify\.sh [0-9]+\.[0-9]+\.[0-9]+",
         f".agents/skills/release-verify/scripts/release_verify.sh {version}",
-    )
+        fatal=False,
+    ):
+        if release_procedure_path not in updated_docs:
+            updated_docs.append(release_procedure_path)
+
     replace_required(
         repo_root / "sites" / "landing" / "public" / "install.sh",
         r"# install\.sh \(v[0-9]+\.[0-9]+\.[0-9]+\)",
@@ -132,16 +171,24 @@ def main() -> None:
     subprocess.run(["./scripts/docs_build.sh"], cwd=repo_root, check=True)
 
     commit_message = f"docs(release): update published version to {version}"
+
+    # Stage only files that exist (and were likely updated). This avoids
+    # aborting the follow-up commit due to removed/migrated doc inputs.
+    paths_to_stage = {
+        repo_root / "sites" / "docs" / "static" / "llms-full.txt",
+        repo_root / "sites" / "landing" / "public" / "install.sh",
+        repo_root / "sites" / "landing" / "public" / "llms-full.txt",
+    }
+    for p in updated_docs:
+        paths_to_stage.add(p)
+
+    stage_args = [str(p.relative_to(repo_root)) for p in paths_to_stage if p.exists()]
+
     subprocess.run(
         [
             "git",
             "add",
-            "docs/android-operator-apk.md",
-            "docs/compatibility.md",
-            "docs/release-procedure.md",
-            "sites/docs/static/llms-full.txt",
-            "sites/landing/public/install.sh",
-            "sites/landing/public/llms-full.txt",
+            *stage_args,
         ],
         cwd=repo_root,
         check=True,
