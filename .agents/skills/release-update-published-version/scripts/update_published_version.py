@@ -188,6 +188,7 @@ def main() -> None:
         [
             "git",
             "add",
+            "-f",
             *stage_args,
         ],
         cwd=repo_root,
