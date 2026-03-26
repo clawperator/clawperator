@@ -11,7 +11,6 @@ The documentation is complete when an agent can:
 without external context, guesswork, or human clarification.
 
 ---
-
 ## Primary Artifact
 
 `llms-full.txt` is the canonical output.
@@ -30,7 +29,6 @@ If there is any tradeoff:
 - do not optimize for human readability
 
 ---
-
 ## Core Requirements
 
 Documentation must be:
@@ -55,7 +53,6 @@ Documentation must be:
 - Includes failure modes and recovery paths
 
 ---
-
 ## Source of Truth Hierarchy
 
 1. Code (authoritative)
@@ -68,7 +65,6 @@ Rules:
 - Do not preserve wording unless verified
 
 ---
-
 ## Current State Only
 
 Documentation reflects the current system only.
@@ -86,7 +82,6 @@ If content is not relevant to current behavior:
 Prefer deletion over preservation.
 
 ---
-
 ## Zero Duplication
 
 - Each concept is defined exactly once
@@ -96,11 +91,9 @@ Prefer deletion over preservation.
 Cross-reference instead of duplicating.
 
 ---
-
 ## Deterministic Contracts
 
 Every system surface must be explicitly defined:
-
 - CLI commands
 - flags and parameters
 - selector behavior
@@ -109,10 +102,10 @@ Every system surface must be explicitly defined:
 - error codes and recovery
 
 No implicit behavior.
+
 No inferred rules.
 
 ---
-
 ## Two-Audience Requirement
 
 Every page must serve both audiences simultaneously:
@@ -133,7 +126,6 @@ Neither axis alone is sufficient. A page that is a perfect executable spec but h
 When the two conflict, choose the agent. But most of the time they do not conflict - a concrete JSON example serves both audiences.
 
 ---
-
 ## Agent-Centric Design
 
 Assume:
@@ -147,51 +139,40 @@ Documentation must:
 - minimize cross-page dependency where possible
 
 ---
-
 ## Page Completeness by Type
 
 Different page types have different minimum bars. A page is not done until it meets the bar for its type.
 
 ### Setup / how-to pages
-
 - Machine-checkable success condition at every numbered step
 - At least one concrete JSON shape for output the reader will see
 - Recovery guidance for the top 3 failure modes at that step
 - Linear flow - no branching paths in the main sequence
 
 ### API reference pages
-
 - Every parameter's valid values documented (not just the parameter name)
 - At least one full request/response or command/output example
 - All error codes that page's commands can produce, with recovery
 - Flag semantics: what it does, what happens when omitted, valid values
 
 ### Contract pages (errors, selectors, result envelope)
-
 - Complete enumeration - every item in the code must appear in the doc
 - Cross-reference to the authoritative code file
 - At least one worked example showing how an agent uses the contract
 
 ---
-
 ## Known Failure Patterns
 
 These are specific antipatterns observed in prior drafting rounds. Check your work against them.
 
 1. **Thin tables.** A table that lists all 17 action types but doesn't explain parameter semantics (valid values for `direction`, what `maxSwipes` controls, how `validator` and `validatorPattern` interact) looks complete but isn't usable. If an agent can't construct a valid call from the table alone, the table is incomplete.
-
 2. **Phantom error codes.** Documenting an error code that doesn't exist in `apps/node/src/contracts/errors.ts`. If a code appears in prose or a recovery table, grep for it in the source. If it's not in the enum, don't document it as a formal error code.
-
 3. **Correct structure, insufficient depth.** Right section headings, right page scope, right cross-references - but each section has 2-3 sentences where it needs 5-10. This pattern produces pages that look complete in a table of contents but can't answer real questions.
-
 4. **Missing JSON examples for major contracts.** If a page defines an output shape (DoctorReport, result envelope, devices response), include a concrete JSON example. Naming fields in prose is not equivalent to showing the shape.
-
 5. **Success conditions that require inference.** "If this returns a JSON result with `status: success`" is weaker than "Exit code `0`, `envelope.status` is `\"success\"`, `envelope.stepResults[0].success` is `true`." Agents need exact field paths, not descriptions.
-
 6. **Installer/script internals in the main flow.** The setup page should tell agents what to run and how to verify it worked. What the installer does internally is context, not the main flow. Keep it brief or in a sidebar.
 
 ---
-
 ## Multi-Pass Workflow
 
 Expect multiple drafting passes across branches. This is by design, not a failure.
@@ -203,7 +184,6 @@ Expect multiple drafting passes across branches. This is by design, not a failur
 A single agent in a single pass will not produce complete docs for complex pages. The workflow accounts for this.
 
 ---
-
 ## Implementation Discipline
 
 - Work one document at a time
@@ -228,7 +208,6 @@ For every claim in the documentation, there must be a code path that confirms it
 Do not write documentation from memory or from existing docs alone. Open the code file, read it, and write the docs from what you see. If the code contradicts existing docs, the code is correct.
 
 ---
-
 ## Success Criteria
 
 The work is complete when:
@@ -241,3 +220,4 @@ The work is complete when:
 Perfection is not required.
 
 Correct structure, accurate contracts, and full coverage are required.
+

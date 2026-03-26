@@ -39,7 +39,7 @@ This is publishing infrastructure, not marketing garnish.
 The docs site is the canonical source for technical behavior:
 
 - `https://docs.clawperator.com/`
-- `https://docs.clawperator.com/ai-agents/node-api-for-agents/`
+- `https://docs.clawperator.com/api/overview/`
 - `https://docs.clawperator.com/design/operator-llm-playbook/`
 - `https://docs.clawperator.com/reference/cli-reference/`
 - `https://docs.clawperator.com/reference/api-overview/`
@@ -170,7 +170,7 @@ curl -I https://clawperator.com/sitemap.xml
 curl -I https://docs.clawperator.com/robots.txt
 curl -I https://docs.clawperator.com/llms.txt
 curl -I https://docs.clawperator.com/sitemap.xml
-curl -I https://docs.clawperator.com/ai-agents/node-api-for-agents/
+curl -I https://docs.clawperator.com/api/overview/
 curl -I https://docs.clawperator.com/reference/cli-reference/
 ```
 

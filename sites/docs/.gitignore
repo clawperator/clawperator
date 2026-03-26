@@ -6,3 +6,4 @@ site/
 docs/
 docs_inventory.json
 docs_build.json
+static/llms-full.txt

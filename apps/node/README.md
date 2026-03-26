@@ -33,8 +33,8 @@ clawperator snapshot --device <device_id>
 
 Full docs: [docs.clawperator.com](https://docs.clawperator.com)
 
-- First-time setup: [docs/first-time-setup.md](../../docs/first-time-setup.md)
-- Node API contract: [docs/node-api-for-agents.md](../../docs/node-api-for-agents.md)
+- First-time setup: [docs/setup.md](../../docs/setup.md)
+- Node API contract: [docs/api/overview.md](../../docs/api/overview.md)
 
 ## Build and Test
 

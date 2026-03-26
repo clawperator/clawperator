@@ -4,9 +4,9 @@ This is a secondary background document for Clawperator runtime conventions.
 
 If you are starting cold, begin with the operational docs first:
 
-- `docs/agent-quickstart.md`
-- `docs/node-api-for-agents.md`
-- `docs/reference/execution-model.md`
+- `docs/setup.md`
+- `docs/api/overview.md`
+- `docs/api/overview.md`
 
 Use this playbook after that, when you need deeper context for:
 - running the app through `ACTION_AGENT_COMMAND`
@@ -72,7 +72,7 @@ For app automation commands, default to:
 
 **`enter_text` vs CLI `type`:** The CLI command is `type` (synonym: `fill`) but the action type field in execution payloads is `enter_text`. These map to the same runtime action. When building execution payloads directly, always use `enter_text`.
 
-**NodeMatcher fields:** `resourceId`, `contentDescEquals`, `textEquals`, `textContains`, `contentDescContains`, `role`. All fields are AND-combined. Prefer `resourceId` when available. Full reference in `docs/node-api-for-agents.md`.
+**NodeMatcher fields:** `resourceId`, `contentDescEquals`, `textEquals`, `textContains`, `contentDescContains`, `role`. All fields are AND-combined. Prefer `resourceId` when available. Full reference in `docs/api/selectors.md`.
 
 **Scroll targeting rule:** If a screen contains nested or multiple scrollable containers, do not rely on auto-detect. Capture `snapshot_ui`, identify the intended list's `resource-id`, and pass it as `params.container`.
 
@@ -141,6 +141,6 @@ Notes:
 
 ## 6) Where to update docs
 
-- Skill model/design: `docs/design/skill-design.md`
-- Secondary runtime playbook and conventions: `docs/design/operator-llm-playbook.md` (this file)
+- Skill model/design: `docs/internal/design/skill-design.md`
+- Secondary runtime playbook and conventions: `docs/internal/design/operator-llm-playbook.md` (this file)
 - App-specific skill packages: `skills/<applicationId>.<intent>/...`

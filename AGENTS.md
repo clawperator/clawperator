@@ -46,11 +46,25 @@ Design consequence:
 - CLI parsing changes must preserve both the structured JSON contract and the exit-code contract. Test valid, invalid, and missing-value cases for any new flag.
 
 ## Key Docs
-- `docs/node-api-for-agents.md` - API contract, CLI reference, error codes
-- `docs/first-time-setup.md` - Device setup and APK installation
-- `docs/architecture.md` - System design
-- `docs/troubleshooting.md` - Common issues
-- `docs/design/` - Internal design documents
+- `docs/setup.md` - Device setup and APK installation
+- `docs/api/overview.md` - API contract and execution model
+- `docs/api/actions.md` - Action types and parameter semantics
+- `docs/api/errors.md` - Error codes and recovery patterns
+- `docs/internal/design/` - Internal design documents
+
+## How to Verify Against Code
+For every claim in the documentation, there must be a code path that confirms it.
+- CLI command names and flags: read `apps/node/src/cli/registry.ts`
+- Selector flags and behavior: read `apps/node/src/cli/selectorFlags.ts` and `apps/node/src/contracts/selectors.ts`
+- Action types and parameters: read `apps/node/src/contracts/execution.ts`
+- Error codes and meanings: read `apps/node/src/contracts/errors.ts`
+- Result envelope shape: read `apps/node/src/contracts/result.ts`
+- Doctor checks: read `apps/node/src/domain/doctor/checks/`
+- Serve command: read `apps/node/src/cli/commands/serve.ts`
+
+Do not write documentation from memory or from existing docs alone. Open the
+code file and write the docs from what you see. If the code contradicts
+existing docs, the code is correct.
 
 ## Public Sites
 - Clawperator has two public website surfaces with different build systems and purposes:
@@ -58,7 +72,7 @@ Design consequence:
   - `sites/docs/` - MkDocs documentation site for `https://docs.clawperator.com`
 - Do not confuse the landing site with the docs site when making website changes:
   - marketing homepage, install entrypoints, and root-level files for `clawperator.com` belong in `sites/landing/`
-  - technical docs content for `docs.clawperator.com` belongs in `docs/`, `apps/node/src/`, `../clawperator-skills/docs/`, and is published through `sites/docs/`
+  - technical docs content for `docs.clawperator.com` belongs in `docs/` and `apps/node/src/`, and is published through `sites/docs/`
 - Root-level machine-facing files must be updated on the correct surface:
   - `clawperator.com/robots.txt`, `llms.txt`, `sitemap.xml`, `install.sh` come from `sites/landing/public/`
   - `docs.clawperator.com/robots.txt` and `llms.txt` come from `sites/docs/static/`
@@ -75,6 +89,7 @@ Design consequence:
 - Typical local layout is sibling repos:
   - `../clawperator` (this repo)
   - `../clawperator-skills` (skills repo)
+- Canonical skills documentation is authored in this repo at `docs/skills/`; the skills repo provides runtime/user-facing skill packages.
 - Repo-specific Codex skills live in `.agents/skills/` in this repository.
 - Current project-local skill:
   - `.agents/skills/docs-generate/` - assembles `sites/docs/.build/` from `docs/`, `apps/node/src/`, and `sites/docs/source-map.yaml`
@@ -96,7 +111,7 @@ Generated staging output is an artifact, not an authored surface.
 
 `sites/docs/site/` is deployable MkDocs build output. Do not hand-edit it either, except as a temporary local build artifact. Source-controlled docs-site root files live in `sites/docs/static/` and are copied into `sites/docs/site/` by `./scripts/docs_build.sh`.
 
-Items under `tasks/` should be treated as temporary working notes, not durable documentation. It is fine during iterative development to capture in-progress findings, plans, or draft documentation in `tasks/`, but before opening a PR we typically delete that task entry. By that point, any durable knowledge must have been migrated into its proper long-term home in `docs/`, `apps/node/src/`, or `../clawperator-skills/docs/` as appropriate.
+Items under `tasks/` should be treated as temporary working notes, not durable documentation. It is fine during iterative development to capture in-progress findings, plans, or draft documentation in `tasks/`, but before opening a PR we typically delete that task entry. By that point, any durable knowledge must have been migrated into its proper long-term home in `docs/` or `apps/node/src/` as appropriate.
 
 **Exception — multi-phase project files:** When a task file covers a sequenced series of PRs (e.g. PR-1 through PR-7), do not delete completed task entries between phases. Keep them in place, marked `[DONE]`, until the final PR in the project ships. An agent working on a later phase benefits from reading the full history: dependency rationale, implementation choices made in earlier phases, and acceptance criteria that later tasks reference. Delete the whole file only when all phases are complete.
 
@@ -121,7 +136,7 @@ confirm it succeeds end to end.
 
 Documentation updates should be considered part of the feature or bug-fix work, not optional follow-up. At minimum, agents should update:
 - `docs/` for API shape, contract, error code, result-envelope, setup/install/device-prep, troubleshooting, or other authored public docs changes
-- `docs/design/` when internal design guidance, engineering expectations, or skill-authoring guidance changed in a durable way
+- `docs/internal/design/` when internal design guidance, engineering expectations, or skill-authoring guidance changed in a durable way
 
 Docs must not over-promise behavior. When code, validators, scripts, and docs disagree, fix the implementation or narrow the docs so they accurately describe the current shipped behavior. Do not document aspirational or partially implemented behavior as if it already exists.
 

@@ -26,10 +26,9 @@ This skill updates code-facing surfaces only:
 - code/tests that should know about the new unreleased version
 - internal repo-maintenance skill docs
 
-It intentionally does **not** update public release-facing docs or website content such as:
-- `docs/android-operator-apk.md`
-- `docs/compatibility.md`
-- `docs/release-procedure.md`
+It intentionally does **not** update public release-facing docs and release-maintenance docs such as:
+- `docs/troubleshooting/compatibility.md`
+- `docs/internal/release-procedure.md`
 - `sites/docs/**`
 - `sites/landing/public/**`
 - `sites/landing/public/install.sh`
