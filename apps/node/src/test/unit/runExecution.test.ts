@@ -1,6 +1,7 @@
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert";
 import { EventEmitter } from "node:events";
+import { once } from "node:events";
 import { chmod, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import {
   addSettleWarnings,
@@ -14,11 +15,13 @@ import {
   runCloseAppPreflight,
   runExecution,
 } from "../../domain/executions/runExecution.js";
+import { buildResultEnvelopeTimeoutHint } from "../../domain/executions/timeoutGuidance.js";
 import type { Execution } from "../../contracts/execution.js";
 import type { ResultEnvelope, StepResult } from "../../contracts/result.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 import { createLogger } from "../../adapters/logger.js";
+import { clawperatorEvents, CLAW_EVENT_TYPES } from "../../domain/observe/events.js";
 import { isAbsolute, join } from "node:path";
 import { tmpdir } from "node:os";
 import { FakeProcessRunner } from "./fakes/FakeProcessRunner.js";
@@ -661,6 +664,181 @@ describe("buildTimeoutError", () => {
     assert.strictEqual(error.broadcastDispatchStatus, "sent");
     assert.strictEqual(error.deviceId, "emulator-5554");
     assert.strictEqual(error.operatorPackage, "com.clawperator.operator.dev");
+    assert.strictEqual(error.hint, undefined);
+  });
+
+  it("adds a version-compatibility hint when no correlated events were captured", () => {
+    const error = buildTimeoutError(
+      {
+        commandId: "cmd-timeout-3",
+        taskId: "task-timeout-3",
+        actions: [{ id: "snap-1", type: "snapshot_ui" }],
+        timeoutMs: 2000,
+      },
+      {
+        code: ERROR_CODES.RESULT_ENVELOPE_TIMEOUT,
+        message: "Timed out waiting for result envelope",
+        lastCorrelatedEvents: [],
+        broadcastDispatchStatus: "sent",
+        deviceId: "emulator-5554",
+        operatorPackage: "com.clawperator.operator.dev",
+      },
+      55
+    );
+
+    assert.match(error.hint ?? "", /No correlated Android log lines were captured/);
+    assert.match(error.hint ?? "", /APK\/CLI version mismatch/);
+    assert.match(error.hint ?? "", /clawperator doctor --json --device emulator-5554 --operator-package com\.clawperator\.operator\.dev/);
+  });
+
+  it("does not add a version hint when broadcast dispatch failed", () => {
+    const error = buildTimeoutError(
+      {
+        commandId: "cmd-timeout-4",
+        taskId: "task-timeout-4",
+        actions: [{ id: "snap-1", type: "snapshot_ui" }],
+        timeoutMs: 2000,
+      },
+      {
+        code: ERROR_CODES.RESULT_ENVELOPE_TIMEOUT,
+        message: "Timed out waiting for result envelope",
+        lastCorrelatedEvents: [],
+        broadcastDispatchStatus: "failed: Target package not found",
+        deviceId: "emulator-5554",
+        operatorPackage: "com.clawperator.operator.dev",
+      },
+      55
+    );
+
+    assert.strictEqual(error.hint, undefined);
+  });
+
+  it("builds a stable timeout hint when context fields are missing", () => {
+    const hint = buildResultEnvelopeTimeoutHint(
+      {
+        broadcastDispatchStatus: "sent: broadcast_sent",
+        lastCorrelatedEvents: [],
+      },
+      {}
+    );
+
+    assert.strictEqual(
+      hint,
+      "No correlated Android log lines were captured. This often indicates an APK/CLI version mismatch or an accessibility service issue. Run 'clawperator doctor --json' to diagnose."
+    );
+  });
+
+  it("emits the timeout hint on the terminal result envelope", async () => {
+    const runner = new FakeProcessRunner();
+    runner.spawn = (() => {
+      const proc = new EventEmitter() as EventEmitter & {
+        stdout?: EventEmitter;
+        stderr?: EventEmitter;
+        kill: () => void;
+      };
+      proc.stdout = new EventEmitter();
+      proc.stderr = new EventEmitter();
+      proc.kill = () => undefined;
+      return proc;
+    }) as FakeProcessRunner["spawn"];
+
+    runner.queueResult({ code: 0, stdout: "List of devices attached\ndevice-123\tdevice\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "package:com.test.operator.dev\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "", stderr: "" });
+
+    const resultEvent = once(clawperatorEvents, CLAW_EVENT_TYPES.RESULT);
+    const result = await runExecution(
+      {
+        commandId: "cmd-timeout-5",
+        taskId: "task-timeout-5",
+        source: "test",
+        expectedFormat: "android-ui-automator",
+        timeoutMs: 1000,
+        actions: [{ id: "snap-1", type: "snapshot_ui" }],
+      },
+      {
+        deviceId: "device-123",
+        operatorPackage: "com.test.operator.dev",
+        runner,
+      }
+    );
+
+    const [event] = await resultEvent;
+    assert.strictEqual(result.ok, false);
+    if (!result.ok) {
+      assert.strictEqual(result.error.code, ERROR_CODES.RESULT_ENVELOPE_TIMEOUT);
+      assert.match(String(result.error.hint ?? ""), /No correlated Android log lines were captured/);
+    }
+    assert.strictEqual(event.deviceId, "device-123");
+    assert.match(event.envelope.hint ?? "", /No correlated Android log lines were captured/);
+    assert.match(event.envelope.hint ?? "", /clawperator doctor --json --device device-123 --operator-package com\.test\.operator\.dev/);
+  });
+
+  it("does not emit the timeout hint when correlated log lines were captured", async () => {
+    const originalSetTimeout = global.setTimeout;
+    try {
+      // Speed up waitForResultEnvelope: broadcast delay is 300ms, and execution timeout is 6000ms (1000 payload + 5000 buffer).
+      // We keep ordering: broadcast should happen before the timeout, but still fast for unit tests.
+      global.setTimeout = ((handler: (...args: any[]) => void, ms?: number, ...args: any[]) => {
+        const adjustedMs =
+          ms === 300 ? 5
+            : ms === 6000 ? 30
+              : ms;
+        return originalSetTimeout(handler, adjustedMs, ...args);
+      }) as typeof global.setTimeout;
+
+      const runner = new FakeProcessRunner();
+      runner.spawn = (() => {
+        const proc = new EventEmitter() as EventEmitter & {
+          stdout?: EventEmitter;
+          stderr?: EventEmitter;
+          kill: (signal?: string) => void;
+        };
+        proc.stdout = new EventEmitter();
+        proc.stderr = new EventEmitter();
+        proc.kill = () => undefined;
+
+        // Ensure we capture correlated TaskScopeDefault lines before the timeout fires.
+        originalSetTimeout(() => {
+          proc.stdout?.emit("data", Buffer.from("TaskScopeDefault: example\n"));
+        }, 10);
+
+        return proc;
+      }) as FakeProcessRunner["spawn"];
+
+      runner.queueResult({ code: 0, stdout: "List of devices attached\ndevice-123\tdevice\n", stderr: "" });
+      runner.queueResult({ code: 0, stdout: "package:com.test.operator.dev\n", stderr: "" });
+      runner.queueResult({ code: 0, stdout: "", stderr: "" }); // logcat -c
+      runner.queueResult({ code: 0, stdout: "", stderr: "" }); // broadcast
+
+      const resultEvent = once(clawperatorEvents, CLAW_EVENT_TYPES.RESULT);
+      const result = await runExecution(
+        {
+          commandId: "cmd-timeout-6",
+          taskId: "task-timeout-6",
+          source: "test",
+          expectedFormat: "android-ui-automator",
+          timeoutMs: 1000,
+          actions: [{ id: "snap-1", type: "snapshot_ui" }],
+        },
+        {
+          deviceId: "device-123",
+          operatorPackage: "com.test.operator.dev",
+          runner,
+        }
+      );
+
+      const [event] = await resultEvent;
+      assert.strictEqual(result.ok, false);
+      if (!result.ok) {
+        assert.strictEqual(result.error.hint, undefined);
+      }
+      assert.strictEqual(event.deviceId, "device-123");
+      assert.strictEqual(event.envelope.hint, undefined);
+    } finally {
+      global.setTimeout = originalSetTimeout;
+    }
   });
 });
 

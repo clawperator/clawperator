@@ -310,7 +310,7 @@ Clawperator is the hand. The agent is the brain. The agent decides what to do, t
 | `OPERATOR_NOT_INSTALLED` | Expected package missing | `clawperator operator setup --apk <path> [--device <serial>]`. |
 | `OPERATOR_VARIANT_MISMATCH` | Release/debug package mismatch | Pass `--operator-package <installed-package>` or reinstall the intended APK. |
 | `DEVICE_ACCESSIBILITY_NOT_RUNNING` | Handshake returned a runtime failure | `clawperator grant-device-permissions [--device <serial>]`, rerun `doctor` and `snapshot`. |
-| `RESULT_ENVELOPE_TIMEOUT` | Broadcast sent, no result envelope arrived | Re-grant permissions, rerun `snapshot --timeout 5000 --verbose`, verify `--operator-package`. |
+| `RESULT_ENVELOPE_TIMEOUT` | Broadcast sent, no result envelope arrived | If no correlated log lines were captured, run `doctor` to check version compatibility and accessibility; otherwise re-grant permissions, rerun `snapshot --timeout 5000 --verbose`, and verify `--operator-package`. |
 | `VERSION_INCOMPATIBLE` | CLI and APK version mismatch | Reinstall CLI (`npm install -g clawperator@latest`) or APK to align versions. |
 
 ### When to pass `--device` and `--operator-package`
@@ -2718,13 +2718,15 @@ Typical fields:
     "lastActionCaveat": "payload-last only; Android execution position is unknown",
     "elapsedMs": 30000,
     "timeoutMs": 30000
-  }
+  },
+  "hint": "No correlated Android log lines were captured. This often indicates an APK/CLI version mismatch or an accessibility service issue. Run 'clawperator doctor --json --device emulator-5554 --operator-package com.clawperator.operator.dev' to diagnose."
 }
 ```
 
 Recovery:
 
 - run `clawperator doctor --json`
+- if `hint` mentions no correlated Android log lines, treat it as a compatibility or accessibility diagnostic path rather than a generic retry
 - confirm the accessibility service and operator package are healthy
 - increase timeout only if the action legitimately needs more wall-clock time
 
@@ -3291,7 +3293,7 @@ Success conditions:
       "status": "fail",
       "code": "RESULT_ENVELOPE_TIMEOUT",
       "summary": "Handshake timed out.",
-      "detail": "No [Clawperator-Result] envelope received within 7000ms. Broadcast dispatch: broadcast_sent. Operator package: com.clawperator.operator.dev. Device: emulator-5554. Re-run with --verbose to inspect correlated Android log lines.",
+      "detail": "No [Clawperator-Result] envelope received within 7000ms. Broadcast dispatch: sent. Operator package: com.clawperator.operator.dev. Device: emulator-5554. No correlated Android log lines were captured. This often indicates an APK/CLI version mismatch or an accessibility service issue. Run 'clawperator doctor --json --device emulator-5554 --operator-package com.clawperator.operator.dev' to diagnose.",
       "fix": {
         "title": "Grant accessibility permissions via adb",
         "platform": "any",
@@ -8738,11 +8740,11 @@ Exact doctor failure shape:
   "status": "fail",
   "code": "RESULT_ENVELOPE_TIMEOUT",
   "summary": "Handshake timed out.",
-  "detail": "No [Clawperator-Result] envelope received within 7000ms. Broadcast dispatch: dispatched. Operator package: com.clawperator.operator.dev. Device: <device_serial>."
+  "detail": "No [Clawperator-Result] envelope received within 7000ms. Broadcast dispatch: sent. Operator package: com.clawperator.operator.dev. Device: <device_serial>. No correlated Android log lines were captured. This often indicates an APK/CLI version mismatch or an accessibility service issue. Run 'clawperator doctor --json --device <device_serial> --operator-package <package>' to diagnose."
 }
 ```
 
-The trailing `Re-run with --verbose to inspect correlated Android log lines.` sentence is conditional. `readinessChecks.ts` appends it only when correlated Android log lines were captured for the failure.
+The trailing `Re-run with --verbose to inspect correlated Android log lines.` sentence is conditional and still appears when correlated Android log lines were captured. When no correlated log lines were captured, the timeout detail now points toward version compatibility or accessibility setup.
 
 Recommended recovery:
 

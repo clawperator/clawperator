@@ -98,6 +98,8 @@ describe("runHandshake", () => {
                 message: "Timeout details",
                 lastCorrelatedEvents: [],
                 broadcastDispatchStatus: "sent",
+                deviceId: "test-device",
+                operatorPackage: "com.test.operator",
             }
         });
 
@@ -106,6 +108,7 @@ describe("runHandshake", () => {
         assert.strictEqual(result.code, ERROR_CODES.RESULT_ENVELOPE_TIMEOUT);
         assert.match(result.detail ?? "", /Broadcast dispatch: sent/);
         assert.match(result.detail ?? "", /Operator package: com\.test\.operator/);
+        assert.match(result.detail ?? "", /APK\/CLI version mismatch/);
         assert.ok(result.fix?.steps.some(step => step.kind === "shell" && step.value.includes("clawperator snapshot")));
     });
 
