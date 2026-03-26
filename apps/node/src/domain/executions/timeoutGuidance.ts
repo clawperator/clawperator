@@ -9,7 +9,7 @@ interface TimeoutGuidanceDiagnostics {
 }
 
 function isBroadcastDispatchSent(status?: string): boolean {
-  return status?.split(":")[0] === "sent";
+  return /^sent($|:)/.test(status ?? "");
 }
 
 export function buildResultEnvelopeTimeoutHint(
@@ -24,12 +24,17 @@ export function buildResultEnvelopeTimeoutHint(
     return undefined;
   }
 
-  const deviceRef = context.deviceId ?? "<device_id>";
-  const packageRef = context.operatorPackage ?? "<package>";
+  const doctorArgs = ["clawperator", "doctor", "--json"];
+  if (context.deviceId !== undefined) {
+    doctorArgs.push("--device", context.deviceId);
+  }
+  if (context.operatorPackage !== undefined) {
+    doctorArgs.push("--operator-package", context.operatorPackage);
+  }
 
   return [
     "No correlated Android log lines were captured.",
     "This often indicates an APK/CLI version mismatch or an accessibility service issue.",
-    `Run 'clawperator doctor --json --device ${deviceRef} --operator-package ${packageRef}' to diagnose.`,
+    `Run '${doctorArgs.join(" ")}' to diagnose.`,
   ].join(" ");
 }

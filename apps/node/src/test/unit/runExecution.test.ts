@@ -1,6 +1,7 @@
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert";
 import { EventEmitter } from "node:events";
+import { once } from "node:events";
 import { chmod, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import {
   addSettleWarnings,
@@ -20,6 +21,7 @@ import type { ResultEnvelope, StepResult } from "../../contracts/result.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 import { createLogger } from "../../adapters/logger.js";
+import { clawperatorEvents, CLAW_EVENT_TYPES } from "../../domain/observe/events.js";
 import { isAbsolute, join } from "node:path";
 import { tmpdir } from "node:os";
 import { FakeProcessRunner } from "./fakes/FakeProcessRunner.js";
@@ -720,8 +722,57 @@ describe("buildTimeoutError", () => {
       {}
     );
 
-    assert.match(hint ?? "", /--device <device_id>/);
-    assert.match(hint ?? "", /--operator-package <package>/);
+    assert.strictEqual(
+      hint,
+      "No correlated Android log lines were captured. This often indicates an APK/CLI version mismatch or an accessibility service issue. Run 'clawperator doctor --json' to diagnose."
+    );
+  });
+
+  it("emits the timeout hint on the terminal result envelope", async () => {
+    const runner = new FakeProcessRunner();
+    runner.spawn = (() => {
+      const proc = new EventEmitter() as EventEmitter & {
+        stdout?: EventEmitter;
+        stderr?: EventEmitter;
+        kill: () => void;
+      };
+      proc.stdout = new EventEmitter();
+      proc.stderr = new EventEmitter();
+      proc.kill = () => undefined;
+      return proc;
+    }) as FakeProcessRunner["spawn"];
+
+    runner.queueResult({ code: 0, stdout: "List of devices attached\ndevice-123\tdevice\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "package:com.test.operator.dev\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "", stderr: "" });
+
+    const resultEvent = once(clawperatorEvents, CLAW_EVENT_TYPES.RESULT);
+    const result = await runExecution(
+      {
+        commandId: "cmd-timeout-5",
+        taskId: "task-timeout-5",
+        source: "test",
+        expectedFormat: "android-ui-automator",
+        timeoutMs: 1000,
+        actions: [{ id: "snap-1", type: "snapshot_ui" }],
+      },
+      {
+        deviceId: "device-123",
+        operatorPackage: "com.test.operator.dev",
+        runner,
+      }
+    );
+
+    const [event] = await resultEvent;
+    assert.strictEqual(result.ok, false);
+    if (!result.ok) {
+      assert.strictEqual(result.error.code, ERROR_CODES.RESULT_ENVELOPE_TIMEOUT);
+      assert.match(String(result.error.hint ?? ""), /No correlated Android log lines were captured/);
+    }
+    assert.strictEqual(event.deviceId, "device-123");
+    assert.match(event.envelope.hint ?? "", /No correlated Android log lines were captured/);
+    assert.match(event.envelope.hint ?? "", /clawperator doctor --json --device device-123 --operator-package com\.test\.operator\.dev/);
   });
 });
 
