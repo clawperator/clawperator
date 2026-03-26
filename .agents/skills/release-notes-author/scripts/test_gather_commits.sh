@@ -81,6 +81,17 @@ run_script() {
   bash "$SCRIPT" "$@" >"$output_file" 2>"$stderr_file"
 }
 
+run_script_in_repo() {
+  local repo_dir="$1"
+  local output_file="$2"
+  local stderr_file="$3"
+  shift 3
+  (
+    cd "$repo_dir"
+    bash "$SCRIPT" "$@" >"$output_file" 2>"$stderr_file"
+  )
+}
+
 first_non_empty_line() {
   awk 'NF {print; exit}' "$1"
 }
@@ -165,19 +176,68 @@ if run_script "$case6_out" "$case6_err"; then
   printf 'FAIL: gather_commits.sh with no args unexpectedly succeeded\n'
   failures=$((failures + 1))
 else
-  printf 'PASS: gather_commits.sh with no args exits non-zero\n'
+  if grep -q '^usage: \.agents/skills/release-notes-author/scripts/gather_commits.sh <start-tag> <end-tag>$' "$case6_err"; then
+    printf 'PASS: gather_commits.sh with no args exits non-zero and prints usage\n'
+  else
+    printf 'FAIL: gather_commits.sh with no args did not print the expected usage line\n'
+    failures=$((failures + 1))
+  fi
 fi
 rm -f "$case6_out" "$case6_err"
 
 case7_out="$(mktemp)"
 case7_err="$(mktemp)"
-if run_script "$case7_out" "$case7_err" invalid-tag v0.5.1; then
+if run_script "$case7_out" "$case7_err" v0.5.0 v0.5.1 extra; then
+  printf 'FAIL: gather_commits.sh with extra args unexpectedly succeeded\n'
+  failures=$((failures + 1))
+else
+  printf 'PASS: gather_commits.sh rejects extra positional args\n'
+fi
+rm -f "$case7_out" "$case7_err"
+
+case8_out="$(mktemp)"
+case8_err="$(mktemp)"
+if run_script "$case8_out" "$case8_err" invalid-tag v0.5.1; then
   printf 'FAIL: gather_commits.sh with invalid tag unexpectedly succeeded\n'
   failures=$((failures + 1))
 else
   printf 'PASS: gather_commits.sh with an invalid tag exits non-zero\n'
 fi
-rm -f "$case7_out" "$case7_err"
+rm -f "$case8_out" "$case8_err"
+
+fixture_repo="$(mktemp -d)"
+fixture_out="$(mktemp)"
+fixture_err="$(mktemp)"
+(
+  cd "$fixture_repo" || exit 1
+  git init -q
+  git config user.name "Release Notes Test"
+  git config user.email "release-notes-test@example.com"
+  mkdir -p apps/node/src/feature
+  printf 'export const value = 1;\n' > apps/node/src/feature/old.ts
+  git add apps/node/src/feature/old.ts
+  git commit -q -m "feat: add temporary feature"
+  git tag v0.4.0
+  rm apps/node/src/feature/old.ts
+  git add -u
+  git commit -q -m "feat: remove temporary feature"
+  git tag v0.5.0
+)
+
+if run_script_in_repo "$fixture_repo" "$fixture_out" "$fixture_err" v0.4.0 v0.5.0; then
+  if grep -q '^CLASSIFICATION: keep$' "$fixture_out" && \
+    grep -q '^  apps/node/src/feature/old.ts  \[deleted\]\[src\]$' "$fixture_out"; then
+    printf 'PASS: synthetic deleted-src fixture is classified as keep with a deleted src file\n'
+  else
+    printf 'FAIL: synthetic deleted-src fixture did not emit a deleted src keep commit\n'
+    failures=$((failures + 1))
+  fi
+else
+  printf 'FAIL: synthetic deleted-src fixture invocation failed\n'
+  failures=$((failures + 1))
+fi
+rm -rf "$fixture_repo"
+rm -f "$fixture_out" "$fixture_err"
 
 if [[ "$failures" -ne 0 ]]; then
   printf 'FAIL: %s test case(s) failed\n' "$failures" >&2

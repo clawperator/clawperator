@@ -19,7 +19,7 @@ repo_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
 [[ -n "$repo_root" ]] || die "not inside a git repository"
 cd "$repo_root"
 
-if [[ $# -lt 2 ]]; then
+if [[ $# -ne 2 ]]; then
   usage
   exit 1
 fi
@@ -101,26 +101,6 @@ path_type() {
           printf 'infra'
           ;;
       esac
-      ;;
-  esac
-}
-
-surface_for_path() {
-  local path="$1"
-  local type="$2"
-  [[ "$type" != "infra" ]] || return 1
-  case "$path" in
-    apps/node/**)
-      printf 'node'
-      ;;
-    apps/android/**)
-      printf 'android'
-      ;;
-    docs/**|sites/docs/**|sites/landing/**)
-      printf 'docs'
-      ;;
-    *)
-      return 1
       ;;
   esac
 }

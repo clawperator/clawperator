@@ -7,6 +7,10 @@ description: Generate and insert a CHANGELOG entry for a version range by gather
 
 Use this skill to turn a git tag range into a `CHANGELOG.md` entry. The deterministic shell script makes every keep/drop decision. You only synthesize prose from the script output.
 
+Run: $release-notes-author v0.5.0 v0.5.1
+
+Use the same invocation shape with the tags you are backfilling. It maps to the gather script below.
+
 1. Run the gather script and print the full output before proceeding.
 
 ```bash
