@@ -2,7 +2,7 @@
 
 This is the short, practical release flow for Clawperator.
 
-For the full release reference, see `docs/release-reference.md`.
+For the full release reference, see `docs/internal/release-reference.md`.
 
 ## Release Model
 
