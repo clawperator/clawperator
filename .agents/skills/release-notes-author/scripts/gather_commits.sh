@@ -3,7 +3,11 @@
 set -euo pipefail
 
 usage() {
-  printf 'usage: .agents/skills/release-notes-author/scripts/gather_commits.sh <start-tag> <end-tag>\n' >&2
+  printf 'usage: .agents/skills/release-notes-author/scripts/gather_commits.sh <start-tag> <end-ref>\n' >&2
+  printf '  <start-tag>  must be an existing git tag (exclusive lower bound)\n' >&2
+  printf '  <end-ref>    a git tag, branch name, or commit SHA (inclusive upper bound)\n' >&2
+  printf '               when a tag, uses the tag creation date as the release date\n' >&2
+  printf '               when a branch or SHA, uses the commit committer date\n' >&2
 }
 
 die() {
@@ -31,8 +35,14 @@ require_cmd git
 require_cmd sort
 
 git rev-parse -q --verify "refs/tags/$START_TAG" >/dev/null || die "tag '$START_TAG' not found"
+
+# Resolve release date: prefer annotated/lightweight tag creation date; fall back to
+# committer date when END_TAG is a branch name or commit SHA (pre-tag workflow).
 release_date="$(git for-each-ref --format='%(creatordate:short)' "refs/tags/$END_TAG")"
-[[ -n "$release_date" ]] || die "tag '$END_TAG' not found"
+if [[ -z "$release_date" ]]; then
+  release_date="$(git log -1 --format='%cs' "$END_TAG" 2>/dev/null)" || true
+  [[ -n "$release_date" ]] || die "ref '$END_TAG' not found or resolves to no commits"
+fi
 
 printf 'RELEASE_DATE: %s\n' "$release_date"
 

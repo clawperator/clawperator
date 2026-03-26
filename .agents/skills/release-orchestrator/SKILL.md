@@ -20,7 +20,7 @@ For now, only accept prerelease-stage versions in the `0.x.y` series. Do not pro
    - Treat the next code version as the post-release unreleased version.
 2. Verify CHANGELOG entry exists before tagging.
    - Check that `CHANGELOG.md` contains a `## [<version>]` block for the intended release version.
-   - If the block is absent, run `$release-notes-author` for the appropriate tag range, review the generated entry, then merge it before proceeding.
+   - If the block is absent, run `$release-notes-author <previous-tag> main` (using the branch, not a tag, since the release tag does not exist yet). Review the generated entry, then merge it before proceeding.
    - Do not proceed to step 3 until the CHANGELOG entry is on the main branch.
 3. Create the release.
    - Run `$release-create` for the intended release version.
