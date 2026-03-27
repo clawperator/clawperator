@@ -100,3 +100,40 @@ export function resolveRoutingRule(eventName: string, rules: readonly RoutingRul
   // Should never happen with a "*" default, but fail safe
   return { prefix: "*", file: true, terminal: false, terminalInJsonMode: false };
 }
+
+// ---------------------------------------------------------------------------
+// Log path utilities (shared between logger and logs command)
+// ---------------------------------------------------------------------------
+
+import { homedir } from "node:os";
+import { join } from "node:path";
+
+/**
+ * Expand ~ to home directory.
+ */
+export function expandHomePath(pathValue: string): string {
+  if (pathValue === "~") {
+    return homedir();
+  }
+  if (pathValue.startsWith("~/")) {
+    return join(homedir(), pathValue.slice(2));
+  }
+  return pathValue;
+}
+
+/**
+ * Format a date as YYYY-MM-DD.
+ */
+export function formatDate(date: Date): string {
+  const year = String(date.getFullYear());
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * Format the daily log file path.
+ */
+export function formatLogPath(logDir: string, date = new Date()): string {
+  return join(logDir, `clawperator-${formatDate(date)}.log`);
+}

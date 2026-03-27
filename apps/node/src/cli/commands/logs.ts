@@ -3,33 +3,12 @@
  * Dumps existing content then streams new lines as they arrive.
  */
 import { createReadStream, existsSync, watchFile, unwatchFile, statSync } from "node:fs";
-import { homedir } from "node:os";
-import { join, resolve } from "node:path";
+import { resolve } from "node:path";
+import { expandHomePath, formatLogPath } from "../../contracts/logging.js";
 
 // ---------------------------------------------------------------------------
-// Log path resolution (mirrors logic in adapters/logger.ts)
+// Log path resolution (uses shared utilities from contracts/logging.ts)
 // ---------------------------------------------------------------------------
-
-function expandHomePath(pathValue: string): string {
-  if (pathValue === "~") {
-    return homedir();
-  }
-  if (pathValue.startsWith("~/")) {
-    return join(homedir(), pathValue.slice(2));
-  }
-  return pathValue;
-}
-
-function formatDate(date: Date): string {
-  const year = String(date.getFullYear());
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function formatLogPath(logDir: string, date = new Date()): string {
-  return join(logDir, `clawperator-${formatDate(date)}.log`);
-}
 
 function resolveLogPath(logDir?: string): string {
   const configuredDir =

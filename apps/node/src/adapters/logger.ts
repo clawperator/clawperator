@@ -1,6 +1,5 @@
 import { appendFileSync, mkdirSync } from "node:fs";
-import { homedir } from "node:os";
-import { join, resolve } from "node:path";
+import { resolve } from "node:path";
 import {
   type LogEvent,
   type LogLevel,
@@ -8,6 +7,8 @@ import {
   LEVEL_ORDER,
   resolveRoutingRule,
   DEFAULT_ROUTING_RULES,
+  expandHomePath,
+  formatLogPath,
 } from "../contracts/logging.js";
 
 // Re-export contract types for consumers
@@ -32,27 +33,6 @@ export interface Logger extends ClawperatorLogger {
 function normalizeLogLevel(level?: string): LogLevel {
   const lowered = level?.toLowerCase();
   return lowered === "debug" || lowered === "warn" || lowered === "error" ? lowered : "info";
-}
-
-function expandHomePath(pathValue: string): string {
-  if (pathValue === "~") {
-    return homedir();
-  }
-  if (pathValue.startsWith("~/")) {
-    return join(homedir(), pathValue.slice(2));
-  }
-  return pathValue;
-}
-
-function formatDate(date: Date): string {
-  const year = String(date.getFullYear());
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function formatLogPath(logDir: string, date = new Date()): string {
-  return join(logDir, `clawperator-${formatDate(date)}.log`);
 }
 
 function warnOnce(state: { warned: boolean }, message: string): void {
