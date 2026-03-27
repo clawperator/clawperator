@@ -49,15 +49,16 @@ export async function startServer(options: ServeOptions): Promise<Server> {
   // Log all requests when a logger is configured (filtered by log level at the file sink).
   // Without a logger, fall back to console.log only when --verbose is set (legacy behavior).
   app.use((req, _res, next) => {
+    const clientIp = req.socket.remoteAddress || "unknown";
     if (options.logger) {
       options.logger.emit({
         ts: new Date().toISOString(),
         level: "info",
         event: "serve.http.request",
-        message: `${req.method} ${req.url}`,
+        message: `${req.method} ${req.url} from ${clientIp}`,
       });
     } else if (options.verbose) {
-      console.log(`[HTTP] ${req.method} ${req.url}`);
+      console.log(`[HTTP] ${req.method} ${req.url} from ${clientIp}`);
     }
     next();
   });
@@ -533,12 +534,14 @@ export async function startServer(options: ServeOptions): Promise<Server> {
     res.setHeader("Connection", "keep-alive");
     res.flushHeaders();
 
+    const clientIp = req.socket.remoteAddress || "unknown";
+
     // Log client connection
     options.logger?.emit({
       ts: new Date().toISOString(),
       level: "info",
       event: "serve.sse.client.connected",
-      message: "SSE client connected",
+      message: `SSE client connected from ${clientIp}`,
     });
 
     const cleanup = () => {
@@ -588,7 +591,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
         ts: new Date().toISOString(),
         level: "info",
         event: "serve.sse.client.disconnected",
-        message: "SSE client disconnected",
+        message: `SSE client disconnected from ${clientIp}`,
       });
       cleanup();
     });

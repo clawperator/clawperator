@@ -61,6 +61,8 @@ async function dumpAndStreamContent(logPath: string): Promise<void> {
   return new Promise((resolve) => {
     let isRunning = true;
     let initialDumpComplete = false;
+    let maxSizeDuringDump = 0;
+    let pendingContentDuringDump: Array<{ start: number; end: number }> = [];
 
     // Handle SIGINT/SIGTERM gracefully - install BEFORE any I/O
     const handleSigint = () => {
@@ -77,36 +79,28 @@ async function dumpAndStreamContent(logPath: string): Promise<void> {
     let initialSize = 0;
     try {
       initialSize = statSync(logPath).size;
+      maxSizeDuringDump = initialSize;
     } catch {
       // If stat fails, we'll track from 0
     }
 
     // Start watching BEFORE the initial dump to avoid missing any events
-    watchFile(logPath, { interval: 500 }, (curr, prev) => {
+    watchFile(logPath, { interval: 500 }, (curr, _prev) => {
       if (!isRunning) return;
 
-      if (!initialDumpComplete) {
-        // During initial dump, just track the current size
-        // The initial dump reads up to initialSize, so any content
-        // between initialSize and curr.size will be streamed after
-        return;
-      }
+      // Track the maximum size seen during the dump
+      if (curr.size > maxSizeDuringDump) {
+        const newContentStart = maxSizeDuringDump;
+        maxSizeDuringDump = curr.size;
 
-      if (curr.size > prev.size) {
-        // File grew - read the new content
-        const stream = createReadStream(logPath, {
-          encoding: "utf8",
-          start: prev.size,
-          end: curr.size - 1,
-        });
+        if (!initialDumpComplete) {
+          // Queue this content to be emitted after the dump completes
+          pendingContentDuringDump.push({ start: newContentStart, end: curr.size - 1 });
+          return;
+        }
 
-        stream.on("data", (chunk: string | Buffer) => {
-          process.stdout.write(chunk.toString());
-        });
-
-        stream.on("error", (err) => {
-          process.stderr.write(`[clawperator] Error reading log: ${String(err)}\n`);
-        });
+        // Emit new content immediately
+        emitLogRange(logPath, newContentStart, curr.size - 1);
       }
     });
 
@@ -127,9 +121,14 @@ async function dumpAndStreamContent(logPath: string): Promise<void> {
         }
         process.stdout.write(buffer);
       }
+
+      // Now emit any content that arrived during the dump
+      for (const range of pendingContentDuringDump) {
+        emitLogRange(logPath, range.start, range.end);
+      }
+      pendingContentDuringDump = [];
+
       initialDumpComplete = true;
-      // After dump, watchFile will automatically pick up any new content
-      // because curr.size will be > prev.size
     });
 
     stream.on("error", (err) => {
@@ -137,5 +136,23 @@ async function dumpAndStreamContent(logPath: string): Promise<void> {
       // Still mark as complete so streaming can continue
       initialDumpComplete = true;
     });
+  });
+}
+
+function emitLogRange(logPath: string, start: number, end: number): void {
+  if (start > end) return;
+
+  const stream = createReadStream(logPath, {
+    encoding: "utf8",
+    start,
+    end,
+  });
+
+  stream.on("data", (chunk: string | Buffer) => {
+    process.stdout.write(chunk.toString());
+  });
+
+  stream.on("error", (err) => {
+    process.stderr.write(`[clawperator] Error reading log: ${String(err)}\n`);
   });
 }
