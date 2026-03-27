@@ -11,7 +11,7 @@ Prefer task packs over GitHub issues for project work. A good task pack is an ex
 
 Run: `$task-author <task-name> "<one-line goal>"`
 
-Use the task name as the folder name under `tasks/`. If the goal is ambiguous, ask the user the minimum clarifying question needed before writing the task pack.
+Use the task name as the folder name under `tasks/`. Use kebab-case such as `release-notes` or `api-refactor`. If the goal is ambiguous, ask the user the minimum clarifying question needed before writing the task pack.
 
 ## Agents Metadata
 
@@ -413,6 +413,7 @@ Hard rules are invariants, not advice. Write them in imperative voice. Examples:
 - Do not start the next PR until the previous PR is merged.
 - One commit per logical step. Do not batch unrelated changes.
 - Do not edit generated docs directly.
+- State how to handle plan deviations during execution: log and continue, or stop and escalate.
 - Update `findings.md` before each phase commit when the phase performs analysis, backfill, or judgment.
 - Put a script's test in the same phase and commit as the script it verifies. Do not defer test creation to a later phase.
 - Use the script output as authoritative. Do not re-derive the decision downstream.
