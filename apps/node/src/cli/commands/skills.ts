@@ -199,7 +199,7 @@ export async function cmdSkillsRun(
       skillId,
       message: bannerMessage,
     });
-  } else {
+  } else if (options.format !== "json") {
     process.stdout.write(`${bannerMessage}\n`);
   }
 
@@ -221,7 +221,7 @@ export async function cmdSkillsRun(
           skillId,
           message: validationMessage,
         });
-      } else {
+      } else if (options.format !== "json") {
         process.stderr.write(`${validationMessage}\n`);
       }
     }
@@ -326,7 +326,7 @@ export async function cmdSkillsValidate(
           skillId,
           message: validationMessage,
         });
-      } else {
+      } else if (options.format !== "json") {
         process.stderr.write(`${validationMessage}\n`);
       }
     }
