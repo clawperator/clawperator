@@ -1975,7 +1975,7 @@ Usage:
     } else if (rest[0] === "validate") {
       const dryRun = hasFlag(rest, "--dry-run");
       if (hasFlag(rest, "--all")) {
-        return (await import("./commands/skills.js")).cmdSkillsValidateAll({ ...out, dryRun });
+        return (await import("./commands/skills.js")).cmdSkillsValidateAll({ ...out, dryRun, logger });
       } else if (!rest[1]) {
         return JSON.stringify({ code: "USAGE", message: "skills validate <skill_id> [--dry-run] | skills validate --all [--dry-run]" });
       } else {

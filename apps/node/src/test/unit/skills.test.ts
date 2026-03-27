@@ -37,6 +37,7 @@ import {
   SKILL_OUTPUT_ASSERTION_FAILED,
   SKILL_ALREADY_EXISTS,
   SKILL_ID_INVALID,
+  REGISTRY_READ_FAILED,
   SKILL_VALIDATION_FAILED,
 } from "../../contracts/skills.js";
 
@@ -587,7 +588,36 @@ describe("skills validate dry-run", () => {
 
   it("emits cli.validation for script-only skills in bulk dry-run validation", async () => {
     const tempLogDir = await mkdtemp(join(tmpdir(), "clawperator-validate-all-json-logs-"));
+    const tempRegistryRoot = await mkdtemp(join(tmpdir(), "clawperator-validate-all-registry-"));
     try {
+      const tempRegistryDir = join(tempRegistryRoot, "skills");
+      const tempSkillDir = join(tempRegistryDir, TEST_SKILL_SCRIPT_ONLY);
+      await mkdir(join(tempSkillDir, "scripts"), { recursive: true });
+      await copyFile(
+        join(packageRoot, "src", "test", "fixtures", "skills", TEST_SKILL_SCRIPT_ONLY, "scripts", "run.js"),
+        join(tempSkillDir, "scripts", "run.js")
+      );
+      await copyFile(
+        join(packageRoot, "src", "test", "fixtures", "skills", TEST_SKILL_SCRIPT_ONLY, "SKILL.md"),
+        join(tempSkillDir, "SKILL.md")
+      );
+      const skillJsonRaw = await readFile(
+        join(packageRoot, "src", "test", "fixtures", "skills", TEST_SKILL_SCRIPT_ONLY, "skill.json"),
+        "utf8"
+      );
+      const skillJson = JSON.parse(skillJsonRaw) as { artifacts?: unknown[] };
+      const registrySkillJson = { ...skillJson, artifacts: [] };
+      await writeFile(
+        join(tempSkillDir, "skill.json"),
+        `${JSON.stringify(registrySkillJson, null, 2)}\n`,
+        "utf8"
+      );
+      await writeFile(
+        join(tempRegistryDir, "skills-registry.json"),
+        `${JSON.stringify({ schemaVersion: "1", skills: [registrySkillJson] }, null, 2)}\n`,
+        "utf8"
+      );
+
       const { stdout, stderr, code } = await runCli([
         "skills",
         "validate",
@@ -600,12 +630,12 @@ describe("skills validate dry-run", () => {
       ], {
         env: {
           ...process.env,
-          CLAWPERATOR_SKILLS_REGISTRY: TEST_REGISTRY_PATH,
+          CLAWPERATOR_SKILLS_REGISTRY: join(tempRegistryDir, "skills-registry.json"),
           CLAWPERATOR_LOG_DIR: tempLogDir,
         },
       });
 
-      assert.notStrictEqual(code, 0, stdout);
+      assert.strictEqual(code, 0, stdout);
       assert.ok(!stderr.includes("Payload validation skipped"), stderr);
       const contents = await readFile(getLogPathForDir(tempLogDir), "utf8");
       const events = parseLogEvents(contents);
@@ -613,6 +643,7 @@ describe("skills validate dry-run", () => {
       assert.ok(validationEvent, "Expected cli.validation for script-only skills");
       assert.strictEqual(validationEvent?.level, "debug");
     } finally {
+      await rm(tempRegistryRoot, { recursive: true, force: true });
       await rm(tempLogDir, { recursive: true, force: true });
     }
   });
@@ -1245,6 +1276,29 @@ describe("scaffoldSkill", () => {
       assert.strictEqual(parsed.valid, true);
       assert.strictEqual(parsed.totalSkills, 2);
       assert.strictEqual(parsed.validSkills?.length, 2);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("CLI skills validate --all returns structured registry errors", async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-skill-validate-all-registry-error-"));
+    const registryDir = join(tempRoot, "skills");
+    const registryPath = join(registryDir, "skills-registry.json");
+    await mkdir(registryDir, { recursive: true });
+    await writeFile(registryPath, "{ not valid json", "utf8");
+
+    try {
+      const validateResult = await runCli(["skills", "validate", "--all", "--output", "json"], {
+        env: {
+          ...process.env,
+          CLAWPERATOR_SKILLS_REGISTRY: registryPath,
+        },
+      });
+      assert.strictEqual(validateResult.code, 1, validateResult.stderr);
+      const parsed = JSON.parse(validateResult.stdout) as { code?: string; message?: string };
+      assert.strictEqual(parsed.code, REGISTRY_READ_FAILED);
+      assert.ok(parsed.message);
     } finally {
       await rm(tempRoot, { recursive: true, force: true });
     }
