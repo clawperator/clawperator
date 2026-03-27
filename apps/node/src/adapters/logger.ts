@@ -63,6 +63,20 @@ function warnOnce(state: { warned: boolean }, message: string): void {
   process.stderr.write(message);
 }
 
+function mergeDefinedContext(
+  base: Partial<LogEvent> | undefined,
+  overlay: Partial<LogEvent>
+): Partial<LogEvent> {
+  const merged: Partial<LogEvent> = base ? { ...base } : {};
+  const target = merged as Record<string, unknown>;
+  for (const [key, value] of Object.entries(overlay) as Array<[keyof LogEvent, LogEvent[keyof LogEvent]]>) {
+    if (value !== undefined) {
+      target[key] = value;
+    }
+  }
+  return merged;
+}
+
 // ---------------------------------------------------------------------------
 // Unified logger factory
 // ---------------------------------------------------------------------------
@@ -119,9 +133,7 @@ export function createClawperatorLogger(options?: CreateClawperatorLoggerOptions
   function buildLogger(defaultContext?: Partial<LogEvent>): Logger {
     function emitEvent(event: LogEvent): void {
       // Merge child context into event. Explicit event fields take precedence.
-      const merged: LogEvent = defaultContext
-        ? { ...defaultContext, ...event } as LogEvent
-        : event;
+      const merged = mergeDefinedContext(defaultContext, event) as LogEvent;
 
       const rule = resolveRoutingRule(merged.event, DEFAULT_ROUTING_RULES);
       const alwaysWriteToFile = merged.event === "skills.run.output";
@@ -150,9 +162,7 @@ export function createClawperatorLogger(options?: CreateClawperatorLoggerOptions
       log: emitEvent,
 
       child(childContext: Partial<LogEvent>): Logger {
-        const mergedContext: Partial<LogEvent> = defaultContext
-          ? { ...defaultContext, ...childContext }
-          : childContext;
+        const mergedContext = mergeDefinedContext(defaultContext, childContext);
         return buildLogger(mergedContext);
       },
 

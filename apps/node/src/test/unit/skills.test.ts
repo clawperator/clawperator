@@ -585,6 +585,38 @@ describe("skills validate dry-run", () => {
     }
   });
 
+  it("emits cli.validation for script-only skills in bulk dry-run validation", async () => {
+    const tempLogDir = await mkdtemp(join(tmpdir(), "clawperator-validate-all-json-logs-"));
+    try {
+      const { stdout, stderr, code } = await runCli([
+        "skills",
+        "validate",
+        "--all",
+        "--dry-run",
+        "--log-level",
+        "debug",
+        "--output",
+        "json",
+      ], {
+        env: {
+          ...process.env,
+          CLAWPERATOR_SKILLS_REGISTRY: TEST_REGISTRY_PATH,
+          CLAWPERATOR_LOG_DIR: tempLogDir,
+        },
+      });
+
+      assert.notStrictEqual(code, 0, stdout);
+      assert.ok(!stderr.includes("Payload validation skipped"), stderr);
+      const contents = await readFile(getLogPathForDir(tempLogDir), "utf8");
+      const events = parseLogEvents(contents);
+      const validationEvent = events.find((event) => event.event === "cli.validation" && event.skillId === TEST_SKILL_SCRIPT_ONLY);
+      assert.ok(validationEvent, "Expected cli.validation for script-only skills");
+      assert.strictEqual(validationEvent?.level, "debug");
+    } finally {
+      await rm(tempLogDir, { recursive: true, force: true });
+    }
+  });
+
   it("emits JSON-parseable output for dry-run success and failure", async () => {
     const success = await runCli([
       "skills",
@@ -1869,6 +1901,41 @@ describe("cmdSkillsRun preflight gate", () => {
     assert.strictEqual(runCalls, 1);
     assert.strictEqual(parsed.skillId, TEST_SKILL_VALID_ARTIFACT);
     assert.strictEqual(parsed.output, "RUN_OK");
+  });
+
+  it("validates before querying APK state in cmdSkillsRun", async () => {
+    let runCalls = 0;
+    const fakeRunSkill = async () => {
+      runCalls += 1;
+      return {
+        ok: true,
+        skillId: TEST_SKILL_VALID_ARTIFACT,
+        output: "RUN_OK",
+        exitCode: 0,
+        durationMs: 1,
+      } as const;
+    };
+
+    const stdout = await cmdSkillsRun(
+      TEST_SKILL_INVALID_ARTIFACT,
+      [],
+      undefined,
+      undefined,
+      undefined,
+      {
+        format: "json",
+        runSkillImpl: fakeRunSkill as typeof runSkill,
+        validateSkillImpl: async () => ({
+          ok: false,
+          code: SKILL_VALIDATION_FAILED,
+          message: "Skill not found: com.test.invalid",
+        }),
+      }
+    );
+    const parsed = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(runCalls, 0);
+    assert.strictEqual(parsed.code, SKILL_VALIDATION_FAILED);
+    assert.match(parsed.message ?? "", /Skill not found/);
   });
 
   it("keeps cmdSkillsRun silent in JSON mode without a logger", async () => {
