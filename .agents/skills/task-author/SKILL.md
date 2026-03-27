@@ -80,20 +80,33 @@ Do not pre-author `findings.md` unless the user explicitly wants a starter scaff
 
 Use `plan.md` for the decisions that should remain stable across all later phases and PRs.
 
+Near the top of the file, include a dedicated `Status` section. This should summarize execution state, not just say "open" or "in progress."
+
 Include:
 
 1. Title and goal
-2. Why the task exists now
-3. In-scope work
-4. Out-of-scope work
-5. Surface map and ownership boundaries
-6. Canonical source-of-truth files
-7. Deterministic versus judgment split
-8. Decision tables, lookup tables, or state tables for branchy behavior
-9. Failure modes the task is designed to prevent
-10. Output contract or acceptance target
-11. Idempotency contract when outputs can be rerun
-12. Durable follow-up destinations for knowledge that must outlive `tasks/`
+2. `Status` summary with completed phases, remaining phases, and overall state
+3. Why the task exists now
+4. In-scope work
+5. Out-of-scope work
+6. Surface map and ownership boundaries
+7. Canonical source-of-truth files
+8. Deterministic versus judgment split
+9. Decision tables, lookup tables, or state tables for branchy behavior
+10. Failure modes the task is designed to prevent
+11. Output contract or acceptance target
+12. Idempotency contract when outputs can be rerun
+13. Durable follow-up destinations for knowledge that must outlive `tasks/`
+
+The `Status` section should be explicit enough that a new agent can tell, at a glance:
+
+- whether the task is not started, active, blocked, or partially complete
+- how many phases or PRs are complete
+- how many phases or PRs remain
+- which phase is currently active or next
+- whether execution is waiting on merge, review, or an external prerequisite
+
+For multi-phase work, prefer a compact status table over a single sentence.
 
 Use tables whenever a rule has branches. Prefer first-match-wins lookup tables over explanatory prose.
 
@@ -104,6 +117,7 @@ Use `work-breakdown.md` for the steps the implementing agent will follow literal
 Start with:
 
 - parent plan reference
+- `Status`
 - `Hard Rules`
 - `Required Reading`
 - PR or phase sequencing table
@@ -118,6 +132,14 @@ For every phase, include:
 - Expected commit message
 
 When work spans multiple PRs, say explicitly: do not start the next PR until the previous one is merged.
+
+The `Status` section in `work-breakdown.md` should mirror execution reality and be update-friendly. It should summarize:
+
+- total phases or PRs
+- completed phases or PRs
+- remaining phases or PRs
+- current or next phase
+- any merge gate or blocking dependency preventing the next step
 
 ## Hard Rules
 
