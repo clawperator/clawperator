@@ -13,21 +13,18 @@ if [[ ! -f "$message_file" ]]; then
   exit 1
 fi
 
+repo_root="$(cd "$(dirname "$0")/.." && pwd)"
+policy_file="$repo_root/validation/commit_message_policy.sh"
+if [[ ! -f "$policy_file" ]]; then
+  echo "commit message policy file not found: $policy_file" >&2
+  exit 1
+fi
+# shellcheck source=/dev/null
+source "$policy_file"
+
 lines=()
 while IFS= read -r line || [[ -n "$line" ]]; do
-  if [[ "$line" =~ ^Co-Authored-By:[[:space:]]*Claude\  ]]; then
-    continue
-  fi
-  if [[ "$line" =~ ^Made[[:space:]]+With:[[:space:]]*Cursor([[:space:]].*)?$ ]]; then
-    continue
-  fi
-  if [[ "$line" =~ ^Made[[:space:]]+with[[:space:]]+Cursor([[:space:]].*)?$ ]]; then
-    continue
-  fi
-  if [[ "$line" =~ ^Generated[[:space:]]+with[[:space:]]+Cursor([[:space:]].*)?$ ]]; then
-    continue
-  fi
-  if [[ "$line" =~ ^Co-Authored-By:[[:space:]]*Cursor([[:space:]].*)?$ ]]; then
+  if is_forbidden_attribution_line "$line"; then
     continue
   fi
   lines+=("$line")

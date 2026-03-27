@@ -37,4 +37,5 @@ Expected output:
 ## Notes
 
 - This setup is local per clone and only needs to be run once.
-- CI commit-message validation still protects pull requests when local hooks are not configured.
+- This is a convenience layer, not the primary enforcement layer.
+- CI commit-message validation is the repo-wide required guard that blocks forbidden commit-message attribution lines from merging to `main`.

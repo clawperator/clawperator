@@ -14,7 +14,14 @@ if [[ "$base_sha" == "$head_sha" ]]; then
   exit 0
 fi
 
-pattern='^(Co-Authored-By:[[:space:]]*Claude .*$|Made[[:space:]]+With:[[:space:]]*Cursor([[:space:]].*)?$|Made[[:space:]]+with[[:space:]]+Cursor([[:space:]].*)?$|Generated[[:space:]]+with[[:space:]]+Cursor([[:space:]].*)?$|Co-Authored-By:[[:space:]]*Cursor([[:space:]].*)?$)'
+repo_root="$(git rev-parse --show-toplevel)"
+policy_file="$repo_root/validation/commit_message_policy.sh"
+if [[ ! -f "$policy_file" ]]; then
+  echo "commit message policy file not found: $policy_file" >&2
+  exit 1
+fi
+# shellcheck source=/dev/null
+source "$policy_file"
 
 violations=0
 
@@ -22,19 +29,24 @@ while IFS= read -r commit_sha; do
   [[ -z "$commit_sha" ]] && continue
 
   commit_message="$(git log -1 --format=%B "$commit_sha")"
-  scan_output_file="$(mktemp)"
-  if printf '%s\n' "$commit_message" | rg -n "$pattern" >"$scan_output_file"; then
-    if [[ $violations -eq 0 ]]; then
-      echo "Forbidden attribution lines detected in commit messages:"
+  commit_has_violations=0
+  line_number=0
+
+  while IFS= read -r message_line || [[ -n "$message_line" ]]; do
+    line_number=$((line_number + 1))
+    if is_forbidden_attribution_line "$message_line"; then
+      if [[ $commit_has_violations -eq 0 ]]; then
+        if [[ $violations -eq 0 ]]; then
+          echo "Forbidden attribution lines detected in commit messages:"
+        fi
+        violations=1
+        commit_has_violations=1
+        echo
+        echo "Commit: $commit_sha"
+      fi
+      printf '%s:%s\n' "$line_number" "$message_line"
     fi
-    violations=1
-    echo
-    echo "Commit: $commit_sha"
-    while IFS= read -r matched_line; do
-      printf '%s\n' "$matched_line"
-    done < "$scan_output_file"
-  fi
-  rm -f "$scan_output_file"
+  done <<< "$commit_message"
 done < <(git rev-list --reverse "${base_sha}..${head_sha}")
 
 if [[ $violations -ne 0 ]]; then
