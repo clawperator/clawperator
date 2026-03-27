@@ -51,6 +51,12 @@ export interface ClawperatorLogger {
 // Routing rules
 // ---------------------------------------------------------------------------
 
+/**
+ * Terminal routing intentionally ignores the log-level threshold.
+ * Only the file sink applies the level gate. A debug-level cli.banner
+ * appears on stderr in pretty mode regardless of --log-level because
+ * terminal output respects output format, not log level.
+ */
 export interface RoutingRule {
   /** Event name prefix to match (first-match-wins). Use "*" for default. */
   prefix: string;
