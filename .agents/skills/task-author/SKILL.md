@@ -53,6 +53,7 @@ Your job is to make shortcuts harder than doing it right.
 5. Decide phase count and PR boundaries.
    - Use the phase-decision table in this skill.
    - Decide explicitly whether the work is 1 phase in 1 PR, multiple phases in 1 PR, or multiple PRs with merge gates.
+   - Assign an agent or model tier to each phase using the `fast`, `default`, and `thinking` categories below.
 6. Draft `plan.md`.
    - Include the required sections in the required order.
    - Make the stable decisions here, not in `work-breakdown.md`.
@@ -143,6 +144,18 @@ Do not collapse strategy and execution into one file.
 Do not pre-author `findings.md` unless the user explicitly wants a starter scaffold. Usually the right move is to define its required structure in `plan.md` or `work-breakdown.md` and tell the implementer when to create it.
 
 For tasks that include synthesis, classification, runtime observation, or judgment-heavy review, do not create `findings.md` up front, but do specify its full required structure in `work-breakdown.md`. The file creation is deferred; the structure is not.
+
+## Agent Tiers
+
+Every phase should name the expected agent or model tier to use.
+
+Use these three categories:
+
+- `fast`: Mechanical, low-ambiguity work. Good for straightforward scaffolding, cleanup, file moves, rote edits, and deterministic follow-through where the failure cost is low.
+- `default`: Normal implementation work. Good for most feature work, validation, and moderate-complexity edits where some judgment is needed but the task is still bounded.
+- `thinking`: High-judgment or high-risk work. Good for planning, architecture, contract design, subtle refactors, synthesis-heavy content, and phases where a wrong choice would cascade into later failures.
+
+Do not leave model choice implicit. The task pack should say which tier each phase expects.
 
 ## Output Skeletons
 
@@ -235,11 +248,14 @@ Parent plan: `tasks/<task-name>/plan.md`
 <Files to read before starting>
 
 ## PR / Phase Plan
-| PR | Purpose | Included phases | Merge gate |
-| --- | --- | --- | --- |
-| PR-1 | <purpose> | <phase ids> | <gate> |
+| PR | Purpose | Included phases | Agent tier | Merge gate |
+| --- | --- | --- | --- | --- |
+| PR-1 | <purpose> | <phase ids> | <fast/default/thinking> | <gate> |
 
 ## Phase <n>: <Title>
+
+### Agent Tier
+<fast / default / thinking>
 
 ### Goal
 <Single deliverable>
@@ -351,6 +367,7 @@ Start with:
 
 For every phase, include:
 
+- Agent tier
 - Goal
 - Files or surfaces to change
 - Steps
@@ -373,6 +390,7 @@ The `Executive Summary` in `work-breakdown.md` should restate the execution shap
 - total PRs
 - total phases
 - which phases live in which PRs
+- which agent tier each phase should use
 - whether the work is currently in planning, active execution, waiting for merge, or final cleanup
 
 If the work exceeds roughly 6-8 phases, prefer splitting it into multiple task packs with explicit sequencing instead of one oversized `work-breakdown.md`.
@@ -557,6 +575,16 @@ Use this default decision rule:
 If multiple phases live in one PR, say so explicitly in the sequencing table.
 
 If each phase needs independent review, different model tiers, or separate merge checkpoints, put them in separate PRs.
+
+Assign agent tiers explicitly:
+
+| Phase type | Default tier |
+| --- | --- |
+| Mechanical setup, cleanup, rote restructuring, straightforward validation reruns | `fast` |
+| Normal implementation, bounded bug fixes, routine feature work, moderate validation | `default` |
+| Planning, architecture, tricky refactors, synthesis-heavy docs, contract design, or risky cross-surface work | `thinking` |
+
+When in doubt, bias upward for planning and downward for cleanup. Do not assign `fast` to a phase whose mistakes would force later phases to be re-planned.
 
 Budget for multiple passes on content-heavy phases. In this repo, content work should generally be treated as draft-plus-refine rather than one-shot output.
 
