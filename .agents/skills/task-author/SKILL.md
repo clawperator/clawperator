@@ -92,6 +92,7 @@ Useful commands:
 
 ```bash
 git log --oneline -- tasks
+git log --all --oneline -- tasks
 find tasks -maxdepth 3 -type f | sort
 git show <sha>:tasks/<path>/plan.md
 git show <sha>:tasks/<path>/work-breakdown.md
@@ -383,6 +384,8 @@ If the work exceeds roughly 6-8 phases, prefer splitting it into multiple task p
 - any existing repo skill the implementing agent should use instead of re-deriving behavior
 - an exemplar file or prior task artifact when structure matters
 
+The reading order matters. Tell the implementing agent to read the files in the listed order before writing anything. Put governing documents first, exemplars second, and task-specific execution detail after that.
+
 Prefer this shape:
 
 ```md
@@ -393,6 +396,12 @@ Prefer this shape:
 | `tasks/<task-name>/plan.md` | Stable contract and scope boundaries |
 | `<path>` | Authoritative behavior or output contract |
 | `<path>` | Exemplar or companion workflow |
+```
+
+When order is important, state it explicitly:
+
+```md
+Read these files IN THIS ORDER before writing anything.
 ```
 
 ## Hard Rules
@@ -481,6 +490,40 @@ If the task changes code and authored public docs in the same effort, keep the d
 
 More generally: when a phase can be handled by an existing repo skill, reference that skill by path instead of re-specifying its full behavior. Check `.agents/skills/` for relevant skills before writing phase instructions from scratch.
 
+## Exemplar-Driven Handoffs
+
+When a task produces multiple similar outputs, establish an exemplar early instead of expecting the implementing agent to infer the bar.
+
+Use this pattern when the task has 3 or more similar deliverables such as:
+
+- docs pages
+- migration edits across many files
+- repeated config or metadata updates
+- repeated generated-but-reviewed outputs
+
+In those cases:
+
+1. Complete one output first as the exemplar, or point to an already-strong repo example.
+2. Name the exemplar file path in `Required Reading`.
+3. State exactly why it is the exemplar:
+   - depth
+   - exact defaults from code
+   - examples
+   - validation patterns
+   - error coverage
+4. Instruct later phases to match that quality bar instead of inventing their own.
+
+If the first pass comes back below the bar, the task pack should support a correction loop. A good correction prompt:
+
+1. Names the specific rejected commit
+2. States what was wrong using concrete examples from the actual output
+3. Points to the exemplar or exemplar diff:
+   - `git diff <bad>..<good> -- <file>`
+4. Restates the expected workflow
+5. Lists the remaining files or steps in order
+
+When the task has 3 or more similar outputs, include exemplar references and the expected correction-loop pattern in `work-breakdown.md`.
+
 ## Phase Design
 
 Split non-trivial work into independently reviewable phases.
@@ -511,6 +554,15 @@ Use this default decision rule:
 If multiple phases live in one PR, say so explicitly in the sequencing table.
 
 If each phase needs independent review, different model tiers, or separate merge checkpoints, put them in separate PRs.
+
+Budget for multiple passes on content-heavy phases. In this repo, content work should generally be treated as draft-plus-refine rather than one-shot output.
+
+For content-heavy phases:
+
+- assume the first pass is a draft
+- include an explicit reread or refine step
+- budget at least two commits per file or deliverable when the work is repeated across many similar outputs
+- do not treat the first authoring pass as the final quality gate
 
 ## Commit Discipline
 
