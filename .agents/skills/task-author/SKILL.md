@@ -191,6 +191,10 @@ Keep repo surface boundaries explicit:
 
 If the task changes a public contract, CLI behavior, setup flow, or user-visible runtime behavior, require corresponding docs updates in the same task pack.
 
+When the task pack includes authored public-doc work, explicitly call the implementing agent to use `.agents/skills/docs-author/SKILL.md` for the documentation phase or subphase. Do not leave public-doc updates as a generic "update docs" instruction.
+
+If the task changes code and authored public docs in the same effort, keep the docs work tied to the same task pack and point the docs phase at `docs/` as the authored source of truth, not `sites/docs/.build/` or `sites/docs/site/`.
+
 ## Phase Design
 
 Split non-trivial work into independently reviewable phases.
