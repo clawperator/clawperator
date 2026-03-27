@@ -1,0 +1,96 @@
+/**
+ * Unified logging contract for Clawperator.
+ *
+ * All event routing, level thresholds, and schema definitions live here.
+ * The routing table and naming table are authoritative - do not re-derive.
+ */
+
+// ---------------------------------------------------------------------------
+// Log levels
+// ---------------------------------------------------------------------------
+
+export type LogLevel = "debug" | "info" | "warn" | "error";
+
+export const LEVEL_ORDER: ReadonlyMap<LogLevel, number> = new Map([
+  ["debug", 0],
+  ["info", 1],
+  ["warn", 2],
+  ["error", 3],
+]);
+
+// ---------------------------------------------------------------------------
+// LogEvent schema
+// ---------------------------------------------------------------------------
+
+export interface LogEvent {
+  ts: string;
+  level: LogLevel;
+  event: string;
+  message: string;
+  commandId?: string;
+  taskId?: string;
+  deviceId?: string;
+  skillId?: string;
+  stream?: "stdout" | "stderr";
+  status?: string;
+  durationMs?: number;
+  exitCode?: number;
+}
+
+// ---------------------------------------------------------------------------
+// ClawperatorLogger interface
+// ---------------------------------------------------------------------------
+
+export interface ClawperatorLogger {
+  emit(event: LogEvent): void;
+  child(defaultContext: Partial<LogEvent>): ClawperatorLogger;
+  logPath(): string | undefined;
+}
+
+// ---------------------------------------------------------------------------
+// Routing rules
+// ---------------------------------------------------------------------------
+
+export interface RoutingRule {
+  /** Event name prefix to match (first-match-wins). Use "*" for default. */
+  prefix: string;
+  /** Whether to write to the NDJSON log file. */
+  file: boolean;
+  /** Whether to write to the terminal (stderr in pretty mode). */
+  terminal: boolean;
+  /** If true, terminal output is suppressed in JSON output mode even when terminal is true. */
+  terminalInJsonMode: boolean;
+}
+
+/**
+ * Default routing rules implementing the event routing table from plan.md.
+ * First-match-wins prefix lookup. Do not re-derive - use verbatim.
+ *
+ * | Event category                | File | Terminal | In JSON mode |
+ * |-------------------------------|------|----------|--------------|
+ * | skills.run.output             | Yes  | No       | No           |
+ * | cli.                          | Yes  | Yes      | No           |
+ * | doctor.                       | Yes  | Yes      | No           |
+ * | serve.                        | Yes  | No       | No           |
+ * | * (default)                   | Yes  | No       | No           |
+ */
+export const DEFAULT_ROUTING_RULES: readonly RoutingRule[] = [
+  { prefix: "skills.run.output", file: true, terminal: false, terminalInJsonMode: false },
+  { prefix: "cli.", file: true, terminal: true, terminalInJsonMode: false },
+  { prefix: "doctor.", file: true, terminal: true, terminalInJsonMode: false },
+  { prefix: "serve.", file: true, terminal: false, terminalInJsonMode: false },
+  { prefix: "*", file: true, terminal: false, terminalInJsonMode: false },
+];
+
+/**
+ * Resolve the routing rule for a given event name using first-match-wins prefix lookup.
+ */
+export function resolveRoutingRule(eventName: string, rules: readonly RoutingRule[] = DEFAULT_ROUTING_RULES): RoutingRule {
+  for (const rule of rules) {
+    if (rule.prefix === "*" || eventName.startsWith(rule.prefix)) {
+      return rule;
+    }
+  }
+  // Should never happen with a "*" default, but fail safe
+  return { prefix: "*", file: true, terminal: false, terminalInJsonMode: false };
+}
