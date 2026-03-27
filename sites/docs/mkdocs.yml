@@ -55,6 +55,7 @@ nav:
   - API:
       - Overview: api/overview.md
       - CLI Reference: api/cli.md
+      - Logging: api/logging.md
       - Actions: api/actions.md
       - Selectors: api/selectors.md
       - Snapshot Format: api/snapshot.md
