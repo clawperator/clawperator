@@ -52,7 +52,17 @@ Create these files for a new task pack:
 - `tasks/<task-name>/plan.md`
 - `tasks/<task-name>/work-breakdown.md`
 
-Use a scoped path such as `tasks/android/<task-name>/` or `tasks/docs/<task-name>/` only when repo history for that surface already uses it or when the grouping materially improves navigation.
+Use these common scoped paths by default when the task is clearly dominated by one surface:
+
+| Task type | Default task path |
+| --- | --- |
+| Android-heavy work | `tasks/android/<task-name>/` |
+| Node-heavy work | `tasks/node/<task-name>/` |
+| Docs-heavy work | `tasks/docs/<task-name>/` |
+
+Use the unscoped form `tasks/<task-name>/` when the task is genuinely cross-surface and no single area clearly owns it.
+
+Check repo history only to refine naming and structure within the chosen area. Do not leave surface scoping as an open-ended judgment call when one of the default mappings above clearly applies.
 
 Create these only when justified:
 
