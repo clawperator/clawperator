@@ -10,6 +10,22 @@ Use this page as the routing index into the authored docs. The concrete machine 
 
 ---
 
+## Version Quick Reference
+
+Check your CLI version:
+
+```bash
+clawperator version
+```
+
+Check CLI and APK compatibility:
+
+```bash
+clawperator version --check-compat --device <device_serial> --operator-package <package>
+```
+
+See [Version Compatibility](troubleshooting/compatibility.md) for detailed compatibility rules and recovery.
+
 ## Agent Entry Points
 
 - [llms.txt](https://docs.clawperator.com/llms.txt) - compact machine entrypoint
