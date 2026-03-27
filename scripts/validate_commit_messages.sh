@@ -28,6 +28,31 @@ violations=0
 while IFS= read -r commit_sha; do
   [[ -z "$commit_sha" ]] && continue
 
+  author_name="$(git log -1 --format=%an "$commit_sha")"
+  author_email="$(git log -1 --format=%ae "$commit_sha")"
+  committer_name="$(git log -1 --format=%cn "$commit_sha")"
+  committer_email="$(git log -1 --format=%ce "$commit_sha")"
+
+  if is_forbidden_identity "$author_name" "$author_email"; then
+    if [[ $violations -eq 0 ]]; then
+      echo "Forbidden attribution markers detected in PR commit range:"
+    fi
+    violations=1
+    echo
+    echo "Commit: $commit_sha"
+    echo "Author identity triggers policy: $author_name <$author_email>"
+  fi
+
+  if is_forbidden_identity "$committer_name" "$committer_email"; then
+    if [[ $violations -eq 0 ]]; then
+      echo "Forbidden attribution markers detected in PR commit range:"
+    fi
+    violations=1
+    echo
+    echo "Commit: $commit_sha"
+    echo "Committer identity triggers policy: $committer_name <$committer_email>"
+  fi
+
   commit_message="$(git log -1 --format=%B "$commit_sha")"
   commit_has_violations=0
   line_number=0
@@ -37,7 +62,7 @@ while IFS= read -r commit_sha; do
     if is_forbidden_attribution_line "$message_line"; then
       if [[ $commit_has_violations -eq 0 ]]; then
         if [[ $violations -eq 0 ]]; then
-          echo "Forbidden attribution lines detected in commit messages:"
+          echo "Forbidden attribution markers detected in PR commit range:"
         fi
         violations=1
         commit_has_violations=1
@@ -51,7 +76,7 @@ done < <(git rev-list --reverse "${base_sha}..${head_sha}")
 
 if [[ $violations -ne 0 ]]; then
   echo
-  echo "Remove AI attribution trailers from commit messages and retry."
+  echo "Remove AI attribution markers from commit messages and commit identities, then retry."
   exit 1
 fi
 

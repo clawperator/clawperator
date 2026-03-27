@@ -30,3 +30,31 @@ is_forbidden_attribution_line() {
 
   return "$matched"
 }
+
+is_forbidden_identity() {
+  local person_name="${1-}"
+  local person_email="${2-}"
+  local had_nocasematch=0
+  local matched=1
+
+  if shopt -q nocasematch; then
+    had_nocasematch=1
+  fi
+  shopt -s nocasematch
+
+  if [[ "$person_name" =~ ^[[:space:]]*Claude([[:space:]].*)?$ ]]; then
+    matched=0
+  elif [[ "$person_email" =~ ^[[:space:]]*noreply@anthropic\.com[[:space:]]*$ ]]; then
+    matched=0
+  elif [[ "$person_email" =~ ^[[:space:]]*.*\+claude@users\.noreply\.github\.com[[:space:]]*$ ]]; then
+    matched=0
+  elif [[ "$person_email" =~ ^[[:space:]]*claude@users\.noreply\.github\.com[[:space:]]*$ ]]; then
+    matched=0
+  fi
+
+  if [[ $had_nocasematch -eq 0 ]]; then
+    shopt -u nocasematch
+  fi
+
+  return "$matched"
+}

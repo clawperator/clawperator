@@ -10,14 +10,18 @@ Maintainers may request changes before merging.
 
 Policy target: AI attribution trailers must not land in `main`.
 
-- Primary enforcement (required): CI checks every commit in the PR range and fails when forbidden attribution lines are present. This blocks merge to `main`, including squash-merge workflows, because the PR commit range is validated before merge.
+- Primary enforcement (required): CI checks every commit in the PR range and fails when forbidden attribution markers are present. This blocks merge to `main`, including squash-merge workflows, because the PR commit range is validated before merge.
 - Local convenience (optional, per clone): `.githooks/commit-msg` strips forbidden lines from the commit message during local commit creation when hooks are enabled.
   - enable once per clone: `git config core.hooksPath .githooks && chmod +x .githooks/commit-msg`
   - agent setup path: `.agents/skills/repo-setup/SKILL.md`
-- Matched forbidden lines (case-insensitive):
+- Matched forbidden commit-message lines (case-insensitive):
   - `Co-Authored-By: Claude ` (prefix match for model/version variants)
   - `Co-Authored-By: Cursor ...`
   - `Made With: Cursor` and `Made with Cursor`
   - `Generated with Cursor`
+- Matched forbidden commit identities in PR commit metadata (case-insensitive):
+  - author or committer name `Claude ...`
+  - author or committer email `noreply@anthropic.com`
+  - author or committer email ending in `+claude@users.noreply.github.com`
 
 Prefix matching is used for Claude because model names and versions change over time (`Claude Sonnet`, `Claude Opus 4.7`, future variants).

@@ -38,4 +38,4 @@ Expected output:
 
 - This setup is local per clone and only needs to be run once.
 - This is a convenience layer, not the primary enforcement layer.
-- CI commit-message validation is the repo-wide required guard that blocks forbidden commit-message attribution lines from merging to `main`.
+- CI validation is the repo-wide required guard that blocks forbidden attribution markers in commit messages and commit identities from merging to `main`.
