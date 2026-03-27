@@ -31,6 +31,12 @@ export async function cmdServe(options: ServeOptions): Promise<void> {
     return new Promise(() => {});
   } catch (e) {
     const errorMessage = `Failed to start server: ${String(e)}`;
+    options.logger?.emit({
+      ts: new Date().toISOString(),
+      level: "error",
+      event: "serve.server.started",
+      message: errorMessage,
+    });
     process.stderr.write(`${errorMessage}\n`);
     process.exit(1);
   }
@@ -45,7 +51,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
     if (options.logger) {
       options.logger.emit({
         ts: new Date().toISOString(),
-        level: "debug",
+        level: "info",
         event: "serve.http.request",
         message: `${req.method} ${req.url}`,
       });
