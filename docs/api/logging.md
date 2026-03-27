@@ -17,9 +17,9 @@ The path components are:
 | Component | Value | Source |
 |-----------|-------|--------|
 | Base directory | `~/.clawperator/logs` | Default, or `CLAWPERATOR_LOG_DIR` env var |
-| Filename prefix | `clawperator-` | Hardcoded |
-| Date format | `YYYY-MM-DD` | Local calendar date of the log entry |
-| Extension | `.log` | Hardcoded |
+| Filename prefix | `clawperator-` | Hardcoded in `formatLogPath()` in `contracts/logging.ts` |
+| Date format | `YYYY-MM-DD` | Local calendar date of the log entry (from `formatDate()` in `contracts/logging.ts`) |
+| Extension | `.log` | Hardcoded in `formatLogPath()` in `contracts/logging.ts` |
 
 Example path: `/home/user/.clawperator/logs/clawperator-2026-03-28.log`
 
@@ -85,7 +85,9 @@ The `--log-level` flag (or `CLAWPERATOR_LOG_LEVEL` env var) controls which event
 | `warn` | warn, error |
 | `error` | error only |
 
-Default: `info`
+Default: `info` (from `normalizeLogLevel()` in `adapters/logger.ts`)
+
+Valid values: `debug`, `info`, `warn`, `error` (case-insensitive)
 
 Invalid values fall back silently to `info`.
 
@@ -146,10 +148,10 @@ If the log directory cannot be written to (permissions, disk full, path does not
 2. Disables file logging for the remainder of the process
 3. Continues normal operation
 
-Example warning:
+Example warning (includes the error message when available):
 
 ```
-[clawperator] WARN: logging disabled after write failure for /home/user/.clawperator/logs/clawperator-2026-03-28.log
+[clawperator] WARN: logging disabled after write failure for /home/user/.clawperator/logs/clawperator-2026-03-28.log: EACCES: permission denied, mkdir '/home/user/.clawperator'
 ```
 
 The command or skill still executes normally. Only the log file is affected.
@@ -178,6 +180,9 @@ Verify the entry appears:
 ```bash
 # In another terminal, or after interrupting the logs command:
 grep '"event":"cli.banner"' ~/.clawperator/logs/clawperator-$(date +%F).log
+
+# Or parse the NDJSON file with jq to see all events:
+jq -c 'select(.event | startswith("cli."))' ~/.clawperator/logs/clawperator-$(date +%F).log
 ```
 
 ## Environment Variables
