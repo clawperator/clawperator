@@ -147,7 +147,7 @@ If the log directory cannot be written to (permissions, disk full, path does not
 Example warning:
 
 ```
-[clawperator] WARN: logging disabled after write failure for /home/user/.clawperator/logs/clawperator-2026-03-28.log: EACCES: permission denied
+[clawperator] WARN: logging disabled after write failure for /home/user/.clawperator/logs/clawperator-2026-03-28.log
 ```
 
 The command or skill still executes normally. Only the log file is affected.
@@ -168,14 +168,14 @@ Generate a log entry:
 
 ```bash
 # Any command generates log entries
-clawperator devices --json
+clawperator skills list
 ```
 
 Verify the entry appears:
 
 ```bash
 # In another terminal, or after interrupting the logs command:
-grep '"event":"devices.list"' ~/.clawperator/logs/clawperator-$(date +%F).log
+grep '"event":"cli.banner"' ~/.clawperator/logs/clawperator-$(date +%F).log
 ```
 
 ## Environment Variables
