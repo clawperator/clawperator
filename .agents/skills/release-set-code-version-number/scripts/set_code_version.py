@@ -102,6 +102,7 @@ def main() -> None:
     internal_replacements = {
         ".agents/skills/release-create/SKILL.md": (re.escape(old_version), new_version),
         "scripts/fake_adb.sh": (re.escape(f"{old_version}-d"), f"{new_version}-d"),
+        "docs/index.md": (rf'(Current code version:\s*){re.escape(old_version)}', rf'\g<1>{new_version}'),
     }
 
     for relative_path, (pattern, replacement) in internal_replacements.items():

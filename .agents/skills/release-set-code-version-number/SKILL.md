@@ -23,6 +23,7 @@ Example:
 This skill updates code-facing surfaces only:
 - `apps/node/package.json`
 - `apps/node/package-lock.json`
+- `docs/index.md` (the "Current code version" badge on the docs home page)
 - code/tests that should know about the new unreleased version
 - internal repo-maintenance skill docs
 
