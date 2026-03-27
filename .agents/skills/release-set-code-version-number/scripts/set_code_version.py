@@ -102,7 +102,7 @@ def main() -> None:
     internal_replacements = {
         ".agents/skills/release-create/SKILL.md": (re.escape(old_version), new_version),
         "scripts/fake_adb.sh": (re.escape(f"{old_version}-d"), f"{new_version}-d"),
-        "docs/index.md": (rf'(Current code version:\s*){re.escape(old_version)}', rf'\g<1>{new_version}'),
+        "docs/index.md": (rf'(\[){re.escape(old_version)}(\]\(https://github\.com/clawperator/clawperator/blob/main/CHANGELOG\.md\))', rf'\g<1>{new_version}\g<2>'),
     }
 
     for relative_path, (pattern, replacement) in internal_replacements.items():
