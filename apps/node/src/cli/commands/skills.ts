@@ -16,7 +16,6 @@ import { getCliVersion } from "../../domain/version/compatibility.js";
 import { getAlternateOperatorVariant } from "../../domain/version/compatibility.js";
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 import { checkApkPresence } from "../../domain/doctor/checks/readinessChecks.js";
-import { loadRegistry } from "../../adapters/skills-repo/localSkillsRegistry.js";
 import type { Logger } from "../../adapters/logger.js";
 import type { LogEvent } from "../../contracts/logging.js";
 import {
@@ -346,27 +345,25 @@ export async function cmdSkillsValidate(
 export async function cmdSkillsValidateAll(
   options: { format: OutputOptions["format"]; dryRun?: boolean; logger?: Logger }
 ): Promise<string> {
-  if (options.dryRun) {
-    const registry = await loadRegistry(undefined);
-    for (const skill of registry.registry.skills) {
-      if (skill.artifacts === undefined || skill.artifacts.length === 0) {
-        const validationMessage = "  [INFO] Payload validation skipped: no pre-compiled artifacts";
-        if (options.logger !== undefined) {
-          emitCliEvent(options.logger.child({ skillId: skill.id }), {
-            level: "debug",
-            event: "cli.validation",
-            skillId: skill.id,
-            message: validationMessage,
-          });
-        } else if (options.format !== "json") {
-          process.stderr.write(`${validationMessage}\n`);
+  const result = await validateAllSkills(undefined, { dryRun: options.dryRun });
+  if (result.ok) {
+    if (options.dryRun) {
+      for (const validSkill of result.validSkills) {
+        if (validSkill.checks.artifactPaths.length === 0) {
+          const validationMessage = "  [INFO] Payload validation skipped: no pre-compiled artifacts";
+          if (options.logger !== undefined) {
+            emitCliEvent(options.logger.child({ skillId: validSkill.skill.id }), {
+              level: "debug",
+              event: "cli.validation",
+              skillId: validSkill.skill.id,
+              message: validationMessage,
+            });
+          } else if (options.format !== "json") {
+            process.stderr.write(`${validationMessage}\n`);
+          }
         }
       }
     }
-  }
-
-  const result = await validateAllSkills(undefined, { dryRun: options.dryRun });
-  if (result.ok) {
     return formatSuccess({
       valid: true,
       totalSkills: result.totalSkills,
