@@ -11,7 +11,8 @@ Maintainers may request changes before merging.
 This repository strips AI attribution trailers that should not ship in history.
 
 - Local hook path: `.githooks/commit-msg`
-- Enable once per clone: `./scripts/setup_git_hooks.sh`
+- Enable once per clone: `git config core.hooksPath .githooks && chmod +x .githooks/commit-msg`
+- Agent setup path: use `.agents/skills/repo-setup/SKILL.md`
 - What gets stripped locally:
   - lines beginning with `Co-Authored-By: Claude `
   - Cursor attribution lines like `Made With: Cursor`

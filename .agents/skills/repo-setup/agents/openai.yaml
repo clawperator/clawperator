@@ -1,0 +1,4 @@
+interface:
+  display_name: "Repo Setup"
+  short_description: "Configure clone-local git defaults"
+  default_prompt: "Use $repo-setup to apply one-time repository setup for the current clone. Read SKILL.md first, configure core.hooksPath to .githooks, ensure .githooks/commit-msg is executable, and verify the hooksPath value."
