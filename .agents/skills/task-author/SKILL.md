@@ -90,23 +90,34 @@ Do not pre-author `findings.md` unless the user explicitly wants a starter scaff
 
 Use `plan.md` for the decisions that should remain stable across all later phases and PRs.
 
+Near the top of the file, include an `Executive Summary` section before the deeper planning detail.
+
 Near the top of the file, include a dedicated `Status` section. This should summarize execution state, not just say "open" or "in progress."
 
 Include:
 
 1. Title and goal
-2. `Status` summary with completed phases, remaining phases, and overall state
-3. Why the task exists now
-4. In-scope work
-5. Out-of-scope work
-6. Surface map and ownership boundaries
-7. Canonical source-of-truth files
-8. Deterministic versus judgment split
-9. Decision tables, lookup tables, or state tables for branchy behavior
-10. Failure modes the task is designed to prevent
-11. Output contract or acceptance target
-12. Idempotency contract when outputs can be rerun
-13. Durable follow-up destinations for knowledge that must outlive `tasks/`
+2. `Executive Summary` with task shape, PR count, phase count, and current state
+3. `Status` summary with completed phases, remaining phases, and overall state
+4. Why the task exists now
+5. In-scope work
+6. Out-of-scope work
+7. Surface map and ownership boundaries
+8. Canonical source-of-truth files
+9. Deterministic versus judgment split
+10. Decision tables, lookup tables, or state tables for branchy behavior
+11. Failure modes the task is designed to prevent
+12. Output contract or acceptance target
+13. Idempotency contract when outputs can be rerun
+14. Durable follow-up destinations for knowledge that must outlive `tasks/`
+
+The `Executive Summary` should let a new agent answer, immediately:
+
+- what this task changes
+- whether it is single-phase or multi-phase
+- how many phases exist
+- how many PRs those phases ship across
+- whether any earlier PRs must merge before later work starts
 
 The `Status` section should be explicit enough that a new agent can tell, at a glance:
 
@@ -127,6 +138,7 @@ Use `work-breakdown.md` for the steps the implementing agent will follow literal
 Start with:
 
 - parent plan reference
+- `Executive Summary`
 - `Status`
 - `Hard Rules`
 - `Required Reading`
@@ -150,6 +162,13 @@ The `Status` section in `work-breakdown.md` should mirror execution reality and 
 - remaining phases or PRs
 - current or next phase
 - any merge gate or blocking dependency preventing the next step
+
+The `Executive Summary` in `work-breakdown.md` should restate the execution shape in compact form:
+
+- total PRs
+- total phases
+- which phases live in which PRs
+- whether the work is currently in planning, active execution, waiting for merge, or final cleanup
 
 ## Hard Rules
 
@@ -241,6 +260,22 @@ Good default order:
 Use a small proof phase first when the mechanism is reusable, high-risk, or hard to validate. Use a stress or backfill phase later to prove the mechanism on harder input.
 
 Do not mix infrastructure, content authoring, and cleanup in the same phase unless the work is purely mechanical.
+
+Decide phase and PR count explicitly. Do not leave the task pack with "phases to be determined."
+
+Use this default decision rule:
+
+| Situation | Default structure |
+| --- | --- |
+| Small, single-deliverable task with one validation path | 1 phase in 1 PR |
+| One implementation step plus one meaningful validation or cleanup step that can be reviewed together | 2 phases in 1 PR |
+| Reusable mechanism that needs proof before broad rollout | 2-4 phases across 2+ PRs |
+| Infrastructure work and content work both exist | split into separate PRs |
+| High-risk or cross-surface work where later steps depend on earlier merge state | split into multiple PRs with merge gates |
+
+If multiple phases live in one PR, say so explicitly in the sequencing table.
+
+If each phase needs independent review, different model tiers, or separate merge checkpoints, put them in separate PRs.
 
 ## Commit Discipline
 
