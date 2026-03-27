@@ -46,7 +46,8 @@ export async function startServer(options: ServeOptions): Promise<Server> {
   const app = express();
   app.use(express.json({ limit: "100kb" }));
 
-  // Logging middleware
+  // Log all requests when a logger is configured (filtered by log level at the file sink).
+  // Without a logger, fall back to console.log only when --verbose is set (legacy behavior).
   app.use((req, _res, next) => {
     if (options.logger) {
       options.logger.emit({
@@ -552,12 +553,12 @@ export async function startServer(options: ServeOptions): Promise<Server> {
           res.write(`data: ${JSON.stringify(data)}\n\n`);
         }
       } catch (err) {
-        options.logger?.emit({
-          ts: new Date().toISOString(),
-          level: "warn",
-          event: "serve.sse.write_failed",
-          message: `SSE write failed: ${String(err)}`,
-        });
+        const msg = `SSE write failed: ${String(err)}`;
+        if (options.logger) {
+          options.logger.emit({ ts: new Date().toISOString(), level: "warn", event: "serve.sse.write_failed", message: msg });
+        } else {
+          process.stderr.write(`[clawperator] ${msg}\n`);
+        }
         cleanup();
       }
     };
@@ -569,12 +570,12 @@ export async function startServer(options: ServeOptions): Promise<Server> {
           res.write(`data: ${JSON.stringify(data)}\n\n`);
         }
       } catch (err) {
-        options.logger?.emit({
-          ts: new Date().toISOString(),
-          level: "warn",
-          event: "serve.sse.write_failed",
-          message: `SSE execution write failed: ${String(err)}`,
-        });
+        const msg = `SSE execution write failed: ${String(err)}`;
+        if (options.logger) {
+          options.logger.emit({ ts: new Date().toISOString(), level: "warn", event: "serve.sse.write_failed", message: msg });
+        } else {
+          process.stderr.write(`[clawperator] ${msg}\n`);
+        }
         cleanup();
       }
     };
@@ -592,21 +593,21 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       cleanup();
     });
     req.on("error", (err) => {
-      options.logger?.emit({
-        ts: new Date().toISOString(),
-        level: "debug",
-        event: "serve.sse.write_failed",
-        message: `SSE req error: ${String(err)}`,
-      });
+      const msg = `SSE req error: ${String(err)}`;
+      if (options.logger) {
+        options.logger.emit({ ts: new Date().toISOString(), level: "debug", event: "serve.sse.write_failed", message: msg });
+      } else {
+        process.stderr.write(`[clawperator] ${msg}\n`);
+      }
       cleanup();
     });
     res.on("error", (err) => {
-      options.logger?.emit({
-        ts: new Date().toISOString(),
-        level: "debug",
-        event: "serve.sse.write_failed",
-        message: `SSE res error: ${String(err)}`,
-      });
+      const msg = `SSE res error: ${String(err)}`;
+      if (options.logger) {
+        options.logger.emit({ ts: new Date().toISOString(), level: "debug", event: "serve.sse.write_failed", message: msg });
+      } else {
+        process.stderr.write(`[clawperator] ${msg}\n`);
+      }
       cleanup();
     });
 
@@ -615,12 +616,12 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       res.write(`event: heartbeat\n`);
       res.write(`data: ${JSON.stringify({ code: "CONNECTED", message: "Clawperator SSE stream active" })}\n\n`);
     } catch (err) {
-      options.logger?.emit({
-        ts: new Date().toISOString(),
-        level: "warn",
-        event: "serve.sse.write_failed",
-        message: `SSE heartbeat failed: ${String(err)}`,
-      });
+      const msg = `SSE heartbeat failed: ${String(err)}`;
+      if (options.logger) {
+        options.logger.emit({ ts: new Date().toISOString(), level: "warn", event: "serve.sse.write_failed", message: msg });
+      } else {
+        process.stderr.write(`[clawperator] ${msg}\n`);
+      }
       cleanup();
     }
   });
@@ -639,12 +640,12 @@ export async function startServer(options: ServeOptions): Promise<Server> {
     }
     
     // Catch-all 500
-    options.logger?.emit({
-      ts: new Date().toISOString(),
-      level: "error",
-      event: "serve.http.error",
-      message: `Unhandled error: ${String(err)}`,
-    });
+    const msg = `Unhandled error: ${String(err)}`;
+    if (options.logger) {
+      options.logger.emit({ ts: new Date().toISOString(), level: "error", event: "serve.http.error", message: msg });
+    } else {
+      process.stderr.write(`[clawperator] ${msg}\n`);
+    }
     res.status(500).json({ ok: false, error: { code: "INTERNAL_SERVER_ERROR", message: "An unexpected error occurred" } });
   });
 
