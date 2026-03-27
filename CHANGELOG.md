@@ -4,6 +4,31 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project aims to follow Semantic Versioning.
 
+## [0.5.2] - 2026-03-28
+This release unifies Node logging and strengthens skill-run diagnostics: shared output assertions, full NDJSON capture of skill child output, a new `logs` command, and expanded documentation. Release automation now attaches the changelog to GitHub Releases.
+
+### 🤖 Node API & CLI
+- **Fixed:** Routed skill output assertions through `runSkill` so CLI and HTTP skill runs share the same validation path and structured failure responses.
+- **Changed:** Replaced ad hoc logging with a unified typed logger that emits NDJSON events for CLI, skills, execution, doctor, and serve, including skill child-process stdout and stderr in log files.
+- **Added:** Added the `logs` command for streaming and filtering Clawperator log output.
+
+### 📚 Documentation & Website
+- **Changed:** Updated the install script, compatibility guidance, and generated llms bundles for the published 0.5.1 artifacts.
+- **Added:** Added logging API reference material and cross-links from setup, skills runtime, and troubleshooting guides.
+
+Pull requests:
+- [task: plan release notes task](https://github.com/clawperator/clawperator/pull/128)
+- [Update release-notes-author guidance](https://github.com/clawperator/clawperator/pull/129)
+- [docs(changelog): update for all historical releases](https://github.com/clawperator/clawperator/pull/130)
+- [feat(release): include CHANGELOG in GitHub Release body](https://github.com/clawperator/clawperator/pull/131)
+- [feat(release): changelog includes PRs](https://github.com/clawperator/clawperator/pull/132)
+- [Fix skill output assertions in the shared runSkill path](https://github.com/clawperator/clawperator/pull/133)
+- [Add repo-local task-author skill for executable task packs](https://github.com/clawperator/clawperator/pull/134)
+- [task: create unified logging plan](https://github.com/clawperator/clawperator/pull/135)
+- [fix(ci): enforce commit attribution policy in PR workflows](https://github.com/clawperator/clawperator/pull/137)
+- [feat(node): unify CLI, skill, doctor, and serve logging](https://github.com/clawperator/clawperator/pull/139)
+- [feat(logging): complete unified logging migration and finalize docs](https://github.com/clawperator/clawperator/pull/140)
+
 ## [0.5.1] - 2026-03-26
 Documentation led this release, with the public site and release guidance refreshed around the published 0.5.0 artifacts. Node also picked up timeout and doctor recovery guidance so version mismatches are easier to diagnose.
 
