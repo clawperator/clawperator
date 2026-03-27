@@ -106,6 +106,9 @@ def main() -> None:
     }
 
     for relative_path, (pattern, replacement) in internal_replacements.items():
+        path = repo_root / relative_path
+        if replace_in_file(path, pattern, replacement):
+            updated_files.append(relative_path)
 
     if insert_incompatibility_case(
         repo_root / "apps" / "node" / "src" / "test" / "unit" / "versionCompatibility.test.ts",
