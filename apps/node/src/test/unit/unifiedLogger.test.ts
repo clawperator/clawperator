@@ -202,7 +202,7 @@ describe("createClawperatorLogger", () => {
       assert.strictEqual(lines[0].event, "cli.banner");
     });
 
-    it("writes doctor.check to stderr in pretty mode", async () => {
+    it("does NOT write doctor.check to stderr (cmdDoctor renders its own report)", async () => {
       const logDir = join(tempRoot, "logs");
       const logger = createClawperatorLogger({
         logDir,
@@ -217,31 +217,16 @@ describe("createClawperatorLogger", () => {
         })
       );
 
+      // doctor.check goes to file only - cmdDoctor() handles terminal rendering
       const terminalOutput = stderrLines.filter((l) =>
         l.includes("adb-reachable status=pass")
       );
-      assert.strictEqual(terminalOutput.length, 1);
-    });
-
-    it("does NOT write doctor.check to stderr in JSON mode", async () => {
-      const logDir = join(tempRoot, "logs");
-      const logger = createClawperatorLogger({
-        logDir,
-        logLevel: "debug",
-        outputFormat: "json",
-      });
-
-      logger.emit(
-        makeEvent({
-          event: "doctor.check",
-          message: "adb-reachable status=pass",
-        })
-      );
-
-      const terminalOutput = stderrLines.filter((l) =>
-        l.includes("adb-reachable")
-      );
       assert.strictEqual(terminalOutput.length, 0);
+
+      // But it should go to file
+      const lines = await readLogLines(logDir);
+      assert.strictEqual(lines.length, 1);
+      assert.strictEqual(lines[0].event, "doctor.check");
     });
   });
 

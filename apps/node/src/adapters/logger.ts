@@ -21,6 +21,8 @@ export type { LogEvent, LogLevel, ClawperatorLogger };
  */
 export interface Logger extends ClawperatorLogger {
   log(event: LogEvent): void;
+  /** Override child() to return Logger so callers keep the log() shim. */
+  child(defaultContext: Partial<LogEvent>): Logger;
 }
 
 // ---------------------------------------------------------------------------
@@ -115,38 +117,36 @@ export function createClawperatorLogger(options?: CreateClawperatorLoggerOptions
   }
 
   function buildLogger(defaultContext?: Partial<LogEvent>): Logger {
+    function emitEvent(event: LogEvent): void {
+      // Merge child context into event. Explicit event fields take precedence.
+      const merged: LogEvent = defaultContext
+        ? { ...defaultContext, ...event } as LogEvent
+        : event;
+
+      const rule = resolveRoutingRule(merged.event, DEFAULT_ROUTING_RULES);
+
+      // File destination
+      if (rule.file && shouldLogToFile(merged.level)) {
+        writeToFile(merged);
+      }
+
+      // Terminal destination
+      if (rule.terminal) {
+        const isJsonMode = outputFormat === "json";
+        if (!isJsonMode || rule.terminalInJsonMode) {
+          writeToTerminal(merged);
+        }
+      }
+    }
+
     return {
-      emit(event: LogEvent): void {
-        // Merge child context into event. Explicit event fields take precedence.
-        const merged: LogEvent = defaultContext
-          ? { ...defaultContext, ...event } as LogEvent
-          : event;
-
-        const rule = resolveRoutingRule(merged.event, DEFAULT_ROUTING_RULES);
-
-        // File destination
-        if (rule.file && shouldLogToFile(merged.level)) {
-          writeToFile(merged);
-        }
-
-        // Terminal destination
-        if (rule.terminal) {
-          const isJsonMode = outputFormat === "json";
-          if (!isJsonMode || rule.terminalInJsonMode) {
-            writeToTerminal(merged);
-          }
-        }
-      },
+      emit: emitEvent,
 
       /**
-       * Compatibility shim: log() delegates to emit().
-       * Existing callers (runSkill, runExecution, adbClient, etc.) use
-       * logger.log({...}) with the old LogEvent shape. The old shape is a
-       * subset of the new LogEvent so this works without modification.
+       * Compatibility shim: log() delegates to emit() via closure.
+       * Safe to destructure or pass as a callback - no `this` dependency.
        */
-      log(event: LogEvent): void {
-        this.emit(event);
-      },
+      log: emitEvent,
 
       child(childContext: Partial<LogEvent>): Logger {
         const mergedContext: Partial<LogEvent> = defaultContext
