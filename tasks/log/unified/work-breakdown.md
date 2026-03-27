@@ -24,7 +24,7 @@ durable docs, and closes the validation matrix. Merge gate between PRs.
 | Completed | 0 |
 | Remaining | 1, 2, 3, 4, 5, 6 |
 | Current / Next | 1 |
-| Blockers | none |
+| Blockers | Phases 3-6 blocked on PR-1 merge |
 
 ## Hard Rules
 

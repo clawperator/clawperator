@@ -25,7 +25,7 @@ and closes the validation matrix. Merge gate between PRs.
 | Completed | 0 |
 | Remaining | 1, 2, 3, 4, 5, 6 |
 | Current / Next | 1 |
-| Blockers | none |
+| Blockers | Phases 3-6 blocked on PR-1 merge |
 
 ## Goal
 
@@ -145,6 +145,7 @@ log files for post-run diagnostics.
 - Exact human-readable `message` text for terminal rendering
 - Module split under `apps/node/src/` as long as the public contract stays unchanged
 - Whether additional events beyond the naming table are needed for edge cases discovered during implementation (add to the table if so)
+- **Product decision - `clawperator logs` behavior**: This plan specifies `clawperator logs` as an always-streaming command (dump existing content then tail) with no flags. An alternative is `clawperator logs --follow` where the bare command does something else (e.g. prints log path). Confirm the always-streaming form before implementing Phase 4.
 
 ## Decision Rules
 
