@@ -2,7 +2,7 @@
 
 import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
-import { createLogger } from "../adapters/logger.js";
+import { createClawperatorLogger } from "../adapters/logger.js";
 import {
   COMMANDS,
   UsageError,
@@ -222,9 +222,10 @@ async function main(): Promise<void> {
     process.exit(0);
   }
   const out = { format: global.output as "json" | "pretty", verbose: global.verbose };
-  const logger = createLogger({
+  const logger = createClawperatorLogger({
     logDir: process.env.CLAWPERATOR_LOG_DIR,
     logLevel: global.logLevel ?? process.env.CLAWPERATOR_LOG_LEVEL,
+    outputFormat: global.output,
   });
 
   let result: string | undefined;
