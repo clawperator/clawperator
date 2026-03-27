@@ -107,6 +107,8 @@ cd clawperator
 npm --prefix apps/node ci && npm --prefix apps/node run build && npm --prefix apps/node link
 ```
 
+For clone-local git defaults (including tracked hooks), use `.agents/skills/repo-setup/SKILL.md`.
+
 ## License
 
 Apache 2.0

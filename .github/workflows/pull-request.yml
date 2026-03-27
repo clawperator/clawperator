@@ -9,6 +9,27 @@ on:
       - main
 
 jobs:
+  commit-message-guard:
+    name: Validate Commit Messages
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Make validation script executable
+        run: chmod +x ./scripts/validate_commit_messages.sh
+
+      - name: Validate commit messages for PR
+        if: github.event_name == 'pull_request'
+        run: ./scripts/validate_commit_messages.sh "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}"
+
+      - name: Validate commit messages for push
+        if: github.event_name == 'push'
+        run: ./scripts/validate_commit_messages.sh "${{ github.event.before }}" "${{ github.sha }}"
+
   docs-build:
     name: Build Docs Site
     runs-on: ubuntu-latest
