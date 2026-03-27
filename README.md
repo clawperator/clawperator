@@ -105,6 +105,7 @@ Both public sites deploy automatically to Cloudflare after changes are merged to
 git clone https://github.com/clawperator/clawperator.git
 cd clawperator
 npm --prefix apps/node ci && npm --prefix apps/node run build && npm --prefix apps/node link
+./scripts/setup_git_hooks.sh
 ```
 
 ## License

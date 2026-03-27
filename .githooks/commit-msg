@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ $# -ne 1 ]]; then
+  echo "usage: $0 <commit-message-file>" >&2
+  exit 1
+fi
+
+message_file="$1"
+
+if [[ ! -f "$message_file" ]]; then
+  echo "commit message file not found: $message_file" >&2
+  exit 1
+fi
+
+lines=()
+while IFS= read -r line || [[ -n "$line" ]]; do
+  if [[ "$line" =~ ^Co-Authored-By:[[:space:]]*Claude\  ]]; then
+    continue
+  fi
+  if [[ "$line" =~ ^Made[[:space:]]+With:[[:space:]]*Cursor([[:space:]].*)?$ ]]; then
+    continue
+  fi
+  if [[ "$line" =~ ^Made[[:space:]]+with[[:space:]]+Cursor([[:space:]].*)?$ ]]; then
+    continue
+  fi
+  if [[ "$line" =~ ^Generated[[:space:]]+with[[:space:]]+Cursor([[:space:]].*)?$ ]]; then
+    continue
+  fi
+  if [[ "$line" =~ ^Co-Authored-By:[[:space:]]*Cursor([[:space:]].*)?$ ]]; then
+    continue
+  fi
+  lines+=("$line")
+done < "$message_file"
+
+# Normalize trailing blank lines after stripping forbidden trailers.
+while (( ${#lines[@]} > 0 )); do
+  last_index=$(( ${#lines[@]} - 1 ))
+  if [[ "${lines[$last_index]}" =~ ^[[:space:]]*$ ]]; then
+    unset "lines[$last_index]"
+    continue
+  fi
+  break
+done
+
+{
+  for line in "${lines[@]}"; do
+    printf '%s\n' "$line"
+  done
+} > "$message_file"
