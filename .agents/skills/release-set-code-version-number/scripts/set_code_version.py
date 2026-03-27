@@ -103,19 +103,9 @@ def main() -> None:
         ".agents/skills/release-create/SKILL.md": (re.escape(old_version), new_version),
         "scripts/fake_adb.sh": (re.escape(f"{old_version}-d"), f"{new_version}-d"),
         "docs/index.md": (rf'(\[){re.escape(old_version)}(\]\(https://github\.com/clawperator/clawperator/blob/main/CHANGELOG\.md\))', rf'\g<1>{new_version}\g<2>'),
-        "docs/troubleshooting/compatibility.md": (rf'(\[){re.escape(old_version)}(\]\(https://github\.com/clawperator/clawperator/blob/main/CHANGELOG\.md\))', rf'\g<1>{new_version}\g<2>'),
     }
 
     for relative_path, (pattern, replacement) in internal_replacements.items():
-        path = repo_root / relative_path
-        if replace_in_file(path, pattern, replacement):
-            updated_files.append(relative_path)
-
-    # Update versioned URLs in compatibility.md (e.g., downloads.clawperator.com/operator/v0.5.2/)
-    compat_path = repo_root / "docs" / "troubleshooting" / "compatibility.md"
-    if replace_in_file(compat_path, rf'v{re.escape(old_version)}', f'v{new_version}'):
-        if "docs/troubleshooting/compatibility.md" not in updated_files:
-            updated_files.append("docs/troubleshooting/compatibility.md")
 
     if insert_incompatibility_case(
         repo_root / "apps" / "node" / "src" / "test" / "unit" / "versionCompatibility.test.ts",

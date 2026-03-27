@@ -9277,7 +9277,7 @@ See [Logging](../api/logging.md) for log format details and [Version Compatibili
 
 # Version Compatibility
 
-**Current code version: [0.5.3](https://github.com/clawperator/clawperator/blob/main/CHANGELOG.md)**
+**Current release: [0.5.2](https://github.com/clawperator/clawperator/releases/tag/v0.5.2)**
 
 ## Purpose
 

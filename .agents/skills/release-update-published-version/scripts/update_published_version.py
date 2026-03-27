@@ -73,6 +73,13 @@ def update_compatibility_versioned_apk_downloads(path: Path, version: str) -> bo
     content = path.read_text(encoding="utf-8")
     changed = False
 
+    # Update the version badge at the top of the page
+    # Pattern matches: **Current release: [X.Y.Z](https://github.com/clawperator/clawperator/releases/tag/vX.Y.Z)**
+    badge_pattern = r'(\*\*Current release: \[)[0-9]+\.[0-9]+\.[0-9]+(\]\(https://github\.com/clawperator/clawperator/releases/tag/v)[0-9]+\.[0-9]+\.[0-9]+(\]\)\*\*)'
+    badge_repl = f"\\g<1>{version}\\g<2>{version}\\g<3>"
+    content, replacements = re.subn(badge_pattern, badge_repl, content, flags=re.MULTILINE)
+    changed = changed or replacements > 0
+
     # Update versioned URLs inside the remediation bullet strings.
     # Note: intentionally only matches numeric x.y.z versions (not `v<version>` templates).
     url_apk_pat = r"(https://downloads\.clawperator\.com/operator/)v([0-9]+\.[0-9]+\.[0-9]+)/operator-v\2\.apk"
