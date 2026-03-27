@@ -1,14 +1,15 @@
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert";
-import { mkdtemp, writeFile, mkdir, rm } from "node:fs/promises";
+import { mkdtemp, writeFile, mkdir, rm, appendFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { existsSync } from "node:fs";
 
-describe("logs command path resolution", () => {
+describe("logs command", () => {
   let tempRoot: string;
   let originalStderrWrite: typeof process.stderr.write;
   let originalStdoutWrite: typeof process.stdout.write;
+  let originalExitCode: typeof process.exitCode;
   let stderrOutput: string[];
   let stdoutOutput: string[];
 
@@ -18,16 +19,18 @@ describe("logs command path resolution", () => {
     stdoutOutput = [];
     originalStderrWrite = process.stderr.write.bind(process.stderr);
     originalStdoutWrite = process.stdout.write.bind(process.stdout);
+    originalExitCode = process.exitCode;
+    process.exitCode = undefined;
   });
 
   afterEach(async () => {
     process.stderr.write = originalStderrWrite;
     process.stdout.write = originalStdoutWrite;
+    process.exitCode = originalExitCode;
     await rm(tempRoot, { recursive: true, force: true });
   });
 
   it("writes message to stderr when log file does not exist", async () => {
-    // Mock stderr
     process.stderr.write = (chunk: string | Buffer) => {
       stderrOutput.push(chunk.toString());
       return true;
@@ -43,7 +46,6 @@ describe("logs command path resolution", () => {
   });
 
   it("dumps existing log content to stdout", async () => {
-    // Mock stdout and stderr
     process.stdout.write = (chunk: string | Buffer) => {
       stdoutOutput.push(chunk.toString());
       return true;
@@ -58,7 +60,6 @@ describe("logs command path resolution", () => {
     const dateStr = `${year}-${month}-${day}`;
     const logPath = join(logDir, `clawperator-${dateStr}.log`);
 
-    // Create log directory and write some content
     await mkdir(logDir, { recursive: true });
     const logLines = [
       '{"ts":"2026-03-28T00:00:00Z","level":"info","event":"test.start","message":"Test started"}',
@@ -66,21 +67,17 @@ describe("logs command path resolution", () => {
     ].join("\n") + "\n";
     await writeFile(logPath, logLines);
 
-    // Verify file exists
     assert.ok(existsSync(logPath), "Log file should exist");
 
     const { cmdLogs } = await import("../../cli/commands/logs.js");
-
-    // Start logs command - it will stream until we stop it
     const logsPromise = cmdLogs({ logDir });
 
-    // Wait a bit for the dump to complete
+    // Wait for dump to complete
     await new Promise((resolve) => setTimeout(resolve, 200));
 
-    // Trigger SIGINT to stop streaming
+    // Trigger SIGINT
     process.emit("SIGINT" as any);
 
-    // Wait for the command to finish with timeout
     await Promise.race([logsPromise, new Promise((resolve) => setTimeout(resolve, 500))]);
 
     const stdout = stdoutOutput.join("");
@@ -88,8 +85,85 @@ describe("logs command path resolution", () => {
     assert.ok(stdout.includes('"event":"test.end"'), `Expected test.end event in stdout, got: ${stdout}`);
   });
 
+  it("streams new content after initial dump", async () => {
+    process.stdout.write = (chunk: string | Buffer) => {
+      stdoutOutput.push(chunk.toString());
+      return true;
+    };
+    process.stderr.write = () => true;
+
+    const logDir = join(tempRoot, "logs-stream");
+    const today = new Date();
+    const year = String(today.getFullYear());
+    const month = String(today.getMonth() + 1).padStart(2, "0");
+    const day = String(today.getDate()).padStart(2, "0");
+    const dateStr = `${year}-${month}-${day}`;
+    const logPath = join(logDir, `clawperator-${dateStr}.log`);
+
+    await mkdir(logDir, { recursive: true });
+    const initialLine = '{"ts":"2026-03-28T00:00:00Z","level":"info","event":"initial","message":"Initial"}\n';
+    await writeFile(logPath, initialLine);
+
+    const { cmdLogs } = await import("../../cli/commands/logs.js");
+    const logsPromise = cmdLogs({ logDir });
+
+    // Wait for initial dump
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    // Verify initial content was dumped
+    let stdout = stdoutOutput.join("");
+    assert.ok(stdout.includes('"event":"initial"'), `Expected initial event in stdout, got: ${stdout}`);
+
+    // Append a new line to the file
+    const newLine = '{"ts":"2026-03-28T00:00:05Z","level":"info","event":"appended","message":"Appended after start"}\n';
+    await appendFile(logPath, newLine);
+
+    // Wait for the watchFile to detect the change and stream the new content
+    await new Promise((resolve) => setTimeout(resolve, 700));
+
+    // Verify the new line was streamed
+    stdout = stdoutOutput.join("");
+    assert.ok(stdout.includes('"event":"appended"'), `Expected appended event in stdout after streaming, got: ${stdout}`);
+
+    // Clean up
+    process.emit("SIGINT" as any);
+    await Promise.race([logsPromise, new Promise((resolve) => setTimeout(resolve, 300))]);
+  });
+
+  it("sets exitCode to 0 on SIGINT", async () => {
+    process.stdout.write = () => true;
+    process.stderr.write = () => true;
+
+    const logDir = join(tempRoot, "logs-exit");
+    const today = new Date();
+    const year = String(today.getFullYear());
+    const month = String(today.getMonth() + 1).padStart(2, "0");
+    const day = String(today.getDate()).padStart(2, "0");
+    const dateStr = `${year}-${month}-${day}`;
+    const logPath = join(logDir, `clawperator-${dateStr}.log`);
+
+    await mkdir(logDir, { recursive: true });
+    await writeFile(logPath, '{"ts":"2026-03-28T00:00:00Z","level":"info","event":"test","message":"Test"}\n');
+
+    const { cmdLogs } = await import("../../cli/commands/logs.js");
+    const logsPromise = cmdLogs({ logDir });
+
+    // Wait for dump
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    // Verify exitCode is not set yet
+    assert.strictEqual(process.exitCode, undefined, "exitCode should be undefined before SIGINT");
+
+    // Trigger SIGINT
+    process.emit("SIGINT" as any);
+
+    await Promise.race([logsPromise, new Promise((resolve) => setTimeout(resolve, 300))]);
+
+    // Verify exitCode is set to 0
+    assert.strictEqual(process.exitCode, 0, "exitCode should be 0 after SIGINT");
+  });
+
   it("uses CLAWPERATOR_LOG_DIR environment variable", async () => {
-    // Mock stderr
     process.stderr.write = (chunk: string | Buffer) => {
       stderrOutput.push(chunk.toString());
       return true;
@@ -124,7 +198,6 @@ describe("logs command log path format", () => {
     const expectedDate = `${year}-${month}-${day}`;
     const expectedFilename = `clawperator-${expectedDate}.log`;
 
-    // The log file should be named clawperator-YYYY-MM-DD.log
     assert.ok(/clawperator-\d{4}-\d{2}-\d{2}\.log/.test(expectedFilename));
   });
 });

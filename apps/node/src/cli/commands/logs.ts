@@ -2,7 +2,7 @@
  * Tail the Clawperator log file.
  * Dumps existing content then streams new lines as they arrive.
  */
-import { createReadStream, existsSync, watchFile, unwatchFile, statSync } from "node:fs";
+import { createReadStream, existsSync, watchFile, unwatchFile } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -89,8 +89,6 @@ async function dumpExistingContent(logPath: string): Promise<void> {
 
 async function streamNewContent(logPath: string): Promise<void> {
   return new Promise((resolve) => {
-    // Track initial size for detecting new content
-    statSync(logPath).size;
     let isRunning = true;
 
     // Handle SIGINT gracefully
