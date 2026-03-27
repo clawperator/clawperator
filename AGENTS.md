@@ -237,6 +237,7 @@ When multiple devices are connected (physical + emulator), be explicit about whi
 - Prefer adding new incremental commits when working in branches rather than amending previous commits. This is easier for users to track at a glance. PRs are ultimately squashed and merged, so incremental commit history is not a negative.
 - Prefer explicit contracts and deterministic behavior over convenience shortcuts.
 - When making breaking contract changes, include migration notes in commit message and docs.
+- Do not add AI attribution lines to commit messages. Never include trailers such as `Co-Authored-By: Claude ...`, `Made With: Cursor`, `Made with Cursor`, or `Generated with Cursor`. Commit messages should contain only project-relevant content.
 - Agents should create commits proactively as work reaches a natural breakpoint, not only at the very end. A natural breakpoint usually means one coherent fix, one verified documentation pass, one validation repair, or one reviewable sub-task. Default to committing progress with a conventional commit message once that unit is working and validated.
 
 When reviewing or extending an existing branch, verify branch claims against the actual code and runtime rather than assuming previous notes, task files, or commit messages are correct.
