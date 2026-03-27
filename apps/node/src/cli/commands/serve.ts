@@ -595,7 +595,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
     req.on("error", (err) => {
       const msg = `SSE req error: ${String(err)}`;
       if (options.logger) {
-        options.logger.emit({ ts: new Date().toISOString(), level: "debug", event: "serve.sse.write_failed", message: msg });
+        options.logger.emit({ ts: new Date().toISOString(), level: "warn", event: "serve.sse.write_failed", message: msg });
       } else {
         process.stderr.write(`[clawperator] ${msg}\n`);
       }
@@ -604,7 +604,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
     res.on("error", (err) => {
       const msg = `SSE res error: ${String(err)}`;
       if (options.logger) {
-        options.logger.emit({ ts: new Date().toISOString(), level: "debug", event: "serve.sse.write_failed", message: msg });
+        options.logger.emit({ ts: new Date().toISOString(), level: "warn", event: "serve.sse.write_failed", message: msg });
       } else {
         process.stderr.write(`[clawperator] ${msg}\n`);
       }
