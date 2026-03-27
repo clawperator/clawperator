@@ -2,15 +2,17 @@
 
 ## Executive Summary
 
-Replace Clawperator's three independent logging surfaces (NDJSON file logger,
-skill child-process terminal streaming, direct CLI/serve terminal output) with a
-single `ClawperatorLogger` that centralizes routing decisions. The logger decides
-what goes to file, what goes to the terminal, and what stays suppressed in JSON
-mode - call sites stop branching independently.
+Replace Clawperator's ad-hoc logging surfaces (NDJSON file logger, direct
+CLI/serve terminal output) with a single `ClawperatorLogger` that centralizes
+event routing. The logger decides what goes to file, what goes to the terminal,
+and what stays suppressed in JSON mode. Skill child-process terminal streaming
+remains direct I/O through the existing `onOutput` callback - it is live
+interactive output, not a log event - but the logger captures it to the log
+file as `skills.run.output` events so post-run diagnostics have full context.
 
 2 PRs, 6 phases. PR-1 introduces the core logger and migrates skill and
 execution flows. PR-2 migrates doctor and serve logging, adds
-`clawperator logs --follow`, preserves SSE compatibility, updates durable docs,
+`clawperator logs`, preserves SSE compatibility, updates durable docs,
 and closes the validation matrix. Merge gate between PRs.
 
 ## Status
@@ -28,7 +30,9 @@ and closes the validation matrix. Merge gate between PRs.
 ## Goal
 
 A single `ClawperatorLogger` contract that all Node layers (domain, CLI, skill
-runner, serve) route through. After this work:
+runner, serve) route log events through. Skill child-process terminal output
+stays on the existing `onOutput` callback for interactive streaming; the logger
+captures it to file separately. After this work:
 
 - Skill progress lines appear in the NDJSON log file alongside lifecycle events
 - An agent reading the log file after a skill timeout can see which phase stalled
@@ -39,8 +43,8 @@ runner, serve) route through. After this work:
 - `child(context)` propagates correlation IDs without manual threading
 - The EventEmitter in `domain/observe/events.ts` remains as the SSE transport
   for this task; it is not conflated with the logger
-- `clawperator logs --follow` dumps existing log content and then streams new
-  lines in real time, so post-timeout diagnostics include the full context
+- `clawperator logs` dumps existing log content and then streams new lines in
+  real time, so post-timeout diagnostics include the full context
 
 ## Why Now
 
@@ -61,7 +65,7 @@ log files for post-run diagnostics.
 - Wire CLI terminal output (pre-run banner, doctor, validation) through the unified logger
 - Migrate serve operational logging (startup, requests, errors, SSE lifecycle) through the unified logger
 - Keep the EventEmitter in `domain/observe/events.ts` as a compatibility transport for SSE
-- Add `clawperator logs --follow` command with `-f` alias
+- Add `clawperator logs` command that dumps and tails the log file
 - Update public docs and internal design notes for the new logging behavior
 - Maintain existing fail-open behavior
 - Maintain JSON mode stdout cleanliness
@@ -74,7 +78,7 @@ log files for post-run diagnostics.
 - Log rotation, compression, or retention policies
 - Structured logging protocol for skill scripts (they continue to emit plain text)
 - Android-side logging changes
-- Query or filter flags on `clawperator logs` beyond `--follow`
+- Query or filter flags on `clawperator logs`
 - Changes to the result envelope shape or terminal envelope protocol
 
 ## Existing Artifact Scope
@@ -133,7 +137,7 @@ log files for post-run diagnostics.
   when output format is `json`
 - File destination: all events at or above configured log level go to file
 - Event naming: follow the naming table below; do not invent names outside this table
-- `clawperator logs --follow` behavior: dump all existing lines from the current daily log file, then stream new lines as they arrive, exit on SIGINT
+- `clawperator logs` behavior: dump all existing lines from the current daily log file, then stream new lines as they arrive, exit on SIGINT
 - SSE compatibility: EventEmitter stays, SSE event names stay, SSE payloads stay
 
 ### Judgment (requires human review)
@@ -158,7 +162,7 @@ Use this table verbatim. Do not re-derive routing rules.
 | Event category | File destination | Terminal destination | Subscriber destination |
 | --- | --- | --- | --- |
 | Lifecycle (`skills.run.start`, `skills.run.complete`, `broadcast.dispatched`, etc.) | Yes, at configured level | No | No |
-| Skill output (`skills.run.output`) | Yes, always at `info` level | No (terminal streaming handled by existing `onOutput` callback in `skills.ts`, not by the logger) | No |
+| Skill output (`skills.run.output`) | Yes, always at `info` level | No (skill terminal streaming is live interactive I/O via the `onOutput` callback in `skills.ts` - it is not a logging concern and stays outside the logger) | No |
 | CLI terminal output (`cli.banner`, `cli.note`, `cli.validation`) | Yes, at `debug` level | Yes, respects output format | No |
 | Doctor events (`doctor.check`) | Yes, at configured level | Yes, in pretty mode only | No |
 | Execution lifecycle (`execution.*`) | Yes, at configured level | No | No |
@@ -219,7 +223,7 @@ installed binary. Set these environment variables before running:
 ```bash
 export CLAWPERATOR_BIN="node $(pwd)/apps/node/dist/cli/index.js"
 export CLAWPERATOR_OPERATOR_PACKAGE="com.clawperator.operator.dev"
-export CLAWPERATOR_SKILLS_REGISTRY="$(cd ../clawperator-skills && pwd)"
+export CLAWPERATOR_SKILLS_REGISTRY="$(cd ../clawperator-skills && pwd)/skills/skills-registry.json"
 ```
 
 After every device run, tail the log file and inspect the output. An agent
@@ -305,12 +309,12 @@ interface LogEvent {
 One JSON object per line. Same shape as `LogEvent`. No changes to file naming
 or rotation. Daily files at `~/.clawperator/logs/clawperator-YYYY-MM-DD.log`.
 
-### `clawperator logs --follow` output
+### `clawperator logs` output
 
 Dumps all existing lines from the current daily log file, then streams new
 lines as they arrive. This ensures that post-timeout diagnostics include the
 already-written lifecycle and progress events. Exits cleanly on SIGINT with
-code 0. No formatting or filtering in v1.
+code 0. No formatting or filtering in v1. No flags beyond `--help`.
 
 ## Idempotency
 

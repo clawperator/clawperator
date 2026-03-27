@@ -6,7 +6,7 @@ Parent plan: `tasks/log/unified/plan.md`
 
 2 PRs, 6 phases. PR-1 (phases 1-2) introduces the unified logger core and
 migrates skill and execution flows. PR-2 (phases 3-6) migrates doctor and serve
-logging, adds `clawperator logs --follow`, preserves SSE compatibility, updates
+logging, adds `clawperator logs`, preserves SSE compatibility, updates
 durable docs, and closes the validation matrix. Merge gate between PRs.
 
 | PR | Phases | Agent tier | Purpose |
@@ -53,7 +53,7 @@ durable docs, and closes the validation matrix. Merge gate between PRs.
     These variables are injected into skill scripts by `skillsConfig.ts`. Without them, skill scripts may invoke a stale global `clawperator` binary that lacks your changes.
 19. Use the skill `com.google.android.apps.chromecast.app.get-climate` from the sibling skills repo (`../clawperator-skills`) for all device verification runs. This skill exercises the full lifecycle (launch, navigate, extract, return) and produces enough output to validate logging coverage. Set `CLAWPERATOR_SKILLS_REGISTRY` if the sibling repo is not already configured:
     ```bash
-    export CLAWPERATOR_SKILLS_REGISTRY="$(cd ../clawperator-skills && pwd)"
+    export CLAWPERATOR_SKILLS_REGISTRY="$(cd ../clawperator-skills && pwd)/skills/skills-registry.json"
     ```
 20. After every device verification run, tail the log file and visually inspect the output. Verify that an agent encountering this log for the first time - with no prior knowledge of Clawperator - could determine: (a) what command was executed, (b) what happened step by step, (c) whether it succeeded or failed, and (d) what to try next if it failed. If any of these are unclear from the log alone, improve the event messages or add events before moving on.
 
@@ -97,7 +97,7 @@ Read these files IN THIS ORDER before writing anything.
 | PR | Purpose | Included phases | Agent tier | Merge gate |
 | --- | --- | --- | --- | --- |
 | PR-1 | Core unified logger + skill/execution wiring | 1, 2 | thinking, default | Tests pass; `skills.run.output` events appear in log file from a device run; JSON mode stdout is clean |
-| PR-2 | Doctor/serve migration + logs command + docs + final validation | 3, 4, 5, 6 | default, default, default, default | Tests pass; SSE `/events` still works; `serve.*` events in log file; `clawperator logs -f` streams events; docs build succeeds; all smoke scripts pass |
+| PR-2 | Doctor/serve migration + logs command + docs + final validation | 3, 4, 5, 6 | default, default, default, default | Tests pass; SSE `/events` still works; `serve.*` events in log file; `clawperator logs` streams events; docs build succeeds; all smoke scripts pass |
 
 ---
 
@@ -154,7 +154,7 @@ handles file writing, terminal rendering, and fail-open behavior in one place.
      ```
    - Routing rule types and `DEFAULT_ROUTING_RULES` constant implementing the
      routing table from `plan.md` as a first-match-wins prefix lookup:
-     - `skills.run.output` -> file only (terminal streaming is handled by the existing `onOutput` callback in `skills.ts`, not by the logger)
+     - `skills.run.output` -> file only (skill terminal streaming is live interactive I/O via the `onOutput` callback in `skills.ts` - it stays outside the logger)
      - `cli.` -> file + terminal, `terminalInJsonMode: false`
      - `doctor.` -> file + terminal, `terminalInJsonMode: false`
      - `serve.` -> file only
@@ -179,7 +179,7 @@ handles file writing, terminal rendering, and fail-open behavior in one place.
 5. Write `apps/node/src/test/unit/unifiedLogger.test.ts`:
    - File routing: events at or above threshold written to file
    - File routing: events below threshold not written
-   - Routing: `skills.run.output` goes to file only, not terminal (terminal streaming is handled by the `onOutput` callback in `skills.ts`)
+   - Routing: `skills.run.output` goes to file only, not terminal (skill terminal streaming is live I/O outside the logger)
    - Terminal routing: `cli.banner` appears on stderr in pretty mode
    - Terminal routing: `cli.banner` does NOT appear on stderr in JSON mode
    - `child()`: context merging works correctly, does not mutate parent
@@ -283,13 +283,15 @@ mode stdout cleanliness.
        message: bannerText,
      });
      ```
-   - The `onOutput` callback in `cmdSkillsRun` for pretty mode should continue
-     to call the existing `process.stdout.write`/`process.stderr.write` for direct
-     terminal streaming (this is the interactive experience). The logger captures
-     it separately via `skills.run.output` events in `runSkill`. Do not remove the
-     direct write - both paths serve different purposes.
-   - For JSON mode: the `onOutput` callback is already not wiring terminal output.
-     The logger still captures `skills.run.output` to file via the routing table.
+   - The `onOutput` callback in `cmdSkillsRun` for pretty mode keeps its direct
+     `process.stdout.write`/`process.stderr.write` calls. This is live interactive
+     I/O - the user sees skill output in real time as the child process runs. It
+     is not a logging concern and stays outside the logger. The logger captures
+     the same data to the log file via `skills.run.output` events emitted in
+     `runSkill`. These are two separate concerns: interactive streaming (direct
+     I/O) and diagnostic capture (logger).
+   - For JSON mode: the `onOutput` callback already does not wire terminal output.
+     The logger still captures `skills.run.output` to the log file.
    - Replace validation info `process.stderr.write` calls with `cli.validation`
      logger events.
 3. Update `apps/node/src/domain/executions/runExecution.ts`:
@@ -313,7 +315,7 @@ mode stdout cleanliness.
    # Set env vars so skill scripts use the branch-local build
    export CLAWPERATOR_BIN="node $(pwd)/apps/node/dist/cli/index.js"
    export CLAWPERATOR_OPERATOR_PACKAGE="com.clawperator.operator.dev"
-   export CLAWPERATOR_SKILLS_REGISTRY="$(cd ../clawperator-skills && pwd)"
+   export CLAWPERATOR_SKILLS_REGISTRY="$(cd ../clawperator-skills && pwd)/skills/skills-registry.json"
    # Pretty mode run
    node apps/node/dist/cli/index.js skills run \
      com.google.android.apps.chromecast.app.get-climate \
@@ -488,8 +490,8 @@ default
 
 ### Goal
 
-Add a new `clawperator logs` command with `--follow` (`-f`) flag that dumps the
-current daily log file and then streams new lines as they arrive.
+Add a new `clawperator logs` command that dumps the current daily log file and
+then streams new lines as they arrive.
 
 ### Files or Surfaces To Change
 
@@ -501,56 +503,48 @@ current daily log file and then streams new lines as they arrive.
 ### Steps
 
 1. Create `apps/node/src/cli/commands/logs.ts`:
-   - `cmdLogs(options: { follow: boolean; logDir?: string })`:
+   - `cmdLogs(options: { logDir?: string })`:
      - Resolve log file path using same logic as `createClawperatorLogger`
        (env var `CLAWPERATOR_LOG_DIR`, default `~/.clawperator/logs`)
-     - If `--follow` is not set:
-       - Print the log file path to stdout as JSON: `{"logPath": "<path>"}`
-       - Exit 0
-     - If `--follow` is set:
-       - Open the current daily log file
-       - Dump all existing content to stdout first (this ensures post-timeout
-         diagnostics include already-written lifecycle and progress events)
-       - Then watch for new lines and stream them to stdout as they arrive
-       - Use `fs.watch` or poll-based tail for new line detection
-       - Handle SIGINT gracefully: close the watcher, exit 0
+     - Open the current daily log file
+     - Dump all existing content to stdout first (this ensures post-timeout
+       diagnostics include already-written lifecycle and progress events)
+     - Then watch for new lines and stream them to stdout as they arrive
+     - Use `fs.watch` or poll-based tail for new line detection
+     - Handle SIGINT gracefully: close the watcher, exit 0
      - Raw NDJSON lines. No formatting or filtering in v1.
 2. Register in `apps/node/src/cli/registry.ts`:
    - Command name: `logs`
-   - Flags: `--follow` (boolean), `-f` (alias for `--follow`)
-   - Description: `Show or tail the Clawperator log file`
+   - No flags (the command always dumps existing content then streams)
+   - Description: `Tail the Clawperator log file`
    - No device required
 3. Wire the command handler following existing patterns in `index.ts` or the
    registry dispatch.
 4. Write `apps/node/src/test/unit/logs.test.ts`:
    - Log path resolution matches logger path logic
-   - Without `--follow`: outputs JSON with logPath
-   - With `--follow`: existing file content is dumped before streaming new lines
-   - CLI flag parsing: `--follow` and `-f` both work
-   - Invalid flags produce error
+   - Existing file content is dumped before streaming new lines
+   - `clawperator logs --unknown-flag` exits with error
 5. Add CLI regression tests for:
-   - `clawperator logs` (no flags) - outputs log path JSON
-   - `clawperator logs --follow` - dumps existing content then tails
-   - `clawperator logs -f` - alias works
+   - `clawperator logs` - dumps existing content then tails
    - `clawperator logs --unknown-flag` - exits with error
 6. Build and run tests.
 7. **Device verification**: Run the climate skill first (to populate the log file),
-   then start `logs --follow` and verify it shows the already-written events plus
+   then start `logs` and verify it shows the already-written events plus
    streams new ones:
    ```bash
    npm --prefix apps/node run build
    export CLAWPERATOR_BIN="node $(pwd)/apps/node/dist/cli/index.js"
    export CLAWPERATOR_OPERATOR_PACKAGE="com.clawperator.operator.dev"
-   export CLAWPERATOR_SKILLS_REGISTRY="$(cd ../clawperator-skills && pwd)"
+   export CLAWPERATOR_SKILLS_REGISTRY="$(cd ../clawperator-skills && pwd)/skills/skills-registry.json"
    # First, run the climate skill to populate the log file
    node apps/node/dist/cli/index.js skills run \
      com.google.android.apps.chromecast.app.get-climate \
      --device <device_serial> \
      --operator-package com.clawperator.operator.dev \
      --format pretty
-   # Now start logs --follow - it should dump existing events first
+   # Now start logs - it should dump existing events first
    # Terminal 1: tail logs (should see already-written events immediately)
-   node apps/node/dist/cli/index.js logs --follow &
+   node apps/node/dist/cli/index.js logs &
    LOGS_PID=$!
    sleep 2
    # Terminal 2: run the skill again to generate new events
@@ -563,16 +557,14 @@ current daily log file and then streams new lines as they arrive.
    kill "$LOGS_PID" 2>/dev/null
    ```
    Verify:
-   - Already-written events appear immediately when `--follow` starts
+   - Already-written events appear immediately when `logs` starts
    - New events from the second skill run stream in real time
    - Clean exit on kill/SIGINT
    - `clawperator --help` lists the `logs` command
 
 ### Acceptance Criteria
 
-- `clawperator logs` outputs JSON with the log file path
-- `clawperator logs --follow` dumps existing log content then streams new lines
-- `clawperator logs -f` is an alias for `--follow`
+- `clawperator logs` dumps existing log content then streams new lines
 - SIGINT exits cleanly with code 0
 - `--help` shows the `logs` command
 - Invalid flags produce error with non-zero exit code
@@ -582,7 +574,6 @@ current daily log file and then streams new lines as they arrive.
 
 ```bash
 npm --prefix apps/node run build && npm --prefix apps/node run test
-node apps/node/dist/cli/index.js logs
 node apps/node/dist/cli/index.js --help | grep logs
 ```
 
@@ -591,7 +582,7 @@ Device verification (see step 7 above).
 ### Expected Commit
 
 ```text
-feat(node): add `clawperator logs` command with --follow support
+feat(node): add `clawperator logs` command
 
 Co-Authored-By: Claude <noreply@anthropic.com>
 ```
@@ -625,7 +616,7 @@ rationale.
 2. Update or create authored docs for:
    - Logging behavior: where logs are written, NDJSON format, log levels,
      `CLAWPERATOR_LOG_DIR` and `CLAWPERATOR_LOG_LEVEL` env vars
-   - `clawperator logs` command: usage, `--follow` flag, examples
+   - `clawperator logs` command: usage and examples
    - Event naming conventions
 3. Add an internal design note at `docs/internal/design/unified-logging.md`:
    - Unified logger contract and routing rules
@@ -689,7 +680,7 @@ logging surfaces work correctly together. Fix any issues found.
    npm --prefix apps/node run build
    export CLAWPERATOR_BIN="node $(pwd)/apps/node/dist/cli/index.js"
    export CLAWPERATOR_OPERATOR_PACKAGE="com.clawperator.operator.dev"
-   export CLAWPERATOR_SKILLS_REGISTRY="$(cd ../clawperator-skills && pwd)"
+   export CLAWPERATOR_SKILLS_REGISTRY="$(cd ../clawperator-skills && pwd)/skills/skills-registry.json"
    node apps/node/dist/cli/index.js devices
    ```
 2. Run the CLAUDE.md required iteration loop:
@@ -704,7 +695,7 @@ logging surfaces work correctly together. Fix any issues found.
    ./scripts/clawperator_smoke_skills.sh
    ```
 4. Verify the complete logging flow end-to-end:
-   - Start `clawperator logs --follow` in Terminal 1
+   - Start `clawperator logs` in Terminal 1
    - Run `clawperator snapshot` in Terminal 2
    - Run `clawperator skills run com.google.android.apps.chromecast.app.get-climate` in Terminal 3
    - Verify Terminal 1 shows all expected event types:
@@ -780,7 +771,7 @@ logging surfaces work correctly together. Fix any issues found.
 - Every log line is valid NDJSON with required fields
 - SSE streaming works with unchanged event names and payloads
 - JSON mode stdout is clean
-- `clawperator logs --follow` streams events in real time
+- `clawperator logs` streams events in real time
 - No sensitive payload leaks in log file
 - Docs build succeeds
 
