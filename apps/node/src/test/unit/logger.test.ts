@@ -79,6 +79,29 @@ describe("createLogger", () => {
     });
   });
 
+  it("preserves inherited deviceId when child context omits it", async () => {
+    const logDir = join(tempRoot, "logs");
+    const parentLogger = createLogger({ logDir, logLevel: "info" }).child({
+      deviceId: "device-parent",
+    });
+    const childLogger = parentLogger.child({
+      skillId: "skill-child",
+      deviceId: undefined,
+    });
+
+    childLogger.log({
+      ts: "2026-03-22T00:00:00.000Z",
+      level: "info",
+      event: "test.child",
+      message: "child",
+    });
+
+    const contents = await readFile(parentLogger.logPath()!, "utf8");
+    const entry = JSON.parse(contents.trimEnd()) as { deviceId?: string; skillId?: string };
+    assert.strictEqual(entry.deviceId, "device-parent");
+    assert.strictEqual(entry.skillId, "skill-child");
+  });
+
   it("appends entries instead of overwriting the file", async () => {
     const logDir = join(tempRoot, "logs");
     const logger = createLogger({ logDir, logLevel: "info" });

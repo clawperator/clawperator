@@ -20,12 +20,12 @@ updates durable docs, and closes the validation matrix. Merge gate between PRs.
 
 | Item | Value |
 | --- | --- |
-| State | not started |
+| State | in progress |
 | Total PRs | 2 |
 | Total phases | 7 (0-6) |
-| Completed | 0 |
-| Remaining | 0, 1, 2, 3, 4, 5, 6 |
-| Current / Next | 0 |
+| Completed | 0 [DONE], 1 [DONE], 2 [DONE] |
+| Remaining | 3, 4, 5, 6 |
+| Current / Next | 3 |
 | Blockers | Phases 3-6 blocked on PR-1 merge |
 
 ## Goal
@@ -166,7 +166,7 @@ Use this table verbatim. Do not re-derive routing rules.
 | Lifecycle (`skills.run.start`, `skills.run.complete`, `broadcast.dispatched`, etc.) | Yes, at configured level | No | No |
 | Skill output (`skills.run.output`) | Yes, always at `info` level | No (skill terminal streaming is live interactive I/O via the `onOutput` callback in `skills.ts` - it is not a logging concern and stays outside the logger) | No |
 | CLI terminal output (`cli.banner`, `cli.note`, `cli.validation`) | Yes, at `debug` level | Yes, respects output format | No |
-| Doctor events (`doctor.check`) | Yes, at configured level | Yes, in pretty mode only | No |
+| Doctor events (`doctor.check`) | Yes, at configured level | No (`cmdDoctor()` renders its own pretty report - logger terminal routing would double each check) | No |
 | Execution lifecycle (`execution.*`) | Yes, at configured level | No | No |
 | Serve operational (`serve.*`) | Yes, at configured level | No | No |
 

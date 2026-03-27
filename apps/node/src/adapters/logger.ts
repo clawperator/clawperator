@@ -1,30 +1,35 @@
 import { appendFileSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
+import {
+  type LogEvent,
+  type LogLevel,
+  type ClawperatorLogger,
+  LEVEL_ORDER,
+  resolveRoutingRule,
+  DEFAULT_ROUTING_RULES,
+} from "../contracts/logging.js";
 
-export interface LogEvent {
-  ts: string;
-  level: string;
-  event: string;
-  commandId?: string;
-  taskId?: string;
-  deviceId?: string;
-  message: string;
-}
+// Re-export contract types for consumers
+export type { LogEvent, LogLevel, ClawperatorLogger };
 
-export interface Logger {
+/**
+ * Compatibility: the old Logger interface had log() instead of emit().
+ * During migration (Phase 1 -> Phase 2), callers that still use log()
+ * go through this extended type. Once Phase 2 migrates all call sites
+ * to emit(), this can be collapsed to just ClawperatorLogger.
+ */
+export interface Logger extends ClawperatorLogger {
   log(event: LogEvent): void;
-  logPath(): string | undefined;
+  /** Override child() to return Logger so callers keep the log() shim. */
+  child(defaultContext: Partial<LogEvent>): Logger;
 }
 
-const LEVEL_ORDER = new Map([
-  ["debug", 0],
-  ["info", 1],
-  ["warn", 2],
-  ["error", 3],
-]);
+// ---------------------------------------------------------------------------
+// Internal helpers
+// ---------------------------------------------------------------------------
 
-function normalizeLogLevel(level?: string): "debug" | "info" | "warn" | "error" {
+function normalizeLogLevel(level?: string): LogLevel {
   const lowered = level?.toLowerCase();
   return lowered === "debug" || lowered === "warn" || lowered === "error" ? lowered : "info";
 }
@@ -58,47 +63,130 @@ function warnOnce(state: { warned: boolean }, message: string): void {
   process.stderr.write(message);
 }
 
-export function createLogger(options?: { logDir?: string; logLevel?: string }): Logger {
+function mergeDefinedContext(
+  base: Partial<LogEvent> | undefined,
+  overlay: Partial<LogEvent>
+): Partial<LogEvent> {
+  const merged: Partial<LogEvent> = base ? { ...base } : {};
+  const target = merged as Record<string, unknown>;
+  for (const [key, value] of Object.entries(overlay) as Array<[keyof LogEvent, LogEvent[keyof LogEvent]]>) {
+    if (value !== undefined) {
+      target[key] = value;
+    }
+  }
+  return merged;
+}
+
+// ---------------------------------------------------------------------------
+// Unified logger factory
+// ---------------------------------------------------------------------------
+
+export interface CreateClawperatorLoggerOptions {
+  logDir?: string;
+  logLevel?: string;
+  outputFormat?: "json" | "pretty";
+}
+
+/**
+ * Create a unified Clawperator logger with file and terminal routing.
+ *
+ * File destination: NDJSON lines at `~/.clawperator/logs/clawperator-YYYY-MM-DD.log`.
+ * Terminal destination: selected events written to stderr in pretty mode, suppressed in JSON mode.
+ * Fail-open: if the log directory is unavailable, one stderr warning then file logging disabled.
+ */
+export function createClawperatorLogger(options?: CreateClawperatorLoggerOptions): Logger {
   const configuredDir =
     options?.logDir?.trim() ||
     process.env.CLAWPERATOR_LOG_DIR?.trim() ||
     "~/.clawperator/logs";
   const logDir = resolve(expandHomePath(configuredDir));
   const threshold = normalizeLogLevel(options?.logLevel ?? process.env.CLAWPERATOR_LOG_LEVEL);
-  const state = { warned: false, disabled: false };
+  const outputFormat = options?.outputFormat ?? "json";
+  const state = { warned: false, fileDisabled: false };
 
-  const shouldLog = (level: string): boolean => {
-    const normalized = normalizeLogLevel(level);
-    return (LEVEL_ORDER.get(normalized) ?? LEVEL_ORDER.get("info") ?? 1) >= (LEVEL_ORDER.get(threshold) ?? 1);
-  };
+  function shouldLogToFile(level: LogLevel): boolean {
+    return (LEVEL_ORDER.get(level) ?? 1) >= (LEVEL_ORDER.get(threshold) ?? 1);
+  }
 
-  return {
-    log(event: LogEvent): void {
-      if (state.disabled) {
-        return;
-      }
-      if (!shouldLog(event.level)) {
-        return;
+  function writeToFile(event: LogEvent): void {
+    if (state.fileDisabled) {
+      return;
+    }
+    const path = formatLogPath(logDir);
+    try {
+      mkdirSync(logDir, { recursive: true });
+      appendFileSync(path, `${JSON.stringify(event)}\n`, "utf8");
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? `[clawperator] WARN: logging disabled after write failure for ${path}: ${error.message}\n`
+          : `[clawperator] WARN: logging disabled after write failure for ${path}\n`;
+      warnOnce(state, message);
+      state.fileDisabled = true;
+    }
+  }
+
+  function writeToTerminal(event: LogEvent): void {
+    process.stderr.write(`${event.message}\n`);
+  }
+
+  function buildLogger(defaultContext?: Partial<LogEvent>): Logger {
+    function emitEvent(event: LogEvent): void {
+      // Merge child context into event. Explicit event fields take precedence.
+      const merged = mergeDefinedContext(defaultContext, event) as LogEvent;
+
+      const rule = resolveRoutingRule(merged.event, DEFAULT_ROUTING_RULES);
+      const alwaysWriteToFile = merged.event === "skills.run.output";
+
+      // File destination
+      if (rule.file && (alwaysWriteToFile || shouldLogToFile(merged.level))) {
+        writeToFile(merged);
       }
 
-      const path = formatLogPath(logDir);
-      try {
-        mkdirSync(logDir, { recursive: true });
-        appendFileSync(path, `${JSON.stringify(event)}\n`, "utf8");
-      } catch (error) {
-        const message =
-          error instanceof Error
-            ? `[clawperator] WARN: logging disabled after write failure for ${path}: ${error.message}\n`
-            : `[clawperator] WARN: logging disabled after write failure for ${path}\n`;
-        warnOnce(state, message);
-        state.disabled = true;
+      // Terminal destination
+      if (rule.terminal) {
+        const isJsonMode = outputFormat === "json";
+        if (!isJsonMode || rule.terminalInJsonMode) {
+          writeToTerminal(merged);
+        }
       }
-    },
-    logPath(): string | undefined {
-      if (state.disabled) {
-        return undefined;
-      }
-      return formatLogPath(logDir);
-    },
-  };
+    }
+
+    return {
+      emit: emitEvent,
+
+      /**
+       * Compatibility shim: log() delegates to emit() via closure.
+       * Safe to destructure or pass as a callback - no `this` dependency.
+       */
+      log: emitEvent,
+
+      child(childContext: Partial<LogEvent>): Logger {
+        const mergedContext = mergeDefinedContext(defaultContext, childContext);
+        return buildLogger(mergedContext);
+      },
+
+      logPath(): string | undefined {
+        if (state.fileDisabled) {
+          return undefined;
+        }
+        return formatLogPath(logDir);
+      },
+    };
+  }
+
+  return buildLogger();
+}
+
+/**
+ * Compatibility alias: createLogger maps to createClawperatorLogger.
+ * During migration, call sites that import createLogger continue to work.
+ * The returned logger uses emit() instead of log(). Callers using the old
+ * log() method must migrate to emit().
+ */
+export function createLogger(options?: { logDir?: string; logLevel?: string }): Logger {
+  return createClawperatorLogger({
+    logDir: options?.logDir,
+    logLevel: options?.logLevel,
+  });
 }

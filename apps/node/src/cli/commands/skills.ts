@@ -17,6 +17,7 @@ import { getAlternateOperatorVariant } from "../../domain/version/compatibility.
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 import { checkApkPresence } from "../../domain/doctor/checks/readinessChecks.js";
 import type { Logger } from "../../adapters/logger.js";
+import type { LogEvent } from "../../contracts/logging.js";
 import {
   CLAWPERATOR_BIN_ENV_VAR,
   CLAWPERATOR_OPERATOR_PACKAGE_ENV_VAR,
@@ -44,6 +45,13 @@ function suppressStreamPipeErrors(stream: EventEmitter): () => void {
   return () => {
     stream.off("error", onError);
   };
+}
+
+function emitCliEvent(logger: Logger | undefined, event: Omit<LogEvent, "ts">): void {
+  logger?.emit({
+    ts: new Date().toISOString(),
+    ...event,
+  });
 }
 
 export async function cmdSkillsList(options: { format: OutputOptions["format"] }): Promise<string> {
@@ -157,37 +165,8 @@ export async function cmdSkillsRun(
 
   const runSkillImpl = options.runSkillImpl ?? runSkill;
   const validateSkillImpl = options.validateSkillImpl ?? validateSkill;
-  if (options.format !== "json") {
-    const config = getDefaultRuntimeConfig({
-      deviceId: options.deviceId,
-      operatorPackage: resolvedOperatorPackage,
-      logger: options.logger,
-    });
-    let apkStatus = `MISSING - run \`clawperator operator setup --apk <path>\``;
-    try {
-      const apkPresence = await checkApkPresence(config);
-      if (apkPresence.status === "pass") {
-        apkStatus = `OK (${resolvedOperatorPackage})`;
-      } else if (apkPresence.status === "warn") {
-        const alternateVariant = getAlternateOperatorVariant(resolvedOperatorPackage);
-        apkStatus = `WARN - ${apkPresence.summary}${apkPresence.detail ? ` ${apkPresence.detail}` : ""} Use --operator-package ${alternateVariant} or reinstall the matching APK.`;
-      } else {
-        apkStatus = `FAIL - ${apkPresence.summary}${apkPresence.detail ? ` ${apkPresence.detail}` : ""}`;
-      }
-    } catch {
-      apkStatus = `MISSING - run \`clawperator operator setup --apk <path>\``;
-    }
-
-    const logDate = new Date();
-    const yyyy = String(logDate.getFullYear());
-    const mm = String(logDate.getMonth() + 1).padStart(2, "0");
-    const dd = String(logDate.getDate()).padStart(2, "0");
-    const logPath = options.logger?.logPath() ?? join(homedir(), ".clawperator", "logs", `clawperator-${yyyy}-${mm}-${dd}.log`);
-    process.stdout.write(
-      `[Clawperator] v${getCliVersion()}  APK: ${apkStatus}  Logs: ${logPath}  Hint: tail -f ${logPath}  Docs: https://docs.clawperator.com/llms.txt\n`
-    );
-  }
-
+  const cliLogger = options.logger?.child({ skillId, deviceId: options.deviceId });
+  let validationSkipped = false;
   if (!options.skipValidate) {
     const validation = await validateSkillImpl(skillId, undefined, { dryRun: true });
     if (!validation.ok) {
@@ -197,8 +176,57 @@ export async function cmdSkillsRun(
         details: validation.details,
       }, options);
     }
-    if (options.format === "pretty" && validation.dryRun?.payloadValidation === "skipped") {
-      process.stderr.write("  [INFO] Payload validation skipped: no pre-compiled artifacts\n");
+    validationSkipped = validation.dryRun?.payloadValidation === "skipped";
+  }
+
+  const config = getDefaultRuntimeConfig({
+    deviceId: options.deviceId,
+    operatorPackage: resolvedOperatorPackage,
+    logger: cliLogger,
+  });
+  let apkStatus = `MISSING - run \`clawperator operator setup --apk <path>\``;
+  try {
+    const apkPresence = await checkApkPresence(config);
+    if (apkPresence.status === "pass") {
+      apkStatus = `OK (${resolvedOperatorPackage})`;
+    } else if (apkPresence.status === "warn") {
+      const alternateVariant = getAlternateOperatorVariant(resolvedOperatorPackage);
+      apkStatus = `WARN - ${apkPresence.summary}${apkPresence.detail ? ` ${apkPresence.detail}` : ""} Use --operator-package ${alternateVariant} or reinstall the matching APK.`;
+    } else {
+      apkStatus = `FAIL - ${apkPresence.summary}${apkPresence.detail ? ` ${apkPresence.detail}` : ""}`;
+    }
+  } catch {
+    apkStatus = `MISSING - run \`clawperator operator setup --apk <path>\``;
+  }
+
+  const logDate = new Date();
+  const yyyy = String(logDate.getFullYear());
+  const mm = String(logDate.getMonth() + 1).padStart(2, "0");
+  const dd = String(logDate.getDate()).padStart(2, "0");
+  const logPath = cliLogger?.logPath() ?? join(homedir(), ".clawperator", "logs", `clawperator-${yyyy}-${mm}-${dd}.log`);
+  const bannerMessage = `[Clawperator] v${getCliVersion()}  APK: ${apkStatus}  Logs: ${logPath}  Hint: tail -f ${logPath}  Docs: https://docs.clawperator.com/llms.txt`;
+  if (cliLogger !== undefined) {
+    emitCliEvent(cliLogger, {
+      level: "debug",
+      event: "cli.banner",
+      skillId,
+      message: bannerMessage,
+    });
+  } else if (options.format !== "json") {
+    process.stdout.write(`${bannerMessage}\n`);
+  }
+
+  if (validationSkipped) {
+    const validationMessage = "  [INFO] Payload validation skipped: no pre-compiled artifacts";
+    if (cliLogger !== undefined) {
+      emitCliEvent(cliLogger, {
+        level: "debug",
+        event: "cli.validation",
+        skillId,
+        message: validationMessage,
+      });
+    } else if (options.format !== "json") {
+      process.stderr.write(`${validationMessage}\n`);
     }
   }
 
@@ -221,14 +249,14 @@ export async function cmdSkillsRun(
                 }
               }
             },
-            logger: options.logger,
+            logger: cliLogger,
           }, expectContains);
         } finally {
           removeStdoutErrorListener();
           removeStderrErrorListener();
         }
       })()
-    : await runSkillImpl(skillId, args, undefined, timeoutMs, env, { logger: options.logger }, expectContains);
+    : await runSkillImpl(skillId, args, undefined, timeoutMs, env, { logger: cliLogger }, expectContains);
   if (result.ok) {
     return formatSuccess({
       skillId: result.skillId,
@@ -281,7 +309,7 @@ export async function cmdSkillsNew(
 
 export async function cmdSkillsValidate(
   skillId: string,
-  options: { format: OutputOptions["format"]; dryRun?: boolean }
+  options: { format: OutputOptions["format"]; dryRun?: boolean; logger?: Logger }
 ): Promise<string> {
   const result = await validateSkill(skillId, undefined, { dryRun: options.dryRun });
   if (result.ok) {
@@ -292,8 +320,18 @@ export async function cmdSkillsValidate(
       ...(result.dryRun ? { dryRun: result.dryRun } : {}),
       checks: result.checks,
     }, options);
-    if (options.format === "pretty" && result.dryRun?.payloadValidation === "skipped") {
-      process.stderr.write("  [INFO] Payload validation skipped: no pre-compiled artifacts\n");
+    if (result.dryRun?.payloadValidation === "skipped") {
+      const validationMessage = "  [INFO] Payload validation skipped: no pre-compiled artifacts";
+      if (options.logger !== undefined) {
+        emitCliEvent(options.logger.child({ skillId }), {
+          level: "debug",
+          event: "cli.validation",
+          skillId,
+          message: validationMessage,
+        });
+      } else if (options.format !== "json") {
+        process.stderr.write(`${validationMessage}\n`);
+      }
     }
     return rendered;
   }
@@ -305,10 +343,27 @@ export async function cmdSkillsValidate(
 }
 
 export async function cmdSkillsValidateAll(
-  options: { format: OutputOptions["format"]; dryRun?: boolean }
+  options: { format: OutputOptions["format"]; dryRun?: boolean; logger?: Logger }
 ): Promise<string> {
   const result = await validateAllSkills(undefined, { dryRun: options.dryRun });
   if (result.ok) {
+    if (options.dryRun) {
+      for (const validSkill of result.validSkills) {
+        if (validSkill.checks.artifactPaths.length === 0) {
+          const validationMessage = "  [INFO] Payload validation skipped: no pre-compiled artifacts";
+          if (options.logger !== undefined) {
+            emitCliEvent(options.logger.child({ skillId: validSkill.skill.id }), {
+              level: "debug",
+              event: "cli.validation",
+              skillId: validSkill.skill.id,
+              message: validationMessage,
+            });
+          } else if (options.format !== "json") {
+            process.stderr.write(`${validationMessage}\n`);
+          }
+        }
+      }
+    }
     return formatSuccess({
       valid: true,
       totalSkills: result.totalSkills,

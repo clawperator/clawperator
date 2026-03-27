@@ -19,12 +19,12 @@ durable docs, and closes the validation matrix. Merge gate between PRs.
 
 | Item | Value |
 | --- | --- |
-| State | planning |
+| State | in progress |
 | Total PRs | 2 |
 | Total phases | 7 (0-6) |
-| Completed | 0 |
-| Remaining | 0, 1, 2, 3, 4, 5, 6 |
-| Current / Next | 0 |
+| Completed | 0 [DONE], 1 [DONE], 2 [DONE] |
+| Remaining | 3, 4, 5, 6 |
+| Current / Next | 3 |
 | Blockers | Phases 3-6 blocked on PR-1 merge |
 
 ## Hard Rules
@@ -121,8 +121,8 @@ gap is closed.
 
 No code changes. This phase produces only diagnostic artifacts.
 
-- `tasks/log/unified/baseline-log.jsonl` (new - raw NDJSON from current skill run)
-- `tasks/log/unified/baseline-terminal.txt` (new - terminal output from the same run)
+- `tasks/log/unified/runs/phase-0-baseline-log.jsonl` (new - raw NDJSON from current skill run)
+- `tasks/log/unified/runs/phase-0-baseline-terminal.txt` (new - terminal output from the same run)
 
 ### Steps
 
@@ -148,16 +148,16 @@ No code changes. This phase produces only diagnostic artifacts.
      com.google.android.apps.chromecast.app.get-climate \
      --device <device_serial> \
      --operator-package com.clawperator.operator.dev \
-     --format pretty --log-level debug 2>&1 | tee tasks/log/unified/baseline-terminal.txt
+     --format pretty --log-level debug 2>&1 | tee tasks/log/unified/runs/phase-0-baseline-terminal.txt
    ```
 5. Copy the log file as the baseline:
    ```bash
-   cp "$LOG_PATH" tasks/log/unified/baseline-log.jsonl
+   cp "$LOG_PATH" tasks/log/unified/runs/phase-0-baseline-log.jsonl
    ```
 6. Inspect the baseline and document the gap:
    ```bash
    echo "=== Events in baseline log ==="
-   cat tasks/log/unified/baseline-log.jsonl | python3 -c "
+   cat tasks/log/unified/runs/phase-0-baseline-log.jsonl | python3 -c "
    import sys, json
    events = []
    for line in sys.stdin:
@@ -179,7 +179,7 @@ No code changes. This phase produces only diagnostic artifacts.
    ```
 7. Restore the original log file:
    ```bash
-   cat "$LOG_PATH.pre-baseline" tasks/log/unified/baseline-log.jsonl > "$LOG_PATH" 2>/dev/null || true
+   cat "$LOG_PATH.pre-baseline" tasks/log/unified/runs/phase-0-baseline-log.jsonl > "$LOG_PATH" 2>/dev/null || true
    rm -f "$LOG_PATH.pre-baseline"
    ```
 8. Verify the baseline confirms the expected gap:
@@ -190,8 +190,8 @@ No code changes. This phase produces only diagnostic artifacts.
 
 ### Acceptance Criteria
 
-- `tasks/log/unified/baseline-log.jsonl` contains valid NDJSON from a real skill run
-- `tasks/log/unified/baseline-terminal.txt` contains terminal output including skill progress
+- `tasks/log/unified/runs/phase-0-baseline-log.jsonl` contains valid NDJSON from a real skill run
+- `tasks/log/unified/runs/phase-0-baseline-terminal.txt` contains terminal output including skill progress
 - The log file shows `skills.run.start` and `skills.run.complete` but NOT `skills.run.output`
 - The gap between what the terminal shows and what the log file contains is documented
 - No code changes were made
@@ -227,7 +227,7 @@ Run:
 ```bash
 LOG_PATH="${CLAWPERATOR_LOG_DIR:-$HOME/.clawperator/logs}/clawperator-$(date +%F).log"
 echo "=== Baseline event types ==="
-cat tasks/log/unified/baseline-log.jsonl | python3 -c "
+cat tasks/log/unified/runs/phase-0-baseline-log.jsonl | python3 -c "
 import sys, json
 for line in sys.stdin:
     line = line.strip()
@@ -911,7 +911,7 @@ logging surfaces work correctly together. Fix any issues found.
    baseline to prove the diagnostic gap is closed:
    ```bash
    echo "=== Phase 0 baseline event types ==="
-   cat tasks/log/unified/baseline-log.jsonl | python3 -c "
+   cat tasks/log/unified/runs/phase-0-baseline-log.jsonl | python3 -c "
    import sys, json, collections
    counts = collections.Counter()
    for line in sys.stdin:
