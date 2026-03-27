@@ -1,6 +1,6 @@
 # Unified Logging Work Breakdown
 
-Parent plan: `tasks/log/unified-v2/plan.md`
+Parent plan: `tasks/log/unified/plan.md`
 
 ## Executive Summary
 
@@ -42,7 +42,7 @@ durable docs, and closes the validation matrix. Merge gate between PRs.
 12. Use the level threshold table from `plan.md` verbatim. Do not re-derive level semantics.
 13. Do not edit `sites/docs/.build/` or `sites/docs/site/` directly. Author docs in `docs/`, then regenerate.
 14. Never shorten `Clawperator` to `Claw` in code, docs, comments, or commit messages.
-15. Update `tasks/log/unified-v2/plan.md` Status section after each phase completes.
+15. Update `tasks/log/unified/plan.md` Status section after each phase completes.
 16. If the plan needs revision during execution, update `plan.md` first, then continue. Do not silently deviate.
 17. After any phase that touches the Node layer, verify changes by running a real command against a connected Android device and inspecting the resulting log file. Do not rely solely on unit tests.
 
@@ -52,7 +52,7 @@ Read these files IN THIS ORDER before writing anything.
 
 | Order | File | Why it matters |
 | --- | --- | --- |
-| 1 | `tasks/log/unified-v2/plan.md` | Stable contract: scope, routing table, event schema, naming table, failure modes |
+| 1 | `tasks/log/unified/plan.md` | Stable contract: scope, routing table, event schema, naming table, failure modes |
 | 2 | `tasks/log/unified/problem-definition.md` | Problem statement, constraints, and motivation |
 | 3 | `CLAUDE.md` | Repo operating rules, required iteration loop, device-selection rules, docs obligations |
 | 4 | `apps/node/src/adapters/logger.ts` | Current logger contract and fail-open semantics being replaced |

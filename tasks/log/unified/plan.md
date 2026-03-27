@@ -294,4 +294,4 @@ it or explicitly leave it with tests and comments explaining why.
 | Event naming rules | `apps/node/src/contracts/logging.ts` (code) |
 | `clawperator logs` command reference | `apps/node/src/cli/registry.ts` (source of truth) and `docs/api/` |
 | Logging behavior and configuration | `docs/` authored docs |
-| Deferred work: EventEmitter-to-logger unification | `tasks/log/unified-v2/finalization-items.md` (created during execution if needed) |
+| Deferred work: EventEmitter-to-logger unification | `tasks/log/unified/finalization-items.md` (created during execution if needed) |
