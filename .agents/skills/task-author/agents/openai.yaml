@@ -1,4 +1,4 @@
 interface:
   display_name: "Task Author"
-  short_description: "Draft executable repo task packs"
-  default_prompt: "Use $task-author to draft a `tasks/<task-name>/` pack with `plan.md`, `work-breakdown.md`, explicit source-of-truth files, phase boundaries, validation, and commit expectations for another agent."
+  short_description: "Author executable repo task packs"
+  default_prompt: "Use $task-author to author a `tasks/<task-name>/` pack with `plan.md`, `work-breakdown.md`, explicit source-of-truth files, phase boundaries, validation, and commit expectations for another agent."
