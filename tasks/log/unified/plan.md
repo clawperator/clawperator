@@ -166,7 +166,7 @@ Use this table verbatim. Do not re-derive routing rules.
 | Lifecycle (`skills.run.start`, `skills.run.complete`, `broadcast.dispatched`, etc.) | Yes, at configured level | No | No |
 | Skill output (`skills.run.output`) | Yes, always at `info` level | No (skill terminal streaming is live interactive I/O via the `onOutput` callback in `skills.ts` - it is not a logging concern and stays outside the logger) | No |
 | CLI terminal output (`cli.banner`, `cli.note`, `cli.validation`) | Yes, at `debug` level | Yes, respects output format | No |
-| Doctor events (`doctor.check`) | Yes, at configured level | Yes, in pretty mode only | No |
+| Doctor events (`doctor.check`) | Yes, at configured level | No (`cmdDoctor()` renders its own pretty report - logger terminal routing would double each check) | No |
 | Execution lifecycle (`execution.*`) | Yes, at configured level | No | No |
 | Serve operational (`serve.*`) | Yes, at configured level | No | No |
 
