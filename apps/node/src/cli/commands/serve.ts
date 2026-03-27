@@ -31,12 +31,6 @@ export async function cmdServe(options: ServeOptions): Promise<void> {
     return new Promise(() => {});
   } catch (e) {
     const errorMessage = `Failed to start server: ${String(e)}`;
-    options.logger?.emit({
-      ts: new Date().toISOString(),
-      level: "error",
-      event: "serve.server.error",
-      message: errorMessage,
-    });
     process.stderr.write(`${errorMessage}\n`);
     process.exit(1);
   }
@@ -532,6 +526,14 @@ export async function startServer(options: ServeOptions): Promise<Server> {
     res.setHeader("Connection", "keep-alive");
     res.flushHeaders();
 
+    // Log client connection
+    options.logger?.emit({
+      ts: new Date().toISOString(),
+      level: "info",
+      event: "serve.sse.client.connected",
+      message: "SSE client connected",
+    });
+
     const cleanup = () => {
       clawperatorEvents.off(CLAW_EVENT_TYPES.RESULT, onResult);
       clawperatorEvents.off(CLAW_EVENT_TYPES.EXECUTION, onExecution);
@@ -547,7 +549,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
         options.logger?.emit({
           ts: new Date().toISOString(),
           level: "warn",
-          event: "serve.sse.error",
+          event: "serve.sse.write_failed",
           message: `SSE write failed: ${String(err)}`,
         });
         cleanup();
@@ -564,7 +566,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
         options.logger?.emit({
           ts: new Date().toISOString(),
           level: "warn",
-          event: "serve.sse.error",
+          event: "serve.sse.write_failed",
           message: `SSE execution write failed: ${String(err)}`,
         });
         cleanup();
@@ -574,12 +576,20 @@ export async function startServer(options: ServeOptions): Promise<Server> {
     clawperatorEvents.on(CLAW_EVENT_TYPES.RESULT, onResult);
     clawperatorEvents.on(CLAW_EVENT_TYPES.EXECUTION, onExecution);
 
-    req.on("close", cleanup);
+    req.on("close", () => {
+      options.logger?.emit({
+        ts: new Date().toISOString(),
+        level: "info",
+        event: "serve.sse.client.disconnected",
+        message: "SSE client disconnected",
+      });
+      cleanup();
+    });
     req.on("error", (err) => {
       options.logger?.emit({
         ts: new Date().toISOString(),
         level: "debug",
-        event: "serve.sse.error",
+        event: "serve.sse.write_failed",
         message: `SSE req error: ${String(err)}`,
       });
       cleanup();
@@ -588,7 +598,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       options.logger?.emit({
         ts: new Date().toISOString(),
         level: "debug",
-        event: "serve.sse.error",
+        event: "serve.sse.write_failed",
         message: `SSE res error: ${String(err)}`,
       });
       cleanup();
@@ -602,7 +612,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       options.logger?.emit({
         ts: new Date().toISOString(),
         level: "warn",
-        event: "serve.sse.error",
+        event: "serve.sse.write_failed",
         message: `SSE heartbeat failed: ${String(err)}`,
       });
       cleanup();
