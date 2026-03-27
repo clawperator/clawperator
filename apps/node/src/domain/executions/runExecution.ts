@@ -421,7 +421,7 @@ async function performExecution(
       async () => {
         const broadcast = await broadcastAgentCommand(config, payload);
         if (broadcast.success) {
-          options.logger?.log({
+          options.logger?.emit({
             ts: new Date().toISOString(),
             level: "info",
             event: "broadcast.dispatched",
@@ -436,7 +436,7 @@ async function performExecution(
     );
 
     if (result.ok) {
-      options.logger?.log({
+      options.logger?.emit({
         ts: new Date().toISOString(),
         level: "info",
         event: "envelope.received",
@@ -467,7 +467,7 @@ async function performExecution(
 
           const deviceArgs = config.deviceId ? ["-s", config.deviceId] : [];
           const screencapCommand = formatCommandLine(config.adbPath, [...deviceArgs, "exec-out", "screencap", "-p"]);
-          options.logger?.log({
+          options.logger?.emit({
             ts: new Date().toISOString(),
             level: "debug",
             event: "adb.command",
@@ -489,7 +489,7 @@ async function performExecution(
 
           await new Promise((resolve, reject) => {
             proc.on("close", (code) => {
-              options.logger?.log({
+              options.logger?.emit({
                 ts: new Date().toISOString(),
                 level: "debug",
                 event: "adb.complete",
@@ -545,7 +545,7 @@ async function performExecution(
         deviceId: result.diagnostics.deviceId,
         operatorPackage: result.diagnostics.operatorPackage,
       });
-      options.logger?.log({
+      options.logger?.emit({
         ts: new Date().toISOString(),
         level: "error",
         event: "timeout.fired",

@@ -102,6 +102,7 @@ export async function runSkill(
   const cmd = ext === ".js" ? process.execPath : resolvedPath;
   const cmdArgs = ext === ".js" ? [resolvedPath, ...args] : args;
   const timeout = timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const skillLogger = callbacks?.logger?.child({ skillId });
 
   // Merge provided env with process.env, with provided env taking precedence
   const childEnv: NodeJS.ProcessEnv = {
@@ -111,10 +112,11 @@ export async function runSkill(
 
   const start = Date.now();
   return new Promise((resolve) => {
-    callbacks?.logger?.log({
+    skillLogger?.emit({
       ts: new Date().toISOString(),
       level: "info",
       event: "skills.run.start",
+      skillId,
       message: `Skill ${skillId} spawned`,
     });
 
@@ -140,12 +142,28 @@ export async function runSkill(
 
     child.stdout?.on("data", (chunk) => {
       const text = chunk.toString();
+      skillLogger?.emit({
+        ts: new Date().toISOString(),
+        level: "info",
+        event: "skills.run.output",
+        skillId,
+        stream: "stdout",
+        message: text,
+      });
       callbacks?.onOutput?.(text, "stdout");
       stdout += text;
     });
 
     child.stderr?.on("data", (chunk) => {
       const text = chunk.toString();
+      skillLogger?.emit({
+        ts: new Date().toISOString(),
+        level: "info",
+        event: "skills.run.output",
+        skillId,
+        stream: "stderr",
+        message: text,
+      });
       callbacks?.onOutput?.(text, "stderr");
       stderr += text;
     });
@@ -181,16 +199,19 @@ export async function runSkill(
 
       if (code !== 0) {
         const exitCode = code ?? 1;
-        callbacks?.logger?.log({
+        skillLogger?.emit({
           ts: new Date().toISOString(),
           level: "error",
           event: "skills.run.failed",
+          skillId,
           message: `Skill ${skillId} exited with code ${exitCode} after ${durationMs}ms`,
         });
-        callbacks?.logger?.log({
+        skillLogger?.emit({
           ts: new Date().toISOString(),
           level: "info",
           event: "skills.run.complete",
+          skillId,
+          exitCode,
           message: `Skill ${skillId} exited with code ${exitCode} after ${durationMs}ms`,
         });
         finish({
@@ -205,10 +226,12 @@ export async function runSkill(
         return;
       }
 
-      callbacks?.logger?.log({
+      skillLogger?.emit({
         ts: new Date().toISOString(),
         level: "info",
         event: "skills.run.complete",
+        skillId,
+        exitCode: 0,
         message: `Skill ${skillId} exited with code 0 after ${durationMs}ms`,
       });
       if (expectContains !== undefined && !stdout.includes(expectContains)) {
@@ -233,10 +256,11 @@ export async function runSkill(
 
     timeoutId = setTimeout(() => {
       timedOut = true;
-      callbacks?.logger?.log({
+      skillLogger?.emit({
         ts: new Date().toISOString(),
         level: "error",
         event: "skills.run.timeout",
+        skillId,
         message: `Skill ${skillId} timed out after ${timeout}ms`,
       });
       child.kill("SIGTERM");
