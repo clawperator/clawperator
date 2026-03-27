@@ -180,7 +180,7 @@ Use these section skeletons unless the task has a strong reason to differ.
 <Explicit exclusions>
 
 ## Existing Artifact Scope
-<If the task edits an artifact that already exists, state what existing content is in scope to change, preserved as-is, or out of scope>
+<If the task edits an artifact that already exists, state what existing content is in scope to change, preserved as-is, or out of scope. If this task creates a new artifact, write `N/A - new artifact`.>
 
 ## Surfaces and Ownership
 <Surface map table>
@@ -384,7 +384,7 @@ If the work exceeds roughly 6-8 phases, prefer splitting it into multiple task p
 - any existing repo skill the implementing agent should use instead of re-deriving behavior
 - an exemplar file or prior task artifact when structure matters
 
-The reading order matters. Tell the implementing agent to read the files in the listed order before writing anything. Put governing documents first, exemplars second, and task-specific execution detail after that.
+The reading order matters. Always state the reading order explicitly. Tell the implementing agent to read the files in the listed order before writing anything. Put governing documents first, exemplars second, and task-specific execution detail after that.
 
 Prefer this shape:
 
@@ -523,6 +523,8 @@ If the first pass comes back below the bar, the task pack should support a corre
 4. Restates the expected workflow
 5. Lists the remaining files or steps in order
 
+The trigger is acceptance failure on the first pass. If the phase acceptance criteria are not met, open a fresh follow-up pass using the correction prompt and the rejected-versus-exemplar diff before continuing to later files or phases.
+
 When the task has 3 or more similar outputs, include exemplar references and the expected correction-loop pattern in `work-breakdown.md`.
 
 ## Phase Design
@@ -564,6 +566,8 @@ For content-heavy phases:
 - include an explicit reread or refine step
 - budget at least two commits per file or deliverable when the work is repeated across many similar outputs
 - do not treat the first authoring pass as the final quality gate
+
+This is the correct unit for content-heavy work: a draft commit plus a refine commit per file or deliverable. Do not collapse content-heavy phases into a one-commit-per-file rule.
 
 ## Commit Discipline
 
@@ -641,7 +645,7 @@ When a task needs `findings.md`, specify:
 - what each phase must append
 - the mapping from inputs to outputs when omissions would be risky
 
-State this explicitly in the task pack when applicable: `Create findings.md at the start of the first execution phase using the structure below. Do not invent the format during execution.`
+State this explicitly in the task pack when applicable: `Create findings.md at the start of the first phase that requires synthesis, classification, backfill, runtime observation, or other judgment-heavy work using the structure below. Do not invent the format during execution.`
 
 A good findings spec usually includes:
 
@@ -701,8 +705,8 @@ Before returning the task pack, confirm:
 
 Scan specifically for these failure patterns before returning:
 
+- an existing repo skill should have been referenced but was not
 - strategy accidentally leaked into `work-breakdown.md`
 - execution details are missing from `work-breakdown.md`
 - a deterministic rule is described but not fenced off from re-derivation
-- an existing repo skill should have been referenced but was not
 - section order drifted away from the default skeleton without a good reason
