@@ -5,187 +5,319 @@ description: Write task folders under tasks/ with explicit plan.md and work-brea
 
 # Task Author
 
-Write task folders in `tasks/` that another agent can execute without guessing.
+Write task packs in `tasks/` that another agent can execute without guessing.
 
-Prefer tasks over GitHub issues for project work. Use a task when the work needs a durable handoff, phased execution, explicit validation, or cross-surface coordination.
+Prefer task packs over GitHub issues for project work. A good task pack is an executable handoff artifact, not issue-tracker prose.
 
-## Core Rule
+## Core Model
 
-Write for the implementer, not for yourself.
+Write for a weaker implementing agent than the one authoring the task.
 
-Assume the implementing agent is competent but has less context and will take the most literal reading of whatever you write. Remove ambiguity before it reaches execution.
-Write so a reviewer can scan the strategy and an implementer can follow the steps literally.
+Assume the implementer:
 
-## Required Task Shape
+- will take the most literal reading
+- will not infer missing constraints
+- may batch work unless forbidden
+- may re-derive decisions unless fenced off
+- may skip verification if "done" is vague
 
-Create at least these files:
+Your job is to make shortcuts harder than doing it right.
+
+## Start With Repo History
+
+`tasks/` is temporary. Strong examples are often already deleted from the working tree.
+
+Before drafting a new task pack:
+
+1. Inspect current `tasks/` entries.
+2. Inspect git history for deleted or completed task folders in the same surface.
+3. Reuse naming, file layout, and section structure that already worked in this repo.
+
+Useful commands:
+
+```bash
+git log --oneline -- tasks
+find tasks -maxdepth 3 -type f | sort
+git show <sha>:tasks/<path>/plan.md
+git show <sha>:tasks/<path>/work-breakdown.md
+git show <sha>:tasks/<path>/findings.md
+```
+
+Do not invent a new task structure if repo history already has a good answer.
+
+## Default Output
+
+Create these files for a new task pack:
 
 - `tasks/<task-name>/plan.md`
 - `tasks/<task-name>/work-breakdown.md`
 
-Create these only when needed:
+Use a scoped path such as `tasks/android/<task-name>/` or `tasks/docs/<task-name>/` only when repo history for that surface already uses it or when the grouping materially improves navigation.
 
-- `tasks/<task-name>/findings.md` - create during execution, not in the planning draft
-- `tasks/<task-name>/finalization-items.md` - capture deferred follow-up items that must survive the current phase
-- additional reference files only if they improve repeatability
+Create these only when justified:
 
-If the task uses `findings.md`, define its structure in `plan.md` or `work-breakdown.md` and treat it as a running execution log, not as an authored deliverable.
+- `tasks/<task-name>/findings.md`
+- `tasks/<task-name>/finalization-items.md`
+- `tasks/<task-name>/design.md`
+- `tasks/<task-name>/agent-prompt.md`
 
-## What `plan.md` Must Contain
+Do not create placeholder files or scaffolding that the implementing agent does not need.
 
-Write the stable contract in `plan.md`.
+## File Roles
+
+Keep the roles strict:
+
+- `plan.md` is the stable contract.
+- `work-breakdown.md` is the executable spec.
+- `findings.md` is an execution-time artifact.
+- `finalization-items.md` records deferred but still-actionable follow-up work.
+
+Do not collapse strategy and execution into one file.
+
+Do not pre-author `findings.md` unless the user explicitly wants a starter scaffold. Usually the right move is to define its required structure in `plan.md` or `work-breakdown.md` and tell the implementer when to create it.
+
+## What `plan.md` Must Do
+
+Use `plan.md` for the decisions that should remain stable across all later phases and PRs.
 
 Include:
 
-1. Purpose and outcome
-2. Scope and out-of-scope
-3. A surface map for the parts of Clawperator or the repo that the task touches
-4. The authoritative source files or artifacts to verify against
-5. The failure modes the task is meant to prevent
-6. Any invariants the implementer must not violate
-7. The output shape or acceptance target
-8. Any durable knowledge that should migrate to `docs/`, `apps/node/src/`, or another permanent home after the task ships
+1. Title and goal
+2. Why the task exists now
+3. In-scope work
+4. Out-of-scope work
+5. Surface map and ownership boundaries
+6. Canonical source-of-truth files
+7. Deterministic versus judgment split
+8. Decision tables, lookup tables, or state tables for branchy behavior
+9. Failure modes the task is designed to prevent
+10. Output contract or acceptance target
+11. Idempotency contract when outputs can be rerun
+12. Durable follow-up destinations for knowledge that must outlive `tasks/`
 
-Use tables when a choice or classification can be enumerated. If a rule has branches, spell them out explicitly instead of describing them in prose.
+Use tables whenever a rule has branches. Prefer first-match-wins lookup tables over explanatory prose.
 
-## What `work-breakdown.md` Must Contain
+## What `work-breakdown.md` Must Do
 
-Write the executable spec in `work-breakdown.md`.
+Use `work-breakdown.md` for the steps the implementing agent will follow literally.
 
-Include:
+Start with:
 
-- A top-level `Hard Rules` section
-- `Required Reading` before any work starts
-- Phases or PRs with explicit dependency order
-- For each phase:
-  - Goal
-  - Steps
-  - Acceptance criteria
-  - Expected commit message
-  - Validation commands
-- A clear statement of what is deterministic and what requires judgment
-- A clear statement of what is in scope for the phase and what is deferred
+- parent plan reference
+- `Hard Rules`
+- `Required Reading`
+- PR or phase sequencing table
 
-Never leave phase boundaries implied. Never assume the implementer will infer sequencing, commit boundaries, or review checkpoints.
+For every phase, include:
+
+- Goal
+- Files or surfaces to change
+- Steps
+- Acceptance criteria
+- Validation commands
+- Expected commit message
+
+When work spans multiple PRs, say explicitly: do not start the next PR until the previous one is merged.
+
+## Hard Rules
+
+`Hard Rules` belong at the top of `work-breakdown.md`, before any phase work.
+
+Hard rules are invariants, not advice. Write them in imperative voice. Examples:
+
+- Do not start the next PR until the previous PR is merged.
+- One commit per logical step. Do not batch unrelated changes.
+- Do not edit generated docs directly.
+- Update `findings.md` before each phase commit when the phase performs analysis, backfill, or judgment.
+- Use the script output as authoritative. Do not re-derive the decision downstream.
 
 ## Deterministic Versus Judgment
 
-Push any repeatable decision into a script, lookup table, command, or explicit rule.
+This split is the most important structural decision in most good task packs.
 
-Leave the LLM only the parts that genuinely require judgment, such as:
+Push into deterministic rules whenever possible:
+
+- classification
+- file routing
+- output shape
+- insertion and upsert rules
+- validation commands
+- schema extraction
+- test expectations
+
+Reserve judgment for the parts that truly need it:
 
 - prose synthesis
-- naming when there is no code-defined name
-- summarizing or grouping where the grouping rule is explicit but the wording is not
-- handling edge cases that cannot be computed safely
+- naming when no code-defined name exists
+- escalation when deterministic rules are insufficient
+- prioritization among valid options when the decision cannot be reduced further
 
-If a choice can be made from code, file paths, diffs, or structured output, make it deterministic and write the rule down.
+If a downstream agent must not re-derive a deterministic decision, state that explicitly.
 
-## Use Explicit Sources
+## Source-Of-Truth Tables
 
-When the task depends on code or generated artifacts, require the author to verify against the source of truth before writing.
+Every task pack that depends on code, contracts, or generated artifacts should include a verification table.
 
-For Clawperator, the usual authority files are:
+Common Clawperator authority files:
 
 | Topic | Verify against |
-|---|---|
-| CLI commands, flags, and placement rules | `apps/node/src/cli/registry.ts` |
-| Selector behavior | `apps/node/src/cli/selectorFlags.ts`, `apps/node/src/contracts/selectors.ts` |
+| --- | --- |
+| CLI commands, flags, aliases | `apps/node/src/cli/registry.ts` |
+| Selector flags and behavior | `apps/node/src/cli/selectorFlags.ts`, `apps/node/src/contracts/selectors.ts` |
 | Action types and parameters | `apps/node/src/contracts/execution.ts` |
 | Error codes and meanings | `apps/node/src/contracts/errors.ts` |
-| Result envelope shape | `apps/node/src/contracts/result.ts` |
+| Result envelope | `apps/node/src/contracts/result.ts` |
 | Doctor checks | `apps/node/src/domain/doctor/checks/` |
-| Serve behavior | `apps/node/src/cli/commands/serve.ts` |
+| Serve command | `apps/node/src/cli/commands/serve.ts` |
 | Android operator behavior | `apps/android/` |
-| Public docs sources | `docs/`, `sites/docs/source-map.yaml`, `sites/docs/mkdocs.yml` |
-| Landing site sources | `sites/landing/` |
+| Public authored docs | `docs/` |
+| Docs-site manifest and generated boundaries | `sites/docs/source-map.yaml`, `sites/docs/mkdocs.yml` |
+| Landing site | `sites/landing/` |
+| Repo-local skills | `.agents/skills/` |
 
-Adjust the table to match the task. Never tell the implementer to rely on existing docs alone.
+Adjust the table to the task. Never tell the implementer to rely on existing docs alone when the code is available.
+
+## Clawperator Surface Rules
+
+Keep repo surface boundaries explicit:
+
+- Android operator APK lives under `apps/android/`.
+- Node CLI/API and contracts live under `apps/node/`.
+- Public docs are authored in `docs/`.
+- `sites/docs/.build/` and `sites/docs/site/` are generated outputs, not authored surfaces.
+- Landing-site source lives in `sites/landing/`.
+- Repo-local maintenance skills live in `.agents/skills/`.
+- `tasks/` is temporary execution scaffolding, not durable documentation.
+
+If the task changes a public contract, CLI behavior, setup flow, or user-visible runtime behavior, require corresponding docs updates in the same task pack.
 
 ## Phase Design
 
-Split non-trivial work into phases and make each phase independently reviewable.
+Split non-trivial work into independently reviewable phases.
 
-Prefer this structure:
+Good default order:
 
-1. Proof or scaffolding phase
-2. Core implementation phase
-3. Validation or backfill phase
-4. Integration or cleanup phase
+1. Proof, scaffolding, or infrastructure
+2. Core implementation
+3. Validation, backfill, or content expansion
+4. Integration or cleanup
 
-Use a small proof first when the task is reusable or high risk. Use a stress-test phase later when the task needs to work on harder input. If the task spans multiple PRs, state that the next PR does not start until the previous one is merged.
+Use a small proof phase first when the mechanism is reusable, high-risk, or hard to validate. Use a stress or backfill phase later to prove the mechanism on harder input.
 
-Keep each phase to one clear deliverable. Do not mix unrelated implementation and cleanup in the same phase unless the work is purely mechanical.
+Do not mix infrastructure, content authoring, and cleanup in the same phase unless the work is purely mechanical.
+
+## Commit Discipline
+
+State commit expectations explicitly.
+
+Useful defaults:
+
+- Infrastructure or cleanup work: one commit per logical task is fine.
+- Content-heavy work: prefer one file at a time, usually draft then refine.
+- Multi-file batches are acceptable only when the change is truly mechanical and reviewable as one unit.
+- Never rely on "commit at sensible points." Name the expected commit messages.
 
 ## Acceptance Criteria
 
-Write acceptance criteria in two layers:
+Write acceptance in two layers:
 
-- Mechanical acceptance: commands, file checks, output shape, tests, exact commit evidence
-- Human review: a short checklist the implementing agent must verify before committing
+1. Mechanical acceptance
+2. Human review
 
-Make acceptance criteria falsifiable. Avoid phrases like "looks good" or "clean enough."
+Mechanical acceptance must be falsifiable:
 
-If the task has output artifacts, define structural idempotency precisely. State what must remain stable across reruns and what may vary.
+- exact command passes
+- exact file exists
+- exact section exists
+- exact output shape matches
+- exact grep returns zero results
+- exact test case passes
 
-## Validation
+Human review should be short and concrete:
 
-List the exact commands to run, when to run them, and what passing looks like.
+- verify the summary reflects the dominant change
+- verify no claim exceeds the evidence
+- verify exemplars and naming remain consistent
 
-If a task changes behavior, include the runnable commands that prove the behavior. If a task touches docs, include the build command. If it touches runtime or device behavior, require the relevant device or emulator validation.
+Avoid vague criteria such as "looks good" or "clean implementation."
 
-If a task creates or modifies a script, include a test for that script in the same phase. Cover success, invalid input, and missing input when applicable.
+## Validation Rules
 
-## Writing Rules
+List exact commands, when to run them, and what passing means.
 
-- Use imperative voice
-- Use concrete file paths, commands, and outputs
-- Prefer tables over prose for branchy logic
-- Name the failure modes the task is designed to prevent
-- State what is in scope and what is not
-- State what to do with deferred items
-- State exact commit messages when commit boundaries matter
-- State exact validation commands
-- Verify any claim against source files before writing it
-- Update durable docs when the task changes public behavior, contracts, or reusable guidance
+When relevant:
 
-## Common Failure Patterns to Prevent
+- docs tasks must include `./scripts/docs_build.sh`
+- Android changes should include assemble, unit tests, install, and device verification paths
+- Node changes should include `npm --prefix apps/node run build` and tests
+- CLI option changes should include valid, invalid, and missing-value cases
+- script-producing phases should include a test script in the same phase
 
-- Leaving decisions to the implementer that should be in the task
-- Writing from memory or from stale docs instead of code
-- Mixing strategy, implementation, and validation into one blob
-- Forgetting to define phase boundaries or commit boundaries
-- Using vague success criteria
-- Omitting required reading
-- Failing to distinguish deterministic work from judgment-heavy work
-- Under-specifying output shape, especially for task artifacts that will be regenerated
-- Hiding cross-surface dependencies instead of naming them
-- Treating `findings.md` like a plan file instead of a live audit trail
+If terminology or policy violations matter, include grep commands instead of prose-only reminders.
 
-## Good Task Checklist
+## `findings.md` Rules
 
-Before you consider the task draft done, confirm:
+`findings.md` is a running audit trail, not a planning deliverable.
 
-- [ ] The task has a single clear goal
-- [ ] Scope and out-of-scope are explicit
-- [ ] Required reading is listed
-- [ ] Source-of-truth files are listed
-- [ ] Deterministic rules are separated from judgment
-- [ ] Phases or PRs are explicitly ordered
-- [ ] Each phase has goal, steps, acceptance, commit, and validation
-- [ ] Mechanical acceptance can be checked without interpretation
-- [ ] Human review criteria are short and concrete
-- [ ] Deferred items are captured somewhere durable
-- [ ] Durable knowledge is sent to the right permanent home
-- [ ] The wording is specific enough that a weaker agent can execute it literally
+Use it when execution includes:
 
-## Clawperator Defaults
+- synthesis
+- classification
+- backfill
+- runtime observations
+- validation anomalies
+- judgment calls that must be reviewable later
 
-When the task touches Clawperator specifically, prefer these references in the plan:
+When a task needs `findings.md`, specify:
 
-- Android operator APK for device behavior
-- Node CLI and contracts for command-surface behavior
-- `docs/` and `sites/docs/` for public documentation
-- `tasks/` only for temporary execution scaffolding, not durable knowledge
+- when it is created
+- required sections
+- what each phase must append
+- the mapping from inputs to outputs when omissions would be risky
 
-If the task changes a public contract, user-visible runtime behavior, or documented workflow, require code and docs updates in the same task.
+A good findings spec usually includes:
+
+- raw command or script output
+- summary tables
+- judgment calls and escalations
+- anomalies and surprises
+- draft-before-insertion snapshots when outputs are synthesized
+
+## Extra Task Files
+
+Use extra files only when they materially improve execution:
+
+- `finalization-items.md` for deferred items discovered during execution that must survive the current phase
+- `design.md` for larger architectural reasoning that would overload `plan.md`
+- `agent-prompt.md` or phase-specific prompts when an execution handoff genuinely benefits from a narrower prompt than `work-breakdown.md`
+
+If the extra file is just restating `plan.md` or `work-breakdown.md`, do not create it.
+
+## Common Failure Patterns
+
+Prevent these explicitly:
+
+- leaving key choices to the implementer
+- writing from stale docs instead of code
+- mixing stable strategy and execution steps in one section
+- omitting required reading
+- omitting exact commit boundaries
+- under-specifying output format
+- claiming idempotency without saying what is stable across reruns
+- failing to name scope exclusions for existing low-quality content
+- confusing authored and generated docs surfaces
+- treating `findings.md` as optional when judgment-heavy work needs an audit trail
+
+## Final Check
+
+Before returning the task pack, confirm:
+
+- the task can be executed from the files alone
+- the plan made the hard decisions
+- `plan.md` and `work-breakdown.md` have distinct jobs
+- deterministic rules are not left to downstream judgment
+- required reading and source-of-truth files are explicit
+- phases, PR boundaries, and merge gates are explicit
+- acceptance criteria are mechanically checkable
+- validation commands are concrete
+- durable knowledge has a permanent home after task cleanup

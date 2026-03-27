@@ -1,4 +1,4 @@
 interface:
   display_name: "Task Author"
-  short_description: "Write durable agent handoff tasks"
-  default_prompt: "Use $task-author to draft a `tasks/<task-name>/` handoff with explicit plan, phases, validation, and commit boundaries."
+  short_description: "Draft executable repo task packs"
+  default_prompt: "Use $task-author to draft a `tasks/<task-name>/` pack with `plan.md`, `work-breakdown.md`, explicit source-of-truth files, phase boundaries, validation, and commit expectations for another agent."
