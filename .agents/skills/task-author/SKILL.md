@@ -9,6 +9,10 @@ Write task packs in `tasks/` that another agent can execute without guessing.
 
 Prefer task packs over GitHub issues for project work. A good task pack is an executable handoff artifact, not issue-tracker prose.
 
+Run: `$task-author <task-name> "<one-line goal>"`
+
+Use the task name as the folder name under `tasks/`. If the goal is ambiguous, ask the user the minimum clarifying question needed before writing the task pack.
+
 ## Core Model
 
 Write for a weaker implementing agent than the one authoring the task.
@@ -22,6 +26,45 @@ Assume the implementer:
 - may skip verification if "done" is vague
 
 Your job is to make shortcuts harder than doing it right.
+
+## Workflow
+
+1. Understand the request.
+   - Extract the intended outcome, owning surface, and why a task pack is needed.
+   - If the request is ambiguous, ask the minimum clarifying question needed to determine scope, task path, or output shape.
+2. Decide whether a task pack is warranted.
+   - If the work is a single obvious change, one surface, one commit, and one validation path with no branching decisions, do not create a task pack. Tell the user the work is too small for `plan.md` plus `work-breakdown.md` and recommend doing the work directly.
+3. Inspect repo history.
+   - Review current `tasks/` entries and deleted historical task packs in the same area before inventing structure.
+4. Determine task path and ownership.
+   - Choose `tasks/android/`, `tasks/node/`, `tasks/docs/`, or unscoped `tasks/` using the explicit path rules below.
+5. Decide phase count and PR boundaries.
+   - Use the phase-decision table in this skill.
+   - Decide explicitly whether the work is 1 phase in 1 PR, multiple phases in 1 PR, or multiple PRs with merge gates.
+6. Draft `plan.md`.
+   - Include the required sections in the required order.
+   - Make the stable decisions here, not in `work-breakdown.md`.
+7. Draft `work-breakdown.md`.
+   - Start with the execution summary sections.
+   - Then add hard rules, required reading, sequencing, and per-phase details.
+8. Add any justified companion files.
+   - Add `findings.md` guidance, `finalization-items.md`, or phase-specific prompts only if the task genuinely needs them.
+9. Run the final check.
+   - Verify that the task pack can be executed literally by a weaker agent.
+10. Present the task pack for review.
+   - Return the finished task-pack files, not a comparison memo.
+
+## When Not To Use This Skill
+
+Do not create a task pack when all of these are true:
+
+- the work is likely one logical commit
+- it clearly belongs to one surface
+- the acceptance path is obvious
+- there are no routing, classification, or sequencing decisions to preserve
+- no weaker-agent handoff artifact is needed
+
+In that case, say the task pack would be unnecessary overhead and recommend direct implementation instead.
 
 ## Start With Repo History
 
@@ -86,6 +129,129 @@ Do not collapse strategy and execution into one file.
 
 Do not pre-author `findings.md` unless the user explicitly wants a starter scaffold. Usually the right move is to define its required structure in `plan.md` or `work-breakdown.md` and tell the implementer when to create it.
 
+## Output Skeletons
+
+Use these section skeletons unless the task has a strong reason to differ.
+
+`plan.md`
+
+```md
+# <Task Title>
+
+## Executive Summary
+<What changes, total PRs, total phases, current state>
+
+## Status
+| Item | Value |
+| --- | --- |
+| State | <not started / active / blocked / partial / done> |
+| Total PRs | <n> |
+| Total phases | <n> |
+| Completed | <phase ids or count> |
+| Remaining | <phase ids or count> |
+| Current / Next | <phase id> |
+| Blockers | <none / merge gate / external dependency> |
+
+## Goal
+<Intended outcome>
+
+## Why Now
+<Why this task exists now>
+
+## In Scope
+<Explicit bullets>
+
+## Out of Scope
+<Explicit exclusions>
+
+## Existing Artifact Scope
+<If the task edits an artifact that already exists, state what existing content is in scope to change, preserved as-is, or out of scope>
+
+## Surfaces and Ownership
+<Surface map table>
+
+## Source Of Truth
+<Verification table>
+
+## Deterministic Versus Judgment
+<What is computed versus what requires synthesis>
+
+## Decision Rules
+<Lookup tables / state tables>
+
+## Failure Modes To Prevent
+<Top failure modes>
+
+## Output Contract
+<Exact output shape>
+
+## Idempotency
+<What stays stable across reruns, what may vary>
+
+## Durable Follow-Up
+<What must move to permanent docs or code after task cleanup>
+```
+
+`work-breakdown.md`
+
+```md
+# <Task Title> Work Breakdown
+
+Parent plan: `tasks/<task-name>/plan.md`
+
+## Executive Summary
+<Total PRs, total phases, phase-to-PR mapping, current execution state>
+
+## Status
+| Item | Value |
+| --- | --- |
+| State | <planning / active / waiting for merge / cleanup / done> |
+| Total PRs | <n> |
+| Total phases | <n> |
+| Completed | <phase ids or count> |
+| Remaining | <phase ids or count> |
+| Current / Next | <phase id> |
+| Blockers | <none / merge gate / external dependency> |
+
+## Hard Rules
+<Imperative invariants>
+
+## Required Reading
+<Files to read before starting>
+
+## PR / Phase Plan
+| PR | Purpose | Included phases | Merge gate |
+| --- | --- | --- | --- |
+| PR-1 | <purpose> | <phase ids> | <gate> |
+
+## Phase <n>: <Title>
+
+### Goal
+<Single deliverable>
+
+### Files or Surfaces To Change
+<Paths or surfaces>
+
+### Steps
+1. <explicit step>
+
+### Acceptance Criteria
+- <mechanical checks>
+- <human review checks>
+
+### Validation
+```bash
+<exact commands>
+```
+
+### Expected Commit
+```text
+<exact commit message>
+```
+```
+
+Keep the section order stable unless the task has a strong reason not to.
+
 ## What `plan.md` Must Do
 
 Use `plan.md` for the decisions that should remain stable across all later phases and PRs.
@@ -129,6 +295,12 @@ The `Status` section should be explicit enough that a new agent can tell, at a g
 
 For multi-phase work, prefer a compact status table over a single sentence.
 
+If the task modifies an artifact that already contains content, add an explicit scope statement for existing content:
+
+- what existing content may be rewritten
+- what existing content is preserved as-is
+- what low-quality or stale content is intentionally out of scope for this task
+
 Use tables whenever a rule has branches. Prefer first-match-wins lookup tables over explanatory prose.
 
 ## What `work-breakdown.md` Must Do
@@ -170,6 +342,8 @@ The `Executive Summary` in `work-breakdown.md` should restate the execution shap
 - which phases live in which PRs
 - whether the work is currently in planning, active execution, waiting for merge, or final cleanup
 
+If the work exceeds roughly 6-8 phases, prefer splitting it into multiple task packs with explicit sequencing instead of one oversized `work-breakdown.md`.
+
 ## Hard Rules
 
 `Hard Rules` belong at the top of `work-breakdown.md`, before any phase work.
@@ -204,6 +378,13 @@ Reserve judgment for the parts that truly need it:
 - prioritization among valid options when the decision cannot be reduced further
 
 If a downstream agent must not re-derive a deterministic decision, state that explicitly.
+
+Use direct fence language in the task pack, not soft phrasing. Good patterns:
+
+- `Use only the classification output below. Do not re-derive routing from raw files.`
+- `Apply the insertion table verbatim. Do not invent a new upsert rule.`
+- `Use .agents/skills/docs-author/SKILL.md for the docs phase. Do not restate that workflow here.`
+- `Treat the generated list as authoritative. Do not filter items unless the plan explicitly says so.`
 
 ## Source-Of-Truth Tables
 
@@ -245,6 +426,8 @@ If the task changes a public contract, CLI behavior, setup flow, or user-visible
 When the task pack includes authored public-doc work, explicitly call the implementing agent to use `.agents/skills/docs-author/SKILL.md` for the documentation phase or subphase. Do not leave public-doc updates as a generic "update docs" instruction.
 
 If the task changes code and authored public docs in the same effort, keep the docs work tied to the same task pack and point the docs phase at `docs/` as the authored source of truth, not `sites/docs/.build/` or `sites/docs/site/`.
+
+More generally: when a phase can be handled by an existing repo skill, reference that skill by path instead of re-specifying its full behavior. Check `.agents/skills/` for relevant skills before writing phase instructions from scratch.
 
 ## Phase Design
 
@@ -392,3 +575,13 @@ Before returning the task pack, confirm:
 - acceptance criteria are mechanically checkable
 - validation commands are concrete
 - durable knowledge has a permanent home after task cleanup
+- the task is large enough to justify a task pack
+- the plan says what happens to existing target-artifact content
+
+Scan specifically for these failure patterns before returning:
+
+- strategy accidentally leaked into `work-breakdown.md`
+- execution details are missing from `work-breakdown.md`
+- a deterministic rule is described but not fenced off from re-derivation
+- an existing repo skill should have been referenced but was not
+- section order drifted away from the default skeleton without a good reason

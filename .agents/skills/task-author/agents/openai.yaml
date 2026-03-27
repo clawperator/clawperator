@@ -1,4 +1,4 @@
 interface:
   display_name: "Task Author"
   short_description: "Author executable repo task packs"
-  default_prompt: "Use $task-author to author a `tasks/<task-name>/` pack with `plan.md`, `work-breakdown.md`, explicit source-of-truth files, phase boundaries, validation, and commit expectations for another agent."
+  default_prompt: "Use $task-author to author a `tasks/<task-name>/` pack. Read SKILL.md first, decide whether a task pack is warranted, produce `plan.md` before `work-breakdown.md`, set explicit phase and PR boundaries, and run the final check before presenting it."
