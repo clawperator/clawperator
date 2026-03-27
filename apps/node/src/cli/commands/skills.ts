@@ -16,6 +16,7 @@ import { getCliVersion } from "../../domain/version/compatibility.js";
 import { getAlternateOperatorVariant } from "../../domain/version/compatibility.js";
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 import { checkApkPresence } from "../../domain/doctor/checks/readinessChecks.js";
+import { loadRegistry } from "../../adapters/skills-repo/localSkillsRegistry.js";
 import type { Logger } from "../../adapters/logger.js";
 import type { LogEvent } from "../../contracts/logging.js";
 import {
@@ -166,6 +167,19 @@ export async function cmdSkillsRun(
   const runSkillImpl = options.runSkillImpl ?? runSkill;
   const validateSkillImpl = options.validateSkillImpl ?? validateSkill;
   const cliLogger = options.logger?.child({ skillId, deviceId: options.deviceId });
+  let validationSkipped = false;
+  if (!options.skipValidate) {
+    const validation = await validateSkillImpl(skillId, undefined, { dryRun: true });
+    if (!validation.ok) {
+      return formatError({
+        code: validation.code,
+        message: validation.message,
+        details: validation.details,
+      }, options);
+    }
+    validationSkipped = validation.dryRun?.payloadValidation === "skipped";
+  }
+
   const config = getDefaultRuntimeConfig({
     deviceId: options.deviceId,
     operatorPackage: resolvedOperatorPackage,
@@ -203,27 +217,17 @@ export async function cmdSkillsRun(
     process.stdout.write(`${bannerMessage}\n`);
   }
 
-  if (!options.skipValidate) {
-    const validation = await validateSkillImpl(skillId, undefined, { dryRun: true });
-    if (!validation.ok) {
-      return formatError({
-        code: validation.code,
-        message: validation.message,
-        details: validation.details,
-      }, options);
-    }
-    if (validation.dryRun?.payloadValidation === "skipped") {
-      const validationMessage = "  [INFO] Payload validation skipped: no pre-compiled artifacts";
-      if (cliLogger !== undefined) {
-        emitCliEvent(cliLogger, {
-          level: "debug",
-          event: "cli.validation",
-          skillId,
-          message: validationMessage,
-        });
-      } else if (options.format !== "json") {
-        process.stderr.write(`${validationMessage}\n`);
-      }
+  if (validationSkipped) {
+    const validationMessage = "  [INFO] Payload validation skipped: no pre-compiled artifacts";
+    if (cliLogger !== undefined) {
+      emitCliEvent(cliLogger, {
+        level: "debug",
+        event: "cli.validation",
+        skillId,
+        message: validationMessage,
+      });
+    } else if (options.format !== "json") {
+      process.stderr.write(`${validationMessage}\n`);
     }
   }
 
@@ -340,8 +344,27 @@ export async function cmdSkillsValidate(
 }
 
 export async function cmdSkillsValidateAll(
-  options: { format: OutputOptions["format"]; dryRun?: boolean }
+  options: { format: OutputOptions["format"]; dryRun?: boolean; logger?: Logger }
 ): Promise<string> {
+  if (options.dryRun) {
+    const registry = await loadRegistry(undefined);
+    for (const skill of registry.registry.skills) {
+      if (skill.artifacts === undefined || skill.artifacts.length === 0) {
+        const validationMessage = "  [INFO] Payload validation skipped: no pre-compiled artifacts";
+        if (options.logger !== undefined) {
+          emitCliEvent(options.logger.child({ skillId: skill.id }), {
+            level: "debug",
+            event: "cli.validation",
+            skillId: skill.id,
+            message: validationMessage,
+          });
+        } else if (options.format !== "json") {
+          process.stderr.write(`${validationMessage}\n`);
+        }
+      }
+    }
+  }
+
   const result = await validateAllSkills(undefined, { dryRun: options.dryRun });
   if (result.ok) {
     return formatSuccess({
