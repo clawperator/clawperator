@@ -45,6 +45,29 @@ durable docs, and closes the validation matrix. Merge gate between PRs.
 15. Update `tasks/log/unified/plan.md` Status section after each phase completes.
 16. If the plan needs revision during execution, update `plan.md` first, then continue. Do not silently deviate.
 17. After any phase that touches the Node layer, verify changes by running a real command against a connected Android device and inspecting the resulting log file. Do not rely solely on unit tests.
+18. For all device verification steps, use the branch-local Node API build via environment variables, not the global binary:
+    ```bash
+    export CLAWPERATOR_BIN="node $(pwd)/apps/node/dist/cli/index.js"
+    export CLAWPERATOR_OPERATOR_PACKAGE="com.clawperator.operator.dev"
+    ```
+    These variables are injected into skill scripts by `skillsConfig.ts`. Without them, skill scripts may invoke a stale global `clawperator` binary that lacks your changes.
+19. Use the skill `com.google.android.apps.chromecast.app.get-climate` from the sibling skills repo (`../clawperator-skills`) for all device verification runs. This skill exercises the full lifecycle (launch, navigate, extract, return) and produces enough output to validate logging coverage. Set `CLAWPERATOR_SKILLS_REGISTRY` if the sibling repo is not already configured:
+    ```bash
+    export CLAWPERATOR_SKILLS_REGISTRY="$(cd ../clawperator-skills && pwd)"
+    ```
+20. After every device verification run, tail the log file and visually inspect the output. Verify that an agent encountering this log for the first time - with no prior knowledge of Clawperator - could determine: (a) what command was executed, (b) what happened step by step, (c) whether it succeeded or failed, and (d) what to try next if it failed. If any of these are unclear from the log alone, improve the event messages or add events before moving on.
+
+## Agent-Perspective Logging Guidance
+
+The primary consumers of Clawperator's log output are LLM agents, not human operators. When implementing or reviewing log events, apply this judgment:
+
+- **Diagnostic sufficiency**: After a skill timeout, an agent reading only the log file should be able to identify which phase stalled and why. If the log shows `skills.run.start` then nothing until `skills.run.timeout`, the gap is exactly what this task fixes.
+- **First-encounter clarity**: An agent using Clawperator for the first time has no knowledge of internal event naming, routing rules, or file conventions. Log messages should be self-explanatory. Prefer `"Skill 'get-climate' started on device emulator-5554"` over `"start"`.
+- **Failure actionability**: Error-level events should include enough context for an agent to decide its next action. Include the failing component, the error category, and a hint at recovery when possible.
+- **Correlation**: Use `child()` context propagation so that an agent can filter a log file by `commandId` or `skillId` to isolate a single run from interleaved concurrent activity.
+- **No noise**: Do not log for the sake of completeness. Every event should answer a question an agent might ask. If you cannot articulate the question, omit the event.
+
+Use your judgment to improve message text, add context fields, or adjust log levels where the existing plan does not specify exact wording. The event names and routing rules are deterministic (follow the tables), but the human-readable `message` field is a judgment call - make it useful for agents.
 
 ## Required Reading
 
@@ -284,19 +307,30 @@ mode stdout cleanliness.
    - Verify execution events route through unified logger
    - Verify EventEmitter `emitResult`/`emitExecution` still fires
 6. Build and run tests.
-7. **Device verification**: Run a skill on a connected device, inspect the log file:
+7. **Device verification**: Run the climate skill on a connected device, inspect the log file:
    ```bash
    npm --prefix apps/node run build
-   node apps/node/dist/cli/index.js skills run <skill_id> \
+   # Set env vars so skill scripts use the branch-local build
+   export CLAWPERATOR_BIN="node $(pwd)/apps/node/dist/cli/index.js"
+   export CLAWPERATOR_OPERATOR_PACKAGE="com.clawperator.operator.dev"
+   export CLAWPERATOR_SKILLS_REGISTRY="$(cd ../clawperator-skills && pwd)"
+   # Pretty mode run
+   node apps/node/dist/cli/index.js skills run \
+     com.google.android.apps.chromecast.app.get-climate \
      --device <device_serial> \
      --operator-package com.clawperator.operator.dev \
      --format pretty --log-level debug
+   # Inspect the log file
    LOG_PATH="${CLAWPERATOR_LOG_DIR:-$HOME/.clawperator/logs}/clawperator-$(date +%F).log"
+   echo "--- Last 40 log lines ---"
    tail -n 40 "$LOG_PATH"
-   # Verify skills.run.output events appear
+   echo "--- skills.run.output events ---"
    grep '"event":"skills.run.output"' "$LOG_PATH" | tail -5
+   echo "--- Lifecycle events ---"
+   grep '"event":"skills.run.start\|skills.run.complete"' "$LOG_PATH" | tail -5
    # Verify JSON mode is clean
-   node apps/node/dist/cli/index.js skills run <skill_id> \
+   node apps/node/dist/cli/index.js skills run \
+     com.google.android.apps.chromecast.app.get-climate \
      --device <device_serial> \
      --operator-package com.clawperator.operator.dev \
      --format json 2>/dev/null | python3 -m json.tool
@@ -306,6 +340,7 @@ mode stdout cleanliness.
    - `skills.run.start` and `skills.run.complete` lifecycle events appear
    - Pretty mode terminal still shows skill output interactively
    - JSON mode stdout is valid JSON with no interleaved log lines
+   - An agent reading only the log file could reconstruct what the skill did and whether it succeeded
 
 ### Acceptance Criteria
 
@@ -499,13 +534,17 @@ current daily log file and then streams new lines as they arrive.
    - `clawperator logs -f` - alias works
    - `clawperator logs --unknown-flag` - exits with error
 6. Build and run tests.
-7. **Device verification**: Run a skill first (to populate the log file), then
-   start `logs --follow` and verify it shows the already-written events plus
+7. **Device verification**: Run the climate skill first (to populate the log file),
+   then start `logs --follow` and verify it shows the already-written events plus
    streams new ones:
    ```bash
    npm --prefix apps/node run build
-   # First, run a skill to populate the log file
-   node apps/node/dist/cli/index.js skills run <skill_id> \
+   export CLAWPERATOR_BIN="node $(pwd)/apps/node/dist/cli/index.js"
+   export CLAWPERATOR_OPERATOR_PACKAGE="com.clawperator.operator.dev"
+   export CLAWPERATOR_SKILLS_REGISTRY="$(cd ../clawperator-skills && pwd)"
+   # First, run the climate skill to populate the log file
+   node apps/node/dist/cli/index.js skills run \
+     com.google.android.apps.chromecast.app.get-climate \
      --device <device_serial> \
      --operator-package com.clawperator.operator.dev \
      --format pretty
@@ -514,8 +553,9 @@ current daily log file and then streams new lines as they arrive.
    node apps/node/dist/cli/index.js logs --follow &
    LOGS_PID=$!
    sleep 2
-   # Terminal 2: run another skill
-   node apps/node/dist/cli/index.js skills run <skill_id> \
+   # Terminal 2: run the skill again to generate new events
+   node apps/node/dist/cli/index.js skills run \
+     com.google.android.apps.chromecast.app.get-climate \
      --device <device_serial> \
      --operator-package com.clawperator.operator.dev \
      --format pretty
@@ -644,9 +684,12 @@ logging surfaces work correctly together. Fix any issues found.
 
 ### Steps
 
-1. Connect an Android device (or start an emulator). Check connectivity:
+1. Connect an Android device (or start an emulator). Set up environment and check connectivity:
    ```bash
    npm --prefix apps/node run build
+   export CLAWPERATOR_BIN="node $(pwd)/apps/node/dist/cli/index.js"
+   export CLAWPERATOR_OPERATOR_PACKAGE="com.clawperator.operator.dev"
+   export CLAWPERATOR_SKILLS_REGISTRY="$(cd ../clawperator-skills && pwd)"
    node apps/node/dist/cli/index.js devices
    ```
 2. Run the CLAUDE.md required iteration loop:
@@ -663,7 +706,7 @@ logging surfaces work correctly together. Fix any issues found.
 4. Verify the complete logging flow end-to-end:
    - Start `clawperator logs --follow` in Terminal 1
    - Run `clawperator snapshot` in Terminal 2
-   - Run `clawperator skills run <skill_id>` in Terminal 3
+   - Run `clawperator skills run com.google.android.apps.chromecast.app.get-climate` in Terminal 3
    - Verify Terminal 1 shows all expected event types:
      - `skills.run.start`, `skills.run.output`, `skills.run.complete`
      - Execution lifecycle events

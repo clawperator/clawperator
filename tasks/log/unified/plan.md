@@ -205,6 +205,50 @@ Use only the names in this table. Do not invent new event families.
 | Why not unify now | The EventEmitter carries rich in-memory objects (`ResultEnvelope`, `RunExecutionResult`) that are not suitable for serialization through the NDJSON log path. Conflating them risks SSE payload regressions for no diagnostic gain. |
 | Future migration | If later work wants a log-stream SSE surface, that is a separate task after unified logging proves stable. |
 
+## Device Verification Requirements
+
+All phases that touch the Node layer must be verified by running the
+`com.google.android.apps.chromecast.app.get-climate` skill from the sibling
+skills repo (`../clawperator-skills`) on a connected Android device. This skill
+exercises the full lifecycle (app launch, navigation, data extraction, return)
+and produces enough output to validate logging coverage.
+
+Use the branch-local Node API build for all verification, not the globally
+installed binary. Set these environment variables before running:
+
+```bash
+export CLAWPERATOR_BIN="node $(pwd)/apps/node/dist/cli/index.js"
+export CLAWPERATOR_OPERATOR_PACKAGE="com.clawperator.operator.dev"
+export CLAWPERATOR_SKILLS_REGISTRY="$(cd ../clawperator-skills && pwd)"
+```
+
+After every device run, tail the log file and inspect the output. An agent
+reading only the log file - with no prior knowledge of Clawperator - should be
+able to determine: what command ran, what happened step by step, whether it
+succeeded or failed, and what to try next on failure. If this is not clear from
+the log alone, improve the event messages before moving on.
+
+## Agent-Perspective Logging Guidance
+
+The primary consumers of Clawperator's log output are LLM agents, not human
+operators. The `message` field in each `LogEvent` is a judgment call - use it to
+serve agents encountering the system for the first time:
+
+- After a skill timeout, an agent reading only the log file should identify
+  which phase stalled. If the log shows `skills.run.start` then silence until
+  `skills.run.timeout`, the gap is the problem this task fixes.
+- Prefer self-explanatory messages over terse labels. Write
+  `"Skill 'get-climate' started on device emulator-5554"` not `"start"`.
+- Error events should include enough context for an agent to decide its next
+  action: the failing component, error category, and recovery hint.
+- Use `child()` context propagation so an agent can filter by `commandId` or
+  `skillId` to isolate a single run from concurrent activity.
+- Do not log for completeness. Every event should answer a question an agent
+  might ask. If you cannot articulate the question, omit the event.
+
+Event names and routing rules are deterministic (follow the tables). Message
+text is judgment - make it useful for agents.
+
 ## Failure Modes To Prevent
 
 1. **Skill progress reaches terminal but not the file.** The entire point of this task. Every `skills.run.output` event must hit the file sink regardless of terminal output mode.
