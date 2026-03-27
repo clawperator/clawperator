@@ -8,6 +8,8 @@ Use this page as the routing index into the authored docs. The concrete machine 
 
 **Current code version: [0.5.3](https://github.com/clawperator/clawperator/blob/main/CHANGELOG.md)**
 
+*This is the unreleased code version in the repo. See [Version Compatibility](troubleshooting/compatibility.md) for the latest published release.*
+
 ---
 
 ## Version Quick Reference

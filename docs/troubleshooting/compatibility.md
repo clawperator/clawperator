@@ -2,6 +2,8 @@
 
 **Current release: [0.5.2](https://github.com/clawperator/clawperator/releases/tag/v0.5.2)**
 
+*This is the latest published release. Download URLs below reference this version. See [Docs Home](../index.md) for the unreleased code version.*
+
 ## Purpose
 
 Define how the CLI checks compatibility with the installed Operator APK, what counts as compatible, which errors can be returned, and how to recover when versions do not align.
