@@ -15,10 +15,9 @@ import {
 export type { LogEvent, LogLevel, ClawperatorLogger };
 
 /**
- * Compatibility: the old Logger interface had log() instead of emit().
- * During migration (Phase 1 -> Phase 2), callers that still use log()
- * go through this extended type. Once Phase 2 migrates all call sites
- * to emit(), this can be collapsed to just ClawperatorLogger.
+ * Compatibility: the old Logger interface has log() as an alias for emit().
+ * Remaining callers in adbClient.ts and logcatResultReader.ts still use log().
+ * Once those are migrated to emit(), this can be collapsed to ClawperatorLogger.
  */
 export interface Logger extends ClawperatorLogger {
   log(event: LogEvent): void;
