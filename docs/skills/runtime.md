@@ -228,6 +228,18 @@ Verification pattern:
 - use pretty mode when a human operator wants the banner plus streamed skill output
 - if pretty mode shows an APK warning or failure, fix the package/device setup before assuming the skill logic is wrong
 
+Debugging skill runs with logs:
+
+```bash
+# Stream logs in real time while a skill runs
+clawperator logs
+
+# In another terminal:
+clawperator skills run <skill_id> --device <device_serial> --operator-package <package>
+```
+
+The unified logger captures skill output as `skills.run.output` events, enabling post-timeout diagnostics. See [Logging](../api/logging.md) for details.
+
 ## Runtime Success Example
 
 ```json

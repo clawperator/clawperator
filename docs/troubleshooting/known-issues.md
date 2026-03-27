@@ -61,9 +61,20 @@ If a current issue becomes reproducible and code-verifiable, add it here with:
 - workaround
 - recovery or follow-up path
 
+## Diagnostic Tools
+
+When investigating issues:
+
+1. Run `clawperator doctor --json` for a comprehensive health check
+2. Use `clawperator logs` to stream the log file in real time
+3. Check the log file directly: `~/.clawperator/logs/clawperator-YYYY-MM-DD.log`
+
+See [Logging](../api/logging.md) for details on log format and the `clawperator logs` command.
+
 ## Related Pages
 
 - [Operator App](operator.md)
 - [Version Compatibility](compatibility.md)
 - [Doctor](../api/doctor.md)
 - [Errors](../api/errors.md)
+- [Logging](../api/logging.md)

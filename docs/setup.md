@@ -258,6 +258,28 @@ Clawperator is the hand. The agent is the brain. The agent decides what to do, t
 
 For deterministic automation, always pass both flags explicitly.
 
+## Debugging setup issues
+
+If setup fails, use `clawperator logs` to inspect what happened:
+
+```bash
+# Stream logs in one terminal
+clawperator logs
+
+# Run the failing command in another terminal
+clawperator doctor --json --device <device_serial> --operator-package <package>
+```
+
+Log file location: `~/.clawperator/logs/clawperator-YYYY-MM-DD.log`
+
+Key events to look for:
+
+- `doctor.check` - Individual doctor check results
+- `adb.command` / `adb.complete` - ADB operations
+- `preflight.apk.pass` / `preflight.apk.missing` - APK presence checks
+
+See [Logging](api/logging.md) for complete documentation.
+
 ## Related pages
 
 - [API Overview](api/overview.md)
@@ -265,3 +287,4 @@ For deterministic automation, always pass both flags explicitly.
 - [Doctor](api/doctor.md)
 - [Errors](api/errors.md)
 - [Troubleshooting](troubleshooting/operator.md)
+- [Logging](api/logging.md)

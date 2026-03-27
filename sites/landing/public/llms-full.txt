@@ -320,6 +320,28 @@ Clawperator is the hand. The agent is the brain. The agent decides what to do, t
 
 For deterministic automation, always pass both flags explicitly.
 
+## Debugging setup issues
+
+If setup fails, use `clawperator logs` to inspect what happened:
+
+```bash
+# Stream logs in one terminal
+clawperator logs
+
+# Run the failing command in another terminal
+clawperator doctor --json --device <device_serial> --operator-package <package>
+```
+
+Log file location: `~/.clawperator/logs/clawperator-YYYY-MM-DD.log`
+
+Key events to look for:
+
+- `doctor.check` - Individual doctor check results
+- `adb.command` / `adb.complete` - ADB operations
+- `preflight.apk.pass` / `preflight.apk.missing` - APK presence checks
+
+See [Logging](api/logging.md) for complete documentation.
+
 ## Related pages
 
 - [API Overview](api/overview.md)
@@ -327,6 +349,7 @@ For deterministic automation, always pass both flags explicitly.
 - [Doctor](api/doctor.md)
 - [Errors](api/errors.md)
 - [Troubleshooting](troubleshooting/operator.md)
+- [Logging](api/logging.md)
 
 ---
 
@@ -8606,6 +8629,18 @@ Verification pattern:
 - use pretty mode when a human operator wants the banner plus streamed skill output
 - if pretty mode shows an APK warning or failure, fix the package/device setup before assuming the skill logic is wrong
 
+Debugging skill runs with logs:
+
+```bash
+# Stream logs in real time while a skill runs
+clawperator logs
+
+# In another terminal:
+clawperator skills run <skill_id> --device <device_serial> --operator-package <package>
+```
+
+The unified logger captures skill output as `skills.run.output` events, enabling post-timeout diagnostics. See [Logging](../api/logging.md) for details.
+
 ## Runtime Success Example
 
 ```json
@@ -9076,6 +9111,37 @@ Treat the Operator as recovered only when:
 - `checks` includes a passing `readiness.handshake`
 - a follow-up `snapshot` returns `envelope.status == "success"`
 
+## Diagnostics and Logging
+
+Use `clawperator logs` to stream the log file in real time:
+
+```bash
+# In Terminal 1: start streaming logs
+clawperator logs
+
+# In Terminal 2: run the failing command
+clawperator snapshot --device <device_serial> --operator-package <package>
+```
+
+The logs command dumps all existing log entries then streams new ones as they arrive. Press Ctrl+C to stop.
+
+Log file location: `~/.clawperator/logs/clawperator-YYYY-MM-DD.log`
+
+Useful patterns:
+
+```bash
+# Check for skill lifecycle events
+grep '"event":"skills.run.start"' ~/.clawperator/logs/clawperator-$(date +%F).log
+
+# Parse events with jq
+jq -c 'select(.event | startswith("skills.run."))' ~/.clawperator/logs/clawperator-$(date +%F).log
+
+# Follow logs in real time
+tail -f ~/.clawperator/logs/clawperator-$(date +%F).log
+```
+
+See [Logging](../api/logging.md) for complete documentation.
+
 ## Related Pages
 
 - [Setup](../setup.md)
@@ -9083,6 +9149,7 @@ Treat the Operator as recovered only when:
 - [Devices](../api/devices.md)
 - [Errors](../api/errors.md)
 - [Version Compatibility](compatibility.md)
+- [Logging](../api/logging.md)
 
 ---
 
@@ -9149,12 +9216,23 @@ If a current issue becomes reproducible and code-verifiable, add it here with:
 - workaround
 - recovery or follow-up path
 
+## Diagnostic Tools
+
+When investigating issues:
+
+1. Run `clawperator doctor --json` for a comprehensive health check
+2. Use `clawperator logs` to stream the log file in real time
+3. Check the log file directly: `~/.clawperator/logs/clawperator-YYYY-MM-DD.log`
+
+See [Logging](../api/logging.md) for details on log format and the `clawperator logs` command.
+
 ## Related Pages
 
 - [Operator App](operator.md)
 - [Version Compatibility](compatibility.md)
 - [Doctor](../api/doctor.md)
 - [Errors](../api/errors.md)
+- [Logging](../api/logging.md)
 
 ---
 

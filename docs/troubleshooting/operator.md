@@ -392,6 +392,37 @@ Treat the Operator as recovered only when:
 - `checks` includes a passing `readiness.handshake`
 - a follow-up `snapshot` returns `envelope.status == "success"`
 
+## Diagnostics and Logging
+
+Use `clawperator logs` to stream the log file in real time:
+
+```bash
+# In Terminal 1: start streaming logs
+clawperator logs
+
+# In Terminal 2: run the failing command
+clawperator snapshot --device <device_serial> --operator-package <package>
+```
+
+The logs command dumps all existing log entries then streams new ones as they arrive. Press Ctrl+C to stop.
+
+Log file location: `~/.clawperator/logs/clawperator-YYYY-MM-DD.log`
+
+Useful patterns:
+
+```bash
+# Check for skill lifecycle events
+grep '"event":"skills.run.start"' ~/.clawperator/logs/clawperator-$(date +%F).log
+
+# Parse events with jq
+jq -c 'select(.event | startswith("skills.run."))' ~/.clawperator/logs/clawperator-$(date +%F).log
+
+# Follow logs in real time
+tail -f ~/.clawperator/logs/clawperator-$(date +%F).log
+```
+
+See [Logging](../api/logging.md) for complete documentation.
+
 ## Related Pages
 
 - [Setup](../setup.md)
@@ -399,3 +430,4 @@ Treat the Operator as recovered only when:
 - [Devices](../api/devices.md)
 - [Errors](../api/errors.md)
 - [Version Compatibility](compatibility.md)
+- [Logging](../api/logging.md)
