@@ -4,7 +4,7 @@ import { spawn } from "node:child_process";
 import { chmod, mkdtemp, mkdir, copyFile, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
-import { homedir, tmpdir } from "node:os";
+import { tmpdir } from "node:os";
 import {
   CLAWPERATOR_BIN_ENV_VAR,
   CLAWPERATOR_OPERATOR_PACKAGE_ENV_VAR,
@@ -120,12 +120,23 @@ async function getPackageVersion(): Promise<string> {
   return parsed.version ?? "0.0.0";
 }
 
-function getTodayLogPath(): string {
+function getLogPathForDir(logDir: string): string {
   const now = new Date();
   const yyyy = String(now.getFullYear());
   const mm = String(now.getMonth() + 1).padStart(2, "0");
   const dd = String(now.getDate()).padStart(2, "0");
-  return join(homedir(), ".clawperator", "logs", `clawperator-${yyyy}-${mm}-${dd}.log`);
+  return join(logDir, `clawperator-${yyyy}-${mm}-${dd}.log`);
+}
+
+function parseLogEvents(contents: string): Array<{ event?: string; skillId?: string; stream?: string; message?: string; level?: string; exitCode?: number }> {
+  return contents.trimEnd().split("\n").filter(Boolean).map((line) => JSON.parse(line) as {
+    event?: string;
+    skillId?: string;
+    stream?: string;
+    message?: string;
+    level?: string;
+    exitCode?: number;
+  });
 }
 
 async function createFakeAdb(options: {
@@ -505,6 +516,39 @@ describe("skills validate dry-run", () => {
         parsed.dryRun?.reason,
         "skill has no pre-compiled artifacts; payload is generated at runtime by the skill script"
       );
+    }
+  });
+
+  it("emits cli.validation when pretty-mode payload validation is skipped", async () => {
+    const tempLogDir = await mkdtemp(join(tmpdir(), "clawperator-validation-logs-"));
+    try {
+      const { stdout, stderr, code } = await runCli([
+        "skills",
+        "validate",
+        TEST_SKILL_SCRIPT_ONLY,
+        "--dry-run",
+        "--log-level",
+        "debug",
+        "--output",
+        "pretty",
+      ], {
+        env: {
+          ...process.env,
+          CLAWPERATOR_SKILLS_REGISTRY: TEST_REGISTRY_PATH,
+          CLAWPERATOR_LOG_DIR: tempLogDir,
+        },
+      });
+
+      assert.strictEqual(code, 0, stdout);
+      assert.match(stderr, /Payload validation skipped: no pre-compiled artifacts/);
+      const contents = await readFile(getLogPathForDir(tempLogDir), "utf8");
+      const events = parseLogEvents(contents);
+      const validationEvent = events.find((event) => event.event === "cli.validation");
+      assert.ok(validationEvent, "Expected cli.validation to be logged");
+      assert.strictEqual(validationEvent?.skillId, TEST_SKILL_SCRIPT_ONLY);
+      assert.strictEqual(validationEvent?.level, "debug");
+    } finally {
+      await rm(tempLogDir, { recursive: true, force: true });
     }
   });
 
@@ -1570,28 +1614,38 @@ describe("runSkill", () => {
     assert.ok(!stdout.includes("[Clawperator]"));
   });
 
-  it("CLI skills run prints a banner first in pretty mode", async () => {
+  it("CLI skills run routes the banner through the logger in pretty mode", async () => {
     const fakeAdbDir = await createFakeAdb({
       installed: true,
       operatorPackage: "com.clawperator.operator.dev",
     });
-    const { stdout, code } = await runCli([
-      "skills", "run", TEST_FIXTURE_CHUNKED_OUTPUT, "--operator-package", "com.clawperator.operator.dev", "--output", "pretty",
+    const tempLogDir = await mkdtemp(join(tmpdir(), "clawperator-banner-logs-"));
+    const logPath = getLogPathForDir(tempLogDir);
+    const { stdout, stderr, code } = await runCli([
+      "skills", "run", TEST_FIXTURE_CHUNKED_OUTPUT, "--operator-package", "com.clawperator.operator.dev", "--log-level", "debug", "--output", "pretty",
     ], {
       env: {
         ...process.env,
         PATH: `${fakeAdbDir}${process.env.PATH ? `:${process.env.PATH}` : ""}`,
         CLAWPERATOR_SKILLS_REGISTRY: TEST_REGISTRY_PATH,
+        CLAWPERATOR_LOG_DIR: tempLogDir,
       },
     });
     assert.strictEqual(code, 0, stdout);
     const version = await getPackageVersion();
-    const logPath = getTodayLogPath();
-    const lines = stdout.split(/\r?\n/).filter((line) => line.length > 0);
-    assert.ok(lines[0]?.startsWith(`[Clawperator] v${version}  APK: OK (com.clawperator.operator.dev)`), lines[0]);
-    assert.ok(lines[0]?.includes(`Logs: ${logPath}`), lines[0]);
-    assert.ok(lines[0]?.includes(`Hint: tail -f ${logPath}`), lines[0]);
-    assert.ok(lines[0]?.includes("Docs: https://docs.clawperator.com/llms.txt"), lines[0]);
+    assert.ok(stdout.includes("chunk1"), stdout);
+    assert.ok(stdout.includes("chunk2"), stdout);
+    const stderrLines = stderr.split(/\r?\n/).filter((line) => line.length > 0);
+    assert.ok(stderrLines[0]?.startsWith(`[Clawperator] v${version}  APK: OK (com.clawperator.operator.dev)`), stderrLines[0]);
+    assert.ok(stderrLines[0]?.includes(`Logs: ${logPath}`), stderrLines[0]);
+    assert.ok(stderrLines[0]?.includes(`Hint: tail -f ${logPath}`), stderrLines[0]);
+    assert.ok(stderrLines[0]?.includes("Docs: https://docs.clawperator.com/llms.txt"), stderrLines[0]);
+    const contents = await readFile(logPath, "utf8");
+    const events = parseLogEvents(contents);
+    const bannerEvent = events.find((event) => event.event === "cli.banner");
+    assert.ok(bannerEvent, `Expected cli.banner in ${logPath}`);
+    assert.strictEqual(bannerEvent?.skillId, TEST_FIXTURE_CHUNKED_OUTPUT);
+    assert.strictEqual(bannerEvent?.level, "debug");
   });
 
   it("CLI skills run banner reflects CLAWPERATOR_LOG_DIR overrides", async () => {
@@ -1606,7 +1660,7 @@ describe("runSkill", () => {
       const mm = String(now.getMonth() + 1).padStart(2, "0");
       const dd = String(now.getDate()).padStart(2, "0");
       const expectedLogPath = join(tempLogDir, `clawperator-${yyyy}-${mm}-${dd}.log`);
-      const { stdout, code } = await runCli([
+      const { stdout, stderr, code } = await runCli([
         "skills", "run", TEST_FIXTURE_CHUNKED_OUTPUT, "--operator-package", "com.clawperator.operator.dev", "--output", "pretty",
       ], {
         env: {
@@ -1617,7 +1671,7 @@ describe("runSkill", () => {
         },
       });
       assert.strictEqual(code, 0, stdout);
-      const lines = stdout.split(/\r?\n/).filter((line) => line.length > 0);
+      const lines = stderr.split(/\r?\n/).filter((line) => line.length > 0);
       assert.ok(lines[0]?.includes(`Logs: ${expectedLogPath}`), lines[0]);
       assert.ok(lines[0]?.includes(`Hint: tail -f ${expectedLogPath}`), lines[0]);
     } finally {
@@ -1631,7 +1685,7 @@ describe("runSkill", () => {
       operatorPackage: "com.clawperator.operator",
       installedPackage: "com.clawperator.operator.dev",
     });
-    const { stdout, code } = await runCli([
+    const { stdout, stderr, code } = await runCli([
       "skills", "run", TEST_FIXTURE_CHUNKED_OUTPUT, "--operator-package", "com.clawperator.operator", "--output", "pretty",
     ], {
       env: {
@@ -1641,7 +1695,7 @@ describe("runSkill", () => {
       },
     });
     assert.strictEqual(code, 0, stdout);
-    const firstLine = stdout.split(/\r?\n/, 1)[0] ?? "";
+    const firstLine = stderr.split(/\r?\n/, 1)[0] ?? "";
     assert.match(firstLine, /Wrong Operator variant installed/);
     assert.match(firstLine, /Expected com\.clawperator\.operator but found com\.clawperator\.operator\.dev/);
     assert.match(firstLine, /Use --operator-package com\.clawperator\.operator\.dev/);
@@ -1654,7 +1708,7 @@ describe("runSkill", () => {
       packageListCode: 1,
       packageListStderr: "adb: device offline",
     });
-    const { stdout, code } = await runCli([
+    const { stdout, stderr, code } = await runCli([
       "skills", "run", TEST_FIXTURE_CHUNKED_OUTPUT, "--operator-package", "com.clawperator.operator", "--output", "pretty",
     ], {
       env: {
@@ -1664,7 +1718,7 @@ describe("runSkill", () => {
       },
     });
     assert.strictEqual(code, 0, stdout);
-    const firstLine = stdout.split(/\r?\n/, 1)[0] ?? "";
+    const firstLine = stderr.split(/\r?\n/, 1)[0] ?? "";
     assert.match(firstLine, /Could not query installed packages on the device/);
     assert.match(firstLine, /adb: device offline/);
     assert.ok(!firstLine.includes("MISSING - run `clawperator operator setup --apk <path>`"));
@@ -1675,7 +1729,7 @@ describe("runSkill", () => {
       installed: true,
       operatorPackage: "com.clawperator.operator.dev",
     });
-    const { stdout, code } = await runCli([
+    const { stdout, stderr, code } = await runCli([
       "skills", "run", TEST_FIXTURE_CHUNKED_OUTPUT, "--operator-package", "com.clawperator.operator.dev", "--output", "json",
     ], {
       env: {
@@ -1687,6 +1741,7 @@ describe("runSkill", () => {
     assert.strictEqual(code, 0, stdout);
     assert.doesNotThrow(() => JSON.parse(stdout));
     assert.ok(!stdout.includes("[Clawperator]"));
+    assert.ok(!stderr.includes("[Clawperator]"));
   });
 });
 
@@ -2076,7 +2131,7 @@ describe("CLI skills run streaming", () => {
     });
 
     assert.strictEqual(code, 0, `stderr: ${stderrChunks.join("")}`);
-    assert.ok(stdoutChunks[0]?.startsWith("[Clawperator]"), stdoutChunks[0]);
+    assert.ok(stderrChunks[0]?.startsWith("[Clawperator]"), stderrChunks[0]);
     assert.ok(
       stdoutChunks.some((chunk, index) =>
         chunk.includes("chunk1") && stdoutChunks.slice(index + 1).some((later) => later.includes("chunk2"))
@@ -2097,19 +2152,55 @@ describe("runSkill logging", () => {
     await rm(tempRoot, { recursive: true, force: true });
   });
 
+  it("logs stdout and stderr chunks with skillId while preserving onOutput", async () => {
+    const logger = createLogger({ logDir: join(tempRoot, "logs"), logLevel: "debug" });
+    const chunks: Array<{ chunk: string; stream: "stdout" | "stderr" }> = [];
+
+    const result = await runSkill(TEST_FIXTURE_MIXED_STREAMS, [], undefined, undefined, undefined, {
+      logger,
+      onOutput: (chunk, stream) => {
+        chunks.push({ chunk, stream });
+      },
+    });
+
+    assert.ok(result.ok, `Expected runSkill to succeed: ${"message" in result ? result.message : ""}`);
+    assert.deepStrictEqual(chunks, [
+      { chunk: "stdout-line\n", stream: "stdout" },
+      { chunk: "stderr-line\n", stream: "stderr" },
+    ]);
+
+    const contents = await readFile(logger.logPath()!, "utf8");
+    const lines = parseLogEvents(contents);
+    const outputLines = lines.filter((line) => line.event === "skills.run.output");
+    assert.deepStrictEqual(
+      outputLines.map((line) => ({ skillId: line.skillId, stream: line.stream, message: line.message })),
+      [
+        { skillId: TEST_FIXTURE_MIXED_STREAMS, stream: "stdout", message: "stdout-line\n" },
+        { skillId: TEST_FIXTURE_MIXED_STREAMS, stream: "stderr", message: "stderr-line\n" },
+      ]
+    );
+    const startLine = lines.find((line) => line.event === "skills.run.start");
+    const completeLine = lines.find((line) => line.event === "skills.run.complete");
+    assert.strictEqual(startLine?.skillId, TEST_FIXTURE_MIXED_STREAMS);
+    assert.strictEqual(completeLine?.skillId, TEST_FIXTURE_MIXED_STREAMS);
+  });
+
   it("logs start and complete without leaking sentinel args", async () => {
     const sentinel = "CLAWPERATOR_TEST_SENTINEL_X9Z";
     const logger = createLogger({ logDir: join(tempRoot, "logs"), logLevel: "debug" });
 
-    const result = await runSkill("com.test.echo", [sentinel], undefined, undefined, undefined, {
+    const result = await runSkill("com.test.env-echo", [sentinel], undefined, undefined, undefined, {
       logger,
     });
 
     assert.ok(result.ok, `Expected runSkill to succeed: ${"message" in result ? result.message : ""}`);
     const contents = await readFile(logger.logPath()!, "utf8");
-    const lines = contents.trimEnd().split("\n").map(line => JSON.parse(line) as { event: string; message?: string });
-    assert.ok(lines.some(line => line.event === "skills.run.start"));
-    assert.ok(lines.some(line => line.event === "skills.run.complete"));
+    const lines = parseLogEvents(contents);
+    const startLine = lines.find((line) => line.event === "skills.run.start");
+    const completeLine = lines.find((line) => line.event === "skills.run.complete");
+    assert.strictEqual(startLine?.skillId, "com.test.env-echo");
+    assert.strictEqual(completeLine?.skillId, "com.test.env-echo");
+    assert.ok(lines.some((line) => line.event === "skills.run.output"));
     for (const line of lines) {
       assert.strictEqual(line.message?.includes(sentinel), false, `sentinel leaked into log line: ${JSON.stringify(line)}`);
       assert.strictEqual(JSON.stringify(line).includes(sentinel), false, `sentinel leaked into log payload: ${JSON.stringify(line)}`);
@@ -2126,10 +2217,14 @@ describe("runSkill logging", () => {
     assert.ok(!result.ok);
     assert.strictEqual(result.code, SKILL_EXECUTION_TIMEOUT);
     const contents = await readFile(logger.logPath()!, "utf8");
-    const lines = contents.trimEnd().split("\n").map(line => JSON.parse(line) as { event: string });
-    assert.ok(lines.some(line => line.event === "skills.run.start"));
-    assert.ok(lines.some(line => line.event === "skills.run.timeout"));
-    assert.ok(!lines.some(line => line.event === "skills.run.complete"));
+    const lines = parseLogEvents(contents);
+    const startLine = lines.find((line) => line.event === "skills.run.start");
+    const timeoutLine = lines.find((line) => line.event === "skills.run.timeout");
+    assert.strictEqual(startLine?.skillId, "com.test.partial-timeout");
+    assert.strictEqual(timeoutLine?.skillId, "com.test.partial-timeout");
+    assert.ok(lines.some((line) => line.event === "skills.run.start"));
+    assert.ok(lines.some((line) => line.event === "skills.run.timeout"));
+    assert.ok(!lines.some((line) => line.event === "skills.run.complete"));
   });
 
   it("logs a failure event when the skill exits non-zero", async () => {
@@ -2142,9 +2237,15 @@ describe("runSkill logging", () => {
     assert.ok(!result.ok);
     assert.strictEqual(result.code, SKILL_EXECUTION_FAILED);
     const contents = await readFile(logger.logPath()!, "utf8");
-    const lines = contents.trimEnd().split("\n").map(line => JSON.parse(line) as { event: string });
-    assert.ok(lines.some(line => line.event === "skills.run.start"));
-    assert.ok(lines.some(line => line.event === "skills.run.failed"));
-    assert.ok(lines.some(line => line.event === "skills.run.complete"));
+    const lines = parseLogEvents(contents);
+    const startLine = lines.find((line) => line.event === "skills.run.start");
+    const failedLine = lines.find((line) => line.event === "skills.run.failed");
+    const completeLine = lines.find((line) => line.event === "skills.run.complete");
+    assert.strictEqual(startLine?.skillId, "com.test.fail");
+    assert.strictEqual(failedLine?.skillId, "com.test.fail");
+    assert.strictEqual(completeLine?.skillId, "com.test.fail");
+    assert.ok(lines.some((line) => line.event === "skills.run.start"));
+    assert.ok(lines.some((line) => line.event === "skills.run.failed"));
+    assert.ok(lines.some((line) => line.event === "skills.run.complete"));
   });
 });
