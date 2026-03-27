@@ -21,6 +21,7 @@ Example:
 ```
 
 This skill updates public release-facing surfaces such as:
+- `docs/index.md` (the "Current release" badge on the docs home page)
 - `docs/troubleshooting/compatibility.md` (versioned Operator APK remediation example)
 - `docs/internal/release-procedure.md` (versioned release command examples)
 - `sites/landing/public/install.sh`

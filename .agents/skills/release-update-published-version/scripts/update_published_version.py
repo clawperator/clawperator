@@ -144,6 +144,16 @@ def main() -> None:
 
     updated_docs: list[Path] = []
 
+    # Update version badge on docs home page
+    docs_index_path = repo_root / "docs" / "index.md"
+    if replace_required(
+        docs_index_path,
+        r'(\*\*Current release: \[)[0-9]+\.[0-9]+\.[0-9]+(\]\(https://github\.com/clawperator/clawperator/releases/tag/v)[0-9]+\.[0-9]+\.[0-9]+(\]\)\*\*)',
+        f"\\g<1>{version}\\g<2>{version}\\g<3>",
+        fatal=False,
+    ):
+        updated_docs.append(docs_index_path)
+
     # The historical `docs/android-operator-apk.md` doc was removed/migrated.
     # Release follow-ups should keep working even when that legacy input is
     # not present.
