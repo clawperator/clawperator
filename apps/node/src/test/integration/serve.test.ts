@@ -6,7 +6,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { createLogger } from "../../adapters/logger.js";
+import { createClawperatorLogger } from "../../adapters/logger.js";
 
 describe("serve API integration", () => {
   let server: Server;
@@ -339,7 +339,7 @@ describe("serve API integration", () => {
 
   test("serve.server.started appears in log file when logger is provided", async () => {
     const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-serve-log-"));
-    const logger = createLogger({ logDir: join(tempRoot, "logs"), logLevel: "info" });
+    const logger = createClawperatorLogger({ logDir: join(tempRoot, "logs"), logLevel: "info" });
 
     const testServer = await startServer({ port: 0, host: "localhost", verbose: false, logger });
     const addr = testServer.address();

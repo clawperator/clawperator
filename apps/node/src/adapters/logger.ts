@@ -15,15 +15,11 @@ import {
 export type { LogEvent, LogLevel, ClawperatorLogger };
 
 /**
- * Compatibility: the old Logger interface has log() as an alias for emit().
- * Remaining callers in adbClient.ts and logcatResultReader.ts still use log().
- * Once those are migrated to emit(), this can be collapsed to ClawperatorLogger.
+ * Logger is a type alias for ClawperatorLogger. Kept as a convenience export
+ * so existing call sites do not need a mass rename. New code should prefer
+ * importing ClawperatorLogger from contracts/logging.ts.
  */
-export interface Logger extends ClawperatorLogger {
-  log(event: LogEvent): void;
-  /** Override child() to return Logger so callers keep the log() shim. */
-  child(defaultContext: Partial<LogEvent>): Logger;
-}
+export type Logger = ClawperatorLogger;
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -73,7 +69,7 @@ export interface CreateClawperatorLoggerOptions {
  * Terminal destination: selected events written to stderr in pretty mode, suppressed in JSON mode.
  * Fail-open: if the log directory is unavailable, one stderr warning then file logging disabled.
  */
-export function createClawperatorLogger(options?: CreateClawperatorLoggerOptions): Logger {
+export function createClawperatorLogger(options?: CreateClawperatorLoggerOptions): ClawperatorLogger {
   const configuredDir =
     options?.logDir?.trim() ||
     process.env.CLAWPERATOR_LOG_DIR?.trim() ||
@@ -109,7 +105,7 @@ export function createClawperatorLogger(options?: CreateClawperatorLoggerOptions
     process.stderr.write(`${event.message}\n`);
   }
 
-  function buildLogger(defaultContext?: Partial<LogEvent>): Logger {
+  function buildLogger(defaultContext?: Partial<LogEvent>): ClawperatorLogger {
     function emitEvent(event: LogEvent): void {
       // Merge child context into event. Explicit event fields take precedence.
       const merged = mergeDefinedContext(defaultContext, event) as LogEvent;
@@ -134,13 +130,7 @@ export function createClawperatorLogger(options?: CreateClawperatorLoggerOptions
     return {
       emit: emitEvent,
 
-      /**
-       * Compatibility shim: log() delegates to emit() via closure.
-       * Safe to destructure or pass as a callback - no `this` dependency.
-       */
-      log: emitEvent,
-
-      child(childContext: Partial<LogEvent>): Logger {
+      child(childContext: Partial<LogEvent>): ClawperatorLogger {
         const mergedContext = mergeDefinedContext(defaultContext, childContext);
         return buildLogger(mergedContext);
       },
@@ -157,15 +147,3 @@ export function createClawperatorLogger(options?: CreateClawperatorLoggerOptions
   return buildLogger();
 }
 
-/**
- * Compatibility alias: createLogger maps to createClawperatorLogger.
- * During migration, call sites that import createLogger continue to work.
- * The returned logger uses emit() instead of log(). Callers using the old
- * log() method must migrate to emit().
- */
-export function createLogger(options?: { logDir?: string; logLevel?: string }): Logger {
-  return createClawperatorLogger({
-    logDir: options?.logDir,
-    logLevel: options?.logLevel,
-  });
-}

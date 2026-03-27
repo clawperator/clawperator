@@ -7,7 +7,7 @@ import { DoctorService } from "../../../domain/doctor/DoctorService.js";
 import { getDefaultRuntimeConfig } from "../../../adapters/android-bridge/runtimeConfig.js";
 import { FakeProcessRunner } from "../fakes/FakeProcessRunner.js";
 import { ERROR_CODES } from "../../../contracts/errors.js";
-import { createLogger } from "../../../adapters/logger.js";
+import { createClawperatorLogger } from "../../../adapters/logger.js";
 import {
   getCliVersion,
   getOperatorApkDownloadUrl,
@@ -252,7 +252,7 @@ describe("DoctorService logging", () => {
 
   it("logs one doctor.check entry per check", async () => {
     const runner = new FakeProcessRunner();
-    const logger = createLogger({ logDir: join(tempRoot, "logs"), logLevel: "info" });
+    const logger = createClawperatorLogger({ logDir: join(tempRoot, "logs"), logLevel: "info" });
     const config = getDefaultRuntimeConfig({ runner, operatorPackage: "com.clawperator.operator.dev" });
 
     runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });

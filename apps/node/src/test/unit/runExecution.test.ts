@@ -20,7 +20,7 @@ import type { Execution } from "../../contracts/execution.js";
 import type { ResultEnvelope, StepResult } from "../../contracts/result.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
-import { createLogger } from "../../adapters/logger.js";
+import { createClawperatorLogger } from "../../adapters/logger.js";
 import { clawperatorEvents, CLAW_EVENT_TYPES } from "../../domain/observe/events.js";
 import { isAbsolute, join } from "node:path";
 import { tmpdir } from "node:os";
@@ -885,7 +885,7 @@ describe("runExecution logging", () => {
   }
 
   it("writes broadcast and envelope events with the execution commandId", async () => {
-    const logger = createLogger({ logDir: join(tempRoot, "logs"), logLevel: "info" });
+    const logger = createClawperatorLogger({ logDir: join(tempRoot, "logs"), logLevel: "info" });
     const adbPath = await writeFakeAdbScript("adb");
     const runner = createLogcatRunner(
       `[Clawperator-Result] ${JSON.stringify({
@@ -940,7 +940,7 @@ describe("runExecution logging", () => {
   });
 
   it("keeps sentinel payload text out of every log line", async () => {
-    const logger = createLogger({ logDir: join(tempRoot, "logs"), logLevel: "debug" });
+    const logger = createClawperatorLogger({ logDir: join(tempRoot, "logs"), logLevel: "debug" });
     const adbPath = await writeFakeAdbScript("adb");
     const sentinel = "CLAWPERATOR_TEST_SENTINEL_X9Z";
     const runner = createLogcatRunner(
@@ -994,11 +994,11 @@ describe("runExecution logging", () => {
   });
 
   it("adds the logger path to timeout errors as an absolute file path", async () => {
-    const logger = createLogger({ logDir: join(tempRoot, "logs"), logLevel: "info" });
+    const logger = createClawperatorLogger({ logDir: join(tempRoot, "logs"), logLevel: "info" });
     const logPath = logger.logPath();
     assert.ok(logPath);
 
-    logger.log({
+    logger.emit({
       ts: "2026-03-22T00:00:00.000Z",
       level: "info",
       event: "preflight.apk.pass",
