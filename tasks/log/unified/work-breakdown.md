@@ -22,9 +22,9 @@ durable docs, and closes the validation matrix. Merge gate between PRs.
 | State | in progress |
 | Total PRs | 2 |
 | Total phases | 7 (0-6) |
-| Completed | 0 [DONE], 1 [DONE], 2 [DONE] |
-| Remaining | 3, 4, 5, 6 |
-| Current / Next | 3 |
+| Completed | 0 [DONE], 1 [DONE], 2 [DONE], 3 [DONE] |
+| Remaining | 4, 5, 6 |
+| Current / Next | 4 |
 | Blockers | None (PR-1 merged via 2586f04) |
 
 ## Hard Rules
