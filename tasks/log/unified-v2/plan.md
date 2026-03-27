@@ -8,10 +8,10 @@ single `ClawperatorLogger` that centralizes routing decisions. The logger decide
 what goes to file, what goes to the terminal, and what stays suppressed in JSON
 mode - call sites stop branching independently.
 
-2 PRs, 6 phases. PR-1 introduces the core logger, migrates skill and execution
-flows, and adds `clawperator logs --follow`. PR-2 migrates doctor and serve
-logging, preserves SSE compatibility, updates durable docs, and closes the
-validation matrix. Merge gate between PRs.
+2 PRs, 6 phases. PR-1 introduces the core logger and migrates skill and
+execution flows. PR-2 migrates doctor and serve logging, adds
+`clawperator logs --follow`, preserves SSE compatibility, updates durable docs,
+and closes the validation matrix. Merge gate between PRs.
 
 ## Status
 
@@ -39,7 +39,8 @@ runner, serve) route through. After this work:
 - `child(context)` propagates correlation IDs without manual threading
 - The EventEmitter in `domain/observe/events.ts` remains as the SSE transport
   for this task; it is not conflated with the logger
-- `clawperator logs --follow` streams the NDJSON log file in real time
+- `clawperator logs --follow` dumps existing log content and then streams new
+  lines in real time, so post-timeout diagnostics include the full context
 
 ## Why Now
 
@@ -132,7 +133,7 @@ log files for post-run diagnostics.
   when output format is `json`
 - File destination: all events at or above configured log level go to file
 - Event naming: follow the naming table below; do not invent names outside this table
-- `clawperator logs --follow` behavior: tail the current NDJSON log file, exit on SIGINT
+- `clawperator logs --follow` behavior: dump all existing lines from the current daily log file, then stream new lines as they arrive, exit on SIGINT
 - SSE compatibility: EventEmitter stays, SSE event names stay, SSE payloads stay
 
 ### Judgment (requires human review)
@@ -157,7 +158,7 @@ Use this table verbatim. Do not re-derive routing rules.
 | Event category | File destination | Terminal destination | Subscriber destination |
 | --- | --- | --- | --- |
 | Lifecycle (`skills.run.start`, `skills.run.complete`, `broadcast.dispatched`, etc.) | Yes, at configured level | No | No |
-| Skill output (`skills.run.output`) | Yes, always at `info` level | Yes, in pretty mode only | No |
+| Skill output (`skills.run.output`) | Yes, always at `info` level | No (terminal streaming handled by existing `onOutput` callback in `skills.ts`, not by the logger) | No |
 | CLI terminal output (`cli.banner`, `cli.note`, `cli.validation`) | Yes, at `debug` level | Yes, respects output format | No |
 | Doctor events (`doctor.check`) | Yes, at configured level | Yes, in pretty mode only | No |
 | Execution lifecycle (`execution.*`) | Yes, at configured level | No | No |
@@ -180,7 +181,7 @@ Use only the names in this table. Do not invent new event families.
 | --- | --- |
 | Preserve as-is | `skills.run.start`, `skills.run.complete`, `skills.run.failed`, `skills.run.timeout`, `preflight.apk.pass`, `preflight.apk.missing`, `broadcast.dispatched`, `envelope.received`, `timeout.fired`, `doctor.check` |
 | Add for skill child-process output | `skills.run.output` with `stream: "stdout" \| "stderr"` |
-| Add for CLI informational lines | `cli.banner`, `cli.note`, `cli.validation` |
+| Add for CLI informational lines | `cli.banner`, `cli.note`, `cli.validation`, `cli.doctor` |
 | Add for serve operational logging | `serve.server.started`, `serve.http.request`, `serve.http.error`, `serve.sse.client.connected`, `serve.sse.client.disconnected`, `serve.sse.write_failed` |
 
 ### Logger interface
@@ -189,7 +190,7 @@ Use only the names in this table. Do not invent new event families.
 | --- | --- |
 | Core contract | `ClawperatorLogger` with `emit(event)`, `child(defaultContext)`, and `logPath()` |
 | `child()` behavior | Returns a new logger instance that merges `defaultContext` fields into every `emit()` call. Call sites use `child({ commandId, taskId, deviceId })` once, then `emit()` without repeating correlation IDs. |
-| Event payload shape | Required fields: `ts`, `level`, `event`, `message`. Optional stable scalar fields: `commandId`, `taskId`, `deviceId`, `stream`, `status`, `durationMs`, `exitCode`. No index signature - use named fields only. |
+| Event payload shape | Required fields: `ts`, `level`, `event`, `message`. Optional stable scalar fields: `commandId`, `taskId`, `deviceId`, `skillId`, `stream`, `status`, `durationMs`, `exitCode`. No index signature - use named fields only. |
 | Sensitive payloads | Do not log raw execution payload JSON, skill arguments, snapshot text, screenshot bytes, full stdout dumps, or other large blobs. Preserve the current "no sentinel leakage" discipline. |
 | File routing | Controlled by `--log-level` and `CLAWPERATOR_LOG_DIR`. Daily file naming and fail-open semantics unchanged. |
 | Terminal routing | Controlled by output mode plus sink policy. JSON mode must not write non-result noise to stdout. Pretty mode renders selected events to stderr. |
@@ -247,6 +248,7 @@ interface LogEvent {
   commandId?: string;
   taskId?: string;
   deviceId?: string;
+  skillId?: string;
   stream?: "stdout" | "stderr";
   status?: string;
   durationMs?: number;
@@ -261,8 +263,10 @@ or rotation. Daily files at `~/.clawperator/logs/clawperator-YYYY-MM-DD.log`.
 
 ### `clawperator logs --follow` output
 
-Streams raw NDJSON lines from the current log file to stdout. Exits cleanly on
-SIGINT with code 0. No formatting or filtering in v1.
+Dumps all existing lines from the current daily log file, then streams new
+lines as they arrive. This ensures that post-timeout diagnostics include the
+already-written lifecycle and progress events. Exits cleanly on SIGINT with
+code 0. No formatting or filtering in v1.
 
 ## Idempotency
 

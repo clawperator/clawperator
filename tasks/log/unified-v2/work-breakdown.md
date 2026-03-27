@@ -4,15 +4,15 @@ Parent plan: `tasks/log/unified-v2/plan.md`
 
 ## Executive Summary
 
-2 PRs, 6 phases. PR-1 (phases 1-3) introduces the unified logger core, migrates
-skill and execution flows, and adds `clawperator logs --follow`. PR-2 (phases
-4-6) migrates doctor and serve operational logging, preserves SSE compatibility,
-updates durable docs, and closes the validation matrix. Merge gate between PRs.
+2 PRs, 6 phases. PR-1 (phases 1-2) introduces the unified logger core and
+migrates skill and execution flows. PR-2 (phases 3-6) migrates doctor and serve
+logging, adds `clawperator logs --follow`, preserves SSE compatibility, updates
+durable docs, and closes the validation matrix. Merge gate between PRs.
 
 | PR | Phases | Agent tier | Purpose |
 | --- | --- | --- | --- |
-| PR-1 | 1, 2, 3 | thinking, default, default | Core logger + skill/execution wiring + logs command |
-| PR-2 | 4, 5, 6 | default, default, default | Doctor/serve migration + docs + final validation |
+| PR-1 | 1, 2 | thinking, default | Core logger + skill/execution wiring |
+| PR-2 | 3, 4, 5, 6 | default, default, default, default | Doctor/serve migration + logs command + docs + final validation |
 
 ## Status
 
@@ -73,8 +73,8 @@ Read these files IN THIS ORDER before writing anything.
 
 | PR | Purpose | Included phases | Agent tier | Merge gate |
 | --- | --- | --- | --- | --- |
-| PR-1 | Core unified logger + skill/execution wiring + logs command | 1, 2, 3 | thinking, default, default | Tests pass; `skills.run.output` events appear in log file from a device run; `clawperator logs -f` streams events; JSON mode stdout is clean |
-| PR-2 | Doctor/serve migration + docs + final validation | 4, 5, 6 | default, default, default | Tests pass; SSE `/events` still works; `serve.*` events in log file; docs build succeeds; all smoke scripts pass |
+| PR-1 | Core unified logger + skill/execution wiring | 1, 2 | thinking, default | Tests pass; `skills.run.output` events appear in log file from a device run; JSON mode stdout is clean |
+| PR-2 | Doctor/serve migration + logs command + docs + final validation | 3, 4, 5, 6 | default, default, default, default | Tests pass; SSE `/events` still works; `serve.*` events in log file; `clawperator logs -f` streams events; docs build succeeds; all smoke scripts pass |
 
 ---
 
@@ -114,6 +114,7 @@ handles file writing, terminal rendering, and fail-open behavior in one place.
        commandId?: string;
        taskId?: string;
        deviceId?: string;
+       skillId?: string;
        stream?: "stdout" | "stderr";
        status?: string;
        durationMs?: number;
@@ -130,7 +131,7 @@ handles file writing, terminal rendering, and fail-open behavior in one place.
      ```
    - Routing rule types and `DEFAULT_ROUTING_RULES` constant implementing the
      routing table from `plan.md` as a first-match-wins prefix lookup:
-     - `skills.run.output` -> file + terminal, `terminalInJsonMode: false`
+     - `skills.run.output` -> file only (terminal streaming is handled by the existing `onOutput` callback in `skills.ts`, not by the logger)
      - `cli.` -> file + terminal, `terminalInJsonMode: false`
      - `doctor.` -> file + terminal, `terminalInJsonMode: false`
      - `serve.` -> file only
@@ -155,9 +156,9 @@ handles file writing, terminal rendering, and fail-open behavior in one place.
 5. Write `apps/node/src/test/unit/unifiedLogger.test.ts`:
    - File routing: events at or above threshold written to file
    - File routing: events below threshold not written
-   - Terminal routing: `skills.run.output` appears on stderr in pretty mode
-   - Terminal routing: `skills.run.output` does NOT appear on stderr in JSON mode
+   - Routing: `skills.run.output` goes to file only, not terminal (terminal streaming is handled by the `onOutput` callback in `skills.ts`)
    - Terminal routing: `cli.banner` appears on stderr in pretty mode
+   - Terminal routing: `cli.banner` does NOT appear on stderr in JSON mode
    - `child()`: context merging works correctly, does not mutate parent
    - Fail-open: when log dir is not writable, file disabled but terminal still works
    - `logPath()` returns expected daily path or undefined when disabled
@@ -334,103 +335,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 
 ---
 
-## Phase 3: Add `clawperator logs` Command
-
-### Agent Tier
-
-default
-
-### Goal
-
-Add a new `clawperator logs` command with `--follow` (`-f`) flag that tails the
-current NDJSON log file in real time.
-
-### Files or Surfaces To Change
-
-- `apps/node/src/cli/commands/logs.ts` (new)
-- `apps/node/src/cli/registry.ts` (register command)
-- `apps/node/src/cli/index.ts` (add handler if needed by registry pattern)
-- `apps/node/src/test/unit/logs.test.ts` (new)
-
-### Steps
-
-1. Create `apps/node/src/cli/commands/logs.ts`:
-   - `cmdLogs(options: { follow: boolean; logDir?: string })`:
-     - Resolve log file path using same logic as `createClawperatorLogger`
-       (env var `CLAWPERATOR_LOG_DIR`, default `~/.clawperator/logs`)
-     - If `--follow` is not set:
-       - Print the log file path to stdout as JSON: `{"logPath": "<path>"}`
-       - Exit 0
-     - If `--follow` is set:
-       - Open the current daily log file
-       - Seek to end of file
-       - Use `fs.watch` or poll-based tail to stream new NDJSON lines to stdout
-       - Handle SIGINT gracefully: close the watcher, exit 0
-     - Raw NDJSON lines. No formatting or filtering in v1.
-2. Register in `apps/node/src/cli/registry.ts`:
-   - Command name: `logs`
-   - Flags: `--follow` (boolean), `-f` (alias for `--follow`)
-   - Description: `Show or tail the Clawperator log file`
-   - No device required
-3. Wire the command handler following existing patterns in `index.ts` or the
-   registry dispatch.
-4. Write `apps/node/src/test/unit/logs.test.ts`:
-   - Log path resolution matches logger path logic
-   - Without `--follow`: outputs JSON with logPath
-   - CLI flag parsing: `--follow` and `-f` both work
-   - Invalid flags produce error
-5. Add CLI regression tests for:
-   - `clawperator logs` (no flags) - outputs log path JSON
-   - `clawperator logs --follow` - starts tailing
-   - `clawperator logs -f` - alias works
-   - `clawperator logs --unknown-flag` - exits with error
-6. Build and run tests.
-7. **Device verification**: Run a skill in one terminal, tail logs in another:
-   ```bash
-   npm --prefix apps/node run build
-   # Terminal 1: tail logs
-   node apps/node/dist/cli/index.js logs --follow
-   # Terminal 2: run a skill
-   node apps/node/dist/cli/index.js skills run <skill_id> \
-     --device <device_serial> \
-     --operator-package com.clawperator.operator.dev \
-     --format pretty
-   ```
-   Verify Terminal 1 shows NDJSON events in real time as the skill runs.
-   Press Ctrl+C in Terminal 1 to verify clean exit (code 0).
-   Verify `clawperator --help` lists the `logs` command.
-
-### Acceptance Criteria
-
-- `clawperator logs` outputs JSON with the log file path
-- `clawperator logs --follow` streams NDJSON lines in real time
-- `clawperator logs -f` is an alias for `--follow`
-- SIGINT exits cleanly with code 0
-- `--help` shows the `logs` command
-- Invalid flags produce error with non-zero exit code
-- All tests pass
-
-### Validation
-
-```bash
-npm --prefix apps/node run build && npm --prefix apps/node run test
-node apps/node/dist/cli/index.js logs
-node apps/node/dist/cli/index.js --help | grep logs
-```
-
-Device verification (see step 7 above).
-
-### Expected Commit
-
-```text
-feat(node): add `clawperator logs` command with --follow support
-
-Co-Authored-By: Claude <noreply@anthropic.com>
-```
-
----
-
-## Phase 4: Doctor and Serve Migration
+## Phase 3: Doctor and Serve Migration
 
 ### Agent Tier
 
@@ -534,6 +439,119 @@ Device verification (see step 8 above).
 
 ```text
 feat(node): route doctor and serve logging through unified logger
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+```
+
+---
+
+## Phase 4: Add `clawperator logs` Command
+
+### Agent Tier
+
+default
+
+### Goal
+
+Add a new `clawperator logs` command with `--follow` (`-f`) flag that dumps the
+current daily log file and then streams new lines as they arrive.
+
+### Files or Surfaces To Change
+
+- `apps/node/src/cli/commands/logs.ts` (new)
+- `apps/node/src/cli/registry.ts` (register command)
+- `apps/node/src/cli/index.ts` (add handler if needed by registry pattern)
+- `apps/node/src/test/unit/logs.test.ts` (new)
+
+### Steps
+
+1. Create `apps/node/src/cli/commands/logs.ts`:
+   - `cmdLogs(options: { follow: boolean; logDir?: string })`:
+     - Resolve log file path using same logic as `createClawperatorLogger`
+       (env var `CLAWPERATOR_LOG_DIR`, default `~/.clawperator/logs`)
+     - If `--follow` is not set:
+       - Print the log file path to stdout as JSON: `{"logPath": "<path>"}`
+       - Exit 0
+     - If `--follow` is set:
+       - Open the current daily log file
+       - Dump all existing content to stdout first (this ensures post-timeout
+         diagnostics include already-written lifecycle and progress events)
+       - Then watch for new lines and stream them to stdout as they arrive
+       - Use `fs.watch` or poll-based tail for new line detection
+       - Handle SIGINT gracefully: close the watcher, exit 0
+     - Raw NDJSON lines. No formatting or filtering in v1.
+2. Register in `apps/node/src/cli/registry.ts`:
+   - Command name: `logs`
+   - Flags: `--follow` (boolean), `-f` (alias for `--follow`)
+   - Description: `Show or tail the Clawperator log file`
+   - No device required
+3. Wire the command handler following existing patterns in `index.ts` or the
+   registry dispatch.
+4. Write `apps/node/src/test/unit/logs.test.ts`:
+   - Log path resolution matches logger path logic
+   - Without `--follow`: outputs JSON with logPath
+   - With `--follow`: existing file content is dumped before streaming new lines
+   - CLI flag parsing: `--follow` and `-f` both work
+   - Invalid flags produce error
+5. Add CLI regression tests for:
+   - `clawperator logs` (no flags) - outputs log path JSON
+   - `clawperator logs --follow` - dumps existing content then tails
+   - `clawperator logs -f` - alias works
+   - `clawperator logs --unknown-flag` - exits with error
+6. Build and run tests.
+7. **Device verification**: Run a skill first (to populate the log file), then
+   start `logs --follow` and verify it shows the already-written events plus
+   streams new ones:
+   ```bash
+   npm --prefix apps/node run build
+   # First, run a skill to populate the log file
+   node apps/node/dist/cli/index.js skills run <skill_id> \
+     --device <device_serial> \
+     --operator-package com.clawperator.operator.dev \
+     --format pretty
+   # Now start logs --follow - it should dump existing events first
+   # Terminal 1: tail logs (should see already-written events immediately)
+   node apps/node/dist/cli/index.js logs --follow &
+   LOGS_PID=$!
+   sleep 2
+   # Terminal 2: run another skill
+   node apps/node/dist/cli/index.js skills run <skill_id> \
+     --device <device_serial> \
+     --operator-package com.clawperator.operator.dev \
+     --format pretty
+   sleep 2
+   kill "$LOGS_PID" 2>/dev/null
+   ```
+   Verify:
+   - Already-written events appear immediately when `--follow` starts
+   - New events from the second skill run stream in real time
+   - Clean exit on kill/SIGINT
+   - `clawperator --help` lists the `logs` command
+
+### Acceptance Criteria
+
+- `clawperator logs` outputs JSON with the log file path
+- `clawperator logs --follow` dumps existing log content then streams new lines
+- `clawperator logs -f` is an alias for `--follow`
+- SIGINT exits cleanly with code 0
+- `--help` shows the `logs` command
+- Invalid flags produce error with non-zero exit code
+- All tests pass
+
+### Validation
+
+```bash
+npm --prefix apps/node run build && npm --prefix apps/node run test
+node apps/node/dist/cli/index.js logs
+node apps/node/dist/cli/index.js --help | grep logs
+```
+
+Device verification (see step 7 above).
+
+### Expected Commit
+
+```text
+feat(node): add `clawperator logs` command with --follow support
 
 Co-Authored-By: Claude <noreply@anthropic.com>
 ```
