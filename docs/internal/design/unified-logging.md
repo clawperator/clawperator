@@ -85,7 +85,7 @@ Routing determines where events go (file, terminal, or both). Terminal routing i
 
 **Design Rationale**:
 
-- `skills.run.output` is file-only to avoid flooding the terminal with skill stdout/stderr lines
+- `skills.run.output` is file-only because skill terminal streaming is live interactive I/O handled by the `onOutput` callback (see below)
 - `cli.*` events appear on stderr in pretty mode for user feedback, but are suppressed in JSON mode to keep output parseable
 - Most server events are file-only to avoid terminal noise during long-running serve
 
@@ -247,7 +247,7 @@ Clawperator has two distinct event systems:
 | `CLAWPERATOR_LOG_DIR` | Base directory for log files | `~/.clawperator/logs` |
 | `CLAWPERATOR_LOG_LEVEL` | File logging threshold | `info` |
 
-Both can be overridden via CLI flags (`--log-dir`, `--log-level`) which take precedence.
+Only `CLAWPERATOR_LOG_LEVEL` has a CLI flag equivalent (`--log-level`), which takes precedence. There is no `--log-dir` CLI flag - set the env var to change the log directory.
 
 ## Future Considerations
 

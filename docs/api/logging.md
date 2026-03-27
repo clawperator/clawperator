@@ -168,22 +168,30 @@ ls -la ~/.clawperator/logs/
 clawperator logs
 ```
 
-Generate a log entry:
+Generate log entries:
 
 ```bash
-# Any command generates log entries
-clawperator skills list
+# Skill runs produce lifecycle and output events
+clawperator skills run <skill_id> --device <device_serial>
+
+# Snapshot commands produce execution lifecycle events
+clawperator snapshot --device <device_serial>
 ```
 
-Verify the entry appears:
+Verify entries appear:
 
 ```bash
-# In another terminal, or after interrupting the logs command:
+# Check for skill lifecycle events
+grep '"event":"skills.run.start"' ~/.clawperator/logs/clawperator-$(date +%F).log
+
+# Check for the CLI banner (emitted at debug level during skill runs)
 grep '"event":"cli.banner"' ~/.clawperator/logs/clawperator-$(date +%F).log
 
-# Or parse the NDJSON file with jq to see all events:
-jq -c 'select(.event | startswith("cli."))' ~/.clawperator/logs/clawperator-$(date +%F).log
+# Parse the NDJSON file with jq to see all events from a specific category
+jq -c 'select(.event | startswith("skills.run."))' ~/.clawperator/logs/clawperator-$(date +%F).log
 ```
+
+Note: `cli.banner` is logged at `debug` level. To see it in the file, use `--log-level debug`.
 
 ## Environment Variables
 
