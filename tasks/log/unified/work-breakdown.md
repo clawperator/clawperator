@@ -11,6 +11,7 @@ durable docs, and closes the validation matrix. Merge gate between PRs.
 
 | PR | Phases | Agent tier | Purpose |
 | --- | --- | --- | --- |
+| -- | 0 | default | Baseline capture (no code changes) |
 | PR-1 | 1, 2 | thinking, default | Core logger + skill/execution wiring |
 | PR-2 | 3, 4, 5, 6 | default, default, default, default | Doctor/serve migration + logs command + docs + final validation |
 
@@ -20,10 +21,10 @@ durable docs, and closes the validation matrix. Merge gate between PRs.
 | --- | --- |
 | State | planning |
 | Total PRs | 2 |
-| Total phases | 6 |
+| Total phases | 7 (0-6) |
 | Completed | 0 |
-| Remaining | 1, 2, 3, 4, 5, 6 |
-| Current / Next | 1 |
+| Remaining | 0, 1, 2, 3, 4, 5, 6 |
+| Current / Next | 0 |
 | Blockers | Phases 3-6 blocked on PR-1 merge |
 
 ## Hard Rules
@@ -96,8 +97,156 @@ Read these files IN THIS ORDER before writing anything.
 
 | PR | Purpose | Included phases | Agent tier | Merge gate |
 | --- | --- | --- | --- | --- |
-| PR-1 | Core unified logger + skill/execution wiring | 1, 2 | thinking, default | Tests pass; `skills.run.output` events appear in log file from a device run; JSON mode stdout is clean |
+| -- | Baseline capture (no code changes) | 0 | default | Baseline log saved; gap documented |
+| PR-1 | Core unified logger + skill/execution wiring | 1, 2 | thinking, default | Tests pass; `skills.run.output` events appear in log file from a device run; JSON mode stdout is clean; diff against baseline shows the gap is filled |
 | PR-2 | Doctor/serve migration + logs command + docs + final validation | 3, 4, 5, 6 | default, default, default, default | Tests pass; SSE `/events` still works; `serve.*` events in log file; `clawperator logs` streams events; docs build succeeds; all smoke scripts pass |
+
+---
+
+## Phase 0: Baseline Capture
+
+### Agent Tier
+
+default
+
+### Goal
+
+Before writing any code, capture the current logging output from a real skill
+run on a connected device. This baseline shows exactly what the log file
+contains today and documents the diagnostic gap that unified logging will fill.
+The saved baseline is compared against after Phase 2 and Phase 6 to prove the
+gap is closed.
+
+### Files or Surfaces To Change
+
+No code changes. This phase produces only diagnostic artifacts.
+
+- `tasks/log/unified/baseline-log.jsonl` (new - raw NDJSON from current skill run)
+- `tasks/log/unified/baseline-terminal.txt` (new - terminal output from the same run)
+
+### Steps
+
+1. Build the branch-local Node API:
+   ```bash
+   npm --prefix apps/node run build
+   ```
+2. Set up environment:
+   ```bash
+   export CLAWPERATOR_BIN="node $(pwd)/apps/node/dist/cli/index.js"
+   export CLAWPERATOR_OPERATOR_PACKAGE="com.clawperator.operator.dev"
+   export CLAWPERATOR_SKILLS_REGISTRY="$(cd ../clawperator-skills && pwd)/skills/skills-registry.json"
+   ```
+3. Clear today's log file to isolate baseline events:
+   ```bash
+   LOG_PATH="${CLAWPERATOR_LOG_DIR:-$HOME/.clawperator/logs}/clawperator-$(date +%F).log"
+   cp "$LOG_PATH" "$LOG_PATH.pre-baseline" 2>/dev/null || true
+   > "$LOG_PATH"
+   ```
+4. Run the climate skill in pretty mode, capturing terminal output:
+   ```bash
+   node apps/node/dist/cli/index.js skills run \
+     com.google.android.apps.chromecast.app.get-climate \
+     --device <device_serial> \
+     --operator-package com.clawperator.operator.dev \
+     --format pretty --log-level debug 2>&1 | tee tasks/log/unified/baseline-terminal.txt
+   ```
+5. Copy the log file as the baseline:
+   ```bash
+   cp "$LOG_PATH" tasks/log/unified/baseline-log.jsonl
+   ```
+6. Inspect the baseline and document the gap:
+   ```bash
+   echo "=== Events in baseline log ==="
+   cat tasks/log/unified/baseline-log.jsonl | python3 -c "
+   import sys, json
+   events = []
+   for line in sys.stdin:
+       line = line.strip()
+       if not line: continue
+       obj = json.loads(line)
+       events.append(obj['event'])
+   for e in events:
+       print(f'  {e}')
+   print(f'Total events: {len(events)}')
+   # Check for the gap
+   has_output = any(e == 'skills.run.output' for e in events)
+   has_banner = any(e == 'cli.banner' for e in events)
+   print(f'skills.run.output present: {has_output}')
+   print(f'cli.banner present: {has_banner}')
+   if not has_output:
+       print('GAP CONFIRMED: skill child-process output is not captured in the log file')
+   "
+   ```
+7. Restore the original log file:
+   ```bash
+   cat "$LOG_PATH.pre-baseline" tasks/log/unified/baseline-log.jsonl > "$LOG_PATH" 2>/dev/null || true
+   rm -f "$LOG_PATH.pre-baseline"
+   ```
+8. Verify the baseline confirms the expected gap:
+   - `skills.run.start` and `skills.run.complete` are present
+   - `skills.run.output` is NOT present (this is the gap)
+   - `cli.banner` is NOT present (banner goes to terminal only)
+   - Terminal output file shows skill progress lines that are missing from the log
+
+### Acceptance Criteria
+
+- `tasks/log/unified/baseline-log.jsonl` contains valid NDJSON from a real skill run
+- `tasks/log/unified/baseline-terminal.txt` contains terminal output including skill progress
+- The log file shows `skills.run.start` and `skills.run.complete` but NOT `skills.run.output`
+- The gap between what the terminal shows and what the log file contains is documented
+- No code changes were made
+
+### Validation
+
+Visual inspection of the baseline files. The gap must be confirmed before
+proceeding to Phase 1.
+
+### Expected Baseline Log (approximate)
+
+The baseline log should contain only these event types:
+
+```jsonl
+{"ts":"...","level":"info","event":"skills.run.start","message":"Skill com.google.android.apps.chromecast.app.get-climate spawned"}
+{"ts":"...","level":"info","event":"skills.run.complete","message":"Skill com.google.android.apps.chromecast.app.get-climate exited with code 0 after ...ms"}
+```
+
+The terminal output will contain the CLI banner and all skill stdout/stderr
+lines that are absent from the log file. This is the diagnostic gap.
+
+### After Phase 2 Comparison
+
+After Phase 2, re-run the same skill and compare against the baseline. The new
+log should contain everything the baseline had, plus:
+
+- `cli.banner` event (debug level)
+- Multiple `skills.run.output` events with `stream` and `skillId` fields
+- `skillId` field on lifecycle events
+- Self-explanatory `message` text
+
+Run:
+```bash
+LOG_PATH="${CLAWPERATOR_LOG_DIR:-$HOME/.clawperator/logs}/clawperator-$(date +%F).log"
+echo "=== Baseline event types ==="
+cat tasks/log/unified/baseline-log.jsonl | python3 -c "
+import sys, json
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    print(json.loads(line)['event'])
+"
+echo ""
+echo "=== Post-Phase-2 event types ==="
+tail -n 50 "$LOG_PATH" | python3 -c "
+import sys, json
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    print(json.loads(line)['event'])
+"
+```
+
+The post-Phase-2 output must show `skills.run.output` events that were absent
+from the baseline. If it does not, Phase 2 is not complete.
 
 ---
 
@@ -758,8 +907,48 @@ logging surfaces work correctly together. Fix any issues found.
    print('Payload leak check complete')
    "
    ```
-8. Fix any issues found. Each fix gets its own commit with a descriptive message.
-9. If no fixes needed, skip the commit and note in plan.md Status that Phase 6
+8. **Baseline comparison**: Compare the final log output against the Phase 0
+   baseline to prove the diagnostic gap is closed:
+   ```bash
+   echo "=== Phase 0 baseline event types ==="
+   cat tasks/log/unified/baseline-log.jsonl | python3 -c "
+   import sys, json, collections
+   counts = collections.Counter()
+   for line in sys.stdin:
+       line = line.strip()
+       if not line: continue
+       counts[json.loads(line)['event']] += 1
+   for event, count in sorted(counts.items()):
+       print(f'  {event}: {count}')
+   "
+   echo ""
+   echo "=== Final log event types (last skill run) ==="
+   # Extract events from the most recent skill run
+   grep 'get-climate' "$LOG_PATH" | python3 -c "
+   import sys, json, collections
+   counts = collections.Counter()
+   for line in sys.stdin:
+       line = line.strip()
+       if not line: continue
+       counts[json.loads(line)['event']] += 1
+   for event, count in sorted(counts.items()):
+       print(f'  {event}: {count}')
+   has_output = 'skills.run.output' in counts
+   has_banner = 'cli.banner' in counts
+   print(f'\nskills.run.output present: {has_output} (was absent in baseline)')
+   print(f'cli.banner present: {has_banner} (was absent in baseline)')
+   if has_output:
+       print('GAP CLOSED: skill child-process output is now captured in the log file')
+   else:
+       print('ERROR: gap is still open - skills.run.output events missing')
+       sys.exit(1)
+   "
+   ```
+   This comparison must show that event types absent from the baseline
+   (`skills.run.output`, `cli.banner`) are now present. If they are not, the
+   core objective of this task is not met.
+9. Fix any issues found. Each fix gets its own commit with a descriptive message.
+10. If no fixes needed, skip the commit and note in plan.md Status that Phase 6
    passed without changes.
 
 ### Acceptance Criteria
@@ -773,6 +962,7 @@ logging surfaces work correctly together. Fix any issues found.
 - JSON mode stdout is clean
 - `clawperator logs` streams events in real time
 - No sensitive payload leaks in log file
+- Baseline comparison confirms `skills.run.output` and `cli.banner` events are now present (were absent in Phase 0 baseline)
 - Docs build succeeds
 
 ### Validation

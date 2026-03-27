@@ -10,10 +10,11 @@ remains direct I/O through the existing `onOutput` callback - it is live
 interactive output, not a log event - but the logger captures it to the log
 file as `skills.run.output` events so post-run diagnostics have full context.
 
-2 PRs, 6 phases. PR-1 introduces the core logger and migrates skill and
-execution flows. PR-2 migrates doctor and serve logging, adds
-`clawperator logs`, preserves SSE compatibility, updates durable docs,
-and closes the validation matrix. Merge gate between PRs.
+2 PRs, 7 phases (0-6). Phase 0 captures a baseline log from a real device run
+before any code changes - proving the diagnostic gap exists. PR-1 introduces
+the core logger and migrates skill and execution flows. PR-2 migrates doctor
+and serve logging, adds `clawperator logs`, preserves SSE compatibility,
+updates durable docs, and closes the validation matrix. Merge gate between PRs.
 
 ## Status
 
@@ -21,10 +22,10 @@ and closes the validation matrix. Merge gate between PRs.
 | --- | --- |
 | State | not started |
 | Total PRs | 2 |
-| Total phases | 6 |
+| Total phases | 7 (0-6) |
 | Completed | 0 |
-| Remaining | 1, 2, 3, 4, 5, 6 |
-| Current / Next | 1 |
+| Remaining | 0, 1, 2, 3, 4, 5, 6 |
+| Current / Next | 0 |
 | Blockers | Phases 3-6 blocked on PR-1 merge |
 
 ## Goal
@@ -316,6 +317,69 @@ Dumps all existing lines from the current daily log file, then streams new
 lines as they arrive. This ensures that post-timeout diagnostics include the
 already-written lifecycle and progress events. Exits cleanly on SIGINT with
 code 0. No formatting or filtering in v1. No flags beyond `--help`.
+
+### Expected log output: before and after
+
+The following examples show what the NDJSON log file contains for a
+`clawperator skills run com.google.android.apps.chromecast.app.get-climate`
+invocation. Timestamps, durations, and device IDs vary. Event order and field
+presence are the contract.
+
+**BEFORE (current state) - skill run log events:**
+
+```jsonl
+{"ts":"...","level":"info","event":"skills.run.start","message":"Skill com.google.android.apps.chromecast.app.get-climate spawned"}
+{"ts":"...","level":"info","event":"skills.run.complete","message":"Skill com.google.android.apps.chromecast.app.get-climate exited with code 0 after 12340ms"}
+```
+
+Gap: no record of what the skill did between start and complete. An agent
+diagnosing a timeout sees `skills.run.start` then `skills.run.timeout` with
+nothing in between.
+
+**AFTER (unified logging) - same skill run:**
+
+```jsonl
+{"ts":"...","level":"debug","event":"cli.banner","message":"[Clawperator] v0.x.x  APK: OK (com.clawperator.operator.dev)  Logs: /.../.clawperator/logs/clawperator-2026-03-27.log  ..."}
+{"ts":"...","level":"info","event":"skills.run.start","message":"Skill 'com.google.android.apps.chromecast.app.get-climate' started","skillId":"com.google.android.apps.chromecast.app.get-climate"}
+{"ts":"...","level":"info","event":"skills.run.output","message":"Launching Google Home...","skillId":"com.google.android.apps.chromecast.app.get-climate","stream":"stdout"}
+{"ts":"...","level":"info","event":"skills.run.output","message":"Navigating to climate controls...","skillId":"com.google.android.apps.chromecast.app.get-climate","stream":"stdout"}
+{"ts":"...","level":"info","event":"skills.run.output","message":"[Clawperator-Result] {\"ok\":true,...}","skillId":"com.google.android.apps.chromecast.app.get-climate","stream":"stdout"}
+{"ts":"...","level":"info","event":"skills.run.output","message":"...","skillId":"com.google.android.apps.chromecast.app.get-climate","stream":"stderr"}
+{"ts":"...","level":"info","event":"skills.run.complete","message":"Skill 'com.google.android.apps.chromecast.app.get-climate' completed successfully in 12340ms","skillId":"com.google.android.apps.chromecast.app.get-climate","durationMs":12340,"exitCode":0}
+```
+
+Key differences:
+- `cli.banner` captures the pre-run info line at `debug` level
+- `skills.run.output` events capture every stdout/stderr chunk from the child
+  process, filling the diagnostic gap between start and complete
+- `skillId` field enables filtering by skill across interleaved concurrent runs
+- `message` text is self-explanatory for an agent reading the log cold
+- `durationMs` and `exitCode` are structured fields, not embedded in message text
+
+**AFTER - execution lifecycle (e.g. snapshot command):**
+
+```jsonl
+{"ts":"...","level":"info","event":"preflight.apk.pass","message":"Operator APK (com.clawperator.operator.dev) is installed on <device_serial>","commandId":"...","taskId":"...","deviceId":"<device_serial>"}
+{"ts":"...","level":"info","event":"broadcast.dispatched","message":"Broadcast dispatched to <device_serial> for com.clawperator.operator.dev","commandId":"...","taskId":"...","deviceId":"<device_serial>"}
+{"ts":"...","level":"info","event":"envelope.received","message":"Result envelope received from <device_serial>","commandId":"...","taskId":"...","deviceId":"<device_serial>"}
+```
+
+**AFTER - doctor command:**
+
+```jsonl
+{"ts":"...","level":"info","event":"doctor.check","message":"adb-reachable status=pass","deviceId":"<device_serial>"}
+{"ts":"...","level":"info","event":"doctor.check","message":"apk-installed status=pass","deviceId":"<device_serial>"}
+{"ts":"...","level":"error","event":"doctor.check","message":"accessibility-service status=fail code=ACCESSIBILITY_NOT_ENABLED","deviceId":"<device_serial>"}
+```
+
+**AFTER - serve command:**
+
+```jsonl
+{"ts":"...","level":"info","event":"serve.server.started","message":"Clawperator server listening on http://127.0.0.1:3400"}
+{"ts":"...","level":"info","event":"serve.http.request","message":"POST /snapshot from 127.0.0.1"}
+{"ts":"...","level":"info","event":"serve.sse.client.connected","message":"SSE client connected from 127.0.0.1"}
+{"ts":"...","level":"info","event":"serve.sse.client.disconnected","message":"SSE client disconnected from 127.0.0.1"}
+```
 
 ## Idempotency
 
