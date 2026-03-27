@@ -1,0 +1,4 @@
+interface:
+  display_name: "Task Author"
+  short_description: "Write durable agent handoff tasks"
+  default_prompt: "Use $task-author to draft a `tasks/<task-name>/` handoff with explicit plan, phases, validation, and commit boundaries."
