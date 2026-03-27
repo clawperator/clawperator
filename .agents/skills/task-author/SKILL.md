@@ -13,6 +13,18 @@ Run: `$task-author <task-name> "<one-line goal>"`
 
 Use the task name as the folder name under `tasks/`. If the goal is ambiguous, ask the user the minimum clarifying question needed before writing the task pack.
 
+## Agents Metadata
+
+`agents/openai.yaml` is UI metadata for skill lists and default prompting. It is not an extra workflow document and it does not override `SKILL.md`.
+
+Keep it aligned with this skill:
+
+- `display_name` should stay human-readable
+- `short_description` should describe the real job of the skill
+- `default_prompt` should point the agent at the actual workflow in this file
+
+When `SKILL.md` meaning changes materially, update `agents/openai.yaml` in the same change.
+
 ## Core Model
 
 Write for a weaker implementing agent than the one authoring the task.
@@ -128,6 +140,8 @@ Keep the roles strict:
 Do not collapse strategy and execution into one file.
 
 Do not pre-author `findings.md` unless the user explicitly wants a starter scaffold. Usually the right move is to define its required structure in `plan.md` or `work-breakdown.md` and tell the implementer when to create it.
+
+For tasks that include synthesis, classification, runtime observation, or judgment-heavy review, do not create `findings.md` up front, but do specify its full required structure in `work-breakdown.md`. The file creation is deferred; the structure is not.
 
 ## Output Skeletons
 
@@ -252,6 +266,15 @@ Parent plan: `tasks/<task-name>/plan.md`
 
 Keep the section order stable unless the task has a strong reason not to.
 
+For a small but still-worthwhile single-phase task pack, keep both files but abbreviate them:
+
+- keep `Executive Summary` to 2-4 lines
+- keep `Status` to one compact table row set
+- keep PR planning to one row
+- keep scope and failure-mode sections tight and explicit rather than expansive
+
+Do not drop `plan.md` or `work-breakdown.md`, but do avoid multi-phase boilerplate when the task is genuinely 1 phase in 1 PR.
+
 ## What `plan.md` Must Do
 
 Use `plan.md` for the decisions that should remain stable across all later phases and PRs.
@@ -303,6 +326,15 @@ If the task modifies an artifact that already contains content, add an explicit 
 
 Use tables whenever a rule has branches. Prefer first-match-wins lookup tables over explanatory prose.
 
+Name durable destinations concretely when they apply. Common destinations in this repo are:
+
+- public docs in `docs/`
+- repo-local skills in `.agents/skills/`
+- code contracts and source-owned comments in `apps/node/src/` or `apps/android/`
+- public release history in `CHANGELOG.md`
+
+Do not write "update the docs" or "capture this somewhere permanent" without naming the destination path.
+
 ## What `work-breakdown.md` Must Do
 
 Use `work-breakdown.md` for the steps the implementing agent will follow literally.
@@ -344,6 +376,25 @@ The `Executive Summary` in `work-breakdown.md` should restate the execution shap
 
 If the work exceeds roughly 6-8 phases, prefer splitting it into multiple task packs with explicit sequencing instead of one oversized `work-breakdown.md`.
 
+`Required Reading` should be specific and ordered. For each entry, give the exact file path and why it must be read before implementation. A good list usually includes:
+
+- the parent `plan.md`
+- the most relevant authoritative code or contract files
+- any existing repo skill the implementing agent should use instead of re-deriving behavior
+- an exemplar file or prior task artifact when structure matters
+
+Prefer this shape:
+
+```md
+## Required Reading
+
+| File | Why it matters |
+| --- | --- |
+| `tasks/<task-name>/plan.md` | Stable contract and scope boundaries |
+| `<path>` | Authoritative behavior or output contract |
+| `<path>` | Exemplar or companion workflow |
+```
+
 ## Hard Rules
 
 `Hard Rules` belong at the top of `work-breakdown.md`, before any phase work.
@@ -354,6 +405,7 @@ Hard rules are invariants, not advice. Write them in imperative voice. Examples:
 - One commit per logical step. Do not batch unrelated changes.
 - Do not edit generated docs directly.
 - Update `findings.md` before each phase commit when the phase performs analysis, backfill, or judgment.
+- Put a script's test in the same phase and commit as the script it verifies. Do not defer test creation to a later phase.
 - Use the script output as authoritative. Do not re-derive the decision downstream.
 
 ## Deterministic Versus Judgment
@@ -493,6 +545,13 @@ Human review should be short and concrete:
 - verify no claim exceeds the evidence
 - verify exemplars and naming remain consistent
 
+Use a task-specific human review checklist with at least these slots:
+
+- output accuracy: does the artifact say exactly what the evidence supports
+- scope completeness: did the task cover the intended surfaces and no more
+- evidence grounding: is every important claim traceable to code, inputs, or findings
+- format compliance: does the output match the required structure and ordering
+
 Avoid vague criteria such as "looks good" or "clean implementation."
 
 ## Validation Rules
@@ -529,6 +588,8 @@ When a task needs `findings.md`, specify:
 - what each phase must append
 - the mapping from inputs to outputs when omissions would be risky
 
+State this explicitly in the task pack when applicable: `Create findings.md at the start of the first execution phase using the structure below. Do not invent the format during execution.`
+
 A good findings spec usually includes:
 
 - raw command or script output
@@ -546,6 +607,13 @@ Use extra files only when they materially improve execution:
 - `agent-prompt.md` or phase-specific prompts when an execution handoff genuinely benefits from a narrower prompt than `work-breakdown.md`
 
 If the extra file is just restating `plan.md` or `work-breakdown.md`, do not create it.
+
+When you create `finalization-items.md`, give each entry enough structure that a later agent can act on it without reconstructing context. A good entry includes:
+
+- the deferred item
+- why it was deferred
+- what follow-up decision or action is needed
+- any dependency or blocking prerequisite
 
 ## Common Failure Patterns
 
