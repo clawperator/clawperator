@@ -18,7 +18,7 @@ The path components are:
 |-----------|-------|--------|
 | Base directory | `~/.clawperator/logs` | Default, or `CLAWPERATOR_LOG_DIR` env var |
 | Filename prefix | `clawperator-` | Hardcoded |
-| Date format | `YYYY-MM-DD` | UTC date of the log entry |
+| Date format | `YYYY-MM-DD` | Local calendar date of the log entry |
 | Extension | `.log` | Hardcoded |
 
 Example path: `/home/user/.clawperator/logs/clawperator-2026-03-28.log`
@@ -88,6 +88,8 @@ The `--log-level` flag (or `CLAWPERATOR_LOG_LEVEL` env var) controls which event
 Default: `info`
 
 Invalid values fall back silently to `info`.
+
+**Exception:** Skill output events (`skills.run.output`) are always written to the file regardless of level threshold, so agents can diagnose timeouts even when `--log-level error` is set.
 
 ## Event Naming Conventions
 
