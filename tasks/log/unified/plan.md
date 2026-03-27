@@ -20,12 +20,12 @@ updates durable docs, and closes the validation matrix. Merge gate between PRs.
 
 | Item | Value |
 | --- | --- |
-| State | not started |
+| State | in progress |
 | Total PRs | 2 |
 | Total phases | 7 (0-6) |
-| Completed | 0 |
-| Remaining | 0, 1, 2, 3, 4, 5, 6 |
-| Current / Next | 0 |
+| Completed | 0 [DONE], 1 [DONE] |
+| Remaining | 2, 3, 4, 5, 6 |
+| Current / Next | 2 |
 | Blockers | Phases 3-6 blocked on PR-1 merge |
 
 ## Goal
