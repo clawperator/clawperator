@@ -552,6 +552,39 @@ describe("skills validate dry-run", () => {
     }
   });
 
+  it("emits cli.validation in JSON mode when payload validation is skipped", async () => {
+    const tempLogDir = await mkdtemp(join(tmpdir(), "clawperator-validation-json-logs-"));
+    try {
+      const { stdout, stderr, code } = await runCli([
+        "skills",
+        "validate",
+        TEST_SKILL_SCRIPT_ONLY,
+        "--dry-run",
+        "--log-level",
+        "debug",
+        "--output",
+        "json",
+      ], {
+        env: {
+          ...process.env,
+          CLAWPERATOR_SKILLS_REGISTRY: TEST_REGISTRY_PATH,
+          CLAWPERATOR_LOG_DIR: tempLogDir,
+        },
+      });
+
+      assert.strictEqual(code, 0, stdout);
+      assert.ok(!stderr.includes("Payload validation skipped"), stderr);
+      const contents = await readFile(getLogPathForDir(tempLogDir), "utf8");
+      const events = parseLogEvents(contents);
+      const validationEvent = events.find((event) => event.event === "cli.validation");
+      assert.ok(validationEvent, "Expected cli.validation to be logged");
+      assert.strictEqual(validationEvent?.skillId, TEST_SKILL_SCRIPT_ONLY);
+      assert.strictEqual(validationEvent?.level, "debug");
+    } finally {
+      await rm(tempLogDir, { recursive: true, force: true });
+    }
+  });
+
   it("emits JSON-parseable output for dry-run success and failure", async () => {
     const success = await runCli([
       "skills",
@@ -1646,6 +1679,44 @@ describe("runSkill", () => {
     assert.ok(bannerEvent, `Expected cli.banner in ${logPath}`);
     assert.strictEqual(bannerEvent?.skillId, TEST_FIXTURE_CHUNKED_OUTPUT);
     assert.strictEqual(bannerEvent?.level, "debug");
+  });
+
+  it("CLI skills run emits cli.banner in JSON mode", async () => {
+    const fakeAdbDir = await createFakeAdb({
+      installed: true,
+      operatorPackage: "com.clawperator.operator.dev",
+    });
+    const tempLogDir = await mkdtemp(join(tmpdir(), "clawperator-banner-json-logs-"));
+    try {
+      const { stdout, stderr, code } = await runCli([
+        "skills",
+        "run",
+        TEST_FIXTURE_CHUNKED_OUTPUT,
+        "--operator-package",
+        "com.clawperator.operator.dev",
+        "--log-level",
+        "debug",
+        "--output",
+        "json",
+      ], {
+        env: {
+          ...process.env,
+          PATH: `${fakeAdbDir}${process.env.PATH ? `:${process.env.PATH}` : ""}`,
+          CLAWPERATOR_SKILLS_REGISTRY: TEST_REGISTRY_PATH,
+          CLAWPERATOR_LOG_DIR: tempLogDir,
+        },
+      });
+      assert.strictEqual(code, 0, stdout);
+      assert.ok(!stderr.includes("[Clawperator]"), stderr);
+      const contents = await readFile(getLogPathForDir(tempLogDir), "utf8");
+      const events = parseLogEvents(contents);
+      const bannerEvent = events.find((event) => event.event === "cli.banner");
+      assert.ok(bannerEvent, `Expected cli.banner in ${tempLogDir}`);
+      assert.strictEqual(bannerEvent?.skillId, TEST_FIXTURE_CHUNKED_OUTPUT);
+      assert.strictEqual(bannerEvent?.level, "debug");
+    } finally {
+      await rm(tempLogDir, { recursive: true, force: true });
+    }
   });
 
   it("CLI skills run banner reflects CLAWPERATOR_LOG_DIR overrides", async () => {

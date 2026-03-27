@@ -166,43 +166,41 @@ export async function cmdSkillsRun(
   const runSkillImpl = options.runSkillImpl ?? runSkill;
   const validateSkillImpl = options.validateSkillImpl ?? validateSkill;
   const cliLogger = options.logger?.child({ skillId, deviceId: options.deviceId });
-  if (options.format !== "json") {
-    const config = getDefaultRuntimeConfig({
-      deviceId: options.deviceId,
-      operatorPackage: resolvedOperatorPackage,
-      logger: cliLogger,
-    });
-    let apkStatus = `MISSING - run \`clawperator operator setup --apk <path>\``;
-    try {
-      const apkPresence = await checkApkPresence(config);
-      if (apkPresence.status === "pass") {
-        apkStatus = `OK (${resolvedOperatorPackage})`;
-      } else if (apkPresence.status === "warn") {
-        const alternateVariant = getAlternateOperatorVariant(resolvedOperatorPackage);
-        apkStatus = `WARN - ${apkPresence.summary}${apkPresence.detail ? ` ${apkPresence.detail}` : ""} Use --operator-package ${alternateVariant} or reinstall the matching APK.`;
-      } else {
-        apkStatus = `FAIL - ${apkPresence.summary}${apkPresence.detail ? ` ${apkPresence.detail}` : ""}`;
-      }
-    } catch {
-      apkStatus = `MISSING - run \`clawperator operator setup --apk <path>\``;
-    }
-
-    const logDate = new Date();
-    const yyyy = String(logDate.getFullYear());
-    const mm = String(logDate.getMonth() + 1).padStart(2, "0");
-    const dd = String(logDate.getDate()).padStart(2, "0");
-    const logPath = cliLogger?.logPath() ?? join(homedir(), ".clawperator", "logs", `clawperator-${yyyy}-${mm}-${dd}.log`);
-    const bannerMessage = `[Clawperator] v${getCliVersion()}  APK: ${apkStatus}  Logs: ${logPath}  Hint: tail -f ${logPath}  Docs: https://docs.clawperator.com/llms.txt`;
-    if (cliLogger !== undefined) {
-      emitCliEvent(cliLogger, {
-        level: "debug",
-        event: "cli.banner",
-        skillId,
-        message: bannerMessage,
-      });
+  const config = getDefaultRuntimeConfig({
+    deviceId: options.deviceId,
+    operatorPackage: resolvedOperatorPackage,
+    logger: cliLogger,
+  });
+  let apkStatus = `MISSING - run \`clawperator operator setup --apk <path>\``;
+  try {
+    const apkPresence = await checkApkPresence(config);
+    if (apkPresence.status === "pass") {
+      apkStatus = `OK (${resolvedOperatorPackage})`;
+    } else if (apkPresence.status === "warn") {
+      const alternateVariant = getAlternateOperatorVariant(resolvedOperatorPackage);
+      apkStatus = `WARN - ${apkPresence.summary}${apkPresence.detail ? ` ${apkPresence.detail}` : ""} Use --operator-package ${alternateVariant} or reinstall the matching APK.`;
     } else {
-      process.stdout.write(`${bannerMessage}\n`);
+      apkStatus = `FAIL - ${apkPresence.summary}${apkPresence.detail ? ` ${apkPresence.detail}` : ""}`;
     }
+  } catch {
+    apkStatus = `MISSING - run \`clawperator operator setup --apk <path>\``;
+  }
+
+  const logDate = new Date();
+  const yyyy = String(logDate.getFullYear());
+  const mm = String(logDate.getMonth() + 1).padStart(2, "0");
+  const dd = String(logDate.getDate()).padStart(2, "0");
+  const logPath = cliLogger?.logPath() ?? join(homedir(), ".clawperator", "logs", `clawperator-${yyyy}-${mm}-${dd}.log`);
+  const bannerMessage = `[Clawperator] v${getCliVersion()}  APK: ${apkStatus}  Logs: ${logPath}  Hint: tail -f ${logPath}  Docs: https://docs.clawperator.com/llms.txt`;
+  if (cliLogger !== undefined) {
+    emitCliEvent(cliLogger, {
+      level: "debug",
+      event: "cli.banner",
+      skillId,
+      message: bannerMessage,
+    });
+  } else {
+    process.stdout.write(`${bannerMessage}\n`);
   }
 
   if (!options.skipValidate) {
@@ -214,7 +212,7 @@ export async function cmdSkillsRun(
         details: validation.details,
       }, options);
     }
-    if (options.format === "pretty" && validation.dryRun?.payloadValidation === "skipped") {
+    if (validation.dryRun?.payloadValidation === "skipped") {
       const validationMessage = "  [INFO] Payload validation skipped: no pre-compiled artifacts";
       if (cliLogger !== undefined) {
         emitCliEvent(cliLogger, {
@@ -319,7 +317,7 @@ export async function cmdSkillsValidate(
       ...(result.dryRun ? { dryRun: result.dryRun } : {}),
       checks: result.checks,
     }, options);
-    if (options.format === "pretty" && result.dryRun?.payloadValidation === "skipped") {
+    if (result.dryRun?.payloadValidation === "skipped") {
       const validationMessage = "  [INFO] Payload validation skipped: no pre-compiled artifacts";
       if (options.logger !== undefined) {
         emitCliEvent(options.logger.child({ skillId }), {
