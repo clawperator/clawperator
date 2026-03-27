@@ -3,9 +3,9 @@ import assert from "node:assert";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { createLogger } from "../../adapters/logger.js";
+import { createClawperatorLogger } from "../../adapters/logger.js";
 
-describe("createLogger", () => {
+describe("createClawperatorLogger (compat tests)", () => {
   let tempRoot: string;
   let stderrWrite: typeof process.stderr.write;
   let originalHome: string | undefined;
@@ -51,9 +51,9 @@ describe("createLogger", () => {
 
   it("writes parseable NDJSON entries", async () => {
     const logDir = join(tempRoot, "logs");
-    const logger = createLogger({ logDir, logLevel: "info" });
+    const logger = createClawperatorLogger({ logDir, logLevel: "info" });
 
-    logger.log({
+    logger.emit({
       ts: "2026-03-22T00:00:00.000Z",
       level: "info",
       event: "test.event",
@@ -81,7 +81,7 @@ describe("createLogger", () => {
 
   it("preserves inherited deviceId when child context omits it", async () => {
     const logDir = join(tempRoot, "logs");
-    const parentLogger = createLogger({ logDir, logLevel: "info" }).child({
+    const parentLogger = createClawperatorLogger({ logDir, logLevel: "info" }).child({
       deviceId: "device-parent",
     });
     const childLogger = parentLogger.child({
@@ -89,7 +89,7 @@ describe("createLogger", () => {
       deviceId: undefined,
     });
 
-    childLogger.log({
+    childLogger.emit({
       ts: "2026-03-22T00:00:00.000Z",
       level: "info",
       event: "test.child",
@@ -104,15 +104,15 @@ describe("createLogger", () => {
 
   it("appends entries instead of overwriting the file", async () => {
     const logDir = join(tempRoot, "logs");
-    const logger = createLogger({ logDir, logLevel: "info" });
+    const logger = createClawperatorLogger({ logDir, logLevel: "info" });
 
-    logger.log({
+    logger.emit({
       ts: "2026-03-22T00:00:00.000Z",
       level: "info",
       event: "test.first",
       message: "first",
     });
-    logger.log({
+    logger.emit({
       ts: "2026-03-22T00:00:01.000Z",
       level: "warn",
       event: "test.second",
@@ -138,9 +138,9 @@ describe("createLogger", () => {
 
   it("creates the missing log directory on first write", async () => {
     const logDir = join(tempRoot, "nested", "logs", "deep");
-    const logger = createLogger({ logDir, logLevel: "info" });
+    const logger = createClawperatorLogger({ logDir, logLevel: "info" });
 
-    logger.log({
+    logger.emit({
       ts: "2026-03-22T00:00:00.000Z",
       level: "info",
       event: "test.mkdir",
@@ -152,11 +152,11 @@ describe("createLogger", () => {
   });
 
   it("defaults to ~/.clawperator/logs when no log dir is configured", async () => {
-    const logger = createLogger({ logLevel: "info" });
+    const logger = createClawperatorLogger({ logLevel: "info" });
 
     assert.strictEqual(logger.logPath(), currentLogPath(tempRoot));
 
-    logger.log({
+    logger.emit({
       ts: "2026-03-22T00:00:00.000Z",
       level: "info",
       event: "test.default-path",
@@ -170,16 +170,16 @@ describe("createLogger", () => {
   it("warns once and fails open when log directory creation fails", async () => {
     const logDir = join(tempRoot, "blocked");
     await writeFile(logDir, "not a directory", "utf8");
-    const logger = createLogger({ logDir, logLevel: "info" });
+    const logger = createClawperatorLogger({ logDir, logLevel: "info" });
 
     assert.doesNotThrow(() => {
-      logger.log({
+      logger.emit({
         ts: "2026-03-22T00:00:00.000Z",
         level: "info",
         event: "test.fail-open",
         message: "blocked",
       });
-      logger.log({
+      logger.emit({
         ts: "2026-03-22T00:00:01.000Z",
         level: "info",
         event: "test.fail-open-2",

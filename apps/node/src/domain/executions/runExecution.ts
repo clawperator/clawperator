@@ -348,7 +348,7 @@ async function performExecution(
 
   const apkCheck = await checkApkPresence(config);
   if (apkCheck.status === "fail") {
-    options.logger?.log({
+    options.logger?.emit({
       ts: new Date().toISOString(),
       level: "error",
       event: "preflight.apk.missing",
@@ -384,7 +384,7 @@ async function performExecution(
   }
 
   if (apkCheck.status === "pass") {
-    options.logger?.log({
+    options.logger?.emit({
       ts: new Date().toISOString(),
       level: "info",
       event: "preflight.apk.pass",

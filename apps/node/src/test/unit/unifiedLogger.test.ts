@@ -424,20 +424,6 @@ describe("createClawperatorLogger", () => {
   // Compatibility: log() shim
   // ---------------------------------------------------------------------------
 
-  describe("log() compatibility shim", () => {
-    it("log() delegates to emit() and writes to file", async () => {
-      const logDir = join(tempRoot, "logs");
-      const logger = createClawperatorLogger({ logDir, logLevel: "debug" });
-
-      // Use log() like the old interface
-      logger.log(makeEvent({ event: "compat.test", message: "via log()" }));
-
-      const lines = await readLogLines(logDir);
-      assert.strictEqual(lines.length, 1);
-      assert.strictEqual(lines[0].event, "compat.test");
-      assert.strictEqual(lines[0].message, "via log()");
-    });
-  });
 
   // ---------------------------------------------------------------------------
   // Default routing: lifecycle events go to file only

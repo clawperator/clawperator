@@ -42,7 +42,7 @@ export async function waitForResultEnvelope(
     let stderrBuffer = "";
     let timeoutId: NodeJS.Timeout;
 
-    config.logger?.log({
+    config.logger?.emit({
       ts: new Date().toISOString(),
       level: "debug",
       event: "adb.command",
@@ -77,7 +77,7 @@ export async function waitForResultEnvelope(
         deviceId: config.deviceId,
         operatorPackage: config.operatorPackage,
       };
-      config.logger?.log({
+      config.logger?.emit({
         ts: new Date().toISOString(),
         level: "debug",
         event: "adb.complete",
@@ -126,7 +126,7 @@ export async function waitForResultEnvelope(
 
     proc.on("error", (error: Error) => {
       if ((error as any).code === "ENOENT") {
-        config.logger?.log({
+        config.logger?.emit({
           ts: new Date().toISOString(),
           level: "debug",
           event: "adb.complete",
@@ -139,7 +139,7 @@ export async function waitForResultEnvelope(
           code: ERROR_CODES.ADB_NOT_FOUND,
         } as any);
       } else {
-        config.logger?.log({
+        config.logger?.emit({
           ts: new Date().toISOString(),
           level: "debug",
           event: "adb.complete",
@@ -154,7 +154,7 @@ export async function waitForResultEnvelope(
       if (settled) return;
       const base = `logcat exited before terminal envelope (code=${code ?? "null"}, signal=${signal ?? "null"})`;
       const stderr = stderrBuffer.trim();
-      config.logger?.log({
+      config.logger?.emit({
         ts: new Date().toISOString(),
         level: "debug",
         event: "adb.complete",

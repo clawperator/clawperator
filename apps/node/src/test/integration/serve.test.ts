@@ -4,6 +4,9 @@ import { startServer } from "../../cli/commands/serve.js";
 import { Server } from "node:http";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { createClawperatorLogger } from "../../adapters/logger.js";
 
 describe("serve API integration", () => {
   let server: Server;
@@ -331,6 +334,36 @@ describe("serve API integration", () => {
       assert.ok(foundEvent, "Did not receive clawperator:execution event in SSE stream");
     } finally {
       await reader.cancel();
+    }
+  });
+
+  test("serve.server.started appears in log file when logger is provided", async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-serve-log-"));
+    const logger = createClawperatorLogger({ logDir: join(tempRoot, "logs"), logLevel: "info" });
+
+    const testServer = await startServer({ port: 0, host: "localhost", verbose: false, logger });
+    const addr = testServer.address();
+    const testPort = addr && typeof addr === "object" ? addr.port : 0;
+
+    try {
+      // Verify server is running
+      assert.ok(testPort > 0, "Server should have started on an ephemeral port");
+
+      // Read the log file and verify serve.server.started event
+      const logPath = logger.logPath();
+      assert.ok(logPath, "Logger should have a log path");
+
+      const contents = await readFile(logPath, "utf8");
+      const lines = contents.trimEnd().split("\n").map(line => JSON.parse(line) as { event: string; message?: string });
+
+      const startedEvent = lines.find(line => line.event === "serve.server.started");
+      assert.ok(startedEvent, "Log should contain serve.server.started event");
+      assert.ok(startedEvent.message?.includes("listening"), "Message should indicate server is listening");
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        testServer.close((err) => (err ? reject(err) : resolve()));
+      });
+      await rm(tempRoot, { recursive: true, force: true });
     }
   });
 });

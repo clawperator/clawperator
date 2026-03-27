@@ -1,6 +1,5 @@
 import { appendFileSync, mkdirSync } from "node:fs";
-import { homedir } from "node:os";
-import { join, resolve } from "node:path";
+import { resolve } from "node:path";
 import {
   type LogEvent,
   type LogLevel,
@@ -8,22 +7,19 @@ import {
   LEVEL_ORDER,
   resolveRoutingRule,
   DEFAULT_ROUTING_RULES,
+  expandHomePath,
+  formatLogPath,
 } from "../contracts/logging.js";
 
 // Re-export contract types for consumers
 export type { LogEvent, LogLevel, ClawperatorLogger };
 
 /**
- * Compatibility: the old Logger interface had log() instead of emit().
- * During migration (Phase 1 -> Phase 2), callers that still use log()
- * go through this extended type. Once Phase 2 migrates all call sites
- * to emit(), this can be collapsed to just ClawperatorLogger.
+ * Logger is a type alias for ClawperatorLogger. Kept as a convenience export
+ * so existing call sites do not need a mass rename. New code should prefer
+ * importing ClawperatorLogger from contracts/logging.ts.
  */
-export interface Logger extends ClawperatorLogger {
-  log(event: LogEvent): void;
-  /** Override child() to return Logger so callers keep the log() shim. */
-  child(defaultContext: Partial<LogEvent>): Logger;
-}
+export type Logger = ClawperatorLogger;
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -32,27 +28,6 @@ export interface Logger extends ClawperatorLogger {
 function normalizeLogLevel(level?: string): LogLevel {
   const lowered = level?.toLowerCase();
   return lowered === "debug" || lowered === "warn" || lowered === "error" ? lowered : "info";
-}
-
-function expandHomePath(pathValue: string): string {
-  if (pathValue === "~") {
-    return homedir();
-  }
-  if (pathValue.startsWith("~/")) {
-    return join(homedir(), pathValue.slice(2));
-  }
-  return pathValue;
-}
-
-function formatDate(date: Date): string {
-  const year = String(date.getFullYear());
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function formatLogPath(logDir: string, date = new Date()): string {
-  return join(logDir, `clawperator-${formatDate(date)}.log`);
 }
 
 function warnOnce(state: { warned: boolean }, message: string): void {
@@ -94,7 +69,7 @@ export interface CreateClawperatorLoggerOptions {
  * Terminal destination: selected events written to stderr in pretty mode, suppressed in JSON mode.
  * Fail-open: if the log directory is unavailable, one stderr warning then file logging disabled.
  */
-export function createClawperatorLogger(options?: CreateClawperatorLoggerOptions): Logger {
+export function createClawperatorLogger(options?: CreateClawperatorLoggerOptions): ClawperatorLogger {
   const configuredDir =
     options?.logDir?.trim() ||
     process.env.CLAWPERATOR_LOG_DIR?.trim() ||
@@ -130,7 +105,7 @@ export function createClawperatorLogger(options?: CreateClawperatorLoggerOptions
     process.stderr.write(`${event.message}\n`);
   }
 
-  function buildLogger(defaultContext?: Partial<LogEvent>): Logger {
+  function buildLogger(defaultContext?: Partial<LogEvent>): ClawperatorLogger {
     function emitEvent(event: LogEvent): void {
       // Merge child context into event. Explicit event fields take precedence.
       const merged = mergeDefinedContext(defaultContext, event) as LogEvent;
@@ -155,13 +130,7 @@ export function createClawperatorLogger(options?: CreateClawperatorLoggerOptions
     return {
       emit: emitEvent,
 
-      /**
-       * Compatibility shim: log() delegates to emit() via closure.
-       * Safe to destructure or pass as a callback - no `this` dependency.
-       */
-      log: emitEvent,
-
-      child(childContext: Partial<LogEvent>): Logger {
+      child(childContext: Partial<LogEvent>): ClawperatorLogger {
         const mergedContext = mergeDefinedContext(defaultContext, childContext);
         return buildLogger(mergedContext);
       },
@@ -178,15 +147,3 @@ export function createClawperatorLogger(options?: CreateClawperatorLoggerOptions
   return buildLogger();
 }
 
-/**
- * Compatibility alias: createLogger maps to createClawperatorLogger.
- * During migration, call sites that import createLogger continue to work.
- * The returned logger uses emit() instead of log(). Callers using the old
- * log() method must migrate to emit().
- */
-export function createLogger(options?: { logDir?: string; logLevel?: string }): Logger {
-  return createClawperatorLogger({
-    logDir: options?.logDir,
-    logLevel: options?.logLevel,
-  });
-}

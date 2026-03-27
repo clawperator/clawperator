@@ -26,7 +26,7 @@ import { validateAllSkills, validateSkill } from "../../domain/skills/validateSk
 import { loadRegistry } from "../../adapters/skills-repo/localSkillsRegistry.js";
 import { validateExecution, validatePayloadSize } from "../../domain/executions/validateExecution.js";
 import { cmdSkillsRun } from "../../cli/commands/skills.js";
-import { createLogger } from "../../adapters/logger.js";
+import { createClawperatorLogger } from "../../adapters/logger.js";
 import {
   SKILL_NOT_FOUND,
   ARTIFACT_NOT_FOUND,
@@ -2391,7 +2391,7 @@ describe("runSkill logging", () => {
   });
 
   it("logs stdout and stderr chunks with skillId while preserving onOutput", async () => {
-    const logger = createLogger({ logDir: join(tempRoot, "logs"), logLevel: "debug" });
+    const logger = createClawperatorLogger({ logDir: join(tempRoot, "logs"), logLevel: "debug" });
     const chunks: Array<{ chunk: string; stream: "stdout" | "stderr" }> = [];
 
     const result = await runSkill(TEST_FIXTURE_MIXED_STREAMS, [], undefined, undefined, undefined, {
@@ -2425,7 +2425,7 @@ describe("runSkill logging", () => {
 
   it("logs start and complete without leaking sentinel args", async () => {
     const sentinel = "CLAWPERATOR_TEST_SENTINEL_X9Z";
-    const logger = createLogger({ logDir: join(tempRoot, "logs"), logLevel: "debug" });
+    const logger = createClawperatorLogger({ logDir: join(tempRoot, "logs"), logLevel: "debug" });
 
     const result = await runSkill("com.test.env-echo", [sentinel], undefined, undefined, undefined, {
       logger,
@@ -2446,7 +2446,7 @@ describe("runSkill logging", () => {
   });
 
   it("logs start and timeout but not complete when the skill times out", async () => {
-    const logger = createLogger({ logDir: join(tempRoot, "logs"), logLevel: "info" });
+    const logger = createClawperatorLogger({ logDir: join(tempRoot, "logs"), logLevel: "info" });
 
     const result = await runSkill("com.test.partial-timeout", [], undefined, 150, undefined, {
       logger,
@@ -2466,7 +2466,7 @@ describe("runSkill logging", () => {
   });
 
   it("logs a failure event when the skill exits non-zero", async () => {
-    const logger = createLogger({ logDir: join(tempRoot, "logs"), logLevel: "info" });
+    const logger = createClawperatorLogger({ logDir: join(tempRoot, "logs"), logLevel: "info" });
 
     const result = await runSkill("com.test.fail", [], undefined, undefined, undefined, {
       logger,

@@ -2129,6 +2129,21 @@ COMMANDS["serve"] = {
   },
 };
 
+COMMANDS["logs"] = {
+  name: "logs",
+  group: "Utilities",
+  supportedFlags: [],
+  summary: "Tail the Clawperator log file",
+  help: "clawperator logs\n\nUsage:\n  clawperator logs\n\nNotes:\n  - Dumps existing log content then streams new lines.\n  - Press Ctrl+C to stop streaming.\n",
+  topLevelBlock: `  logs                                      Tail the Clawperator log file (dump then stream)`,
+  handler: async (_ctx) => {
+    await (await import("./commands/logs.js")).cmdLogs({});
+    // Long-running: cmdLogs streams until interrupted.
+    // Return undefined so the dispatcher skips console.log.
+    return undefined;
+  },
+};
+
 // doctor
 COMMANDS["doctor"] = {
   name: "doctor",

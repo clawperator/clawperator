@@ -3,6 +3,13 @@ import type { ResultEnvelope } from "../../contracts/result.js";
 import type { RunExecutionResult } from "../executions/runExecution.js";
 
 /**
+ * EventEmitter-based SSE transport. Intentionally separate from ClawperatorLogger.
+ * The logger handles file and terminal routing; this emitter carries rich in-memory
+ * objects (ResultEnvelope, RunExecutionResult) to SSE clients. See
+ * docs/internal/design/ for rationale.
+ */
+
+/**
  * Global event emitter for Clawperator envelopes.
  * Used by the 'serve' command to stream SSE events.
  */

@@ -30,7 +30,14 @@ export async function cmdServe(options: ServeOptions): Promise<void> {
     // Long running
     return new Promise(() => {});
   } catch (e) {
-    console.error(`❌ Failed to start server: ${String(e)}`);
+    const errorMessage = `Failed to start server: ${String(e)}`;
+    options.logger?.emit({
+      ts: new Date().toISOString(),
+      level: "error",
+      event: "serve.server.started",
+      message: errorMessage,
+    });
+    process.stderr.write(`${errorMessage}\n`);
     process.exit(1);
   }
 }
@@ -39,10 +46,19 @@ export async function startServer(options: ServeOptions): Promise<Server> {
   const app = express();
   app.use(express.json({ limit: "100kb" }));
 
-  // Logging middleware
+  // Log all requests when a logger is configured (filtered by log level at the file sink).
+  // Without a logger, fall back to console.log only when --verbose is set (legacy behavior).
   app.use((req, _res, next) => {
-    if (options.verbose) {
-      console.log(`[HTTP] ${req.method} ${req.url}`);
+    const clientIp = req.socket.remoteAddress || "unknown";
+    if (options.logger) {
+      options.logger.emit({
+        ts: new Date().toISOString(),
+        level: "info",
+        event: "serve.http.request",
+        message: `${req.method} ${req.url} from ${clientIp}`,
+      });
+    } else if (options.verbose) {
+      console.log(`[HTTP] ${req.method} ${req.url} from ${clientIp}`);
     }
     next();
   });
@@ -518,6 +534,16 @@ export async function startServer(options: ServeOptions): Promise<Server> {
     res.setHeader("Connection", "keep-alive");
     res.flushHeaders();
 
+    const clientIp = req.socket.remoteAddress || "unknown";
+
+    // Log client connection
+    options.logger?.emit({
+      ts: new Date().toISOString(),
+      level: "info",
+      event: "serve.sse.client.connected",
+      message: `SSE client connected from ${clientIp}`,
+    });
+
     const cleanup = () => {
       clawperatorEvents.off(CLAW_EVENT_TYPES.RESULT, onResult);
       clawperatorEvents.off(CLAW_EVENT_TYPES.EXECUTION, onExecution);
@@ -530,7 +556,12 @@ export async function startServer(options: ServeOptions): Promise<Server> {
           res.write(`data: ${JSON.stringify(data)}\n\n`);
         }
       } catch (err) {
-        console.error(`⚠️ SSE write failed: ${String(err)}`);
+        const msg = `SSE write failed: ${String(err)}`;
+        if (options.logger) {
+          options.logger.emit({ ts: new Date().toISOString(), level: "warn", event: "serve.sse.write_failed", message: msg });
+        } else {
+          process.stderr.write(`[clawperator] ${msg}\n`);
+        }
         cleanup();
       }
     };
@@ -542,7 +573,12 @@ export async function startServer(options: ServeOptions): Promise<Server> {
           res.write(`data: ${JSON.stringify(data)}\n\n`);
         }
       } catch (err) {
-        console.error(`⚠️ SSE execution write failed: ${String(err)}`);
+        const msg = `SSE execution write failed: ${String(err)}`;
+        if (options.logger) {
+          options.logger.emit({ ts: new Date().toISOString(), level: "warn", event: "serve.sse.write_failed", message: msg });
+        } else {
+          process.stderr.write(`[clawperator] ${msg}\n`);
+        }
         cleanup();
       }
     };
@@ -550,13 +586,31 @@ export async function startServer(options: ServeOptions): Promise<Server> {
     clawperatorEvents.on(CLAW_EVENT_TYPES.RESULT, onResult);
     clawperatorEvents.on(CLAW_EVENT_TYPES.EXECUTION, onExecution);
 
-    req.on("close", cleanup);
+    req.on("close", () => {
+      options.logger?.emit({
+        ts: new Date().toISOString(),
+        level: "info",
+        event: "serve.sse.client.disconnected",
+        message: `SSE client disconnected from ${clientIp}`,
+      });
+      cleanup();
+    });
     req.on("error", (err) => {
-      if (options.verbose) console.warn(`[HTTP] SSE req error: ${String(err)}`);
+      const msg = `SSE req error: ${String(err)}`;
+      if (options.logger) {
+        options.logger.emit({ ts: new Date().toISOString(), level: "warn", event: "serve.sse.write_failed", message: msg });
+      } else {
+        process.stderr.write(`[clawperator] ${msg}\n`);
+      }
       cleanup();
     });
     res.on("error", (err) => {
-      if (options.verbose) console.warn(`[HTTP] SSE res error: ${String(err)}`);
+      const msg = `SSE res error: ${String(err)}`;
+      if (options.logger) {
+        options.logger.emit({ ts: new Date().toISOString(), level: "warn", event: "serve.sse.write_failed", message: msg });
+      } else {
+        process.stderr.write(`[clawperator] ${msg}\n`);
+      }
       cleanup();
     });
 
@@ -565,7 +619,12 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       res.write(`event: heartbeat\n`);
       res.write(`data: ${JSON.stringify({ code: "CONNECTED", message: "Clawperator SSE stream active" })}\n\n`);
     } catch (err) {
-      console.error(`⚠️ SSE heartbeat failed: ${String(err)}`);
+      const msg = `SSE heartbeat failed: ${String(err)}`;
+      if (options.logger) {
+        options.logger.emit({ ts: new Date().toISOString(), level: "warn", event: "serve.sse.write_failed", message: msg });
+      } else {
+        process.stderr.write(`[clawperator] ${msg}\n`);
+      }
       cleanup();
     }
   });
@@ -584,7 +643,12 @@ export async function startServer(options: ServeOptions): Promise<Server> {
     }
     
     // Catch-all 500
-    if (options.verbose) console.error(`[HTTP] Unhandled error: ${String(err)}`);
+    const msg = `Unhandled error: ${String(err)}`;
+    if (options.logger) {
+      options.logger.emit({ ts: new Date().toISOString(), level: "error", event: "serve.http.error", message: msg });
+    } else {
+      process.stderr.write(`[clawperator] ${msg}\n`);
+    }
     res.status(500).json({ ok: false, error: { code: "INTERNAL_SERVER_ERROR", message: "An unexpected error occurred" } });
   });
 
@@ -592,16 +656,34 @@ export async function startServer(options: ServeOptions): Promise<Server> {
     const server = app.listen(options.port, options.host, () => {
       const addr = server.address();
       const actualPort = addr && typeof addr === "object" ? addr.port : options.port;
-      console.log(`🚀 Clawperator API server listening on http://${options.host}:${actualPort}`);
+      const startupMessage = `Clawperator API server listening on http://${options.host}:${actualPort}`;
+      options.logger?.emit({
+        ts: new Date().toISOString(),
+        level: "info",
+        event: "serve.server.started",
+        message: startupMessage,
+      });
+      process.stderr.write(`${startupMessage}\n`);
       if (options.verbose) {
-        console.log(`- GET  /devices`);
-        console.log(`- POST /execute`);
-        console.log(`- POST /snapshot`);
-        console.log(`- POST /screenshot`);
-        console.log(`- GET  /skills`);
-        console.log(`- GET  /skills/:skillId`);
-        console.log(`- POST /skills/:skillId/run`);
-        console.log(`- GET  /events (SSE)`);
+        const routes = [
+          "- GET  /devices",
+          "- POST /execute",
+          "- POST /snapshot",
+          "- POST /screenshot",
+          "- GET  /skills",
+          "- GET  /skills/:skillId",
+          "- POST /skills/:skillId/run",
+          "- GET  /events (SSE)",
+        ];
+        for (const r of routes) {
+          options.logger?.emit({
+            ts: new Date().toISOString(),
+            level: "debug",
+            event: "serve.server.started",
+            message: r,
+          });
+        }
+        process.stderr.write(routes.join("\n") + "\n");
       }
       resolve(server);
     });

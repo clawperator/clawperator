@@ -29,7 +29,7 @@ export async function runAdb(
   const deviceArgs = config.deviceId ? ["-s", config.deviceId, ...args] : args;
   const loggedArgs = config.deviceId ? ["-s", config.deviceId, ...(options?.redactedArgs ?? args)] : (options?.redactedArgs ?? args);
   const start = Date.now();
-  config.logger?.log({
+  config.logger?.emit({
     ts: new Date().toISOString(),
     level: "debug",
     event: "adb.command",
@@ -38,7 +38,7 @@ export async function runAdb(
   });
   const result = await config.runner.run(config.adbPath, deviceArgs, options);
   const durationMs = Date.now() - start;
-  config.logger?.log({
+  config.logger?.emit({
     ts: new Date().toISOString(),
     level: "debug",
     event: "adb.complete",

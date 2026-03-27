@@ -131,7 +131,7 @@ export class DoctorService {
   private async finalize(checks: DoctorCheckResult[], config: RuntimeConfig, autoFix?: boolean): Promise<DoctorReport> {
     const logger = config.logger;
     for (const check of checks) {
-      logger?.log({
+      logger?.emit({
         ts: new Date().toISOString(),
         level: check.status === "fail" ? "error" : check.status === "warn" ? "warn" : "info",
         event: "doctor.check",
