@@ -1,5 +1,7 @@
 # Version Compatibility
 
+**Current code version: [0.5.3](https://github.com/clawperator/clawperator/blob/main/CHANGELOG.md)**
+
 ## Purpose
 
 Define how the CLI checks compatibility with the installed Operator APK, what counts as compatible, which errors can be returned, and how to recover when versions do not align.
@@ -111,10 +113,10 @@ Incompatible response:
     "hint": "Clawperator requires the exact same version between the CLI and APK, ignoring only the debug suffix."
   },
   "remediation": [
-    "Download the matching APK: https://downloads.clawperator.com/operator/v0.5.2/operator-v0.5.2.apk",
-    "Download the checksum: https://downloads.clawperator.com/operator/v0.5.2/operator-v0.5.2.apk.sha256",
-    "Verify the checksum: sha256sum -c operator-v0.5.2.apk.sha256",
-    "Install the matching APK: clawperator operator setup --apk operator-v0.5.2.apk --device <device_id>",
+    "Download the matching APK: https://downloads.clawperator.com/operator/v0.5.3/operator-v0.5.3.apk",
+    "Download the checksum: https://downloads.clawperator.com/operator/v0.5.3/operator-v0.5.3.apk.sha256",
+    "Verify the checksum: sha256sum -c operator-v0.5.3.apk.sha256",
+    "Install the matching APK: clawperator operator setup --apk operator-v0.5.3.apk --device <device_id>",
     "If you are using the release package, the versioned download above is the exact APK to install."
   ]
 }

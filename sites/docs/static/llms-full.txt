@@ -9277,6 +9277,8 @@ See [Logging](../api/logging.md) for log format details and [Version Compatibili
 
 # Version Compatibility
 
+**Current code version: [0.5.3](https://github.com/clawperator/clawperator/blob/main/CHANGELOG.md)**
+
 ## Purpose
 
 Define how the CLI checks compatibility with the installed Operator APK, what counts as compatible, which errors can be returned, and how to recover when versions do not align.
