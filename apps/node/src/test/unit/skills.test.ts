@@ -1871,6 +1871,52 @@ describe("cmdSkillsRun preflight gate", () => {
     assert.strictEqual(parsed.output, "RUN_OK");
   });
 
+  it("keeps cmdSkillsRun silent in JSON mode without a logger", async () => {
+    const cmdModulePath = join(packageRoot, "dist", "cli", "commands", "skills.js");
+    const script = `
+      import { cmdSkillsRun } from ${JSON.stringify(cmdModulePath)};
+      const writes = [];
+      process.stdout.write = ((chunk) => {
+        writes.push(String(chunk));
+        return true;
+      });
+      const result = await cmdSkillsRun(
+        ${JSON.stringify(TEST_SKILL_VALID_ARTIFACT)},
+        [],
+        undefined,
+        undefined,
+        undefined,
+        {
+          format: "json",
+          skipValidate: true,
+          runSkillImpl: async () => ({
+            ok: true,
+            skillId: ${JSON.stringify(TEST_SKILL_VALID_ARTIFACT)},
+            output: "RUN_OK",
+            exitCode: 0,
+            durationMs: 1,
+          }),
+        }
+      );
+      process.stderr.write(JSON.stringify({ writes, result }));
+    `;
+
+    const child = await runNodeSnippet(script, {
+      env: {
+        ...process.env,
+        CLAWPERATOR_SKILLS_REGISTRY: TEST_REGISTRY_PATH,
+      },
+    });
+    assert.strictEqual(child.code, 0, child.stderr);
+    const jsonLine = child.stderr.trim().split(/\r?\n/).reverse().find((line) => line.startsWith("{") && line.includes("\"result\""));
+    assert.ok(jsonLine, child.stdout);
+    const parsed = JSON.parse(jsonLine) as { writes?: string[]; result?: string };
+    const rendered = JSON.parse(parsed.result ?? "{}") as { skillId?: string; output?: string };
+    assert.deepStrictEqual(parsed.writes, []);
+    assert.strictEqual(rendered.skillId, TEST_SKILL_VALID_ARTIFACT);
+    assert.strictEqual(rendered.output, "RUN_OK");
+  });
+
   it("ignores pipe errors from live pretty-mode streaming", async () => {
     const fakeAdbDir = await createFakeAdb({
       installed: true,

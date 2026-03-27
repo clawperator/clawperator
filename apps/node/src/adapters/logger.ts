@@ -124,9 +124,10 @@ export function createClawperatorLogger(options?: CreateClawperatorLoggerOptions
         : event;
 
       const rule = resolveRoutingRule(merged.event, DEFAULT_ROUTING_RULES);
+      const alwaysWriteToFile = merged.event === "skills.run.output";
 
       // File destination
-      if (rule.file && shouldLogToFile(merged.level)) {
+      if (rule.file && (alwaysWriteToFile || shouldLogToFile(merged.level))) {
         writeToFile(merged);
       }
 
