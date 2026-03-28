@@ -32,8 +32,9 @@ start the next until the current one passes its acceptance criteria.
    the PR.
 2. Build the Node CLI before any device interaction:
    `npm --prefix apps/node run build`. Never test against stale `dist/`.
-3. Use the branch-local CLI for all device operations:
-   `CLAWPERATOR_BIN="node $(pwd)/apps/node/dist/cli/index.js"`.
+3. Use the branch-local CLI for all device operations. The preflight will resolve
+   `CLAWPERATOR_BIN=node` into `clawperator_cmd = ["node", "$(pwd)/apps/node/dist/cli/index.js"]`
+   automatically when CLAWPERATOR_SCRIPT or the default path is used.
 4. Use the `.dev` Operator APK for all local testing:
    `CLAWPERATOR_OPERATOR_PACKAGE="com.clawperator.operator.dev"`.
 5. Do not hard-code device serials anywhere. Always use `--device <serial>`
@@ -41,7 +42,7 @@ start the next until the current one passes its acceptance criteria.
 6. Agent working directory for `public-surface` mode must be a clean
    `tempfile.mkdtemp()`. Never the repo root.
 7. Do not store the full inherited environment in `config.json`. Store only
-   the `env_overrides` dict (ANDROID_SERIAL, CLAWPERATOR_BIN,
+   the `env_overrides` dict (ANDROID_SERIAL, CLAWPERATOR_CMD, CLAWPERATOR_BIN,
    CLAWPERATOR_OPERATOR_PACKAGE).
 8. The harness must never write to `evals/runs/` inside the repo without
    creating the directory first (it is gitignored, so it may not exist).
@@ -162,6 +163,7 @@ CLI entry point yet. Focus on correctness of each component in isolation.
 - `evals/harness/runner.py`
 - `evals/harness/scorer.py`
 - `evals/harness/artifacts.py`
+- `evals/harness/logger.py`
 - `evals/harness/agents/base.py`
 - `evals/harness/agents/claude.py`
 
@@ -174,8 +176,8 @@ CLI entry point yet. Focus on correctness of each component in isolation.
 class Environment:
     device_serial: str
     ground_truth_android_version: str
-    clawperator_bin: str           # "clawperator" or "node"
-    clawperator_script: str | None # None for published; path to index.js for local-dev
+    clawperator_cmd: list[str]   # e.g. ["node", "/path/to/dist/cli/index.js"]
+                                  # or ["clawperator"] for published runtime
     clawperator_version: str
     operator_package: str
 
@@ -186,20 +188,21 @@ def preflight(device: str | None) -> Environment:
     3. If device is specified, verify it is in the authorized list.
        If not specified and exactly one authorized device exists, use it.
        If not specified and multiple devices exist, raise with helpful message.
-    4. Resolve CLAWPERATOR_BIN: env var (executable name only, e.g. "node" or
-       "clawperator") > "node". If local-dev fallback, set clawperator_script
-       to "<repo_root>/apps/node/dist/cli/index.js". Otherwise set to None.
-       NEVER store "node /path/to/script.js" as a single string in clawperator_bin.
-    5. Verify the resolved binary is on PATH: shutil.which(env.clawperator_bin).
+    4. Resolve CLAWPERATOR_CMD. Check CLAWPERATOR_BIN env var. If set to 'node',
+       also resolve CLAWPERATOR_SCRIPT or default to
+       `<repo_root>/apps/node/dist/cli/index.js`. Set
+       `clawperator_cmd = [node_executable, script_path]`. If CLAWPERATOR_BIN is
+       set to an absolute path or 'clawperator', set
+       `clawperator_cmd = [that_value]`. Default (no env var):
+       `clawperator_cmd = ['node', '<repo_root>/apps/node/dist/cli/index.js']`.
+    5. Verify: `shutil.which(env.clawperator_cmd[0])` is not None.
        If None, raise EnvironmentError.
     6. Resolve CLAWPERATOR_OPERATOR_PACKAGE: env var > "com.clawperator.operator.dev"
-    7. Build command prefix: [env.clawperator_bin] + ([env.clawperator_script] if
-       env.clawperator_script else []).
-       Run `<prefix> doctor --json` with ANDROID_SERIAL set.
+    7. Run `env.clawperator_cmd + ['doctor', '--json']` with ANDROID_SERIAL set.
        If exit code != 0, raise EnvironmentError("doctor_preflight_failed").
     8. Run `adb -s <serial> shell getprop ro.build.version.release`.
        Strip whitespace. Reject empty result.
-    9. Run `<prefix> version --json` to capture clawperator_version.
+    9. Run `env.clawperator_cmd + ['version', '--json']` to capture clawperator_version.
     10. Return Environment dataclass.
     """
 ```
@@ -217,12 +220,26 @@ def normalize_version(v: str) -> str:
         v = v[len("android "):]
     return v.strip()
 
+ANSWER_PATTERN = re.compile(
+    r'^CLAWPERATOR_EVAL_ANSWER:\s*(\S.*?)\s*$',
+    re.MULTILINE
+)
+
 def extract_answer(transcript: str) -> str | None:
     """
-    Scan transcript lines for 'CLAWPERATOR_EVAL_ANSWER: <value>'.
-    Return the last occurrence (allows the agent to revise).
-    Returns None if no marker found.
+    Scan transcript for CLAWPERATOR_EVAL_ANSWER: <value>.
+    Uses ANSWER_PATTERN (re.MULTILINE so ^ and $ match line boundaries).
+    Rules:
+    - Requires at least one non-whitespace character after the colon+space.
+      A line like 'CLAWPERATOR_EVAL_ANSWER:' (no value) does NOT match.
+    - Last match in the transcript wins (agent may revise its answer).
+    - The value is captured as the first group, stripped of surrounding whitespace.
+    - The marker may appear anywhere in the line (inside JSON strings, code blocks,
+      plain text). The scanner does not parse structure.
+    Returns None if no valid match found.
     """
+    matches = ANSWER_PATTERN.findall(transcript)
+    return matches[-1] if matches else None
 
 def detect_disallowed_tool(transcript: str) -> bool:
     """
@@ -266,6 +283,33 @@ def write_run(
     """
 ```
 
+#### `logger.py`
+
+```python
+"""
+Lightweight structured logger for the eval harness.
+Writes to stderr (for operator visibility) and to a harness.log file in the run dir.
+All log entries are timestamped and prefixed with the run_id once it is known.
+
+Required log events (at minimum):
+- SPAWN: the exact command list, work_dir, env_overrides dict (sanitized: redact any key
+  containing "KEY", "SECRET", "TOKEN", "PASSWORD")
+- ENV_SUMMARY: device_serial, clawperator_cmd, operator_package, clawperator_version
+- STATE: runner transitions - "starting", "agent_spawned", "answer_found", "timeout_triggered",
+         "sigterm_sent", "sigkill_sent", "completed"
+- TIMEOUT: wall_clock_s elapsed when timeout fires
+- KILL: which signal was sent and to which pgid
+- SCORE: outcome.status and answer_normalized (or "no_answer")
+- ERROR: any EnvironmentError or unexpected exception, with traceback
+
+Format: single-line JSON per event, written to stderr and appended to harness.log.
+Example: {"ts": "2026-03-28T14:30:01Z", "run_id": "android-version-...", "event": "SPAWN", "cmd": [...], ...}
+"""
+
+def get_logger(run_id: str, log_file: Path | None = None) -> HarnessLogger:
+    """Return a logger bound to this run_id. If log_file is None, log to stderr only."""
+```
+
 #### `agents/base.py`
 
 ```python
@@ -289,6 +333,24 @@ class BaseAgent(ABC):
     @abstractmethod
     def build_env(self, base_env: dict) -> dict:
         """Return env overrides for this agent (not the full environment)."""
+
+    @abstractmethod
+    def supports_streaming(self) -> bool:
+        """
+        Return True if this agent's CLI emits output line-by-line as it runs.
+        False means output is buffered until the process exits (e.g. Codex).
+        runner.py uses this to decide whether to scan for the answer marker
+        during execution or only at process exit.
+        """
+
+    @abstractmethod
+    def normalize_line(self, raw: str) -> str:
+        """
+        Pre-process a raw output line before transcript writing and answer scanning.
+        Default implementation returns the line unchanged.
+        Adapters may use this to strip ANSI codes, progress spinners, or log prefixes
+        that appear in the agent's output but pollute the transcript.
+        """
 ```
 
 No `count_turn` method in Phase 1. It is added in Phase 2.
@@ -312,7 +374,16 @@ class ClaudeAgent(BaseAgent):
         # Claude Code uses the subprocess working directory for context.
         # No additional env overrides needed beyond what runner.py provides.
         return {}
+
+    def supports_streaming(self) -> bool:
+        return True  # Claude streams stream-json lines incrementally
+
+    def normalize_line(self, raw: str) -> str:
+        return raw   # Claude output needs no normalization
 ```
+
+Note for Phase 2 work-breakdown: Codex should return `supports_streaming() -> False` since it
+buffers output.
 
 #### `runner.py`
 
@@ -327,8 +398,13 @@ def run_eval(
     max_turns: int | None = None,  # accepted but not used in Phase 1
 ) -> Path:
     """
+    0a. Send `adb -s <device_serial> shell input keyevent KEYCODE_WAKEUP` (wake screen).
+    0b. Send `adb -s <device_serial> shell input keyevent KEYCODE_HOME` (navigate to Home).
+        Sleep 0.5s to allow Home to settle.
     1. Build prompt from spec['prompts'][knowledge_mode] file.
-       Substitute $CLAWPERATOR_BIN, $DEVICE_SERIAL, $CLAWPERATOR_OPERATOR_PACKAGE.
+       Substitute $CLAWPERATOR_CMD (primary, space-joined argv list),
+       $CLAWPERATOR_BIN (legacy, executable only), $DEVICE_SERIAL,
+       $CLAWPERATOR_OPERATOR_PACKAGE.
     2. Compute prompt_sha256.
     3. Create work_dir:
        - public-surface: tempfile.mkdtemp()
@@ -337,7 +413,8 @@ def run_eval(
     5. Build subprocess env:
        base = dict(os.environ)
        base["ANDROID_SERIAL"] = env.device_serial
-       base["CLAWPERATOR_BIN"] = env.clawperator_bin
+       base["CLAWPERATOR_CMD"] = " ".join(env.clawperator_cmd)   # space-joined for agent shell use
+       base["CLAWPERATOR_BIN"] = env.clawperator_cmd[0]           # kept for backward compat
        base["CLAWPERATOR_OPERATOR_PACKAGE"] = env.operator_package
        overrides = agent.build_env(base)
        final_env = {**base, **overrides}
@@ -345,20 +422,27 @@ def run_eval(
     7. Record started_at.
     8. Open transcript file for writing (before spawning, before the loop).
     9. Spawn subprocess with Popen, cwd=work_dir, env=final_env,
-       stdout=PIPE, stderr=STDOUT, start_new_session=True.
-       Merging stderr into stdout via stderr=STDOUT.
-    10. Start a background timer thread that will send SIGTERM after
-        wall-clock timeout elapses. The timer fires regardless of whether
-        the agent writes any output.
-    11. Read output line by line:
-        for raw_line in proc.stdout:
-            line = raw_line.decode("utf-8", errors="replace")
+       stdout=PIPE, stderr=STDOUT, text=True, bufsize=1,
+       start_new_session=True. Merging stderr into stdout via stderr=STDOUT.
+    10. Start a background timer thread (threading.Timer) that sets a
+        `timeout_triggered = threading.Event()` and calls the os.killpg
+        termination sequence after wall-clock timeout elapses. The timer fires
+        regardless of whether the agent writes any output. The for-loop
+        naturally exits when proc.stdout is closed (either by process exit or
+        SIGKILL). After the loop, check `timeout_triggered.is_set()` to
+        distinguish natural exit from timeout kill.
+    11. Read output line by line. Call agent.normalize_line(line) on each line
+        before writing to transcript and scanning for the answer marker:
+        for line in proc.stdout:           # With text=True, lines are already decoded strings
+            line = agent.normalize_line(line)
             transcript_file.write(line)
             transcript_file.flush()
             # Check for answer marker in-memory on each line (no re-read,
             # no polling). Update last_answer if marker found.
             # Check transcript size; truncate at 10MB if needed.
-    12. After the loop, check if the timer fired (timeout_triggered flag).
+    12. After the loop, check last_answer first, then check
+        timeout_triggered.is_set(). An answer found in the last line before
+        timeout still wins.
     13. Record finished_at.
     14. Read full transcript. Run scorer.score().
     15. Determine outcome.status using the precedence table in
@@ -391,14 +475,34 @@ to call the Clawperator binary) from surviving after the timeout fires.
 
 **IO pattern (replaces the prior polling approach):**
 
-- `subprocess.Popen(..., stdout=PIPE, stderr=STDOUT)` - merge stderr into stdout
-- Read line by line in Python: `for raw_line in proc.stdout:`
-- Tee each decoded line immediately to the transcript file as it arrives
+```python
+subprocess.Popen(
+    cmd,
+    cwd=work_dir,
+    env=final_env,
+    stdout=PIPE,
+    stderr=STDOUT,
+    text=True,          # decode output as str, not bytes
+    bufsize=1,          # line-buffered; essential for real-time streaming
+    start_new_session=True,
+)
+```
+
+- `text=True` - lines come out as str, no manual decode
+- `bufsize=1` - line-buffered, ensures each line arrives as soon as the agent writes it;
+  prevents long blocking on unbuffered reads
+- `stderr=STDOUT` - merge stderr into stdout
+- Read line by line in Python: `for line in proc.stdout:` (NOT `raw_line.decode(...)` -
+  lines are already strings when `text=True` is set)
+- Tee each normalized line immediately to the transcript file as it arrives
 - Check for the answer marker in-memory on each line (no file re-read, no polling)
 - Transcript file is opened for writing before the loop starts and flushed on each line
-- The background timer thread sends SIGTERM after wall-clock timeout regardless
-  of whether the agent writes any output. This ensures timeout fires even on a
-  completely silent agent.
+- A `threading.Timer` is started immediately after Popen. It sets a
+  `timeout_triggered = threading.Event()` and calls the `os.killpg` termination
+  sequence. The for-loop naturally exits when proc.stdout is closed (either by process
+  exit or SIGKILL). After the loop, check `timeout_triggered.is_set()` to distinguish
+  natural exit from timeout kill. This ensures timeout fires even on a completely silent
+  agent.
 
 ### Steps
 
@@ -450,6 +554,17 @@ assert result.answer_correct is False
 result = score("no answer", "15")
 assert result.answer_correct is False
 assert result.answer_extracted_raw is None
+
+# extract_answer - malformed marker (no value after colon)
+transcript_malformed = "CLAWPERATOR_EVAL_ANSWER:\n"
+assert extract_answer(transcript_malformed) is None
+
+transcript_whitespace_only = "CLAWPERATOR_EVAL_ANSWER:   \n"
+assert extract_answer(transcript_whitespace_only) is None
+
+# extract_answer - marker inside JSON blob counts
+transcript_inside_json = '{"output": "CLAWPERATOR_EVAL_ANSWER: 15"}'
+assert extract_answer(transcript_inside_json) == "15"
 ```
 
 ### Acceptance Criteria
@@ -458,6 +573,7 @@ assert result.answer_extracted_raw is None
 - `from evals.harness.runner import run_eval` imports without error.
 - `from evals.harness.agents.claude import ClaudeAgent` imports without error.
 - `from evals.harness.environment import preflight` imports without error.
+- `from evals.harness.logger import get_logger` imports without error.
 
 ### Validation
 
@@ -465,6 +581,7 @@ assert result.answer_extracted_raw is None
 python -m pytest evals/harness/test_scorer.py -v
 python -c "from evals.harness.runner import run_eval; print('ok')"
 python -c "from evals.harness.agents.claude import ClaudeAgent; print('ok')"
+python -c "from evals.harness.logger import get_logger; print('ok')"
 ```
 
 ### Expected Commit
@@ -536,7 +653,7 @@ Clawperator CLI. Your task is to determine the Android version running on the
 device and return it as your final answer.
 
 Environment:
-- Clawperator binary: $CLAWPERATOR_BIN
+- Clawperator command: $CLAWPERATOR_CMD
 - Operator package: $CLAWPERATOR_OPERATOR_PACKAGE
 - Target device serial: $DEVICE_SERIAL
 - Clawperator documentation: https://docs.clawperator.com
@@ -564,6 +681,8 @@ Constraints:
 - Use only Clawperator commands for device interaction. Do not use adb
   shell commands or any other method to read the version.
 - Reference only the public documentation at https://docs.clawperator.com.
+- Use $CLAWPERATOR_CMD as the command to invoke Clawperator
+  (e.g. `node /home/user/repo/apps/node/dist/cli/index.js` or `clawperator`).
 - Pass --device $DEVICE_SERIAL on every Clawperator command.
 - Pass --operator-package $CLAWPERATOR_OPERATOR_PACKAGE on every
   Clawperator command.
@@ -608,7 +727,8 @@ Print `outcome.status` and `outcome.answer_normalized` to stdout.
   docs.gaps PR merged)
 - How to run the first eval (exact command)
 - How to read result.json (field descriptions)
-- How `public-surface` isolation works (temp dir, no repo access)
+- How `public-surface` isolation works (soft isolation: temp dir, no repo files placed in it,
+  no repo paths in env or prompt - but not a hard sandbox)
 - Note: runs are not parallel (one device, one run at a time)
 - How to add a new agent adapter (pointer to `agents/base.py`)
 - Note that `CLAWPERATOR_EVAL_ANSWER` is an internal eval marker and must
@@ -638,7 +758,9 @@ must not block the PR from landing.
    testable.
 5. **Public-surface isolation** - why `tempfile.mkdtemp()`. Why the repo
    path must not appear in the agent's cwd, prompt, or inherited env vars.
-   What "no repo access" means in practice.
+   Clarify that this is soft isolation (the harness does not sandbox the
+   agent) - the claim is "the agent was not given repo access," not "the
+   agent was prevented from accessing the repo."
 6. **Doctor pre-flight** - why the harness aborts before spawning the agent
    on doctor failure rather than letting the agent discover it.
 7. **`used_disallowed_tool` detection** - the chosen heuristic (fill in
@@ -677,8 +799,8 @@ section and fill it in after the 1d validation runs reveal the real pattern.
 ### Acceptance Criteria
 
 - `evals/specs/android-version/spec.json` is valid JSON.
-- `evals/specs/android-version/prompt-public.md` contains all three template
-  variables (`$CLAWPERATOR_BIN`, `$CLAWPERATOR_OPERATOR_PACKAGE`,
+- `evals/specs/android-version/prompt-public.md` contains the required template
+  variables (`$CLAWPERATOR_CMD`, `$CLAWPERATOR_OPERATOR_PACKAGE`,
   `$DEVICE_SERIAL`) and the `CLAWPERATOR_EVAL_ANSWER` marker definition.
 - `python evals/run_eval.py android-version --agent claude --model test --dry-run`
   exits 0 and prints the substituted prompt.

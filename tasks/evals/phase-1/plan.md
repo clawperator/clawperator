@@ -84,7 +84,7 @@ thin surface before adding the complexity of multiple agents and specs.
 | --- | --- |
 | Agent CLI flags (claude) | Run `claude --help` on this machine |
 | ADB device serial convention | `ANDROID_SERIAL` env var is the adb convention |
-| Clawperator binary resolution | `CLAWPERATOR_BIN` env var, fallback `node apps/node/dist/cli/index.js` |
+| Clawperator command resolution | `CLAWPERATOR_BIN` env var (resolved to `clawperator_cmd: list[str]` during preflight), default `["node", "<repo_root>/apps/node/dist/cli/index.js"]` |
 | Operator package resolution | `CLAWPERATOR_OPERATOR_PACKAGE`, fallback `com.clawperator.operator.dev` |
 | Doctor pre-flight contract | `apps/node/src/cli/commands/doctor.ts` |
 | Result envelope marker | `[Clawperator-Result]` in terminal output |
@@ -98,7 +98,7 @@ thin surface before adding the complexity of multiple agents and specs.
 | Answer marker | Deterministic | `CLAWPERATOR_EVAL_ANSWER:` prefix, last occurrence wins |
 | Scorer normalization | Deterministic | Strip leading `android ` (case-insensitive), strip whitespace, lowercase |
 | `used_disallowed_tool` detection | Judgment | Detect agent-initiated `adb shell` in transcript. Avoid false positives from Clawperator's own verbose log output. Finalize heuristic during implementation (see Open Questions). |
-| Prompt template substitution | Deterministic | `$CLAWPERATOR_BIN`, `$DEVICE_SERIAL`, `$CLAWPERATOR_OPERATOR_PACKAGE` replaced before spawning |
+| Prompt template substitution | Deterministic | `$CLAWPERATOR_CMD` (primary, space-joined argv), `$CLAWPERATOR_BIN` (legacy, executable only), `$DEVICE_SERIAL`, `$CLAWPERATOR_OPERATOR_PACKAGE` replaced before spawning |
 | Run ID format | Deterministic | `<eval_id>-<YYYYMMDD-HHMMSS>-<agent_type>-<model_short>` |
 
 ## Decision Rules
@@ -110,37 +110,40 @@ thin surface before adding the complexity of multiple agents and specs.
 | What if the agent emits the answer marker multiple times? | Use the last occurrence. |
 | What if the transcript is truncated at 10MB? | Still scan the full stream for the answer marker before truncating. Store the truncation marker `[TRANSCRIPT TRUNCATED AT 10MB]` at the end. |
 | What `ANDROID_SERIAL` in agent env? | Always set it to the resolved device serial. This eliminates `--device` failure modes. |
-| Public-surface working directory | Always `tempfile.mkdtemp()`. Never the repo root. Never a path that reveals the repo location. **Note: this is soft isolation** - the agent is not sandboxed. It could read the parent filesystem if it tried. The harness controls what it puts *in* the agent's environment and working directory, not what the agent can access beyond that. |
-| CLAWPERATOR_BIN representation | `CLAWPERATOR_BIN` env var contains the executable name only (e.g. 'node' or 'clawperator'). Script path is separate. Do not store 'node /path/to/script.js' as a single string. |
+| Public-surface working directory | Always `tempfile.mkdtemp()`. Never the repo root. The temp dir path must not be under or adjacent to the repo root, and must not contain any repo files or symlinks. **Note: this is soft isolation** - the agent is not sandboxed. It could read the parent filesystem if it tried. The harness controls what it puts *in* the agent's environment and working directory, not what the agent can access beyond that. |
+| CLAWPERATOR_BIN representation | Internal representation is `clawperator_cmd: list[str]` (always an argv list). `CLAWPERATOR_BIN` env var is accepted as input from the user but resolved into `clawperator_cmd` during preflight. Never store a compound command string like 'node /path/script.js' as a single string anywhere in the harness. Subprocess calls always use `env.clawperator_cmd + [subcommand, ...]` as the argv list. |
 | Context file in temp dir | Check whether Claude Code requires a context file to function in a directory with no CLAUDE.md. If required, create a minimal one: contains only `https://docs.clawperator.com` and nothing else. |
 
 ## Pre-Run Device State
 
-The harness does not normalize device UI state before spawning the agent.
-The following assumptions define what is and is not the harness's responsibility:
+The harness normalizes device UI state to the Home screen before spawning the
+agent. The following defines what is and is not the harness's responsibility:
+
+**Harness does before spawning the agent (added step in runner.py):**
+1. Send `adb -s <serial> shell input keyevent KEYCODE_WAKEUP` - wake the screen.
+2. Send `adb -s <serial> shell input keyevent KEYCODE_HOME` - navigate to the Home screen.
+   Sleep 0.5s after to allow Home to settle.
 
 **Harness verifies (via doctor pre-flight):**
 - Device is connected and authorized
 - Operator APK is installed and responsive
 
-**Harness does NOT control:**
-- Which app is in the foreground
-- Whether the screen is on or off
-- Whether the device is unlocked
+**Harness does NOT handle:**
+- Screen unlock (device must have no PIN/pattern lock, or be already unlocked)
+- Permission dialogs that appear post-spawn (agent must handle these)
 
-**Required pre-run state (operator responsibility before starting the eval):**
-- Screen on
-- Device unlocked
-- No overlay dialogs blocking the screen (e.g. update prompts, permission dialogs)
+**Required pre-run state (operator responsibility):**
+- Device unlocked (no PIN/pattern) OR manually unlocked before running
+- No full-screen dialogs that can't be dismissed with HOME
 
 **Agent responsibility:**
-- Open Android Settings itself (the prompt provides the package name)
-- Handle arbitrary foreground state at start
+- Navigate to Android Settings from the Home screen
+- Handle any per-app permission prompts encountered during navigation
 
-Rationale: requiring the harness to normalize to Home screen adds fragility for
-marginal gain. The agent is expected to navigate from any foreground state. If
-eval noise from starting state proves significant, add a Home screen
-normalization step in a future phase.
+Rationale: HOME normalization eliminates "random foreground app" as a noise
+source for near zero cost (two adb keyevents). Screen unlock is excluded
+because automating unlock requires knowing the PIN/pattern, which is
+device-specific and outside harness scope.
 
 ## Failure Modes To Prevent
 
@@ -184,6 +187,7 @@ For every completed run, `evals/runs/<run_id>/` contains:
 - `result.json` - schema from `tasks/evals/plan.md`, no null required fields
 - `config.json` - full run configuration including invocation.command
 - `transcript.txt` - full agent stdout+stderr, up to 10MB
+- `harness.log` - structured harness event log (JSON lines, one event per line)
 
 ## Acceptance Criteria
 

@@ -27,11 +27,18 @@ eval. `--max-turns` is enforced. Every run records `turns_counted` and
 `turns_budget` in `result.json`. `turns_counted` is populated for Claude and
 Gemini. For Codex and Kimi it is best-effort and may be null.
 
+**Turn counting is a diagnostic metric only:**
+- It is NOT used for pass/fail scoring.
+- It is NOT comparable across agents (different agents define "turn" differently).
+- It is recorded in `result.json` as `metrics.turns_counted` for human inspection.
+- A run with `turns_counted = null` is fully valid.
+- Do not build tooling that aggregates or compares `turns_counted` across agents in Phase 2.
+
 ## Why This Phase
 
 Three of the four installed agents cannot run evals yet. Turn budgets prevent
 runaway costs on expensive models. Turn counting also provides the first
-comparative signal across agents.
+diagnostic signal for inspecting agent behavior - not for cross-agent comparison.
 
 ## In Scope
 
@@ -82,11 +89,11 @@ comparative signal across agents.
 
 ## Deterministic Versus Judgment
 
-| Aspect | Type | Rule |
-| --- | --- | --- |
-| Turn counting for Claude/Gemini | Deterministic | Parse stream-json lines. Count lines where `"role":"assistant"` or `"type":"message"` with assistant role. Document exact JSON key checked. |
-| Turn counting for Codex/Kimi | Best-effort / may remain null. Not a gating metric. | Approximate using heuristic markers visible in real output (empirically determined). Log a warning per run that turn counting is approximate for this adapter. If the heuristic fires fewer than 2 times in the full transcript, set `turns_counted = null`. |
-| Budget exceeded status | Deterministic | `turns_counted >= turns_budget` at the time of the check. Check after every line. |
+| Aspect | Type | Use | Rule |
+| --- | --- | --- | --- |
+| Turn counting for Claude/Gemini | Deterministic | diagnostic only | Parse stream-json lines. Count lines where `"role":"assistant"` or `"type":"message"` with assistant role. Document exact JSON key checked. |
+| Turn counting for Codex/Kimi | Best-effort / may remain null. Not a gating metric. | diagnostic only, may be null | Approximate using heuristic markers visible in real output (empirically determined). Log a warning per run that turn counting is approximate for this adapter. If the heuristic fires fewer than 2 times in the full transcript, set `turns_counted = null`. |
+| Budget exceeded status | Deterministic | enforcement | `turns_counted >= turns_budget` at the time of the check. Check after every line. |
 
 ## Decision Rules
 

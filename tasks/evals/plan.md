@@ -66,22 +66,22 @@ Every run is parameterized by two independent axes:
 
 **Knowledge surface** controls what context the agent may draw on:
 
-- `public-surface`: agent runs in an isolated temp directory with no repo
-  access. Prompt provides only: `docs.clawperator.com`, `clawperator.com`,
-  the clawperator binary path, and the device serial. **Isolation is soft in
-  Phase 1**: the agent runs in a temp directory with no repo files and no
-  repo paths in its environment, but the harness does not sandbox filesystem
-  or network access. The agent could in principle inspect the parent
-  filesystem. This is documented as 'soft isolation' and is sufficient for
-  the first eval. Hard isolation (real sandboxing) is a future enhancement if
-  eval integrity requires it.
+- **public-surface mode** (soft isolation): the agent runs in a freshly created
+  temp directory (`tempfile.mkdtemp()`). No repo files are placed in this
+  directory. No repo paths appear in the agent's environment or prompt. The
+  agent's filesystem access is NOT sandboxed - it could traverse the filesystem
+  if it chose to. The eval's claim is: 'the agent was not given repo access'
+  (passive), not 'the agent was prevented from accessing the repo' (active). If
+  eval integrity requires real isolation, add hard sandboxing in a future phase.
+  Prompt provides only: `docs.clawperator.com`, `clawperator.com`, the
+  clawperator command, and the device serial.
 - `full-repo`: agent runs from the repo root with full access to all internal
   docs and source.
 
 **Runtime target** controls which binary and Operator APK are used:
 
-- `local-dev`: `CLAWPERATOR_BIN` (defaults to
-  `node apps/node/dist/cli/index.js`) + `com.clawperator.operator.dev`
+- `local-dev`: `CLAWPERATOR_CMD` (defaults to
+  `["node", "<repo_root>/apps/node/dist/cli/index.js"]`) + `com.clawperator.operator.dev`
 - `published`: global `clawperator` npm binary + `com.clawperator.operator`
 
 ## Repository Structure
@@ -165,14 +165,15 @@ Note: "Confidence" is for turn counting only. All four are viable for task compl
     "work_dir": "/tmp/clawperator-eval-<id>",
     "env_overrides": {
       "ANDROID_SERIAL": "<device_serial>",
-      "CLAWPERATOR_BIN": "...",
+      "CLAWPERATOR_CMD": "node /path/to/dist/cli/index.js",
+      "CLAWPERATOR_BIN": "node",
       "CLAWPERATOR_OPERATOR_PACKAGE": "..."
     }
   },
   "environment": {
     "device_serial": "<device_serial>",
     "ground_truth_android_version": "15",
-    "clawperator_bin": "...",
+    "clawperator_cmd": ["node", "/path/to/dist/cli/index.js"],
     "clawperator_version": "0.5.3",
     "operator_package": "..."
   },
@@ -228,6 +229,19 @@ Rules:
 - An answer that arrives in the final line before timeout still wins (priority 2/3 beats 4/5).
 - `budget_exceeded` only fires if `--max-turns` is set and the agent has not yet emitted an answer.
 - `error` always wins. A run where the harness itself fails is not a `fail` - it is an `error`.
+
+Edge cases:
+- If the agent emits a valid answer marker on the very last line before the timeout fires (race
+  condition): the answer wins. The timer thread sets `timeout_triggered` but the for-loop reads
+  one more line before exiting. Check `last_answer` after the loop, before checking
+  `timeout_triggered.is_set()`. Answer takes priority 2/3 over timeout (priority 5).
+- If the agent emits `CLAWPERATOR_EVAL_ANSWER:` with no value (empty after colon): this is a
+  malformed marker. Do NOT count it as an answer. The regex must require at least one
+  non-whitespace character after the colon.
+- If the agent emits the marker inside a JSON blob or code block: it still counts. The scorer
+  scans the raw transcript, not parsed output.
+- "Last valid match wins" means: if the agent emits the marker 5 times, the 5th (last) valid
+  match is the answer, regardless of what came before.
 
 ## Harness CLI
 
@@ -304,7 +318,9 @@ they survive task cleanup and inform future maintainers and agents:
 - **Two-axis model**: every run is parameterized by knowledge surface x runtime
   target independently. Rationale for each axis and its values.
 - **Public-surface isolation**: why `tempfile.mkdtemp()` and why repo paths
-  must not appear in the agent's environment or prompt.
+  must not appear in the agent's environment or prompt. Clarify the soft-isolation
+  model: the harness does not sandbox the agent; the claim is "agent was not given
+  repo access," not "agent was prevented from accessing the repo."
 - **`used_disallowed_tool` detection**: the chosen heuristic (finalized during
   Phase 1 implementation), why it is diagnostic-only and non-blocking.
 - **Doctor pre-flight requirement**: why the harness aborts before spawning
