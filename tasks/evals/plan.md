@@ -237,8 +237,10 @@ Edge cases:
 - If the agent emits `CLAWPERATOR_EVAL_ANSWER:` with no value (empty after colon): this is a
   malformed marker. Do NOT count it as an answer. The regex must require at least one
   non-whitespace character after the colon.
-- If the agent emits the marker inside a JSON blob or code block: it still counts. The scorer
-  scans the raw transcript, not parsed output.
+- If the agent emits the marker inside a JSON blob or code block (i.e. not at
+  line start): it does NOT match. The regex requires `^CLAWPERATOR_EVAL_ANSWER:`
+  at the beginning of a line. Agents must emit the marker as a bare line.
+  This is intentional - it prevents false positives from tool output logs.
 - "Last valid match wins" means: if the agent emits the marker 5 times, the 5th (last) valid
   match is the answer, regardless of what came before.
 

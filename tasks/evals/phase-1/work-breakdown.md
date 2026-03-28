@@ -53,8 +53,9 @@ start the next until the current one passes its acceptance criteria.
 13. Do not add AI attribution lines to commit messages.
 14. `--max-turns` is accepted by `run_eval.py` in Phase 1 but must have no
     effect on harness behavior. It is recorded in `config.json` only.
-15. Answer scoring must normalize both sides: strip leading `android ` prefix
-    (case-insensitive), strip whitespace, lowercase. Never compare raw strings.
+15. Answer scoring must normalize both sides. Normalization order: strip
+    whitespace, lowercase, strip leading `android ` prefix, strip whitespace
+    again. Never compare raw strings. See `normalize_version` spec below.
 
 ## Required Reading
 
@@ -221,7 +222,13 @@ codes explicitly. Never use shell=True with user-provided values.
 
 ```python
 def normalize_version(v: str) -> str:
-    """Strip whitespace, strip leading 'android ' prefix (case-insensitive), lowercase."""
+    """
+    Normalize a version string for comparison. Steps in order:
+    1. Strip leading and trailing whitespace.
+    2. Lowercase.
+    3. Strip leading 'android ' prefix if present (handles 'Android 15' -> '15').
+    4. Strip whitespace again (handles 'android  15' with extra internal space).
+    """
     v = v.strip().lower()
     if v.startswith("android "):
         v = v[len("android "):]
@@ -309,9 +316,15 @@ Required log events (at minimum):
 - KILL: which signal was sent and to which pgid
 - SCORE: outcome.status and answer_normalized (or "no_answer")
 - ERROR: any EnvironmentError or unexpected exception, with traceback
+- RESULT: final one-line human-readable summary written as the last log entry.
+  Format: "RESULT: <status> | answer=<normalized_or_none> | truth=<ground_truth> | turns=<n_or_null> | time=<wall_clock_s>s"
+  Example: "RESULT: pass | answer=15 | truth=15 | turns=null | time=87.4s"
+  This line makes run inspection fast - a developer tailing harness.log sees the
+  outcome immediately without opening result.json.
 
 Format: single-line JSON per event, written to stderr and appended to harness.log.
-Example: {"ts": "2026-03-28T14:30:01Z", "run_id": "android-version-...", "event": "SPAWN", "cmd": [...], ...}
+Exception: the RESULT event is written as a plain text line (not JSON) for human readability.
+JSON example: {"ts": "2026-03-28T14:30:01Z", "run_id": "android-version-...", "event": "SPAWN", "cmd": [...], ...}
 """
 
 def get_logger(run_id: str, log_file: Path | None = None) -> HarnessLogger:
@@ -418,9 +431,11 @@ def run_eval(
         already-awake device is usually a no-op, but can behave inconsistently on some
         emulators - treat failure as advisory, not fatal.
     1. Build prompt from spec['prompts'][knowledge_mode] file.
-       Substitute $CLAWPERATOR_CMD (primary, space-joined argv list),
-       $CLAWPERATOR_BIN (legacy, executable only), $DEVICE_SERIAL,
-       $CLAWPERATOR_OPERATOR_PACKAGE.
+       Substitute $CLAWPERATOR_CMD (primary - use shlex.join(env.clawperator_cmd),
+       producing a shell-safe string the agent can embed in bash commands),
+       $DEVICE_SERIAL, $CLAWPERATOR_OPERATOR_PACKAGE.
+       Prompt instructs the agent: "Execute Clawperator commands using exactly
+       this base command: $CLAWPERATOR_CMD".
     2. Compute prompt_sha256.
     3. Create work_dir:
        - public-surface: tempfile.mkdtemp()
@@ -429,10 +444,21 @@ def run_eval(
     5. Build subprocess env:
        base = dict(os.environ)
        base["ANDROID_SERIAL"] = env.device_serial
-       base["CLAWPERATOR_CMD"] = " ".join(env.clawperator_cmd)   # space-joined for agent shell use
+       base["CLAWPERATOR_CMD"] = shlex.join(env.clawperator_cmd)  # shell-safe join; handles spaces in path
        base["CLAWPERATOR_OPERATOR_PACKAGE"] = env.operator_package
-       # CLAWPERATOR_BIN is accepted as an INPUT env var during preflight resolution
-       # but is NOT injected into the agent's env. The agent receives CLAWPERATOR_CMD.
+       # CLAWPERATOR_BIN is accepted as INPUT during preflight only.
+       # Not injected into the agent's env - agent receives CLAWPERATOR_CMD.
+       # For public-surface mode, strip vars that could leak repo context:
+       # Remove PYTHONPATH if present; remove any inherited CLAWPERATOR_* vars
+       # except those explicitly set above. Do NOT strip PATH, HOME, LANG, or
+       # standard system vars - stripping those breaks tool resolution.
+       if knowledge_mode == "public-surface":
+           base.pop("PYTHONPATH", None)
+           for k in list(base.keys()):
+               if k.startswith("CLAWPERATOR_") and k not in (
+                   "CLAWPERATOR_CMD", "CLAWPERATOR_OPERATOR_PACKAGE"
+               ):
+                   del base[k]
        overrides = agent.build_env(base)
        final_env = {**base, **overrides}
     6. Build command = agent.build_command(prompt, work_dir).
@@ -459,9 +485,12 @@ def run_eval(
             line = agent.normalize_line(line)
             transcript_file.write(line)
             transcript_file.flush()
-            # Check for answer marker in-memory on each line (no re-read,
-            # no polling). Update last_answer if marker found.
-            # Check transcript size; truncate at 10MB if needed.
+            # Check for answer marker in-memory on each line. Update last_answer if found.
+            # Transcript size cap: once transcript_bytes_written >= 10MB, stop writing
+            # further lines to the file. Still continue reading proc.stdout (so the
+            # process is not blocked on a full pipe) and still scan for the answer marker.
+            # When the cap is hit, append one line: "[[TRANSCRIPT TRUNCATED AT 10MB]]"
+            # to the file and set a truncated=True flag. Do not append more lines after.
     12. After the loop, check last_answer first, then check
         timeout_triggered.is_set(). An answer found in the last line before
         timeout still wins.
@@ -474,8 +503,11 @@ def run_eval(
         - budget_exceeded only if --max-turns is set and no answer was emitted.
     16. Build result.json and config.json per schema in tasks/evals/plan.md.
     17. Write run artifacts via artifacts.write_run().
-    18. Clean up temp work_dir if public-surface mode.
-    19. Return run dir path.
+    18. Log RESULT summary line (plain text, last entry in harness.log):
+        logger.result(status, answer_normalized, ground_truth, turns_counted, wall_clock_s)
+        This produces: "RESULT: pass | answer=15 | truth=15 | turns=null | time=87.4s"
+    19. Clean up temp work_dir if public-surface mode.
+    20. Return run dir path.
     """
 ```
 
@@ -489,6 +521,13 @@ try:
     os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
 except ProcessLookupError:
     pass  # process group already gone
+
+# After kill, verify the process is actually gone
+time.sleep(1)
+if proc.poll() is None:
+    logger.log("WARN", event="kill_incomplete",
+               msg="Process still alive after SIGKILL - may have daemonized children")
+    # Do not retry. Log and continue. Orphans are the OS's problem.
 ```
 
 Use `start_new_session=True` in the Popen call to ensure a clean process group
