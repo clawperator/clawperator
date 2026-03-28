@@ -45,9 +45,8 @@ thin surface before adding the complexity of multiple agents and specs.
   (accepted but not enforced), `--runs-dir`, `--dry-run`
 - `evals/README.md` (operational docs: how to run, how to read results,
   how public-surface isolation works, how to add an agent adapter)
-- `docs/internal/design/evals.md` (design rationale: measurement-not-teaching
-  principle, two-axis model, marker protocol, isolation rules, detection
-  heuristics, compatibility matrix concept)
+- `docs/internal/design/evals.md` (best-effort - write if time allows in 1c;
+  if not, write as immediate follow-up commit after 1d passes)
 - `.gitignore` at repo root: add `evals/runs/`
 
 ## Out of Scope
@@ -70,14 +69,14 @@ thin surface before adding the complexity of multiple agents and specs.
 
 ## Surfaces and Ownership
 
-| Surface | Path | Change |
-| --- | --- | --- |
-| Eval harness | `evals/harness/` | New Python package |
-| Eval spec | `evals/specs/android-version/` | New spec + prompt |
-| Eval CLI | `evals/run_eval.py` | New entry point |
-| Operational README | `evals/README.md` | New |
-| Internal design doc | `docs/internal/design/evals.md` | New |
-| Repo gitignore | `.gitignore` | One line added |
+| Surface | Path | Change | Required? |
+| --- | --- | --- | --- |
+| Eval harness | `evals/harness/` | New Python package | required |
+| Eval spec | `evals/specs/android-version/` | New spec + prompt | required |
+| Eval CLI | `evals/run_eval.py` | New entry point | required |
+| Operational README | `evals/README.md` | New | required |
+| Internal design doc | `docs/internal/design/evals.md` | New | best-effort |
+| Repo gitignore | `.gitignore` | One line added | required |
 
 ## Source Of Truth
 
@@ -111,8 +110,37 @@ thin surface before adding the complexity of multiple agents and specs.
 | What if the agent emits the answer marker multiple times? | Use the last occurrence. |
 | What if the transcript is truncated at 10MB? | Still scan the full stream for the answer marker before truncating. Store the truncation marker `[TRANSCRIPT TRUNCATED AT 10MB]` at the end. |
 | What `ANDROID_SERIAL` in agent env? | Always set it to the resolved device serial. This eliminates `--device` failure modes. |
-| Public-surface working directory | Always `tempfile.mkdtemp()`. Never the repo root. Never a path that reveals the repo location. |
+| Public-surface working directory | Always `tempfile.mkdtemp()`. Never the repo root. Never a path that reveals the repo location. **Note: this is soft isolation** - the agent is not sandboxed. It could read the parent filesystem if it tried. The harness controls what it puts *in* the agent's environment and working directory, not what the agent can access beyond that. |
+| CLAWPERATOR_BIN representation | `CLAWPERATOR_BIN` env var contains the executable name only (e.g. 'node' or 'clawperator'). Script path is separate. Do not store 'node /path/to/script.js' as a single string. |
 | Context file in temp dir | Check whether Claude Code requires a context file to function in a directory with no CLAUDE.md. If required, create a minimal one: contains only `https://docs.clawperator.com` and nothing else. |
+
+## Pre-Run Device State
+
+The harness does not normalize device UI state before spawning the agent.
+The following assumptions define what is and is not the harness's responsibility:
+
+**Harness verifies (via doctor pre-flight):**
+- Device is connected and authorized
+- Operator APK is installed and responsive
+
+**Harness does NOT control:**
+- Which app is in the foreground
+- Whether the screen is on or off
+- Whether the device is unlocked
+
+**Required pre-run state (operator responsibility before starting the eval):**
+- Screen on
+- Device unlocked
+- No overlay dialogs blocking the screen (e.g. update prompts, permission dialogs)
+
+**Agent responsibility:**
+- Open Android Settings itself (the prompt provides the package name)
+- Handle arbitrary foreground state at start
+
+Rationale: requiring the harness to normalize to Home screen adds fragility for
+marginal gain. The agent is expected to navigate from any foreground state. If
+eval noise from starting state proves significant, add a Home screen
+normalization step in a future phase.
 
 ## Failure Modes To Prevent
 
@@ -128,6 +156,10 @@ thin surface before adding the complexity of multiple agents and specs.
   warning if not.
 - Storing the full inherited environment in `config.json`. Store only the
   env_overrides relevant to the run.
+- Sending SIGTERM only to the agent parent PID may leave child processes running
+  (e.g. an agent that spawned a subprocess to call the Clawperator binary). Use
+  `os.killpg` with `os.getpgid(proc.pid)` to terminate the entire process group.
+  Set `start_new_session=True` in Popen to ensure a clean process group boundary.
 
 ## Open Questions (resolve during Phase 1 implementation)
 
@@ -157,15 +189,16 @@ For every completed run, `evals/runs/<run_id>/` contains:
 
 All four must be true for Phase 1 to be complete:
 
-1. At least 3 independent passing runs (status `pass`) on the same device,
-   each with a correct Android version. Three runs is the minimum sanity bar.
-2. At least one intentional environment failure run (Operator not installed or
-   device offline) that produces `outcome.status = "error"` with a clear
+1. At least 1 `result.json` with `outcome.status = "pass"` and
+   `outcome.answer_correct = true`.
+2. At least 1 `result.json` with `outcome.status = "error"` and a non-null
    `failure_reason`.
-3. Each passing transcript shows the observe-decide-act loop with real
-   Clawperator commands and `[Clawperator-Result]` envelopes.
-4. `--dry-run` prints the resolved config and substituted prompt without
-   spawning an agent.
+3. Dry-run exits 0 with the prompt printed.
+4. The passing transcript contains at least one line with `[Clawperator-Result]`.
+
+**Post-merge milestone:** After the PR merges, gather 3 independent passing
+runs to establish the baseline. This is not a merge gate - it is the first
+entry in the eval log.
 
 ## Idempotency
 
@@ -180,6 +213,8 @@ timestamps. The harness must not overwrite a previous run directory.
 | `used_disallowed_tool` final heuristic | Code comment in `harness/scorer.py` AND `docs/internal/design/evals.md` |
 | Open Question resolutions (Claude context file, transcript cap) | `docs/internal/design/evals.md` decisions section |
 
-Note: `evals/README.md` and `docs/internal/design/evals.md` are Phase 1
-deliverables, not follow-up. Their content requirements are in sub-phase 1c
+Note: `evals/README.md` is a required Phase 1 deliverable.
+`docs/internal/design/evals.md` is best-effort - write if time allows in 1c;
+if not, write as an immediate follow-up commit after 1d passes. It must not
+block the PR from landing. Content requirements for both are in sub-phase 1c
 of `tasks/evals/phase-1/work-breakdown.md`.

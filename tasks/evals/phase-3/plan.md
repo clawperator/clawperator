@@ -87,6 +87,24 @@ Neither question can be asked until this phase ships.
 | Version output format | `clawperator version --json` output shape |
 | Local npm version | `apps/node/package.json` `"version"` field |
 
+## Pre-Implementation Verification
+
+Before implementing Phase 3, verify the following on the target machine:
+
+1. `clawperator doctor --json` - verify it returns JSON and exits 0 on a
+   healthy device. Record the exact JSON shape.
+2. `clawperator version --json` - verify it returns JSON with a version field.
+   Record the exact key name (likely `"version"` but verify).
+3. `clawperator --help` - verify the global binary is present and the version
+   matches expectations.
+4. Which Operator APK is installed: `adb shell pm list packages | grep clawperator`
+   - confirm `com.clawperator.operator` (release) is installed alongside or
+   instead of the `.dev` variant.
+
+Do not assume these commands exist or produce JSON. They were introduced at
+specific versions. Verify before writing environment.py's `published` resolution
+path.
+
 ## Deterministic Versus Judgment
 
 | Aspect | Type | Rule |
@@ -101,6 +119,7 @@ Neither question can be asked until this phase ships.
 | Question | Rule |
 | --- | --- |
 | If `clawperator` is not on PATH for `published` mode? | Abort with `outcome.status = "error"`, `failure_reason = "published_binary_not_found"`. |
+| If `clawperator version --json` does not exist in the installed binary? | Fall back to parsing `clawperator version` plain text. Document the fallback in `environment.py` and in `docs/internal/design/evals.md`. |
 | Should the `full-repo` prompt mention the repo path? | Yes, the prompt may tell the agent the repo is available at `$REPO_ROOT`. Add this as a template variable. |
 | Does `full-repo` mode disable the doctor pre-flight? | No. Doctor still runs before spawning the agent. |
 | Does `full-repo` mode set `ANDROID_SERIAL` in the agent env? | Yes, same as `public-surface`. |

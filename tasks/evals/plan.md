@@ -68,7 +68,13 @@ Every run is parameterized by two independent axes:
 
 - `public-surface`: agent runs in an isolated temp directory with no repo
   access. Prompt provides only: `docs.clawperator.com`, `clawperator.com`,
-  the clawperator binary path, and the device serial.
+  the clawperator binary path, and the device serial. **Isolation is soft in
+  Phase 1**: the agent runs in a temp directory with no repo files and no
+  repo paths in its environment, but the harness does not sandbox filesystem
+  or network access. The agent could in principle inspect the parent
+  filesystem. This is documented as 'soft isolation' and is sufficient for
+  the first eval. Hard isolation (real sandboxing) is a future enhancement if
+  eval integrity requires it.
 - `full-repo`: agent runs from the repo root with full access to all internal
   docs and source.
 
@@ -124,6 +130,17 @@ All four agent CLIs are installed. Non-interactive invocations verified:
 | Gemini CLI | `-p "<prompt>" --yolo --output-format stream-json` | `--model` | cwd of subprocess |
 | Codex | `exec --dangerously-bypass-approvals-and-sandbox "<prompt>"` | `-m` | `-C <dir>` |
 | Kimi | `--print --yolo -p "<prompt>"` | `--model` | `--work-dir <dir>` |
+
+## Agent Capability Matrix
+
+| Agent | Non-interactive flag | Stream JSON | Explicit work-dir | Turn counting | Confidence |
+| --- | --- | --- | --- | --- | --- |
+| Claude | `--dangerously-skip-permissions` | yes (`--output-format stream-json`) | cwd of subprocess | Parse `"type":"message"` JSON lines | high |
+| Gemini | `--yolo` | yes (`--output-format stream-json`) | cwd of subprocess | Empirical (verify in Phase 2) | medium |
+| Codex | `--dangerously-bypass-approvals-and-sandbox` | no (plain text) | `-C <dir>` | Heuristic only | low |
+| Kimi | `--print --yolo` | maybe (verify in Phase 2) | `--work-dir <dir>` | Heuristic only | low |
+
+Note: "Confidence" is for turn counting only. All four are viable for task completion.
 
 ## Result Schema
 
@@ -193,6 +210,25 @@ All four agent CLIs are installed. Non-interactive invocations verified:
 
 `turns_counted` and `turns_budget` are `null` in Phase 1, populated in Phase 2.
 
+## Outcome Precedence
+
+When multiple terminal conditions could apply simultaneously, the harness uses
+this precedence (highest to lowest):
+
+| Priority | Condition | Status |
+| --- | --- | --- |
+| 1 | Harness or environment error (pre-flight failure, subprocess crash, I/O error) | `error` |
+| 2 | Answer emitted and correct | `pass` |
+| 3 | Answer emitted and incorrect | `fail` |
+| 4 | Turn budget reached before answer | `budget_exceeded` |
+| 5 | Wall-clock timeout reached before answer | `timeout` |
+| 6 | Process exited normally with no answer emitted | `no_answer` |
+
+Rules:
+- An answer that arrives in the final line before timeout still wins (priority 2/3 beats 4/5).
+- `budget_exceeded` only fires if `--max-turns` is set and the agent has not yet emitted an answer.
+- `error` always wins. A run where the harness itself fails is not a `fail` - it is an `error`.
+
 ## Harness CLI
 
 ```
@@ -240,12 +276,12 @@ Full spec, prompt, scoring rules, and validation: `tasks/evals/phase-1/`.
 
 ## Internal Documentation
 
-Two internal doc artifacts are concrete Phase 1 deliverables, not optional follow-up:
+Two internal doc artifacts are Phase 1 deliverables:
 
-| Artifact | Path | Phase | Purpose |
-| --- | --- | --- | --- |
-| Harness operational README | `evals/README.md` | 1 | How to run evals, add adapters, read results |
-| Eval system design doc | `docs/internal/design/evals.md` | 1 | Design rationale, isolation rules, marker protocol, detection heuristics |
+| Artifact | Path | Phase | Purpose | Required? |
+| --- | --- | --- | --- | --- |
+| Harness operational README | `evals/README.md` | 1 | How to run evals, add adapters, read results | required |
+| Eval system design doc | `docs/internal/design/evals.md` | 1 | Design rationale, isolation rules, marker protocol, detection heuristics | best-effort |
 
 Content requirements for both are specified in `tasks/evals/phase-1/work-breakdown.md` sub-phase 1c.
 

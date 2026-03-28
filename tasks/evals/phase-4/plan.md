@@ -20,6 +20,39 @@ runs the generated skill deterministically and scores its output.
 | Current / Next | 4a |
 | Blockers | Phase 3 PR must be merged before starting |
 
+## Pre-Implementation Alignment Check
+
+Before implementing Phase 4, the implementer must answer the following
+questions by reading the current skill contracts and docs:
+
+1. Read `apps/node/src/contracts/skills.ts` and `../clawperator-skills/` (the
+   sibling repo). What is the minimal valid skill shape? Does it match what a
+   naive agent would emit?
+
+2. Is the generated artifact expected to be:
+   - A deterministic runnable skill (executes the same action sequence every time)?
+   - An agent-readable workflow scaffold (captures the strategy but is not itself
+     deterministic)?
+   - Something else?
+
+   Answer this before writing `prompt-skill.md`. The prompt must tell the agent
+   which format to produce.
+
+3. The current product and docs story describes skills as "reusable app-specific
+   workflow knowledge" that "lives above the runtime." A generated skill that is
+   just an opaque LLM dump of tool calls may not align with this. Verify that the
+   replay path (`clawperator skills run`) can actually execute what a LLM agent
+   would produce.
+
+4. If the skill contract is not stable enough to produce reliable replays,
+   consider: is Phase 4 about measuring "can the agent produce a valid skill
+   artifact" (structure test) or "can the skill actually run correctly"
+   (execution test)? Both are valid but they require different prompts and
+   different scorers.
+
+**Hard rule:** Do not write `prompt-skill.md` until questions 1-4 above are
+answered in `tasks/evals/phase-4/findings.md`.
+
 ## Goal
 
 A single eval run can produce two scores:

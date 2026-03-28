@@ -12,7 +12,7 @@ start the next until the current one passes its acceptance criteria.
 | 1a | Directory scaffold + gitignore | fast |
 | 1b | Harness core (environment, runner, scorer, artifacts, claude adapter) | thinking |
 | 1c | Eval spec + prompt + run_eval.py CLI + README | default |
-| 1d | Validation: 3 passing runs + error run + dry-run | default |
+| 1d | Validation: 1 passing run + 1 error run + dry-run | default |
 
 ## Status
 
@@ -73,7 +73,7 @@ Read these files IN THIS ORDER before writing anything.
 
 | PR | Purpose | Included sub-phases | Agent tier | Merge gate |
 | --- | --- | --- | --- | --- |
-| PR-1 | Complete Phase 1 harness | 1a, 1b, 1c, 1d | fast/thinking/default/default | 3 passing runs; error run; dry-run; `evals/runs/` gitignored |
+| PR-1 | Complete Phase 1 harness | 1a, 1b, 1c, 1d | fast/thinking/default/default | 1 passing run; 1 error run; dry-run exits 0; `evals/runs/` gitignored |
 
 ---
 
@@ -174,8 +174,9 @@ CLI entry point yet. Focus on correctness of each component in isolation.
 class Environment:
     device_serial: str
     ground_truth_android_version: str
-    clawperator_bin: str          # resolved path or command
-    clawperator_version: str      # from `clawperator version` output
+    clawperator_bin: str           # "clawperator" or "node"
+    clawperator_script: str | None # None for published; path to index.js for local-dev
+    clawperator_version: str
     operator_package: str
 
 def preflight(device: str | None) -> Environment:
@@ -185,14 +186,20 @@ def preflight(device: str | None) -> Environment:
     3. If device is specified, verify it is in the authorized list.
        If not specified and exactly one authorized device exists, use it.
        If not specified and multiple devices exist, raise with helpful message.
-    4. Resolve CLAWPERATOR_BIN: env var > "node <repo_root>/apps/node/dist/cli/index.js"
-    5. Verify the resolved binary is executable (os.access check).
+    4. Resolve CLAWPERATOR_BIN: env var (executable name only, e.g. "node" or
+       "clawperator") > "node". If local-dev fallback, set clawperator_script
+       to "<repo_root>/apps/node/dist/cli/index.js". Otherwise set to None.
+       NEVER store "node /path/to/script.js" as a single string in clawperator_bin.
+    5. Verify the resolved binary is on PATH: shutil.which(env.clawperator_bin).
+       If None, raise EnvironmentError.
     6. Resolve CLAWPERATOR_OPERATOR_PACKAGE: env var > "com.clawperator.operator.dev"
-    7. Run `<bin> doctor --json` with ANDROID_SERIAL set.
+    7. Build command prefix: [env.clawperator_bin] + ([env.clawperator_script] if
+       env.clawperator_script else []).
+       Run `<prefix> doctor --json` with ANDROID_SERIAL set.
        If exit code != 0, raise EnvironmentError("doctor_preflight_failed").
     8. Run `adb -s <serial> shell getprop ro.build.version.release`.
        Strip whitespace. Reject empty result.
-    9. Run `<bin> version --json` to capture clawperator_version.
+    9. Run `<prefix> version --json` to capture clawperator_version.
     10. Return Environment dataclass.
     """
 ```
@@ -336,27 +343,62 @@ def run_eval(
        final_env = {**base, **overrides}
     6. Build command = agent.build_command(prompt, work_dir).
     7. Record started_at.
-    8. Open transcript file for streaming write.
-    9. Spawn subprocess with Popen, cwd=work_dir, env=final_env.
-       stdout and stderr merged to transcript file via stdout=f, stderr=f.
-    10. Poll for:
-        a. Process exits naturally.
-        b. Wall-clock timeout exceeded.
-        c. Answer marker found in transcript (check every 0.5s, re-read last 4KB).
-    11. On timeout: send SIGTERM, wait 5s, send SIGKILL.
-    12. Record finished_at.
-    13. Read full transcript. Run scorer.score().
-    14. Determine outcome.status:
-        - timeout -> "timeout"
-        - answer_correct -> "pass"
-        - answer emitted but wrong -> "fail"
-        - no answer -> "no_answer"
-    15. Build result.json and config.json per schema in tasks/evals/plan.md.
-    16. Write run artifacts via artifacts.write_run().
-    17. Clean up temp work_dir if public-surface mode.
-    18. Return run dir path.
+    8. Open transcript file for writing (before spawning, before the loop).
+    9. Spawn subprocess with Popen, cwd=work_dir, env=final_env,
+       stdout=PIPE, stderr=STDOUT, start_new_session=True.
+       Merging stderr into stdout via stderr=STDOUT.
+    10. Start a background timer thread that will send SIGTERM after
+        wall-clock timeout elapses. The timer fires regardless of whether
+        the agent writes any output.
+    11. Read output line by line:
+        for raw_line in proc.stdout:
+            line = raw_line.decode("utf-8", errors="replace")
+            transcript_file.write(line)
+            transcript_file.flush()
+            # Check for answer marker in-memory on each line (no re-read,
+            # no polling). Update last_answer if marker found.
+            # Check transcript size; truncate at 10MB if needed.
+    12. After the loop, check if the timer fired (timeout_triggered flag).
+    13. Record finished_at.
+    14. Read full transcript. Run scorer.score().
+    15. Determine outcome.status using the precedence table in
+        tasks/evals/plan.md ## Outcome Precedence. Summary:
+        - error > pass > fail > budget_exceeded > timeout > no_answer
+        - An answer in the last line before timeout still wins.
+        - budget_exceeded only if --max-turns is set and no answer was emitted.
+    16. Build result.json and config.json per schema in tasks/evals/plan.md.
+    17. Write run artifacts via artifacts.write_run().
+    18. Clean up temp work_dir if public-surface mode.
+    19. Return run dir path.
     """
 ```
+
+**Timeout termination pattern:**
+
+```python
+# Terminate entire process group, not just the parent PID
+try:
+    os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+    time.sleep(5)
+    os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+except ProcessLookupError:
+    pass  # process group already gone
+```
+
+Use `start_new_session=True` in the Popen call to ensure a clean process group
+boundary. This prevents child processes (e.g. a subprocess the agent spawned
+to call the Clawperator binary) from surviving after the timeout fires.
+
+**IO pattern (replaces the prior polling approach):**
+
+- `subprocess.Popen(..., stdout=PIPE, stderr=STDOUT)` - merge stderr into stdout
+- Read line by line in Python: `for raw_line in proc.stdout:`
+- Tee each decoded line immediately to the transcript file as it arrives
+- Check for the answer marker in-memory on each line (no file re-read, no polling)
+- Transcript file is opened for writing before the loop starts and flushed on each line
+- The background timer thread sends SIGTERM after wall-clock timeout regardless
+  of whether the agent writes any output. This ensures timeout fires even on a
+  completely silent agent.
 
 ### Steps
 
@@ -572,7 +614,11 @@ Print `outcome.status` and `outcome.answer_normalized` to stdout.
 - Note that `CLAWPERATOR_EVAL_ANSWER` is an internal eval marker and must
   not appear in public-facing documentation or production usage
 
-### Internal Design Doc
+### Internal Design Doc (best-effort)
+
+Write this if time allows in 1c. If the other 1c deliverables are done and
+validated, the design doc can ship in a follow-up commit after 1d passes. It
+must not block the PR from landing.
 
 `docs/internal/design/evals.md` must cover these topics in order:
 
@@ -622,9 +668,11 @@ section and fill it in after the 1d validation runs reveal the real pattern.
      --agent claude --model claude-opus-4-5 --dry-run
    ```
    Expected: prints resolved config and prompt, exits 0, no agent spawned.
-6. Write `docs/internal/design/evals.md` covering the 9 topics specified above.
-   Sections 1-6 and 9 can be written now. Sections 7 and 8 may use a
-   placeholder pending 1d validation runs.
+6. Write `docs/internal/design/evals.md` covering the 9 topics specified above
+   if time allows. Sections 1-6 and 9 can be written now. Sections 7 and 8 may
+   use a placeholder pending 1d validation runs. If this step must be deferred,
+   commit the other deliverables and write the design doc as an immediate
+   follow-up commit after 1d passes.
 
 ### Acceptance Criteria
 
@@ -639,8 +687,9 @@ section and fill it in after the 1d validation runs reveal the real pattern.
 - `evals/README.md` contains the words "public-surface" and "temp".
 - `evals/README.md` contains a note that `CLAWPERATOR_EVAL_ANSWER` is an
   internal marker that must not appear in public docs.
-- `docs/internal/design/evals.md` exists and covers all 9 required topics
-  (sections 7 and 8 may be marked as placeholders pending 1d).
+- `docs/internal/design/evals.md` exists and covers all 9 required topics OR
+  is committed as an immediate follow-up after 1d passes (present OR committed
+  as immediate follow-up).
 
 ### Validation
 
@@ -668,8 +717,8 @@ default
 
 ### Goal
 
-Run the eval three times with a real connected device and verify that all
-Phase 1 acceptance criteria are met.
+Run the eval with a real connected device and verify that all Phase 1
+acceptance criteria are met: 1 passing run, 1 error run, dry-run exits 0.
 
 ### Required Environment
 
@@ -687,16 +736,15 @@ Phase 1 acceptance criteria are met.
    node apps/node/dist/cli/index.js doctor \
      --operator-package com.clawperator.operator.dev
    ```
-2. Run the eval three times. For each run, record the run ID and outcome.
+2. Run the eval once. Record the run ID and outcome.
    Use an explicit device serial if more than one device is connected:
    ```bash
    python evals/run_eval.py android-version \
      --agent claude --model claude-opus-4-5 \
      --device <device_serial>
    ```
-3. After three runs, verify at least one is `pass`.
-   Read the transcript of each passing run and verify it shows real
-   `[Clawperator-Result]` envelopes in the output.
+3. Verify the run is `pass`. Read the passing transcript and verify it shows
+   real `[Clawperator-Result]` envelopes in the output.
 4. Simulate an environment failure. Disconnect the device or stop the
    Operator APK, then run:
    ```bash
@@ -705,18 +753,18 @@ Phase 1 acceptance criteria are met.
    ```
    Verify the output shows `outcome.status = "error"` in `result.json`.
 5. Run dry-run and verify it exits 0 with the prompt printed.
-6. Capture run IDs of the three passing runs and one error run.
+6. Capture run IDs of the passing run and error run.
    Note them in this section for human review.
 
 ### Acceptance Criteria
 
 All must be true:
-1. At least 3 `result.json` files with `outcome.status = "pass"` and
+1. At least 1 `result.json` with `outcome.status = "pass"` and
    `outcome.answer_correct = true`.
 2. At least 1 `result.json` with `outcome.status = "error"` and a non-null
    `failure_reason`.
-3. Each passing transcript contains at least one line with `[Clawperator-Result]`.
-4. Dry-run exits 0.
+3. The passing transcript contains at least one line with `[Clawperator-Result]`.
+4. Dry-run exits 0 with the prompt printed.
 5. `evals/runs/` is gitignored:
    ```bash
    git check-ignore -v evals/runs/

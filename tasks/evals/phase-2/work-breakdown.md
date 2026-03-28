@@ -74,7 +74,7 @@ Record the exact output format for each in findings (create
 
 | PR | Purpose | Included sub-phases | Agent tier | Merge gate |
 | --- | --- | --- | --- | --- |
-| PR-2 | Additional agents + turn budget | 2a, 2b, 2c | default | 1 passing run per new agent; turns_counted populated; rescore works |
+| PR-2 | Additional agents + turn budget | 2a, 2b, 2c | default | 1 passing run per new agent; turns_counted populated for Claude/Gemini (null acceptable for Codex/Kimi); rescore works |
 
 ---
 
@@ -212,11 +212,13 @@ Wire `count_turn` into `runner.py`. Enforce `--max-turns`. Add
        break
    ```
 4. After the poll loop, record `turns_counted`:
-   - If counting is available and `turns > 0`, set to `turns`.
-   - If `turns == 0` and counting could not be confirmed working, set to `null`
-     and log a warning.
-   - Use `null` consistently for agents whose `count_turn` only approximates.
-     The comment in the adapter determines whether to trust the count.
+   - For Claude and Gemini: trust the count if parsing succeeded and `turns > 0`.
+   - For Codex and Kimi: set `turns_counted = null` if the heuristic fired
+     fewer than 2 times in the full transcript (i.e. if the signal is too
+     sparse to be meaningful). Log a message:
+     "Turn counting for <agent> is approximate; result may be null."
+   - If `turns == 0` for any agent and counting could not be confirmed working,
+     set to `null` and log a warning.
 5. Populate `result.json` fields:
    - `metrics.turns_counted`: int or null
    - `metrics.turns_budget`: value of `max_turns` (int or null if not set)
@@ -295,6 +297,8 @@ Implement `--rescore`. Run validation passes for Gemini, Codex, and Kimi.
   codex, kimi.
 - `--rescore` on an existing run produces `result-rescored.json` without errors.
 - `result-rescored.json` does not overwrite `result.json`.
+- It is acceptable for codex and kimi runs to have `turns_counted = null` in
+  `result.json`.
 
 ### Validation
 

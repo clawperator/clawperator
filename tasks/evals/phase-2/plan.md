@@ -24,7 +24,8 @@ transcripts without re-running an agent.
 
 All four agent types (claude, gemini, codex, kimi) can run the `android-version`
 eval. `--max-turns` is enforced. Every run records `turns_counted` and
-`turns_budget` in `result.json`.
+`turns_budget` in `result.json`. `turns_counted` is populated for Claude and
+Gemini. For Codex and Kimi it is best-effort and may be null.
 
 ## Why This Phase
 
@@ -84,7 +85,7 @@ comparative signal across agents.
 | Aspect | Type | Rule |
 | --- | --- | --- |
 | Turn counting for Claude/Gemini | Deterministic | Parse stream-json lines. Count lines where `"role":"assistant"` or `"type":"message"` with assistant role. Document exact JSON key checked. |
-| Turn counting for Codex/Kimi | Judgment | Approximate. Use heuristic markers visible in real output (empirically determined). Log a warning per run that turn counting is approximate for this adapter. |
+| Turn counting for Codex/Kimi | Best-effort / may remain null. Not a gating metric. | Approximate using heuristic markers visible in real output (empirically determined). Log a warning per run that turn counting is approximate for this adapter. If the heuristic fires fewer than 2 times in the full transcript, set `turns_counted = null`. |
 | Budget exceeded status | Deterministic | `turns_counted >= turns_budget` at the time of the check. Check after every line. |
 
 ## Decision Rules
@@ -115,8 +116,8 @@ Phase 2 is complete when:
    produces at least 1 passing run.
 3. `python evals/run_eval.py android-version --agent kimi --model <model>`
    produces at least 1 passing run.
-4. All three new agent passing runs have `turns_counted` populated (not null)
-   in `result.json`.
+4. Codex and Kimi passing runs may have `turns_counted = null` in
+   `result.json` - this is expected and acceptable.
 5. `python evals/run_eval.py android-version --rescore <run_id>` produces
    `result-rescored.json` without errors.
 6. A run that exceeds the turn budget before answering produces
