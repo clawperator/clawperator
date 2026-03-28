@@ -237,12 +237,13 @@ def extract_answer(transcript: str) -> str | None:
     Scan transcript for CLAWPERATOR_EVAL_ANSWER: <value>.
     Uses ANSWER_PATTERN (re.MULTILINE so ^ and $ match line boundaries).
     Rules:
-    - Requires at least one non-whitespace character after the colon+space.
-      A line like 'CLAWPERATOR_EVAL_ANSWER:' (no value) does NOT match.
+    - The marker must appear at the START of a line. A marker embedded inside
+      a JSON value or code block will NOT match. This is intentional - it keeps
+      matching deterministic and avoids false positives from tool output.
+    - Requires at least one non-whitespace character after the colon.
+      A line like 'CLAWPERATOR_EVAL_ANSWER:' (nothing after colon) does NOT match.
     - Last match in the transcript wins (agent may revise its answer).
     - The value is captured as the first group, stripped of surrounding whitespace.
-    - The marker may appear anywhere in the line (inside JSON strings, code blocks,
-      plain text). The scanner does not parse structure.
     Returns None if no valid match found.
     """
     matches = ANSWER_PATTERN.findall(transcript)
@@ -344,10 +345,13 @@ class BaseAgent(ABC):
     @abstractmethod
     def supports_streaming(self) -> bool:
         """
-        Return True if this agent's CLI emits output line-by-line as it runs.
-        False means output is buffered until the process exits (e.g. Codex).
-        runner.py uses this to decide whether to scan for the answer marker
-        during execution or only at process exit.
+        Return True if the harness should attempt in-flight answer scanning
+        line-by-line during execution. False means the harness defers answer
+        scanning until after the process exits.
+        This does NOT guarantee the CLI itself flushes output promptly - some
+        CLIs claim to stream but buffer in practice. The flag controls harness
+        behavior, not CLI behavior.
+        Codex and similar tools that buffer all output until exit should return False.
         """
 
     @abstractmethod
@@ -408,6 +412,11 @@ def run_eval(
     0a. Send `adb -s <device_serial> shell input keyevent KEYCODE_WAKEUP` (wake screen).
     0b. Send `adb -s <device_serial> shell input keyevent KEYCODE_HOME` (navigate to Home).
         Sleep 0.5s to allow Home to settle.
+        If either keyevent command fails (non-zero exit or adb error), log a WARNING-level
+        harness event but do NOT abort. The doctor pre-flight and the first Clawperator
+        command issued by the agent are the definitive device-health gates. WAKEUP on an
+        already-awake device is usually a no-op, but can behave inconsistently on some
+        emulators - treat failure as advisory, not fatal.
     1. Build prompt from spec['prompts'][knowledge_mode] file.
        Substitute $CLAWPERATOR_CMD (primary, space-joined argv list),
        $CLAWPERATOR_BIN (legacy, executable only), $DEVICE_SERIAL,
@@ -421,13 +430,19 @@ def run_eval(
        base = dict(os.environ)
        base["ANDROID_SERIAL"] = env.device_serial
        base["CLAWPERATOR_CMD"] = " ".join(env.clawperator_cmd)   # space-joined for agent shell use
-       base["CLAWPERATOR_BIN"] = env.clawperator_cmd[0]           # kept for backward compat
        base["CLAWPERATOR_OPERATOR_PACKAGE"] = env.operator_package
+       # CLAWPERATOR_BIN is accepted as an INPUT env var during preflight resolution
+       # but is NOT injected into the agent's env. The agent receives CLAWPERATOR_CMD.
        overrides = agent.build_env(base)
        final_env = {**base, **overrides}
     6. Build command = agent.build_command(prompt, work_dir).
+    6a. Compute run_id via artifacts.make_run_id(eval_id, agent.config.type_id, model).
+    6b. Create run_dir: runs_dir / run_id. Raise if it already exists (idempotency guard).
+    6c. Initialize logger: logger = get_logger(run_id, log_file=run_dir / "harness.log").
+        From this point all events write to both stderr and harness.log.
+    6d. Log ENV_SUMMARY: device_serial, clawperator_cmd, operator_package, clawperator_version.
     7. Record started_at.
-    8. Open transcript file for writing (before spawning, before the loop).
+    8. Open transcript file for writing at run_dir / "transcript.txt" (before spawning).
     9. Spawn subprocess with Popen, cwd=work_dir, env=final_env,
        stdout=PIPE, stderr=STDOUT, text=True, bufsize=1,
        start_new_session=True. Merging stderr into stdout via stderr=STDOUT.
@@ -569,9 +584,13 @@ assert extract_answer(transcript_malformed) is None
 transcript_whitespace_only = "CLAWPERATOR_EVAL_ANSWER:   \n"
 assert extract_answer(transcript_whitespace_only) is None
 
-# extract_answer - marker inside JSON blob counts
+# extract_answer - marker inside JSON blob does NOT match (marker must be at line start)
 transcript_inside_json = '{"output": "CLAWPERATOR_EVAL_ANSWER: 15"}'
-assert extract_answer(transcript_inside_json) == "15"
+assert extract_answer(transcript_inside_json) is None
+
+# extract_answer - marker at line start inside a multiline string does match
+transcript_linestart = 'some output\nCLAWPERATOR_EVAL_ANSWER: 15\nmore output'
+assert extract_answer(transcript_linestart) == "15"
 ```
 
 ### Acceptance Criteria

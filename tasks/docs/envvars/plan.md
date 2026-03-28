@@ -62,19 +62,24 @@ It does not block Phase 1 or Phase 2.
 - Changes to existing `docs/` pages beyond adding a link to
   `docs/configuration.md` from `docs/setup.md`
 
-## Env Vars to Document
+## Candidate Env Vars to Investigate
 
-Verify each exists as a real resolution path in the Node CLI source before
-documenting it. Do not document aspirational vars.
+The following are hypothesized based on CLAUDE.md conventions and eval harness
+design. Treat this table as a research starting point, not a verified contract.
+Sub-phase 1a source research must confirm or correct each entry before any
+docs are written. If a var is not found in Node CLI source, it must not appear
+on the public docs page.
 
-| Env Var | Controls | Resolution order |
+| Candidate Env Var | Hypothesis | Must verify in source |
 | --- | --- | --- |
-| `ANDROID_SERIAL` | Target device serial | Explicit `--device` flag > `ANDROID_SERIAL` env var > auto-select if exactly one device connected |
-| `CLAWPERATOR_BIN` | Which binary to invoke | `CLAWPERATOR_BIN` env var > local sibling build (`apps/node/dist/cli/index.js`) > global `clawperator` on PATH |
-| `CLAWPERATOR_OPERATOR_PACKAGE` | Which Operator APK to target | `--operator-package` flag > `CLAWPERATOR_OPERATOR_PACKAGE` env var > auto-detect if exactly one variant installed > `com.clawperator.operator` |
+| `ANDROID_SERIAL` | Standard adb convention; likely read by the CLI for device selection | `apps/node/src/cli/selectorFlags.ts` |
+| `CLAWPERATOR_BIN` | Overrides which binary to invoke; used by eval harness and CLAUDE.md - may NOT be read by the Node CLI itself | Search `apps/node/src/` - may return no results |
+| `CLAWPERATOR_OPERATOR_PACKAGE` | Overrides the operator package; likely maps to the `--operator-package` flag default | `apps/node/src/cli/selectorFlags.ts` |
 
-The table above reflects the intended contract. Verify the actual resolution
-order in source before writing the docs page - see Source Of Truth below.
+The source research in sub-phase 1a is the gate. Do not write docs for any
+var that is not confirmed in source. If `CLAWPERATOR_BIN` is not read by the
+Node CLI, it belongs only in `docs/internal/` or `evals/README.md`, not in
+the public docs.
 
 ## Existing Artifact Scope
 
@@ -136,8 +141,9 @@ order in source before writing the docs page - see Source Of Truth below.
 
 ## Acceptance Criteria
 
-1. `docs/configuration.md` exists and covers all three env vars with their
-   resolution order, defaults, and error cases.
+1. `docs/configuration.md` exists and covers all env vars confirmed in 1a
+   source research - no more, no fewer. Each has resolution order, defaults,
+   and error cases sourced from code.
 2. The resolution order documented matches the source code (verified via
    Source Of Truth files above).
 3. `docs/setup.md` contains a cross-reference link to `docs/configuration.md`.

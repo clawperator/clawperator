@@ -93,7 +93,7 @@ diagnostic signal for inspecting agent behavior - not for cross-agent comparison
 | --- | --- | --- | --- |
 | Turn counting for Claude/Gemini | Deterministic | diagnostic only | Parse stream-json lines. Count lines where `"role":"assistant"` or `"type":"message"` with assistant role. Document exact JSON key checked. |
 | Turn counting for Codex/Kimi | Best-effort / may remain null. Not a gating metric. | diagnostic only, may be null | Approximate using heuristic markers visible in real output (empirically determined). Log a warning per run that turn counting is approximate for this adapter. If the heuristic fires fewer than 2 times in the full transcript, set `turns_counted = null`. |
-| Budget exceeded status | Deterministic | enforcement | `turns_counted >= turns_budget` at the time of the check. Check after every line. |
+| Budget exceeded status | Deterministic for Claude; conditional for Gemini (after 2a validation); not enforced for Codex/Kimi | enforcement only for structured-turn agents | `budget_exceeded` fires only when `count_turn` is reliable: Claude always, Gemini if empirical 2a inspection confirms reliable parsing, Codex/Kimi never. For Codex and Kimi, `budget_exceeded` is never emitted - wall-clock timeout is the only enforcement mechanism. |
 
 ## Decision Rules
 
@@ -127,8 +127,11 @@ Phase 2 is complete when:
    `result.json` - this is expected and acceptable.
 5. `python evals/run_eval.py android-version --rescore <run_id>` produces
    `result-rescored.json` without errors.
-6. A run that exceeds the turn budget before answering produces
-   `outcome.status = "budget_exceeded"`.
+6. A Claude run with `--max-turns 2` that has not answered by turn 2 produces
+   `outcome.status = "budget_exceeded"`. Codex and Kimi runs with `--max-turns`
+   set do NOT produce `budget_exceeded` - they time out via wall-clock only.
+   Gemini's enforcement is conditional on 2a empirical validation confirming
+   reliable turn parsing.
 
 ## Durable Follow-Up
 

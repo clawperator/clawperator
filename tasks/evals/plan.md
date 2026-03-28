@@ -166,7 +166,6 @@ Note: "Confidence" is for turn counting only. All four are viable for task compl
     "env_overrides": {
       "ANDROID_SERIAL": "<device_serial>",
       "CLAWPERATOR_CMD": "node /path/to/dist/cli/index.js",
-      "CLAWPERATOR_BIN": "node",
       "CLAWPERATOR_OPERATOR_PACKAGE": "..."
     }
   },
