@@ -450,6 +450,7 @@ Write the `android-version` eval spec, the public-surface prompt, the
 - `evals/specs/android-version/prompt-public.md`
 - `evals/run_eval.py`
 - `evals/README.md`
+- `docs/internal/design/evals.md`
 
 ### Eval Spec
 
@@ -568,6 +569,46 @@ Print `outcome.status` and `outcome.answer_normalized` to stdout.
 - How `public-surface` isolation works (temp dir, no repo access)
 - Note: runs are not parallel (one device, one run at a time)
 - How to add a new agent adapter (pointer to `agents/base.py`)
+- Note that `CLAWPERATOR_EVAL_ANSWER` is an internal eval marker and must
+  not appear in public-facing documentation or production usage
+
+### Internal Design Doc
+
+`docs/internal/design/evals.md` must cover these topics in order:
+
+1. **Why evals exist** - measurement instrument for docs quality and API
+   discoverability. The harness answers: "Can an unfamiliar agent use
+   Clawperator's public surfaces to complete a task on a real device?"
+2. **Measurement-not-teaching principle** - the eval is a ruler, not a
+   textbook. Eval prompts, spec files, and `CLAWPERATOR_EVAL_ANSWER` must
+   never appear in public docs. If agents see the marker in docs, future
+   runs measure eval familiarity rather than real capability.
+3. **`CLAWPERATOR_EVAL_ANSWER` marker** - internal eval artifact. Not a
+   production API. Not published on `docs.clawperator.com` or
+   `clawperator.com`. Agents emit it only because the eval prompt instructs
+   them to. Must not appear in production transcripts.
+4. **Two-axis model** - knowledge surface x runtime target. Explain each
+   value and what it isolates. Include the phase each combination becomes
+   testable.
+5. **Public-surface isolation** - why `tempfile.mkdtemp()`. Why the repo
+   path must not appear in the agent's cwd, prompt, or inherited env vars.
+   What "no repo access" means in practice.
+6. **Doctor pre-flight** - why the harness aborts before spawning the agent
+   on doctor failure rather than letting the agent discover it.
+7. **`used_disallowed_tool` detection** - the chosen heuristic (fill in
+   after implementation), why it is diagnostic-only, why false negatives are
+   acceptable in Phase 1.
+8. **Open Question resolutions** - record the empirical answers to the Phase
+   1 open questions (Claude context file requirement; transcript cap behavior).
+9. **Compatibility matrix** - future public artifact. When Phase 1 has >= 10
+   runs across >= 2 agents, create `docs/evals-compat.md` with agent/model
+   pass rates. That page is the appropriate public output - it does not expose
+   prompts, markers, or harness internals.
+
+Write `docs/internal/design/evals.md` after implementing the harness (sub-phase
+1b) and spec (1c), so the heuristic and open question answers are known. It is
+acceptable to write a placeholder for the `used_disallowed_tool` heuristic
+section and fill it in after the 1d validation runs reveal the real pattern.
 
 ### Steps
 
@@ -581,18 +622,25 @@ Print `outcome.status` and `outcome.answer_normalized` to stdout.
      --agent claude --model claude-opus-4-5 --dry-run
    ```
    Expected: prints resolved config and prompt, exits 0, no agent spawned.
+6. Write `docs/internal/design/evals.md` covering the 9 topics specified above.
+   Sections 1-6 and 9 can be written now. Sections 7 and 8 may use a
+   placeholder pending 1d validation runs.
 
 ### Acceptance Criteria
 
 - `evals/specs/android-version/spec.json` is valid JSON.
-- `evals/specs/android-version/prompt-public.md` contains all five template
+- `evals/specs/android-version/prompt-public.md` contains all three template
   variables (`$CLAWPERATOR_BIN`, `$CLAWPERATOR_OPERATOR_PACKAGE`,
   `$DEVICE_SERIAL`) and the `CLAWPERATOR_EVAL_ANSWER` marker definition.
 - `python evals/run_eval.py android-version --agent claude --model test --dry-run`
   exits 0 and prints the substituted prompt.
 - `python evals/run_eval.py android-version --agent claude --model test --mode full-repo`
   exits non-zero with the Phase 3 message.
-- `evals/README.md` contains the word "public-surface" and "temp".
+- `evals/README.md` contains the words "public-surface" and "temp".
+- `evals/README.md` contains a note that `CLAWPERATOR_EVAL_ANSWER` is an
+  internal marker that must not appear in public docs.
+- `docs/internal/design/evals.md` exists and covers all 9 required topics
+  (sections 7 and 8 may be marked as placeholders pending 1d).
 
 ### Validation
 
@@ -600,12 +648,14 @@ Print `outcome.status` and `outcome.answer_normalized` to stdout.
 python -m json.tool evals/specs/android-version/spec.json > /dev/null && echo "valid json"
 python evals/run_eval.py android-version --agent claude --model test --dry-run
 python evals/run_eval.py android-version --agent claude --model test --mode full-repo; echo "exit: $?"
+grep -q "CLAWPERATOR_EVAL_ANSWER" evals/README.md && echo "marker note present"
+ls docs/internal/design/evals.md && echo "design doc present"
 ```
 
 ### Expected Commit
 
 ```
-feat(evals): add android-version eval spec, prompt, CLI entry point, and README
+feat(evals): add android-version eval spec, prompt, CLI, README, and internal design doc
 ```
 
 ---

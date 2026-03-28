@@ -238,12 +238,53 @@ Full spec, prompt, scoring rules, and validation: `tasks/evals/phase-1/`.
 - Leaking repo paths into the agent's environment in `public-surface` mode.
   The agent's working directory must be a clean temp dir with no repo files.
 
-## Durable Follow-Up
+## Internal Documentation
 
-After Phase 1 ships, the following should be moved to their permanent homes:
+Two internal doc artifacts are concrete Phase 1 deliverables, not optional follow-up:
 
-| Item | Destination |
-| --- | --- |
-| Eval harness design decisions | `docs/internal/design/` |
-| Documented agent invocation patterns | `evals/README.md` |
-| Known eval fairness gaps | Fixed in `docs/` before declaring results meaningful |
+| Artifact | Path | Phase | Purpose |
+| --- | --- | --- | --- |
+| Harness operational README | `evals/README.md` | 1 | How to run evals, add adapters, read results |
+| Eval system design doc | `docs/internal/design/evals.md` | 1 | Design rationale, isolation rules, marker protocol, detection heuristics |
+
+Content requirements for both are specified in `tasks/evals/phase-1/work-breakdown.md` sub-phase 1c.
+
+### Eval System Design Doc
+
+`docs/internal/design/evals.md` must capture the following decisions durably so
+they survive task cleanup and inform future maintainers and agents:
+
+- **Why evals exist**: measurement instrument for docs quality and API
+  discoverability - not a teaching surface. The harness measures whether an
+  agent can succeed with the public docs as written.
+- **Measurement-not-teaching principle**: eval prompts, spec files, and the
+  `CLAWPERATOR_EVAL_ANSWER` marker must never appear in public docs. If agents
+  encounter the marker through public docs, future runs measure familiarity
+  with the eval format rather than genuine task completion.
+- **`CLAWPERATOR_EVAL_ANSWER` marker**: internal eval artifact only. Not a
+  production API. Not referenced from `docs.clawperator.com` or
+  `clawperator.com`. Agents emit it only because the eval prompt instructs them
+  to; it must not appear in production transcripts.
+- **Two-axis model**: every run is parameterized by knowledge surface x runtime
+  target independently. Rationale for each axis and its values.
+- **Public-surface isolation**: why `tempfile.mkdtemp()` and why repo paths
+  must not appear in the agent's environment or prompt.
+- **`used_disallowed_tool` detection**: the chosen heuristic (finalized during
+  Phase 1 implementation), why it is diagnostic-only and non-blocking.
+- **Doctor pre-flight requirement**: why the harness aborts before spawning
+  the agent rather than letting the agent discover the failure.
+- **Compatibility matrix**: future public artifact. Once Phase 1 accumulates
+  enough runs, publish `docs/evals-compat.md` with a table of agent/model
+  pass rates by eval and knowledge mode. This is the appropriate public output
+  of the eval system - it does not expose prompts, markers, or harness internals.
+
+### Compatibility Matrix
+
+The compatibility matrix is NOT part of any current phase. It is deferred until
+Phase 1 has at least 10 runs across at least 2 agents. When that threshold is
+reached, create `docs/evals-compat.md` with:
+
+- A table: eval name x agent/model x knowledge mode x runtime target -> pass rate
+- Footnotes explaining knowledge mode and runtime target
+- No mention of `CLAWPERATOR_EVAL_ANSWER` or internal harness mechanics
+- Published at `docs.clawperator.com` via the normal docs pipeline

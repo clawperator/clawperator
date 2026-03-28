@@ -43,7 +43,11 @@ thin surface before adding the complexity of multiple agents and specs.
 - `evals/run_eval.py` CLI with flags: positional eval ID, `--agent`,
   `--model`, `--device`, `--mode`, `--runtime`, `--timeout-s`, `--max-turns`
   (accepted but not enforced), `--runs-dir`, `--dry-run`
-- `evals/README.md`
+- `evals/README.md` (operational docs: how to run, how to read results,
+  how public-surface isolation works, how to add an agent adapter)
+- `docs/internal/design/evals.md` (design rationale: measurement-not-teaching
+  principle, two-axis model, marker protocol, isolation rules, detection
+  heuristics, compatibility matrix concept)
 - `.gitignore` at repo root: add `evals/runs/`
 
 ## Out of Scope
@@ -71,7 +75,8 @@ thin surface before adding the complexity of multiple agents and specs.
 | Eval harness | `evals/harness/` | New Python package |
 | Eval spec | `evals/specs/android-version/` | New spec + prompt |
 | Eval CLI | `evals/run_eval.py` | New entry point |
-| Docs | `evals/README.md` | New |
+| Operational README | `evals/README.md` | New |
+| Internal design doc | `docs/internal/design/evals.md` | New |
 | Repo gitignore | `.gitignore` | One line added |
 
 ## Source Of Truth
@@ -172,6 +177,9 @@ timestamps. The harness must not overwrite a previous run directory.
 
 | Item | Destination after task cleanup |
 | --- | --- |
-| Agent invocation flag documentation | `evals/README.md` |
-| Public-surface isolation rules | `evals/README.md` |
-| `used_disallowed_tool` heuristic | Code comment in `harness/scorer.py` |
+| `used_disallowed_tool` final heuristic | Code comment in `harness/scorer.py` AND `docs/internal/design/evals.md` |
+| Open Question resolutions (Claude context file, transcript cap) | `docs/internal/design/evals.md` decisions section |
+
+Note: `evals/README.md` and `docs/internal/design/evals.md` are Phase 1
+deliverables, not follow-up. Their content requirements are in sub-phase 1c
+of `tasks/evals/phase-1/work-breakdown.md`.
