@@ -237,7 +237,7 @@ def normalize_version(v: str) -> str:
     return v.strip()
 
 ANSWER_PATTERN = re.compile(
-    r'^CLAWPERATOR_EVAL_ANSWER:\s*(\S.*?)\s*$',
+    r'^CLAWPERATOR_EVAL_ANSWER:\s*([^\s]+)\s*$',
     re.MULTILINE
 )
 
@@ -249,8 +249,9 @@ def extract_answer(transcript: str) -> str | None:
     - The marker must appear at the START of a line. A marker embedded inside
       a JSON value or code block will NOT match. This is intentional - it keeps
       matching deterministic and avoids false positives from tool output.
-    - Requires at least one non-whitespace character after the colon.
-      A line like 'CLAWPERATOR_EVAL_ANSWER:' (nothing after colon) does NOT match.
+    - Requires exactly one non-whitespace token after the colon.
+      A line like 'CLAWPERATOR_EVAL_ANSWER:' (nothing after colon) or
+      'CLAWPERATOR_EVAL_ANSWER: 15 extra text' does NOT match.
     - Last match in the transcript wins (agent may revise its answer).
     - The value is captured as the first group, stripped of surrounding whitespace.
     Returns None if no valid match found.
@@ -297,7 +298,7 @@ def write_run(
     """
     Create run_dir. Write result.json, config.json, transcript.txt.
     Do not overwrite an existing run_dir - raise if it already exists.
-    Transcript is capped at 10MB. If truncated, append [TRANSCRIPT TRUNCATED AT 10MB].
+    Transcript is capped at 10MB. If truncated, append [TRANSCRIPT_TRUNCATED].
     """
 ```
 
@@ -449,27 +450,24 @@ def run_eval(
        rewrite the command structure."
     2. Compute prompt_sha256.
     3. Create work_dir:
-       - public-surface: tempfile.mkdtemp()
+       - public-surface: tempfile.mkdtemp() once per run
        - full-repo: repo root
     4. Check for CLAUDE.md / context file requirement (see Open Questions).
     5. Build subprocess env:
-       base = dict(os.environ)
-       base["ANDROID_SERIAL"] = env.device_serial
-       base["CLAWPERATOR_CMD"] = shlex.join(env.clawperator_cmd)  # shell-safe join; handles spaces in path
-       base["CLAWPERATOR_OPERATOR_PACKAGE"] = env.operator_package
+       # Build a minimal, stable environment instead of inheriting everything.
+       # Keep only the standard runtime variables the CLI needs plus the
+       # explicit eval variables.
+       base = {
+           "PATH": os.environ["PATH"],
+           "HOME": os.environ["HOME"],
+           "LANG": os.environ.get("LANG", "C.UTF-8"),
+           "LC_ALL": os.environ.get("LC_ALL", "C.UTF-8"),
+           "ANDROID_SERIAL": env.device_serial,
+           "CLAWPERATOR_CMD": shlex.join(env.clawperator_cmd),  # logging-safe only
+           "CLAWPERATOR_OPERATOR_PACKAGE": env.operator_package,
+       }
        # CLAWPERATOR_BIN is accepted as INPUT during preflight only.
        # Not injected into the agent's env - agent receives CLAWPERATOR_CMD.
-       # For public-surface mode, strip vars that could leak repo context:
-       # Remove PYTHONPATH if present; remove any inherited CLAWPERATOR_* vars
-       # except those explicitly set above. Do NOT strip PATH, HOME, LANG, or
-       # standard system vars - stripping those breaks tool resolution.
-       if knowledge_mode == "public-surface":
-           base.pop("PYTHONPATH", None)
-           for k in list(base.keys()):
-               if k.startswith("CLAWPERATOR_") and k not in (
-                   "CLAWPERATOR_CMD", "CLAWPERATOR_OPERATOR_PACKAGE"
-               ):
-                   del base[k]
        overrides = agent.build_env(base)
        final_env = {**base, **overrides}
     6. Build command = agent.build_command(prompt, work_dir).
@@ -502,7 +500,7 @@ def run_eval(
             # Transcript size cap: once transcript_bytes_written >= 10MB, stop writing
             # further lines to the file. Still continue reading proc.stdout (so the
             # process is not blocked on a full pipe) and still scan for the answer marker.
-            # When the cap is hit, append one line: "[[TRANSCRIPT TRUNCATED AT 10MB]]"
+            # When the cap is hit, append one line: "[TRANSCRIPT_TRUNCATED]"
             # to the file and set a truncated=True flag. Do not append more lines after.
     12. After the loop, check last_answer first, then check
         timeout_triggered.is_set(). An answer found in the last line before
@@ -747,6 +745,12 @@ Instructions:
    found under "About phone" or "About device".
 3. Use the observe-decide-act loop: snapshot the current state, decide
    what to do, execute an action, repeat.
+   Concrete workflow:
+   1. Take a snapshot of the current UI.
+   2. Inspect visible text and elements.
+   3. Decide the next action (tap, open app, scroll, or go back).
+   4. Execute that action.
+   5. Repeat until the Android version is known.
 4. When you have determined the Android version, output exactly this line:
 
    CLAWPERATOR_EVAL_ANSWER: <version>

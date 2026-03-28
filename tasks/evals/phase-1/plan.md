@@ -97,9 +97,9 @@ thin surface before adding the complexity of multiple agents and specs.
 | --- | --- | --- |
 | Answer marker | Deterministic | `CLAWPERATOR_EVAL_ANSWER:` prefix, last occurrence wins |
 | Scorer normalization | Deterministic | Strip leading `android ` (case-insensitive), strip whitespace, lowercase |
-| Result marker detection | Deterministic | Count only exact line-start matches of `^\\[Clawperator-Result\\]`; substring matches are ignored. This is best-effort telemetry, not a status gate. |
+| Result marker detection | Deterministic | Count only exact line-start matches of `^\\[Clawperator-Result\\]`; substring matches are ignored. This is best-effort telemetry, not a status gate. Do not let parsing affect control flow. |
 | `used_disallowed_tool` detection | Judgment | Detect agent-initiated `adb shell` in transcript. Avoid false positives from Clawperator's own verbose log output. Log `violations.used_adb` separately and keep the heuristic diagnostic-only. |
-| Prompt rendering contract | Deterministic | Implement a single `build_prompt(template_path: str, variables: dict) -> str` function. Variables are explicit: `CLAWPERATOR_BIN`, `CLAWPERATOR_CMD`, `CLAWPERATOR_OPERATOR_PACKAGE`, `DEVICE_SERIAL`, `DOCS_URL`. No implicit string replacement or ad hoc formatting. |
+| Prompt rendering contract | Deterministic | Implement a single `build_prompt(template_path: str, variables: dict) -> str` function. Variables are explicit: `CLAWPERATOR_BIN`, `CLAWPERATOR_CMD`, `CLAWPERATOR_OPERATOR_PACKAGE`, `DEVICE_SERIAL`, `DOCS_URL`. No implicit string replacement or ad hoc formatting. Use the rendered prompt as input to the agent once per run. |
 | Command execution contract | Deterministic | The prompt must tell the agent to execute Clawperator commands exactly as shell commands using the provided base command. Do not reinterpret or rewrite the command structure. |
 | Run ID format | Deterministic | `<eval_id>-<YYYYMMDD-HHMMSS>-<agent_type>-<model_short>[-<label_slug>]` |
 
@@ -110,10 +110,11 @@ thin surface before adding the complexity of multiple agents and specs.
 | What if doctor pre-flight fails? | Abort with `outcome.status = "error"`, `failure_reason = "doctor_preflight_failed"`. Do not spawn the agent. |
 | What if no device is connected? | Abort with `outcome.status = "error"`, `failure_reason = "no_device"`. Do not spawn the agent. |
 | What if the agent emits the answer marker multiple times? | Use the last occurrence. |
-| What if the transcript is truncated at 10MB? | Still scan the full stream for the answer marker before truncating. Store the truncation marker `[TRANSCRIPT TRUNCATED AT 10MB]` at the end. |
+| What if the transcript is truncated at 10MB? | Still scan the full stream for the answer marker before truncating. Store the truncation marker `[TRANSCRIPT_TRUNCATED]` at the end. Do not stop the run. |
 | What `ANDROID_SERIAL` in agent env? | Always set it to the resolved device serial. This eliminates `--device` failure modes. |
 | What timestamp records ground truth? | Record `ground_truth_collected_at` when `adb shell getprop ro.build.version.release` is read. If a post-run re-read is performed, store it separately for logging only and never use it for scoring. |
-| Public-surface working directory | Always `tempfile.mkdtemp()`. Never the repo root. The temp dir path must not be under or adjacent to the repo root, and must not contain any repo files or symlinks. **Note: this is soft isolation** - the agent is not sandboxed. It could read the parent filesystem if it tried. The harness controls what it puts *in* the agent's environment and working directory, not what the agent can access beyond that. |
+| Public-surface working directory | Always `tempfile.mkdtemp()` once per run. Never the repo root. The temp dir path must not be under or adjacent to the repo root, and must not contain any repo files or symlinks. **Note: this is soft isolation** - the agent is not sandboxed. It could read the parent filesystem if it tried. The harness controls what it puts *in* the agent's environment and working directory, not what the agent can access beyond that. |
+| Agent environment | Start from a minimal whitelist (`PATH`, `HOME`, `LANG`, `LC_ALL`) and inject only the eval variables needed for the run. Do not inherit the full parent environment blindly. |
 | CLAWPERATOR_BIN representation | Internal representation is `clawperator_cmd: list[str]` (always an argv list). `CLAWPERATOR_BIN` env var is accepted as input from the user but resolved into `clawperator_cmd` during preflight. Never store a compound command string like 'node /path/script.js' as a single string anywhere in the harness. Subprocess calls always use `env.clawperator_cmd + [subcommand, ...]` as the argv list. |
 | Context file in temp dir | Check whether Claude Code requires a context file to function in a directory with no CLAUDE.md. If required, create a minimal one: contains only `https://docs.clawperator.com` and nothing else. |
 
@@ -160,8 +161,10 @@ device-specific and outside harness scope.
 - Starting the harness with a stale `dist/` when using `local-dev` runtime.
   Check that `dist/cli/index.js` exists and is newer than `src/`. Print a
   warning if not.
-- Storing the full inherited environment in `config.json`. Store only the
-  env_overrides relevant to the run.
+- Building subprocess command lines as strings. Use argv lists directly and
+  only stringify for logging with `shlex.join(cmd)`.
+- Inheriting the full parent environment blindly. Start from a minimal
+  whitelist, then inject only the variables required for the run.
 - Sending SIGTERM only to the agent parent PID may leave child processes running
   (e.g. an agent that spawned a subprocess to call the Clawperator binary). Use
   `os.killpg` with `os.getpgid(proc.pid)` to terminate the entire process group.

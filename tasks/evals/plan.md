@@ -189,11 +189,17 @@ Note: "Confidence" is for turn counting only. All four are viable for task compl
   },
   "metrics": {
     "wall_clock_s": 87.4,
+    "time_to_first_clawperator_command_s": 4.2,
     "timeout_budget_s": 300,
     "clawperator_commands_detected": 8,
     "answer_emitted": true,
     "violations": {
       "used_adb": false
+    },
+    "diagnostics": {
+      "used_snapshot": true,
+      "used_open_settings": true,
+      "navigated_settings": true
     },
     "used_disallowed_tool": false,
     "turns_counted": null,
@@ -219,6 +225,11 @@ Note: "Confidence" is for turn counting only. All four are viable for task compl
 `run_label` is optional user-provided metadata. If present, it is appended to
 `run_id` as a filesystem-safe slug and recorded in `config.json`.
 
+`time_to_first_clawperator_command_s` is diagnostic-only and measures the
+latency from agent spawn to the first exact `[Clawperator-Result]` envelope.
+It helps distinguish "thinking too long" from "navigation failure" and does
+not affect scoring.
+
 `clawperator_commands_detected` counts only exact line-start matches of
 `[Clawperator-Result]` and is diagnostic-only. It helps inspection, but it
 does not drive scoring or status selection.
@@ -226,6 +237,9 @@ does not drive scoring or status selection.
 `metrics.violations.used_adb` is the authoritative diagnostic flag for direct
 `adb shell` usage. `used_disallowed_tool` remains a derived summary field for
 backwards compatibility and is not a scoring gate.
+
+`metrics.diagnostics.*` are heuristic-only breadcrumbs to summarize the
+transcript. They are there for triage, not for status selection.
 
 ## Outcome Precedence
 
@@ -310,6 +324,8 @@ Full spec, prompt, scoring rules, and validation: `tasks/evals/phase-1/`.
   line-start prefix match only: `r"^\[Clawperator-Result\]"`.
 - Letting timeout cleanup drop buffered transcript lines. Flush transcript
   buffers and close file handles before escalating from SIGTERM to SIGKILL.
+- Building command invocations as shell strings. Always pass subprocess argv
+  lists directly and use `shlex.join(cmd)` only for human-readable logging.
 
 ## Internal Documentation
 
