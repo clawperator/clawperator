@@ -188,13 +188,20 @@ def preflight(device: str | None) -> Environment:
     3. If device is specified, verify it is in the authorized list.
        If not specified and exactly one authorized device exists, use it.
        If not specified and multiple devices exist, raise with helpful message.
-    4. Resolve CLAWPERATOR_CMD. Check CLAWPERATOR_BIN env var. If set to 'node',
-       also resolve CLAWPERATOR_SCRIPT or default to
-       `<repo_root>/apps/node/dist/cli/index.js`. Set
-       `clawperator_cmd = [node_executable, script_path]`. If CLAWPERATOR_BIN is
-       set to an absolute path or 'clawperator', set
-       `clawperator_cmd = [that_value]`. Default (no env var):
-       `clawperator_cmd = ['node', '<repo_root>/apps/node/dist/cli/index.js']`.
+    4. Resolve CLAWPERATOR_CMD using this three-tier order:
+       a. If CLAWPERATOR_BIN env var is set: use it as the executable.
+          If it is 'node', also check CLAWPERATOR_SCRIPT env var or default
+          the script to `<repo_root>/apps/node/dist/cli/index.js`.
+          Set `clawperator_cmd = [bin] or [bin, script]` accordingly.
+       b. If CLAWPERATOR_BIN is not set: check whether the local build exists
+          at `<repo_root>/apps/node/dist/cli/index.js`. If the file exists,
+          set `clawperator_cmd = ['node', '<path>']`.
+       c. If the local build does not exist: check `shutil.which('clawperator')`.
+          If found, set `clawperator_cmd = ['clawperator']`.
+       d. If none of the above resolves: raise EnvironmentError with a clear
+          message listing all three paths that were checked and found missing.
+       This order matches the documented resolution order for public env vars:
+       explicit override > local sibling build > global binary.
     5. Verify: `shutil.which(env.clawperator_cmd[0])` is not None.
        If None, raise EnvironmentError.
     6. Resolve CLAWPERATOR_OPERATOR_PACKAGE: env var > "com.clawperator.operator.dev"

@@ -74,6 +74,13 @@ carried forward.
 - Adding llms.txt or sitemap regeneration (handled by the existing release flow).
 - Any change to `sites/landing/`.
 - Eval harness implementation (that is `tasks/evals/`).
+- Environment variable reference documentation (`CLAWPERATOR_BIN`,
+  `CLAWPERATOR_OPERATOR_PACKAGE`, `ANDROID_SERIAL`, resolution order).
+  In `public-surface` eval mode the harness injects these values directly,
+  so the agent never needs to know the resolution order. This is a real
+  documentation gap but not a Phase 1 eval prerequisite. It is tracked
+  separately in `tasks/docs/envvars/` and should land before Phase 3 evals
+  (`full-repo` mode + `published` runtime) are treated as meaningful.
 
 ## Existing Artifact Scope
 
