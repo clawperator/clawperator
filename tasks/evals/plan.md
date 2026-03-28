@@ -148,7 +148,7 @@ Note: "Confidence" is for turn counting only. All four are viable for task compl
 
 ```json
 {
-  "run_id": "<eval_id>-<timestamp>-<agent>-<model_short>",
+  "run_id": "<eval_id>-<timestamp>-<agent>-<model_short>[-<label_slug>]",
   "eval_id": "android-version",
   "started_at": "<ISO8601>",
   "finished_at": "<ISO8601>",
@@ -160,6 +160,7 @@ Note: "Confidence" is for turn counting only. All four are viable for task compl
     "prompt_file": "prompt-public.md",
     "prompt_sha256": "<sha256 of rendered prompt>"
   },
+  "run_label": "baseline-opus",
   "invocation": {
     "command": ["claude", "-p", "...", "--model", "...", "..."],
     "work_dir": "/tmp/clawperator-eval-<id>",
@@ -172,6 +173,8 @@ Note: "Confidence" is for turn counting only. All four are viable for task compl
   "environment": {
     "device_serial": "<device_serial>",
     "ground_truth_android_version": "15",
+    "ground_truth_collected_at": "<ISO8601>",
+    "ground_truth_rechecked_at": null,
     "clawperator_cmd": ["node", "/path/to/dist/cli/index.js"],
     "clawperator_version": "0.5.3",
     "operator_package": "..."
@@ -189,6 +192,9 @@ Note: "Confidence" is for turn counting only. All four are viable for task compl
     "timeout_budget_s": 300,
     "clawperator_commands_detected": 8,
     "answer_emitted": true,
+    "violations": {
+      "used_adb": false
+    },
     "used_disallowed_tool": false,
     "turns_counted": null,
     "turns_budget": null
@@ -209,6 +215,17 @@ Note: "Confidence" is for turn counting only. All four are viable for task compl
 | `budget_exceeded` | Turn limit reached before answer | 2 |
 
 `turns_counted` and `turns_budget` are `null` in Phase 1, populated in Phase 2.
+
+`run_label` is optional user-provided metadata. If present, it is appended to
+`run_id` as a filesystem-safe slug and recorded in `config.json`.
+
+`clawperator_commands_detected` counts only exact line-start matches of
+`[Clawperator-Result]` and is diagnostic-only. It helps inspection, but it
+does not drive scoring or status selection.
+
+`metrics.violations.used_adb` is the authoritative diagnostic flag for direct
+`adb shell` usage. `used_disallowed_tool` remains a derived summary field for
+backwards compatibility and is not a scoring gate.
 
 ## Outcome Precedence
 
@@ -255,6 +272,7 @@ python evals/run_eval.py <eval_id> \
   [--runtime <local-dev|published>] \
   [--timeout-s <int>] \
   [--max-turns <int>] \
+  [--label <text>] \
   [--runs-dir <path>] \
   [--dry-run] \
   [--rescore <run_id>]
@@ -284,10 +302,14 @@ Full spec, prompt, scoring rules, and validation: `tasks/evals/phase-1/`.
 - Comparing answer strings without normalization. Always run `normalize_version`
   on both sides before scoring.
 - Recording a `pass` for a run where the agent bypassed Clawperator and called
-  `adb shell` directly. Detect and record `used_disallowed_tool` regardless of
-  the score.
+  `adb shell` directly. Detect and record `metrics.violations.used_adb`
+  regardless of the score; do not fail the run automatically.
 - Leaking repo paths into the agent's environment in `public-surface` mode.
   The agent's working directory must be a clean temp dir with no repo files.
+- Counting `[Clawperator-Result]` with substring matching. Use an exact
+  line-start prefix match only: `r"^\[Clawperator-Result\]"`.
+- Letting timeout cleanup drop buffered transcript lines. Flush transcript
+  buffers and close file handles before escalating from SIGTERM to SIGKILL.
 
 ## Internal Documentation
 

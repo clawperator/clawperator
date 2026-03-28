@@ -177,6 +177,7 @@ CLI entry point yet. Focus on correctness of each component in isolation.
 class Environment:
     device_serial: str
     ground_truth_android_version: str
+    ground_truth_collected_at: str
     clawperator_cmd: list[str]   # e.g. ["node", "/path/to/dist/cli/index.js"]
                                   # or ["clawperator"] for published runtime
     clawperator_version: str
@@ -209,7 +210,8 @@ def preflight(device: str | None) -> Environment:
     7. Run `env.clawperator_cmd + ['doctor', '--json']` with ANDROID_SERIAL set.
        If exit code != 0, raise EnvironmentError("doctor_preflight_failed").
     8. Run `adb -s <serial> shell getprop ro.build.version.release`.
-       Strip whitespace. Reject empty result.
+       Strip whitespace. Reject empty result. Record the timestamp used for
+       collection in `ground_truth_collected_at`.
     9. Run `env.clawperator_cmd + ['version', '--json']` to capture clawperator_version.
     10. Return Environment dataclass.
     """
@@ -279,16 +281,17 @@ def score(transcript: str, ground_truth: str) -> ScorerResult:
 #### `artifacts.py`
 
 ```python
-def make_run_id(eval_id: str, agent_type: str, model: str) -> str:
+def make_run_id(eval_id: str, agent_type: str, model: str, label: str | None = None) -> str:
     """
-    Format: <eval_id>-<YYYYMMDD-HHMMSS>-<agent_type>-<model_short>
+    Format: <eval_id>-<YYYYMMDD-HHMMSS>-<agent_type>-<model_short>[-<label_slug>]
     model_short: first 12 chars of model, lowercased, hyphens preserved.
+    label_slug: optional, filesystem-safe lowercase label suffix.
     """
 
 def write_run(
     run_dir: Path,
     result: dict,      # result.json content
-    config: dict,      # config.json content (includes invocation.command)
+    config: dict,      # config.json content (includes invocation.command and run_label)
     transcript: str,
 ) -> None:
     """
@@ -314,7 +317,8 @@ Required log events (at minimum):
          "sigterm_sent", "sigkill_sent", "completed"
 - TIMEOUT: wall_clock_s elapsed when timeout fires
 - KILL: which signal was sent and to which pgid
-- SCORE: outcome.status and answer_normalized (or "no_answer")
+- SCORE: outcome.status, answer_normalized (or "no_answer"), and violations.used_adb
+- VIOLATION: diagnostic-only adb-shell detection evidence and whether it matched
 - ERROR: any EnvironmentError or unexpected exception, with traceback
 - RESULT: final one-line human-readable summary written as the last log entry.
   Format: "RESULT: <status> | answer=<normalized_or_none> | truth=<ground_truth> | turns=<n_or_null> | time=<wall_clock_s>s"
@@ -419,6 +423,7 @@ def run_eval(
     knowledge_mode: str,
     timeout_s: int,
     runs_dir: Path,
+    label: str | None = None,
     max_turns: int | None = None,  # accepted but not used in Phase 1
 ) -> Path:
     """
@@ -430,12 +435,18 @@ def run_eval(
         command issued by the agent are the definitive device-health gates. WAKEUP on an
         already-awake device is usually a no-op, but can behave inconsistently on some
         emulators - treat failure as advisory, not fatal.
-    1. Build prompt from spec['prompts'][knowledge_mode] file.
-       Substitute $CLAWPERATOR_CMD (primary - use shlex.join(env.clawperator_cmd),
-       producing a shell-safe string the agent can embed in bash commands),
-       $DEVICE_SERIAL, $CLAWPERATOR_OPERATOR_PACKAGE.
-       Prompt instructs the agent: "Execute Clawperator commands using exactly
-       this base command: $CLAWPERATOR_CMD".
+    1. Build prompt through a single function contract:
+       build_prompt(template_path: str, variables: dict) -> str
+       Variables are explicit and injected once:
+       - CLAWPERATOR_BIN
+       - CLAWPERATOR_CMD (use shlex.join(env.clawperator_cmd) for shell-safe use)
+       - CLAWPERATOR_OPERATOR_PACKAGE
+       - DEVICE_SERIAL
+       - DOCS_URL
+       No implicit string replacement or ad hoc formatting.
+       Prompt instructs the agent: "Execute Clawperator commands exactly as
+       shell commands using the provided base command. Do not reinterpret or
+       rewrite the command structure."
     2. Compute prompt_sha256.
     3. Create work_dir:
        - public-surface: tempfile.mkdtemp()
@@ -462,7 +473,7 @@ def run_eval(
        overrides = agent.build_env(base)
        final_env = {**base, **overrides}
     6. Build command = agent.build_command(prompt, work_dir).
-    6a. Compute run_id via artifacts.make_run_id(eval_id, agent.config.type_id, model).
+    6a. Compute run_id via artifacts.make_run_id(eval_id, agent.config.type_id, model, label).
     6b. Create run_dir: runs_dir / run_id. Raise if it already exists (idempotency guard).
     6c. Initialize logger: logger = get_logger(run_id, log_file=run_dir / "harness.log").
         From this point all events write to both stderr and harness.log.
@@ -475,10 +486,12 @@ def run_eval(
     10. Start a background timer thread (threading.Timer) that sets a
         `timeout_triggered = threading.Event()` and calls the os.killpg
         termination sequence after wall-clock timeout elapses. The timer fires
-        regardless of whether the agent writes any output. The for-loop
-        naturally exits when proc.stdout is closed (either by process exit or
-        SIGKILL). After the loop, check `timeout_triggered.is_set()` to
-        distinguish natural exit from timeout kill.
+        regardless of whether the agent writes any output. Before the final
+        SIGKILL escalation, flush transcript buffers and close file handles so
+        the last lines survive timeout cleanup. The for-loop naturally exits
+        when proc.stdout is closed (either by process exit or SIGKILL). After
+        the loop, check `timeout_triggered.is_set()` to distinguish natural
+        exit from timeout kill.
     11. Read output line by line. Call agent.normalize_line(line) on each line
         before writing to transcript and scanning for the answer marker:
         for line in proc.stdout:           # With text=True, lines are already decoded strings
@@ -495,19 +508,23 @@ def run_eval(
         timeout_triggered.is_set(). An answer found in the last line before
         timeout still wins.
     13. Record finished_at.
-    14. Read full transcript. Run scorer.score().
-    15. Determine outcome.status using the precedence table in
+    14. Optionally re-read `adb -s <serial> shell getprop ro.build.version.release`
+        for logging only. If performed, record `ground_truth_rechecked_at`
+        in result.json and emit the observed value to harness.log. Never use
+        the re-read for scoring.
+    15. Read full transcript. Run scorer.score().
+    16. Determine outcome.status using the precedence table in
         tasks/evals/plan.md ## Outcome Precedence. Summary:
         - error > pass > fail > budget_exceeded > timeout > no_answer
         - An answer in the last line before timeout still wins.
         - budget_exceeded only if --max-turns is set and no answer was emitted.
-    16. Build result.json and config.json per schema in tasks/evals/plan.md.
-    17. Write run artifacts via artifacts.write_run().
-    18. Log RESULT summary line (plain text, last entry in harness.log):
+    17. Build result.json and config.json per schema in tasks/evals/plan.md.
+    18. Write run artifacts via artifacts.write_run().
+    19. Log RESULT summary line (plain text, last entry in harness.log):
         logger.result(status, answer_normalized, ground_truth, turns_counted, wall_clock_s)
         This produces: "RESULT: pass | answer=15 | truth=15 | turns=null | time=87.4s"
-    19. Clean up temp work_dir if public-surface mode.
-    20. Return run dir path.
+    20. Clean up temp work_dir if public-surface mode.
+    21. Return run dir path.
     """
 ```
 
@@ -721,7 +738,7 @@ Environment:
 - Clawperator command: $CLAWPERATOR_CMD
 - Operator package: $CLAWPERATOR_OPERATOR_PACKAGE
 - Target device serial: $DEVICE_SERIAL
-- Clawperator documentation: https://docs.clawperator.com
+- Clawperator documentation: $DOCS_URL
 
 Instructions:
 1. Open Android Settings using the Clawperator CLI. The Android Settings
@@ -745,7 +762,9 @@ Instructions:
 Constraints:
 - Use only Clawperator commands for device interaction. Do not use adb
   shell commands or any other method to read the version.
-- Reference only the public documentation at https://docs.clawperator.com.
+- Execute Clawperator commands exactly as shell commands using the provided
+  base command. Do not reinterpret or rewrite the command structure.
+- Reference only the public documentation at $DOCS_URL.
 - Use $CLAWPERATOR_CMD as the command to invoke Clawperator
   (e.g. `node /home/user/repo/apps/node/dist/cli/index.js` or `clawperator`).
 - Pass --device $DEVICE_SERIAL on every Clawperator command.
@@ -766,12 +785,21 @@ python evals/run_eval.py android-version \
   [--runtime local-dev|published] \
   [--timeout-s 300] \
   [--max-turns 40] \
+  [--label baseline-opus] \
   [--runs-dir evals/runs] \
   [--dry-run]
 ```
 
-`--dry-run` must print: resolved config, prompt file path, prompt sha256, and
-the substituted prompt text. Then exit 0 without spawning an agent.
+`--dry-run` must print, in this order:
+- resolved config
+- prompt file path
+- prompt sha256
+- exact agent command
+- work dir
+- env overrides
+- substituted prompt text
+
+Then exit 0 without spawning an agent.
 
 `--mode full-repo` must raise a clear error in Phase 1: "full-repo mode is not
 yet implemented (Phase 3)".
@@ -782,8 +810,13 @@ is not yet implemented (Phase 3)".
 `--rescore` is not implemented in Phase 1. Raise: "rescore is not yet
 implemented (Phase 2)".
 
+`--label` is optional. Record it in config.json and append a filesystem-safe
+slug to `run_id` when present.
+
 Successful run: print the run directory path to stdout on completion.
-Print `outcome.status` and `outcome.answer_normalized` to stdout.
+Also print a one-line human summary on stdout in the form
+`PASS | claude/opus | 87.4s | answer=15` (status, agent/model shorthand,
+wall-clock duration, normalized answer).
 
 ### README
 
@@ -798,6 +831,11 @@ Print `outcome.status` and `outcome.answer_normalized` to stdout.
 - How to add a new agent adapter (pointer to `agents/base.py`)
 - Note that `CLAWPERATOR_EVAL_ANSWER` is an internal eval marker and must
   not appear in public-facing documentation or production usage
+- Known failure patterns:
+  - agent loops on the same screen
+  - agent never emits `CLAWPERATOR_EVAL_ANSWER`
+  - agent uses `adb` directly and the run only records the violation
+  - agent guesses the answer without using Clawperator
 
 ### Internal Design Doc (best-effort)
 
@@ -854,7 +892,8 @@ section and fill it in after the 1d validation runs reveal the real pattern.
    python evals/run_eval.py android-version \
      --agent claude --model claude-opus-4-5 --dry-run
    ```
-   Expected: prints resolved config and prompt, exits 0, no agent spawned.
+   Expected: prints resolved config, exact command, work dir, env overrides,
+   and prompt text; exits 0, no agent spawned.
 6. Write `docs/internal/design/evals.md` covering the 9 topics specified above
    if time allows. Sections 1-6 and 9 can be written now. Sections 7 and 8 may
    use a placeholder pending 1d validation runs. If this step must be deferred,

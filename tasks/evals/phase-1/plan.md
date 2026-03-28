@@ -42,7 +42,7 @@ thin surface before adding the complexity of multiple agents and specs.
 - `evals/specs/android-version/`: spec.json + prompt-public.md
 - `evals/run_eval.py` CLI with flags: positional eval ID, `--agent`,
   `--model`, `--device`, `--mode`, `--runtime`, `--timeout-s`, `--max-turns`
-  (accepted but not enforced), `--runs-dir`, `--dry-run`
+  (accepted but not enforced), `--label`, `--runs-dir`, `--dry-run`
 - `evals/README.md` (operational docs: how to run, how to read results,
   how public-surface isolation works, how to add an agent adapter)
 - `docs/internal/design/evals.md` (best-effort - write if time allows in 1c;
@@ -88,7 +88,7 @@ thin surface before adding the complexity of multiple agents and specs.
 | Operator package resolution | `CLAWPERATOR_OPERATOR_PACKAGE`, fallback `com.clawperator.operator.dev` |
 | Doctor pre-flight contract | `apps/node/src/cli/commands/doctor.ts` |
 | Result envelope marker | `[Clawperator-Result]` in terminal output |
-| Ground truth collection | `adb [-s <serial>] shell getprop ro.build.version.release` |
+| Ground truth collection | `adb [-s <serial>] shell getprop ro.build.version.release` (capture timestamp at read time) |
 | Overarching design | `tasks/evals/plan.md` |
 
 ## Deterministic Versus Judgment
@@ -97,9 +97,11 @@ thin surface before adding the complexity of multiple agents and specs.
 | --- | --- | --- |
 | Answer marker | Deterministic | `CLAWPERATOR_EVAL_ANSWER:` prefix, last occurrence wins |
 | Scorer normalization | Deterministic | Strip leading `android ` (case-insensitive), strip whitespace, lowercase |
-| `used_disallowed_tool` detection | Judgment | Detect agent-initiated `adb shell` in transcript. Avoid false positives from Clawperator's own verbose log output. Finalize heuristic during implementation (see Open Questions). |
-| Prompt template substitution | Deterministic | `$CLAWPERATOR_CMD` (primary, space-joined argv), `$CLAWPERATOR_BIN` (legacy, executable only), `$DEVICE_SERIAL`, `$CLAWPERATOR_OPERATOR_PACKAGE` replaced before spawning |
-| Run ID format | Deterministic | `<eval_id>-<YYYYMMDD-HHMMSS>-<agent_type>-<model_short>` |
+| Result marker detection | Deterministic | Count only exact line-start matches of `^\\[Clawperator-Result\\]`; substring matches are ignored. This is best-effort telemetry, not a status gate. |
+| `used_disallowed_tool` detection | Judgment | Detect agent-initiated `adb shell` in transcript. Avoid false positives from Clawperator's own verbose log output. Log `violations.used_adb` separately and keep the heuristic diagnostic-only. |
+| Prompt rendering contract | Deterministic | Implement a single `build_prompt(template_path: str, variables: dict) -> str` function. Variables are explicit: `CLAWPERATOR_BIN`, `CLAWPERATOR_CMD`, `CLAWPERATOR_OPERATOR_PACKAGE`, `DEVICE_SERIAL`, `DOCS_URL`. No implicit string replacement or ad hoc formatting. |
+| Command execution contract | Deterministic | The prompt must tell the agent to execute Clawperator commands exactly as shell commands using the provided base command. Do not reinterpret or rewrite the command structure. |
+| Run ID format | Deterministic | `<eval_id>-<YYYYMMDD-HHMMSS>-<agent_type>-<model_short>[-<label_slug>]` |
 
 ## Decision Rules
 
@@ -110,6 +112,7 @@ thin surface before adding the complexity of multiple agents and specs.
 | What if the agent emits the answer marker multiple times? | Use the last occurrence. |
 | What if the transcript is truncated at 10MB? | Still scan the full stream for the answer marker before truncating. Store the truncation marker `[TRANSCRIPT TRUNCATED AT 10MB]` at the end. |
 | What `ANDROID_SERIAL` in agent env? | Always set it to the resolved device serial. This eliminates `--device` failure modes. |
+| What timestamp records ground truth? | Record `ground_truth_collected_at` when `adb shell getprop ro.build.version.release` is read. If a post-run re-read is performed, store it separately for logging only and never use it for scoring. |
 | Public-surface working directory | Always `tempfile.mkdtemp()`. Never the repo root. The temp dir path must not be under or adjacent to the repo root, and must not contain any repo files or symlinks. **Note: this is soft isolation** - the agent is not sandboxed. It could read the parent filesystem if it tried. The harness controls what it puts *in* the agent's environment and working directory, not what the agent can access beyond that. |
 | CLAWPERATOR_BIN representation | Internal representation is `clawperator_cmd: list[str]` (always an argv list). `CLAWPERATOR_BIN` env var is accepted as input from the user but resolved into `clawperator_cmd` during preflight. Never store a compound command string like 'node /path/script.js' as a single string anywhere in the harness. Subprocess calls always use `env.clawperator_cmd + [subcommand, ...]` as the argv list. |
 | Context file in temp dir | Check whether Claude Code requires a context file to function in a directory with no CLAUDE.md. If required, create a minimal one: contains only `https://docs.clawperator.com` and nothing else. |
@@ -163,6 +166,10 @@ device-specific and outside harness scope.
   (e.g. an agent that spawned a subprocess to call the Clawperator binary). Use
   `os.killpg` with `os.getpgid(proc.pid)` to terminate the entire process group.
   Set `start_new_session=True` in Popen to ensure a clean process group boundary.
+- Letting timeout cleanup drop buffered transcript lines. Flush transcript
+  buffers and close file handles before escalating from SIGTERM to SIGKILL.
+- Treating `used_disallowed_tool` as a fail signal. It is diagnostic-only in
+  Phase 1 and must not override the outcome status.
 
 ## Open Questions (resolve during Phase 1 implementation)
 
@@ -172,10 +179,11 @@ device-specific and outside harness scope.
    stub. Document the result.
 
 2. **`used_disallowed_tool` heuristic**: Clawperator's verbose output may
-   contain `adb shell` strings in log lines. The detection pattern must
-   distinguish agent-run `adb` from Clawperator internal output. Candidate
-   pattern: look for lines matching `^\$ adb shell` or `^> adb shell` in the
-   transcript. Finalize during implementation and document the chosen heuristic.
+   contain `adb shell` strings in log lines. Use a conservative pattern that
+   only matches agent-authored shell lines, for example
+   `^(?:\\$|>)\\s+adb\\s+shell\\b` after ANSI stripping. Record the result in
+   `metrics.violations.used_adb`. Keep it diagnostic-only and accept false
+   negatives in Phase 1.
 
 3. **Transcript size**: If a run produces a very large transcript (e.g. many
    snapshots with full XML), consider streaming to file and only reading the
