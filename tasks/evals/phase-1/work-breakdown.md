@@ -43,7 +43,8 @@ start the next until the current one passes its acceptance criteria.
    `tempfile.mkdtemp()`. Never the repo root.
 7. Do not store the full inherited environment in `config.json`. Store only
    the `env_overrides` dict (ANDROID_SERIAL, CLAWPERATOR_CMD, CLAWPERATOR_BIN,
-   CLAWPERATOR_OPERATOR_PACKAGE).
+   CLAWPERATOR_OPERATOR_PACKAGE) and lightweight reproducibility anchors:
+   Python version, platform, cwd, agent binary version, and an env hash.
 8. The harness must never write to `evals/runs/` inside the repo without
    creating the directory first (it is gitignored, so it may not exist).
 9. One commit per sub-phase. Do not batch 1a+1b into one commit.
@@ -54,8 +55,10 @@ start the next until the current one passes its acceptance criteria.
 14. `--max-turns` is accepted by `run_eval.py` in Phase 1 but must have no
     effect on harness behavior. It is recorded in `config.json` only.
 15. Answer scoring must normalize both sides. Normalization order: strip
-    whitespace, lowercase, strip leading `android ` prefix, strip whitespace
-    again. Never compare raw strings. See `normalize_version` spec below.
+    whitespace, lowercase, strip leading `android ` prefix, then extract the
+    first digit run if one exists. If no digits exist, compare the trimmed
+    lowercase string. Never compare raw strings. See `normalize_version`
+    spec below.
 
 ## Required Reading
 
@@ -206,6 +209,9 @@ def preflight(device: str | None) -> Environment:
        explicit override > local sibling build > global binary.
     5. Verify: `shutil.which(env.clawperator_cmd[0])` is not None.
        If None, raise EnvironmentError.
+       For the selected agent adapter, also verify the agent executable exists
+       up front. If it cannot be resolved, raise EnvironmentError("agent_binary_not_found")
+       before any device interaction.
     6. Resolve CLAWPERATOR_OPERATOR_PACKAGE: env var > "com.clawperator.operator.dev"
     7. Run `env.clawperator_cmd + ['doctor', '--json']` with ANDROID_SERIAL set.
        If exit code != 0, raise EnvironmentError("doctor_preflight_failed").
@@ -233,8 +239,9 @@ def normalize_version(v: str) -> str:
     """
     v = v.strip().lower()
     if v.startswith("android "):
-        v = v[len("android "):]
-    return v.strip()
+        v = v[len("android "):].strip()
+    match = re.search(r"\d+", v)
+    return match.group(0) if match else v
 
 ANSWER_PATTERN = re.compile(
     r'^CLAWPERATOR_EVAL_ANSWER:\s*([^\s]+)\s*$',
@@ -292,7 +299,8 @@ def make_run_id(eval_id: str, agent_type: str, model: str, label: str | None = N
 def write_run(
     run_dir: Path,
     result: dict,      # result.json content
-    config: dict,      # config.json content (includes invocation.command and run_label)
+    config: dict,      # config.json content (includes invocation.command, run_label,
+                       # and reproducibility anchors)
     transcript: str,
 ) -> None:
     """
@@ -467,7 +475,8 @@ def run_eval(
            "CLAWPERATOR_OPERATOR_PACKAGE": env.operator_package,
        }
        # CLAWPERATOR_BIN is accepted as INPUT during preflight only.
-       # Not injected into the agent's env - agent receives CLAWPERATOR_CMD.
+       # Not injected into the agent's env - agent receives the full
+       # shell-safe CLAWPERATOR_CMD string.
        overrides = agent.build_env(base)
        final_env = {**base, **overrides}
     6. Build command = agent.build_command(prompt, work_dir).
@@ -480,7 +489,9 @@ def run_eval(
     8. Open transcript file for writing at run_dir / "transcript.txt" (before spawning).
     9. Spawn subprocess with Popen, cwd=work_dir, env=final_env,
        stdout=PIPE, stderr=STDOUT, text=True, bufsize=1,
-       start_new_session=True. Merging stderr into stdout via stderr=STDOUT.
+       start_new_session=True. This creates a fresh session and process group
+       on POSIX, equivalent to `preexec_fn=os.setsid`.
+       Merge stderr into stdout via stderr=STDOUT.
     10. Start a background timer thread (threading.Timer) that sets a
         `timeout_triggered = threading.Event()` and calls the os.killpg
         termination sequence after wall-clock timeout elapses. The timer fires
@@ -496,6 +507,8 @@ def run_eval(
             line = agent.normalize_line(line)
             transcript_file.write(line)
             transcript_file.flush()
+            # Streaming is logging-only. Control flow must never depend on
+            # in-flight parsing success.
             # Check for answer marker in-memory on each line. Update last_answer if found.
             # Transcript size cap: once transcript_bytes_written >= 10MB, stop writing
             # further lines to the file. Still continue reading proc.stdout (so the
@@ -517,6 +530,7 @@ def run_eval(
         - An answer in the last line before timeout still wins.
         - budget_exceeded only if --max-turns is set and no answer was emitted.
     17. Build result.json and config.json per schema in tasks/evals/plan.md.
+        Include the minimal reproducibility anchors from the hard rules.
     18. Write run artifacts via artifacts.write_run().
     19. Log RESULT summary line (plain text, last entry in harness.log):
         logger.result(status, answer_normalized, ground_truth, turns_counted, wall_clock_s)
@@ -743,6 +757,7 @@ Instructions:
    app package name is: com.android.settings
 2. Navigate within Settings to find the Android version. It is typically
    found under "About phone" or "About device".
+   Example path: Settings -> About phone -> Android version.
 3. Use the observe-decide-act loop: snapshot the current state, decide
    what to do, execute an action, repeat.
    Concrete workflow:

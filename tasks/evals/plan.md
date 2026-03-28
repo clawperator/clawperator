@@ -192,6 +192,7 @@ Note: "Confidence" is for turn counting only. All four are viable for task compl
     "time_to_first_clawperator_command_s": 4.2,
     "timeout_budget_s": 300,
     "clawperator_commands_detected": 8,
+    "actions_per_turn": null,
     "answer_emitted": true,
     "violations": {
       "used_adb": false
@@ -199,7 +200,9 @@ Note: "Confidence" is for turn counting only. All four are viable for task compl
     "diagnostics": {
       "used_snapshot": true,
       "used_open_settings": true,
-      "navigated_settings": true
+      "navigated_settings": true,
+      "failure_classification": "navigation",
+      "domains_accessed": ["docs.clawperator.com"]
     },
     "used_disallowed_tool": false,
     "turns_counted": null,
@@ -230,6 +233,10 @@ latency from agent spawn to the first exact `[Clawperator-Result]` envelope.
 It helps distinguish "thinking too long" from "navigation failure" and does
 not affect scoring.
 
+`actions_per_turn` is diagnostic-only and is computed as
+`clawperator_commands_detected / turns_counted` when both values are known.
+It is null in Phase 1.
+
 `clawperator_commands_detected` counts only exact line-start matches of
 `[Clawperator-Result]` and is diagnostic-only. It helps inspection, but it
 does not drive scoring or status selection.
@@ -240,6 +247,14 @@ backwards compatibility and is not a scoring gate.
 
 `metrics.diagnostics.*` are heuristic-only breadcrumbs to summarize the
 transcript. They are there for triage, not for status selection.
+
+`metrics.diagnostics.failure_classification` is a coarse, best-effort label
+for transcript triage. Acceptable values in Phase 1 are `unknown`,
+`navigation`, `docs`, `tool_usage`, and `timeout`.
+
+`metrics.diagnostics.domains_accessed` is a best-effort list of outbound HTTP
+domains observed in transcript or proxy logs. It is for traceability when docs
+links or external content seem to influence behavior.
 
 ## Outcome Precedence
 
@@ -326,6 +341,12 @@ Full spec, prompt, scoring rules, and validation: `tasks/evals/phase-1/`.
   buffers and close file handles before escalating from SIGTERM to SIGKILL.
 - Building command invocations as shell strings. Always pass subprocess argv
   lists directly and use `shlex.join(cmd)` only for human-readable logging.
+- Failing to capture agent-binary availability up front. Resolve the adapter's
+  executable during preflight and abort with `agent_binary_not_found` if it is
+  unavailable.
+- Failing to capture domain-level traceability when docs-linked behavior seems
+  surprising. Capture accessed domains when possible so prompt-injection-style
+  surprises can be triaged later.
 
 ## Internal Documentation
 
