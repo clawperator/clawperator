@@ -73,6 +73,13 @@ def update_compatibility_versioned_apk_downloads(path: Path, version: str) -> bo
     content = path.read_text(encoding="utf-8")
     changed = False
 
+    # Update the version badge at the top of the page
+    # Pattern matches: **Current release: [X.Y.Z](https://github.com/clawperator/clawperator/releases/tag/vX.Y.Z)**
+    badge_pattern = r'(\*\*Current release: \[)[0-9]+\.[0-9]+\.[0-9]+(\]\(https://github\.com/clawperator/clawperator/releases/tag/v)[0-9]+\.[0-9]+\.[0-9]+(\]\)\*\*)'
+    badge_repl = f"\\g<1>{version}\\g<2>{version}\\g<3>"
+    content, replacements = re.subn(badge_pattern, badge_repl, content, flags=re.MULTILINE)
+    changed = changed or replacements > 0
+
     # Update versioned URLs inside the remediation bullet strings.
     # Note: intentionally only matches numeric x.y.z versions (not `v<version>` templates).
     url_apk_pat = r"(https://downloads\.clawperator\.com/operator/)v([0-9]+\.[0-9]+\.[0-9]+)/operator-v\2\.apk"
@@ -136,6 +143,16 @@ def main() -> None:
         die(f"{version} is not the current npm release (latest is {latest_npm_version})")
 
     updated_docs: list[Path] = []
+
+    # Update version badge on docs home page
+    docs_index_path = repo_root / "docs" / "index.md"
+    if replace_required(
+        docs_index_path,
+        r'(\*\*Current release: \[)[0-9]+\.[0-9]+\.[0-9]+(\]\(https://github\.com/clawperator/clawperator/releases/tag/v)[0-9]+\.[0-9]+\.[0-9]+(\]\)\*\*)',
+        f"\\g<1>{version}\\g<2>{version}\\g<3>",
+        fatal=False,
+    ):
+        updated_docs.append(docs_index_path)
 
     # The historical `docs/android-operator-apk.md` doc was removed/migrated.
     # Release follow-ups should keep working even when that legacy input is

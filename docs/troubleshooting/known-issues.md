@@ -65,11 +65,28 @@ If a current issue becomes reproducible and code-verifiable, add it here with:
 
 When investigating issues:
 
-1. Run `clawperator doctor --json` for a comprehensive health check
-2. Use `clawperator logs` to stream the log file in real time
-3. Check the log file directly: `~/.clawperator/logs/clawperator-YYYY-MM-DD.log`
+1. **Check versions first** - Many issues are version mismatches:
+   ```bash
+   clawperator version
+   clawperator version --check-compat --json --device <device_serial> --operator-package <package>
+   ```
 
-See [Logging](../api/logging.md) for details on log format and the `clawperator logs` command.
+2. **Run doctor** for a comprehensive health check:
+   ```bash
+   clawperator doctor --json --device <device_serial> --operator-package <package>
+   ```
+
+3. **Stream logs** to see what is happening in real time:
+   ```bash
+   clawperator logs
+   ```
+
+4. **Check the log file** directly:
+   ```bash
+   cat ~/.clawperator/logs/clawperator-$(date +%F).log
+   ```
+
+See [Logging](../api/logging.md) for log format details and [Version Compatibility](compatibility.md) for compatibility rules.
 
 ## Related Pages
 

@@ -4,6 +4,28 @@ Clawperator is a deterministic actuator tool for Android device automation.
 
 Use this page as the routing index into the authored docs. The concrete machine entry points are `llms.txt` and `llms-full.txt`.
 
+---
+
+**Current release: [0.5.2](https://github.com/clawperator/clawperator/releases/tag/v0.5.2)**
+
+---
+
+## Version Quick Reference
+
+Check your CLI version:
+
+```bash
+clawperator version
+```
+
+Check CLI and APK compatibility:
+
+```bash
+clawperator version --check-compat --device <device_serial> --operator-package <package>
+```
+
+See [Version Compatibility](troubleshooting/compatibility.md) for detailed compatibility rules and recovery.
+
 ## Agent Entry Points
 
 - [llms.txt](https://docs.clawperator.com/llms.txt) - compact machine entrypoint
