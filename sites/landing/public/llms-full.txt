@@ -2909,16 +2909,17 @@ Current runtime note:
 
 ## Annotated Live-Device Example
 
-Full `clawperator snapshot --json` output from a physical Samsung Galaxy device
-with Android Settings open. Device serial redacted to `<device_serial>`.
+Full `clawperator snapshot --json` output from an Android emulator running
+Android 15 (API 35) with the Settings app open. This example uses the emulator
+because it produces reproducible results that any device can create and run.
 
 ### Envelope
 
 ```json
 {
   "envelope": {
-    "commandId": "snapshot-1774924560470-bj129yk",
-    "taskId": "snapshot-1774924560470-bj129yk",
+    "commandId": "snapshot-1774926121032-v6kvd37",
+    "taskId": "snapshot-1774926121032-v6kvd37",
     "status": "success",
     "stepResults": [
       {
@@ -2928,16 +2929,15 @@ with Android Settings open. Device serial redacted to `<device_serial>`.
         "data": {
           "actual_format": "hierarchy_xml",
           "foreground_package": "com.android.settings",
-          "has_overlay": "true",
-          "overlay_package": "com.sec.android.app.launcher",
-          "window_count": "3",
+          "has_overlay": "false",
+          "window_count": "2",
           "text": "<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>\n<hierarchy rotation=\"0\">...</hierarchy>"
         }
       }
     ],
     "error": null
   },
-  "deviceId": "<device_serial>",
+  "deviceId": "emulator-5554",
   "terminalSource": "clawperator_result",
   "isCanonicalTerminal": true
 }
@@ -2945,12 +2945,12 @@ with Android Settings open. Device serial redacted to `<device_serial>`.
 
 Fields to note:
 
-- `actual_format`, `foreground_package`, `has_overlay`, `overlay_package`, and
-  `window_count` appear in the `data` object alongside `text`. They are
-  runtime-detail fields emitted by the Android side and are not part of the
-  Node-guaranteed contract. An agent may read them opportunistically (for
-  example, confirming `foreground_package` before proceeding), but must not
-  depend on them being present in all environments or versions.
+- `actual_format`, `foreground_package`, `has_overlay`, and `window_count` appear
+  in the `data` object alongside `text`. They are runtime-detail fields emitted
+  by the Android side and are not part of the Node-guaranteed contract. An
+  agent may read them opportunistically (for example, confirming
+  `foreground_package` before proceeding), but must not depend on them being
+  present in all environments or versions.
 - `terminalSource: "clawperator_result"` and `isCanonicalTerminal: true`
   are outer-envelope fields added by the terminal output layer; they are not
   part of the `envelope` sub-object.
@@ -2961,156 +2961,119 @@ The full hierarchy is trimmed to show the structurally important layers.
 Omitted attributes (checkable, checked, focused, long-clickable, password,
 selected) are present in real output but rarely useful for targeting.
 
+This example was captured on an emulator running Android 15 with a
+1080 x 2400 pixel display.
+
 ```xml
 <?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
 <!--
   rotation="0" - device is portrait. Bounds coordinates use portrait dimensions.
-  On this device: 1080 x 2340 pixels.
+  On this emulator: 1080 x 2400 pixels.
 -->
 <hierarchy rotation="0">
 
-  <!-- ... several wrapper containers ... -->
-
-  <!--
-    action_bar: contains the screen title text node and the search button.
-    Not scrollable; always visible at the top of the screen.
-  -->
+  <!-- Main scrollable container for Settings homepage -->
   <node
-    resource-id="com.android.settings:id/action_bar"
-    class="android.view.ViewGroup"
-    package="com.android.settings"
-    clickable="false"
-    scrollable="false"
-    bounds="[0,706][1080,922]">
-
-    <!--
-      The visible screen title. Use text="Settings" to confirm the active screen.
-      clickable="false" - this is a label, not a tap target.
-    -->
-    <node
-      text="Settings"
-      resource-id=""
-      class="android.widget.TextView"
-      package="com.android.settings"
-      clickable="false"
-      enabled="true"
-      bounds="[84,782][331,869]" />
-
-    <!--
-      Search button. No resource-id, but content-desc="Search settings" is stable.
-      clickable="true" - this is a tap target.
-      To tap: use contentDescEquals selector with value "Search settings".
-    -->
-    <node
-      text=""
-      resource-id=""
-      class="android.widget.Button"
-      package="com.android.settings"
-      content-desc="Search settings"
-      clickable="true"
-      enabled="true"
-      focusable="true"
-      bounds="[912,730][1080,922]" />
-  </node>
-
-  <!--
-    recycler_view: the scrollable list container.
-    scrollable="true" - this is the node to target for scroll actions.
-    Use resourceId selector with value "com.android.settings:id/recycler_view".
-    bounds spans the full list area below the action bar.
-  -->
-  <node
-    resource-id="com.android.settings:id/recycler_view"
-    class="androidx.recyclerview.widget.RecyclerView"
+    resource-id="com.android.settings:id/settings_homepage_container"
+    class="android.widget.ScrollView"
     package="com.android.settings"
     clickable="false"
     enabled="true"
     scrollable="true"
-    bounds="[0,922][1080,2295]">
+    bounds="[0,136][1080,2337]">
 
-    <!--
-      A settings list row. The row container is clickable, not the child text nodes.
-      No resource-id on the row itself - target by the child title text instead.
-      bounds="[30,1290][1050,1499]" - tap center is approximately (540, 1394).
-    -->
+    <!-- Toolbar containing the Settings title -->
     <node
-      text=""
-      resource-id=""
+      resource-id="com.android.settings:id/settings_toolbar"
       class="android.widget.LinearLayout"
       package="com.android.settings"
-      clickable="true"
-      enabled="true"
-      focusable="true"
-      bounds="[30,1290][1050,1499]">
+      clickable="false"
+      bounds="[0,136][1080,292]">
 
       <!--
-        Icon container. Not useful for targeting.
+        The visible screen title. Use text="Settings" to confirm the active screen.
+        clickable="false" - this is a label, not a tap target.
       -->
       <node
-        resource-id="com.android.settings:id/icon_frame"
-        class="android.widget.FrameLayout"
+        text="Settings"
+        resource-id="com.android.settings:id/action_bar"
+        class="android.widget.TextView"
+        package="com.android.settings"
         clickable="false"
-        bounds="[84,1352][216,1436]" />
+        enabled="true"
+        bounds="[48,185][267,243]" />
 
+      <!--
+        Search button. Use resource-id to target.
+        clickable="true" - this is a tap target.
+      -->
       <node
-        resource-id=""
-        class="android.widget.RelativeLayout"
-        clickable="false"
-        bounds="[216,1290][816,1499]">
+        text=""
+        resource-id="com.android.settings:id/search_action_bar"
+        class="android.widget.Button"
+        package="com.android.settings"
+        content-desc="Search settings"
+        clickable="true"
+        enabled="true"
+        bounds="[912,136][1080,292]" />
+    </node>
 
-        <!--
-          Title text node.
-          resource-id="android:id/title" is consistent across Settings rows.
-          Use textEquals selector with this resource-id to locate a specific row.
-          clickable="false" - click the parent LinearLayout, not this node.
-        -->
+    <!--
+      Main content list container.
+      Use resourceId selector with value "com.android.settings:id/main_content".
+    -->
+    <node
+      resource-id="com.android.settings:id/main_content"
+      class="android.widget.LinearLayout"
+      package="com.android.settings"
+      clickable="false"
+      bounds="[0,292][1080,2337]">
+
+      <!--
+        A settings list row. The row container is clickable.
+        Target by the child title text.
+      -->
+      <node
+        text=""
+        resource-id=""
+        class="android.widget.LinearLayout"
+        package="com.android.settings"
+        clickable="true"
+        enabled="true"
+        bounds="[0,315][1080,483]">
+
         <node
-          text="Connections"
+          text="Network &amp; internet"
           resource-id="android:id/title"
           class="android.widget.TextView"
           package="com.android.settings"
           clickable="false"
           enabled="true"
-          bounds="[216,1332][507,1402]" />
+          bounds="[144,351][579,447]" />
 
         <!--
-          Summary text node.
-          resource-id="android:id/summary" shows current state or sub-items.
-          Useful for reading current values without navigating into the screen.
+          Summary text node showing current state.
+          resource-id="android:id/summary" shows current Wi-Fi status.
         -->
         <node
-          text="Wi-Fi  •  Bluetooth  •  SIM manager"
+          text="Wi-Fi"
           resource-id="android:id/summary"
           class="android.widget.TextView"
           package="com.android.settings"
           clickable="false"
           enabled="true"
-          bounds="[216,1402][816,1457]" />
+          bounds="[144,351][936,447]" />
       </node>
-    </node>
 
-    <!-- Second row follows the same pattern -->
-    <node
-      text=""
-      resource-id=""
-      class="android.widget.LinearLayout"
-      package="com.android.settings"
-      clickable="true"
-      enabled="true"
-      focusable="true"
-      bounds="[30,1499][1050,1759]">
-
+      <!-- Second row follows the same pattern -->
       <node
-        resource-id="com.android.settings:id/icon_frame"
-        class="android.widget.FrameLayout"
-        clickable="false"
-        bounds="[84,1587][216,1671]" />
-
-      <node
+        text=""
         resource-id=""
-        class="android.widget.RelativeLayout"
-        clickable="false"
-        bounds="[216,1499][996,1759]">
+        class="android.widget.LinearLayout"
+        package="com.android.settings"
+        clickable="true"
+        enabled="true"
+        bounds="[0,483][1080,651]">
 
         <node
           text="Connected devices"
@@ -3119,21 +3082,19 @@ selected) are present in real output but rarely useful for targeting.
           package="com.android.settings"
           clickable="false"
           enabled="true"
-          bounds="[216,1587][578,1657]" />
+          bounds="[144,519][621,615]" />
 
         <node
-          text="Quick Share  •  Samsung DeX  •  Android Auto"
+          text="Bluetooth"
           resource-id="android:id/summary"
           class="android.widget.TextView"
           package="com.android.settings"
           clickable="false"
           enabled="true"
-          bounds="[216,1657][996,1712]" />
+          bounds="[144,519][936,615]" />
       </node>
+
     </node>
-
-    <!-- ... more rows below ... -->
-
   </node>
 </hierarchy>
 ```
@@ -3143,10 +3104,10 @@ selected) are present in real output but rarely useful for targeting.
 | Goal | Selector approach |
 | --- | --- |
 | Confirm Settings is open | `textEquals: "Settings"` on a TextView |
-| Tap a named settings row | `resourceId: "android:id/title"` + `textEquals: "Connections"` to locate, then click parent row |
+| Tap a named settings row | `resourceId: "android:id/title"` + `textEquals: "Network & internet"` to locate, then click parent row |
 | Read current state of a row | `resourceId: "android:id/summary"` + nearby `textEquals` for the row title |
-| Tap the search button | `contentDescEquals: "Search settings"` |
-| Scroll the list | `resourceId: "com.android.settings:id/recycler_view"` as scroll target |
+| Tap the search button | `contentDescEquals: "Search settings"` or `resourceId: "com.android.settings:id/search_action_bar"` |
+| Scroll the list | `resourceId: "com.android.settings:id/settings_homepage_container"` as scroll target |
 
 ## Extraction Failure
 
