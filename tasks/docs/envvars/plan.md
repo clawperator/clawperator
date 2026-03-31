@@ -17,13 +17,13 @@ it has no documented contract to follow.
 
 | Item | Value |
 | --- | --- |
-| State | not started |
+| State | done |
 | Total PRs | 1 |
 | Total phases | 1 |
-| Completed | none |
-| Remaining | 1 |
-| Current / Next | 1 |
-| Blockers | `tasks/docs/gaps/` must land first (establishes doc quality baseline) |
+| Completed | 1 |
+| Remaining | none |
+| Current / Next | - |
+| Blockers | none |
 
 ## Goal
 

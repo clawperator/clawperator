@@ -50,6 +50,7 @@ Use:
 ## Setup
 
 - [Setup](setup.md) - install the CLI, prepare a device, install the Operator APK, verify readiness, and run the first snapshot
+- [Quickstart](quickstart.md) - the observe/decide/act loop: taking snapshots, reading the hierarchy, and sending actions
 
 ## API
 
@@ -366,12 +367,330 @@ See [Logging](api/logging.md) for complete documentation.
 
 ## Related pages
 
+- [Quickstart](quickstart.md)
 - [API Overview](api/overview.md)
 - [Devices](api/devices.md)
 - [Doctor](api/doctor.md)
 - [Errors](api/errors.md)
+- [Environment Variables](api/environment.md)
 - [Troubleshooting](troubleshooting/operator.md)
 - [Logging](api/logging.md)
+
+---
+
+# Quickstart
+
+## Before You Start
+
+This page assumes a working Clawperator installation: CLI installed, device
+connected, Operator APK installed, and `clawperator doctor --json` returning
+`"criticalOk": true`.
+
+If you have not reached that state yet, complete [Setup](setup.md) first.
+
+---
+
+## The Automation Loop
+
+Clawperator is a deterministic actuator. The agent reasons and decides; Clawperator
+executes and returns structured data. Every automation follows the same three-step
+loop:
+
+```
+Observe  ->  Decide  ->  Act
+```
+
+1. **Observe** - take a UI snapshot to read the current device state
+2. **Decide** - parse the XML hierarchy to find the right node to target
+3. **Act** - send an execution payload with the next action, wait for the result
+
+Repeat until the task is done.
+
+---
+
+## Step 1: Observe
+
+The canonical observation action is `snapshot_ui`. Run it with the built-in
+`snapshot` command:
+
+```bash
+clawperator snapshot --json --device <device_serial>
+```
+
+On success, the result envelope contains the XML hierarchy in
+`envelope.stepResults[0].data.text`.
+
+Success conditions to check before proceeding:
+
+```json
+{
+  "envelope": {
+    "status": "success",
+    "stepResults": [
+      {
+        "actionType": "snapshot_ui",
+        "success": true,
+        "data": {
+          "text": "<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>\n<hierarchy rotation=\"0\">...</hierarchy>"
+        }
+      }
+    ]
+  }
+}
+```
+
+**Branch rule:** only proceed when `envelope.status == "success"` and
+`stepResults[0].success == true`. If `data.text` is missing, Node converts the
+step to `SNAPSHOT_EXTRACTION_FAILED`. See [Snapshot Format](api/snapshot.md)
+for recovery.
+
+---
+
+## Step 2: Decide
+
+Parse the XML to find the node you want to act on. The key attributes for
+targeting are:
+
+| Attribute | Use for |
+| --- | --- |
+| `text` | Matching visible label text |
+| `resource-id` | Stable structural identifiers like `android:id/title` |
+| `content-desc` | Accessibility labels when text is empty |
+| `clickable` | Only `clickable="true"` nodes can be tapped directly |
+| `scrollable` | Identifies containers to target for scroll actions |
+| `bounds` | Screen coordinates in `[x1,y1][x2,y2]` form |
+
+For example, in a Settings hierarchy the "Connections" row appears as:
+
+```xml
+<!-- The row container: clickable="true", no resource-id -->
+<node
+  text=""
+  resource-id=""
+  class="android.widget.LinearLayout"
+  clickable="true"
+  enabled="true"
+  bounds="[30,1290][1050,1499]">
+
+  <!-- Title: clickable="false", resource-id="android:id/title" -->
+  <node
+    text="Connections"
+    resource-id="android:id/title"
+    class="android.widget.TextView"
+    clickable="false"
+    bounds="[216,1332][507,1402]" />
+
+  <!-- Summary: shows current sub-settings -->
+  <node
+    text="Wi-Fi  •  Bluetooth  •  SIM manager"
+    resource-id="android:id/summary"
+    class="android.widget.TextView"
+    clickable="false"
+    bounds="[216,1402][816,1457]" />
+</node>
+```
+
+To tap this row, target the child title text. Clawperator will resolve the
+nearest `clickable` ancestor if the matched node is not itself clickable.
+
+Selector to use:
+
+```json
+{
+  "textEquals": "Connections",
+  "resourceId": "android:id/title"
+}
+```
+
+See [Selectors](api/selectors.md) for the full `NodeMatcher` contract.
+
+---
+
+## Step 3: Act
+
+Send an execution payload via `clawperator exec --json`. The payload lists one
+or more actions in sequence. Clawperator dispatches them in order and returns a
+single result envelope.
+
+Example - click the "Connections" row, wait for navigation, then take a snapshot:
+
+```json
+{
+  "commandId": "nav-to-connections",
+  "taskId": "nav-to-connections",
+  "source": "agent-loop",
+  "expectedFormat": "android-ui-automator",
+  "timeoutMs": 15000,
+  "actions": [
+    {
+      "id": "click-1",
+      "type": "click",
+      "params": {
+        "matcher": {
+          "textEquals": "Connections",
+          "resourceId": "android:id/title"
+        }
+      }
+    },
+    {
+      "id": "wait-1",
+      "type": "wait_for_navigation",
+      "params": {
+        "expectedPackage": "com.android.settings",
+        "timeoutMs": 5000
+      }
+    },
+    {
+      "id": "snap-2",
+      "type": "snapshot_ui"
+    }
+  ],
+  "mode": "direct"
+}
+```
+
+Save this as `payload.json` and run:
+
+```bash
+clawperator exec --json --device <device_serial> < payload.json
+```
+
+Success conditions:
+
+- `envelope.status == "success"`
+- `envelope.stepResults` has three entries, all with `success: true`
+- `envelope.stepResults[2].data.text` contains the Connections screen hierarchy
+
+**Branch rule:** if any step fails, the envelope still returns but the failed
+step has `success: false`. Check `envelope.stepResults[i].success` individually,
+not just the top-level status. See [Errors](api/errors.md) for recovery by code.
+
+---
+
+## Putting It Together
+
+A complete agent sequence for reading the Android version:
+
+### 1. Pre-flight
+
+```bash
+clawperator doctor --json --device <device_serial>
+# Require: "criticalOk": true
+```
+
+### 2. Open Settings and observe
+
+```json
+{
+  "commandId": "open-settings",
+  "taskId": "open-settings",
+  "source": "agent-loop",
+  "expectedFormat": "android-ui-automator",
+  "timeoutMs": 20000,
+  "actions": [
+    {
+      "id": "open-1",
+      "type": "open_app",
+      "params": { "applicationId": "com.android.settings" }
+    },
+    {
+      "id": "wait-1",
+      "type": "wait_for_navigation",
+      "params": { "expectedPackage": "com.android.settings", "timeoutMs": 5000 }
+    },
+    {
+      "id": "snap-1",
+      "type": "snapshot_ui"
+    }
+  ],
+  "mode": "direct"
+}
+```
+
+### 3. Read snapshot, find "About phone"
+
+Parse `stepResults[2].data.text`. Search for a node with
+`resource-id="android:id/title"` and `text="About phone"`. If it is not
+visible, scroll down the `recycler_view` and take another snapshot.
+
+Scroll payload (use when the target row is below the visible area):
+
+```json
+{
+  "commandId": "scroll-settings",
+  "taskId": "scroll-settings",
+  "source": "agent-loop",
+  "expectedFormat": "android-ui-automator",
+  "timeoutMs": 10000,
+  "actions": [
+    {
+      "id": "scroll-1",
+      "type": "scroll",
+      "params": {
+        "direction": "down",
+        "container": { "resourceId": "com.android.settings:id/recycler_view" }
+      }
+    },
+    {
+      "id": "snap-2",
+      "type": "snapshot_ui"
+    }
+  ],
+  "mode": "direct"
+}
+```
+
+### 4. Navigate and read the value
+
+Once "About phone" is visible, click it and snapshot the next screen to find
+the "Android version" row:
+
+```json
+{
+  "commandId": "read-android-version",
+  "taskId": "read-android-version",
+  "source": "agent-loop",
+  "expectedFormat": "android-ui-automator",
+  "timeoutMs": 20000,
+  "actions": [
+    {
+      "id": "click-about",
+      "type": "click",
+      "params": {
+        "matcher": { "textEquals": "About phone", "resourceId": "android:id/title" }
+      }
+    },
+    {
+      "id": "wait-about",
+      "type": "wait_for_navigation",
+      "params": { "expectedPackage": "com.android.settings", "timeoutMs": 5000 }
+    },
+    {
+      "id": "snap-3",
+      "type": "snapshot_ui"
+    }
+  ],
+  "mode": "direct"
+}
+```
+
+Parse `stepResults[2].data.text` for the "Android version" row. The value
+appears as the `text` attribute of the summary node adjacent to an `android:id/title`
+node with `text="Android version"`.
+
+---
+
+## What to Read Next
+
+| Topic | Page |
+| --- | --- |
+| All action types and parameters | [Actions](api/actions.md) |
+| Selector syntax for node matching | [Selectors](api/selectors.md) |
+| Snapshot XML format and annotated example | [Snapshot Format](api/snapshot.md) |
+| Full result envelope contract | [API Overview](api/overview.md) |
+| Error codes and recovery steps | [Errors](api/errors.md) |
+| Scrolling and multi-step navigation patterns | [Navigation Patterns](api/navigation.md) |
+| Environment variable controls | [Environment Variables](api/environment.md) |
 
 ---
 
@@ -2587,6 +2906,247 @@ Current runtime note:
   </node>
 </hierarchy>
 ```
+
+## Annotated Live-Device Example
+
+Full `clawperator snapshot --json` output from a physical Samsung Galaxy device
+with Android Settings open. Device serial redacted to `<device_serial>`.
+
+### Envelope
+
+```json
+{
+  "envelope": {
+    "commandId": "snapshot-1774924560470-bj129yk",
+    "taskId": "snapshot-1774924560470-bj129yk",
+    "status": "success",
+    "stepResults": [
+      {
+        "id": "snap",
+        "actionType": "snapshot_ui",
+        "success": true,
+        "data": {
+          "actual_format": "hierarchy_xml",
+          "foreground_package": "com.android.settings",
+          "has_overlay": "true",
+          "overlay_package": "com.sec.android.app.launcher",
+          "window_count": "3",
+          "text": "<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>\n<hierarchy rotation=\"0\">...</hierarchy>"
+        }
+      }
+    ],
+    "error": null
+  },
+  "deviceId": "<device_serial>",
+  "terminalSource": "clawperator_result",
+  "isCanonicalTerminal": true
+}
+```
+
+Fields to note:
+
+- `actual_format`, `foreground_package`, `has_overlay`, `overlay_package`, and
+  `window_count` appear in the `data` object alongside `text`. They are
+  runtime-detail fields emitted by the Android side and are not part of the
+  Node-guaranteed contract. An agent may read them opportunistically (for
+  example, confirming `foreground_package` before proceeding), but must not
+  depend on them being present in all environments or versions.
+- `terminalSource: "clawperator_result"` and `isCanonicalTerminal: true`
+  are outer-envelope fields added by the terminal output layer; they are not
+  part of the `envelope` sub-object.
+
+### Annotated XML Fragment
+
+The full hierarchy is trimmed to show the structurally important layers.
+Omitted attributes (checkable, checked, focused, long-clickable, password,
+selected) are present in real output but rarely useful for targeting.
+
+```xml
+<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
+<!--
+  rotation="0" - device is portrait. Bounds coordinates use portrait dimensions.
+  On this device: 1080 x 2340 pixels.
+-->
+<hierarchy rotation="0">
+
+  <!-- ... several wrapper containers ... -->
+
+  <!--
+    action_bar: contains the screen title text node and the search button.
+    Not scrollable; always visible at the top of the screen.
+  -->
+  <node
+    resource-id="com.android.settings:id/action_bar"
+    class="android.view.ViewGroup"
+    package="com.android.settings"
+    clickable="false"
+    scrollable="false"
+    bounds="[0,706][1080,922]">
+
+    <!--
+      The visible screen title. Use text="Settings" to confirm the active screen.
+      clickable="false" - this is a label, not a tap target.
+    -->
+    <node
+      text="Settings"
+      resource-id=""
+      class="android.widget.TextView"
+      package="com.android.settings"
+      clickable="false"
+      enabled="true"
+      bounds="[84,782][331,869]" />
+
+    <!--
+      Search button. No resource-id, but content-desc="Search settings" is stable.
+      clickable="true" - this is a tap target.
+      To tap: use contentDescEquals selector with value "Search settings".
+    -->
+    <node
+      text=""
+      resource-id=""
+      class="android.widget.Button"
+      package="com.android.settings"
+      content-desc="Search settings"
+      clickable="true"
+      enabled="true"
+      focusable="true"
+      bounds="[912,730][1080,922]" />
+  </node>
+
+  <!--
+    recycler_view: the scrollable list container.
+    scrollable="true" - this is the node to target for scroll actions.
+    Use resourceId selector with value "com.android.settings:id/recycler_view".
+    bounds spans the full list area below the action bar.
+  -->
+  <node
+    resource-id="com.android.settings:id/recycler_view"
+    class="androidx.recyclerview.widget.RecyclerView"
+    package="com.android.settings"
+    clickable="false"
+    enabled="true"
+    scrollable="true"
+    bounds="[0,922][1080,2295]">
+
+    <!--
+      A settings list row. The row container is clickable, not the child text nodes.
+      No resource-id on the row itself - target by the child title text instead.
+      bounds="[30,1290][1050,1499]" - tap center is approximately (540, 1394).
+    -->
+    <node
+      text=""
+      resource-id=""
+      class="android.widget.LinearLayout"
+      package="com.android.settings"
+      clickable="true"
+      enabled="true"
+      focusable="true"
+      bounds="[30,1290][1050,1499]">
+
+      <!--
+        Icon container. Not useful for targeting.
+      -->
+      <node
+        resource-id="com.android.settings:id/icon_frame"
+        class="android.widget.FrameLayout"
+        clickable="false"
+        bounds="[84,1352][216,1436]" />
+
+      <node
+        resource-id=""
+        class="android.widget.RelativeLayout"
+        clickable="false"
+        bounds="[216,1290][816,1499]">
+
+        <!--
+          Title text node.
+          resource-id="android:id/title" is consistent across Settings rows.
+          Use textEquals selector with this resource-id to locate a specific row.
+          clickable="false" - click the parent LinearLayout, not this node.
+        -->
+        <node
+          text="Connections"
+          resource-id="android:id/title"
+          class="android.widget.TextView"
+          package="com.android.settings"
+          clickable="false"
+          enabled="true"
+          bounds="[216,1332][507,1402]" />
+
+        <!--
+          Summary text node.
+          resource-id="android:id/summary" shows current state or sub-items.
+          Useful for reading current values without navigating into the screen.
+        -->
+        <node
+          text="Wi-Fi  •  Bluetooth  •  SIM manager"
+          resource-id="android:id/summary"
+          class="android.widget.TextView"
+          package="com.android.settings"
+          clickable="false"
+          enabled="true"
+          bounds="[216,1402][816,1457]" />
+      </node>
+    </node>
+
+    <!-- Second row follows the same pattern -->
+    <node
+      text=""
+      resource-id=""
+      class="android.widget.LinearLayout"
+      package="com.android.settings"
+      clickable="true"
+      enabled="true"
+      focusable="true"
+      bounds="[30,1499][1050,1759]">
+
+      <node
+        resource-id="com.android.settings:id/icon_frame"
+        class="android.widget.FrameLayout"
+        clickable="false"
+        bounds="[84,1587][216,1671]" />
+
+      <node
+        resource-id=""
+        class="android.widget.RelativeLayout"
+        clickable="false"
+        bounds="[216,1499][996,1759]">
+
+        <node
+          text="Connected devices"
+          resource-id="android:id/title"
+          class="android.widget.TextView"
+          package="com.android.settings"
+          clickable="false"
+          enabled="true"
+          bounds="[216,1587][578,1657]" />
+
+        <node
+          text="Quick Share  •  Samsung DeX  •  Android Auto"
+          resource-id="android:id/summary"
+          class="android.widget.TextView"
+          package="com.android.settings"
+          clickable="false"
+          enabled="true"
+          bounds="[216,1657][996,1712]" />
+      </node>
+    </node>
+
+    <!-- ... more rows below ... -->
+
+  </node>
+</hierarchy>
+```
+
+### Targeting Patterns from This Example
+
+| Goal | Selector approach |
+| --- | --- |
+| Confirm Settings is open | `textEquals: "Settings"` on a TextView |
+| Tap a named settings row | `resourceId: "android:id/title"` + `textEquals: "Connections"` to locate, then click parent row |
+| Read current state of a row | `resourceId: "android:id/summary"` + nearby `textEquals` for the row title |
+| Tap the search button | `contentDescEquals: "Search settings"` |
+| Scroll the list | `resourceId: "com.android.settings:id/recycler_view"` as scroll target |
 
 ## Extraction Failure
 

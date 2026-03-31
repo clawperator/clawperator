@@ -15,12 +15,12 @@ Phase 1 eval harness produces results that are treated as meaningful.
 
 | Item | Value |
 | --- | --- |
-| State | not started |
+| State | done |
 | Total PRs | 1 |
 | Total phases | 2 |
-| Completed | none |
-| Remaining | 1, 2 |
-| Current / Next | 1 |
+| Completed | 1, 2 |
+| Remaining | none |
+| Current / Next | - |
 | Blockers | none |
 
 ## Goal

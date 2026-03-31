@@ -282,9 +282,11 @@ See [Logging](api/logging.md) for complete documentation.
 
 ## Related pages
 
+- [Quickstart](quickstart.md)
 - [API Overview](api/overview.md)
 - [Devices](api/devices.md)
 - [Doctor](api/doctor.md)
 - [Errors](api/errors.md)
+- [Environment Variables](api/environment.md)
 - [Troubleshooting](troubleshooting/operator.md)
 - [Logging](api/logging.md)
