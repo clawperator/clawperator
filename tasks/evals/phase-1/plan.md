@@ -33,6 +33,18 @@ Phase 1 is the foundation everything else builds on. Keeping it to one agent
 and one eval is intentional: it is faster to discover harness problems on a
 thin surface before adding the complexity of multiple agents and specs.
 
+## Implementing Agent
+
+**Kimi** is the default coding agent for implementing this phase. See
+`tasks/evals/plan.md` "Implementing Agent" section for full invocation
+reference, model name (`kimi-code/kimi-for-coding`), and agent tier to
+Kimi flag mapping.
+
+Note: "one agent adapter (Claude)" above refers to the eval subject - the agent
+being evaluated. The implementing agent (Kimi) writes the harness code.
+The Claude adapter is built first because Claude is the most well-understood
+eval subject.
+
 ## In Scope
 
 - `evals/` directory structure as defined in `tasks/evals/plan.md`
@@ -181,8 +193,14 @@ device-specific and outside harness scope.
 - Omitting agent API keys from the subprocess environment. The harness uses a
   minimal env whitelist that does NOT include API keys. Each agent adapter's
   `build_env()` method MUST forward the required API key(s) from `os.environ`
-  (e.g. `ANTHROPIC_API_KEY` for Claude). Without this, the agent subprocess
-  silently fails to authenticate.
+  (e.g. `ANTHROPIC_API_KEY` for Claude, `OPENAI_API_KEY` for Codex,
+  `GOOGLE_API_KEY`/`GEMINI_API_KEY` for Gemini). Without this, the agent
+  subprocess silently fails to authenticate. Exception: Kimi uses OAuth stored
+  credentials in `~/.kimi/` and does NOT need env-var API keys - it only needs
+  HOME in the whitelist (already present).
+- Using short model names for Kimi (e.g. `kimi-k2`). Kimi requires
+  provider-prefixed model names like `kimi-code/kimi-for-coding`. Short names
+  produce `LLM not set` and the agent fails to start.
 
 ## Open Questions (resolve during Phase 1 implementation)
 

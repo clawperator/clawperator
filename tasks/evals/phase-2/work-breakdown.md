@@ -7,11 +7,14 @@ Parent plan: `tasks/evals/phase-2/plan.md`
 1 PR, 3 sub-phases. Sub-phases are sequenced; complete one before starting
 the next. Phase 1 PR must be merged before starting.
 
-| Sub-phase | Purpose | Agent tier |
-| --- | --- | --- |
-| 2a | Gemini, Codex, Kimi adapters + count_turn in base + Claude count_turn | default |
-| 2b | Turn budget enforcement in runner.py + result schema changes | default |
-| 2c | `--rescore` flag + validation runs for all three new agents | default |
+| Sub-phase | Purpose | Agent tier | Kimi flags |
+| --- | --- | --- | --- |
+| 2a | Gemini, Codex, Kimi adapters + count_turn in base + Claude count_turn | default | `--print --yolo` |
+| 2b | Turn budget enforcement in runner.py + result schema changes | default | `--print --yolo` |
+| 2c | `--rescore` flag + validation runs for all three new agents | default | `--print --yolo` |
+
+**Implementing agent:** Kimi (`kimi` CLI v1.27.0). See `tasks/evals/plan.md`
+"Implementing Agent" section for invocation reference and model name.
 
 ## Status
 
@@ -180,18 +183,29 @@ def build_env(self, base_env: dict) -> dict:
 ```python
 ["kimi", "--print", "--yolo", "--output-format", "stream-json", "--model", self.config.model, "--work-dir", work_dir, "-p", prompt]
 ```
-Note: `--output-format stream-json` requires `--print` mode. Verify empirically
-in sub-phase 2a that the output is parseable JSON lines.
+Note: `--output-format stream-json` requires `--print` mode (which `--print`
+implies `--yolo` anyway). The model must be provider-prefixed, e.g.
+`kimi-code/kimi-for-coding`. Short names like `kimi-k2` do NOT work and
+produce `LLM not set` error. Verify empirically in sub-phase 2a that the
+output is parseable JSON lines.
+
+**Kimi stream-json output format (verified v1.27.0):**
+Each line is a complete JSON object. Assistant messages have `"role":"assistant"`,
+tool results have `"role":"tool"`. Turn counting: count `"role":"assistant"` lines.
+Example:
+```json
+{"role":"assistant","content":[{"type":"think","think":"..."},{"type":"text","text":"..."}],"tool_calls":[{"type":"function","id":"tool_...","function":{"name":"Shell","arguments":"{...}"}}]}
+{"role":"tool","content":[{"type":"text","text":"..."}],"tool_call_id":"tool_..."}
+{"role":"assistant","content":[{"type":"text","text":"Done."}]}
+```
 
 **`KimiAgent.build_env`:**
 ```python
 def build_env(self, base_env: dict) -> dict:
-    env = {}
-    for key in ["MOONSHOT_API_KEY", "KIMI_API_KEY"]:
-        val = os.environ.get(key)
-        if val is not None:
-            env[key] = val
-    return env
+    # Kimi uses OAuth stored credentials in ~/.kimi/credentials, NOT env-var
+    # API keys. No additional env vars needed as long as HOME is in the
+    # whitelist (it is). The agent reads credentials from $HOME/.kimi/.
+    return {}
 ```
 
 **CRITICAL:** The harness uses a minimal env whitelist. Agent API keys are NOT
@@ -328,7 +342,7 @@ Implement `--rescore`. Run validation passes for Gemini, Codex, and Kimi.
      --agent codex --model o3 --device <serial>
 
    python evals/run_eval.py android-version \
-     --agent kimi --model kimi-k2 --device <serial>
+     --agent kimi --model kimi-code/kimi-for-coding --device <serial>
    ```
 3. Verify each run produces a valid `result.json` and a transcript.
 4. Run `--rescore` on one of the Phase 1 passing runs to verify it works:

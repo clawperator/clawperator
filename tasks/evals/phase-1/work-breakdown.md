@@ -7,12 +7,16 @@ Parent plan: `tasks/evals/phase-1/plan.md`
 1 PR, 4 sub-phases. All ship together. Sub-phases are sequenced; do not
 start the next until the current one passes its acceptance criteria.
 
-| Sub-phase | Purpose | Agent tier |
-| --- | --- | --- |
-| 1a | Directory scaffold + gitignore | fast |
-| 1b | Harness core (environment, runner, scorer, artifacts, claude adapter) | thinking |
-| 1c | Eval spec + prompt + run_eval.py CLI + README | default |
-| 1d | Validation: 1 passing run + 1 error run + dry-run | default |
+| Sub-phase | Purpose | Agent tier | Kimi flags |
+| --- | --- | --- | --- |
+| 1a | Directory scaffold + gitignore | fast | `--no-thinking --print --yolo` |
+| 1b | Harness core (environment, runner, scorer, artifacts, claude adapter) | thinking | `--thinking --print --yolo` |
+| 1c | Eval spec + prompt + run_eval.py CLI + README | default | `--print --yolo` |
+| 1d | Validation: 1 passing run + 1 error run + dry-run | default | `--print --yolo` |
+
+**Implementing agent:** Kimi (`kimi` CLI v1.27.0). See `tasks/evals/plan.md`
+"Implementing Agent" section for invocation reference, model name, and flag
+mapping. Model must be `kimi-code/kimi-for-coding` (short names do not work).
 
 ## Status
 
@@ -47,9 +51,12 @@ start the next until the current one passes its acceptance criteria.
    CLAWPERATOR_OPERATOR_PACKAGE, and agent API key names) and lightweight
    reproducibility anchors: Python version, platform, cwd, agent binary
    version, and an env hash. **Redact API key values** in `config.json`:
-   store `"ANTHROPIC_API_KEY": "[REDACTED]"` (not the actual key). The
-   logger's SPAWN event must also redact any key containing "KEY", "SECRET",
-   "TOKEN", or "PASSWORD".
+   any env var whose name contains "KEY", "SECRET", "TOKEN", or "PASSWORD"
+   must be stored as `"[REDACTED]"` (not the actual value). The logger's
+   SPAWN event must apply the same redaction. Note: Kimi uses OAuth stored
+   credentials in `~/.kimi/`, not env-var API keys, so there is nothing to
+   redact for Kimi runs. Other agents (Claude, Gemini, Codex) do use env-var
+   API keys.
 8. The harness must never write to `evals/runs/` inside the repo without
    creating the directory first (it is gitignored, so it may not exist).
 9. One commit per sub-phase. Do not batch 1a+1b into one commit.

@@ -22,6 +22,63 @@ are treated as meaningful benchmarks.
 | PR-3 | 3 | Published runtime target + full-repo mode | default |
 | PR-4 | 4 | Skill generation and replay eval | thinking |
 
+## Implementing Agent
+
+**Kimi** (`kimi` CLI, version 1.27.0) is the default coding agent for
+implementing these plans. All sub-phases should be executed using Kimi unless
+a specific sub-phase explicitly requires a different agent.
+
+### Kimi Invocation Reference
+
+```bash
+# Non-interactive with full output (default for implementation tasks):
+kimi --print --yolo -p "<prompt>" --output-format stream-json \
+  --model kimi-code/kimi-for-coding \
+  --work-dir <dir>
+
+# Flags:
+#   --print           Non-interactive mode (implies --yolo)
+#   --yolo / -y       Auto-approve all tool actions
+#   --output-format   stream-json | text (stream-json for structured output)
+#   --model / -m      Must use provider-prefixed name: "kimi-code/kimi-for-coding"
+#                     Short names like "kimi-k2" do NOT work
+#   --work-dir / -w   Set the agent's working directory (default: cwd)
+#   --thinking        Enable thinking mode (for complex sub-phases)
+#   --no-thinking     Disable thinking mode (for simple sub-phases)
+#   -p / -c           Prompt text
+```
+
+### Kimi Authentication
+
+Kimi uses OAuth stored credentials in `~/.kimi/credentials`, NOT env-var API
+keys. The `build_env()` adapter does not need to forward any API key. Kimi
+works with a minimal environment as long as `~/.kimi/` is accessible (the HOME
+env var must be in the whitelist, which it already is).
+
+### Kimi Stream-JSON Output Format
+
+Each JSON line has this shape:
+
+```json
+// Assistant message (with optional tool_calls):
+{"role":"assistant","content":[{"type":"think","think":"...","encrypted":null},{"type":"text","text":"..."}],"tool_calls":[...]}
+
+// Tool result:
+{"role":"tool","content":[{"type":"text","text":"..."}],"tool_call_id":"tool_..."}
+```
+
+Turn counting: count lines where `"role":"assistant"` appears at the top level.
+Each assistant line is one complete turn. Tool-result lines (`"role":"tool"`)
+are NOT turns.
+
+### Agent Tier to Kimi Flag Mapping
+
+| Agent tier | Kimi flags | When to use |
+| --- | --- | --- |
+| fast | `--no-thinking --print --yolo` | Scaffolding, file creation, simple edits |
+| default | `--print --yolo` (uses config default for thinking) | Most implementation work |
+| thinking | `--thinking --print --yolo` | Complex design decisions, architecture, scorer logic |
+
 ## Status
 
 | Item | Value |
@@ -129,7 +186,7 @@ All four agent CLIs are installed. Non-interactive invocations verified:
 | Claude Code | `-p "<prompt>" --dangerously-skip-permissions --output-format stream-json` | `--model` | cwd of subprocess |
 | Gemini CLI | `-p "<prompt>" --yolo --output-format stream-json` | `--model` (`-m`) | cwd of subprocess |
 | Codex | `exec --dangerously-bypass-approvals-and-sandbox --json "<prompt>"` | `-m` | `-C <dir>` (alias: `--cd`) |
-| Kimi | `--print --yolo --output-format stream-json -p "<prompt>"` | `--model` (`-m`) | `--work-dir <dir>` |
+| Kimi | `--print --yolo --output-format stream-json -p "<prompt>"` | `--model` (`-m`); must use provider-prefixed name e.g. `kimi-code/kimi-for-coding` | `--work-dir <dir>` (`-w`) |
 
 ## Agent Capability Matrix
 
@@ -138,7 +195,7 @@ All four agent CLIs are installed. Non-interactive invocations verified:
 | Claude | `--dangerously-skip-permissions` | yes (`--output-format stream-json`) | cwd of subprocess | Parse `"type":"message"` JSON lines | high |
 | Gemini | `--yolo` | yes (`--output-format stream-json`) | cwd of subprocess | Empirical (verify in Phase 2) | medium |
 | Codex | `--dangerously-bypass-approvals-and-sandbox` | yes (`--json` outputs JSONL) | `-C <dir>` | Empirical (verify in Phase 2 using `--json` JSONL) | medium |
-| Kimi | `--print --yolo` | yes (`--output-format stream-json` with `--print`) | `--work-dir <dir>` | Empirical (verify in Phase 2) | medium |
+| Kimi | `--print --yolo` | yes (`--output-format stream-json` with `--print`; verified v1.27.0) | `--work-dir <dir>` | Count `"role":"assistant"` JSON lines (verified) | high |
 
 Note: "Confidence" is for turn counting only. All four are viable for task completion.
 
@@ -350,6 +407,13 @@ Full spec, prompt, scoring rules, and validation: `tasks/evals/phase-1/`.
 - Failing to capture domain-level traceability when docs-linked behavior seems
   surprising. Capture accessed domains when possible so prompt-injection-style
   surprises can be triaged later.
+- Using short model names for Kimi (e.g. `kimi-k2`). Kimi requires
+  provider-prefixed model names like `kimi-code/kimi-for-coding`. Short names
+  produce `LLM not set` and the agent fails to start.
+- Omitting agent API keys from the subprocess environment. Claude needs
+  `ANTHROPIC_API_KEY`, Gemini needs `GOOGLE_API_KEY`/`GEMINI_API_KEY`, Codex
+  needs `OPENAI_API_KEY`. Kimi is the exception: it uses OAuth stored
+  credentials in `~/.kimi/` and does NOT need env-var API keys.
 
 ## Internal Documentation
 
