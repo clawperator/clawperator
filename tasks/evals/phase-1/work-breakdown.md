@@ -32,9 +32,10 @@ start the next until the current one passes its acceptance criteria.
    the PR.
 2. Build the Node CLI before any device interaction:
    `npm --prefix apps/node run build`. Never test against stale `dist/`.
-3. Use the branch-local CLI for all device operations. The preflight will resolve
-   `CLAWPERATOR_BIN=node` into `clawperator_cmd = ["node", "$(pwd)/apps/node/dist/cli/index.js"]`
-   automatically when CLAWPERATOR_SCRIPT or the default path is used.
+3. Use the branch-local CLI for all device operations. The preflight will
+   auto-detect the local build at `<repo_root>/apps/node/dist/cli/index.js`
+   and set `clawperator_cmd = ["node", "<abs_path>"]` when CLAWPERATOR_BIN is
+   not set. There is no CLAWPERATOR_SCRIPT env var - do not reference it.
 4. Use the `.dev` Operator APK for all local testing:
    `CLAWPERATOR_OPERATOR_PACKAGE="com.clawperator.operator.dev"`.
 5. Do not hard-code device serials anywhere. Always use `--device <serial>`
@@ -42,9 +43,13 @@ start the next until the current one passes its acceptance criteria.
 6. Agent working directory for `public-surface` mode must be a clean
    `tempfile.mkdtemp()`. Never the repo root.
 7. Do not store the full inherited environment in `config.json`. Store only
-   the `env_overrides` dict (ANDROID_SERIAL, CLAWPERATOR_CMD, CLAWPERATOR_BIN,
-   CLAWPERATOR_OPERATOR_PACKAGE) and lightweight reproducibility anchors:
-   Python version, platform, cwd, agent binary version, and an env hash.
+   the `env_overrides` dict (ANDROID_SERIAL, CLAWPERATOR_CMD,
+   CLAWPERATOR_OPERATOR_PACKAGE, and agent API key names) and lightweight
+   reproducibility anchors: Python version, platform, cwd, agent binary
+   version, and an env hash. **Redact API key values** in `config.json`:
+   store `"ANTHROPIC_API_KEY": "[REDACTED]"` (not the actual key). The
+   logger's SPAWN event must also redact any key containing "KEY", "SECRET",
+   "TOKEN", or "PASSWORD".
 8. The harness must never write to `evals/runs/` inside the repo without
    creating the directory first (it is gitignored, so it may not exist).
 9. One commit per sub-phase. Do not batch 1a+1b into one commit.
@@ -193,20 +198,30 @@ def preflight(device: str | None) -> Environment:
     3. If device is specified, verify it is in the authorized list.
        If not specified and exactly one authorized device exists, use it.
        If not specified and multiple devices exist, raise with helpful message.
-    4. Resolve CLAWPERATOR_CMD using this three-tier order:
-       a. If CLAWPERATOR_BIN env var is set: use it as the executable.
-          If it is 'node', also check CLAWPERATOR_SCRIPT env var or default
-          the script to `<repo_root>/apps/node/dist/cli/index.js`.
-          Set `clawperator_cmd = [bin] or [bin, script]` accordingly.
+    4. Resolve clawperator_cmd using this three-tier order (mirrors
+       `apps/node/src/domain/skills/skillsConfig.ts` `resolveSkillBin()`):
+       a. If CLAWPERATOR_BIN env var is set and non-empty: use it as the
+          executable. Set `clawperator_cmd = [bin]`.
+          NOTE: there is no CLAWPERATOR_SCRIPT env var. Do not invent one.
+          If the user wants `node /path/to/index.js`, they should either:
+          - Not set CLAWPERATOR_BIN (let step b auto-detect), or
+          - Set CLAWPERATOR_BIN to the full path of a standalone binary.
+          Setting CLAWPERATOR_BIN=node alone is NOT useful (produces
+          `["node"]` with no script - same behavior as the real
+          `resolveSkillBin()` which returns `{cmd: explicitBin, args: []}`).
        b. If CLAWPERATOR_BIN is not set: check whether the local build exists
           at `<repo_root>/apps/node/dist/cli/index.js`. If the file exists,
-          set `clawperator_cmd = ['node', '<path>']`.
+          set `clawperator_cmd = ['node', '<abs_path>']`. Use the absolute
+          path, not a relative one. Resolve `<repo_root>` via
+          `git rev-parse --show-toplevel` or `Path(__file__).resolve().parents[N]`
+          at import time.
        c. If the local build does not exist: check `shutil.which('clawperator')`.
           If found, set `clawperator_cmd = ['clawperator']`.
        d. If none of the above resolves: raise EnvironmentError with a clear
           message listing all three paths that were checked and found missing.
-       This order matches the documented resolution order for public env vars:
-       explicit override > local sibling build > global binary.
+       This order matches the documented resolution order in
+       `apps/node/src/domain/skills/skillsConfig.ts`:
+       explicit CLAWPERATOR_BIN > local sibling build > global binary.
     5. Verify: `shutil.which(env.clawperator_cmd[0])` is not None.
        If None, raise EnvironmentError.
        For the selected agent adapter, also verify the agent executable exists
@@ -218,7 +233,10 @@ def preflight(device: str | None) -> Environment:
     8. Run `adb -s <serial> shell getprop ro.build.version.release`.
        Strip whitespace. Reject empty result. Record the timestamp used for
        collection in `ground_truth_collected_at`.
-    9. Run `env.clawperator_cmd + ['version', '--json']` to capture clawperator_version.
+    9. Run `env.clawperator_cmd + ['version']` to capture clawperator_version.
+       The version command outputs JSON by default (e.g. `{"cliVersion":"0.5.3"}`).
+       Parse the JSON output and extract the `cliVersion` field. There is no
+       `--json` flag on the version command; JSON is the default output format.
     10. Return Environment dataclass.
     """
 ```
@@ -244,7 +262,7 @@ def normalize_version(v: str) -> str:
     return match.group(0) if match else v
 
 ANSWER_PATTERN = re.compile(
-    r'^CLAWPERATOR_EVAL_ANSWER:\s*([^\s]+)\s*$',
+    r'^CLAWPERATOR_EVAL_ANSWER:\s*(\S.*?)\s*$',
     re.MULTILINE
 )
 
@@ -256,11 +274,14 @@ def extract_answer(transcript: str) -> str | None:
     - The marker must appear at the START of a line. A marker embedded inside
       a JSON value or code block will NOT match. This is intentional - it keeps
       matching deterministic and avoids false positives from tool output.
-    - Requires exactly one non-whitespace token after the colon.
+    - Requires at least one non-whitespace character after the colon.
       A line like 'CLAWPERATOR_EVAL_ANSWER:' (nothing after colon) or
-      'CLAWPERATOR_EVAL_ANSWER: 15 extra text' does NOT match.
+      'CLAWPERATOR_EVAL_ANSWER:   ' (whitespace only) does NOT match.
+    - Multi-word answers ARE captured. 'CLAWPERATOR_EVAL_ANSWER: Android 15'
+      captures 'Android 15'. The scorer's normalize_version() handles reduction
+      to the canonical form.
     - Last match in the transcript wins (agent may revise its answer).
-    - The value is captured as the first group, stripped of surrounding whitespace.
+    - The captured value is trimmed of leading/trailing whitespace.
     Returns None if no valid match found.
     """
     matches = ANSWER_PATTERN.findall(transcript)
@@ -366,7 +387,15 @@ class BaseAgent(ABC):
 
     @abstractmethod
     def build_env(self, base_env: dict) -> dict:
-        """Return env overrides for this agent (not the full environment)."""
+        """
+        Return env overrides for this agent (not the full environment).
+        CRITICAL: The harness builds a minimal env whitelist (PATH, HOME, LANG,
+        LC_ALL, ANDROID_SERIAL, CLAWPERATOR_*). Agent API keys (e.g.
+        ANTHROPIC_API_KEY, GOOGLE_API_KEY, OPENAI_API_KEY) are NOT included in
+        the base env. Each adapter MUST forward its required API key(s) from
+        os.environ in this method, or the agent subprocess will fail to
+        authenticate.
+        """
 
     @abstractmethod
     def supports_streaming(self) -> bool:
@@ -408,9 +437,15 @@ class ClaudeAgent(BaseAgent):
         return cmd
 
     def build_env(self, base_env: dict) -> dict:
-        # Claude Code uses the subprocess working directory for context.
-        # No additional env overrides needed beyond what runner.py provides.
-        return {}
+        # Claude Code needs its API key to function. Forward it from the
+        # parent env if present. The harness uses a minimal env whitelist,
+        # so agent-specific keys must be explicitly injected here.
+        env = {}
+        for key in ["ANTHROPIC_API_KEY"]:
+            val = os.environ.get(key)
+            if val is not None:
+                env[key] = val
+        return env
 
     def supports_streaming(self) -> bool:
         return True  # Claude streams stream-json lines incrementally
@@ -447,11 +482,12 @@ def run_eval(
     1. Build prompt through a single function contract:
        build_prompt(template_path: str, variables: dict) -> str
        Variables are explicit and injected once:
-       - CLAWPERATOR_BIN
        - CLAWPERATOR_CMD (use shlex.join(env.clawperator_cmd) for shell-safe use)
        - CLAWPERATOR_OPERATOR_PACKAGE
        - DEVICE_SERIAL
-       - DOCS_URL
+       - DOCS_URL (hardcoded to "https://docs.clawperator.com")
+       Note: CLAWPERATOR_BIN is NOT a prompt variable. It is a preflight input
+       only. The agent receives CLAWPERATOR_CMD (the resolved command string).
        No implicit string replacement or ad hoc formatting.
        Prompt instructs the agent: "Execute Clawperator commands exactly as
        shell commands using the provided base command. Do not reinterpret or
@@ -659,6 +695,14 @@ assert extract_answer(transcript_inside_json) is None
 # extract_answer - marker at line start inside a multiline string does match
 transcript_linestart = 'some output\nCLAWPERATOR_EVAL_ANSWER: 15\nmore output'
 assert extract_answer(transcript_linestart) == "15"
+
+# extract_answer - multi-word answer IS captured (normalization handles reduction)
+transcript_multiword = 'CLAWPERATOR_EVAL_ANSWER: Android 15\n'
+assert extract_answer(transcript_multiword) == "Android 15"
+
+# extract_answer - trailing whitespace is stripped
+transcript_trailing = 'CLAWPERATOR_EVAL_ANSWER: 15   \n'
+assert extract_answer(transcript_trailing) == "15"
 ```
 
 ### Acceptance Criteria
@@ -841,7 +885,7 @@ wall-clock duration, normalized answer).
 
 `evals/README.md` must include:
 - Prerequisites (Python 3.11+, device connected, Operator APK installed,
-  docs.gaps PR merged)
+  tasks/docs/gaps/ PR merged)
 - How to run the first eval (exact command)
 - How to read result.json (field descriptions)
 - How `public-surface` isolation works (soft isolation: temp dir, no repo files placed in it,
@@ -969,8 +1013,9 @@ acceptance criteria are met: 1 passing run, 1 error run, dry-run exits 0.
 
 - Android device connected with Clawperator Operator APK installed and
   permissioned.
-- `docs/gaps/` changes in place (or at least the current docs are sufficient
-  for the agent to have a fair shot - note this in findings if not yet merged).
+- `tasks/docs/gaps/` PR changes in place (or at least the current docs are
+  sufficient for the agent to have a fair shot - note this in findings if not
+  yet merged).
 - Branch-local CLI built: `npm --prefix apps/node run build`.
 
 ### Steps

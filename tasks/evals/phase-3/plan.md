@@ -84,7 +84,7 @@ Neither question can be asked until this phase ships.
 | --- | --- |
 | Published runtime binary | `which clawperator` on this machine |
 | Published Operator package ID | `com.clawperator.operator` (release APK) |
-| Version output format | `clawperator version --json` output shape |
+| Version output format | `clawperator version` output shape (JSON by default; no `--json` flag needed) |
 | Local npm version | `apps/node/package.json` `"version"` field |
 
 ## Pre-Implementation Verification
@@ -93,8 +93,10 @@ Before implementing Phase 3, verify the following on the target machine:
 
 1. `clawperator doctor --json` - verify it returns JSON and exits 0 on a
    healthy device. Record the exact JSON shape.
-2. `clawperator version --json` - verify it returns JSON with a version field.
-   Record the exact key name (likely `"version"` but verify).
+2. `clawperator version` - verify it returns JSON by default with a version
+   field. The key is `"cliVersion"` (verified in `cmdVersion` at
+   `apps/node/src/cli/commands/version.ts:19`). There is no `--json` flag
+   on the bare `version` command; JSON is the default output format.
 3. `clawperator --help` - verify the global binary is present and the version
    matches expectations.
 4. Which Operator APK is installed: `adb shell pm list packages | grep clawperator`
@@ -119,7 +121,7 @@ path.
 | Question | Rule |
 | --- | --- |
 | If `clawperator` is not on PATH for `published` mode? | Abort with `outcome.status = "error"`, `failure_reason = "published_binary_not_found"`. |
-| If `clawperator version --json` does not exist in the installed binary? | Fall back to parsing `clawperator version` plain text. Document the fallback in `environment.py` and in `docs/internal/design/evals.md`. |
+| If `clawperator version` returns non-JSON output? | Fall back to regex-parsing the plain text for a version string. Document the fallback in `environment.py`. Note: the CLI outputs JSON by default, so non-JSON is unusual and may indicate a very old binary. |
 | Should the `full-repo` prompt mention the repo path? | Yes, the prompt may tell the agent the repo is available at `$REPO_ROOT`. Add this as a template variable. |
 | Does `full-repo` mode disable the doctor pre-flight? | No. Doctor still runs before spawning the agent. |
 | Does `full-repo` mode set `ANDROID_SERIAL` in the agent env? | Yes, same as `public-surface`. |

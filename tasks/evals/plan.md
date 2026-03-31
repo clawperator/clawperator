@@ -12,7 +12,7 @@ transcripts.
 and one agent. Phases 2-4 expand agent support, runtime targets, and eval
 scope. No phase requires a merge gate on the next except where noted.
 
-Prerequisite: `docs/gaps/` must land (and merge) before Phase 1 eval results
+Prerequisite: `tasks/docs/gaps/` must land (and merge) before Phase 1 eval results
 are treated as meaningful benchmarks.
 
 | PR | Phase | Scope | Agent tier |
@@ -32,7 +32,7 @@ are treated as meaningful benchmarks.
 | Completed | none |
 | Remaining | 1, 2, 3, 4 |
 | Current / Next | 1 |
-| Blockers | docs/gaps/ must land before Phase 1 results are meaningful |
+| Blockers | tasks/docs/gaps/ must land before Phase 1 results are meaningful |
 
 ## Goal
 
@@ -80,7 +80,7 @@ Every run is parameterized by two independent axes:
 
 **Runtime target** controls which binary and Operator APK are used:
 
-- `local-dev`: `CLAWPERATOR_CMD` (defaults to
+- `local-dev`: harness-internal `clawperator_cmd` (defaults to
   `["node", "<repo_root>/apps/node/dist/cli/index.js"]`) + `com.clawperator.operator.dev`
 - `published`: global `clawperator` npm binary + `com.clawperator.operator`
 
@@ -127,9 +127,9 @@ All four agent CLIs are installed. Non-interactive invocations verified:
 | Agent | Non-interactive flag | Model flag | Work-dir flag |
 | --- | --- | --- | --- |
 | Claude Code | `-p "<prompt>" --dangerously-skip-permissions --output-format stream-json` | `--model` | cwd of subprocess |
-| Gemini CLI | `-p "<prompt>" --yolo --output-format stream-json` | `--model` | cwd of subprocess |
-| Codex | `exec --dangerously-bypass-approvals-and-sandbox "<prompt>"` | `-m` | `-C <dir>` |
-| Kimi | `--print --yolo -p "<prompt>"` | `--model` | `--work-dir <dir>` |
+| Gemini CLI | `-p "<prompt>" --yolo --output-format stream-json` | `--model` (`-m`) | cwd of subprocess |
+| Codex | `exec --dangerously-bypass-approvals-and-sandbox --json "<prompt>"` | `-m` | `-C <dir>` (alias: `--cd`) |
+| Kimi | `--print --yolo --output-format stream-json -p "<prompt>"` | `--model` (`-m`) | `--work-dir <dir>` |
 
 ## Agent Capability Matrix
 
@@ -137,8 +137,8 @@ All four agent CLIs are installed. Non-interactive invocations verified:
 | --- | --- | --- | --- | --- | --- |
 | Claude | `--dangerously-skip-permissions` | yes (`--output-format stream-json`) | cwd of subprocess | Parse `"type":"message"` JSON lines | high |
 | Gemini | `--yolo` | yes (`--output-format stream-json`) | cwd of subprocess | Empirical (verify in Phase 2) | medium |
-| Codex | `--dangerously-bypass-approvals-and-sandbox` | no (plain text) | `-C <dir>` | Heuristic only | low |
-| Kimi | `--print --yolo` | maybe (verify in Phase 2) | `--work-dir <dir>` | Heuristic only | low |
+| Codex | `--dangerously-bypass-approvals-and-sandbox` | yes (`--json` outputs JSONL) | `-C <dir>` | Empirical (verify in Phase 2 using `--json` JSONL) | medium |
+| Kimi | `--print --yolo` | yes (`--output-format stream-json` with `--print`) | `--work-dir <dir>` | Empirical (verify in Phase 2) | medium |
 
 Note: "Confidence" is for turn counting only. All four are viable for task completion.
 
@@ -167,7 +167,8 @@ Note: "Confidence" is for turn counting only. All four are viable for task compl
     "env_overrides": {
       "ANDROID_SERIAL": "<device_serial>",
       "CLAWPERATOR_CMD": "node /path/to/dist/cli/index.js",
-      "CLAWPERATOR_OPERATOR_PACKAGE": "..."
+      "CLAWPERATOR_OPERATOR_PACKAGE": "...",
+      "ANTHROPIC_API_KEY": "[REDACTED]"
     }
   },
   "environment": {
@@ -280,9 +281,11 @@ Edge cases:
   condition): the answer wins. The timer thread sets `timeout_triggered` but the for-loop reads
   one more line before exiting. Check `last_answer` after the loop, before checking
   `timeout_triggered.is_set()`. Answer takes priority 2/3 over timeout (priority 5).
-- If the agent emits `CLAWPERATOR_EVAL_ANSWER:` with no value (empty after colon): this is a
-  malformed marker. Do NOT count it as an answer. The regex must require at least one
-  non-whitespace character after the colon.
+- If the agent emits `CLAWPERATOR_EVAL_ANSWER:` with no value (empty after colon) or
+  only whitespace: this is a malformed marker. Do NOT count it as an answer. The regex
+  must require at least one non-whitespace character after the colon. Multi-word values
+  (e.g. "Android 15") ARE valid and captured in full; the scorer's `normalize_version()`
+  reduces them to the canonical form for comparison.
 - If the agent emits the marker inside a JSON blob or code block (i.e. not at
   line start): it does NOT match. The regex requires `^CLAWPERATOR_EVAL_ANSWER:`
   at the beginning of a line. Agents must emit the marker as a bare line.

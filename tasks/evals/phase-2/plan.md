@@ -34,6 +34,13 @@ Gemini. For Codex and Kimi it is best-effort and may be null.
 - A run with `turns_counted = null` is fully valid.
 - Do not build tooling that aggregates or compares `turns_counted` across agents in Phase 2.
 
+**Updated agent capabilities (verified on machine 2026-03-31):**
+- Codex `exec` supports `--json` for JSONL output (not just plain text as
+  originally assumed). This may enable structured turn counting.
+- Kimi supports `--output-format stream-json` in `--print` mode.
+- All four agents now potentially support structured output. Verify empirically
+  in sub-phase 2a before implementing `count_turn`.
+
 ## Why This Phase
 
 Three of the four installed agents cannot run evals yet. Turn budgets prevent
@@ -92,8 +99,9 @@ diagnostic signal for inspecting agent behavior - not for cross-agent comparison
 | Aspect | Type | Use | Rule |
 | --- | --- | --- | --- |
 | Turn counting for Claude/Gemini | Deterministic | diagnostic only | Parse stream-json lines. Count lines where `"role":"assistant"` or `"type":"message"` with assistant role. Document exact JSON key checked. |
-| Turn counting for Codex/Kimi | Best-effort / may remain null. Not a gating metric. | diagnostic only, may be null | Approximate using heuristic markers visible in real output (empirically determined). Log a warning per run that turn counting is approximate for this adapter. If the heuristic fires fewer than 2 times in the full transcript, set `turns_counted = null`. |
-| Budget exceeded status | Deterministic for Claude; conditional for Gemini (after 2a validation); not enforced for Codex/Kimi | enforcement only for structured-turn agents | `budget_exceeded` fires only when `count_turn` is reliable: Claude always, Gemini if empirical 2a inspection confirms reliable parsing, Codex/Kimi never. For Codex and Kimi, `budget_exceeded` is never emitted - wall-clock timeout is the only enforcement mechanism. |
+| Turn counting for Codex | Conditional (verify `--json` JSONL in 2a) | diagnostic only, may be null | Codex supports `--json` which outputs JSONL. Verify empirically in 2a whether JSONL events reliably mark turn boundaries. If yes, implement structured counting. If not, fall back to heuristic. Log a warning per run if counting is approximate. |
+| Turn counting for Kimi | Conditional (verify `--output-format stream-json` in 2a) | diagnostic only, may be null | Kimi supports `--output-format stream-json` in `--print` mode. Verify empirically in 2a. Same logic as Codex. |
+| Budget exceeded status | Deterministic for Claude; conditional for Gemini/Codex/Kimi (after 2a validation) | enforcement only for structured-turn agents | `budget_exceeded` fires only when `count_turn` is reliable (verified in 2a empirical inspection). For agents where turn counting is unreliable after 2a, `budget_exceeded` is never emitted - wall-clock timeout is the only enforcement mechanism. |
 
 ## Decision Rules
 
@@ -128,10 +136,10 @@ Phase 2 is complete when:
 5. `python evals/run_eval.py android-version --rescore <run_id>` produces
    `result-rescored.json` without errors.
 6. A Claude run with `--max-turns 2` that has not answered by turn 2 produces
-   `outcome.status = "budget_exceeded"`. Codex and Kimi runs with `--max-turns`
-   set do NOT produce `budget_exceeded` - they time out via wall-clock only.
-   Gemini's enforcement is conditional on 2a empirical validation confirming
-   reliable turn parsing.
+   `outcome.status = "budget_exceeded"`. For Gemini, Codex, and Kimi,
+   `budget_exceeded` enforcement is conditional on 2a empirical validation
+   confirming reliable turn parsing for each. Agents where turn parsing is
+   unreliable time out via wall-clock only.
 
 ## Durable Follow-Up
 

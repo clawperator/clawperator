@@ -123,12 +123,30 @@ Add skill extraction and validation to `scorer.py`. Update `spec.json`.
        Returns the raw JSON string or None if no complete block found.
        """
 
-   def validate_skill(skill_json: str, bin: str, operator_package: str) -> tuple[bool, list[str]]:
+   def validate_skill(skill_json: str, clawperator_cmd: list[str], operator_package: str) -> tuple[bool, list[str]]:
        """
-       Write skill_json to a temp file/dir structure.
-       Run: <bin> skills validate <temp_skill_dir> --operator-package <pkg>
-       Return (is_valid: bool, errors: list[str]).
-       Clean up temp dir regardless of result.
+       Validate an agent-emitted skill JSON blob against the Clawperator skill
+       contract. This is non-trivial because `clawperator skills validate`
+       operates on registered skill IDs, not raw JSON files.
+
+       Steps:
+       1. Parse skill_json as JSON. If invalid JSON, return (False, ["invalid JSON"]).
+       2. Create a temp skill directory structure that mimics a registered skill:
+          - <tmpdir>/<skill_id>/SKILL.md  (can be empty)
+          - <tmpdir>/<skill_id>/skill.json  (the emitted JSON)
+          - <tmpdir>/<skill_id>/scripts/run.js  (if the skill references scripts)
+       3. The skill_id to use: extract from the JSON's "id" field if present,
+          otherwise generate a temp ID like "eval-generated-<timestamp>".
+       4. Attempt structural validation by checking required fields against
+          the SkillEntry interface in apps/node/src/contracts/skills.ts:
+          Required fields: id, applicationId, intent, summary, path, skillFile,
+          scripts (array), artifacts (array).
+       5. If structural validation passes, optionally attempt
+          `<clawperator_cmd> skills validate <skill_id>` if the skill can be
+          temporarily registered. If this step is too complex for Phase 4,
+          structural validation alone is acceptable - document the limitation.
+       6. Clean up temp dir regardless of result.
+       7. Return (is_valid: bool, errors: list[str]).
        """
    ```
 

@@ -116,9 +116,22 @@ rather than hand-authored.
 | --- | --- |
 | Skill validation command | `apps/node/src/cli/registry.ts` (skills validate) |
 | Skill run command | `apps/node/src/cli/registry.ts` (skills run) |
-| Skill structure contract | `apps/node/src/contracts/skills.ts` |
-| Skill validation behavior | `apps/node/src/domain/skills/validateSkill.ts` |
+| Skill structure contract | `apps/node/src/contracts/skills.ts` (`SkillEntry` interface) |
+| Skill validation behavior | `apps/node/src/domain/skills/validateSkill.ts` (requires skill in local registry) |
+| Skill registry loader | `apps/node/src/adapters/skills-repo/localSkillsRegistry.ts` |
 | Expected skill output | `[Clawperator-Result]` envelope with answer in `stepResults` |
+
+**Important implementation note:** `clawperator skills validate <skill_id>` looks
+up the skill by ID from the local skills registry (`~/.clawperator/skills/`),
+not from an arbitrary file path. To validate an agent-emitted skill, you must
+either:
+1. Scaffold the skill into the registry directory and register it, validate,
+   then clean up, OR
+2. Perform structural validation in Python against the `SkillEntry` interface
+   and the expected file structure (skill.json, scripts, artifacts).
+
+Option 2 is simpler and sufficient for Phase 4. Reserve option 1 for a future
+phase if structural validation proves too weak.
 
 ## Skill Score Schema
 
@@ -155,8 +168,16 @@ CLAWPERATOR_SKILL_START
 CLAWPERATOR_SKILL_END
 ```
 
-The content between the markers is extracted, written to a temp directory as a
-skill artifact, and validated with `clawperator skills validate`.
+The content between the markers is extracted and structurally validated against
+the `SkillEntry` interface from `apps/node/src/contracts/skills.ts`. Required
+fields: `id`, `applicationId`, `intent`, `summary`, `path`, `skillFile`,
+`scripts` (array), `artifacts` (array). The prompt must tell the agent what
+structure to produce. A naive agent that just emits an action list without the
+registry wrapper fields will fail validation.
+
+For replay, the extracted skill JSON and any referenced scripts are written to a
+temp directory, temporarily registered, and executed via `clawperator skills run`.
+The temp registration is cleaned up after the replay regardless of outcome.
 
 ## Deterministic Versus Judgment
 

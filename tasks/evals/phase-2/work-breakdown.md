@@ -119,10 +119,14 @@ method to `BaseAgent` and implement it for all four adapters.
    Wrap in try/except; return False on parse error.
 4. Implement `GeminiAgent`. Use `gemini -p ... --yolo --output-format stream-json`
    as the base command. Implement `count_turn` from the empirical output.
-5. Implement `CodexAgent`. Use `codex exec --dangerously-bypass-approvals-and-sandbox`.
-   Codex does not support stream-json. Implement `count_turn` using heuristic
-   markers observed in real output (e.g. "Applying changes" or similar agent
-   completion signals). Add a prominent comment stating the count is approximate.
+5. Implement `CodexAgent`. Use `codex exec --dangerously-bypass-approvals-and-sandbox --json`.
+   Codex supports `--json` which outputs JSONL to stdout. In sub-phase 2a,
+   inspect the JSONL event stream to determine if turn boundaries are
+   identifiable. If yes, implement structured `count_turn`. If the JSONL is
+   too noisy or ambiguous for reliable turn counting, fall back to heuristic
+   markers (e.g. "Applying changes") and add a prominent comment.
+   `supports_streaming()` should return True if `--json` produces real-time
+   JSONL output, or False if output is buffered until exit (verify empirically).
 6. Implement `KimiAgent`. Use `kimi --print --yolo`. If `--output-format stream-json`
    is available and produces parseable turn events, use it. Otherwise approximate.
    Document the approach in a comment.
@@ -143,15 +147,58 @@ method to `BaseAgent` and implement it for all four adapters.
 Working directory controlled by cwd parameter to Popen (no explicit flag needed
 for Gemini - it uses cwd).
 
+**`GeminiAgent.build_env`:**
+```python
+def build_env(self, base_env: dict) -> dict:
+    env = {}
+    for key in ["GOOGLE_API_KEY", "GEMINI_API_KEY"]:
+        val = os.environ.get(key)
+        if val is not None:
+            env[key] = val
+    return env
+```
+
 **`CodexAgent.build_command`:**
 ```python
-["codex", "exec", "--dangerously-bypass-approvals-and-sandbox", "-m", self.config.model, "-C", work_dir, prompt]
+["codex", "exec", "--dangerously-bypass-approvals-and-sandbox", "--json", "-m", self.config.model, "-C", work_dir, prompt]
+```
+Note: `--json` outputs JSONL to stdout. This enables structured turn counting
+in Phase 2 (verify exact event shape empirically in sub-phase 2a).
+
+**`CodexAgent.build_env`:**
+```python
+def build_env(self, base_env: dict) -> dict:
+    env = {}
+    for key in ["OPENAI_API_KEY"]:
+        val = os.environ.get(key)
+        if val is not None:
+            env[key] = val
+    return env
 ```
 
 **`KimiAgent.build_command`:**
 ```python
-["kimi", "--print", "--yolo", "--model", self.config.model, "--work-dir", work_dir, "-p", prompt]
+["kimi", "--print", "--yolo", "--output-format", "stream-json", "--model", self.config.model, "--work-dir", work_dir, "-p", prompt]
 ```
+Note: `--output-format stream-json` requires `--print` mode. Verify empirically
+in sub-phase 2a that the output is parseable JSON lines.
+
+**`KimiAgent.build_env`:**
+```python
+def build_env(self, base_env: dict) -> dict:
+    env = {}
+    for key in ["MOONSHOT_API_KEY", "KIMI_API_KEY"]:
+        val = os.environ.get(key)
+        if val is not None:
+            env[key] = val
+    return env
+```
+
+**CRITICAL:** The harness uses a minimal env whitelist. Agent API keys are NOT
+included in the base environment. Each adapter MUST forward its required API
+key(s) from `os.environ` in `build_env()`. Without this, the agent subprocess
+will fail to authenticate. Verify each adapter's required env var names by
+running the CLI with no API key and reading the error message.
 
 ### Acceptance Criteria
 

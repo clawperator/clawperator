@@ -18,7 +18,7 @@ scored `result.json` with a full agent transcript for every run.
 | Completed | none |
 | Remaining | 1a, 1b, 1c, 1d |
 | Current / Next | 1a |
-| Blockers | `docs/gaps/` PR must merge before Phase 1d results count as meaningful |
+| Blockers | `tasks/docs/gaps/` PR must merge before Phase 1d results count as meaningful |
 
 ## Goal
 
@@ -84,7 +84,7 @@ thin surface before adding the complexity of multiple agents and specs.
 | --- | --- |
 | Agent CLI flags (claude) | Run `claude --help` on this machine |
 | ADB device serial convention | `ANDROID_SERIAL` env var is the adb convention |
-| Clawperator command resolution | `CLAWPERATOR_BIN` env var (resolved to `clawperator_cmd: list[str]` during preflight), default `["node", "<repo_root>/apps/node/dist/cli/index.js"]` |
+| Clawperator command resolution | Three-tier: (1) `CLAWPERATOR_BIN` env var if set, (2) local build at `<repo_root>/apps/node/dist/cli/index.js` if present, (3) global `clawperator` via `shutil.which`. Mirrors `apps/node/src/domain/skills/skillsConfig.ts:resolveSkillBin()`. Resolved to `clawperator_cmd: list[str]` during preflight. No `CLAWPERATOR_SCRIPT` env var exists. |
 | Operator package resolution | `CLAWPERATOR_OPERATOR_PACKAGE`, fallback `com.clawperator.operator.dev` |
 | Doctor pre-flight contract | `apps/node/src/cli/commands/doctor.ts` |
 | Result envelope marker | `[Clawperator-Result]` in terminal output |
@@ -95,11 +95,11 @@ thin surface before adding the complexity of multiple agents and specs.
 
 | Aspect | Type | Rule |
 | --- | --- | --- |
-| Answer marker | Deterministic | `CLAWPERATOR_EVAL_ANSWER:` prefix, last occurrence wins |
+| Answer marker | Deterministic | `CLAWPERATOR_EVAL_ANSWER:` prefix at line start, last valid occurrence wins. Captures all non-whitespace content after colon (multi-word values like "Android 15" are captured). Empty-after-colon lines are ignored. |
 | Scorer normalization | Deterministic | Strip leading/trailing whitespace, lowercase, strip leading `android ` if present, then extract the first digit run if one exists. If no digits exist, compare the trimmed lowercase string. Never compare raw strings. |
 | Result marker detection | Deterministic | Count only exact line-start matches of `^\\[Clawperator-Result\\]`; substring matches are ignored. This is best-effort telemetry, not a status gate. Do not let parsing affect control flow. |
 | `used_disallowed_tool` detection | Judgment | Detect agent-initiated `adb shell` in transcript. Avoid false positives from Clawperator's own verbose log output. Log `violations.used_adb` separately and keep the heuristic diagnostic-only. |
-| Prompt rendering contract | Deterministic | Implement a single `build_prompt(template_path: str, variables: dict) -> str` function. Variables are explicit: `CLAWPERATOR_BIN`, `CLAWPERATOR_CMD`, `CLAWPERATOR_OPERATOR_PACKAGE`, `DEVICE_SERIAL`, `DOCS_URL`. No implicit string replacement or ad hoc formatting. Use the rendered prompt as input to the agent once per run, and make `CLAWPERATOR_CMD` the full shell-safe base command string (for example `node /abs/path/to/index.js`). |
+| Prompt rendering contract | Deterministic | Implement a single `build_prompt(template_path: str, variables: dict) -> str` function. Variables are explicit: `CLAWPERATOR_CMD`, `CLAWPERATOR_OPERATOR_PACKAGE`, `DEVICE_SERIAL`, `DOCS_URL`. No `CLAWPERATOR_BIN` in prompt variables (it is a preflight input only). No implicit string replacement or ad hoc formatting. Use the rendered prompt as input to the agent once per run, and make `CLAWPERATOR_CMD` the full shell-safe base command string (for example `node /abs/path/to/index.js`). |
 | Command execution contract | Deterministic | The prompt must tell the agent to execute Clawperator commands exactly as shell commands using the provided base command. Do not reinterpret or rewrite the command structure. |
 | Run ID format | Deterministic | `<eval_id>-<YYYYMMDD-HHMMSS>-<agent_type>-<model_short>[-<label_slug>]` |
 
@@ -116,7 +116,7 @@ thin surface before adding the complexity of multiple agents and specs.
 | What timestamp records ground truth? | Record `ground_truth_collected_at` when `adb shell getprop ro.build.version.release` is read. If a post-run re-read is performed, store it separately for logging only and never use it for scoring. |
 | Public-surface working directory | Always `tempfile.mkdtemp()` once per run. Never the repo root. The temp dir path must not be under or adjacent to the repo root, and must not contain any repo files or symlinks. **Note: this is soft isolation** - the agent is not sandboxed. It could read the parent filesystem if it tried. The harness controls what it puts *in* the agent's environment and working directory, not what the agent can access beyond that. |
 | Agent environment | Start from a minimal whitelist (`PATH`, `HOME`, `LANG`, `LC_ALL`) and inject only the eval variables needed for the run. Do not inherit the full parent environment blindly. |
-| CLAWPERATOR_BIN representation | Internal representation is `clawperator_cmd: list[str]` (always an argv list). `CLAWPERATOR_BIN` env var is accepted as input from the user but resolved into `clawperator_cmd` during preflight. Never store a compound command string like 'node /path/script.js' as a single string anywhere in the harness. The agent receives only the full shell-safe command string derived from that argv list, never a partially composed executable name. Subprocess calls always use `env.clawperator_cmd + [subcommand, ...]` as the argv list. |
+| CLAWPERATOR_BIN representation | Internal representation is `clawperator_cmd: list[str]` (always an argv list). `CLAWPERATOR_BIN` env var is accepted as input from the user but resolved into `clawperator_cmd` during preflight. There is no `CLAWPERATOR_SCRIPT` env var - do not invent one. Never store a compound command string like 'node /path/script.js' as a single string anywhere in the harness. The agent receives only the full shell-safe command string derived from that argv list (via `shlex.join()`), never a partially composed executable name. Subprocess calls always use `env.clawperator_cmd + [subcommand, ...]` as the argv list. |
 | Context file in temp dir | Check whether Claude Code requires a context file to function in a directory with no CLAUDE.md. If required, create a minimal one: contains only `https://docs.clawperator.com` and nothing else. |
 | Prompt traceability | If outbound HTTP access can be observed, capture accessed domains for triage. At minimum, grep the transcript for visible docs-linked domains and record them in diagnostics. |
 
@@ -178,6 +178,11 @@ device-specific and outside harness scope.
 - Failing to capture agent-binary availability up front. Resolve the adapter's
   executable during preflight and abort with `agent_binary_not_found` if it is
   unavailable.
+- Omitting agent API keys from the subprocess environment. The harness uses a
+  minimal env whitelist that does NOT include API keys. Each agent adapter's
+  `build_env()` method MUST forward the required API key(s) from `os.environ`
+  (e.g. `ANTHROPIC_API_KEY` for Claude). Without this, the agent subprocess
+  silently fails to authenticate.
 
 ## Open Questions (resolve during Phase 1 implementation)
 

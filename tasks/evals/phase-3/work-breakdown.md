@@ -82,7 +82,8 @@ Add version pinning to `result.json`.
      note if the env var is set and differs).
 3. Capture `clawperator_npm_version`:
    - For `local-dev`: read from `apps/node/package.json` `"version"` field.
-   - For `published`: parse `clawperator version --json` output.
+   - For `published`: parse `clawperator version` output (JSON by default;
+     the key is `"cliVersion"` - see `apps/node/src/cli/commands/version.ts:19`).
 4. Add `clawperator_npm_version` to the `Environment` dataclass and to
    `result.json` under `environment`.
 5. Remove the `--runtime published` "not implemented" error from `run_eval.py`.
