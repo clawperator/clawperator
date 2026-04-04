@@ -588,7 +588,12 @@ def run_eval(
         transcript_text = "".join(transcript_parts)
         finished_at = format_timestamp(env.device_timezone)
         wall_clock_s = time.monotonic() - started_mono
-        score_result = score(transcript_text, env.ground_truth_android_version, answer_extracted_raw=answer_extracted_raw)
+        score_result = score(
+            transcript_text,
+            env.ground_truth_android_version,
+            answer_extracted_raw=answer_extracted_raw,
+            allow_transcript_fallback=False,
+        )
         if score_result.answer_extracted_raw is not None and status != "budget_exceeded":
             status = "pass" if score_result.answer_correct else "fail"
         elif status != "budget_exceeded" and timeout_triggered.is_set():
@@ -695,7 +700,12 @@ def run_eval(
         failure_reason = str(exc) if str(exc) else exc.__class__.__name__
         status = "error"
         if score_result is None:
-            score_result = score(transcript_text, env.ground_truth_android_version, answer_extracted_raw=answer_extracted_raw)
+            score_result = score(
+                transcript_text,
+                env.ground_truth_android_version,
+                answer_extracted_raw=answer_extracted_raw,
+                allow_transcript_fallback=False,
+            )
         logger.error(exc)
         logger.score(
             outcome_status=status,

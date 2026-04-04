@@ -40,6 +40,12 @@ def test_score_no_answer():
     assert result.answer_extracted_raw is None
 
 
+def test_score_can_disable_transcript_fallback():
+    result = score("CLAWPERATOR_EVAL_ANSWER: 15\n", "15", allow_transcript_fallback=False)
+    assert result.answer_correct is False
+    assert result.answer_extracted_raw is None
+
+
 def test_extract_answer_malformed_marker_no_value():
     transcript_malformed = "CLAWPERATOR_EVAL_ANSWER:\n"
     assert extract_answer(transcript_malformed) is None
