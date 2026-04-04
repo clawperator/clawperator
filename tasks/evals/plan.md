@@ -17,67 +17,10 @@ are treated as meaningful benchmarks.
 
 | PR | Phase | Scope | Agent tier |
 | --- | --- | --- | --- |
-| PR-1 | 1 | Harness scaffold + first eval + Claude adapter | thinking |
+| PR-1 | 1 | Harness scaffold + first eval + Claude eval-subject adapter | thinking |
 | PR-2 | 2 | Gemini, Codex, Kimi adapters + turn counting | default |
 | PR-3 | 3 | Published runtime target + full-repo mode | default |
 | PR-4 | 4 | Skill generation and replay eval | thinking |
-
-## Implementing Agent
-
-**Kimi** (`kimi` CLI, version 1.27.0) is the default coding agent for
-implementing these plans. All sub-phases should be executed using Kimi unless
-a specific sub-phase explicitly requires a different agent.
-
-### Kimi Invocation Reference
-
-```bash
-# Non-interactive with full output (default for implementation tasks):
-kimi --print --yolo -p "<prompt>" --output-format stream-json \
-  --model kimi-code/kimi-for-coding \
-  --work-dir <dir>
-
-# Flags:
-#   --print           Non-interactive mode (implies --yolo)
-#   --yolo / -y       Auto-approve all tool actions
-#   --output-format   stream-json | text (stream-json for structured output)
-#   --model / -m      Must use provider-prefixed name: "kimi-code/kimi-for-coding"
-#                     Short names like "kimi-k2" do NOT work
-#   --work-dir / -w   Set the agent's working directory (default: cwd)
-#   --thinking        Enable thinking mode (for complex sub-phases)
-#   --no-thinking     Disable thinking mode (for simple sub-phases)
-#   -p / -c           Prompt text
-```
-
-### Kimi Authentication
-
-Kimi uses OAuth stored credentials in `~/.kimi/credentials`, NOT env-var API
-keys. The `build_env()` adapter does not need to forward any API key. Kimi
-works with a minimal environment as long as `~/.kimi/` is accessible (the HOME
-env var must be in the whitelist, which it already is).
-
-### Kimi Stream-JSON Output Format
-
-Each JSON line has this shape:
-
-```json
-// Assistant message (with optional tool_calls):
-{"role":"assistant","content":[{"type":"think","think":"...","encrypted":null},{"type":"text","text":"..."}],"tool_calls":[...]}
-
-// Tool result:
-{"role":"tool","content":[{"type":"text","text":"..."}],"tool_call_id":"tool_..."}
-```
-
-Turn counting: count lines where `"role":"assistant"` appears at the top level.
-Each assistant line is one complete turn. Tool-result lines (`"role":"tool"`)
-are NOT turns.
-
-### Agent Tier to Kimi Flag Mapping
-
-| Agent tier | Kimi flags | When to use |
-| --- | --- | --- |
-| fast | `--no-thinking --print --yolo` | Scaffolding, file creation, simple edits |
-| default | `--print --yolo` (uses config default for thinking) | Most implementation work |
-| thinking | `--thinking --print --yolo` | Complex design decisions, architecture, scorer logic |
 
 ## Status
 
@@ -171,7 +114,7 @@ evals/
 Run artifacts (gitignored):
 ```
 evals/runs/
-└── android-version-20260328-143022-claude-opus/
+└── android-version-20260328-143022-claude-sonnet/
     ├── config.json
     ├── result.json
     └── transcript.txt
@@ -209,7 +152,7 @@ Note: "Confidence" is for turn counting only. All four are viable for task compl
   "eval_id": "android-version",
   "started_at": "<ISO8601>",
   "finished_at": "<ISO8601>",
-  "agent": { "type": "claude", "model": "claude-opus-4-5", "extra_flags": [] },
+  "agent": { "type": "claude", "model": "claude-sonnet-4-6", "extra_flags": [] },
   "knowledge_mode": "public-surface",
   "runtime_target": "local-dev",
   "spec": {
@@ -217,7 +160,7 @@ Note: "Confidence" is for turn counting only. All four are viable for task compl
     "prompt_file": "prompt-public.md",
     "prompt_sha256": "<sha256 of rendered prompt>"
   },
-  "run_label": "baseline-opus",
+  "run_label": "baseline-sonnet",
   "invocation": {
     "command": ["claude", "-p", "...", "--model", "...", "..."],
     "work_dir": "/tmp/clawperator-eval-<id>",

@@ -3,7 +3,7 @@
 ## Executive Summary
 
 Ship the first working end-to-end eval run. One eval spec (`android-version`),
-one agent adapter (Claude), wall-clock timeout only. The harness produces a
+one agent adapter for the Claude eval subject, wall-clock timeout only. The harness produces a
 scored `result.json` with a full agent transcript for every run.
 
 1 PR, 4 sub-phases. All sub-phases ship in the same PR.
@@ -12,13 +12,13 @@ scored `result.json` with a full agent transcript for every run.
 
 | Item | Value |
 | --- | --- |
-| State | not started |
+| State | complete |
 | Total PRs | 1 |
 | Total phases | 4 (1a-1d) |
-| Completed | none |
-| Remaining | 1a, 1b, 1c, 1d |
-| Current / Next | 1a |
-| Blockers | `tasks/docs/gaps/` PR must merge before Phase 1d results count as meaningful |
+| Completed | 1a, 1b, 1c, 1d |
+| Remaining | none |
+| Current / Next | none |
+| Blockers | none |
 
 ## Goal
 
@@ -33,17 +33,6 @@ Phase 1 is the foundation everything else builds on. Keeping it to one agent
 and one eval is intentional: it is faster to discover harness problems on a
 thin surface before adding the complexity of multiple agents and specs.
 
-## Implementing Agent
-
-**Kimi** is the default coding agent for implementing this phase. See
-`tasks/evals/plan.md` "Implementing Agent" section for full invocation
-reference, model name (`kimi-code/kimi-for-coding`), and agent tier to
-Kimi flag mapping.
-
-Note: "one agent adapter (Claude)" above refers to the eval subject - the agent
-being evaluated. The implementing agent (Kimi) writes the harness code.
-The Claude adapter is built first because Claude is the most well-understood
-eval subject.
 
 ## In Scope
 

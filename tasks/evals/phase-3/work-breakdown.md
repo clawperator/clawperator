@@ -6,13 +6,11 @@ Parent plan: `tasks/evals/phase-3/plan.md`
 
 1 PR, 2 sub-phases. Phase 2 PR must be merged before starting.
 
-| Sub-phase | Purpose | Agent tier | Kimi flags |
+| Sub-phase | Purpose | Agent tier | Execution flags |
 | --- | --- | --- | --- |
 | 3a | Published runtime target + version pinning | default | `--print --yolo` |
 | 3b | Full-repo knowledge mode + prompt + validation | default | `--print --yolo` |
 
-**Implementing agent:** Kimi (`kimi` CLI v1.27.0). See `tasks/evals/plan.md`
-"Implementing Agent" section for invocation reference and model name.
 
 ## Status
 
@@ -103,12 +101,12 @@ Add version pinning to `result.json`.
 
 ```bash
 python evals/run_eval.py android-version \
-  --agent claude --model claude-opus-4-5 \
+  --agent claude --model claude-sonnet-4-6 \
   --runtime published --dry-run
 # Verify binary path shown is the global install, not apps/node/
 
 python evals/run_eval.py android-version \
-  --agent claude --model claude-opus-4-5 \
+  --agent claude --model claude-sonnet-4-6 \
   --runtime published --device <serial>
 python -m json.tool evals/runs/<run_id>/result.json | grep "clawperator_npm_version"
 ```
@@ -165,7 +163,7 @@ stub error from the CLI.
 6. Run a validation eval in `full-repo` mode:
    ```bash
    python evals/run_eval.py android-version \
-     --agent claude --model claude-opus-4-5 \
+     --agent claude --model claude-sonnet-4-6 \
      --mode full-repo --device <serial>
    ```
 7. Verify the run `config.json` shows `work_dir` as the repo root, not a
@@ -182,11 +180,11 @@ stub error from the CLI.
 
 ```bash
 python evals/run_eval.py android-version \
-  --agent claude --model claude-opus-4-5 \
+  --agent claude --model claude-sonnet-4-6 \
   --mode full-repo --dry-run
 
 python evals/run_eval.py android-version \
-  --agent claude --model claude-opus-4-5 \
+  --agent claude --model claude-sonnet-4-6 \
   --mode full-repo --device <serial>
 python -m json.tool evals/runs/<run_id>/config.json | grep "work_dir"
 ```

@@ -7,27 +7,24 @@ Parent plan: `tasks/evals/phase-1/plan.md`
 1 PR, 4 sub-phases. All ship together. Sub-phases are sequenced; do not
 start the next until the current one passes its acceptance criteria.
 
-| Sub-phase | Purpose | Agent tier | Kimi flags |
+| Sub-phase | Purpose | Agent tier | Execution flags |
 | --- | --- | --- | --- |
 | 1a | Directory scaffold + gitignore | fast | `--no-thinking --print --yolo` |
 | 1b | Harness core (environment, runner, scorer, artifacts, claude adapter) | thinking | `--thinking --print --yolo` |
 | 1c | Eval spec + prompt + run_eval.py CLI + README | default | `--print --yolo` |
 | 1d | Validation: 1 passing run + 1 error run + dry-run | default | `--print --yolo` |
 
-**Implementing agent:** Kimi (`kimi` CLI v1.27.0). See `tasks/evals/plan.md`
-"Implementing Agent" section for invocation reference, model name, and flag
-mapping. Model must be `kimi-code/kimi-for-coding` (short names do not work).
 
 ## Status
 
 | Item | Value |
 | --- | --- |
-| State | not started |
+| State | complete |
 | Total PRs | 1 |
 | Total sub-phases | 4 (1a-1d) |
-| Completed | none |
-| Remaining | 1a, 1b, 1c, 1d |
-| Current / Next | 1a |
+| Completed | 1a, 1b, 1c, 1d |
+| Remaining | none |
+| Current / Next | none |
 | Blockers | none |
 
 ## Hard Rules
@@ -849,13 +846,13 @@ Constraints:
 ```
 python evals/run_eval.py android-version \
   --agent claude \
-  --model claude-opus-4-5 \
+  --model claude-sonnet-4-6 \
   [--device <serial>] \
   [--mode public-surface|full-repo] \
   [--runtime local-dev|published] \
   [--timeout-s 300] \
   [--max-turns 40] \
-  [--label baseline-opus] \
+  [--label baseline-sonnet] \
   [--runs-dir evals/runs] \
   [--dry-run]
 ```
@@ -885,7 +882,7 @@ slug to `run_id` when present.
 
 Successful run: print the run directory path to stdout on completion.
 Also print a one-line human summary on stdout in the form
-`PASS | claude/opus | 87.4s | answer=15` (status, agent/model shorthand,
+`PASS | claude/sonnet | 87.4s | answer=15` (status, agent/model shorthand,
 wall-clock duration, normalized answer).
 
 ### README
@@ -959,8 +956,8 @@ section and fill it in after the 1d validation runs reveal the real pattern.
 4. Create `evals/README.md` with the required sections above.
 5. Verify dry-run works:
    ```bash
-   python evals/run_eval.py android-version \
-     --agent claude --model claude-opus-4-5 --dry-run
+python evals/run_eval.py android-version \
+     --agent claude --model claude-sonnet-4-6 --dry-run
    ```
    Expected: prints resolved config, exact command, work dir, env overrides,
    and prompt text; exits 0, no agent spawned.
@@ -1036,8 +1033,8 @@ acceptance criteria are met: 1 passing run, 1 error run, dry-run exits 0.
 2. Run the eval once. Record the run ID and outcome.
    Use an explicit device serial if more than one device is connected:
    ```bash
-   python evals/run_eval.py android-version \
-     --agent claude --model claude-opus-4-5 \
+python evals/run_eval.py android-version \
+     --agent claude --model claude-sonnet-4-6 \
      --device <device_serial>
    ```
 3. Verify the run is `pass`. Read the passing transcript and verify it shows
@@ -1045,13 +1042,18 @@ acceptance criteria are met: 1 passing run, 1 error run, dry-run exits 0.
 4. Simulate an environment failure. Disconnect the device or stop the
    Operator APK, then run:
    ```bash
-   python evals/run_eval.py android-version \
-     --agent claude --model claude-opus-4-5
+python evals/run_eval.py android-version \
+     --agent claude --model claude-sonnet-4-6
    ```
    Verify the output shows `outcome.status = "error"` in `result.json`.
 5. Run dry-run and verify it exits 0 with the prompt printed.
 6. Capture run IDs of the passing run and error run.
    Note them in this section for human review.
+
+### Evidence
+
+- Passing run: `android-version-20260404-213738-282-6c7d79-claude-haiku-phase1-pass-haiku-2`
+- Error run: `android-version-20260404-213924-384-7226c3-claude-haiku-phase1-error-haiku`
 
 ### Acceptance Criteria
 

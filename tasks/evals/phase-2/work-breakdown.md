@@ -7,14 +7,12 @@ Parent plan: `tasks/evals/phase-2/plan.md`
 1 PR, 3 sub-phases. Sub-phases are sequenced; complete one before starting
 the next. Phase 1 PR must be merged before starting.
 
-| Sub-phase | Purpose | Agent tier | Kimi flags |
+| Sub-phase | Purpose | Agent tier | Execution flags |
 | --- | --- | --- | --- |
 | 2a | Gemini, Codex, Kimi adapters + count_turn in base + Claude count_turn | default | `--print --yolo` |
 | 2b | Turn budget enforcement in runner.py + result schema changes | default | `--print --yolo` |
 | 2c | `--rescore` flag + validation runs for all three new agents | default | `--print --yolo` |
 
-**Implementing agent:** Kimi (`kimi` CLI v1.27.0). See `tasks/evals/plan.md`
-"Implementing Agent" section for invocation reference and model name.
 
 ## Status
 
@@ -296,7 +294,7 @@ Wire `count_turn` into `runner.py`. Enforce `--max-turns`. Add
 ```bash
 # Verify budget_exceeded status with a very low turn budget
 python evals/run_eval.py android-version \
-  --agent claude --model claude-opus-4-5 \
+  --agent claude --model claude-sonnet-4-6 \
   --max-turns 2 --device <serial>
 cat evals/runs/<run_id>/result.json | python -m json.tool | grep -A2 '"status"'
 # Expected: "budget_exceeded"

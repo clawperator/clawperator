@@ -1,0 +1,25 @@
+{
+  "eval_id": "android-version",
+  "name": "Determine Android Version via Settings",
+  "description": "Agent must navigate Android Settings using the Clawperator CLI to determine the device Android version.",
+  "version": "1.0.0",
+  "prompts": {
+    "public-surface": "prompt-public.md",
+    "full-repo": "prompt-full-repo.md"
+  },
+  "environment": {
+    "requires_device": true,
+    "requires_clawperator_doctor": true,
+    "requires_settings_app": true
+  },
+  "budget": {
+    "default_timeout_s": 300,
+    "default_max_turns": 40
+  },
+  "scoring": {
+    "method": "exact_match_normalized",
+    "ground_truth_source": "adb_getprop",
+    "ground_truth_prop": "ro.build.version.release",
+    "answer_marker": "CLAWPERATOR_EVAL_ANSWER"
+  }
+}
