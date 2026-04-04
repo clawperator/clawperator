@@ -1050,6 +1050,11 @@ python evals/run_eval.py android-version \
 6. Capture run IDs of the passing run and error run.
    Note them in this section for human review.
 
+### Evidence
+
+- Passing run: `android-version-20260404-213738-282-6c7d79-claude-haiku-phase1-pass-haiku-2`
+- Error run: `android-version-20260404-213924-384-7226c3-claude-haiku-phase1-error-haiku`
+
 ### Acceptance Criteria
 
 All must be true:

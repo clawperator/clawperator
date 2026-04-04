@@ -5,10 +5,12 @@ import argparse
 import hashlib
 import json
 import os
+import platform
 import shlex
 import shutil
 import tempfile
 import sys
+import time
 from pathlib import Path
 
 
@@ -18,6 +20,7 @@ if str(ROOT) not in sys.path:
 
 from evals.harness.agents.base import AgentConfig
 from evals.harness.agents.claude import ClaudeAgent
+from evals.harness.artifacts import make_run_id, write_run
 from evals.harness.environment import preflight, resolve_inputs
 from evals.harness.runner import build_prompt, run_eval, _prepare_clawperator_launcher
 
@@ -75,10 +78,136 @@ def _render_dry_run(
     print(prompt_text)
 
 
+def _write_preflight_failure_run(
+    *,
+    args: argparse.Namespace,
+    spec: dict,
+    agent: ClaudeAgent,
+    failure_reason: str,
+) -> Path:
+    runs_dir = Path(args.runs_dir)
+    run_id = make_run_id(args.eval_id, args.agent, args.model, args.label)
+    run_dir = runs_dir / run_id
+    run_dir.mkdir(parents=True, exist_ok=False)
+
+    prompt_path = ROOT / "evals" / "specs" / args.eval_id / spec["prompts"][args.mode]
+    prompt_text = build_prompt(
+        str(prompt_path),
+        {
+            "CLAWPERATOR_CMD": "clawperator",
+            "CLAWPERATOR_OPERATOR_PACKAGE": os.environ.get("CLAWPERATOR_OPERATOR_PACKAGE", "com.clawperator.operator.dev"),
+            "DEVICE_SERIAL": "<unresolved>",
+            "DOCS_URL": "https://docs.clawperator.com",
+        },
+    )
+    prompt_sha256 = hashlib.sha256(prompt_text.encode("utf-8")).hexdigest()
+    command = agent.build_command(prompt_text, "<tempdir>")
+    started_at = finished_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    result = {
+        "run_id": run_id,
+        "eval_id": args.eval_id,
+        "started_at": started_at,
+        "finished_at": finished_at,
+        "agent": {
+            "type": args.agent,
+            "model": args.model,
+            "extra_flags": list(agent.config.extra_flags),
+        },
+        "knowledge_mode": args.mode,
+        "runtime_target": args.runtime,
+        "spec": {
+            "eval_version": spec.get("version", spec.get("eval_version", "1.0.0")),
+            "prompt_file": prompt_path.name,
+            "prompt_sha256": prompt_sha256,
+        },
+        "run_label": args.label,
+        "invocation": {
+            "command": command,
+            "work_dir": "<tempdir>",
+            "env_overrides": {},
+        },
+        "environment": {
+            "device_serial": None,
+            "ground_truth_android_version": None,
+            "ground_truth_collected_at": None,
+            "ground_truth_rechecked_at": None,
+            "clawperator_cmd": ["clawperator"],
+            "clawperator_version": None,
+            "operator_package": os.environ.get("CLAWPERATOR_OPERATOR_PACKAGE", "com.clawperator.operator.dev"),
+            "cwd": "<redacted>",
+            "runs_dir": "<redacted>",
+        },
+        "outcome": {
+            "status": "error",
+            "answer_extracted_raw": None,
+            "answer_normalized": None,
+            "ground_truth_normalized": None,
+            "answer_correct": False,
+            "failure_reason": failure_reason,
+        },
+        "metrics": {
+            "wall_clock_s": 0.0,
+            "time_to_first_clawperator_command_s": None,
+            "timeout_budget_s": args.timeout_s,
+            "clawperator_commands_detected": 0,
+            "actions_per_turn": None,
+            "answer_emitted": False,
+            "violations": {"used_adb": False},
+            "diagnostics": {
+                "used_snapshot": False,
+                "used_open_settings": False,
+                "navigated_settings": False,
+                "failure_classification": "unknown",
+                "domains_accessed": [],
+            },
+            "used_disallowed_tool": False,
+            "turns_counted": None,
+            "turns_budget": args.max_turns,
+        },
+        "artifacts": {"transcript": "transcript.txt", "config": "config.json"},
+    }
+    config = {
+        "run_id": run_id,
+        "eval_id": args.eval_id,
+        "agent": {
+            "type": args.agent,
+            "model": args.model,
+            "extra_flags": list(agent.config.extra_flags),
+        },
+        "knowledge_mode": args.mode,
+        "runtime_target": args.runtime,
+        "spec": {
+            "prompt_file": prompt_path.name,
+            "prompt_sha256": prompt_sha256,
+        },
+        "run_label": args.label,
+        "invocation": {
+            "command": command,
+            "work_dir": "<tempdir>",
+            "env_overrides": {},
+        },
+        "environment": {
+            "python_version": platform.python_version(),
+            "platform": platform.platform(),
+            "cwd": "<redacted>",
+            "agent_binary_version": "unknown",
+            "env_hash": "",
+            "runs_dir": "<redacted>",
+            "clawperator_cmd": ["clawperator"],
+        },
+        "timeout_s": args.timeout_s,
+        "max_turns": args.max_turns,
+    }
+    write_run(run_dir, result, config, "")
+    return run_dir
+
+
 def _minimal_base_env() -> dict[str, str]:
     return {
         "PATH": os.environ["PATH"],
         "HOME": os.environ["HOME"],
+        "USER": os.environ.get("USER", ""),
+        "LOGNAME": os.environ.get("LOGNAME", os.environ.get("USER", "")),
         "LANG": os.environ.get("LANG", "C.UTF-8"),
         "LC_ALL": os.environ.get("LC_ALL", "C.UTF-8"),
     }
@@ -198,8 +327,14 @@ def main(argv: list[str] | None = None) -> int:
     try:
         env = preflight(args.device)
     except EnvironmentError as exc:
-        print(str(exc), file=sys.stderr)
-        return 1
+        run_dir = _write_preflight_failure_run(args=args, spec=spec, agent=agent, failure_reason=str(exc))
+        result = json.loads((run_dir / "result.json").read_text(encoding="utf-8"))
+        status = result["outcome"]["status"].upper()
+        answer = result["outcome"]["answer_normalized"] or "none"
+        duration = result["metrics"]["wall_clock_s"]
+        print(run_dir)
+        print(f"{status} | {args.agent}/{_model_shorthand(args.agent, args.model)} | {duration:.1f}s | answer={answer}")
+        return 0
 
     run_dir = run_eval(
         spec=spec,

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from evals.harness.scorer import extract_answer, normalize_version, score
+from evals.harness.scorer import extract_answer, extract_answer_from_transcript, normalize_version, score
 
 
 def test_normalize_version():
@@ -53,6 +53,22 @@ def test_extract_answer_whitespace_only():
 def test_extract_answer_inside_json_blob_does_not_match():
     transcript_inside_json = '{"output": "CLAWPERATOR_EVAL_ANSWER: 15"}'
     assert extract_answer(transcript_inside_json) is None
+
+
+def test_extract_answer_from_assistant_json_line():
+    transcript_json_line = (
+        '{"type":"assistant","message":{"role":"assistant","content":['
+        '{"type":"text","text":"The snapshot clearly shows the Android version.\\n\\nCLAWPERATOR_EVAL_ANSWER: 16"}'
+        ']}}'
+    )
+    assert extract_answer_from_transcript(transcript_json_line) == "16"
+
+
+def test_extract_answer_from_result_json_line():
+    transcript_result_json = (
+        '{"type":"result","result":"The snapshot clearly shows the Android version.\\n\\nCLAWPERATOR_EVAL_ANSWER: 16"}'
+    )
+    assert extract_answer_from_transcript(transcript_result_json) == "16"
 
 
 def test_extract_answer_line_start_inside_multiline_string_matches():

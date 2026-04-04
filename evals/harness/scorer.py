@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import re
+import json
 
 
 ANSWER_PATTERN = re.compile(r"^CLAWPERATOR_EVAL_ANSWER:\s*(\S.*?)\s*$", re.MULTILINE)
@@ -22,6 +23,60 @@ def extract_answer(transcript: str) -> str | None:
     return matches[-1] if matches else None
 
 
+def extract_answer_from_line(line: str) -> str | None:
+    matches = ANSWER_PATTERN.findall(line)
+    return matches[-1] if matches else None
+
+
+def _iter_text_values(value):
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, list):
+        for item in value:
+            yield from _iter_text_values(item)
+    elif isinstance(value, dict):
+        for item in value.values():
+            yield from _iter_text_values(item)
+
+
+def extract_answer_from_json_line(line: str) -> str | None:
+    try:
+        payload = json.loads(line)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    payload_type = payload.get("type")
+    if payload_type == "assistant":
+        message = payload.get("message")
+        if isinstance(message, dict):
+            for text in _iter_text_values(message.get("content")):
+                match = extract_answer_from_line(text)
+                if match is not None:
+                    return match
+    elif payload_type == "result":
+        result_text = payload.get("result")
+        if isinstance(result_text, str):
+            match = extract_answer_from_line(result_text)
+            if match is not None:
+                return match
+    return None
+
+
+def extract_answer_from_transcript(transcript: str) -> str | None:
+    matches = ANSWER_PATTERN.findall(transcript)
+    if matches:
+        return matches[-1]
+    for line in transcript.splitlines():
+        answer = extract_answer_from_line(line)
+        if answer is not None:
+            return answer
+        answer = extract_answer_from_json_line(line)
+        if answer is not None:
+            return answer
+    return None
+
+
 def detect_disallowed_tool(transcript: str) -> bool:
     cleaned = _ANSI_PATTERN.sub("", transcript)
     return _DISALLOWED_TOOL_PATTERN.search(cleaned) is not None
@@ -37,7 +92,7 @@ class ScorerResult:
 
 
 def score(transcript: str, ground_truth: str, answer_extracted_raw: str | None = None) -> ScorerResult:
-    raw_answer = answer_extracted_raw if answer_extracted_raw is not None else extract_answer(transcript)
+    raw_answer = answer_extracted_raw if answer_extracted_raw is not None else extract_answer_from_transcript(transcript)
     answer_normalized = normalize_version(raw_answer) if raw_answer is not None else None
     ground_truth_normalized = normalize_version(ground_truth)
     answer_correct = answer_normalized is not None and answer_normalized == ground_truth_normalized

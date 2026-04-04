@@ -64,6 +64,8 @@ def _minimal_base_env(
     return {
         "PATH": path,
         "HOME": os.environ["HOME"],
+        "USER": os.environ.get("USER", ""),
+        "LOGNAME": os.environ.get("LOGNAME", os.environ.get("USER", "")),
         "LANG": os.environ.get("LANG", "C.UTF-8"),
         "LC_ALL": os.environ.get("LC_ALL", "C.UTF-8"),
         "ANDROID_SERIAL": device_serial,

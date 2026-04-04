@@ -13,6 +13,7 @@ class ClaudeAgent(BaseAgent):
             "-p", prompt,
             "--model", self.config.model,
             "--dangerously-skip-permissions",
+            "--tools", "Bash",
             "--output-format", "stream-json",
             "--verbose",
         ]
