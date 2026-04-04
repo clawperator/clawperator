@@ -5,16 +5,13 @@ import sys
 import threading
 import traceback
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from .timeutil import format_timestamp
+
 
 _SENSITIVE_KEY_RE = ("KEY", "SECRET", "TOKEN", "PASSWORD")
-
-
-def _timestamp() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
 def _redact_value(key: str, value: Any) -> Any:
@@ -33,6 +30,7 @@ def _sanitize_mapping(mapping: dict[str, Any] | None) -> dict[str, Any] | None:
 class HarnessLogger:
     run_id: str
     log_file: Path | None = None
+    timestamp_timezone_name: str | None = None
     _lock: threading.Lock = field(default_factory=threading.Lock, init=False, repr=False)
     _file_handle: Any = field(default=None, init=False, repr=False)
     _file_disabled: bool = field(default=False, init=False, repr=False)
@@ -60,7 +58,7 @@ class HarnessLogger:
 
     def log(self, level: str, event: str, message: str | None = None, **fields: Any) -> None:
         payload = {
-            "ts": _timestamp(),
+            "ts": format_timestamp(self.timestamp_timezone_name),
             "run_id": self.run_id,
             "level": level,
             "event": event,
@@ -113,6 +111,5 @@ class HarnessLogger:
                 self._file_handle = None
 
 
-def get_logger(run_id: str, log_file: Path | None = None) -> HarnessLogger:
-    return HarnessLogger(run_id=run_id, log_file=log_file)
-
+def get_logger(run_id: str, log_file: Path | None = None, timestamp_timezone_name: str | None = None) -> HarnessLogger:
+    return HarnessLogger(run_id=run_id, log_file=log_file, timestamp_timezone_name=timestamp_timezone_name)

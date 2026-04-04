@@ -10,7 +10,6 @@ import shlex
 import shutil
 import tempfile
 import sys
-import time
 from pathlib import Path
 
 
@@ -23,6 +22,7 @@ from evals.harness.agents.claude import ClaudeAgent
 from evals.harness.artifacts import make_run_id, write_run
 from evals.harness.environment import preflight, resolve_inputs
 from evals.harness.runner import build_prompt, run_eval, _prepare_clawperator_launcher
+from evals.harness.timeutil import format_timestamp
 
 
 SUPPORTED_AGENTS = {"claude": ClaudeAgent}
@@ -102,7 +102,7 @@ def _write_preflight_failure_run(
     )
     prompt_sha256 = hashlib.sha256(prompt_text.encode("utf-8")).hexdigest()
     command = agent.build_command(prompt_text, "<tempdir>")
-    started_at = finished_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    started_at = finished_at = format_timestamp()
     result = {
         "run_id": run_id,
         "eval_id": args.eval_id,

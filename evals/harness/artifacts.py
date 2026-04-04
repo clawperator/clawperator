@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from uuid import uuid4
 
@@ -15,8 +15,23 @@ def _slugify(value: str) -> str:
     return re.sub(r"-+", "-", slug).strip("-")
 
 
-def make_run_id(eval_id: str, agent_type: str, model: str, label: str | None = None) -> str:
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S-%f")[:-3]
+def make_run_id(
+    eval_id: str,
+    agent_type: str,
+    model: str,
+    label: str | None = None,
+    timezone_name: str | None = None,
+) -> str:
+    if timezone_name is None:
+        timestamp = datetime.now().astimezone()
+    else:
+        try:
+            from zoneinfo import ZoneInfo
+
+            timestamp = datetime.now(ZoneInfo(timezone_name))
+        except Exception:
+            timestamp = datetime.now().astimezone()
+    timestamp = timestamp.strftime("%Y%m%d-%H%M%S-%f")[:-3]
     entropy = uuid4().hex[:6]
     model_short = model.lower()[:12]
     parts = [eval_id, timestamp, entropy, agent_type, model_short]

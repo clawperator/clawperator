@@ -21,6 +21,7 @@ from .artifacts import make_run_id, write_run
 from .environment import Environment, REPO_ROOT
 from .logger import get_logger
 from .scorer import extract_answer, score
+from .timeutil import format_timestamp
 
 
 DOCS_URL = "https://docs.clawperator.com"
@@ -400,10 +401,10 @@ def run_eval(
     eval_id = spec["eval_id"]
     eval_version = spec.get("version", spec.get("eval_version", "1.0.0"))
     runs_dir.mkdir(parents=True, exist_ok=True)
-    run_id = make_run_id(eval_id, agent.config.type_id, agent.config.model, label)
+    run_id = make_run_id(eval_id, agent.config.type_id, agent.config.model, label, timezone_name=env.device_timezone)
     run_dir = runs_dir / run_id
     run_dir.mkdir(parents=True, exist_ok=False)
-    logger = get_logger(run_id, log_file=run_dir / "harness.log")
+    logger = get_logger(run_id, log_file=run_dir / "harness.log", timestamp_timezone_name=env.device_timezone)
     logger.state("starting")
 
     work_dir = Path(tempfile.mkdtemp()) if knowledge_mode == "public-surface" else REPO_ROOT
@@ -500,7 +501,7 @@ def run_eval(
         _run_keyevent(env.device_serial, "KEYCODE_HOME", logger)
         time.sleep(0.5)
 
-        started_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        started_at = format_timestamp(env.device_timezone)
         started_mono = time.monotonic()
         logger.state("agent_spawned")
 
@@ -563,7 +564,7 @@ def run_eval(
             transcript_handle = None
 
         transcript_text = "".join(transcript_parts)
-        finished_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        finished_at = format_timestamp(env.device_timezone)
         wall_clock_s = time.monotonic() - started_mono
         score_result = score(transcript_text, env.ground_truth_android_version, answer_extracted_raw=answer_extracted_raw)
         if score_result.answer_extracted_raw is not None:
@@ -648,7 +649,7 @@ def run_eval(
         if timer is not None:
             timer.cancel()
             timer.join(timeout=6.0)
-        finished_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        finished_at = format_timestamp(env.device_timezone if "env" in locals() else None)
         transcript_text = "".join(transcript_parts)
         wall_clock_s = time.monotonic() - started_mono if "started_mono" in locals() else 0.0
         failure_reason = str(exc) if str(exc) else exc.__class__.__name__

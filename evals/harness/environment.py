@@ -5,9 +5,9 @@ import os
 import shutil
 import subprocess
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from pathlib import Path
 
+from .timeutil import format_timestamp
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 LOCAL_CLI = REPO_ROOT / "apps/node/dist/cli/index.js"
@@ -16,6 +16,7 @@ LOCAL_CLI = REPO_ROOT / "apps/node/dist/cli/index.js"
 @dataclass
 class Environment:
     device_serial: str
+    device_timezone: str | None
     ground_truth_android_version: str
     ground_truth_collected_at: str
     clawperator_cmd: list[str]
@@ -26,12 +27,9 @@ class Environment:
 @dataclass
 class RuntimeInputs:
     device_serial: str
+    device_timezone: str | None
     clawperator_cmd: list[str]
     operator_package: str
-
-
-def _timestamp() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
 def _minimal_env(device_serial: str | None = None, operator_package: str | None = None) -> dict[str, str]:
@@ -79,6 +77,14 @@ def _run(cmd: list[str], env: dict[str, str], cwd: Path | None = None) -> subpro
     return subprocess.run(cmd, check=False, capture_output=True, text=True, env=env, cwd=str(cwd) if cwd else None)
 
 
+def _resolve_device_timezone(adb: str, device_serial: str) -> str | None:
+    result = _run([adb, "-s", device_serial, "shell", "getprop", "persist.sys.timezone"], env=_minimal_env(device_serial=device_serial))
+    if result.returncode != 0:
+        return None
+    value = result.stdout.strip()
+    return value or None
+
+
 def resolve_inputs(device: str | None) -> RuntimeInputs:
     adb = shutil.which("adb")
     if adb is None:
@@ -102,6 +108,7 @@ def resolve_inputs(device: str | None) -> RuntimeInputs:
             raise EnvironmentError("multiple_devices")
         device_serial = authorized[0]
 
+    device_timezone = _resolve_device_timezone(adb, device_serial)
     clawperator_cmd = _resolve_clawperator_cmd()
     clawperator_bin = Path(clawperator_cmd[0])
     if shutil.which(clawperator_cmd[0]) is None and not (clawperator_bin.is_file() and os.access(clawperator_bin, os.X_OK)):
@@ -113,6 +120,7 @@ def resolve_inputs(device: str | None) -> RuntimeInputs:
 
     return RuntimeInputs(
         device_serial=device_serial,
+        device_timezone=device_timezone,
         clawperator_cmd=clawperator_cmd,
         operator_package=operator_package,
     )
@@ -136,7 +144,7 @@ def preflight(device: str | None) -> Environment:
     ground_truth = version_result.stdout.strip()
     if not ground_truth:
         raise EnvironmentError("ground_truth_unreadable")
-    collected_at = _timestamp()
+    collected_at = format_timestamp(inputs.device_timezone)
 
     cli_version_result = _run([*inputs.clawperator_cmd, "version"], env=doctor_env)
     if cli_version_result.returncode != 0:
@@ -151,6 +159,7 @@ def preflight(device: str | None) -> Environment:
 
     return Environment(
         device_serial=inputs.device_serial,
+        device_timezone=inputs.device_timezone,
         ground_truth_android_version=ground_truth,
         ground_truth_collected_at=collected_at,
         clawperator_cmd=inputs.clawperator_cmd,

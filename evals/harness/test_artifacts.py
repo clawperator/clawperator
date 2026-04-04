@@ -25,8 +25,8 @@ def test_make_run_id_includes_entropy_suffix(monkeypatch):
     second = artifacts.make_run_id("android-version", "claude", "claude-sonnet-4-6")
 
     assert first != second
-    assert first.startswith("android-version-20260328-143022-123-aaaaaa-claude-")
-    assert second.startswith("android-version-20260328-143022-123-bbbbbb-claude-")
+    assert first.startswith("android-version-20260329-003022-123-aaaaaa-claude-")
+    assert second.startswith("android-version-20260329-003022-123-bbbbbb-claude-")
 
 
 def test_make_run_id_appends_label_slug(monkeypatch):
