@@ -36,3 +36,13 @@ def test_make_run_id_appends_label_slug(monkeypatch):
     run_id = artifacts.make_run_id("android-version", "claude", "claude-sonnet-4-6", "baseline run", timezone_name="UTC")
 
     assert run_id.endswith("-baseline-run")
+
+
+def test_make_run_id_slugs_model_name(monkeypatch):
+    monkeypatch.setattr(artifacts, "datetime", _FixedDateTime)
+    monkeypatch.setattr(artifacts, "uuid4", lambda: _FixedUuid("dddddddddddddddddddddddddddddddd"))
+
+    run_id = artifacts.make_run_id("android-version", "kimi", "kimi-code/kimi-for-coding", timezone_name="UTC")
+
+    assert "/" not in run_id
+    assert run_id.startswith("android-version-20260328-143022-123-dddddd-kimi-kimi-code-ki")
