@@ -64,3 +64,15 @@ Observed output:
 ```json
 {"role":"assistant","content":[{"type":"think","think":"The user just wants me to say hello. This is a simple greeting request that I can respond to directly without needing any tools.","encrypted":null},{"type":"text","text":"Hello! 👋 How can I help you today?"}]}
 ```
+
+## API Usage Issues
+
+- The current public CLI surface uses `open`, not `open-app`. During the
+  Gemini live run, the agent repeatedly tried `clawperator open-app ...` and
+  then `clawperator action --type open_app ...`, both of which failed with the
+  shipped command set. The correct command was visible in
+  `node apps/node/dist/cli/index.js --help`:
+  `clawperator open <package-id|url|uri> [--device <id>] [--operator-package <pkg>]`
+- This is worth keeping in findings because it shows a real prompt-to-API
+  mismatch. Future phases should treat these mismatches as input for API/docs
+  improvement, not just as agent failures.
