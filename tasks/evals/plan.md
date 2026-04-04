@@ -209,7 +209,7 @@ Note: "Confidence" is for turn counting only. All four are viable for task compl
   "eval_id": "android-version",
   "started_at": "<ISO8601>",
   "finished_at": "<ISO8601>",
-  "agent": { "type": "claude", "model": "claude-sonnet-4-0", "extra_flags": [] },
+  "agent": { "type": "claude", "model": "claude-sonnet-4-20250514", "extra_flags": [] },
   "knowledge_mode": "public-surface",
   "runtime_target": "local-dev",
   "spec": {
