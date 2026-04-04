@@ -133,3 +133,43 @@ def test_rescore_rebuilds_derived_fields(tmp_path):
     assert rescored["metrics"]["answer_emitted"] is False
     assert rescored["metrics"]["used_disallowed_tool"] is True
     assert rescored["metrics"]["violations"]["used_adb"] is True
+
+
+def test_rescore_rejects_missing_outcome_or_metrics(tmp_path):
+    runs_dir = tmp_path / "runs"
+    run_dir = runs_dir / "android-version-20260404-000000-aaaaaa-claude-claude-sonnet"
+    run_dir.mkdir(parents=True)
+
+    _write_json(run_dir / "config.json", {"environment": {"ground_truth_android_version": "15"}})
+    _write_json(run_dir / "result.json", {"run_id": run_dir.name, "environment": {"ground_truth_android_version": "15"}})
+    (run_dir / "transcript.txt").write_text("CLAWPERATOR_EVAL_ANSWER: 15\n", encoding="utf-8")
+
+    with pytest.raises(SystemExit, match="missing or non-object outcome"):
+        _rescore_run(runs_dir, run_dir.name)
+
+
+def test_rescore_rejects_missing_metrics(tmp_path):
+    runs_dir = tmp_path / "runs"
+    run_dir = runs_dir / "android-version-20260404-000000-aaaaaa-claude-claude-sonnet"
+    run_dir.mkdir(parents=True)
+
+    _write_json(run_dir / "config.json", {"environment": {"ground_truth_android_version": "15"}})
+    _write_json(
+        run_dir / "result.json",
+        {
+            "run_id": run_dir.name,
+            "outcome": {
+                "status": "pass",
+                "answer_extracted_raw": "15",
+                "answer_normalized": "15",
+                "ground_truth_normalized": "15",
+                "answer_correct": True,
+                "failure_reason": None,
+            },
+            "environment": {"ground_truth_android_version": "15"},
+        },
+    )
+    (run_dir / "transcript.txt").write_text("CLAWPERATOR_EVAL_ANSWER: 15\n", encoding="utf-8")
+
+    with pytest.raises(SystemExit, match="missing or non-object metrics"):
+        _rescore_run(runs_dir, run_dir.name)

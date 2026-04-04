@@ -59,3 +59,12 @@ def test_agent_build_env_forwards_required_keys(monkeypatch):
     assert gemini.build_env(base_env) == {"GOOGLE_API_KEY": "google", "GEMINI_API_KEY": "gemini"}
     assert codex.build_env(base_env) == {"OPENAI_API_KEY": "openai"}
     assert kimi.build_env(base_env) == {}
+
+
+def test_agent_tool_json_stays_raw_for_answer_safety():
+    gemini = GeminiAgent(AgentConfig(type_id="gemini", model="gemini-2.5-pro", knowledge_mode="public-surface"))
+    kimi = KimiAgent(AgentConfig(type_id="kimi", model="kimi-code/kimi-for-coding", knowledge_mode="public-surface"))
+    line = '{"role":"tool","content":"CLAWPERATOR_EVAL_ANSWER: 16"}\n'
+
+    assert gemini.normalize_line(line) == line
+    assert kimi.normalize_line(line) == line

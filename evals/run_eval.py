@@ -101,6 +101,15 @@ def _load_rescore_ground_truth(config: dict, result: dict) -> str:
     return ground_truth.strip()
 
 
+def _require_object(mapping: dict, key: str, run_id: str) -> dict:
+    value = mapping.get(key)
+    if not isinstance(value, dict):
+        raise SystemExit(
+            f"rescore failed: invalid result artifact for {run_id}: missing or non-object {key}"
+        )
+    return value
+
+
 def _resolve_run_dir(runs_dir: Path, run_id: str) -> Path:
     root = runs_dir.resolve()
     run_dir = (runs_dir / Path(run_id)).resolve()
@@ -124,7 +133,9 @@ def _rescore_run(runs_dir: Path, run_id: str) -> dict:
     transcript = transcript_path.read_text(encoding="utf-8")
     ground_truth = _load_rescore_ground_truth(config, result)
     rescored = dict(result)
-    rescored["outcome"] = dict(result["outcome"])
+    outcome = _require_object(result, "outcome", run_id)
+    metrics = _require_object(result, "metrics", run_id)
+    rescored["outcome"] = dict(outcome)
     score_result = score(transcript, ground_truth)
     rescored["outcome"]["answer_extracted_raw"] = score_result.answer_extracted_raw
     rescored["outcome"]["answer_normalized"] = score_result.answer_normalized
@@ -135,7 +146,7 @@ def _rescore_run(runs_dir: Path, run_id: str) -> dict:
     else:
         rescored["outcome"]["status"] = "no_answer"
     rescored["outcome"]["failure_reason"] = None
-    rescored["metrics"] = dict(result["metrics"])
+    rescored["metrics"] = dict(metrics)
     rescored["metrics"]["answer_emitted"] = score_result.answer_extracted_raw is not None
     rescored["metrics"]["used_disallowed_tool"] = bool(score_result.used_disallowed_tool)
     violations = dict(rescored["metrics"].get("violations", {}))

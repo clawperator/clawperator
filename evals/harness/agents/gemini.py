@@ -42,7 +42,7 @@ class GeminiAgent(BaseAgent):
             return raw
         if payload.get("type") != "message":
             return raw
-        if payload.get("role") not in {"assistant", "tool"}:
+        if payload.get("role") != "assistant":
             return raw
         content = payload.get("content")
         if isinstance(content, str):

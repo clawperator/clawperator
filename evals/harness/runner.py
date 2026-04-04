@@ -556,7 +556,7 @@ def run_eval(
                     transcript_parts.append(line)
                     transcript_bytes_written += len(encoded_line)
             if answer_extracted_raw is None:
-                answer = extract_answer_from_transcript(line)
+                answer = extract_answer_from_transcript(raw_line)
                 if answer is not None:
                     answer_extracted_raw = answer
                     if not answer_found_logged:
