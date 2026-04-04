@@ -12,7 +12,7 @@
 Use the project-managed Python environment:
 
 ```bash
-uv run --extra dev python evals/run_eval.py android-version \
+uv run --project evals --extra dev python evals/run_eval.py android-version \
   --agent claude \
   --model claude-opus-4-5
 ```
