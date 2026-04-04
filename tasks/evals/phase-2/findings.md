@@ -76,3 +76,9 @@ Observed output:
 - This is worth keeping in findings because it shows a real prompt-to-API
   mismatch. Future phases should treat these mismatches as input for API/docs
   improvement, not just as agent failures.
+- `scroll-until --text "About phone"` returned `EDGE_REACHED` in the live
+  Gemini run even though the Settings UI still contained relevant entries
+  lower in the page. The transcript suggests the agent may have been using the
+  wrong container or a stale scroll path. This is a useful reminder that the
+  current scroll heuristic can fail silently from the agent's perspective and
+  should be treated as a real surface for future API/docs improvements.
