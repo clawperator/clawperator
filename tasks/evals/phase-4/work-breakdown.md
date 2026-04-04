@@ -6,14 +6,12 @@ Parent plan: `tasks/evals/phase-4/plan.md`
 
 1 PR, 3 sub-phases. Phase 3 PR must be merged before starting.
 
-| Sub-phase | Purpose | Agent tier | Kimi flags |
+| Sub-phase | Purpose | Agent tier | Execution flags |
 | --- | --- | --- | --- |
 | 4a | Skill emission prompt + extraction + validation | thinking | `--thinking --print --yolo` |
 | 4b | Replay runner and replay CLI subcommand | default | `--print --yolo` |
 | 4c | End-to-end validation with real generated skills | default | `--print --yolo` |
 
-**Implementing agent:** Kimi (`kimi` CLI v1.27.0). See `tasks/evals/plan.md`
-"Implementing Agent" section for invocation reference and model name.
 
 ## Status
 

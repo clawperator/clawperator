@@ -7,16 +7,13 @@ Parent plan: `tasks/evals/phase-1/plan.md`
 1 PR, 4 sub-phases. All ship together. Sub-phases are sequenced; do not
 start the next until the current one passes its acceptance criteria.
 
-| Sub-phase | Purpose | Agent tier | Kimi flags |
+| Sub-phase | Purpose | Agent tier | Execution flags |
 | --- | --- | --- | --- |
 | 1a | Directory scaffold + gitignore | fast | `--no-thinking --print --yolo` |
 | 1b | Harness core (environment, runner, scorer, artifacts, claude adapter) | thinking | `--thinking --print --yolo` |
 | 1c | Eval spec + prompt + run_eval.py CLI + README | default | `--print --yolo` |
 | 1d | Validation: 1 passing run + 1 error run + dry-run | default | `--print --yolo` |
 
-**Implementing agent:** Kimi (`kimi` CLI v1.27.0). See `tasks/evals/plan.md`
-"Implementing Agent" section for invocation reference, model name, and flag
-mapping. Model must be `kimi-code/kimi-for-coding` (short names do not work).
 
 ## Status
 

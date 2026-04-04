@@ -7,14 +7,12 @@ Parent plan: `tasks/evals/phase-2/plan.md`
 1 PR, 3 sub-phases. Sub-phases are sequenced; complete one before starting
 the next. Phase 1 PR must be merged before starting.
 
-| Sub-phase | Purpose | Agent tier | Kimi flags |
+| Sub-phase | Purpose | Agent tier | Execution flags |
 | --- | --- | --- | --- |
 | 2a | Gemini, Codex, Kimi adapters + count_turn in base + Claude count_turn | default | `--print --yolo` |
 | 2b | Turn budget enforcement in runner.py + result schema changes | default | `--print --yolo` |
 | 2c | `--rescore` flag + validation runs for all three new agents | default | `--print --yolo` |
 
-**Implementing agent:** Kimi (`kimi` CLI v1.27.0). See `tasks/evals/plan.md`
-"Implementing Agent" section for invocation reference and model name.
 
 ## Status
 

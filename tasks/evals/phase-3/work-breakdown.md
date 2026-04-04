@@ -6,13 +6,11 @@ Parent plan: `tasks/evals/phase-3/plan.md`
 
 1 PR, 2 sub-phases. Phase 2 PR must be merged before starting.
 
-| Sub-phase | Purpose | Agent tier | Kimi flags |
+| Sub-phase | Purpose | Agent tier | Execution flags |
 | --- | --- | --- | --- |
 | 3a | Published runtime target + version pinning | default | `--print --yolo` |
 | 3b | Full-repo knowledge mode + prompt + validation | default | `--print --yolo` |
 
-**Implementing agent:** Kimi (`kimi` CLI v1.27.0). See `tasks/evals/plan.md`
-"Implementing Agent" section for invocation reference and model name.
 
 ## Status
 

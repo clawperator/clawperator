@@ -33,17 +33,6 @@ Phase 1 is the foundation everything else builds on. Keeping it to one agent
 and one eval is intentional: it is faster to discover harness problems on a
 thin surface before adding the complexity of multiple agents and specs.
 
-## Implementing Agent
-
-**Kimi** is the default coding agent for implementing this phase. See
-`tasks/evals/plan.md` "Implementing Agent" section for full invocation
-reference, model name (`kimi-code/kimi-for-coding`), and agent tier to
-Kimi flag mapping.
-
-Note: "one agent adapter for the Claude eval subject" above refers to the
-agent being evaluated. The implementing agent is Kimi, which writes the
-harness code. The Claude adapter is built first because Claude is the most
-well-understood eval subject.
 
 ## In Scope
 
