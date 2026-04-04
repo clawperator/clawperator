@@ -23,6 +23,13 @@ class Environment:
     operator_package: str
 
 
+@dataclass
+class RuntimeInputs:
+    device_serial: str
+    clawperator_cmd: list[str]
+    operator_package: str
+
+
 def _timestamp() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
@@ -72,7 +79,7 @@ def _run(cmd: list[str], env: dict[str, str], cwd: Path | None = None) -> subpro
     return subprocess.run(cmd, check=False, capture_output=True, text=True, env=env, cwd=str(cwd) if cwd else None)
 
 
-def preflight(device: str | None) -> Environment:
+def resolve_inputs(device: str | None) -> RuntimeInputs:
     adb = shutil.which("adb")
     if adb is None:
         raise EnvironmentError("adb_not_found")
@@ -103,12 +110,26 @@ def preflight(device: str | None) -> Environment:
     if operator_package is None or not operator_package.strip():
         operator_package = "com.clawperator.operator.dev"
 
-    doctor_env = _minimal_env(device_serial=device_serial, operator_package=operator_package)
-    doctor_result = _run([*clawperator_cmd, "doctor", "--json"], env=doctor_env)
+    return RuntimeInputs(
+        device_serial=device_serial,
+        clawperator_cmd=clawperator_cmd,
+        operator_package=operator_package,
+    )
+
+
+def preflight(device: str | None) -> Environment:
+    inputs = resolve_inputs(device)
+    adb = shutil.which("adb")
+    if adb is None:
+        raise EnvironmentError("adb_not_found")
+
+    doctor_env = _minimal_env(device_serial=inputs.device_serial, operator_package=inputs.operator_package)
+    doctor_result = _run([*inputs.clawperator_cmd, "doctor", "--json"], env=doctor_env)
     if doctor_result.returncode != 0:
         raise EnvironmentError("doctor_preflight_failed")
 
-    version_result = _run([adb, "-s", device_serial, "shell", "getprop", "ro.build.version.release"], env=adb_env)
+    adb_env = _minimal_env()
+    version_result = _run([adb, "-s", inputs.device_serial, "shell", "getprop", "ro.build.version.release"], env=adb_env)
     if version_result.returncode != 0:
         raise EnvironmentError("ground_truth_unreadable")
     ground_truth = version_result.stdout.strip()
@@ -116,7 +137,7 @@ def preflight(device: str | None) -> Environment:
         raise EnvironmentError("ground_truth_unreadable")
     collected_at = _timestamp()
 
-    cli_version_result = _run([*clawperator_cmd, "version"], env=doctor_env)
+    cli_version_result = _run([*inputs.clawperator_cmd, "version"], env=doctor_env)
     if cli_version_result.returncode != 0:
         raise EnvironmentError("clawperator_version_unreadable")
     try:
@@ -128,11 +149,10 @@ def preflight(device: str | None) -> Environment:
         raise EnvironmentError("clawperator_version_invalid")
 
     return Environment(
-        device_serial=device_serial,
+        device_serial=inputs.device_serial,
         ground_truth_android_version=ground_truth,
         ground_truth_collected_at=collected_at,
-        clawperator_cmd=clawperator_cmd,
+        clawperator_cmd=inputs.clawperator_cmd,
         clawperator_version=cli_version.strip(),
-        operator_package=operator_package,
+        operator_package=inputs.operator_package,
     )
-
