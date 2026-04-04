@@ -22,7 +22,7 @@ Parent plan: `tasks/evals/phase-3/plan.md`
 | Completed | none |
 | Remaining | 3a, 3b |
 | Current / Next | 3a |
-| Blockers | Phase 2 PR must be merged |
+| Blockers | none |
 
 ## Hard Rules
 
