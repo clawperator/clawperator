@@ -23,7 +23,13 @@ from evals.harness.agents.claude import ClaudeAgent
 from evals.harness.agents.gemini import GeminiAgent
 from evals.harness.agents.kimi import KimiAgent
 from evals.harness.artifacts import make_run_id, write_run
-from evals.harness.environment import preflight, resolve_inputs
+from evals.harness.environment import (
+    LOCAL_DEV_OPERATOR_PACKAGE,
+    RELEASE_OPERATOR_PACKAGE,
+    RuntimeInputs,
+    preflight,
+    resolve_inputs,
+)
 from evals.harness.runner import build_prompt, run_eval, _prepare_clawperator_launcher
 from evals.harness.scorer import score
 from evals.harness.timeutil import format_timestamp
@@ -163,6 +169,7 @@ def _write_preflight_failure_run(
     spec: dict,
     agent: BaseAgent,
     failure_reason: str,
+    runtime_inputs: RuntimeInputs | None = None,
 ) -> Path:
     runs_dir = Path(args.runs_dir)
     run_id = make_run_id(args.eval_id, args.agent, args.model, args.label)
@@ -170,12 +177,18 @@ def _write_preflight_failure_run(
     run_dir.mkdir(parents=True, exist_ok=False)
 
     prompt_path = ROOT / "evals" / "specs" / args.eval_id / spec["prompts"][args.mode]
+    clawperator_cmd = runtime_inputs.clawperator_cmd if runtime_inputs is not None else ["clawperator"]
+    default_operator_package = RELEASE_OPERATOR_PACKAGE if args.runtime == "published" else LOCAL_DEV_OPERATOR_PACKAGE
+    operator_package = runtime_inputs.operator_package if runtime_inputs is not None else os.environ.get(
+        "CLAWPERATOR_OPERATOR_PACKAGE",
+        default_operator_package,
+    )
     prompt_text = build_prompt(
         str(prompt_path),
         {
-            "CLAWPERATOR_CMD": "clawperator",
-            "CLAWPERATOR_OPERATOR_PACKAGE": os.environ.get("CLAWPERATOR_OPERATOR_PACKAGE", "com.clawperator.operator.dev"),
-            "DEVICE_SERIAL": "<unresolved>",
+            "CLAWPERATOR_CMD": shlex.join(clawperator_cmd),
+            "CLAWPERATOR_OPERATOR_PACKAGE": operator_package,
+            "DEVICE_SERIAL": runtime_inputs.device_serial if runtime_inputs is not None else "<unresolved>",
             "DOCS_URL": "https://docs.clawperator.com",
         },
     )
@@ -206,13 +219,14 @@ def _write_preflight_failure_run(
             "env_overrides": {},
         },
         "environment": {
-            "device_serial": None,
+            "device_serial": runtime_inputs.device_serial if runtime_inputs is not None else None,
             "ground_truth_android_version": None,
             "ground_truth_collected_at": None,
             "ground_truth_rechecked_at": None,
-            "clawperator_cmd": ["clawperator"],
-            "clawperator_version": None,
-            "operator_package": os.environ.get("CLAWPERATOR_OPERATOR_PACKAGE", "com.clawperator.operator.dev"),
+            "clawperator_cmd": clawperator_cmd,
+            "clawperator_version": runtime_inputs.clawperator_version if runtime_inputs is not None else None,
+            "clawperator_npm_version": runtime_inputs.clawperator_npm_version if runtime_inputs is not None else None,
+            "operator_package": operator_package,
             "cwd": "<redacted>",
             "runs_dir": "<redacted>",
         },
@@ -272,8 +286,9 @@ def _write_preflight_failure_run(
             "agent_binary_version": "unknown",
             "env_hash": "",
             "runs_dir": "<redacted>",
-            "clawperator_cmd": ["clawperator"],
+            "clawperator_cmd": clawperator_cmd,
             "ground_truth_android_version": None,
+            "clawperator_npm_version": runtime_inputs.clawperator_npm_version if runtime_inputs is not None else None,
         },
         "timeout_s": args.timeout_s,
         "max_turns": args.max_turns,
@@ -326,8 +341,6 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.mode == "full-repo":
         raise SystemExit("full-repo mode is not yet implemented (Phase 3)")
-    if args.runtime == "published":
-        raise SystemExit("published runtime is not yet implemented (Phase 3)")
     if args.eval_id != "android-version":
         raise SystemExit(f"unsupported eval: {args.eval_id}")
 
@@ -368,15 +381,22 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.dry_run:
         try:
-            inputs = resolve_inputs(args.device)
+            inputs = resolve_inputs(args.device, args.runtime)
         except EnvironmentError as exc:
             print(str(exc), file=sys.stderr)
             return 1
         resolved_config["device_serial"] = inputs.device_serial
         dry_run_work_dir = Path(tempfile.mkdtemp(prefix="clawperator-eval-"))
-        display_clawperator_cmd, path_prefix = _prepare_clawperator_launcher(dry_run_work_dir, inputs.clawperator_cmd, args.mode)
+        display_clawperator_cmd, path_prefix = _prepare_clawperator_launcher(
+            dry_run_work_dir,
+            inputs.clawperator_cmd,
+            args.mode,
+            args.runtime,
+        )
         resolved_config["clawperator_cmd"] = display_clawperator_cmd
         resolved_config["operator_package"] = inputs.operator_package
+        resolved_config["clawperator_version"] = inputs.clawperator_version
+        resolved_config["clawperator_npm_version"] = inputs.clawperator_npm_version
         prompt_path = ROOT / "evals" / "specs" / args.eval_id / spec["prompts"][args.mode]
         prompt_text = build_prompt(
             str(prompt_path),
@@ -419,9 +439,33 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     try:
-        env = preflight(args.device)
+        inputs = resolve_inputs(args.device, args.runtime)
     except EnvironmentError as exc:
-        run_dir = _write_preflight_failure_run(args=args, spec=spec, agent=agent, failure_reason=str(exc))
+        run_dir = _write_preflight_failure_run(
+            args=args,
+            spec=spec,
+            agent=agent,
+            failure_reason=str(exc),
+            runtime_inputs=None,
+        )
+        result = json.loads((run_dir / "result.json").read_text(encoding="utf-8"))
+        status = result["outcome"]["status"].upper()
+        answer = result["outcome"]["answer_normalized"] or "none"
+        duration = result["metrics"]["wall_clock_s"]
+        print(run_dir)
+        print(f"{status} | {args.agent}/{_model_shorthand(args.agent, args.model)} | {duration:.1f}s | answer={answer}")
+        return 0
+
+    try:
+        env = preflight(args.device, args.runtime, resolved_inputs=inputs)
+    except EnvironmentError as exc:
+        run_dir = _write_preflight_failure_run(
+            args=args,
+            spec=spec,
+            agent=agent,
+            failure_reason=str(exc),
+            runtime_inputs=inputs,
+        )
         result = json.loads((run_dir / "result.json").read_text(encoding="utf-8"))
         status = result["outcome"]["status"].upper()
         answer = result["outcome"]["answer_normalized"] or "none"

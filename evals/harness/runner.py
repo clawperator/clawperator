@@ -18,7 +18,7 @@ from typing import Any
 
 from .agents.base import BaseAgent
 from .artifacts import make_run_id, write_run
-from .environment import Environment, REPO_ROOT
+from .environment import Environment, RELEASE_OPERATOR_PACKAGE, REPO_ROOT
 from .logger import get_logger
 from .scorer import extract_answer_from_transcript, score
 from .timeutil import format_timestamp
@@ -75,8 +75,13 @@ def _minimal_base_env(
     }
 
 
-def _prepare_clawperator_launcher(work_dir: Path, clawperator_cmd: list[str], knowledge_mode: str) -> tuple[list[str], str | None]:
-    if knowledge_mode != "public-surface":
+def _prepare_clawperator_launcher(
+    work_dir: Path,
+    clawperator_cmd: list[str],
+    knowledge_mode: str,
+    runtime_target: str,
+) -> tuple[list[str], str | None]:
+    if runtime_target == "published" or knowledge_mode != "public-surface":
         return clawperator_cmd, None
     if len(clawperator_cmd) == 1 and clawperator_cmd[0] == "clawperator":
         return clawperator_cmd, None
@@ -284,6 +289,7 @@ def _build_config(
             "runs_dir": display_runs_dir,
             "clawperator_cmd": display_clawperator_cmd,
             "ground_truth_android_version": env.ground_truth_android_version,
+            "clawperator_npm_version": env.clawperator_npm_version,
         },
         "timeout_s": timeout_s,
         "max_turns": max_turns,
@@ -362,6 +368,7 @@ def _build_result(
             "ground_truth_rechecked_at": ground_truth_rechecked_at,
             "clawperator_cmd": display_clawperator_cmd,
             "clawperator_version": env.clawperator_version,
+            "clawperator_npm_version": env.clawperator_npm_version,
             "operator_package": env.operator_package,
             "cwd": display_cwd,
             "runs_dir": display_runs_dir,
@@ -403,6 +410,7 @@ def run_eval(
 ) -> Path:
     eval_id = spec["eval_id"]
     eval_version = spec.get("version", spec.get("eval_version", "1.0.0"))
+    runtime_target = spec.get("runtime_target", "local-dev")
     runs_dir.mkdir(parents=True, exist_ok=True)
     run_id = make_run_id(eval_id, agent.config.type_id, agent.config.model, label, timezone_name=env.device_timezone)
     run_dir = runs_dir / run_id
@@ -448,7 +456,12 @@ def run_eval(
     try:
         _ensure_agent_binary_available(agent)
         prompt_path = _load_prompt_path(spec, knowledge_mode)
-        display_clawperator_cmd, path_prefix = _prepare_clawperator_launcher(work_dir, env.clawperator_cmd, knowledge_mode)
+        display_clawperator_cmd, path_prefix = _prepare_clawperator_launcher(
+            work_dir,
+            env.clawperator_cmd,
+            knowledge_mode,
+            runtime_target,
+        )
         display_work_dir = _display_work_dir(work_dir, knowledge_mode)
         display_cwd = _display_cwd(knowledge_mode)
         display_runs_dir = _display_runs_dir(runs_dir, knowledge_mode)
@@ -499,11 +512,19 @@ def run_eval(
         )
         logger.spawn(command=command, work_dir=display_work_dir, env_overrides=config_env_overrides)
         logger.env_summary(
+            runtime_target=runtime_target,
             device_serial=env.device_serial,
             clawperator_cmd=display_clawperator_cmd,
             operator_package=env.operator_package,
             clawperator_version=env.clawperator_version,
+            clawperator_npm_version=env.clawperator_npm_version,
         )
+        if runtime_target == "published" and env.operator_package != RELEASE_OPERATOR_PACKAGE:
+            logger.warning(
+                "published_operator_package_override",
+                requested_operator_package=env.operator_package,
+                default_operator_package=RELEASE_OPERATOR_PACKAGE,
+            )
         _run_keyevent(env.device_serial, "KEYCODE_WAKEUP", logger)
         _run_keyevent(env.device_serial, "KEYCODE_HOME", logger)
         time.sleep(0.5)

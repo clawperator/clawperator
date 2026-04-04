@@ -14,12 +14,12 @@ Phase 1 and Phase 2 are already complete on `main`; this phase is unblocked.
 
 | Item | Value |
 | --- | --- |
-| State | not started |
+| State | in progress |
 | Total PRs | 1 |
 | Total phases | 2 (3a-3b) |
-| Completed | none |
-| Remaining | 3a, 3b |
-| Current / Next | 3a |
+| Completed | 3a |
+| Remaining | 3b |
+| Current / Next | 3b |
 | Blockers | none |
 
 ## Goal
