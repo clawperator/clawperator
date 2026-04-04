@@ -14,7 +14,7 @@ Use the project-managed Python environment from the `evals/` project root:
 ```bash
 uv run --project evals --extra dev python evals/run_eval.py android-version \
   --agent claude \
-  --model claude-sonnet-4-20250514
+  --model claude-sonnet-4-6
 ```
 
 You can pass `--device <serial>` when more than one device is connected.

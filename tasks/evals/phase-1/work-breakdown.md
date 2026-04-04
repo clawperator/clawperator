@@ -849,7 +849,7 @@ Constraints:
 ```
 python evals/run_eval.py android-version \
   --agent claude \
-  --model claude-sonnet-4-20250514 \
+  --model claude-sonnet-4-6 \
   [--device <serial>] \
   [--mode public-surface|full-repo] \
   [--runtime local-dev|published] \
@@ -960,7 +960,7 @@ section and fill it in after the 1d validation runs reveal the real pattern.
 5. Verify dry-run works:
    ```bash
 python evals/run_eval.py android-version \
-     --agent claude --model claude-sonnet-4-20250514 --dry-run
+     --agent claude --model claude-sonnet-4-6 --dry-run
    ```
    Expected: prints resolved config, exact command, work dir, env overrides,
    and prompt text; exits 0, no agent spawned.
@@ -1037,7 +1037,7 @@ acceptance criteria are met: 1 passing run, 1 error run, dry-run exits 0.
    Use an explicit device serial if more than one device is connected:
    ```bash
 python evals/run_eval.py android-version \
-     --agent claude --model claude-sonnet-4-20250514 \
+     --agent claude --model claude-sonnet-4-6 \
      --device <device_serial>
    ```
 3. Verify the run is `pass`. Read the passing transcript and verify it shows
@@ -1046,7 +1046,7 @@ python evals/run_eval.py android-version \
    Operator APK, then run:
    ```bash
 python evals/run_eval.py android-version \
-     --agent claude --model claude-sonnet-4-20250514
+     --agent claude --model claude-sonnet-4-6
    ```
    Verify the output shows `outcome.status = "error"` in `result.json`.
 5. Run dry-run and verify it exits 0 with the prompt printed.
