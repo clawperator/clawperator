@@ -65,4 +65,6 @@ class GeminiAgent(BaseAgent):
             return False
         if not isinstance(payload, dict):
             return False
-        return payload.get("type") == "message" and payload.get("role") == "assistant"
+        if payload.get("type") == "result" and payload.get("status") == "success":
+            return True
+        return payload.get("type") == "message" and payload.get("role") == "assistant" and not payload.get("delta", False)

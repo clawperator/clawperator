@@ -36,7 +36,8 @@ def test_agent_count_turns_from_empirical_json_lines():
     kimi_line = '{"role":"assistant","content":[{"type":"text","text":"Hello!"}]}'
 
     assert claude.count_turn(claude_line) is True
-    assert gemini.count_turn(gemini_line) is True
+    assert gemini.count_turn(gemini_line) is False
+    assert gemini.count_turn('{"type":"result","status":"success"}') is True
     assert codex.count_turn(codex_line) is True
     assert kimi.count_turn(kimi_line) is True
 

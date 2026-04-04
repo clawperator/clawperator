@@ -101,8 +101,18 @@ def _load_rescore_ground_truth(config: dict, result: dict) -> str:
     return ground_truth.strip()
 
 
+def _resolve_run_dir(runs_dir: Path, run_id: str) -> Path:
+    root = runs_dir.resolve()
+    run_dir = (runs_dir / Path(run_id)).resolve()
+    try:
+        run_dir.relative_to(root)
+    except ValueError as exc:
+        raise SystemExit("rescore failed: run_id escapes runs_dir") from exc
+    return run_dir
+
+
 def _rescore_run(runs_dir: Path, run_id: str) -> dict:
-    run_dir = runs_dir / run_id
+    run_dir = _resolve_run_dir(runs_dir, run_id)
     config_path = run_dir / "config.json"
     result_path = run_dir / "result.json"
     transcript_path = run_dir / "transcript.txt"
@@ -122,9 +132,15 @@ def _rescore_run(runs_dir: Path, run_id: str) -> dict:
     rescored["outcome"]["answer_correct"] = score_result.answer_correct
     if score_result.answer_extracted_raw is not None:
         rescored["outcome"]["status"] = "pass" if score_result.answer_correct else "fail"
-        rescored["outcome"]["failure_reason"] = None
+    else:
+        rescored["outcome"]["status"] = "no_answer"
+    rescored["outcome"]["failure_reason"] = None
     rescored["metrics"] = dict(result["metrics"])
+    rescored["metrics"]["answer_emitted"] = score_result.answer_extracted_raw is not None
     rescored["metrics"]["used_disallowed_tool"] = bool(score_result.used_disallowed_tool)
+    violations = dict(rescored["metrics"].get("violations", {}))
+    violations["used_adb"] = bool(score_result.used_disallowed_tool)
+    rescored["metrics"]["violations"] = violations
     result_rescored_path = run_dir / "result-rescored.json"
     _write_json_file(result_rescored_path, rescored)
     return rescored
@@ -311,7 +327,7 @@ def main(argv: list[str] | None = None) -> int:
         run_id = args.rescore
         if not run_id:
             raise SystemExit("rescore failed: missing run_id")
-        run_dir = Path(args.runs_dir) / run_id
+        run_dir = _resolve_run_dir(Path(args.runs_dir), run_id)
         rescored = _rescore_run(Path(args.runs_dir), run_id)
         status = rescored["outcome"]["status"].upper()
         answer = rescored["outcome"]["answer_normalized"] or "none"

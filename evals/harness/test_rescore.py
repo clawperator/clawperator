@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from evals.run_eval import _rescore_run, main
 
 
@@ -81,3 +83,53 @@ def test_rescore_cli_accepts_only_run_id(tmp_path, capsys):
     captured = capsys.readouterr()
     assert exit_code == 0
     assert "RESCORED" in captured.out.upper()
+
+
+def test_rescore_rejects_escape_run_id(tmp_path):
+    runs_dir = tmp_path / "runs"
+    runs_dir.mkdir()
+
+    with pytest.raises(SystemExit, match="escapes runs_dir"):
+        _rescore_run(runs_dir, "../escape")
+
+
+def test_rescore_rebuilds_derived_fields(tmp_path):
+    runs_dir = tmp_path / "runs"
+    run_dir = runs_dir / "android-version-20260404-000000-aaaaaa-claude-claude-sonnet"
+    run_dir.mkdir(parents=True)
+
+    _write_json(
+        run_dir / "config.json",
+        {"environment": {"ground_truth_android_version": "15"}},
+    )
+    _write_json(
+        run_dir / "result.json",
+        {
+            "run_id": run_dir.name,
+            "outcome": {
+                "status": "pass",
+                "answer_extracted_raw": "15",
+                "answer_normalized": "15",
+                "ground_truth_normalized": "15",
+                "answer_correct": True,
+                "failure_reason": None,
+            },
+            "metrics": {
+                "used_disallowed_tool": False,
+                "answer_emitted": True,
+                "violations": {"used_adb": False},
+                "wall_clock_s": 1.0,
+            },
+            "environment": {"ground_truth_android_version": "15"},
+        },
+    )
+    (run_dir / "transcript.txt").write_text("> adb shell getprop ro.build.version.release\n", encoding="utf-8")
+
+    rescored = _rescore_run(runs_dir, run_dir.name)
+
+    assert rescored["outcome"]["status"] == "no_answer"
+    assert rescored["outcome"]["answer_extracted_raw"] is None
+    assert rescored["outcome"]["answer_correct"] is False
+    assert rescored["metrics"]["answer_emitted"] is False
+    assert rescored["metrics"]["used_disallowed_tool"] is True
+    assert rescored["metrics"]["violations"]["used_adb"] is True

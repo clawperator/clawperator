@@ -562,19 +562,18 @@ def run_eval(
                     if not answer_found_logged:
                         logger.state("answer_found")
                         answer_found_logged = True
-            if answer_extracted_raw is None:
-                try:
-                    if agent.count_turn(raw_line):
-                        turns += 1
-                        if max_turns is not None and turns >= max_turns:
-                            status = "budget_exceeded"
-                            failure_reason = "budget_exceeded"
-                            logger.warning("turn_budget_reached", turns=turns, max_turns=max_turns)
-                            _terminate_process_group(proc, logger)
-                            break
-                except Exception as exc:
-                    turn_count_parse_failed = True
-                    logger.warning("turn_count_failed", error=str(exc) if str(exc) else exc.__class__.__name__)
+            try:
+                if agent.count_turn(raw_line):
+                    turns += 1
+                    if max_turns is not None and turns >= max_turns and answer_extracted_raw is None:
+                        status = "budget_exceeded"
+                        failure_reason = "budget_exceeded"
+                        logger.warning("turn_budget_reached", turns=turns, max_turns=max_turns)
+                        _terminate_process_group(proc, logger)
+                        break
+            except Exception as exc:
+                turn_count_parse_failed = True
+                logger.warning("turn_count_failed", error=str(exc) if str(exc) else exc.__class__.__name__)
             if line.startswith("[Clawperator-Result]") and first_result_seen_at is None:
                 first_result_seen_at = time.monotonic() - started_mono
 
