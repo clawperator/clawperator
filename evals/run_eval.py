@@ -17,15 +17,24 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from evals.harness.agents.base import AgentConfig
+from evals.harness.agents.base import AgentConfig, BaseAgent
+from evals.harness.agents.codex import CodexAgent
 from evals.harness.agents.claude import ClaudeAgent
+from evals.harness.agents.gemini import GeminiAgent
+from evals.harness.agents.kimi import KimiAgent
 from evals.harness.artifacts import make_run_id, write_run
 from evals.harness.environment import preflight, resolve_inputs
 from evals.harness.runner import build_prompt, run_eval, _prepare_clawperator_launcher
+from evals.harness.scorer import score
 from evals.harness.timeutil import format_timestamp
 
 
-SUPPORTED_AGENTS = {"claude": ClaudeAgent}
+SUPPORTED_AGENTS = {
+    "claude": ClaudeAgent,
+    "codex": CodexAgent,
+    "gemini": GeminiAgent,
+    "kimi": KimiAgent,
+}
 SUPPORTED_MODES = {"public-surface", "full-repo"}
 SUPPORTED_RUNTIMES = {"local-dev", "published"}
 
@@ -39,7 +48,7 @@ def _load_spec(eval_id: str) -> dict:
     return spec
 
 
-def _make_agent(agent_name: str, model: str, knowledge_mode: str) -> ClaudeAgent:
+def _make_agent(agent_name: str, model: str, knowledge_mode: str) -> BaseAgent:
     agent_cls = SUPPORTED_AGENTS.get(agent_name)
     if agent_cls is None:
         raise SystemExit(f"unsupported agent: {agent_name}")
@@ -78,11 +87,81 @@ def _render_dry_run(
     print(prompt_text)
 
 
+def _write_json_file(path: Path, payload: dict) -> None:
+    path.write_text(json.dumps(payload, indent=2, sort_keys=False) + "\n", encoding="utf-8")
+
+
+def _load_rescore_ground_truth(config: dict, result: dict) -> str:
+    ground_truth = (
+        config.get("environment", {}).get("ground_truth_android_version")
+        or result.get("environment", {}).get("ground_truth_android_version")
+    )
+    if not isinstance(ground_truth, str) or not ground_truth.strip():
+        raise SystemExit("rescore failed: ground truth android version missing")
+    return ground_truth.strip()
+
+
+def _require_object(mapping: dict, key: str, run_id: str) -> dict:
+    value = mapping.get(key)
+    if not isinstance(value, dict):
+        raise SystemExit(
+            f"rescore failed: invalid result artifact for {run_id}: missing or non-object {key}"
+        )
+    return value
+
+
+def _resolve_run_dir(runs_dir: Path, run_id: str) -> Path:
+    root = runs_dir.resolve()
+    run_dir = (runs_dir / Path(run_id)).resolve()
+    try:
+        run_dir.relative_to(root)
+    except ValueError as exc:
+        raise SystemExit("rescore failed: run_id escapes runs_dir") from exc
+    return run_dir
+
+
+def _rescore_run(runs_dir: Path, run_id: str) -> dict:
+    run_dir = _resolve_run_dir(runs_dir, run_id)
+    config_path = run_dir / "config.json"
+    result_path = run_dir / "result.json"
+    transcript_path = run_dir / "transcript.txt"
+    if not config_path.exists() or not result_path.exists() or not transcript_path.exists():
+        raise SystemExit(f"rescore failed: run artifacts missing for {run_id}")
+
+    config = json.loads(config_path.read_text(encoding="utf-8"))
+    result = json.loads(result_path.read_text(encoding="utf-8"))
+    transcript = transcript_path.read_text(encoding="utf-8")
+    ground_truth = _load_rescore_ground_truth(config, result)
+    rescored = dict(result)
+    outcome = _require_object(result, "outcome", run_id)
+    metrics = _require_object(result, "metrics", run_id)
+    rescored["outcome"] = dict(outcome)
+    score_result = score(transcript, ground_truth)
+    rescored["outcome"]["answer_extracted_raw"] = score_result.answer_extracted_raw
+    rescored["outcome"]["answer_normalized"] = score_result.answer_normalized
+    rescored["outcome"]["ground_truth_normalized"] = score_result.ground_truth_normalized
+    rescored["outcome"]["answer_correct"] = score_result.answer_correct
+    if score_result.answer_extracted_raw is not None:
+        rescored["outcome"]["status"] = "pass" if score_result.answer_correct else "fail"
+    else:
+        rescored["outcome"]["status"] = "no_answer"
+    rescored["outcome"]["failure_reason"] = None
+    rescored["metrics"] = dict(metrics)
+    rescored["metrics"]["answer_emitted"] = score_result.answer_extracted_raw is not None
+    rescored["metrics"]["used_disallowed_tool"] = bool(score_result.used_disallowed_tool)
+    violations = dict(rescored["metrics"].get("violations", {}))
+    violations["used_adb"] = bool(score_result.used_disallowed_tool)
+    rescored["metrics"]["violations"] = violations
+    result_rescored_path = run_dir / "result-rescored.json"
+    _write_json_file(result_rescored_path, rescored)
+    return rescored
+
+
 def _write_preflight_failure_run(
     *,
     args: argparse.Namespace,
     spec: dict,
-    agent: ClaudeAgent,
+    agent: BaseAgent,
     failure_reason: str,
 ) -> Path:
     runs_dir = Path(args.runs_dir)
@@ -194,6 +273,7 @@ def _write_preflight_failure_run(
             "env_hash": "",
             "runs_dir": "<redacted>",
             "clawperator_cmd": ["clawperator"],
+            "ground_truth_android_version": None,
         },
         "timeout_s": args.timeout_s,
         "max_turns": args.max_turns,
@@ -226,8 +306,8 @@ def _sanitize_env_overrides(env_overrides: dict[str, str]) -> dict[str, str]:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="evals/run_eval.py")
     parser.add_argument("eval_id")
-    parser.add_argument("--agent", required=True, choices=sorted(SUPPORTED_AGENTS))
-    parser.add_argument("--model", required=True)
+    parser.add_argument("--agent", choices=sorted(SUPPORTED_AGENTS))
+    parser.add_argument("--model")
     parser.add_argument("--device")
     parser.add_argument("--mode", default="public-surface", choices=sorted(SUPPORTED_MODES))
     parser.add_argument("--runtime", default="local-dev", choices=sorted(SUPPORTED_RUNTIMES))
@@ -248,13 +328,27 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit("full-repo mode is not yet implemented (Phase 3)")
     if args.runtime == "published":
         raise SystemExit("published runtime is not yet implemented (Phase 3)")
-    if args.rescore is not None:
-        raise SystemExit("rescore is not yet implemented (Phase 2)")
     if args.eval_id != "android-version":
         raise SystemExit(f"unsupported eval: {args.eval_id}")
 
     spec = _load_spec(args.eval_id)
     spec["runtime_target"] = args.runtime
+
+    if args.rescore is not None:
+        run_id = args.rescore
+        if not run_id:
+            raise SystemExit("rescore failed: missing run_id")
+        run_dir = _resolve_run_dir(Path(args.runs_dir), run_id)
+        rescored = _rescore_run(Path(args.runs_dir), run_id)
+        status = rescored["outcome"]["status"].upper()
+        answer = rescored["outcome"]["answer_normalized"] or "none"
+        duration = rescored["metrics"].get("wall_clock_s", 0.0)
+        print(run_dir)
+        print(f"{status} | rescored | {duration:.1f}s | answer={answer}")
+        return 0
+
+    if args.agent is None or args.model is None:
+        raise SystemExit("--agent and --model are required unless --rescore is used")
 
     agent = _make_agent(args.agent, args.model, args.mode)
     resolved_config = {

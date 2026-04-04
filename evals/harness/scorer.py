@@ -54,12 +54,26 @@ def extract_answer_from_json_line(line: str) -> str | None:
                 match = extract_answer_from_line(text)
                 if match is not None:
                     return match
+    elif payload_type == "message":
+        if payload.get("role") == "assistant":
+            for text in _iter_text_values(payload.get("content")):
+                match = extract_answer_from_line(text)
+                if match is not None:
+                    return match
     elif payload_type == "result":
         result_text = payload.get("result")
         if isinstance(result_text, str):
             match = extract_answer_from_line(result_text)
             if match is not None:
                 return match
+    elif payload_type == "item.completed":
+        item = payload.get("item")
+        if isinstance(item, dict) and item.get("type") == "agent_message":
+            text = item.get("text")
+            if isinstance(text, str):
+                match = extract_answer_from_line(text)
+                if match is not None:
+                    return match
     return None
 
 
@@ -91,8 +105,15 @@ class ScorerResult:
     used_disallowed_tool: bool
 
 
-def score(transcript: str, ground_truth: str, answer_extracted_raw: str | None = None) -> ScorerResult:
-    raw_answer = answer_extracted_raw if answer_extracted_raw is not None else extract_answer_from_transcript(transcript)
+def score(
+    transcript: str,
+    ground_truth: str,
+    answer_extracted_raw: str | None = None,
+    allow_transcript_fallback: bool = True,
+) -> ScorerResult:
+    raw_answer = answer_extracted_raw
+    if raw_answer is None and allow_transcript_fallback:
+        raw_answer = extract_answer_from_transcript(transcript)
     answer_normalized = normalize_version(raw_answer) if raw_answer is not None else None
     ground_truth_normalized = normalize_version(ground_truth)
     answer_correct = answer_normalized is not None and answer_normalized == ground_truth_normalized

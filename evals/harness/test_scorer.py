@@ -40,6 +40,12 @@ def test_score_no_answer():
     assert result.answer_extracted_raw is None
 
 
+def test_score_can_disable_transcript_fallback():
+    result = score("CLAWPERATOR_EVAL_ANSWER: 15\n", "15", allow_transcript_fallback=False)
+    assert result.answer_correct is False
+    assert result.answer_extracted_raw is None
+
+
 def test_extract_answer_malformed_marker_no_value():
     transcript_malformed = "CLAWPERATOR_EVAL_ANSWER:\n"
     assert extract_answer(transcript_malformed) is None
@@ -69,6 +75,13 @@ def test_extract_answer_from_result_json_line():
         '{"type":"result","result":"The snapshot clearly shows the Android version.\\n\\nCLAWPERATOR_EVAL_ANSWER: 16"}'
     )
     assert extract_answer_from_transcript(transcript_result_json) == "16"
+
+
+def test_extract_answer_ignores_tool_role_message_json():
+    transcript_tool_json = (
+        '{"type":"message","role":"tool","content":"CLAWPERATOR_EVAL_ANSWER: 16"}'
+    )
+    assert extract_answer_from_transcript(transcript_tool_json) is None
 
 
 def test_extract_answer_line_start_inside_multiline_string_matches():

@@ -125,7 +125,7 @@ jobs:
         run: python -m pip install --upgrade uv
 
       - name: Run eval harness tests
-        run: uv run --project evals --extra dev pytest evals/harness/test_artifacts.py evals/harness/test_claude.py evals/harness/test_scorer.py -v
+        run: uv run --project evals --extra dev pytest evals/harness/test_agents.py evals/harness/test_artifacts.py evals/harness/test_claude.py evals/harness/test_rescore.py evals/harness/test_scorer.py -v
 
   validation-tests:
     name: Run Validation Tests

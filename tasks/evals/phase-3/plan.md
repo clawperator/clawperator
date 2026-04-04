@@ -6,6 +6,8 @@ Add the two remaining run axes: the `published` runtime target (global npm
 binary + release Operator APK) and the `full-repo` knowledge mode (agent
 runs from repo root with full source access). Add version pinning in results.
 
+Phase 1 and Phase 2 are already complete on `main`; this phase is unblocked.
+
 1 PR, 2 sub-phases.
 
 ## Status
@@ -18,7 +20,7 @@ runs from repo root with full source access). Add version pinning in results.
 | Completed | none |
 | Remaining | 3a, 3b |
 | Current / Next | 3a |
-| Blockers | Phase 2 PR must be merged before starting |
+| Blockers | none |
 
 ## Goal
 

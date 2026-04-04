@@ -33,7 +33,7 @@ def make_run_id(
             timestamp = datetime.now().astimezone()
     timestamp = timestamp.strftime("%Y%m%d-%H%M%S-%f")[:-3]
     entropy = uuid4().hex[:6]
-    model_short = model.lower()[:12]
+    model_short = _slugify(model)[:12] or "model"
     parts = [eval_id, timestamp, entropy, agent_type, model_short]
     if label is not None:
         slug = _slugify(label)
