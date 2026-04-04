@@ -32,3 +32,6 @@ class BaseAgent(ABC):
     def normalize_line(self, raw: str) -> str:
         """Pre-process a raw output line before transcript writing and answer scanning."""
 
+    @abstractmethod
+    def count_turn(self, line: str) -> bool:
+        """Return True if this output line represents a completed agent turn."""

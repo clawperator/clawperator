@@ -54,12 +54,26 @@ def extract_answer_from_json_line(line: str) -> str | None:
                 match = extract_answer_from_line(text)
                 if match is not None:
                     return match
+    elif payload_type == "message":
+        if payload.get("role") in {"assistant", "tool"}:
+            for text in _iter_text_values(payload.get("content")):
+                match = extract_answer_from_line(text)
+                if match is not None:
+                    return match
     elif payload_type == "result":
         result_text = payload.get("result")
         if isinstance(result_text, str):
             match = extract_answer_from_line(result_text)
             if match is not None:
                 return match
+    elif payload_type == "item.completed":
+        item = payload.get("item")
+        if isinstance(item, dict) and item.get("type") == "agent_message":
+            text = item.get("text")
+            if isinstance(text, str):
+                match = extract_answer_from_line(text)
+                if match is not None:
+                    return match
     return None
 
 

@@ -66,3 +66,19 @@ class ClaudeAgent(BaseAgent):
                     if chunks:
                         return "".join(chunks) + ("\n" if raw.endswith("\n") else "")
         return raw
+
+    def count_turn(self, line: str) -> bool:
+        try:
+            payload = json.loads(line)
+        except json.JSONDecodeError:
+            return False
+        if not isinstance(payload, dict):
+            return False
+        if payload.get("type") == "assistant":
+            return True
+        if payload.get("type") != "message":
+            return False
+        message = payload.get("message")
+        if isinstance(message, dict) and message.get("role") == "assistant":
+            return True
+        return payload.get("role") == "assistant"
