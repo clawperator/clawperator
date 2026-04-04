@@ -21,18 +21,18 @@ def test_make_run_id_includes_entropy_suffix(monkeypatch):
     uuids = iter([_FixedUuid("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"), _FixedUuid("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")])
     monkeypatch.setattr(artifacts, "uuid4", lambda: next(uuids))
 
-    first = artifacts.make_run_id("android-version", "claude", "claude-sonnet-4-6")
-    second = artifacts.make_run_id("android-version", "claude", "claude-sonnet-4-6")
+    first = artifacts.make_run_id("android-version", "claude", "claude-sonnet-4-6", timezone_name="UTC")
+    second = artifacts.make_run_id("android-version", "claude", "claude-sonnet-4-6", timezone_name="UTC")
 
     assert first != second
-    assert first.startswith("android-version-20260329-003022-123-aaaaaa-claude-")
-    assert second.startswith("android-version-20260329-003022-123-bbbbbb-claude-")
+    assert first.startswith("android-version-20260328-143022-123-aaaaaa-claude-")
+    assert second.startswith("android-version-20260328-143022-123-bbbbbb-claude-")
 
 
 def test_make_run_id_appends_label_slug(monkeypatch):
     monkeypatch.setattr(artifacts, "datetime", _FixedDateTime)
     monkeypatch.setattr(artifacts, "uuid4", lambda: _FixedUuid("cccccccccccccccccccccccccccccccc"))
 
-    run_id = artifacts.make_run_id("android-version", "claude", "claude-sonnet-4-6", "baseline run")
+    run_id = artifacts.make_run_id("android-version", "claude", "claude-sonnet-4-6", "baseline run", timezone_name="UTC")
 
     assert run_id.endswith("-baseline-run")
