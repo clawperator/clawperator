@@ -32,12 +32,13 @@ def test_agent_count_turns_from_empirical_json_lines():
         '"content":[{"type":"text","text":"Hello! How can I help you today?"}]}}'
     )
     gemini_line = '{"type":"message","role":"assistant","content":"Hello.","delta":true}'
+    gemini_result_line = '{"type":"result","status":"success","stats":{"tool_calls":0}}'
     codex_line = '{"type":"turn.completed","usage":{"input_tokens":1,"output_tokens":1}}'
     kimi_line = '{"role":"assistant","content":[{"type":"text","text":"Hello!"}]}'
 
     assert claude.count_turn(claude_line) is True
-    assert gemini.count_turn(gemini_line) is False
-    assert gemini.count_turn('{"type":"result","status":"success"}') is True
+    assert gemini.count_turn(gemini_line) is True
+    assert gemini.count_turn(gemini_result_line) is False
     assert codex.count_turn(codex_line) is True
     assert kimi.count_turn(kimi_line) is True
 
