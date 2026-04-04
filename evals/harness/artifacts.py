@@ -59,4 +59,5 @@ def write_run(
         raise FileExistsError(f"run artifacts already exist in {run_dir}")
     _write_json(result_path, result)
     _write_json(config_path, config)
-    transcript_path.write_bytes(_encode_transcript(transcript))
+    if not transcript_path.exists():
+        transcript_path.write_bytes(_encode_transcript(transcript))

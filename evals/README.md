@@ -5,7 +5,6 @@
 - Python 3.11 or newer
 - A connected Android device
 - The Clawperator Operator APK installed and permissioned
-- The `tasks/docs/gaps/` PR merged before treating results as meaningful
 
 ## Run The First Eval
 

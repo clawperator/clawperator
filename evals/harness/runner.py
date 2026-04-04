@@ -513,16 +513,18 @@ def run_eval(
 
         for raw_line in proc.stdout:
             line = agent.normalize_line(raw_line)
-            transcript_parts.append(line)
             if not transcript_truncated:
                 encoded_line = line.encode("utf-8")
                 if transcript_bytes_written >= TRANSCRIPT_CAP_BYTES:
-                    transcript_handle.write("[TRANSCRIPT_TRUNCATED]\n")
+                    marker = "[TRANSCRIPT_TRUNCATED]\n"
+                    transcript_handle.write(marker)
                     transcript_handle.flush()
+                    transcript_parts.append(marker)
                     transcript_truncated = True
                 else:
                     transcript_handle.write(line)
                     transcript_handle.flush()
+                    transcript_parts.append(line)
                     transcript_bytes_written += len(encoded_line)
             if extract_answer(line) is not None and not answer_found_logged:
                 logger.state("answer_found")

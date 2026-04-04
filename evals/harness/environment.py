@@ -103,7 +103,8 @@ def resolve_inputs(device: str | None) -> RuntimeInputs:
         device_serial = authorized[0]
 
     clawperator_cmd = _resolve_clawperator_cmd()
-    if shutil.which(clawperator_cmd[0]) is None:
+    clawperator_bin = Path(clawperator_cmd[0])
+    if shutil.which(clawperator_cmd[0]) is None and not (clawperator_bin.is_file() and os.access(clawperator_bin, os.X_OK)):
         raise EnvironmentError("clawperator_binary_not_found")
 
     operator_package = os.environ.get("CLAWPERATOR_OPERATOR_PACKAGE")
