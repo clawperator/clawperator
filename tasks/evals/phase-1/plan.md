@@ -15,9 +15,9 @@ scored `result.json` with a full agent transcript for every run.
 | State | in progress |
 | Total PRs | 1 |
 | Total phases | 4 (1a-1d) |
-| Completed | 1a |
-| Remaining | 1b, 1c, 1d |
-| Current / Next | 1b |
+| Completed | 1a, 1b |
+| Remaining | 1c, 1d |
+| Current / Next | 1c |
 | Blockers | `tasks/docs/gaps/` PR must merge before Phase 1d results count as meaningful |
 
 ## Goal

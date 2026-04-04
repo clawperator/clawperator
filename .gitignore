@@ -96,3 +96,4 @@ __pycache__/
 # Local recording artifacts
 tmp/
 evals/runs/
+.venv/
