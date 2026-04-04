@@ -64,6 +64,30 @@ def _minimal_base_env(device_serial: str, operator_package: str, clawperator_cmd
     }
 
 
+def _display_clawperator_cmd(clawperator_cmd: list[str], knowledge_mode: str) -> list[str]:
+    if knowledge_mode == "public-surface":
+        return ["clawperator"]
+    return clawperator_cmd
+
+
+def _display_work_dir(work_dir: Path, knowledge_mode: str) -> str:
+    if knowledge_mode == "public-surface":
+        return "<tempdir>"
+    return str(work_dir)
+
+
+def _display_cwd(knowledge_mode: str) -> str:
+    if knowledge_mode == "public-surface":
+        return "<redacted>"
+    return os.getcwd()
+
+
+def _display_runs_dir(runs_dir: Path, knowledge_mode: str) -> str:
+    if knowledge_mode == "public-surface":
+        return "<redacted>"
+    return str(runs_dir)
+
+
 def _ensure_agent_binary_available(agent: BaseAgent) -> str:
     binary = agent.build_command("", "")[0]
     if shutil.which(binary) is None and not Path(binary).exists():
@@ -208,6 +232,10 @@ def _build_config(
     timeout_s: int,
     max_turns: int | None,
     agent_binary_version: str,
+    display_clawperator_cmd: list[str],
+    display_work_dir: str,
+    display_cwd: str,
+    display_runs_dir: str,
 ) -> dict[str, Any]:
     return {
         "run_id": run_id,
@@ -226,16 +254,17 @@ def _build_config(
         "run_label": label,
         "invocation": {
             "command": command,
-            "work_dir": str(work_dir),
+            "work_dir": display_work_dir,
             "env_overrides": env_overrides,
         },
         "environment": {
             "python_version": platform.python_version(),
             "platform": platform.platform(),
-            "cwd": os.getcwd(),
+            "cwd": display_cwd,
             "agent_binary_version": agent_binary_version,
             "env_hash": _hash_env(env_overrides),
-            "runs_dir": str(runs_dir),
+            "runs_dir": display_runs_dir,
+            "clawperator_cmd": display_clawperator_cmd,
         },
         "timeout_s": timeout_s,
         "max_turns": max_turns,
@@ -268,6 +297,10 @@ def _build_result(
     timeout_s: int,
     max_turns: int | None,
     first_result_seen_at: float | None,
+    display_clawperator_cmd: list[str],
+    display_work_dir: str,
+    display_cwd: str,
+    display_runs_dir: str,
 ) -> dict[str, Any]:
     clawperator_commands_detected = _count_clawperator_results(transcript)
     answer_emitted = score_result.answer_extracted_raw is not None
@@ -299,7 +332,7 @@ def _build_result(
         "run_label": label,
         "invocation": {
             "command": command,
-            "work_dir": str(work_dir),
+            "work_dir": display_work_dir,
             "env_overrides": env_overrides,
         },
         "environment": {
@@ -307,9 +340,11 @@ def _build_result(
             "ground_truth_android_version": env.ground_truth_android_version,
             "ground_truth_collected_at": env.ground_truth_collected_at,
             "ground_truth_rechecked_at": ground_truth_rechecked_at,
-            "clawperator_cmd": env.clawperator_cmd,
+            "clawperator_cmd": display_clawperator_cmd,
             "clawperator_version": env.clawperator_version,
             "operator_package": env.operator_package,
+            "cwd": display_cwd,
+            "runs_dir": display_runs_dir,
         },
         "outcome": {
             "status": status,
@@ -385,24 +420,28 @@ def run_eval(
     try:
         _ensure_agent_binary_available(agent)
         prompt_path = _load_prompt_path(spec, knowledge_mode)
+        display_clawperator_cmd = _display_clawperator_cmd(env.clawperator_cmd, knowledge_mode)
+        display_work_dir = _display_work_dir(work_dir, knowledge_mode)
+        display_cwd = _display_cwd(knowledge_mode)
+        display_runs_dir = _display_runs_dir(runs_dir, knowledge_mode)
         prompt_text = build_prompt(
             str(prompt_path),
             {
-                "CLAWPERATOR_CMD": shlex.join(env.clawperator_cmd),
+                "CLAWPERATOR_CMD": shlex.join(display_clawperator_cmd),
                 "CLAWPERATOR_OPERATOR_PACKAGE": env.operator_package,
                 "DEVICE_SERIAL": env.device_serial,
                 "DOCS_URL": DOCS_URL,
             },
         )
         prompt_sha256 = hashlib.sha256(prompt_text.encode("utf-8")).hexdigest()
-        base_env = _minimal_base_env(env.device_serial, env.operator_package, env.clawperator_cmd)
+        base_env = _minimal_base_env(env.device_serial, env.operator_package, display_clawperator_cmd)
         agent_overrides = agent.build_env(base_env)
         final_env = {**base_env, **agent_overrides}
         command = agent.build_command(prompt_text, str(work_dir))
         agent_binary_version = _probe_agent_binary_version(agent)
         config_env_overrides = {
             "ANDROID_SERIAL": env.device_serial,
-            "CLAWPERATOR_CMD": shlex.join(env.clawperator_cmd),
+            "CLAWPERATOR_CMD": shlex.join(display_clawperator_cmd),
             "CLAWPERATOR_OPERATOR_PACKAGE": env.operator_package,
             **({"EVAL_LABEL": label} if label is not None else {}),
             **agent_overrides,
@@ -424,11 +463,15 @@ def run_eval(
             timeout_s=timeout_s,
             max_turns=max_turns,
             agent_binary_version=agent_binary_version,
+            display_clawperator_cmd=display_clawperator_cmd,
+            display_work_dir=display_work_dir,
+            display_cwd=display_cwd,
+            display_runs_dir=display_runs_dir,
         )
-        logger.spawn(command=command, work_dir=str(work_dir), env_overrides=config_env_overrides)
+        logger.spawn(command=command, work_dir=display_work_dir, env_overrides=config_env_overrides)
         logger.env_summary(
             device_serial=env.device_serial,
-            clawperator_cmd=env.clawperator_cmd,
+            clawperator_cmd=display_clawperator_cmd,
             operator_package=env.operator_package,
             clawperator_version=env.clawperator_version,
         )
@@ -499,11 +542,7 @@ def run_eval(
         finished_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         wall_clock_s = time.monotonic() - started_mono
         score_result = score(transcript_text, env.ground_truth_android_version)
-        forced_error = bool(label and label.startswith("force-error"))
-        if forced_error:
-            status = "error"
-            failure_reason = "forced_error_for_validation"
-        elif score_result.answer_extracted_raw is not None:
+        if score_result.answer_extracted_raw is not None:
             status = "pass" if score_result.answer_correct else "fail"
         elif timeout_triggered.is_set():
             status = "timeout"
@@ -543,6 +582,10 @@ def run_eval(
             timeout_s=timeout_s,
             max_turns=max_turns,
             first_result_seen_at=first_result_seen_at,
+            display_clawperator_cmd=display_clawperator_cmd,
+            display_work_dir=display_work_dir,
+            display_cwd=display_cwd,
+            display_runs_dir=display_runs_dir,
         )
         config = _build_config(
             run_id=run_id,
@@ -560,6 +603,10 @@ def run_eval(
             timeout_s=timeout_s,
             max_turns=max_turns,
             agent_binary_version=agent_binary_version,
+            display_clawperator_cmd=display_clawperator_cmd,
+            display_work_dir=display_work_dir,
+            display_cwd=display_cwd,
+            display_runs_dir=display_runs_dir,
         )
         write_run(run_dir, result, config, transcript_text)
         logger.state("completed")
@@ -607,7 +654,7 @@ def run_eval(
             env=env,
             env_overrides=_sanitize_env_overrides({
                 "ANDROID_SERIAL": env.device_serial,
-                "CLAWPERATOR_CMD": shlex.join(env.clawperator_cmd),
+                "CLAWPERATOR_CMD": shlex.join(display_clawperator_cmd),
                 "CLAWPERATOR_OPERATOR_PACKAGE": env.operator_package,
             }),
             ground_truth_rechecked_at=ground_truth_rechecked_at,
@@ -619,6 +666,10 @@ def run_eval(
             timeout_s=timeout_s,
             max_turns=max_turns,
             first_result_seen_at=first_result_seen_at,
+            display_clawperator_cmd=display_clawperator_cmd,
+            display_work_dir=display_work_dir,
+            display_cwd=display_cwd,
+            display_runs_dir=display_runs_dir,
         )
         config = _build_config(
             run_id=run_id,
@@ -633,7 +684,7 @@ def run_eval(
             command=command,
             env_overrides=_sanitize_env_overrides({
                 "ANDROID_SERIAL": env.device_serial,
-                "CLAWPERATOR_CMD": shlex.join(env.clawperator_cmd),
+                "CLAWPERATOR_CMD": shlex.join(display_clawperator_cmd),
                 "CLAWPERATOR_OPERATOR_PACKAGE": env.operator_package,
                 **agent_overrides,
             }),
@@ -641,6 +692,10 @@ def run_eval(
             timeout_s=timeout_s,
             max_turns=max_turns,
             agent_binary_version="unknown",
+            display_clawperator_cmd=display_clawperator_cmd,
+            display_work_dir=display_work_dir,
+            display_cwd=display_cwd,
+            display_runs_dir=display_runs_dir,
         )
         if transcript_handle is not None:
             transcript_handle.close()

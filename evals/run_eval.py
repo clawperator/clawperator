@@ -5,7 +5,6 @@ import argparse
 import hashlib
 import json
 import os
-import shlex
 import shutil
 import tempfile
 import sys
@@ -18,12 +17,11 @@ if str(ROOT) not in sys.path:
 
 from evals.harness.agents.base import AgentConfig
 from evals.harness.agents.claude import ClaudeAgent
-from evals.harness.agents.doctor import DoctorAgent
 from evals.harness.environment import preflight, resolve_inputs
 from evals.harness.runner import build_prompt, run_eval
 
 
-SUPPORTED_AGENTS = {"claude": ClaudeAgent, "doctor": DoctorAgent}
+SUPPORTED_AGENTS = {"claude": ClaudeAgent}
 SUPPORTED_MODES = {"public-surface", "full-repo"}
 SUPPORTED_RUNTIMES = {"local-dev", "published"}
 
@@ -59,7 +57,7 @@ def _render_dry_run(
     prompt_path: Path,
     prompt_sha256: str,
     command: list[str],
-    work_dir: Path,
+    work_dir: str,
     env_overrides: dict,
     prompt_text: str,
 ) -> None:
@@ -141,7 +139,7 @@ def main(argv: list[str] | None = None) -> int:
         "timeout_s": args.timeout_s,
         "max_turns": args.max_turns,
         "label": args.label,
-        "runs_dir": args.runs_dir,
+        "runs_dir": "<redacted>",
     }
 
     if args.dry_run:
@@ -151,13 +149,13 @@ def main(argv: list[str] | None = None) -> int:
             print(str(exc), file=sys.stderr)
             return 1
         resolved_config["device_serial"] = inputs.device_serial
-        resolved_config["clawperator_cmd"] = inputs.clawperator_cmd
+        resolved_config["clawperator_cmd"] = ["clawperator"]
         resolved_config["operator_package"] = inputs.operator_package
         prompt_path = ROOT / "evals" / "specs" / args.eval_id / spec["prompts"][args.mode]
         prompt_text = build_prompt(
             str(prompt_path),
             {
-                "CLAWPERATOR_CMD": shlex.join(inputs.clawperator_cmd),
+                "CLAWPERATOR_CMD": "clawperator",
                 "CLAWPERATOR_OPERATOR_PACKAGE": inputs.operator_package,
                 "DEVICE_SERIAL": inputs.device_serial,
                 "DOCS_URL": "https://docs.clawperator.com",
@@ -169,13 +167,13 @@ def main(argv: list[str] | None = None) -> int:
         base_env = _minimal_base_env()
         env_overrides = _sanitize_env_overrides({
             "ANDROID_SERIAL": inputs.device_serial,
-            "CLAWPERATOR_CMD": shlex.join(inputs.clawperator_cmd),
+            "CLAWPERATOR_CMD": "clawperator",
             "CLAWPERATOR_OPERATOR_PACKAGE": inputs.operator_package,
             **({"EVAL_LABEL": args.label} if args.label is not None else {}),
             **agent.build_env({
                 **base_env,
                 "ANDROID_SERIAL": inputs.device_serial,
-                "CLAWPERATOR_CMD": shlex.join(inputs.clawperator_cmd),
+                "CLAWPERATOR_CMD": "clawperator",
                 "CLAWPERATOR_OPERATOR_PACKAGE": inputs.operator_package,
             }),
         })
@@ -185,7 +183,7 @@ def main(argv: list[str] | None = None) -> int:
                 prompt_path=prompt_path,
                 prompt_sha256=prompt_sha256,
                 command=command,
-                work_dir=dry_run_work_dir,
+                work_dir="<tempdir>",
                 env_overrides=env_overrides,
                 prompt_text=prompt_text,
             )
