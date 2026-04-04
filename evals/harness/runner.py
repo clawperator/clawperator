@@ -20,7 +20,7 @@ from .agents.base import BaseAgent
 from .artifacts import make_run_id, write_run
 from .environment import Environment, REPO_ROOT
 from .logger import get_logger
-from .scorer import extract_answer, score
+from .scorer import extract_answer_from_transcript, score
 from .timeutil import format_timestamp
 
 
@@ -282,6 +282,7 @@ def _build_config(
             "env_hash": _hash_env(env_overrides),
             "runs_dir": display_runs_dir,
             "clawperator_cmd": display_clawperator_cmd,
+            "ground_truth_android_version": env.ground_truth_android_version,
         },
         "timeout_s": timeout_s,
         "max_turns": max_turns,
@@ -314,6 +315,7 @@ def _build_result(
     timeout_s: int,
     max_turns: int | None,
     first_result_seen_at: float | None,
+    turns_counted: int | None,
     display_clawperator_cmd: list[str],
     display_work_dir: str,
     display_cwd: str,
@@ -381,8 +383,8 @@ def _build_result(
             "violations": violations,
             "diagnostics": diagnostics,
             "used_disallowed_tool": bool(score_result.used_disallowed_tool),
-            "turns_counted": None,
-            "turns_budget": None,
+            "turns_counted": turns_counted,
+            "turns_budget": max_turns,
         },
         "artifacts": {"transcript": "transcript.txt", "config": "config.json"},
     }
@@ -422,6 +424,9 @@ def run_eval(
     answer_extracted_raw: str | None = None
     ground_truth_rechecked_at: str | None = None
     first_result_seen_at: float | None = None
+    turns = 0
+    turn_count_parse_failed = False
+    turns_counted: int | None = None
     status = "error"
     failure_reason: str | None = None
     score_result = None
@@ -548,10 +553,26 @@ def run_eval(
                     transcript_handle.flush()
                     transcript_parts.append(line)
                     transcript_bytes_written += len(encoded_line)
-            if extract_answer(line) is not None and not answer_found_logged:
-                answer_extracted_raw = extract_answer(line)
-                logger.state("answer_found")
-                answer_found_logged = True
+            if answer_extracted_raw is None:
+                answer = extract_answer_from_transcript(line)
+                if answer is not None:
+                    answer_extracted_raw = answer
+                    if not answer_found_logged:
+                        logger.state("answer_found")
+                        answer_found_logged = True
+            if answer_extracted_raw is None:
+                try:
+                    if agent.count_turn(raw_line):
+                        turns += 1
+                        if max_turns is not None and turns >= max_turns:
+                            status = "budget_exceeded"
+                            failure_reason = "budget_exceeded"
+                            logger.warning("turn_budget_reached", turns=turns, max_turns=max_turns)
+                            _terminate_process_group(proc, logger)
+                            break
+                except Exception as exc:
+                    turn_count_parse_failed = True
+                    logger.warning("turn_count_failed", error=str(exc) if str(exc) else exc.__class__.__name__)
             if line.startswith("[Clawperator-Result]") and first_result_seen_at is None:
                 first_result_seen_at = time.monotonic() - started_mono
 
@@ -567,14 +588,30 @@ def run_eval(
         finished_at = format_timestamp(env.device_timezone)
         wall_clock_s = time.monotonic() - started_mono
         score_result = score(transcript_text, env.ground_truth_android_version, answer_extracted_raw=answer_extracted_raw)
-        if score_result.answer_extracted_raw is not None:
+        if score_result.answer_extracted_raw is not None and status != "budget_exceeded":
             status = "pass" if score_result.answer_correct else "fail"
-        elif timeout_triggered.is_set():
+        elif status != "budget_exceeded" and timeout_triggered.is_set():
             status = "timeout"
-        else:
+        elif status != "budget_exceeded":
             status = "no_answer"
+        if turn_count_parse_failed:
+            logger.warning("turn_count_parse_failed")
+        if agent.config.type_id in {"codex", "kimi"}:
+            if turns < 2:
+                turns_counted = None
+                logger.warning("turn_count_approximate", agent=agent.config.type_id, turns=turns)
+            else:
+                turns_counted = turns
+        else:
+            if turns > 0 and not turn_count_parse_failed:
+                turns_counted = turns
+            else:
+                turns_counted = None
+                logger.warning("turn_count_unreliable", agent=agent.config.type_id, turns=turns)
         if status == "error":
             failure_reason = failure_reason or "unexpected_error"
+        elif status == "budget_exceeded":
+            failure_reason = failure_reason or "budget_exceeded"
         else:
             failure_reason = None
         logger.score(
@@ -607,6 +644,7 @@ def run_eval(
             timeout_s=timeout_s,
             max_turns=max_turns,
             first_result_seen_at=first_result_seen_at,
+            turns_counted=turns_counted,
             display_clawperator_cmd=display_clawperator_cmd,
             display_work_dir=display_work_dir,
             display_cwd=display_cwd,
@@ -639,7 +677,7 @@ def run_eval(
             status,
             score_result.answer_normalized if score_result.answer_normalized is not None else None,
             env.ground_truth_android_version,
-            None,
+            turns_counted,
             wall_clock_s,
         )
         return run_dir
@@ -691,6 +729,7 @@ def run_eval(
             timeout_s=timeout_s,
             max_turns=max_turns,
             first_result_seen_at=first_result_seen_at,
+            turns_counted=turns_counted,
             display_clawperator_cmd=display_clawperator_cmd,
             display_work_dir=display_work_dir,
             display_cwd=display_cwd,
@@ -727,7 +766,13 @@ def run_eval(
             transcript_handle = None
         write_run(run_dir, result, config, transcript_text)
         logger.state("completed")
-        logger.result(status, score_result.answer_normalized if score_result.answer_normalized is not None else None, env.ground_truth_android_version, None, wall_clock_s)
+        logger.result(
+            status,
+            score_result.answer_normalized if score_result.answer_normalized is not None else None,
+            env.ground_truth_android_version,
+            turns_counted,
+            wall_clock_s,
+        )
         return run_dir
     finally:
         if transcript_handle is not None:
