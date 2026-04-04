@@ -9,7 +9,7 @@
 
 ## Run The First Eval
 
-Use the project-managed Python environment:
+Use the project-managed Python environment from the `evals/` project root:
 
 ```bash
 uv run --project evals --extra dev python evals/run_eval.py android-version \
@@ -18,6 +18,7 @@ uv run --project evals --extra dev python evals/run_eval.py android-version \
 ```
 
 You can pass `--device <serial>` when more than one device is connected.
+The lockfile for this project lives at `evals/uv.lock`.
 
 ## Read `result.json`
 
