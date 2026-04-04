@@ -45,10 +45,6 @@ Design consequence:
 - If Node performs a pre-flight or fallback outside the Android runtime, only normalize the result to success when that pre-flight or fallback actually succeeded.
 - CLI parsing changes must preserve both the structured JSON contract and the exit-code contract. Test valid, invalid, and missing-value cases for any new flag.
 
-## Agent Selection
-- When carrying out eval-task implementation work, prefer `kimi` as the default coding agent unless the user explicitly asks for a different agent or model.
-- Keep task and plan documents focused on the work to be done, not on assigning a particular implementation agent.
-
 ## Key Docs
 - `docs/setup.md` - Device setup and APK installation
 - `docs/api/overview.md` - API contract and execution model
