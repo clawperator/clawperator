@@ -19,12 +19,12 @@ start the next until the current one passes its acceptance criteria.
 
 | Item | Value |
 | --- | --- |
-| State | not started |
+| State | complete |
 | Total PRs | 1 |
 | Total sub-phases | 4 (1a-1d) |
-| Completed | none |
-| Remaining | 1a, 1b, 1c, 1d |
-| Current / Next | 1a |
+| Completed | 1a, 1b, 1c, 1d |
+| Remaining | none |
+| Current / Next | none |
 | Blockers | none |
 
 ## Hard Rules
