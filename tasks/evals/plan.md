@@ -17,7 +17,7 @@ are treated as meaningful benchmarks.
 
 | PR | Phase | Scope | Agent tier |
 | --- | --- | --- | --- |
-| PR-1 | 1 | Harness scaffold + first eval + Claude adapter | thinking |
+| PR-1 | 1 | Harness scaffold + first eval + Claude eval-subject adapter | thinking |
 | PR-2 | 2 | Gemini, Codex, Kimi adapters + turn counting | default |
 | PR-3 | 3 | Published runtime target + full-repo mode | default |
 | PR-4 | 4 | Skill generation and replay eval | thinking |

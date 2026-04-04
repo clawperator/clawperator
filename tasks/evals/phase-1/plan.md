@@ -3,7 +3,7 @@
 ## Executive Summary
 
 Ship the first working end-to-end eval run. One eval spec (`android-version`),
-one agent adapter (Claude), wall-clock timeout only. The harness produces a
+one agent adapter for the Claude eval subject, wall-clock timeout only. The harness produces a
 scored `result.json` with a full agent transcript for every run.
 
 1 PR, 4 sub-phases. All sub-phases ship in the same PR.
@@ -40,10 +40,10 @@ thin surface before adding the complexity of multiple agents and specs.
 reference, model name (`kimi-code/kimi-for-coding`), and agent tier to
 Kimi flag mapping.
 
-Note: "one agent adapter (Claude)" above refers to the eval subject - the agent
-being evaluated. The implementing agent (Kimi) writes the harness code.
-The Claude adapter is built first because Claude is the most well-understood
-eval subject.
+Note: "one agent adapter for the Claude eval subject" above refers to the
+agent being evaluated. The implementing agent is Kimi, which writes the
+harness code. The Claude adapter is built first because Claude is the most
+well-understood eval subject.
 
 ## In Scope
 
