@@ -18,12 +18,12 @@ the next. Phase 1 PR must be merged before starting.
 
 | Item | Value |
 | --- | --- |
-| State | in progress |
+| State | complete |
 | Total PRs | 1 |
 | Total sub-phases | 3 (2a-2c) |
-| Completed | 2a |
-| Remaining | 2b, 2c |
-| Current / Next | 2b |
+| Completed | 2a, 2b, 2c |
+| Remaining | none |
+| Current / Next | done |
 | Blockers | Phase 1 PR must be merged |
 
 ## Hard Rules
