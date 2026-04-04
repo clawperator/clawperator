@@ -4,6 +4,7 @@ import json
 import re
 from datetime import datetime, timezone
 from pathlib import Path
+from uuid import uuid4
 
 
 _TRANSCRIPT_CAP_BYTES = 10 * 1024 * 1024
@@ -15,9 +16,10 @@ def _slugify(value: str) -> str:
 
 
 def make_run_id(eval_id: str, agent_type: str, model: str, label: str | None = None) -> str:
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S-%f")[:-3]
+    entropy = uuid4().hex[:6]
     model_short = model.lower()[:12]
-    parts = [eval_id, timestamp, agent_type, model_short]
+    parts = [eval_id, timestamp, entropy, agent_type, model_short]
     if label is not None:
         slug = _slugify(label)
         if slug:
