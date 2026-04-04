@@ -52,9 +52,17 @@ def _load_prompt_path(spec: dict, knowledge_mode: str) -> Path:
     raise KeyError(f"prompt path not found for mode {knowledge_mode}")
 
 
-def _minimal_base_env(device_serial: str, operator_package: str, clawperator_cmd: list[str]) -> dict[str, str]:
+def _minimal_base_env(
+    device_serial: str,
+    operator_package: str,
+    clawperator_cmd: list[str],
+    path_prefix: str | None = None,
+) -> dict[str, str]:
+    path = os.environ["PATH"]
+    if path_prefix is not None and path_prefix:
+        path = f"{path_prefix}{os.pathsep}{path}"
     return {
-        "PATH": os.environ["PATH"],
+        "PATH": path,
         "HOME": os.environ["HOME"],
         "LANG": os.environ.get("LANG", "C.UTF-8"),
         "LC_ALL": os.environ.get("LC_ALL", "C.UTF-8"),
@@ -64,10 +72,16 @@ def _minimal_base_env(device_serial: str, operator_package: str, clawperator_cmd
     }
 
 
-def _display_clawperator_cmd(clawperator_cmd: list[str], knowledge_mode: str) -> list[str]:
-    if knowledge_mode == "public-surface":
-        return ["clawperator"]
-    return clawperator_cmd
+def _prepare_clawperator_launcher(work_dir: Path, clawperator_cmd: list[str], knowledge_mode: str) -> tuple[list[str], str | None]:
+    if knowledge_mode != "public-surface":
+        return clawperator_cmd, None
+    if len(clawperator_cmd) == 1 and clawperator_cmd[0] == "clawperator":
+        return clawperator_cmd, None
+    wrapper_path = work_dir / "clawperator"
+    script = "#!/bin/sh\nexec " + shlex.join(clawperator_cmd) + ' "$@"\n'
+    wrapper_path.write_text(script, encoding="utf-8")
+    wrapper_path.chmod(0o755)
+    return ["clawperator"], str(work_dir)
 
 
 def _display_work_dir(work_dir: Path, knowledge_mode: str) -> str:
@@ -402,6 +416,7 @@ def run_eval(
     command: list[str] = []
     transcript_parts: list[str] = []
     transcript_text = ""
+    answer_extracted_raw: str | None = None
     ground_truth_rechecked_at: str | None = None
     first_result_seen_at: float | None = None
     status = "error"
@@ -416,11 +431,15 @@ def run_eval(
     transcript_bytes_written = 0
     transcript_truncated = False
     answer_found_logged = False
+    display_clawperator_cmd: list[str] = ["clawperator"]
+    display_work_dir = "<tempdir>"
+    display_cwd = "<redacted>"
+    display_runs_dir = "<redacted>"
 
     try:
         _ensure_agent_binary_available(agent)
         prompt_path = _load_prompt_path(spec, knowledge_mode)
-        display_clawperator_cmd = _display_clawperator_cmd(env.clawperator_cmd, knowledge_mode)
+        display_clawperator_cmd, path_prefix = _prepare_clawperator_launcher(work_dir, env.clawperator_cmd, knowledge_mode)
         display_work_dir = _display_work_dir(work_dir, knowledge_mode)
         display_cwd = _display_cwd(knowledge_mode)
         display_runs_dir = _display_runs_dir(runs_dir, knowledge_mode)
@@ -434,7 +453,7 @@ def run_eval(
             },
         )
         prompt_sha256 = hashlib.sha256(prompt_text.encode("utf-8")).hexdigest()
-        base_env = _minimal_base_env(env.device_serial, env.operator_package, display_clawperator_cmd)
+        base_env = _minimal_base_env(env.device_serial, env.operator_package, display_clawperator_cmd, path_prefix=path_prefix)
         agent_overrides = agent.build_env(base_env)
         final_env = {**base_env, **agent_overrides}
         command = agent.build_command(prompt_text, str(work_dir))
@@ -527,6 +546,7 @@ def run_eval(
                     transcript_parts.append(line)
                     transcript_bytes_written += len(encoded_line)
             if extract_answer(line) is not None and not answer_found_logged:
+                answer_extracted_raw = extract_answer(line)
                 logger.state("answer_found")
                 answer_found_logged = True
             if line.startswith("[Clawperator-Result]") and first_result_seen_at is None:
@@ -543,7 +563,7 @@ def run_eval(
         transcript_text = "".join(transcript_parts)
         finished_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         wall_clock_s = time.monotonic() - started_mono
-        score_result = score(transcript_text, env.ground_truth_android_version)
+        score_result = score(transcript_text, env.ground_truth_android_version, answer_extracted_raw=answer_extracted_raw)
         if score_result.answer_extracted_raw is not None:
             status = "pass" if score_result.answer_correct else "fail"
         elif timeout_triggered.is_set():
@@ -632,7 +652,7 @@ def run_eval(
         failure_reason = str(exc) if str(exc) else exc.__class__.__name__
         status = "error"
         if score_result is None:
-            score_result = score(transcript_text, env.ground_truth_android_version)
+            score_result = score(transcript_text, env.ground_truth_android_version, answer_extracted_raw=answer_extracted_raw)
         logger.error(exc)
         logger.score(
             outcome_status=status,

@@ -5,6 +5,7 @@ import argparse
 import hashlib
 import json
 import os
+import shlex
 import shutil
 import tempfile
 import sys
@@ -18,7 +19,7 @@ if str(ROOT) not in sys.path:
 from evals.harness.agents.base import AgentConfig
 from evals.harness.agents.claude import ClaudeAgent
 from evals.harness.environment import preflight, resolve_inputs
-from evals.harness.runner import build_prompt, run_eval
+from evals.harness.runner import build_prompt, run_eval, _prepare_clawperator_launcher
 
 
 SUPPORTED_AGENTS = {"claude": ClaudeAgent}
@@ -149,31 +150,34 @@ def main(argv: list[str] | None = None) -> int:
             print(str(exc), file=sys.stderr)
             return 1
         resolved_config["device_serial"] = inputs.device_serial
-        resolved_config["clawperator_cmd"] = ["clawperator"]
+        dry_run_work_dir = Path(tempfile.mkdtemp(prefix="clawperator-eval-"))
+        display_clawperator_cmd, path_prefix = _prepare_clawperator_launcher(dry_run_work_dir, inputs.clawperator_cmd, args.mode)
+        resolved_config["clawperator_cmd"] = display_clawperator_cmd
         resolved_config["operator_package"] = inputs.operator_package
         prompt_path = ROOT / "evals" / "specs" / args.eval_id / spec["prompts"][args.mode]
         prompt_text = build_prompt(
             str(prompt_path),
             {
-                "CLAWPERATOR_CMD": "clawperator",
+                "CLAWPERATOR_CMD": shlex.join(display_clawperator_cmd),
                 "CLAWPERATOR_OPERATOR_PACKAGE": inputs.operator_package,
                 "DEVICE_SERIAL": inputs.device_serial,
                 "DOCS_URL": "https://docs.clawperator.com",
             },
         )
         prompt_sha256 = hashlib.sha256(prompt_text.encode("utf-8")).hexdigest()
-        dry_run_work_dir = Path(tempfile.mkdtemp(prefix="clawperator-eval-"))
         command = agent.build_command(prompt_text, str(dry_run_work_dir))
         base_env = _minimal_base_env()
+        if path_prefix is not None:
+            base_env["PATH"] = f"{path_prefix}{os.pathsep}{base_env['PATH']}"
         env_overrides = _sanitize_env_overrides({
             "ANDROID_SERIAL": inputs.device_serial,
-            "CLAWPERATOR_CMD": "clawperator",
+            "CLAWPERATOR_CMD": shlex.join(display_clawperator_cmd),
             "CLAWPERATOR_OPERATOR_PACKAGE": inputs.operator_package,
             **({"EVAL_LABEL": args.label} if args.label is not None else {}),
             **agent.build_env({
                 **base_env,
                 "ANDROID_SERIAL": inputs.device_serial,
-                "CLAWPERATOR_CMD": "clawperator",
+                "CLAWPERATOR_CMD": shlex.join(display_clawperator_cmd),
                 "CLAWPERATOR_OPERATOR_PACKAGE": inputs.operator_package,
             }),
         })

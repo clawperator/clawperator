@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from .agents.base import AgentConfig
-from .agents.claude import ClaudeAgent
+from evals.harness.agents.base import AgentConfig
+from evals.harness.agents.claude import ClaudeAgent
 
 
 def test_normalize_line_extracts_assistant_text_from_stream_json():

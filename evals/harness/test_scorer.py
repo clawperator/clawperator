@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .scorer import extract_answer, normalize_version, score
+from evals.harness.scorer import extract_answer, normalize_version, score
 
 
 def test_normalize_version():
@@ -68,4 +68,3 @@ def test_extract_answer_multiword_answer_is_captured():
 def test_extract_answer_trailing_whitespace_is_stripped():
     transcript_trailing = "CLAWPERATOR_EVAL_ANSWER: 15   \n"
     assert extract_answer(transcript_trailing) == "15"
-
