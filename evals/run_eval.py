@@ -27,6 +27,7 @@ from evals.harness.environment import (
     LOCAL_DEV_OPERATOR_PACKAGE,
     RELEASE_OPERATOR_PACKAGE,
     RuntimeInputs,
+    REPO_ROOT,
     preflight,
     resolve_inputs,
 )
@@ -186,10 +187,13 @@ def _write_preflight_failure_run(
     prompt_text = build_prompt(
         str(prompt_path),
         {
-            "CLAWPERATOR_CMD": shlex.join(clawperator_cmd),
-            "CLAWPERATOR_OPERATOR_PACKAGE": operator_package,
-            "DEVICE_SERIAL": runtime_inputs.device_serial if runtime_inputs is not None else "<unresolved>",
-            "DOCS_URL": "https://docs.clawperator.com",
+            **{
+                "CLAWPERATOR_CMD": shlex.join(clawperator_cmd),
+                "CLAWPERATOR_OPERATOR_PACKAGE": operator_package,
+                "DEVICE_SERIAL": runtime_inputs.device_serial if runtime_inputs is not None else "<unresolved>",
+                "DOCS_URL": "https://docs.clawperator.com",
+            },
+            **({"REPO_ROOT": str(REPO_ROOT)} if args.mode == "full-repo" else {}),
         },
     )
     prompt_sha256 = hashlib.sha256(prompt_text.encode("utf-8")).hexdigest()
@@ -339,8 +343,6 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
-    if args.mode == "full-repo":
-        raise SystemExit("full-repo mode is not yet implemented (Phase 3)")
     if args.eval_id != "android-version":
         raise SystemExit(f"unsupported eval: {args.eval_id}")
 
@@ -376,7 +378,7 @@ def main(argv: list[str] | None = None) -> int:
         "timeout_s": args.timeout_s,
         "max_turns": args.max_turns,
         "label": args.label,
-        "runs_dir": "<redacted>",
+        "runs_dir": "<redacted>" if args.mode == "public-surface" else str(Path(args.runs_dir)),
     }
 
     if args.dry_run:
@@ -386,7 +388,7 @@ def main(argv: list[str] | None = None) -> int:
             print(str(exc), file=sys.stderr)
             return 1
         resolved_config["device_serial"] = inputs.device_serial
-        dry_run_work_dir = Path(tempfile.mkdtemp(prefix="clawperator-eval-"))
+        dry_run_work_dir = Path(tempfile.mkdtemp(prefix="clawperator-eval-")) if args.mode == "public-surface" else REPO_ROOT
         display_clawperator_cmd, path_prefix = _prepare_clawperator_launcher(
             dry_run_work_dir,
             inputs.clawperator_cmd,
@@ -405,6 +407,7 @@ def main(argv: list[str] | None = None) -> int:
                 "CLAWPERATOR_OPERATOR_PACKAGE": inputs.operator_package,
                 "DEVICE_SERIAL": inputs.device_serial,
                 "DOCS_URL": "https://docs.clawperator.com",
+                **({"REPO_ROOT": str(REPO_ROOT)} if args.mode == "full-repo" else {}),
             },
         )
         prompt_sha256 = hashlib.sha256(prompt_text.encode("utf-8")).hexdigest()
@@ -430,12 +433,13 @@ def main(argv: list[str] | None = None) -> int:
                 prompt_path=prompt_path,
                 prompt_sha256=prompt_sha256,
                 command=command,
-                work_dir="<tempdir>",
+                work_dir=str(dry_run_work_dir),
                 env_overrides=env_overrides,
                 prompt_text=prompt_text,
             )
         finally:
-            shutil.rmtree(dry_run_work_dir, ignore_errors=True)
+            if args.mode == "public-surface":
+                shutil.rmtree(dry_run_work_dir, ignore_errors=True)
         return 0
 
     try:

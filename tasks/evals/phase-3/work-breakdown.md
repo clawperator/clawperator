@@ -16,12 +16,12 @@ Parent plan: `tasks/evals/phase-3/plan.md`
 
 | Item | Value |
 | --- | --- |
-| State | in progress |
+| State | complete |
 | Total PRs | 1 |
 | Total sub-phases | 2 (3a-3b) |
-| Completed | 3a |
-| Remaining | 3b |
-| Current / Next | 3b |
+| Completed | 3a, 3b |
+| Remaining | none |
+| Current / Next | done |
 | Blockers | none |
 
 ## Hard Rules

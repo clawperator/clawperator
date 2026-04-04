@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from evals.harness import environment
+from evals.harness.runner import build_prompt
 
 
 def _fake_run_factory(version: str):
@@ -70,3 +71,20 @@ def test_preflight_populates_clawperator_npm_version(monkeypatch, tmp_path, runt
     assert env.clawperator_npm_version == expected_npm_version
     assert env.clawperator_version == expected_npm_version
     assert env.clawperator_cmd[0] == expected_cmd_prefix
+
+
+def test_full_repo_prompt_substitutes_repo_root():
+    prompt_path = Path(environment.REPO_ROOT / "evals/specs/android-version/prompt-full-repo.md")
+    prompt = build_prompt(
+        str(prompt_path),
+        {
+            "CLAWPERATOR_CMD": "clawperator",
+            "CLAWPERATOR_OPERATOR_PACKAGE": "com.clawperator.operator",
+            "DEVICE_SERIAL": "device-123",
+            "DOCS_URL": "https://docs.clawperator.com",
+            "REPO_ROOT": str(environment.REPO_ROOT),
+        },
+    )
+
+    assert "$REPO_ROOT" not in prompt
+    assert str(environment.REPO_ROOT) in prompt

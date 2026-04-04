@@ -472,6 +472,7 @@ def run_eval(
                 "CLAWPERATOR_OPERATOR_PACKAGE": env.operator_package,
                 "DEVICE_SERIAL": env.device_serial,
                 "DOCS_URL": DOCS_URL,
+                **({"REPO_ROOT": str(REPO_ROOT)} if knowledge_mode == "full-repo" else {}),
             },
         )
         prompt_sha256 = hashlib.sha256(prompt_text.encode("utf-8")).hexdigest()

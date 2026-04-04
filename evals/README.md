@@ -28,6 +28,14 @@ Runtime targets:
   the release Operator APK (`com.clawperator.operator`). Use this to verify
   the shipped runtime path.
 
+Knowledge modes:
+
+- `--mode public-surface` keeps the agent in a fresh temp directory and gives
+  it only public docs plus the command surface.
+- `--mode full-repo` runs the agent from the repository root and lets it read
+  internal docs and source code. Use this when you want to measure the boost
+  from repo-local knowledge.
+
 Other supported agents:
 
 - `claude`
