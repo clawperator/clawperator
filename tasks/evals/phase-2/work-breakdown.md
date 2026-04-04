@@ -296,7 +296,7 @@ Wire `count_turn` into `runner.py`. Enforce `--max-turns`. Add
 ```bash
 # Verify budget_exceeded status with a very low turn budget
 python evals/run_eval.py android-version \
-  --agent claude --model claude-opus-4-5 \
+  --agent claude --model claude-sonnet-4-0 \
   --max-turns 2 --device <serial>
 cat evals/runs/<run_id>/result.json | python -m json.tool | grep -A2 '"status"'
 # Expected: "budget_exceeded"

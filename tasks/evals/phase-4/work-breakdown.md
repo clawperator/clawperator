@@ -300,7 +300,7 @@ it. Achieve at least one `replay_status = "pass"`.
    (the agent has the best chance with full repo access):
    ```bash
    python evals/run_eval.py android-version \
-     --agent claude --model claude-opus-4-5 \
+     --agent claude --model claude-sonnet-4-0 \
      --mode full-repo \
      --skill-prompt prompt-skill.md \
      --device <serial>

@@ -171,7 +171,7 @@ evals/
 Run artifacts (gitignored):
 ```
 evals/runs/
-└── android-version-20260328-143022-claude-opus/
+└── android-version-20260328-143022-claude-sonnet/
     ├── config.json
     ├── result.json
     └── transcript.txt
@@ -209,7 +209,7 @@ Note: "Confidence" is for turn counting only. All four are viable for task compl
   "eval_id": "android-version",
   "started_at": "<ISO8601>",
   "finished_at": "<ISO8601>",
-  "agent": { "type": "claude", "model": "claude-opus-4-5", "extra_flags": [] },
+  "agent": { "type": "claude", "model": "claude-sonnet-4-0", "extra_flags": [] },
   "knowledge_mode": "public-surface",
   "runtime_target": "local-dev",
   "spec": {
@@ -217,7 +217,7 @@ Note: "Confidence" is for turn counting only. All four are viable for task compl
     "prompt_file": "prompt-public.md",
     "prompt_sha256": "<sha256 of rendered prompt>"
   },
-  "run_label": "baseline-opus",
+  "run_label": "baseline-sonnet",
   "invocation": {
     "command": ["claude", "-p", "...", "--model", "...", "..."],
     "work_dir": "/tmp/clawperator-eval-<id>",

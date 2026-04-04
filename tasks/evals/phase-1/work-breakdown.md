@@ -849,13 +849,13 @@ Constraints:
 ```
 python evals/run_eval.py android-version \
   --agent claude \
-  --model claude-opus-4-5 \
+  --model claude-sonnet-4-0 \
   [--device <serial>] \
   [--mode public-surface|full-repo] \
   [--runtime local-dev|published] \
   [--timeout-s 300] \
   [--max-turns 40] \
-  [--label baseline-opus] \
+  [--label baseline-sonnet] \
   [--runs-dir evals/runs] \
   [--dry-run]
 ```
@@ -885,7 +885,7 @@ slug to `run_id` when present.
 
 Successful run: print the run directory path to stdout on completion.
 Also print a one-line human summary on stdout in the form
-`PASS | claude/opus | 87.4s | answer=15` (status, agent/model shorthand,
+`PASS | claude/sonnet | 87.4s | answer=15` (status, agent/model shorthand,
 wall-clock duration, normalized answer).
 
 ### README
@@ -959,8 +959,8 @@ section and fill it in after the 1d validation runs reveal the real pattern.
 4. Create `evals/README.md` with the required sections above.
 5. Verify dry-run works:
    ```bash
-   python evals/run_eval.py android-version \
-     --agent claude --model claude-opus-4-5 --dry-run
+python evals/run_eval.py android-version \
+     --agent claude --model claude-sonnet-4-0 --dry-run
    ```
    Expected: prints resolved config, exact command, work dir, env overrides,
    and prompt text; exits 0, no agent spawned.
@@ -1036,8 +1036,8 @@ acceptance criteria are met: 1 passing run, 1 error run, dry-run exits 0.
 2. Run the eval once. Record the run ID and outcome.
    Use an explicit device serial if more than one device is connected:
    ```bash
-   python evals/run_eval.py android-version \
-     --agent claude --model claude-opus-4-5 \
+python evals/run_eval.py android-version \
+     --agent claude --model claude-sonnet-4-0 \
      --device <device_serial>
    ```
 3. Verify the run is `pass`. Read the passing transcript and verify it shows
@@ -1045,8 +1045,8 @@ acceptance criteria are met: 1 passing run, 1 error run, dry-run exits 0.
 4. Simulate an environment failure. Disconnect the device or stop the
    Operator APK, then run:
    ```bash
-   python evals/run_eval.py android-version \
-     --agent claude --model claude-opus-4-5
+python evals/run_eval.py android-version \
+     --agent claude --model claude-sonnet-4-0
    ```
    Verify the output shows `outcome.status = "error"` in `result.json`.
 5. Run dry-run and verify it exits 0 with the prompt printed.
