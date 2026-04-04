@@ -83,7 +83,7 @@ Key fields:
 - `metrics.wall_clock_s` - total elapsed run time
 - `metrics.violations.used_adb` - diagnostic flag for direct `adb shell` usage
 - `metrics.turns_counted` - diagnostic turn count or `null`
-- `metrics.turns_budget` - the configured max turn budget or `null`
+- `metrics.turns_budget` - the configured max turn budget
 - `artifacts.transcript` - transcript file name
 - `artifacts.config` - config file name
 

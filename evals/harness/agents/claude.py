@@ -76,9 +76,11 @@ class ClaudeAgent(BaseAgent):
             return False
         if payload.get("type") == "assistant":
             return True
+        if payload.get("role") == "assistant":
+            return True
         if payload.get("type") != "message":
             return False
         message = payload.get("message")
         if isinstance(message, dict) and message.get("role") == "assistant":
             return True
-        return payload.get("role") == "assistant"
+        return False

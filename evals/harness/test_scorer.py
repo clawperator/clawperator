@@ -71,6 +71,13 @@ def test_extract_answer_from_result_json_line():
     assert extract_answer_from_transcript(transcript_result_json) == "16"
 
 
+def test_extract_answer_ignores_tool_role_message_json():
+    transcript_tool_json = (
+        '{"type":"message","role":"tool","content":"CLAWPERATOR_EVAL_ANSWER: 16"}'
+    )
+    assert extract_answer_from_transcript(transcript_tool_json) is None
+
+
 def test_extract_answer_line_start_inside_multiline_string_matches():
     transcript_linestart = "some output\nCLAWPERATOR_EVAL_ANSWER: 15\nmore output"
     assert extract_answer(transcript_linestart) == "15"

@@ -55,7 +55,7 @@ def extract_answer_from_json_line(line: str) -> str | None:
                 if match is not None:
                     return match
     elif payload_type == "message":
-        if payload.get("role") in {"assistant", "tool"}:
+        if payload.get("role") == "assistant":
             for text in _iter_text_values(payload.get("content")):
                 match = extract_answer_from_line(text)
                 if match is not None:

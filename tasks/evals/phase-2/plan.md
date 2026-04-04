@@ -18,7 +18,7 @@ transcripts without re-running an agent.
 | Completed | 2a, 2b, 2c |
 | Remaining | none |
 | Current / Next | done |
-| Blockers | Phase 1 PR must be merged before starting |
+| Blockers | none |
 
 ## Goal
 
