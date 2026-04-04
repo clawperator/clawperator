@@ -404,6 +404,7 @@ def run_eval(
             "ANDROID_SERIAL": env.device_serial,
             "CLAWPERATOR_CMD": shlex.join(env.clawperator_cmd),
             "CLAWPERATOR_OPERATOR_PACKAGE": env.operator_package,
+            **({"EVAL_LABEL": label} if label is not None else {}),
             **agent_overrides,
         }
         sanitized_config_env_overrides = _sanitize_env_overrides(config_env_overrides)
@@ -498,7 +499,11 @@ def run_eval(
         finished_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         wall_clock_s = time.monotonic() - started_mono
         score_result = score(transcript_text, env.ground_truth_android_version)
-        if score_result.answer_extracted_raw is not None:
+        forced_error = bool(label and label.startswith("force-error"))
+        if forced_error:
+            status = "error"
+            failure_reason = "forced_error_for_validation"
+        elif score_result.answer_extracted_raw is not None:
             status = "pass" if score_result.answer_correct else "fail"
         elif timeout_triggered.is_set():
             status = "timeout"

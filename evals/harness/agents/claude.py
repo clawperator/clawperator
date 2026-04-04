@@ -13,6 +13,7 @@ class ClaudeAgent(BaseAgent):
             "--model", self.config.model,
             "--dangerously-skip-permissions",
             "--output-format", "stream-json",
+            "--verbose",
         ]
         cmd.extend(self.config.extra_flags)
         return cmd
@@ -30,4 +31,3 @@ class ClaudeAgent(BaseAgent):
 
     def normalize_line(self, raw: str) -> str:
         return raw
-

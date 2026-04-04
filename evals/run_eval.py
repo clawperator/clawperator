@@ -18,11 +18,12 @@ if str(ROOT) not in sys.path:
 
 from evals.harness.agents.base import AgentConfig
 from evals.harness.agents.claude import ClaudeAgent
+from evals.harness.agents.doctor import DoctorAgent
 from evals.harness.environment import preflight, resolve_inputs
 from evals.harness.runner import build_prompt, run_eval
 
 
-SUPPORTED_AGENTS = {"claude": ClaudeAgent}
+SUPPORTED_AGENTS = {"claude": ClaudeAgent, "doctor": DoctorAgent}
 SUPPORTED_MODES = {"public-surface", "full-repo"}
 SUPPORTED_RUNTIMES = {"local-dev", "published"}
 
@@ -170,6 +171,7 @@ def main(argv: list[str] | None = None) -> int:
             "ANDROID_SERIAL": inputs.device_serial,
             "CLAWPERATOR_CMD": shlex.join(inputs.clawperator_cmd),
             "CLAWPERATOR_OPERATOR_PACKAGE": inputs.operator_package,
+            **({"EVAL_LABEL": args.label} if args.label is not None else {}),
             **agent.build_env({
                 **base_env,
                 "ANDROID_SERIAL": inputs.device_serial,
