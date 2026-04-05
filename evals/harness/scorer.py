@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import PurePosixPath
+from pathlib import PurePosixPath, PureWindowsPath
 import re
 import json
 from typing import Any
@@ -183,6 +183,13 @@ def _require_inline_content_coverage(
 
 
 def _is_safe_relative_path(value: str) -> bool:
+    if "\\" in value:
+        return False
+    windows_candidate = PureWindowsPath(value)
+    if windows_candidate.is_absolute() or windows_candidate.drive or windows_candidate.root:
+        return False
+    if any(part == ".." for part in windows_candidate.parts):
+        return False
     candidate = PurePosixPath(value)
     if candidate.is_absolute():
         return False
