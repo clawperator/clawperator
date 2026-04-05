@@ -143,9 +143,16 @@ def _failed_doctor_checks(report: dict[str, Any]) -> list[dict[str, Any]]:
     return failed
 
 
+def _primary_doctor_failure_check(failed_checks: list[dict[str, Any]]) -> dict[str, Any] | None:
+    for check in failed_checks:
+        if check.get("status") == "fail":
+            return check
+    return failed_checks[0] if failed_checks else None
+
+
 def _summarize_doctor_failure(report: dict[str, Any]) -> dict[str, Any]:
     failed_checks = _failed_doctor_checks(report)
-    primary_check = failed_checks[0] if failed_checks else None
+    primary_check = _primary_doctor_failure_check(failed_checks)
     summary: dict[str, Any] = {
         "device_id": report.get("deviceId"),
         "operator_package": report.get("operatorPackage"),

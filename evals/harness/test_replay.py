@@ -211,6 +211,53 @@ def test_run_replay_does_not_pass_from_seeded_artifact_when_skill_fails(monkeypa
     assert skill_score["replay_answer_correct"] is False
 
 
+def test_run_replay_clears_answer_fields_when_process_exits_non_zero(monkeypatch, tmp_path):
+    transcript = (
+        "before\n"
+        "CLAWPERATOR_SKILL_START\n"
+        "{"
+        "\"id\":\"com.example.android-version\","
+        "\"applicationId\":\"com.example\","
+        "\"intent\":\"android-version\","
+        "\"summary\":\"Determine Android version\","
+        "\"path\":\"skills/com.example.android-version\","
+        "\"skillFile\":\"skills/com.example.android-version/SKILL.md\","
+        "\"scripts\":[\"skills/com.example.android-version/scripts/run.js\"],"
+        "\"artifacts\":[],"
+        "\"skillMarkdown\":\"# Generated skill\\n\","
+        "\"scriptContents\":{"
+        "\"skills/com.example.android-version/scripts/run.js\":\"console.log('CLAWPERATOR_EVAL_ANSWER: 15'); process.exit(1)\\n\""
+        "}"
+        "}"
+        "\nCLAWPERATOR_SKILL_END\n"
+        "after\n"
+    )
+    run_dir = _write_basic_run(tmp_path, transcript)
+
+    def fake_run(cmd, check, capture_output, text, env, timeout, cwd):
+        payload = {
+            "skillId": "com.example.android-version",
+            "output": "CLAWPERATOR_EVAL_ANSWER: 15\n",
+            "exitCode": 1,
+            "durationMs": 12,
+        }
+        return subprocess.CompletedProcess(cmd, 1, stdout=json.dumps(payload), stderr="")
+
+    monkeypatch.setattr("evals.harness.replay.subprocess.run", fake_run)
+
+    skill_score = run_replay(
+        run_dir=run_dir,
+        clawperator_cmd=["clawperator"],
+        operator_package="com.clawperator.operator.dev",
+        device_serial="device-123",
+        timeout_s=1,
+    )
+
+    assert skill_score["replay_status"] == "error"
+    assert skill_score["replay_answer_normalized"] is None
+    assert skill_score["replay_answer_correct"] is False
+
+
 def test_run_replay_skips_binary_artifact_and_falls_back_to_stdout(monkeypatch, tmp_path):
     transcript = (
         "before\n"

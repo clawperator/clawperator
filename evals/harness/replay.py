@@ -375,6 +375,8 @@ def run_replay(
             skill_score["replay_answer_correct"] = replay_result.answer_correct
 
         if completed.returncode != 0:
+            skill_score["replay_answer_normalized"] = None
+            skill_score["replay_answer_correct"] = False
             skill_score["replay_status"] = "error"
             return skill_score
         if replay_answer is None:
