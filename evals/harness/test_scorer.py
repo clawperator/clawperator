@@ -162,6 +162,7 @@ def test_validate_skill_accepts_minimal_registry_shape():
         "\"path\":\"skills/com.example.android-version\","
         "\"skillFile\":\"skills/com.example.android-version/SKILL.md\","
         "\"scripts\":[\"skills/com.example.android-version/scripts/run.js\"],"
+        "\"scriptContents\":{\"skills/com.example.android-version/scripts/run.js\":\"console.log('hi')\\n\"},"
         "\"artifacts\":[]}"
     )
     ok, errors = validate_skill(skill_json, ["clawperator"], "com.clawperator.operator.dev")
@@ -188,4 +189,49 @@ def test_validate_skill_rejects_missing_required_fields():
     )
     ok, errors = validate_skill(skill_json, ["clawperator"], "com.clawperator.operator.dev")
     assert ok is False
+    assert "missing or invalid string field: summary" in errors
     assert "array field must not be empty: scripts" in errors
+
+
+def test_validate_skill_rejects_blank_required_strings():
+    skill_json = (
+        "{\"id\":\" \",\"applicationId\":\"com.example\","
+        "\"intent\":\"android-version\",\"summary\":\"Determine Android version\","
+        "\"path\":\"skills/com.example.android-version\","
+        "\"skillFile\":\"skills/com.example.android-version/SKILL.md\","
+        "\"scripts\":[\"skills/com.example.android-version/scripts/run.js\"],"
+        "\"scriptContents\":{\"skills/com.example.android-version/scripts/run.js\":\"console.log('hi')\\n\"},"
+        "\"artifacts\":[]}"
+    )
+    ok, errors = validate_skill(skill_json, ["clawperator"], "com.clawperator.operator.dev")
+    assert ok is False
+    assert "missing or invalid string field: id" in errors
+
+
+def test_validate_skill_rejects_missing_inline_script_contents():
+    skill_json = (
+        "{\"id\":\"com.example.android-version\",\"applicationId\":\"com.example\","
+        "\"intent\":\"android-version\",\"summary\":\"Determine Android version\","
+        "\"path\":\"skills/com.example.android-version\","
+        "\"skillFile\":\"skills/com.example.android-version/SKILL.md\","
+        "\"scripts\":[\"skills/com.example.android-version/scripts/run.js\"],"
+        "\"artifacts\":[]}"
+    )
+    ok, errors = validate_skill(skill_json, ["clawperator"], "com.clawperator.operator.dev")
+    assert ok is False
+    assert "missing or invalid object field: scriptContents" in errors
+
+
+def test_validate_skill_rejects_missing_inline_artifact_contents():
+    skill_json = (
+        "{\"id\":\"com.example.android-version\",\"applicationId\":\"com.example\","
+        "\"intent\":\"android-version\",\"summary\":\"Determine Android version\","
+        "\"path\":\"skills/com.example.android-version\","
+        "\"skillFile\":\"skills/com.example.android-version/SKILL.md\","
+        "\"scripts\":[\"skills/com.example.android-version/scripts/run.js\"],"
+        "\"scriptContents\":{\"skills/com.example.android-version/scripts/run.js\":\"console.log('hi')\\n\"},"
+        "\"artifacts\":[\"skills/com.example.android-version/version.txt\"]}"
+    )
+    ok, errors = validate_skill(skill_json, ["clawperator"], "com.clawperator.operator.dev")
+    assert ok is False
+    assert "missing or invalid object field: artifactContents" in errors

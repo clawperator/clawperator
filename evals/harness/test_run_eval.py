@@ -312,11 +312,12 @@ def test_attach_skill_score_records_replay_error_without_raising(monkeypatch, tm
         '"id":"com.example.android-version",'
         '"applicationId":"com.example",'
         '"intent":"android-version",'
-        '"summary":"",'
+        '"summary":"Determine Android version",'
         '"path":"skills/com.example.android-version",'
         '"skillFile":"skills/com.example.android-version/SKILL.md",'
         '"scripts":["skills/com.example.android-version/scripts/run.js"],'
-        '"artifacts":[]'
+        '"artifacts":[],'
+        '"scriptContents":{"skills/com.example.android-version/scripts/run.js":"console.log(\\"15\\")\\n"}'
         "}\n"
         "CLAWPERATOR_SKILL_END\n",
         encoding="utf-8",

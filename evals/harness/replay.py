@@ -159,7 +159,50 @@ def _is_plausible_answer(value: str) -> bool:
     )
 
 
-def _extract_answer_from_artifacts(skill: dict[str, Any], temp_root: Path) -> str | None:
+def _capture_artifact_states(skill: dict[str, Any], temp_root: Path) -> dict[str, tuple[bool, int | None, int | None]]:
+    states: dict[str, tuple[bool, int | None, int | None]] = {}
+    for artifact_path in skill.get("artifacts", []):
+        if not isinstance(artifact_path, str):
+            continue
+        try:
+            candidate_path = _resolve_safe_relative_path(temp_root, artifact_path)
+        except ValueError:
+            continue
+        if not candidate_path.exists():
+            states[artifact_path] = (False, None, None)
+            continue
+        try:
+            stat = candidate_path.stat()
+        except OSError:
+            states[artifact_path] = (False, None, None)
+            continue
+        states[artifact_path] = (True, stat.st_mtime_ns, stat.st_size)
+    return states
+
+
+def _artifact_changed(
+    path: Path,
+    before: tuple[bool, int | None, int | None] | None,
+) -> bool:
+    if not path.exists():
+        return False
+    try:
+        stat = path.stat()
+    except OSError:
+        return False
+    if before is None:
+        return True
+    existed_before, mtime_ns_before, size_before = before
+    if not existed_before:
+        return True
+    return stat.st_mtime_ns != mtime_ns_before or stat.st_size != size_before
+
+
+def _extract_answer_from_artifacts(
+    skill: dict[str, Any],
+    temp_root: Path,
+    artifact_states_before: dict[str, tuple[bool, int | None, int | None]],
+) -> str | None:
     for artifact_path in skill.get("artifacts", []):
         if not isinstance(artifact_path, str):
             continue
@@ -169,9 +212,11 @@ def _extract_answer_from_artifacts(skill: dict[str, Any], temp_root: Path) -> st
             continue
         if not candidate_path.exists():
             continue
+        if not _artifact_changed(candidate_path, artifact_states_before.get(artifact_path)):
+            continue
         try:
             artifact_text = candidate_path.read_text(encoding="utf-8")
-        except OSError:
+        except (OSError, UnicodeDecodeError):
             continue
         candidate = _extract_skill_output(artifact_text)
         if candidate is not None:
@@ -276,6 +321,7 @@ def run_replay(
             return skill_score
 
         env = _build_replay_env(registry_path, clawperator_cmd)
+        artifact_states_before = _capture_artifact_states(skill_payload, temp_root)
 
         command = [
             *clawperator_cmd,
@@ -312,23 +358,28 @@ def run_replay(
         combined_output = "\n".join(
             part for part in [completed.stdout, completed.stderr] if isinstance(part, str) and part
         )
-        replay_answer = _extract_answer_from_artifacts(skill_payload, temp_root)
+        replay_answer = _extract_skill_output(combined_output)
+        if completed.returncode == 0:
+            artifact_answer = _extract_answer_from_artifacts(skill_payload, temp_root, artifact_states_before)
+            if artifact_answer is not None:
+                replay_answer = artifact_answer
+
+        if replay_answer is not None:
+            replay_result = score(
+                combined_output,
+                ground_truth,
+                answer_extracted_raw=replay_answer,
+                allow_transcript_fallback=False,
+            )
+            skill_score["replay_answer_normalized"] = replay_result.answer_normalized
+            skill_score["replay_answer_correct"] = replay_result.answer_correct
+
+        if completed.returncode != 0:
+            skill_score["replay_status"] = "error"
+            return skill_score
         if replay_answer is None:
-            replay_answer = _extract_skill_output(combined_output)
-        if replay_answer is None:
-            if completed.returncode != 0:
-                skill_score["replay_status"] = "error"
-            else:
-                skill_score["replay_status"] = "no_answer"
+            skill_score["replay_status"] = "no_answer"
             return skill_score
 
-        replay_result = score(
-            combined_output,
-            ground_truth,
-            answer_extracted_raw=replay_answer,
-            allow_transcript_fallback=False,
-        )
-        skill_score["replay_answer_normalized"] = replay_result.answer_normalized
-        skill_score["replay_answer_correct"] = replay_result.answer_correct
-        skill_score["replay_status"] = "pass" if replay_result.answer_correct else "fail"
+        skill_score["replay_status"] = "pass" if skill_score["replay_answer_correct"] else "fail"
         return skill_score

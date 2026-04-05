@@ -84,6 +84,9 @@ uv run --project evals --extra dev python evals/run_eval.py android-version \
 Replay uses the device serial recorded in the original run config. It writes
 `result-replay.json` alongside the original artifacts. If the original run did
 not emit a valid skill, replay reports `replay_status = "skipped"`.
+Replay only reports `pass`, `fail`, or `no_answer` when the replayed
+`clawperator skills run` process exits cleanly. Non-zero exit codes are always
+recorded as `replay_status = "error"`.
 
 Other supported agents:
 
@@ -202,6 +205,9 @@ API and must not appear in public-facing documentation or production usage.
   long answer can consume more than one counted turn
 - `skill_score.replay_status = "skipped"` means the run did not emit a valid
   skill block, not that replay failed
+- Replay only trusts answer artifacts that the skill created or modified
+  during the replayed run. Seeded inline artifact contents alone do not count
+  as a successful replay result.
 - `outcome.failure_reason = "doctor_preflight_failed"` means preflight blocked
   the run before the agent started. Check `preflight.doctor_failure` in
   `result.json` for the actionable doctor code, evidence, and suggested fix.

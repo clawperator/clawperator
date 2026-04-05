@@ -141,7 +141,7 @@ def detect_disallowed_tool(transcript: str) -> bool:
 
 def _require_string_field(payload: dict[str, Any], field: str, errors: list[str]) -> None:
     value = payload.get(field)
-    if not isinstance(value, str):
+    if not isinstance(value, str) or not value.strip():
         errors.append(f"missing or invalid string field: {field}")
 
 
@@ -154,8 +154,31 @@ def _require_string_list_field(payload: dict[str, Any], field: str, errors: list
         errors.append(f"array field must not be empty: {field}")
         return
     for index, item in enumerate(value):
-        if not isinstance(item, str):
+        if not isinstance(item, str) or not item.strip():
             errors.append(f"invalid string item in {field}[{index}]")
+
+
+def _require_inline_content_coverage(
+    payload: dict[str, Any],
+    *,
+    paths_field: str,
+    contents_field: str,
+    errors: list[str],
+) -> None:
+    paths = payload.get(paths_field)
+    if not isinstance(paths, list):
+        return
+    contents = payload.get(contents_field)
+    if not isinstance(contents, dict):
+        if len(paths) > 0:
+            errors.append(f"missing or invalid object field: {contents_field}")
+        return
+    for path in paths:
+        if not isinstance(path, str) or not path.strip():
+            continue
+        content = contents.get(path)
+        if not isinstance(content, str):
+            errors.append(f"missing inline content for {path} in {contents_field}")
 
 
 def validate_skill(skill_json: str, clawperator_cmd: list[str], operator_package: str) -> tuple[bool, list[str]]:
@@ -185,6 +208,8 @@ def validate_skill(skill_json: str, clawperator_cmd: list[str], operator_package
 
     _require_string_list_field(payload, "scripts", errors, allow_empty=False)
     _require_string_list_field(payload, "artifacts", errors, allow_empty=True)
+    _require_inline_content_coverage(payload, paths_field="scripts", contents_field="scriptContents", errors=errors)
+    _require_inline_content_coverage(payload, paths_field="artifacts", contents_field="artifactContents", errors=errors)
 
     if errors:
         return False, errors

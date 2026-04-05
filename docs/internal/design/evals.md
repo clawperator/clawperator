@@ -110,9 +110,12 @@ The emitted JSON must satisfy the `SkillEntry` contract:
 - `artifacts`
 
 Validation is structural. The harness parses the JSON, checks required fields
-and types, and does not rely on permanent registration in the user skill
-store. That keeps replay self-contained and avoids writing generated skills to
-the repository.
+and replay-readiness constraints, and does not rely on permanent registration
+in the user skill store. Required string fields must be non-blank, listed
+script and artifact paths must be non-blank strings, and replayable skills
+must include inline content coverage for every listed script and artifact.
+That keeps replay self-contained and avoids writing generated skills to the
+repository.
 
 To make the skill replayable, the emitted JSON may also include inline file
 content:
@@ -146,15 +149,20 @@ Replay has its own wall-clock timeout. The default is 60 seconds, and
 
 Current answer surfacing contract:
 
+- Replay only reports `pass`, `fail`, or `no_answer` when `clawperator skills
+  run` exited with code `0`. Non-zero exit codes are always `replay_status =
+  "error"`.
 - If a skill artifact contains a plain-text answer, replay uses that artifact
-  content first.
+  content only when the replayed skill created or modified that artifact
+  during execution.
 - Otherwise replay falls back to the run output and looks for
   `CLAWPERATOR_EVAL_ANSWER: <version>` in the raw output, stdout, stderr, or
   JSON envelope text.
 
 That order matters because some generated skills update their artifact file
-during execution. Capturing the artifact answer before the run would be stale
-if the skill rewrites the file.
+during execution. Capturing a seeded artifact answer before the run would be a
+false positive if the skill never rewrote the file. Binary or unreadable
+artifacts are skipped and do not block stdout or stderr answer extraction.
 
 ## Decision Rules
 
