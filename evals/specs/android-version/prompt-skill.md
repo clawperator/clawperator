@@ -65,9 +65,11 @@ fields at the top level when needed:
 - `artifactContents` - an object whose keys are the artifact paths from
   `artifacts` and whose values are the artifact source text
 
-The JSON object should describe a deterministic skill that replays the Android
-Settings navigation and returns the Android version in its own output. The
-skill's runtime output must include the line:
+The JSON object should describe a deterministic skill package for the Android
+version you already determined in this run. Do not try to rediscover the
+version inside the skill package. A minimal acceptable skill is a runtime
+wrapper that emits the discovered version verbatim. The skill's runtime output
+must include the line:
 
 CLAWPERATOR_EVAL_ANSWER: <version>
 

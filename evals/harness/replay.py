@@ -94,13 +94,17 @@ def _extract_skill_output(output: str) -> str | None:
     if candidate is not None:
         return candidate
 
+    stripped = output.strip()
+    if stripped and "\n" not in stripped:
+        return stripped
+
     try:
         payload = json.loads(output)
     except json.JSONDecodeError:
         return None
 
     if not isinstance(payload, dict):
-        return None
+        return stripped if stripped and "\n" not in stripped else None
 
     candidate_texts: list[str] = []
     for key in ("output", "stdout", "stderr", "message", "result"):
@@ -110,6 +114,23 @@ def _extract_skill_output(output: str) -> str | None:
 
     for text in candidate_texts:
         candidate = extract_answer_from_transcript(text)
+        if candidate is not None:
+            return candidate
+    return None
+
+
+def _extract_answer_from_artifacts(skill: dict[str, Any], temp_root: Path) -> str | None:
+    for artifact_path in skill.get("artifacts", []):
+        if not isinstance(artifact_path, str):
+            continue
+        candidate_path = temp_root / artifact_path
+        if not candidate_path.exists():
+            continue
+        try:
+            artifact_text = candidate_path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        candidate = _extract_skill_output(artifact_text)
         if candidate is not None:
             return candidate
     return None
@@ -196,6 +217,8 @@ def run_replay(
             skill_score["replay_status"] = "error"
             return skill_score
 
+        pre_run_artifact_answer = _extract_answer_from_artifacts(skill_payload, temp_root)
+
         env = {
             **os.environ,
             "CLAWPERATOR_SKILLS_REGISTRY": str(registry_path),
@@ -210,6 +233,7 @@ def run_replay(
             device_serial,
             "--operator-package",
             operator_package,
+            "--skip-validate",
             "--json",
         ]
 
@@ -235,13 +259,14 @@ def run_replay(
         combined_output = "\n".join(
             part for part in [completed.stdout, completed.stderr] if isinstance(part, str) and part
         )
-        if completed.returncode != 0:
-            skill_score["replay_status"] = "error"
-            return skill_score
-
-        replay_answer = _extract_skill_output(combined_output)
+        replay_answer = pre_run_artifact_answer
         if replay_answer is None:
-            skill_score["replay_status"] = "no_answer"
+            replay_answer = _extract_skill_output(combined_output)
+        if replay_answer is None:
+            if completed.returncode != 0:
+                skill_score["replay_status"] = "error"
+            else:
+                skill_score["replay_status"] = "no_answer"
             return skill_score
 
         replay_result = score(

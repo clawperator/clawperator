@@ -1,129 +1,182 @@
 # Eval System Design
 
-## Why evals exist
+## Purpose
 
-Evals are a measurement instrument for docs quality and API discoverability.
-The harness answers one question: can an unfamiliar agent use Clawperator's
-public surfaces to complete a task on a real device?
+The eval harness measures whether an unfamiliar agent can use Clawperator to
+operate a connected Android device and complete a task on a real target. It
+also measures whether the same run can emit a reusable Clawperator skill and
+replay that skill deterministically.
 
-## Measurement-not-teaching principle
+The harness is a measurement tool, not a planner. Agent reasoning stays
+outside the runtime.
 
-The eval is a ruler, not a textbook. Eval prompts, spec files, and
-`CLAWPERATOR_EVAL_ANSWER` must never appear in public docs. If agents see the
-marker in public documentation, future runs measure familiarity with the eval
-format rather than real task completion.
+## Measurement Boundaries
 
-## `CLAWPERATOR_EVAL_ANSWER` marker
+Every run is described by two independent axes:
 
-`CLAWPERATOR_EVAL_ANSWER` is an internal eval artifact, not a production API.
-It is emitted only because the eval prompt instructs the agent to do so. It is
-not published on `docs.clawperator.com` or `clawperator.com`, and it should not
-appear in production transcripts.
+| Axis | Values | What it changes |
+| --- | --- | --- |
+| Knowledge surface | `public-surface`, `full-repo` | Whether the agent sees only public docs or the repository itself |
+| Runtime target | `local-dev`, `published` | Whether the run uses the branch-local CLI build or the global release binary |
 
-## Two-axis model
+`public-surface` runs use a fresh temp directory and only expose the public
+command surface. `full-repo` runs use the repository root so the agent can read
+internal source and docs. The harness does not sandbox filesystem access.
 
-Every run is parameterized by two independent axes.
+`local-dev` uses the branch-local Node CLI build at
+`apps/node/dist/cli/index.js` and the debug Operator APK
+`com.clawperator.operator.dev`. `published` uses the globally installed
+`clawperator` binary and the release Operator APK `com.clawperator.operator`.
 
-| Axis | Values | What it isolates | Phase |
-| --- | --- | --- | --- |
-| Knowledge surface | `public-surface`, `full-repo` | Whether the agent succeeds with only public docs versus the full repo | `public-surface`: Phase 1; `full-repo`: Phase 3 |
-| Runtime target | `local-dev`, `published` | Whether the run exercises the branch-local build or the published binary and APK | `local-dev`: Phase 1; `published`: Phase 3 |
+Doctor preflight runs before the agent is spawned. The harness also keeps
+`ANDROID_SERIAL` in the agent environment and passes the selected device as an
+explicit CLI selector.
 
-In Phase 1 only the `public-surface` + `local-dev` combination is testable.
+## Result Artifacts
 
-## Runtime target semantics
+Every completed run writes a `result.json` file under `evals/runs/<run_id>/`.
+The main task score remains in `outcome`.
 
-`local-dev` uses the branch-local Node CLI build from
-`apps/node/dist/cli/index.js` when it exists. It pairs with the debug Operator
-APK `com.clawperator.operator.dev`.
+When the skill prompt variant is used and the spec defines `skill_generation`,
+the harness adds a `skill_score` block to `result.json`.
 
-`published` uses the globally installed `clawperator` binary resolved with
-`shutil.which("clawperator")`. It does not fall back to the branch-local
-build. If the global binary is missing, the harness aborts with
-`published_binary_not_found`.
-
-`published` uses the release Operator APK `com.clawperator.operator` as the
-effective package. If `CLAWPERATOR_OPERATOR_PACKAGE` is set to a different
-value, the harness logs a warning and still uses the release package. That
-keeps published runs comparable and prevents silent `.dev` versus release
-mixing.
-
-The harness records `environment.clawperator_npm_version` in `result.json` for
-every passing run:
-
-- `local-dev` reads the version from `apps/node/package.json`
-- `published` reads the `cliVersion` field from `clawperator version`
-
-`clawperator version` is expected to return JSON, but the harness also accepts
-a plain-text fallback and extracts the first version-like token when JSON is
-not available.
-
-Verification pattern:
-
-```bash
-uv run --project evals --extra dev python evals/run_eval.py android-version \
-  --agent claude --model claude-sonnet-4-6 --runtime published --dry-run
+```json
+{
+  "outcome": {
+    "status": "pass",
+    "answer_extracted_raw": "Android 16",
+    "answer_normalized": "16",
+    "ground_truth_normalized": "16",
+    "answer_correct": true,
+    "failure_reason": null
+  },
+  "skill_score": {
+    "skill_emitted": true,
+    "skill_valid": true,
+    "skill_validation_errors": [],
+    "replay_attempted": true,
+    "replay_status": "pass",
+    "replay_answer_normalized": "16",
+    "replay_answer_correct": true,
+    "replay_wall_clock_s": 12.4
+  }
+}
 ```
 
-The dry-run output should show the global `clawperator` binary path and
-`com.clawperator.operator`.
+`skill_score` fields:
 
-## Public-surface isolation
+| Field | Meaning |
+| --- | --- |
+| `skill_emitted` | The transcript contained a complete skill block between the configured markers. |
+| `skill_valid` | The extracted skill passed structural validation against the skill registry contract. |
+| `skill_validation_errors` | Validation failures, if any. |
+| `replay_attempted` | The harness attempted to run the extracted skill. |
+| `replay_status` | `pass`, `fail`, `no_answer`, `error`, or `skipped`. |
+| `replay_answer_normalized` | Normalized replay answer used for scoring. |
+| `replay_answer_correct` | Whether the replay answer matched the ground truth. |
+| `replay_wall_clock_s` | Replay execution time in seconds. |
 
-Public-surface runs use `tempfile.mkdtemp()` so the agent gets a clean working
-directory. The repo path must not appear in the agent's cwd, prompt, or
-inherited env vars. This is soft isolation only. The harness does not sandbox
-the agent and does not claim to prevent the agent from exploring the parent
-filesystem.
+`skill_score` is independent from the task score. A run can pass the main eval
+and fail skill replay, or fail the task and still emit a valid skill.
 
-## Full-repo knowledge mode
+## Skill Emission Protocol
 
-`full-repo` uses the repository root as the agent working directory. The
-prompt includes `$REPO_ROOT`, and the template tells the agent it may read
-internal docs under `$REPO_ROOT/docs/` and source under
-`$REPO_ROOT/apps/node/src/`.
+The skill prompt variant instructs the agent to emit a skill block between the
+exact markers:
 
-`full-repo` is intentionally non-isolated. The harness does not copy files to a
-temp directory and does not redact the repo path from `config.json` or
-`result.json`.
-
-Doctor preflight still runs before the agent is spawned. `ANDROID_SERIAL` is
-still present in the agent environment.
-
-Verification pattern:
-
-```bash
-uv run --project evals --extra dev python evals/run_eval.py android-version \
-  --agent claude --model claude-sonnet-4-6 --mode full-repo --dry-run
+```text
+CLAWPERATOR_SKILL_START
+<skill JSON here>
+CLAWPERATOR_SKILL_END
 ```
 
-The dry-run output should show the repository root as the working directory
-and the rendered prompt should contain `Repository root: <repo_root>`.
+The extractor keeps the last complete block in the transcript.
 
-## Doctor pre-flight
+The emitted JSON must satisfy the `SkillEntry` contract:
 
-The harness aborts before spawning the agent if `clawperator doctor --json`
-fails. That keeps device setup problems out of the agent's turn budget and
-prevents misleading eval failures caused by the environment rather than the
-agent.
+- `id`
+- `applicationId`
+- `intent`
+- `summary`
+- `path`
+- `skillFile`
+- `scripts`
+- `artifacts`
 
-## `used_disallowed_tool` detection
+Validation is structural. The harness parses the JSON, checks required fields
+and types, and does not rely on permanent registration in the user skill
+store. That keeps replay self-contained and avoids writing generated skills to
+the repository.
 
-Phase 1 uses a conservative transcript heuristic for agent-authored `adb shell`
-usage. It strips ANSI codes and looks for shell-prompt-style lines that start
-with `>` or `$` followed by `adb shell`. The flag is diagnostic-only. False
-negatives are acceptable in Phase 1.
+To make the skill replayable, the emitted JSON may also include inline file
+content:
 
-## Open Question resolutions
+- `skillMarkdown`
+- `scriptContents`
+- `artifactContents`
 
-- Claude context file requirement: pending validation during Phase 1 device
-  runs.
-- Transcript cap behavior: transcripts are capped at 10 MiB and the harness
-  appends `[TRANSCRIPT_TRUNCATED]` when the cap is reached.
+The replay materializer writes those files into a temp directory, creates a
+temporary registry, and removes everything after the replay finishes.
 
-## Compatibility matrix
+## Replay Contract
 
-When Phase 1 reaches at least 10 runs across at least 2 agents, publish a
-public compatibility matrix in `docs/evals-compat.md` with pass rates by eval,
-agent/model, knowledge mode, and runtime target. Do not expose prompts, markers,
-or harness internals in that page.
+Replay is a separate execution step, not a second agent run.
+
+Replay semantics:
+
+1. Load `config.json`, `result.json`, and `transcript.txt` from the original
+   run directory.
+2. Extract the last complete skill block.
+3. Require that replay uses the same device serial recorded in the run config.
+4. Validate the extracted skill structurally.
+5. Materialize the skill into a temp directory.
+6. Run `clawperator skills run <skill_id> --device <serial> --operator-package
+   <package> --skip-validate --json`.
+7. Score the replay against the original ground truth.
+8. Delete the temp materialization after replay.
+
+Replay has its own wall-clock timeout. The default is 60 seconds, and
+`--replay-timeout-s` overrides it.
+
+Current answer surfacing contract:
+
+- If a skill artifact contains a plain-text answer, replay uses that artifact
+  content first.
+- Otherwise replay falls back to the run output and looks for
+  `CLAWPERATOR_EVAL_ANSWER: <version>` in the raw output, stdout, stderr, or
+  JSON envelope text.
+
+That order matters because some generated skills update their artifact file
+during execution. Capturing the artifact answer before the run would be stale
+if the skill rewrites the file.
+
+## Decision Rules
+
+| Question | Rule |
+| --- | --- |
+| What if no skill block is emitted? | `skill_emitted = false`, replay is skipped. |
+| What if skill validation fails? | `skill_valid = false`, replay is skipped. |
+| What if replay returns no answer? | `replay_status = "no_answer"` when the run exited cleanly, otherwise `error`. |
+| What if replay times out? | `replay_status = "error"` and `replay_wall_clock_s` records the elapsed time. |
+| Does task score affect skill score? | No. They are independent. |
+| Can generated skills be committed automatically? | No. The harness uses temp materialization only. |
+
+## Failure Modes To Prevent
+
+- Replaying against a different device than the original run used.
+- Writing generated skills to a permanent repo location.
+- Treating a missing skill block as a task failure instead of a skipped skill
+  score.
+- Letting replay run indefinitely instead of enforcing the replay timeout.
+- Assuming replay should rediscover the Android version. The skill should
+  carry the discovered version forward and replay should verify it.
+
+## Operational Guidance
+
+- Use `--mode full-repo` and `--skill-prompt prompt-skill.md` when you want to
+  measure skill emission on the strongest available prompt surface.
+- Use `--replay <run_id>` to inspect a previous run's emitted skill.
+- Pass `--device <serial>` explicitly whenever more than one device is
+  connected.
+- Keep `skill_score` separate from `outcome` when you analyze runs.
+

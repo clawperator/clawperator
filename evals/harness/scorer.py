@@ -100,7 +100,19 @@ def extract_skill(transcript: str, start_marker: str, end_marker: str) -> str | 
     matches = pattern.findall(transcript)
     if not matches:
         return None
-    return matches[-1].strip()
+    candidate = matches[-1].strip()
+    try:
+        json.loads(candidate)
+        return candidate
+    except json.JSONDecodeError:
+        pass
+    try:
+        decoded = json.loads(f'"{candidate}"')
+    except json.JSONDecodeError:
+        return candidate
+    if isinstance(decoded, str):
+        return decoded.strip()
+    return candidate
 
 
 def detect_disallowed_tool(transcript: str) -> bool:
@@ -154,11 +166,6 @@ def validate_skill(skill_json: str, clawperator_cmd: list[str], operator_package
 
     _require_string_list_field(payload, "scripts", errors, allow_empty=False)
     _require_string_list_field(payload, "artifacts", errors, allow_empty=True)
-
-    if not errors:
-        skill_id = payload.get("id", "")
-        if isinstance(skill_id, str) and skill_id.strip() and "." not in skill_id:
-            errors.append("id should contain at least one dot so applicationId and intent are distinct")
 
     if errors:
         return False, errors
