@@ -12,12 +12,12 @@ runs the generated skill deterministically and scores its output.
 
 | Item | Value |
 | --- | --- |
-| State | not started |
+| State | in progress |
 | Total PRs | 1 |
 | Total phases | 3 (4a-4c) |
-| Completed | none |
-| Remaining | 4a, 4b, 4c |
-| Current / Next | 4a |
+| Completed | 4a |
+| Remaining | 4b, 4c |
+| Current / Next | 4b |
 | Blockers | none |
 
 ## Pre-Implementation Alignment Check

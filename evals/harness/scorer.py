@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import re
 import json
+from typing import Any
 
 
 ANSWER_PATTERN = re.compile(r"^CLAWPERATOR_EVAL_ANSWER:\s*(\S.*?)\s*$", re.MULTILINE)
@@ -91,9 +92,78 @@ def extract_answer_from_transcript(transcript: str) -> str | None:
     return None
 
 
+def extract_skill(transcript: str, start_marker: str, end_marker: str) -> str | None:
+    pattern = re.compile(
+        re.escape(start_marker) + r"\s*(.*?)\s*" + re.escape(end_marker),
+        re.DOTALL,
+    )
+    matches = pattern.findall(transcript)
+    if not matches:
+        return None
+    return matches[-1].strip()
+
+
 def detect_disallowed_tool(transcript: str) -> bool:
     cleaned = _ANSI_PATTERN.sub("", transcript)
     return _DISALLOWED_TOOL_PATTERN.search(cleaned) is not None
+
+
+def _require_string_field(payload: dict[str, Any], field: str, errors: list[str]) -> None:
+    value = payload.get(field)
+    if not isinstance(value, str) or not value.strip():
+        errors.append(f"missing or invalid string field: {field}")
+
+
+def _require_string_list_field(payload: dict[str, Any], field: str, errors: list[str], *, allow_empty: bool = True) -> None:
+    value = payload.get(field)
+    if not isinstance(value, list):
+        errors.append(f"missing or invalid array field: {field}")
+        return
+    if not allow_empty and len(value) == 0:
+        errors.append(f"array field must not be empty: {field}")
+        return
+    for index, item in enumerate(value):
+        if not isinstance(item, str) or not item.strip():
+            errors.append(f"invalid string item in {field}[{index}]")
+
+
+def validate_skill(skill_json: str, clawperator_cmd: list[str], operator_package: str) -> tuple[bool, list[str]]:
+    errors: list[str] = []
+    try:
+        payload = json.loads(skill_json)
+    except json.JSONDecodeError as exc:
+        return False, [f"invalid JSON: {exc.msg}"]
+
+    if not isinstance(payload, dict):
+        return False, ["skill payload must be a JSON object"]
+
+    required_fields = (
+        "id",
+        "applicationId",
+        "intent",
+        "summary",
+        "path",
+        "skillFile",
+        "scripts",
+        "artifacts",
+    )
+    for field in required_fields:
+        if field in {"scripts", "artifacts"}:
+            continue
+        _require_string_field(payload, field, errors)
+
+    _require_string_list_field(payload, "scripts", errors, allow_empty=False)
+    _require_string_list_field(payload, "artifacts", errors, allow_empty=True)
+
+    if not errors:
+        skill_id = payload.get("id", "")
+        if isinstance(skill_id, str) and skill_id.strip() and "." not in skill_id:
+            errors.append("id should contain at least one dot so applicationId and intent are distinct")
+
+    if errors:
+        return False, errors
+
+    return True, []
 
 
 @dataclass
