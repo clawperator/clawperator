@@ -49,3 +49,19 @@ def test_write_preflight_failure_run_uses_full_repo_paths(monkeypatch, tmp_path)
     assert config["environment"]["cwd"] == str(run_eval.ROOT)
     assert config["environment"]["runs_dir"] == str(tmp_path / "runs")
     assert config["environment"]["operator_package"] == environment.RELEASE_OPERATOR_PACKAGE
+
+
+def test_load_replay_runtime_prefers_recorded_context():
+    config = {
+        "runtime_target": "published",
+        "environment": {
+            "clawperator_cmd": ["/opt/homebrew/bin/clawperator"],
+            "operator_package": "com.clawperator.operator",
+        },
+    }
+
+    clawperator_cmd, operator_package, runtime_target = run_eval._load_replay_runtime(config)
+
+    assert clawperator_cmd == ["/opt/homebrew/bin/clawperator"]
+    assert operator_package == "com.clawperator.operator"
+    assert runtime_target == "published"

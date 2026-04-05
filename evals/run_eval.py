@@ -68,6 +68,25 @@ def _resolve_prompt_path(eval_id: str, spec: dict, mode: str, skill_prompt: str 
     return prompt_path
 
 
+def _load_replay_runtime(config: dict) -> tuple[list[str], str, str]:
+    runtime_target = config.get("runtime_target")
+    if not isinstance(runtime_target, str) or not runtime_target.strip():
+        runtime_target = "local-dev"
+
+    environment = config.get("environment", {})
+    operator_package = environment.get("operator_package")
+    if not isinstance(operator_package, str) or not operator_package.strip():
+        operator_package = RELEASE_OPERATOR_PACKAGE if runtime_target == "published" else LOCAL_DEV_OPERATOR_PACKAGE
+
+    configured_cmd = environment.get("clawperator_cmd")
+    if isinstance(configured_cmd, list) and configured_cmd and all(isinstance(part, str) and part for part in configured_cmd):
+        clawperator_cmd = list(configured_cmd)
+    else:
+        clawperator_cmd = _resolve_clawperator_cmd(runtime_target)
+
+    return clawperator_cmd, operator_package, runtime_target
+
+
 def _make_agent(agent_name: str, model: str, knowledge_mode: str) -> BaseAgent:
     agent_cls = SUPPORTED_AGENTS.get(agent_name)
     if agent_cls is None:
@@ -314,6 +333,7 @@ def _write_preflight_failure_run(
             "env_overrides": {},
         },
         "environment": {
+            "device_serial": runtime_inputs.device_serial if runtime_inputs is not None else None,
             "python_version": platform.python_version(),
             "platform": platform.platform(),
             "cwd": cwd_display,
@@ -388,11 +408,10 @@ def main(argv: list[str] | None = None) -> int:
             raise SystemExit("replay failed: missing run_id")
         run_dir = _resolve_run_dir(Path(args.runs_dir), args.replay)
         config = json.loads((run_dir / "config.json").read_text(encoding="utf-8"))
-        operator_package = config.get("environment", {}).get("operator_package") or LOCAL_DEV_OPERATOR_PACKAGE
+        clawperator_cmd, operator_package, runtime_target = _load_replay_runtime(config)
         device_serial = config.get("environment", {}).get("device_serial")
         if not isinstance(device_serial, str) or not device_serial.strip():
             device_serial = ""
-        clawperator_cmd = _resolve_clawperator_cmd("local-dev")
         skill_score = run_replay(
             run_dir=run_dir,
             clawperator_cmd=clawperator_cmd,
@@ -407,7 +426,7 @@ def main(argv: list[str] | None = None) -> int:
         status = skill_score["replay_status"].upper()
         answer = skill_score["replay_answer_normalized"] or "none"
         print(run_dir)
-        print(f"{status} | replay | {skill_score['replay_wall_clock_s']:.1f}s | answer={answer}")
+        print(f"{status} | replay/{runtime_target} | {skill_score['replay_wall_clock_s']:.1f}s | answer={answer}")
         return 0
 
     if args.rescore is not None:
