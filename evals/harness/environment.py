@@ -26,6 +26,7 @@ class Environment:
     clawperator_version: str
     clawperator_npm_version: str
     operator_package: str
+    requested_operator_package: str | None
 
 
 @dataclass
@@ -213,4 +214,5 @@ def preflight(
         clawperator_version=inputs.clawperator_version,
         clawperator_npm_version=inputs.clawperator_npm_version,
         operator_package=inputs.operator_package,
+        requested_operator_package=inputs.requested_operator_package,
     )
