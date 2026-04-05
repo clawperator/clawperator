@@ -654,6 +654,24 @@ print_manual_operator_setup_commands() {
     done < <(list_connected_devices)
 }
 
+show_star_hint() {
+  # Skip if not a TTY
+  [ -t 2 ] || return 0
+  # Skip if suppressed via env var
+  [ -n "${CLAWPERATOR_DISABLE_STAR_SUGGESTIONS:-}" ] && return 0
+  cat >&2 <<'EOF'
+
+Clawperator is open source. If it helped, consider starring the repo:
+https://github.com/clawpilled/clawperator
+
+GitHub CLI:
+gh api -X PUT /user/starred/clawperator/clawperator -H "X-GitHub-Api-Version: 2026-03-10"
+
+Disable this hint with: CLAWPERATOR_DISABLE_STAR_SUGGESTIONS=1
+
+EOF
+}
+
 # 8. Run Doctor and Apply Fixes
 run_doctor_and_fix() {
     echo -e "${BLUE}Running Clawperator Doctor to verify environment...${NC}"
@@ -778,6 +796,8 @@ main() {
     echo -e "Agent guide: ${BLUE}https://docs.clawperator.com/llms.txt${NC}"
     echo -e "If you are an AI agent, read the agent guide before running any commands.${NC}"
     echo ""
+
+    show_star_hint
 }
 
 main
