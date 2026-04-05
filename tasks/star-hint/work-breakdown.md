@@ -195,11 +195,17 @@ Disable this hint with: --disable-star-suggestions
      does not write
    - State suppression (skill): `skillHintShown: true` in state - skill trigger does
      not write
-   - Version suppression: upgrade trigger suppressed when stored version matches current
+   - Version suppression: upgrade trigger suppressed when stored version matches the
+     version already recorded in state (i.e. `lastUpgradeHintVersion === currentVersion`)
    - Show path: trigger fires, writes `HINT_TEXT` to stderr, updates state field
      correctly for each trigger type
    - Module-level `shown` guard: second call in same module instance is suppressed
    - Error swallowing: state write failure (e.g. mkdir throws) does not throw
+
+   Tests must never touch the real `~/.clawperator/` directory. Mock or stub the
+   state file path (e.g. redirect `homedir()` or inject the path via a test seam)
+   so tests are isolated and non-invasive. A test that writes to the real home
+   directory is not acceptable.
 
 ### Acceptance Criteria
 
@@ -618,16 +624,16 @@ CLAWPERATOR_DISABLE_STAR_SUGGESTIONS=1 \
   node apps/node/dist/cli/index.js --version 2>&1
 # expected: version number only, no hint text on either stream
 
-# Hint goes to stderr only, not stdout (when hint would fire - first run after version bump)
-# Run once to potentially emit the hint; capture stdout and stderr separately:
-node apps/node/dist/cli/index.js --version \
+# Hint goes to stderr only, not stdout (deterministic: use isolated HOME with no prior state)
+ISOLATED_HOME=$(mktemp -d)
+HOME="$ISOLATED_HOME" node apps/node/dist/cli/index.js --version \
   1>/tmp/clawperator-hint-stdout.txt \
   2>/tmp/clawperator-hint-stderr.txt
 cat /tmp/clawperator-hint-stdout.txt
 # expected: version number only - no hint text on stdout
 cat /tmp/clawperator-hint-stderr.txt
-# expected: hint text here if this was the first run after a version bump, or empty
-# if state already recorded this version
+# expected: hint text (version not yet in state for this isolated HOME)
+rm -rf "$ISOLATED_HOME"
 
 # Hint module has no runtime network or subprocess API usage
 grep -n "\bfetch\b\|axios\|http\.request\|https\.request\|\bspawn\b\|\bexec\b\|child_process" \

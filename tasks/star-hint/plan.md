@@ -252,8 +252,9 @@ Keep each note to 1-2 lines. No section headers. Append near the bottom of each 
 
 ## Failure Modes To Prevent
 
-- Hint text appearing before primary command output on stdout - all hint calls in main()
-  must come after `console.log(result)`, never inside command handler functions
+- In the command execution path, hint text must only appear after `console.log(result)`.
+  In the `--version` path, hint text must only appear after `console.log(pkg.version)`
+  and before `process.exit(0)`. Never call the hint from inside command handler functions.
 - Hint text appearing in stdout, JSON output, HTTP API responses, or SSE streams -
   use only `process.stderr.write`
 - Hint firing on command failure or usage error - check per-trigger conditions strictly
