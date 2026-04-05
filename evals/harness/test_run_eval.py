@@ -16,7 +16,7 @@ class _StubAgent:
         return ["stub-agent", work_dir]
 
 
-def test_write_preflight_failure_run_uses_full_repo_paths(tmp_path):
+def test_write_preflight_failure_run_uses_full_repo_paths(monkeypatch, tmp_path):
     args = SimpleNamespace(
         eval_id="android-version",
         agent="claude",
@@ -29,7 +29,7 @@ def test_write_preflight_failure_run_uses_full_repo_paths(tmp_path):
         max_turns=40,
     )
     spec = {"prompts": {"full-repo": "prompt-full-repo.md"}}
-
+    monkeypatch.setenv("CLAWPERATOR_OPERATOR_PACKAGE", "   ")
     run_dir = run_eval._write_preflight_failure_run(
         args=args,
         spec=spec,

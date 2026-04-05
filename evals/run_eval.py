@@ -189,7 +189,12 @@ def _write_preflight_failure_run(
     elif args.runtime == "published":
         operator_package = RELEASE_OPERATOR_PACKAGE
     else:
-        operator_package = os.environ.get("CLAWPERATOR_OPERATOR_PACKAGE", default_operator_package)
+        env_operator_package = os.environ.get("CLAWPERATOR_OPERATOR_PACKAGE")
+        operator_package = (
+            env_operator_package.strip()
+            if env_operator_package is not None and env_operator_package.strip()
+            else default_operator_package
+        )
     work_dir = str(ROOT) if args.mode == "full-repo" else "<tempdir>"
     cwd_display = str(ROOT) if args.mode == "full-repo" else "<redacted>"
     runs_dir_display = str(runs_dir) if args.mode == "full-repo" else "<redacted>"

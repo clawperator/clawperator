@@ -27,15 +27,21 @@ def _fake_run_factory(version: str):
     return _fake_run
 
 
-def test_preflight_published_binary_missing(monkeypatch):
-    def fake_which(name: str):
-        if name == "adb":
-            return "/usr/bin/adb"
-        if name == "clawperator":
-            return None
+def _fake_which_factory(mapping: dict[str, str | None]):
+    def _fake_which(name: str):
+        if name in mapping:
+            return mapping[name]
+        if Path(name).is_absolute():
+            return name
+        if "/" in name:
+            return name
         return f"/usr/bin/{name}"
 
-    monkeypatch.setattr(environment.shutil, "which", fake_which)
+    return _fake_which
+
+
+def test_preflight_published_binary_missing(monkeypatch):
+    monkeypatch.setattr(environment.shutil, "which", _fake_which_factory({"adb": "/usr/bin/adb", "clawperator": None}))
     monkeypatch.setattr(environment, "_run", _fake_run_factory("0.5.2"))
 
     with pytest.raises(EnvironmentError, match="published_binary_not_found"):
@@ -43,13 +49,6 @@ def test_preflight_published_binary_missing(monkeypatch):
 
 
 def test_published_runtime_forces_release_operator_package(monkeypatch):
-    def fake_which(name: str):
-        if name == "adb":
-            return "/usr/bin/adb"
-        if name == "clawperator":
-            return "/opt/homebrew/bin/clawperator"
-        return f"/usr/bin/{name}"
-
     def fake_run(cmd: list[str], env: dict[str, str], cwd: Path | None = None):
         if cmd[-1] == "devices":
             return subprocess.CompletedProcess(cmd, 0, stdout="List of devices attached\nR5CT22AGEEF\tdevice\n", stderr="")
@@ -63,7 +62,11 @@ def test_published_runtime_forces_release_operator_package(monkeypatch):
             return subprocess.CompletedProcess(cmd, 0, stdout="clawperator 0.5.1\n", stderr="")
         raise AssertionError(f"unexpected command: {cmd!r}")
 
-    monkeypatch.setattr(environment.shutil, "which", fake_which)
+    monkeypatch.setattr(
+        environment.shutil,
+        "which",
+        _fake_which_factory({"adb": "/usr/bin/adb", "clawperator": "/opt/homebrew/bin/clawperator"}),
+    )
     monkeypatch.setattr(environment, "_run", fake_run)
     monkeypatch.setenv("CLAWPERATOR_OPERATOR_PACKAGE", "com.clawperator.operator.dev")
 
@@ -76,13 +79,6 @@ def test_published_runtime_forces_release_operator_package(monkeypatch):
 
 
 def test_published_preflight_preserves_requested_operator_package(monkeypatch):
-    def fake_which(name: str):
-        if name == "adb":
-            return "/usr/bin/adb"
-        if name == "clawperator":
-            return "/opt/homebrew/bin/clawperator"
-        return f"/usr/bin/{name}"
-
     def fake_run(cmd: list[str], env: dict[str, str], cwd: Path | None = None):
         if cmd[-1] == "devices":
             return subprocess.CompletedProcess(cmd, 0, stdout="List of devices attached\nR5CT22AGEEF\tdevice\n", stderr="")
@@ -96,7 +92,11 @@ def test_published_preflight_preserves_requested_operator_package(monkeypatch):
             return subprocess.CompletedProcess(cmd, 0, stdout='{"cliVersion":"0.5.2"}\n', stderr="")
         raise AssertionError(f"unexpected command: {cmd!r}")
 
-    monkeypatch.setattr(environment.shutil, "which", fake_which)
+    monkeypatch.setattr(
+        environment.shutil,
+        "which",
+        _fake_which_factory({"adb": "/usr/bin/adb", "clawperator": "/opt/homebrew/bin/clawperator"}),
+    )
     monkeypatch.setattr(environment, "_run", fake_run)
     monkeypatch.setenv("CLAWPERATOR_OPERATOR_PACKAGE", "com.clawperator.operator.dev")
 
@@ -131,6 +131,10 @@ def test_preflight_populates_clawperator_npm_version(monkeypatch, tmp_path, runt
             return "/usr/bin/node"
         if name == "clawperator":
             return "/opt/homebrew/bin/clawperator" if runtime == "published" else None
+        if Path(name).is_absolute():
+            return name
+        if "/" in name:
+            return name
         return f"/usr/bin/{name}"
 
     monkeypatch.setattr(environment, "LOCAL_CLI", local_cli)
