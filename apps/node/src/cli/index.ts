@@ -340,7 +340,7 @@ async function main(): Promise<void> {
   if (result !== undefined) {
     console.log(result);
   }
-  if (!usageParseError) {
+  if (!usageParseError && (process.exitCode ?? 0) === 0) {
     // Helper to detect successful skills run by heuristic (success envelopes lack top-level `code`)
     function isSuccessfulSkillsRunResult(r: string | undefined): boolean {
       try {
@@ -349,6 +349,9 @@ async function main(): Promise<void> {
         return false;
       }
     }
+    // Determine CLI success using the same logic as exit-code selection (single source of truth)
+    const cliSucceeded =
+      result === undefined || !shouldCliStdoutForceExitCode1(result, usageParseError);
     // Doctor trigger: cmdDoctor sets process.exitCode before returning - relied on here
     if (cmd === 'doctor' && (process.exitCode ?? 0) === 0) {
       await maybeShowStarHint('doctor');
@@ -358,7 +361,9 @@ async function main(): Promise<void> {
       await maybeShowStarHint('skill');
     }
     // Upgrade trigger: fires once per version after any successful command or --version
-    await maybeShowStarHint('upgrade');
+    if (cliSucceeded) {
+      await maybeShowStarHint('upgrade');
+    }
   }
   if (typeof result === "string" && shouldCliStdoutForceExitCode1(result, usageParseError)) {
     process.exitCode = 1;
