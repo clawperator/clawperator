@@ -158,6 +158,102 @@ def test_write_preflight_failure_run_redacts_public_surface_runtime_command(monk
     assert config["environment"]["runs_dir"] == "<redacted>"
 
 
+def test_write_preflight_failure_run_persists_doctor_details(monkeypatch, tmp_path):
+    args = SimpleNamespace(
+        eval_id="android-version",
+        agent="claude",
+        model="claude-sonnet-4-6",
+        label=None,
+        runs_dir=str(tmp_path / "runs"),
+        mode="public-surface",
+        runtime="local-dev",
+        timeout_s=300,
+        max_turns=40,
+    )
+    spec = {"prompts": {"public-surface": "prompt-public.md"}}
+    preflight_details = {
+        "doctor_report": {
+            "deviceId": "emulator-5554",
+            "operatorPackage": "com.clawperator.operator.dev",
+        },
+        "doctor_failure": {
+            "code": "VERSION_INCOMPATIBLE",
+            "summary": "CLI and APK versions are incompatible",
+            "evidence": {
+                "cliVersion": "0.5.3",
+                "apkVersion": "0.4.1-d",
+            },
+        },
+    }
+
+    run_dir = run_eval._write_preflight_failure_run(
+        args=args,
+        spec=spec,
+        agent=_StubAgent(),
+        failure_reason="doctor_preflight_failed",
+        runtime_inputs=None,
+        preflight_details=preflight_details,
+    )
+
+    result = json.loads((run_dir / "result.json").read_text(encoding="utf-8"))
+    config = json.loads((run_dir / "config.json").read_text(encoding="utf-8"))
+
+    assert result["preflight"] == {
+        "doctor_failure": {
+            "code": "VERSION_INCOMPATIBLE",
+            "summary": "CLI and APK versions are incompatible",
+        }
+    }
+    assert config["preflight"] == result["preflight"]
+
+
+def test_write_preflight_failure_run_persists_full_doctor_report_in_full_repo(monkeypatch, tmp_path):
+    args = SimpleNamespace(
+        eval_id="android-version",
+        agent="claude",
+        model="claude-sonnet-4-6",
+        label=None,
+        runs_dir=str(tmp_path / "runs"),
+        mode="full-repo",
+        runtime="local-dev",
+        timeout_s=300,
+        max_turns=40,
+    )
+    spec = {"prompts": {"full-repo": "prompt-full-repo.md"}}
+    preflight_details = {
+        "doctor_report": {
+            "deviceId": "emulator-5554",
+            "operatorPackage": "com.clawperator.operator.dev",
+            "nextActions": ["Run `clawperator doctor --json`"],
+        },
+        "doctor_failure": {
+            "code": "VERSION_INCOMPATIBLE",
+            "summary": "CLI and APK versions are incompatible",
+            "detail": "CLI 0.5.3 is not compatible with installed APK 0.4.1-d.",
+            "evidence": {
+                "cliVersion": "0.5.3",
+                "apkVersion": "0.4.1-d",
+            },
+        },
+    }
+
+    run_dir = run_eval._write_preflight_failure_run(
+        args=args,
+        spec=spec,
+        agent=_StubAgent(),
+        failure_reason="doctor_preflight_failed",
+        runtime_inputs=None,
+        preflight_details=preflight_details,
+    )
+
+    result = json.loads((run_dir / "result.json").read_text(encoding="utf-8"))
+    config = json.loads((run_dir / "config.json").read_text(encoding="utf-8"))
+
+    assert result["preflight"]["doctor_report"]["deviceId"] == "emulator-5554"
+    assert result["preflight"]["doctor_report"]["nextActions"] == ["Run `clawperator doctor --json`"]
+    assert config["preflight"]["doctor_failure"]["evidence"]["cliVersion"] == "0.5.3"
+
+
 def test_load_replay_runtime_prefers_recorded_context():
     config = {
         "runtime_target": "local-dev",
@@ -267,11 +363,12 @@ def test_attach_skill_score_records_replay_error_without_raising(monkeypatch, tm
         '"id":"com.example.android-version",'
         '"applicationId":"com.example",'
         '"intent":"android-version",'
-        '"summary":"",'
+        '"summary":"Determine Android version",'
         '"path":"skills/com.example.android-version",'
         '"skillFile":"skills/com.example.android-version/SKILL.md",'
         '"scripts":["skills/com.example.android-version/scripts/run.js"],'
-        '"artifacts":[]'
+        '"artifacts":[],'
+        '"scriptContents":{"skills/com.example.android-version/scripts/run.js":"console.log(\\"15\\")\\n"}'
         "}\n"
         "CLAWPERATOR_SKILL_END\n",
         encoding="utf-8",

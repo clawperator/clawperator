@@ -7,6 +7,7 @@ import shutil
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from .timeutil import format_timestamp
 
@@ -38,6 +39,13 @@ class RuntimeInputs:
     requested_operator_package: str | None
     clawperator_version: str
     clawperator_npm_version: str
+
+
+def _raise_environment_error(code: str, *, details: dict[str, Any] | None = None) -> None:
+    error = EnvironmentError(code)
+    if details is not None:
+        setattr(error, "details", details)
+    raise error
 
 
 def _minimal_env(device_serial: str | None = None, operator_package: str | None = None) -> dict[str, str]:
@@ -121,6 +129,62 @@ def _run(cmd: list[str], env: dict[str, str], cwd: Path | None = None) -> subpro
     return subprocess.run(cmd, check=False, capture_output=True, text=True, env=env, cwd=str(cwd) if cwd else None)
 
 
+def _failed_doctor_checks(report: dict[str, Any]) -> list[dict[str, Any]]:
+    checks = report.get("checks")
+    if not isinstance(checks, list):
+        return []
+    failed: list[dict[str, Any]] = []
+    for check in checks:
+        if not isinstance(check, dict):
+            continue
+        status = check.get("status")
+        if status in {"fail", "warn"}:
+            failed.append(check)
+    return failed
+
+
+def _primary_doctor_failure_check(failed_checks: list[dict[str, Any]]) -> dict[str, Any] | None:
+    for check in failed_checks:
+        if check.get("status") == "fail":
+            return check
+    return failed_checks[0] if failed_checks else None
+
+
+def _summarize_doctor_failure(report: dict[str, Any]) -> dict[str, Any]:
+    failed_checks = _failed_doctor_checks(report)
+    primary_check = _primary_doctor_failure_check(failed_checks)
+    summary: dict[str, Any] = {
+        "device_id": report.get("deviceId"),
+        "operator_package": report.get("operatorPackage"),
+        "critical_ok": report.get("criticalOk"),
+        "failed_checks": failed_checks,
+        "next_actions": report.get("nextActions", []),
+    }
+    if isinstance(primary_check, dict):
+        summary["code"] = primary_check.get("code")
+        summary["summary"] = primary_check.get("summary")
+        summary["detail"] = primary_check.get("detail")
+        summary["evidence"] = primary_check.get("evidence", {})
+        if "fix" in primary_check:
+            summary["fix"] = primary_check.get("fix")
+        if "deviceGuidance" in primary_check:
+            summary["device_guidance"] = primary_check.get("deviceGuidance")
+    return summary
+
+
+def _doctor_failure_details(stdout: str) -> dict[str, Any] | None:
+    try:
+        payload = json.loads(stdout)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    return {
+        "doctor_report": payload,
+        "doctor_failure": _summarize_doctor_failure(payload),
+    }
+
+
 def _resolve_device_timezone(adb: str, device_serial: str) -> str | None:
     result = _run([adb, "-s", device_serial, "shell", "getprop", "persist.sys.timezone"], env=_minimal_env(device_serial=device_serial))
     if result.returncode != 0:
@@ -194,7 +258,10 @@ def preflight(
     doctor_env = _minimal_env(device_serial=inputs.device_serial, operator_package=inputs.operator_package)
     doctor_result = _run([*inputs.clawperator_cmd, "doctor", "--json", "--device", inputs.device_serial], env=doctor_env)
     if doctor_result.returncode != 0:
-        raise EnvironmentError("doctor_preflight_failed")
+        _raise_environment_error(
+            "doctor_preflight_failed",
+            details=_doctor_failure_details(doctor_result.stdout),
+        )
 
     adb_env = _minimal_env()
     version_result = _run([adb, "-s", inputs.device_serial, "shell", "getprop", "ro.build.version.release"], env=adb_env)

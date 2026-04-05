@@ -84,6 +84,9 @@ uv run --project evals --extra dev python evals/run_eval.py android-version \
 Replay uses the device serial recorded in the original run config. It writes
 `result-replay.json` alongside the original artifacts. If the original run did
 not emit a valid skill, replay reports `replay_status = "skipped"`.
+Replay only reports `pass`, `fail`, or `no_answer` when the replayed
+`clawperator skills run` process exits cleanly. Non-zero exit codes are always
+recorded as `replay_status = "error"`.
 
 Other supported agents:
 
@@ -147,6 +150,10 @@ Key fields:
 - `outcome.ground_truth_normalized` - normalized ground truth
 - `outcome.answer_correct` - whether the normalized answer matched ground truth
 - `outcome.failure_reason` - non-null for error runs
+- `preflight` - present on preflight failures when the harness has structured
+  diagnostics. Public-surface runs keep only `doctor_failure.code` and
+  `doctor_failure.summary` there. Full-repo runs also include the raw
+  `doctor_report`
 - `metrics.wall_clock_s` - total elapsed run time
 - `metrics.violations.used_adb` - diagnostic flag for direct `adb shell` usage
 - `metrics.turns_counted` - diagnostic turn count or `null`
@@ -199,3 +206,10 @@ API and must not appear in public-facing documentation or production usage.
   long answer can consume more than one counted turn
 - `skill_score.replay_status = "skipped"` means the run did not emit a valid
   skill block, not that replay failed
+- Replay only trusts answer artifacts that the skill created or modified
+  during the replayed run. Seeded inline artifact contents alone do not count
+  as a successful replay result.
+- `outcome.failure_reason = "doctor_preflight_failed"` means preflight blocked
+  the run before the agent started. Check `preflight.doctor_failure` in
+  `result.json` for the actionable doctor code and summary. Full-repo runs also
+  preserve the raw `doctor_report`.

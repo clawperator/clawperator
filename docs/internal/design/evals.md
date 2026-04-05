@@ -40,6 +40,15 @@ The main task score remains in `outcome`.
 When the skill prompt variant is used and the spec defines `skill_generation`,
 the harness adds a `skill_score` block to `result.json`.
 
+If preflight fails before the agent starts, the harness still writes
+`config.json` and `result.json`. Those artifacts keep the generic
+`outcome.failure_reason` such as `doctor_preflight_failed`, and they also add a
+`preflight` block with structured doctor diagnostics when the failing step was
+`clawperator doctor --json`. Public-surface runs keep only the minimal
+`doctor_failure.code` and `doctor_failure.summary` in that block. Full-repo
+runs also keep the raw `doctor_report` so engineers can inspect the full doctor
+payload when the repo surface is already exposed.
+
 ```json
 {
   "outcome": {
@@ -104,9 +113,12 @@ The emitted JSON must satisfy the `SkillEntry` contract:
 - `artifacts`
 
 Validation is structural. The harness parses the JSON, checks required fields
-and types, and does not rely on permanent registration in the user skill
-store. That keeps replay self-contained and avoids writing generated skills to
-the repository.
+and replay-readiness constraints, and does not rely on permanent registration
+in the user skill store. Required string fields must be non-blank, listed
+script and artifact paths must be non-blank strings, and replayable skills
+must include inline content coverage for every listed script and artifact.
+That keeps replay self-contained and avoids writing generated skills to the
+repository.
 
 To make the skill replayable, the emitted JSON may also include inline file
 content:
@@ -140,15 +152,20 @@ Replay has its own wall-clock timeout. The default is 60 seconds, and
 
 Current answer surfacing contract:
 
+- Replay only reports `pass`, `fail`, or `no_answer` when `clawperator skills
+  run` exited with code `0`. Non-zero exit codes are always `replay_status =
+  "error"`.
 - If a skill artifact contains a plain-text answer, replay uses that artifact
-  content first.
+  content only when the replayed skill created or modified that artifact
+  during execution.
 - Otherwise replay falls back to the run output and looks for
   `CLAWPERATOR_EVAL_ANSWER: <version>` in the raw output, stdout, stderr, or
   JSON envelope text.
 
 That order matters because some generated skills update their artifact file
-during execution. Capturing the artifact answer before the run would be stale
-if the skill rewrites the file.
+during execution. Capturing a seeded artifact answer before the run would be a
+false positive if the skill never rewrote the file. Binary or unreadable
+artifacts are skipped and do not block stdout or stderr answer extraction.
 
 ## Decision Rules
 
@@ -170,6 +187,12 @@ if the skill rewrites the file.
 - Letting replay run indefinitely instead of enforcing the replay timeout.
 - Assuming replay should rediscover the Android version. The skill should
   carry the discovered version forward and replay should verify it.
+- In `full-repo`, collapsing doctor preflight failures to
+  `doctor_preflight_failed` without the associated `code`, `detail`,
+  evidence, and fix steps from the doctor report.
+- In `public-surface`, retaining more than `doctor_failure.code` and
+  `doctor_failure.summary`, or leaking raw doctor reports or host-specific
+  paths and commands.
 
 ## Operational Guidance
 
@@ -179,4 +202,3 @@ if the skill rewrites the file.
 - Pass `--device <serial>` explicitly whenever more than one device is
   connected.
 - Keep `skill_score` separate from `outcome` when you analyze runs.
-
