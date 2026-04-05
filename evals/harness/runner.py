@@ -355,6 +355,7 @@ def _build_config(
     display_work_dir: str,
     display_cwd: str,
     display_runs_dir: str,
+    skill_prompt_path: Path | None = None,
 ) -> dict[str, Any]:
     return {
         "run_id": run_id,
@@ -369,6 +370,11 @@ def _build_config(
         "spec": {
             "prompt_file": prompt_path.name,
             "prompt_sha256": prompt_sha256,
+            **(
+                {"skill_prompt_file": skill_prompt_path.name}
+                if skill_prompt_path is not None and skill_prompt_path.name != prompt_path.name
+                else {}
+            ),
         },
         "run_label": label,
         "invocation": {

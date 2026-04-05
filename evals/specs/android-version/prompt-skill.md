@@ -56,14 +56,18 @@ skill registry contract. At minimum, it must include these top-level fields:
 - `scripts`
 - `artifacts`
 
-To make the skill replayable, include these optional inline file-content
-fields at the top level when needed:
+To make the skill replayable, include these inline file-content
+fields at the top level as required by the paths you provide:
 
 - `skillMarkdown` - the exact Markdown body for `skillFile`
 - `scriptContents` - an object whose keys are the script paths from `scripts`
-  and whose values are the script source text
+  and whose values are the script source text. If `scripts` is non-empty, you
+  must provide `scriptContents` for every path listed in `scripts`, or replay
+  will fail.
 - `artifactContents` - an object whose keys are the artifact paths from
-  `artifacts` and whose values are the artifact source text
+  `artifacts` and whose values are the artifact source text. If `artifacts` is
+  non-empty, you must provide `artifactContents` for every path listed in
+  `artifacts`, or replay will fail.
 
 The JSON object should describe a deterministic skill package for the Android
 version you already determined in this run. Do not try to rediscover the

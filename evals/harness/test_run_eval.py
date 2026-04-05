@@ -13,10 +13,21 @@ from evals import run_eval
 
 class _StubAgent:
     def __init__(self) -> None:
-        self.config = SimpleNamespace(extra_flags=[])
+        self.config = SimpleNamespace(type_id="claude", model="claude-sonnet-4-6", extra_flags=[])
 
     def build_command(self, prompt: str, work_dir: str) -> list[str]:
         return ["stub-agent", work_dir]
+
+
+def _make_stub_environment():
+    return SimpleNamespace(
+        device_serial="device-123",
+        clawperator_cmd=["clawperator"],
+        clawperator_version="0.5.3",
+        clawperator_npm_version="0.5.3",
+        ground_truth_android_version="15",
+        operator_package="com.clawperator.operator.dev",
+    )
 
 
 def test_write_preflight_failure_run_uses_full_repo_paths(monkeypatch, tmp_path):
@@ -53,6 +64,62 @@ def test_write_preflight_failure_run_uses_full_repo_paths(monkeypatch, tmp_path)
     assert config["environment"]["runs_dir"] == str(tmp_path / "runs")
     assert config["environment"]["operator_package"] == environment.RELEASE_OPERATOR_PACKAGE
     assert "skill_prompt_file" not in config["spec"]
+
+
+def test_build_config_omits_redundant_skill_prompt_file(tmp_path):
+    config = runner._build_config(
+        run_id="run-1",
+        eval_id="android-version",
+        agent=_StubAgent(),
+        knowledge_mode="full-repo",
+        runtime_target="local-dev",
+        prompt_path=tmp_path / "prompt-skill.md",
+        prompt_sha256="abc123",
+        work_dir=tmp_path,
+        runs_dir=tmp_path / "runs",
+        env=_make_stub_environment(),
+        command=["stub-agent", str(tmp_path)],
+        env_overrides={},
+        label=None,
+        timeout_s=300,
+        max_turns=40,
+        agent_binary_version="1.0.0",
+        display_clawperator_cmd=["clawperator"],
+        display_work_dir=str(tmp_path),
+        display_cwd=str(tmp_path),
+        display_runs_dir=str(tmp_path / "runs"),
+        skill_prompt_path=tmp_path / "prompt-skill.md",
+    )
+
+    assert "skill_prompt_file" not in config["spec"]
+
+
+def test_build_config_records_distinct_skill_prompt_file(tmp_path):
+    config = runner._build_config(
+        run_id="run-1",
+        eval_id="android-version",
+        agent=_StubAgent(),
+        knowledge_mode="full-repo",
+        runtime_target="local-dev",
+        prompt_path=tmp_path / "prompt-full-repo.md",
+        prompt_sha256="abc123",
+        work_dir=tmp_path,
+        runs_dir=tmp_path / "runs",
+        env=_make_stub_environment(),
+        command=["stub-agent", str(tmp_path)],
+        env_overrides={},
+        label=None,
+        timeout_s=300,
+        max_turns=40,
+        agent_binary_version="1.0.0",
+        display_clawperator_cmd=["clawperator"],
+        display_work_dir=str(tmp_path),
+        display_cwd=str(tmp_path),
+        display_runs_dir=str(tmp_path / "runs"),
+        skill_prompt_path=tmp_path / "prompt-skill.md",
+    )
+
+    assert config["spec"]["skill_prompt_file"] == "prompt-skill.md"
 
 
 def test_write_preflight_failure_run_redacts_public_surface_runtime_command(monkeypatch, tmp_path):
