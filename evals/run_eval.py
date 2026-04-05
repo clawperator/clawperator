@@ -91,6 +91,20 @@ def _load_replay_runtime(config: dict) -> tuple[list[str], str, str]:
     return clawperator_cmd, operator_package, runtime_target
 
 
+def _public_preflight_details(preflight_details: dict | None) -> dict | None:
+    if not isinstance(preflight_details, dict):
+        return None
+    doctor_failure = preflight_details.get("doctor_failure")
+    if not isinstance(doctor_failure, dict):
+        return None
+    summary: dict[str, object] = {}
+    for field in ("code", "summary"):
+        value = doctor_failure.get(field)
+        if isinstance(value, str) and value.strip():
+            summary[field] = value
+    return {"doctor_failure": summary} if summary else None
+
+
 def _make_agent(agent_name: str, model: str, knowledge_mode: str) -> BaseAgent:
     agent_cls = SUPPORTED_AGENTS.get(agent_name)
     if agent_cls is None:
@@ -260,6 +274,9 @@ def _write_preflight_failure_run(
     )
     prompt_sha256 = hashlib.sha256(prompt_text.encode("utf-8")).hexdigest()
     command = agent.build_command(prompt_text, work_dir)
+    persisted_preflight_details = (
+        _public_preflight_details(preflight_details) if args.mode == "public-surface" else preflight_details
+    )
     started_at = finished_at = format_timestamp()
     result = {
         "run_id": run_id,
@@ -306,7 +323,7 @@ def _write_preflight_failure_run(
             "answer_correct": False,
             "failure_reason": failure_reason,
         },
-        **({"preflight": preflight_details} if preflight_details is not None else {}),
+        **({"preflight": persisted_preflight_details} if persisted_preflight_details is not None else {}),
         "metrics": {
             "wall_clock_s": 0.0,
             "time_to_first_clawperator_command_s": None,
@@ -365,7 +382,7 @@ def _write_preflight_failure_run(
         },
         "timeout_s": args.timeout_s,
         "max_turns": args.max_turns,
-        **({"preflight": preflight_details} if preflight_details is not None else {}),
+        **({"preflight": persisted_preflight_details} if persisted_preflight_details is not None else {}),
     }
     write_run(run_dir, result, config, "")
     if launcher_work_dir is not None:

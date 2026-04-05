@@ -44,7 +44,10 @@ If preflight fails before the agent starts, the harness still writes
 `config.json` and `result.json`. Those artifacts keep the generic
 `outcome.failure_reason` such as `doctor_preflight_failed`, and they also add a
 `preflight` block with structured doctor diagnostics when the failing step was
-`clawperator doctor --json`.
+`clawperator doctor --json`. Public-surface runs keep only the minimal
+`doctor_failure.code` and `doctor_failure.summary` in that block. Full-repo
+runs also keep the raw `doctor_report` so engineers can inspect the full doctor
+payload when the repo surface is already exposed.
 
 ```json
 {
@@ -186,6 +189,8 @@ artifacts are skipped and do not block stdout or stderr answer extraction.
   carry the discovered version forward and replay should verify it.
 - Collapsing doctor preflight failures to `doctor_preflight_failed` without the
   associated `code`, `detail`, evidence, and fix steps from the doctor report.
+- Letting public-surface artifacts leak raw doctor reports or host-specific
+  paths and commands.
 
 ## Operational Guidance
 
