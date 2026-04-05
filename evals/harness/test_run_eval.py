@@ -94,3 +94,36 @@ def test_extract_answer_candidate_prefers_normalized_stream_output():
     answer = runner._extract_answer_candidate(raw_line, normalized_line)
 
     assert answer == "15"
+
+
+def test_extract_answer_candidate_handles_gemini_wrapped_marker():
+    raw_line = (
+        '{"type":"message","role":"assistant","content":"CLAWPERATOR_\\nEVAL_ANSWER: 15","delta":true}\n'
+    )
+    normalized_line = "CLAWPERATOR_\nEVAL_ANSWER: 15\n"
+
+    answer = runner._extract_answer_candidate(raw_line, normalized_line)
+
+    assert answer == "15"
+
+
+def test_extract_answer_candidate_handles_kimi_stream_json():
+    raw_line = (
+        '{"role":"assistant","content":[{"type":"text","text":"CLAWPERATOR_EVAL_ANSWER: 15"}]}\n'
+    )
+    normalized_line = "CLAWPERATOR_EVAL_ANSWER: 15\n"
+
+    answer = runner._extract_answer_candidate(raw_line, normalized_line)
+
+    assert answer == "15"
+
+
+def test_extract_answer_candidate_handles_codex_item_completed_json():
+    raw_line = (
+        '{"type":"item.completed","item":{"type":"agent_message","text":"CLAWPERATOR_EVAL_ANSWER: 15"}}\n'
+    )
+    normalized_line = "CLAWPERATOR_EVAL_ANSWER: 15\n"
+
+    answer = runner._extract_answer_candidate(raw_line, normalized_line)
+
+    assert answer == "15"

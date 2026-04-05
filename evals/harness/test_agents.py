@@ -68,3 +68,33 @@ def test_agent_tool_json_stays_raw_for_answer_safety():
 
     assert gemini.normalize_line(line) == line
     assert kimi.normalize_line(line) == line
+
+
+def test_gemini_normalize_line_extracts_answer_text():
+    gemini = GeminiAgent(AgentConfig(type_id="gemini", model="gemini-2.5-pro", knowledge_mode="public-surface"))
+    line = '{"type":"message","role":"assistant","content":"CLAWPERATOR_EVAL_ANSWER: 15","delta":true}\n'
+
+    assert gemini.normalize_line(line) == "CLAWPERATOR_EVAL_ANSWER: 15\n"
+
+
+def test_gemini_normalize_line_preserves_wrapped_marker_text():
+    gemini = GeminiAgent(AgentConfig(type_id="gemini", model="gemini-2.5-pro", knowledge_mode="public-surface"))
+    line = '{"type":"message","role":"assistant","content":"CLAWPERATOR_\\nEVAL_ANSWER: 15","delta":true}\n'
+
+    assert gemini.normalize_line(line) == "CLAWPERATOR_\nEVAL_ANSWER: 15\n"
+
+
+def test_kimi_normalize_line_extracts_answer_text():
+    kimi = KimiAgent(AgentConfig(type_id="kimi", model="kimi-code/kimi-for-coding", knowledge_mode="public-surface"))
+    line = '{"role":"assistant","content":[{"type":"text","text":"CLAWPERATOR_EVAL_ANSWER: 15"}]}\n'
+
+    assert kimi.normalize_line(line) == "CLAWPERATOR_EVAL_ANSWER: 15\n"
+
+
+def test_codex_normalize_line_extracts_answer_text():
+    codex = CodexAgent(AgentConfig(type_id="codex", model="gpt-5.1-codex-mini", knowledge_mode="public-surface"))
+    line = (
+        '{"type":"item.completed","item":{"type":"agent_message","text":"CLAWPERATOR_EVAL_ANSWER: 15"}}\n'
+    )
+
+    assert codex.normalize_line(line) == "CLAWPERATOR_EVAL_ANSWER: 15\n"
