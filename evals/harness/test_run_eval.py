@@ -55,6 +55,42 @@ def test_write_preflight_failure_run_uses_full_repo_paths(monkeypatch, tmp_path)
     assert "skill_prompt_file" not in config["spec"]
 
 
+def test_write_preflight_failure_run_redacts_public_surface_runtime_command(monkeypatch, tmp_path):
+    args = SimpleNamespace(
+        eval_id="android-version",
+        agent="claude",
+        model="claude-sonnet-4-6",
+        label=None,
+        runs_dir=str(tmp_path / "runs"),
+        mode="public-surface",
+        runtime="local-dev",
+        timeout_s=300,
+        max_turns=40,
+    )
+    spec = {"prompts": {"public-surface": "prompt-public.md"}}
+    monkeypatch.setenv("CLAWPERATOR_OPERATOR_PACKAGE", "   ")
+
+    run_dir = run_eval._write_preflight_failure_run(
+        args=args,
+        spec=spec,
+        agent=_StubAgent(),
+        failure_reason="doctor_preflight_failed",
+        runtime_inputs=None,
+    )
+
+    result = json.loads((run_dir / "result.json").read_text(encoding="utf-8"))
+    config = json.loads((run_dir / "config.json").read_text(encoding="utf-8"))
+
+    assert result["environment"]["clawperator_cmd"] == ["clawperator"]
+    assert result["environment"]["runtime_clawperator_cmd"] == ["node", str(run_eval.REPO_ROOT / "apps/node/dist/cli/index.js")]
+    assert result["environment"]["cwd"] == "<redacted>"
+    assert result["environment"]["runs_dir"] == "<redacted>"
+    assert config["environment"]["clawperator_cmd"] == ["clawperator"]
+    assert config["environment"]["runtime_clawperator_cmd"] == ["node", str(run_eval.REPO_ROOT / "apps/node/dist/cli/index.js")]
+    assert config["environment"]["cwd"] == "<redacted>"
+    assert config["environment"]["runs_dir"] == "<redacted>"
+
+
 def test_load_replay_runtime_prefers_recorded_context():
     config = {
         "runtime_target": "local-dev",
@@ -158,9 +194,24 @@ def test_extract_answer_candidate_handles_codex_item_completed_json():
 def test_attach_skill_score_records_replay_error_without_raising(monkeypatch, tmp_path):
     run_dir = tmp_path / "run"
     run_dir.mkdir()
+    (run_dir / "transcript.txt").write_text(
+        "CLAWPERATOR_SKILL_START\n"
+        "{"
+        '"id":"com.example.android-version",'
+        '"applicationId":"com.example",'
+        '"intent":"android-version",'
+        '"summary":"",'
+        '"path":"skills/com.example.android-version",'
+        '"skillFile":"skills/com.example.android-version/SKILL.md",'
+        '"scripts":["skills/com.example.android-version/scripts/run.js"],'
+        '"artifacts":[]'
+        "}\n"
+        "CLAWPERATOR_SKILL_END\n",
+        encoding="utf-8",
+    )
     result = {"run_id": "run-1", "outcome": {"status": "pass"}}
     env = SimpleNamespace(
-        clawperator_cmd=["clawperator"],
+        clawperator_cmd=["node", "/repo/apps/node/dist/cli/index.js"],
         operator_package="com.clawperator.operator.dev",
         device_serial="device-123",
     )
@@ -179,6 +230,10 @@ def test_attach_skill_score_records_replay_error_without_raising(monkeypatch, tm
     )
 
     saved = json.loads((run_dir / "result.json").read_text(encoding="utf-8"))
+    assert updated["skill_score"]["skill_emitted"] is True
+    assert updated["skill_score"]["skill_valid"] is True
     assert updated["skill_score"]["replay_status"] == "error"
     assert updated["skill_score"]["replay_error"] == "boom"
     assert saved["skill_score"]["replay_status"] == "error"
+    assert saved["skill_score"]["skill_emitted"] is True
+    assert saved["skill_score"]["skill_valid"] is True

@@ -191,6 +191,16 @@ def test_build_replay_env_sets_clawperator_bin_for_absolute_binary(tmp_path):
     assert env["CLAWPERATOR_BIN"] == "/opt/homebrew/bin/clawperator"
 
 
+def test_build_replay_env_sets_clawperator_bin_for_multipart_command(tmp_path):
+    registry_path = tmp_path / "skills" / "skills-registry.json"
+    env = _build_replay_env(
+        registry_path,
+        ["node", "/repo/apps/node/dist/cli/index.js"],
+    )
+
+    assert env["CLAWPERATOR_BIN"] == 'node /repo/apps/node/dist/cli/index.js'
+
+
 def test_materialize_skill_package_writes_skill_json_with_registry_shape_only(tmp_path):
     skill = {
         "id": "com.example.android-version",

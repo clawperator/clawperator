@@ -21,7 +21,7 @@ from .artifacts import make_run_id, write_run
 from .environment import Environment, RELEASE_OPERATOR_PACKAGE, REPO_ROOT
 from .logger import get_logger
 from .replay import run_replay
-from .scorer import extract_answer_from_transcript, score
+from .scorer import extract_answer_from_transcript, extract_skill, score, validate_skill
 from .timeutil import format_timestamp
 
 
@@ -179,11 +179,17 @@ def _write_json_file(path: Path, payload: dict[str, Any]) -> None:
     temp_path.replace(path)
 
 
-def _replay_error_skill_score(error: Exception) -> dict[str, Any]:
+def _replay_error_skill_score(
+    error: Exception,
+    *,
+    skill_emitted: bool | None = None,
+    skill_valid: bool | None = None,
+    skill_validation_errors: list[str] | None = None,
+) -> dict[str, Any]:
     return {
-        "skill_emitted": False,
-        "skill_valid": False,
-        "skill_validation_errors": [],
+        "skill_emitted": False if skill_emitted is None else skill_emitted,
+        "skill_valid": False if skill_valid is None else skill_valid,
+        "skill_validation_errors": [] if skill_validation_errors is None else list(skill_validation_errors),
         "replay_attempted": False,
         "replay_status": "error",
         "replay_answer_normalized": None,
@@ -205,6 +211,28 @@ def _attach_skill_score(
         return result
     skill_generation = spec.get("skill_generation")
     replay_timeout_s = int(skill_generation.get("replay_timeout_s", 60)) if isinstance(skill_generation, dict) else 60
+    start_marker = (
+        skill_generation.get("skill_start_marker")
+        if isinstance(skill_generation, dict) and isinstance(skill_generation.get("skill_start_marker"), str)
+        else "CLAWPERATOR_SKILL_START"
+    )
+    end_marker = (
+        skill_generation.get("skill_end_marker")
+        if isinstance(skill_generation, dict) and isinstance(skill_generation.get("skill_end_marker"), str)
+        else "CLAWPERATOR_SKILL_END"
+    )
+    transcript_path = run_dir / "transcript.txt"
+    transcript = transcript_path.read_text(encoding="utf-8") if transcript_path.exists() else ""
+    skill_json = extract_skill(transcript, start_marker, end_marker)
+    skill_emitted = skill_json is not None
+    skill_valid = False
+    skill_validation_errors: list[str] = []
+    if skill_json is not None:
+        skill_valid, skill_validation_errors = validate_skill(
+            skill_json,
+            env.clawperator_cmd,
+            env.operator_package,
+        )
     try:
         skill_score = run_replay(
             run_dir=run_dir,
@@ -214,7 +242,12 @@ def _attach_skill_score(
             timeout_s=replay_timeout_s,
         )
     except Exception as exc:
-        skill_score = _replay_error_skill_score(exc)
+        skill_score = _replay_error_skill_score(
+            exc,
+            skill_emitted=skill_emitted,
+            skill_valid=skill_valid,
+            skill_validation_errors=skill_validation_errors,
+        )
     replay_result = dict(result)
     replay_result["skill_score"] = skill_score
     _write_json_file(run_dir / "result.json", replay_result)

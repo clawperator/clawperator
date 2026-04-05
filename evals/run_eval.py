@@ -220,6 +220,7 @@ def _write_preflight_failure_run(
         if runtime_inputs is not None
         else (["clawperator"] if args.runtime == "published" else ["node", str(REPO_ROOT / "apps/node/dist/cli/index.js")])
     )
+    display_clawperator_cmd = list(clawperator_cmd)
     default_operator_package = RELEASE_OPERATOR_PACKAGE if args.runtime == "published" else LOCAL_DEV_OPERATOR_PACKAGE
     if runtime_inputs is not None:
         operator_package = runtime_inputs.operator_package
@@ -235,11 +236,20 @@ def _write_preflight_failure_run(
     work_dir = str(ROOT) if args.mode == "full-repo" else "<tempdir>"
     cwd_display = str(ROOT) if args.mode == "full-repo" else "<redacted>"
     runs_dir_display = str(runs_dir) if args.mode == "full-repo" else "<redacted>"
+    launcher_work_dir: tempfile.TemporaryDirectory[str] | None = None
+    if args.mode == "public-surface":
+        launcher_work_dir = tempfile.TemporaryDirectory(prefix="clawperator-eval-preflight-")
+        display_clawperator_cmd, _ = _prepare_clawperator_launcher(
+            Path(launcher_work_dir.name),
+            clawperator_cmd,
+            args.mode,
+            args.runtime,
+        )
     prompt_text = build_prompt(
         str(prompt_path),
         {
             **{
-                "CLAWPERATOR_CMD": shlex.join(clawperator_cmd),
+                "CLAWPERATOR_CMD": shlex.join(display_clawperator_cmd),
                 "CLAWPERATOR_OPERATOR_PACKAGE": operator_package,
                 "DEVICE_SERIAL": runtime_inputs.device_serial if runtime_inputs is not None else "<unresolved>",
                 "DOCS_URL": "https://docs.clawperator.com",
@@ -279,7 +289,8 @@ def _write_preflight_failure_run(
             "ground_truth_android_version": None,
             "ground_truth_collected_at": None,
             "ground_truth_rechecked_at": None,
-            "clawperator_cmd": clawperator_cmd,
+            "clawperator_cmd": display_clawperator_cmd,
+            "runtime_clawperator_cmd": clawperator_cmd,
             "clawperator_version": runtime_inputs.clawperator_version if runtime_inputs is not None else None,
             "clawperator_npm_version": runtime_inputs.clawperator_npm_version if runtime_inputs is not None else None,
             "operator_package": operator_package,
@@ -344,7 +355,7 @@ def _write_preflight_failure_run(
             "agent_binary_version": "unknown",
             "env_hash": "",
             "runs_dir": runs_dir_display,
-            "clawperator_cmd": clawperator_cmd,
+            "clawperator_cmd": display_clawperator_cmd,
             "runtime_clawperator_cmd": clawperator_cmd,
             "ground_truth_android_version": None,
             "clawperator_npm_version": runtime_inputs.clawperator_npm_version if runtime_inputs is not None else None,
@@ -354,6 +365,8 @@ def _write_preflight_failure_run(
         "max_turns": args.max_turns,
     }
     write_run(run_dir, result, config, "")
+    if launcher_work_dir is not None:
+        launcher_work_dir.cleanup()
     return run_dir
 
 

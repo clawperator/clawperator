@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shlex
 import subprocess
 import tempfile
 import time
@@ -188,10 +189,8 @@ def _build_replay_env(registry_path: Path, clawperator_cmd: list[str]) -> dict[s
         "LC_ALL": os.environ.get("LC_ALL", "C.UTF-8"),
         "CLAWPERATOR_SKILLS_REGISTRY": str(registry_path),
     }
-    if len(clawperator_cmd) == 1:
-        candidate = Path(clawperator_cmd[0])
-        if candidate.is_absolute():
-            env["CLAWPERATOR_BIN"] = str(candidate)
+    if clawperator_cmd and all(isinstance(part, str) and part for part in clawperator_cmd):
+        env["CLAWPERATOR_BIN"] = shlex.join(clawperator_cmd)
     return env
 
 
