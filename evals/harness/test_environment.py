@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import subprocess
 from pathlib import Path
 
@@ -107,16 +108,21 @@ def test_published_preflight_preserves_requested_operator_package(monkeypatch):
 
 
 @pytest.mark.parametrize(
-    ("runtime", "expected_cmd_prefix", "expected_npm_version"),
+    ("runtime", "expected_cmd_prefix"),
     [
-        ("local-dev", "node", "0.5.3"),
-        ("published", "/opt/homebrew/bin/clawperator", "0.5.2"),
+        ("local-dev", "node"),
+        ("published", "/opt/homebrew/bin/clawperator"),
     ],
 )
-def test_preflight_populates_clawperator_npm_version(monkeypatch, tmp_path, runtime, expected_cmd_prefix, expected_npm_version):
+def test_preflight_populates_clawperator_npm_version(monkeypatch, tmp_path, runtime, expected_cmd_prefix):
     local_cli = tmp_path / "apps" / "node" / "dist" / "cli" / "index.js"
     local_cli.parent.mkdir(parents=True, exist_ok=True)
     local_cli.write_text("#!/usr/bin/env node\n", encoding="utf-8")
+    expected_npm_version = (
+        json.loads((environment.REPO_ROOT / "apps/node/package.json").read_text(encoding="utf-8"))["version"]
+        if runtime == "local-dev"
+        else "0.5.2"
+    )
 
     def fake_which(name: str):
         if name == "adb":

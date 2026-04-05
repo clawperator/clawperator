@@ -178,12 +178,21 @@ def _write_preflight_failure_run(
     run_dir.mkdir(parents=True, exist_ok=False)
 
     prompt_path = ROOT / "evals" / "specs" / args.eval_id / spec["prompts"][args.mode]
-    clawperator_cmd = runtime_inputs.clawperator_cmd if runtime_inputs is not None else ["clawperator"]
-    default_operator_package = RELEASE_OPERATOR_PACKAGE if args.runtime == "published" else LOCAL_DEV_OPERATOR_PACKAGE
-    operator_package = runtime_inputs.operator_package if runtime_inputs is not None else os.environ.get(
-        "CLAWPERATOR_OPERATOR_PACKAGE",
-        default_operator_package,
+    clawperator_cmd = (
+        runtime_inputs.clawperator_cmd
+        if runtime_inputs is not None
+        else (["clawperator"] if args.runtime == "published" else ["node", str(REPO_ROOT / "apps/node/dist/cli/index.js")])
     )
+    default_operator_package = RELEASE_OPERATOR_PACKAGE if args.runtime == "published" else LOCAL_DEV_OPERATOR_PACKAGE
+    if runtime_inputs is not None:
+        operator_package = runtime_inputs.operator_package
+    elif args.runtime == "published":
+        operator_package = RELEASE_OPERATOR_PACKAGE
+    else:
+        operator_package = os.environ.get("CLAWPERATOR_OPERATOR_PACKAGE", default_operator_package)
+    work_dir = str(ROOT) if args.mode == "full-repo" else "<tempdir>"
+    cwd_display = str(ROOT) if args.mode == "full-repo" else "<redacted>"
+    runs_dir_display = str(runs_dir) if args.mode == "full-repo" else "<redacted>"
     prompt_text = build_prompt(
         str(prompt_path),
         {
@@ -197,7 +206,7 @@ def _write_preflight_failure_run(
         },
     )
     prompt_sha256 = hashlib.sha256(prompt_text.encode("utf-8")).hexdigest()
-    command = agent.build_command(prompt_text, "<tempdir>")
+    command = agent.build_command(prompt_text, work_dir)
     started_at = finished_at = format_timestamp()
     result = {
         "run_id": run_id,
@@ -219,7 +228,7 @@ def _write_preflight_failure_run(
         "run_label": args.label,
         "invocation": {
             "command": command,
-            "work_dir": "<tempdir>",
+            "work_dir": work_dir,
             "env_overrides": {},
         },
         "environment": {
@@ -231,8 +240,8 @@ def _write_preflight_failure_run(
             "clawperator_version": runtime_inputs.clawperator_version if runtime_inputs is not None else None,
             "clawperator_npm_version": runtime_inputs.clawperator_npm_version if runtime_inputs is not None else None,
             "operator_package": operator_package,
-            "cwd": "<redacted>",
-            "runs_dir": "<redacted>",
+            "cwd": cwd_display,
+            "runs_dir": runs_dir_display,
         },
         "outcome": {
             "status": "error",
@@ -280,19 +289,20 @@ def _write_preflight_failure_run(
         "run_label": args.label,
         "invocation": {
             "command": command,
-            "work_dir": "<tempdir>",
+            "work_dir": work_dir,
             "env_overrides": {},
         },
         "environment": {
             "python_version": platform.python_version(),
             "platform": platform.platform(),
-            "cwd": "<redacted>",
+            "cwd": cwd_display,
             "agent_binary_version": "unknown",
             "env_hash": "",
-            "runs_dir": "<redacted>",
+            "runs_dir": runs_dir_display,
             "clawperator_cmd": clawperator_cmd,
             "ground_truth_android_version": None,
             "clawperator_npm_version": runtime_inputs.clawperator_npm_version if runtime_inputs is not None else None,
+            "operator_package": operator_package,
         },
         "timeout_s": args.timeout_s,
         "max_turns": args.max_turns,
