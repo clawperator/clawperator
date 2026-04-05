@@ -43,7 +43,8 @@ Constraints:
   shell commands or any other method to read the version.
 - Execute Clawperator commands exactly as shell commands using the provided
   base command. Do not reinterpret or rewrite the command structure.
-- Reference only the public documentation at $DOCS_URL.
+- Reference the public documentation at $DOCS_URL as a baseline, and you may
+  also use the repo-local docs and source under $REPO_ROOT.
 - Use $CLAWPERATOR_CMD as the command to invoke Clawperator
   (e.g. `node /home/user/repo/apps/node/dist/cli/index.js` or `clawperator`).
 - Pass --device $DEVICE_SERIAL on every Clawperator command.

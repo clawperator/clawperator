@@ -41,6 +41,39 @@ def test_preflight_published_binary_missing(monkeypatch):
         environment.resolve_inputs(None, runtime="published")
 
 
+def test_published_runtime_forces_release_operator_package(monkeypatch):
+    def fake_which(name: str):
+        if name == "adb":
+            return "/usr/bin/adb"
+        if name == "clawperator":
+            return "/opt/homebrew/bin/clawperator"
+        return f"/usr/bin/{name}"
+
+    def fake_run(cmd: list[str], env: dict[str, str], cwd: Path | None = None):
+        if cmd[-1] == "devices":
+            return subprocess.CompletedProcess(cmd, 0, stdout="List of devices attached\nR5CT22AGEEF\tdevice\n", stderr="")
+        if cmd[-3:] == ["shell", "getprop", "persist.sys.timezone"]:
+            return subprocess.CompletedProcess(cmd, 0, stdout="Australia/Brisbane\n", stderr="")
+        if cmd[-3:] == ["shell", "getprop", "ro.build.version.release"]:
+            return subprocess.CompletedProcess(cmd, 0, stdout="15\n", stderr="")
+        if "doctor" in cmd:
+            return subprocess.CompletedProcess(cmd, 0, stdout="{}\n", stderr="")
+        if cmd[-1] == "version":
+            return subprocess.CompletedProcess(cmd, 0, stdout="clawperator 0.5.1\n", stderr="")
+        raise AssertionError(f"unexpected command: {cmd!r}")
+
+    monkeypatch.setattr(environment.shutil, "which", fake_which)
+    monkeypatch.setattr(environment, "_run", fake_run)
+    monkeypatch.setenv("CLAWPERATOR_OPERATOR_PACKAGE", "com.clawperator.operator.dev")
+
+    inputs = environment.resolve_inputs(None, runtime="published")
+
+    assert inputs.operator_package == environment.RELEASE_OPERATOR_PACKAGE
+    assert inputs.requested_operator_package == "com.clawperator.operator.dev"
+    assert inputs.clawperator_version == "0.5.1"
+    assert inputs.clawperator_npm_version == "0.5.1"
+
+
 @pytest.mark.parametrize(
     ("runtime", "expected_cmd_prefix", "expected_npm_version"),
     [
@@ -88,3 +121,16 @@ def test_full_repo_prompt_substitutes_repo_root():
 
     assert "$REPO_ROOT" not in prompt
     assert str(environment.REPO_ROOT) in prompt
+
+
+def test_probe_clawperator_version_plain_text_fallback(monkeypatch):
+    def fake_run(cmd: list[str], env: dict[str, str], cwd: Path | None = None):
+        if cmd[-1] == "version":
+            return subprocess.CompletedProcess(cmd, 0, stdout="clawperator 0.5.4-beta.1\n", stderr="")
+        raise AssertionError(f"unexpected command: {cmd!r}")
+
+    monkeypatch.setattr(environment, "_run", fake_run)
+
+    version = environment._probe_clawperator_version(["clawperator"], {"PATH": "/usr/bin", "HOME": "/tmp"})
+
+    assert version == "0.5.4-beta.1"

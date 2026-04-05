@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 from dataclasses import dataclass
@@ -33,6 +34,7 @@ class RuntimeInputs:
     device_timezone: str | None
     clawperator_cmd: list[str]
     operator_package: str
+    requested_operator_package: str | None
     clawperator_version: str
     clawperator_npm_version: str
 
@@ -99,14 +101,19 @@ def _probe_clawperator_version(clawperator_cmd: list[str], env: dict[str, str]) 
     cli_version_result = _run([*clawperator_cmd, "version"], env=env)
     if cli_version_result.returncode != 0:
         raise EnvironmentError("clawperator_version_unreadable")
+    raw_output = cli_version_result.stdout.strip()
     try:
-        version_payload = json.loads(cli_version_result.stdout.strip() or "{}")
+        version_payload = json.loads(raw_output or "{}")
     except json.JSONDecodeError as exc:
-        raise EnvironmentError("clawperator_version_invalid") from exc
-    cli_version = version_payload.get("cliVersion")
-    if not isinstance(cli_version, str) or not cli_version.strip():
-        raise EnvironmentError("clawperator_version_invalid")
-    return cli_version.strip()
+        version_payload = None
+    if isinstance(version_payload, dict):
+        cli_version = version_payload.get("cliVersion")
+        if isinstance(cli_version, str) and cli_version.strip():
+            return cli_version.strip()
+    text_match = re.search(r"\b\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.-]+)?\b", raw_output)
+    if text_match is not None:
+        return text_match.group(0)
+    raise EnvironmentError("clawperator_version_invalid")
 
 
 def _run(cmd: list[str], env: dict[str, str], cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
@@ -150,9 +157,13 @@ def resolve_inputs(device: str | None, runtime: str = "local-dev") -> RuntimeInp
     if shutil.which(clawperator_cmd[0]) is None and not (clawperator_bin.is_file() and os.access(clawperator_bin, os.X_OK)):
         raise EnvironmentError("clawperator_binary_not_found")
 
-    operator_package = os.environ.get("CLAWPERATOR_OPERATOR_PACKAGE")
-    if operator_package is None or not operator_package.strip():
-        operator_package = RELEASE_OPERATOR_PACKAGE if runtime == "published" else LOCAL_DEV_OPERATOR_PACKAGE
+    requested_operator_package = os.environ.get("CLAWPERATOR_OPERATOR_PACKAGE")
+    if runtime == "published":
+        operator_package = RELEASE_OPERATOR_PACKAGE
+    elif requested_operator_package is None or not requested_operator_package.strip():
+        operator_package = LOCAL_DEV_OPERATOR_PACKAGE
+    else:
+        operator_package = requested_operator_package.strip()
 
     doctor_env = _minimal_env(device_serial=device_serial, operator_package=operator_package)
     cli_version = _probe_clawperator_version(clawperator_cmd, doctor_env)
@@ -163,6 +174,7 @@ def resolve_inputs(device: str | None, runtime: str = "local-dev") -> RuntimeInp
         device_timezone=device_timezone,
         clawperator_cmd=clawperator_cmd,
         operator_package=operator_package,
+        requested_operator_package=requested_operator_package.strip() if requested_operator_package and requested_operator_package.strip() else None,
         clawperator_version=cli_version,
         clawperator_npm_version=npm_version,
     )

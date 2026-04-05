@@ -520,10 +520,14 @@ def run_eval(
             clawperator_version=env.clawperator_version,
             clawperator_npm_version=env.clawperator_npm_version,
         )
-        if runtime_target == "published" and env.operator_package != RELEASE_OPERATOR_PACKAGE:
+        if (
+            runtime_target == "published"
+            and env.requested_operator_package is not None
+            and env.requested_operator_package != RELEASE_OPERATOR_PACKAGE
+        ):
             logger.warning(
                 "published_operator_package_override",
-                requested_operator_package=env.operator_package,
+                requested_operator_package=env.requested_operator_package,
                 default_operator_package=RELEASE_OPERATOR_PACKAGE,
             )
         _run_keyevent(env.device_serial, "KEYCODE_WAKEUP", logger)
