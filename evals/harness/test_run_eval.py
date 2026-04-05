@@ -158,6 +158,51 @@ def test_write_preflight_failure_run_redacts_public_surface_runtime_command(monk
     assert config["environment"]["runs_dir"] == "<redacted>"
 
 
+def test_write_preflight_failure_run_persists_doctor_details(monkeypatch, tmp_path):
+    args = SimpleNamespace(
+        eval_id="android-version",
+        agent="claude",
+        model="claude-sonnet-4-6",
+        label=None,
+        runs_dir=str(tmp_path / "runs"),
+        mode="public-surface",
+        runtime="local-dev",
+        timeout_s=300,
+        max_turns=40,
+    )
+    spec = {"prompts": {"public-surface": "prompt-public.md"}}
+    preflight_details = {
+        "doctor_report": {
+            "deviceId": "emulator-5554",
+            "operatorPackage": "com.clawperator.operator.dev",
+        },
+        "doctor_failure": {
+            "code": "VERSION_INCOMPATIBLE",
+            "summary": "CLI and APK versions are incompatible",
+            "evidence": {
+                "cliVersion": "0.5.3",
+                "apkVersion": "0.4.1-d",
+            },
+        },
+    }
+
+    run_dir = run_eval._write_preflight_failure_run(
+        args=args,
+        spec=spec,
+        agent=_StubAgent(),
+        failure_reason="doctor_preflight_failed",
+        runtime_inputs=None,
+        preflight_details=preflight_details,
+    )
+
+    result = json.loads((run_dir / "result.json").read_text(encoding="utf-8"))
+    config = json.loads((run_dir / "config.json").read_text(encoding="utf-8"))
+
+    assert result["preflight"]["doctor_failure"]["code"] == "VERSION_INCOMPATIBLE"
+    assert result["preflight"]["doctor_failure"]["evidence"]["apkVersion"] == "0.4.1-d"
+    assert config["preflight"]["doctor_failure"]["evidence"]["cliVersion"] == "0.5.3"
+
+
 def test_load_replay_runtime_prefers_recorded_context():
     config = {
         "runtime_target": "local-dev",

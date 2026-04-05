@@ -208,6 +208,7 @@ def _write_preflight_failure_run(
     failure_reason: str,
     runtime_inputs: RuntimeInputs | None = None,
     skill_prompt: str | None = None,
+    preflight_details: dict | None = None,
 ) -> Path:
     runs_dir = Path(args.runs_dir)
     run_id = make_run_id(args.eval_id, args.agent, args.model, args.label)
@@ -305,6 +306,7 @@ def _write_preflight_failure_run(
             "answer_correct": False,
             "failure_reason": failure_reason,
         },
+        **({"preflight": preflight_details} if preflight_details is not None else {}),
         "metrics": {
             "wall_clock_s": 0.0,
             "time_to_first_clawperator_command_s": None,
@@ -363,6 +365,7 @@ def _write_preflight_failure_run(
         },
         "timeout_s": args.timeout_s,
         "max_turns": args.max_turns,
+        **({"preflight": preflight_details} if preflight_details is not None else {}),
     }
     write_run(run_dir, result, config, "")
     if launcher_work_dir is not None:
@@ -550,6 +553,7 @@ def main(argv: list[str] | None = None) -> int:
             failure_reason=str(exc),
             runtime_inputs=None,
             skill_prompt=args.skill_prompt,
+            preflight_details=getattr(exc, "details", None),
         )
         result = json.loads((run_dir / "result.json").read_text(encoding="utf-8"))
         status = result["outcome"]["status"].upper()
@@ -569,6 +573,7 @@ def main(argv: list[str] | None = None) -> int:
             failure_reason=str(exc),
             runtime_inputs=inputs,
             skill_prompt=args.skill_prompt,
+            preflight_details=getattr(exc, "details", None),
         )
         result = json.loads((run_dir / "result.json").read_text(encoding="utf-8"))
         status = result["outcome"]["status"].upper()

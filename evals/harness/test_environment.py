@@ -176,3 +176,55 @@ def test_probe_clawperator_version_plain_text_fallback(monkeypatch):
     version = environment._probe_clawperator_version(["clawperator"], {"PATH": "/usr/bin", "HOME": "/tmp"})
 
     assert version == "0.5.4-beta.1"
+
+
+def test_preflight_attaches_doctor_failure_details(monkeypatch):
+    doctor_report = {
+        "ok": False,
+        "criticalOk": False,
+        "deviceId": "emulator-5554",
+        "operatorPackage": "com.clawperator.operator.dev",
+        "checks": [
+            {
+                "id": "readiness.version.compatibility",
+                "status": "fail",
+                "code": "VERSION_INCOMPATIBLE",
+                "summary": "CLI and APK versions are incompatible",
+                "detail": "Rebuild or reinstall the debug APK from the same checkout.",
+                "evidence": {
+                    "cliVersion": "0.5.3",
+                    "apkVersion": "0.4.1-d",
+                    "operatorPackage": "com.clawperator.operator.dev",
+                },
+                "fix": {
+                    "title": "Align CLI and APK versions",
+                    "platform": "any",
+                    "steps": [{"kind": "manual", "value": "Reinstall the debug APK"}],
+                },
+            }
+        ],
+        "nextActions": ["Reinstall the matching debug APK and rerun doctor --json."],
+    }
+
+    def fake_run(cmd: list[str], env: dict[str, str], cwd: Path | None = None):
+        if cmd[-1] == "devices":
+            return subprocess.CompletedProcess(cmd, 0, stdout="List of devices attached\nemulator-5554\tdevice\n", stderr="")
+        if cmd[-3:] == ["shell", "getprop", "persist.sys.timezone"]:
+            return subprocess.CompletedProcess(cmd, 0, stdout="Australia/Brisbane\n", stderr="")
+        if "doctor" in cmd:
+            return subprocess.CompletedProcess(cmd, 1, stdout=json.dumps(doctor_report) + "\n", stderr="")
+        if cmd[-1] == "version":
+            return subprocess.CompletedProcess(cmd, 0, stdout='{"cliVersion":"0.5.3"}\n', stderr="")
+        raise AssertionError(f"unexpected command: {cmd!r}")
+
+    monkeypatch.setattr(environment.shutil, "which", _fake_which_factory({"adb": "/usr/bin/adb", "node": "/usr/bin/node"}))
+    monkeypatch.setattr(environment, "_run", fake_run)
+
+    with pytest.raises(EnvironmentError, match="doctor_preflight_failed") as exc_info:
+        environment.preflight(None, runtime="local-dev")
+
+    details = getattr(exc_info.value, "details")
+    assert details["doctor_failure"]["code"] == "VERSION_INCOMPATIBLE"
+    assert details["doctor_failure"]["evidence"]["cliVersion"] == "0.5.3"
+    assert details["doctor_failure"]["evidence"]["apkVersion"] == "0.4.1-d"
+    assert details["doctor_report"]["deviceId"] == "emulator-5554"

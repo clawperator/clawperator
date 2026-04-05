@@ -147,6 +147,9 @@ Key fields:
 - `outcome.ground_truth_normalized` - normalized ground truth
 - `outcome.answer_correct` - whether the normalized answer matched ground truth
 - `outcome.failure_reason` - non-null for error runs
+- `preflight` - present on preflight failures when the harness has structured
+  diagnostics, including `doctor_failure.code`, `detail`, evidence, and the
+  raw `doctor_report`
 - `metrics.wall_clock_s` - total elapsed run time
 - `metrics.violations.used_adb` - diagnostic flag for direct `adb shell` usage
 - `metrics.turns_counted` - diagnostic turn count or `null`
@@ -199,3 +202,6 @@ API and must not appear in public-facing documentation or production usage.
   long answer can consume more than one counted turn
 - `skill_score.replay_status = "skipped"` means the run did not emit a valid
   skill block, not that replay failed
+- `outcome.failure_reason = "doctor_preflight_failed"` means preflight blocked
+  the run before the agent started. Check `preflight.doctor_failure` in
+  `result.json` for the actionable doctor code, evidence, and suggested fix.

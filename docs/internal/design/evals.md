@@ -40,6 +40,12 @@ The main task score remains in `outcome`.
 When the skill prompt variant is used and the spec defines `skill_generation`,
 the harness adds a `skill_score` block to `result.json`.
 
+If preflight fails before the agent starts, the harness still writes
+`config.json` and `result.json`. Those artifacts keep the generic
+`outcome.failure_reason` such as `doctor_preflight_failed`, and they also add a
+`preflight` block with structured doctor diagnostics when the failing step was
+`clawperator doctor --json`.
+
 ```json
 {
   "outcome": {
@@ -170,6 +176,8 @@ if the skill rewrites the file.
 - Letting replay run indefinitely instead of enforcing the replay timeout.
 - Assuming replay should rediscover the Android version. The skill should
   carry the discovered version forward and replay should verify it.
+- Collapsing doctor preflight failures to `doctor_preflight_failed` without the
+  associated `code`, `detail`, evidence, and fix steps from the doctor report.
 
 ## Operational Guidance
 
@@ -179,4 +187,3 @@ if the skill rewrites the file.
 - Pass `--device <serial>` explicitly whenever more than one device is
   connected.
 - Keep `skill_score` separate from `outcome` when you analyze runs.
-
