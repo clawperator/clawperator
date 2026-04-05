@@ -235,3 +235,21 @@ def test_validate_skill_rejects_missing_inline_artifact_contents():
     ok, errors = validate_skill(skill_json, ["clawperator"], "com.clawperator.operator.dev")
     assert ok is False
     assert "missing or invalid object field: artifactContents" in errors
+
+
+def test_validate_skill_rejects_unsafe_relative_paths():
+    skill_json = (
+        "{\"id\":\"com.example.android-version\",\"applicationId\":\"com.example\","
+        "\"intent\":\"android-version\",\"summary\":\"Determine Android version\","
+        "\"path\":\"../skills/com.example.android-version\","
+        "\"skillFile\":\"skills/com.example.android-version/SKILL.md\","
+        "\"scripts\":[\"../skills/com.example.android-version/scripts/run.js\"],"
+        "\"scriptContents\":{\"../skills/com.example.android-version/scripts/run.js\":\"console.log('hi')\\n\"},"
+        "\"artifacts\":[\"/tmp/version.txt\"],"
+        "\"artifactContents\":{\"/tmp/version.txt\":\"15\"}}"
+    )
+    ok, errors = validate_skill(skill_json, ["clawperator"], "com.clawperator.operator.dev")
+    assert ok is False
+    assert "unsafe path field: path" in errors
+    assert "unsafe path in scripts[0]" in errors
+    assert "unsafe path in artifacts[0]" in errors

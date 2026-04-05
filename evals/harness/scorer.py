@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import PurePosixPath
 import re
 import json
 from typing import Any
@@ -181,6 +182,32 @@ def _require_inline_content_coverage(
             errors.append(f"missing inline content for {path} in {contents_field}")
 
 
+def _is_safe_relative_path(value: str) -> bool:
+    candidate = PurePosixPath(value)
+    if candidate.is_absolute():
+        return False
+    return not any(part == ".." for part in candidate.parts)
+
+
+def _require_safe_path_field(payload: dict[str, Any], field: str, errors: list[str]) -> None:
+    value = payload.get(field)
+    if not isinstance(value, str) or not value.strip():
+        return
+    if not _is_safe_relative_path(value.strip()):
+        errors.append(f"unsafe path field: {field}")
+
+
+def _require_safe_path_list_field(payload: dict[str, Any], field: str, errors: list[str]) -> None:
+    value = payload.get(field)
+    if not isinstance(value, list):
+        return
+    for index, item in enumerate(value):
+        if not isinstance(item, str) or not item.strip():
+            continue
+        if not _is_safe_relative_path(item.strip()):
+            errors.append(f"unsafe path in {field}[{index}]")
+
+
 def validate_skill(skill_json: str, clawperator_cmd: list[str], operator_package: str) -> tuple[bool, list[str]]:
     errors: list[str] = []
     try:
@@ -208,6 +235,10 @@ def validate_skill(skill_json: str, clawperator_cmd: list[str], operator_package
 
     _require_string_list_field(payload, "scripts", errors, allow_empty=False)
     _require_string_list_field(payload, "artifacts", errors, allow_empty=True)
+    for field in ("path", "skillFile"):
+        _require_safe_path_field(payload, field, errors)
+    _require_safe_path_list_field(payload, "scripts", errors)
+    _require_safe_path_list_field(payload, "artifacts", errors)
     _require_inline_content_coverage(payload, paths_field="scripts", contents_field="scriptContents", errors=errors)
     _require_inline_content_coverage(payload, paths_field="artifacts", contents_field="artifactContents", errors=errors)
 

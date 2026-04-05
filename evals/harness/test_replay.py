@@ -405,6 +405,7 @@ def test_run_replay_rejects_path_traversal_in_skill_materialization(tmp_path):
     )
 
     assert skill_score["skill_emitted"] is True
-    assert skill_score["skill_valid"] is True
-    assert skill_score["replay_attempted"] is True
-    assert skill_score["replay_status"] == "error"
+    assert skill_score["skill_valid"] is False
+    assert "unsafe path field: skillFile" in skill_score["skill_validation_errors"]
+    assert skill_score["replay_attempted"] is False
+    assert skill_score["replay_status"] == "skipped"
