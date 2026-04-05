@@ -322,7 +322,6 @@ def _build_config(
     display_work_dir: str,
     display_cwd: str,
     display_runs_dir: str,
-    skill_prompt_path: Path | None = None,
 ) -> dict[str, Any]:
     return {
         "run_id": run_id,
@@ -337,7 +336,6 @@ def _build_config(
         "spec": {
             "prompt_file": prompt_path.name,
             "prompt_sha256": prompt_sha256,
-            **({"skill_prompt_file": skill_prompt_path.name} if skill_prompt_path is not None else {}),
         },
         "run_label": label,
         "invocation": {
@@ -582,7 +580,6 @@ def run_eval(
             display_work_dir=display_work_dir,
             display_cwd=display_cwd,
             display_runs_dir=display_runs_dir,
-            skill_prompt_path=prompt_path if skill_prompt_name is not None else None,
         )
         logger.spawn(command=command, work_dir=display_work_dir, env_overrides=config_env_overrides)
         logger.env_summary(
@@ -754,7 +751,6 @@ def run_eval(
             display_work_dir=display_work_dir,
             display_cwd=display_cwd,
             display_runs_dir=display_runs_dir,
-            skill_prompt_path=prompt_path if skill_prompt_name is not None else None,
         )
         config = _build_config(
             run_id=run_id,

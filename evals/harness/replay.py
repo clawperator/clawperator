@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import tempfile
 import time
@@ -73,7 +74,10 @@ def _materialize_skill_package(skill: dict[str, Any], temp_root: Path) -> tuple[
     skill_root.mkdir(parents=True, exist_ok=True)
 
     skill_json_path = skill_root / "skill.json"
-    skill_json_path.write_text(json.dumps(skill, indent=2, sort_keys=False) + "\n", encoding="utf-8")
+    skill_json_path.write_text(
+        json.dumps(_required_skill_entry(skill), indent=2, sort_keys=False) + "\n",
+        encoding="utf-8",
+    )
 
     _write_text_file(temp_root, skill["skillFile"], skill.get("skillMarkdown", "# Generated skill\n"))
 
@@ -131,19 +135,27 @@ def _extract_skill_output(output: str) -> str | None:
 
         for text in candidate_texts:
             normalized = text.strip()
-            if normalized and "\n" not in normalized:
+            if _is_plausible_answer(normalized):
                 return normalized
         return None
 
     if isinstance(payload, str):
         decoded = payload.strip()
-        if decoded and "\n" not in decoded:
+        if _is_plausible_answer(decoded):
             return decoded
         return extract_answer_from_transcript(payload)
 
-    if stripped and "\n" not in stripped:
+    if _is_plausible_answer(stripped):
         return stripped
     return None
+
+
+def _is_plausible_answer(value: str) -> bool:
+    if not value or "\n" in value:
+        return False
+    return value.lower() == "unknown" or bool(
+        re.match(r"^(?:android\s+)?\d+(?:\.\d+)?$", value.strip(), re.IGNORECASE)
+    )
 
 
 def _extract_answer_from_artifacts(skill: dict[str, Any], temp_root: Path) -> str | None:

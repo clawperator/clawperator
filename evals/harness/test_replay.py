@@ -4,7 +4,7 @@ import json
 import subprocess
 from pathlib import Path
 
-from evals.harness.replay import _build_replay_env, _extract_skill_output, run_replay
+from evals.harness.replay import _build_replay_env, _extract_skill_output, _materialize_skill_package, run_replay
 
 
 def _write_json(path: Path, payload: dict) -> None:
@@ -173,11 +173,46 @@ def test_extract_skill_output_parses_single_line_json_before_fallback():
     assert _extract_skill_output(output) == "15"
 
 
+def test_extract_skill_output_rejects_arbitrary_single_line_text():
+    output = json.dumps(
+        {
+            "message": "completed successfully",
+            "durationMs": 999,
+        }
+    )
+
+    assert _extract_skill_output(output) is None
+
+
 def test_build_replay_env_sets_clawperator_bin_for_absolute_binary(tmp_path):
     registry_path = tmp_path / "skills" / "skills-registry.json"
     env = _build_replay_env(registry_path, ["/opt/homebrew/bin/clawperator"])
 
     assert env["CLAWPERATOR_BIN"] == "/opt/homebrew/bin/clawperator"
+
+
+def test_materialize_skill_package_writes_skill_json_with_registry_shape_only(tmp_path):
+    skill = {
+        "id": "com.example.android-version",
+        "applicationId": "com.example",
+        "intent": "android-version",
+        "summary": "Determine Android version",
+        "path": "skills/com.example.android-version",
+        "skillFile": "skills/com.example.android-version/SKILL.md",
+        "scripts": ["skills/com.example.android-version/scripts/run.js"],
+        "artifacts": [],
+        "skillMarkdown": "# Generated skill\n",
+        "scriptContents": {
+            "skills/com.example.android-version/scripts/run.js": "console.log('hi')\n"
+        },
+    }
+
+    _materialize_skill_package(skill, tmp_path)
+
+    skill_json = json.loads((tmp_path / "skills/com.example.android-version/skill.json").read_text(encoding="utf-8"))
+    assert "scriptContents" not in skill_json
+    assert "skillMarkdown" not in skill_json
+    assert skill_json["id"] == "com.example.android-version"
 
 
 def test_run_replay_rejects_path_traversal_in_skill_materialization(tmp_path):

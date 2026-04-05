@@ -52,6 +52,7 @@ def test_write_preflight_failure_run_uses_full_repo_paths(monkeypatch, tmp_path)
     assert config["environment"]["cwd"] == str(run_eval.ROOT)
     assert config["environment"]["runs_dir"] == str(tmp_path / "runs")
     assert config["environment"]["operator_package"] == environment.RELEASE_OPERATOR_PACKAGE
+    assert "skill_prompt_file" not in config["spec"]
 
 
 def test_load_replay_runtime_prefers_recorded_context():

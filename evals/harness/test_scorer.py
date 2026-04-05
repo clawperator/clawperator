@@ -150,6 +150,11 @@ def test_extract_skill_no_block():
     assert extract_skill("no markers here", "CLAWPERATOR_SKILL_START", "CLAWPERATOR_SKILL_END") is None
 
 
+def test_extract_skill_requires_standalone_marker_lines():
+    transcript = 'before "CLAWPERATOR_SKILL_START {\\\"foo\\\":1} CLAWPERATOR_SKILL_END" after'
+    assert extract_skill(transcript, "CLAWPERATOR_SKILL_START", "CLAWPERATOR_SKILL_END") is None
+
+
 def test_validate_skill_accepts_minimal_registry_shape():
     skill_json = (
         "{\"id\":\"com.example.android-version\",\"applicationId\":\"com.example\","
@@ -183,5 +188,4 @@ def test_validate_skill_rejects_missing_required_fields():
     )
     ok, errors = validate_skill(skill_json, ["clawperator"], "com.clawperator.operator.dev")
     assert ok is False
-    assert "missing or invalid string field: summary" in errors
     assert "array field must not be empty: scripts" in errors

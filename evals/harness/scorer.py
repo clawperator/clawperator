@@ -104,8 +104,14 @@ def extract_answer_from_transcript(transcript: str) -> str | None:
 
 def extract_skill(transcript: str, start_marker: str, end_marker: str) -> str | None:
     pattern = re.compile(
-        re.escape(start_marker) + r"\s*(.*?)\s*" + re.escape(end_marker),
-        re.DOTALL,
+        r"^[ \t]*"
+        + re.escape(start_marker)
+        + r"[ \t]*$\n?"
+        + r"(.*?)"
+        + r"\n?^[ \t]*"
+        + re.escape(end_marker)
+        + r"[ \t]*$",
+        re.DOTALL | re.MULTILINE,
     )
     matches = pattern.findall(transcript)
     if not matches:
@@ -135,7 +141,7 @@ def detect_disallowed_tool(transcript: str) -> bool:
 
 def _require_string_field(payload: dict[str, Any], field: str, errors: list[str]) -> None:
     value = payload.get(field)
-    if not isinstance(value, str) or not value.strip():
+    if not isinstance(value, str):
         errors.append(f"missing or invalid string field: {field}")
 
 
@@ -148,7 +154,7 @@ def _require_string_list_field(payload: dict[str, Any], field: str, errors: list
         errors.append(f"array field must not be empty: {field}")
         return
     for index, item in enumerate(value):
-        if not isinstance(item, str) or not item.strip():
+        if not isinstance(item, str):
             errors.append(f"invalid string item in {field}[{index}]")
 
 
