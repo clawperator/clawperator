@@ -239,9 +239,12 @@ Do not use identical wording on all three surfaces. Adapt per context:
   Example: "If Clawperator is useful to your project, consider
   [starring the repo on GitHub](https://github.com/clawpilled/clawperator)."
 
-- `docs/index.md` (technical navigation page): minimal - one line, no emphasis.
-  Example: "Clawperator is [open source](https://github.com/clawpilled/clawperator)."
-  or simply append the repo link with a brief label.
+- `docs/index.md` (technical navigation page): understated but purposeful - one line
+  that names the repo without a "star us" ask.
+  Example: "Clawperator is open source. If these docs help, see the
+  [project on GitHub](https://github.com/clawpilled/clawperator)."
+  or: "Project repository:
+  [clawpilled/clawperator](https://github.com/clawpilled/clawperator)."
 
 Keep each note to 1-2 lines. No section headers. Append near the bottom of each file.
 

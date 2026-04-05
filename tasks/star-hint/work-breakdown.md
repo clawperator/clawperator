@@ -44,9 +44,12 @@ Current state: planning.
 - Never show the hint in the JSON output path, HTTP API responses, or SSE streams.
 - All state I/O in `starHint.ts` must be wrapped in try/catch. Errors are silently
   swallowed. The hint module must never throw.
-- All hint calls in `cli/index.ts` must come AFTER `console.log(result)` in main().
-  Never call `maybeShowStarHint` from inside a command handler function. The hint must
-  appear after the primary command output, not before.
+- In the command execution path, all hint calls must come AFTER `console.log(result)`
+  in main(). Never call `maybeShowStarHint` from inside a command handler function.
+  The hint must appear after the primary command output, not before.
+- In the `--version` early-exit path, call the hint after version output and before
+  `process.exit(0)`. This path does not go through `console.log(result)`; the rule
+  above applies only to the command execution path.
 - Do NOT add a hint call in the `--help` path. That path is excluded from the upgrade
   trigger.
 - `await maybeShowStarHint(...)` must be used before `process.exit(0)` in the
@@ -204,12 +207,13 @@ Disable this hint with: --disable-star-suggestions
 - `apps/node/src/cli/starHint.test.ts` exists with all 8 test cases
 - `npm --prefix apps/node run build` succeeds with no TypeScript errors
 - `npm --prefix apps/node run test` passes with all new tests green
-- Grep confirms no network calls or subprocess invocations in starHint.ts:
+- Grep confirms no runtime network or subprocess APIs in starHint.ts:
   ```bash
-  grep -n "\bfetch\b\|https://\|http://\|axios\|spawn\|exec\b\|child_process" \
+  grep -n "\bfetch\b\|axios\|http\.request\|https\.request\|\bspawn\b\|\bexec\b\|child_process" \
     apps/node/src/cli/starHint.ts
   # expected: zero matches
-  # (the static HINT_TEXT string contains a URL but makes no request)
+  # (HINT_TEXT contains a static GitHub URL as a string literal - that is fine;
+  #  this grep targets runtime/network/subprocess API usage, not raw URL text)
   ```
 - Grep confirms no stdout writes in starHint.ts:
   ```bash
@@ -330,12 +334,16 @@ the command path. Do not modify doctor.ts, skills.ts, or registry.ts.
      if (cmd === 'doctor' && (process.exitCode ?? 0) === 0) {
        await maybeShowStarHint('doctor');
      }
-     // Skill trigger: fires after first successful skills run
-     if (cmd === 'skills' && rest[0] === 'run') {
-       try {
-         const parsed = JSON.parse(result ?? '{}') as { code?: string };
-         if (!parsed.code) await maybeShowStarHint('skill');
-       } catch { /* ignore */ }
+     // Skill trigger: fires after first successful skills run.
+     // Success is detected by a heuristic: success envelopes lack a top-level `code`
+     // field while error envelopes have one. This is a deliberate temporary heuristic,
+     // not a contract. Wrap in a named helper to isolate the assumption:
+     //   function isSuccessfulSkillsRunResult(r: string | undefined): boolean {
+     //     try { return !((JSON.parse(r ?? '{}') as { code?: string }).code); }
+     //     catch { return false; }
+     //   }
+     if (cmd === 'skills' && rest[0] === 'run' && isSuccessfulSkillsRunResult(result)) {
+       await maybeShowStarHint('skill');
      }
      // Upgrade trigger: fires once per version after any successful command or --version
      await maybeShowStarHint('upgrade');
@@ -350,9 +358,10 @@ the command path. Do not modify doctor.ts, skills.ts, or registry.ts.
      in scope at this point.
    - `process.exitCode` for doctor: `cmdDoctor` sets it before returning, so by the
      time `console.log(result)` runs it already reflects the doctor outcome.
-   - `result` for skills: success envelopes have `skillId`, `output`, `exitCode`,
-     `durationMs` but no top-level `code` field; error envelopes have `code`,
-     `message`. The `JSON.parse` check distinguishes them.
+   - `isSuccessfulSkillsRunResult`: define this as a small local helper function in
+     `index.ts` near the hint dispatch block. Its body is the JSON parse heuristic
+     described in the comment above. Isolating it in a named function makes the
+     heuristic visible and easy to replace later if the contract hardens.
    - Call doctor first, then skill, then upgrade. The module-level `shown` guard
      ensures only one hint fires per invocation; feature-specific triggers get
      priority over the generic upgrade trigger.
@@ -543,14 +552,14 @@ for the surface. Do not restructure existing content.
    If Clawperator is useful to your project, consider [starring the repo on GitHub](https://github.com/clawpilled/clawperator).
    ```
 
-4. Append to `docs/index.md` (technical navigation; minimal - one line):
+4. Append to `docs/index.md` (technical navigation; understated but purposeful):
    ```markdown
 
-   Clawperator is [open source](https://github.com/clawpilled/clawperator).
+   Clawperator is open source. If these docs help, see the [project on GitHub](https://github.com/clawpilled/clawperator).
    ```
-   If `docs/index.md` is not a user-facing intro page, find the most appropriate
-   getting-started or overview page in `docs/` and append there instead. Note the
-   chosen file in the commit message.
+   If `docs/index.md` is not a user-facing intro or overview page, find the most
+   appropriate getting-started or overview page in `docs/` and append there instead.
+   Note the chosen file in the commit message.
 
 5. Do NOT run `./scripts/docs_build.sh`. These are authored source files and do not
    require docs-site regeneration.
@@ -603,10 +612,10 @@ CLAWPERATOR_DISABLE_STAR_SUGGESTIONS=1 \
   node apps/node/dist/cli/index.js --json --version 2>/dev/null
 # expected: version number on stdout only, no hint text
 
-# Hint module has no network calls or subprocess invocations
-grep -n "\bfetch\b\|https://\|http://\|axios\|spawn\|exec\b\|child_process" \
+# Hint module has no runtime network or subprocess API usage
+grep -n "\bfetch\b\|axios\|http\.request\|https\.request\|\bspawn\b\|\bexec\b\|child_process" \
   apps/node/src/cli/starHint.ts
-# expected: zero matches
+# expected: zero matches (static URL in HINT_TEXT string is not a runtime call)
 
 # All hint calls are in index.ts only - not in doctor.ts, skills.ts, registry.ts
 grep -rn "maybeShowStarHint" apps/node/src/
