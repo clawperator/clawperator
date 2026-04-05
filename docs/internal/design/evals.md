@@ -187,9 +187,11 @@ artifacts are skipped and do not block stdout or stderr answer extraction.
 - Letting replay run indefinitely instead of enforcing the replay timeout.
 - Assuming replay should rediscover the Android version. The skill should
   carry the discovered version forward and replay should verify it.
-- Collapsing doctor preflight failures to `doctor_preflight_failed` without the
-  associated `code`, `detail`, evidence, and fix steps from the doctor report.
-- Letting public-surface artifacts leak raw doctor reports or host-specific
+- In `full-repo`, collapsing doctor preflight failures to
+  `doctor_preflight_failed` without the associated `code`, `detail`,
+  evidence, and fix steps from the doctor report.
+- In `public-surface`, retaining more than `doctor_failure.code` and
+  `doctor_failure.summary`, or leaking raw doctor reports or host-specific
   paths and commands.
 
 ## Operational Guidance
