@@ -53,6 +53,23 @@ def test_write_preflight_failure_run_uses_full_repo_paths(monkeypatch, tmp_path)
 
 def test_load_replay_runtime_prefers_recorded_context():
     config = {
+        "runtime_target": "local-dev",
+        "environment": {
+            "clawperator_cmd": ["clawperator"],
+            "runtime_clawperator_cmd": ["node", "/repo/apps/node/dist/cli/index.js"],
+            "operator_package": "com.clawperator.operator.dev",
+        },
+    }
+
+    clawperator_cmd, operator_package, runtime_target = run_eval._load_replay_runtime(config)
+
+    assert clawperator_cmd == ["node", "/repo/apps/node/dist/cli/index.js"]
+    assert operator_package == "com.clawperator.operator.dev"
+    assert runtime_target == "local-dev"
+
+
+def test_load_replay_runtime_published_can_use_display_command():
+    config = {
         "runtime_target": "published",
         "environment": {
             "clawperator_cmd": ["/opt/homebrew/bin/clawperator"],

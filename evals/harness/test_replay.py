@@ -81,6 +81,8 @@ def test_run_replay_passes_with_materialized_skill(monkeypatch, tmp_path):
     def fake_run(cmd, check, capture_output, text, env, timeout, cwd):
         assert cmd[:3] == ["clawperator", "skills", "run"]
         assert "--json" in cmd
+        assert "SECRET_TOKEN" not in env
+        assert env["CLAWPERATOR_SKILLS_REGISTRY"].endswith("skills/skills-registry.json")
         payload = {
             "skillId": "com.example.android-version",
             "output": "CLAWPERATOR_EVAL_ANSWER: 15\n",
@@ -107,7 +109,7 @@ def test_run_replay_passes_with_materialized_skill(monkeypatch, tmp_path):
     assert skill_score["replay_answer_correct"] is True
 
 
-def test_run_replay_prefers_plain_text_artifact_answer(monkeypatch, tmp_path):
+def test_run_replay_prefers_post_run_artifact_answer(monkeypatch, tmp_path):
     transcript = (
         "before\n"
         "CLAWPERATOR_SKILL_START\n"
@@ -134,6 +136,8 @@ def test_run_replay_prefers_plain_text_artifact_answer(monkeypatch, tmp_path):
     run_dir = _write_basic_run(tmp_path, transcript)
 
     def fake_run(cmd, check, capture_output, text, env, timeout, cwd):
+        artifact_path = Path(cwd) / "skills/com.example.android-version/android-version.txt"
+        artifact_path.write_text("15", encoding="utf-8")
         payload = {
             "skillId": "com.example.android-version",
             "output": "CLAWPERATOR_EVAL_ANSWER: 5\n",

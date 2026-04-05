@@ -78,11 +78,15 @@ def _load_replay_runtime(config: dict) -> tuple[list[str], str, str]:
     if not isinstance(operator_package, str) or not operator_package.strip():
         operator_package = RELEASE_OPERATOR_PACKAGE if runtime_target == "published" else LOCAL_DEV_OPERATOR_PACKAGE
 
-    configured_cmd = environment.get("clawperator_cmd")
+    configured_cmd = environment.get("runtime_clawperator_cmd")
     if isinstance(configured_cmd, list) and configured_cmd and all(isinstance(part, str) and part for part in configured_cmd):
         clawperator_cmd = list(configured_cmd)
     else:
-        clawperator_cmd = _resolve_clawperator_cmd(runtime_target)
+        display_cmd = environment.get("clawperator_cmd")
+        if runtime_target == "published" and isinstance(display_cmd, list) and display_cmd and all(isinstance(part, str) and part for part in display_cmd):
+            clawperator_cmd = list(display_cmd)
+        else:
+            clawperator_cmd = _resolve_clawperator_cmd(runtime_target)
 
     return clawperator_cmd, operator_package, runtime_target
 
@@ -341,6 +345,7 @@ def _write_preflight_failure_run(
             "env_hash": "",
             "runs_dir": runs_dir_display,
             "clawperator_cmd": clawperator_cmd,
+            "runtime_clawperator_cmd": clawperator_cmd,
             "ground_truth_android_version": None,
             "clawperator_npm_version": runtime_inputs.clawperator_npm_version if runtime_inputs is not None else None,
             "operator_package": operator_package,

@@ -136,6 +136,18 @@ def _extract_answer_from_artifacts(skill: dict[str, Any], temp_root: Path) -> st
     return None
 
 
+def _build_replay_env(registry_path: Path) -> dict[str, str]:
+    return {
+        "PATH": os.environ["PATH"],
+        "HOME": os.environ["HOME"],
+        "USER": os.environ.get("USER", ""),
+        "LOGNAME": os.environ.get("LOGNAME", os.environ.get("USER", "")),
+        "LANG": os.environ.get("LANG", "C.UTF-8"),
+        "LC_ALL": os.environ.get("LC_ALL", "C.UTF-8"),
+        "CLAWPERATOR_SKILLS_REGISTRY": str(registry_path),
+    }
+
+
 def _load_ground_truth(config: dict[str, Any], result: dict[str, Any]) -> str:
     ground_truth = config.get("environment", {}).get("ground_truth_android_version")
     if isinstance(ground_truth, str) and ground_truth.strip():
@@ -217,12 +229,7 @@ def run_replay(
             skill_score["replay_status"] = "error"
             return skill_score
 
-        pre_run_artifact_answer = _extract_answer_from_artifacts(skill_payload, temp_root)
-
-        env = {
-            **os.environ,
-            "CLAWPERATOR_SKILLS_REGISTRY": str(registry_path),
-        }
+        env = _build_replay_env(registry_path)
 
         command = [
             *clawperator_cmd,
@@ -259,7 +266,7 @@ def run_replay(
         combined_output = "\n".join(
             part for part in [completed.stdout, completed.stderr] if isinstance(part, str) and part
         )
-        replay_answer = pre_run_artifact_answer
+        replay_answer = _extract_answer_from_artifacts(skill_payload, temp_root)
         if replay_answer is None:
             replay_answer = _extract_skill_output(combined_output)
         if replay_answer is None:

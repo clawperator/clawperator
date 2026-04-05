@@ -298,6 +298,7 @@ def _build_config(
             "env_hash": _hash_env(env_overrides),
             "runs_dir": display_runs_dir,
             "clawperator_cmd": display_clawperator_cmd,
+            "runtime_clawperator_cmd": env.clawperator_cmd,
             "clawperator_version": env.clawperator_version,
             "ground_truth_android_version": env.ground_truth_android_version,
             "clawperator_npm_version": env.clawperator_npm_version,
