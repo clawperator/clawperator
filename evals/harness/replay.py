@@ -1,0 +1,256 @@
+from __future__ import annotations
+
+import json
+import os
+import subprocess
+import tempfile
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+from .environment import REPO_ROOT
+from .scorer import extract_answer_from_transcript, extract_skill, score, validate_skill
+
+
+DEFAULT_REPLAY_TIMEOUT_S = 60
+_SKILL_REQUIRED_FIELDS = (
+    "id",
+    "applicationId",
+    "intent",
+    "summary",
+    "path",
+    "skillFile",
+    "scripts",
+    "artifacts",
+)
+
+
+def _read_json(path: Path) -> dict[str, Any]:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _now_utc_iso() -> str:
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _required_skill_entry(payload: dict[str, Any]) -> dict[str, Any]:
+    return {field: payload[field] for field in _SKILL_REQUIRED_FIELDS}
+
+
+def _coerce_string_map(value: Any) -> dict[str, str]:
+    if not isinstance(value, dict):
+        return {}
+    out: dict[str, str] = {}
+    for key, entry in value.items():
+        if isinstance(key, str) and isinstance(entry, str):
+            out[key] = entry
+    return out
+
+
+def _write_text_file(root: Path, relative_path: str, content: str) -> None:
+    file_path = root / relative_path
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    file_path.write_text(content, encoding="utf-8")
+
+
+def _materialize_skill_package(skill: dict[str, Any], temp_root: Path) -> tuple[Path, str]:
+    skill_id = skill["id"]
+    skill_root = temp_root / skill["path"]
+    skill_root.mkdir(parents=True, exist_ok=True)
+
+    skill_json_path = skill_root / "skill.json"
+    skill_json_path.write_text(json.dumps(skill, indent=2, sort_keys=False) + "\n", encoding="utf-8")
+
+    _write_text_file(temp_root, skill["skillFile"], skill.get("skillMarkdown", "# Generated skill\n"))
+
+    script_contents = _coerce_string_map(skill.get("scriptContents"))
+    for script_path in skill["scripts"]:
+        content = script_contents.get(script_path)
+        if content is None:
+            raise ValueError(f"missing inline script content for {script_path}")
+        _write_text_file(temp_root, script_path, content)
+
+    artifact_contents = _coerce_string_map(skill.get("artifactContents"))
+    for artifact_path in skill["artifacts"]:
+        content = artifact_contents.get(artifact_path)
+        if content is None:
+            raise ValueError(f"missing inline artifact content for {artifact_path}")
+        _write_text_file(temp_root, artifact_path, content)
+
+    registry_path = temp_root / "skills" / "skills-registry.json"
+    registry_path.parent.mkdir(parents=True, exist_ok=True)
+    registry = {
+        "schemaVersion": "1.0",
+        "generatedAt": _now_utc_iso(),
+        "skills": [_required_skill_entry(skill)],
+    }
+    registry_path.write_text(json.dumps(registry, indent=2, sort_keys=False) + "\n", encoding="utf-8")
+    return registry_path, skill_id
+
+
+def _extract_skill_output(output: str) -> str | None:
+    candidate = extract_answer_from_transcript(output)
+    if candidate is not None:
+        return candidate
+
+    try:
+        payload = json.loads(output)
+    except json.JSONDecodeError:
+        return None
+
+    if not isinstance(payload, dict):
+        return None
+
+    candidate_texts: list[str] = []
+    for key in ("output", "stdout", "stderr", "message", "result"):
+        value = payload.get(key)
+        if isinstance(value, str):
+            candidate_texts.append(value)
+
+    for text in candidate_texts:
+        candidate = extract_answer_from_transcript(text)
+        if candidate is not None:
+            return candidate
+    return None
+
+
+def _load_ground_truth(config: dict[str, Any], result: dict[str, Any]) -> str:
+    ground_truth = config.get("environment", {}).get("ground_truth_android_version")
+    if isinstance(ground_truth, str) and ground_truth.strip():
+        return ground_truth.strip()
+    ground_truth = result.get("environment", {}).get("ground_truth_android_version")
+    if isinstance(ground_truth, str) and ground_truth.strip():
+        return ground_truth.strip()
+    raise ValueError("ground truth android version missing")
+
+
+def _load_skill_generation_spec(eval_id: str) -> dict[str, Any] | None:
+    spec_path = REPO_ROOT / "evals" / "specs" / eval_id / "spec.json"
+    if not spec_path.exists():
+        return None
+    spec = json.loads(spec_path.read_text(encoding="utf-8"))
+    skill_generation = spec.get("skill_generation")
+    return skill_generation if isinstance(skill_generation, dict) else None
+
+
+def run_replay(
+    run_dir: Path,
+    clawperator_cmd: list[str],
+    operator_package: str,
+    device_serial: str,
+    timeout_s: int = DEFAULT_REPLAY_TIMEOUT_S,
+) -> dict[str, Any]:
+    config_path = run_dir / "config.json"
+    result_path = run_dir / "result.json"
+    transcript_path = run_dir / "transcript.txt"
+    if not config_path.exists() or not result_path.exists() or not transcript_path.exists():
+        raise FileNotFoundError(f"missing replay artifacts in {run_dir}")
+
+    config = _read_json(config_path)
+    result = _read_json(result_path)
+    transcript = transcript_path.read_text(encoding="utf-8")
+    ground_truth = _load_ground_truth(config, result)
+    eval_id = config.get("eval_id") or result.get("eval_id")
+
+    skill_generation = _load_skill_generation_spec(eval_id) if isinstance(eval_id, str) else None
+    start_marker = skill_generation.get("skill_start_marker") if skill_generation else "CLAWPERATOR_SKILL_START"
+    end_marker = skill_generation.get("skill_end_marker") if skill_generation else "CLAWPERATOR_SKILL_END"
+
+    skill_score = {
+        "skill_emitted": False,
+        "skill_valid": False,
+        "skill_validation_errors": [],
+        "replay_attempted": False,
+        "replay_status": "skipped",
+        "replay_answer_normalized": None,
+        "replay_answer_correct": False,
+        "replay_wall_clock_s": 0.0,
+    }
+
+    skill_json = extract_skill(transcript, start_marker, end_marker)
+    if skill_json is None:
+        return skill_score
+
+    recorded_device_serial = config.get("environment", {}).get("device_serial")
+    if not isinstance(recorded_device_serial, str) or not recorded_device_serial.strip():
+        raise ValueError("replay device serial missing from run config")
+    if device_serial != recorded_device_serial:
+        raise ValueError("replay device serial does not match the original run config")
+
+    skill_score["skill_emitted"] = True
+    is_valid, errors = validate_skill(skill_json, clawperator_cmd, operator_package)
+    skill_score["skill_valid"] = is_valid
+    skill_score["skill_validation_errors"] = errors
+    if not is_valid:
+        return skill_score
+
+    skill_payload = json.loads(skill_json)
+
+    with tempfile.TemporaryDirectory(prefix="clawperator-eval-skill-") as temp_dir_name:
+        temp_root = Path(temp_dir_name)
+        try:
+            registry_path, skill_id = _materialize_skill_package(skill_payload, temp_root)
+        except Exception:
+            skill_score["replay_attempted"] = True
+            skill_score["replay_status"] = "error"
+            return skill_score
+
+        env = {
+            **os.environ,
+            "CLAWPERATOR_SKILLS_REGISTRY": str(registry_path),
+        }
+
+        command = [
+            *clawperator_cmd,
+            "skills",
+            "run",
+            skill_id,
+            "--device",
+            device_serial,
+            "--operator-package",
+            operator_package,
+            "--json",
+        ]
+
+        skill_score["replay_attempted"] = True
+        started = time.monotonic()
+        try:
+            completed = subprocess.run(
+                command,
+                check=False,
+                capture_output=True,
+                text=True,
+                env=env,
+                timeout=timeout_s,
+                cwd=str(temp_root),
+            )
+        except subprocess.TimeoutExpired:
+            skill_score["replay_status"] = "error"
+            skill_score["replay_wall_clock_s"] = time.monotonic() - started
+            return skill_score
+
+        skill_score["replay_wall_clock_s"] = time.monotonic() - started
+
+        combined_output = "\n".join(
+            part for part in [completed.stdout, completed.stderr] if isinstance(part, str) and part
+        )
+        if completed.returncode != 0:
+            skill_score["replay_status"] = "error"
+            return skill_score
+
+        replay_answer = _extract_skill_output(combined_output)
+        if replay_answer is None:
+            skill_score["replay_status"] = "no_answer"
+            return skill_score
+
+        replay_result = score(
+            combined_output,
+            ground_truth,
+            answer_extracted_raw=replay_answer,
+            allow_transcript_fallback=False,
+        )
+        skill_score["replay_answer_normalized"] = replay_result.answer_normalized
+        skill_score["replay_answer_correct"] = replay_result.answer_correct
+        skill_score["replay_status"] = "pass" if replay_result.answer_correct else "fail"
+        return skill_score

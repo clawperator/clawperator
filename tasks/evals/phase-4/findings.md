@@ -29,3 +29,5 @@ The emitted skill block will be a single JSON object whose top-level fields sati
 The durable validation gate in 4a is structural: parse the JSON, verify the required registry fields and types, and reject malformed or incomplete output before replay.
 
 The replay step in 4b will use the same skill JSON block, write any inline files into a temp directory, register the skill there, and run it with the original device serial.
+
+The replay scorer will treat the skill as successful only when the skill script's output contains `CLAWPERATOR_EVAL_ANSWER: <version>`. When `clawperator skills run --json` is used, the evaluator will read the raw `output` field from that JSON wrapper and score the marker from there. Replay remains deterministic because it runs the materialized skill package directly against the original device serial with a fixed wall-clock timeout.

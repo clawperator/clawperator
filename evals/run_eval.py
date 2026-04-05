@@ -30,8 +30,10 @@ from evals.harness.environment import (
     REPO_ROOT,
     preflight,
     resolve_inputs,
+    _resolve_clawperator_cmd,
 )
 from evals.harness.runner import build_prompt, run_eval, _prepare_clawperator_launcher
+from evals.harness.replay import run_replay, DEFAULT_REPLAY_TIMEOUT_S
 from evals.harness.scorer import score
 from evals.harness.timeutil import format_timestamp
 
@@ -53,6 +55,17 @@ def _load_spec(eval_id: str) -> dict:
     spec = json.loads(spec_path.read_text(encoding="utf-8"))
     spec["spec_dir"] = str(spec_path.parent)
     return spec
+
+
+def _resolve_prompt_path(eval_id: str, spec: dict, mode: str, skill_prompt: str | None) -> Path:
+    spec_dir = Path(spec.get("spec_dir") or (ROOT / "evals" / "specs" / eval_id))
+    prompt_name: str | None = skill_prompt
+    if prompt_name is None:
+        prompt_name = spec["prompts"][mode]
+    prompt_path = Path(prompt_name)
+    if not prompt_path.is_absolute():
+        prompt_path = spec_dir / prompt_path
+    return prompt_path
 
 
 def _make_agent(agent_name: str, model: str, knowledge_mode: str) -> BaseAgent:
@@ -171,13 +184,14 @@ def _write_preflight_failure_run(
     agent: BaseAgent,
     failure_reason: str,
     runtime_inputs: RuntimeInputs | None = None,
+    skill_prompt: str | None = None,
 ) -> Path:
     runs_dir = Path(args.runs_dir)
     run_id = make_run_id(args.eval_id, args.agent, args.model, args.label)
     run_dir = runs_dir / run_id
     run_dir.mkdir(parents=True, exist_ok=False)
 
-    prompt_path = ROOT / "evals" / "specs" / args.eval_id / spec["prompts"][args.mode]
+    prompt_path = _resolve_prompt_path(args.eval_id, spec, args.mode, skill_prompt)
     clawperator_cmd = (
         runtime_inputs.clawperator_cmd
         if runtime_inputs is not None
@@ -229,6 +243,7 @@ def _write_preflight_failure_run(
             "eval_version": spec.get("version", spec.get("eval_version", "1.0.0")),
             "prompt_file": prompt_path.name,
             "prompt_sha256": prompt_sha256,
+            **({"skill_prompt_file": prompt_path.name} if skill_prompt is not None else {}),
         },
         "run_label": args.label,
         "invocation": {
@@ -290,6 +305,7 @@ def _write_preflight_failure_run(
         "spec": {
             "prompt_file": prompt_path.name,
             "prompt_sha256": prompt_sha256,
+            **({"skill_prompt_file": prompt_path.name} if skill_prompt is not None else {}),
         },
         "run_label": args.label,
         "invocation": {
@@ -347,6 +363,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--runtime", default="local-dev", choices=sorted(SUPPORTED_RUNTIMES))
     parser.add_argument("--timeout-s", type=int, default=300)
     parser.add_argument("--max-turns", type=int, default=40)
+    parser.add_argument("--skill-prompt")
+    parser.add_argument("--replay")
+    parser.add_argument("--replay-timeout-s", type=int, default=DEFAULT_REPLAY_TIMEOUT_S)
     parser.add_argument("--label")
     parser.add_argument("--runs-dir", default=str(ROOT / "evals" / "runs"))
     parser.add_argument("--dry-run", action="store_true")
@@ -363,6 +382,33 @@ def main(argv: list[str] | None = None) -> int:
 
     spec = _load_spec(args.eval_id)
     spec["runtime_target"] = args.runtime
+
+    if args.replay is not None:
+        if not args.replay:
+            raise SystemExit("replay failed: missing run_id")
+        run_dir = _resolve_run_dir(Path(args.runs_dir), args.replay)
+        config = json.loads((run_dir / "config.json").read_text(encoding="utf-8"))
+        operator_package = config.get("environment", {}).get("operator_package") or LOCAL_DEV_OPERATOR_PACKAGE
+        device_serial = config.get("environment", {}).get("device_serial")
+        if not isinstance(device_serial, str) or not device_serial.strip():
+            device_serial = ""
+        clawperator_cmd = _resolve_clawperator_cmd("local-dev")
+        skill_score = run_replay(
+            run_dir=run_dir,
+            clawperator_cmd=clawperator_cmd,
+            operator_package=operator_package,
+            device_serial=device_serial,
+            timeout_s=args.replay_timeout_s,
+        )
+        result = json.loads((run_dir / "result.json").read_text(encoding="utf-8"))
+        replay_result = dict(result)
+        replay_result["skill_score"] = skill_score
+        _write_json_file(run_dir / "result-replay.json", replay_result)
+        status = skill_score["replay_status"].upper()
+        answer = skill_score["replay_answer_normalized"] or "none"
+        print(run_dir)
+        print(f"{status} | replay | {skill_score['replay_wall_clock_s']:.1f}s | answer={answer}")
+        return 0
 
     if args.rescore is not None:
         run_id = args.rescore
@@ -414,7 +460,7 @@ def main(argv: list[str] | None = None) -> int:
         resolved_config["operator_package"] = inputs.operator_package
         resolved_config["clawperator_version"] = inputs.clawperator_version
         resolved_config["clawperator_npm_version"] = inputs.clawperator_npm_version
-        prompt_path = ROOT / "evals" / "specs" / args.eval_id / spec["prompts"][args.mode]
+        prompt_path = _resolve_prompt_path(args.eval_id, spec, args.mode, args.skill_prompt)
         prompt_text = build_prompt(
             str(prompt_path),
             {
@@ -466,6 +512,7 @@ def main(argv: list[str] | None = None) -> int:
             agent=agent,
             failure_reason=str(exc),
             runtime_inputs=None,
+            skill_prompt=args.skill_prompt,
         )
         result = json.loads((run_dir / "result.json").read_text(encoding="utf-8"))
         status = result["outcome"]["status"].upper()
@@ -484,6 +531,7 @@ def main(argv: list[str] | None = None) -> int:
             agent=agent,
             failure_reason=str(exc),
             runtime_inputs=inputs,
+            skill_prompt=args.skill_prompt,
         )
         result = json.loads((run_dir / "result.json").read_text(encoding="utf-8"))
         status = result["outcome"]["status"].upper()
@@ -502,6 +550,7 @@ def main(argv: list[str] | None = None) -> int:
         runs_dir=Path(args.runs_dir),
         label=args.label,
         max_turns=args.max_turns,
+        skill_prompt_name=args.skill_prompt,
     )
 
     result = json.loads((run_dir / "result.json").read_text(encoding="utf-8"))

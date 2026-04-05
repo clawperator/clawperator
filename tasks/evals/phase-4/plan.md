@@ -15,9 +15,9 @@ runs the generated skill deterministically and scores its output.
 | State | in progress |
 | Total PRs | 1 |
 | Total phases | 3 (4a-4c) |
-| Completed | 4a |
-| Remaining | 4b, 4c |
-| Current / Next | 4b |
+| Completed | 4a, 4b |
+| Remaining | 4c |
+| Current / Next | 4c |
 | Blockers | none |
 
 ## Pre-Implementation Alignment Check

@@ -56,11 +56,22 @@ skill registry contract. At minimum, it must include these top-level fields:
 - `scripts`
 - `artifacts`
 
-To make the skill replayable, you may include additional inline file-content
-fields at the top level, such as the Markdown body for `SKILL.md` and the
-source text for the listed scripts. The JSON object should describe a
-deterministic skill that replays the Android Settings navigation and returns
-the Android version in its own output.
+To make the skill replayable, include these optional inline file-content
+fields at the top level when needed:
+
+- `skillMarkdown` - the exact Markdown body for `skillFile`
+- `scriptContents` - an object whose keys are the script paths from `scripts`
+  and whose values are the script source text
+- `artifactContents` - an object whose keys are the artifact paths from
+  `artifacts` and whose values are the artifact source text
+
+The JSON object should describe a deterministic skill that replays the Android
+Settings navigation and returns the Android version in its own output. The
+skill's runtime output must include the line:
+
+CLAWPERATOR_EVAL_ANSWER: <version>
+
+Use the numeric Android version only as the `<version>` value.
 
 If you cannot produce a valid skill package, omit the markers entirely.
 

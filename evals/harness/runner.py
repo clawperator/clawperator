@@ -20,6 +20,7 @@ from .agents.base import BaseAgent
 from .artifacts import make_run_id, write_run
 from .environment import Environment, RELEASE_OPERATOR_PACKAGE, REPO_ROOT
 from .logger import get_logger
+from .replay import run_replay
 from .scorer import extract_answer_from_transcript, score
 from .timeutil import format_timestamp
 
@@ -34,7 +35,13 @@ def build_prompt(template_path: str, variables: dict) -> str:
     return template.substitute(variables)
 
 
-def _load_prompt_path(spec: dict, knowledge_mode: str) -> Path:
+def _load_prompt_path(spec: dict, knowledge_mode: str, skill_prompt_name: str | None = None) -> Path:
+    if skill_prompt_name is not None:
+        prompt_path = Path(skill_prompt_name)
+        spec_dir = spec.get("spec_dir")
+        if spec_dir is not None and not prompt_path.is_absolute():
+            return Path(spec_dir) / prompt_path
+        return prompt_path
     direct = spec.get("prompt_path")
     if direct is not None:
         return Path(direct)
@@ -259,6 +266,7 @@ def _build_config(
     display_work_dir: str,
     display_cwd: str,
     display_runs_dir: str,
+    skill_prompt_path: Path | None = None,
 ) -> dict[str, Any]:
     return {
         "run_id": run_id,
@@ -273,6 +281,7 @@ def _build_config(
         "spec": {
             "prompt_file": prompt_path.name,
             "prompt_sha256": prompt_sha256,
+            **({"skill_prompt_file": skill_prompt_path.name} if skill_prompt_path is not None else {}),
         },
         "run_label": label,
         "invocation": {
@@ -327,6 +336,7 @@ def _build_result(
     display_work_dir: str,
     display_cwd: str,
     display_runs_dir: str,
+    skill_prompt_path: Path | None = None,
 ) -> dict[str, Any]:
     clawperator_commands_detected = _count_clawperator_results(transcript)
     answer_emitted = score_result.answer_extracted_raw is not None
@@ -354,6 +364,7 @@ def _build_result(
             "eval_version": eval_version,
             "prompt_file": prompt_path.name,
             "prompt_sha256": prompt_sha256,
+            **({"skill_prompt_file": skill_prompt_path.name} if skill_prompt_path is not None else {}),
         },
         "run_label": label,
         "invocation": {
@@ -407,6 +418,7 @@ def run_eval(
     runs_dir: Path,
     label: str | None = None,
     max_turns: int | None = None,
+    skill_prompt_name: str | None = None,
 ) -> Path:
     eval_id = spec["eval_id"]
     eval_version = spec.get("version", spec.get("eval_version", "1.0.0"))
@@ -455,7 +467,7 @@ def run_eval(
 
     try:
         _ensure_agent_binary_available(agent)
-        prompt_path = _load_prompt_path(spec, knowledge_mode)
+        prompt_path = _load_prompt_path(spec, knowledge_mode, skill_prompt_name)
         display_clawperator_cmd, path_prefix = _prepare_clawperator_launcher(
             work_dir,
             env.clawperator_cmd,
@@ -510,6 +522,7 @@ def run_eval(
             display_work_dir=display_work_dir,
             display_cwd=display_cwd,
             display_runs_dir=display_runs_dir,
+            skill_prompt_path=prompt_path if skill_prompt_name is not None else None,
         )
         logger.spawn(command=command, work_dir=display_work_dir, env_overrides=config_env_overrides)
         logger.env_summary(
@@ -681,6 +694,7 @@ def run_eval(
             display_work_dir=display_work_dir,
             display_cwd=display_cwd,
             display_runs_dir=display_runs_dir,
+            skill_prompt_path=prompt_path if skill_prompt_name is not None else None,
         )
         config = _build_config(
             run_id=run_id,
@@ -703,8 +717,22 @@ def run_eval(
             display_work_dir=display_work_dir,
             display_cwd=display_cwd,
             display_runs_dir=display_runs_dir,
+            skill_prompt_path=prompt_path if skill_prompt_name is not None else None,
         )
         write_run(run_dir, result, config, transcript_text)
+        if skill_prompt_name is not None and spec.get("skill_generation"):
+            skill_generation = spec.get("skill_generation")
+            replay_timeout_s = int(skill_generation.get("replay_timeout_s", 60)) if isinstance(skill_generation, dict) else 60
+            skill_score = run_replay(
+                run_dir=run_dir,
+                clawperator_cmd=env.clawperator_cmd,
+                operator_package=env.operator_package,
+                device_serial=env.device_serial,
+                timeout_s=replay_timeout_s,
+            )
+            result = dict(result)
+            result["skill_score"] = skill_score
+            run_dir.joinpath("result.json").write_text(json.dumps(result, indent=2, sort_keys=False) + "\n", encoding="utf-8")
         logger.state("completed")
         logger.result(
             status,
@@ -772,6 +800,7 @@ def run_eval(
             display_work_dir=display_work_dir,
             display_cwd=display_cwd,
             display_runs_dir=display_runs_dir,
+            skill_prompt_path=prompt_path if skill_prompt_name is not None else None,
         )
         config = _build_config(
             run_id=run_id,
@@ -799,11 +828,25 @@ def run_eval(
             display_work_dir=display_work_dir,
             display_cwd=display_cwd,
             display_runs_dir=display_runs_dir,
+            skill_prompt_path=prompt_path if skill_prompt_name is not None else None,
         )
         if transcript_handle is not None:
             transcript_handle.close()
             transcript_handle = None
         write_run(run_dir, result, config, transcript_text)
+        if skill_prompt_name is not None and spec.get("skill_generation"):
+            skill_generation = spec.get("skill_generation")
+            replay_timeout_s = int(skill_generation.get("replay_timeout_s", 60)) if isinstance(skill_generation, dict) else 60
+            skill_score = run_replay(
+                run_dir=run_dir,
+                clawperator_cmd=env.clawperator_cmd,
+                operator_package=env.operator_package,
+                device_serial=env.device_serial,
+                timeout_s=replay_timeout_s,
+            )
+            result = dict(result)
+            result["skill_score"] = skill_score
+            run_dir.joinpath("result.json").write_text(json.dumps(result, indent=2, sort_keys=False) + "\n", encoding="utf-8")
         logger.state("completed")
         logger.result(
             status,
