@@ -1,0 +1,51 @@
+from __future__ import annotations
+
+import json
+from types import SimpleNamespace
+from pathlib import Path
+
+from evals.harness import environment
+from evals import run_eval
+
+
+class _StubAgent:
+    def __init__(self) -> None:
+        self.config = SimpleNamespace(extra_flags=[])
+
+    def build_command(self, prompt: str, work_dir: str) -> list[str]:
+        return ["stub-agent", work_dir]
+
+
+def test_write_preflight_failure_run_uses_full_repo_paths(monkeypatch, tmp_path):
+    args = SimpleNamespace(
+        eval_id="android-version",
+        agent="claude",
+        model="claude-sonnet-4-6",
+        label=None,
+        runs_dir=str(tmp_path / "runs"),
+        mode="full-repo",
+        runtime="published",
+        timeout_s=300,
+        max_turns=40,
+    )
+    spec = {"prompts": {"full-repo": "prompt-full-repo.md"}}
+    monkeypatch.setenv("CLAWPERATOR_OPERATOR_PACKAGE", "   ")
+    run_dir = run_eval._write_preflight_failure_run(
+        args=args,
+        spec=spec,
+        agent=_StubAgent(),
+        failure_reason="published_binary_not_found",
+        runtime_inputs=None,
+    )
+
+    result = json.loads((run_dir / "result.json").read_text(encoding="utf-8"))
+    config = json.loads((run_dir / "config.json").read_text(encoding="utf-8"))
+
+    assert result["environment"]["operator_package"] == environment.RELEASE_OPERATOR_PACKAGE
+    assert result["environment"]["cwd"] == str(run_eval.ROOT)
+    assert result["environment"]["runs_dir"] == str(tmp_path / "runs")
+    assert result["environment"]["clawperator_npm_version"] is None
+    assert config["invocation"]["work_dir"] == str(run_eval.ROOT)
+    assert config["environment"]["cwd"] == str(run_eval.ROOT)
+    assert config["environment"]["runs_dir"] == str(tmp_path / "runs")
+    assert config["environment"]["operator_package"] == environment.RELEASE_OPERATOR_PACKAGE

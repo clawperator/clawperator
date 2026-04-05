@@ -4,7 +4,7 @@ Parent plan: `tasks/evals/phase-4/plan.md`
 
 ## Executive Summary
 
-1 PR, 3 sub-phases. Phase 3 PR must be merged before starting.
+1 PR, 3 sub-phases. Phase 3 is already merged on `main`.
 
 | Sub-phase | Purpose | Agent tier | Execution flags |
 | --- | --- | --- | --- |
@@ -23,11 +23,11 @@ Parent plan: `tasks/evals/phase-4/plan.md`
 | Completed | none |
 | Remaining | 4a, 4b, 4c |
 | Current / Next | 4a |
-| Blockers | Phase 3 PR must be merged |
+| Blockers | none |
 
 ## Hard Rules
 
-1. Do not start Phase 4 until Phase 3 PR is merged.
+1. Phase 3 is already merged on `main`.
 2. Never write extracted skills to a permanent repo location during a run.
    Always use a temp directory. Clean it up after replay.
 3. Replay must use the same device serial from the original run's `config.json`.

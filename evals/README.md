@@ -19,6 +19,23 @@ uv run --project evals --extra dev python evals/run_eval.py android-version \
 You can pass `--device <serial>` when more than one device is connected.
 The lockfile for this project lives at `evals/uv.lock`.
 
+Runtime targets:
+
+- `--runtime local-dev` uses the branch-local `apps/node/dist/cli/index.js`
+  build and the `.dev` Operator APK. This is the default for day-to-day
+  development.
+- `--runtime published` uses the globally installed `clawperator` binary and
+  the release Operator APK (`com.clawperator.operator`). Use this to verify
+  the shipped runtime path.
+
+Knowledge modes:
+
+- `--mode public-surface` keeps the agent in a fresh temp directory and gives
+  it only public docs plus the command surface.
+- `--mode full-repo` runs the agent from the repository root and lets it read
+  internal docs and source code. Use this when you want to measure the boost
+  from repo-local knowledge.
+
 Other supported agents:
 
 - `claude`
