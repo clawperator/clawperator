@@ -18,7 +18,7 @@ runs the generated skill deterministically and scores its output.
 | Completed | none |
 | Remaining | 4a, 4b, 4c |
 | Current / Next | 4a |
-| Blockers | Phase 3 PR must be merged before starting |
+| Blockers | none |
 
 ## Pre-Implementation Alignment Check
 
