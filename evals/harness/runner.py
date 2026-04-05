@@ -20,7 +20,8 @@ from .agents.base import BaseAgent
 from .artifacts import make_run_id, write_run
 from .environment import Environment, RELEASE_OPERATOR_PACKAGE, REPO_ROOT
 from .logger import get_logger
-from .scorer import extract_answer_from_transcript, score
+from .replay import run_replay
+from .scorer import extract_answer_from_transcript, extract_skill, score, validate_skill
 from .timeutil import format_timestamp
 
 
@@ -34,7 +35,13 @@ def build_prompt(template_path: str, variables: dict) -> str:
     return template.substitute(variables)
 
 
-def _load_prompt_path(spec: dict, knowledge_mode: str) -> Path:
+def _load_prompt_path(spec: dict, knowledge_mode: str, skill_prompt_name: str | None = None) -> Path:
+    if skill_prompt_name is not None:
+        prompt_path = Path(skill_prompt_name)
+        spec_dir = spec.get("spec_dir")
+        if spec_dir is not None and not prompt_path.is_absolute():
+            return Path(spec_dir) / prompt_path
+        return prompt_path
     direct = spec.get("prompt_path")
     if direct is not None:
         return Path(direct)
@@ -158,6 +165,95 @@ def _count_clawperator_results(transcript: str) -> int:
     return count
 
 
+def _extract_answer_candidate(raw_line: str, normalized_line: str) -> str | None:
+    for candidate in (normalized_line, raw_line):
+        answer = extract_answer_from_transcript(candidate)
+        if answer is not None:
+            return answer
+    return None
+
+
+def _write_json_file(path: Path, payload: dict[str, Any]) -> None:
+    temp_path = path.with_suffix(path.suffix + ".tmp")
+    temp_path.write_text(json.dumps(payload, indent=2, sort_keys=False) + "\n", encoding="utf-8")
+    temp_path.replace(path)
+
+
+def _replay_error_skill_score(
+    error: Exception,
+    *,
+    skill_emitted: bool | None = None,
+    skill_valid: bool | None = None,
+    skill_validation_errors: list[str] | None = None,
+) -> dict[str, Any]:
+    return {
+        "skill_emitted": False if skill_emitted is None else skill_emitted,
+        "skill_valid": False if skill_valid is None else skill_valid,
+        "skill_validation_errors": [] if skill_validation_errors is None else list(skill_validation_errors),
+        "replay_attempted": False,
+        "replay_status": "error",
+        "replay_answer_normalized": None,
+        "replay_answer_correct": False,
+        "replay_wall_clock_s": 0.0,
+        "replay_error": str(error) if str(error) else error.__class__.__name__,
+    }
+
+
+def _attach_skill_score(
+    *,
+    run_dir: Path,
+    result: dict[str, Any],
+    spec: dict[str, Any],
+    skill_prompt_name: str | None,
+    env: Environment,
+) -> dict[str, Any]:
+    if skill_prompt_name is None or not spec.get("skill_generation"):
+        return result
+    skill_generation = spec.get("skill_generation")
+    replay_timeout_s = int(skill_generation.get("replay_timeout_s", 60)) if isinstance(skill_generation, dict) else 60
+    start_marker = (
+        skill_generation.get("skill_start_marker")
+        if isinstance(skill_generation, dict) and isinstance(skill_generation.get("skill_start_marker"), str)
+        else "CLAWPERATOR_SKILL_START"
+    )
+    end_marker = (
+        skill_generation.get("skill_end_marker")
+        if isinstance(skill_generation, dict) and isinstance(skill_generation.get("skill_end_marker"), str)
+        else "CLAWPERATOR_SKILL_END"
+    )
+    transcript_path = run_dir / "transcript.txt"
+    transcript = transcript_path.read_text(encoding="utf-8") if transcript_path.exists() else ""
+    skill_json = extract_skill(transcript, start_marker, end_marker)
+    skill_emitted = skill_json is not None
+    skill_valid = False
+    skill_validation_errors: list[str] = []
+    if skill_json is not None:
+        skill_valid, skill_validation_errors = validate_skill(
+            skill_json,
+            env.clawperator_cmd,
+            env.operator_package,
+        )
+    try:
+        skill_score = run_replay(
+            run_dir=run_dir,
+            clawperator_cmd=env.clawperator_cmd,
+            operator_package=env.operator_package,
+            device_serial=env.device_serial,
+            timeout_s=replay_timeout_s,
+        )
+    except Exception as exc:
+        skill_score = _replay_error_skill_score(
+            exc,
+            skill_emitted=skill_emitted,
+            skill_valid=skill_valid,
+            skill_validation_errors=skill_validation_errors,
+        )
+    replay_result = dict(result)
+    replay_result["skill_score"] = skill_score
+    _write_json_file(run_dir / "result.json", replay_result)
+    return replay_result
+
+
 def _extract_domains(transcript: str) -> list[str]:
     domains = set()
     for domain in re.findall(r"(?:https?://)?([A-Za-z0-9.-]+\.[A-Za-z]{2,})", transcript):
@@ -259,6 +355,7 @@ def _build_config(
     display_work_dir: str,
     display_cwd: str,
     display_runs_dir: str,
+    skill_prompt_path: Path | None = None,
 ) -> dict[str, Any]:
     return {
         "run_id": run_id,
@@ -273,6 +370,11 @@ def _build_config(
         "spec": {
             "prompt_file": prompt_path.name,
             "prompt_sha256": prompt_sha256,
+            **(
+                {"skill_prompt_file": skill_prompt_path.name}
+                if skill_prompt_path is not None and skill_prompt_path.name != prompt_path.name
+                else {}
+            ),
         },
         "run_label": label,
         "invocation": {
@@ -281,6 +383,7 @@ def _build_config(
             "env_overrides": env_overrides,
         },
         "environment": {
+            "device_serial": env.device_serial,
             "python_version": platform.python_version(),
             "platform": platform.platform(),
             "cwd": display_cwd,
@@ -288,8 +391,11 @@ def _build_config(
             "env_hash": _hash_env(env_overrides),
             "runs_dir": display_runs_dir,
             "clawperator_cmd": display_clawperator_cmd,
+            "runtime_clawperator_cmd": env.clawperator_cmd,
+            "clawperator_version": env.clawperator_version,
             "ground_truth_android_version": env.ground_truth_android_version,
             "clawperator_npm_version": env.clawperator_npm_version,
+            "operator_package": env.operator_package,
         },
         "timeout_s": timeout_s,
         "max_turns": max_turns,
@@ -327,6 +433,7 @@ def _build_result(
     display_work_dir: str,
     display_cwd: str,
     display_runs_dir: str,
+    skill_prompt_path: Path | None = None,
 ) -> dict[str, Any]:
     clawperator_commands_detected = _count_clawperator_results(transcript)
     answer_emitted = score_result.answer_extracted_raw is not None
@@ -354,6 +461,7 @@ def _build_result(
             "eval_version": eval_version,
             "prompt_file": prompt_path.name,
             "prompt_sha256": prompt_sha256,
+            **({"skill_prompt_file": skill_prompt_path.name} if skill_prompt_path is not None else {}),
         },
         "run_label": label,
         "invocation": {
@@ -407,6 +515,7 @@ def run_eval(
     runs_dir: Path,
     label: str | None = None,
     max_turns: int | None = None,
+    skill_prompt_name: str | None = None,
 ) -> Path:
     eval_id = spec["eval_id"]
     eval_version = spec.get("version", spec.get("eval_version", "1.0.0"))
@@ -455,7 +564,7 @@ def run_eval(
 
     try:
         _ensure_agent_binary_available(agent)
-        prompt_path = _load_prompt_path(spec, knowledge_mode)
+        prompt_path = _load_prompt_path(spec, knowledge_mode, skill_prompt_name)
         display_clawperator_cmd, path_prefix = _prepare_clawperator_launcher(
             work_dir,
             env.clawperator_cmd,
@@ -582,7 +691,7 @@ def run_eval(
                     transcript_parts.append(line)
                     transcript_bytes_written += len(encoded_line)
             if answer_extracted_raw is None:
-                answer = extract_answer_from_transcript(raw_line)
+                answer = _extract_answer_candidate(raw_line, line)
                 if answer is not None:
                     answer_extracted_raw = answer
                     if not answer_found_logged:
@@ -618,7 +727,7 @@ def run_eval(
             transcript_text,
             env.ground_truth_android_version,
             answer_extracted_raw=answer_extracted_raw,
-            allow_transcript_fallback=False,
+            allow_transcript_fallback=True,
         )
         if score_result.answer_extracted_raw is not None and status != "budget_exceeded":
             status = "pass" if score_result.answer_correct else "fail"
@@ -703,8 +812,16 @@ def run_eval(
             display_work_dir=display_work_dir,
             display_cwd=display_cwd,
             display_runs_dir=display_runs_dir,
+            skill_prompt_path=prompt_path if skill_prompt_name is not None else None,
         )
         write_run(run_dir, result, config, transcript_text)
+        result = _attach_skill_score(
+            run_dir=run_dir,
+            result=result,
+            spec=spec,
+            skill_prompt_name=skill_prompt_name,
+            env=env,
+        )
         logger.state("completed")
         logger.result(
             status,
@@ -730,7 +847,7 @@ def run_eval(
                 transcript_text,
                 env.ground_truth_android_version,
                 answer_extracted_raw=answer_extracted_raw,
-                allow_transcript_fallback=False,
+                allow_transcript_fallback=True,
             )
         logger.error(exc)
         logger.score(
@@ -772,6 +889,7 @@ def run_eval(
             display_work_dir=display_work_dir,
             display_cwd=display_cwd,
             display_runs_dir=display_runs_dir,
+            skill_prompt_path=prompt_path if skill_prompt_name is not None else None,
         )
         config = _build_config(
             run_id=run_id,
@@ -799,11 +917,19 @@ def run_eval(
             display_work_dir=display_work_dir,
             display_cwd=display_cwd,
             display_runs_dir=display_runs_dir,
+            skill_prompt_path=prompt_path if skill_prompt_name is not None else None,
         )
         if transcript_handle is not None:
             transcript_handle.close()
             transcript_handle = None
         write_run(run_dir, result, config, transcript_text)
+        result = _attach_skill_score(
+            run_dir=run_dir,
+            result=result,
+            spec=spec,
+            skill_prompt_name=skill_prompt_name,
+            env=env,
+        )
         logger.state("completed")
         logger.result(
             status,

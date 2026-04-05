@@ -19,6 +19,15 @@ uv run --project evals --extra dev python evals/run_eval.py android-version \
 You can pass `--device <serial>` when more than one device is connected.
 The lockfile for this project lives at `evals/uv.lock`.
 
+Every run writes its artifacts under `evals/runs/<run_id>/`:
+
+- `config.json`
+- `result.json`
+- `transcript.txt`
+
+Replay runs also write `result-replay.json`. Rescore runs write
+`result-rescored.json`.
+
 Runtime targets:
 
 - `--runtime local-dev` uses the branch-local `apps/node/dist/cli/index.js`
@@ -35,6 +44,46 @@ Knowledge modes:
 - `--mode full-repo` runs the agent from the repository root and lets it read
   internal docs and source code. Use this when you want to measure the boost
   from repo-local knowledge.
+
+## Skill Scoring And Replay
+
+The `android-version` eval can also score whether the agent emitted a reusable
+skill package.
+
+Use the skill prompt variant to enable that scoring:
+
+```bash
+uv run --project evals --extra dev python evals/run_eval.py android-version \
+  --agent claude \
+  --model claude-sonnet-4-6 \
+  --mode full-repo \
+  --skill-prompt prompt-skill.md \
+  --device <serial>
+```
+
+When you use `--skill-prompt prompt-skill.md` and the spec provides
+`skill_generation`, the run records a `skill_score` block in `result.json`.
+You will see fields like:
+
+- `skill_emitted`
+- `skill_valid`
+- `skill_validation_errors`
+- `replay_attempted`
+- `replay_status`
+- `replay_answer_normalized`
+- `replay_answer_correct`
+- `replay_wall_clock_s`
+
+Replay the emitted skill from a previous run with:
+
+```bash
+uv run --project evals --extra dev python evals/run_eval.py android-version \
+  --replay <run_id>
+```
+
+Replay uses the device serial recorded in the original run config. It writes
+`result-replay.json` alongside the original artifacts. If the original run did
+not emit a valid skill, replay reports `replay_status = "skipped"`.
 
 Other supported agents:
 
@@ -62,14 +111,15 @@ uv run --project evals --extra dev python evals/run_eval.py android-version \
   --device <serial>
 ```
 
-Phase 2 records `metrics.turns_counted` and `metrics.turns_budget` in
-`result.json`. These are diagnostic fields only. They are not scoring gates and
-they are not meant to be compared across agents.
+The harness records `metrics.turns_counted` and `metrics.turns_budget` in
+`result.json` when turn counting is enabled. These are diagnostic fields only.
+They are not scoring gates and they are not meant to be compared across
+agents.
 
 `--max-turns` stops a run with `outcome.status = budget_exceeded` if the agent
 has not answered yet. Gemini currently counts assistant `delta: true` message
 chunks as turns, so its turn count can look more granular than a human reading
-of the reply. That is expected for this phase.
+of the reply. That is expected for Gemini.
 
 `--rescore <run_id>` replays scoring from `config.json` and `transcript.txt`
 without re-running the agent. It writes `result-rescored.json` alongside the
@@ -82,15 +132,15 @@ Every run writes `evals/runs/<run_id>/result.json`.
 Key fields:
 
 - `run_id` - unique run directory name
-- `eval_id` - always `android-version` in Phase 1
+- `eval_id` - always `android-version` for this eval
 - `agent.type` and `agent.model` - the evaluated agent identity
-- `knowledge_mode` - `public-surface` in Phase 1
-- `runtime_target` - `local-dev` in Phase 1
+- `knowledge_mode` - `public-surface` or `full-repo`
+- `runtime_target` - `local-dev` or `published`
 - `spec.eval_version` - eval spec version
 - `spec.prompt_sha256` - hash of the rendered prompt text
 - `environment.device_serial` - the device used for the run
 - `environment.ground_truth_android_version` - Android version read from `adb`
-- `outcome.status` - `pass`, `fail`, `timeout`, `no_answer`, or `error`
+- `outcome.status` - `pass`, `fail`, `timeout`, `no_answer`, `error`, or `budget_exceeded`
 - `outcome.status` can also be `budget_exceeded` when `--max-turns` is hit
 - `outcome.answer_extracted_raw` - last marker value emitted by the agent
 - `outcome.answer_normalized` - normalized answer used for scoring
@@ -101,12 +151,14 @@ Key fields:
 - `metrics.violations.used_adb` - diagnostic flag for direct `adb shell` usage
 - `metrics.turns_counted` - diagnostic turn count or `null`
 - `metrics.turns_budget` - the configured max turn budget
+- `skill_score` - present when the run used the skill prompt and the spec has
+  `skill_generation`
 - `artifacts.transcript` - transcript file name
 - `artifacts.config` - config file name
 
 ## Public-Surface Isolation
 
-Phase 1 public-surface runs use a fresh temp directory from `tempfile.mkdtemp()`.
+Public-surface runs use a fresh temp directory from `tempfile.mkdtemp()`.
 That directory does not contain repo files, repo paths are not put into the
 agent prompt, and the harness only forwards a minimal environment. This is
 soft isolation, not a sandbox. The agent can still access the broader machine
@@ -145,3 +197,5 @@ API and must not appear in public-facing documentation or production usage.
 - The agent guesses the answer without using Clawperator
 - Gemini `delta: true` chunks count as turn boundaries for `--max-turns`, so a
   long answer can consume more than one counted turn
+- `skill_score.replay_status = "skipped"` means the run did not emit a valid
+  skill block, not that replay failed

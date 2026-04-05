@@ -1,6 +1,13 @@
 from __future__ import annotations
 
-from evals.harness.scorer import extract_answer, extract_answer_from_transcript, normalize_version, score
+from evals.harness.scorer import (
+    extract_answer,
+    extract_answer_from_transcript,
+    extract_skill,
+    normalize_version,
+    score,
+    validate_skill,
+)
 
 
 def test_normalize_version():
@@ -97,3 +104,88 @@ def test_extract_answer_multiword_answer_is_captured():
 def test_extract_answer_trailing_whitespace_is_stripped():
     transcript_trailing = "CLAWPERATOR_EVAL_ANSWER: 15   \n"
     assert extract_answer(transcript_trailing) == "15"
+
+
+def test_extract_answer_wrapped_marker_is_captured():
+    transcript_wrapped = "The device page is visible.\nCLAWPERATOR_\nEVAL_ANSWER: 15\n"
+    assert extract_answer(transcript_wrapped) == "15"
+    assert extract_answer_from_transcript(transcript_wrapped) == "15"
+
+
+def test_extract_skill_single_block():
+    transcript = "before\nCLAWPERATOR_SKILL_START\n{\"foo\":1}\nCLAWPERATOR_SKILL_END\nafter"
+    assert extract_skill(transcript, "CLAWPERATOR_SKILL_START", "CLAWPERATOR_SKILL_END") == "{\"foo\":1}"
+
+
+def test_extract_skill_last_block_wins():
+    transcript = (
+        "CLAWPERATOR_SKILL_START\n{\"v\":1}\nCLAWPERATOR_SKILL_END\n"
+        "CLAWPERATOR_SKILL_START\n{\"v\":2}\nCLAWPERATOR_SKILL_END"
+    )
+    assert extract_skill(transcript, "CLAWPERATOR_SKILL_START", "CLAWPERATOR_SKILL_END") == "{\"v\":2}"
+
+
+def test_extract_skill_decodes_json_string_literal_block():
+    transcript = (
+        "CLAWPERATOR_SKILL_START\n"
+        "\"{\\\"id\\\":\\\"com.example.android-version\\\",\\\"applicationId\\\":\\\"com.example\\\","
+        "\\\"intent\\\":\\\"android-version\\\",\\\"summary\\\":\\\"Determine Android version\\\","
+        "\\\"path\\\":\\\"skills/com.example.android-version\\\","
+        "\\\"skillFile\\\":\\\"skills/com.example.android-version/SKILL.md\\\","
+        "\\\"scripts\\\":[\\\"skills/com.example.android-version/scripts/run.js\\\"],"
+        "\\\"artifacts\\\":[]}\"\n"
+        "CLAWPERATOR_SKILL_END"
+    )
+    assert extract_skill(transcript, "CLAWPERATOR_SKILL_START", "CLAWPERATOR_SKILL_END") == (
+        "{\"id\":\"com.example.android-version\",\"applicationId\":\"com.example\","
+        "\"intent\":\"android-version\",\"summary\":\"Determine Android version\","
+        "\"path\":\"skills/com.example.android-version\","
+        "\"skillFile\":\"skills/com.example.android-version/SKILL.md\","
+        "\"scripts\":[\"skills/com.example.android-version/scripts/run.js\"],"
+        "\"artifacts\":[]}"
+    )
+
+
+def test_extract_skill_no_block():
+    assert extract_skill("no markers here", "CLAWPERATOR_SKILL_START", "CLAWPERATOR_SKILL_END") is None
+
+
+def test_extract_skill_requires_standalone_marker_lines():
+    transcript = 'before "CLAWPERATOR_SKILL_START {\\\"foo\\\":1} CLAWPERATOR_SKILL_END" after'
+    assert extract_skill(transcript, "CLAWPERATOR_SKILL_START", "CLAWPERATOR_SKILL_END") is None
+
+
+def test_validate_skill_accepts_minimal_registry_shape():
+    skill_json = (
+        "{\"id\":\"com.example.android-version\",\"applicationId\":\"com.example\","
+        "\"intent\":\"android-version\",\"summary\":\"Determine Android version\","
+        "\"path\":\"skills/com.example.android-version\","
+        "\"skillFile\":\"skills/com.example.android-version/SKILL.md\","
+        "\"scripts\":[\"skills/com.example.android-version/scripts/run.js\"],"
+        "\"artifacts\":[]}"
+    )
+    ok, errors = validate_skill(skill_json, ["clawperator"], "com.clawperator.operator.dev")
+    assert ok is True
+    assert errors == []
+
+
+def test_validate_skill_rejects_invalid_json():
+    ok, errors = validate_skill("{not-json}", ["clawperator"], "com.clawperator.operator.dev")
+    assert ok is False
+    assert errors and errors[0].startswith("invalid JSON:")
+
+
+def test_validate_skill_rejects_missing_required_fields():
+    skill_json = (
+        "{\"id\":\"com.example.android-version\","
+        "\"applicationId\":\"com.example\","
+        "\"intent\":\"android-version\","
+        "\"summary\":\"\","
+        "\"path\":\"skills/com.example.android-version\","
+        "\"skillFile\":\"skills/com.example.android-version/SKILL.md\","
+        "\"scripts\":[],"
+        "\"artifacts\":[]}"
+    )
+    ok, errors = validate_skill(skill_json, ["clawperator"], "com.clawperator.operator.dev")
+    assert ok is False
+    assert "array field must not be empty: scripts" in errors

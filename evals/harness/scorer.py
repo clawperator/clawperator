@@ -3,9 +3,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 import re
 import json
+from typing import Any
 
 
 ANSWER_PATTERN = re.compile(r"^CLAWPERATOR_EVAL_ANSWER:\s*(\S.*?)\s*$", re.MULTILINE)
+_WRAPPED_ANSWER_PATTERN = re.compile(
+    r"^CLAWPERATOR_(?:\s*\n\s*)EVAL_ANSWER:\s*(\S.*?)\s*$",
+    re.MULTILINE,
+)
 _ANSI_PATTERN = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 _DISALLOWED_TOOL_PATTERN = re.compile(r"^(?:\$|>)\s+adb\s+shell\b", re.MULTILINE | re.IGNORECASE)
 
@@ -20,12 +25,18 @@ def normalize_version(v: str) -> str:
 
 def extract_answer(transcript: str) -> str | None:
     matches = ANSWER_PATTERN.findall(transcript)
-    return matches[-1] if matches else None
+    if matches:
+        return matches[-1]
+    wrapped_matches = _WRAPPED_ANSWER_PATTERN.findall(transcript)
+    return wrapped_matches[-1] if wrapped_matches else None
 
 
 def extract_answer_from_line(line: str) -> str | None:
     matches = ANSWER_PATTERN.findall(line)
-    return matches[-1] if matches else None
+    if matches:
+        return matches[-1]
+    wrapped_matches = _WRAPPED_ANSWER_PATTERN.findall(line)
+    return wrapped_matches[-1] if wrapped_matches else None
 
 
 def _iter_text_values(value):
@@ -78,9 +89,9 @@ def extract_answer_from_json_line(line: str) -> str | None:
 
 
 def extract_answer_from_transcript(transcript: str) -> str | None:
-    matches = ANSWER_PATTERN.findall(transcript)
-    if matches:
-        return matches[-1]
+    answer = extract_answer(transcript)
+    if answer is not None:
+        return answer
     for line in transcript.splitlines():
         answer = extract_answer_from_line(line)
         if answer is not None:
@@ -91,9 +102,94 @@ def extract_answer_from_transcript(transcript: str) -> str | None:
     return None
 
 
+def extract_skill(transcript: str, start_marker: str, end_marker: str) -> str | None:
+    pattern = re.compile(
+        r"^[ \t]*"
+        + re.escape(start_marker)
+        + r"[ \t]*$\n?"
+        + r"(.*?)"
+        + r"\n?^[ \t]*"
+        + re.escape(end_marker)
+        + r"[ \t]*$",
+        re.DOTALL | re.MULTILINE,
+    )
+    matches = pattern.findall(transcript)
+    if not matches:
+        return None
+    candidate = matches[-1].strip()
+    decoded: Any = candidate
+    for _ in range(2):
+        if not isinstance(decoded, str):
+            break
+        try:
+            parsed = json.loads(decoded)
+        except json.JSONDecodeError:
+            break
+        if isinstance(parsed, str):
+            decoded = parsed.strip()
+            continue
+        return decoded if isinstance(decoded, str) else candidate
+    if isinstance(decoded, str):
+        return decoded.strip()
+    return candidate
+
+
 def detect_disallowed_tool(transcript: str) -> bool:
     cleaned = _ANSI_PATTERN.sub("", transcript)
     return _DISALLOWED_TOOL_PATTERN.search(cleaned) is not None
+
+
+def _require_string_field(payload: dict[str, Any], field: str, errors: list[str]) -> None:
+    value = payload.get(field)
+    if not isinstance(value, str):
+        errors.append(f"missing or invalid string field: {field}")
+
+
+def _require_string_list_field(payload: dict[str, Any], field: str, errors: list[str], *, allow_empty: bool = True) -> None:
+    value = payload.get(field)
+    if not isinstance(value, list):
+        errors.append(f"missing or invalid array field: {field}")
+        return
+    if not allow_empty and len(value) == 0:
+        errors.append(f"array field must not be empty: {field}")
+        return
+    for index, item in enumerate(value):
+        if not isinstance(item, str):
+            errors.append(f"invalid string item in {field}[{index}]")
+
+
+def validate_skill(skill_json: str, clawperator_cmd: list[str], operator_package: str) -> tuple[bool, list[str]]:
+    errors: list[str] = []
+    try:
+        payload = json.loads(skill_json)
+    except json.JSONDecodeError as exc:
+        return False, [f"invalid JSON: {exc.msg}"]
+
+    if not isinstance(payload, dict):
+        return False, ["skill payload must be a JSON object"]
+
+    required_fields = (
+        "id",
+        "applicationId",
+        "intent",
+        "summary",
+        "path",
+        "skillFile",
+        "scripts",
+        "artifacts",
+    )
+    for field in required_fields:
+        if field in {"scripts", "artifacts"}:
+            continue
+        _require_string_field(payload, field, errors)
+
+    _require_string_list_field(payload, "scripts", errors, allow_empty=False)
+    _require_string_list_field(payload, "artifacts", errors, allow_empty=True)
+
+    if errors:
+        return False, errors
+
+    return True, []
 
 
 @dataclass

@@ -7,6 +7,12 @@
     "public-surface": "prompt-public.md",
     "full-repo": "prompt-full-repo.md"
   },
+  "skill_generation": {
+    "skill_prompt": "prompt-skill.md",
+    "skill_start_marker": "CLAWPERATOR_SKILL_START",
+    "skill_end_marker": "CLAWPERATOR_SKILL_END",
+    "replay_timeout_s": 60
+  },
   "environment": {
     "requires_device": true,
     "requires_clawperator_doctor": true,
