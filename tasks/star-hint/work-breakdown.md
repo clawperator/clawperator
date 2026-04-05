@@ -5,9 +5,12 @@ Parent plan: `tasks/star-hint/plan.md`
 ## Executive Summary
 
 1 PR, 4 phases, all in one branch. No merge gates. Phase 1 creates the hint module
-and tests it. Phase 2 wires it into the CLI (flag registration, 5 call sites). Phase 3
-adds the bash hint to the install script. Phase 4 appends support notes to 3 docs
-surfaces. Total work is bounded - no discovery or classification steps.
+and tests it. Phase 2 wires it into `cli/index.ts` only (flag registration + hint
+dispatch in main()). Phase 3 adds the bash hint to the install script. Phase 4
+appends support notes to 3 docs surfaces.
+
+`doctor.ts`, `skills.ts`, and `registry.ts` are not modified. All hint calls live
+in `main()` and fire after `console.log(result)`.
 
 | PR | Phases | Agent tier |
 | --- | --- | --- |
@@ -29,8 +32,11 @@ Current state: planning.
 
 ## Hard Rules
 
-- Do NOT call `gh`, `gh --version`, any GitHub API, or any network endpoint from
-  within any Node or shell code added in this task. This is an absolute prohibition.
+- Do NOT invoke any subprocess, shell-out, library call, or HTTP request whose purpose
+  is to inspect GitHub state or interact with GitHub on the user's behalf. This includes
+  `gh`, `gh --version`, `curl`/`fetch` to any GitHub endpoint, and any library that
+  wraps GitHub APIs. The only GitHub-related content permitted is the static string in
+  `HINT_TEXT`.
 - All hint output must go to `process.stderr` in Node code and `>&2` in shell code.
   Never write hint text to stdout.
 - Never show the hint when `process.stderr.isTTY !== true`. The check must happen
@@ -38,17 +44,25 @@ Current state: planning.
 - Never show the hint in the JSON output path, HTTP API responses, or SSE streams.
 - All state I/O in `starHint.ts` must be wrapped in try/catch. Errors are silently
   swallowed. The hint module must never throw.
+- All hint calls in `cli/index.ts` must come AFTER `console.log(result)` in main().
+  Never call `maybeShowStarHint` from inside a command handler function. The hint must
+  appear after the primary command output, not before.
+- Do NOT add a hint call in the `--help` path. That path is excluded from the upgrade
+  trigger.
+- `await maybeShowStarHint(...)` must be used before `process.exit(0)` in the
+  `--version` path. A `.then()` or unawaited call will be cut off by exit.
 - `--disable-star-suggestions` must be added to `FLAG_VALUE_ARITY` in `cli/index.ts`
-  (arity 0) and to the `globalFlags` list at ~line 242-246 in `cli/index.ts`, or it
-  will cause "unrecognized flag" errors for callers who pass it.
-- `maybeShowStarHint` must be awaited before `process.exit(0)` in the `--version` and
-  `--help` early-exit paths. A `.then()` or unawaited call will be cut off by exit.
-- Only add the 4 trigger points specified in the plan. Do not add any additional calls.
+  (arity 0) and to the `globalFlags` list in main(), or it will cause "unrecognized
+  flag" errors for callers who pass it.
+- Do NOT modify `apps/node/src/cli/commands/doctor.ts`,
+  `apps/node/src/cli/commands/skills.ts`, or `apps/node/src/cli/registry.ts`.
+  No `disableStar` field in `HandlerContext`. All hint logic stays in `main()`.
+- `writeState` must call `mkdirSync(dir, { recursive: true })` before writing. Do not
+  assume `~/.clawperator/` pre-exists. Swallow any error from both mkdir and write.
+- Only add the trigger points specified in the plan. Do not add any additional calls.
 - One logical commit per phase. Do not batch all phases into one commit.
 - Do not edit generated docs (`sites/docs/.build/`, `sites/docs/site/`).
-- Do not run `./scripts/docs_build.sh` for this task - the docs changes are in authored
-  source files (`docs/`, `README.md`, `sites/landing/public/index.md`) and do not
-  require docs-site regeneration.
+- Do not run `./scripts/docs_build.sh` for this task.
 
 ## Required Reading
 
@@ -57,13 +71,12 @@ Read these files IN THIS ORDER before writing anything.
 | File | Why it matters |
 | --- | --- |
 | `tasks/star-hint/plan.md` | Stable contract, exact hint text, decision tables - do not re-derive |
-| `apps/node/src/cli/index.ts` lines 44-340 | FLAG_VALUE_ARITY, getGlobalOpts, main() flow, existing --version and --help paths, HandlerContext construction |
-| `apps/node/src/cli/registry.ts` | HandlerContext type definition - find and add disableStar field |
-| `apps/node/src/cli/commands/doctor.ts` | Doctor success path - understand getDoctorExitCode and where to insert hint call |
-| `apps/node/src/cli/commands/skills.ts` lines 141-290 | cmdSkillsRun result.ok branch - find exact insertion point |
-| `apps/node/src/adapters/logger.ts` | expandHomePath() and homedir() usage - reuse the same pattern for state file path |
-| `apps/node/package.json` | Verify the version field exists and its key name |
-| `sites/landing/public/install.sh` lines 696-783 | main() structure - find where to append hint block |
+| `apps/node/src/cli/index.ts` lines 44-340 | FLAG_VALUE_ARITY, getGlobalOpts, main() flow, --version path, console.log(result) location, HandlerContext construction |
+| `apps/node/src/cli/commands/doctor.ts` | Read-only: understand that cmdDoctor sets `process.exitCode` before returning - used in success detection in main() |
+| `apps/node/src/cli/commands/skills.ts` lines 260-290 | Read-only: understand the success result shape (skillId, output, exitCode, durationMs - no `code` field) vs error shape (code, message) |
+| `apps/node/src/adapters/logger.ts` | homedir() and path join patterns for state file path |
+| `apps/node/package.json` | Verify the version field key name |
+| `sites/landing/public/install.sh` lines 696-783 | main() structure - find where to append hint call |
 
 ## PR / Phase Plan
 
@@ -89,13 +102,16 @@ I/O, TTY check, suppression logic, and unit tests.
 
 ### Steps
 
-1. Read `apps/node/src/adapters/logger.ts` to find `expandHomePath()` or the homedir
-   import pattern. Use `homedir()` from `node:os` (same as the existing code) to
-   construct the state file path: `join(homedir(), '.clawperator', 'star-hint-state.json')`.
+1. Read `apps/node/src/adapters/logger.ts` to find the `homedir()` import pattern.
+   Use `homedir()` from `node:os` to construct the state file path:
+   `join(homedir(), '.clawperator', 'star-hint-state.json')`.
 
 2. Read `apps/node/package.json` to confirm the `version` field key name.
 
-3. Create `apps/node/src/cli/starHint.ts` with this exact structure:
+3. Look at one existing `.test.ts` file near `apps/node/src/cli/` to confirm the test
+   framework import style before writing the test file.
+
+4. Create `apps/node/src/cli/starHint.ts` with this exact structure:
 
    a. **Module-level guard:**
       ```typescript
@@ -111,24 +127,27 @@ I/O, TTY check, suppression logic, and unit tests.
       }
       ```
 
-   c. **readState(): StarHintState** - reads and parses `~/.clawperator/star-hint-state.json`.
+   c. **`stateFilePath(): string`** - returns
+      `join(homedir(), '.clawperator', 'star-hint-state.json')`. No I/O.
+
+   d. **`readState(): StarHintState`** - reads and JSON-parses the state file.
       Returns `{}` if file missing, unreadable, or parse fails. Never throws.
 
-   d. **writeState(state: StarHintState): void** - writes state as JSON. Never throws.
-      Do not create the `~/.clawperator/` directory if it does not exist - wrap the write
-      in try/catch and swallow any error. (The directory will already exist on any machine
-      that has run Clawperator.)
+   e. **`writeState(state: StarHintState): void`** - writes state as JSON. Before
+      writing, call `mkdirSync(dirname(stateFilePath()), { recursive: true })` to
+      ensure the directory exists. Wrap both the mkdir and the write in a single
+      try/catch and swallow any error. Never throws.
 
-   e. **getCliVersion(): string** - reads version from `../../package.json` using
-      `createRequire(import.meta.url)` (same pattern as `cli/index.ts` line 3-4).
+   f. **`getCliVersion(): string`** - reads version from `../../package.json` using
+      `createRequire(import.meta.url)` (same pattern as `cli/index.ts` lines 3-4).
       Returns `"0.0.0"` on any error. Never throws.
 
-   f. **isSuppressed(): boolean** - returns true if any of:
+   g. **`isSuppressed(): boolean`** - returns `true` if any of:
       - `process.stderr.isTTY !== true`
       - `process.env.CLAWPERATOR_DISABLE_STAR_SUGGESTIONS` is a non-empty string
       - `process.argv.slice(2).includes('--disable-star-suggestions')`
 
-   g. **HINT_TEXT constant** - exact multi-line string:
+   h. **`HINT_TEXT` constant** - exact multi-line string (copy verbatim from plan.md):
       ```typescript
       const HINT_TEXT = `
 Clawperator is open source. If it helped, consider starring the repo:
@@ -140,11 +159,11 @@ gh api -X PUT /user/starred/clawperator/clawperator -H "X-GitHub-Api-Version: 20
 Disable this hint with: --disable-star-suggestions
 `;
       ```
-      (One blank line before the first line of content, one blank line after the last
-      line of content - the template literal newline at the start and end provides these.)
+      The template literal starts and ends with a newline, providing blank-line
+      separation before and after the hint text.
 
-   h. **maybeShowStarHint(trigger: 'doctor' | 'skill' | 'upgrade'): Promise\<void\>** -
-      exported. Apply the first-match-wins decision table from `plan.md`:
+   i. **`maybeShowStarHint(trigger: 'doctor' | 'skill' | 'upgrade'): Promise<void>`** -
+      exported. Apply the first-match-wins decision table from plan.md exactly:
 
       ```
       if (shown) return
@@ -166,29 +185,31 @@ Disable this hint with: --disable-star-suggestions
       if (trigger === 'skill') writeState({ ...state, skillHintShown: true })
       ```
 
-4. Create `apps/node/src/cli/starHint.test.ts`. Tests must cover:
-   - TTY suppression: when `process.stderr.isTTY` is falsy, nothing is written to stderr
-   - Env suppression: when `CLAWPERATOR_DISABLE_STAR_SUGGESTIONS` is set, nothing written
-   - State suppression: when `doctorHintShown` is already true, doctor trigger does not write
-   - State suppression: when `skillHintShown` is already true, skill trigger does not write
+5. Create `apps/node/src/cli/starHint.test.ts`. Tests must cover all 8 cases:
+   - TTY suppression: `process.stderr.isTTY` falsy - nothing written to stderr
+   - Env suppression: `CLAWPERATOR_DISABLE_STAR_SUGGESTIONS` set - nothing written
+   - State suppression (doctor): `doctorHintShown: true` in state - doctor trigger
+     does not write
+   - State suppression (skill): `skillHintShown: true` in state - skill trigger does
+     not write
    - Version suppression: upgrade trigger suppressed when stored version matches current
-   - Show path: trigger fires, writes HINT_TEXT to stderr, updates state correctly
-   - Module-level shown guard: second call in same process is suppressed
-   - Error swallowing: state write failure does not throw
-
-   Use the existing test setup patterns in the repo (look at another `.test.ts` file
-   near `apps/node/src/cli/` for the test framework import style).
+   - Show path: trigger fires, writes `HINT_TEXT` to stderr, updates state field
+     correctly for each trigger type
+   - Module-level `shown` guard: second call in same module instance is suppressed
+   - Error swallowing: state write failure (e.g. mkdir throws) does not throw
 
 ### Acceptance Criteria
 
 - `apps/node/src/cli/starHint.ts` exists and exports `maybeShowStarHint`
-- `apps/node/src/cli/starHint.test.ts` exists with all 8 test cases above
+- `apps/node/src/cli/starHint.test.ts` exists with all 8 test cases
 - `npm --prefix apps/node run build` succeeds with no TypeScript errors
-- `npm --prefix apps/node run test` passes (all new tests green)
-- Grep confirms no `gh` invocations and no `fetch`/`http`/`axios` calls in starHint.ts:
+- `npm --prefix apps/node run test` passes with all new tests green
+- Grep confirms no network calls or subprocess invocations in starHint.ts:
   ```bash
-  grep -n "gh\b\|fetch\|https\|http\b\|axios" apps/node/src/cli/starHint.ts
-  # expected: zero matches (the hint text string contains the URL but that is static)
+  grep -n "\bfetch\b\|https://\|http://\|axios\|spawn\|exec\b\|child_process" \
+    apps/node/src/cli/starHint.ts
+  # expected: zero matches
+  # (the static HINT_TEXT string contains a URL but makes no request)
   ```
 - Grep confirms no stdout writes in starHint.ts:
   ```bash
@@ -219,86 +240,55 @@ default
 ### Goal
 
 Register `--disable-star-suggestions` as a global flag and insert `maybeShowStarHint`
-calls at the 5 hook points in `cli/index.ts`, `doctor.ts`, and `skills.ts`.
+calls in `main()` only - after `--version` output and after `console.log(result)` in
+the command path. Do not modify doctor.ts, skills.ts, or registry.ts.
 
 ### Files or Surfaces To Change
 
-- `apps/node/src/cli/index.ts`
-- `apps/node/src/cli/registry.ts`
-- `apps/node/src/cli/commands/doctor.ts`
-- `apps/node/src/cli/commands/skills.ts`
+- `apps/node/src/cli/index.ts` (only)
 
 ### Steps
 
-1. **`apps/node/src/cli/index.ts` - register the flag:**
+1. **Register the flag in `FLAG_VALUE_ARITY` (lines 44-94):**
 
-   a. In `FLAG_VALUE_ARITY` (lines 44-94), add:
-      ```typescript
-      ["--disable-star-suggestions", 0],
-      ```
-      Arity 0 means the flag takes no value argument.
-
-   b. In `getGlobalOpts()` (lines 100-181), add a branch in the argv loop for the
-      new flag. Pattern: match `argv[i] === "--disable-star-suggestions"` and consume
-      it (no value to increment). The flag value is not needed in the returned object -
-      the hint module reads argv directly. This branch just needs to consume the token
-      so it does not fall through to `rest`.
-
-      Add before the `else { rest.push(argv[i]) }` at line ~177:
-      ```typescript
-      } else if (argv[i] === "--disable-star-suggestions") {
-        // consumed; hint module reads process.argv directly
-      } else {
-      ```
-
-   c. In `main()`, find the `globalFlags` array at ~lines 242-246:
-      ```typescript
-      const globalFlags = [
-        "--device", "--device-id", "--operator-package", "--receiver-package",
-        "--json", "--output", "--format", "--log-level", "--timeout", "--timeout-ms",
-        "--verbose", "--help", "--version"
-      ];
-      ```
-      Add `"--disable-star-suggestions"` to this array.
-
-2. **`apps/node/src/cli/registry.ts` - add field to HandlerContext:**
-
-   Find the `HandlerContext` type/interface. Add:
+   Add:
    ```typescript
-   disableStar?: boolean;
+   ["--disable-star-suggestions", 0],
    ```
-   This is informational for any handler that wants to forward it. The hint module
-   reads argv directly, so this field is optional and not strictly required for
-   suppression to work. Add it for completeness and forward it in the next step.
+   Arity 0 means the flag takes no value argument.
 
-3. **`apps/node/src/cli/index.ts` - thread disableStar through HandlerContext:**
+2. **Parse the flag in `getGlobalOpts()` (lines 100-181):**
 
-   In `main()`, at the `HandlerContext` construction (~line 306-316):
+   Add a branch in the argv loop. The flag needs to be consumed so it does not fall
+   through to `rest`. The hint module reads `process.argv` directly so no return value
+   is needed. Add before the final `else { rest.push(argv[i]) }`:
    ```typescript
-   const ctx: HandlerContext = {
-     argv,
-     rest,
-     format: out.format,
-     explicitJsonOutput: global.explicitJsonOutput,
-     verbose: out.verbose,
-     logger,
-     deviceId: global.deviceId,
-     operatorPackage: global.operatorPackage,
-     timeoutMs: global.timeoutMs,
-   };
+   } else if (argv[i] === "--disable-star-suggestions") {
+     // consumed; hint module reads process.argv directly
+   } else {
    ```
-   The hint module reads argv directly, so no field needs to be added to ctx for
-   the hint to work. Skip adding disableStar to ctx unless registry.ts requires it.
-   Do not add it if it would cause a TypeScript error.
 
-4. **`apps/node/src/cli/index.ts` - upgrade trigger call sites:**
+3. **Add to the `globalFlags` list in `main()` (~lines 242-246):**
 
-   Import `maybeShowStarHint` at the top of the file:
+   Find:
+   ```typescript
+   const globalFlags = [
+     "--device", "--device-id", "--operator-package", "--receiver-package",
+     "--json", "--output", "--format", "--log-level", "--timeout", "--timeout-ms",
+     "--verbose", "--help", "--version"
+   ];
+   ```
+   Add `"--disable-star-suggestions"` to this array.
+
+4. **Import `maybeShowStarHint` at the top of the file:**
    ```typescript
    import { maybeShowStarHint } from "./starHint.js";
    ```
 
-   Add upgrade hint call in the `--version` path (around line 197-200). Change from:
+5. **Upgrade trigger in the `--version` path (~lines 197-200):**
+
+   The hint must fire AFTER the version is printed, BEFORE `process.exit(0)`.
+   Change:
    ```typescript
    if (argvForGlobalMeta.includes("--version")) {
      const pkg = require("../../package.json") as { version?: string };
@@ -315,137 +305,93 @@ calls at the 5 hook points in `cli/index.ts`, `doctor.ts`, and `skills.ts`.
      process.exit(0);
    }
    ```
+   The `main` function is already async so `await` is valid here.
 
-   Add upgrade hint call in the `--help` path (around line 213-216). Change from:
+6. **Doctor, skill, and upgrade triggers in the command path:**
+
+   Locate the block that prints the result and sets the exit code (~lines 335-339):
    ```typescript
-   if (argvForGlobalMeta.includes("--help")) {
-     console.log(resolveHelpFromRegistry(global.rest, COMMANDS));
-     process.exit(0);
+   if (result !== undefined) {
+     console.log(result);
+   }
+   if (typeof result === "string" && shouldCliStdoutForceExitCode1(result, usageParseError)) {
+     process.exitCode = 1;
    }
    ```
-   To:
+
+   Insert hint calls AFTER `console.log(result)` and BEFORE
+   `shouldCliStdoutForceExitCode1`. The block should become:
    ```typescript
-   if (argvForGlobalMeta.includes("--help")) {
-     console.log(resolveHelpFromRegistry(global.rest, COMMANDS));
+   if (result !== undefined) {
+     console.log(result);
+   }
+   if (!usageParseError) {
+     // Doctor trigger: fires after first successful clawperator doctor
+     if (cmd === 'doctor' && (process.exitCode ?? 0) === 0) {
+       await maybeShowStarHint('doctor');
+     }
+     // Skill trigger: fires after first successful skills run
+     if (cmd === 'skills' && rest[0] === 'run') {
+       try {
+         const parsed = JSON.parse(result ?? '{}') as { code?: string };
+         if (!parsed.code) await maybeShowStarHint('skill');
+       } catch { /* ignore */ }
+     }
+     // Upgrade trigger: fires once per version after any successful command or --version
      await maybeShowStarHint('upgrade');
-     process.exit(0);
+   }
+   if (typeof result === "string" && shouldCliStdoutForceExitCode1(result, usageParseError)) {
+     process.exitCode = 1;
    }
    ```
 
-   Add upgrade hint call in the command success path. Find the location where
-   `handlerResult` is set (~lines 317-319):
-   ```typescript
-   const handlerResult = await def.handler(ctx);
-   if (handlerResult !== undefined) {
-     result = handlerResult;
-   }
-   ```
-   After that block, still inside the same `else` branch (the non-usageParseError
-   command execution branch), add:
-   ```typescript
-   await maybeShowStarHint('upgrade');
-   ```
-   This fires only when the handler returned without throwing. UsageErrors are caught
-   by the surrounding try/catch and `maybeShowStarHint` is not called there.
-
-5. **`apps/node/src/cli/commands/doctor.ts` - doctor trigger:**
-
-   Import `maybeShowStarHint` at the top:
-   ```typescript
-   import { maybeShowStarHint } from "../starHint.js";
-   ```
-
-   In `cmdDoctor`, the exit code is set in two branches. Find both places where
-   `process.exitCode = getDoctorExitCode(report, options.checkOnly)` is called
-   (lines ~31 and ~40). After each assignment, if the exit code is 0, call the hint.
-
-   Since the same report is used in both branches, compute the exit code once and
-   share it, or simply check `getDoctorExitCode(report, options.checkOnly) === 0`
-   before each hint call. Do not call the hint if the doctor run failed.
-
-   The hint call must be `await`ed. The function signatures of `cmdDoctor` is already
-   `async`, so this is safe.
-
-   Example for the JSON branch (around line 30-33):
-   ```typescript
-   if (options.format === "json") {
-     const exitCode = getDoctorExitCode(report, options.checkOnly);
-     process.exitCode = exitCode;
-     if (exitCode === 0) await maybeShowStarHint('doctor');
-     return JSON.stringify(report, null, 2);
-   }
-   ```
-
-   And for the pretty branch (around line 40-41):
-   ```typescript
-   const exitCode = getDoctorExitCode(report, options.checkOnly);
-   process.exitCode = exitCode;
-   if (exitCode === 0) await maybeShowStarHint('doctor');
-   return renderPrettyDoctorReport(report);
-   ```
-
-6. **`apps/node/src/cli/commands/skills.ts` - skill trigger:**
-
-   Import `maybeShowStarHint` at the top:
-   ```typescript
-   import { maybeShowStarHint } from "../starHint.js";
-   ```
-
-   In `cmdSkillsRun`, find the `result.ok` branch (around lines 260-268):
-   ```typescript
-   if (result.ok) {
-     return formatSuccess({
-       skillId: result.skillId,
-       output: result.output,
-       exitCode: result.exitCode,
-       durationMs: result.durationMs,
-       timeoutMs: timeoutMs ?? undefined,
-       expectedSubstring: expectContains ?? undefined,
-     }, options);
-   }
-   ```
-
-   Change to:
-   ```typescript
-   if (result.ok) {
-     await maybeShowStarHint('skill');
-     return formatSuccess({
-       skillId: result.skillId,
-       output: result.output,
-       exitCode: result.exitCode,
-       durationMs: result.durationMs,
-       timeoutMs: timeoutMs ?? undefined,
-       expectedSubstring: expectContains ?? undefined,
-     }, options);
-   }
-   ```
+   Implementation notes:
+   - `cmd` is defined at ~line 217 as `const [cmd, ...rest] = global.rest;` and is
+     in scope at this point.
+   - `process.exitCode` for doctor: `cmdDoctor` sets it before returning, so by the
+     time `console.log(result)` runs it already reflects the doctor outcome.
+   - `result` for skills: success envelopes have `skillId`, `output`, `exitCode`,
+     `durationMs` but no top-level `code` field; error envelopes have `code`,
+     `message`. The `JSON.parse` check distinguishes them.
+   - Call doctor first, then skill, then upgrade. The module-level `shown` guard
+     ensures only one hint fires per invocation; feature-specific triggers get
+     priority over the generic upgrade trigger.
+   - The outer `!usageParseError` guard ensures the hints do not fire on flag errors.
+     Handler throws (UsageError) are caught earlier and set `usageParseError = true`,
+     so that guard also covers thrown errors.
 
 ### Acceptance Criteria
 
 - `npm --prefix apps/node run build` succeeds with zero TypeScript errors
 - `npm --prefix apps/node run test` passes
-- `clawperator --disable-star-suggestions --help` does not produce "unrecognized flag" error:
-  ```bash
-  node apps/node/dist/cli/index.js --disable-star-suggestions --help 2>/dev/null
-  # expected: help text, exit 0
-  ```
-- `clawperator --disable-star-suggestions snapshot --help` does not error:
+- `--disable-star-suggestions` does not cause "unrecognized flag" when combined with
+  any command:
   ```bash
   node apps/node/dist/cli/index.js --disable-star-suggestions snapshot --help 2>/dev/null
+  echo "exit: $?"
   # expected: help text, exit 0
   ```
-- Grep confirms maybeShowStarHint is called in all 5 places:
+- `--disable-star-suggestions` passed before `doctor` command does not error:
   ```bash
-  grep -n "maybeShowStarHint" \
-    apps/node/src/cli/index.ts \
-    apps/node/src/cli/commands/doctor.ts \
-    apps/node/src/cli/commands/skills.ts
-  # expected: at least 5 matches total (3 in index.ts, 1 in doctor.ts, 1 in skills.ts)
+  node apps/node/dist/cli/index.js --disable-star-suggestions doctor --help 2>/dev/null
+  echo "exit: $?"
+  # expected: exit 0
+  ```
+- Grep confirms all hint call sites are in index.ts only:
+  ```bash
+  grep -rn "maybeShowStarHint" apps/node/src/
+  # expected: matches only in starHint.ts (definition) and index.ts (call sites)
+  # no matches in doctor.ts, skills.ts, or registry.ts
+  ```
+- Grep confirms hint calls come after console.log in the diff:
+  ```bash
+  git diff apps/node/src/cli/index.ts | grep -n "maybeShowStarHint\|console\.log(result"
+  # verify visually that console.log(result) appears before maybeShowStarHint lines
   ```
 - Grep confirms no stdout writes were introduced:
   ```bash
-  git diff --unified=0 | grep "^+" | grep "stdout"
-  # expected: zero new stdout lines related to the hint
+  git diff --unified=0 apps/node/src/cli/index.ts | grep "^+" | grep "stdout"
+  # expected: zero new stdout lines related to hint
   ```
 
 ### Validation
@@ -453,8 +399,11 @@ calls at the 5 hook points in `cli/index.ts`, `doctor.ts`, and `skills.ts`.
 ```bash
 npm --prefix apps/node run build
 npm --prefix apps/node run test
-node apps/node/dist/cli/index.js --disable-star-suggestions --help 2>/dev/null; echo "exit: $?"
-node apps/node/dist/cli/index.js --disable-star-suggestions snapshot --help 2>/dev/null; echo "exit: $?"
+node apps/node/dist/cli/index.js --disable-star-suggestions snapshot --help 2>/dev/null
+echo "exit: $?"
+node apps/node/dist/cli/index.js --disable-star-suggestions doctor --help 2>/dev/null
+echo "exit: $?"
+grep -rn "maybeShowStarHint" apps/node/src/
 ```
 
 ### Expected Commit
@@ -483,8 +432,7 @@ Add the bash star hint block to `sites/landing/public/install.sh` near the end o
 
 1. Read `sites/landing/public/install.sh` lines 696-783 (`main()` function). Identify
    the last block before the final return or exit. The hint must appear after all
-   install steps have completed successfully - immediately before or after the final
-   success message, if one exists.
+   install steps have completed successfully.
 
 2. Add a new function `show_star_hint()` near the other helper functions (before
    `main()`), not inline in `main()`:
@@ -509,37 +457,38 @@ Add the bash star hint block to `sites/landing/public/install.sh` near the end o
    }
    ```
 
-   Notes on the shell function:
+   Notes:
    - `[ -t 2 ]` checks if stderr (fd 2) is a TTY.
-   - `[ -n "${CLAWPERATOR_DISABLE_STAR_SUGGESTIONS:-}" ]` checks if the env var is
-     set to a non-empty value. The `:-` default prevents unbound variable errors when
-     `set -u` is active.
-   - `cat >&2 <<'EOF'` heredoc redirects all output to stderr. The single-quoted `'EOF'`
-     prevents variable expansion inside the heredoc.
-   - The blank line at the start and end of the heredoc provides visual separation.
+   - `[ -n "${CLAWPERATOR_DISABLE_STAR_SUGGESTIONS:-}" ]` checks for non-empty env var.
+     The `:-` default prevents unbound variable errors under `set -u`.
+   - `cat >&2 <<'EOF'` redirects output to stderr. Single-quoted `'EOF'` prevents
+     variable expansion inside the heredoc.
+   - The blank line at start and end of the heredoc provides visual separation.
+   - The last line uses `CLAWPERATOR_DISABLE_STAR_SUGGESTIONS=1` (not the CLI flag),
+     since this is a shell script context.
 
-3. In `main()`, call `show_star_hint` after the last install step completes but before
-   the function returns. Place it so it only runs when installation has succeeded
-   (i.e., inside the success path, not inside error handlers).
+3. In `main()`, call `show_star_hint` after the last install step completes. Place it
+   so it only runs on the success path, not inside error handlers.
 
 ### Acceptance Criteria
 
 - `show_star_hint` function exists in install.sh
 - `bash -n sites/landing/public/install.sh` passes (syntax check)
-- Running `show_star_hint` with stderr redirected to a file produces the exact hint text
-  (manual inspection)
 - `show_star_hint` with `CLAWPERATOR_DISABLE_STAR_SUGGESTIONS=1` produces no output:
   ```bash
-  CLAWPERATOR_DISABLE_STAR_SUGGESTIONS=1 bash -c \
-    'source sites/landing/public/install.sh 2>/dev/null; show_star_hint' 2>&1 | wc -c
-  # expected: 0 (no output)
+  CLAWPERATOR_DISABLE_STAR_SUGGESTIONS=1 \
+    bash -c 'show_star_hint() {
+      [ -t 2 ] || return 0
+      [ -n "${CLAWPERATOR_DISABLE_STAR_SUGGESTIONS:-}" ] && return 0
+      echo "should not reach here" >&2
+    }; show_star_hint' 2>&1 | wc -c
+  # expected: 0
   ```
-  Note: sourcing may fail if install.sh has side effects on source. If so, extract
-  just the function for the test or inspect manually.
-- Grep confirms the hint text is in the script and redirected to stderr:
+  (Test the logic in isolation if sourcing install.sh has side effects.)
+- Grep confirms hint content and stderr redirect exist:
   ```bash
   grep -n "clawpilled/clawperator" sites/landing/public/install.sh
-  grep -n ">&2" sites/landing/public/install.sh | grep -i "hint\|cat\|echo"
+  grep -n "show_star_hint" sites/landing/public/install.sh
   ```
 
 ### Validation
@@ -565,61 +514,58 @@ fast
 
 ### Goal
 
-Append a short support note to three docs surfaces. Keep each note to 2 lines maximum.
-Do not restructure existing content.
+Append a short support note to three docs surfaces. Each note is 1-2 lines, adapted
+for the surface. Do not restructure existing content.
 
 ### Files or Surfaces To Change
 
 - `sites/landing/public/index.md`
 - `README.md`
-- `docs/index.md` (or the most appropriate getting-started page if index.md is not
-  suitable - read the file first to confirm)
+- `docs/index.md` (confirm this is a suitable user-facing page before editing; if not,
+  use the most appropriate getting-started page in `docs/`)
 
 ### Steps
 
-1. Read each of the three target files before editing to understand current structure
-   and find the appropriate append point (typically near the bottom).
+1. Read all three target files before editing to understand structure and find the
+   appropriate append point (near the bottom of each file).
 
-2. Append to `sites/landing/public/index.md`:
+2. Append to `sites/landing/public/index.md` (community-facing; softer, welcoming
+   tone):
    ```markdown
 
-   Clawperator is open source. If it helps you, consider [starring the project on GitHub](https://github.com/clawpilled/clawperator).
+   Clawperator is open source and community-supported. If it's useful to you, [star it on GitHub](https://github.com/clawpilled/clawperator) - it helps others discover it.
    ```
-   One blank line before the note. No section header.
 
-3. Append to `README.md`:
+3. Append to `README.md` (developer/contributor entry point; direct "support the
+   project" framing):
    ```markdown
 
-   Clawperator is open source. If it helps you, consider [starring the project on GitHub](https://github.com/clawpilled/clawperator).
+   If Clawperator is useful to your project, consider [starring the repo on GitHub](https://github.com/clawpilled/clawperator).
    ```
-   One blank line before the note. No section header.
 
-4. Read `docs/index.md`. If it is a suitable surface for a 2-line note (i.e., it is
-   a user-facing intro or getting-started page, not a generated or machine-only file),
-   append the same note. If it is not suitable, find the most appropriate page in
-   `docs/` (e.g., a getting-started or setup page) and append there instead. Document
-   your choice in the commit message.
-
-   Append:
+4. Append to `docs/index.md` (technical navigation; minimal - one line):
    ```markdown
 
-   Clawperator is open source. If it helps you, consider [starring the project on GitHub](https://github.com/clawpilled/clawperator).
+   Clawperator is [open source](https://github.com/clawpilled/clawperator).
    ```
+   If `docs/index.md` is not a user-facing intro page, find the most appropriate
+   getting-started or overview page in `docs/` and append there instead. Note the
+   chosen file in the commit message.
 
-5. Do NOT run `./scripts/docs_build.sh`. The docs surface changes are in authored
-   source files and do not trigger a docs-site regeneration requirement for this task.
+5. Do NOT run `./scripts/docs_build.sh`. These are authored source files and do not
+   require docs-site regeneration.
 
 ### Acceptance Criteria
 
 - All three files have been updated
 - Each addition is 2 lines or fewer (1 blank line + 1 content line)
-- The link `https://github.com/clawpilled/clawperator` appears in each file:
+- The link `https://github.com/clawpilled/clawperator` appears in all three files:
   ```bash
   grep -l "clawpilled/clawperator" \
     sites/landing/public/index.md \
     README.md \
     docs/index.md
-  # expected: all 3 files listed
+  # expected: all 3 files listed (adjust docs path if a different page was used)
   ```
 - No existing content was removed or restructured
 - No new section headers were added
@@ -644,32 +590,34 @@ docs(star-hint): add support note to landing page, README, and docs
 ## Full validation sequence (run after all phases)
 
 ```bash
-# Build
+# Build and test
 npm --prefix apps/node run build
-
-# Tests
 npm --prefix apps/node run test
 
 # Flag registration (no unrecognized flag error)
 node apps/node/dist/cli/index.js --disable-star-suggestions --help 2>/dev/null
-echo "exit code: $?"
+echo "exit: $?"
 
-# Hint does not appear in JSON output
+# Hint does not appear in JSON output (stdout)
 CLAWPERATOR_DISABLE_STAR_SUGGESTIONS=1 \
   node apps/node/dist/cli/index.js --json --version 2>/dev/null
-# expected: version number only, no hint text
+# expected: version number on stdout only, no hint text
 
-# Grep: hint module has no stdout, no network calls
-grep -n "stdout\|fetch\|https\|http\b\|axios\|\bgh\b" apps/node/src/cli/starHint.ts
+# Hint module has no network calls or subprocess invocations
+grep -n "\bfetch\b\|https://\|http://\|axios\|spawn\|exec\b\|child_process" \
+  apps/node/src/cli/starHint.ts
+# expected: zero matches
 
-# Grep: all 5 call sites exist
-grep -n "maybeShowStarHint" \
-  apps/node/src/cli/index.ts \
-  apps/node/src/cli/commands/doctor.ts \
-  apps/node/src/cli/commands/skills.ts
+# All hint calls are in index.ts only - not in doctor.ts, skills.ts, registry.ts
+grep -rn "maybeShowStarHint" apps/node/src/
+# expected: definition in starHint.ts, call sites only in index.ts
+
+# Hint calls appear after console.log(result) in index.ts
+grep -n "console\.log(result\|maybeShowStarHint" apps/node/src/cli/index.ts
+# verify visually: console.log(result) line number < maybeShowStarHint line numbers
 
 # Install script syntax
-bash -n sites/landing/public/install.sh && echo "install.sh syntax ok"
+bash -n sites/landing/public/install.sh && echo "syntax ok"
 
 # Docs notes present
 grep -l "clawpilled/clawperator" \

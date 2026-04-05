@@ -4,9 +4,10 @@
 
 Adds a lightweight, one-time GitHub star suggestion system to the Clawperator CLI
 and install script. Single PR, 4 phases in one PR. The Node CLI gets a centralized
-hint module, 4 wired trigger points, a new global flag, and state tracking under
-`~/.clawperator/star-hint-state.json`. The install script gets a standalone bash
-hint at install completion. Three docs surfaces get a short support note.
+hint module, hint calls consolidated in `main()`, a new global flag, and state
+tracking under `~/.clawperator/star-hint-state.json`. The install script gets a
+standalone bash hint at install completion. Three docs surfaces get a short support
+note.
 
 No GitHub API calls. No stdout pollution. No dynamic behavior.
 
@@ -24,8 +25,9 @@ No GitHub API calls. No stdout pollution. No dynamic behavior.
 
 ## Goal
 
-Show a single, static, stderr-only star suggestion at 4 specific high-value moments.
-Never pollute structured output. Never repeat. Never call any GitHub API. Let users
+Show a single, static, stderr-only star suggestion at 3 specific high-value moments
+in the CLI (plus install script). Never pollute structured output. Never repeat.
+Never call any GitHub API or interact with GitHub on the user's behalf. Let users
 opt out via flag or env var.
 
 ## Why Now
@@ -40,9 +42,9 @@ undermining Clawperator's positioning as a deterministic, agent-first runtime.
 - State persistence in `~/.clawperator/star-hint-state.json`
 - Global flag `--disable-star-suggestions` (arity 0) registered in `cli/index.ts`
 - Env var suppression: `CLAWPERATOR_DISABLE_STAR_SUGGESTIONS`
-- Trigger hook in `apps/node/src/cli/commands/doctor.ts` (doctor success)
-- Trigger hook in `apps/node/src/cli/commands/skills.ts` (skill run success)
-- Trigger hook in `apps/node/src/cli/index.ts` (upgrade detection at startup, --help, --version)
+- All hint calls consolidated in `main()` in `apps/node/src/cli/index.ts`:
+  - upgrade trigger after `--version` output
+  - upgrade + doctor + skill triggers after `console.log(result)` in the command path
 - Bash hint block added to `sites/landing/public/install.sh`
 - Short support note in `sites/landing/public/index.md`
 - Short support note in `README.md`
@@ -50,44 +52,38 @@ undermining Clawperator's positioning as a deterministic, agent-first runtime.
 
 ## Out of Scope
 
-- Any call to `gh`, the GitHub API, or any network request
+- Any subprocess invocation, shell-out, library call, or HTTP request whose purpose
+  is to inspect GitHub state or interact with GitHub on the user's behalf
 - Checking whether the repo is already starred
+- Showing the hint on `--help` invocations
 - Personalizing the hint based on user identity or history
-- Additional trigger points beyond the 4 specified
+- Additional trigger points beyond the 3 CLI triggers and the install script trigger
 - Analytics, telemetry, or call-home behavior
 - Showing the hint on command failure or usage errors
 - Modifying the HTTP API server, SSE stream, or JSON contract shapes
+- Modifying `apps/node/src/cli/commands/doctor.ts` or `apps/node/src/cli/commands/skills.ts`
+- Modifying `apps/node/src/cli/registry.ts` or adding fields to `HandlerContext`
+- Release notes beyond the 3 authored doc surfaces - deferred, not part of this PR
 
 ## Existing Artifact Scope
 
-`apps/node/src/cli/index.ts` - add `--disable-star-suggestions` to FLAG_VALUE_ARITY,
-parse in `getGlobalOpts()`, add to `globalFlags` list, insert 3 upgrade trigger call
-sites. No other changes to this file.
+`apps/node/src/cli/index.ts` - add `--disable-star-suggestions` to `FLAG_VALUE_ARITY`,
+parse in `getGlobalOpts()`, add to `globalFlags` list, insert hint calls after
+`--version` output and after `console.log(result)` in the command path. No other
+changes to this file.
 
-`apps/node/src/cli/registry.ts` - add `disableStar?: boolean` to `HandlerContext`
-type. No other changes.
-
-`apps/node/src/cli/commands/doctor.ts` - insert one hint call after the success
-check. No restructuring.
-
-`apps/node/src/cli/commands/skills.ts` - insert one hint call in the `result.ok`
-branch of `cmdSkillsRun`. No restructuring.
-
-`sites/landing/public/install.sh` - append hint block near end of `main()`.
-No restructuring.
+`sites/landing/public/install.sh` - add `show_star_hint()` helper function and one
+call site in `main()`. No restructuring.
 
 `sites/landing/public/index.md`, `README.md`, `docs/index.md` - append a short
-(2-4 line) support note. No restructuring of existing content.
+(1-2 line) surface-appropriate support note. No restructuring of existing content.
 
 ## Surfaces and Ownership
 
 | Surface | Path | Change type |
 | --- | --- | --- |
 | Hint module | `apps/node/src/cli/starHint.ts` | new file |
-| CLI global flag parsing | `apps/node/src/cli/index.ts` | add flag + 3 call sites |
-| Handler context type | `apps/node/src/cli/registry.ts` | add field to HandlerContext |
-| Doctor hook | `apps/node/src/cli/commands/doctor.ts` | add 1 call site |
-| Skills hook | `apps/node/src/cli/commands/skills.ts` | add 1 call site |
+| CLI global flag + hint dispatch | `apps/node/src/cli/index.ts` | add flag, add hint calls in main() |
 | Install script | `sites/landing/public/install.sh` | add bash hint block |
 | Landing page | `sites/landing/public/index.md` | append support note |
 | README | `README.md` | append support note |
@@ -98,17 +94,17 @@ No restructuring.
 | Topic | Verify against |
 | --- | --- |
 | FLAG_VALUE_ARITY map and getGlobalOpts() | `apps/node/src/cli/index.ts` lines 44-181 |
-| HandlerContext type | `apps/node/src/cli/registry.ts` |
 | globalFlags list in main() | `apps/node/src/cli/index.ts` lines 242-246 |
-| Doctor success path (report.ok, getDoctorExitCode) | `apps/node/src/cli/commands/doctor.ts` |
-| Skills run success path (result.ok branch) | `apps/node/src/cli/commands/skills.ts` lines 260-268 |
-| State dir convention (~/.clawperator/) | `apps/node/src/adapters/logger.ts` (expandHomePath) |
+| main() flow and result printing | `apps/node/src/cli/index.ts` lines 190-340 |
+| Doctor process.exitCode behavior | `apps/node/src/cli/commands/doctor.ts` (read-only - not modified) |
+| Skills result.ok / result.code shape | `apps/node/src/cli/commands/skills.ts` lines 260-290 (read-only - not modified) |
+| State dir convention (~/.clawperator/) | `apps/node/src/adapters/logger.ts` (homedir() usage pattern) |
 | Package version source | `apps/node/package.json` (read via require as in cli/index.ts line 198) |
 | Install script structure and main() | `sites/landing/public/install.sh` |
 
 ## Deterministic Versus Judgment
 
-Everything in this task is deterministic except the 2-4 line docs support note on
+Everything in this task is deterministic except the 1-2 line docs support note on
 three surfaces.
 
 Deterministic rules:
@@ -125,15 +121,18 @@ Deterministic rules:
 - Version source: `require("../../package.json")` as used in `cli/index.ts` line 198.
 - Each trigger fires at most once per state (upgrade: once per version string).
 - A module-level `shown` flag prevents more than one hint per process invocation even
-  if multiple triggers fire in the same run.
+  if multiple triggers would otherwise qualify.
 - All errors in the hint module are silently swallowed. Never throw. Never crash the CLI.
+- State dir `~/.clawperator/` is created with `mkdirSync(..., { recursive: true })` if
+  missing, with errors swallowed. Do not assume the directory pre-exists.
+- Hint is always printed after the primary command result has been written to stdout.
+  All hint calls in main() must come after `console.log(result)`.
 - In install.sh: TTY check is `[ -t 2 ]` (stderr). Suppression check is
   `[ -n "${CLAWPERATOR_DISABLE_STAR_SUGGESTIONS:-}" ]`.
 
 Judgment (minimal):
 
-- Exact wording of the 2-4 line support note on the three docs surfaces. Must be short,
-  non-intrusive, and consistent with Clawperator's tone. See Decision Rules for guidance.
+- Exact wording of the 1-2 line support note, adapted per surface. See Decision Rules.
 
 ## Decision Rules
 
@@ -182,61 +181,90 @@ Disable this hint with: CLAWPERATOR_DISABLE_STAR_SUGGESTIONS=1
 
 (The CLI flag is not applicable in an install script context.)
 
-**Trigger hook locations in cli/index.ts:**
+**Trigger hook locations - all in `apps/node/src/cli/index.ts`:**
 
-| Path | Where to call | Condition |
+| Location | Triggers to call | Condition |
 | --- | --- | --- |
-| `--version` path | Before `process.exit(0)` at ~line 200 | Always (version check inside module) |
-| `--help` path | Before `process.exit(0)` at ~line 215 | Always (version check inside module) |
-| Command success path | After handler returns at ~line 317-319, inside the non-error branch | Only if no usageParseError and handler did not throw |
+| After `console.log(pkg.version)` in `--version` path, before `process.exit(0)` | `upgrade` | always (version state checked inside module) |
+| After `console.log(result)` in command success path | `doctor`, `skill`, `upgrade` | see per-trigger conditions below; only if no usageParseError and handler did not throw |
 
-**Trigger hook locations in command files:**
+Do NOT add a hint call in the `--help` path. Help output is exploratory and not a
+value moment.
 
-| File | Call site | Condition |
-| --- | --- | --- |
-| `doctor.ts` | After `process.exitCode = getDoctorExitCode(...)`, when exit code is 0 | `getDoctorExitCode(report, options.checkOnly) === 0` |
-| `skills.ts` | Inside `if (result.ok)` branch of `cmdSkillsRun`, before the return | `result.ok === true` |
+**Per-trigger condition in the command path (after `console.log(result)`):**
 
-**Doctor success definition:** `getDoctorExitCode(report, options.checkOnly) === 0`.
-Both the JSON and pretty branches return after setting `process.exitCode`, so call
-`await maybeShowStarHint('doctor')` just before the `return` in the success branch
-for each format path. Alternatively, compute the exit code once, call the hint if 0,
-then use the cached value. Do not call `maybeShowStarHint` if the doctor check failed.
+Doctor trigger fires when:
+- `cmd === 'doctor'`
+- `(process.exitCode ?? 0) === 0`
+  (cmdDoctor sets `process.exitCode` before returning; 0 means success)
 
-**Note on `--help` and `--version` early-exit paths:**
+Skill trigger fires when:
+- `cmd === 'skills'` and `rest[0] === 'run'`
+- the result JSON does not contain a top-level `code` field
+  (success envelopes have `skillId`, `output`, `exitCode`, `durationMs`;
+  error envelopes have `code`, `message`)
+- detect this with: `try { const p = JSON.parse(result ?? '{}'); if (!p.code) ... } catch { }`
 
-These paths call `process.exit(0)` before `getGlobalOpts` runs. The hint module must
-not depend on parsed opts - it reads `process.argv` and `process.env` directly. The
-`--disable-star-suggestions` check inside the module covers suppression here.
+Upgrade trigger fires when:
+- no usageParseError, handler did not throw
+- version state checked inside the module
 
-Because both are async and the hint write is to stderr, the implementer must `await
-maybeShowStarHint(...)` before `process.exit(0)` so the write completes. Do not use
-`.then()` chains that might be cut off by exit.
+**Ordering within the command path block:**
 
-**docs support note tone:**
+Call doctor trigger first, then skill trigger, then upgrade trigger. The module-level
+`shown` guard ensures only one fires per invocation. Calling doctor/skill before
+upgrade gives feature-specific triggers priority over the generic upgrade trigger on
+the first invocation.
 
-Keep it to 2 lines maximum per surface. Example:
-```
-Clawperator is open source. If it helps you, consider
-[starring the project on GitHub](https://github.com/clawpilled/clawperator).
-```
-Do not add a section header. Append near the bottom of each file, not mid-content.
+**Note on `--version` early-exit path:**
+
+The `--version` path calls `process.exit(0)` before `getGlobalOpts` finishes. The
+hint module must not depend on parsed opts - it reads `process.argv` and `process.env`
+directly. The `--disable-star-suggestions` check inside the module covers suppression.
+
+Because `maybeShowStarHint` is async, the implementer must `await` it before
+`process.exit(0)` so the write completes. A `.then()` or unawaited call will be cut
+off by the exit.
+
+**Surface-appropriate docs wording:**
+
+Do not use identical wording on all three surfaces. Adapt per context:
+
+- `sites/landing/public/index.md` (community-facing landing): softer, welcoming tone.
+  Example: "Clawperator is open source and community-supported. If it's useful to you,
+  [star it on GitHub](https://github.com/clawpilled/clawperator) - it helps others
+  discover it."
+
+- `README.md` (developer/contributor entry point): direct "support the project" framing.
+  Example: "If Clawperator is useful to your project, consider
+  [starring the repo on GitHub](https://github.com/clawpilled/clawperator)."
+
+- `docs/index.md` (technical navigation page): minimal - one line, no emphasis.
+  Example: "Clawperator is [open source](https://github.com/clawpilled/clawperator)."
+  or simply append the repo link with a brief label.
+
+Keep each note to 1-2 lines. No section headers. Append near the bottom of each file.
 
 ## Failure Modes To Prevent
 
-- Hint text or blank lines appearing in stdout, JSON output, HTTP API responses, or SSE
-  streams - use only `process.stderr.write`
-- Hint firing on command failure or usage error - only fire on confirmed success
+- Hint text appearing before primary command output on stdout - all hint calls in main()
+  must come after `console.log(result)`, never inside command handler functions
+- Hint text appearing in stdout, JSON output, HTTP API responses, or SSE streams -
+  use only `process.stderr.write`
+- Hint firing on command failure or usage error - check per-trigger conditions strictly
 - Hint firing in non-TTY contexts (piped output, CI, agent runner) - always check TTY
 - State write error crashing the CLI - wrap all state I/O in try/catch, swallow errors
 - Hint firing twice in one invocation - enforce module-level `shown` guard
-- Any network call, any call to `gh`, any GitHub API call - forbidden absolutely
+- Any subprocess, shell-out, library call, or HTTP request targeting GitHub - forbidden
+  absolutely; the only GitHub-related content is the static string in HINT_TEXT
 - `--disable-star-suggestions` causing "unrecognized flag" error - must be in
   `FLAG_VALUE_ARITY` and the `globalFlags` list in `cli/index.ts`
 - Upgrade hint firing on every startup instead of once per version - state guard on
   `lastUpgradeHintVersion`
-- `await maybeShowStarHint(...)` missing before `process.exit(0)` in early-exit paths -
-  the write is async; fire-and-forget will be cut off
+- `await maybeShowStarHint(...)` missing before `process.exit(0)` in the `--version`
+  path - the write is async; fire-and-forget will be cut off
+- State write failing silently on fresh installs because `~/.clawperator/` does not
+  yet exist - use `mkdirSync(..., { recursive: true })` before writing
 
 ## Output Contract
 
@@ -252,7 +280,7 @@ export async function maybeShowStarHint(
 - Never throws
 - Never returns a value used by callers
 - Has no effect on stdout, JSON output, exit code, or any structured output
-- Is safe to call from any command handler without wrapping in try/catch
+- Is safe to call from `main()` without wrapping in try/catch
 
 ## Idempotency
 
@@ -263,6 +291,7 @@ export async function maybeShowStarHint(
 - Running multiple triggers in one invocation: fires at most once (module-level `shown`
   guard).
 - State file missing or unreadable: treat as empty state, show hint, attempt write.
+- State dir missing: create it silently, then write.
 
 ## Durable Follow-Up
 
