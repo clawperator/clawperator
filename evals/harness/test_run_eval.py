@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from pathlib import Path
 
 from evals.harness import environment
+from evals.harness import runner
 from evals import run_eval
 
 
@@ -82,3 +83,14 @@ def test_load_replay_runtime_published_can_use_display_command():
     assert clawperator_cmd == ["/opt/homebrew/bin/clawperator"]
     assert operator_package == "com.clawperator.operator"
     assert runtime_target == "published"
+
+
+def test_extract_answer_candidate_prefers_normalized_stream_output():
+    raw_line = (
+        '{"role":"assistant","content":[{"type":"text","text":"CLAWPERATOR_EVAL_ANSWER: 15"}]}\n'
+    )
+    normalized_line = "CLAWPERATOR_EVAL_ANSWER: 15\n"
+
+    answer = runner._extract_answer_candidate(raw_line, normalized_line)
+
+    assert answer == "15"

@@ -106,6 +106,12 @@ def test_extract_answer_trailing_whitespace_is_stripped():
     assert extract_answer(transcript_trailing) == "15"
 
 
+def test_extract_answer_wrapped_marker_is_captured():
+    transcript_wrapped = "The device page is visible.\nCLAWPERATOR_\nEVAL_ANSWER: 15\n"
+    assert extract_answer(transcript_wrapped) == "15"
+    assert extract_answer_from_transcript(transcript_wrapped) == "15"
+
+
 def test_extract_skill_single_block():
     transcript = "before\nCLAWPERATOR_SKILL_START\n{\"foo\":1}\nCLAWPERATOR_SKILL_END\nafter"
     assert extract_skill(transcript, "CLAWPERATOR_SKILL_START", "CLAWPERATOR_SKILL_END") == "{\"foo\":1}"

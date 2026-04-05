@@ -7,6 +7,10 @@ from typing import Any
 
 
 ANSWER_PATTERN = re.compile(r"^CLAWPERATOR_EVAL_ANSWER:\s*(\S.*?)\s*$", re.MULTILINE)
+_WRAPPED_ANSWER_PATTERN = re.compile(
+    r"^CLAWPERATOR_(?:\s*\n\s*)EVAL_ANSWER:\s*(\S.*?)\s*$",
+    re.MULTILINE,
+)
 _ANSI_PATTERN = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 _DISALLOWED_TOOL_PATTERN = re.compile(r"^(?:\$|>)\s+adb\s+shell\b", re.MULTILINE | re.IGNORECASE)
 
@@ -21,12 +25,18 @@ def normalize_version(v: str) -> str:
 
 def extract_answer(transcript: str) -> str | None:
     matches = ANSWER_PATTERN.findall(transcript)
-    return matches[-1] if matches else None
+    if matches:
+        return matches[-1]
+    wrapped_matches = _WRAPPED_ANSWER_PATTERN.findall(transcript)
+    return wrapped_matches[-1] if wrapped_matches else None
 
 
 def extract_answer_from_line(line: str) -> str | None:
     matches = ANSWER_PATTERN.findall(line)
-    return matches[-1] if matches else None
+    if matches:
+        return matches[-1]
+    wrapped_matches = _WRAPPED_ANSWER_PATTERN.findall(line)
+    return wrapped_matches[-1] if wrapped_matches else None
 
 
 def _iter_text_values(value):
@@ -79,9 +89,9 @@ def extract_answer_from_json_line(line: str) -> str | None:
 
 
 def extract_answer_from_transcript(transcript: str) -> str | None:
-    matches = ANSWER_PATTERN.findall(transcript)
-    if matches:
-        return matches[-1]
+    answer = extract_answer(transcript)
+    if answer is not None:
+        return answer
     for line in transcript.splitlines():
         answer = extract_answer_from_line(line)
         if answer is not None:

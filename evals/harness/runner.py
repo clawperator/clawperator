@@ -165,6 +165,14 @@ def _count_clawperator_results(transcript: str) -> int:
     return count
 
 
+def _extract_answer_candidate(raw_line: str, normalized_line: str) -> str | None:
+    for candidate in (normalized_line, raw_line):
+        answer = extract_answer_from_transcript(candidate)
+        if answer is not None:
+            return answer
+    return None
+
+
 def _extract_domains(transcript: str) -> list[str]:
     domains = set()
     for domain in re.findall(r"(?:https?://)?([A-Za-z0-9.-]+\.[A-Za-z]{2,})", transcript):
@@ -599,7 +607,7 @@ def run_eval(
                     transcript_parts.append(line)
                     transcript_bytes_written += len(encoded_line)
             if answer_extracted_raw is None:
-                answer = extract_answer_from_transcript(raw_line)
+                answer = _extract_answer_candidate(raw_line, line)
                 if answer is not None:
                     answer_extracted_raw = answer
                     if not answer_found_logged:
@@ -635,7 +643,7 @@ def run_eval(
             transcript_text,
             env.ground_truth_android_version,
             answer_extracted_raw=answer_extracted_raw,
-            allow_transcript_fallback=False,
+            allow_transcript_fallback=True,
         )
         if score_result.answer_extracted_raw is not None and status != "budget_exceeded":
             status = "pass" if score_result.answer_correct else "fail"
@@ -762,7 +770,7 @@ def run_eval(
                 transcript_text,
                 env.ground_truth_android_version,
                 answer_extracted_raw=answer_extracted_raw,
-                allow_transcript_fallback=False,
+                allow_transcript_fallback=True,
             )
         logger.error(exc)
         logger.score(
