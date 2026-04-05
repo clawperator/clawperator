@@ -4,6 +4,8 @@ import json
 from types import SimpleNamespace
 from pathlib import Path
 
+import pytest
+
 from evals.harness import environment
 from evals.harness import runner
 from evals import run_eval
@@ -85,6 +87,29 @@ def test_load_replay_runtime_published_can_use_display_command():
     assert runtime_target == "published"
 
 
+def test_replay_cli_rejects_missing_recorded_device_serial(tmp_path):
+    runs_dir = tmp_path / "runs"
+    run_dir = runs_dir / "android-version-20260404-000000-aaaaaa-claude-claude-sonnet"
+    run_dir.mkdir(parents=True)
+    (run_dir / "config.json").write_text(
+        json.dumps(
+            {
+                "runtime_target": "published",
+                "environment": {
+                    "clawperator_cmd": ["/opt/homebrew/bin/clawperator"],
+                    "operator_package": "com.clawperator.operator",
+                },
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(SystemExit, match="missing environment.device_serial"):
+        run_eval.main(["android-version", "--replay", run_dir.name, "--runs-dir", str(runs_dir)])
+
+
 def test_extract_answer_candidate_prefers_normalized_stream_output():
     raw_line = (
         '{"role":"assistant","content":[{"type":"text","text":"CLAWPERATOR_EVAL_ANSWER: 15"}]}\n'
@@ -127,3 +152,32 @@ def test_extract_answer_candidate_handles_codex_item_completed_json():
     answer = runner._extract_answer_candidate(raw_line, normalized_line)
 
     assert answer == "15"
+
+
+def test_attach_skill_score_records_replay_error_without_raising(monkeypatch, tmp_path):
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    result = {"run_id": "run-1", "outcome": {"status": "pass"}}
+    env = SimpleNamespace(
+        clawperator_cmd=["clawperator"],
+        operator_package="com.clawperator.operator.dev",
+        device_serial="device-123",
+    )
+
+    def fake_run_replay(**kwargs):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(runner, "run_replay", fake_run_replay)
+
+    updated = runner._attach_skill_score(
+        run_dir=run_dir,
+        result=result,
+        spec={"skill_generation": {"replay_timeout_s": 60}},
+        skill_prompt_name="prompt-skill.md",
+        env=env,
+    )
+
+    saved = json.loads((run_dir / "result.json").read_text(encoding="utf-8"))
+    assert updated["skill_score"]["replay_status"] == "error"
+    assert updated["skill_score"]["replay_error"] == "boom"
+    assert saved["skill_score"]["replay_status"] == "error"

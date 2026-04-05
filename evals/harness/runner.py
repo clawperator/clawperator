@@ -173,6 +173,54 @@ def _extract_answer_candidate(raw_line: str, normalized_line: str) -> str | None
     return None
 
 
+def _write_json_file(path: Path, payload: dict[str, Any]) -> None:
+    temp_path = path.with_suffix(path.suffix + ".tmp")
+    temp_path.write_text(json.dumps(payload, indent=2, sort_keys=False) + "\n", encoding="utf-8")
+    temp_path.replace(path)
+
+
+def _replay_error_skill_score(error: Exception) -> dict[str, Any]:
+    return {
+        "skill_emitted": False,
+        "skill_valid": False,
+        "skill_validation_errors": [],
+        "replay_attempted": False,
+        "replay_status": "error",
+        "replay_answer_normalized": None,
+        "replay_answer_correct": False,
+        "replay_wall_clock_s": 0.0,
+        "replay_error": str(error) if str(error) else error.__class__.__name__,
+    }
+
+
+def _attach_skill_score(
+    *,
+    run_dir: Path,
+    result: dict[str, Any],
+    spec: dict[str, Any],
+    skill_prompt_name: str | None,
+    env: Environment,
+) -> dict[str, Any]:
+    if skill_prompt_name is None or not spec.get("skill_generation"):
+        return result
+    skill_generation = spec.get("skill_generation")
+    replay_timeout_s = int(skill_generation.get("replay_timeout_s", 60)) if isinstance(skill_generation, dict) else 60
+    try:
+        skill_score = run_replay(
+            run_dir=run_dir,
+            clawperator_cmd=env.clawperator_cmd,
+            operator_package=env.operator_package,
+            device_serial=env.device_serial,
+            timeout_s=replay_timeout_s,
+        )
+    except Exception as exc:
+        skill_score = _replay_error_skill_score(exc)
+    replay_result = dict(result)
+    replay_result["skill_score"] = skill_score
+    _write_json_file(run_dir / "result.json", replay_result)
+    return replay_result
+
+
 def _extract_domains(transcript: str) -> list[str]:
     domains = set()
     for domain in re.findall(r"(?:https?://)?([A-Za-z0-9.-]+\.[A-Za-z]{2,})", transcript):
@@ -732,19 +780,13 @@ def run_eval(
             skill_prompt_path=prompt_path if skill_prompt_name is not None else None,
         )
         write_run(run_dir, result, config, transcript_text)
-        if skill_prompt_name is not None and spec.get("skill_generation"):
-            skill_generation = spec.get("skill_generation")
-            replay_timeout_s = int(skill_generation.get("replay_timeout_s", 60)) if isinstance(skill_generation, dict) else 60
-            skill_score = run_replay(
-                run_dir=run_dir,
-                clawperator_cmd=env.clawperator_cmd,
-                operator_package=env.operator_package,
-                device_serial=env.device_serial,
-                timeout_s=replay_timeout_s,
-            )
-            result = dict(result)
-            result["skill_score"] = skill_score
-            run_dir.joinpath("result.json").write_text(json.dumps(result, indent=2, sort_keys=False) + "\n", encoding="utf-8")
+        result = _attach_skill_score(
+            run_dir=run_dir,
+            result=result,
+            spec=spec,
+            skill_prompt_name=skill_prompt_name,
+            env=env,
+        )
         logger.state("completed")
         logger.result(
             status,
@@ -846,19 +888,13 @@ def run_eval(
             transcript_handle.close()
             transcript_handle = None
         write_run(run_dir, result, config, transcript_text)
-        if skill_prompt_name is not None and spec.get("skill_generation"):
-            skill_generation = spec.get("skill_generation")
-            replay_timeout_s = int(skill_generation.get("replay_timeout_s", 60)) if isinstance(skill_generation, dict) else 60
-            skill_score = run_replay(
-                run_dir=run_dir,
-                clawperator_cmd=env.clawperator_cmd,
-                operator_package=env.operator_package,
-                device_serial=env.device_serial,
-                timeout_s=replay_timeout_s,
-            )
-            result = dict(result)
-            result["skill_score"] = skill_score
-            run_dir.joinpath("result.json").write_text(json.dumps(result, indent=2, sort_keys=False) + "\n", encoding="utf-8")
+        result = _attach_skill_score(
+            run_dir=run_dir,
+            result=result,
+            spec=spec,
+            skill_prompt_name=skill_prompt_name,
+            env=env,
+        )
         logger.state("completed")
         logger.result(
             status,

@@ -125,6 +125,27 @@ def test_extract_skill_last_block_wins():
     assert extract_skill(transcript, "CLAWPERATOR_SKILL_START", "CLAWPERATOR_SKILL_END") == "{\"v\":2}"
 
 
+def test_extract_skill_decodes_json_string_literal_block():
+    transcript = (
+        "CLAWPERATOR_SKILL_START\n"
+        "\"{\\\"id\\\":\\\"com.example.android-version\\\",\\\"applicationId\\\":\\\"com.example\\\","
+        "\\\"intent\\\":\\\"android-version\\\",\\\"summary\\\":\\\"Determine Android version\\\","
+        "\\\"path\\\":\\\"skills/com.example.android-version\\\","
+        "\\\"skillFile\\\":\\\"skills/com.example.android-version/SKILL.md\\\","
+        "\\\"scripts\\\":[\\\"skills/com.example.android-version/scripts/run.js\\\"],"
+        "\\\"artifacts\\\":[]}\"\n"
+        "CLAWPERATOR_SKILL_END"
+    )
+    assert extract_skill(transcript, "CLAWPERATOR_SKILL_START", "CLAWPERATOR_SKILL_END") == (
+        "{\"id\":\"com.example.android-version\",\"applicationId\":\"com.example\","
+        "\"intent\":\"android-version\",\"summary\":\"Determine Android version\","
+        "\"path\":\"skills/com.example.android-version\","
+        "\"skillFile\":\"skills/com.example.android-version/SKILL.md\","
+        "\"scripts\":[\"skills/com.example.android-version/scripts/run.js\"],"
+        "\"artifacts\":[]}"
+    )
+
+
 def test_extract_skill_no_block():
     assert extract_skill("no markers here", "CLAWPERATOR_SKILL_START", "CLAWPERATOR_SKILL_END") is None
 

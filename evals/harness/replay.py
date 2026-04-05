@@ -48,15 +48,28 @@ def _coerce_string_map(value: Any) -> dict[str, str]:
     return out
 
 
+def _resolve_safe_relative_path(root: Path, relative_path: str) -> Path:
+    candidate = Path(relative_path)
+    if candidate.is_absolute() or candidate.anchor:
+        raise ValueError(f"path must be relative: {relative_path}")
+    resolved_root = root.resolve()
+    resolved_path = (resolved_root / candidate).resolve()
+    try:
+        resolved_path.relative_to(resolved_root)
+    except ValueError as exc:
+        raise ValueError(f"path escapes root: {relative_path}") from exc
+    return resolved_path
+
+
 def _write_text_file(root: Path, relative_path: str, content: str) -> None:
-    file_path = root / relative_path
+    file_path = _resolve_safe_relative_path(root, relative_path)
     file_path.parent.mkdir(parents=True, exist_ok=True)
     file_path.write_text(content, encoding="utf-8")
 
 
 def _materialize_skill_package(skill: dict[str, Any], temp_root: Path) -> tuple[Path, str]:
     skill_id = skill["id"]
-    skill_root = temp_root / skill["path"]
+    skill_root = _resolve_safe_relative_path(temp_root, skill["path"])
     skill_root.mkdir(parents=True, exist_ok=True)
 
     skill_json_path = skill_root / "skill.json"
@@ -95,27 +108,41 @@ def _extract_skill_output(output: str) -> str | None:
         return candidate
 
     stripped = output.strip()
-    if stripped and "\n" not in stripped:
-        return stripped
+    looks_like_json = stripped.startswith("{") or stripped.startswith("[") or stripped.startswith('"')
 
-    try:
-        payload = json.loads(output)
-    except json.JSONDecodeError:
+    payload = None
+    if looks_like_json:
+        try:
+            payload = json.loads(output)
+        except json.JSONDecodeError:
+            payload = None
+
+    if isinstance(payload, dict):
+        candidate_texts: list[str] = []
+        for key in ("output", "stdout", "stderr", "message", "result"):
+            value = payload.get(key)
+            if isinstance(value, str):
+                candidate_texts.append(value)
+
+        for text in candidate_texts:
+            candidate = extract_answer_from_transcript(text)
+            if candidate is not None:
+                return candidate
+
+        for text in candidate_texts:
+            normalized = text.strip()
+            if normalized and "\n" not in normalized:
+                return normalized
         return None
 
-    if not isinstance(payload, dict):
-        return stripped if stripped and "\n" not in stripped else None
+    if isinstance(payload, str):
+        decoded = payload.strip()
+        if decoded and "\n" not in decoded:
+            return decoded
+        return extract_answer_from_transcript(payload)
 
-    candidate_texts: list[str] = []
-    for key in ("output", "stdout", "stderr", "message", "result"):
-        value = payload.get(key)
-        if isinstance(value, str):
-            candidate_texts.append(value)
-
-    for text in candidate_texts:
-        candidate = extract_answer_from_transcript(text)
-        if candidate is not None:
-            return candidate
+    if stripped and "\n" not in stripped:
+        return stripped
     return None
 
 
@@ -123,7 +150,10 @@ def _extract_answer_from_artifacts(skill: dict[str, Any], temp_root: Path) -> st
     for artifact_path in skill.get("artifacts", []):
         if not isinstance(artifact_path, str):
             continue
-        candidate_path = temp_root / artifact_path
+        try:
+            candidate_path = _resolve_safe_relative_path(temp_root, artifact_path)
+        except ValueError:
+            continue
         if not candidate_path.exists():
             continue
         try:
@@ -136,8 +166,8 @@ def _extract_answer_from_artifacts(skill: dict[str, Any], temp_root: Path) -> st
     return None
 
 
-def _build_replay_env(registry_path: Path) -> dict[str, str]:
-    return {
+def _build_replay_env(registry_path: Path, clawperator_cmd: list[str]) -> dict[str, str]:
+    env = {
         "PATH": os.environ["PATH"],
         "HOME": os.environ["HOME"],
         "USER": os.environ.get("USER", ""),
@@ -146,6 +176,11 @@ def _build_replay_env(registry_path: Path) -> dict[str, str]:
         "LC_ALL": os.environ.get("LC_ALL", "C.UTF-8"),
         "CLAWPERATOR_SKILLS_REGISTRY": str(registry_path),
     }
+    if len(clawperator_cmd) == 1:
+        candidate = Path(clawperator_cmd[0])
+        if candidate.is_absolute():
+            env["CLAWPERATOR_BIN"] = str(candidate)
+    return env
 
 
 def _load_ground_truth(config: dict[str, Any], result: dict[str, Any]) -> str:
@@ -229,7 +264,7 @@ def run_replay(
             skill_score["replay_status"] = "error"
             return skill_score
 
-        env = _build_replay_env(registry_path)
+        env = _build_replay_env(registry_path, clawperator_cmd)
 
         command = [
             *clawperator_cmd,

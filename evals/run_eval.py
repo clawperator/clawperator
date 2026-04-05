@@ -416,7 +416,7 @@ def main(argv: list[str] | None = None) -> int:
         clawperator_cmd, operator_package, runtime_target = _load_replay_runtime(config)
         device_serial = config.get("environment", {}).get("device_serial")
         if not isinstance(device_serial, str) or not device_serial.strip():
-            device_serial = ""
+            raise SystemExit("replay failed: run artifacts missing environment.device_serial")
         skill_score = run_replay(
             run_dir=run_dir,
             clawperator_cmd=clawperator_cmd,

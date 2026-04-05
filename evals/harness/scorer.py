@@ -111,15 +111,18 @@ def extract_skill(transcript: str, start_marker: str, end_marker: str) -> str | 
     if not matches:
         return None
     candidate = matches[-1].strip()
-    try:
-        json.loads(candidate)
-        return candidate
-    except json.JSONDecodeError:
-        pass
-    try:
-        decoded = json.loads(f'"{candidate}"')
-    except json.JSONDecodeError:
-        return candidate
+    decoded: Any = candidate
+    for _ in range(2):
+        if not isinstance(decoded, str):
+            break
+        try:
+            parsed = json.loads(decoded)
+        except json.JSONDecodeError:
+            break
+        if isinstance(parsed, str):
+            decoded = parsed.strip()
+            continue
+        return decoded if isinstance(decoded, str) else candidate
     if isinstance(decoded, str):
         return decoded.strip()
     return candidate

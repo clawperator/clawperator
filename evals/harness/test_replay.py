@@ -4,7 +4,7 @@ import json
 import subprocess
 from pathlib import Path
 
-from evals.harness.replay import run_replay
+from evals.harness.replay import _build_replay_env, _extract_skill_output, run_replay
 
 
 def _write_json(path: Path, payload: dict) -> None:
@@ -159,3 +159,59 @@ def test_run_replay_prefers_post_run_artifact_answer(monkeypatch, tmp_path):
     assert skill_score["replay_status"] == "pass"
     assert skill_score["replay_answer_normalized"] == "15"
     assert skill_score["replay_answer_correct"] is True
+
+
+def test_extract_skill_output_parses_single_line_json_before_fallback():
+    output = json.dumps(
+        {
+            "durationMs": 999,
+            "exitCode": 7,
+            "output": "CLAWPERATOR_EVAL_ANSWER: 15\n",
+        }
+    )
+
+    assert _extract_skill_output(output) == "15"
+
+
+def test_build_replay_env_sets_clawperator_bin_for_absolute_binary(tmp_path):
+    registry_path = tmp_path / "skills" / "skills-registry.json"
+    env = _build_replay_env(registry_path, ["/opt/homebrew/bin/clawperator"])
+
+    assert env["CLAWPERATOR_BIN"] == "/opt/homebrew/bin/clawperator"
+
+
+def test_run_replay_rejects_path_traversal_in_skill_materialization(tmp_path):
+    transcript = (
+        "before\n"
+        "CLAWPERATOR_SKILL_START\n"
+        "{"
+        "\"id\":\"com.example.android-version\","
+        "\"applicationId\":\"com.example\","
+        "\"intent\":\"android-version\","
+        "\"summary\":\"Determine Android version\","
+        "\"path\":\"skills/com.example.android-version\","
+        "\"skillFile\":\"../escape/SKILL.md\","
+        "\"scripts\":[\"skills/com.example.android-version/scripts/run.js\"],"
+        "\"artifacts\":[],"
+        "\"skillMarkdown\":\"# Generated skill\\n\","
+        "\"scriptContents\":{"
+        "\"skills/com.example.android-version/scripts/run.js\":\"console.log('CLAWPERATOR_EVAL_ANSWER: 15')\\n\""
+        "}"
+        "}"
+        "\nCLAWPERATOR_SKILL_END\n"
+        "after\n"
+    )
+    run_dir = _write_basic_run(tmp_path, transcript)
+
+    skill_score = run_replay(
+        run_dir=run_dir,
+        clawperator_cmd=["clawperator"],
+        operator_package="com.clawperator.operator.dev",
+        device_serial="device-123",
+        timeout_s=1,
+    )
+
+    assert skill_score["skill_emitted"] is True
+    assert skill_score["skill_valid"] is True
+    assert skill_score["replay_attempted"] is True
+    assert skill_score["replay_status"] == "error"
