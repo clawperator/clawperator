@@ -125,8 +125,10 @@ Deterministic rules:
 - All errors in the hint module are silently swallowed. Never throw. Never crash the CLI.
 - State dir `~/.clawperator/` is created with `mkdirSync(..., { recursive: true })` if
   missing, with errors swallowed. Do not assume the directory pre-exists.
-- Hint is always printed after the primary command result has been written to stdout.
-  All hint calls in main() must come after `console.log(result)`.
+- In the command execution path, all hint calls must come after `console.log(result)`
+  in main(). In the `--version` early-exit path, call the hint after version output
+  and before `process.exit(0)`. These are two distinct paths; the rule applies to
+  each independently.
 - In install.sh: TTY check is `[ -t 2 ]` (stderr). Suppression check is
   `[ -n "${CLAWPERATOR_DISABLE_STAR_SUGGESTIONS:-}" ]`.
 

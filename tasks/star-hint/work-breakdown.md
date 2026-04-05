@@ -357,7 +357,10 @@ the command path. Do not modify doctor.ts, skills.ts, or registry.ts.
    - `cmd` is defined at ~line 217 as `const [cmd, ...rest] = global.rest;` and is
      in scope at this point.
    - `process.exitCode` for doctor: `cmdDoctor` sets it before returning, so by the
-     time `console.log(result)` runs it already reflects the doctor outcome.
+     time `console.log(result)` runs it already reflects the doctor outcome. This
+     relies on an observed contract of `cmdDoctor` - not a generic Node.js convention.
+     If `cmdDoctor` is ever refactored to defer exit code setting, this trigger will
+     silently stop firing on success. Flag this in code review if doctor.ts changes.
    - `isSuccessfulSkillsRunResult`: define this as a small local helper function in
      `index.ts` near the hint dispatch block. Its body is the JSON parse heuristic
      described in the comment above. Isolating it in a named function makes the
@@ -483,7 +486,9 @@ Add the bash star hint block to `sites/landing/public/install.sh` near the end o
 
 - `show_star_hint` function exists in install.sh
 - `bash -n sites/landing/public/install.sh` passes (syntax check)
-- `show_star_hint` with `CLAWPERATOR_DISABLE_STAR_SUGGESTIONS=1` produces no output:
+- Behavior validation of `show_star_hint` suppression may be manual. Sourcing
+  `install.sh` directly is side-effectful and not safe in a test environment.
+  Instead, test the function logic in isolation:
   ```bash
   CLAWPERATOR_DISABLE_STAR_SUGGESTIONS=1 \
     bash -c 'show_star_hint() {
@@ -491,9 +496,10 @@ Add the bash star hint block to `sites/landing/public/install.sh` near the end o
       [ -n "${CLAWPERATOR_DISABLE_STAR_SUGGESTIONS:-}" ] && return 0
       echo "should not reach here" >&2
     }; show_star_hint' 2>&1 | wc -c
-  # expected: 0
+  # expected: 0 (suppressed)
   ```
-  (Test the logic in isolation if sourcing install.sh has side effects.)
+  Syntax check and grep are the required automated checks; behavior verification
+  above is sufficient for the suppression path.
 - Grep confirms hint content and stderr redirect exist:
   ```bash
   grep -n "clawpilled/clawperator" sites/landing/public/install.sh
@@ -607,10 +613,21 @@ npm --prefix apps/node run test
 node apps/node/dist/cli/index.js --disable-star-suggestions --help 2>/dev/null
 echo "exit: $?"
 
-# Hint does not appear in JSON output (stdout)
+# Hint is suppressed by env var (suppression works)
 CLAWPERATOR_DISABLE_STAR_SUGGESTIONS=1 \
-  node apps/node/dist/cli/index.js --json --version 2>/dev/null
-# expected: version number on stdout only, no hint text
+  node apps/node/dist/cli/index.js --version 2>&1
+# expected: version number only, no hint text on either stream
+
+# Hint goes to stderr only, not stdout (when hint would fire - first run after version bump)
+# Run once to potentially emit the hint; capture stdout and stderr separately:
+node apps/node/dist/cli/index.js --version \
+  1>/tmp/clawperator-hint-stdout.txt \
+  2>/tmp/clawperator-hint-stderr.txt
+cat /tmp/clawperator-hint-stdout.txt
+# expected: version number only - no hint text on stdout
+cat /tmp/clawperator-hint-stderr.txt
+# expected: hint text here if this was the first run after a version bump, or empty
+# if state already recorded this version
 
 # Hint module has no runtime network or subprocess API usage
 grep -n "\bfetch\b\|axios\|http\.request\|https\.request\|\bspawn\b\|\bexec\b\|child_process" \
