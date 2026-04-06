@@ -175,6 +175,31 @@ describe("maybeShowStarHint", () => {
     assert.strictEqual(state.lastUpgradeHintVersion, pkg.version);
   });
 
+  it("shows upgrade hint again when version differs from last shown", async () => {
+    // Pre-populate state with an old version
+    const stateDir = join(tempRoot, ".clawperator");
+    const stateFile = join(stateDir, "star-hint-state.json");
+    const fs = await import("node:fs/promises");
+    await fs.mkdir(stateDir, { recursive: true });
+    await fs.writeFile(stateFile, JSON.stringify({ lastUpgradeHintVersion: "0.1.0" }), "utf8");
+
+    mockStderr();
+    await maybeShowStarHint("upgrade");
+    restoreStderr();
+
+    // Should show because current version differs from 0.1.0
+    assert.match(capturedStderr, /Clawperator is open source/);
+
+    // Verify state was updated to new version
+    const stateData = await readFile(stateFile, "utf8");
+    const state = JSON.parse(stateData);
+    const { createRequire } = await import("node:module");
+    const require = createRequire(import.meta.url);
+    const pkg = require("../../package.json") as { version: string };
+    assert.strictEqual(state.lastUpgradeHintVersion, pkg.version);
+    assert.notStrictEqual(state.lastUpgradeHintVersion, "0.1.0");
+  });
+
   it("module-level shown guard prevents second hint in same invocation", async () => {
     mockStderr();
 
