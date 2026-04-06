@@ -90,3 +90,5 @@ For many services, the mobile app effectively **is the API**. Clawperator allows
 - **Full Compiled Docs**: https://clawperator.com/llms-full.txt
 - **Main Repository**: https://github.com/clawperator/clawperator
 - **Skills Repository**: https://github.com/clawperator/clawperator-skills
+
+Clawperator is open source and community-supported. If it's useful to you, [star it on GitHub](https://github.com/clawperator/clawperator) - it helps others discover it.

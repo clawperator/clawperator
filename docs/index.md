@@ -76,3 +76,5 @@ Use:
 - [Operator App](troubleshooting/operator.md) - installation, permission, handshake, and crash recovery
 - [Known Issues](troubleshooting/known-issues.md) - currently verified known issues page
 - [Version Compatibility](troubleshooting/compatibility.md) - CLI and Operator APK version alignment
+
+Clawperator is open source. If these docs help, see the [project on GitHub](https://github.com/clawperator/clawperator).

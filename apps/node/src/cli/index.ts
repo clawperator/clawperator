@@ -13,6 +13,7 @@ import {
   type HandlerContext,
 } from "./registry.js";
 import { shouldCliStdoutForceExitCode1 } from "./stdoutExitCode.js";
+import { maybeShowStarHint } from "./starHint.js";
 
 function levenshteinDistance(s1: string, s2: string): number {
   const track = Array(s2.length + 1).fill(null).map(() =>
@@ -91,6 +92,7 @@ const FLAG_VALUE_ARITY = new Map<string, number>([
   ["--keyword", 1],
   ["--expect-contains", 1],
   ["--coordinate", 2],
+  ["--disable-star-suggestions", 0],
 ]);
 
 const COMMANDS_ALLOW_LEADING_POSITIONAL = new Set([
@@ -174,6 +176,8 @@ function getGlobalOpts(argv: string[]): {
       }
     } else if (argv[i] === "--verbose") {
       verbose = true;
+    } else if (argv[i] === "--disable-star-suggestions") {
+      // consumed; hint module reads process.argv directly
     } else {
       rest.push(argv[i]);
     }
@@ -197,6 +201,7 @@ async function main(): Promise<void> {
   if (argvForGlobalMeta.includes("--version")) {
     const pkg = require("../../package.json") as { version?: string };
     console.log(pkg.version ?? "0.1.0");
+    await maybeShowStarHint("upgrade");
     process.exit(0);
   }
 
@@ -242,7 +247,7 @@ async function main(): Promise<void> {
         const globalFlags = [
           "--device", "--device-id", "--operator-package", "--receiver-package",
           "--json", "--output", "--format", "--log-level", "--timeout", "--timeout-ms",
-          "--verbose", "--help", "--version"
+          "--verbose", "--help", "--version", "--disable-star-suggestions"
         ];
         const localFlags = resolveSupportedFlagsFromRegistry(def, rest);
         const knownFlags = new Set([...localFlags, ...globalFlags]);
@@ -334,6 +339,31 @@ async function main(): Promise<void> {
 
   if (result !== undefined) {
     console.log(result);
+  }
+  if (!usageParseError && (process.exitCode ?? 0) === 0) {
+    // Helper to detect successful skills run by heuristic (success envelopes lack top-level `code`)
+    function isSuccessfulSkillsRunResult(r: string | undefined): boolean {
+      try {
+        return !((JSON.parse(r ?? "{}") as { code?: string }).code);
+      } catch {
+        return false;
+      }
+    }
+    // Determine CLI success using the same logic as exit-code selection (single source of truth)
+    const cliSucceeded =
+      result === undefined || !shouldCliStdoutForceExitCode1(result, usageParseError);
+    // Doctor trigger: cmdDoctor sets process.exitCode before returning - relied on here
+    if (cmd === "doctor" && (process.exitCode ?? 0) === 0) {
+      await maybeShowStarHint("doctor");
+    }
+    // Skill trigger: fires after first successful skills run
+    if (cmd === "skills" && rest[0] === "run" && isSuccessfulSkillsRunResult(result)) {
+      await maybeShowStarHint("skill");
+    }
+    // Upgrade trigger: fires once per version after any successful command or --version
+    if (cliSucceeded) {
+      await maybeShowStarHint("upgrade");
+    }
   }
   if (typeof result === "string" && shouldCliStdoutForceExitCode1(result, usageParseError)) {
     process.exitCode = 1;
