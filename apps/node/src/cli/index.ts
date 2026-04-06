@@ -201,7 +201,7 @@ async function main(): Promise<void> {
   if (argvForGlobalMeta.includes("--version")) {
     const pkg = require("../../package.json") as { version?: string };
     console.log(pkg.version ?? "0.1.0");
-    await maybeShowStarHint('upgrade');
+    await maybeShowStarHint("upgrade");
     process.exit(0);
   }
 
@@ -353,16 +353,16 @@ async function main(): Promise<void> {
     const cliSucceeded =
       result === undefined || !shouldCliStdoutForceExitCode1(result, usageParseError);
     // Doctor trigger: cmdDoctor sets process.exitCode before returning - relied on here
-    if (cmd === 'doctor' && (process.exitCode ?? 0) === 0) {
-      await maybeShowStarHint('doctor');
+    if (cmd === "doctor" && (process.exitCode ?? 0) === 0) {
+      await maybeShowStarHint("doctor");
     }
     // Skill trigger: fires after first successful skills run
-    if (cmd === 'skills' && rest[0] === 'run' && isSuccessfulSkillsRunResult(result)) {
-      await maybeShowStarHint('skill');
+    if (cmd === "skills" && rest[0] === "run" && isSuccessfulSkillsRunResult(result)) {
+      await maybeShowStarHint("skill");
     }
     // Upgrade trigger: fires once per version after any successful command or --version
     if (cliSucceeded) {
-      await maybeShowStarHint('upgrade');
+      await maybeShowStarHint("upgrade");
     }
   }
   if (typeof result === "string" && shouldCliStdoutForceExitCode1(result, usageParseError)) {
