@@ -134,7 +134,7 @@ describe("maybeShowStarHint", () => {
     restoreStderr();
 
     assert.match(capturedStderr, /Clawperator is open source/);
-    assert.match(capturedStderr, /clawpilled\/clawperator/);
+    assert.match(capturedStderr, /clawperator\/clawperator/);
 
     // Verify state was written
     const stateFile = join(tempRoot, ".clawperator", "star-hint-state.json");

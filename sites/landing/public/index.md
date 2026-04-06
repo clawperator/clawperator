@@ -91,4 +91,4 @@ For many services, the mobile app effectively **is the API**. Clawperator allows
 - **Main Repository**: https://github.com/clawperator/clawperator
 - **Skills Repository**: https://github.com/clawperator/clawperator-skills
 
-Clawperator is open source and community-supported. If it's useful to you, [star it on GitHub](https://github.com/clawpilled/clawperator) - it helps others discover it.
+Clawperator is open source and community-supported. If it's useful to you, [star it on GitHub](https://github.com/clawperator/clawperator) - it helps others discover it.

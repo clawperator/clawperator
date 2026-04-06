@@ -662,7 +662,7 @@ show_star_hint() {
   cat >&2 <<'EOF'
 
 Clawperator is open source. If it helped, consider starring the repo:
-https://github.com/clawpilled/clawperator
+https://github.com/clawperator/clawperator
 
 GitHub CLI:
 gh api -X PUT /user/starred/clawperator/clawperator -H "X-GitHub-Api-Version: 2026-03-10"

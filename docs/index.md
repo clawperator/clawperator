@@ -77,4 +77,4 @@ Use:
 - [Known Issues](troubleshooting/known-issues.md) - currently verified known issues page
 - [Version Compatibility](troubleshooting/compatibility.md) - CLI and Operator APK version alignment
 
-Clawperator is open source. If these docs help, see the [project on GitHub](https://github.com/clawpilled/clawperator).
+Clawperator is open source. If these docs help, see the [project on GitHub](https://github.com/clawperator/clawperator).
