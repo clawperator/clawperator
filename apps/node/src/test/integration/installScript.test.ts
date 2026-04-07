@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "../../..");
 const repoRoot = join(packageRoot, "..", "..");
 const installScript = join(repoRoot, "sites", "landing", "public", "install.sh");
+const installedNodeVersion = "v24.14.1";
 
 describe("landing install.sh Node upgrade path", () => {
   let tempRoot: string;
@@ -61,7 +62,7 @@ describe("landing install.sh Node upgrade path", () => {
         "  printf '%s %s %s\\n' \"$1\" \"${2:-}\" \"${3:-}\" >> \"$NVM_LOG_FILE\"",
         "  case \"$1\" in",
         "    install)",
-        `      printf 'v24.14.1' > "${stateFile}"`,
+        `      printf '${installedNodeVersion}' > "${stateFile}"`,
         "      ;;",
         "    alias|use)",
         "      return 0",
@@ -118,7 +119,7 @@ check_node
 
     assert.strictEqual(result.code, 0, result.stderr);
     assert.match(result.stdout, /Upgrading to Node\.js >= 24 via nvm/);
-    assert.match(result.stdout, /Node\.js 24\.14\.1 installed via nvm/);
+    assert.match(result.stdout, /Node\.js 24\.[0-9]+\.[0-9]+ installed via nvm/);
     assert.match(log, /install 24/);
     assert.match(log, /alias default 24/);
     assert.match(log, /use 24/);

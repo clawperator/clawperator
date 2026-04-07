@@ -7,17 +7,19 @@ import { FakeProcessRunner } from "../fakes/FakeProcessRunner.js";
 
 describe("Doctor: hostChecks", () => {
     function withNodeVersion(version: string, fn: () => Promise<void> | void): Promise<void> | void {
-        const originalVersion = process.version;
+        const originalVersionDescriptor = Object.getOwnPropertyDescriptor(process, "version");
         Object.defineProperty(process, "version", {
             configurable: true,
             value: version,
         });
 
         const restore = () => {
-            Object.defineProperty(process, "version", {
-                configurable: true,
-                value: originalVersion,
-            });
+            if (originalVersionDescriptor) {
+                Object.defineProperty(process, "version", originalVersionDescriptor);
+                return;
+            }
+
+            Reflect.deleteProperty(process as unknown as Record<string, unknown>, "version");
         };
 
         try {
