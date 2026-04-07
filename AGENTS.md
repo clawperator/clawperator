@@ -221,6 +221,7 @@ When multiple devices are connected (physical + emulator), be explicit about whi
 - Skills smoke: `./scripts/clawperator_smoke_skills.sh`
 - Canonical integration check (opt-in): `CLAWPERATOR_RUN_INTEGRATION=1 ./scripts/clawperator_integration_canonical.sh`
 - Formatting/quality: `./scripts/apply_coding_standards.sh -f`
+- Repo-specific validation harnesses belong in `validation/` and should be wired into CI there, not added as one-off scripts under `scripts/`.
 
 ## Security and Privacy Guardrails
 - Do not hardcode personal names, device identifiers, or local machine paths.

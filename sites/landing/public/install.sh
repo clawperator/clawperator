@@ -108,13 +108,12 @@ check_java() {
                 echo -e "${YELLOW}Please install Java 17 manually from: https://adoptium.net/temurin/releases/${NC}"
                 return 1
             fi
-            # Set JAVA_HOME only if not already set to a valid path
-            if [ -z "${JAVA_HOME:-}" ] || ! echo "$JAVA_HOME" | grep -q "jdk"; then
-                local temurin_home="/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home"
-                if [ -d "$temurin_home" ]; then
-                    export JAVA_HOME="$temurin_home"
-                    echo -e "${BLUE}Set JAVA_HOME to $temurin_home${NC}"
-                fi
+            # Point the current shell at the newly installed JDK 17 so Gradle
+            # does not keep using an older JAVA_HOME from before the install.
+            local temurin_home="${CLAWPERATOR_TEMURIN_17_HOME:-/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home}"
+            if [ -d "$temurin_home" ]; then
+                export JAVA_HOME="$temurin_home"
+                echo -e "${BLUE}Set JAVA_HOME to $temurin_home${NC}"
             fi
         else
             echo -e "${RED}❌ Homebrew not found. Please install Java 17 manually:${NC}"
@@ -903,4 +902,6 @@ main() {
     show_star_hint
 }
 
-main
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    main "$@"
+fi

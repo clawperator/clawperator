@@ -149,10 +149,13 @@ jobs:
         run: npm --prefix apps/node run build
 
       - name: Make validation scripts executable
-        run: chmod +x validation/test_doctor.sh validation/test_install_multidevice.sh
+        run: chmod +x validation/test_doctor.sh validation/test_install_multidevice.sh validation/test_install_java.sh
 
       - name: Run doctor validation
         run: bash validation/test_doctor.sh
 
       - name: Run multi-device install validation
         run: bash validation/test_install_multidevice.sh
+
+      - name: Run Java install validation
+        run: bash validation/test_install_java.sh
