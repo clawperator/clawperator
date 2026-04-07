@@ -47,14 +47,10 @@ on_error() {
 trap cleanup_temp_files EXIT
 trap 'on_error $LINENO' ERR
 
-echo -e "${BLUE}════════════════════════════════════════════════════════════════${NC}"
-echo -e "${BLUE}  Clawperator Installation Script${NC}"
-echo -e "${BLUE}════════════════════════════════════════════════════════════════${NC}"
-
 # 1. OS Detection
 # Allow tests to inject OS via an exported variable; detect automatically otherwise.
+# Assigned at top level so all functions can reference $OS when sourced.
 OS="${OS:-$(uname -s)}"
-echo -e "${BLUE}OS detected: $OS${NC}"
 
 validate_os() {
     case "$OS" in
@@ -90,21 +86,6 @@ java_install_conflict_detected() {
             return 0
             ;;
     esac
-    return 1
-}
-
-java_home_has_supported_version() {
-    if [ -z "${JAVA_HOME:-}" ] || [ ! -x "${JAVA_HOME}/bin/java" ]; then
-        return 1
-    fi
-
-    local java_home_output
-    java_home_output="$("${JAVA_HOME}/bin/java" -version 2>&1)"
-    if java_output_is_supported "$java_home_output"; then
-        printf '%s\n' "$java_home_output"
-        return 0
-    fi
-
     return 1
 }
 
@@ -167,6 +148,7 @@ check_java() {
                 export JAVA_HOME="$temurin_home"
                 echo -e "${BLUE}Set JAVA_HOME to $temurin_home${NC}"
                 export PATH="${temurin_home}/bin:${PATH}"
+                hash -r
             fi
         else
             echo -e "${RED}❌ Homebrew not found. Please install Java 17 manually:${NC}"
@@ -226,7 +208,7 @@ check_java() {
         local new_version_output
         new_version_output=$(java -version 2>&1)
         if java_output_is_supported "$new_version_output"; then
-            echo -e "${GREEN}✅ Java 17 installed successfully.${NC}"
+            echo -e "${GREEN}✅ Java detected successfully: $(java_version_first_line "$new_version_output")${NC}"
             return 0
         fi
     fi
@@ -885,6 +867,10 @@ run_doctor_and_fix() {
 
 # Main
 main() {
+    echo -e "${BLUE}════════════════════════════════════════════════════════════════${NC}"
+    echo -e "${BLUE}  Clawperator Installation Script${NC}"
+    echo -e "${BLUE}════════════════════════════════════════════════════════════════${NC}"
+    echo -e "${BLUE}OS detected: $OS${NC}"
     validate_os || exit 1
     check_java || exit 1
     check_node || exit 1

@@ -130,7 +130,7 @@ EOF
     fi
 
     assert_contains "Set JAVA_HOME to $temurin_home" "$case_dir/output.txt"
-    assert_contains "Java 17 installed successfully." "$case_dir/output.txt"
+    assert_contains "Java detected successfully:" "$case_dir/output.txt"
 )
 
 run_linux_conflict_case() (
