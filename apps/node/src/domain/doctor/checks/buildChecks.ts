@@ -31,13 +31,23 @@ export async function checkJavaVersion(config: RuntimeConfig): Promise<DoctorChe
       summary: "Java 17 or 21 is required for Android builds.",
       detail: versionOutput.split("\n")[0],
     };
-  } catch {
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if ((error as NodeJS.ErrnoException | undefined)?.code === "ENOENT") {
+      return {
+        id: "host.java.version",
+        status: "fail",
+        code: ERROR_CODES.HOST_DEPENDENCY_MISSING,
+        summary: "Java not found.",
+        detail: "Java JDK 17 or 21 is required to build Android apps.",
+      };
+    }
     return {
       id: "host.java.version",
       status: "fail",
       code: ERROR_CODES.HOST_DEPENDENCY_MISSING,
-      summary: "Java not found.",
-      detail: "Java JDK 17 or 21 is required to build Android apps.",
+      summary: "Failed to check Java version.",
+      detail: `Java JDK 17 or 21 is required to build Android apps. Check failed with: ${message}`,
     };
   }
 }

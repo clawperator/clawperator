@@ -74,6 +74,17 @@ java_output_is_supported() {
     return 1
 }
 
+java_output_indicates_missing_runtime() {
+    local output_lower
+    output_lower="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
+    case "$output_lower" in
+        *"no java runtime present"*|*"unable to locate a java runtime"*)
+            return 0
+            ;;
+    esac
+    return 1
+}
+
 java_version_first_line() {
     printf '%s\n' "$1" | head -n 1
 }
@@ -96,6 +107,7 @@ check_java() {
     local java_version_output=""
     local java_check_status="missing"
     local java_home_output=""
+    local java_version_status=0
 
     # Prefer a valid JAVA_HOME before touching the system install.
     if [ -n "${JAVA_HOME:-}" ] && [ -x "${JAVA_HOME}/bin/java" ]; then
@@ -111,9 +123,16 @@ check_java() {
 
     # Check if java is on PATH
     if command -v java &> /dev/null; then
-        java_version_output=$(java -version 2>&1)
-        if java_output_is_supported "$java_version_output"; then
+        if java_version_output="$(java -version 2>&1)"; then
+            java_version_status=0
+        else
+            java_version_status=$?
+        fi
+
+        if [ "$java_version_status" -eq 0 ] && java_output_is_supported "$java_version_output"; then
             java_check_status="valid"
+        elif java_output_indicates_missing_runtime "$java_version_output"; then
+            java_check_status="missing"
         else
             java_check_status="incompatible"
         fi
@@ -206,17 +225,16 @@ check_java() {
     hash -r
     if command -v java &> /dev/null; then
         local new_version_output
-        new_version_output=$(java -version 2>&1)
-        if java_output_is_supported "$new_version_output"; then
-            echo -e "${GREEN}✅ Java detected successfully: $(java_version_first_line "$new_version_output")${NC}"
-            return 0
+        if new_version_output="$(java -version 2>&1)"; then
+            if java_output_is_supported "$new_version_output"; then
+                echo -e "${GREEN}✅ Java detected successfully: $(java_version_first_line "$new_version_output")${NC}"
+                return 0
+            fi
         fi
+        echo -e "${YELLOW}Current shell still resolves: $(java_version_first_line "$new_version_output")${NC}"
     fi
 
     echo -e "${RED}❌ Java installation verification failed.${NC}"
-    if command -v java &> /dev/null; then
-        echo -e "${YELLOW}Current shell still resolves: $(java_version_first_line "$(java -version 2>&1)")${NC}"
-    fi
     echo -e "${YELLOW}Please install Java 17 manually from: https://adoptium.net/temurin/releases/${NC}"
     return 1
 }

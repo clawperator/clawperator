@@ -133,6 +133,57 @@ EOF
     assert_contains "Java detected successfully:" "$case_dir/output.txt"
 )
 
+run_macos_java_stub_case() (
+    local case_dir="$1"
+    local stub_bin="$case_dir/bin"
+    local temurin_home="$case_dir/java-home/temurin-17"
+    local version_file="$case_dir/java-version.txt"
+
+    mkdir -p "$stub_bin" "$temurin_home/bin"
+    printf '%s\n' 'No Java runtime present, requesting install.' > "$version_file"
+
+    cat > "$stub_bin/java" <<EOF
+#!/usr/bin/env bash
+cat "$version_file" >&2
+exit 1
+EOF
+
+    cat > "$temurin_home/bin/java" <<EOF
+#!/usr/bin/env bash
+cat "$version_file" >&2
+EOF
+
+    cat > "$stub_bin/brew" <<EOF
+#!/usr/bin/env bash
+printf '%s\n' 'brew install --cask temurin@17' >&2
+printf '%s\n' 'openjdk version "17.0.9" 2023-10-17' > "$version_file"
+exit 0
+EOF
+
+    chmod +x "$stub_bin/java" "$stub_bin/brew" "$temurin_home/bin/java"
+
+    export PATH="$stub_bin:$PATH"
+    export OS=Darwin
+    unset JAVA_HOME || true
+    export CLAWPERATOR_TEMURIN_17_HOME="$temurin_home"
+    hash -r
+
+    # shellcheck disable=SC1090
+    source "$INSTALL_SCRIPT"
+
+    check_java > "$case_dir/output.txt"
+
+    if [ "$JAVA_HOME" != "$temurin_home" ]; then
+        echo "Expected JAVA_HOME to be set to the installed Temurin JDK."
+        echo "Got: $JAVA_HOME"
+        exit 1
+    fi
+
+    assert_contains "Java not found. Installing Java 17" "$case_dir/output.txt"
+    assert_contains "Set JAVA_HOME to $temurin_home" "$case_dir/output.txt"
+    assert_contains "Java detected successfully:" "$case_dir/output.txt"
+)
+
 run_linux_conflict_case() (
     local case_dir="$1"
     local stub_bin="$case_dir/bin"
@@ -193,6 +244,7 @@ EOF
 
 run_valid_java_home_case "$TMP_DIR/valid-java-home"
 run_homebrew_install_case "$TMP_DIR/homebrew-install"
+run_macos_java_stub_case "$TMP_DIR/macos-java-stub"
 run_linux_conflict_case "$TMP_DIR/linux-conflict"
 
 echo "validation/test_install_java.sh: pass"
