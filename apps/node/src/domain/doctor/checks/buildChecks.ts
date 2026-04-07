@@ -6,13 +6,32 @@ import { runAdb } from "../../../adapters/android-bridge/adbClient.js";
 
 export async function checkJavaVersion(config: RuntimeConfig): Promise<DoctorCheckResult> {
   try {
-    const { stdout, stderr } = await config.runner.run("java", ["-version"]);
+    const { stdout, stderr, error } = await config.runner.run("java", ["-version"]);
+    if (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        return {
+          id: "host.java.version",
+          status: "fail",
+          code: ERROR_CODES.HOST_DEPENDENCY_MISSING,
+          summary: "Java not found.",
+          detail: "Java JDK 17 or 21 is required to build Android apps.",
+        };
+      }
+      return {
+        id: "host.java.version",
+        status: "fail",
+        code: ERROR_CODES.HOST_DEPENDENCY_MISSING,
+        summary: "Failed to check Java version.",
+        detail: `Java JDK 17 or 21 is required to build Android apps. Check failed with: ${message}`,
+      };
+    }
     const versionOutput = (stdout + stderr).toLowerCase();
     if (versionOutput.includes('version "17') || versionOutput.includes('version "21') || versionOutput.includes('openjdk 17') || versionOutput.includes('openjdk 21')) {
       return {
         id: "host.java.version",
         status: "pass",
-        summary: "Java 17+ is installed.",
+        summary: "Java 17 or 21 is installed.",
       };
     }
     return {
@@ -22,12 +41,23 @@ export async function checkJavaVersion(config: RuntimeConfig): Promise<DoctorChe
       summary: "Java 17 or 21 is required for Android builds.",
       detail: versionOutput.split("\n")[0],
     };
-  } catch {
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if ((error as NodeJS.ErrnoException | undefined)?.code === "ENOENT") {
+      return {
+        id: "host.java.version",
+        status: "fail",
+        code: ERROR_CODES.HOST_DEPENDENCY_MISSING,
+        summary: "Java not found.",
+        detail: "Java JDK 17 or 21 is required to build Android apps.",
+      };
+    }
     return {
       id: "host.java.version",
       status: "fail",
-      summary: "Java not found.",
-      detail: "Java JDK 17+ is required to build Android apps.",
+      code: ERROR_CODES.HOST_DEPENDENCY_MISSING,
+      summary: "Failed to check Java version.",
+      detail: `Java JDK 17 or 21 is required to build Android apps. Check failed with: ${message}`,
     };
   }
 }

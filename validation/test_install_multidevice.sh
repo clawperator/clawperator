@@ -7,8 +7,7 @@ REPO_ROOT="$(pwd)"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
-INSTALL_SH_NO_MAIN="$TMP_DIR/install.no-main.sh"
-sed '$d' "$REPO_ROOT/sites/landing/public/install.sh" > "$INSTALL_SH_NO_MAIN"
+INSTALL_SCRIPT="$REPO_ROOT/sites/landing/public/install.sh"
 
 assert_exit_code() {
     local actual="$1"
@@ -113,7 +112,7 @@ run_scenario() {
         set +e
         maybe_install_operator_apk >"$2" 2>"$3"
         printf "%s" "$?" >"$4"
-    ' _ "$INSTALL_SH_NO_MAIN" "$stdout_file" "$stderr_file" "$status_file" "$mock_dir/clawperator"
+    ' _ "$INSTALL_SCRIPT" "$stdout_file" "$stderr_file" "$status_file" "$mock_dir/clawperator"
 
     local actual_exit
     actual_exit="$(cat "$status_file")"

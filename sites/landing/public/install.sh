@@ -47,13 +47,10 @@ on_error() {
 trap cleanup_temp_files EXIT
 trap 'on_error $LINENO' ERR
 
-echo -e "${BLUE}════════════════════════════════════════════════════════════════${NC}"
-echo -e "${BLUE}  Clawperator Installation Script${NC}"
-echo -e "${BLUE}════════════════════════════════════════════════════════════════${NC}"
-
 # 1. OS Detection
-OS="$(uname -s)"
-echo -e "${BLUE}OS detected: $OS${NC}"
+# Allow tests to inject OS via an exported variable; detect automatically otherwise.
+# Assigned at top level so all functions can reference $OS when sourced.
+OS="${OS:-$(uname -s)}"
 
 validate_os() {
     case "$OS" in
@@ -66,7 +63,183 @@ validate_os() {
     esac
 }
 
-# 2. Check Node.js >= 22
+java_output_is_supported() {
+    local output_lower
+    output_lower="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
+    case "$output_lower" in
+        *'version "17'*|*'version "21'*|*'openjdk 17'*|*'openjdk 21'*)
+            return 0
+            ;;
+    esac
+    return 1
+}
+
+java_output_indicates_missing_runtime() {
+    local output_lower
+    output_lower="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
+    case "$output_lower" in
+        *"no java runtime present"*|*"unable to locate a java runtime"*)
+            return 0
+            ;;
+    esac
+    return 1
+}
+
+java_version_first_line() {
+    printf '%s\n' "$1" | head -n 1
+}
+
+java_install_conflict_detected() {
+    local output_lower
+    output_lower="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
+    case "$output_lower" in
+        *conflict*|*"held broken packages"*|*"conflicting files"*|*"failed to commit transaction"*|*"would remove"*)
+            return 0
+            ;;
+    esac
+    return 1
+}
+
+# 2. Check Java (Java 17 or 21 required for Android builds)
+# Returns: 0 if valid Java is available, 1 on failure
+# Three-state detection: valid (skip), missing (install), incompatible (warn+install)
+check_java() {
+    local java_version_output=""
+    local java_check_status="missing"
+    local java_home_output=""
+    local java_version_status=0
+
+    # Prefer a valid JAVA_HOME before touching the system install.
+    if [ -n "${JAVA_HOME:-}" ] && [ -x "${JAVA_HOME}/bin/java" ]; then
+        java_home_output="$("${JAVA_HOME}/bin/java" -version 2>&1 || true)"
+        if java_output_is_supported "$java_home_output"; then
+            java_version_output="$java_home_output"
+            export PATH="${JAVA_HOME}/bin:${PATH}"
+            hash -r
+            echo -e "${GREEN}✅ Java detected via JAVA_HOME: $(java_version_first_line "$java_version_output")${NC}"
+            return 0
+        fi
+    fi
+
+    # Check if java is on PATH
+    if command -v java &> /dev/null; then
+        if java_version_output="$(java -version 2>&1)"; then
+            java_version_status=0
+        else
+            java_version_status=$?
+        fi
+
+        if [ "$java_version_status" -eq 0 ] && java_output_is_supported "$java_version_output"; then
+            java_check_status="valid"
+        elif java_output_indicates_missing_runtime "$java_version_output"; then
+            java_check_status="missing"
+        else
+            java_check_status="incompatible"
+        fi
+    fi
+
+    case "$java_check_status" in
+        valid)
+            echo -e "${GREEN}✅ Java detected: $(java_version_first_line "$java_version_output")${NC}"
+            return 0
+            ;;
+        incompatible)
+            echo -e "${YELLOW}⚠️  Incompatible Java version detected:${NC}"
+            echo -e "${YELLOW}   $(java_version_first_line "$java_version_output")${NC}"
+            echo -e "${YELLOW}   Java 17 or 21 is required for Android builds. Installing Java 17...${NC}"
+            ;;
+        missing)
+            echo -e "${YELLOW}⚠️  Java not found. Installing Java 17...${NC}"
+            ;;
+    esac
+
+    # Provisioning based on platform
+    if [ "$OS" == "Darwin" ]; then
+        if command -v brew &> /dev/null; then
+            echo "Installing Temurin JDK 17 via Homebrew..."
+            if ! brew install --cask temurin@17; then
+                echo -e "${RED}❌ Failed to install Java via Homebrew.${NC}"
+                echo -e "${YELLOW}Please install Java 17 manually from: https://adoptium.net/temurin/releases/${NC}"
+                return 1
+            fi
+            local temurin_home="${CLAWPERATOR_TEMURIN_17_HOME:-/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home}"
+            if [ -d "$temurin_home" ]; then
+                export JAVA_HOME="$temurin_home"
+                echo -e "${BLUE}Set JAVA_HOME to $temurin_home${NC}"
+                export PATH="${temurin_home}/bin:${PATH}"
+                hash -r
+            fi
+        else
+            echo -e "${RED}❌ Homebrew not found. Please install Java 17 manually:${NC}"
+            echo -e "${YELLOW}https://adoptium.net/temurin/releases/${NC}"
+            return 1
+        fi
+    elif [ "$OS" == "Linux" ]; then
+        if command -v apt-get &> /dev/null; then
+            echo "Installing OpenJDK 17 via apt..."
+            if ! sudo apt-get update; then
+                echo -e "${RED}❌ Failed to update apt package lists.${NC}"
+                echo -e "${YELLOW}Please install Java 17 manually from: https://adoptium.net/temurin/releases/${NC}"
+                return 1
+            fi
+            local apt_install_output
+            if ! apt_install_output="$(sudo apt-get install -y openjdk-17-jdk 2>&1)"; then
+                if java_install_conflict_detected "$apt_install_output"; then
+                    echo -e "${RED}❌ The package manager reported a conflict that may require removing the existing JDK.${NC}"
+                    echo -e "${YELLOW}Please install Java 17 manually from: https://adoptium.net/temurin/releases/${NC}"
+                    printf '%s%s%s\n' "$YELLOW" "$apt_install_output" "$NC"
+                    return 1
+                fi
+                echo -e "${RED}❌ Failed to install Java via apt.${NC}"
+                printf '%s%s%s\n' "$YELLOW" "$apt_install_output" "$NC"
+                echo -e "${YELLOW}Please install Java 17 manually from: https://adoptium.net/temurin/releases/${NC}"
+                return 1
+            fi
+        elif command -v pacman &> /dev/null; then
+            echo "Installing OpenJDK 17 via pacman..."
+            local pacman_install_output
+            if ! pacman_install_output="$(sudo pacman -S --noconfirm jdk17-openjdk 2>&1)"; then
+                if java_install_conflict_detected "$pacman_install_output"; then
+                    echo -e "${RED}❌ The package manager reported a conflict that may require removing the existing JDK.${NC}"
+                    echo -e "${YELLOW}Please install Java 17 manually from: https://adoptium.net/temurin/releases/${NC}"
+                    printf '%s%s%s\n' "$YELLOW" "$pacman_install_output" "$NC"
+                    return 1
+                fi
+                echo -e "${RED}❌ Failed to install Java via pacman.${NC}"
+                printf '%s%s%s\n' "$YELLOW" "$pacman_install_output" "$NC"
+                echo -e "${YELLOW}Please install Java 17 manually from: https://adoptium.net/temurin/releases/${NC}"
+                return 1
+            fi
+        else
+            echo -e "${RED}❌ Unsupported Linux distribution. Please install Java 17 manually:${NC}"
+            echo -e "${YELLOW}https://adoptium.net/temurin/releases/${NC}"
+            return 1
+        fi
+    else
+        echo -e "${RED}❌ Unsupported OS for automatic Java installation.${NC}"
+        echo -e "${YELLOW}Please install Java 17 manually from: https://adoptium.net/temurin/releases/${NC}"
+        return 1
+    fi
+
+    # Verify installation
+    hash -r
+    if command -v java &> /dev/null; then
+        local new_version_output
+        if new_version_output="$(java -version 2>&1)"; then
+            if java_output_is_supported "$new_version_output"; then
+                echo -e "${GREEN}✅ Java detected successfully: $(java_version_first_line "$new_version_output")${NC}"
+                return 0
+            fi
+        fi
+        echo -e "${YELLOW}Current shell still resolves: $(java_version_first_line "$new_version_output")${NC}"
+    fi
+
+    echo -e "${RED}❌ Java installation verification failed.${NC}"
+    echo -e "${YELLOW}Please install Java 17 manually from: https://adoptium.net/temurin/releases/${NC}"
+    return 1
+}
+
+# 3. Check Node.js >= 22
 load_nvm() {
     export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
     if [ -s "$NVM_DIR/nvm.sh" ]; then
@@ -712,7 +885,12 @@ run_doctor_and_fix() {
 
 # Main
 main() {
+    echo -e "${BLUE}════════════════════════════════════════════════════════════════${NC}"
+    echo -e "${BLUE}  Clawperator Installation Script${NC}"
+    echo -e "${BLUE}════════════════════════════════════════════════════════════════${NC}"
+    echo -e "${BLUE}OS detected: $OS${NC}"
     validate_os || exit 1
+    check_java || exit 1
     check_node || exit 1
     check_curl || exit 1
     check_adb || exit 1
@@ -800,4 +978,4 @@ main() {
     show_star_hint
 }
 
-main
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then main "$@"; fi

@@ -9,12 +9,15 @@ Get from an empty host to a first successful `clawperator snapshot --json` with 
 | Requirement | Minimum | Machine check |
 | --- | --- | --- |
 | Node.js | v22+ | `node -v` |
+| Java | 17 or 21 | `java -version` |
 | adb | On `PATH` | `adb version` |
 | Android target | One device or emulator visible to adb | `clawperator devices` |
 
+**Java note:** The installer provisions Java 17 automatically on supported platforms (macOS with Homebrew, Ubuntu/Debian, Arch). Java 17 or 21 is required as the host JDK for Android builds (AGP 8.x requirement). The Android Gradle build compiles Java and Kotlin with Java 17 settings; device compatibility is handled by Android's DEX pipeline, not by targeting an older bytecode level.
+
 ## 1. Install the CLI
 
-Recommended - the installer handles Node, adb, CLI, APK download, and device setup in one step:
+Recommended - the installer handles Node, Java 17, adb, CLI, APK download, and device setup in one step:
 
 ```bash
 curl -fsSL https://clawperator.com/install.sh | bash
@@ -130,6 +133,7 @@ clawperator doctor --json --device <device_serial> --operator-package com.clawpe
 | Check ID | What it verifies |
 | --- | --- |
 | `host.node.version` | Node.js >= 22 |
+| `host.java.version` | Java 17 or 21 is installed |
 | `host.adb.presence` | adb is installed and on PATH |
 | `host.adb.server` | adb server starts successfully |
 | `device.discovery` | At least one device is connected and in state `device` |
