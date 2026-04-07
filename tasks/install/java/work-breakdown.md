@@ -128,6 +128,8 @@ and provision one when needed before the rest of the install flow depends on it.
 
 **Mechanical:**
 - `bash -n sites/landing/public/install.sh` exits 0.
+- After a smoke run on a host with no prior Java: `java -version 2>&1 | grep -E 'version "17|openjdk 17'` exits 0.
+- After a smoke run: `clawperator doctor --full --format json` reports `host.java.version` as `pass`.
 
 **Human review:**
 - The Java detection helper uses the exact substring patterns from `buildChecks.ts`,
@@ -140,10 +142,19 @@ and provision one when needed before the rest of the install flow depends on it.
 ### Phase 1 Validation
 
 ```bash
+# Syntax check
 bash -n sites/landing/public/install.sh
+
+# After smoke run on a host with no prior Java:
+java -version 2>&1 | grep -E 'version "17|openjdk 17'
+
+# Confirm the doctor check that the installer is meant to unblock now passes:
+clawperator doctor --full --format json
 ```
 
-One local install smoke run in a disposable environment or against a safe test host.
+The smoke run must be on a host without a pre-existing valid Java install to
+actually exercise the provisioning path. A machine that already has Java 17
+only validates the skip path.
 
 ### Expected Commit
 
@@ -217,6 +228,8 @@ docs(setup): update Java requirements and installer behavior after Java 17 provi
 ## Completion Criteria
 
 - The installer provisions Java 17 on supported hosts when no valid JDK is found.
+- After provisioning, `java -version` matches the accepted patterns and
+  `clawperator doctor --full` reports `host.java.version` as `pass`.
 - Hosts with Java 17 or 21 already installed are left alone.
 - Hosts with an incompatible Java version get a clear warning and a Java 17
   install attempt without clobbering the existing install.
