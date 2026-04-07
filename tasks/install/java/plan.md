@@ -45,11 +45,6 @@ builds require a host JDK.
 
 - Add Java detection and provisioning to `sites/landing/public/install.sh`.
 - Keep the existing installer flow deterministic and idempotent.
-- Upgrade `build.gradle.kts` Java toolchain and `sourceCompatibility`/`targetCompatibility`
-  from `VERSION_11` to `VERSION_17` to align the Gradle build files with the actual
-  host JDK requirement. AGP 8.13.2 requires Java 17+ and this removes the misleading
-  discrepancy where the Gradle files advertise Java 11 but Java 17 is required to run
-  the build.
 - Update setup docs to reflect the new installer capability and the remaining
   prerequisites.
 - Validate the landing-site and docs-site generated outputs after the source edits land.
@@ -59,7 +54,9 @@ builds require a host JDK.
 - Do not teach `clawperator doctor` to install Java.
 - Do not add or depend on `gradle/gradle-daemon-jvm.properties`.
 - Do not make Java 21 a hard requirement for the repo.
-- Do not change minSdk, targetSdk, compileSdk, or any Android API level settings.
+- Do not change any Gradle build files (`build.gradle.kts` or module-level
+  `.gradle.kts` files). The Android build toolchain migration from Java 11 to
+  Java 17 is a separate task: `tasks/android/java17-migration/`.
 
 ## Existing Artifact Scope
 
@@ -70,7 +67,6 @@ builds require a host JDK.
 | Surface | Owned files | Notes |
 | --- | --- | --- |
 | Landing site install flow | `sites/landing/public/install.sh` | Primary implementation surface |
-| Android build configuration | `build.gradle.kts` | Upgrade Java toolchain and sourceCompatibility/targetCompatibility from VERSION_11 to VERSION_17 |
 | Setup documentation | `docs/setup.md` | Must explain the new installer behavior |
 | Doctor documentation | `docs/api/doctor.md` | Update only if wording needs to stay aligned with the installer flow |
 
@@ -80,25 +76,20 @@ builds require a host JDK.
 | --- | --- |
 | Installer responsibilities | `sites/landing/public/install.sh` |
 | Accepted Java versions and exact version-string match patterns | `apps/node/src/domain/doctor/checks/buildChecks.ts` (line 11) |
-| Authoritative build-level reason for Java 17 minimum | AGP 8.x (8.13.2, `gradle/libs.versions.toml`) requires Java 17+ as the host JDK |
-| Gradle version in use | `gradle/wrapper/gradle-wrapper.properties` (Gradle 8.13) |
 | Doctor sequencing and `--full` behavior | `apps/node/src/domain/doctor/DoctorService.ts` |
 | User-facing setup instructions | `docs/setup.md` |
 | Doctor contract text | `docs/api/doctor.md` |
 
 ### Why Java 17, not Java 11
 
-`build.gradle.kts` sets `sourceCompatibility = JavaVersion.VERSION_11` and
-`toolchain { languageVersion.set(JavaLanguageVersion.of(11)) }`. This is the
-**bytecode compatibility target** for the compiled Android app, chosen to match
-the minSdk requirement (Android 5.0+). It is not the host JDK requirement.
+The Android module `.gradle.kts` files set `sourceCompatibility = JavaVersion.VERSION_11`.
+This is the **bytecode compatibility target** for the compiled Android app, not
+the host JDK requirement. AGP 8.x requires Java 17+ as the host JDK to run the
+Gradle build, and the doctor check correctly enforces this by accepting only
+Java 17 or 21.
 
-**AGP 8.x requires Java 17+ as the host JDK** to run the Gradle build. The
-project uses AGP 8.13.2. A host with Java 11 will fail to build. The doctor
-check correctly enforces this by accepting only Java 17 or 21.
-
-The installer must provision Java 17, not Java 11, even though the project
-bytecode targets Java 11.
+The installer must provision Java 17, not Java 11. The bytecode target migration
+is tracked separately in `tasks/android/java17-migration/`.
 
 ### Exact accepted patterns from `buildChecks.ts`
 

@@ -23,9 +23,8 @@ flow. Phase 2 updates docs and validates the generated site outputs.
 
 - Keep `doctor` read-only for Java. Do not add Java installation logic there.
 - Do not add or depend on `gradle/gradle-daemon-jvm.properties`.
-- Upgrade `build.gradle.kts` from Java 11 to Java 17 for the toolchain,
-  sourceCompatibility, targetCompatibility, and detekt jvmTarget. Do not
-  change minSdk, targetSdk, compileSdk, or any other settings.
+- Do not change any Gradle build files. The Android toolchain migration is a
+  separate task: `tasks/android/java17-migration/`.
 - The install target is Java 17 LTS. Do not provision Java 21 unless Java 17 is
   unavailable on the target platform.
 - The version check in the installer must match the exact string-match logic in
@@ -52,9 +51,6 @@ Read these files IN THIS ORDER before writing anything.
 | --- | --- |
 | `tasks/install/java/plan.md` | Stable contract, decision rules, version check patterns, and AGP rationale |
 | `apps/node/src/domain/doctor/checks/buildChecks.ts` | The exact string patterns that determine whether a Java install is valid (`version "17`, `version "21`, `openjdk 17`, `openjdk 21`). The installer must mirror this check exactly. |
-| `build.gradle.kts` | Contains `sourceCompatibility = JavaVersion.VERSION_11` - this is a bytecode target, not a host JDK requirement. Do not treat it as evidence that Java 11 is acceptable. |
-| `gradle/libs.versions.toml` | AGP version (8.13.2). AGP 8.x requires Java 17+ host JDK. |
-| `gradle/wrapper/gradle-wrapper.properties` | Gradle 8.13. Confirms build tool versions in use. |
 | `sites/landing/public/install.sh` | Current installer flow. Read the `main()` function and all `check_*` helpers to understand the pattern to follow. |
 | `docs/setup.md` | User-facing setup instructions - update in phase 2. |
 | `docs/api/doctor.md` | Doctor contract text - update only if wording needs alignment. |
@@ -65,7 +61,7 @@ Read these files IN THIS ORDER before writing anything.
 | --- | --- | --- | --- | --- |
 | PR-1 | Close the host Java provisioning gap in the install flow and align docs | phase-1, phase-2 | thinking for phase-1, default for phase-2 | all validation commands pass |
 
-## Phase 1: Upgrade Gradle Toolchain and Add Java Provisioning to the Installer
+## Phase 1: Add Java Provisioning to the Installer
 
 ### Agent Tier
 
@@ -73,13 +69,11 @@ thinking
 
 ### Goal
 
-1. Upgrade the Gradle build toolchain from Java 11 to Java 17 in `build.gradle.kts`.
-2. Teach `sites/landing/public/install.sh` to detect an acceptable Java install
-   and provision one when needed before the rest of the install flow depends on it.
+Teach `sites/landing/public/install.sh` to detect an acceptable Java install
+and provision one when needed before the rest of the install flow depends on it.
 
 ### Files or Surfaces To Change
 
-- `build.gradle.kts` - toolchain and sourceCompatibility/targetCompatibility upgrade
 - `sites/landing/public/install.sh` - Java detection and provisioning helper
 
 ### Required Steps
@@ -87,15 +81,7 @@ thinking
 1. Read all required reading files in the order listed. Pay particular attention
    to the version-check patterns in `buildChecks.ts` and the `check_*` helper
    pattern in `install.sh`.
-2. **Upgrade `build.gradle.kts`:**
-   - Change `sourceCompatibility = JavaVersion.VERSION_11` to `JavaVersion.VERSION_17`
-     in both `JavaPluginExtension` and `BaseExtension.compileOptions` blocks.
-   - Change `targetCompatibility = JavaVersion.VERSION_11` to `JavaVersion.VERSION_17`
-     in both blocks.
-   - Change `toolchain { languageVersion.set(JavaLanguageVersion.of(11)) }` to `of(17)`.
-   - Change `jvmTarget = "11"` in the detekt task configuration to `"17"`.
-   - Do not change minSdk, targetSdk, compileSdk, or any other settings.
-3. **Add a three-state Java detection helper to `install.sh`:**
+2. **Add a three-state Java detection helper to `install.sh`:**
    - The helper must distinguish these states using the exact version-string
      patterns from `buildChecks.ts`:
      - `version "17` or `openjdk 17` in `java -version` output - **valid**, skip
@@ -142,13 +128,6 @@ thinking
 
 **Mechanical:**
 - `bash -n sites/landing/public/install.sh` exits 0.
-- `./gradlew :app:assembleDebug` succeeds on a host with Java 17.
-- `./gradlew testDebugUnitTest` passes.
-- `grep -n "JavaVersion.VERSION_17" build.gradle.kts` returns at least 2 matches
-  (both the `JavaPluginExtension` and `BaseExtension.compileOptions` blocks).
-- `grep "languageVersion.set(JavaLanguageVersion.of(17))" build.gradle.kts`
-  returns a match.
-- `grep 'jvmTarget = "17"' build.gradle.kts` returns at least 2 matches.
 
 **Human review:**
 - The Java detection helper uses the exact substring patterns from `buildChecks.ts`,
@@ -157,15 +136,11 @@ thinking
   provisioning.
 - No existing installer helper behavior is broken. The `check_node`, `check_adb`,
   `check_git` flow is unchanged.
-- The `build.gradle.kts` changes affect only the toolchain/jvmTarget lines; no
-  other configuration was touched.
 
 ### Phase 1 Validation
 
 ```bash
 bash -n sites/landing/public/install.sh
-./gradlew :app:assembleDebug
-./gradlew testDebugUnitTest
 ```
 
 One local install smoke run in a disposable environment or against a safe test host.
@@ -173,7 +148,7 @@ One local install smoke run in a disposable environment or against a safe test h
 ### Expected Commit
 
 ```text
-feat(install): upgrade Gradle toolchain to Java 17 and add Java provisioning to installer
+feat(install): add Java 17 detection and provisioning to installer
 ```
 
 ## Phase 2: Update Docs and Validate Site Outputs
@@ -241,9 +216,6 @@ docs(setup): update Java requirements and installer behavior after Java 17 provi
 
 ## Completion Criteria
 
-- `build.gradle.kts` uses Java 17 for the toolchain, sourceCompatibility,
-  targetCompatibility, and detekt jvmTarget.
-- `./gradlew :app:assembleDebug` and `./gradlew testDebugUnitTest` pass.
 - The installer provisions Java 17 on supported hosts when no valid JDK is found.
 - Hosts with Java 17 or 21 already installed are left alone.
 - Hosts with an incompatible Java version get a clear warning and a Java 17
