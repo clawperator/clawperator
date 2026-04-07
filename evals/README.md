@@ -19,6 +19,11 @@ uv run --project evals --extra dev python evals/run_eval.py android-version \
 You can pass `--device <serial>` when more than one device is connected.
 The lockfile for this project lives at `evals/uv.lock`.
 
+For repo-local Codex work, the [`evals-run`](../.agents/skills/evals-run/SKILL.md)
+skill wraps the common emulator workflow, including both runtime targets.
+Its helper script lives at
+[`run_android_version_eval.sh`](../.agents/skills/evals-run/scripts/run_android_version_eval.sh).
+
 Every run writes its artifacts under `evals/runs/<run_id>/`:
 
 - `config.json`
