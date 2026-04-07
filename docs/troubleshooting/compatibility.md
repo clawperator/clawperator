@@ -209,17 +209,6 @@ Typical recovery options:
 2. install the matching APK version
 3. for debug package workflows, rebuild and reinstall the debug APK from the same checkout
 
-**Note for eval runs:** The eval harness has two runtime targets that use different version sources:
-- `--runtime published` uses the globally installed `clawperator` CLI (published version) and release APK
-- `--runtime local-dev` uses the code version from `apps/node/package.json` and the locally built debug APK
-
-The code version is typically ahead of the published version. If you encounter
-`VERSION_INCOMPATIBLE` during eval runs, ensure you've built and installed the
-debug APK from the same source tree when using `local-dev`, or installed the
-matching published versions when using `published`. See
-[Eval Runtime Targets](../../evals/README.md#runtime-target-version-compatibility)
-for details.
-
 Release install path:
 
 - download the version-matched APK URL generated from the CLI version
