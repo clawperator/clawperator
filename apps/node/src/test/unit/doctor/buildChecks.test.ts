@@ -33,6 +33,28 @@ describe("Doctor: buildChecks", () => {
             assert.strictEqual(result.status, "pass");
         });
 
+        it("returns pass when the OpenJDK 17 format is installed", async () => {
+            const runner = new FakeProcessRunner();
+            const config = getDefaultRuntimeConfig({ runner });
+
+            runner.queueResult({ code: 0, stdout: "", stderr: "OpenJDK 17 Runtime Environment" });
+
+            const result = await checkJavaVersion(config);
+
+            assert.strictEqual(result.status, "pass");
+        });
+
+        it("returns pass when the OpenJDK 21 format is installed", async () => {
+            const runner = new FakeProcessRunner();
+            const config = getDefaultRuntimeConfig({ runner });
+
+            runner.queueResult({ code: 0, stdout: "", stderr: "OpenJDK 21 Runtime Environment" });
+
+            const result = await checkJavaVersion(config);
+
+            assert.strictEqual(result.status, "pass");
+        });
+
         it("returns fail when Java 11 is installed", async () => {
             const runner = new FakeProcessRunner();
             const config = getDefaultRuntimeConfig({ runner });

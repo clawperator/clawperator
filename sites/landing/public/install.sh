@@ -66,6 +66,47 @@ validate_os() {
     esac
 }
 
+java_output_is_supported() {
+    local output_lower
+    output_lower="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
+    case "$output_lower" in
+        *'version "17'*|*'version "21'*|*'openjdk 17'*|*'openjdk 21'*)
+            return 0
+            ;;
+    esac
+    return 1
+}
+
+java_version_first_line() {
+    printf '%s\n' "$1" | head -n 1
+}
+
+java_install_conflict_detected() {
+    local output_lower
+    output_lower="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
+    case "$output_lower" in
+        *conflict*|*"held broken packages"*|*"conflicting files"*|*"failed to commit transaction"*|*"would remove"*)
+            return 0
+            ;;
+    esac
+    return 1
+}
+
+java_home_has_supported_version() {
+    if [ -z "${JAVA_HOME:-}" ] || [ ! -x "${JAVA_HOME}/bin/java" ]; then
+        return 1
+    fi
+
+    local java_home_output
+    java_home_output="$("${JAVA_HOME}/bin/java" -version 2>&1)"
+    if java_output_is_supported "$java_home_output"; then
+        printf '%s\n' "$java_home_output"
+        return 0
+    fi
+
+    return 1
+}
+
 # 2. Check Java (Java 17 or 21 required for Android builds)
 # Returns: 0 if valid Java is available, 1 on failure
 # Three-state detection: valid (skip), missing (install), incompatible (warn+install)
@@ -73,11 +114,18 @@ check_java() {
     local java_version_output=""
     local java_check_status="missing"
 
+    # Prefer a valid JAVA_HOME before touching the system install.
+    if java_version_output="$(java_home_has_supported_version)"; then
+        export PATH="${JAVA_HOME}/bin:${PATH}"
+        hash -r
+        echo -e "${GREEN}✅ Java detected via JAVA_HOME: $(java_version_first_line "$java_version_output")${NC}"
+        return 0
+    fi
+
     # Check if java is on PATH
     if command -v java &> /dev/null; then
         java_version_output=$(java -version 2>&1)
-        # Check for accepted version patterns (must match buildChecks.ts exactly)
-        if echo "$java_version_output" | grep -qE 'version "17|version "21|openjdk 17|openjdk 21'; then
+        if java_output_is_supported "$java_version_output"; then
             java_check_status="valid"
         else
             java_check_status="incompatible"
@@ -86,12 +134,12 @@ check_java() {
 
     case "$java_check_status" in
         valid)
-            echo -e "${GREEN}✅ Java detected: $(echo "$java_version_output" | head -n 1)${NC}"
+            echo -e "${GREEN}✅ Java detected: $(java_version_first_line "$java_version_output")${NC}"
             return 0
             ;;
         incompatible)
             echo -e "${YELLOW}⚠️  Incompatible Java version detected:${NC}"
-            echo -e "${YELLOW}   $(echo "$java_version_output" | head -n 1)${NC}"
+            echo -e "${YELLOW}   $(java_version_first_line "$java_version_output")${NC}"
             echo -e "${YELLOW}   Java 17 or 21 is required for Android builds. Installing Java 17...${NC}"
             ;;
         missing)
@@ -108,12 +156,11 @@ check_java() {
                 echo -e "${YELLOW}Please install Java 17 manually from: https://adoptium.net/temurin/releases/${NC}"
                 return 1
             fi
-            # Point the current shell at the newly installed JDK 17 so Gradle
-            # does not keep using an older JAVA_HOME from before the install.
             local temurin_home="${CLAWPERATOR_TEMURIN_17_HOME:-/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home}"
             if [ -d "$temurin_home" ]; then
                 export JAVA_HOME="$temurin_home"
                 echo -e "${BLUE}Set JAVA_HOME to $temurin_home${NC}"
+                export PATH="${temurin_home}/bin:${PATH}"
             fi
         else
             echo -e "${RED}❌ Homebrew not found. Please install Java 17 manually:${NC}"
@@ -128,15 +175,31 @@ check_java() {
                 echo -e "${YELLOW}Please install Java 17 manually from: https://adoptium.net/temurin/releases/${NC}"
                 return 1
             fi
-            if ! sudo apt-get install -y openjdk-17-jdk; then
+            local apt_install_output
+            if ! apt_install_output="$(sudo apt-get install -y openjdk-17-jdk 2>&1)"; then
+                if java_install_conflict_detected "$apt_install_output"; then
+                    echo -e "${RED}❌ The package manager reported a conflict that may require removing the existing JDK.${NC}"
+                    echo -e "${YELLOW}Please install Java 17 manually from: https://adoptium.net/temurin/releases/${NC}"
+                    echo -e "${YELLOW}${apt_install_output}${NC}"
+                    return 1
+                fi
                 echo -e "${RED}❌ Failed to install Java via apt.${NC}"
+                echo -e "${YELLOW}${apt_install_output}${NC}"
                 echo -e "${YELLOW}Please install Java 17 manually from: https://adoptium.net/temurin/releases/${NC}"
                 return 1
             fi
         elif command -v pacman &> /dev/null; then
             echo "Installing OpenJDK 17 via pacman..."
-            if ! sudo pacman -S --noconfirm jdk17-openjdk; then
+            local pacman_install_output
+            if ! pacman_install_output="$(sudo pacman -S --noconfirm jdk17-openjdk 2>&1)"; then
+                if java_install_conflict_detected "$pacman_install_output"; then
+                    echo -e "${RED}❌ The package manager reported a conflict that may require removing the existing JDK.${NC}"
+                    echo -e "${YELLOW}Please install Java 17 manually from: https://adoptium.net/temurin/releases/${NC}"
+                    echo -e "${YELLOW}${pacman_install_output}${NC}"
+                    return 1
+                fi
                 echo -e "${RED}❌ Failed to install Java via pacman.${NC}"
+                echo -e "${YELLOW}${pacman_install_output}${NC}"
                 echo -e "${YELLOW}Please install Java 17 manually from: https://adoptium.net/temurin/releases/${NC}"
                 return 1
             fi
@@ -156,13 +219,16 @@ check_java() {
     if command -v java &> /dev/null; then
         local new_version_output
         new_version_output=$(java -version 2>&1)
-        if echo "$new_version_output" | grep -qE 'version "17|version "21|openjdk 17|openjdk 21'; then
+        if java_output_is_supported "$new_version_output"; then
             echo -e "${GREEN}✅ Java 17 installed successfully.${NC}"
             return 0
         fi
     fi
 
     echo -e "${RED}❌ Java installation verification failed.${NC}"
+    if command -v java &> /dev/null; then
+        echo -e "${YELLOW}Current shell still resolves: $(java_version_first_line "$(java -version 2>&1)")${NC}"
+    fi
     echo -e "${YELLOW}Please install Java 17 manually from: https://adoptium.net/temurin/releases/${NC}"
     return 1
 }

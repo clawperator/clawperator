@@ -10,59 +10,189 @@ INSTALL_SCRIPT="$REPO_ROOT/sites/landing/public/install.sh"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
-STUB_BIN="$TMP_DIR/bin"
-mkdir -p "$STUB_BIN" "$TMP_DIR/java-home"
+assert_contains() {
+    local needle="$1"
+    local file="$2"
+    if ! grep -Fq "$needle" "$file"; then
+        echo "Expected to find: $needle"
+        echo "In file: $file"
+        cat "$file"
+        exit 1
+    fi
+}
 
-VERSION_FILE="$TMP_DIR/java-version.txt"
-printf '%s\n' 'openjdk version "11.0.20" 2023-07-18' > "$VERSION_FILE"
+run_valid_java_home_case() (
+    local case_dir="$1"
+    local stub_bin="$case_dir/bin"
+    local java_home="$case_dir/java-home/existing"
 
-cat > "$STUB_BIN/java" <<EOF
+    mkdir -p "$stub_bin" "$java_home/bin"
+
+    cat > "$stub_bin/java" <<'EOF'
 #!/usr/bin/env bash
-cat "$VERSION_FILE" >&2
+printf '%s\n' 'openjdk version "11.0.20" 2023-07-18' >&2
 EOF
 
-cat > "$STUB_BIN/brew" <<EOF
+    cat > "$java_home/bin/java" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' 'openjdk version "17.0.9" 2023-10-17' >&2
+EOF
+
+    cat > "$stub_bin/brew" <<'EOF'
+#!/usr/bin/env bash
+echo "brew should not have been called" >&2
+exit 99
+EOF
+
+    chmod +x "$stub_bin/java" "$stub_bin/brew" "$java_home/bin/java"
+
+    export PATH="$stub_bin:$PATH"
+    export OS=Darwin
+    export JAVA_HOME="$java_home"
+    export CLAWPERATOR_TEMURIN_17_HOME="$case_dir/java-home/temurin-17"
+    hash -r
+
+    # shellcheck disable=SC1090
+    source "$INSTALL_SCRIPT"
+
+    check_java > "$case_dir/output.txt"
+
+    if [ "$JAVA_HOME" != "$java_home" ]; then
+        echo "Expected JAVA_HOME to remain unchanged when a valid JDK already exists."
+        echo "Got: $JAVA_HOME"
+        exit 1
+    fi
+
+    if [ "$(command -v java)" != "$java_home/bin/java" ]; then
+        echo "Expected PATH to be updated to use the preserved JAVA_HOME."
+        echo "Got: $(command -v java)"
+        exit 1
+    fi
+
+    assert_contains "Java detected via JAVA_HOME" "$case_dir/output.txt"
+)
+
+run_homebrew_install_case() (
+    local case_dir="$1"
+    local stub_bin="$case_dir/bin"
+    local java_home="$case_dir/java-home/old-jdk"
+    local temurin_home="$case_dir/java-home/temurin-17"
+    local version_file="$case_dir/java-version.txt"
+
+    mkdir -p "$stub_bin" "$java_home" "$temurin_home/bin"
+    printf '%s\n' 'openjdk version "11.0.20" 2023-07-18' > "$version_file"
+
+    cat > "$stub_bin/java" <<EOF
+#!/usr/bin/env bash
+cat "$version_file" >&2
+EOF
+
+    cat > "$temurin_home/bin/java" <<EOF
+#!/usr/bin/env bash
+cat "$version_file" >&2
+EOF
+
+    cat > "$stub_bin/brew" <<EOF
 #!/usr/bin/env bash
 printf '%s\n' 'brew install --cask temurin@17' >&2
-printf '%s\n' 'openjdk version "17.0.9" 2023-10-17' > "$VERSION_FILE"
+printf '%s\n' 'openjdk version "17.0.9" 2023-10-17' > "$version_file"
 exit 0
 EOF
 
-cat > "$STUB_BIN/hash" <<'EOF'
+    cat > "$stub_bin/hash" <<'EOF'
 #!/usr/bin/env bash
 exit 0
 EOF
 
-chmod +x "$STUB_BIN/java" "$STUB_BIN/brew" "$STUB_BIN/hash"
+    chmod +x "$stub_bin/java" "$stub_bin/brew" "$stub_bin/hash" "$temurin_home/bin/java"
 
-export PATH="$STUB_BIN:$PATH"
-export OS=Darwin
-export JAVA_HOME="$TMP_DIR/java-home/old-jdk"
-export CLAWPERATOR_TEMURIN_17_HOME="$TMP_DIR/java-home/temurin-17"
+    export PATH="$stub_bin:$PATH"
+    export OS=Darwin
+    export JAVA_HOME="$java_home"
+    export CLAWPERATOR_TEMURIN_17_HOME="$temurin_home"
+    hash -r
 
-mkdir -p "$CLAWPERATOR_TEMURIN_17_HOME"
+    # shellcheck disable=SC1090
+    source "$INSTALL_SCRIPT"
 
-# shellcheck disable=SC1090
-source "$INSTALL_SCRIPT"
+    check_java > "$case_dir/output.txt"
 
-check_java > "$TMP_DIR/output.txt"
+    if [ "$JAVA_HOME" != "$temurin_home" ]; then
+        echo "Expected JAVA_HOME to be reset to the installed Temurin JDK."
+        echo "Got: $JAVA_HOME"
+        exit 1
+    fi
 
-if [ "$JAVA_HOME" != "$CLAWPERATOR_TEMURIN_17_HOME" ]; then
-    echo "Expected JAVA_HOME to be reset to the installed Temurin JDK."
-    echo "Got: $JAVA_HOME"
-    exit 1
+    if [ "$(command -v java)" != "$temurin_home/bin/java" ]; then
+        echo "Expected the installed Temurin JDK to be first on PATH."
+        echo "Got: $(command -v java)"
+        exit 1
+    fi
+
+    assert_contains "Set JAVA_HOME to $temurin_home" "$case_dir/output.txt"
+    assert_contains "Java 17 installed successfully." "$case_dir/output.txt"
+)
+
+run_linux_conflict_case() (
+    local case_dir="$1"
+    local stub_bin="$case_dir/bin"
+    local version_file="$case_dir/java-version.txt"
+
+    mkdir -p "$stub_bin"
+    printf '%s\n' 'openjdk version "11.0.20" 2023-07-18' > "$version_file"
+
+    cat > "$stub_bin/java" <<EOF
+#!/usr/bin/env bash
+cat "$version_file" >&2
+EOF
+
+    cat > "$stub_bin/apt-get" <<'EOF'
+#!/usr/bin/env bash
+if [ "$1" = "update" ]; then
+    exit 0
 fi
 
-if ! grep -q "Set JAVA_HOME to $CLAWPERATOR_TEMURIN_17_HOME" "$TMP_DIR/output.txt"; then
-    echo "Expected the installer to report the updated JAVA_HOME."
-    cat "$TMP_DIR/output.txt"
-    exit 1
+if [ "$1" = "install" ]; then
+    printf '%s\n' 'Conflicts: openjdk-11-jdk' >&2
+    exit 100
 fi
 
-if ! grep -q "Java 17 installed successfully." "$TMP_DIR/output.txt"; then
-    echo "Expected the installer to verify the Java 17 install."
-    cat "$TMP_DIR/output.txt"
-    exit 1
-fi
+exit 1
+EOF
+
+    cat > "$stub_bin/sudo" <<'EOF'
+#!/usr/bin/env bash
+"$@"
+EOF
+
+    cat > "$stub_bin/uname" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' 'Linux'
+EOF
+
+    chmod +x "$stub_bin/java" "$stub_bin/apt-get" "$stub_bin/sudo" "$stub_bin/uname"
+
+    export PATH="$stub_bin:$PATH"
+    export OS=Linux
+    unset JAVA_HOME || true
+    hash -r
+
+    # shellcheck disable=SC1090
+    source "$INSTALL_SCRIPT"
+
+    if check_java > "$case_dir/output.txt"; then
+        echo "Expected the Linux conflict case to fail."
+        cat "$case_dir/output.txt"
+        exit 1
+    fi
+
+    assert_contains "package manager reported a conflict" "$case_dir/output.txt"
+    assert_contains "adoptium.net/temurin/releases" "$case_dir/output.txt"
+    assert_contains "Conflicts: openjdk-11-jdk" "$case_dir/output.txt"
+)
+
+run_valid_java_home_case "$TMP_DIR/valid-java-home"
+run_homebrew_install_case "$TMP_DIR/homebrew-install"
+run_linux_conflict_case "$TMP_DIR/linux-conflict"
 
 echo "validation/test_install_java.sh: pass"
