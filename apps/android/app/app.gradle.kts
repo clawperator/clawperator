@@ -85,7 +85,7 @@ android {
             // Fall back to using debug keystore if environment variables are not set. Required for CI.
             storeFile = env("CLAWPERATOR_ANDROID_KEYSTORE_PATH")?.let { file(it) }
                 ?: env("ANDROID_KEYSTORE_PATH", "KEYSTORE_LOCATION")?.let { file(it) }
-                ?: file("../../../scripts/debug.keystore")
+                ?: file("../../../.android/debug.keystore")
             storePassword = env("CLAWPERATOR_ANDROID_KEYSTORE_PASSWORD")
                 ?: env("ANDROID_KEYSTORE_PASSWORD", "KEYSTORE_PASSWORD")
                 ?: "android"
