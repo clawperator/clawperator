@@ -187,11 +187,11 @@ check_java() {
                 if java_install_conflict_detected "$apt_install_output"; then
                     echo -e "${RED}❌ The package manager reported a conflict that may require removing the existing JDK.${NC}"
                     echo -e "${YELLOW}Please install Java 17 manually from: https://adoptium.net/temurin/releases/${NC}"
-                    echo -e "${YELLOW}${apt_install_output}${NC}"
+                    printf '%s%s%s\n' "$YELLOW" "$apt_install_output" "$NC"
                     return 1
                 fi
                 echo -e "${RED}❌ Failed to install Java via apt.${NC}"
-                echo -e "${YELLOW}${apt_install_output}${NC}"
+                printf '%s%s%s\n' "$YELLOW" "$apt_install_output" "$NC"
                 echo -e "${YELLOW}Please install Java 17 manually from: https://adoptium.net/temurin/releases/${NC}"
                 return 1
             fi
@@ -202,11 +202,11 @@ check_java() {
                 if java_install_conflict_detected "$pacman_install_output"; then
                     echo -e "${RED}❌ The package manager reported a conflict that may require removing the existing JDK.${NC}"
                     echo -e "${YELLOW}Please install Java 17 manually from: https://adoptium.net/temurin/releases/${NC}"
-                    echo -e "${YELLOW}${pacman_install_output}${NC}"
+                    printf '%s%s%s\n' "$YELLOW" "$pacman_install_output" "$NC"
                     return 1
                 fi
                 echo -e "${RED}❌ Failed to install Java via pacman.${NC}"
-                echo -e "${YELLOW}${pacman_install_output}${NC}"
+                printf '%s%s%s\n' "$YELLOW" "$pacman_install_output" "$NC"
                 echo -e "${YELLOW}Please install Java 17 manually from: https://adoptium.net/temurin/releases/${NC}"
                 return 1
             fi
