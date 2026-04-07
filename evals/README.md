@@ -31,11 +31,44 @@ Replay runs also write `result-replay.json`. Rescore runs write
 Runtime targets:
 
 - `--runtime local-dev` uses the branch-local `apps/node/dist/cli/index.js`
-  build and the `.dev` Operator APK. This is the default for day-to-day
-  development.
+  build and the `.dev` Operator APK (`com.clawperator.operator.dev`). This is
+  the default for day-to-day development.
 - `--runtime published` uses the globally installed `clawperator` binary and
   the release Operator APK (`com.clawperator.operator`). Use this to verify
   the shipped runtime path.
+
+### Runtime Target Version Compatibility
+
+The two runtime targets use different version sources that can diverge:
+
+| Runtime Target | CLI Version Source | APK Version | Package Name |
+|----------------|-------------------|-------------|--------------|
+| `local-dev` | `apps/node/package.json` (code version) | Local debug build | `com.clawperator.operator.dev` |
+| `published` | `npm install -g clawperator` (published version) | Downloaded release | `com.clawperator.operator` |
+
+The **code version** is typically ahead of the **published version** because
+it includes unreleased changes. This means you cannot mix runtime targets
+without version alignment.
+
+**Important:** The CLI and APK versions must be compatible. If you see a
+`VERSION_INCOMPATIBLE` error during preflight, align your setup:
+
+- For `local-dev` (code version): Build and install the debug APK from the
+  same source tree:
+  ```bash
+  ./gradlew :app:assembleDebug
+  adb install -r apps/android/app/build/outputs/apk/debug/app-debug.apk
+  ```
+
+- For `published` (published version): Install matching versions of the CLI
+  and APK:
+  ```bash
+  npm install -g clawperator@<version>
+  clawperator operator setup --apk <downloaded-apk> --device <serial>
+  ```
+
+The published APK download URL follows the pattern:
+`https://downloads.clawperator.com/operator/v{VERSION}/operator-v{VERSION}.apk`
 
 Knowledge modes:
 
@@ -213,3 +246,6 @@ API and must not appear in public-facing documentation or production usage.
   the run before the agent started. Check `preflight.doctor_failure` in
   `result.json` for the actionable doctor code and summary. Full-repo runs also
   preserve the raw `doctor_report`.
+- `VERSION_INCOMPATIBLE` during preflight means the CLI and APK versions don't
+  match. See [Runtime Target Version Compatibility](#runtime-target-version-compatibility)
+  above. The code version (local-dev) is typically ahead of the published version.
