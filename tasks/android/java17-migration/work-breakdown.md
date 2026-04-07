@@ -47,7 +47,7 @@ to confirm the pattern before editing the rest.
 
 | PR | Purpose | Included phases | Agent tier | Merge gate |
 | --- | --- | --- | --- | --- |
-| PR-1 | Migrate all Android build files from Java 11 to Java 17 | phase-1 | fast | build and tests pass |
+| PR-1 | Migrate all Android build files from Java 11 to Java 17 | phase-1 | fast | debug build, unit tests, and release build all pass |
 
 ## Phase 1: Migrate All Files
 
@@ -80,15 +80,24 @@ All 17 files listed in the plan's Surfaces and Ownership table.
    | `JavaLanguageVersion.of(11)` | `JavaLanguageVersion.of(17)` |
 
 3. Run the verification grep again. Confirm zero results before continuing.
-4. Run the build:
+4. Run the debug build and unit tests:
    ```bash
    ./gradlew :app:assembleDebug
-   ```
-5. Run the tests:
-   ```bash
    ./gradlew testDebugUnitTest
    ```
-6. Commit.
+5. Run the release build locally using the debug keystore fallback. No signing
+   secrets are needed - `app.gradle.kts` falls back to `scripts/debug.keystore`
+   when the signing env vars are absent. This mirrors what CI does in
+   `.github/workflows/release-apk.yml` (`./gradlew :app:assembleRelease`) and
+   exercises R8 minification, which only runs in the release variant:
+   ```bash
+   ./gradlew :app:assembleRelease
+   ```
+6. Confirm the release APK was produced:
+   ```bash
+   ls apps/android/app/build/outputs/apk/release/app-release.apk
+   ```
+7. Commit.
 
 ### Acceptance Criteria
 
@@ -96,6 +105,8 @@ All 17 files listed in the plan's Surfaces and Ownership table.
 - `grep -rn "VERSION_11\|jvmTarget.*\"11\"\|languageVersion.*of(11)" apps/android build.gradle.kts --include="*.gradle.kts"` returns zero results.
 - `./gradlew :app:assembleDebug` exits 0.
 - `./gradlew testDebugUnitTest` exits 0.
+- `./gradlew :app:assembleRelease` exits 0 (no signing env vars required locally).
+- `apps/android/app/build/outputs/apk/release/app-release.apk` exists.
 
 **Human review:**
 - Only version number values changed. No other content in any file was touched.
@@ -108,6 +119,8 @@ grep -rn "VERSION_11\|jvmTarget.*\"11\"\|languageVersion.*of(11)" \
   apps/android build.gradle.kts --include="*.gradle.kts"
 ./gradlew :app:assembleDebug
 ./gradlew testDebugUnitTest
+./gradlew :app:assembleRelease
+ls apps/android/app/build/outputs/apk/release/app-release.apk
 ```
 
 ### Expected Commit

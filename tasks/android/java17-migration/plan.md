@@ -84,8 +84,10 @@ changes. All other content in each file is preserved as-is.
 | Claim | Verify against |
 | --- | --- |
 | Files with Java 11 settings | `grep -rn "VERSION_11\|jvmTarget.*\"11\"\|languageVersion.*of(11)" apps/android build.gradle.kts --include="*.gradle.kts"` |
-| Build still passes after change | `./gradlew :app:assembleDebug` |
-| Tests still pass after change | `./gradlew testDebugUnitTest` |
+| Debug build passes | `./gradlew :app:assembleDebug` |
+| Unit tests pass | `./gradlew testDebugUnitTest` |
+| Release build passes | `./gradlew :app:assembleRelease` (no signing secrets needed locally - falls back to debug keystore) |
+| How CI builds the release APK | `.github/workflows/release-apk.yml` - uses `./gradlew :app:assembleRelease` with Temurin 17 |
 
 ## Deterministic Versus Judgment
 
@@ -114,6 +116,9 @@ After the change:
 - `grep -rn "VERSION_11\|jvmTarget.*\"11\"\|languageVersion.*of(11)" apps/android build.gradle.kts --include="*.gradle.kts"` returns zero results.
 - `./gradlew :app:assembleDebug` succeeds.
 - `./gradlew testDebugUnitTest` passes.
+- `./gradlew :app:assembleRelease` succeeds locally without signing env vars
+  (falls back to `scripts/debug.keystore`). The release build exercises R8
+  minification, which the debug build skips. Both variants must pass.
 
 ## Idempotency
 
