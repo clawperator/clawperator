@@ -51,6 +51,7 @@ Read these files IN THIS ORDER before writing anything.
 | --- | --- |
 | `tasks/install/java/plan.md` | Stable contract, decision rules, version check patterns, and AGP rationale |
 | `apps/node/src/domain/doctor/checks/buildChecks.ts` | The exact string patterns that determine whether a Java install is valid (`version "17`, `version "21`, `openjdk 17`, `openjdk 21`). The installer must mirror this check exactly. |
+| `apps/node/src/test/unit/doctor/hostChecks.test.ts` | Exemplar for how to test doctor checks using `FakeProcessRunner`. Use this pattern for the new `buildChecks.test.ts`. |
 | `sites/landing/public/install.sh` | Current installer flow. Read the `main()` function and all `check_*` helpers to understand the pattern to follow. |
 | `docs/setup.md` | User-facing setup instructions - update in phase 2. |
 | `docs/api/doctor.md` | Doctor contract text - update only if wording needs alignment. |
@@ -75,6 +76,7 @@ and provision one when needed before the rest of the install flow depends on it.
 ### Files or Surfaces To Change
 
 - `sites/landing/public/install.sh` - Java detection and provisioning helper
+- `apps/node/src/test/unit/doctor/buildChecks.test.ts` - new unit tests for `checkJavaVersion` (create)
 
 ### Required Steps
 
@@ -111,11 +113,21 @@ and provision one when needed before the rest of the install flow depends on it.
      require removing the existing JDK (detected when the package manager reports
      a conflict), stop, print a clear manual remediation message pointing to
      `https://adoptium.net/temurin/releases/`, and return 1.
-5. **Wire the Java check into `main()`** in the correct position: after `validate_os`
+5. **Write unit tests for `checkJavaVersion`** in a new file
+   `apps/node/src/test/unit/doctor/buildChecks.test.ts`. Use `FakeProcessRunner`
+   following the pattern in `hostChecks.test.ts`. Required cases:
+   - `java -version` stderr contains `openjdk version "17.0.x"` → `status: "pass"`
+   - `java -version` stderr contains `openjdk version "21.0.x"` → `status: "pass"`
+   - `java -version` stderr contains `openjdk version "11.0.x"` → `status: "fail"`
+   - `java -version` stderr contains `openjdk version "22.0.x"` → `status: "fail"`
+   - `java` command throws (exit 127 / ENOENT) → `status: "fail"`
+   These tests prove the version-string patterns without requiring the host
+   Java install to be modified or removed.
+6. **Wire the Java check into `main()`** in the correct position: after `validate_os`
    and before `check_node`. Java is a build prerequisite; it should be resolved early.
 6. Make the installer output clear about which state was detected and what action
    was taken (found valid, installed, warned+installed, or failed).
-7. Keep the rest of the install sequence working after Java provisioning.
+8. Keep the rest of the install sequence working after Java provisioning.
 
 ### Implementation Notes
 
@@ -128,12 +140,16 @@ and provision one when needed before the rest of the install flow depends on it.
 
 **Mechanical:**
 - `bash -n sites/landing/public/install.sh` exits 0.
+- `npm --prefix apps/node run build && npm --prefix apps/node run test` passes,
+  including the new `buildChecks.test.ts` cases.
 - After a smoke run on a host with no prior Java: `java -version 2>&1 | grep -E 'version "17|openjdk 17'` exits 0.
 - After a smoke run: `clawperator doctor --full --format json` reports `host.java.version` as `pass`.
 
 **Human review:**
-- The Java detection helper uses the exact substring patterns from `buildChecks.ts`,
-  not a looser check.
+- All five `checkJavaVersion` cases are present in `buildChecks.test.ts`: Java 17
+  pass, Java 21 pass, Java 11 fail, Java 22 fail, command not found fail.
+- The Java detection helper in `install.sh` uses the exact substring patterns from
+  `buildChecks.ts`, not a looser check.
 - The incompatible-version case produces a clear user-facing warning before attempting
   provisioning.
 - No existing installer helper behavior is broken. The `check_node`, `check_adb`,
@@ -145,6 +161,9 @@ and provision one when needed before the rest of the install flow depends on it.
 # Syntax check
 bash -n sites/landing/public/install.sh
 
+# Unit tests - covers all version-string cases without touching the host Java install
+npm --prefix apps/node run build && npm --prefix apps/node run test
+
 # After smoke run on a host with no prior Java:
 java -version 2>&1 | grep -E 'version "17|openjdk 17'
 
@@ -152,9 +171,11 @@ java -version 2>&1 | grep -E 'version "17|openjdk 17'
 clawperator doctor --full --format json
 ```
 
-The smoke run must be on a host without a pre-existing valid Java install to
-actually exercise the provisioning path. A machine that already has Java 17
-only validates the skip path.
+The unit tests in `buildChecks.test.ts` are the primary mechanism for verifying
+the version-string logic without needing to remove or modify the host Java install.
+The smoke run exercises the provisioning path and must be done on a host without a
+pre-existing valid Java install - a machine that already has Java 17 only validates
+the skip path.
 
 ### Expected Commit
 

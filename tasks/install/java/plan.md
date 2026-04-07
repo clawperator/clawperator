@@ -67,6 +67,7 @@ builds require a host JDK.
 | Surface | Owned files | Notes |
 | --- | --- | --- |
 | Landing site install flow | `sites/landing/public/install.sh` | Primary implementation surface |
+| Doctor check unit tests | `apps/node/src/test/unit/doctor/buildChecks.test.ts` | Create - locks down the version-string patterns used by both the doctor and the installer |
 | Setup documentation | `docs/setup.md` | Must explain the new installer behavior |
 | Doctor documentation | `docs/api/doctor.md` | Update only if wording needs to stay aligned with the installer flow |
 
