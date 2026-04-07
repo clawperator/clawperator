@@ -653,6 +653,48 @@ When relevant:
 
 If terminology or policy violations matter, include grep commands instead of prose-only reminders.
 
+## Test Coverage
+
+Before writing a task, check whether the code being changed or referenced already
+has unit test coverage. If it does not, the task must require adding tests - not
+as a follow-up, but in the same phase and commit as the code change.
+
+**When live testing has host-state constraints**, unit tests are the primary
+verification mechanism - not a supplement. Common constraints:
+
+- the test requires a machine in a specific state (no Java installed, no device
+  connected, specific OS)
+- the test requires hardware that may not be available
+- the test is destructive or hard to reverse
+
+When a live test path has constraints, the task must:
+
+1. Name the unit test approach explicitly and treat it as the primary gate.
+2. Describe what the unit tests prove vs. what the live test proves.
+3. Call out what conditions the live test requires, so the implementer knows
+   when the live path is actually exercising the intended scenario.
+
+**Specify required test cases explicitly.** Do not write "add tests" or "add
+coverage." Name the cases:
+
+```md
+Required cases:
+- valid input X → expected output Y
+- valid input X2 → expected output Y
+- invalid input Z → expected failure F
+- command not found → expected failure F2
+```
+
+**When logic in one place must mirror logic in another** (e.g., an installer
+script replicating a check from a Node module), unit tests for the canonical
+source lock down the shared contract and catch drift if either side changes.
+Point the implementer at the exemplar test file and name the `FakeProcessRunner`
+or equivalent pattern when it exists.
+
+**Do not put tests in a later phase.** A phase that introduces behavior must
+include the tests that prove that behavior. Deferring tests to a cleanup or
+follow-up phase is a hard rule violation.
+
 ## `findings.md` Rules
 
 `findings.md` is a running audit trail, not a planning deliverable.
@@ -714,6 +756,12 @@ Prevent these explicitly:
 - failing to name scope exclusions for existing low-quality content
 - confusing authored and generated docs surfaces
 - treating `findings.md` as optional when judgment-heavy work needs an audit trail
+- treating live testing as sufficient when the live path has host-state constraints
+  that may not be met - name the unit test approach as the primary gate instead
+- writing "add tests" without naming the required cases
+- deferring tests to a later phase when the behavior is introduced in an earlier one
+- failing to check whether referenced code has existing test coverage before
+  writing the task - if it does not, the task must require adding it
 
 ## Final Check
 
@@ -738,3 +786,6 @@ Scan specifically for these failure patterns before returning:
 - execution details are missing from `work-breakdown.md`
 - a deterministic rule is described but not fenced off from re-derivation
 - section order drifted away from the default skeleton without a good reason
+- a phase introduces behavior but defers its tests to a later phase or omits them
+- live test validation is listed without noting its host-state preconditions
+- referenced code has no unit tests and the task does not require adding them
