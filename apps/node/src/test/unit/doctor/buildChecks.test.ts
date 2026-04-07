@@ -16,7 +16,7 @@ describe("Doctor: buildChecks", () => {
             const result = await checkJavaVersion(config);
 
             assert.strictEqual(result.status, "pass");
-            assert.strictEqual((result as any).summary, "Java 17+ is installed.");
+            assert.strictEqual((result as any).summary, "Java 17 or 21 is installed.");
             assert.strictEqual(runner.calls.length, 1);
             assert.strictEqual(runner.calls[0].command, "java");
             assert.deepStrictEqual(runner.calls[0].args, ["-version"]);

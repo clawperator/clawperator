@@ -13,7 +13,7 @@ export async function checkJavaVersion(config: RuntimeConfig): Promise<DoctorChe
         status: "fail",
         code: ERROR_CODES.HOST_DEPENDENCY_MISSING,
         summary: "Java not found.",
-        detail: "Java JDK 17+ is required to build Android apps.",
+        detail: "Java JDK 17 or 21 is required to build Android apps.",
       };
     }
     const versionOutput = (stdout + stderr).toLowerCase();
@@ -21,7 +21,7 @@ export async function checkJavaVersion(config: RuntimeConfig): Promise<DoctorChe
       return {
         id: "host.java.version",
         status: "pass",
-        summary: "Java 17+ is installed.",
+        summary: "Java 17 or 21 is installed.",
       };
     }
     return {
@@ -36,7 +36,7 @@ export async function checkJavaVersion(config: RuntimeConfig): Promise<DoctorChe
       id: "host.java.version",
       status: "fail",
       summary: "Java not found.",
-      detail: "Java JDK 17+ is required to build Android apps.",
+      detail: "Java JDK 17 or 21 is required to build Android apps.",
     };
   }
 }
