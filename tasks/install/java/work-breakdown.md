@@ -11,12 +11,12 @@ flow. Phase 2 updates docs and validates the generated site outputs.
 
 | Item | Value |
 | --- | --- |
-| State | planning |
+| State | in progress |
 | Total PRs | 1 |
 | Total phases | 2 |
-| Completed | 0 |
-| Remaining | 2 |
-| Current / Next | phase-1 |
+| Completed | 1 |
+| Remaining | 1 |
+| Current / Next | phase-2 |
 | Blockers | none |
 
 ## Hard Rules
@@ -62,7 +62,7 @@ Read these files IN THIS ORDER before writing anything.
 | --- | --- | --- | --- | --- |
 | PR-1 | Close the host Java provisioning gap in the install flow and align docs | phase-1, phase-2 | thinking for phase-1, default for phase-2 | all validation commands pass |
 
-## Phase 1: Add Java Provisioning to the Installer
+## Phase 1: Add Java Provisioning to the Installer [DONE]
 
 ### Agent Tier
 
