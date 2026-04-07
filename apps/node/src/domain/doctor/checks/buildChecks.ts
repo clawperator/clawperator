@@ -35,6 +35,7 @@ export async function checkJavaVersion(config: RuntimeConfig): Promise<DoctorChe
     return {
       id: "host.java.version",
       status: "fail",
+      code: ERROR_CODES.HOST_DEPENDENCY_MISSING,
       summary: "Java not found.",
       detail: "Java JDK 17 or 21 is required to build Android apps.",
     };

@@ -52,7 +52,8 @@ echo -e "${BLUE}  Clawperator Installation Script${NC}"
 echo -e "${BLUE}════════════════════════════════════════════════════════════════${NC}"
 
 # 1. OS Detection
-OS="$(uname -s)"
+# Allow tests to inject OS via an exported variable; detect automatically otherwise.
+OS="${OS:-$(uname -s)}"
 echo -e "${BLUE}OS detected: $OS${NC}"
 
 validate_os() {
