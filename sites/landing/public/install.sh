@@ -66,7 +66,104 @@ validate_os() {
     esac
 }
 
-# 2. Check Node.js >= 22
+# 2. Check Java (Java 17 or 21 required for Android builds)
+# Returns: 0 if valid Java is available, 1 on failure
+# Three-state detection: valid (skip), missing (install), incompatible (warn+install)
+check_java() {
+    local java_version_output=""
+    local java_check_status="missing"
+
+    # Check if java is on PATH
+    if command -v java &> /dev/null; then
+        java_version_output=$(java -version 2>&1)
+        # Check for accepted version patterns (must match buildChecks.ts exactly)
+        if echo "$java_version_output" | grep -qE 'version "17|version "21|openjdk 17|openjdk 21'; then
+            java_check_status="valid"
+        else
+            java_check_status="incompatible"
+        fi
+    fi
+
+    case "$java_check_status" in
+        valid)
+            echo -e "${GREEN}✅ Java detected: $(echo "$java_version_output" | head -n 1)${NC}"
+            return 0
+            ;;
+        incompatible)
+            echo -e "${YELLOW}⚠️  Incompatible Java version detected:${NC}"
+            echo -e "${YELLOW}   $(echo "$java_version_output" | head -n 1)${NC}"
+            echo -e "${YELLOW}   Java 17 or 21 is required for Android builds. Installing Java 17...${NC}"
+            ;;
+        missing)
+            echo -e "${YELLOW}⚠️  Java not found. Installing Java 17...${NC}"
+            ;;
+    esac
+
+    # Provisioning based on platform
+    if [ "$OS" == "Darwin" ]; then
+        if command -v brew &> /dev/null; then
+            echo "Installing Temurin JDK 17 via Homebrew..."
+            if ! brew install --cask temurin@17; then
+                echo -e "${RED}❌ Failed to install Java via Homebrew.${NC}"
+                echo -e "${YELLOW}Please install Java 17 manually from: https://adoptium.net/temurin/releases/${NC}"
+                return 1
+            fi
+            # Set JAVA_HOME only if not already set to a valid path
+            if [ -z "${JAVA_HOME:-}" ] || ! echo "$JAVA_HOME" | grep -q "jdk"; then
+                local temurin_home="/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home"
+                if [ -d "$temurin_home" ]; then
+                    export JAVA_HOME="$temurin_home"
+                    echo -e "${BLUE}Set JAVA_HOME to $temurin_home${NC}"
+                fi
+            fi
+        else
+            echo -e "${RED}❌ Homebrew not found. Please install Java 17 manually:${NC}"
+            echo -e "${YELLOW}https://adoptium.net/temurin/releases/${NC}"
+            return 1
+        fi
+    elif [ "$OS" == "Linux" ]; then
+        if command -v apt-get &> /dev/null; then
+            echo "Installing OpenJDK 17 via apt..."
+            if ! sudo apt-get update && sudo apt-get install -y openjdk-17-jdk; then
+                echo -e "${RED}❌ Failed to install Java via apt.${NC}"
+                echo -e "${YELLOW}Please install Java 17 manually from: https://adoptium.net/temurin/releases/${NC}"
+                return 1
+            fi
+        elif command -v pacman &> /dev/null; then
+            echo "Installing OpenJDK 17 via pacman..."
+            if ! sudo pacman -S --noconfirm jdk17-openjdk; then
+                echo -e "${RED}❌ Failed to install Java via pacman.${NC}"
+                echo -e "${YELLOW}Please install Java 17 manually from: https://adoptium.net/temurin/releases/${NC}"
+                return 1
+            fi
+        else
+            echo -e "${RED}❌ Unsupported Linux distribution. Please install Java 17 manually:${NC}"
+            echo -e "${YELLOW}https://adoptium.net/temurin/releases/${NC}"
+            return 1
+        fi
+    else
+        echo -e "${RED}❌ Unsupported OS for automatic Java installation.${NC}"
+        echo -e "${YELLOW}Please install Java 17 manually from: https://adoptium.net/temurin/releases/${NC}"
+        return 1
+    fi
+
+    # Verify installation
+    hash -r
+    if command -v java &> /dev/null; then
+        local new_version_output
+        new_version_output=$(java -version 2>&1)
+        if echo "$new_version_output" | grep -qE 'version "17|version "21|openjdk 17|openjdk 21'; then
+            echo -e "${GREEN}✅ Java 17 installed successfully.${NC}"
+            return 0
+        fi
+    fi
+
+    echo -e "${RED}❌ Java installation verification failed.${NC}"
+    echo -e "${YELLOW}Please install Java 17 manually from: https://adoptium.net/temurin/releases/${NC}"
+    return 1
+}
+
+# 3. Check Node.js >= 22
 load_nvm() {
     export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
     if [ -s "$NVM_DIR/nvm.sh" ]; then
@@ -713,6 +810,7 @@ run_doctor_and_fix() {
 # Main
 main() {
     validate_os || exit 1
+    check_java || exit 1
     check_node || exit 1
     check_curl || exit 1
     check_adb || exit 1
