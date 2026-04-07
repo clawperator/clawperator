@@ -28,7 +28,7 @@ flow. Phase 2 updates docs and validates the generated site outputs.
 - The install target is Java 17 LTS. Do not provision Java 21 unless Java 17 is
   unavailable on the target platform.
 - The version check in the installer must match the exact string-match logic in
-  `buildChecks.ts`: accepted strings are `version "17`, `version "21`,
+  `buildChecks.ts` (line 11): accepted strings are `version "17`, `version "21`,
   `openjdk 17`, `openjdk 21`. Do not use a numeric comparison or a ">=17" check.
 - Three-state detection is required - see plan Decision Rule 4. Do not implement
   a two-state "present vs missing" check.
@@ -120,7 +120,7 @@ and provision one when needed before the rest of the install flow depends on it.
    - `runner.queueResult({ code: 0, stdout: "", stderr: 'openjdk version "21.0.1"' })` → `status: "pass"`
    - `runner.queueResult({ code: 0, stdout: "", stderr: 'openjdk version "11.0.20"' })` → `status: "fail"`
    - `runner.queueResult({ code: 0, stdout: "", stderr: 'openjdk version "22.0.1"' })` → `status: "fail"`
-   - `runner.queueError(127, "ENOENT")` → `status: "fail"`
+   - `runner.queueResult({ code: 127, stdout: "", stderr: "" })` → `status: "fail"`
    Note: `NodeProcessRunner.run` always resolves - it never throws. The ENOENT
    case resolves with `{ code: 127, stdout: "", stderr: "" }`, so the fail result
    comes from the try-block path (empty version string matches no valid pattern),
