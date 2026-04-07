@@ -100,7 +100,7 @@ describe("cmdDoctor", () => {
                 fix: {
                   title: "Upgrade Node.js",
                   platform: "any",
-                  steps: [{ kind: "shell", value: "nvm install 22" }],
+                  steps: [{ kind: "shell", value: "nvm install 24" }],
                   docsUrl: DOCTOR_DOCS_URLS.setup,
                 },
               },

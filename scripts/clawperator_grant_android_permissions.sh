@@ -42,6 +42,32 @@ require_cmd() {
     fi
 }
 
+require_node_major() {
+    local minimum_major=$1
+    local version
+    local major
+
+    version="$(node -p "process.versions.node" 2>/dev/null || true)"
+    if [ -z "$version" ]; then
+        echo "Error: unable to determine the installed Node.js version"
+        echo "Install Node.js ${minimum_major}+ to build and run the local CLI."
+        exit 1
+    fi
+
+    major="${version%%.*}"
+    if [ -z "$major" ] || ! [[ "$major" =~ ^[0-9]+$ ]]; then
+        echo "Error: unable to parse the installed Node.js version: $version"
+        echo "Install Node.js ${minimum_major}+ to build and run the local CLI."
+        exit 1
+    fi
+
+    if [ "$major" -lt "$minimum_major" ]; then
+        echo "Error: Node.js $version is too old"
+        echo "Install Node.js ${minimum_major}+ to build and run the local CLI."
+        exit 1
+    fi
+}
+
 ensure_node_cli_built() {
     if [ ! -d "$NODE_DIR" ]; then
         echo "Error: apps/node not found at $NODE_DIR"
@@ -125,8 +151,9 @@ if [ -n "$PACKAGE" ] && { [ "$USE_DEBUG" = true ] || [ "$USE_RELEASE" = true ]; 
     exit 1
 fi
 
-require_cmd node "Install Node.js 22+ to build and run the local CLI."
+require_cmd node "Install Node.js 24+ to build and run the local CLI."
 require_cmd npm "Install npm so the repo-local apps/node CLI can be built."
+require_node_major 24
 
 ensure_node_cli_built
 

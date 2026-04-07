@@ -239,7 +239,7 @@ check_java() {
     return 1
 }
 
-# 3. Check Node.js >= 22
+# 3. Check Node.js >= 24
 load_nvm() {
     export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
     if [ -s "$NVM_DIR/nvm.sh" ]; then
@@ -266,9 +266,9 @@ install_or_upgrade_node_with_nvm() {
         fi
     fi
 
-    nvm install 22
-    nvm alias default 22
-    nvm use 22 > /dev/null
+    nvm install 24
+    nvm alias default 24
+    nvm use 24 > /dev/null
     hash -r
 
     local NODE_VERSION
@@ -279,7 +279,7 @@ install_or_upgrade_node_with_nvm() {
 
 check_node() {
     if ! command -v node &> /dev/null; then
-        echo -e "${YELLOW}⚠️  Node.js not found. Installing Node.js >= 22 via nvm...${NC}"
+        echo -e "${YELLOW}⚠️  Node.js not found. Installing Node.js >= 24 via nvm...${NC}"
         install_or_upgrade_node_with_nvm
         return $?
     fi
@@ -287,8 +287,8 @@ check_node() {
     NODE_VERSION=$(node -v | cut -d'v' -f2)
     MAJOR_VERSION=$(echo "$NODE_VERSION" | cut -d'.' -f1)
 
-    if [ "$MAJOR_VERSION" -lt 22 ]; then
-        echo -e "${YELLOW}⚠️  Node.js version $NODE_VERSION detected. Upgrading to Node.js >= 22 via nvm...${NC}"
+    if [ "$MAJOR_VERSION" -lt 24 ]; then
+        echo -e "${YELLOW}⚠️  Node.js version $NODE_VERSION detected. Upgrading to Node.js >= 24 via nvm...${NC}"
         install_or_upgrade_node_with_nvm
         return $?
     fi

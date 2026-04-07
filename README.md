@@ -66,7 +66,7 @@ CLI device commands are flat (`snapshot`, `screenshot`, `click`, `open`, `type`,
 
 ## Requirements
 
-- Node.js >= 22
+- Node.js >= 24
 - `adb` in PATH
 - Android device with USB debugging enabled
 - Clawperator APK installed ([stable download](https://clawperator.com/operator.apk), [historical releases](https://github.com/clawperator/clawperator/releases))
