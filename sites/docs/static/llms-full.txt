@@ -100,7 +100,7 @@ Get from an empty host to a first successful `clawperator snapshot --json` with 
 | adb | On `PATH` | `adb version` |
 | Android target | One device or emulator visible to adb | `clawperator devices` |
 
-**Java note:** The installer provisions Java 17 automatically on supported platforms (macOS with Homebrew, Ubuntu/Debian, Arch). Java 17 or 21 is required as the host JDK for Android builds (AGP 8.x requirement). The Android app bytecode targets Java 11 for device compatibility, but the host build toolchain requires Java 17 or 21.
+**Java note:** The installer provisions Java 17 automatically on supported platforms (macOS with Homebrew, Ubuntu/Debian, Arch). Java 17 or 21 is required as the host JDK for Android builds (AGP 8.x requirement). The Android Gradle build compiles Java and Kotlin with Java 17 settings; device compatibility is handled by Android's DEX pipeline, not by targeting an older bytecode level.
 
 ## 1. Install the CLI
 
