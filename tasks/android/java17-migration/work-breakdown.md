@@ -68,8 +68,8 @@ All 17 files listed in the plan's Surfaces and Ownership table.
 
 1. Run the verification grep to confirm the current state and count of matches:
    ```bash
-   grep -rn "VERSION_11\|jvmTarget.*\"11\"\|languageVersion.*of(11)" \
-     apps/android build.gradle.kts --include="*.gradle.kts"
+   find apps/android build.gradle.kts -name "*.gradle.kts" | \
+     xargs grep -rnE 'VERSION_11|jvmTarget.*"11"|languageVersion.*of\(11\)'
    ```
 2. Apply the substitution table from the plan to every file:
 
@@ -102,7 +102,7 @@ All 17 files listed in the plan's Surfaces and Ownership table.
 ### Acceptance Criteria
 
 **Mechanical:**
-- `grep -rn "VERSION_11\|jvmTarget.*\"11\"\|languageVersion.*of(11)" apps/android build.gradle.kts --include="*.gradle.kts"` returns zero results.
+- `find apps/android build.gradle.kts -name "*.gradle.kts" | xargs grep -rnE 'VERSION_11|jvmTarget.*"11"|languageVersion.*of\(11\)'` returns zero results.
 - `./gradlew :app:assembleDebug` exits 0.
 - `./gradlew testDebugUnitTest` exits 0.
 - `./gradlew :app:assembleRelease` exits 0 (no signing env vars required locally).
@@ -115,8 +115,8 @@ All 17 files listed in the plan's Surfaces and Ownership table.
 ### Phase 1 Validation
 
 ```bash
-grep -rn "VERSION_11\|jvmTarget.*\"11\"\|languageVersion.*of(11)" \
-  apps/android build.gradle.kts --include="*.gradle.kts"
+find apps/android build.gradle.kts -name "*.gradle.kts" | \
+  xargs grep -rnE 'VERSION_11|jvmTarget.*"11"|languageVersion.*of\(11\)'
 ./gradlew :app:assembleDebug
 ./gradlew testDebugUnitTest
 ./gradlew :app:assembleRelease

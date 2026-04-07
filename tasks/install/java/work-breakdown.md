@@ -94,7 +94,7 @@ and provision one when needed before the rest of the install flow depends on it.
        without overwriting the existing install or `JAVA_HOME`
    - Do not use a numeric comparison or a ">=17" test. Use substring matching
      that mirrors the exact patterns in `buildChecks.ts`.
-4. **Add OS-specific Java 17 provisioning:**
+3. **Add OS-specific Java 17 provisioning:**
    - Follow the existing `check_adb` / `check_git` helper style: explicit
      package-manager branching with colored output and clear success/failure messages.
    - macOS with Homebrew: `brew install --cask temurin@17`. After install, set
@@ -113,7 +113,7 @@ and provision one when needed before the rest of the install flow depends on it.
      require removing the existing JDK (detected when the package manager reports
      a conflict), stop, print a clear manual remediation message pointing to
      `https://adoptium.net/temurin/releases/`, and return 1.
-5. **Write unit tests for `checkJavaVersion`** in a new file
+4. **Write unit tests for `checkJavaVersion`** in a new file
    `apps/node/src/test/unit/doctor/buildChecks.test.ts`. Use `FakeProcessRunner`
    following the pattern in `hostChecks.test.ts`. Required cases:
    - `runner.queueResult({ code: 0, stdout: "", stderr: 'openjdk version "17.0.9"' })` → `status: "pass"`
@@ -127,11 +127,11 @@ and provision one when needed before the rest of the install flow depends on it.
    not the catch block. The catch in `checkJavaVersion` is effectively dead code
    with the current runner. Flag this to the reviewer but do not fix it as part
    of this task.
-6. **Wire the Java check into `main()`** in the correct position: after `validate_os`
+5. **Wire the Java check into `main()`** in the correct position: after `validate_os`
    and before `check_node`. Java is a build prerequisite; it should be resolved early.
-7. Make the installer output clear about which state was detected and what action
+6. Make the installer output clear about which state was detected and what action
    was taken (found valid, installed, warned+installed, or failed).
-8. Keep the rest of the install sequence working after Java provisioning.
+7. Keep the rest of the install sequence working after Java provisioning.
 
 ### Implementation Notes
 

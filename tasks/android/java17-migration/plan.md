@@ -83,7 +83,7 @@ changes. All other content in each file is preserved as-is.
 
 | Claim | Verify against |
 | --- | --- |
-| Files with Java 11 settings | `grep -rn "VERSION_11\|jvmTarget.*\"11\"\|languageVersion.*of(11)" apps/android build.gradle.kts --include="*.gradle.kts"` |
+| Files with Java 11 settings | `find apps/android build.gradle.kts -name "*.gradle.kts" | xargs grep -rnE 'VERSION_11|jvmTarget.*"11"|languageVersion.*of\(11\)'` |
 | Debug build passes | `./gradlew :app:assembleDebug` |
 | Unit tests pass | `./gradlew testDebugUnitTest` |
 | Release build passes | `./gradlew :app:assembleRelease` (no signing secrets needed locally - falls back to debug keystore) |
@@ -113,7 +113,7 @@ No judgment is required. Do not skip any file. Do not change any other value.
 ## Output Contract
 
 After the change:
-- `grep -rn "VERSION_11\|jvmTarget.*\"11\"\|languageVersion.*of(11)" apps/android build.gradle.kts --include="*.gradle.kts"` returns zero results.
+- `find apps/android build.gradle.kts -name "*.gradle.kts" | xargs grep -rnE 'VERSION_11|jvmTarget.*"11"|languageVersion.*of\(11\)'` returns zero results.
 - `./gradlew :app:assembleDebug` succeeds.
 - `./gradlew testDebugUnitTest` passes.
 - `./gradlew :app:assembleRelease` succeeds locally without signing env vars
