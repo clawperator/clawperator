@@ -21,6 +21,14 @@ assert_contains() {
     fi
 }
 
+link_required_shell_tools() {
+    local stub_bin="$1"
+    local tool
+    for tool in bash cat grep head rm tr; do
+        ln -sf "$(command -v "$tool")" "$stub_bin/$tool"
+    done
+}
+
 run_valid_java_home_case() (
     local case_dir="$1"
     local stub_bin="$case_dir/bin"
@@ -238,6 +246,7 @@ run_linux_pacman_install_case() (
     local version_file="$case_dir/java-version.txt"
 
     mkdir -p "$stub_bin"
+    link_required_shell_tools "$stub_bin"
     printf '%s\n' 'openjdk version "11.0.20" 2023-07-18' > "$version_file"
 
     cat > "$stub_bin/java" <<EOF
@@ -262,7 +271,7 @@ EOF
 
     chmod +x "$stub_bin/java" "$stub_bin/pacman" "$stub_bin/sudo"
 
-    export PATH="$stub_bin:$PATH"
+    export PATH="$stub_bin"
     export OS=Linux
     unset JAVA_HOME || true
     hash -r
