@@ -62,14 +62,16 @@ describe("Doctor: buildChecks", () => {
             const runner = new FakeProcessRunner();
             const config = getDefaultRuntimeConfig({ runner });
 
-            // Simulates command not found - NodeProcessRunner resolves with code 127, empty output
-            runner.queueResult({ code: 127, stdout: "", stderr: "" });
+            runner.queueError(127, "ENOENT");
 
             const result = await checkJavaVersion(config);
 
-            // With the current runner, code 127 with empty output hits the try path,
-            // versionOutput is empty, matches no pattern, returns fail via HOST_DEPENDENCY_MISSING
             assert.strictEqual(result.status, "fail");
+            assert.strictEqual(result.code, ERROR_CODES.HOST_DEPENDENCY_MISSING);
+            assert.strictEqual((result as any).summary, "Java not found.");
+            assert.strictEqual(runner.calls.length, 1);
+            assert.strictEqual(runner.calls[0].command, "java");
+            assert.deepStrictEqual(runner.calls[0].args, ["-version"]);
         });
     });
 });

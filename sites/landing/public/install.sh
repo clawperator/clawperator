@@ -124,7 +124,12 @@ check_java() {
     elif [ "$OS" == "Linux" ]; then
         if command -v apt-get &> /dev/null; then
             echo "Installing OpenJDK 17 via apt..."
-            if ! sudo apt-get update && sudo apt-get install -y openjdk-17-jdk; then
+            if ! sudo apt-get update; then
+                echo -e "${RED}❌ Failed to update apt package lists.${NC}"
+                echo -e "${YELLOW}Please install Java 17 manually from: https://adoptium.net/temurin/releases/${NC}"
+                return 1
+            fi
+            if ! sudo apt-get install -y openjdk-17-jdk; then
                 echo -e "${RED}❌ Failed to install Java via apt.${NC}"
                 echo -e "${YELLOW}Please install Java 17 manually from: https://adoptium.net/temurin/releases/${NC}"
                 return 1
