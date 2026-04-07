@@ -7,13 +7,23 @@ import { runAdb } from "../../../adapters/android-bridge/adbClient.js";
 export async function checkJavaVersion(config: RuntimeConfig): Promise<DoctorCheckResult> {
   try {
     const { stdout, stderr, error } = await config.runner.run("java", ["-version"]);
-    if (error && (error as NodeJS.ErrnoException).code === "ENOENT") {
+    if (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        return {
+          id: "host.java.version",
+          status: "fail",
+          code: ERROR_CODES.HOST_DEPENDENCY_MISSING,
+          summary: "Java not found.",
+          detail: "Java JDK 17 or 21 is required to build Android apps.",
+        };
+      }
       return {
         id: "host.java.version",
         status: "fail",
         code: ERROR_CODES.HOST_DEPENDENCY_MISSING,
-        summary: "Java not found.",
-        detail: "Java JDK 17 or 21 is required to build Android apps.",
+        summary: "Failed to check Java version.",
+        detail: `Java JDK 17 or 21 is required to build Android apps. Check failed with: ${message}`,
       };
     }
     const versionOutput = (stdout + stderr).toLowerCase();

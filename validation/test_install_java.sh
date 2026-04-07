@@ -184,6 +184,98 @@ EOF
     assert_contains "Java detected successfully:" "$case_dir/output.txt"
 )
 
+run_linux_apt_install_case() (
+    local case_dir="$1"
+    local stub_bin="$case_dir/bin"
+    local version_file="$case_dir/java-version.txt"
+
+    mkdir -p "$stub_bin"
+    printf '%s\n' 'openjdk version "11.0.20" 2023-07-18' > "$version_file"
+
+    cat > "$stub_bin/java" <<EOF
+#!/usr/bin/env bash
+cat "$version_file" >&2
+EOF
+
+    cat > "$stub_bin/apt-get" <<EOF
+#!/usr/bin/env bash
+if [ "\$1" = "update" ]; then
+    exit 0
+fi
+
+if [ "\$1" = "install" ]; then
+    printf '%s\n' 'openjdk version "17.0.9" 2023-10-17' > "$version_file"
+    exit 0
+fi
+
+exit 1
+EOF
+
+    cat > "$stub_bin/sudo" <<'EOF'
+#!/usr/bin/env bash
+"$@"
+EOF
+
+    chmod +x "$stub_bin/java" "$stub_bin/apt-get" "$stub_bin/sudo"
+
+    export PATH="$stub_bin:$PATH"
+    export OS=Linux
+    unset JAVA_HOME || true
+    hash -r
+
+    # shellcheck disable=SC1090
+    source "$INSTALL_SCRIPT"
+
+    check_java > "$case_dir/output.txt"
+
+    assert_contains "Installing OpenJDK 17 via apt" "$case_dir/output.txt"
+    assert_contains "Java detected successfully:" "$case_dir/output.txt"
+)
+
+run_linux_pacman_install_case() (
+    local case_dir="$1"
+    local stub_bin="$case_dir/bin"
+    local version_file="$case_dir/java-version.txt"
+
+    mkdir -p "$stub_bin"
+    printf '%s\n' 'openjdk version "11.0.20" 2023-07-18' > "$version_file"
+
+    cat > "$stub_bin/java" <<EOF
+#!/usr/bin/env bash
+cat "$version_file" >&2
+EOF
+
+    cat > "$stub_bin/pacman" <<EOF
+#!/usr/bin/env bash
+if [ "\$1" = "-S" ]; then
+    printf '%s\n' 'openjdk version "17.0.9" 2023-10-17' > "$version_file"
+    exit 0
+fi
+
+exit 1
+EOF
+
+    cat > "$stub_bin/sudo" <<'EOF'
+#!/usr/bin/env bash
+"$@"
+EOF
+
+    chmod +x "$stub_bin/java" "$stub_bin/pacman" "$stub_bin/sudo"
+
+    export PATH="$stub_bin:$PATH"
+    export OS=Linux
+    unset JAVA_HOME || true
+    hash -r
+
+    # shellcheck disable=SC1090
+    source "$INSTALL_SCRIPT"
+
+    check_java > "$case_dir/output.txt"
+
+    assert_contains "Installing OpenJDK 17 via pacman" "$case_dir/output.txt"
+    assert_contains "Java detected successfully:" "$case_dir/output.txt"
+)
+
 run_linux_conflict_case() (
     local case_dir="$1"
     local stub_bin="$case_dir/bin"
@@ -245,6 +337,8 @@ EOF
 run_valid_java_home_case "$TMP_DIR/valid-java-home"
 run_homebrew_install_case "$TMP_DIR/homebrew-install"
 run_macos_java_stub_case "$TMP_DIR/macos-java-stub"
+run_linux_apt_install_case "$TMP_DIR/linux-apt-install"
+run_linux_pacman_install_case "$TMP_DIR/linux-pacman-install"
 run_linux_conflict_case "$TMP_DIR/linux-conflict"
 
 echo "validation/test_install_java.sh: pass"

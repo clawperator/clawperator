@@ -96,6 +96,23 @@ describe("Doctor: buildChecks", () => {
             assert.deepStrictEqual(runner.calls[0].args, ["-version"]);
         });
 
+        it("returns a troubleshooting failure when the Java command returns a non-ENOENT error", async () => {
+            const runner = new FakeProcessRunner();
+            const config = getDefaultRuntimeConfig({ runner });
+
+            runner.queueError(13, "permission denied");
+
+            const result = await checkJavaVersion(config);
+
+            assert.strictEqual(result.status, "fail");
+            assert.strictEqual(result.code, ERROR_CODES.HOST_DEPENDENCY_MISSING);
+            assert.strictEqual((result as any).summary, "Failed to check Java version.");
+            assert.strictEqual(
+                (result as any).detail,
+                "Java JDK 17 or 21 is required to build Android apps. Check failed with: permission denied",
+            );
+        });
+
         it("returns a troubleshooting failure when the Java check throws for another reason", async () => {
             const runner = new FakeProcessRunner();
             const config = getDefaultRuntimeConfig({ runner });
