@@ -23,9 +23,22 @@ uv run --project evals --extra dev python evals/run_eval.py android-version \
   --device <serial>
 ```
 
+To run both runtime targets on the same emulator with the matching APK setup
+steps, use:
+
+```bash
+./scripts/run_android_version_eval.sh <device_serial> <agent> <model>
+```
+
+Pass `local-dev` or `published` as a fourth argument to run only one target.
+The published branch downloads the exact APK for the installed published CLI
+version before setup.
+
 ## Triage
 
 - `VERSION_INCOMPATIBLE` usually means the CLI and APK versions do not match.
+- For `local-dev`, rebuild the debug APK from the same checkout before rerunning.
+- For `published`, download and install the APK that matches `clawperator version`.
 - `doctor_preflight_failed` means preflight stopped the run before the agent started.
 - `no_answer` means the transcript needs inspection for the answer marker and scorer behavior.
 - Auth or provider errors such as `LLM not set` mean the agent config must be fixed before rerunning.
