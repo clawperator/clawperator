@@ -114,13 +114,18 @@ java_home_has_supported_version() {
 check_java() {
     local java_version_output=""
     local java_check_status="missing"
+    local java_home_output=""
 
     # Prefer a valid JAVA_HOME before touching the system install.
-    if java_version_output="$(java_home_has_supported_version)"; then
-        export PATH="${JAVA_HOME}/bin:${PATH}"
-        hash -r
-        echo -e "${GREEN}✅ Java detected via JAVA_HOME: $(java_version_first_line "$java_version_output")${NC}"
-        return 0
+    if [ -n "${JAVA_HOME:-}" ] && [ -x "${JAVA_HOME}/bin/java" ]; then
+        java_home_output="$("${JAVA_HOME}/bin/java" -version 2>&1 || true)"
+        if java_output_is_supported "$java_home_output"; then
+            java_version_output="$java_home_output"
+            export PATH="${JAVA_HOME}/bin:${PATH}"
+            hash -r
+            echo -e "${GREEN}✅ Java detected via JAVA_HOME: $(java_version_first_line "$java_version_output")${NC}"
+            return 0
+        fi
     fi
 
     # Check if java is on PATH
