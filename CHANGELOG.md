@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project aims to follow Semantic Versioning.
 
+## [0.5.4] - 2026-04-07
+This release pins the release and CI toolchain to Node 24, removes the flaky npm self-upgrade path, and aligns the public setup guidance with the new runtime floor.
+
+### 🤖 Node API & CLI
+- **Changed:** Pinned the release and PR workflows to Node 24.14.1 and removed the global npm bootstrap step from npm publishing to avoid the trusted-publishing failure path.
+- **Changed:** Raised the declared Node requirement to 24 in package metadata, doctor checks, installer scripts, and runtime guidance.
+
+### 📚 Documentation & Website
+- **Changed:** Regenerated machine-facing docs and updated setup/release guidance to match the Node 24 floor.
+
+Pull requests:
+- [chore: pin workflows and tooling to Node 24](https://github.com/clawperator/clawperator/pull/154)
+
 ## [0.5.3] - 2026-04-07
 This release adds new user guidance around starring the project and improves Java setup reliability for Android builds, while expanding setup and snapshot documentation.
 
