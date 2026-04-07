@@ -27,7 +27,7 @@ cd "$(git rev-parse --show-toplevel)"
 Example:
 
 ```bash
-.agents/skills/release-create/scripts/create_release.sh 0.5.3
+.agents/skills/release-create/scripts/create_release.sh 0.5.4
 ```
 
 If `sha` is omitted, the script tags `HEAD`.
