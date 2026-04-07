@@ -170,22 +170,22 @@ subprojects {
 
 fun addCommonConfigurationForAndroidModules(project: Project) {
     project.extensions.configure<JavaPluginExtension> {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
 
         toolchain {
-            languageVersion.set(JavaLanguageVersion.of(11))
+            languageVersion.set(JavaLanguageVersion.of(17))
         }
     }
 
     project.extensions.configure<BaseExtension> {
         compileOptions {
-            sourceCompatibility = JavaVersion.VERSION_11
-            targetCompatibility = JavaVersion.VERSION_11
+            sourceCompatibility = JavaVersion.VERSION_17
+            targetCompatibility = JavaVersion.VERSION_17
         }
 
 //        (this as ExtensionAware).extensions.configure<KotlinJvmOptions> {
-//            jvmTarget = "11"
+//            jvmTarget = "17"
 //        }
 
         compileSdkVersion(project.rootProject.extra["compileSdkVersion"] as Int)
@@ -290,10 +290,10 @@ detekt {
 }
 
 tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
-    jvmTarget = "11"
+    jvmTarget = "17"
 }
 tasks.withType<io.gitlab.arturbosch.detekt.DetektCreateBaselineTask>().configureEach {
-    jvmTarget = "11"
+    jvmTarget = "17"
 }
 
 ktlint {
