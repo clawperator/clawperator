@@ -120,43 +120,60 @@ Deterministic:
 
 - script plumbing
 - environment detection
+- version-string matching (must mirror `buildChecks.ts` exactly)
+- distribution choice (Temurin - see Decision Rules)
 - docs wording that reflects implemented behavior
 - site generation and build validation
 
 Judgment:
 
-- which package manager path to use on each supported OS
-- which Java distribution and major version to provision
 - how much remediation output to print when Java is already installed
 
 ## Decision Rules
 
-1. The accepted Java versions are exactly **17 and 21**. This is the check
-   implemented in `apps/node/src/domain/doctor/checks/buildChecks.ts` via
-   string matching on `version "17`, `version "21`, `openjdk 17`, `openjdk 21`.
-   Java 11, 18, 19, 20, 22, or any other major version fails the doctor check.
-2. The provisioning target is **Java 17 LTS**. It is the minimum accepted version,
-   is broadly packaged, and satisfies the doctor check. Do not provision Java 21
-   unless Java 17 is unavailable on the target platform and the package manager
-   only offers 21.
-3. A "valid" existing install is one that passes the doctor check, meaning the
-   `java -version` output contains `version "17`, `version "21`, `openjdk 17`, or
-   `openjdk 21`. Match this exactly - do not use a looser version check in the
-   installer.
+1. **Distribution:** use the following per-platform targets when Java must be
+   installed. Temurin is the macOS target (TCK-verified, no Oracle license
+   friction, one-command Homebrew install). On Linux, distro-packaged OpenJDK 17
+   is used instead - adding the Adoptium apt repo just to get Temurin adds GPG
+   key and source-list setup complexity for no functional benefit, since OpenJDK
+   17 also passes the doctor check.
+
+   | Platform | Command | Notes |
+   | --- | --- | --- |
+   | macOS (Homebrew present) | `brew install --cask temurin@17` | Preferred |
+   | macOS (no Homebrew) | print error + point to `https://adoptium.net/temurin/releases/` + return 1 | Same pattern as adb on macOS without Homebrew |
+   | Linux/apt | `sudo apt-get install -y openjdk-17-jdk` | In default Ubuntu/Debian repos; no extra repo setup needed |
+   | Linux/pacman | `sudo pacman -S --noconfirm jdk17-openjdk` | In default Arch repos |
+
+   **Do not install anything when any valid Java is already present.** A valid
+   install is any distribution whose `java -version` output matches the accepted
+   patterns (see Rule 3). The existing distribution is irrelevant.
+
+2. The accepted Java versions are exactly **17 and 21**. This is the check in
+   `apps/node/src/domain/doctor/checks/buildChecks.ts` via string matching on
+   `version "17`, `version "21`, `openjdk 17`, `openjdk 21`. Java 11, 18, 19,
+   20, 22, or any other major version fails the doctor check.
+
+3. A "valid" existing install is one that passes the doctor check: `java -version`
+   output contains `version "17`, `version "21`, `openjdk 17`, or `openjdk 21`.
+   Match this exactly - do not use a numeric comparison or a ">=17" check.
+
 4. Three-state detection is required. The installer must distinguish:
-   - **missing**: `java` not on PATH - provision Java 17.
+   - **missing**: `java` not on PATH - provision per Rule 1.
    - **valid**: present and passes the doctor version check - skip provisioning,
      report version found.
    - **incompatible**: present but does not pass the doctor version check (e.g.,
-     Java 11, 22, 23) - warn the user that the installed version is not accepted,
-     install Java 17 via the package manager without overwriting the existing
-     installation or overriding `JAVA_HOME`. After install, confirm the new JDK
-     is resolvable on PATH (e.g., via `JAVA_HOME` update or shell export). If the
-     package manager install would require destructively removing the existing JDK,
-     stop, print a clear error, and tell the user to install Java 17 or 21 manually.
-5. Preserve any existing `JAVA_HOME` or user-managed JDK install unless the user
-   has no valid Java. Do not mutate `JAVA_HOME` when a valid Java already exists.
+     Java 11, 22, 23) - warn the user, then provision per Rule 1 without
+     overwriting the existing installation or overriding `JAVA_HOME`. After
+     install, confirm the new JDK is resolvable on PATH. If the package manager
+     would require destructively removing the existing JDK, stop, print a clear
+     error pointing to `https://adoptium.net/temurin/releases/`, and return 1.
+
+5. Preserve any existing `JAVA_HOME` or user-managed JDK install when a valid
+   Java is present. Do not mutate `JAVA_HOME` when a valid Java already exists.
+
 6. Keep host Java provisioning in the installer flow, not in `doctor`.
+
 7. Never introduce a new dependency on a Gradle daemon criteria file to solve
    this task.
 

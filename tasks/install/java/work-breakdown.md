@@ -109,16 +109,22 @@ thinking
 4. **Add OS-specific Java 17 provisioning:**
    - Follow the existing `check_adb` / `check_git` helper style: explicit
      package-manager branching with colored output and clear success/failure messages.
-   - macOS: `brew install openjdk@17` (Homebrew required; print manual fallback if
-     absent). After install, set `JAVA_HOME` to the Homebrew prefix for `openjdk@17`
-     if and only if no valid `JAVA_HOME` was already present.
-   - Linux/apt: `sudo apt-get install -y openjdk-17-jdk`
+   - macOS with Homebrew: `brew install --cask temurin@17`. After install, set
+     `JAVA_HOME` to the Homebrew Caskroom path for temurin@17 if and only if no
+     valid `JAVA_HOME` was already present.
+   - macOS without Homebrew: print an error pointing to
+     `https://adoptium.net/temurin/releases/` and return 1. Same pattern as
+     `check_adb` on macOS without Homebrew.
+   - Linux/apt: `sudo apt-get install -y openjdk-17-jdk`. This package is in the
+     default Ubuntu/Debian repos and requires no extra repo setup. Do not add the
+     Adoptium apt repo.
    - Linux/pacman: `sudo pacman -S --noconfirm jdk17-openjdk`
    - After provisioning, re-run the version check. If it still does not produce
      a valid result, print a clear error message and return 1.
    - For the incompatible-version case: if provisioning via package manager would
      require removing the existing JDK (detected when the package manager reports
-     a conflict), stop, print a clear manual remediation message, and return 1.
+     a conflict), stop, print a clear manual remediation message pointing to
+     `https://adoptium.net/temurin/releases/`, and return 1.
 5. **Wire the Java check into `main()`** in the correct position: after `validate_os`
    and before `check_node`. Java is a build prerequisite; it should be resolved early.
 6. Make the installer output clear about which state was detected and what action
