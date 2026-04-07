@@ -45,17 +45,21 @@ builds require a host JDK.
 
 - Add Java detection and provisioning to `sites/landing/public/install.sh`.
 - Keep the existing installer flow deterministic and idempotent.
+- Upgrade `build.gradle.kts` Java toolchain and `sourceCompatibility`/`targetCompatibility`
+  from `VERSION_11` to `VERSION_17` to align the Gradle build files with the actual
+  host JDK requirement. AGP 8.13.2 requires Java 17+ and this removes the misleading
+  discrepancy where the Gradle files advertise Java 11 but Java 17 is required to run
+  the build.
 - Update setup docs to reflect the new installer capability and the remaining
   prerequisites.
-- Validate the landing-site and docs-site generated outputs after the source
-  edits land.
+- Validate the landing-site and docs-site generated outputs after the source edits land.
 
 ## Out of Scope
 
 - Do not teach `clawperator doctor` to install Java.
-- Do not change the Android app's runtime target or bytecode target.
 - Do not add or depend on `gradle/gradle-daemon-jvm.properties`.
 - Do not make Java 21 a hard requirement for the repo.
+- Do not change minSdk, targetSdk, compileSdk, or any Android API level settings.
 
 ## Existing Artifact Scope
 
@@ -66,6 +70,7 @@ builds require a host JDK.
 | Surface | Owned files | Notes |
 | --- | --- | --- |
 | Landing site install flow | `sites/landing/public/install.sh` | Primary implementation surface |
+| Android build configuration | `build.gradle.kts` | Upgrade Java toolchain and sourceCompatibility/targetCompatibility from VERSION_11 to VERSION_17 |
 | Setup documentation | `docs/setup.md` | Must explain the new installer behavior |
 | Doctor documentation | `docs/api/doctor.md` | Update only if wording needs to stay aligned with the installer flow |
 
@@ -74,10 +79,40 @@ builds require a host JDK.
 | Claim | Source of truth |
 | --- | --- |
 | Installer responsibilities | `sites/landing/public/install.sh` |
-| Java build requirement | `apps/node/src/domain/doctor/checks/buildChecks.ts` |
+| Accepted Java versions and exact version-string match patterns | `apps/node/src/domain/doctor/checks/buildChecks.ts` (line 11) |
+| Authoritative build-level reason for Java 17 minimum | AGP 8.x (8.13.2, `gradle/libs.versions.toml`) requires Java 17+ as the host JDK |
+| Gradle version in use | `gradle/wrapper/gradle-wrapper.properties` (Gradle 8.13) |
 | Doctor sequencing and `--full` behavior | `apps/node/src/domain/doctor/DoctorService.ts` |
 | User-facing setup instructions | `docs/setup.md` |
 | Doctor contract text | `docs/api/doctor.md` |
+
+### Why Java 17, not Java 11
+
+`build.gradle.kts` sets `sourceCompatibility = JavaVersion.VERSION_11` and
+`toolchain { languageVersion.set(JavaLanguageVersion.of(11)) }`. This is the
+**bytecode compatibility target** for the compiled Android app, chosen to match
+the minSdk requirement (Android 5.0+). It is not the host JDK requirement.
+
+**AGP 8.x requires Java 17+ as the host JDK** to run the Gradle build. The
+project uses AGP 8.13.2. A host with Java 11 will fail to build. The doctor
+check correctly enforces this by accepting only Java 17 or 21.
+
+The installer must provision Java 17, not Java 11, even though the project
+bytecode targets Java 11.
+
+### Exact accepted patterns from `buildChecks.ts`
+
+```
+version "17   (e.g. openjdk version "17.0.x")
+version "21   (e.g. openjdk version "21.0.x")
+openjdk 17    (alternate output format)
+openjdk 21    (alternate output format)
+```
+
+Any `java -version` output that does not contain at least one of the above strings
+is an incompatible install. The installer's version check must use these same
+patterns - not a numeric comparison, not a ">=17" check, not just checking that
+`java` resolves on PATH.
 
 ## Deterministic Versus Judgment
 
@@ -96,22 +131,53 @@ Judgment:
 
 ## Decision Rules
 
-1. Prefer Java 17 LTS as the host JDK to provision unless code-level evidence
-   shows a different version is required.
-2. Treat a preexisting valid Java install as sufficient and skip provisioning.
-3. Preserve any existing `JAVA_HOME` or user-managed JDK install.
-4. Keep host Java provisioning in the installer flow, not in `doctor`.
-5. Never introduce a new dependency on a Gradle daemon criteria file to solve
+1. The accepted Java versions are exactly **17 and 21**. This is the check
+   implemented in `apps/node/src/domain/doctor/checks/buildChecks.ts` via
+   string matching on `version "17`, `version "21`, `openjdk 17`, `openjdk 21`.
+   Java 11, 18, 19, 20, 22, or any other major version fails the doctor check.
+2. The provisioning target is **Java 17 LTS**. It is the minimum accepted version,
+   is broadly packaged, and satisfies the doctor check. Do not provision Java 21
+   unless Java 17 is unavailable on the target platform and the package manager
+   only offers 21.
+3. A "valid" existing install is one that passes the doctor check, meaning the
+   `java -version` output contains `version "17`, `version "21`, `openjdk 17`, or
+   `openjdk 21`. Match this exactly - do not use a looser version check in the
+   installer.
+4. Three-state detection is required. The installer must distinguish:
+   - **missing**: `java` not on PATH - provision Java 17.
+   - **valid**: present and passes the doctor version check - skip provisioning,
+     report version found.
+   - **incompatible**: present but does not pass the doctor version check (e.g.,
+     Java 11, 22, 23) - warn the user that the installed version is not accepted,
+     install Java 17 via the package manager without overwriting the existing
+     installation or overriding `JAVA_HOME`. After install, confirm the new JDK
+     is resolvable on PATH (e.g., via `JAVA_HOME` update or shell export). If the
+     package manager install would require destructively removing the existing JDK,
+     stop, print a clear error, and tell the user to install Java 17 or 21 manually.
+5. Preserve any existing `JAVA_HOME` or user-managed JDK install unless the user
+   has no valid Java. Do not mutate `JAVA_HOME` when a valid Java already exists.
+6. Keep host Java provisioning in the installer flow, not in `doctor`.
+7. Never introduce a new dependency on a Gradle daemon criteria file to solve
    this task.
 
 ## Failure Modes To Prevent
 
+- Using a two-state detection ("present" vs "missing") that silently skips
+  provisioning when a user has Java 11 or Java 22 - the doctor will still fail
+  and the user gets no useful error.
+- Using a looser version check in the installer (e.g., `java -version` succeeds
+  and any output is treated as valid) that diverges from the exact string-match
+  logic in `buildChecks.ts`.
 - Accidentally turning the install flow into a JDK 21 requirement.
+- Installing Java 17 alongside Java 22 but having the PATH still resolve to Java
+  22 after install, so the doctor check still fails.
 - Clobbering an existing Java install or overriding user-owned environment
   settings.
 - Updating docs before the installer behavior exists.
 - Letting `doctor` become a host mutator instead of a diagnostic command.
 - Shipping a macOS-only or Linux-only path that breaks the installer contract.
+- Treating the existing `JAVA_HOME` as the final answer without running the
+  version check - `JAVA_HOME` may point to an incompatible version.
 
 ## Output Contract
 
