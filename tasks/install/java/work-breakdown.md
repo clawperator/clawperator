@@ -28,7 +28,7 @@ flow. Phase 2 updates docs and validates the generated site outputs.
 - The install target is Java 17 LTS. Do not provision Java 21 unless Java 17 is
   unavailable on the target platform.
 - The version check in the installer must match the exact string-match logic in
-  `buildChecks.ts` (lines 11-12): accepted strings are `version "17`, `version "21`,
+  `buildChecks.ts`: accepted strings are `version "17`, `version "21`,
   `openjdk 17`, `openjdk 21`. Do not use a numeric comparison or a ">=17" check.
 - Three-state detection is required - see plan Decision Rule 4. Do not implement
   a two-state "present vs missing" check.
@@ -103,9 +103,9 @@ and provision one when needed before the rest of the install flow depends on it.
    - macOS without Homebrew: print an error pointing to
      `https://adoptium.net/temurin/releases/` and return 1. Same pattern as
      `check_adb` on macOS without Homebrew.
-   - Linux/apt: `sudo apt-get install -y openjdk-17-jdk`. This package is in the
-     default Ubuntu/Debian repos and requires no extra repo setup. Do not add the
-     Adoptium apt repo.
+   - Linux/apt: `sudo apt-get update && sudo apt-get install -y openjdk-17-jdk`.
+     This package is in the default Ubuntu/Debian repos and requires no extra
+     repo setup. Do not add the Adoptium apt repo.
    - Linux/pacman: `sudo pacman -S --noconfirm jdk17-openjdk`
    - After provisioning, re-run the version check. If it still does not produce
      a valid result, print a clear error message and return 1.
@@ -116,16 +116,20 @@ and provision one when needed before the rest of the install flow depends on it.
 5. **Write unit tests for `checkJavaVersion`** in a new file
    `apps/node/src/test/unit/doctor/buildChecks.test.ts`. Use `FakeProcessRunner`
    following the pattern in `hostChecks.test.ts`. Required cases:
-   - `java -version` stderr contains `openjdk version "17.0.x"` → `status: "pass"`
-   - `java -version` stderr contains `openjdk version "21.0.x"` → `status: "pass"`
-   - `java -version` stderr contains `openjdk version "11.0.x"` → `status: "fail"`
-   - `java -version` stderr contains `openjdk version "22.0.x"` → `status: "fail"`
-   - `java` command throws (exit 127 / ENOENT) → `status: "fail"`
-   These tests prove the version-string patterns without requiring the host
-   Java install to be modified or removed.
+   - `runner.queueResult({ code: 0, stdout: "", stderr: 'openjdk version "17.0.9"' })` → `status: "pass"`
+   - `runner.queueResult({ code: 0, stdout: "", stderr: 'openjdk version "21.0.1"' })` → `status: "pass"`
+   - `runner.queueResult({ code: 0, stdout: "", stderr: 'openjdk version "11.0.20"' })` → `status: "fail"`
+   - `runner.queueResult({ code: 0, stdout: "", stderr: 'openjdk version "22.0.1"' })` → `status: "fail"`
+   - `runner.queueError(127, "ENOENT")` → `status: "fail"`
+   Note: `NodeProcessRunner.run` always resolves - it never throws. The ENOENT
+   case resolves with `{ code: 127, stdout: "", stderr: "" }`, so the fail result
+   comes from the try-block path (empty version string matches no valid pattern),
+   not the catch block. The catch in `checkJavaVersion` is effectively dead code
+   with the current runner. Flag this to the reviewer but do not fix it as part
+   of this task.
 6. **Wire the Java check into `main()`** in the correct position: after `validate_os`
    and before `check_node`. Java is a build prerequisite; it should be resolved early.
-6. Make the installer output clear about which state was detected and what action
+7. Make the installer output clear about which state was detected and what action
    was taken (found valid, installed, warned+installed, or failed).
 8. Keep the rest of the install sequence working after Java provisioning.
 

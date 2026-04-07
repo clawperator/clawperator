@@ -149,6 +149,10 @@ Judgment:
 3. A "valid" existing install is one that passes the doctor check: `java -version`
    output contains `version "17`, `version "21`, `openjdk 17`, or `openjdk 21`.
    Match this exactly - do not use a numeric comparison or a ">=17" check.
+   Note: `checkJavaVersion` currently returns the summary `"Java 17+ is installed."`
+   on success, which implies 18+ is accepted when it is not. User-facing messaging
+   in the installer and in `buildChecks.ts` should say "Java 17 or 21" - not
+   "Java 17+". Do not silently perpetuate this wording in new installer output.
 
 4. Three-state detection is required. The installer must distinguish:
    - **missing**: `java` not on PATH - provision per Rule 1.
