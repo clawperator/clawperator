@@ -80,7 +80,7 @@ describe("landing install.sh Node upgrade path", () => {
 
   function runCheckNode() {
     return new Promise<{ code: number; stdout: string; stderr: string }>((resolve) => {
-      const proc = spawn("bash", ["-lc", `set -euo pipefail
+      const proc = spawn("bash", ["-c", `set -euo pipefail
 source ${JSON.stringify(installScript)}
 PATH=${JSON.stringify(`${fakeBinDir}:${process.env.PATH ?? ""}`)}
 export PATH
