@@ -4,6 +4,32 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project aims to follow Semantic Versioning.
 
+## [0.5.3] - 2026-04-07
+This release adds new user guidance around starring the project and improves Java setup reliability for Android builds, while expanding setup and snapshot documentation.
+
+### 🤖 Node API & CLI
+- **Added:** Added a star-hint system in the CLI with suppression controls for flags, environment variables, and non-interactive sessions.
+- **Added:** Added Java runtime provisioning support in install and doctor flows so Android build prerequisites can be prepared and validated more reliably.
+
+### 📚 Documentation & Website
+- **Added:** Added a new snapshot API guide and quickstart documentation, plus version badges and quick-reference version checks in core docs pages.
+- **Changed:** Updated release-facing docs and install artifacts for the published `0.5.2` release and refreshed site guidance related to version visibility and star messaging.
+
+Pull requests:
+- [docs: add version badges and improve version discoverability](https://github.com/clawperator/clawperator/pull/141)
+- [Add comprehensive task plans and work breakdowns](https://github.com/clawperator/clawperator/pull/142)
+- [docs: add snapshot guide and quickstart](https://github.com/clawperator/clawperator/pull/143)
+- [feat(evals): phase 1 eval harness and android-version spec](https://github.com/clawperator/clawperator/pull/144)
+- [feat(evals): add multi-agent adapters and turn budget enforcement](https://github.com/clawperator/clawperator/pull/145)
+- [feat(evals): add runtime contracts and knowledge mode](https://github.com/clawperator/clawperator/pull/146)
+- [feat(evals): add skill generation replay eval](https://github.com/clawperator/clawperator/pull/147)
+- [feat(evals): add replay framework and comprehensive test coverage](https://github.com/clawperator/clawperator/pull/148)
+- [feat: add star hint system with triggers and suppression](https://github.com/clawperator/clawperator/pull/149)
+- [chore: update AGP to 8.13.2](https://github.com/clawperator/clawperator/pull/150)
+- [tasks: Java provisioning and Android migration plans](https://github.com/clawperator/clawperator/pull/151)
+- [chore(android): migrate build toolchain from Java 11 to Java 17](https://github.com/clawperator/clawperator/pull/152)
+- [feat(install): add Java provisioning to installer](https://github.com/clawperator/clawperator/pull/153)
+
 ## [0.5.2] - 2026-03-28
 This release unifies Node logging and strengthens skill-run diagnostics: shared output assertions, full NDJSON capture of skill child output, a new `logs` command, and expanded documentation. Release automation now attaches the changelog to GitHub Releases.
 
