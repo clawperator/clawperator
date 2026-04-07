@@ -11,12 +11,12 @@ flow. Phase 2 updates docs and validates the generated site outputs.
 
 | Item | Value |
 | --- | --- |
-| State | in progress |
+| State | complete |
 | Total PRs | 1 |
 | Total phases | 2 |
-| Completed | 1 |
-| Remaining | 1 |
-| Current / Next | phase-2 |
+| Completed | 2 |
+| Remaining | 0 |
+| Current / Next | - |
 | Blockers | none |
 
 ## Hard Rules
@@ -187,7 +187,7 @@ the skip path.
 feat(install): add Java 17 detection and provisioning to installer
 ```
 
-## Phase 2: Update Docs and Validate Site Outputs
+## Phase 2: Update Docs and Validate Site Outputs [DONE]
 
 ### Agent Tier
 

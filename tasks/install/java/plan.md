@@ -20,12 +20,12 @@ Java requirements, not mutate the host.
 
 | Item | Value |
 | --- | --- |
-| State | in progress |
+| State | complete |
 | Total PRs | 1 |
 | Total phases | 2 |
-| Completed | 1 |
-| Remaining | 1 |
-| Current / Next | phase-2 |
+| Completed | 2 |
+| Remaining | 0 |
+| Current / Next | - |
 | Blockers | none |
 
 ## Goal
