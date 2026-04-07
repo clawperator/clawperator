@@ -1,0 +1,4 @@
+interface:
+  display_name: "Evals Run"
+  short_description: "Run and debug Clawperator evals"
+  default_prompt: "Use $evals-run to run, debug, replay, or rescore Clawperator evals."
