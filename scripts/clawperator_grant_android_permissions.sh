@@ -125,7 +125,7 @@ if [ -n "$PACKAGE" ] && { [ "$USE_DEBUG" = true ] || [ "$USE_RELEASE" = true ]; 
     exit 1
 fi
 
-require_cmd node "Install Node.js 22+ to build and run the local CLI."
+require_cmd node "Install Node.js 24+ to build and run the local CLI."
 require_cmd npm "Install npm so the repo-local apps/node CLI can be built."
 
 ensure_node_cli_built

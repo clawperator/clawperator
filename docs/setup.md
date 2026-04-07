@@ -8,7 +8,7 @@ Get from an empty host to a first successful `clawperator snapshot --json` with 
 
 | Requirement | Minimum | Machine check |
 | --- | --- | --- |
-| Node.js | v22+ | `node -v` |
+| Node.js | v24+ | `node -v` |
 | Java | 17 or 21 | `java -version` |
 | adb | On `PATH` | `adb version` |
 | Android target | One device or emulator visible to adb | `clawperator devices` |
@@ -25,7 +25,7 @@ curl -fsSL https://clawperator.com/install.sh | bash
 
 If the installer succeeds, skip to [5. Verify readiness with doctor](#5-verify-readiness-with-doctor).
 
-Alternatively, install the CLI only via npm (Node.js 22+ required):
+Alternatively, install the CLI only via npm (Node.js 24+ required):
 
 ```bash
 npm install -g clawperator
@@ -132,7 +132,7 @@ clawperator doctor --json --device <device_serial> --operator-package com.clawpe
 
 | Check ID | What it verifies |
 | --- | --- |
-| `host.node.version` | Node.js >= 22 |
+| `host.node.version` | Node.js >= 24 |
 | `host.java.version` | Java 17 or 21 is installed |
 | `host.adb.presence` | adb is installed and on PATH |
 | `host.adb.server` | adb server starts successfully |
@@ -157,7 +157,7 @@ clawperator doctor --json --device <device_serial> --operator-package com.clawpe
     {
       "id": "host.node.version",
       "status": "pass",
-      "summary": "Node version v22.x.x is compatible."
+      "summary": "Node version v24.x.x is compatible."
     }
   ],
   "nextActions": []

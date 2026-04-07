@@ -16,7 +16,7 @@ curl -fsSL https://clawperator.com/install.sh | bash
 
 ## Requirements
 
-- Node.js 22+
+- Node.js 24+
 - `adb` on `PATH`
 - Android device with USB debugging enabled
 - Clawperator APK installed from [clawperator.com/operator.apk](https://clawperator.com/operator.apk)

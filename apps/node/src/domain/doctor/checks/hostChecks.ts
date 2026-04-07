@@ -7,7 +7,7 @@ import { DOCTOR_DOCS_URLS } from "../docsUrls.js";
 export async function checkNodeVersion(): Promise<DoctorCheckResult> {
   const version = process.version;
   const major = parseInt(version.slice(1).split(".")[0], 10);
-  const MIN_NODE_VERSION = 22;
+  const MIN_NODE_VERSION = 24;
 
   if (major < MIN_NODE_VERSION) {
     return {
@@ -20,8 +20,8 @@ export async function checkNodeVersion(): Promise<DoctorCheckResult> {
         title: "Upgrade Node.js",
         platform: "any",
         steps: [
-          { kind: "shell", value: "nvm install 22" },
-          { kind: "shell", value: "nvm use 22" },
+          { kind: "shell", value: "nvm install 24" },
+          { kind: "shell", value: "nvm use 24" },
           { kind: "manual", value: "Alternatively, download from nodejs.org" }
         ],
         docsUrl: DOCTOR_DOCS_URLS.setup,

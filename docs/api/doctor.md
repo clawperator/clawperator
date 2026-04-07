@@ -136,7 +136,7 @@ Each entry in `checks[]` has:
     {
       "id": "host.node.version",
       "status": "pass",
-      "summary": "Node version v22.12.0 is compatible."
+      "summary": "Node version v24.14.1 is compatible."
     },
     {
       "id": "host.adb.presence",
@@ -392,7 +392,7 @@ For a failing check, pretty output includes:
 
 | Check ID | Statuses seen in current code | Typical codes | What it verifies |
 | --- | --- | --- | --- |
-| `host.node.version` | `pass`, `fail` | `NODE_TOO_OLD` | Node.js major version is at least 22 |
+| `host.node.version` | `pass`, `fail` | `NODE_TOO_OLD` | Node.js major version is at least 24 |
 | `host.adb.presence` | `pass`, `fail` | `ADB_NOT_FOUND` | adb exists and can report a version |
 | `host.adb.server` | `pass`, `fail` | `ADB_SERVER_FAILED` | adb server can start |
 | `host.java.version` | `pass`, `fail` | `HOST_DEPENDENCY_MISSING` or no explicit code | Java 17 or 21 is available for full Android build checks |
