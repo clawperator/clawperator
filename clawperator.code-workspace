@@ -5,6 +5,9 @@
 		},
 		{
 			"path": "../clawperator-skills"
+		},
+		{
+			"path": "../clawperator-distribution"
 		}
 	],
 	"settings": {}
