@@ -1,11 +1,58 @@
 import { describe, it } from "node:test";
 import assert from "node:assert";
-import { checkAdbPresence, checkAdbServer } from "../../../domain/doctor/checks/hostChecks.js";
+import { checkAdbPresence, checkAdbServer, checkNodeVersion } from "../../../domain/doctor/checks/hostChecks.js";
 import { ERROR_CODES } from "../../../contracts/errors.js";
 import { getDefaultRuntimeConfig } from "../../../adapters/android-bridge/runtimeConfig.js";
 import { FakeProcessRunner } from "../fakes/FakeProcessRunner.js";
 
 describe("Doctor: hostChecks", () => {
+    function withNodeVersion(version: string, fn: () => Promise<void> | void): Promise<void> | void {
+        const originalVersion = process.version;
+        Object.defineProperty(process, "version", {
+            configurable: true,
+            value: version,
+        });
+
+        const restore = () => {
+            Object.defineProperty(process, "version", {
+                configurable: true,
+                value: originalVersion,
+            });
+        };
+
+        try {
+            const result = fn();
+            if (result && typeof (result as Promise<void>).then === "function") {
+                return (result as Promise<void>).finally(restore);
+            }
+            restore();
+            return result;
+        } catch (error) {
+            restore();
+            throw error;
+        }
+    }
+
+    describe("checkNodeVersion", () => {
+        it("fails below the Node 24 floor and passes at the floor", async () => {
+            await withNodeVersion("v23.11.0", async () => {
+                const result = await checkNodeVersion();
+
+                assert.strictEqual(result.status, "fail");
+                assert.strictEqual(result.code, ERROR_CODES.NODE_TOO_OLD);
+                assert.match((result as any).detail, /Node\.js v24 or newer/);
+                assert.match((result as any).fix.steps[0].value, /nvm install 24/);
+            });
+
+            await withNodeVersion("v24.0.0", async () => {
+                const result = await checkNodeVersion();
+
+                assert.strictEqual(result.status, "pass");
+                assert.strictEqual((result as any).summary, "Node version v24.0.0 is compatible.");
+            });
+        });
+    });
+
     describe("checkAdbPresence", () => {
         it("returns ADB_NOT_FOUND when adb is missing", async () => {
             const runner = new FakeProcessRunner();
