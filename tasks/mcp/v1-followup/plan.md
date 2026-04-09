@@ -37,6 +37,8 @@ The current MCP server works and is already heavily tested, but the implementati
 - live-device verification exposed flaky snapshot and app-state assumptions
 - common MCP JSON Schemas and runtime validators were close enough to drift that repeated review catches were needed
 - error payload diagnostics became materially more useful once envelope context was preserved
+- agent usage still pays a high token and payload cost for common observe-decide-act loops
+- long-lived sessions still require repetitive per-call defaults that are easy for agents to get wrong
 
 These are exactly the sorts of issues that get harder to fix after client adoption grows.
 
@@ -47,16 +49,20 @@ These are exactly the sorts of issues that get harder to fix after client adopti
 - Clarifying MCP error taxonomy and making tool/runtime failures more diagnosable
 - Improving transport bootstrap safety and regression coverage for stdout discipline
 - Making MCP verification less flaky on live devices and more explicit about acceptable runtime states
+- Evaluating bounded, agent-oriented snapshot output that reduces XML parsing cost without weakening the canonical surface
+- Evaluating session-default ergonomics for repeated `deviceId`, `operatorPackage`, and timeout usage
+- Evaluating a minimal agent-oriented readiness or foreground-state surface where it clearly reduces full-snapshot dependence
 - Tightening MCP-facing docs where current behavior is subtle or non-obvious
 
 ## Out of Scope
 
-- Adding new MCP tools
+- Broadly mirroring the full CLI surface in MCP
 - Adding non-stdio transports
 - Reworking the core Clawperator execution engine for non-MCP callers
 - Broad serve API redesign
 - Registry submission, packaging changes, or desktop-client-specific wrappers
 - Changing the existing public tool names or removing shipped tools
+- Returning raw screenshot bytes over MCP
 
 ## Existing Artifact Scope
 
@@ -111,6 +117,7 @@ Judgment:
 - which live-device failures should be retried versus explicitly accepted as valid runtime states
 - which MCP error payload fields are genuinely useful to preserve for clients
 - whether future drift-reduction work belongs in `contracts/` or in MCP-only helpers
+- whether agent-ergonomics improvements belong in existing tools, sibling tools, or MCP resources/session state
 
 ## Decision Rules
 
@@ -121,6 +128,7 @@ Judgment:
 | Alias-sensitive MCP safety checks | Normalize through canonical execution input mapping before making the decision |
 | Shared MCP input schema fragments | Define once in shared helpers unless there is a tool-specific reason not to |
 | Live-device smoke failures | Distinguish contract regressions from acceptable runtime-state variability before changing behavior |
+| Agent-oriented ergonomics additions | Prefer narrow additions that reduce token cost or repeated boilerplate without duplicating the whole CLI |
 
 ## Failure Modes To Prevent
 
@@ -130,6 +138,8 @@ Judgment:
 - runtime extraction issues being misreported as caller parameter errors
 - duplicated helper logic diverging across core and named tools
 - verification scripts failing for incidental device state rather than contract regressions
+- agents burning large token budgets on raw XML when a bounded summary would do
+- agents repeatedly mis-specifying per-call defaults in long-lived sessions
 
 ## Output Contract
 

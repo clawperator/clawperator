@@ -12,6 +12,12 @@ This task turns post-implementation lessons from the shipped MCP server into a b
 
 The intent is not to expand the product. It is to reduce drift, sharpen diagnostics, and make future MCP review passes quieter because the recurring bug classes are removed at the source.
 
+This follow-up should also capture a small number of agent-facing ergonomics improvements that repeatedly matter in practice:
+
+- snapshot output is often much larger than agents need for the next decision
+- agents repeat `deviceId`, `operatorPackage`, and timeout boilerplate on nearly every call
+- some quick state checks still require a full snapshot when a thinner surface would do
+
 ## Status
 
 | Item | Value |
@@ -70,6 +76,9 @@ These are the specific classes of follow-up work this pack should address:
 5. Live-device verification needs to tolerate legitimate device-state variation without hiding contract regressions.
 6. MCP error payloads are substantially more useful when execution context survives sanitization.
 7. Bootstrap detection for `mcp serve` must continue to preempt every stdout-writing top-level path.
+8. Agents still pay a large token and parsing penalty on `snapshot` because the default surface is full XML only.
+9. Long-lived MCP sessions still lack an ergonomic way to set defaults for repeated execution-backed calls.
+10. Agents sometimes need a thin “where am I?” or readiness answer before deciding whether a full snapshot is worth the cost.
 
 ## PR Plan
 
@@ -176,18 +185,23 @@ npm --prefix apps/node run test
 node validation/test_mcp_stdio_smoke.mjs
 ```
 
-## Phase 4: Docs And Operator-Facing Polish
+## Phase 4: Agent Ergonomics And Docs Polish
 
 ### Agent Tier
 
-default
+thinking
 
 ### Goal
 
-Bring public MCP guidance in line with the hardened behavior and capture subtle operator expectations that repeatedly surfaced during implementation.
+Capture the highest-leverage agent-facing improvements without turning MCP v1 follow-up into a broad new surface expansion.
 
 ### Likely Work
 
+- evaluate a bounded snapshot response mode or sibling surface that gives agents a compact, stable summary instead of forcing full XML every time
+- evaluate process-level session defaults for repeated `deviceId`, `operatorPackage`, and timeout usage, with explicit per-call overrides
+- evaluate whether a minimal foreground-state or readiness surface would reduce unnecessary full snapshots and blind retries
+- evaluate whether `execute` should grow a `validateOnly`-style MCP affordance rather than forcing agents to infer runtime validation from failed real calls
+- evaluate whether correlation IDs, retryability hints, or concurrency hints should be exposed more explicitly for agent branching logic
 - update `docs/api/mcp.md` for any contract or diagnostics clarifications introduced by Phases 1-3
 - add concise operator guidance where live-device verification assumptions are non-obvious
 - update `apps/node/README.md` only if the npm-facing surface changed materially
@@ -195,6 +209,8 @@ Bring public MCP guidance in line with the hardened behavior and capture subtle 
 
 ### Acceptance Criteria
 
+- the task leaves a clear recommendation for which agent-ergonomics additions are worth shipping next and which are intentionally deferred
+- any accepted ergonomics additions remain narrow, bounded, and consistent with the existing MCP contract philosophy
 - docs describe current shipped MCP behavior without over-promising
 - diagnostics guidance reflects the actual preserved error payloads and logging path
 - docs build succeeds if any docs changed
@@ -231,3 +247,4 @@ When this follow-up lands, the MCP server should feel less like a newly shipped 
 - safety-sensitive guards should reason over canonical normalized input
 - bootstrap and smoke verification should be less brittle
 - docs should better match the lived operator experience of running MCP locally
+- the next step for agent-oriented improvements should be explicit rather than implicit guesswork
