@@ -40,6 +40,15 @@ export function normalizeCliFlagAliasesBeforeForwardSeparator(
   aliasSpecs: readonly CliFlagAliasSpec[],
   flagValueArity: ReadonlyMap<string, number> = new Map<string, number>(),
 ): string[] {
+  const aliasToCanonical = new Map<string, string>();
+  for (const spec of aliasSpecs) {
+    for (const alias of spec.aliases) {
+      aliasToCanonical.set(alias, spec.canonical);
+    }
+  }
+  const normalizeToken = (token: string): string => aliasToCanonical.get(token) ?? token;
+
+  const escapedLiteralIndices = new Set<number>();
   let forwardIdx = -1;
   for (let i = 0; i < argv.length; i += 1) {
     if (argv[i] !== "--") {
@@ -52,6 +61,7 @@ export function normalizeCliFlagAliasesBeforeForwardSeparator(
       && argv[i + 1] !== undefined
     ) {
       // `--` immediately after a one-value flag escapes a literal value token.
+      escapedLiteralIndices.add(i + 1);
       i += 1;
       continue;
     }
@@ -60,9 +70,19 @@ export function normalizeCliFlagAliasesBeforeForwardSeparator(
   }
 
   if (forwardIdx < 0) {
-    return normalizeCliFlagAliases(argv, aliasSpecs);
+    return argv.map((token, index) => {
+      if (escapedLiteralIndices.has(index)) {
+        return token;
+      }
+      return normalizeToken(token);
+    });
   }
 
-  const prefix = normalizeCliFlagAliases(argv.slice(0, forwardIdx), aliasSpecs);
+  const prefix = argv.slice(0, forwardIdx).map((token, index) => {
+    if (escapedLiteralIndices.has(index)) {
+      return token;
+    }
+    return normalizeToken(token);
+  });
   return [...prefix, ...argv.slice(forwardIdx)];
 }

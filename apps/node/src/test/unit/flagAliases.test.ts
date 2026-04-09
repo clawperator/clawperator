@@ -51,4 +51,18 @@ describe("normalizeCliFlagAliasesBeforeForwardSeparator", () => {
     );
     assert.deepStrictEqual(normalized, ["--summary", "--", "literal", "--output", "json"]);
   });
+
+  it("does not rewrite escaped literal values that look like aliases", () => {
+    const flagValueArity = new Map<string, number>([
+      ["--summary", 1],
+      ["--timeout", 1],
+      ["--timeout-ms", 1],
+    ]);
+    const normalized = normalizeCliFlagAliasesBeforeForwardSeparator(
+      ["--summary", "--", "--timeout-ms", "--timeout-ms", "5000"],
+      TEST_ALIASES,
+      flagValueArity,
+    );
+    assert.deepStrictEqual(normalized, ["--summary", "--", "--timeout-ms", "--timeout", "5000"]);
+  });
 });
