@@ -101,7 +101,9 @@ Extract the minimum shared typed services needed so MCP does not become a third 
 
 1. Extract typed helpers for the seams that are currently transport-specific. The primary target is `resolveOperatorPackageForRequest` in `apps/node/src/cli/commands/serve.ts` - move it to a shared module under `apps/node/src/domain/` or equivalent so MCP does not reimplement it. Read `serve.ts` for any other execution helpers that both `serve` and MCP would otherwise duplicate and extract those if the evidence is clear.
 2. Keep the extraction minimal and evidence-based. Do not refactor unrelated command code.
-3. Add focused tests proving the extracted services match current behavior.
+3. Add focused unit tests for each extracted helper. At minimum cover:
+   - operator-package resolution with an explicit caller value, with an env-var fallback, and with the default fallback
+   - verify the existing `serve` integration tests still pass after extraction (no behavior change)
 4. Update `serve.ts` to use the extracted helpers where that reduces duplication cleanly.
 
 ### Acceptance Criteria
@@ -153,6 +155,11 @@ Add the `mcp serve` command path, pin the SDK dependency, and prove protocol cor
    - selector mapping (call `isNodeMatcherEmpty()` from `contracts/selectors.ts` after mapping and reject at the MCP boundary if the result would be empty; do not let an all-empty `NodeMatcher` reach the execution layer)
    - envelope extraction
    - MCP error/result shaping
+
+   Add unit tests for each helper before moving on:
+   - execution ID helper: generates distinct IDs with the `mcp-<tool>-` prefix pattern; two calls produce different values
+   - selector mapping helper: each MCP input field maps to the correct `NodeMatcher` field; all-empty input triggers rejection, not a pass-through
+   - envelope extraction helper: correct field key is pulled from `stepResults[].data`; missing key returns a defined fallback or error, not `undefined` silently
 5. Explicitly protect the `mcp serve` path from stray stdout writes. In `apps/node/src/cli/index.ts`, detect the `mcp serve` argv pattern before `getGlobalOpts` runs and before any `console.log` can fire. Route directly to the MCP bootstrap from that detection point. All pre-bootstrap errors must go to stderr. This prevents `maybeShowStarHint`, the `console.log(result)` dispatch path, and `UsageError` formatting from writing to stdout during server operation.
 6. Add real protocol tests at `apps/node/src/test/integration/mcp.test.ts`, modeled on the repo’s existing long-running integration style (see `apps/node/src/test/integration/serve.test.ts`), covering:
    - no unexpected stdout bytes before initialize
@@ -207,10 +214,10 @@ Ship the smallest useful real MCP surface on top of the verified transport.
    - `operatorPackage`
    - `timeoutMs`
 5. Add protocol-level tool-call tests for:
-   - `devices`
-   - `snapshot`
-   - `execute`
-   - invalid payloads
+   - `devices`: valid call returns a list (may be empty if no device is connected in CI)
+   - `snapshot`: valid call returns an envelope; test does not require a connected device but must confirm the response shape
+   - `execute`: valid call with a minimal `actions` array (e.g., a single `sleep` action with `durationMs`); invalid call with missing `actions` field; invalid call with `actions` containing an element missing `type`
+   - invalid tool name: confirm MCP-level error response, not a crash
 
    These tests must spawn the compiled binary as a subprocess and exchange real stdio MCP messages, not import handlers directly. Importing handlers bypasses the exact class of bug (stray writes, dispatch leaks) that the protocol tests exist to catch.
 
@@ -270,7 +277,13 @@ Add ergonomic named tools only after the transport and canonical execute path ar
    - `press`: required `key` as enum of `"back"`, `"home"`, `"recents"`, validated at the MCP boundary
    - `wait`: required `selector`, optional `timeoutMs`
    - `scroll_until`: required `selector`, optional `container`, optional `clickAfter?: boolean`; use `scroll_until` action type when `clickAfter` is false or omitted, `scroll_and_click` action type when `clickAfter` is true
-3. Add protocol-level tests for valid and invalid tool calls.
+3. Add protocol-level tests for valid and invalid tool calls. Cover at minimum:
+   - `open`: rejected when both `appId` and `uri` are provided; rejected when neither is provided; accepted with only `appId`; accepted with only `uri`
+   - `click`: rejected when both `selector` and `coordinate` are provided; rejected when neither is provided
+   - `press`: rejected when `key` is a value not in the enum (e.g., `"volume_up"`); accepted with each valid key
+   - `read`: `all: false` or omitted returns a single string in the content; `all: true` returns an array
+   - `scroll_until`: valid with `clickAfter` omitted; valid with `clickAfter: true`
+   - any tool that accepts a selector: rejected when the selector object maps to an all-empty `NodeMatcher`
 4. Do not add `packages`, `back`, or `scroll` in this task pack.
 
 ### Acceptance Criteria
@@ -314,7 +327,7 @@ Document the shipped MCP surface clearly and verify it against a real client plu
 ### Steps
 
 1. Use `.agents/skills/docs-author/SKILL.md` for the docs-authoring workflow.
-2. Update `apps/node/README.md` for the npm-shipped MCP surface.
+2. Update `apps/node/README.md` for the npm-shipped MCP surface. Include at minimum: a short description of what the MCP server is, the `clawperator mcp serve` command, a Claude Desktop `mcpServers` JSON block using `node` as the command and the installed binary path as the arg, and a note on the `ADB_PATH` env requirement.
 3. Add public docs covering:
    - what the MCP server is
    - exact launch command
@@ -322,12 +335,14 @@ Document the shipped MCP surface clearly and verify it against a real client plu
    - Claude Desktop configuration example
    - Node version requirement
    - environment configuration for long-running MCP processes, including `CLAWPERATOR_OPERATOR_PACKAGE` and `ADB_PATH`; note that Claude Desktop and similar MCP clients typically do not inherit the shell PATH, so `ADB_PATH` must be set explicitly in the client env block rather than relying on PATH resolution
-   - the shipped MCP tool list
+   - the shipped MCP tool list with parameter-level documentation for each tool: what each parameter accepts, which are required vs optional, and at least one example call shape
+   - behavior when no device is connected at server start: the server starts successfully and returns errors on tool calls rather than failing to boot; document this so Claude Desktop users who launch the server before connecting a device know what to expect
    - device-selection caveats, including that concurrent tool calls may surface `EXECUTION_CONFLICT_IN_FLIGHT` if two execution-backed tools are called simultaneously; document this as expected behavior, not a bug
    - a short smoke-test flow
 4. Update docs-site navigation and source-map entries.
 5. Run the docs build workflow instead of hand-editing generated outputs.
 6. If the implementation produced a reusable verification path, place it under `validation/`, not as a one-off script under `scripts/`.
+6a. Add a design note under `docs/internal/design/` covering the durable MCP-specific decisions that future contributors will need: why stdio-only in v1, why `execute` uses a light MCP schema and defers to `validateExecution` rather than mirroring `ActionParams`, and why named tools call action builders rather than the CLI formatter functions. This is required by the repo's docs discipline for internal design guidance that is not obvious from the code alone.
 7. Perform one real end-to-end MCP smoke test against a connected device or emulator. At minimum prove:
    - `devices`
    - `snapshot` returns parseable XML with at least one extractable node element, not just `ok: true`
