@@ -6,11 +6,13 @@
 //
 // Run from the repo root. Requires apps/node to be built first.
 
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../..");
-const { getMcpTools } = await import(path.join(repoRoot, "apps/node/dist/mcp/tools/index.js"));
+const { getMcpTools } = await import(
+  pathToFileURL(path.join(repoRoot, "apps/node/dist/mcp/tools/index.js")).href,
+);
 
 const tools = getMcpTools();
 process.stdout.write(JSON.stringify(tools.map((t) => [t.name, t.description])));
