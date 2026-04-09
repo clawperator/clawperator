@@ -47,7 +47,7 @@ export function parseReadAllResult(value: string): ReadAllResult {
     }
     return {
       ok: true,
-      values: parsed,
+      values: parsed as string[],
     };
   } catch {
     return {

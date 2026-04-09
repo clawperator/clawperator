@@ -293,12 +293,12 @@ async function main() {
           operatorPackage,
         },
       }, 30000);
-      if (!attempt?.isError) {
+      if (attempt && !attempt.isError) {
         readResult = attempt;
         usedCandidate = candidate.label;
         break;
       }
-      lastReadError = parseToolPayload(attempt);
+      lastReadError = attempt ? parseToolPayload(attempt) : { code: "MCP_READ_MISSING_RESULT" };
     }
 
     if (!readResult || !usedCandidate) {
