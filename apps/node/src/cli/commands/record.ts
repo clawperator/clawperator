@@ -1,5 +1,4 @@
 import * as fs from "node:fs/promises";
-import { dirname } from "node:path";
 import { runExecution } from "../../domain/executions/runExecution.js";
 import { buildStartRecordingExecution } from "../../domain/actions/startRecording.js";
 import { buildStopRecordingExecution } from "../../domain/actions/stopRecording.js";
@@ -7,7 +6,6 @@ import { pullRecording } from "../../domain/recording/pullRecording.js";
 import { parseRecordingFile } from "../../domain/recording/parseRecording.js";
 import {
   exportRecordingFile,
-  getDefaultRecordingExportPath,
 } from "../../domain/recording/exportRecording.js";
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 import type { OutputOptions } from "../output.js";
@@ -201,19 +199,9 @@ export async function cmdRecordExport(options: {
   snapshotMode?: RecordingExportSnapshotMode;
 }): Promise<string> {
   try {
-    const outputFile = options.outputFile ?? getDefaultRecordingExportPath(options.inputFile);
-    try {
-      await fs.mkdir(dirname(outputFile), { recursive: true });
-    } catch (error) {
-      throw {
-        code: ERROR_CODES.RECORDING_EXPORT_FAILED,
-        message: `Failed to prepare export output path ${outputFile}: ${error instanceof Error ? error.message : String(error)}`,
-      };
-    }
-
     const result = await exportRecordingFile(
       options.inputFile,
-      outputFile,
+      options.outputFile,
       options.snapshotMode ?? "omit",
     );
 

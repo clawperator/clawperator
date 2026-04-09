@@ -1,5 +1,5 @@
 import * as fs from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { ERROR_CODES } from "../../contracts/errors.js";
 import {
   RECORDING_EXPORT_VERSION,
@@ -20,11 +20,12 @@ export async function exportRecordingFile(
   snapshotMode: RecordingExportSnapshotMode = "omit",
 ): Promise<{ outputFile: string; exportData: RecordingExportArtifact }> {
   const resolvedInputFile = await resolveRecordingInputFile(inputFile);
-  const content = await fs.readFile(resolvedInputFile, "utf-8");
+  const content = await readRecordingInputFile(resolvedInputFile);
   const exportData = exportRecording(content, snapshotMode);
   const resolvedOutputFile = outputFile ?? getDefaultRecordingExportPath(resolvedInputFile);
 
   try {
+    await fs.mkdir(dirname(resolvedOutputFile), { recursive: true });
     await fs.writeFile(resolvedOutputFile, JSON.stringify(exportData, null, 2), "utf-8");
   } catch (error) {
     throw {
@@ -37,18 +38,33 @@ export async function exportRecordingFile(
 }
 
 async function resolveRecordingInputFile(inputFile: string): Promise<string> {
-  const stats = await fs.stat(inputFile);
+  let stats;
+  try {
+    stats = await fs.stat(inputFile);
+  } catch (error) {
+    throw buildRecordingExportIoError("inspect", inputFile, error);
+  }
   if (!stats.isDirectory()) {
     return inputFile;
   }
 
-  const entries = await fs.readdir(inputFile, { withFileTypes: true });
+  let entries;
+  try {
+    entries = await fs.readdir(inputFile, { withFileTypes: true });
+  } catch (error) {
+    throw buildRecordingExportIoError("read", inputFile, error);
+  }
   const candidates = await Promise.all(
     entries
       .filter(entry => entry.isFile() && entry.name.endsWith(".ndjson"))
       .map(async entry => {
         const fullPath = join(inputFile, entry.name);
-        const entryStats = await fs.stat(fullPath);
+        let entryStats;
+        try {
+          entryStats = await fs.stat(fullPath);
+        } catch (error) {
+          throw buildRecordingExportIoError("inspect", fullPath, error);
+        }
         return {
           path: fullPath,
           mtimeMs: entryStats.mtimeMs,
@@ -72,6 +88,25 @@ async function resolveRecordingInputFile(inputFile: string): Promise<string> {
   });
 
   return candidates[0]!.path;
+}
+
+async function readRecordingInputFile(inputFile: string): Promise<string> {
+  try {
+    return await fs.readFile(inputFile, "utf-8");
+  } catch (error) {
+    throw buildRecordingExportIoError("read", inputFile, error);
+  }
+}
+
+function buildRecordingExportIoError(
+  operation: "inspect" | "read",
+  targetPath: string,
+  error: unknown,
+): { code: string; message: string } {
+  return {
+    code: ERROR_CODES.RECORDING_EXPORT_FAILED,
+    message: `Failed to ${operation} recording export input ${targetPath}: ${error instanceof Error ? error.message : String(error)}`,
+  };
 }
 
 export function exportRecording(
@@ -100,6 +135,21 @@ export function getDefaultRecordingExportPath(inputFile: string): string {
   return inputFile.endsWith(".ndjson")
     ? `${inputFile.slice(0, -".ndjson".length)}.export.json`
     : `${inputFile}.export.json`;
+}
+
+export function parseRecordingExportArtifactJson(json: string): RecordingExportArtifact {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(json);
+  } catch {
+    throw new Error("recording context must be valid JSON");
+  }
+
+  if (!isRecordingExportArtifact(parsed)) {
+    throw new Error("recording context must match the recording export artifact schema");
+  }
+
+  return parsed;
 }
 
 function buildExportEvent(
@@ -241,4 +291,134 @@ function getEventPackageName(event: RawRecordingEvent): string | undefined {
     case "press_key":
       return undefined;
   }
+}
+
+function isRecordingExportArtifact(value: unknown): value is RecordingExportArtifact {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  if (value.exportVersion !== RECORDING_EXPORT_VERSION) {
+    return false;
+  }
+
+  if (!isRecordingExportSession(value.session)) {
+    return false;
+  }
+
+  if (value.snapshotMode !== "omit" && value.snapshotMode !== "include") {
+    return false;
+  }
+
+  if (!Array.isArray(value.events) || !value.events.every(isRecordingExportEvent)) {
+    return false;
+  }
+
+  if (!isRecordingExportCounts(value.counts)) {
+    return false;
+  }
+
+  if (!Array.isArray(value.packageTransitions) || !value.packageTransitions.every(isRecordingExportPackageTransition)) {
+    return false;
+  }
+
+  return isRecordingExportTimeline(value.timeline);
+}
+
+function isRecordingExportSession(value: unknown): boolean {
+  return isRecord(value)
+    && typeof value.sessionId === "string"
+    && typeof value.schemaVersion === "number"
+    && typeof value.startedAt === "number"
+    && typeof value.operatorPackage === "string";
+}
+
+function isRecordingExportCounts(value: unknown): boolean {
+  return isRecord(value)
+    && typeof value.totalEvents === "number"
+    && isRecord(value.byType)
+    && Object.values(value.byType).every(count => typeof count === "number");
+}
+
+function isRecordingExportPackageTransition(value: unknown): boolean {
+  return isRecord(value)
+    && typeof value.seq === "number"
+    && typeof value.ts === "number"
+    && typeof value.fromPackageName === "string"
+    && typeof value.toPackageName === "string";
+}
+
+function isRecordingExportTimeline(value: unknown): boolean {
+  return isRecord(value)
+    && isNullableNumber(value.firstEventTs)
+    && isNullableNumber(value.lastEventTs)
+    && isNullableNumber(value.durationMs);
+}
+
+function isRecordingExportEvent(value: unknown): boolean {
+  if (!isRecord(value) || typeof value.seq !== "number" || typeof value.ts !== "number") {
+    return false;
+  }
+
+  if (!(value.deltaMsSincePrevious === null || typeof value.deltaMsSincePrevious === "number")) {
+    return false;
+  }
+
+  if (!isRecordingExportSnapshot(value.snapshot)) {
+    return false;
+  }
+
+  switch (value.type) {
+    case "window_change":
+      return typeof value.packageName === "string"
+        && isNullableString(value.className)
+        && isNullableString(value.title);
+    case "click":
+      return typeof value.packageName === "string"
+        && isNullableString(value.resourceId)
+        && isNullableString(value.text)
+        && isNullableString(value.contentDesc)
+        && isBounds(value.bounds);
+    case "scroll":
+      return typeof value.packageName === "string"
+        && isNullableString(value.resourceId)
+        && typeof value.scrollX === "number"
+        && typeof value.scrollY === "number"
+        && typeof value.maxScrollX === "number"
+        && typeof value.maxScrollY === "number";
+    case "press_key":
+      return value.key === "back";
+    case "text_change":
+      return typeof value.packageName === "string"
+        && isNullableString(value.resourceId)
+        && typeof value.text === "string";
+    default:
+      return false;
+  }
+}
+
+function isRecordingExportSnapshot(value: unknown): boolean {
+  return isRecord(value)
+    && typeof value.present === "boolean"
+    && isNullableString(value.xml);
+}
+
+function isBounds(value: unknown): boolean {
+  return isRecord(value)
+    && typeof value.left === "number"
+    && typeof value.top === "number"
+    && typeof value.right === "number"
+    && typeof value.bottom === "number";
+}
+
+function isNullableString(value: unknown): value is string | null {
+  return value === null || typeof value === "string";
+}
+
+function isNullableNumber(value: unknown): value is number | null {
+  return value === null || typeof value === "number";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }

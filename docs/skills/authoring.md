@@ -90,6 +90,7 @@ What that file is for:
 - it is reference evidence for an external human or agent authoring the skill
 - it is not an executable recipe
 - `scaffoldSkill()` does not infer selectors, parameters, or control flow from it
+- the source file must already match the recording export artifact schema
 - `skills validate` does not inspect `recording-context.json`; it still validates only the registry-linked skill files
 
 The scaffolded `SKILL.md` includes this section before the `Usage:` block:
@@ -139,6 +140,7 @@ Failure modes:
 
 - blank `--recording-context` values: `SKILLS_SCAFFOLD_FAILED`
 - missing or unreadable source file: `SKILLS_SCAFFOLD_FAILED`
+- non-export JSON or malformed export artifacts: `SKILLS_SCAFFOLD_FAILED`
 - the scaffold does not derive skill logic from the recording context
 
 ## `SKILL.md` Format

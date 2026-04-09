@@ -53,6 +53,27 @@ const TEST_FIXTURE_MIXED_STREAMS = "test-fixture-mixed-streams";
 const TEST_FIXTURE_SPLIT_WORD = "test-fixture-split-word";
 const ORIGINAL_REGISTRY_PATH = process.env.CLAWPERATOR_SKILLS_REGISTRY;
 const ORIGINAL_STDERR_WRITE = process.stderr.write.bind(process.stderr);
+const VALID_RECORDING_EXPORT_JSON = `${JSON.stringify({
+  exportVersion: 1,
+  session: {
+    sessionId: "demo-session",
+    schemaVersion: 1,
+    startedAt: 1710000000000,
+    operatorPackage: "com.clawperator.operator.dev",
+  },
+  snapshotMode: "omit",
+  events: [],
+  counts: {
+    totalEvents: 0,
+    byType: {},
+  },
+  packageTransitions: [],
+  timeline: {
+    firstEventTs: null,
+    lastEventTs: null,
+    durationMs: null,
+  },
+})}\n`;
 
 before(() => {
   process.env.CLAWPERATOR_SKILLS_REGISTRY = TEST_REGISTRY_PATH;
@@ -1081,7 +1102,7 @@ describe("scaffoldSkill", () => {
     const recordingContextPath = join(tempRoot, "recording-context.json");
     await mkdir(registryDir, { recursive: true });
     await copyFile(TEST_REGISTRY_PATH, registryPath);
-    await writeFile(recordingContextPath, "{\"exportVersion\":1,\"marker\":\"recording-context\"}\n", "utf8");
+    await writeFile(recordingContextPath, VALID_RECORDING_EXPORT_JSON, "utf8");
 
     try {
       const skillId = "com.example.notes.capture-recording-context";
@@ -1114,6 +1135,25 @@ describe("scaffoldSkill", () => {
       const result = await scaffoldSkill("com.example.notes.capture-blank", { registryPath, recordingContextPath: "   " });
       assert.ok(!result.ok);
       assert.strictEqual(result.code, SKILLS_SCAFFOLD_FAILED);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects recording context files that are not recording export artifacts", async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-skill-scaffold-recording-context-invalid-"));
+    const registryDir = join(tempRoot, "skills");
+    const registryPath = join(registryDir, "skills-registry.json");
+    const recordingContextPath = join(tempRoot, "not-a-recording-export.json");
+    await mkdir(registryDir, { recursive: true });
+    await copyFile(TEST_REGISTRY_PATH, registryPath);
+    await writeFile(recordingContextPath, "{\"not\":\"a recording export\"}\n", "utf8");
+
+    try {
+      const result = await scaffoldSkill("com.example.notes.capture-invalid", { registryPath, recordingContextPath });
+      assert.ok(!result.ok);
+      assert.strictEqual(result.code, SKILLS_SCAFFOLD_FAILED);
+      assert.match(result.message, /recording export artifact schema/);
     } finally {
       await rm(tempRoot, { recursive: true, force: true });
     }
@@ -1276,7 +1316,7 @@ describe("scaffoldSkill", () => {
     const recordingContextPath = join(tempRoot, "recording-context.json");
     await mkdir(registryDir, { recursive: true });
     await copyFile(TEST_REGISTRY_PATH, registryPath);
-    await writeFile(recordingContextPath, "{\"exportVersion\":1,\"marker\":\"recording-context\"}\n", "utf8");
+    await writeFile(recordingContextPath, VALID_RECORDING_EXPORT_JSON, "utf8");
 
     try {
       const skillId = "com.example.weather.read-recording-context";
@@ -1346,6 +1386,82 @@ describe("scaffoldSkill", () => {
     }
   });
 
+  it("CLI skills new rejects non-export recording context files", async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-skill-cli-recording-context-invalid-"));
+    const registryDir = join(tempRoot, "skills");
+    const registryPath = join(registryDir, "skills-registry.json");
+    const recordingContextPath = join(tempRoot, "not-a-recording-export.json");
+    await mkdir(registryDir, { recursive: true });
+    await copyFile(TEST_REGISTRY_PATH, registryPath);
+    await writeFile(recordingContextPath, "{\"not\":\"a recording export\"}\n", "utf8");
+
+    try {
+      const skillId = "com.example.weather.reject-invalid-recording-context";
+      const { stdout, code } = await runCli(
+        [
+          "skills",
+          "new",
+          skillId,
+          "--recording-context",
+          recordingContextPath,
+          "--output",
+          "json",
+        ],
+        {
+          env: {
+            ...process.env,
+            CLAWPERATOR_SKILLS_REGISTRY: registryPath,
+          },
+        }
+      );
+
+      assert.notStrictEqual(code, 0);
+      const parsed = JSON.parse(stdout) as { code?: string; message?: string };
+      assert.strictEqual(parsed.code, SKILLS_SCAFFOLD_FAILED);
+      assert.match(parsed.message ?? "", /recording export artifact schema/);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("CLI skills new accepts an escaped double-dash recording context path", async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-skill-cli-recording-context-double-dash-"));
+    const registryDir = join(tempRoot, "skills");
+    const registryPath = join(registryDir, "skills-registry.json");
+    const recordingContextPath = join(tempRoot, "--recording-context.export.json");
+    await mkdir(registryDir, { recursive: true });
+    await copyFile(TEST_REGISTRY_PATH, registryPath);
+    await writeFile(recordingContextPath, VALID_RECORDING_EXPORT_JSON, "utf8");
+
+    try {
+      const skillId = "com.example.weather.accept-double-dash-recording-context";
+      const { stdout, code } = await runCli(
+        [
+          "skills",
+          "new",
+          skillId,
+          "--recording-context",
+          "--",
+          recordingContextPath,
+          "--output",
+          "json",
+        ],
+        {
+          env: {
+            ...process.env,
+            CLAWPERATOR_SKILLS_REGISTRY: registryPath,
+          },
+        }
+      );
+
+      assert.strictEqual(code, 0, stdout);
+      const parsed = JSON.parse(stdout) as { recordingContextPath?: string };
+      assert.strictEqual(parsed.recordingContextPath, join(tempRoot, "skills", skillId, "recording-context.json"));
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
   it("CLI skills new accepts a dash-prefixed recording context path", async () => {
     const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-skill-cli-recording-context-dash-"));
     const registryDir = join(tempRoot, "skills");
@@ -1353,7 +1469,7 @@ describe("scaffoldSkill", () => {
     const recordingContextPath = join(tempRoot, "-recording-context.json");
     await mkdir(registryDir, { recursive: true });
     await copyFile(TEST_REGISTRY_PATH, registryPath);
-    await writeFile(recordingContextPath, "{\"exportVersion\":1,\"marker\":\"dash-path\"}\n", "utf8");
+    await writeFile(recordingContextPath, VALID_RECORDING_EXPORT_JSON, "utf8");
 
     try {
       const skillId = "com.example.weather.accept-dash-recording-context";

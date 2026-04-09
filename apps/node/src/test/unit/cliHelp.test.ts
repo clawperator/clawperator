@@ -292,7 +292,7 @@ describe("CLI help", () => {
     const { stdout, code } = await runCli(["recording", "export", "--input", "--bogus"]);
     assert.notStrictEqual(code, 0);
     assert.match(stdout, /"code":"USAGE"/);
-    assert.match(stdout, /--input requires a value/);
+    assert.match(stdout, /Use '--input -- <literal>'/);
   });
 
   it("returns USAGE when --input is followed by another flag for recording parse", async () => {
@@ -371,6 +371,46 @@ describe("CLI help", () => {
 
       assert.strictEqual(code, 0, stdout);
       const output = join(tempRoot, "-context.export.json");
+      await stat(output);
+      const obj = JSON.parse(stdout) as { outputFile?: string };
+      assert.strictEqual(obj.outputFile, output);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("recording export accepts an escaped double-dash input path", async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-recording-double-dash-input-"));
+    const inputFile = join(tempRoot, "--context.ndjson");
+    await mkdir(tempRoot, { recursive: true });
+    await writeFile(
+      inputFile,
+      [
+        JSON.stringify({
+          type: "recording_header",
+          schemaVersion: 1,
+          sessionId: "double-dash-input",
+          startedAt: 1710000000000,
+          operatorPackage: "com.clawperator.operator.dev",
+        }),
+        JSON.stringify({
+          ts: 1710000000100,
+          seq: 0,
+          type: "window_change",
+          packageName: "com.example.a",
+          className: "MainActivity",
+          title: "Home",
+          snapshot: "<window />",
+        }),
+      ].join("\n"),
+      "utf8",
+    );
+
+    try {
+      const { stdout, code } = await runCli(["recording", "export", "--input", "--", inputFile]);
+
+      assert.strictEqual(code, 0, stdout);
+      const output = join(tempRoot, "--context.export.json");
       await stat(output);
       const obj = JSON.parse(stdout) as { outputFile?: string };
       assert.strictEqual(obj.outputFile, output);

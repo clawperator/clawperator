@@ -39,13 +39,32 @@ export function getStringOptStrict(
   flag: string,
   knownFlags: readonly string[] = [],
 ): string | undefined {
-  const value = getStringOpt(rest, flag);
-  if (value === undefined) {
+  const i = rest.indexOf(flag);
+  if (i < 0) {
     return undefined;
   }
-  if (value.startsWith("--") || knownFlags.includes(value)) {
+
+  const value = rest[i + 1];
+  if (!value) {
     throw new UsageError(`${flag} requires a value`);
   }
+
+  if (value === "--") {
+    const escapedValue = rest[i + 2];
+    if (!escapedValue) {
+      throw new UsageError(`${flag} requires a value`);
+    }
+    return escapedValue;
+  }
+
+  if (knownFlags.includes(value)) {
+    throw new UsageError(`${flag} requires a value`);
+  }
+
+  if (value.startsWith("--")) {
+    throw new UsageError(`${flag} requires a value. Use '${flag} -- <literal>' for a literal value that starts with --`);
+  }
+
   return value;
 }
 

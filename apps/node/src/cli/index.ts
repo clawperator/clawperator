@@ -268,6 +268,14 @@ async function main(): Promise<void> {
           }
           const valueArity = FLAG_VALUE_ARITY.get(arg);
           if (valueArity !== undefined) {
+            if (
+              valueArity === 1
+              && restBeforeForward[i + 1] === "--"
+              && restBeforeForward[i + 2] !== undefined
+            ) {
+              i += 2;
+              continue;
+            }
             i += valueArity;
             continue;
           }

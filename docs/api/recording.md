@@ -356,11 +356,12 @@ Failure modes:
 
 - malformed header or event data: `RECORDING_PARSE_FAILED`
 - unsupported schema version: `RECORDING_SCHEMA_VERSION_UNSUPPORTED`
+- input path inspection or read failure: `RECORDING_EXPORT_FAILED`
 - output write failure: `RECORDING_EXPORT_FAILED`
 
 Recovery:
 
-- `RECORDING_EXPORT_FAILED`: fix the `--out` path, confirm the parent directory is writable, or choose a different host path
+- `RECORDING_EXPORT_FAILED`: confirm the `--input` path exists and is readable, or fix the `--out` path and parent-directory permissions
 
 The export is evidence for an external authoring agent or human. It is not an automatic skill generator.
 
@@ -611,7 +612,7 @@ Only document codes that exist in `apps/node/src/contracts/errors.ts`.
 | `RECORDING_SESSION_NOT_FOUND` | `record pull` could not resolve a session id or the provided id was invalid |
 | `RECORDING_PULL_FAILED` | adb pull failed |
 | `RECORDING_PARSE_FAILED` | malformed file, invalid header, bad event fields, bad NDJSON, or unknown event type |
-| `RECORDING_EXPORT_FAILED` | output file or parent directory could not be written |
+| `RECORDING_EXPORT_FAILED` | recording export input could not be inspected/read, or the output file could not be written |
 | `RECORDING_SCHEMA_VERSION_UNSUPPORTED` | header schema version was not `1` |
 
 Related CLI usage error:

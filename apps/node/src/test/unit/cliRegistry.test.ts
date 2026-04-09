@@ -104,12 +104,19 @@ describe("getStringOptStrict", () => {
   it("rejects double-dash tokens as missing values", () => {
     assert.throws(
       () => getStringOptStrict(["--input", "--bogus"], "--input"),
-      /--input requires a value/
+      /Use '--input -- <literal>'/
     );
   });
 
   it("allows dash-prefixed path values", () => {
     assert.strictEqual(getStringOptStrict(["--input", "-context.ndjson"], "--input"), "-context.ndjson");
+  });
+
+  it("accepts escaped double-dash literals", () => {
+    assert.strictEqual(
+      getStringOptStrict(["--summary", "--", "--literal"], "--summary", ["--summary"]),
+      "--literal",
+    );
   });
 });
 

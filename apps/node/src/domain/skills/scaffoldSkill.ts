@@ -1,4 +1,4 @@
-import { access, chmod, copyFile, mkdir, mkdtemp, rename, rm, writeFile } from "node:fs/promises";
+import { access, chmod, copyFile, mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import {
   loadRegistry,
@@ -13,6 +13,7 @@ import {
   SKILL_ID_INVALID,
   SKILLS_SCAFFOLD_FAILED,
 } from "../../contracts/skills.js";
+import { parseRecordingExportArtifactJson } from "../recording/exportRecording.js";
 
 export interface ScaffoldSkillSuccess {
   ok: true;
@@ -286,6 +287,8 @@ export async function scaffoldSkill(
 
     if (recordingContextPath !== undefined) {
       try {
+        const recordingContextContents = await readFile(recordingContextPath, "utf8");
+        parseRecordingExportArtifactJson(recordingContextContents);
         await copyFile(recordingContextPath, join(stagingRoot, "recording-context.json"));
       } catch (error) {
         await rm(stagingRoot, { recursive: true, force: true });

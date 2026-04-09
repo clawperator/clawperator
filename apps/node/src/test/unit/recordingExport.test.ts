@@ -395,6 +395,17 @@ describe("exportRecording", () => {
       (error: unknown) => (error as { code?: string }).code === ERROR_CODES.RECORDING_EXPORT_FAILED,
     );
   });
+
+  it("surfaces RECORDING_EXPORT_FAILED when the input file does not exist", async () => {
+    await assert.rejects(
+      () => exportRecordingFile("/tmp/does-not-exist-recording.ndjson"),
+      (error: unknown) => {
+        const typed = error as { code?: string; message?: string };
+        return typed.code === ERROR_CODES.RECORDING_EXPORT_FAILED
+          && /Failed to inspect recording export input/.test(typed.message ?? "");
+      },
+    );
+  });
 });
 
 describe("recording export CLI", () => {
@@ -466,5 +477,40 @@ describe("recording export CLI", () => {
     const thirdJson = JSON.parse(third.stdout) as { outputFile?: string; sessionId?: string };
     assert.strictEqual(thirdJson.outputFile, directoryOutput);
     assert.strictEqual(thirdJson.sessionId, "pulled-cli-demo");
+  });
+
+  it("uses the resolved NDJSON file when deriving the default output path for directory input", async () => {
+    const dir = await makeTempDir("clawperator-recording-export-cli-dir-default-");
+    const pulledDir = join(dir, "pulled");
+    await mkdir(pulledDir, { recursive: true });
+    await writeFile(join(pulledDir, "export-demo.ndjson"), [
+      buildHeader({ sessionId: "pulled-cli-default" }),
+      JSON.stringify({
+        ts: 1710000001000,
+        seq: 0,
+        type: "window_change",
+        packageName: "com.example.dir",
+        className: "MainActivity",
+        title: "Dir",
+      }),
+    ].join("\n"), "utf8");
+
+    const result = await runCli(["recording", "export", "--input", pulledDir, "--json"]);
+    assert.strictEqual(result.code, 0, result.stdout);
+    assert.strictEqual(result.stderr, "");
+
+    const parsed = JSON.parse(result.stdout) as { outputFile?: string; sessionId?: string };
+    assert.strictEqual(parsed.outputFile, join(pulledDir, "export-demo.export.json"));
+    assert.strictEqual(parsed.sessionId, "pulled-cli-default");
+    await readFile(join(pulledDir, "export-demo.export.json"), "utf8");
+  });
+
+  it("returns RECORDING_EXPORT_FAILED for missing input files", async () => {
+    const result = await runCli(["recording", "export", "--input", "/tmp/does-not-exist-recording.ndjson", "--json"]);
+    assert.notStrictEqual(result.code, 0);
+    assert.strictEqual(result.stderr, "");
+    const parsed = JSON.parse(result.stdout) as { code?: string; message?: string };
+    assert.strictEqual(parsed.code, ERROR_CODES.RECORDING_EXPORT_FAILED);
+    assert.match(parsed.message ?? "", /Failed to inspect recording export input/);
   });
 });
