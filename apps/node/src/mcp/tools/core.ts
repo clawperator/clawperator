@@ -24,8 +24,8 @@ const emptyArgsSchema = z.object({}).strict();
 const snapshotArgsSchema = executionToolOptionsSchema;
 
 const executionActionSchema = z.object({
-  id: z.string(),
-  type: z.string(),
+  id: z.string().trim().min(1),
+  type: z.string().trim().min(1),
   params: z.record(z.unknown()).optional(),
 }).strict();
 
@@ -114,8 +114,8 @@ export function getCoreMcpTools(logger?: Logger): McpToolDefinition[] {
             type: "object",
             additionalProperties: false,
             properties: {
-              id: { type: "string" },
-              type: { type: "string" },
+              id: { type: "string", minLength: 1 },
+              type: { type: "string", minLength: 1 },
               params: { type: "object" },
             },
             required: ["id", "type"],

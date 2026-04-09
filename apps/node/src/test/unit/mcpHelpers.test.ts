@@ -1,10 +1,13 @@
 import assert from "node:assert";
 import { describe, it } from "node:test";
+import { ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js";
 import type { ResultEnvelope } from "../../contracts/result.js";
 import { createMcpExecutionIds } from "../../mcp/executionIds.js";
 import { buildMcpErrorResult, buildMcpSuccessResult, normalizeMcpError } from "../../mcp/errors.js";
 import { extractStepDataValue } from "../../mcp/results.js";
 import { mapSelectorToNodeMatcher, mcpSelectorSchema } from "../../mcp/selectors.js";
+import { getCoreMcpTools } from "../../mcp/tools/core.js";
+import { getNamedMcpTools } from "../../mcp/tools/named.js";
 import { executionToolOptionsSchema } from "../../mcp/tools/common.js";
 
 describe("createMcpExecutionIds", () => {
@@ -49,6 +52,11 @@ describe("mapSelectorToNodeMatcher", () => {
 
   it("rejects whitespace-only selector fields at the MCP boundary", () => {
     const parsed = mcpSelectorSchema.safeParse({ text: "   " });
+    assert.strictEqual(parsed.success, false);
+  });
+
+  it("rejects an empty selector object at the MCP boundary", () => {
+    const parsed = mcpSelectorSchema.safeParse({});
     assert.strictEqual(parsed.success, false);
   });
 });
@@ -169,6 +177,36 @@ describe("executionToolOptionsSchema", () => {
     });
 
     assert.strictEqual(parsed.success, false);
+  });
+});
+
+describe("MCP tool schemas", () => {
+  it("requires selector-bearing tools to advertise at least one selector field", () => {
+    const clickTool = getNamedMcpTools().find(tool => tool.name === "click");
+    assert.ok(clickTool);
+
+    const selectorSchema = (clickTool!.inputSchema as {
+      properties?: { selector?: { minProperties?: number } };
+    }).properties?.selector;
+
+    assert.strictEqual(selectorSchema?.minProperties, 1);
+  });
+
+  it("rejects empty execute action ids and types before dispatch", async () => {
+    const executeTool = getCoreMcpTools().find(tool => tool.name === "execute");
+    assert.ok(executeTool);
+
+    await assert.rejects(
+      async () => executeTool!.handler({
+        actions: [
+          {
+            id: " ",
+            type: "tap",
+          },
+        ],
+      }),
+      (error: unknown) => error instanceof McpError && error.code === ErrorCode.InvalidParams,
+    );
   });
 });
 

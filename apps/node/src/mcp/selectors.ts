@@ -11,7 +11,10 @@ export const mcpSelectorSchema = z.object({
   textContains: optionalNonEmptyTrimmedSelectorString,
   desc: optionalNonEmptyTrimmedSelectorString,
   descContains: optionalNonEmptyTrimmedSelectorString,
-}).strict();
+}).strict().refine(
+  value => Object.values(value).some(entry => entry !== undefined),
+  { message: "selector must include at least one non-empty selector field" },
+);
 
 export type McpSelectorInput = z.infer<typeof mcpSelectorSchema>;
 

@@ -23,7 +23,14 @@ export function extractStepDataValue(
     errorKey?: string;
   }
 ): StepDataExtractionResult {
-  const step = [...envelope.stepResults].reverse().find(candidate => candidate.actionType === options.actionType);
+  let step: StepResult | undefined;
+  for (let index = envelope.stepResults.length - 1; index >= 0; index -= 1) {
+    const candidate = envelope.stepResults[index];
+    if (candidate.actionType === options.actionType) {
+      step = candidate;
+      break;
+    }
+  }
   if (!step) {
     return {
       ok: false,

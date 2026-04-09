@@ -90,6 +90,7 @@ const scrollUntilArgsSchema = executionToolOptionsSchema.extend({
 const selectorJsonSchema = {
   type: "object",
   additionalProperties: false,
+  minProperties: 1,
   properties: {
     id: { type: "string", minLength: 1 },
     role: { type: "string", minLength: 1 },
