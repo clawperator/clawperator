@@ -71,13 +71,17 @@ function remapObjectKeys(
   normalizeValue?: (canonicalKey: string, value: unknown) => unknown,
 ): Record<string, unknown> {
   const output: Record<string, unknown> = {};
+  const canonicalKeys = new Set(Object.values(aliases));
 
   for (const [rawKey, rawValue] of Object.entries(input)) {
     const canonicalKey = aliases[rawKey] ?? rawKey;
     const value = normalizeValue ? normalizeValue(canonicalKey, rawValue) : rawValue;
+    const isAliasKey = aliases[rawKey] !== undefined;
+    const hadCanonicalInInput = canonicalKeys.has(canonicalKey)
+      && Object.prototype.hasOwnProperty.call(input, canonicalKey);
 
-    if (Object.prototype.hasOwnProperty.call(output, canonicalKey)) {
-      output[canonicalKey] = value;
+    // If caller provided a canonical key, keep it over alias variants.
+    if (isAliasKey && hadCanonicalInInput) {
       continue;
     }
     output[canonicalKey] = value;

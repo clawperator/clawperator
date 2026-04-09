@@ -14,7 +14,7 @@ import {
 } from "./registry.js";
 import {
   expandSupportedFlagsWithAliases,
-  normalizeCliFlagAliases,
+  normalizeCliFlagAliasesBeforeForwardSeparator,
   type CliFlagAliasSpec,
 } from "./flagAliases.js";
 import { shouldCliStdoutForceExitCode1 } from "./stdoutExitCode.js";
@@ -140,7 +140,7 @@ function getGlobalOpts(argv: string[]): {
   verbose: boolean;
   rest: string[];
 } {
-  argv = normalizeCliFlagAliases(argv, GLOBAL_FLAG_ALIASES);
+  argv = normalizeCliFlagAliasesBeforeForwardSeparator(argv, GLOBAL_FLAG_ALIASES);
   const rest: string[] = [];
   let deviceId: string | undefined;
   let operatorPackage: string | undefined;
@@ -286,7 +286,7 @@ async function main(): Promise<void> {
           "--verbose", "--help", "--version", "--disable-star-suggestions"
         ];
         const flagAliases = typeof def.flagAliases === "function" ? def.flagAliases(rest) : (def.flagAliases ?? []);
-        const normalizedRest = normalizeCliFlagAliases(rest, flagAliases);
+        const normalizedRest = normalizeCliFlagAliasesBeforeForwardSeparator(rest, flagAliases);
         const localFlags = expandSupportedFlagsWithAliases(resolveSupportedFlagsFromRegistry(def, rest), flagAliases);
         const knownFlags = new Set([...localFlags, ...globalFlags]);
 

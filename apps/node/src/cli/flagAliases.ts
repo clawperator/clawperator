@@ -34,3 +34,16 @@ export function normalizeCliFlagAliases(
 
   return rest.map((token) => aliasToCanonical.get(token) ?? token);
 }
+
+export function normalizeCliFlagAliasesBeforeForwardSeparator(
+  argv: string[],
+  aliasSpecs: readonly CliFlagAliasSpec[],
+): string[] {
+  const forwardIdx = argv.indexOf("--");
+  if (forwardIdx < 0) {
+    return normalizeCliFlagAliases(argv, aliasSpecs);
+  }
+
+  const prefix = normalizeCliFlagAliases(argv.slice(0, forwardIdx), aliasSpecs);
+  return [...prefix, ...argv.slice(forwardIdx)];
+}
