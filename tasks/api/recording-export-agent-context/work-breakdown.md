@@ -4,14 +4,16 @@ Parent plan: `tasks/api/recording-export-agent-context/plan.md`
 
 ## Executive Summary
 
-1 PR, 4 phases. Phase 1 locks the export contract and test cases. Phase 2 adds
-the richer recording export builder plus CLI wiring. Phase 3 extends `skills
-new` with deterministic recording-context attachment only. Phase 4 validates the
-workflow on a real recording and updates public docs using the repo docs skills.
+1 PR, 5 phases. Phase 1 locks the export contract and test cases. Phase 2
+extracts shared recording validation and proves `parseRecording.ts` remains
+behaviorally identical. Phase 3 adds the richer recording export builder plus
+CLI wiring. Phase 4 extends `skills new` with deterministic recording-context
+attachment only. Phase 5 validates the workflow on a real recording and updates
+public docs using the repo docs skills.
 
 | PR | Phases | Agent tier | Purpose |
 | --- | --- | --- | --- |
-| PR-1 | 1, 2, 3, 4 | thinking, default, default, default | Export contract, implementation, scaffold integration, docs and proof |
+| PR-1 | 1, 2, 3, 4, 5 | thinking, default, default, default, default | Export contract, validation extraction, implementation, scaffold integration, docs and proof |
 
 ## Status
 
@@ -19,9 +21,9 @@ workflow on a real recording and updates public docs using the repo docs skills.
 | --- | --- |
 | State | planning |
 | Total PRs | 1 |
-| Total phases | 4 |
+| Total phases | 5 |
 | Completed | 0 |
-| Remaining | 4 |
+| Remaining | 5 |
 | Current / Next | Phase 1 |
 | Blockers | none |
 
@@ -85,7 +87,7 @@ Read these files IN THIS ORDER before writing anything.
 
 | PR | Purpose | Included phases | Agent tier | Merge gate |
 | --- | --- | --- | --- | --- |
-| PR-1 | Full recording-export workflow | 1, 2, 3, 4 | thinking, default, default, default | `npm --prefix apps/node run build && npm --prefix apps/node run test` passes; docs build passes; live export workflow validated if debug Operator device is available |
+| PR-1 | Full recording-export workflow | 1, 2, 3, 4, 5 | thinking, default, default, default, default | `npm --prefix apps/node run build && npm --prefix apps/node run test` passes; docs build passes; live export workflow validated if debug Operator device is available |
 
 ## Phase 1: Lock the export contract and test matrix
 
@@ -103,7 +105,6 @@ before implementation so downstream phases do not re-derive the format.
 - `tasks/api/recording-export-agent-context/plan.md` (only if contract needs correction before code)
 - `apps/node/src/domain/recording/recordingEventTypes.ts`
 - `apps/node/src/test/unit/parseRecording.test.ts` (only if new shared fixtures or types belong there)
-- `apps/node/src/test/unit/recordingExport.test.ts` (new)
 
 ### Steps
 
@@ -115,23 +116,34 @@ before implementation so downstream phases do not re-derive the format.
    - counts object
 3. Keep the types factual. Do not add fields that imply selector choice,
    parameterization, or intent.
-4. Create a new shared-validation plan in code comments or docstrings for a
-   `recordingValidation.ts` helper that returns `{ header, events }`.
+4. Define the shared-validation contract up front in type comments or docstrings
+   for a `recordingValidation.ts` helper. Pin all of the following:
+   - return shape: `{ header, events }`
+   - `events` are sorted by `seq` before return
+   - the helper throws plain `{ code, message }` objects, not `Error` instances
+   - parser-only warnings remain in `parseRecording.ts`, not in the shared helper
+   - the helper never writes to stderr
 5. Do not add test imports that require a non-existent `exportRecording.ts`
    module in this phase. The test file lands in Phase 2 with the implementation.
 6. Required cases to implement in Phase 2:
    - valid mixed-event recording exports all supported event types
+   - header-only recording exports as an empty recording with `timeline.* = null`
+   - recording containing only `scroll`, `text_change`, and `press_key` events exports all of them
+   - NDJSON lines out of order by `seq` are sorted before delta computation
    - events are sorted by `seq` before delta / transition calculation
    - `deltaMsSincePrevious` is `null` for the first event and numeric thereafter
-   - package transitions are emitted only when adjacent package-bearing events
-     change package
+   - package transitions skip non-package-bearing events like `press_key`
+   - package revert pattern `A -> B -> A` emits two transitions
    - `--snapshots omit` writes `present: true/false` and `xml: null`
    - `--snapshots include` preserves raw XML
+   - snapshot mode behavior is verified on package-bearing and non-package-bearing event types
    - written export file can be read back and matches the contract
    - malformed header fails
    - malformed event fails
    - unsupported schema version fails
    - export-stage output write failure emits `RECORDING_EXPORT_FAILED`
+   - `parseRecording` still prints its stderr step summary
+   - export path does not print parser step summaries to stderr
 7. If contract changes are needed, update `plan.md` before proceeding.
 
 ### Acceptance Criteria
@@ -154,7 +166,66 @@ npm --prefix apps/node run build
 feat(node): define recording export types
 ```
 
-## Phase 2: Implement `recording export`
+## Phase 2: Extract shared recording validation safely
+
+### Agent Tier
+
+default
+
+### Goal
+
+Extract shared NDJSON validation into a dedicated helper and prove
+`parseRecording.ts` remains behaviorally identical before any export work starts.
+
+### Files or Surfaces To Change
+
+- `apps/node/src/domain/recording/recordingValidation.ts` (new)
+- `apps/node/src/domain/recording/parseRecording.ts`
+- `apps/node/src/test/unit/parseRecording.test.ts`
+
+### Steps
+
+1. Extract shared NDJSON validation into
+   `apps/node/src/domain/recording/recordingValidation.ts` with a helper that
+   returns `{ header, events }`.
+2. Ensure the helper sorts `events` by `seq` before returning them.
+3. Preserve current validation error semantics exactly:
+   - same line-numbered messages
+   - same plain `{ code, message }` throw shape
+   - same unsupported-schema behavior
+4. Keep parser-only concerns out of the helper:
+   - missing-snapshot warnings stay in `parseRecording.ts`
+   - `printStepSummary()` stays in `parseRecording.ts`
+   - no stderr output from the helper
+5. Update `parseRecording.ts` to consume the helper without changing its
+   current step-log output semantics.
+6. Run the full existing parser test file and the broader Node test suite.
+7. If any existing `parseRecording.test.ts` case needs modification, stop and
+   investigate before continuing to the export implementation phase.
+
+### Acceptance Criteria
+
+- `recordingValidation.ts` exists with the helper behavior pinned above
+- All existing `parseRecording.test.ts` cases pass without modification
+- `parseRecording.ts` still emits its stderr summary behavior
+- No export code is introduced yet
+- `npm --prefix apps/node run build && npm --prefix apps/node run test`
+  succeeds
+
+### Validation
+
+```bash
+npm --prefix apps/node run build
+npm --prefix apps/node run test
+```
+
+### Expected Commit
+
+```text
+refactor(node): extract shared recording validation
+```
+
+## Phase 3: Implement `recording export`
 
 ### Agent Tier
 
@@ -168,7 +239,7 @@ agent-context JSON artifact from a local NDJSON recording file.
 ### Files or Surfaces To Change
 
 - `apps/node/src/domain/recording/exportRecording.ts` (new)
-- `apps/node/src/domain/recording/recordingValidation.ts` (new)
+- `apps/node/src/domain/recording/recordingValidation.ts`
 - `apps/node/src/domain/recording/recordingEventTypes.ts`
 - `apps/node/src/cli/commands/record.ts`
 - `apps/node/src/cli/registry.ts`
@@ -179,51 +250,59 @@ agent-context JSON artifact from a local NDJSON recording file.
 
 ### Steps
 
-1. Extract shared NDJSON validation into
-   `apps/node/src/domain/recording/recordingValidation.ts` with a helper that
-   returns `{ header, events }`.
-2. Update `parseRecording.ts` to consume that helper without changing its
-   current output semantics.
-3. Implement `exportRecordingFile(inputFile, outputFile?, snapshotMode?)` and
+1. Implement `exportRecordingFile(inputFile, outputFile?, snapshotMode?)` and
    any pure helper functions in a new `exportRecording.ts`.
-4. Add `RECORDING_EXPORT_FAILED` to `apps/node/src/contracts/errors.ts` for
+2. Add `RECORDING_EXPORT_VERSION = 1` as a named constant in the recording
+   types surface instead of hardcoding `1` inside the exporter.
+3. Add `RECORDING_EXPORT_FAILED` to `apps/node/src/contracts/errors.ts` for
    export-stage output failures.
-5. Preserve all validated raw events in the exported `events` array.
-6. Compute only the deterministic derived fields from `plan.md`:
+4. Preserve all validated raw events in the exported `events` array using the
+   exact per-event shape from `plan.md`.
+5. Compute only the deterministic derived fields from `plan.md`:
    - sorted event order
    - `deltaMsSincePrevious`
    - counts
    - package transitions
+   - `timeline.durationMs = lastEventTs - firstEventTs`
+6. Handle the header-only recording case exactly as specified in `plan.md`.
 7. Add `--snapshots <omit|include>` handling with `omit` as the default. Parse
    this flag with `getStringOpt`, not `getOpt`, so `--snapshots` with no value
    is a usage error.
-8. Add `cmdRecordExport()` to `apps/node/src/cli/commands/record.ts`.
-9. Wire `recording export` and `record export` help text and usage into
+8. `cmdRecordExport()` must create parent directories for `--out` recursively
+   before writing. Directory creation or write failure returns
+   `RECORDING_EXPORT_FAILED`.
+9. Export code must call the shared validation helper directly. Do not call
+   `parseRecording()` from the export path because that would inherit parser
+   normalization and stderr side effects.
+10. Add `cmdRecordExport()` to `apps/node/src/cli/commands/record.ts`.
+11. Wire `recording export` and `record export` help text and usage into
    `apps/node/src/cli/registry.ts`, including:
    - `supportedFlags` entry for `export` with `--input`, `--out`, and `--snapshots`
    - `topLevelBlock` line for `recording export`
    - bare-command USAGE message updated to `recording start|stop|pull|parse|export ...`
    - help text that explains syntax, output-path rule, and `--snapshots <omit|include>`
-10. Keep `recording parse` semantics unchanged.
-11. Treat the `parseRecording.ts` refactor as a parser-regression gate. All
-    existing `apps/node/src/test/unit/parseRecording.test.ts` cases must pass
-    without modification. If any existing parser test needs updating, stop and
-    investigate before continuing.
-12. Add CLI and unit tests for:
+12. Keep `recording parse` semantics unchanged.
+13. Add CLI and unit tests for:
    - valid `recording export --input <file>`
+   - success wrapper includes `eventCount`, `packageTransitionCount`, and `byType`
    - explicit `--out`
    - explicit `--snapshots include`
    - omitted snapshots mode defaults to `omit`
    - `--snapshots` present with no value returns USAGE
    - `--snapshots foo` returns USAGE
    - missing `--input`
+   - header-only recording exports as empty with null timeline fields
+   - event stream with only non-step events exports all events unchanged
+   - out-of-order `seq` lines are sorted before delta computation
+   - package transitions skip `press_key` and support `A -> B -> A`
    - malformed NDJSON
    - unsupported schema version
    - output write failure
-   - written export file can be read back and matches the contract
+   - written export file can be read back and matches a known-good expected object
    - both execution paths: `recording export ...` and `record export ...`
    - help text routing for `recording export --help` and `record export --help`
-13. Build and run Node tests.
+   - export path does not emit parser step summaries to stderr
+14. Build and run Node tests.
 
 ### Acceptance Criteria
 
@@ -232,8 +311,7 @@ agent-context JSON artifact from a local NDJSON recording file.
 - Success JSON wrapper matches the `plan.md` contract
 - Export file preserves all supported event types
 - Default export mode omits XML blobs while preserving snapshot presence facts
-- `recording parse` test expectations remain unchanged
-- All existing `parseRecording.test.ts` cases pass without modification
+- Shared validation extraction from Phase 2 remains intact
 - CLI valid / invalid / missing-input cases are covered by tests
 - `npm --prefix apps/node run build && npm --prefix apps/node run test`
   succeeds
@@ -251,7 +329,7 @@ npm --prefix apps/node run test
 feat(node): add recording export command
 ```
 
-## Phase 3: Attach recording context during `skills new`
+## Phase 4: Attach recording context during `skills new`
 
 ### Agent Tier
 
@@ -287,15 +365,21 @@ reference file, while keeping skill generation decisions outside Clawperator.
    - `Read that file to inspect the recorded interaction timeline and raw events.`
    - `The recording context is reference evidence, not an executable skill recipe.`
    - `An external agent or human author must write the reusable skill logic.`
-7. Do not change the scaffolded `run.js` logic beyond wording that points users
+7. Insert this guidance as a dedicated `## Recording Context` section before the
+   `Usage:` block in the scaffolded `SKILL.md`.
+8. Use `SKILLS_SCAFFOLD_FAILED` when the recording-context source path does not
+   exist or cannot be copied. The error message must include the missing or
+   unreadable source path.
+9. Do not change the scaffolded `run.js` logic beyond wording that points users
    toward the recording context for manual / agent refinement.
-8. Add skills tests for:
+10. Add skills tests for:
    - `skills new` without recording context remains unchanged
    - `skills new --recording-context <file>` copies the file
    - missing recording-context file fails deterministically
    - copied file path appears in success output
    - `skill.json.artifacts` remains unchanged
-9. Build and run Node tests.
+   - `skills validate` behavior remains unchanged and does not inspect `recording-context.json`
+11. Build and run Node tests.
 
 ### Acceptance Criteria
 
@@ -320,7 +404,7 @@ npm --prefix apps/node run test
 feat(node): attach recording context to new skills
 ```
 
-## Phase 4: Validate the workflow and update public docs
+## Phase 5: Validate the workflow and update public docs
 
 ### Agent Tier
 
@@ -343,21 +427,23 @@ runtime evidence in `findings.md`.
 
 1. Use `.agents/skills/docs-author/SKILL.md` for the authored-doc updates. Do
    not restate that workflow from scratch.
-2. Update `docs/api/recording.md` to cover:
+2. Before invoking docs-author, read the final Phase 3 and Phase 4 code changes
+   so the docs examples match the implemented CLI surface and scaffold behavior.
+3. Update `docs/api/recording.md` to cover:
    - `recording export` command syntax
    - default output path rule
    - success wrapper shape
    - exported file contract
    - explicit boundary that export preserves evidence but does not author skills
-3. Update `docs/skills/authoring.md` to cover:
+4. Update `docs/skills/authoring.md` to cover:
    - `skills new --recording-context <file>`
    - copied file path
    - external-agent authoring workflow
    - explicit non-goals: no automatic skill generation inside Clawperator
-4. If the docs build requires nav or source-map changes for the updated authored
+5. If the docs build requires nav or source-map changes for the updated authored
    pages, update `sites/docs/source-map.yaml` and `sites/docs/mkdocs.yml` in
    this same phase. Do not assume those updates are unnecessary.
-5. Create `tasks/api/recording-export-agent-context/findings.md` at the start
+6. Create `tasks/api/recording-export-agent-context/findings.md` at the start
    of runtime validation with these sections:
    - `# Recording Export Findings`
    - `## Environment`
@@ -366,7 +452,7 @@ runtime evidence in `findings.md`.
    - `## Skill Scaffold Summary`
    - `## Anomalies`
    - `## Open Questions`
-6. If a debug Operator device is available:
+7. If a debug Operator device is available:
    - run `recording start`
    - perform a short real interaction
    - run `recording stop`
@@ -374,12 +460,15 @@ runtime evidence in `findings.md`.
    - run `recording export`
    - run `skills new --recording-context <export_file>`
    - capture outputs and any anomalies in `findings.md`
-7. If a device is not available, note the host-state limitation in
+8. If a device is not available, note the host-state limitation in
    `findings.md` and treat the unit test suite as the primary gate. Still create
    the file so the skipped live path is auditable.
-8. Use `.agents/skills/docs-build/SKILL.md` or the repo-standard build commands
+9. Move any durable runtime caveat discovered during validation into
+   `docs/api/recording.md` or `docs/skills/authoring.md` before the task pack is
+   considered complete. Do not leave durable knowledge only in `findings.md`.
+10. Use `.agents/skills/docs-build/SKILL.md` or the repo-standard build commands
    to regenerate and validate docs outputs after authored docs are updated.
-9. Run the full validation set.
+11. Run the full validation set.
 
 ### Acceptance Criteria
 
