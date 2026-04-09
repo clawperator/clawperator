@@ -7,10 +7,10 @@ Parent plan: `tasks/mcp/hardening/plan.md`
 Three phases in one PR. All phases are hardening - no new tool surface.
 
 - Phase 1 (thinking): Schema convergence - extract duplicated JSON Schema fragments to `mcp/schemas.ts`
-- Phase 2 (default): Error surface - add six missing validation test cases, audit error codes
-- Phase 3 (default): Transport hardening - fix MCP interception bypass, normalize timeout pattern, harden smoke script
+- Phase 2 (default): Error surface - add genuinely missing test cases, re-baselined against the current suite
+- Phase 3 (default): Transport hardening - strengthen transport invariant test, normalize timeout pattern, harden smoke script
 
-Phases run sequentially in one PR. Build and test after each phase.
+Phases run sequentially. Build and test after each phase before committing.
 
 ## Status
 
@@ -26,13 +26,14 @@ Phases run sequentially in one PR. Build and test after each phase.
 
 ## Hard Rules
 
-1. Run `npm --prefix apps/node run build && npm --prefix apps/node run test` after each phase before committing.
-2. Do not delete or loosen any existing test. Only add.
-3. Do not change the public JSON Schema shape of any existing MCP tool. The extraction in Phase 1 must produce byte-identical schemas.
-4. Do not touch `sites/docs/.build/` or `sites/docs/site/` directly.
-5. Use `node apps/node/dist/cli/index.js` for any local verification. Do not use the global `clawperator` binary.
-6. One commit per phase. Do not batch phases into one commit.
-7. If a step reveals an unexpected finding (e.g., a third JSON Schema duplicate), log the finding, fix it if clearly in scope, and note it in the commit message. Do not silently skip it.
+1. Read `apps/node/src/test/integration/mcp.test.ts` in full before adding any test cases. Do not add a case that already exists.
+2. Run `npm --prefix apps/node run build && npm --prefix apps/node run test` after each phase before committing.
+3. Do not delete or loosen any existing test. Only add.
+4. Do not change the public JSON Schema shape of any existing MCP tool. The extraction in Phase 1 must produce byte-identical schemas.
+5. Do not change the `mcp serve` global-flag interception behavior. It is intentional and documented. Do not move the MCP check to after `getGlobalOpts`.
+6. Do not touch `sites/docs/.build/` or `sites/docs/site/` directly.
+7. Use `node apps/node/dist/cli/index.js` for any local verification. Do not use the global `clawperator` binary.
+8. One commit per phase. Do not batch phases into one commit.
 
 ## Required Reading
 
@@ -40,24 +41,22 @@ Read in this order before writing anything:
 
 | Order | File | Why it matters |
 | --- | --- | --- |
-| 1 | `tasks/mcp/hardening/plan.md` | Scope, decision rules, and failure modes |
-| 2 | `apps/node/src/mcp/tools/named.ts` | Contains `selectorJsonSchema` and `nonWhitespaceStringJsonSchema` to be extracted |
-| 3 | `apps/node/src/mcp/selectors.ts` | Zod `mcpSelectorSchema` - structural counterpart to the JSON Schema to be extracted |
-| 4 | `apps/node/src/mcp/tools/common.ts` | `applyMcpExecutionMetadata` timeout pattern and `buildCommonExecutionSchema` |
-| 5 | `apps/node/src/mcp/tools/core.ts` | `snapshot`, `execute`, and `devices` handlers |
-| 6 | `apps/node/src/mcp/errors.ts` | Error taxonomy, sanitization, and string code inventory |
-| 7 | `apps/node/src/mcp/results.ts` | `extractStepDataValue` and its error code strings |
-| 8 | `apps/node/src/cli/index.ts` | `resolveMcpServeArgs` and the global opts parsing flow |
-| 9 | `apps/node/src/test/integration/mcp.test.ts` | Current integration coverage - read all cases before adding |
-| 10 | `apps/node/src/test/unit/mcpHelpers.test.ts` | Current unit coverage for helpers |
-| 11 | `apps/node/src/test/unit/cliHelp.test.ts` | Current CLI unit tests |
-| 12 | `validation/test_mcp_stdio_smoke.mjs` | Current smoke flow - read entirely before editing |
+| 1 | `tasks/mcp/hardening/plan.md` | Scope, decision rules, out-of-scope list |
+| 2 | `apps/node/src/test/integration/mcp.test.ts` | Full current coverage - read all 598 lines before adding any case |
+| 3 | `apps/node/src/test/unit/mcpHelpers.test.ts` | Current unit coverage for helpers |
+| 4 | `apps/node/src/test/unit/cliHelp.test.ts:158` | Confirms global-flag interception behavior is intentional and tested |
+| 5 | `apps/node/src/mcp/tools/named.ts` | Contains the `selectorJsonSchema` to be extracted and the `read(all=true)` branches at lines 259-290 |
+| 6 | `apps/node/src/mcp/selectors.ts` | Zod counterpart of the selector JSON Schema |
+| 7 | `apps/node/src/mcp/tools/common.ts` | `applyMcpExecutionMetadata` timeout pattern |
+| 8 | `apps/node/src/mcp/results.ts` | `extractStepDataValue` and its error codes |
+| 9 | `apps/node/src/mcp/errors.ts` | Error taxonomy and sanitization |
+| 10 | `validation/test_mcp_stdio_smoke.mjs` | Current smoke flow - read entirely before editing |
 
 ## PR Plan
 
 | PR | Purpose | Included phases | Agent tier | Merge gate |
 | --- | --- | --- | --- | --- |
-| PR-1 | MCP server hardening | 1, 2, 3 | thinking / default / default | build, test, smoke |
+| PR-1 | MCP server hardening | 1, 2, 3 | thinking / default / default | build, test |
 
 ---
 
@@ -69,19 +68,19 @@ thinking
 
 ### Goal
 
-Extract the duplicated JSON Schema fragments from `named.ts` into a shared `apps/node/src/mcp/schemas.ts` module, so future drift between the Zod schemas and JSON Schemas is caught in one place.
+Extract the duplicated JSON Schema fragments from `named.ts` into a shared `apps/node/src/mcp/schemas.ts` module so that future changes to the selector shape propagate from one place.
 
 ### Files or Surfaces To Change
 
 - `apps/node/src/mcp/schemas.ts` - NEW file, exports shared JSON Schema fragments
 - `apps/node/src/mcp/tools/named.ts` - remove local definitions, import from `../schemas.js`
-- No other files unless the audit in Step 3 finds additional duplicates
+- No other files unless the audit in Step 3 finds additional clear duplicates
 
 ### Steps
 
-1. Read `apps/node/src/mcp/tools/named.ts` lines 101-119 to confirm the current local definitions of `nonWhitespaceStringJsonSchema` and `selectorJsonSchema`.
+1. Read `apps/node/src/mcp/tools/named.ts` lines 101-119 to confirm the two local definitions being extracted: `nonWhitespaceStringJsonSchema` and `selectorJsonSchema`.
 
-2. Create `apps/node/src/mcp/schemas.ts` with exactly these two exports. The content must be structurally identical to what is currently in `named.ts`:
+2. Create `apps/node/src/mcp/schemas.ts` with exactly these two exports. Content must be byte-identical to the current definitions in `named.ts`:
 
    ```ts
    export const nonWhitespaceStringJsonSchema = {
@@ -105,13 +104,13 @@ Extract the duplicated JSON Schema fragments from `named.ts` into a shared `apps
    } as const;
    ```
 
-   Do not change the shape. Do not add or remove properties. The goal is zero schema drift, not schema redesign.
+   Do not change the shape. Do not add or remove fields.
 
-3. Audit the rest of `apps/node/src/mcp/` for any other hand-copied JSON Schema fragments that are also defined elsewhere as Zod schemas. If found, extract them too. If not found, stop.
+3. Audit the rest of `apps/node/src/mcp/` for any other JSON Schema fragments defined verbatim in more than one file. If found, extract them too. If not found, stop.
 
-4. In `named.ts`, remove the local `nonWhitespaceStringJsonSchema` and `selectorJsonSchema` definitions and import from `"../schemas.js"`. All existing uses of both names inside `named.ts` should work without any other changes.
+4. In `named.ts`, remove the two local definitions and import from `"../schemas.js"`. All existing uses inside `named.ts` should work without further changes.
 
-5. Verify the exported `inputSchema` objects for all named tools are unchanged. Run a quick diff to confirm no JSON Schema property was added, removed, or renamed.
+5. Verify the exported `inputSchema` objects for all named tools are unchanged. Run a diff to confirm no property was added, removed, or renamed.
 
 6. Run `npm --prefix apps/node run build && npm --prefix apps/node run test`.
 
@@ -119,13 +118,14 @@ Extract the duplicated JSON Schema fragments from `named.ts` into a shared `apps
 
 Mechanical:
 - `apps/node/src/mcp/schemas.ts` exists and exports `nonWhitespaceStringJsonSchema` and `selectorJsonSchema`
-- `named.ts` contains no local definition of either name (grep for `const selectorJsonSchema` and `const nonWhitespaceStringJsonSchema` in `named.ts` - must return zero matches)
+- `grep -n "const selectorJsonSchema" apps/node/src/mcp/tools/named.ts` returns no output
+- `grep -n "const nonWhitespaceStringJsonSchema" apps/node/src/mcp/tools/named.ts` returns no output
 - `npm --prefix apps/node run build` exits 0
 - `npm --prefix apps/node run test` exits 0
-- Integration test `lists tools over the stdio protocol` passes (schema shapes are unchanged)
+- The integration test `lists tools over the stdio protocol` still passes (schema shapes unchanged)
 
 Human review:
-- The extracted schemas are byte-identical to the originals (no properties added or removed)
+- The extracted schemas are byte-identical to the originals
 - No new file other than `schemas.ts` was created
 
 ### Validation
@@ -136,7 +136,7 @@ grep -n "const selectorJsonSchema" apps/node/src/mcp/tools/named.ts
 grep -n "const nonWhitespaceStringJsonSchema" apps/node/src/mcp/tools/named.ts
 ```
 
-Both grep commands must return no output.
+Both greps must return no output.
 
 ### Expected Commit
 
@@ -154,102 +154,125 @@ default
 
 ### Goal
 
-Add the six missing MCP validation boundary test cases and verify the string error code inventory is complete.
+Fill the genuine coverage gaps in the MCP test suite. Do not add cases that already exist. The three real gaps are: `type` and `scroll_until` validation boundaries (integration), and the `read(all=true)` invalid-data branches (unit).
+
+### Before You Start
+
+Read `apps/node/src/test/integration/mcp.test.ts` in full. The following cases are already present and must not be re-added:
+
+| Already covered | Location |
+| --- | --- |
+| `execute` with caller-controlled screenshot path | `mcp.test.ts:552` |
+| `execute` with screenshot alias + caller path | `mcp.test.ts:561` |
+| Unknown tool name returns `-32601` | `mcp.test.ts:570` |
 
 ### Files or Surfaces To Change
 
-- `apps/node/src/test/integration/mcp.test.ts` - add cases a through f below
-- `apps/node/src/test/unit/mcpHelpers.test.ts` - add case g (runtime extraction failure) if not already covered
-- `apps/node/src/mcp/errors.ts` - add named string constants if any ad-hoc codes are found in tool handlers
+- `apps/node/src/test/integration/mcp.test.ts` - add cases a, b, c below
+- `apps/node/src/mcp/results.ts` or `apps/node/src/mcp/tools/named.ts` - extract `read(all=true)` parsing logic into a testable helper
+- `apps/node/src/test/unit/mcpHelpers.test.ts` - add unit cases d, e, f, g below
 
 ### Steps
 
-1. Read `apps/node/src/test/integration/mcp.test.ts` fully before adding anything. Note the `assertInvalidParams` and `assertRuntimeStructuredError` helper functions already present.
+#### Integration test cases (a, b, c)
 
-2. Add the following integration test cases inside the `describe("mcp stdio integration")` block. Each case must call `await client.initialize()` first.
+These use the existing `assertInvalidParams` and `assertRuntimeStructuredError` helpers already in `mcp.test.ts`.
 
-   **Case a - `type` missing `selector`:**
-   ```ts
-   it("rejects type when selector is missing", async () => {
-     await client.initialize();
-     const response = await client.requestTool("type", { text: "hello" });
-     assertInvalidParams(response);
-   });
-   ```
+**Case a - `type` missing `selector`:**
+```ts
+it("rejects type when selector is missing", async () => {
+  await client.initialize();
+  const response = await client.requestTool("type", { text: "hello" });
+  assertInvalidParams(response);
+});
+```
 
-   **Case b - `type` missing `text`:**
-   ```ts
-   it("rejects type when text is missing", async () => {
-     await client.initialize();
-     const response = await client.requestTool("type", { selector: { text: "Field" } });
-     assertInvalidParams(response);
-   });
-   ```
+**Case b - `type` missing `text`:**
+```ts
+it("rejects type when text is missing", async () => {
+  await client.initialize();
+  const response = await client.requestTool("type", { selector: { text: "Field" } });
+  assertInvalidParams(response);
+});
+```
 
-   **Case c - `scroll_until` invalid direction:**
-   ```ts
-   it("rejects scroll_until when direction is invalid", async () => {
-     await client.initialize();
-     const response = await client.requestTool("scroll_until", {
-       selector: { text: "Item" },
-       direction: "diagonal",
-     });
-     assertInvalidParams(response);
-   });
-   ```
+**Case c - `scroll_until` invalid direction:**
+```ts
+it("rejects scroll_until when direction is invalid", async () => {
+  await client.initialize();
+  const response = await client.requestTool("scroll_until", {
+    selector: { text: "Item" },
+    direction: "diagonal",
+  });
+  assertInvalidParams(response);
+});
+```
 
-   **Case d - `read` with `validator: "regex"` but no `validatorPattern`:**
-   ```ts
-   it("rejects read when validator is regex but validatorPattern is missing", async () => {
-     await client.initialize();
-     const response = await client.requestTool("read", {
-       selector: { text: "Field" },
-       validator: "regex",
-     });
-     assertInvalidParams(response);
-   });
-   ```
+#### Unit test cases for `read(all=true)` branches (d, e, f, g)
 
-   **Case e - `execute` with caller-controlled `take_screenshot` path:**
-   ```ts
-   it("rejects execute when take_screenshot action includes a caller-controlled path", async () => {
-     await client.initialize();
-     const response = await client.requestTool("execute", {
-       actions: [
-         { id: "ss-1", type: "take_screenshot", params: { path: "/tmp/out.png" } },
-       ],
-     });
-     assertInvalidParams(response);
-   });
-   ```
+The three `MCP_STEP_DATA_INVALID` branches in `named.ts:259-290` are:
 
-   **Case f - unknown tool name:**
-   ```ts
-   it("returns MethodNotFound for an unknown tool name", async () => {
-     await client.initialize();
-     const response = await client.requestTool("nonexistent_tool", {});
-     assert.ok(response.error);
-     assert.strictEqual(response.error?.code, -32601);
-   });
-   ```
+1. JSON parse of `extracted.value` throws → `"read returned invalid JSON array data"`
+2. Parsed value is not an array → `"read returned non-array data for all=true"`
+3. Array contains a non-string element → `"read returned non-string items in array for all=true"`
 
-3. For case g (runtime extraction failure producing tool-level `isError` with a string `code`): read `apps/node/src/test/unit/mcpHelpers.test.ts` and confirm it covers `extractStepDataValue` returning `MCP_STEP_NOT_FOUND` and `MCP_STEP_DATA_MISSING`. If either is missing, add unit test cases there. Do not add these to the integration test - they require device-side failure to trigger and are better tested at the unit level.
+To make these testable without a live device, extract the parsing logic from `named.ts` into a pure helper function. The function takes the extracted string value and returns either a `string[]` or an error descriptor. The exact shape of the helper and its location (`results.ts` or a separate `readResult.ts`) are left to implementation judgment - pick whichever requires less restructuring. The contract is: the helper is exported and the unit test imports and calls it directly.
 
-4. Audit the string error codes used across `apps/node/src/mcp/tools/core.ts` and `apps/node/src/mcp/tools/named.ts`. Every string used as a `code:` field in `buildMcpErrorResult` calls must appear as a named constant or as one of the standard string values from `results.ts` (`MCP_STEP_NOT_FOUND`, `MCP_STEP_DATA_MISSING`, `MCP_STEP_DATA_INVALID`). If any raw string literal is found, define a named constant in `errors.ts` or `results.ts` and replace the usage.
+After extracting:
 
-5. Run `npm --prefix apps/node run build && npm --prefix apps/node run test`.
+**Case d - `read(all=true)`: invalid JSON:**
+```ts
+it("returns MCP_STEP_DATA_INVALID when read all=true value is not valid JSON", () => {
+  const result = parseReadAllResult("not-json");
+  assert.strictEqual(result.ok, false);
+  assert.strictEqual(result.code, "MCP_STEP_DATA_INVALID");
+});
+```
+
+**Case e - `read(all=true)`: parsed value is not an array:**
+```ts
+it("returns MCP_STEP_DATA_INVALID when read all=true value parses to a non-array", () => {
+  const result = parseReadAllResult('"a string"');
+  assert.strictEqual(result.ok, false);
+  assert.strictEqual(result.code, "MCP_STEP_DATA_INVALID");
+});
+```
+
+**Case f - `read(all=true)`: array contains non-string:**
+```ts
+it("returns MCP_STEP_DATA_INVALID when read all=true array contains a non-string", () => {
+  const result = parseReadAllResult('[1, 2, 3]');
+  assert.strictEqual(result.ok, false);
+  assert.strictEqual(result.code, "MCP_STEP_DATA_INVALID");
+});
+```
+
+**Case g - `read(all=true)`: valid string array (happy path):**
+```ts
+it("returns ok with string array when read all=true value is a valid string array", () => {
+  const result = parseReadAllResult('["a", "b"]');
+  assert.strictEqual(result.ok, true);
+  if (result.ok) assert.deepStrictEqual(result.values, ["a", "b"]);
+});
+```
+
+Also verify that `mcpHelpers.test.ts` already covers `MCP_STEP_NOT_FOUND` (no matching step) and `MCP_STEP_DATA_MISSING` (key absent) for `extractStepDataValue`. If either is missing, add it.
+
+#### Build and test
+
+Run `npm --prefix apps/node run build && npm --prefix apps/node run test`.
 
 ### Acceptance Criteria
 
 Mechanical:
-- All six cases (a-f) are present in `mcp.test.ts` and pass
-- `mcpHelpers.test.ts` covers `MCP_STEP_NOT_FOUND` and `MCP_STEP_DATA_MISSING` error paths
-- No raw string literal used as a `code` in a `buildMcpErrorResult` call without a named constant
+- Cases a, b, c are present in `mcp.test.ts` and pass
+- Cases d, e, f, g are present in a unit test file and pass
+- `grep -n "MCP_STEP_DATA_INVALID" apps/node/src/test/unit/mcpHelpers.test.ts` returns at least three matches (one per branch)
 - `npm --prefix apps/node run build && npm --prefix apps/node run test` exits 0
 
 Human review:
-- Each test case targets the exact failure mode (not a superset or approximation)
-- The unknown-tool test asserts the correct JSON-RPC error code -32601, not -32602
+- No test case re-adds something already covered - verify against the already-covered table above
+- Each `read(all=true)` case targets a distinct branch (invalid JSON, non-array, non-string element)
 
 ### Validation
 
@@ -260,7 +283,7 @@ npm --prefix apps/node run build && npm --prefix apps/node run test
 ### Expected Commit
 
 ```text
-test(node): add missing MCP validation boundary and error surface coverage
+test(node): add missing MCP validation boundary and read extraction coverage
 ```
 
 ---
@@ -273,165 +296,167 @@ default
 
 ### Goal
 
-Fix the MCP interception bypass for global flags preceding `mcp serve`, normalize `wait` and `scroll_until` to follow the same timeout pattern as all other named tools, and harden the smoke script `read` step against transient device state.
+Strengthen the transport invariant test from a silence window to a full `initialize` handshake. Normalize `wait` and `scroll_until` timeout pattern. Harden the smoke script read step.
+
+Do not change the `mcp serve` global-flag interception behavior.
 
 ### Files or Surfaces To Change
 
-- `apps/node/src/cli/index.ts` - fix MCP interception to handle global flags before `mcp serve`
-- `apps/node/src/test/integration/mcp.test.ts` - add regression test for global-flag form
+- `apps/node/src/test/integration/mcp.test.ts` - replace the 150 ms silence test with a handshake test
 - `apps/node/src/mcp/tools/named.ts` - normalize `wait` and `scroll_until` timeout
 - `validation/test_mcp_stdio_smoke.mjs` - harden `read` step with fallback candidates
-- `docs/internal/design/mcp-server.md` - add a note about the interception rule if the fix introduces a non-obvious invariant
+- `docs/internal/design/mcp-server.md` - add a sentence about the transport invariant if not already present
 
 ### Steps
 
-#### Fix 1: MCP interception bypass
+#### Fix 1: Strengthen the transport invariant test
 
-1. Read `apps/node/src/cli/index.ts` lines 230-260 to understand the current flow: `resolveMcpServeArgs` runs at `argv[0]` / `argv[1]` before global opts are parsed.
+The existing test `emits zero stdout bytes before initialize` waits 150 ms and checks byte count. This passes even if the subprocess exits early or never reaches a working state.
 
-2. The bug: `resolveMcpServeArgs(argv)` checks `argv[0] === "mcp"`. If any global flag precedes `mcp serve` (e.g., `--log-level debug mcp serve`), `argv[0]` is `--log-level`, not `mcp`, and the MCP path is not taken. The CLI then proceeds to stdout-writing paths that corrupt the MCP client's stdio stream.
+Replace it with a test that successfully completes an `initialize` handshake and verifies the first response byte is `{` (valid JSON-RPC):
 
-3. Fix: Move the MCP check to after `getGlobalOpts` has stripped the global flags into their own fields and returned `rest`. After the `getGlobalOpts` call in `main()`, check if `global.rest[0] === "mcp"` and `global.rest[1] === "serve"`. If so, run the MCP server and return. Remove or inline `resolveMcpServeArgs` as appropriate.
+```ts
+it("completes initialize over stdio and returns valid JSON-RPC", async () => {
+  await client.initialize();
+  // If initialize completed without throwing, the server is producing valid JSON-RPC
+  // on stdout. The McpIntegrationClient's drainMessages would throw on non-JSON bytes.
+});
+```
 
-   The ordering concern: `getGlobalOpts` can throw `UsageError` for invalid flags, and that error path uses `console.log` (stdout). This is acceptable because an invalid global flag before `mcp serve` is a caller error. The MCP interception is for well-formed invocations.
+If the existing test is kept alongside this one, that is fine. Do not delete the existing test if it provides unique signal (e.g., validating that no bytes appear before the first request is sent). If the existing test is strictly subsumed by the new one, remove it to avoid redundancy - but only if the existing test adds no independent signal.
 
-   The `--version` check at line 258 runs after the original MCP check but before `getGlobalOpts`. After the refactor, `--version mcp serve` would reach `getGlobalOpts`. Verify that `getGlobalOpts` handles `--version` as a passthrough token (it is not a flag `getGlobalOpts` knows about, so it goes into `rest`). If it does, the `--version` guard at line 258 will still fire before the MCP path. Confirm this ordering is correct and adjust if not.
+Also add a dedicated test for the `initialize` response structure:
 
-4. After fixing, verify manually:
-   ```bash
-   npm --prefix apps/node run build
-   echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1"}}}' | node apps/node/dist/cli/index.js --log-level debug mcp serve
-   ```
-   The output must be a JSON-RPC response, not a help string or error message.
+```ts
+it("initialize response includes server name and protocol version", async () => {
+  const response = await client.initialize();
+  const info = (response.result as { serverInfo?: { name?: string }; protocolVersion?: string });
+  assert.strictEqual(info.serverInfo?.name, "clawperator");
+  assert.strictEqual(typeof info.protocolVersion, "string");
+});
+```
 
-#### Fix 2: Regression test for global-flag interception
+If this is already covered by the existing `completes initialize and returns server info` test, skip it.
 
-5. In `mcp.test.ts`, add a test inside `describe("mcp stdio integration")`:
+#### Fix 2: Normalize `wait` timeout
 
-   ```ts
-   it("emits zero stdout bytes before initialize when global flags precede mcp serve", async () => {
-     const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "../../..");
-     const child = spawn(process.execPath, ["dist/cli/index.js", "--log-level", "debug", "mcp", "serve"], {
-       cwd: packageRoot,
-       stdio: ["pipe", "pipe", "pipe"],
-     });
-     const stdoutChunks: Buffer[] = [];
-     child.stdout.on("data", (chunk: Buffer) => stdoutChunks.push(chunk));
-     await new Promise(resolve => setTimeout(resolve, 150));
-     child.kill("SIGTERM");
-     await new Promise(resolve => child.once("exit", resolve));
-     const totalBytes = stdoutChunks.reduce((n, c) => n + c.length, 0);
-     assert.strictEqual(totalBytes, 0, "global flag before mcp serve must not produce stdout before initialize");
-   });
-   ```
+In `apps/node/src/mcp/tools/named.ts`, find the `wait` tool handler:
 
-#### Fix 3: Normalize `wait` and `scroll_until` timeout
+```ts
+buildWaitExecution(selector, parsed.timeoutMs)
+...
+applyMcpExecutionMetadata(execution, "wait")
+```
 
-6. In `apps/node/src/mcp/tools/named.ts`, find the `wait` tool handler. It currently calls:
-   ```ts
-   buildWaitExecution(selector, parsed.timeoutMs)
-   ...
-   applyMcpExecutionMetadata(execution, "wait")
-   ```
-   Change to pass `parsed.timeoutMs` to `applyMcpExecutionMetadata` as the third argument:
-   ```ts
-   applyMcpExecutionMetadata(execution, "wait", parsed.timeoutMs)
-   ```
-   The behavior is identical (both paths set the same value) but the pattern is now consistent with `open`, `click`, `type`, `read`, and `press`.
+Add `parsed.timeoutMs` as the third argument to `applyMcpExecutionMetadata`:
 
-7. Find the `scroll_until` tool handler. It currently calls:
-   ```ts
-   applyMcpExecutionMetadata(buildScrollUntilExecution(..., parsed.timeoutMs ?? 30_000), "scroll_until")
-   ```
-   Change to:
-   ```ts
-   applyMcpExecutionMetadata(buildScrollUntilExecution(..., parsed.timeoutMs ?? 30_000), "scroll_until", parsed.timeoutMs ?? 30_000)
-   ```
-   Again, no behavior change - just consistent pattern.
+```ts
+applyMcpExecutionMetadata(execution, "wait", parsed.timeoutMs)
+```
+
+No behavior change. The same `timeoutMs` is applied via both paths; this just makes the pattern consistent with `open`, `click`, `type`, `read`, and `press`.
+
+#### Fix 3: Normalize `scroll_until` timeout
+
+In the `scroll_until` handler:
+
+```ts
+applyMcpExecutionMetadata(buildScrollUntilExecution(..., parsed.timeoutMs ?? 30_000), "scroll_until")
+```
+
+Add the timeout as the third argument:
+
+```ts
+applyMcpExecutionMetadata(buildScrollUntilExecution(..., parsed.timeoutMs ?? 30_000), "scroll_until", parsed.timeoutMs ?? 30_000)
+```
+
+No behavior change.
 
 #### Fix 4: Harden smoke script `read` step
 
-8. In `validation/test_mcp_stdio_smoke.mjs`, the current `read` step extracts a single candidate text from the snapshot and uses it as a `{ text: candidateText }` selector. If that exact text is not found (transient state change), the smoke fails.
+In `validation/test_mcp_stdio_smoke.mjs`, the current `read` step extracts a single candidate text and uses it immediately. If that exact text is absent when `read` is called, the smoke fails for non-contract reasons.
 
-   Change `extractCandidateText` to extract multiple candidates:
-   ```js
-   function extractCandidateTexts(snapshotXml, maxCandidates = 5) {
-     const candidates = [];
-     const matches = [
-       ...snapshotXml.matchAll(/\btext="([^"]+)"/g),
-       ...snapshotXml.matchAll(/\bcontent-desc="([^"]+)"/g),
-     ];
-     for (const match of matches) {
-       const value = decodeXmlEntities(match[1] ?? "").trim();
-       if (value.length > 0 && !candidates.includes(value)) {
-         candidates.push(value);
-       }
-       if (candidates.length >= maxCandidates) break;
-     }
-     return candidates;
-   }
-   ```
+Change `extractCandidateText` to `extractCandidateTexts` (returning up to 5 candidates):
 
-   Update the `read` step to try each candidate in order, accepting the first success:
-   ```js
-   const candidateTexts = extractCandidateTexts(snapshotXml);
-   if (candidateTexts.length === 0) {
-     throw new Error("Could not find any non-empty text or content-desc value in the live snapshot");
-   }
+```js
+function extractCandidateTexts(snapshotXml, maxCandidates = 5) {
+  const candidates = [];
+  const matches = [
+    ...snapshotXml.matchAll(/\btext="([^"]+)"/g),
+    ...snapshotXml.matchAll(/\bcontent-desc="([^"]+)"/g),
+  ];
+  for (const match of matches) {
+    const value = decodeXmlEntities(match[1] ?? "").trim();
+    if (value.length > 0 && !candidates.includes(value)) {
+      candidates.push(value);
+    }
+    if (candidates.length >= maxCandidates) break;
+  }
+  return candidates;
+}
+```
 
-   let readResult;
-   let usedCandidate;
-   for (const candidate of candidateTexts) {
-     const attempt = await session.request("tools/call", {
-       name: "read",
-       arguments: { selector: { text: candidate }, deviceId: selectedDevice, operatorPackage },
-     }, 30000);
-     if (!attempt?.isError) {
-       readResult = attempt;
-       usedCandidate = candidate;
-       break;
-     }
-   }
-   if (!readResult) {
-     throw new Error(`read failed for all ${candidateTexts.length} candidate selectors`);
-   }
-   console.log(`Using selector text ${JSON.stringify(usedCandidate)}`);
-   ```
+Update the `read` call site to try each candidate in order:
 
-   Remove the old single-candidate `extractCandidateText` function and the old `candidateText` log.
+```js
+const candidateTexts = extractCandidateTexts(snapshotXml);
+if (candidateTexts.length === 0) {
+  throw new Error("Could not find any non-empty text or content-desc value in the live snapshot");
+}
 
-9. Run `npm --prefix apps/node run build && npm --prefix apps/node run test`.
+let readResult;
+let usedCandidate;
+for (const candidate of candidateTexts) {
+  const attempt = await session.request("tools/call", {
+    name: "read",
+    arguments: { selector: { text: candidate }, deviceId: selectedDevice, operatorPackage },
+  }, 30000);
+  if (!attempt?.isError) {
+    readResult = attempt;
+    usedCandidate = candidate;
+    break;
+  }
+}
+if (!readResult) {
+  throw new Error(`read failed for all ${candidateTexts.length} candidate selectors`);
+}
+console.log(`Using selector text ${JSON.stringify(usedCandidate)}`);
+```
 
-10. If `docs/internal/design/mcp-server.md` does not already contain a note about the MCP interception invariant (that `mcp serve` must be intercepted regardless of global flag position), add a brief note there.
+Remove the old `extractCandidateText` (singular) function and the old candidate log line.
+
+#### Fix 5: Design doc note
+
+Read `docs/internal/design/mcp-server.md`. If it does not already state that stdout is reserved exclusively for JSON-RPC messages after `mcp serve` is invoked (without global flags), and that this invariant is enforced at the entry point before any CLI formatting runs, add a brief sentence to that effect. Do not add a full new section - a sentence addition to the existing bootstrap paragraph is sufficient.
+
+#### Build and test
+
+Run `npm --prefix apps/node run build && npm --prefix apps/node run test`.
 
 ### Acceptance Criteria
 
 Mechanical:
-- `node apps/node/dist/cli/index.js --log-level debug mcp serve` produces zero non-JSON-RPC stdout bytes before an initialize message is sent
-- The new regression test in `mcp.test.ts` passes
+- Integration test suite contains a test that completes an `initialize` handshake (not just a 150 ms wait)
 - `named.ts` `wait` handler calls `applyMcpExecutionMetadata` with three arguments
 - `named.ts` `scroll_until` handler calls `applyMcpExecutionMetadata` with three arguments
-- `validation/test_mcp_stdio_smoke.mjs` contains `extractCandidateTexts` (plural) and a candidate loop
+- `validation/test_mcp_stdio_smoke.mjs` contains `extractCandidateTexts` (plural) and iterates candidates
 - `npm --prefix apps/node run build && npm --prefix apps/node run test` exits 0
 
 Human review:
-- The MCP interception fix does not break any non-MCP CLI invocation
-- The timeout normalization makes no behavior change (same value, different call site)
-- The smoke hardening still fails clearly if the MCP contract is actually broken
+- The `mcp serve` interception behavior is unchanged (global flags still produce usage; the CLI unit test at `cliHelp.test.ts:158` still passes)
+- The timeout normalization makes no behavior change (same value applied, different call site)
+- The smoke hardening still fails clearly for real MCP contract regressions
 
 ### Validation
 
 ```bash
 npm --prefix apps/node run build && npm --prefix apps/node run test
-echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1"}}}' | node apps/node/dist/cli/index.js --log-level debug mcp serve
 ```
-
-The second command must produce a JSON-RPC response (first line of stdout is a valid JSON object with `"id":1`).
 
 ### Expected Commit
 
 ```text
-fix(node): harden MCP transport interception, timeout consistency, and smoke verification
+fix(node): strengthen MCP transport invariant, timeout consistency, and smoke verification
 ```
 
 ---
@@ -445,7 +470,7 @@ npm --prefix apps/node run build && npm --prefix apps/node run test
 node apps/node/dist/cli/index.js mcp --help
 ```
 
-If the smoke harness is available on a device:
+If a device is available:
 
 ```bash
 node validation/test_mcp_stdio_smoke.mjs

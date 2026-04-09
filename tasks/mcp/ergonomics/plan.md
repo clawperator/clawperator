@@ -7,7 +7,7 @@ Agent-facing ergonomics pass for the MCP stdio server. Two concrete features in 
 - Bounded snapshot: optional `maxChars` parameter on the `snapshot` tool to limit XML output length
 - Session configure: new `configure` tool for per-session `deviceId`, `operatorPackage`, and `timeoutMs` defaults
 
-Three phases: implement bounded snapshot, implement configure tool, then docs and tests.
+Three phases. Each implementation phase carries its own proving tests. Phase 3 is docs only.
 
 **Blocked on `tasks/mcp/hardening/` merging first.**
 
@@ -31,55 +31,60 @@ Reduce agent token cost for snapshot-heavy observe-decide-act loops and eliminat
 
 Two concrete ergonomics problems compound as MCP usage grows:
 
-1. `snapshot` returns full Android UI XML unconditionally. For large UI trees, this can be thousands of tokens per call. Agents that only need to check if a specific node exists, or that are making preliminary orientation decisions, pay the full cost every time.
+1. `snapshot` returns full Android UI XML unconditionally. For large UI trees this can be thousands of tokens per call. Agents that only need orientation before a decision pay the full cost every time.
 
-2. Every execution tool call requires `deviceId` and `operatorPackage` to be specified, even when the session is pinned to a single device and operator throughout. This is boilerplate the agent must repeat on every call or risk omitting.
+2. Every execution tool call requires `deviceId` and `operatorPackage` even when the session is pinned to a single device throughout. This is boilerplate the agent must repeat on every call or risk omitting.
 
 Both problems are reducible without adding new Android execution primitives.
 
 ## In Scope
 
-- `maxChars?: number` parameter on the `snapshot` tool - truncates the returned `snapshot` string at the specified character count and adds `truncated: true` to the payload
+- `maxChars?: number` parameter on the `snapshot` tool - truncates the returned `snapshot` string at the specified character count and adds `truncated: true` to the success payload when applied
+- Unit tests for `maxChars` truncation in the same phase as the implementation
 - New `configure` MCP tool - accepts optional `deviceId`, `operatorPackage`, and `timeoutMs`; stores them in per-session process memory; subsequent execution tool calls merge these defaults (per-call wins)
-- Session state lifecycle: initialized empty at server start, mutable via `configure`, not persisted across server restarts
-- Tests for both features
-- Docs update for both features (`docs/api/mcp.md`, `apps/node/README.md` if the npm-facing surface changed)
+- Unit tests for `mergeWithSessionDefaults` and session isolation in the same phase as the implementation
+- Design note update for `configure` - it is the first MCP-only stateful surface; `docs/internal/design/mcp-server.md` must acknowledge it
+- Docs update for both features in Phase 3 (`docs/api/mcp.md`)
 
 ## Out of Scope
 
 - Foreground state check or thin readiness surface - requires a new execution action type not currently in the engine
 - `validateOnly` mode for `execute` - requires Android runtime support
 - Session state persistence across server restarts
-- Clearing individual session defaults (call `configure` with new values or restart the server)
+- Clearing individual session defaults after they are set (restart the server or override per-call)
 - New named tools beyond `configure`
 - Non-stdio transports
 - Changes to the core Android execution engine
 
 ## Existing Artifact Scope
 
-`apps/node/src/mcp/tools/core.ts` - in scope to extend `snapshot` and add `configure`. Existing `devices`, `snapshot`, and `execute` behavior is preserved. `maxChars` is additive.
+`apps/node/src/mcp/tools/core.ts` - in scope to extend `snapshot` and add `configure`. Existing `devices`, `snapshot`, and `execute` behavior is preserved. `maxChars` is additive and changes nothing when omitted.
 
-`apps/node/src/mcp/server.ts` - in scope to wire session state creation into `createMcpServer`.
+`apps/node/src/mcp/server.ts` - in scope to wire session state into `createMcpServer`.
 
-`apps/node/src/mcp/tools/common.ts` - in scope to add session default merge helper.
+`apps/node/src/mcp/tools/common.ts` - in scope to add the `mergeWithSessionDefaults` helper.
 
-`apps/node/src/mcp/tools/named.ts` - in scope to update handler signatures to receive session defaults.
+`apps/node/src/mcp/tools/named.ts` - in scope to update handler signatures and apply session merge.
 
 `apps/node/src/mcp/tools/index.ts` - in scope to update `getMcpTools` signature.
 
-`docs/api/mcp.md` - in scope for `maxChars` and `configure` documentation. Existing content preserved.
+`docs/api/mcp.md` and `docs/internal/design/mcp-server.md` - in scope for additive updates only.
 
 ## Surfaces and Ownership
 
 | Surface | Path | Change type |
 | --- | --- | --- |
-| Snapshot tool | `apps/node/src/mcp/tools/core.ts` | additive (new parameter) |
-| Configure tool | `apps/node/src/mcp/tools/core.ts` | new tool added |
+| Snapshot tool | `apps/node/src/mcp/tools/core.ts` | additive (new parameter + truncation helper) |
+| Configure tool | `apps/node/src/mcp/tools/core.ts` | new tool |
 | Session state | `apps/node/src/mcp/session.ts` (NEW) | new module |
-| Tool factory signatures | `apps/node/src/mcp/tools/index.ts`, `common.ts`, `core.ts`, `named.ts` | targeted update |
+| Truncation helper | `apps/node/src/mcp/tools/core.ts` or `apps/node/src/mcp/results.ts` | new exported helper |
+| Session merge helper | `apps/node/src/mcp/tools/common.ts` | new exported function |
+| Tool factory signatures | `apps/node/src/mcp/tools/index.ts`, `core.ts`, `named.ts` | targeted update |
 | MCP server bootstrap | `apps/node/src/mcp/server.ts` | targeted update |
-| Integration tests | `apps/node/src/test/integration/mcp.test.ts` | add cases |
+| Unit tests | `apps/node/src/test/unit/mcpHelpers.test.ts` | add truncation and merge cases |
+| Integration tests | `apps/node/src/test/integration/mcp.test.ts` | add configure and tool-list cases |
 | MCP API docs | `docs/api/mcp.md` | additive |
+| MCP design note | `docs/internal/design/mcp-server.md` | additive sentence |
 
 ## Source Of Truth
 
@@ -92,58 +97,64 @@ Both problems are reducible without adding new Android execution primitives.
 | MCP server creation | `apps/node/src/mcp/server.ts` |
 | Existing integration test patterns | `apps/node/src/test/integration/mcp.test.ts` |
 | MCP public docs | `docs/api/mcp.md` |
+| MCP design posture | `docs/internal/design/mcp-server.md` |
 
 ## Deterministic Versus Judgment
 
 Deterministic:
 
-- `maxChars` truncates by character count (not byte count, not token count). Truncation point is exact: `snapshot.slice(0, maxChars)`.
-- When `maxChars` truncation applies, the success payload includes `truncated: true`. When it does not apply (full snapshot fits), `truncated` is omitted.
-- `configure` tool parameter names are `deviceId`, `operatorPackage`, and `timeoutMs` - identical to the per-call parameter names on execution tools.
-- Session default merge rule: per-call value, if provided and non-empty, wins. Session default applies only when the per-call value is absent (`undefined`).
-- `configure` returns the full current session state after applying the update, even if no fields changed.
-- Session state is stored in the `Server` instance created by `createMcpServer`. It is not a module-level global.
+- `maxChars` truncation is `snapshot.slice(0, maxChars)`. No ellipsis, no XML-aware break point.
+- When truncation applies, the success payload includes `truncated: true`. When the full snapshot fits, `truncated` is omitted entirely.
+- The `configure` success payload shape is `{ session: { ...currentValues } }`. Only fields that are currently set appear. This is the single canonical shape. Use it in the handler, the tests, and the docs.
+- `configure` parameter names are `deviceId`, `operatorPackage`, and `timeoutMs` - identical to the per-call names on all execution tools.
+- Session default merge rule: `effectiveValue = perCallValue ?? sessionDefault`. Applied independently for each of the three fields.
+- `configure` validates `deviceId` and `operatorPackage` as non-empty strings when provided. Empty or whitespace-only values are `InvalidParams`.
+- Session state is on the `Server` instance created by `createMcpServer`, not a module-level global. Two separate `createMcpServer()` calls produce two independent session stores.
+- Tests for truncation and session-default merge are unit tests that do not require a connected device.
 
 Judgment:
 
-- Whether `configure` should validate that `deviceId` and `operatorPackage` are non-empty when provided, or pass them through for the execution tool to reject. Prefer validating at the `configure` boundary (same rules as per-call: non-empty string or omitted).
-- How to thread session state through to tool handlers. Prefer passing a mutable `SessionDefaults` object through `getMcpTools` rather than a module-level singleton, so test isolation is maintained.
+- Where exactly to define the truncation helper (inline in the `snapshot` handler vs. extracted to `results.ts`). Prefer extraction if the function boundary is clean, so the unit test can import it directly.
+- How to thread session state to tool handlers (through `getMcpTools` signature vs. closure). Prefer the explicit parameter approach for testability.
 
 ## Decision Rules
 
 | Decision point | Rule |
 | --- | --- |
-| `maxChars` truncation boundary | Truncate with `snapshot.slice(0, maxChars)`. Do not pad, ellipsize, or try to find a valid XML break point. |
-| `truncated` field presence | Include `truncated: true` only when truncation was applied. Omit when the full snapshot fits within `maxChars`. |
-| Session default merge | `effectiveDeviceId = options.deviceId ?? session.deviceId`. Apply the same rule for `operatorPackage` and `timeoutMs`. |
-| `configure` validation | Reject blank strings (`""`, whitespace-only) for `deviceId` and `operatorPackage` using the same `nonEmptyOptionalStringSchema` already used in `executionToolOptionsSchema`. |
-| Session state scope | One `SessionDefaults` object per `createMcpServer()` call. Not a module-level global. |
-| `configure` success payload | Return `{ deviceId, operatorPackage, timeoutMs }` showing the current session state after the update. Omit fields that are still unset. |
+| `configure` success payload | Always `{ session: { ...currentValues } }`. Omit unset fields. This shape is used in the handler, the unit tests, the integration tests, and the docs. |
+| `truncated` field | Include as `true` only when truncation was applied. Omit when the full snapshot fits within `maxChars`. |
+| `configure` validation | Use `nonEmptyOptionalStringSchema` (already in `common.ts`) for `deviceId` and `operatorPackage`. |
+| Session state scope | One object per `createMcpServer()` call. Never a module-level global. |
+| Test location | Truncation and merge-precedence tests are unit tests. Integration tests cover protocol-level behavior (tool list includes `configure`, `configure` call succeeds and returns correct shape). |
+| Design note requirement | `configure` is the first MCP-only stateful surface. Add a sentence to `docs/internal/design/mcp-server.md` acknowledging that session-local state is an exception to the stateless posture, bounded to the `configure` tool only. |
 
 ## Failure Modes To Prevent
 
-- `maxChars` splitting multi-byte UTF-8 characters (JS `slice` operates on UTF-16 code units, not bytes - this is acceptable; document it)
-- Session state leaking between test cases in the integration test suite (use one client per test, as current tests already do - new tests must follow the same pattern)
-- `configure` accepting empty-string `deviceId` silently and causing confusing DEVICE_NOT_FOUND errors on subsequent calls
-- `snapshot` behavior changing for callers that do not provide `maxChars` (the existing path must be byte-identical to the pre-change behavior)
-- The tool list changing order or count due to adding `configure` (the integration test `lists tools over the stdio protocol` asserts exact tool order - update that assertion to include `configure`)
+- `plan.md` and `work-breakdown.md` specifying different `configure` payload shapes (resolved: `{ session: { ... } }` is canonical everywhere)
+- Tests that `return` on any runtime error, passing without ever proving truncation or session merge
+- Session state leaking between test cases (each integration test spawns its own client; each unit test uses an independent session object)
+- `snapshot` behavior changing for callers that omit `maxChars` (the existing path must be byte-identical)
+- The tool list order changing without updating `lists tools over the stdio protocol` in `mcp.test.ts`
+- `configure` accepting blank `deviceId` and causing silent DEVICE_NOT_FOUND errors downstream
 
 ## Output Contract
 
 This task produces:
 
-- `apps/node/src/mcp/session.ts` with `SessionDefaults` type and `createSessionDefaults()`
-- Updated `snapshot` tool with `maxChars` parameter
-- New `configure` tool
-- Updated tool factory signatures to receive session defaults
-- Integration tests for `maxChars` truncation and `configure` session behavior
-- Updated `docs/api/mcp.md` documenting both features
+- `apps/node/src/mcp/session.ts` with `SessionDefaults` and `createSessionDefaults`
+- An exported truncation helper and updated `snapshot` tool with `maxChars` parameter
+- New `configure` tool with session state wiring through all execution tools
+- Unit tests covering: truncation (5 cases), `mergeWithSessionDefaults` (3 cases), session isolation (1 case)
+- Integration tests covering: `configure` in tool list, `configure` call shape, blank-value rejection
+- Updated `docs/api/mcp.md` with `maxChars` and `configure` documentation
+- A sentence in `docs/internal/design/mcp-server.md` acknowledging session-local state
 - A passing `npm --prefix apps/node run build && npm --prefix apps/node run test`
+- A passing `./scripts/docs_build.sh`
 
 ## Idempotency
 
-If `maxChars` is already implemented when a future agent picks up this task, mark Phase 1 done and skip to Phase 2. If `configure` is already implemented, mark Phase 2 done and go to Phase 3. Each phase is independently checkable.
+If `maxChars` is already implemented when a future agent picks this up, mark Phase 1 done and go to Phase 2. If `configure` is already implemented, mark Phase 2 done and go to Phase 3. Each phase is independently checkable by its acceptance criteria.
 
 ## Durable Follow-Up
 
-If session defaults prove useful in practice and future agents encounter repeated boilerplate, the next ergonomics iteration is to support clearing individual defaults (e.g., `configure({ deviceId: null })` using a sentinel). That work is out of scope here and should go in a new task if evidence of demand exists.
+If session defaults prove useful in practice and agents encounter pain from re-specifying them, the next ergonomics iteration is a mechanism to clear individual defaults at runtime. That work is out of scope here and should go in a new task only if usage evidence supports it.
