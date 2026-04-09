@@ -31,7 +31,8 @@ function decodeXmlEntities(value) {
     .replaceAll("&gt;", ">");
 }
 
-function extractCandidateText(snapshotXml) {
+function extractCandidateTexts(snapshotXml, maxCandidates = 5) {
+  const candidates = [];
   const matches = [
     ...snapshotXml.matchAll(/\btext="([^"]+)"/g),
     ...snapshotXml.matchAll(/\bcontent-desc="([^"]+)"/g),
@@ -39,12 +40,15 @@ function extractCandidateText(snapshotXml) {
 
   for (const match of matches) {
     const value = decodeXmlEntities(match[1] ?? "").trim();
-    if (value.length > 0) {
-      return value;
+    if (value.length > 0 && !candidates.includes(value)) {
+      candidates.push(value);
+    }
+    if (candidates.length >= maxCandidates) {
+      break;
     }
   }
 
-  return undefined;
+  return candidates;
 }
 
 function parseToolPayload(result) {
@@ -247,24 +251,36 @@ async function main() {
       throw new Error("snapshot did not return parseable XML with at least one <node element");
     }
 
-    const candidateText = extractCandidateText(snapshotXml);
-    if (!candidateText) {
-      throw new Error("Could not find a non-empty text or content-desc value in the live snapshot");
+    const candidateTexts = extractCandidateTexts(snapshotXml);
+    if (candidateTexts.length === 0) {
+      throw new Error("Could not find any non-empty text or content-desc value in the live snapshot");
     }
 
-    console.log(`Using selector text ${JSON.stringify(candidateText)}`);
-
-    const readResult = await session.request("tools/call", {
-      name: "read",
-      arguments: {
-        selector: { text: candidateText },
-        deviceId: selectedDevice,
-        operatorPackage,
-      },
-    }, 30000);
-    if (readResult?.isError) {
-      throw new Error(`read failed: ${JSON.stringify(parseToolPayload(readResult))}`);
+    let readResult;
+    let usedCandidate;
+    let lastReadError;
+    for (const candidateText of candidateTexts) {
+      const attempt = await session.request("tools/call", {
+        name: "read",
+        arguments: {
+          selector: { text: candidateText },
+          deviceId: selectedDevice,
+          operatorPackage,
+        },
+      }, 30000);
+      if (!attempt?.isError) {
+        readResult = attempt;
+        usedCandidate = candidateText;
+        break;
+      }
+      lastReadError = parseToolPayload(attempt);
     }
+
+    if (!readResult || !usedCandidate) {
+      throw new Error(`read failed for all snapshot-derived candidates: ${JSON.stringify(lastReadError)}`);
+    }
+
+    console.log(`Using selector text ${JSON.stringify(usedCandidate)}`);
 
     const readPayload = parseToolPayload(readResult);
     if (typeof readPayload !== "string" || readPayload.trim().length === 0) {

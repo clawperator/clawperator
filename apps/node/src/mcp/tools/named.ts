@@ -9,7 +9,8 @@ import { buildPressKeyExecution } from "../../domain/actions/pressKey.js";
 import { buildWaitExecution } from "../../domain/actions/wait.js";
 import { buildScrollUntilExecution } from "../../domain/actions/scrollUntil.js";
 import { buildMcpErrorResult } from "../errors.js";
-import { extractStepDataValue } from "../results.js";
+import { extractStepDataValue, parseReadAllResult } from "../results.js";
+import { nonWhitespaceStringJsonSchema, selectorJsonSchema } from "../schemas.js";
 import { mcpSelectorSchema } from "../selectors.js";
 import type { McpToolDefinition } from "./index.js";
 import {
@@ -97,26 +98,6 @@ const scrollUntilArgsSchema = executionToolOptionsSchema.extend({
   container: mcpSelectorSchema.optional(),
   clickAfter: z.boolean().optional(),
 }).strict();
-
-const nonWhitespaceStringJsonSchema = {
-  type: "string",
-  minLength: 1,
-  pattern: "\\S",
-};
-
-const selectorJsonSchema = {
-  type: "object",
-  additionalProperties: false,
-  minProperties: 1,
-  properties: {
-    id: nonWhitespaceStringJsonSchema,
-    role: nonWhitespaceStringJsonSchema,
-    text: nonWhitespaceStringJsonSchema,
-    textContains: nonWhitespaceStringJsonSchema,
-    desc: nonWhitespaceStringJsonSchema,
-    descContains: nonWhitespaceStringJsonSchema,
-  },
-};
 
 const coordinateJsonSchema = {
   type: "object",
@@ -257,36 +238,17 @@ export function getNamedMcpTools(logger?: Logger): McpToolDefinition[] {
           }
 
           if (parsed.all) {
-            try {
-              const values = JSON.parse(extracted.value) as unknown;
-              if (!Array.isArray(values)) {
-                return buildMcpErrorResult({
-                  code: "MCP_STEP_DATA_INVALID",
-                  message: "read returned non-array data for all=true",
-                  envelope: result.envelope,
-                  deviceId: result.deviceId,
-                  terminalSource: result.terminalSource,
-                });
-              }
-              if (!values.every((v) => typeof v === "string")) {
-                return buildMcpErrorResult({
-                  code: "MCP_STEP_DATA_INVALID",
-                  message: "read returned non-string items in array for all=true",
-                  envelope: result.envelope,
-                  deviceId: result.deviceId,
-                  terminalSource: result.terminalSource,
-                });
-              }
-              return buildSuccessResult(values);
-            } catch {
+            const parsedReadAll = parseReadAllResult(extracted.value);
+            if (!parsedReadAll.ok) {
               return buildMcpErrorResult({
-                code: "MCP_STEP_DATA_INVALID",
-                message: "read returned invalid JSON array data",
+                code: parsedReadAll.code,
+                message: parsedReadAll.message,
                 envelope: result.envelope,
                 deviceId: result.deviceId,
                 terminalSource: result.terminalSource,
               });
             }
+            return buildSuccessResult(parsedReadAll.values);
           }
 
           return buildSuccessResult(extracted.value);
@@ -327,6 +289,7 @@ export function getNamedMcpTools(logger?: Logger): McpToolDefinition[] {
         const execution = applyMcpExecutionMetadata(
           buildWaitExecution(selector, parsed.timeoutMs),
           "wait",
+          parsed.timeoutMs,
         );
 
         return await runExecutionTool(execution, parsed, logger, (result) => {
@@ -356,7 +319,7 @@ export function getNamedMcpTools(logger?: Logger): McpToolDefinition[] {
           container,
           parsed.clickAfter ?? false,
           parsed.timeoutMs ?? 30_000,
-        ), "scroll_until");
+        ), "scroll_until", parsed.timeoutMs ?? 30_000);
 
         return await runExecutionTool(execution, parsed, logger, (result) => {
           return buildSuccessResult(buildExecutionSuccessPayload(result));

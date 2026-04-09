@@ -15,6 +15,49 @@ export interface StepDataExtractionFailure {
 
 export type StepDataExtractionResult = StepDataExtractionSuccess | StepDataExtractionFailure;
 
+export interface ReadAllResultSuccess {
+  ok: true;
+  values: string[];
+}
+
+export interface ReadAllResultFailure {
+  ok: false;
+  code: "MCP_STEP_DATA_INVALID";
+  message: string;
+}
+
+export type ReadAllResult = ReadAllResultSuccess | ReadAllResultFailure;
+
+export function parseReadAllResult(value: string): ReadAllResult {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!Array.isArray(parsed)) {
+      return {
+        ok: false,
+        code: "MCP_STEP_DATA_INVALID",
+        message: "read returned non-array data for all=true",
+      };
+    }
+    if (!parsed.every((entry) => typeof entry === "string")) {
+      return {
+        ok: false,
+        code: "MCP_STEP_DATA_INVALID",
+        message: "read returned non-string items in array for all=true",
+      };
+    }
+    return {
+      ok: true,
+      values: parsed,
+    };
+  } catch {
+    return {
+      ok: false,
+      code: "MCP_STEP_DATA_INVALID",
+      message: "read returned invalid JSON array data",
+    };
+  }
+}
+
 export function extractStepDataValue(
   envelope: ResultEnvelope,
   options: {
