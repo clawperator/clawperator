@@ -114,8 +114,8 @@ export function getCoreMcpTools(logger?: Logger): McpToolDefinition[] {
             type: "object",
             additionalProperties: false,
             properties: {
-              id: { type: "string", minLength: 1 },
-              type: { type: "string", minLength: 1 },
+              id: { type: "string", minLength: 1, pattern: "\\S" },
+              type: { type: "string", minLength: 1, pattern: "\\S" },
               params: { type: "object" },
             },
             required: ["id", "type"],

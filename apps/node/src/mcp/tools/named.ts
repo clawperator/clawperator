@@ -62,7 +62,7 @@ const clickArgsSchema = executionToolOptionsSchema.extend({
 
 const typeArgsSchema = executionToolOptionsSchema.extend({
   selector: mcpSelectorSchema,
-  text: z.string(),
+  text: z.string().min(1),
   submit: z.boolean().optional(),
   clear: z.boolean().optional(),
 }).strict();
@@ -190,7 +190,7 @@ export function getNamedMcpTools(logger?: Logger): McpToolDefinition[] {
       description: "Type text into a matching field, optionally clearing first or submitting after.",
       inputSchema: buildCommonExecutionSchema({
         selector: selectorJsonSchema,
-        text: { type: "string" },
+        text: { type: "string", minLength: 1 },
         submit: { type: "boolean" },
         clear: { type: "boolean" },
       }, ["selector", "text"]),
