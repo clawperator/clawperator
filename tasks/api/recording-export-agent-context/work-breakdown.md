@@ -431,7 +431,7 @@ runtime evidence in `findings.md`.
 
 - `docs/api/recording.md`
 - `docs/skills/authoring.md`
-- `tasks/api/recording-export-agent-context/findings.md` (new, created in this phase only if runtime validation occurs)
+- `tasks/api/recording-export-agent-context/findings.md` (new, always created in this phase so live validation or skipped-live rationale is auditable)
 - Generated docs outputs after authored docs updates
 
 ### Steps
