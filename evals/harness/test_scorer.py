@@ -84,6 +84,24 @@ def test_extract_answer_from_result_json_line():
     assert extract_answer_from_transcript(transcript_result_json) == "16"
 
 
+def test_extract_answer_from_kimi_json_line_with_string_content():
+    transcript_kimi_string = (
+        '{"role":"assistant","content":"The snapshot clearly shows the Android version.\\n\\nCLAWPERATOR_EVAL_ANSWER: 16"}'
+    )
+    assert extract_answer_from_transcript(transcript_kimi_string) == "16"
+
+
+def test_extract_answer_from_kimi_json_line_with_text_item_list():
+    transcript_kimi_list = (
+        '{"role":"assistant","content":['
+        '{"type":"text","text":"The snapshot clearly shows the Android version.\\n\\nCLAWPERATOR_"},'
+        '{"type":"text","text":"EVAL_ANSWER: "},'
+        '{"type":"text","text":"16"}'
+        ']}'
+    )
+    assert extract_answer_from_transcript(transcript_kimi_list) == "16"
+
+
 def test_extract_answer_ignores_tool_role_message_json():
     transcript_tool_json = (
         '{"type":"message","role":"tool","content":"CLAWPERATOR_EVAL_ANSWER: 16"}'
