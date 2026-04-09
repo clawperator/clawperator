@@ -61,6 +61,10 @@ recording evidence, not make authoring decisions on the user's behalf.
   - `press_key`
   - `text_change`
 - Preserve raw snapshot XML per event when present.
+- Add snapshot export-mode control so the export can stay agent-consumable for
+  large recordings:
+  - `--snapshots omit` (default)
+  - `--snapshots include`
 - Add factual derived fields that do not require product judgment:
   - event ordering by `seq`
   - `deltaMsSincePrevious`
@@ -158,6 +162,7 @@ recording evidence, not make authoring decisions on the user's behalf.
 | User wants agent-authoring context | Use new `recording export` path |
 | Input source for export in v1 | Require `--input <local_ndjson_file>`; do not add direct device/session export in this task |
 | Output path omitted | Replace `.ndjson` with `.export.json`; otherwise append `.export.json` |
+| Snapshot flag omitted | Default to `--snapshots omit` so the export is usable as agent context without embedding raw XML blobs by default |
 
 ### Export-content rules
 
@@ -165,9 +170,11 @@ recording evidence, not make authoring decisions on the user's behalf.
 | --- | --- |
 | Event coverage | Export every validated raw event type; do not drop `scroll`, `text_change`, or `press_key` |
 | Ordering | Sort by `seq` before deriving deltas or transitions |
-| Snapshot handling | Preserve raw XML string when present; preserve `null` when absent; do not parse into heuristically chosen selectors |
+| Snapshot handling | Support `omit` and `include` modes only in this task. `omit` keeps `present: true/false` but writes `xml: null`. `include` preserves raw XML string. Do not parse into heuristically chosen selectors |
 | Package transitions | Emit only factual transitions observed from adjacent package-bearing events |
 | Unsupported / malformed event | Fail with existing recording parse error semantics rather than silently skipping |
+| Shared validation | Extract a shared validation helper that returns `{ header, events }`. `parseRecording` and `exportRecording` must both consume that helper rather than duplicating validation rules |
+| Export versioning | `exportVersion` tracks the Node exporter's output shape. `session.schemaVersion` tracks the Android recorder's input shape. A single export version may support multiple schema versions only when the output shape remains backward-compatible |
 
 ### Skill scaffold integration rules
 
@@ -195,14 +202,17 @@ recording evidence, not make authoring decisions on the user's behalf.
    external agent, not as automatic skill authoring inside Clawperator.
 7. **Build / test staleness.** Node tests run compiled `dist/` output; build
    before test every time.
+8. **Agent-context overload.** The default export must not embed megabytes of
+   snapshot XML into the file when the user only needs a timeline and event
+   metadata view.
 
 ## Output Contract
 
 ### CLI surface
 
 ```text
-clawperator recording export --input <file> [--out <file>] [--output <json|pretty>]
-clawperator record export --input <file> [--out <file>] [--output <json|pretty>]
+clawperator recording export --input <file> [--out <file>] [--snapshots <omit|include>] [--output <json|pretty>]
+clawperator record export --input <file> [--out <file>] [--snapshots <omit|include>] [--output <json|pretty>]
 ```
 
 Success wrapper:
@@ -261,7 +271,7 @@ Success wrapper:
       "title": "Source",
       "snapshot": {
         "present": true,
-        "xml": "<hierarchy>...</hierarchy>"
+        "xml": null
       }
     }
   ]
@@ -273,6 +283,21 @@ Success wrapper:
 When `skills new --recording-context <file>` succeeds, the returned success
 payload must include the copied file in the `files` array and expose
 `recordingContextPath` as an explicit field.
+
+### Export failure codes
+
+- Use existing recording parse failure codes for malformed input:
+  - `RECORDING_PARSE_FAILED`
+  - `RECORDING_SCHEMA_VERSION_UNSUPPORTED`
+- Add `RECORDING_EXPORT_FAILED` for export-stage failures such as unwritable
+  output paths or failed file serialization.
+
+## Known Limitations
+
+- The export path still reads the entire NDJSON file into memory in v1.
+- `--snapshots include` can produce very large output files for long recordings.
+- Streaming export and snapshot-summary modes are explicitly out of scope for
+  this task.
 
 ## Idempotency
 
