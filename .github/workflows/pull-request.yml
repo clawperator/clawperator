@@ -43,6 +43,19 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Set up Node.js 24.14.1
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24.14.1"
+          cache: npm
+          cache-dependency-path: apps/node/package-lock.json
+
+      - name: Install Node dependencies
+        run: npm --prefix apps/node ci
+
+      - name: Build Node package
+        run: npm --prefix apps/node run build
+
       - name: Run docs build
         run: ./scripts/docs_build.sh
 
