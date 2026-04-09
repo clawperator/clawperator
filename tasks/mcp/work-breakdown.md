@@ -1,0 +1,347 @@
+# Clawperator MCP Server Work Breakdown
+
+Parent plan: `tasks/mcp/plan.md`
+
+## Executive Summary
+
+2 PRs, 5 phases.
+
+- PR-1 proves the transport and extracts shared services first.
+- PR-2 expands the ergonomic tool surface and finishes docs plus real-device verification.
+
+Do not start PR-2 until PR-1 is merged. This task is intentionally transport-first so the team can validate MCP correctness before investing in a broad named-tool surface.
+
+## Status
+
+| Item | Value |
+| --- | --- |
+| State | planning |
+| Total PRs | 2 |
+| Total phases | 5 |
+| Completed | none |
+| Remaining | 1, 2, 3, 4, 5 |
+| Current / Next | Phase 1 |
+| Blockers | PR-2 waits on PR-1 merge |
+
+## Hard Rules
+
+1. Keep this task inside `apps/node/`, `docs/`, docs-site config, and `apps/node/README.md`. Do not create a separate top-level package.
+2. Implement stdio transport only. Do not add HTTP, SSE, remote hosting, or registry submission work.
+3. Build transport-neutral services first. Do not make MCP the third place where validation, operator-package resolution, or execution shaping is reimplemented.
+4. Reuse canonical domain logic where possible. Do not call CLI formatter functions from the MCP layer if a structured domain or extracted shared service is available.
+5. The `mcp serve` path must never write to stdout except through the MCP SDK transport. Do not use `console.log`, `process.stdout.write`, or helpers that write to stdout from the server path.
+6. Every execution-backed MCP tool must use one shared helper for `commandId` and `taskId` generation.
+7. Every tool that extracts data from `ResultEnvelope.stepResults` must use one shared extraction helper.
+8. Build `apps/node` before running tests. Node tests execute built `dist/` artifacts.
+9. Use the branch-local Node build and the `.dev` operator package for local verification unless the task explicitly needs the release APK.
+10. When multiple devices are connected, always pass `--device`.
+11. If the MCP layer needs selector mapping, use only the mapping from `tasks/mcp/plan.md`. Do not invent alternate selector keys.
+12. Do not hand-edit `sites/docs/.build/` or `sites/docs/site/`.
+13. Pin one exact MCP SDK version in `apps/node/package.json`. Do not use an open-ended “or higher” range.
+14. PR-2 must not start until PR-1 is merged.
+15. Use the exact MCP tool name `scroll_until` everywhere in implementation, tests, and docs.
+
+## Required Reading
+
+Read these files IN THIS ORDER before writing anything.
+
+| Order | File | Why it matters |
+| --- | --- | --- |
+| 1 | `apps/node/src/domain/executions/runExecution.ts` | Canonical execution orchestration and post-processing |
+| 2 | `apps/node/src/domain/executions/validateExecution.ts` | Canonical execution validation and supported actions |
+| 3 | `apps/node/src/contracts/execution.ts` | Execution payload contract |
+| 4 | `apps/node/src/contracts/result.ts` | Result envelope contract |
+| 5 | `apps/node/src/contracts/errors.ts` | Stable error codes |
+| 6 | `apps/node/src/contracts/selectors.ts` | Canonical selector contract |
+| 7 | `apps/node/src/cli/index.ts` | Top-level CLI dispatch and stdout behavior |
+| 8 | `apps/node/src/cli/registry.ts` | Existing command surface and help conventions |
+| 9 | `apps/node/src/cli/commands/action.ts` | Current action behavior references |
+| 10 | `apps/node/src/cli/commands/observe.ts` | Current observe behavior references |
+| 11 | `apps/node/src/cli/commands/devices.ts` | Current device-listing behavior references |
+| 12 | `apps/node/src/cli/commands/packages.ts` | Current package-listing behavior references and current CLI-only seam |
+| 13 | `apps/node/src/cli/commands/serve.ts` | Current server transport behavior and duplication seams |
+| 14 | `apps/node/package.json` | Publish surface, scripts, engines, shipped README |
+| 15 | `apps/node/README.md` | Package-facing docs surface |
+| 16 | `tasks/mcp/plan.md` | Stable contract and scope boundaries after code-first review |
+| 17 | sibling repo `../clawperator-distribution/docs/decision-framework.md` | Distribution rationale |
+| 18 | sibling repo `../clawperator-distribution/videos/intro/v1/demo-flow-notes.md` | Demo proof constraints |
+
+## PR / Phase Plan
+
+| PR | Purpose | Included phases | Agent tier | Merge gate |
+| --- | --- | --- | --- | --- |
+| PR-1 | Extract shared services and prove MCP transport | 1, 2, 3 | thinking/thinking/default | protocol tests pass; minimal tools work; no stray stdout |
+| PR-2 | Expand ergonomic tools and docs | 4, 5 | thinking/default | PR-1 merged; build/test/docs pass; real-device smoke passes |
+
+## Phase 1: Extract Shared Transport-Neutral Services
+
+### Agent Tier
+
+thinking
+
+### Goal
+
+Extract the minimum shared typed services needed so MCP does not become a third transport-specific implementation.
+
+### Files or Surfaces To Change
+
+- transport-neutral shared surfaces under `apps/node/src/domain/` or equivalent
+- `apps/node/src/cli/commands/serve.ts` only as needed to reuse extracted helpers
+- related tests
+
+### Steps
+
+1. Extract or introduce typed helpers for the seams that are currently transport-specific:
+   - operator-package resolution/defaulting
+   - any execution helper that both `serve` and MCP would otherwise duplicate
+2. Keep the extraction minimal and evidence-based. Do not refactor unrelated command code.
+3. Add focused tests proving the extracted services match current behavior.
+4. Update `serve.ts` to use the extracted helpers where that reduces duplication cleanly.
+
+### Acceptance Criteria
+
+- MCP can build on typed shared services rather than CLI string-returning helpers.
+- `serve` is not left as a separate competing implementation for any extracted seam.
+- Tests prove the extracted services preserve current behavior.
+
+### Validation
+
+```bash
+npm --prefix apps/node run build
+npm --prefix apps/node run test
+```
+
+### Expected Commit
+
+```text
+refactor(node): extract shared services for mcp transport
+```
+
+## Phase 2: MCP Transport Scaffold And Protocol Safety
+
+### Agent Tier
+
+thinking
+
+### Goal
+
+Add the `mcp serve` command path, pin the SDK dependency, and prove protocol correctness before broad tool work begins.
+
+### Files or Surfaces To Change
+
+- `apps/node/package.json`
+- `apps/node/package-lock.json`
+- `apps/node/src/cli/index.ts`
+- `apps/node/src/cli/registry.ts`
+- `apps/node/src/cli/commands/mcp.ts` or equivalent
+- `apps/node/src/mcp/` transport files
+- protocol-focused tests
+
+### Steps
+
+1. Add `@modelcontextprotocol/sdk` version `1.29.0` to `apps/node/package.json`.
+2. Add a new top-level `mcp` CLI command with a `serve` subcommand.
+3. Implement stdio MCP server bootstrap under `apps/node/src/mcp/`.
+4. Add shared MCP helpers for:
+   - execution ID generation using timestamp plus random suffix
+   - selector mapping
+   - envelope extraction
+   - MCP error/result shaping
+5. Explicitly protect the `mcp serve` path from stray stdout writes.
+6. Add real protocol tests modeled on the repo’s existing long-running integration style, covering:
+   - no unexpected stdout bytes before initialize
+   - initialize handshake
+   - listTools
+   - one invalid request path
+   - clean exit on stdin close
+
+### Acceptance Criteria
+
+- `clawperator mcp serve` is a valid CLI path.
+- The server boots over stdio without corrupting stdout.
+- Protocol tests prove initialize, listTools, invalid request handling, and clean shutdown.
+- Shared MCP helpers exist for IDs, selector mapping, envelope extraction, and error shaping.
+
+### Validation
+
+```bash
+npm --prefix apps/node run build
+npm --prefix apps/node run test
+node apps/node/dist/cli/index.js mcp --help
+```
+
+### Expected Commit
+
+```text
+feat(node): scaffold mcp transport and protocol tests
+```
+
+## Phase 3: PR-1 Minimal Tools
+
+### Agent Tier
+
+default
+
+### Goal
+
+Ship the smallest useful real MCP surface on top of the verified transport.
+
+### Files or Surfaces To Change
+
+- `apps/node/src/mcp/` tool files
+- related tests
+
+### Steps
+
+1. Implement `devices` using the shared typed device-listing path.
+2. Implement `snapshot` using the canonical observe/execution path.
+3. Implement `execute` as a thin wrapper over the canonical validated execution contract.
+4. Support common execution-backed options where applicable:
+   - `deviceId`
+   - `operatorPackage`
+   - `timeoutMs`
+5. Add protocol-level tool-call tests for:
+   - `devices`
+   - `snapshot`
+   - `execute`
+   - invalid payloads
+6. Stop after PR-1 and wait for merge.
+
+### Acceptance Criteria
+
+- `devices`, `snapshot`, and `execute` are callable through a real stdio MCP session.
+- `execute` uses the canonical execution contract rather than inventing a new MCP-only payload shape.
+- Common execution-backed options behave predictably.
+- PR-1 stands on its own as a valid reviewable transport-first slice.
+
+### Validation
+
+```bash
+npm --prefix apps/node run build
+npm --prefix apps/node run test
+```
+
+### Expected Commit
+
+```text
+feat(node): add core mcp tools
+```
+
+## Phase 4: PR-2 Named Tool Expansion
+
+### Agent Tier
+
+thinking
+
+### Goal
+
+Add ergonomic named tools only after the transport and canonical execute path are already proven.
+
+### Files or Surfaces To Change
+
+- `apps/node/src/mcp/` named tool files
+- any helper extraction justified by actual duplication
+- related tests
+
+### Steps
+
+1. Implement named tools for:
+   - `open`
+   - `click`
+   - `type`
+   - `read`
+   - `press`
+   - `wait`
+   - `scroll_until`
+2. Use explicit schemas:
+   - `open`: exactly one of `appId` or `uri`
+   - `click`: `selector` xor `coordinate`
+   - `type`: required `text`, required `selector`, optional `submit`, optional `clear`
+   - `read`: required `selector`, optional `all`, optional `container`
+   - `wait`: required `selector`, optional `timeoutMs`
+   - `scroll_until`: required `selector`, optional `container`, optional `clickAfter?: boolean`
+3. Add protocol-level tests for valid and invalid tool calls.
+4. Do not add `packages`, `back`, or `scroll` in this task pack.
+
+### Acceptance Criteria
+
+- Named tools map cleanly onto canonical contracts and extracted shared services.
+- Validation is protocol-level, not only direct handler-level.
+- Selector and container semantics remain thin mappings over existing contracts.
+- `scroll_until` exposes click-after behavior through one tool with `clickAfter?: boolean`, not through a second MCP tool.
+
+### Validation
+
+```bash
+npm --prefix apps/node run build
+npm --prefix apps/node run test
+```
+
+### Expected Commit
+
+```text
+feat(node): expand mcp named tools
+```
+
+## Phase 5: Docs And Real-Device Verification
+
+### Agent Tier
+
+default
+
+### Goal
+
+Document the shipped MCP surface clearly and verify it against a real client plus a connected device or emulator.
+
+### Files or Surfaces To Change
+
+- `apps/node/README.md`
+- `docs/` new or updated MCP docs
+- `sites/docs/source-map.yaml`
+- `sites/docs/mkdocs.yml`
+- optional `validation/` entry if a reusable MCP smoke harness is added
+
+### Steps
+
+1. Use `.agents/skills/docs-author/SKILL.md` for the docs-authoring workflow.
+2. Update `apps/node/README.md` for the npm-shipped MCP surface.
+3. Add public docs covering:
+   - what the MCP server is
+   - exact launch command
+   - branch-local development command example
+   - Claude Desktop configuration example
+   - Node version requirement
+   - environment configuration for long-running MCP processes, including `CLAWPERATOR_OPERATOR_PACKAGE` and `ADB_PATH`
+   - the shipped MCP tool list
+   - device-selection caveats
+   - a short smoke-test flow
+4. Update docs-site navigation and source-map entries.
+5. Run the docs build workflow instead of hand-editing generated outputs.
+6. If the implementation produced a reusable verification path, place it under `validation/`, not as a one-off script under `scripts/`.
+7. Perform one real end-to-end MCP smoke test against a connected device or emulator. At minimum prove:
+   - `devices`
+   - `snapshot`
+   - `open` or `execute`
+   - one selector-driven interaction
+8. Record any verification caveats directly in the docs or a durable design note if contributors will need them later.
+
+### Acceptance Criteria
+
+- Package-facing and public docs both reflect the shipped MCP surface.
+- `./scripts/docs_build.sh` passes.
+- A real MCP client can start the server and successfully call the minimum smoke-test sequence.
+- The docs do not promise registry submission, hosted infrastructure, or tools not yet shipped.
+
+### Validation
+
+```bash
+npm --prefix apps/node run build
+npm --prefix apps/node run test
+./scripts/docs_build.sh
+```
+
+### Expected Commit
+
+```text
+docs(node): document mcp server and verification
+```
