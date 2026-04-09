@@ -2150,7 +2150,7 @@ COMMANDS["recording"] = {
       }
       const snapshotMode = getStringOptStrict(rest, "--snapshots", ["--input", "--out", "--snapshots"]);
       if (snapshotMode !== undefined && snapshotMode !== "omit" && snapshotMode !== "include") {
-        return JSON.stringify({ code: "USAGE", message: "recording export --snapshots must be one of: omit, include" });
+        throw new UsageError("recording export --snapshots must be one of: omit, include");
       }
       return (await import("./commands/record.js")).cmdRecordExport({
         ...out,

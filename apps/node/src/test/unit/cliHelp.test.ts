@@ -311,7 +311,7 @@ describe("CLI help", () => {
 
   it("returns USAGE when --snapshots has an invalid value for record export", async () => {
     const { stdout, code } = await runCli(["record", "export", "--input", "/tmp/demo.ndjson", "--snapshots", "foo"]);
-    assert.strictEqual(code, 0);
+    assert.notStrictEqual(code, 0);
     const obj = JSON.parse(stdout);
     assert.strictEqual(obj.code, "USAGE");
     assert.match(obj.message, /omit, include/);
