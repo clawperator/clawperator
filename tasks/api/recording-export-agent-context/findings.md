@@ -47,3 +47,9 @@
 ## Open Questions
 
 - None at this point. The emulator had the debug Operator APK installed and the live flow completed successfully.
+
+## Follow-up Improvements
+
+- Stale recording recovery could be smoother. During the live rerun on `emulator-5554`, `recording start` initially failed with `RECORDING_ALREADY_IN_PROGRESS` because a prior session was still active on the device. I had to stop the leftover session manually before the flow could continue. A `recording status` command, or a richer `recording start` error that always includes the active `sessionId` plus a suggested recovery step, would reduce friction without adding any planner behavior.
+- `recording pull` and `recording export` still require a manual handoff that is easy to mistype. In the live run, `recording pull` wrote the host file successfully, but I still had to locate the NDJSON path and pass it to `recording export` by hand. It would be nicer if `recording pull` always returned the pulled path prominently, or if `recording export` accepted a pulled session directory and resolved the newest NDJSON automatically.
+- The test suite should explicitly cover the stale-session path. The current regression coverage proves the happy path and the parser contract, but it does not lock down the `RECORDING_ALREADY_IN_PROGRESS` recovery case that showed up in the live emulator run. A focused test for that scenario would make the flow more resilient in future changes.
