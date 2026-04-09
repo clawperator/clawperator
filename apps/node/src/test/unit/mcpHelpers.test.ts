@@ -167,4 +167,47 @@ describe("normalizeMcpError", () => {
       },
     });
   });
+
+  it("preserves envelope and execution context fields needed for MCP diagnostics", () => {
+    const payload = normalizeMcpError({
+      code: "SNAPSHOT_EXTRACTION_FAILED",
+      message: "snapshot extraction failed",
+      envelope: {
+        commandId: "cmd-1",
+        stepResults: [
+          {
+            id: "snap",
+            actionType: "snapshot_ui",
+            success: false,
+            data: {
+              error: "SNAPSHOT_EXTRACTION_FAILED",
+              stderr: "secret",
+            },
+          },
+        ],
+      },
+      deviceId: "device-123",
+      terminalSource: "broadcast",
+    });
+
+    assert.deepStrictEqual(payload, {
+      code: "SNAPSHOT_EXTRACTION_FAILED",
+      message: "snapshot extraction failed",
+      envelope: {
+        commandId: "cmd-1",
+        stepResults: [
+          {
+            id: "snap",
+            actionType: "snapshot_ui",
+            success: false,
+            data: {
+              error: "SNAPSHOT_EXTRACTION_FAILED",
+            },
+          },
+        ],
+      },
+      deviceId: "device-123",
+      terminalSource: "broadcast",
+    });
+  });
 });

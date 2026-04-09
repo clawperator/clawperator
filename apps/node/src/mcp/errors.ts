@@ -61,6 +61,15 @@ function sanitizeMcpErrorPayload(error: Record<string, unknown>): McpErrorPayloa
   if ("details" in error) {
     payload.details = sanitizeValue(error.details);
   }
+  if ("envelope" in error) {
+    payload.envelope = sanitizeValue(error.envelope);
+  }
+  if (typeof error.deviceId === "string" && error.deviceId.length > 0) {
+    payload.deviceId = error.deviceId;
+  }
+  if (typeof error.terminalSource === "string" && error.terminalSource.length > 0) {
+    payload.terminalSource = error.terminalSource;
+  }
 
   return payload;
 }

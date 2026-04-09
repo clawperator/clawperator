@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { Logger } from "../../adapters/logger.js";
 import type { ExecutionAction } from "../../contracts/execution.js";
+import { normalizeExecutionInput } from "../../contracts/inputAliases.js";
 import { listDevices } from "../../domain/devices/listDevices.js";
 import { buildSnapshotExecution } from "../../domain/observe/snapshot.js";
 import { buildMcpErrorResult } from "../errors.js";
@@ -30,6 +31,22 @@ const executionActionSchema = z.object({
 const executeArgsSchema = executionToolOptionsSchema.extend({
   actions: z.array(executionActionSchema).min(1, { message: "actions is required" }),
 }).strict();
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function hasCallerControlledScreenshotPath(action: z.infer<typeof executionActionSchema>): boolean {
+  const normalized = normalizeExecutionInput({ actions: [action] }) as { actions?: unknown };
+  const normalizedAction = Array.isArray(normalized.actions) ? normalized.actions[0] : undefined;
+  if (!isRecord(normalizedAction)) {
+    return false;
+  }
+  if (normalizedAction.type !== "take_screenshot") {
+    return false;
+  }
+  return isRecord(normalizedAction.params) && Object.prototype.hasOwnProperty.call(normalizedAction.params, "path");
+}
 
 function buildCommonExecutionSchema(properties: Record<string, unknown>, required: string[] = []): Record<string, unknown> {
   return {
@@ -121,7 +138,7 @@ export function getCoreMcpTools(logger?: Logger): McpToolDefinition[] {
       handler: async (args) => {
         const parsed = parseToolArguments(executeArgsSchema, args);
 
-        if (parsed.actions.some((action) => action.type === "take_screenshot" && action.params !== undefined && "path" in action.params)) {
+        if (parsed.actions.some((action) => hasCallerControlledScreenshotPath(action))) {
           return buildValidationResult("execute does not allow caller-controlled take_screenshot paths over MCP", "actions");
         }
 

@@ -539,6 +539,15 @@ describe("mcp stdio integration", () => {
     assertInvalidParams(response);
   });
 
+  it("rejects execute when screenshot aliases include a caller path alias", async () => {
+    await client.initialize();
+
+    const response = await client.requestTool("execute", {
+      actions: [{ id: "shot-1", type: "screenshot", params: { filePath: "/tmp/owned.png" } }],
+    });
+    assertInvalidParams(response);
+  });
+
   it("returns an MCP error for an unknown tool name", async () => {
     await client.initialize();
 
