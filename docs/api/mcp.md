@@ -339,7 +339,7 @@ Example call:
 
 ### `read`
 
-Read text from one node or all matches.
+Read text from one node or all matches. Supports regex validation to filter results at the runtime boundary.
 
 Parameters:
 
@@ -348,6 +348,8 @@ Parameters:
 | `selector` | yes | Target selector |
 | `all` | no | When `true`, returns a JSON array payload instead of a single string |
 | `container` | no | Optional container selector |
+| `validator` | no | Validation mode. Currently only `"regex"` is supported. |
+| `validatorPattern` | no | Required when `validator` is `"regex"`. A valid regex pattern the matched text must satisfy. |
 | `deviceId` | no | Explicit target device |
 | `operatorPackage` | no | Explicit operator package |
 | `timeoutMs` | no | Execution timeout. Defaults to `30000`. |
@@ -371,6 +373,19 @@ Example all-values read:
     "textContains": "Wi"
   },
   "all": true,
+  "deviceId": "<device_serial>"
+}
+```
+
+Example regex-validated read:
+
+```json
+{
+  "selector": {
+    "id": "com.example:id/version_text"
+  },
+  "validator": "regex",
+  "validatorPattern": "^\\d+\\.\\d+\\.\\d+$",
   "deviceId": "<device_serial>"
 }
 ```

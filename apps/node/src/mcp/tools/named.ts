@@ -71,7 +71,17 @@ const readArgsSchema = executionToolOptionsSchema.extend({
   selector: mcpSelectorSchema,
   all: z.boolean().optional(),
   container: mcpSelectorSchema.optional(),
-}).strict();
+  validator: z.literal("regex").optional(),
+  validatorPattern: z.string().trim().min(1).optional(),
+}).strict().superRefine((value, ctx) => {
+  if (value.validator === "regex" && value.validatorPattern === undefined) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "validatorPattern is required when validator is \"regex\"",
+      path: ["validatorPattern"],
+    });
+  }
+});
 
 const pressArgsSchema = executionToolOptionsSchema.extend({
   key: z.enum(["back", "home", "recents"]),
@@ -197,11 +207,13 @@ export function getNamedMcpTools(logger?: Logger): McpToolDefinition[] {
     },
     {
       name: "read",
-      description: "Read text from a matching node, optionally returning all matches.",
+      description: "Read text from a matching node, optionally returning all matches. Supports regex validation via validator and validatorPattern.",
       inputSchema: buildCommonExecutionSchema({
         selector: selectorJsonSchema,
         all: { type: "boolean" },
         container: selectorJsonSchema,
+        validator: { type: "string", enum: ["regex"] },
+        validatorPattern: { type: "string", minLength: 1 },
       }, ["selector"]),
       handler: async (args) => {
         const parsed = parseToolArguments(readArgsSchema, args);
@@ -211,7 +223,13 @@ export function getNamedMcpTools(logger?: Logger): McpToolDefinition[] {
         const container = mapOptionalSelector(parsed.container, "container");
 
         const execution = applyMcpExecutionMetadata(
-          buildReadExecution(selector, parsed.all, container),
+          buildReadExecution({
+            selector,
+            readAll: parsed.all,
+            container,
+            validator: parsed.validator,
+            validatorPattern: parsed.validatorPattern,
+          }),
           "read",
           parsed.timeoutMs,
         );
