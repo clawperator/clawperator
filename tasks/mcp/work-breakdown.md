@@ -64,8 +64,15 @@ Read these files IN THIS ORDER before writing anything.
 | 15 | `apps/node/package.json` | Publish surface, scripts, engines, shipped README |
 | 16 | `apps/node/README.md` | Package-facing docs surface |
 | 17 | `tasks/mcp/plan.md` | Stable contract and scope boundaries after code-first review |
-| 18 | sibling repo `../clawperator-distribution/docs/decision-framework.md` | Distribution rationale |
-| 19 | sibling repo `../clawperator-distribution/videos/intro/v1/demo-flow-notes.md` | Demo proof constraints |
+
+## Background Context
+
+These are useful framing, not pre-implementation requirements. Read before Phase 5 docs work, not before writing tool code.
+
+| File | Why it is useful |
+| --- | --- |
+| sibling repo `../clawperator-distribution/docs/decision-framework.md` | Distribution rationale; informs how to frame the MCP docs for technical audiences |
+| sibling repo `../clawperator-distribution/videos/intro/v1/demo-flow-notes.md` | Demo proof constraints; useful if MCP becomes part of the distribution demo |
 
 ## PR / Phase Plan
 
@@ -143,7 +150,7 @@ Add the `mcp serve` command path, pin the SDK dependency, and prove protocol cor
 3. Implement stdio MCP server bootstrap under `apps/node/src/mcp/`.
 4. Add shared MCP helpers for:
    - execution ID generation using timestamp plus random suffix
-   - selector mapping
+   - selector mapping (call `isNodeMatcherEmpty()` from `contracts/selectors.ts` after mapping and reject at the MCP boundary if the result would be empty; do not let an all-empty `NodeMatcher` reach the execution layer)
    - envelope extraction
    - MCP error/result shaping
 5. Explicitly protect the `mcp serve` path from stray stdout writes. In `apps/node/src/cli/index.ts`, detect the `mcp serve` argv pattern before `getGlobalOpts` runs and before any `console.log` can fire. Route directly to the MCP bootstrap from that detection point. All pre-bootstrap errors must go to stderr. This prevents `maybeShowStarHint`, the `console.log(result)` dispatch path, and `UsageError` formatting from writing to stdout during server operation.
@@ -204,6 +211,9 @@ Ship the smallest useful real MCP surface on top of the verified transport.
    - `snapshot`
    - `execute`
    - invalid payloads
+
+   These tests must spawn the compiled binary as a subprocess and exchange real stdio MCP messages, not import handlers directly. Importing handlers bypasses the exact class of bug (stray writes, dispatch leaks) that the protocol tests exist to catch.
+
 6. Stop after PR-1 and wait for merge.
 
 ### Acceptance Criteria
@@ -253,7 +263,7 @@ Add ergonomic named tools only after the transport and canonical execute path ar
    - `wait`
    - `scroll_until`
 2. Use explicit schemas:
-   - `open`: exactly one of `appId` or `uri`
+   - `open`: exactly one of `appId` or `uri`; implement this as a Zod discriminated union or `superRefine` so the rejection is a schema-level error with a typed message, not a runtime `if/else` producing a generic throw
    - `click`: `selector` xor `coordinate`, optional `clickType` as enum of `"default"`, `"long_click"`, `"focus"`, defaults to `"default"` when omitted
    - `type`: required `text`, required `selector`, optional `submit`, optional `clear`
    - `read`: required `selector`, optional `all`, optional `container`; when `all` is false or omitted return first matched text as a string, when `all: true` return all matches as an array of strings
@@ -313,14 +323,14 @@ Document the shipped MCP surface clearly and verify it against a real client plu
    - Node version requirement
    - environment configuration for long-running MCP processes, including `CLAWPERATOR_OPERATOR_PACKAGE` and `ADB_PATH`; note that Claude Desktop and similar MCP clients typically do not inherit the shell PATH, so `ADB_PATH` must be set explicitly in the client env block rather than relying on PATH resolution
    - the shipped MCP tool list
-   - device-selection caveats
+   - device-selection caveats, including that concurrent tool calls may surface `EXECUTION_CONFLICT_IN_FLIGHT` if two execution-backed tools are called simultaneously; document this as expected behavior, not a bug
    - a short smoke-test flow
 4. Update docs-site navigation and source-map entries.
 5. Run the docs build workflow instead of hand-editing generated outputs.
 6. If the implementation produced a reusable verification path, place it under `validation/`, not as a one-off script under `scripts/`.
 7. Perform one real end-to-end MCP smoke test against a connected device or emulator. At minimum prove:
    - `devices`
-   - `snapshot`
+   - `snapshot` returns parseable XML with at least one extractable node element, not just `ok: true`
    - `open` or `execute`
    - one selector-driven interaction
 8. Record any verification caveats directly in the docs or a durable design note if contributors will need them later.

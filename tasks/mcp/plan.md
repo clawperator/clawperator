@@ -195,7 +195,7 @@ For this task pack, the exact MCP tool name is `scroll_until`. Do not alternate 
 | caller passes both | reject at schema validation |
 | caller passes neither | reject at schema validation |
 
-Do not infer app-vs-URI from one untyped `target` string in the MCP layer.
+Do not infer app-vs-URI from one untyped `target` string in the MCP layer. Implement the mutual exclusion as a Zod discriminated union or `superRefine` so rejection is a schema-level error with a typed message, not a runtime `if/else`.
 
 ### `scroll_until` input shape
 
@@ -232,6 +232,8 @@ The MCP server generates `commandId`, `taskId`, `source`, and `expectedFormat`. 
 | `descContains` | `contentDescContains` |
 
 Container selectors, where supported, use the same mapping under a nested `container` object.
+
+After mapping any MCP selector input to `NodeMatcher`, call `isNodeMatcherEmpty()` from `contracts/selectors.ts`. If the result is empty, reject at the MCP boundary with a clear validation error. Do not let an all-empty matcher reach `runExecution`.
 
 Coordinates are absolute integer screen pixels:
 
@@ -289,6 +291,7 @@ Long-running server configuration, such as `CLAWPERATOR_OPERATOR_PACKAGE`, `ADB_
 - Leaving execution ID generation ad hoc across tools
 - Letting MCP schemas drift from the actual selector and execution contracts
 - Declaring success without real stdio MCP smoke validation against a connected device or emulator
+- Treating `EXECUTION_CONFLICT_IN_FLIGHT` from concurrent tool calls as a bug to fix rather than expected behavior to document
 
 ## Output Contract
 
@@ -305,11 +308,10 @@ This task is complete when all of the following are true:
 - the `mcp serve` code path is verified to avoid stray stdout writes outside MCP protocol traffic
 - protocol tests prove initialize, listTools, callTool, invalid request handling, and clean shutdown
 
-## Idempotency
+## Stability Expectations
 
-- Starting the server repeatedly should not mutate persistent project state
-- Rebuilding docs should overwrite generated outputs deterministically from authored sources
-- Tool registration names and schemas should remain stable across reruns unless the task explicitly changes them
+- Tool registration names and schemas must remain stable once PR-1 merges. Any rename is a breaking change for existing MCP client configurations.
+- Rebuilding docs must overwrite generated outputs deterministically from authored sources. Do not hand-edit generated output.
 
 ## Durable Follow-Up
 
