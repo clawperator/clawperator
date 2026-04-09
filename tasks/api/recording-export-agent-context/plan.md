@@ -171,6 +171,7 @@ recording evidence, not make authoring decisions on the user's behalf.
 | Event coverage | Export every validated raw event type; do not drop `scroll`, `text_change`, or `press_key` |
 | Ordering | Sort by `seq` before deriving deltas or transitions |
 | Snapshot handling | Support `omit` and `include` modes only in this task. `omit` keeps `present: true/false` but writes `xml: null`. `include` preserves raw XML string. Do not parse into heuristically chosen selectors |
+| Snapshot presence flag | `snapshot.present` is `true` when the raw event snapshot is a non-empty string. It is `false` when the raw snapshot is `null`, `undefined`, absent, or an empty string |
 | Package transitions | Emit only factual transitions observed from adjacent package-bearing events |
 | Unsupported / malformed event | Fail with existing recording parse error semantics rather than silently skipping |
 | Shared validation | Extract a shared validation helper that returns `{ header, events }`. `parseRecording` and `exportRecording` must both consume that helper rather than duplicating validation rules |
@@ -271,6 +272,26 @@ Success wrapper:
       "title": "Source",
       "snapshot": {
         "present": true,
+        "xml": null
+      }
+    },
+    {
+      "seq": 1,
+      "ts": 1710000001900,
+      "deltaMsSincePrevious": 1800,
+      "type": "click",
+      "packageName": "com.example.source",
+      "resourceId": "com.example.source:id/refresh",
+      "text": "Refresh",
+      "contentDesc": null,
+      "bounds": {
+        "left": 840,
+        "top": 220,
+        "right": 1020,
+        "bottom": 360
+      },
+      "snapshot": {
+        "present": false,
         "xml": null
       }
     }
