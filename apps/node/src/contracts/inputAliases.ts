@@ -78,9 +78,10 @@ function remapObjectKeys(
     const value = normalizeValue ? normalizeValue(canonicalKey, rawValue) : rawValue;
     const isAliasKey = aliases[rawKey] !== undefined;
     const hadCanonicalInInput = canonicalKeys.has(canonicalKey)
-      && Object.prototype.hasOwnProperty.call(input, canonicalKey);
+      && Object.prototype.hasOwnProperty.call(input, canonicalKey)
+      && input[canonicalKey] !== undefined;
 
-    // If caller provided a canonical key, keep it over alias variants.
+    // If caller provided a canonical key with a defined value, keep it over alias variants.
     if (isAliasKey && hadCanonicalInInput) {
       continue;
     }

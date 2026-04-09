@@ -197,6 +197,26 @@ describe("validateExecution", () => {
     assert.strictEqual(ex.actions[0].params?.applicationId, "com.example.canonical");
   });
 
+  it("uses alias value when canonical key is explicitly undefined", () => {
+    const ex = validateExecution({
+      commandId: "cmd-canonical-undefined-1",
+      taskId: "task-canonical-undefined-1",
+      source: "test",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 5000,
+      actions: [{
+        id: "open-1",
+        type: "open_app",
+        params: {
+          applicationId: undefined,
+          package: "com.example.alias",
+        },
+      }],
+    });
+
+    assert.strictEqual(ex.actions[0].params?.applicationId, "com.example.alias");
+  });
+
   it("normalizes expected_package and expected_node aliases for wait_for_navigation", () => {
     const ex = validateExecution({
       commandId: "cmd-nav-1",
