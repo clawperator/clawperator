@@ -24,11 +24,11 @@ function delay(ms) {
 
 function decodeXmlEntities(value) {
   return value
+    .replaceAll("&amp;", "&")
     .replaceAll("&quot;", "\"")
     .replaceAll("&apos;", "'")
     .replaceAll("&lt;", "<")
-    .replaceAll("&gt;", ">")
-    .replaceAll("&amp;", "&");
+    .replaceAll("&gt;", ">");
 }
 
 function extractCandidateText(snapshotXml) {
@@ -67,6 +67,20 @@ class McpSession {
     child.stdout.on("data", (chunk) => this.handleStdout(chunk));
     child.stderr.setEncoding("utf8");
     child.stderr.on("data", (chunk) => process.stderr.write(chunk));
+
+    const rejectAll = (error) => {
+      for (const { reject, timeout } of this.pending.values()) {
+        clearTimeout(timeout);
+        reject(error);
+      }
+      this.pending.clear();
+    };
+    child.once("exit", (code) => {
+      rejectAll(new Error(`MCP server exited unexpectedly with code ${code}`));
+    });
+    child.once("error", (err) => {
+      rejectAll(new Error(`MCP server process error: ${err.message}`));
+    });
   }
 
   handleStdout(chunk) {
@@ -83,7 +97,18 @@ class McpSession {
   }
 
   handleMessage(line) {
-    const message = JSON.parse(line);
+    let message;
+    try {
+      message = JSON.parse(line);
+    } catch {
+      const error = new Error(`Non-JSON bytes received on MCP stdout: ${line.slice(0, 200)}`);
+      for (const { reject, timeout } of this.pending.values()) {
+        clearTimeout(timeout);
+        reject(error);
+      }
+      this.pending.clear();
+      return;
+    }
     if ("id" in message && this.pending.has(message.id)) {
       const { resolve, reject, timeout } = this.pending.get(message.id);
       clearTimeout(timeout);

@@ -262,6 +262,15 @@ export function getNamedMcpTools(logger?: Logger): McpToolDefinition[] {
                   terminalSource: result.terminalSource,
                 });
               }
+              if (!values.every((v) => typeof v === "string")) {
+                return buildMcpErrorResult({
+                  code: "MCP_STEP_DATA_INVALID",
+                  message: "read returned non-string items in array for all=true",
+                  envelope: result.envelope,
+                  deviceId: result.deviceId,
+                  terminalSource: result.terminalSource,
+                });
+              }
               return buildSuccessResult(values);
             } catch {
               return buildMcpErrorResult({
