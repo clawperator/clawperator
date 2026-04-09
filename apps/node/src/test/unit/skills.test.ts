@@ -1119,6 +1119,31 @@ describe("scaffoldSkill", () => {
     }
   });
 
+  it("removes a partial scaffold when recording context copy fails", async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-skill-scaffold-recording-context-missing-"));
+    const registryDir = join(tempRoot, "skills");
+    const registryPath = join(registryDir, "skills-registry.json");
+    await mkdir(registryDir, { recursive: true });
+    await copyFile(TEST_REGISTRY_PATH, registryPath);
+
+    try {
+      const skillId = "com.example.notes.capture-missing-recording-context";
+      const result = await scaffoldSkill(skillId, {
+        registryPath,
+        recordingContextPath: join(tempRoot, "does-not-exist.json"),
+      });
+
+      assert.ok(!result.ok);
+      assert.strictEqual(result.code, SKILLS_SCAFFOLD_FAILED);
+      await assert.rejects(
+        () => stat(join(tempRoot, "skills", skillId)),
+        /ENOENT/
+      );
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
   it("supports multi-line summaries without breaking YAML frontmatter", async () => {
     const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-skill-scaffold-multiline-summary-"));
     const registryDir = join(tempRoot, "skills");
@@ -1255,6 +1280,83 @@ describe("scaffoldSkill", () => {
 
     try {
       const skillId = "com.example.weather.read-recording-context";
+      const { stdout, code } = await runCli(
+        [
+          "skills",
+          "new",
+          skillId,
+          "--summary",
+          "Read the current weather summary",
+          "--recording-context",
+          recordingContextPath,
+          "--output",
+          "json",
+        ],
+        {
+          env: {
+            ...process.env,
+            CLAWPERATOR_SKILLS_REGISTRY: registryPath,
+          },
+        }
+      );
+
+      assert.strictEqual(code, 0, stdout);
+      const parsed = JSON.parse(stdout) as { created?: boolean; recordingContextPath?: string; files?: string[] };
+      assert.strictEqual(parsed.created, true);
+      assert.strictEqual(parsed.recordingContextPath, join(tempRoot, "skills", skillId, "recording-context.json"));
+      assert.ok(parsed.files?.some((file) => file.endsWith("/recording-context.json")));
+      assert.strictEqual(
+        await readFile(join(tempRoot, "skills", skillId, "recording-context.json"), "utf8"),
+        await readFile(recordingContextPath, "utf8")
+      );
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("CLI skills new rejects --recording-context when the value is another flag", async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-skill-cli-recording-context-missing-"));
+    const registryDir = join(tempRoot, "skills");
+    const registryPath = join(registryDir, "skills-registry.json");
+    await mkdir(registryDir, { recursive: true });
+    await copyFile(TEST_REGISTRY_PATH, registryPath);
+
+    try {
+      const skillId = "com.example.weather.reject-missing-recording-context";
+      const { stdout, code } = await runCli(
+        ["skills", "new", skillId, "--recording-context", "--summary", "demo", "--output", "json"],
+        {
+          env: {
+            ...process.env,
+            CLAWPERATOR_SKILLS_REGISTRY: registryPath,
+          },
+        }
+      );
+
+      assert.notStrictEqual(code, 0);
+      const parsed = JSON.parse(stdout) as { code?: string; message?: string };
+      assert.strictEqual(parsed.code, "USAGE");
+      assert.match(parsed.message ?? "", /--recording-context requires a value/);
+      await assert.rejects(
+        () => stat(join(tempRoot, "skills", skillId)),
+        /ENOENT/
+      );
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("CLI skills new accepts a dash-prefixed recording context path", async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-skill-cli-recording-context-dash-"));
+    const registryDir = join(tempRoot, "skills");
+    const registryPath = join(registryDir, "skills-registry.json");
+    const recordingContextPath = join(tempRoot, "-recording-context.json");
+    await mkdir(registryDir, { recursive: true });
+    await copyFile(TEST_REGISTRY_PATH, registryPath);
+    await writeFile(recordingContextPath, "{\"exportVersion\":1,\"marker\":\"dash-path\"}\n", "utf8");
+
+    try {
+      const skillId = "com.example.weather.accept-dash-recording-context";
       const { stdout, code } = await runCli(
         [
           "skills",

@@ -34,6 +34,21 @@ export function getStringOpt(rest: string[], flag: string): string | undefined {
   return rest[i + 1];
 }
 
+export function getStringOptStrict(
+  rest: string[],
+  flag: string,
+  knownFlags: readonly string[] = [],
+): string | undefined {
+  const value = getStringOpt(rest, flag);
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value.startsWith("--") || knownFlags.includes(value)) {
+    throw new UsageError(`${flag} requires a value`);
+  }
+  return value;
+}
+
 export function getNumberOpt(rest: string[], flag: string): number | undefined {
   const i = rest.indexOf(flag);
   if (i < 0) {
@@ -1994,11 +2009,11 @@ Usage:
       if (!rest[1]) {
         return JSON.stringify({ code: "USAGE", message: "skills new <skill_id> [--summary <text>] [--recording-context <file>]" });
       } else {
-        const summary = getOpt(rest, "--summary");
+        const knownFlags = ["--summary", "--recording-context"];
         return (await import("./commands/skills.js")).cmdSkillsNew(rest[1], {
           ...out,
-          summary,
-          recordingContextPath: getStringOpt(rest, "--recording-context"),
+          summary: getStringOptStrict(rest, "--summary", knownFlags),
+          recordingContextPath: getStringOptStrict(rest, "--recording-context", knownFlags),
         });
       }
     } else if (rest[0] === "validate") {
@@ -2098,30 +2113,30 @@ COMMANDS["recording"] = {
     if (sub === "start") {
       return (await import("./commands/record.js")).cmdRecordStart({
         ...out,
-        sessionId: getOpt(rest, "--session-id"),
+        sessionId: getStringOptStrict(rest, "--session-id", ["--session-id"]),
         ...runOpts,
       });
     } else if (sub === "stop") {
       return (await import("./commands/record.js")).cmdRecordStop({
         ...out,
-        sessionId: getOpt(rest, "--session-id"),
+        sessionId: getStringOptStrict(rest, "--session-id", ["--session-id"]),
         ...runOpts,
       });
     } else if (sub === "pull") {
-      const outputDirFlag = getStringOpt(rest, "--out");
+      const outputDirFlag = getStringOptStrict(rest, "--out", ["--session-id", "--out"]);
       const outputDir = outputDirFlag ?? "./recordings/";
       return (await import("./commands/record.js")).cmdRecordPull({
         ...out,
-        sessionId: getOpt(rest, "--session-id"),
+        sessionId: getStringOptStrict(rest, "--session-id", ["--session-id", "--out"]),
         outputDir,
         ...runOpts,
       });
     } else if (sub === "parse") {
-      const inputFile = getStringOpt(rest, "--input");
+      const inputFile = getStringOptStrict(rest, "--input", ["--input", "--out"]);
       if (!inputFile) {
         return JSON.stringify({ code: "USAGE", message: "recording parse --input <file> [--out <file>] ('record' is an alias)" });
       } else {
-        const outputFileFlag = getStringOpt(rest, "--out");
+        const outputFileFlag = getStringOptStrict(rest, "--out", ["--input", "--out"]);
         return (await import("./commands/record.js")).cmdRecordParse({
           ...out,
           inputFile,
@@ -2129,18 +2144,18 @@ COMMANDS["recording"] = {
         });
       }
     } else if (sub === "export") {
-      const inputFile = getStringOpt(rest, "--input");
+      const inputFile = getStringOptStrict(rest, "--input", ["--input", "--out", "--snapshots"]);
       if (!inputFile) {
         return JSON.stringify({ code: "USAGE", message: "recording export --input <file> [--out <file>] [--snapshots <omit|include>] ('record' is an alias)" });
       }
-      const snapshotMode = getStringOpt(rest, "--snapshots");
+      const snapshotMode = getStringOptStrict(rest, "--snapshots", ["--input", "--out", "--snapshots"]);
       if (snapshotMode !== undefined && snapshotMode !== "omit" && snapshotMode !== "include") {
         return JSON.stringify({ code: "USAGE", message: "recording export --snapshots must be one of: omit, include" });
       }
       return (await import("./commands/record.js")).cmdRecordExport({
         ...out,
         inputFile,
-        outputFile: getStringOpt(rest, "--out"),
+        outputFile: getStringOptStrict(rest, "--out", ["--input", "--out", "--snapshots"]),
         snapshotMode,
       });
     } else {

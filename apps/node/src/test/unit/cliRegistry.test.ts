@@ -9,6 +9,7 @@ import {
   didYouMean,
   barePositionalTokens,
   isOpenCliUriTarget,
+  getStringOptStrict,
   resolveSupportedFlagsFromRegistry,
 } from "../../cli/registry.js";
 
@@ -96,6 +97,19 @@ describe("barePositionalTokens", () => {
       barePositionalTokens(["--selector", "{}", "hello", "--submit"], ["--selector", "--text"], ["--submit"]),
       ["hello"],
     );
+  });
+});
+
+describe("getStringOptStrict", () => {
+  it("rejects double-dash tokens as missing values", () => {
+    assert.throws(
+      () => getStringOptStrict(["--input", "--bogus"], "--input"),
+      /--input requires a value/
+    );
+  });
+
+  it("allows dash-prefixed path values", () => {
+    assert.strictEqual(getStringOptStrict(["--input", "-context.ndjson"], "--input"), "-context.ndjson");
   });
 });
 
