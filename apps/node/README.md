@@ -29,12 +29,58 @@ clawperator devices
 clawperator snapshot --device <device_id>
 ```
 
+## Run As An MCP Server
+
+The npm package also ships a first-party stdio MCP server for MCP clients such as Claude Desktop:
+
+```bash
+clawperator mcp serve
+```
+
+For branch-local development, build first and launch the compiled entrypoint directly:
+
+```bash
+npm --prefix apps/node run build
+node apps/node/dist/cli/index.js mcp serve
+```
+
+Claude Desktop example:
+
+```json
+{
+  "mcpServers": {
+    "clawperator": {
+      "command": "node",
+      "args": [
+        "<installed_clawperator_path>/dist/cli/index.js",
+        "mcp",
+        "serve"
+      ],
+      "env": {
+        "ADB_PATH": "<adb_path>",
+        "CLAWPERATOR_OPERATOR_PACKAGE": "com.clawperator.operator.dev",
+        "CLAWPERATOR_LOG_DIR": "<log_dir>",
+        "CLAWPERATOR_LOG_LEVEL": "info"
+      }
+    }
+  }
+}
+```
+
+Important MCP notes:
+
+- Node.js `24+` is required.
+- Set `ADB_PATH` explicitly in GUI MCP clients. They often do not inherit your shell `PATH`.
+- Use `CLAWPERATOR_OPERATOR_PACKAGE=com.clawperator.operator.dev` for local branch verification against the debug APK.
+- MCP errors and diagnostics are easiest to inspect through the log file under `CLAWPERATOR_LOG_DIR`, because GUI clients typically do not show stderr.
+
 ## Documentation
 
 Full docs: [docs.clawperator.com](https://docs.clawperator.com)
 
 - First-time setup: [docs/setup.md](../../docs/setup.md)
 - Node API contract: [docs/api/overview.md](../../docs/api/overview.md)
+- MCP server: [docs/api/mcp.md](../../docs/api/mcp.md)
 
 ## Build and Test
 

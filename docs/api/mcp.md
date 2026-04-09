@@ -1,0 +1,512 @@
+# MCP Server
+
+## Purpose
+
+Describe the first-party stdio MCP server exposed by `clawperator mcp serve`: how to launch it, how to configure long-running MCP clients, which tools ship today, and what behavior to expect when device state changes under a running client.
+
+## Sources
+
+- CLI command registration: `apps/node/src/cli/registry.ts`
+- MCP bootstrap: `apps/node/src/cli/commands/mcp.ts`, `apps/node/src/mcp/server.ts`
+- Shared MCP tool helpers: `apps/node/src/mcp/tools/common.ts`, `apps/node/src/mcp/selectors.ts`
+- Core tools: `apps/node/src/mcp/tools/core.ts`
+- Named tools: `apps/node/src/mcp/tools/named.ts`
+- Execution contract: `apps/node/src/contracts/execution.ts`
+- Error codes: `apps/node/src/contracts/errors.ts`
+- Selector contract: `apps/node/src/contracts/selectors.ts`
+- Result envelope: `apps/node/src/contracts/result.ts`
+- Package Node requirement: `apps/node/package.json`
+
+## What It Is
+
+`clawperator mcp serve` starts a local stdio MCP server for MCP clients such as Claude Desktop. The server is transport-only:
+
+- it speaks MCP over stdin/stdout
+- it does not expose HTTP or SSE
+- it uses the same canonical execution engine as the CLI and `serve`
+- it starts even when no Android device is connected
+
+If no device is connected at startup, the process still boots normally. Tool calls that need a device then return structured Clawperator errors such as `NO_DEVICES` or `ADB_NOT_FOUND`.
+
+## Start The Server
+
+Installed package command:
+
+```bash
+clawperator mcp serve
+```
+
+Branch-local development command:
+
+```bash
+npm --prefix apps/node run build
+node apps/node/dist/cli/index.js mcp serve
+```
+
+Notes:
+
+- `mcp serve` is a long-running stdio transport. Do not wrap it in another CLI command that also writes to stdout.
+- The MCP path is detected before the normal CLI formatter runs, so stdout is reserved for MCP protocol messages only.
+- Node.js `24+` is required.
+
+## Claude Desktop Example
+
+Example `mcpServers` entry:
+
+```json
+{
+  "mcpServers": {
+    "clawperator": {
+      "command": "node",
+      "args": [
+        "<installed_clawperator_path>/dist/cli/index.js",
+        "mcp",
+        "serve"
+      ],
+      "env": {
+        "ADB_PATH": "<adb_path>",
+        "CLAWPERATOR_OPERATOR_PACKAGE": "com.clawperator.operator.dev",
+        "CLAWPERATOR_LOG_DIR": "<log_dir>",
+        "CLAWPERATOR_LOG_LEVEL": "info"
+      }
+    }
+  }
+}
+```
+
+Why `node` is the command:
+
+- the npm package ships `dist/cli/index.js`
+- MCP desktop clients usually want an explicit executable plus argument list
+- using `node` plus the installed CLI entrypoint avoids relying on shell wrappers
+
+## Environment For Long-Running MCP Clients
+
+These environment variables matter most for MCP use:
+
+| Variable | Default | Why MCP users care |
+| --- | --- | --- |
+| `ADB_PATH` | `adb` from `PATH` | MCP clients like Claude Desktop usually do not inherit your interactive shell `PATH`. Set this explicitly in the MCP client config. |
+| `CLAWPERATOR_OPERATOR_PACKAGE` | `com.clawperator.operator` | Use `com.clawperator.operator.dev` for local branch testing against the debug APK. |
+| `CLAWPERATOR_LOG_DIR` | `~/.clawperator/logs` | Primary diagnostics path for MCP users because Claude Desktop does not surface stderr. |
+| `CLAWPERATOR_LOG_LEVEL` | `info` | Raise to `debug` when diagnosing tool failures. |
+
+Important diagnostics rule:
+
+- stderr is not visible in Claude Desktop
+- when an MCP session fails, check the log file under `CLAWPERATOR_LOG_DIR`
+- `CLAWPERATOR_LOG_LEVEL=debug` is the main way to get more runtime detail from a GUI MCP client
+
+For the full environment-variable contract, see [Environment Variables](environment.md).
+
+## Selector Shape
+
+Selector-taking MCP tools accept this object shape:
+
+| Field | Maps to `NodeMatcher` | Meaning |
+| --- | --- | --- |
+| `id` | `resourceId` | Exact Android resource id |
+| `role` | `role` | Exact node role |
+| `text` | `textEquals` | Exact visible text |
+| `textContains` | `textContains` | Substring match on visible text |
+| `desc` | `contentDescEquals` | Exact content description |
+| `descContains` | `contentDescContains` | Substring match on content description |
+
+Rules:
+
+- at least one selector field must be present and non-empty
+- an all-empty selector is rejected at the MCP boundary
+- selector objects are used by `click`, `type`, `read`, `wait`, and `scroll_until`
+
+For the underlying selector contract, see [Selectors](selectors.md).
+
+## Tool Summary
+
+<!-- CODE-DERIVED: mcp-tool-summary -->
+
+## Tool Details
+
+All execution-backed tools accept these common options unless noted otherwise:
+
+| Field | Required | Meaning |
+| --- | --- | --- |
+| `deviceId` | no | Explicit adb device serial. Strongly recommended when multiple devices are connected. |
+| `operatorPackage` | no | Operator package override. Blank string is rejected. |
+| `timeoutMs` | no | Execution timeout override. For `wait`, this is the wait duration and the execution timeout is derived from it. |
+
+### `devices`
+
+List adb-visible devices.
+
+Input:
+
+```json
+{}
+```
+
+Success payload shape:
+
+```json
+{
+  "devices": [
+    {
+      "serial": "emulator-5554",
+      "state": "device"
+    }
+  ]
+}
+```
+
+Notes:
+
+- this is observational output only
+- it does not apply execution-time device resolution rules
+
+### `snapshot`
+
+Capture the current UI hierarchy XML.
+
+Parameters:
+
+| Field | Required | Notes |
+| --- | --- | --- |
+| `deviceId` | no | Explicit target device |
+| `operatorPackage` | no | Explicit operator package |
+| `timeoutMs` | no | Execution timeout; defaults to `30000` |
+
+Example call:
+
+```json
+{
+  "deviceId": "<device_serial>",
+  "operatorPackage": "com.clawperator.operator.dev"
+}
+```
+
+Success payload includes:
+
+- `snapshot`: XML string from `snapshot_ui`
+- `deviceId`
+- `terminalSource`
+- `envelope`
+
+### `execute`
+
+Run a caller-supplied action list through the canonical execution validator and runtime.
+
+Parameters:
+
+| Field | Required | Notes |
+| --- | --- | --- |
+| `actions` | yes | Array of action objects. Each action must include `id` and `type`; `params` is optional passthrough data. |
+| `deviceId` | no | Explicit target device |
+| `operatorPackage` | no | Explicit operator package. Blank string is rejected before runtime dispatch. |
+| `timeoutMs` | no | Top-level execution timeout. Defaults to `30000`. |
+
+Example call:
+
+```json
+{
+  "deviceId": "<device_serial>",
+  "operatorPackage": "com.clawperator.operator.dev",
+  "actions": [
+    {
+      "id": "sleep-1",
+      "type": "sleep",
+      "params": {
+        "durationMs": 1000
+      }
+    }
+  ]
+}
+```
+
+Validation boundary:
+
+- MCP only enforces `actions` presence plus `id` and `type` on each element
+- the full action contract is enforced later by `validateExecution()`
+
+Use [Actions](actions.md) for canonical action types and params.
+
+### `open`
+
+Open an app or URI.
+
+Parameters:
+
+| Field | Required | Notes |
+| --- | --- | --- |
+| `appId` | conditional | Android package id |
+| `uri` | conditional | URI to open |
+| `deviceId` | no | Explicit target device |
+| `operatorPackage` | no | Explicit operator package |
+| `timeoutMs` | no | Execution timeout. Defaults to `15000`. |
+
+Rule:
+
+- provide exactly one of `appId` or `uri`
+
+Example app launch:
+
+```json
+{
+  "appId": "com.android.settings",
+  "deviceId": "<device_serial>"
+}
+```
+
+Example URI launch:
+
+```json
+{
+  "uri": "https://clawperator.com",
+  "deviceId": "<device_serial>"
+}
+```
+
+### `click`
+
+Click a node or an absolute coordinate.
+
+Parameters:
+
+| Field | Required | Notes |
+| --- | --- | --- |
+| `selector` | conditional | Selector object |
+| `coordinate` | conditional | `{ "x": <int>, "y": <int> }` |
+| `clickType` | no | One of `default`, `long_click`, `focus` |
+| `deviceId` | no | Explicit target device |
+| `operatorPackage` | no | Explicit operator package |
+| `timeoutMs` | no | Execution timeout. Defaults to `30000`. |
+
+Rule:
+
+- provide exactly one of `selector` or `coordinate`
+
+Example selector click:
+
+```json
+{
+  "selector": {
+    "text": "Network & internet"
+  },
+  "deviceId": "<device_serial>"
+}
+```
+
+Example coordinate click:
+
+```json
+{
+  "coordinate": {
+    "x": 540,
+    "y": 1180
+  },
+  "deviceId": "<device_serial>"
+}
+```
+
+### `type`
+
+Type text into a matching field.
+
+Parameters:
+
+| Field | Required | Notes |
+| --- | --- | --- |
+| `selector` | yes | Target field selector |
+| `text` | yes | Text to enter |
+| `submit` | no | When `true`, submit after entry |
+| `clear` | no | When `true`, clear first |
+| `deviceId` | no | Explicit target device |
+| `operatorPackage` | no | Explicit operator package |
+| `timeoutMs` | no | Execution timeout. Defaults to `30000`. |
+
+Example call:
+
+```json
+{
+  "selector": {
+    "id": "com.android.settings:id/search_src_text"
+  },
+  "text": "battery",
+  "clear": true,
+  "deviceId": "<device_serial>"
+}
+```
+
+### `read`
+
+Read text from one node or all matches.
+
+Parameters:
+
+| Field | Required | Notes |
+| --- | --- | --- |
+| `selector` | yes | Target selector |
+| `all` | no | When `true`, returns a JSON array payload instead of a single string |
+| `container` | no | Optional container selector |
+| `deviceId` | no | Explicit target device |
+| `operatorPackage` | no | Explicit operator package |
+| `timeoutMs` | no | Execution timeout. Defaults to `30000`. |
+
+Example single-value read:
+
+```json
+{
+  "selector": {
+    "text": "Network & internet"
+  },
+  "deviceId": "<device_serial>"
+}
+```
+
+Example all-values read:
+
+```json
+{
+  "selector": {
+    "textContains": "Wi"
+  },
+  "all": true,
+  "deviceId": "<device_serial>"
+}
+```
+
+### `press`
+
+Press a supported Android navigation key.
+
+Parameters:
+
+| Field | Required | Notes |
+| --- | --- | --- |
+| `key` | yes | One of `back`, `home`, `recents` |
+| `deviceId` | no | Explicit target device |
+| `operatorPackage` | no | Explicit operator package |
+| `timeoutMs` | no | Execution timeout. Defaults to `10000`. |
+
+Example call:
+
+```json
+{
+  "key": "back",
+  "deviceId": "<device_serial>"
+}
+```
+
+### `wait`
+
+Wait until a matching node appears.
+
+Parameters:
+
+| Field | Required | Notes |
+| --- | --- | --- |
+| `selector` | yes | Target selector |
+| `deviceId` | no | Explicit target device |
+| `operatorPackage` | no | Explicit operator package |
+| `timeoutMs` | no | Wait duration in milliseconds. The execution timeout becomes `max(timeoutMs + 5000, 30000)`. |
+
+Example call:
+
+```json
+{
+  "selector": {
+    "text": "Settings"
+  },
+  "timeoutMs": 8000,
+  "deviceId": "<device_serial>"
+}
+```
+
+### `scroll_until`
+
+Scroll downward until a matching node appears, optionally clicking it afterward.
+
+Parameters:
+
+| Field | Required | Notes |
+| --- | --- | --- |
+| `selector` | yes | Target selector |
+| `container` | no | Optional container selector |
+| `clickAfter` | no | When `true`, the runtime uses action type `scroll_and_click` |
+| `deviceId` | no | Explicit target device |
+| `operatorPackage` | no | Explicit operator package |
+| `timeoutMs` | no | Execution timeout. Defaults to `30000`. |
+
+Example scroll only:
+
+```json
+{
+  "selector": {
+    "text": "About phone"
+  },
+  "deviceId": "<device_serial>"
+}
+```
+
+Example scroll then click:
+
+```json
+{
+  "selector": {
+    "text": "About phone"
+  },
+  "clickAfter": true,
+  "deviceId": "<device_serial>"
+}
+```
+
+## Result And Error Behavior
+
+Tool responses use normal MCP `tools/call` results:
+
+- success responses serialize JSON in the text content and, for object payloads, also expose `structuredContent`
+- execution failures return `isError: true`
+- unknown exceptions are caught and returned as MCP tool errors instead of crashing the server
+
+Common failure cases:
+
+- `NO_DEVICES`: no usable Android target is connected
+- `ADB_NOT_FOUND`: `adb` could not be resolved or executed
+- `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED`: more than one device is connected and no `deviceId` was supplied
+- `EXECUTION_CONFLICT_IN_FLIGHT`: another execution-backed tool is already running on the same device and operator package
+- `EXECUTION_VALIDATION_FAILED`: invalid MCP arguments or invalid action payload
+
+For the full error-code catalog, see [Errors](errors.md).
+
+## Device And Concurrency Caveats
+
+Device targeting rules:
+
+- if one device is connected, omitting `deviceId` is usually fine
+- if multiple devices are connected, pass `deviceId`
+- for local branch testing, prefer `com.clawperator.operator.dev`
+
+Concurrency rules:
+
+- `devices` is observational and does not use the execution lock
+- execution-backed tools share the same in-flight protection as the CLI
+- concurrent calls against the same device and operator package may return `EXECUTION_CONFLICT_IN_FLIGHT`
+- this is expected behavior, not a transport bug
+
+## Smoke-Test Flow
+
+One reproducible terminal smoke path:
+
+```bash
+npm --prefix apps/node run build
+node validation/test_mcp_stdio_smoke.mjs
+```
+
+What the smoke script proves:
+
+1. it starts `node apps/node/dist/cli/index.js mcp serve`
+2. it completes the MCP initialize handshake over stdio
+3. it verifies `devices`
+4. it opens Android Settings on a real device or emulator
+5. it captures a snapshot and confirms the XML contains node elements
+6. it performs a selector-driven read using text discovered from the live snapshot
+
+The smoke script prefers a physical device when both a physical device and an emulator are connected. Override with `CLAWPERATOR_SMOKE_DEVICE=<device_serial>` if needed.
