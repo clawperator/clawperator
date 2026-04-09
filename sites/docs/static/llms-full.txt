@@ -6098,6 +6098,7 @@ Notes:
 
 - `mcp serve` is a long-running stdio transport. Do not wrap it in another CLI command that also writes to stdout.
 - The MCP path is detected before the normal CLI formatter runs, so stdout is reserved for MCP protocol messages only.
+- Global CLI flags such as `--device`, `--device-id`, and `--operator-package` are not accepted on the `mcp serve` argv line. Pass `deviceId` and `operatorPackage` per MCP tool call instead.
 - Node.js `24+` is required.
 
 ## Claude Desktop Example

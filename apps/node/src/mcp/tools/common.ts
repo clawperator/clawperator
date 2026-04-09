@@ -1,7 +1,7 @@
+import { ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js";
 import { z, type ZodError, type ZodType } from "zod";
 import type { NodeMatcher } from "../../contracts/selectors.js";
 import type { Execution } from "../../contracts/execution.js";
-import { ERROR_CODES } from "../../contracts/errors.js";
 import type { Logger } from "../../adapters/logger.js";
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 import { runExecution } from "../../domain/executions/runExecution.js";
@@ -24,22 +24,22 @@ export const executionToolOptionsSchema = z.object({
 
 export type ExecutionToolOptions = z.infer<typeof executionToolOptionsSchema>;
 
-export function parseToolArguments<T>(schema: ZodType<T>, args: Record<string, unknown>): T | McpToolResult {
+export function parseToolArguments<T>(schema: ZodType<T>, args: Record<string, unknown>): T {
   const parsed = schema.safeParse(args);
   if (parsed.success) {
     return parsed.data;
   }
 
-  return buildMcpValidationError(parsed.error);
+  throw buildMcpValidationError(parsed.error);
 }
 
-export function buildMcpValidationError(error: ZodError): McpToolResult {
+export function buildMcpValidationError(error: ZodError): McpError {
   const firstIssue = error.issues[0];
-  return buildMcpErrorResult({
-    code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
-    message: firstIssue?.message ?? "Invalid MCP tool arguments",
-    details: firstIssue ? { path: firstIssue.path.join(".") } : undefined,
-  });
+  const path = firstIssue ? firstIssue.path.join(".") : undefined;
+  return new McpError(
+    ErrorCode.InvalidParams,
+    path ? `${firstIssue?.message ?? "Invalid MCP tool arguments"} (path: ${path})` : (firstIssue?.message ?? "Invalid MCP tool arguments"),
+  );
 }
 
 export async function runExecutionTool(
@@ -109,18 +109,17 @@ export function buildSuccessResult(payload: unknown): McpToolResult {
   return buildMcpSuccessResult(payload);
 }
 
-export function buildValidationResult(message: string, path?: string): McpToolResult {
-  return buildMcpErrorResult({
-    code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
-    message,
-    ...(path !== undefined ? { details: { path } } : {}),
-  });
+export function buildValidationResult(message: string, path?: string): never {
+  throw new McpError(
+    ErrorCode.InvalidParams,
+    path !== undefined ? `${message} (path: ${path})` : message,
+  );
 }
 
 export function mapRequiredSelector(
   selector: McpSelectorInput,
   fieldName = "selector"
-): NodeMatcher | McpToolResult {
+): NodeMatcher {
   try {
     return mapSelectorToNodeMatcher(selector, fieldName);
   } catch (error) {
@@ -131,7 +130,7 @@ export function mapRequiredSelector(
 export function mapOptionalSelector(
   selector: McpSelectorInput | undefined,
   fieldName = "selector"
-): NodeMatcher | undefined | McpToolResult {
+): NodeMatcher | undefined {
   if (selector === undefined) {
     return undefined;
   }

@@ -83,16 +83,20 @@ class McpIntegrationClient {
   }
 
   async callTool(name: string, args?: Record<string, unknown>): Promise<ToolCallResult> {
-    const response = await this.request("tools/call", {
-      name,
-      arguments: args ?? {},
-    });
+    const response = await this.requestTool(name, args);
 
     if (!response.result) {
       throw new Error(`Missing tool result for ${name}`);
     }
 
     return response.result as ToolCallResult;
+  }
+
+  async requestTool(name: string, args?: Record<string, unknown>): Promise<JsonRpcResponse> {
+    return await this.request("tools/call", {
+      name,
+      arguments: args ?? {},
+    });
   }
 
   request(method: string, params?: unknown): Promise<JsonRpcResponse> {
@@ -232,6 +236,12 @@ describe("mcp stdio integration", () => {
     assert.strictEqual(typeof payload.code, "string");
   }
 
+  function assertInvalidParams(response: JsonRpcResponse): void {
+    assert.ok(response.error);
+    assert.strictEqual(response.error?.code, -32602);
+    assert.strictEqual(typeof response.error?.message, "string");
+  }
+
   it("calls devices over the stdio protocol", async () => {
     await client.initialize();
 
@@ -296,44 +306,32 @@ describe("mcp stdio integration", () => {
   it("rejects execute when actions is missing", async () => {
     await client.initialize();
 
-    const result = await client.callTool("execute", {});
-    const payload = JSON.parse(result.content[0]?.text ?? "{}") as { code?: string };
-
-    assert.strictEqual(result.isError, true);
-    assert.strictEqual(payload.code, "EXECUTION_VALIDATION_FAILED");
+    const response = await client.requestTool("execute", {});
+    assertInvalidParams(response);
   });
 
   it("rejects open when both appId and uri are provided", async () => {
     await client.initialize();
 
-    const result = await client.callTool("open", {
+    const response = await client.requestTool("open", {
       appId: "com.android.settings",
       uri: "https://example.com",
     });
-    const payload = parseToolPayload(result) as { code?: string };
-
-    assert.strictEqual(result.isError, true);
-    assert.strictEqual(payload.code, "EXECUTION_VALIDATION_FAILED");
+    assertInvalidParams(response);
   });
 
   it("rejects open when neither appId nor uri is provided", async () => {
     await client.initialize();
 
-    const result = await client.callTool("open", {});
-    const payload = parseToolPayload(result) as { code?: string };
-
-    assert.strictEqual(result.isError, true);
-    assert.strictEqual(payload.code, "EXECUTION_VALIDATION_FAILED");
+    const response = await client.requestTool("open", {});
+    assertInvalidParams(response);
   });
 
   it("rejects open when appId is blank", async () => {
     await client.initialize();
 
-    const result = await client.callTool("open", { appId: "" });
-    const payload = parseToolPayload(result) as { code?: string };
-
-    assert.strictEqual(result.isError, true);
-    assert.strictEqual(payload.code, "EXECUTION_VALIDATION_FAILED");
+    const response = await client.requestTool("open", { appId: "" });
+    assertInvalidParams(response);
   });
 
   it("accepts open with only appId", async () => {
@@ -373,42 +371,34 @@ describe("mcp stdio integration", () => {
   it("rejects click when both selector and coordinate are provided", async () => {
     await client.initialize();
 
-    const result = await client.callTool("click", {
+    const response = await client.requestTool("click", {
       selector: { text: "Settings" },
       coordinate: { x: 1, y: 1 },
     });
-
-    assert.strictEqual(result.isError, true);
-    assert.strictEqual((parseToolPayload(result) as { code?: string }).code, "EXECUTION_VALIDATION_FAILED");
+    assertInvalidParams(response);
   });
 
   it("rejects click when neither selector nor coordinate is provided", async () => {
     await client.initialize();
 
-    const result = await client.callTool("click", {});
-
-    assert.strictEqual(result.isError, true);
-    assert.strictEqual((parseToolPayload(result) as { code?: string }).code, "EXECUTION_VALIDATION_FAILED");
+    const response = await client.requestTool("click", {});
+    assertInvalidParams(response);
   });
 
   it("rejects click when selector is empty", async () => {
     await client.initialize();
 
-    const result = await client.callTool("click", {
+    const response = await client.requestTool("click", {
       selector: {},
     });
-
-    assert.strictEqual(result.isError, true);
-    assert.strictEqual((parseToolPayload(result) as { code?: string }).code, "EXECUTION_VALIDATION_FAILED");
+    assertInvalidParams(response);
   });
 
   it("rejects press when key is unsupported", async () => {
     await client.initialize();
 
-    const result = await client.callTool("press", { key: "volume_up" });
-
-    assert.strictEqual(result.isError, true);
-    assert.strictEqual((parseToolPayload(result) as { code?: string }).code, "EXECUTION_VALIDATION_FAILED");
+    const response = await client.requestTool("press", { key: "volume_up" });
+    assertInvalidParams(response);
   });
 
   it("accepts press with each supported key", async () => {
@@ -468,12 +458,10 @@ describe("mcp stdio integration", () => {
   it("rejects wait when selector is empty", async () => {
     await client.initialize();
 
-    const result = await client.callTool("wait", {
+    const response = await client.requestTool("wait", {
       selector: {},
     });
-
-    assert.strictEqual(result.isError, true);
-    assert.strictEqual((parseToolPayload(result) as { code?: string }).code, "EXECUTION_VALIDATION_FAILED");
+    assertInvalidParams(response);
   });
 
   it("accepts scroll_until when clickAfter is omitted", async () => {
@@ -516,51 +504,39 @@ describe("mcp stdio integration", () => {
   it("rejects execute when an action is missing type", async () => {
     await client.initialize();
 
-    const result = await client.callTool("execute", {
+    const response = await client.requestTool("execute", {
       actions: [{ id: "broken" }],
     });
-    const payload = JSON.parse(result.content[0]?.text ?? "{}") as { code?: string };
-
-    assert.strictEqual(result.isError, true);
-    assert.strictEqual(payload.code, "EXECUTION_VALIDATION_FAILED");
+    assertInvalidParams(response);
   });
 
   it("rejects execute when operatorPackage is blank", async () => {
     await client.initialize();
 
-    const result = await client.callTool("execute", {
+    const response = await client.requestTool("execute", {
       operatorPackage: "",
       actions: [{ id: "sleep-1", type: "sleep", params: { durationMs: 1 } }],
     });
-    const payload = JSON.parse(result.content[0]?.text ?? "{}") as { code?: string };
-
-    assert.strictEqual(result.isError, true);
-    assert.strictEqual(payload.code, "EXECUTION_VALIDATION_FAILED");
+    assertInvalidParams(response);
   });
 
   it("rejects execute when deviceId is blank", async () => {
     await client.initialize();
 
-    const result = await client.callTool("execute", {
+    const response = await client.requestTool("execute", {
       deviceId: "",
       actions: [{ id: "sleep-1", type: "sleep", params: { durationMs: 1 } }],
     });
-    const payload = JSON.parse(result.content[0]?.text ?? "{}") as { code?: string };
-
-    assert.strictEqual(result.isError, true);
-    assert.strictEqual(payload.code, "EXECUTION_VALIDATION_FAILED");
+    assertInvalidParams(response);
   });
 
   it("rejects execute when take_screenshot includes a caller path", async () => {
     await client.initialize();
 
-    const result = await client.callTool("execute", {
+    const response = await client.requestTool("execute", {
       actions: [{ id: "shot-1", type: "take_screenshot", params: { path: "/tmp/owned.png" } }],
     });
-    const payload = JSON.parse(result.content[0]?.text ?? "{}") as { code?: string };
-
-    assert.strictEqual(result.isError, true);
-    assert.strictEqual(payload.code, "EXECUTION_VALIDATION_FAILED");
+    assertInvalidParams(response);
   });
 
   it("returns an MCP error for an unknown tool name", async () => {

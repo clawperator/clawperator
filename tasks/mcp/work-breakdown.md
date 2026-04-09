@@ -4,24 +4,24 @@ Parent plan: `tasks/mcp/plan.md`
 
 ## Executive Summary
 
-2 PRs, 5 phases.
+2 PRs, 5 phases were planned. For the shipped `add-mcp-server` run, the user explicitly directed the work to complete all five phases on a single branch and PR.
 
 - PR-1 proves the transport and extracts shared services first.
 - PR-2 expands the ergonomic tool surface and finishes docs plus real-device verification.
 
-Do not start PR-2 until PR-1 is merged. This task is intentionally transport-first so the team can validate MCP correctness before investing in a broad named-tool surface.
+The original sequencing remains useful context, but this branch intentionally completed the full scope in one pass so the task pack stays aligned with what actually shipped.
 
 ## Status
 
 | Item | Value |
 | --- | --- |
-| State | planning |
-| Total PRs | 2 |
+| State | completed |
+| Total PRs | 2 planned, 1 used for this run |
 | Total phases | 5 |
-| Completed | none |
-| Remaining | 1, 2, 3, 4, 5 |
-| Current / Next | Phase 1 |
-| Blockers | PR-2 waits on PR-1 merge |
+| Completed | 1, 2, 3, 4, 5 |
+| Remaining | none |
+| Current / Next | complete |
+| Blockers | none |
 
 ## Hard Rules
 

@@ -86,10 +86,6 @@ const scrollUntilArgsSchema = executionToolOptionsSchema.extend({
   clickAfter: z.boolean().optional(),
 }).strict();
 
-function isToolResult<T>(value: T | { content: unknown }): value is { content: unknown } {
-  return typeof value === "object" && value !== null && "content" in value;
-}
-
 const selectorJsonSchema = {
   type: "object",
   additionalProperties: false,
@@ -144,9 +140,6 @@ export function getNamedMcpTools(logger?: Logger): McpToolDefinition[] {
       },
       handler: async (args) => {
         const parsed = parseToolArguments(openArgsSchema, args);
-        if (isToolResult(parsed)) {
-          return parsed;
-        }
 
         const execution = applyMcpExecutionMetadata(parsed.appId !== undefined
           ? buildOpenAppExecution(parsed.appId)
@@ -173,14 +166,8 @@ export function getNamedMcpTools(logger?: Logger): McpToolDefinition[] {
       },
       handler: async (args) => {
         const parsed = parseToolArguments(clickArgsSchema, args);
-        if (isToolResult(parsed)) {
-          return parsed;
-        }
 
         const matcher = parsed.selector !== undefined ? mapRequiredSelector(parsed.selector, "selector") : undefined;
-        if (matcher !== undefined && isToolResult(matcher)) {
-          return matcher;
-        }
 
         const execution = applyMcpExecutionMetadata(
           buildClickExecution(matcher, parsed.clickType ?? "default", parsed.coordinate),
@@ -204,14 +191,8 @@ export function getNamedMcpTools(logger?: Logger): McpToolDefinition[] {
       }, ["selector", "text"]),
       handler: async (args) => {
         const parsed = parseToolArguments(typeArgsSchema, args);
-        if (isToolResult(parsed)) {
-          return parsed;
-        }
 
         const selector = mapRequiredSelector(parsed.selector, "selector");
-        if (isToolResult(selector)) {
-          return selector;
-        }
 
         const execution = applyMcpExecutionMetadata(buildTypeTextExecution({
           selector,
@@ -235,19 +216,10 @@ export function getNamedMcpTools(logger?: Logger): McpToolDefinition[] {
       }, ["selector"]),
       handler: async (args) => {
         const parsed = parseToolArguments(readArgsSchema, args);
-        if (isToolResult(parsed)) {
-          return parsed;
-        }
 
         const selector = mapRequiredSelector(parsed.selector, "selector");
-        if (isToolResult(selector)) {
-          return selector;
-        }
 
         const container = mapOptionalSelector(parsed.container, "container");
-        if (container !== undefined && isToolResult(container)) {
-          return container;
-        }
 
         const execution = applyMcpExecutionMetadata(
           buildReadExecution(selector, parsed.all, container),
@@ -289,9 +261,6 @@ export function getNamedMcpTools(logger?: Logger): McpToolDefinition[] {
       }, ["key"]),
       handler: async (args) => {
         const parsed = parseToolArguments(pressArgsSchema, args);
-        if (isToolResult(parsed)) {
-          return parsed;
-        }
 
         const execution = applyMcpExecutionMetadata(
           buildPressKeyExecution(parsed.key),
@@ -312,14 +281,8 @@ export function getNamedMcpTools(logger?: Logger): McpToolDefinition[] {
       }, ["selector"]),
       handler: async (args) => {
         const parsed = parseToolArguments(waitArgsSchema, args);
-        if (isToolResult(parsed)) {
-          return parsed;
-        }
 
         const selector = mapRequiredSelector(parsed.selector, "selector");
-        if (isToolResult(selector)) {
-          return selector;
-        }
 
         const execution = applyMcpExecutionMetadata(
           buildWaitExecution(selector, parsed.timeoutMs),
@@ -341,19 +304,10 @@ export function getNamedMcpTools(logger?: Logger): McpToolDefinition[] {
       }, ["selector"]),
       handler: async (args) => {
         const parsed = parseToolArguments(scrollUntilArgsSchema, args);
-        if (isToolResult(parsed)) {
-          return parsed;
-        }
 
         const selector = mapRequiredSelector(parsed.selector, "selector");
-        if (isToolResult(selector)) {
-          return selector;
-        }
 
         const container = mapOptionalSelector(parsed.container, "container");
-        if (container !== undefined && isToolResult(container)) {
-          return container;
-        }
 
         const execution = applyMcpExecutionMetadata(buildScrollUntilExecution(
           "down",

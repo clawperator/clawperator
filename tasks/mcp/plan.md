@@ -4,7 +4,7 @@
 
 Add a first-party stdio MCP server to Clawperator as a thin transport adapter over the existing Node execution substrate. The strongest implementation path is not to bolt MCP directly onto CLI string-producing helpers. It is to extract the missing transport-neutral services first, prove protocol correctness with a very small tool surface, and then expand into ergonomic named tools.
 
-This task should ship across 2 PRs and 5 phases:
+This task was planned across 2 PRs and 5 phases. For the shipped `add-mcp-server` run, the user explicitly overrode that split and required all five phases to land on a single branch and PR.
 
 - PR-1: extract shared transport-neutral services and ship a minimal but real MCP server with protocol-tested core tools
 - PR-2: expand the MCP tool surface, complete docs, and perform real-device verification
@@ -13,13 +13,13 @@ This task should ship across 2 PRs and 5 phases:
 
 | Item | Value |
 | --- | --- |
-| State | not started |
-| Total PRs | 2 |
+| State | completed |
+| Total PRs | 2 planned, 1 used for this run |
 | Total phases | 5 |
-| Completed | none |
-| Remaining | 1, 2, 3, 4, 5 |
-| Current / Next | Phase 1 |
-| Blockers | PR-2 must not start until PR-1 is merged |
+| Completed | 1, 2, 3, 4, 5 |
+| Remaining | none |
+| Current / Next | complete |
+| Blockers | none |
 
 ## Goal
 

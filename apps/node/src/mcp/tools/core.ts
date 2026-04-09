@@ -8,6 +8,7 @@ import { extractStepDataValue } from "../results.js";
 import type { McpToolDefinition } from "./index.js";
 import {
   applyMcpExecutionMetadata,
+  buildValidationResult,
   buildExecutionSuccessPayload,
   buildSuccessResult,
   createRuntimeConfig,
@@ -51,10 +52,7 @@ export function getCoreMcpTools(logger?: Logger): McpToolDefinition[] {
       description: "List connected Android devices visible to adb.",
       inputSchema: { type: "object", additionalProperties: false },
       handler: async (args) => {
-        const parsed = parseToolArguments(emptyArgsSchema, args);
-        if ("content" in parsed) {
-          return parsed;
-        }
+        parseToolArguments(emptyArgsSchema, args);
 
         try {
           const devices = await listDevices(createRuntimeConfig());
@@ -70,9 +68,6 @@ export function getCoreMcpTools(logger?: Logger): McpToolDefinition[] {
       inputSchema: buildCommonExecutionSchema({}),
       handler: async (args) => {
         const parsed = parseToolArguments(snapshotArgsSchema, args);
-        if ("content" in parsed) {
-          return parsed;
-        }
 
         const execution = applyMcpExecutionMetadata(
           buildSnapshotExecution({ timeoutMs: parsed.timeoutMs }),
@@ -125,16 +120,9 @@ export function getCoreMcpTools(logger?: Logger): McpToolDefinition[] {
       }, ["actions"]),
       handler: async (args) => {
         const parsed = parseToolArguments(executeArgsSchema, args);
-        if ("content" in parsed) {
-          return parsed;
-        }
 
         if (parsed.actions.some((action) => action.type === "take_screenshot" && action.params !== undefined && "path" in action.params)) {
-          return buildMcpErrorResult({
-            code: "EXECUTION_VALIDATION_FAILED",
-            message: "execute does not allow caller-controlled take_screenshot paths over MCP",
-            details: { path: "actions" },
-          });
+          return buildValidationResult("execute does not allow caller-controlled take_screenshot paths over MCP", "actions");
         }
 
         const execution = {
