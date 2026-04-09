@@ -770,6 +770,42 @@ Success conditions for a valid payload before dispatch:
 - every `actions[i].type` is a supported canonical action type after alias normalization
 - on a live execution path, `commandId` and `taskId` are echoed back in the result envelope for correlation
 
+## Input Normalization
+
+Stored payloads should use canonical field names and canonical action types. On input, Node normalizes a small alias set before schema validation.
+
+Accepted top-level execution key aliases:
+
+| Alias | Canonical field |
+| --- | --- |
+| `command_id` | `commandId` |
+| `task_id` | `taskId` |
+| `expected_format` | `expectedFormat` |
+| `timeout_ms` | `timeoutMs` |
+
+For action-type aliases and parameter aliases such as `package` -> `applicationId`, `url` -> `uri`, and `selector` -> `matcher`, use [Actions](actions.md). For raw matcher-field aliases such as `resource_id` and `content_desc`, use [Selectors](selectors.md).
+
+Verification pattern:
+
+```bash
+clawperator exec --validate-only --payload '{"command_id":"cmd-001","task_id":"task-001","source":"docs","expected_format":"android-ui-automator","timeout_ms":30000,"actions":[{"id":"snap-1","type":"snapshot"}]}' --json
+```
+
+Success condition:
+
+- exit code `0`
+- top-level `ok == true`
+- `execution.commandId == "cmd-001"`
+- `execution.taskId == "task-001"`
+- `execution.expectedFormat == "android-ui-automator"`
+- `execution.timeoutMs == 30000`
+- `execution.actions[0].type == "snapshot_ui"`
+
+CLI payload-source aliases accepted by `clawperator exec`:
+
+- `--payload` is canonical
+- `--execution`, `--input`, and `--file` are accepted aliases for the same argument
+
 ## Execution Limits
 
 Current Node-side validation limits are:
@@ -1629,10 +1665,11 @@ Common payload-key aliases also accepted on input:
 - app/package fields: `package`, `package_id`, `application_id`, `app`, `app_id` -> `applicationId`
 - URI field: `url` -> `uri`
 - matcher fields: `selector`, `node`, `element` -> `matcher`
+- raw matcher-object fields: `id`, `resource_id`, `text`, `text_contains`, `content_desc`, `content_desc_contains`, `description`, `description_contains`, `accessibility_label`, `accessibility_label_contains`
 - text-entry field: `value` -> `text`
-- screenshot path fields: `file`, `output_path` -> `path`
+- screenshot path fields: `file`, `filePath`, `output_path` -> `path`
 - navigation fields: `expected_package`, `expected_node`, `timeout_ms`
-- label selector field: `label_matcher`
+- label selector fields: `label_matcher`, `label_selector`
 
 ## Full Payload Example
 
@@ -2447,6 +2484,17 @@ Rules enforced by Node:
 - common input aliases are normalized before that strict validation runs, including `id`/`resource_id`, `text`, `text_contains`, `content_desc`, `description`, and `accessibility_label`
 - when the shared CLI parser sees no selector flags at all, it returns an empty matcher object and the command decides whether selectors are required for that command
 
+Accepted raw JSON matcher-field aliases:
+
+| Alias | Canonical field |
+| --- | --- |
+| `id`, `resource_id` | `resourceId` |
+| `text` | `textEquals` |
+| `text_contains` | `textContains` |
+| `content_desc`, `description`, `accessibility_label` | `contentDescEquals` |
+| `content_desc_equals` | `contentDescEquals` |
+| `content_desc_contains`, `description_contains`, `accessibility_label_contains` | `contentDescContains` |
+
 Concrete payload example:
 
 ```json
@@ -2630,9 +2678,17 @@ clawperator type "hello world" --role textfield
 | `--label-id` | `resourceId` |
 | `--label-desc` | `contentDescEquals` |
 
+Accepted CLI aliases for those `read-value` label flags:
+
+- `--text` and `--label-text` -> `--label`
+- `--id` and `--resource-id` -> `--label-id`
+- `--desc` and `--content-desc` -> `--label-desc`
+
 At least one of those flags is required.
 
 Blank label values are rejected, and if you provide none of the three label flags the command returns a usage error before execution is built.
+
+Raw JSON aliases for `read_key_value_pair.params.labelMatcher` follow the same `NodeMatcher` alias table shown above. Raw payload aliases `label_matcher` and `label_selector` are normalized to `labelMatcher` before validation.
 
 Concrete execution fragment:
 
@@ -6027,6 +6083,16 @@ clawperator exec --dry-run --execution '{"commandId":"settings-nav-1","taskId":"
 
 - `params.applicationId`
 
+Accepted raw JSON parameter aliases for `open_app`:
+
+- `application_id`
+- `app`
+- `app_id`
+- `appId`
+- `package`
+- `package_id`
+- `packageId`
+
 Validation rule:
 
 - blank or missing `applicationId` fails with `EXECUTION_VALIDATION_FAILED`
@@ -6123,6 +6189,10 @@ Error cases:
 `open_uri` requires:
 
 - `params.uri`
+
+Accepted raw JSON parameter alias for `open_uri`:
+
+- `url`
 
 Validation rules:
 
@@ -6222,6 +6292,7 @@ CLI aliases accepted for agent-first ergonomics:
 
 - command alias: `wait_for_navigation`
 - target-package flags: `--package`, `--package-id`, `--application-id`
+- selector flag aliases from [Selectors](selectors.md): `--resource-id`, `--content-desc`, `--content-desc-contains`
 
 Current public parameters:
 
@@ -6237,6 +6308,12 @@ Validation rules:
 - `timeoutMs` is required
 - `timeoutMs` must be positive
 - `timeoutMs` must not exceed `30000`
+
+Accepted raw JSON parameter aliases for `wait_for_navigation`:
+
+- `expected_package` -> `expectedPackage`
+- `expected_node` and `wait_for` -> `expectedNode`
+- `timeout_ms` -> `timeoutMs`
 
 Builder inflation rule:
 

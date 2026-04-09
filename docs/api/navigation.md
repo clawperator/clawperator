@@ -41,6 +41,16 @@ clawperator exec --dry-run --execution '{"commandId":"settings-nav-1","taskId":"
 
 - `params.applicationId`
 
+Accepted raw JSON parameter aliases for `open_app`:
+
+- `application_id`
+- `app`
+- `app_id`
+- `appId`
+- `package`
+- `package_id`
+- `packageId`
+
 Validation rule:
 
 - blank or missing `applicationId` fails with `EXECUTION_VALIDATION_FAILED`
@@ -137,6 +147,10 @@ Error cases:
 `open_uri` requires:
 
 - `params.uri`
+
+Accepted raw JSON parameter alias for `open_uri`:
+
+- `url`
 
 Validation rules:
 
@@ -236,6 +250,7 @@ CLI aliases accepted for agent-first ergonomics:
 
 - command alias: `wait_for_navigation`
 - target-package flags: `--package`, `--package-id`, `--application-id`
+- selector flag aliases from [Selectors](selectors.md): `--resource-id`, `--content-desc`, `--content-desc-contains`
 
 Current public parameters:
 
@@ -251,6 +266,12 @@ Validation rules:
 - `timeoutMs` is required
 - `timeoutMs` must be positive
 - `timeoutMs` must not exceed `30000`
+
+Accepted raw JSON parameter aliases for `wait_for_navigation`:
+
+- `expected_package` -> `expectedPackage`
+- `expected_node` and `wait_for` -> `expectedNode`
+- `timeout_ms` -> `timeoutMs`
 
 Builder inflation rule:
 

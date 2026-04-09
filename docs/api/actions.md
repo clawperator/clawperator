@@ -98,10 +98,11 @@ Common payload-key aliases also accepted on input:
 - app/package fields: `package`, `package_id`, `application_id`, `app`, `app_id` -> `applicationId`
 - URI field: `url` -> `uri`
 - matcher fields: `selector`, `node`, `element` -> `matcher`
+- raw matcher-object fields: `id`, `resource_id`, `text`, `text_contains`, `content_desc`, `content_desc_contains`, `description`, `description_contains`, `accessibility_label`, `accessibility_label_contains`
 - text-entry field: `value` -> `text`
-- screenshot path fields: `file`, `output_path` -> `path`
+- screenshot path fields: `file`, `filePath`, `output_path` -> `path`
 - navigation fields: `expected_package`, `expected_node`, `timeout_ms`
-- label selector field: `label_matcher`
+- label selector fields: `label_matcher`, `label_selector`
 
 ## Full Payload Example
 
