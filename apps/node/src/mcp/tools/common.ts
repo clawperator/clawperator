@@ -9,6 +9,7 @@ import { resolveOperatorPackageForRequest } from "../../domain/config/resolveOpe
 import { buildMcpErrorResult, buildMcpSuccessResult, type McpToolResult } from "../errors.js";
 import { createMcpExecutionIds } from "../executionIds.js";
 import type { McpSelectorInput } from "../selectors.js";
+import type { SessionDefaults } from "../session.js";
 import { mapSelectorToNodeMatcher } from "../selectors.js";
 
 const nonEmptyOptionalStringSchema = z.string().trim().min(1, {
@@ -22,6 +23,18 @@ export const executionToolOptionsSchema = z.object({
 }).strict();
 
 export type ExecutionToolOptions = z.infer<typeof executionToolOptionsSchema>;
+
+export function mergeWithSessionDefaults<T extends ExecutionToolOptions>(
+  options: T,
+  session: SessionDefaults,
+): T {
+  return {
+    ...options,
+    deviceId: options.deviceId ?? session.deviceId,
+    operatorPackage: options.operatorPackage ?? session.operatorPackage,
+    timeoutMs: options.timeoutMs ?? session.timeoutMs,
+  };
+}
 
 export function parseToolArguments<T>(schema: ZodType<T>, args: Record<string, unknown>): T {
   const parsed = schema.safeParse(args);

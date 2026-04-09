@@ -6,9 +6,11 @@ import { createMcpExecutionIds } from "../../mcp/executionIds.js";
 import { buildMcpErrorResult, buildMcpSuccessResult, normalizeMcpError } from "../../mcp/errors.js";
 import { extractStepDataValue, parseReadAllResult } from "../../mcp/results.js";
 import { mapSelectorToNodeMatcher, mcpSelectorSchema } from "../../mcp/selectors.js";
+import { createSessionDefaults } from "../../mcp/session.js";
 import { getCoreMcpTools } from "../../mcp/tools/core.js";
 import { getNamedMcpTools } from "../../mcp/tools/named.js";
-import { executionToolOptionsSchema } from "../../mcp/tools/common.js";
+import { applySnapshotMaxChars } from "../../mcp/tools/core.js";
+import { executionToolOptionsSchema, mergeWithSessionDefaults, type ExecutionToolOptions } from "../../mcp/tools/common.js";
 
 describe("createMcpExecutionIds", () => {
   it("generates distinct IDs with the expected prefix", () => {
@@ -234,6 +236,115 @@ describe("executionToolOptionsSchema", () => {
   });
 });
 
+describe("applySnapshotMaxChars", () => {
+  it("returns full snapshot when maxChars is undefined", () => {
+    const result = applySnapshotMaxChars("abcde", undefined);
+    assert.strictEqual(result.snapshot, "abcde");
+    assert.strictEqual(result.truncated, undefined);
+  });
+
+  it("returns full snapshot when length is below maxChars", () => {
+    const result = applySnapshotMaxChars("abc", 10);
+    assert.strictEqual(result.snapshot, "abc");
+    assert.strictEqual(result.truncated, undefined);
+  });
+
+  it("returns full snapshot when length equals maxChars", () => {
+    const result = applySnapshotMaxChars("abcde", 5);
+    assert.strictEqual(result.snapshot, "abcde");
+    assert.strictEqual(result.truncated, undefined);
+  });
+
+  it("truncates and sets truncated when length exceeds maxChars", () => {
+    const result = applySnapshotMaxChars("abcdefgh", 4);
+    assert.strictEqual(result.snapshot, "abcd");
+    assert.strictEqual(result.truncated, true);
+  });
+
+  it("handles maxChars of 1", () => {
+    const result = applySnapshotMaxChars("abc", 1);
+    assert.strictEqual(result.snapshot, "a");
+    assert.strictEqual(result.truncated, true);
+  });
+});
+
+describe("mergeWithSessionDefaults", () => {
+  it("uses session deviceId when per-call deviceId is absent", () => {
+    const session = createSessionDefaults();
+    session.deviceId = "session-device";
+
+    const result = mergeWithSessionDefaults({} as ExecutionToolOptions, session);
+    assert.strictEqual(result.deviceId, "session-device");
+  });
+
+  it("uses per-call deviceId over session default", () => {
+    const session = createSessionDefaults();
+    session.deviceId = "session-device";
+
+    const result = mergeWithSessionDefaults({ deviceId: "call-device" }, session);
+    assert.strictEqual(result.deviceId, "call-device");
+  });
+
+  it("uses session operatorPackage when per-call operatorPackage is absent", () => {
+    const session = createSessionDefaults();
+    session.operatorPackage = "com.session.operator";
+
+    const result = mergeWithSessionDefaults({} as ExecutionToolOptions, session);
+    assert.strictEqual(result.operatorPackage, "com.session.operator");
+  });
+
+  it("uses per-call operatorPackage over session default", () => {
+    const session = createSessionDefaults();
+    session.operatorPackage = "com.session.operator";
+
+    const result = mergeWithSessionDefaults({ operatorPackage: "com.call.operator" }, session);
+    assert.strictEqual(result.operatorPackage, "com.call.operator");
+  });
+
+  it("uses session timeoutMs when per-call timeoutMs is absent", () => {
+    const session = createSessionDefaults();
+    session.timeoutMs = 1234;
+
+    const result = mergeWithSessionDefaults({} as ExecutionToolOptions, session);
+    assert.strictEqual(result.timeoutMs, 1234);
+  });
+
+  it("applies precedence independently across all three fields", () => {
+    const session = createSessionDefaults();
+    session.deviceId = "session-device";
+    session.operatorPackage = "com.session.operator";
+    session.timeoutMs = 2000;
+
+    const result = mergeWithSessionDefaults({
+      deviceId: "call-device",
+      timeoutMs: 500,
+    } as ExecutionToolOptions, session);
+
+    assert.strictEqual(result.deviceId, "call-device");
+    assert.strictEqual(result.operatorPackage, "com.session.operator");
+    assert.strictEqual(result.timeoutMs, 500);
+  });
+
+  it("leaves all fields undefined when both sources are absent", () => {
+    const result = mergeWithSessionDefaults({} as ExecutionToolOptions, createSessionDefaults());
+    assert.strictEqual(result.deviceId, undefined);
+    assert.strictEqual(result.operatorPackage, undefined);
+    assert.strictEqual(result.timeoutMs, undefined);
+  });
+
+  it("two separate SessionDefaults objects do not share state", () => {
+    const first = createSessionDefaults();
+    const second = createSessionDefaults();
+    first.deviceId = "device-one";
+    first.operatorPackage = "com.one";
+    first.timeoutMs = 111;
+
+    assert.strictEqual(second.deviceId, undefined);
+    assert.strictEqual(second.operatorPackage, undefined);
+    assert.strictEqual(second.timeoutMs, undefined);
+  });
+});
+
 describe("MCP tool schemas", () => {
   it("requires selector-bearing tools to advertise at least one selector field", () => {
     const clickTool = getNamedMcpTools().find(tool => tool.name === "click");
@@ -258,6 +369,34 @@ describe("MCP tool schemas", () => {
 
     assert.strictEqual(schema.properties?.appId?.pattern, "\\S");
     assert.strictEqual(schema.properties?.uri?.pattern, "\\S");
+  });
+
+  it("includes maxChars on the snapshot tool schema", () => {
+    const snapshotTool = getCoreMcpTools().find(tool => tool.name === "snapshot");
+    assert.ok(snapshotTool);
+
+    const schema = snapshotTool!.inputSchema as {
+      properties?: { maxChars?: { minimum?: number } };
+    };
+
+    assert.strictEqual(schema.properties?.maxChars?.minimum, 1);
+  });
+
+  it("includes configure in the core tool list with the canonical session schema", () => {
+    const configureTool = getCoreMcpTools().find(tool => tool.name === "configure");
+    assert.ok(configureTool);
+
+    const schema = configureTool!.inputSchema as {
+      properties?: {
+        deviceId?: { pattern?: string };
+        operatorPackage?: { pattern?: string };
+        timeoutMs?: { minimum?: number };
+      };
+    };
+
+    assert.strictEqual(schema.properties?.deviceId?.pattern, "\\S");
+    assert.strictEqual(schema.properties?.operatorPackage?.pattern, "\\S");
+    assert.strictEqual(schema.properties?.timeoutMs?.minimum, 0);
   });
 
   it("rejects empty execute action ids and types before dispatch", async () => {
