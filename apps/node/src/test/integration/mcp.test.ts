@@ -11,6 +11,11 @@ interface JsonRpcResponse {
   error?: { code: number; message: string };
 }
 
+interface ToolCallResult {
+  content: Array<{ type: "text"; text: string }>;
+  isError?: boolean;
+}
+
 class McpIntegrationClient {
   private readonly child: ChildProcessWithoutNullStreams;
   private readonly stdoutChunks: Buffer[] = [];
@@ -70,6 +75,19 @@ class McpIntegrationClient {
 
     this.notify("notifications/initialized", {});
     return response;
+  }
+
+  async callTool(name: string, args?: Record<string, unknown>): Promise<ToolCallResult> {
+    const response = await this.request("tools/call", {
+      name,
+      arguments: args ?? {},
+    });
+
+    if (!response.result) {
+      throw new Error(`Missing tool result for ${name}`);
+    }
+
+    return response.result as ToolCallResult;
   }
 
   request(method: string, params?: unknown): Promise<JsonRpcResponse> {
@@ -161,7 +179,119 @@ describe("mcp stdio integration", () => {
 
     const response = await client.request("tools/list", {});
 
-    assert.ok(Array.isArray((response.result as { tools?: unknown[] }).tools));
+    const tools = (response.result as { tools?: Array<{ name: string }> }).tools ?? [];
+    assert.ok(Array.isArray(tools));
+    assert.deepStrictEqual(
+      tools.map(tool => tool.name),
+      ["devices", "snapshot", "execute"],
+    );
+  });
+
+  it("calls devices over the stdio protocol", async () => {
+    await client.initialize();
+
+    const result = await client.callTool("devices");
+    const payload = JSON.parse(result.content[0]?.text ?? "{}") as { devices?: unknown[]; code?: string };
+
+    if (result.isError) {
+      assert.ok(typeof payload.code === "string");
+      return;
+    }
+
+    assert.ok(Array.isArray(payload.devices));
+  });
+
+  it("calls snapshot over the stdio protocol", async () => {
+    await client.initialize();
+
+    const result = await client.callTool("snapshot");
+    const payload = JSON.parse(result.content[0]?.text ?? "{}") as {
+      snapshot?: string;
+      code?: string;
+      envelope?: unknown;
+    };
+
+    if (result.isError) {
+      assert.ok(
+        payload.code === "NO_DEVICES"
+        || payload.code === "ADB_NOT_FOUND"
+        || payload.code === "DEVICE_NOT_FOUND"
+        || payload.code === "MULTIPLE_DEVICES_DEVICE_ID_REQUIRED"
+      );
+      return;
+    }
+
+    assert.strictEqual(typeof payload.snapshot, "string");
+    assert.ok(payload.envelope);
+  });
+
+  it("calls execute over the stdio protocol", async () => {
+    await client.initialize();
+
+    const result = await client.callTool("execute", {
+      actions: [
+        {
+          id: "sleep-1",
+          type: "sleep",
+          params: { durationMs: 1 },
+        },
+      ],
+    });
+    const payload = JSON.parse(result.content[0]?.text ?? "{}") as { code?: string; envelope?: unknown };
+
+    if (result.isError) {
+      assert.ok(typeof payload.code === "string");
+      return;
+    }
+
+    assert.ok(payload.envelope);
+  });
+
+  it("rejects execute when actions is missing", async () => {
+    await client.initialize();
+
+    const result = await client.callTool("execute", {});
+    const payload = JSON.parse(result.content[0]?.text ?? "{}") as { code?: string };
+
+    assert.strictEqual(result.isError, true);
+    assert.strictEqual(payload.code, "EXECUTION_VALIDATION_FAILED");
+  });
+
+  it("rejects execute when an action is missing type", async () => {
+    await client.initialize();
+
+    const result = await client.callTool("execute", {
+      actions: [{ id: "broken" }],
+    });
+    const payload = JSON.parse(result.content[0]?.text ?? "{}") as { code?: string };
+
+    assert.strictEqual(result.isError, true);
+    assert.strictEqual(payload.code, "EXECUTION_VALIDATION_FAILED");
+  });
+
+  it("rejects execute when operatorPackage is blank", async () => {
+    await client.initialize();
+
+    const result = await client.callTool("execute", {
+      operatorPackage: "",
+      actions: [{ id: "sleep-1", type: "sleep", params: { durationMs: 1 } }],
+    });
+    const payload = JSON.parse(result.content[0]?.text ?? "{}") as { code?: string };
+
+    assert.strictEqual(result.isError, true);
+    assert.strictEqual(payload.code, "EXECUTION_VALIDATION_FAILED");
+  });
+
+  it("returns an MCP error for an unknown tool name", async () => {
+    await client.initialize();
+
+    const response = await client.request("tools/call", {
+      name: "missing_tool",
+      arguments: {},
+    });
+
+    assert.ok(response.error);
+    assert.strictEqual(response.error?.code, -32601);
   });
 
   it("returns a JSON-RPC error for an invalid request", async () => {
