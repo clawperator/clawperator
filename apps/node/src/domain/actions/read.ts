@@ -5,7 +5,7 @@ export interface ReadOptions {
   selector: NodeMatcher;
   readAll?: boolean;
   container?: NodeMatcher;
-  validator?: "regex";
+  validator?: string;
   validatorPattern?: string;
 }
 
