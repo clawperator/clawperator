@@ -228,23 +228,8 @@ function argvPrefixBeforeForwardSeparator(argv: string[]): string[] {
 }
 
 function resolveMcpServeArgs(argv: string[]): string[] | undefined {
-  const prefix = argvPrefixBeforeForwardSeparator(argv);
-  const globalFlagsWithValues = new Set(["--device", "--device-id", "--operator-package", "--receiver-package", "--output", "--format", "--timeout", "--timeout-ms", "--log-level"]);
-  for (let index = 0; index < prefix.length; index += 1) {
-    const token = prefix[index];
-    if (token === undefined) {
-      break;
-    }
-    if (globalFlagsWithValues.has(token)) {
-      index += 1;
-      continue;
-    }
-    if (token === "mcp" && prefix[index + 1] === "serve") {
-      return [...argv.slice(0, index), ...argv.slice(index + 2)];
-    }
-    if (token === "--json" || token === "--verbose" || token === "--disable-star-suggestions" || token === "--help" || token === "--version") {
-      continue;
-    }
+  if (argv[0] === "mcp" && argv[1] === "serve") {
+    return argv.slice(2);
   }
 
   return undefined;

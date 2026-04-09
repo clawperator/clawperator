@@ -136,22 +136,29 @@ describe("CLI help", () => {
     assert.match(stdout, /exec <json-or-file> \[--validate-only\]/);
   });
 
-  it("rejects global flags before mcp serve", async () => {
-    const { stdout, stderr, code } = await runCli(["--operator-package", "com.clawperator.operator.dev", "mcp", "serve"]);
-    assert.notStrictEqual(code, 0);
-    assert.match(stderr || stdout, /mcp serve does not accept additional arguments/);
+  it("shows top-level help for help mcp serve", async () => {
+    const { stdout, code } = await runCli(["help", "mcp", "serve"]);
+    assert.strictEqual(code, 0);
+    assert.match(stdout, /Clawperator CLI/);
+    assert.match(stdout, /mcp serve/);
   });
 
-  it("routes --help before mcp serve through the MCP bootstrap guard", async () => {
-    const { stdout, stderr, code } = await runCli(["--help", "mcp", "serve"]);
-    assert.notStrictEqual(code, 0);
-    assert.match(stderr || stdout, /mcp serve does not accept additional arguments/);
+  it("shows mcp help for --help mcp serve", async () => {
+    const { stdout, code } = await runCli(["--help", "mcp", "serve"]);
+    assert.strictEqual(code, 0);
+    assert.ok(stdout.length > 0);
   });
 
-  it("routes --version before mcp serve through the MCP bootstrap guard", async () => {
-    const { stdout, stderr, code } = await runCli(["--version", "mcp", "serve"]);
-    assert.notStrictEqual(code, 0);
-    assert.match(stderr || stdout, /mcp serve does not accept additional arguments/);
+  it("prints the version for --version before mcp serve", async () => {
+    const { stdout, code } = await runCli(["--version", "mcp", "serve"]);
+    assert.strictEqual(code, 0);
+    assert.match(stdout.trim(), /^\d+\.\d+\.\d+/);
+  });
+
+  it("returns mcp serve usage for global flags before mcp serve", async () => {
+    const { stdout, code } = await runCli(["--operator-package", "com.clawperator.operator.dev", "mcp", "serve"]);
+    assert.strictEqual(code, 0);
+    assert.match(stdout, /mcp serve is a stdio transport/);
   });
 
   it("rejects forwarded extra args after mcp serve", async () => {

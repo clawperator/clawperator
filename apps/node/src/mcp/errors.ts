@@ -14,9 +14,10 @@ export interface McpToolResult {
 }
 
 export function buildMcpSuccessResult(payload: unknown): McpToolResult {
+  const sanitized = sanitizeMcpTransportValue(payload);
   return {
-    content: [{ type: "text", text: JSON.stringify(payload) }],
-    ...(isRecord(payload) ? { structuredContent: payload } : {}),
+    content: [{ type: "text", text: JSON.stringify(sanitized) }],
+    ...(isRecord(sanitized) ? { structuredContent: sanitized } : {}),
   };
 }
 
@@ -47,6 +48,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function isSensitiveKey(key: string): boolean {
+  const normalized = key.toLowerCase();
+  return normalized === "path" || normalized.endsWith("path") || normalized === "command" || normalized === "stdout" || normalized === "stderr" || normalized === "stack";
+}
+
 function sanitizeMcpErrorPayload(error: Record<string, unknown>): McpErrorPayload {
   const payload: McpErrorPayload = {
     message: typeof error.message === "string" && error.message.length > 0 ? error.message : "Unknown MCP error",
@@ -59,10 +65,10 @@ function sanitizeMcpErrorPayload(error: Record<string, unknown>): McpErrorPayloa
     payload.hint = error.hint;
   }
   if ("details" in error) {
-    payload.details = sanitizeValue(error.details);
+    payload.details = sanitizeMcpTransportValue(error.details);
   }
   if ("envelope" in error) {
-    payload.envelope = sanitizeValue(error.envelope);
+    payload.envelope = sanitizeMcpTransportValue(error.envelope);
   }
   if (typeof error.deviceId === "string" && error.deviceId.length > 0) {
     payload.deviceId = error.deviceId;
@@ -74,9 +80,9 @@ function sanitizeMcpErrorPayload(error: Record<string, unknown>): McpErrorPayloa
   return payload;
 }
 
-function sanitizeValue(value: unknown): unknown {
+function sanitizeMcpTransportValue(value: unknown): unknown {
   if (Array.isArray(value)) {
-    return value.map(sanitizeValue);
+    return value.map(sanitizeMcpTransportValue);
   }
 
   if (!isRecord(value)) {
@@ -85,10 +91,10 @@ function sanitizeValue(value: unknown): unknown {
 
   const sanitized: Record<string, unknown> = {};
   for (const [key, entry] of Object.entries(value)) {
-    if (key === "stdout" || key === "stderr" || key === "command" || key === "stack") {
+    if (isSensitiveKey(key)) {
       continue;
     }
-    sanitized[key] = sanitizeValue(entry);
+    sanitized[key] = sanitizeMcpTransportValue(entry);
   }
   return sanitized;
 }

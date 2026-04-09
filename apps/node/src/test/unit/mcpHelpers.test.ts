@@ -2,7 +2,7 @@ import assert from "node:assert";
 import { describe, it } from "node:test";
 import type { ResultEnvelope } from "../../contracts/result.js";
 import { createMcpExecutionIds } from "../../mcp/executionIds.js";
-import { normalizeMcpError } from "../../mcp/errors.js";
+import { buildMcpErrorResult, buildMcpSuccessResult, normalizeMcpError } from "../../mcp/errors.js";
 import { extractStepDataValue } from "../../mcp/results.js";
 import { mapSelectorToNodeMatcher, mcpSelectorSchema } from "../../mcp/selectors.js";
 import { executionToolOptionsSchema } from "../../mcp/tools/common.js";
@@ -237,5 +237,102 @@ describe("normalizeMcpError", () => {
       deviceId: "device-123",
       terminalSource: "broadcast",
     });
+  });
+});
+
+describe("MCP transport redaction", () => {
+  it("redacts host path fields from successful tool payloads", () => {
+    const result = buildMcpSuccessResult({
+      envelope: {
+        stepResults: [
+          {
+            id: "shot",
+            actionType: "take_screenshot",
+            success: true,
+            data: {
+              path: "/tmp/owned.png",
+              screenshotPath: "/tmp/owned-again.png",
+              safe: "ok",
+            },
+          },
+        ],
+      },
+      details: {
+        logPath: "/tmp/clawperator.log",
+      },
+      safe: "still-ok",
+    });
+
+    const content = JSON.parse(result.content[0].text) as Record<string, unknown>;
+    assert.deepStrictEqual(content, {
+      envelope: {
+        stepResults: [
+          {
+            id: "shot",
+            actionType: "take_screenshot",
+            success: true,
+            data: {
+              safe: "ok",
+            },
+          },
+        ],
+      },
+      details: {},
+      safe: "still-ok",
+    });
+    assert.deepStrictEqual(result.structuredContent, content);
+  });
+
+  it("redacts host path fields from error payloads", () => {
+    const result = buildMcpErrorResult({
+      code: "TIMEOUT",
+      message: "timed out",
+      details: {
+        logPath: "/tmp/clawperator.log",
+        stdout: "secret",
+        nested: {
+          filePath: "/tmp/owned.txt",
+          safe: "ok",
+        },
+      },
+      envelope: {
+        stepResults: [
+          {
+            id: "shot",
+            actionType: "take_screenshot",
+            success: false,
+            data: {
+              path: "/tmp/owned.png",
+              safe: "ok",
+            },
+          },
+        ],
+      },
+    });
+
+    const content = JSON.parse(result.content[0].text) as Record<string, unknown>;
+    assert.deepStrictEqual(content, {
+      code: "TIMEOUT",
+      message: "timed out",
+      details: {
+        nested: {
+          safe: "ok",
+        },
+      },
+      envelope: {
+        stepResults: [
+          {
+            id: "shot",
+            actionType: "take_screenshot",
+            success: false,
+            data: {
+              safe: "ok",
+            },
+          },
+        ],
+      },
+    });
+    assert.deepStrictEqual(result.structuredContent, content);
+    assert.strictEqual(result.isError, true);
   });
 });
