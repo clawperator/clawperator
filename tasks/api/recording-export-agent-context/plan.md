@@ -181,6 +181,9 @@ recording evidence, not make authoring decisions on the user's behalf.
 | Export versioning | `exportVersion` tracks the Node exporter's output shape. `session.schemaVersion` tracks the Android recorder's input shape. A single export version may support multiple schema versions only when the output shape remains backward-compatible |
 | Empty recordings | A header-only NDJSON recording is valid. Export it as `events: []`, `counts.totalEvents: 0`, `counts.byType: {}`, `packageTransitions: []`, and `timeline.firstEventTs`, `timeline.lastEventTs`, `timeline.durationMs` set to `null` |
 | Duration semantics | `timeline.durationMs` is `lastEventTs - firstEventTs`. It is the event span, not the session span from `session.startedAt` |
+| Transition timestamp and seq | Package-transition records use the `seq` and `ts` of the arriving package-bearing event, not the departing event |
+| Timeline field types | `timeline.firstEventTs`, `timeline.lastEventTs`, and `timeline.durationMs` are typed as `number | null`, not optional numbers |
+| Count map type | `counts.byType` is typed as `Record<string, number>` so empty recordings can emit `{}` and future event types do not require a closed enum expansion |
 
 ### Exported event-shape rules
 
@@ -205,6 +208,7 @@ Rule:
 | `skills new` without `--recording-context` | Keep existing scaffold behavior |
 | `skills new` with `--recording-context <file>` | Copy the file verbatim into the scaffolded skill folder |
 | Missing recording-context source file | Fail with `SKILLS_SCAFFOLD_FAILED` and a message that names the missing source path |
+| Blank recording-context source path | Fail with `SKILLS_SCAFFOLD_FAILED`; blank strings are invalid input, not omitted input |
 | Recording-context destination | `skills/<skill_id>/recording-context.json` |
 | `skill.json.artifacts` field | Leave unchanged; recording context is a reference file, not a compiled runtime artifact |
 | Scaffolded `run.js` | Do not derive flow logic from the recording context |
@@ -247,12 +251,13 @@ Success wrapper:
   "outputFile": "./recordings/demo-session.export.json",
   "sessionId": "demo-session",
   "eventCount": 5,
-  "packageTransitionCount": 2,
+  "packageTransitionCount": 1,
   "byType": {
-    "window_change": 2,
+    "window_change": 1,
     "click": 1,
     "scroll": 1,
-    "press_key": 1
+    "press_key": 1,
+    "text_change": 1
   }
 }
 ```
@@ -276,18 +281,19 @@ Success wrapper:
   "counts": {
     "totalEvents": 5,
     "byType": {
-      "window_change": 2,
+      "window_change": 1,
       "click": 1,
       "scroll": 1,
-      "press_key": 1
+      "press_key": 1,
+      "text_change": 1
     }
   },
   "packageTransitions": [
     {
-      "seq": 3,
-      "ts": 1710000003200,
+      "seq": 4,
+      "ts": 1710000004200,
       "fromPackageName": "com.example.source",
-      "toPackageName": "com.example.dest"
+      "toPackageName": "com.example.search"
     }
   ],
   "events": [
@@ -356,7 +362,7 @@ Success wrapper:
       "ts": 1710000004200,
       "deltaMsSincePrevious": 1000,
       "type": "text_change",
-      "packageName": "com.example.source",
+      "packageName": "com.example.search",
       "resourceId": "com.example.source:id/search",
       "text": "thermostat",
       "snapshot": {

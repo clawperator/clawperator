@@ -57,7 +57,7 @@ public docs using the repo docs skills.
 14. For the live validation phase, prefer the debug Operator APK and pass
     `--operator-package com.clawperator.operator.dev`.
 15. Create `tasks/api/recording-export-agent-context/findings.md` at the start
-    of Phase 4 using the structure below. Do not invent the format during
+    of Phase 5 using the structure below. Do not invent the format during
     execution.
 16. Add `--recording-context` to the `skills new` supported-flags surface in
     `apps/node/src/cli/registry.ts`. Do not rely on ad hoc parsing alone.
@@ -114,6 +114,8 @@ before implementation so downstream phases do not re-derive the format.
    - per-event export object
    - package transition object
    - counts object
+   - `timeline` fields typed as `number | null`
+   - `counts.byType` typed as `Record<string, number>`
 3. Keep the types factual. Do not add fields that imply selector choice,
    parameterization, or intent.
 4. Define the shared-validation contract up front in type comments or docstrings
@@ -125,7 +127,7 @@ before implementation so downstream phases do not re-derive the format.
    - the helper never writes to stderr
 5. Do not add test imports that require a non-existent `exportRecording.ts`
    module in this phase. The test file lands in Phase 2 with the implementation.
-6. Required cases to implement in Phase 2:
+6. Required cases to implement in Phase 3:
    - valid mixed-event recording exports all supported event types
    - header-only recording exports as an empty recording with `timeline.* = null`
    - recording containing only `scroll`, `text_change`, and `press_key` events exports all of them
@@ -199,8 +201,11 @@ Extract shared NDJSON validation into a dedicated helper and prove
    - no stderr output from the helper
 5. Update `parseRecording.ts` to consume the helper without changing its
    current step-log output semantics.
-6. Run the full existing parser test file and the broader Node test suite.
-7. If any existing `parseRecording.test.ts` case needs modification, stop and
+6. Add a test that captures stderr from a `parseRecording` invocation and
+   proves the parser still emits its human-readable step summary after the
+   refactor.
+7. Run the full existing parser test file and the broader Node test suite.
+8. If any existing `parseRecording.test.ts` case needs modification, stop and
    investigate before continuing to the export implementation phase.
 
 ### Acceptance Criteria
@@ -267,7 +272,9 @@ agent-context JSON artifact from a local NDJSON recording file.
 6. Handle the header-only recording case exactly as specified in `plan.md`.
 7. Add `--snapshots <omit|include>` handling with `omit` as the default. Parse
    this flag with `getStringOpt`, not `getOpt`, so `--snapshots` with no value
-   is a usage error.
+   is a usage error. If `getStringOpt` alone cannot distinguish omitted-vs-
+   present-but-empty, pair it with an explicit `hasFlag` check rather than
+   weakening the contract.
 8. `cmdRecordExport()` must create parent directories for `--out` recursively
    before writing. Directory creation or write failure returns
    `RECORDING_EXPORT_FAILED`.
@@ -298,7 +305,7 @@ agent-context JSON artifact from a local NDJSON recording file.
    - malformed NDJSON
    - unsupported schema version
    - output write failure
-   - written export file can be read back and matches a known-good expected object
+   - written export file can be read back and matches a known-good expected object via `deepStrictEqual`
    - both execution paths: `recording export ...` and `record export ...`
    - help text routing for `recording export --help` and `record export --help`
    - export path does not emit parser step summaries to stderr
@@ -370,16 +377,19 @@ reference file, while keeping skill generation decisions outside Clawperator.
 8. Use `SKILLS_SCAFFOLD_FAILED` when the recording-context source path does not
    exist or cannot be copied. The error message must include the missing or
    unreadable source path.
-9. Do not change the scaffolded `run.js` logic beyond wording that points users
+9. Reject blank `--recording-context` values as invalid input and surface
+   `SKILLS_SCAFFOLD_FAILED`.
+10. Do not change the scaffolded `run.js` logic beyond wording that points users
    toward the recording context for manual / agent refinement.
-10. Add skills tests for:
+11. Add skills tests for:
    - `skills new` without recording context remains unchanged
    - `skills new --recording-context <file>` copies the file
    - missing recording-context file fails deterministically
+   - blank recording-context path fails deterministically
    - copied file path appears in success output
    - `skill.json.artifacts` remains unchanged
    - `skills validate` behavior remains unchanged and does not inspect `recording-context.json`
-11. Build and run Node tests.
+12. Build and run Node tests.
 
 ### Acceptance Criteria
 
