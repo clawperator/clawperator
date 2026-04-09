@@ -58,7 +58,7 @@
   - What happened: `recording pull` wrote the host NDJSON file successfully, but I still had to locate the pulled path and pass it to `recording export` by hand. That extra hop is easy to get wrong when sessions are named dynamically.
   - How to fix: make `recording pull` return the exact pulled file path in a top-level field every time, and add a convenience mode to `recording export` that accepts a pulled session directory instead of only a raw NDJSON file. The safest version is directory autodiscovery that picks the newest `*.ndjson` file in the directory and fails clearly if more than one candidate is present. That keeps the command deterministic while reducing manual path handling.
   - Effort: `low` for better output shaping only, `med` for directory autodiscovery plus tests, `high` if you also add a new combined pull-and-export workflow.
-- The test suite should explicitly cover the stale-session path.
-  - What exists now: the suite proves the happy path, the parser contract, and the export/scaffold round-trip, but it does not lock down `RECORDING_ALREADY_IN_PROGRESS`.
-  - How to fix: add a focused CLI regression that starts a recording, attempts a second `recording start`, asserts the structured error payload, and verifies the existing session can be stopped and resumed cleanly afterward. If a full emulator integration test is too heavy, a unit test around the command handler response shape is still valuable, but the emulator-level path is the strongest signal because the bug surfaced there.
-  - Effort: `low` for a handler-level regression test, `med` for a live emulator smoke that exercises the stale-session recovery end to end.
+- [DONE] The test suite now explicitly covers the stale-session path.
+  - What changed: `apps/node/src/test/unit/recordCommands.test.ts` now checks the `RECORDING_ALREADY_IN_PROGRESS` recovery hint in both JSON and pretty output modes.
+  - Why this is enough: the handler-level regression pins the structured error payload and the user-facing hint without requiring a heavier emulator-only replay for every test run.
+  - Effort: `low`.
