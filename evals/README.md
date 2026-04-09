@@ -62,7 +62,7 @@ without version alignment.
   same source tree:
   ```bash
   ./gradlew :app:assembleDebug
-  adb install -r apps/android/app/build/outputs/apk/debug/app-debug.apk
+  adb -s <serial> install -r apps/android/app/build/outputs/apk/debug/app-debug.apk
   ```
 
 - For `published` (published version): Install matching versions of the CLI

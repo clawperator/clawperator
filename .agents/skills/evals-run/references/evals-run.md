@@ -8,7 +8,7 @@
 
 ## Before Running
 
-- Use `./gradlew :app:assembleDebug` and install `apps/android/app/build/outputs/apk/debug/app-debug.apk` when testing `local-dev`.
+- Use `./gradlew :app:assembleDebug` and install `apps/android/app/build/outputs/apk/debug/app-debug.apk` with `adb -s <serial>` when testing `local-dev`.
 - Install the matching release CLI and release APK when testing `published`.
 - Use `--device <serial>` whenever more than one Android device is connected.
 - Use `--mode full-repo` only when the eval should see repository-internal docs and source.

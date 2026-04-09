@@ -57,8 +57,8 @@ setup_published() {
   apk_path="${DOWNLOAD_DIR}/operator-v${published_version}.apk"
   sha_path="${apk_path}.sha256"
   mkdir -p "$DOWNLOAD_DIR"
-  curl -fsSLo "$apk_path" "$apk_url"
-  curl -fsSLo "$sha_path" "$sha_url"
+  curl --retry 3 --retry-delay 2 --retry-all-errors --retry-connrefused -fsSLo "$apk_path" "$apk_url"
+  curl --retry 3 --retry-delay 2 --retry-all-errors --retry-connrefused -fsSLo "$sha_path" "$sha_url"
   expected_sha="$(awk 'NR == 1 { print $1 }' "$sha_path")"
   actual_sha="$(sha256_file "$apk_path")"
   if [[ "$actual_sha" != "$expected_sha" ]]; then
