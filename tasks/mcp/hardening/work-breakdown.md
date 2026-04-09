@@ -28,7 +28,7 @@ Phases run sequentially. Build and test after each phase before committing.
 
 1. Read `apps/node/src/test/integration/mcp.test.ts` in full before adding any test cases. Do not add a case that already exists.
 2. Run `npm --prefix apps/node run build && npm --prefix apps/node run test` after each phase before committing.
-3. Do not delete or loosen any existing test. Only add.
+3. Do not delete or loosen any existing test. Only add. Keep the existing pre-initialize silence check and add the initialize-handshake test alongside it.
 4. Do not change the public JSON Schema shape of any existing MCP tool. The extraction in Phase 1 must produce byte-identical schemas.
 5. Do not change the `mcp serve` global-flag interception behavior. It is intentional and documented. Do not move the MCP check to after `getGlobalOpts`.
 6. Do not touch `sites/docs/.build/` or `sites/docs/site/` directly.
@@ -302,7 +302,7 @@ Do not change the `mcp serve` global-flag interception behavior.
 
 ### Files or Surfaces To Change
 
-- `apps/node/src/test/integration/mcp.test.ts` - replace the 150 ms silence test with a handshake test
+- `apps/node/src/test/integration/mcp.test.ts` - keep the 150 ms silence test and add a handshake test beside it
 - `apps/node/src/mcp/tools/named.ts` - normalize `wait` and `scroll_until` timeout
 - `validation/test_mcp_stdio_smoke.mjs` - harden `read` step with fallback candidates
 - `docs/internal/design/mcp-server.md` - add a sentence about the transport invariant if not already present
@@ -311,9 +311,9 @@ Do not change the `mcp serve` global-flag interception behavior.
 
 #### Fix 1: Strengthen the transport invariant test
 
-The existing test `emits zero stdout bytes before initialize` waits 150 ms and checks byte count. This passes even if the subprocess exits early or never reaches a working state.
+The existing test `emits zero stdout bytes before initialize` waits 150 ms and checks byte count. Keep it. It proves that nothing leaks to stdout before the first client request is sent. On its own it is insufficient because it still passes if the subprocess exits early or never reaches a working state.
 
-Replace it with a test that successfully completes an `initialize` handshake and verifies the first response byte is `{` (valid JSON-RPC):
+Add a second test that successfully completes an `initialize` handshake:
 
 ```ts
 it("completes initialize over stdio and returns valid JSON-RPC", async () => {
@@ -323,7 +323,7 @@ it("completes initialize over stdio and returns valid JSON-RPC", async () => {
 });
 ```
 
-If the existing test is kept alongside this one, that is fine. Do not delete the existing test if it provides unique signal (e.g., validating that no bytes appear before the first request is sent). If the existing test is strictly subsumed by the new one, remove it to avoid redundancy - but only if the existing test adds no independent signal.
+Do not remove the existing silence-window test. The two tests cover different failure modes and both should remain.
 
 Also add a dedicated test for the `initialize` response structure:
 

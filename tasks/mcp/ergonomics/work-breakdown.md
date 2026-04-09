@@ -7,7 +7,7 @@ Parent plan: `tasks/mcp/ergonomics/plan.md`
 Three phases in one PR. Blocked on `tasks/mcp/hardening/` merging first.
 
 - Phase 1 (thinking): Bounded snapshot - `maxChars` parameter plus unit tests for truncation behavior
-- Phase 2 (thinking): Session configure tool - `configure` tool, session wiring, unit tests for merge precedence and isolation, design note
+- Phase 2 (thinking): Session configure tool - `configure` tool, session wiring, unit tests for merge precedence across all three fields plus isolation, design note
 - Phase 3 (default): Docs only - `docs/api/mcp.md` and docs build
 
 Tests live in the same phase as the behavior they prove. Phase 3 contains no new test cases.
@@ -30,12 +30,13 @@ Tests live in the same phase as the behavior they prove. Phase 3 contains no new
 2. Run `npm --prefix apps/node run build && npm --prefix apps/node run test` after each phase before committing.
 3. The `configure` success payload is `{ session: { ...currentValues } }` everywhere: in the handler, unit tests, integration tests, and docs. There is no other shape.
 4. Tests for truncation (Phase 1) and session merge (Phase 2) are unit tests. They must not `return` early on runtime errors - they must assert the specific behavior deterministically without a connected device.
-5. Do not change any existing tool name, parameter name, or existing parameter behavior. All changes are additive.
-6. Session state is on the `Server` instance from `createMcpServer()`. Never a module-level global.
-7. The integration test `lists tools over the stdio protocol` asserts exact tool order. Update it when `configure` is added.
-8. Do not touch `sites/docs/.build/` or `sites/docs/site/` directly. Use `.agents/skills/docs-author/SKILL.md` for the docs phase.
-9. One commit per phase. Do not batch phases.
-10. Docs changes belong in Phase 3 only. Implement and test first.
+5. `mergeWithSessionDefaults` coverage must explicitly prove precedence for `deviceId`, `operatorPackage`, and `timeoutMs`. Do not stop at `deviceId` only.
+6. Do not change any existing tool name, parameter name, or existing parameter behavior. All changes are additive.
+7. Session state is on the `Server` instance from `createMcpServer()`. Never a module-level global.
+8. The integration test `lists tools over the stdio protocol` asserts exact tool order. Update it when `configure` is added.
+9. Do not touch `sites/docs/.build/` or `sites/docs/site/` directly. Use `.agents/skills/docs-author/SKILL.md` for the docs phase.
+10. One commit per phase. Do not batch phases.
+11. Docs changes belong in Phase 3 only. Implement and test first.
 
 ## Required Reading
 
@@ -236,7 +237,7 @@ Add `configure` tool and per-session defaults. Prove merge precedence and sessio
 - `apps/node/src/mcp/tools/core.ts` - add `configure` tool; update `getCoreMcpTools` signature; apply session merge in `snapshot` and `execute`
 - `apps/node/src/mcp/tools/named.ts` - update `getNamedMcpTools` signature; apply session merge in all named tool handlers
 - `apps/node/src/mcp/server.ts` - create session defaults and pass to `getMcpTools`
-- `apps/node/src/test/unit/mcpHelpers.test.ts` - add 4 unit cases for `mergeWithSessionDefaults` and isolation
+- `apps/node/src/test/unit/mcpHelpers.test.ts` - add unit cases covering merge precedence for all three fields plus isolation
 - `apps/node/src/test/integration/mcp.test.ts` - update tool-list assertion; add 3 integration cases
 - `docs/internal/design/mcp-server.md` - add session-state sentence
 
@@ -281,7 +282,9 @@ export function mergeWithSessionDefaults(
 
 In `apps/node/src/test/unit/mcpHelpers.test.ts`, import `mergeWithSessionDefaults` and `createSessionDefaults`, then add:
 
-**Case 1 - session default used when per-call value is absent:**
+At minimum, cover each merged field explicitly. The unit cases below are required:
+
+**Case 1 - `deviceId`: session default used when per-call value is absent:**
 ```ts
 it("mergeWithSessionDefaults uses session deviceId when per-call deviceId is absent", () => {
   const session = createSessionDefaults();
@@ -291,7 +294,7 @@ it("mergeWithSessionDefaults uses session deviceId when per-call deviceId is abs
 });
 ```
 
-**Case 2 - per-call value overrides session default:**
+**Case 2 - `deviceId`: per-call value overrides session default:**
 ```ts
 it("mergeWithSessionDefaults uses per-call deviceId over session default", () => {
   const session = createSessionDefaults();
@@ -301,23 +304,51 @@ it("mergeWithSessionDefaults uses per-call deviceId over session default", () =>
 });
 ```
 
-**Case 3 - both absent, result is undefined:**
+**Case 3 - `operatorPackage`: per-call value overrides session default:**
 ```ts
-it("mergeWithSessionDefaults returns undefined deviceId when both are absent", () => {
-  const result = mergeWithSessionDefaults({}, createSessionDefaults());
-  assert.strictEqual(result.deviceId, undefined);
+it("mergeWithSessionDefaults uses per-call operatorPackage over session default", () => {
+  const session = createSessionDefaults();
+  session.operatorPackage = "com.session.operator";
+  const result = mergeWithSessionDefaults({ operatorPackage: "com.call.operator" }, session);
+  assert.strictEqual(result.operatorPackage, "com.call.operator");
 });
 ```
 
-**Case 4 - two sessions are independent:**
+**Case 4 - `timeoutMs`: session default used when per-call timeoutMs is absent:**
+```ts
+it("mergeWithSessionDefaults uses session timeoutMs when per-call timeoutMs is absent", () => {
+  const session = createSessionDefaults();
+  session.timeoutMs = 1234;
+  const result = mergeWithSessionDefaults({}, session);
+  assert.strictEqual(result.timeoutMs, 1234);
+});
+```
+
+**Case 5 - all fields absent remain undefined:**
+```ts
+it("mergeWithSessionDefaults leaves all fields undefined when both sources are absent", () => {
+  const result = mergeWithSessionDefaults({}, createSessionDefaults());
+  assert.strictEqual(result.deviceId, undefined);
+  assert.strictEqual(result.operatorPackage, undefined);
+  assert.strictEqual(result.timeoutMs, undefined);
+});
+```
+
+**Case 6 - two sessions are independent:**
 ```ts
 it("two separate SessionDefaults objects do not share state", () => {
   const s1 = createSessionDefaults();
   const s2 = createSessionDefaults();
   s1.deviceId = "device-one";
+  s1.operatorPackage = "com.one";
+  s1.timeoutMs = 111;
   assert.strictEqual(s2.deviceId, undefined);
+  assert.strictEqual(s2.operatorPackage, undefined);
+  assert.strictEqual(s2.timeoutMs, undefined);
 });
 ```
+
+You may combine cases if the assertions stay explicit, but the final unit coverage must still prove precedence or fallback for all three fields and independence of separate session objects.
 
 #### Step 4: Update tool factory signatures
 
@@ -481,7 +512,7 @@ npm --prefix apps/node run build && npm --prefix apps/node run test
 
 Mechanical:
 - `apps/node/src/mcp/session.ts` exists and exports `SessionDefaults` and `createSessionDefaults`
-- All 4 unit cases for `mergeWithSessionDefaults` pass
+- Unit tests explicitly prove `mergeWithSessionDefaults` behavior for `deviceId`, `operatorPackage`, and `timeoutMs`, plus session isolation
 - All 3 integration cases (A, B, C) pass
 - Tool-list integration test includes `"configure"` at position 4 (after `"execute"`)
 - `configure` with `deviceId: ""` returns `-32602`
@@ -494,6 +525,7 @@ Human review:
 - Session state is not a module-level global (verify it is created inside `createMcpServer`)
 - `devices` and `configure` tool handlers do not call `mergeWithSessionDefaults`
 - All other execution tools do call `mergeWithSessionDefaults`
+- `mergeWithSessionDefaults` coverage does not stop at `deviceId`; it also proves `operatorPackage` and `timeoutMs`
 - The `configure` payload shape is `{ session: { ... } }` consistently - not a flat object
 
 ### Validation

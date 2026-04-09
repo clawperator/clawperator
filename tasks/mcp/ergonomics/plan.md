@@ -42,7 +42,7 @@ Both problems are reducible without adding new Android execution primitives.
 - `maxChars?: number` parameter on the `snapshot` tool - truncates the returned `snapshot` string at the specified character count and adds `truncated: true` to the success payload when applied
 - Unit tests for `maxChars` truncation in the same phase as the implementation
 - New `configure` MCP tool - accepts optional `deviceId`, `operatorPackage`, and `timeoutMs`; stores them in per-session process memory; subsequent execution tool calls merge these defaults (per-call wins)
-- Unit tests for `mergeWithSessionDefaults` and session isolation in the same phase as the implementation
+- Unit tests for `mergeWithSessionDefaults` across `deviceId`, `operatorPackage`, and `timeoutMs`, plus session isolation, in the same phase as the implementation
 - Design note update for `configure` - it is the first MCP-only stateful surface; `docs/internal/design/mcp-server.md` must acknowledge it
 - Docs update for both features in Phase 3 (`docs/api/mcp.md`)
 
@@ -144,7 +144,7 @@ This task produces:
 - `apps/node/src/mcp/session.ts` with `SessionDefaults` and `createSessionDefaults`
 - An exported truncation helper and updated `snapshot` tool with `maxChars` parameter
 - New `configure` tool with session state wiring through all execution tools
-- Unit tests covering: truncation (5 cases), `mergeWithSessionDefaults` (3 cases), session isolation (1 case)
+- Unit tests covering: truncation (5 cases), `mergeWithSessionDefaults` across all three fields (at least 5 cases total), session isolation (1 case)
 - Integration tests covering: `configure` in tool list, `configure` call shape, blank-value rejection
 - Updated `docs/api/mcp.md` with `maxChars` and `configure` documentation
 - A sentence in `docs/internal/design/mcp-server.md` acknowledging session-local state
