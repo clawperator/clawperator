@@ -16,6 +16,7 @@ import { createAvd, deleteAvd, enableEmulatorDeveloperSettings, startAvd, stopAv
 import { provisionEmulator } from "../../domain/android-emulators/provision.js";
 import { DEFAULT_EMULATOR_AVD_NAME, DEFAULT_EMULATOR_DEVICE_PROFILE, SUPPORTED_EMULATOR_API_LEVEL } from "../../domain/android-emulators/constants.js";
 import type { Logger } from "../../adapters/logger.js";
+import { resolveOperatorPackageForRequest } from "../../domain/config/resolveOperatorPackage.js";
 
 interface ServeOptions {
   port: number;
@@ -110,19 +111,6 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       operatorPackage: process.env.CLAWPERATOR_OPERATOR_PACKAGE,
       logger: options.logger,
     });
-  }
-
-  function resolveOperatorPackageForRequest(provided: string | undefined): string {
-    // - When the caller provides operatorPackage, use it verbatim (already validated non-empty).
-    // - When omitted, fall back to env var if non-empty, otherwise default to the release package.
-    if (provided !== undefined) {
-      return provided;
-    }
-    const env = process.env.CLAWPERATOR_OPERATOR_PACKAGE;
-    if (env !== undefined && env.trim().length > 0) {
-      return env;
-    }
-    return "com.clawperator.operator";
   }
 
   // REST: Execute command
