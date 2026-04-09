@@ -9,6 +9,8 @@ import {
   didYouMean,
   barePositionalTokens,
   isOpenCliUriTarget,
+  getStringOptStrict,
+  resolveSupportedFlagsFromRegistry,
 } from "../../cli/registry.js";
 
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "../../..");
@@ -94,6 +96,26 @@ describe("barePositionalTokens", () => {
     assert.deepStrictEqual(
       barePositionalTokens(["--selector", "{}", "hello", "--submit"], ["--selector", "--text"], ["--submit"]),
       ["hello"],
+    );
+  });
+});
+
+describe("getStringOptStrict", () => {
+  it("rejects double-dash tokens as missing values", () => {
+    assert.throws(
+      () => getStringOptStrict(["--input", "--bogus"], "--input"),
+      /Use '--input -- <literal>'/
+    );
+  });
+
+  it("allows dash-prefixed path values", () => {
+    assert.strictEqual(getStringOptStrict(["--input", "-context.ndjson"], "--input"), "-context.ndjson");
+  });
+
+  it("accepts escaped double-dash literals", () => {
+    assert.strictEqual(
+      getStringOptStrict(["--summary", "--", "--literal"], "--summary", ["--summary"]),
+      "--literal",
     );
   });
 });
@@ -246,6 +268,13 @@ describe("record synonym dispatches to recording handler", () => {
     const { stdout, code } = await runCli(["record", "--help"]);
     assert.strictEqual(code, 0);
     assert.match(stdout, /recording start/);
+  });
+
+  it("recording export exposes the expected supported flags", () => {
+    assert.deepStrictEqual(
+      resolveSupportedFlagsFromRegistry(COMMANDS.recording, ["export"]),
+      ["--input", "--out", "--snapshots"],
+    );
   });
 });
 

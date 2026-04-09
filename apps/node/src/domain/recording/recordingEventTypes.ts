@@ -73,6 +73,131 @@ export type RawRecordingEvent =
   | PressKeyEvent
   | TextChangeEvent;
 
+export const RECORDING_EXPORT_VERSION = 1;
+
+export type RecordingExportSnapshotMode = "omit" | "include";
+
+export interface RecordingExportSnapshot {
+  present: boolean;
+  xml: string | null;
+}
+
+export interface RecordingExportWindowChangeEvent {
+  seq: number;
+  ts: number;
+  deltaMsSincePrevious: number | null;
+  type: "window_change";
+  packageName: string;
+  className: string | null;
+  title: string | null;
+  snapshot: RecordingExportSnapshot;
+}
+
+export interface RecordingExportClickEvent {
+  seq: number;
+  ts: number;
+  deltaMsSincePrevious: number | null;
+  type: "click";
+  packageName: string;
+  resourceId: string | null;
+  text: string | null;
+  contentDesc: string | null;
+  bounds: { left: number; top: number; right: number; bottom: number };
+  snapshot: RecordingExportSnapshot;
+}
+
+export interface RecordingExportScrollEvent {
+  seq: number;
+  ts: number;
+  deltaMsSincePrevious: number | null;
+  type: "scroll";
+  packageName: string;
+  resourceId: string | null;
+  scrollX: number;
+  scrollY: number;
+  maxScrollX: number;
+  maxScrollY: number;
+  snapshot: RecordingExportSnapshot;
+}
+
+export interface RecordingExportPressKeyEvent {
+  seq: number;
+  ts: number;
+  deltaMsSincePrevious: number | null;
+  type: "press_key";
+  key: "back";
+  snapshot: RecordingExportSnapshot;
+}
+
+export interface RecordingExportTextChangeEvent {
+  seq: number;
+  ts: number;
+  deltaMsSincePrevious: number | null;
+  type: "text_change";
+  packageName: string;
+  resourceId: string | null;
+  text: string;
+  snapshot: RecordingExportSnapshot;
+}
+
+export type RecordingExportEvent =
+  | RecordingExportWindowChangeEvent
+  | RecordingExportClickEvent
+  | RecordingExportScrollEvent
+  | RecordingExportPressKeyEvent
+  | RecordingExportTextChangeEvent;
+
+export interface RecordingExportCounts {
+  totalEvents: number;
+  byType: Record<string, number>;
+}
+
+export interface RecordingExportPackageTransition {
+  seq: number;
+  ts: number;
+  fromPackageName: string;
+  toPackageName: string;
+}
+
+export interface RecordingExportTimeline {
+  firstEventTs: number | null;
+  lastEventTs: number | null;
+  durationMs: number | null;
+}
+
+export interface RecordingExportSession {
+  sessionId: string;
+  schemaVersion: number;
+  startedAt: number;
+  operatorPackage: string;
+}
+
+export interface RecordingExportArtifact {
+  exportVersion: number;
+  session: RecordingExportSession;
+  snapshotMode: RecordingExportSnapshotMode;
+  events: RecordingExportEvent[];
+  counts: RecordingExportCounts;
+  packageTransitions: RecordingExportPackageTransition[];
+  timeline: RecordingExportTimeline;
+}
+
+/**
+ * Shared NDJSON validation contract for recordingValidation.ts.
+ *
+ * Rules pinned here for parse and export call sites:
+ * - returns `{ header, events }`
+ * - `events` are sorted by `seq` before return
+ * - throws plain `{ code, message }` objects, not `Error` instances
+ * - preserves current line-numbered validation messages
+ * - never writes to stderr
+ * - parser-only warnings remain in parseRecording.ts
+ */
+export interface ValidatedRecording {
+  header: RecordingHeader;
+  events: RawRecordingEvent[];
+}
+
 // Step types emitted by the parser (v1)
 export interface OpenAppStep {
   seq: number;

@@ -291,9 +291,12 @@ export async function cmdSkillsRun(
 
 export async function cmdSkillsNew(
   skillId: string,
-  options: { format: OutputOptions["format"]; summary?: string }
+  options: { format: OutputOptions["format"]; summary?: string; recordingContextPath?: string }
 ): Promise<string> {
-  const result = await scaffoldSkill(skillId, { summary: options.summary });
+  const result = await scaffoldSkill(skillId, {
+    summary: options.summary,
+    recordingContextPath: options.recordingContextPath,
+  });
   if (result.ok) {
     return formatSuccess({
       created: true,
@@ -301,6 +304,7 @@ export async function cmdSkillsNew(
       registryPath: result.registryPath,
       skillPath: result.skillPath,
       files: result.files,
+      ...(result.recordingContextPath ? { recordingContextPath: result.recordingContextPath } : {}),
       next: "Edit SKILL.md and scripts/run.js, then verify with: clawperator skills validate <skill_id>",
     }, options);
   }

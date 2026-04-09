@@ -90,10 +90,9 @@ coverage/
 __pycache__/
 *.pyc
 
-# Local agent worktrees
-.claude/worktrees/
-
 # Local recording artifacts
 tmp/
 evals/runs/
 .venv/
+/.worktrees
+.claude/worktrees/
