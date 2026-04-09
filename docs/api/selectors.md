@@ -46,7 +46,19 @@ Rules enforced by Node:
 - each matcher string value must be at most `512` characters (`LIMITS.MAX_MATCHER_VALUE_LENGTH`)
 - blank strings are rejected before or during validation depending on how the matcher was built
 - selector objects are strict in execution validation, so unknown keys are rejected
+- common input aliases are normalized before that strict validation runs, including `id`/`resource_id`, `text`, `text_contains`, `content_desc`, `description`, and `accessibility_label`
 - when the shared CLI parser sees no selector flags at all, it returns an empty matcher object and the command decides whether selectors are required for that command
+
+Accepted raw JSON matcher-field aliases:
+
+| Alias | Canonical field |
+| --- | --- |
+| `id`, `resource_id` | `resourceId` |
+| `text` | `textEquals` |
+| `text_contains` | `textContains` |
+| `content_desc`, `description`, `accessibility_label` | `contentDescEquals` |
+| `content_desc_equals` | `contentDescEquals` |
+| `content_desc_contains`, `description_contains`, `accessibility_label_contains` | `contentDescContains` |
 
 Concrete payload example:
 
@@ -94,6 +106,15 @@ For most commands, the CLI offers two equivalent ways to build a `NodeMatcher`:
 
 1. Shorthand flags such as `--text`, `--text-contains`, `--id`, `--desc`, `--desc-contains`, and `--role`
 2. Raw JSON via `--selector '<json>'`
+
+Agent-friendly CLI aliases accepted for shorthand selectors:
+
+- `--resource-id` -> `--id`
+- `--content-desc` -> `--desc`
+- `--content-desc-contains` -> `--desc-contains`
+- `--container-resource-id` -> `--container-id`
+- `--container-content-desc` -> `--container-desc`
+- `--container-content-desc-contains` -> `--container-desc-contains`
 
 Container selectors follow the same pattern:
 
@@ -207,9 +228,17 @@ clawperator type "hello world" --role textfield
 | `--label-id` | `resourceId` |
 | `--label-desc` | `contentDescEquals` |
 
+Accepted CLI aliases for those `read-value` label flags:
+
+- `--text` and `--label-text` -> `--label`
+- `--id` and `--resource-id` -> `--label-id`
+- `--desc` and `--content-desc` -> `--label-desc`
+
 At least one of those flags is required.
 
 Blank label values are rejected, and if you provide none of the three label flags the command returns a usage error before execution is built.
+
+Raw JSON aliases for `read_key_value_pair.params.labelMatcher` follow the same `NodeMatcher` alias table shown above. Raw payload aliases `label_matcher` and `label_selector` are normalized to `labelMatcher` before validation.
 
 Concrete execution fragment:
 

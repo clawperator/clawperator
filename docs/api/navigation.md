@@ -41,6 +41,16 @@ clawperator exec --dry-run --execution '{"commandId":"settings-nav-1","taskId":"
 
 - `params.applicationId`
 
+Accepted raw JSON parameter aliases for `open_app`:
+
+- `application_id`
+- `app`
+- `app_id`
+- `appId`
+- `package`
+- `package_id`
+- `packageId`
+
 Validation rule:
 
 - blank or missing `applicationId` fails with `EXECUTION_VALIDATION_FAILED`
@@ -80,6 +90,12 @@ clawperator open com.android.settings
 ```
 
 The `open` command treats a non-URI target as an app package and dispatches to `open_app`.
+
+Accepted CLI aliases for the same intent:
+
+- `clawperator open-app com.android.settings`
+- `clawperator open_app com.android.settings`
+- `clawperator open --package com.android.settings`
 
 Exact classification rule from `isOpenCliUriTarget()`:
 
@@ -132,6 +148,10 @@ Error cases:
 
 - `params.uri`
 
+Accepted raw JSON parameter alias for `open_uri`:
+
+- `url`
+
 Validation rules:
 
 - blank or missing `uri` fails
@@ -172,6 +192,11 @@ clawperator open https://clawperator.com
 ```
 
 The `open` command uses `isOpenCliUriTarget()` and routes to `open_uri` when the target matches a URI-with-scheme pattern.
+
+Accepted CLI aliases for the same intent:
+
+- `clawperator open --url https://clawperator.com`
+- `clawperator open --uri https://clawperator.com`
 
 Verification:
 
@@ -221,6 +246,12 @@ Error cases:
 
 `wait_for_navigation` is the navigation-specific confirmation step.
 
+CLI aliases accepted for agent-first ergonomics:
+
+- command alias: `wait_for_navigation`
+- target-package flags: `--package`, `--package-id`, `--application-id`
+- selector flag aliases from [Selectors](selectors.md): `--resource-id`, `--content-desc`, `--content-desc-contains`
+
 Current public parameters:
 
 | Field | Valid values | Meaning |
@@ -235,6 +266,12 @@ Validation rules:
 - `timeoutMs` is required
 - `timeoutMs` must be positive
 - `timeoutMs` must not exceed `30000`
+
+Accepted raw JSON parameter aliases for `wait_for_navigation`:
+
+- `expected_package` -> `expectedPackage`
+- `expected_node` and `wait_for` -> `expectedNode`
+- `timeout_ms` -> `timeoutMs`
 
 Builder inflation rule:
 

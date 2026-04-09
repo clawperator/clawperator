@@ -12,6 +12,11 @@ import {
   resolveSupportedFlagsFromRegistry,
   type HandlerContext,
 } from "./registry.js";
+import {
+  expandSupportedFlagsWithAliases,
+  normalizeCliFlagAliasesBeforeForwardSeparator,
+  type CliFlagAliasSpec,
+} from "./flagAliases.js";
 import { shouldCliStdoutForceExitCode1 } from "./stdoutExitCode.js";
 import { maybeShowStarHint } from "./starHint.js";
 
@@ -55,21 +60,35 @@ const FLAG_VALUE_ARITY = new Map<string, number>([
   ["--apk", 1],
   ["--name", 1],
   ["--path", 1],
+  ["--file", 1],
   ["--app", 1],
+  ["--package", 1],
+  ["--package-id", 1],
+  ["--application-id", 1],
+  ["--app-id", 1],
+  ["--url", 1],
+  ["--uri", 1],
   ["--key", 1],
+  ["--button", 1],
   ["--direction", 1],
   ["--text", 1],
   ["--text-contains", 1],
   ["--id", 1],
+  ["--resource-id", 1],
   ["--desc", 1],
+  ["--content-desc", 1],
   ["--desc-contains", 1],
+  ["--content-desc-contains", 1],
   ["--role", 1],
   ["--selector", 1],
   ["--container-text", 1],
   ["--container-text-contains", 1],
   ["--container-id", 1],
+  ["--container-resource-id", 1],
   ["--container-desc", 1],
+  ["--container-content-desc", 1],
   ["--container-desc-contains", 1],
+  ["--container-content-desc-contains", 1],
   ["--container-role", 1],
   ["--container-selector", 1],
   ["--payload", 1],
@@ -79,15 +98,19 @@ const FLAG_VALUE_ARITY = new Map<string, number>([
   ["--artifact", 1],
   ["--vars", 1],
   ["--summary", 1],
+  ["--description", 1],
   ["--session-id", 1],
   ["--out", 1],
   ["--input", 1],
+  ["--skill", 1],
   ["--label", 1],
+  ["--label-text", 1],
   ["--label-id", 1],
   ["--label-desc", 1],
   ["--ref", 1],
   ["--port", 1],
   ["--host", 1],
+  ["--bind", 1],
   ["--intent", 1],
   ["--keyword", 1],
   ["--expect-contains", 1],
@@ -98,6 +121,13 @@ const FLAG_VALUE_ARITY = new Map<string, number>([
 const COMMANDS_ALLOW_LEADING_POSITIONAL = new Set([
   "exec",
 ]);
+
+const GLOBAL_FLAG_ALIASES: readonly CliFlagAliasSpec[] = [
+  { canonical: "--device", aliases: ["--device-id"] },
+  { canonical: "--operator-package", aliases: ["--receiver-package"] },
+  { canonical: "--output", aliases: ["--format"] },
+  { canonical: "--timeout", aliases: ["--timeout-ms"] },
+] as const;
 
 function getGlobalOpts(argv: string[]): {
   deviceId?: string;
@@ -110,6 +140,7 @@ function getGlobalOpts(argv: string[]): {
   verbose: boolean;
   rest: string[];
 } {
+  argv = normalizeCliFlagAliasesBeforeForwardSeparator(argv, GLOBAL_FLAG_ALIASES, FLAG_VALUE_ARITY);
   const rest: string[] = [];
   let deviceId: string | undefined;
   let operatorPackage: string | undefined;
@@ -126,9 +157,6 @@ function getGlobalOpts(argv: string[]): {
       break;
     } else if (argv[i] === "--device" && argv[i + 1]) {
       deviceId = argv[++i];
-    } else if (argv[i] === "--device-id" && argv[i + 1]) {
-      // legacy alias
-      deviceId = argv[++i];
     } else if (argv[i] === "--operator-package") {
       const value = argv[i + 1];
       if (value === undefined || value.trim().length === 0 || value.startsWith("-")) {
@@ -136,19 +164,11 @@ function getGlobalOpts(argv: string[]): {
       }
       operatorPackage = value;
       i++;
-    } else if (argv[i] === "--receiver-package") {
-      const value = argv[i + 1];
-      if (value === undefined || value.trim().length === 0 || value.startsWith("-")) {
-        throw new UsageError("--receiver-package requires a value");
-      }
-      // legacy alias
-      operatorPackage = value;
-      i++;
     } else if (argv[i] === "--json") {
       // json is explicit
       output = "json";
       explicitJsonOutput = true;
-    } else if ((argv[i] === "--output" || argv[i] === "--format") && argv[i + 1]) {
+    } else if (argv[i] === "--output" && argv[i + 1]) {
       const next = argv[++i];
       output = next === "pretty" ? "pretty" : "json";
       if (next === "json") {
@@ -157,11 +177,6 @@ function getGlobalOpts(argv: string[]): {
     } else if (argv[i] === "--timeout") {
       if (!argv[i + 1]) {
         throw new UsageError("--timeout requires a value");
-      }
-      timeoutMs = Number(argv[++i]);
-    } else if (argv[i] === "--timeout-ms") {
-      if (!argv[i + 1]) {
-        throw new UsageError("--timeout-ms requires a value");
       }
       timeoutMs = Number(argv[++i]);
     } else if (argv[i] === "--log-level") {
@@ -270,7 +285,9 @@ async function main(): Promise<void> {
           "--json", "--output", "--format", "--log-level", "--timeout", "--timeout-ms",
           "--verbose", "--help", "--version", "--disable-star-suggestions"
         ];
-        const localFlags = resolveSupportedFlagsFromRegistry(def, rest);
+        const flagAliases = typeof def.flagAliases === "function" ? def.flagAliases(rest) : (def.flagAliases ?? []);
+        const normalizedRest = normalizeCliFlagAliasesBeforeForwardSeparator(rest, flagAliases, FLAG_VALUE_ARITY);
+        const localFlags = expandSupportedFlagsWithAliases(resolveSupportedFlagsFromRegistry(def, rest), flagAliases);
         const knownFlags = new Set([...localFlags, ...globalFlags]);
 
         let firstUnknownFlag: string | undefined;
@@ -283,7 +300,7 @@ async function main(): Promise<void> {
           if (arg === "--") {
             break;
           }
-          if (cmd === "exec" && rest[0] !== "best-effort" && arg === "--goal") {
+          if (def.name === "exec" && rest[0] !== "best-effort" && arg === "--goal") {
             firstUnknownFlag = arg;
             break;
           }
@@ -339,7 +356,7 @@ async function main(): Promise<void> {
         } else {
           const ctx: HandlerContext = {
             argv,
-            rest,
+            rest: normalizedRest,
             format: out.format,
             explicitJsonOutput: global.explicitJsonOutput,
             verbose: out.verbose,

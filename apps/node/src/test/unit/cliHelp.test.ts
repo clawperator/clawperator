@@ -203,7 +203,7 @@ describe("CLI help", () => {
     const { stdout, code } = await runCli(["inspect", "ui", "--timeout-ms"]);
     assert.notStrictEqual(code, 0);
     assert.match(stdout, /"code":"USAGE"/);
-    assert.match(stdout, /--timeout-ms requires a value/);
+    assert.match(stdout, /--timeout requires a value/);
   });
 
   it("accepts --format as an alias for --output", async () => {
@@ -556,6 +556,7 @@ describe("promoted flat commands - help and missing-arg errors", () => {
     assert.strictEqual(code, 0);
     assert.match(stdout, /clawperator snapshot/);
     assert.match(stdout, /--timeout <ms>/);
+    assert.doesNotMatch(stdout, /--file/);
   });
 
   it("screenshot --help shows screenshot help", async () => {
@@ -563,6 +564,7 @@ describe("promoted flat commands - help and missing-arg errors", () => {
     assert.strictEqual(code, 0);
     assert.match(stdout, /clawperator screenshot/);
     assert.match(stdout, /--path <file>/);
+    assert.match(stdout, /Also accepted as: --device-id, --file/);
   });
 
   it("click --help shows click help", async () => {
@@ -700,6 +702,14 @@ describe("promoted flat commands - help and missing-arg errors", () => {
 
   it("exec rejects --goal for normal payload execution", async () => {
     const { stdout, code } = await runCli(["exec", "--goal", "wifi"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "USAGE");
+    assert.match(obj.message ?? "", /unrecognized flag '--goal'/);
+  });
+
+  it("execute synonym also rejects --goal for normal payload execution", async () => {
+    const { stdout, code } = await runCli(["execute", "--goal", "wifi"]);
     assert.strictEqual(code, 1, stdout);
     const obj = JSON.parse(stdout) as { code?: string; message?: string };
     assert.strictEqual(obj.code, "USAGE");

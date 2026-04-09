@@ -66,6 +66,42 @@ Success conditions for a valid payload before dispatch:
 - every `actions[i].type` is a supported canonical action type after alias normalization
 - on a live execution path, `commandId` and `taskId` are echoed back in the result envelope for correlation
 
+## Input Normalization
+
+Stored payloads should use canonical field names and canonical action types. On input, Node normalizes a small alias set before schema validation.
+
+Accepted top-level execution key aliases:
+
+| Alias | Canonical field |
+| --- | --- |
+| `command_id` | `commandId` |
+| `task_id` | `taskId` |
+| `expected_format` | `expectedFormat` |
+| `timeout_ms` | `timeoutMs` |
+
+For action-type aliases and parameter aliases such as `package` -> `applicationId`, `url` -> `uri`, and `selector` -> `matcher`, use [Actions](actions.md). For raw matcher-field aliases such as `resource_id` and `content_desc`, use [Selectors](selectors.md).
+
+Verification pattern:
+
+```bash
+clawperator exec --validate-only --payload '{"command_id":"cmd-001","task_id":"task-001","source":"docs","expected_format":"android-ui-automator","timeout_ms":30000,"actions":[{"id":"snap-1","type":"snapshot"}]}' --json
+```
+
+Success condition:
+
+- exit code `0`
+- top-level `ok == true`
+- `execution.commandId == "cmd-001"`
+- `execution.taskId == "task-001"`
+- `execution.expectedFormat == "android-ui-automator"`
+- `execution.timeoutMs == 30000`
+- `execution.actions[0].type == "snapshot_ui"`
+
+CLI payload-source aliases accepted by `clawperator exec`:
+
+- `--payload` is canonical
+- `--execution`, `--input`, and `--file` are accepted aliases for the same argument
+
 ## Execution Limits
 
 Current Node-side validation limits are:

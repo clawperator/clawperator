@@ -11,6 +11,8 @@ import { ERROR_CODES } from "../contracts/errors.js";
 import type { ClawperatorError } from "../contracts/errors.js";
 import type { OutputFormat } from "./output.js";
 import { formatError } from "./output.js";
+import type { CliFlagAliasSpec } from "./flagAliases.js";
+import { normalizeCliFlagAliases } from "./flagAliases.js";
 
 // ---------------------------------------------------------------------------
 // Flag name constants
@@ -27,6 +29,12 @@ export const ELEMENT_SELECTOR_VALUE_FLAGS = [
   "--role",
 ] as const;
 
+export const ELEMENT_SELECTOR_FLAG_ALIASES: readonly CliFlagAliasSpec[] = [
+  { canonical: "--id", aliases: ["--resource-id"] },
+  { canonical: "--desc", aliases: ["--content-desc"] },
+  { canonical: "--desc-contains", aliases: ["--content-desc-contains"] },
+] as const;
+
 /** All container selector flags that take a value. */
 export const CONTAINER_SELECTOR_VALUE_FLAGS = [
   "--container-selector",
@@ -36,6 +44,12 @@ export const CONTAINER_SELECTOR_VALUE_FLAGS = [
   "--container-desc",
   "--container-desc-contains",
   "--container-role",
+] as const;
+
+export const CONTAINER_SELECTOR_FLAG_ALIASES: readonly CliFlagAliasSpec[] = [
+  { canonical: "--container-id", aliases: ["--container-resource-id"] },
+  { canonical: "--container-desc", aliases: ["--container-content-desc"] },
+  { canonical: "--container-desc-contains", aliases: ["--container-content-desc-contains"] },
 ] as const;
 
 // ---------------------------------------------------------------------------
@@ -59,7 +73,23 @@ export type ContainerResult =
  * Used by registry handlers to detect the "no selector provided" case.
  */
 export function hasElementSelectorFlag(rest: string[]): boolean {
-  return ELEMENT_SELECTOR_VALUE_FLAGS.some((f) => rest.includes(f));
+  const normalized = normalizeSelectorFlagAliases(rest);
+  return ELEMENT_SELECTOR_VALUE_FLAGS.some((f) => normalized.includes(f));
+}
+
+function normalizeFlagAliases(
+  rest: string[],
+  aliasSpecs: readonly CliFlagAliasSpec[],
+): string[] {
+  return normalizeCliFlagAliases(rest, aliasSpecs);
+}
+
+function normalizeSelectorFlagAliases(rest: string[]): string[] {
+  return normalizeFlagAliases(rest, ELEMENT_SELECTOR_FLAG_ALIASES);
+}
+
+function normalizeContainerFlagAliases(rest: string[]): string[] {
+  return normalizeFlagAliases(rest, CONTAINER_SELECTOR_FLAG_ALIASES);
 }
 
 /**
@@ -121,6 +151,7 @@ function blankError(flag: string): ClawperatorError {
  * Returns { ok: false, error } on mutual exclusion or blank string violations.
  */
 export function resolveElementMatcherFromCli(rest: string[]): MatcherResult {
+  rest = normalizeSelectorFlagAliases(rest);
   const dupEl = duplicateValueFlagError(rest, ELEMENT_SELECTOR_VALUE_FLAGS);
   if (dupEl) return { ok: false, error: dupEl };
 
@@ -233,6 +264,7 @@ export function resolveElementMatcherFromCli(rest: string[]): MatcherResult {
  * Returns { ok: false, error } on mutual exclusion or blank string violations.
  */
 export function resolveContainerMatcherFromCli(rest: string[]): ContainerResult {
+  rest = normalizeContainerFlagAliases(rest);
   const dupCt = duplicateValueFlagError(rest, CONTAINER_SELECTOR_VALUE_FLAGS);
   if (dupCt) return { ok: false, error: dupCt };
 

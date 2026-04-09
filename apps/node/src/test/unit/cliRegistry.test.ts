@@ -211,7 +211,7 @@ describe("flag aliases - --operator-package works as alias for --operator-packag
     assert.strictEqual(code, 1, stdout);
     const obj = JSON.parse(stdout);
     assert.strictEqual(obj.code, "USAGE");
-    assert.match(obj.message, /--receiver-package requires a value/);
+    assert.match(obj.message, /--operator-package requires a value/);
   });
 
   it("--receiver-package blank value produces USAGE error with exit code 1", async () => {
@@ -219,7 +219,7 @@ describe("flag aliases - --operator-package works as alias for --operator-packag
     assert.strictEqual(code, 1, stdout);
     const obj = JSON.parse(stdout);
     assert.strictEqual(obj.code, "USAGE");
-    assert.match(obj.message, /--receiver-package requires a value/);
+    assert.match(obj.message, /--operator-package requires a value/);
   });
 
   it("--receiver-package is accepted and passed through to operator setup failure", async () => {
@@ -275,6 +275,60 @@ describe("record synonym dispatches to recording handler", () => {
       resolveSupportedFlagsFromRegistry(COMMANDS.recording, ["export"]),
       ["--input", "--out", "--snapshots"],
     );
+  });
+});
+
+describe("agent-oriented command aliases", () => {
+  it("open_app resolves to the open handler", async () => {
+    const { stdout, code } = await runCli(["open_app"]);
+    assert.notStrictEqual(code, 0);
+    const obj = JSON.parse(stdout);
+    assert.strictEqual(obj.code, "MISSING_ARGUMENT");
+    assert.match(obj.message, /open requires a target/);
+  });
+
+  it("close_app resolves to the close handler", async () => {
+    const { stdout, code } = await runCli(["close_app"]);
+    assert.notStrictEqual(code, 0);
+    const obj = JSON.parse(stdout);
+    assert.strictEqual(obj.code, "MISSING_ARGUMENT");
+    assert.match(obj.message, /close requires a package name/);
+  });
+
+  it("wait_for_navigation resolves to the wait-for-nav handler", async () => {
+    const { stdout, code } = await runCli(["wait_for_navigation", "--json"]);
+    assert.notStrictEqual(code, 0);
+    const obj = JSON.parse(stdout);
+    assert.strictEqual(obj.code, "MISSING_ARGUMENT");
+    assert.match(obj.message, /wait-for-nav requires --timeout <ms>/);
+  });
+});
+
+describe("agent-oriented flag aliases", () => {
+  it("open accepts --package as an alias for --app", async () => {
+    const { stdout, code } = await runCli(["open", "--package", "com.example.app", "com.example.other"]);
+    assert.notStrictEqual(code, 0);
+    assert.match(stdout, /positional argument or via --app, not both/);
+  });
+
+  it("click accepts --resource-id selector aliases", async () => {
+    const { stdout, code } = await runCli(["click", "--resource-id", "com.example:id/login", "--selector", '{"textEquals":"Login"}', "--json"]);
+    assert.notStrictEqual(code, 0);
+    assert.match(stdout, /use --selector OR the simple flags, not both/);
+  });
+
+  it("scroll accepts --container-resource-id aliases", async () => {
+    const { stdout, code } = await runCli(["scroll", "down", "--container-resource-id", "com.example:id/list", "--container-selector", '{"textEquals":"List"}', "--json"]);
+    assert.notStrictEqual(code, 0);
+    assert.match(stdout, /use --container-selector OR the --container-\* flags, not both/);
+  });
+
+  it("read-value accepts --text as an alias for --label", async () => {
+    const { stdout, code } = await runCli(["read-value", "--text", "Battery", "--validate-only", "--json"]);
+    assert.strictEqual(code, 0);
+    const obj = JSON.parse(stdout);
+    assert.strictEqual(obj.ok, true);
+    assert.strictEqual(obj.execution.actions[0].params.labelMatcher.textEquals, "Battery");
   });
 });
 

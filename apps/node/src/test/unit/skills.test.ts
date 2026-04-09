@@ -1889,6 +1889,22 @@ describe("runSkill", () => {
     assert.strictEqual(parsed.timeoutMs, undefined);
   });
 
+  it("CLI skills run preserves alias-like tokens after -- without rewriting", async () => {
+    const { stdout, code } = await runCli([
+      "skills",
+      "run",
+      "com.test.echo",
+      "--output",
+      "json",
+      "--",
+      "--timeout-ms",
+    ]);
+    assert.strictEqual(code, 0, stdout);
+    const parsed = JSON.parse(stdout) as { output?: string };
+    assert.ok(parsed.output?.includes("TEST_OUTPUT:--timeout-ms"));
+    assert.doesNotMatch(parsed.output ?? "", /TEST_OUTPUT:--timeout$/m);
+  });
+
   it("CLI skills run forwards --help after -- without triggering top-level help", async () => {
     const { stdout, code } = await runCli([
       "skills",
@@ -1968,7 +1984,7 @@ describe("runSkill", () => {
     assert.strictEqual(code, 1, stdout);
     const parsed = JSON.parse(stdout) as { code?: string; message?: string };
     assert.strictEqual(parsed.code, "USAGE");
-    assert.strictEqual(parsed.message, "--timeout-ms requires a value");
+    assert.strictEqual(parsed.message, "--timeout requires a value");
   });
 
   it("CLI skills run returns USAGE when --expect-contains is missing a value", async () => {

@@ -48,8 +48,20 @@ describe("resolveElementMatcherFromCli - simple flags", () => {
     assert.deepStrictEqual(result.matcher, { resourceId: "com.foo:id/bar" });
   });
 
+  it("--resource-id aliases to --id", () => {
+    const result = resolveElementMatcherFromCli(["--resource-id", "com.foo:id/bar"]);
+    assert.ok(result.ok);
+    assert.deepStrictEqual(result.matcher, { resourceId: "com.foo:id/bar" });
+  });
+
   it("--desc produces contentDescEquals", () => {
     const result = resolveElementMatcherFromCli(["--desc", "Submit"]);
+    assert.ok(result.ok);
+    assert.deepStrictEqual(result.matcher, { contentDescEquals: "Submit" });
+  });
+
+  it("--content-desc aliases to --desc", () => {
+    const result = resolveElementMatcherFromCli(["--content-desc", "Submit"]);
     assert.ok(result.ok);
     assert.deepStrictEqual(result.matcher, { contentDescEquals: "Submit" });
   });
@@ -239,6 +251,10 @@ describe("hasElementSelectorFlag", () => {
     assert.strictEqual(hasElementSelectorFlag(["--id", "x"]), true);
   });
 
+  it("returns true when selector alias is present", () => {
+    assert.strictEqual(hasElementSelectorFlag(["--resource-id", "x"]), true);
+  });
+
   it("returns true when --selector is present", () => {
     assert.strictEqual(hasElementSelectorFlag(["--selector", "{}"]), true);
   });
@@ -271,6 +287,12 @@ describe("resolveContainerMatcherFromCli", () => {
 
   it("--container-id populates resourceId on container", () => {
     const result = resolveContainerMatcherFromCli(["--container-id", "com.foo:id/scroll"]);
+    assert.ok(result.ok);
+    assert.deepStrictEqual(result.container, { resourceId: "com.foo:id/scroll" });
+  });
+
+  it("--container-resource-id aliases to --container-id", () => {
+    const result = resolveContainerMatcherFromCli(["--container-resource-id", "com.foo:id/scroll"]);
     assert.ok(result.ok);
     assert.deepStrictEqual(result.container, { resourceId: "com.foo:id/scroll" });
   });
