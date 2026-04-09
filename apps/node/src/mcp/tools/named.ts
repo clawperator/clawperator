@@ -289,7 +289,6 @@ export function getNamedMcpTools(logger?: Logger): McpToolDefinition[] {
         const execution = applyMcpExecutionMetadata(
           buildWaitExecution(selector, parsed.timeoutMs),
           "wait",
-          parsed.timeoutMs,
         );
 
         return await runExecutionTool(execution, parsed, logger, (result) => {

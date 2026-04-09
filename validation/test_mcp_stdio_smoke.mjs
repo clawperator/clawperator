@@ -31,20 +31,45 @@ function decodeXmlEntities(value) {
     .replaceAll("&gt;", ">");
 }
 
-function extractCandidateTexts(snapshotXml, maxCandidates = 5) {
-  const candidates = [];
-  const matches = [
-    ...snapshotXml.matchAll(/\btext="([^"]+)"/g),
-    ...snapshotXml.matchAll(/\bcontent-desc="([^"]+)"/g),
-  ];
+function buildCandidateKey(selector) {
+  return JSON.stringify(selector);
+}
 
-  for (const match of matches) {
-    const value = decodeXmlEntities(match[1] ?? "").trim();
-    if (value.length > 0 && !candidates.includes(value)) {
-      candidates.push(value);
+function appendCandidate(candidates, seen, selector, label, maxCandidates) {
+  if (candidates.length >= maxCandidates) {
+    return;
+  }
+
+  const key = buildCandidateKey(selector);
+  if (seen.has(key)) {
+    return;
+  }
+
+  seen.add(key);
+  candidates.push({ selector, label });
+}
+
+function extractCandidateTexts(snapshotXml, maxCandidates = 5) {
+  const textCandidates = [...snapshotXml.matchAll(/\btext="([^"]+)"/g)]
+    .map((match) => decodeXmlEntities(match[1] ?? "").trim())
+    .filter((value) => value.length > 0);
+  const descCandidates = [...snapshotXml.matchAll(/\bcontent-desc="([^"]+)"/g)]
+    .map((match) => decodeXmlEntities(match[1] ?? "").trim())
+    .filter((value) => value.length > 0);
+
+  const candidates = [];
+  const seen = new Set();
+  const maxLength = Math.max(textCandidates.length, descCandidates.length);
+
+  for (let index = 0; index < maxLength && candidates.length < maxCandidates; index += 1) {
+    const textValue = textCandidates[index];
+    if (textValue !== undefined) {
+      appendCandidate(candidates, seen, { text: textValue }, `text=${JSON.stringify(textValue)}`, maxCandidates);
     }
-    if (candidates.length >= maxCandidates) {
-      break;
+
+    const descValue = descCandidates[index];
+    if (descValue !== undefined) {
+      appendCandidate(candidates, seen, { desc: descValue }, `desc=${JSON.stringify(descValue)}`, maxCandidates);
     }
   }
 
@@ -251,26 +276,26 @@ async function main() {
       throw new Error("snapshot did not return parseable XML with at least one <node element");
     }
 
-    const candidateTexts = extractCandidateTexts(snapshotXml);
-    if (candidateTexts.length === 0) {
+    const candidates = extractCandidateTexts(snapshotXml);
+    if (candidates.length === 0) {
       throw new Error("Could not find any non-empty text or content-desc value in the live snapshot");
     }
 
     let readResult;
     let usedCandidate;
     let lastReadError;
-    for (const candidateText of candidateTexts) {
+    for (const candidate of candidates) {
       const attempt = await session.request("tools/call", {
         name: "read",
         arguments: {
-          selector: { text: candidateText },
+          selector: candidate.selector,
           deviceId: selectedDevice,
           operatorPackage,
         },
       }, 30000);
       if (!attempt?.isError) {
         readResult = attempt;
-        usedCandidate = candidateText;
+        usedCandidate = candidate.label;
         break;
       }
       lastReadError = parseToolPayload(attempt);
@@ -280,7 +305,7 @@ async function main() {
       throw new Error(`read failed for all snapshot-derived candidates: ${JSON.stringify(lastReadError)}`);
     }
 
-    console.log(`Using selector text ${JSON.stringify(usedCandidate)}`);
+    console.log(`Using selector ${usedCandidate}`);
 
     const readPayload = parseToolPayload(readResult);
     if (typeof readPayload !== "string" || readPayload.trim().length === 0) {
