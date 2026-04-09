@@ -27,7 +27,7 @@ To run both runtime targets on the same emulator with the matching APK setup
 steps, use:
 
 ```bash
-./scripts/run_android_version_eval.sh <device_serial> <agent> <model>
+.agents/skills/evals-run/scripts/run_android_version_eval.sh <device_serial> <agent> <model>
 ```
 
 Pass `local-dev` or `published` as a fourth argument to run only one target.

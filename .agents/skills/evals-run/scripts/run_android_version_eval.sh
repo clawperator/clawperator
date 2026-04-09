@@ -16,6 +16,20 @@ DEBUG_APK="$ROOT/apps/android/app/build/outputs/apk/debug/app-debug.apk"
 LOCAL_CLI="$ROOT/apps/node/dist/cli/index.js"
 DOWNLOAD_DIR="${HOME}/.clawperator/evals-downloads"
 
+sha256_file() {
+  local file="$1"
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$file" | awk '{print $1}'
+    return 0
+  fi
+  if command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$file" | awk '{print $1}'
+    return 0
+  fi
+  echo "missing sha256 tool: install sha256sum or shasum" >&2
+  exit 3
+}
+
 run_eval() {
   local runtime="$1"
   uv run --project "$ROOT/evals" --extra dev python "$ROOT/evals/run_eval.py" android-version \
@@ -28,7 +42,7 @@ run_eval() {
 
 setup_local_dev() {
   npm --prefix "$ROOT/apps/node" run build
-  ./gradlew :app:assembleDebug
+  "$ROOT/gradlew" :app:assembleDebug
   CLAWPERATOR_OPERATOR_PACKAGE=com.clawperator.operator.dev \
     node "$LOCAL_CLI" operator setup \
       --apk "$DEBUG_APK" \
@@ -45,8 +59,8 @@ setup_published() {
   mkdir -p "$DOWNLOAD_DIR"
   curl -fsSLo "$apk_path" "$apk_url"
   curl -fsSLo "$sha_path" "$sha_url"
-  expected_sha="$(tr -d '\r\n' < "$sha_path")"
-  actual_sha="$(sha256sum "$apk_path" | awk '{print $1}')"
+  expected_sha="$(awk 'NR == 1 { print $1 }' "$sha_path")"
+  actual_sha="$(sha256_file "$apk_path")"
   if [[ "$actual_sha" != "$expected_sha" ]]; then
     echo "checksum mismatch for $apk_path" >&2
     echo "expected: $expected_sha" >&2
