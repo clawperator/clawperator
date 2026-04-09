@@ -98,17 +98,23 @@ const scrollUntilArgsSchema = executionToolOptionsSchema.extend({
   clickAfter: z.boolean().optional(),
 }).strict();
 
+const nonWhitespaceStringJsonSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "\\S",
+};
+
 const selectorJsonSchema = {
   type: "object",
   additionalProperties: false,
   minProperties: 1,
   properties: {
-    id: { type: "string", minLength: 1 },
-    role: { type: "string", minLength: 1 },
-    text: { type: "string", minLength: 1 },
-    textContains: { type: "string", minLength: 1 },
-    desc: { type: "string", minLength: 1 },
-    descContains: { type: "string", minLength: 1 },
+    id: nonWhitespaceStringJsonSchema,
+    role: nonWhitespaceStringJsonSchema,
+    text: nonWhitespaceStringJsonSchema,
+    textContains: nonWhitespaceStringJsonSchema,
+    desc: nonWhitespaceStringJsonSchema,
+    descContains: nonWhitespaceStringJsonSchema,
   },
 };
 
@@ -129,8 +135,8 @@ export function getNamedMcpTools(logger?: Logger): McpToolDefinition[] {
       description: "Open an Android application by package id or launch a URI.",
       inputSchema: {
         ...buildCommonExecutionSchema({
-          appId: { type: "string", minLength: 1 },
-          uri: { type: "string", minLength: 1 },
+          appId: nonWhitespaceStringJsonSchema,
+          uri: nonWhitespaceStringJsonSchema,
         }),
         oneOf: [
           { required: ["appId"], not: { required: ["uri"] } },
@@ -213,7 +219,7 @@ export function getNamedMcpTools(logger?: Logger): McpToolDefinition[] {
         all: { type: "boolean" },
         container: selectorJsonSchema,
         validator: { type: "string", enum: ["regex"] },
-        validatorPattern: { type: "string", minLength: 1 },
+        validatorPattern: nonWhitespaceStringJsonSchema,
       }, ["selector"]),
       handler: async (args) => {
         const parsed = parseToolArguments(readArgsSchema, args);

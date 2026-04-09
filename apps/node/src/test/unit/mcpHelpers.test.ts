@@ -186,10 +186,24 @@ describe("MCP tool schemas", () => {
     assert.ok(clickTool);
 
     const selectorSchema = (clickTool!.inputSchema as {
-      properties?: { selector?: { minProperties?: number } };
+      properties?: { selector?: { minProperties?: number; properties?: Record<string, { pattern?: string }> } };
     }).properties?.selector;
 
     assert.strictEqual(selectorSchema?.minProperties, 1);
+    assert.strictEqual(selectorSchema?.properties?.id?.pattern, "\\S");
+    assert.strictEqual(selectorSchema?.properties?.text?.pattern, "\\S");
+  });
+
+  it("requires open tool string arguments to reject whitespace-only values in the published schema", () => {
+    const openTool = getNamedMcpTools().find(tool => tool.name === "open");
+    assert.ok(openTool);
+
+    const schema = openTool!.inputSchema as {
+      properties?: { appId?: { pattern?: string }; uri?: { pattern?: string } };
+    };
+
+    assert.strictEqual(schema.properties?.appId?.pattern, "\\S");
+    assert.strictEqual(schema.properties?.uri?.pattern, "\\S");
   });
 
   it("rejects empty execute action ids and types before dispatch", async () => {

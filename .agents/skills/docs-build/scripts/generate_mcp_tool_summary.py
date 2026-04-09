@@ -19,17 +19,25 @@ def iter_tools() -> list[tuple[str, str]]:
     tools: list[tuple[str, str]] = []
     for filename in TOOL_FILE_ORDER:
         text = (TOOLS_DIR / filename).read_text(encoding="utf-8")
+        file_tools: list[tuple[str, str]] = []
         for match in PATTERN.finditer(text):
-            tools.append((match.group("name"), match.group("description")))
+            file_tools.append((match.group("name"), match.group("description")))
+        if not file_tools:
+            raise ValueError(f"Failed to detect any MCP tools in {TOOLS_DIR / filename}")
+        tools.extend(file_tools)
     return tools
 
 
 def main() -> int:
+    tools = iter_tools()
+    if not tools:
+        raise ValueError("Failed to detect any MCP tools while generating the summary")
+
     rows = [
         "| Tool | Purpose |",
         "| --- | --- |",
     ]
-    for name, description in iter_tools():
+    for name, description in tools:
         rows.append(f"| `{name}` | {description} |")
     print("\n".join(rows))
     return 0
