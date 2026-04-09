@@ -2,19 +2,23 @@ import { z, type ZodError, type ZodType } from "zod";
 import type { NodeMatcher } from "../../contracts/selectors.js";
 import type { Execution } from "../../contracts/execution.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
+import type { Logger } from "../../adapters/logger.js";
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 import { runExecution } from "../../domain/executions/runExecution.js";
 import { resolveOperatorPackageForRequest } from "../../domain/config/resolveOperatorPackage.js";
 import { buildMcpErrorResult, buildMcpSuccessResult, type McpToolResult } from "../errors.js";
+import { createMcpExecutionIds } from "../executionIds.js";
 import type { McpSelectorInput } from "../selectors.js";
 import { mapSelectorToNodeMatcher } from "../selectors.js";
 
+const nonEmptyOptionalStringSchema = z.string().refine(
+  value => value.trim().length > 0,
+  { message: "must be a non-empty string when provided" }
+);
+
 export const executionToolOptionsSchema = z.object({
-  deviceId: z.string().optional(),
-  operatorPackage: z.string().refine(
-    value => value.trim().length > 0,
-    { message: "operatorPackage must be a non-empty string when provided" }
-  ).optional(),
+  deviceId: nonEmptyOptionalStringSchema.optional(),
+  operatorPackage: nonEmptyOptionalStringSchema.optional(),
   timeoutMs: z.number().int().optional(),
 }).strict();
 
@@ -41,6 +45,7 @@ export function buildMcpValidationError(error: ZodError): McpToolResult {
 export async function runExecutionTool(
   execution: Execution,
   options: ExecutionToolOptions,
+  logger: Logger | undefined,
   onSuccess: (result: Awaited<ReturnType<typeof runExecution>> & { ok: true }) => McpToolResult | Promise<McpToolResult>,
 ): Promise<McpToolResult> {
   try {
@@ -48,6 +53,7 @@ export async function runExecutionTool(
       deviceId: options.deviceId,
       operatorPackage: resolveOperatorPackageForRequest(options.operatorPackage),
       warn: message => process.stderr.write(message),
+      logger,
     });
 
     if (!result.ok) {
@@ -68,6 +74,21 @@ export async function runExecutionTool(
   } catch (error) {
     return buildMcpErrorResult(error);
   }
+}
+
+export function applyMcpExecutionMetadata(
+  execution: Omit<Execution, "commandId" | "taskId"> & Partial<Pick<Execution, "commandId" | "taskId">>,
+  toolName: string,
+  timeoutMs?: number,
+): Execution {
+  const ids = createMcpExecutionIds(toolName);
+  return {
+    ...execution,
+    commandId: ids.commandId,
+    taskId: ids.taskId,
+    source: "mcp",
+    ...(timeoutMs !== undefined ? { timeoutMs } : {}),
+  };
 }
 
 export function createRuntimeConfig() {

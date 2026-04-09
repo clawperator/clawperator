@@ -31,25 +31,11 @@ export function buildMcpErrorResult(error: unknown): McpToolResult {
 
 export function normalizeMcpError(error: unknown): McpErrorPayload {
   if (isClawperatorError(error)) {
-    return { ...error };
+    return sanitizeMcpErrorPayload(error as unknown as Record<string, unknown>);
   }
 
   if (typeof error === "object" && error !== null) {
-    const maybeMessage = "message" in error ? (error as { message?: unknown }).message : undefined;
-    const maybeCode = "code" in error ? (error as { code?: unknown }).code : undefined;
-    const payload: McpErrorPayload = {
-      message: typeof maybeMessage === "string" && maybeMessage.length > 0 ? maybeMessage : "Unknown MCP error",
-    };
-    if (typeof maybeCode === "string" && maybeCode.length > 0) {
-      payload.code = maybeCode;
-    }
-    for (const [key, value] of Object.entries(error)) {
-      if (key === "message" || key === "code") {
-        continue;
-      }
-      payload[key] = value;
-    }
-    return payload;
+    return sanitizeMcpErrorPayload(error as Record<string, unknown>);
   }
 
   return {
@@ -59,4 +45,41 @@ export function normalizeMcpError(error: unknown): McpErrorPayload {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function sanitizeMcpErrorPayload(error: Record<string, unknown>): McpErrorPayload {
+  const payload: McpErrorPayload = {
+    message: typeof error.message === "string" && error.message.length > 0 ? error.message : "Unknown MCP error",
+  };
+
+  if (typeof error.code === "string" && error.code.length > 0) {
+    payload.code = error.code;
+  }
+  if (typeof error.hint === "string" && error.hint.length > 0) {
+    payload.hint = error.hint;
+  }
+  if ("details" in error) {
+    payload.details = sanitizeValue(error.details);
+  }
+
+  return payload;
+}
+
+function sanitizeValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(sanitizeValue);
+  }
+
+  if (!isRecord(value)) {
+    return value;
+  }
+
+  const sanitized: Record<string, unknown> = {};
+  for (const [key, entry] of Object.entries(value)) {
+    if (key === "stdout" || key === "stderr" || key === "command" || key === "stack") {
+      continue;
+    }
+    sanitized[key] = sanitizeValue(entry);
+  }
+  return sanitized;
 }

@@ -1,12 +1,13 @@
 import { z } from "zod";
+import type { Logger } from "../../adapters/logger.js";
 import type { ExecutionAction } from "../../contracts/execution.js";
 import { listDevices } from "../../domain/devices/listDevices.js";
 import { buildSnapshotExecution } from "../../domain/observe/snapshot.js";
-import { createMcpExecutionIds } from "../executionIds.js";
 import { buildMcpErrorResult } from "../errors.js";
 import { extractStepDataValue } from "../results.js";
 import type { McpToolDefinition } from "./index.js";
 import {
+  applyMcpExecutionMetadata,
   buildExecutionSuccessPayload,
   buildSuccessResult,
   createRuntimeConfig,
@@ -29,12 +30,26 @@ const executeArgsSchema = executionToolOptionsSchema.extend({
   actions: z.array(executionActionSchema).min(1, { message: "actions is required" }),
 }).strict();
 
-export function getCoreMcpTools(): McpToolDefinition[] {
+function buildCommonExecutionSchema(properties: Record<string, unknown>, required: string[] = []): Record<string, unknown> {
+  return {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      deviceId: { type: "string", minLength: 1 },
+      operatorPackage: { type: "string", minLength: 1 },
+      timeoutMs: { type: "integer" },
+      ...properties,
+    },
+    ...(required.length > 0 ? { required } : {}),
+  };
+}
+
+export function getCoreMcpTools(logger?: Logger): McpToolDefinition[] {
   return [
     {
       name: "devices",
       description: "List connected Android devices visible to adb.",
-      inputSchema: { type: "object" },
+      inputSchema: { type: "object", additionalProperties: false },
       handler: async (args) => {
         const parsed = parseToolArguments(emptyArgsSchema, args);
         if ("content" in parsed) {
@@ -52,29 +67,20 @@ export function getCoreMcpTools(): McpToolDefinition[] {
     {
       name: "snapshot",
       description: "Capture the current Android UI hierarchy as XML.",
-      inputSchema: {
-        type: "object",
-        properties: {
-          deviceId: { type: "string" },
-          operatorPackage: { type: "string" },
-          timeoutMs: { type: "integer" },
-        },
-      },
+      inputSchema: buildCommonExecutionSchema({}),
       handler: async (args) => {
         const parsed = parseToolArguments(snapshotArgsSchema, args);
         if ("content" in parsed) {
           return parsed;
         }
 
-        const ids = createMcpExecutionIds("snapshot");
-        const execution = {
-          ...buildSnapshotExecution({ timeoutMs: parsed.timeoutMs }),
-          commandId: ids.commandId,
-          taskId: ids.taskId,
-          source: "mcp",
-        };
+        const execution = applyMcpExecutionMetadata(
+          buildSnapshotExecution({ timeoutMs: parsed.timeoutMs }),
+          "snapshot",
+          parsed.timeoutMs,
+        );
 
-        return await runExecutionTool(execution, parsed, (result) => {
+        return await runExecutionTool(execution, parsed, logger, (result) => {
           const extracted = extractStepDataValue(result.envelope, {
             actionType: "snapshot_ui",
             dataKey: "text",
@@ -101,44 +107,45 @@ export function getCoreMcpTools(): McpToolDefinition[] {
     {
       name: "execute",
       description: "Run a validated Clawperator execution payload over the canonical execution engine.",
-      inputSchema: {
-        type: "object",
-        properties: {
-          deviceId: { type: "string" },
-          operatorPackage: { type: "string" },
-          timeoutMs: { type: "integer" },
-          actions: {
-            type: "array",
-            items: {
-              type: "object",
-              properties: {
-                id: { type: "string" },
-                type: { type: "string" },
-                params: { type: "object" },
-              },
-              required: ["id", "type"],
+      inputSchema: buildCommonExecutionSchema({
+        actions: {
+          type: "array",
+          minItems: 1,
+          items: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              id: { type: "string" },
+              type: { type: "string" },
+              params: { type: "object" },
             },
+            required: ["id", "type"],
           },
         },
-        required: ["actions"],
-      },
+      }, ["actions"]),
       handler: async (args) => {
         const parsed = parseToolArguments(executeArgsSchema, args);
         if ("content" in parsed) {
           return parsed;
         }
 
-        const ids = createMcpExecutionIds("execute");
+        if (parsed.actions.some((action) => action.type === "take_screenshot" && action.params !== undefined && "path" in action.params)) {
+          return buildMcpErrorResult({
+            code: "EXECUTION_VALIDATION_FAILED",
+            message: "execute does not allow caller-controlled take_screenshot paths over MCP",
+            details: { path: "actions" },
+          });
+        }
+
         const execution = {
-          commandId: ids.commandId,
-          taskId: ids.taskId,
           source: "mcp",
           expectedFormat: "android-ui-automator" as const,
           timeoutMs: parsed.timeoutMs ?? 30_000,
           actions: parsed.actions as ExecutionAction[],
         };
+        const stampedExecution = applyMcpExecutionMetadata(execution, "execute", parsed.timeoutMs ?? 30_000);
 
-        return await runExecutionTool(execution, parsed, (result) => {
+        return await runExecutionTool(stampedExecution, parsed, logger, (result) => {
           return buildSuccessResult(buildExecutionSuccessPayload(result));
         });
       },

@@ -2,6 +2,7 @@ import assert from "node:assert";
 import { describe, it } from "node:test";
 import type { ResultEnvelope } from "../../contracts/result.js";
 import { createMcpExecutionIds } from "../../mcp/executionIds.js";
+import { normalizeMcpError } from "../../mcp/errors.js";
 import { extractStepDataValue } from "../../mcp/results.js";
 import { mapSelectorToNodeMatcher } from "../../mcp/selectors.js";
 
@@ -139,6 +140,31 @@ describe("extractStepDataValue", () => {
       error: "MCP_STEP_DATA_MISSING",
       message: "read_text step result did not include text.",
       step: envelope.stepResults[0],
+    });
+  });
+});
+
+describe("normalizeMcpError", () => {
+  it("redacts raw stdout and stderr from MCP error payloads", () => {
+    const payload = normalizeMcpError({
+      code: "ADB_FAILED",
+      message: "adb failed",
+      hint: "Check adb",
+      details: {
+        stdout: "secret",
+        stderr: "secret",
+        command: "adb shell",
+        safe: "ok",
+      },
+    });
+
+    assert.deepStrictEqual(payload, {
+      code: "ADB_FAILED",
+      message: "adb failed",
+      hint: "Check adb",
+      details: {
+        safe: "ok",
+      },
     });
   });
 });

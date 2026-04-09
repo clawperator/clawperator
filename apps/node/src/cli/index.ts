@@ -255,8 +255,10 @@ async function main(): Promise<void> {
   const argv = process.argv.slice(2);
   if (isMcpServeArgv(argv)) {
     try {
-      const mcpIndex = argv.findIndex((token) => token === "mcp");
-      await (await import("./commands/mcp.js")).cmdMcpServe(argv.slice(mcpIndex + 2));
+      const prefix = argvPrefixBeforeForwardSeparator(argv);
+      const mcpIndex = prefix.findIndex((token) => token === "mcp");
+      const mcpArgs = [...prefix.slice(0, mcpIndex), ...prefix.slice(mcpIndex + 2)];
+      await (await import("./commands/mcp.js")).cmdMcpServe(mcpArgs);
       return;
     } catch (error) {
       if (error instanceof UsageError) {

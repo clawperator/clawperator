@@ -6287,6 +6287,7 @@ Validation boundary:
 
 - MCP only enforces `actions` presence plus `id` and `type` on each element
 - the full action contract is enforced later by `validateExecution()`
+- MCP rejects caller-controlled `take_screenshot` `path` values so an MCP client cannot choose arbitrary host write locations
 
 Use [Actions](actions.md) for canonical action types and params.
 

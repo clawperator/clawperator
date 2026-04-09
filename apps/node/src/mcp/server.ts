@@ -1,4 +1,5 @@
 import { createRequire } from "node:module";
+import { createClawperatorLogger } from "../adapters/logger.js";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
@@ -21,7 +22,10 @@ function createServerInfo(): { name: string; version: string } {
 }
 
 export function createMcpServer(): Server {
-  const tools = getMcpTools();
+  const logger = createClawperatorLogger({ outputFormat: "json" }).child({
+    event: "mcp.server",
+  });
+  const tools = getMcpTools(logger);
   const toolsByName = new Map(tools.map(tool => [tool.name, tool]));
   const server = new Server(createServerInfo(), {
     capabilities: {
@@ -60,16 +64,12 @@ export async function runMcpStdioServer(): Promise<void> {
     resolveClosed = resolve;
   });
 
-  transport.onerror = (error) => {
-    process.stderr.write(`[clawperator:mcp] transport error: ${error.message}\n`);
-  };
-  transport.onclose = () => {
-    resolveClosed();
-  };
-
-  await server.connect(transport);
-
+  let shutdownRequested = false;
   const shutdown = async (exitCode?: number) => {
+    if (shutdownRequested) {
+      return;
+    }
+    shutdownRequested = true;
     try {
       await server.close();
     } finally {
@@ -79,6 +79,15 @@ export async function runMcpStdioServer(): Promise<void> {
     }
   };
 
+  transport.onerror = (error) => {
+    process.stderr.write(`[clawperator:mcp] transport error: ${error.message}\n`);
+    void shutdown(1);
+  };
+  transport.onclose = () => {
+    resolveClosed();
+  };
+
+  await server.connect(transport);
   process.once("SIGINT", () => {
     void shutdown(0);
   });
@@ -87,5 +96,5 @@ export async function runMcpStdioServer(): Promise<void> {
   });
 
   await closed;
-  await server.close();
+  await shutdown();
 }

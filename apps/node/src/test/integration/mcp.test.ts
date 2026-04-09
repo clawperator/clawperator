@@ -184,12 +184,23 @@ describe("mcp stdio integration", () => {
 
     const response = await client.request("tools/list", {});
 
-    const tools = (response.result as { tools?: Array<{ name: string }> }).tools ?? [];
+    const tools = (response.result as { tools?: Array<{ name: string; inputSchema?: Record<string, unknown> }> }).tools ?? [];
     assert.ok(Array.isArray(tools));
     assert.deepStrictEqual(
       tools.map(tool => tool.name),
       ["devices", "snapshot", "execute", "open", "click", "type", "read", "press", "wait", "scroll_until"],
     );
+
+    const execute = tools.find((tool) => tool.name === "execute");
+    const open = tools.find((tool) => tool.name === "open");
+    const click = tools.find((tool) => tool.name === "click");
+    const typeTool = tools.find((tool) => tool.name === "type");
+
+    assert.strictEqual(execute?.inputSchema?.additionalProperties, false);
+    assert.deepStrictEqual(execute?.inputSchema?.required, ["actions"]);
+    assert.ok(Array.isArray(open?.inputSchema?.oneOf));
+    assert.ok(Array.isArray(click?.inputSchema?.oneOf));
+    assert.deepStrictEqual(typeTool?.inputSchema?.required, ["selector", "text"]);
   });
 
   async function getPreferredExecutionArgs(): Promise<Record<string, unknown>> {
@@ -309,6 +320,16 @@ describe("mcp stdio integration", () => {
     await client.initialize();
 
     const result = await client.callTool("open", {});
+    const payload = parseToolPayload(result) as { code?: string };
+
+    assert.strictEqual(result.isError, true);
+    assert.strictEqual(payload.code, "EXECUTION_VALIDATION_FAILED");
+  });
+
+  it("rejects open when appId is blank", async () => {
+    await client.initialize();
+
+    const result = await client.callTool("open", { appId: "" });
     const payload = parseToolPayload(result) as { code?: string };
 
     assert.strictEqual(result.isError, true);
@@ -510,6 +531,31 @@ describe("mcp stdio integration", () => {
     const result = await client.callTool("execute", {
       operatorPackage: "",
       actions: [{ id: "sleep-1", type: "sleep", params: { durationMs: 1 } }],
+    });
+    const payload = JSON.parse(result.content[0]?.text ?? "{}") as { code?: string };
+
+    assert.strictEqual(result.isError, true);
+    assert.strictEqual(payload.code, "EXECUTION_VALIDATION_FAILED");
+  });
+
+  it("rejects execute when deviceId is blank", async () => {
+    await client.initialize();
+
+    const result = await client.callTool("execute", {
+      deviceId: "",
+      actions: [{ id: "sleep-1", type: "sleep", params: { durationMs: 1 } }],
+    });
+    const payload = JSON.parse(result.content[0]?.text ?? "{}") as { code?: string };
+
+    assert.strictEqual(result.isError, true);
+    assert.strictEqual(payload.code, "EXECUTION_VALIDATION_FAILED");
+  });
+
+  it("rejects execute when take_screenshot includes a caller path", async () => {
+    await client.initialize();
+
+    const result = await client.callTool("execute", {
+      actions: [{ id: "shot-1", type: "take_screenshot", params: { path: "/tmp/owned.png" } }],
     });
     const payload = JSON.parse(result.content[0]?.text ?? "{}") as { code?: string };
 
