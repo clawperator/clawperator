@@ -6260,6 +6260,8 @@ Success payload includes:
 - `terminalSource`
 - `envelope`
 
+When `maxChars` is applied, the returned `envelope` is truncated consistently with the top-level `snapshot` field, so MCP clients do not receive a second full-copy XML payload through `content` or `structuredContent`.
+
 ### `execute`
 
 Run a caller-supplied action list through the canonical execution validator and runtime.
