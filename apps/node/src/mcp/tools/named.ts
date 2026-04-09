@@ -301,7 +301,7 @@ export function getNamedMcpTools(logger?: Logger): McpToolDefinition[] {
     },
     {
       name: "scroll_until",
-      description: "Scroll until a matching node is visible, optionally clicking it afterward.",
+      description: "Scroll downward until a matching node is visible, optionally clicking it afterward.",
       inputSchema: buildCommonExecutionSchema({
         selector: selectorJsonSchema,
         container: selectorJsonSchema,

@@ -6185,7 +6185,7 @@ For the underlying selector contract, see [Selectors](selectors.md).
 | `read` | Read text from a matching node, optionally returning all matches. |
 | `press` | Press one of the supported Android navigation keys. |
 | `wait` | Wait until a matching node appears. |
-| `scroll_until` | Scroll until a matching node is visible, optionally clicking it afterward. |
+| `scroll_until` | Scroll downward until a matching node is visible, optionally clicking it afterward. |
 
 ## Tool Details
 
