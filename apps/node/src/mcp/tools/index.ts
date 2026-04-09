@@ -1,5 +1,6 @@
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { getCoreMcpTools } from "./core.js";
+import { getNamedMcpTools } from "./named.js";
 
 export interface McpToolDefinition {
   name: string;
@@ -15,5 +16,6 @@ export interface McpToolDefinition {
 export function getMcpTools(): McpToolDefinition[] {
   return [
     ...getCoreMcpTools(),
+    ...getNamedMcpTools(),
   ];
 }

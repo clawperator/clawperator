@@ -16,6 +16,11 @@ interface ToolCallResult {
   isError?: boolean;
 }
 
+interface DevicePayload {
+  devices?: Array<{ serial: string; state: string }>;
+  code?: string;
+}
+
 class McpIntegrationClient {
   private readonly child: ChildProcessWithoutNullStreams;
   private readonly stdoutChunks: Buffer[] = [];
@@ -183,9 +188,38 @@ describe("mcp stdio integration", () => {
     assert.ok(Array.isArray(tools));
     assert.deepStrictEqual(
       tools.map(tool => tool.name),
-      ["devices", "snapshot", "execute"],
+      ["devices", "snapshot", "execute", "open", "click", "type", "read", "press", "wait", "scroll_until"],
     );
   });
+
+  async function getPreferredExecutionArgs(): Promise<Record<string, unknown>> {
+    const result = await client.callTool("devices");
+    if (result.isError) {
+      return {};
+    }
+
+    const payload = JSON.parse(result.content[0]?.text ?? "{}") as DevicePayload;
+    const devices = payload.devices ?? [];
+    if (devices.length === 0) {
+      return {};
+    }
+
+    const preferred = devices.find(device => !device.serial.startsWith("emulator-")) ?? devices[0];
+    return {
+      deviceId: preferred?.serial,
+      operatorPackage: process.env.CLAWPERATOR_OPERATOR_PACKAGE ?? "com.clawperator.operator.dev",
+    };
+  }
+
+  function parseToolPayload(result: ToolCallResult): Record<string, unknown> | string | unknown[] {
+    return JSON.parse(result.content[0]?.text ?? "null") as Record<string, unknown> | string | unknown[];
+  }
+
+  function assertRuntimeStructuredError(result: ToolCallResult): void {
+    const payload = parseToolPayload(result) as { code?: string };
+    assert.strictEqual(result.isError, true);
+    assert.strictEqual(typeof payload.code, "string");
+  }
 
   it("calls devices over the stdio protocol", async () => {
     await client.initialize();
@@ -204,7 +238,7 @@ describe("mcp stdio integration", () => {
   it("calls snapshot over the stdio protocol", async () => {
     await client.initialize();
 
-    const result = await client.callTool("snapshot");
+    const result = await client.callTool("snapshot", await getPreferredExecutionArgs());
     const payload = JSON.parse(result.content[0]?.text ?? "{}") as {
       snapshot?: string;
       code?: string;
@@ -229,6 +263,7 @@ describe("mcp stdio integration", () => {
     await client.initialize();
 
     const result = await client.callTool("execute", {
+      ...(await getPreferredExecutionArgs()),
       actions: [
         {
           id: "sleep-1",
@@ -255,6 +290,206 @@ describe("mcp stdio integration", () => {
 
     assert.strictEqual(result.isError, true);
     assert.strictEqual(payload.code, "EXECUTION_VALIDATION_FAILED");
+  });
+
+  it("rejects open when both appId and uri are provided", async () => {
+    await client.initialize();
+
+    const result = await client.callTool("open", {
+      appId: "com.android.settings",
+      uri: "https://example.com",
+    });
+    const payload = parseToolPayload(result) as { code?: string };
+
+    assert.strictEqual(result.isError, true);
+    assert.strictEqual(payload.code, "EXECUTION_VALIDATION_FAILED");
+  });
+
+  it("rejects open when neither appId nor uri is provided", async () => {
+    await client.initialize();
+
+    const result = await client.callTool("open", {});
+    const payload = parseToolPayload(result) as { code?: string };
+
+    assert.strictEqual(result.isError, true);
+    assert.strictEqual(payload.code, "EXECUTION_VALIDATION_FAILED");
+  });
+
+  it("accepts open with only appId", async () => {
+    await client.initialize();
+
+    const result = await client.callTool("open", {
+      ...(await getPreferredExecutionArgs()),
+      appId: "com.android.settings",
+    });
+
+    if (result.isError) {
+      assertRuntimeStructuredError(result);
+      return;
+    }
+
+    const payload = parseToolPayload(result) as { envelope?: unknown };
+    assert.ok(payload.envelope);
+  });
+
+  it("accepts open with only uri", async () => {
+    await client.initialize();
+
+    const result = await client.callTool("open", {
+      ...(await getPreferredExecutionArgs()),
+      uri: "https://example.com",
+    });
+
+    if (result.isError) {
+      assertRuntimeStructuredError(result);
+      return;
+    }
+
+    const payload = parseToolPayload(result) as { envelope?: unknown };
+    assert.ok(payload.envelope);
+  });
+
+  it("rejects click when both selector and coordinate are provided", async () => {
+    await client.initialize();
+
+    const result = await client.callTool("click", {
+      selector: { text: "Settings" },
+      coordinate: { x: 1, y: 1 },
+    });
+
+    assert.strictEqual(result.isError, true);
+    assert.strictEqual((parseToolPayload(result) as { code?: string }).code, "EXECUTION_VALIDATION_FAILED");
+  });
+
+  it("rejects click when neither selector nor coordinate is provided", async () => {
+    await client.initialize();
+
+    const result = await client.callTool("click", {});
+
+    assert.strictEqual(result.isError, true);
+    assert.strictEqual((parseToolPayload(result) as { code?: string }).code, "EXECUTION_VALIDATION_FAILED");
+  });
+
+  it("rejects click when selector is empty", async () => {
+    await client.initialize();
+
+    const result = await client.callTool("click", {
+      selector: {},
+    });
+
+    assert.strictEqual(result.isError, true);
+    assert.strictEqual((parseToolPayload(result) as { code?: string }).code, "EXECUTION_VALIDATION_FAILED");
+  });
+
+  it("rejects press when key is unsupported", async () => {
+    await client.initialize();
+
+    const result = await client.callTool("press", { key: "volume_up" });
+
+    assert.strictEqual(result.isError, true);
+    assert.strictEqual((parseToolPayload(result) as { code?: string }).code, "EXECUTION_VALIDATION_FAILED");
+  });
+
+  it("accepts press with each supported key", async () => {
+    await client.initialize();
+
+    for (const key of ["back", "home", "recents"] as const) {
+      const result = await client.callTool("press", {
+        ...(await getPreferredExecutionArgs()),
+        key,
+      });
+
+      if (result.isError) {
+        assertRuntimeStructuredError(result);
+        continue;
+      }
+
+      const payload = parseToolPayload(result) as { envelope?: unknown };
+      assert.ok(payload.envelope);
+    }
+  });
+
+  it("returns a single string for read when all is omitted", async () => {
+    await client.initialize();
+
+    const result = await client.callTool("read", {
+      ...(await getPreferredExecutionArgs()),
+      selector: { textContains: "Settings" },
+    });
+
+    if (result.isError) {
+      assertRuntimeStructuredError(result);
+      return;
+    }
+
+    const payload = parseToolPayload(result);
+    assert.strictEqual(typeof payload, "string");
+  });
+
+  it("returns an array for read when all is true", async () => {
+    await client.initialize();
+
+    const result = await client.callTool("read", {
+      ...(await getPreferredExecutionArgs()),
+      selector: { textContains: "Settings" },
+      all: true,
+    });
+
+    if (result.isError) {
+      assertRuntimeStructuredError(result);
+      return;
+    }
+
+    const payload = parseToolPayload(result);
+    assert.ok(Array.isArray(payload));
+  });
+
+  it("rejects wait when selector is empty", async () => {
+    await client.initialize();
+
+    const result = await client.callTool("wait", {
+      selector: {},
+    });
+
+    assert.strictEqual(result.isError, true);
+    assert.strictEqual((parseToolPayload(result) as { code?: string }).code, "EXECUTION_VALIDATION_FAILED");
+  });
+
+  it("accepts scroll_until when clickAfter is omitted", async () => {
+    await client.initialize();
+
+    const result = await client.callTool("scroll_until", {
+      ...(await getPreferredExecutionArgs()),
+      selector: { textContains: "Settings" },
+    });
+
+    if (result.isError) {
+      assertRuntimeStructuredError(result);
+      return;
+    }
+
+    const payload = parseToolPayload(result) as { envelope?: { stepResults?: Array<{ actionType?: string }> } };
+    const actionType = payload.envelope?.stepResults?.[0]?.actionType;
+    assert.strictEqual(actionType, "scroll_until");
+  });
+
+  it("accepts scroll_until when clickAfter is true", async () => {
+    await client.initialize();
+
+    const result = await client.callTool("scroll_until", {
+      ...(await getPreferredExecutionArgs()),
+      selector: { textContains: "Settings" },
+      clickAfter: true,
+    });
+
+    if (result.isError) {
+      assertRuntimeStructuredError(result);
+      return;
+    }
+
+    const payload = parseToolPayload(result) as { envelope?: { stepResults?: Array<{ actionType?: string }> } };
+    const actionType = payload.envelope?.stepResults?.[0]?.actionType;
+    assert.strictEqual(actionType, "scroll_and_click");
   });
 
   it("rejects execute when an action is missing type", async () => {

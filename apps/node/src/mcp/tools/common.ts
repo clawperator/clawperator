@@ -1,10 +1,13 @@
 import { z, type ZodError, type ZodType } from "zod";
+import type { NodeMatcher } from "../../contracts/selectors.js";
 import type { Execution } from "../../contracts/execution.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 import { runExecution } from "../../domain/executions/runExecution.js";
 import { resolveOperatorPackageForRequest } from "../../domain/config/resolveOperatorPackage.js";
 import { buildMcpErrorResult, buildMcpSuccessResult, type McpToolResult } from "../errors.js";
+import type { McpSelectorInput } from "../selectors.js";
+import { mapSelectorToNodeMatcher } from "../selectors.js";
 
 export const executionToolOptionsSchema = z.object({
   deviceId: z.string().optional(),
@@ -44,12 +47,21 @@ export async function runExecutionTool(
     const result = await runExecution(execution, {
       deviceId: options.deviceId,
       operatorPackage: resolveOperatorPackageForRequest(options.operatorPackage),
-      timeoutMs: options.timeoutMs,
       warn: message => process.stderr.write(message),
     });
 
     if (!result.ok) {
       return buildMcpErrorResult(result.error);
+    }
+
+    if (result.envelope.status === "failed") {
+      return buildMcpErrorResult({
+        code: result.envelope.errorCode ?? "EXECUTION_FAILED",
+        message: result.envelope.error ?? "Execution failed",
+        envelope: result.envelope,
+        deviceId: result.deviceId,
+        terminalSource: result.terminalSource,
+      });
     }
 
     return await onSuccess(result);
@@ -74,4 +86,34 @@ export function buildExecutionSuccessPayload(result: Awaited<ReturnType<typeof r
 
 export function buildSuccessResult(payload: unknown): McpToolResult {
   return buildMcpSuccessResult(payload);
+}
+
+export function buildValidationResult(message: string, path?: string): McpToolResult {
+  return buildMcpErrorResult({
+    code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+    message,
+    ...(path !== undefined ? { details: { path } } : {}),
+  });
+}
+
+export function mapRequiredSelector(
+  selector: McpSelectorInput,
+  fieldName = "selector"
+): NodeMatcher | McpToolResult {
+  try {
+    return mapSelectorToNodeMatcher(selector, fieldName);
+  } catch (error) {
+    return buildValidationResult(error instanceof Error ? error.message : String(error), fieldName);
+  }
+}
+
+export function mapOptionalSelector(
+  selector: McpSelectorInput | undefined,
+  fieldName = "selector"
+): NodeMatcher | undefined | McpToolResult {
+  if (selector === undefined) {
+    return undefined;
+  }
+
+  return mapRequiredSelector(selector, fieldName);
 }
