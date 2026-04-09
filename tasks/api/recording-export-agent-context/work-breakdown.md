@@ -81,13 +81,13 @@ Read these files IN THIS ORDER before writing anything.
 | 9 | `apps/node/src/test/unit/skills.test.ts` | Existing scaffold / skills CLI coverage patterns |
 | 10 | `.agents/skills/docs-author/SKILL.md` | Required workflow for authored public docs changes |
 | 11 | `.agents/skills/docs-build/SKILL.md` | Required workflow for docs regeneration / validation |
-| 12 | `CLAUDE.md` | Repo validation rules, commit conventions, surface boundaries |
+| 12 | `AGENTS.md` | Repo validation rules, commit conventions, surface boundaries |
 
 ## PR / Phase Plan
 
 | PR | Purpose | Included phases | Agent tier | Merge gate |
 | --- | --- | --- | --- | --- |
-| PR-1 | Full recording-export workflow | 1, 2, 3, 4, 5 | thinking, default, default, default, default | `npm --prefix apps/node run build && npm --prefix apps/node run test` passes; docs build passes; live export workflow validated if debug Operator device is available |
+| PR-1 | Full recording-export workflow | 1, 2, 3, 4, 5 | thinking, default, default, default, default | `./gradlew :app:assembleDebug`, `./gradlew testDebugUnitTest`, `npm --prefix apps/node run build && npm --prefix apps/node run test`, and `./scripts/docs_build.sh` all pass; live export workflow validated if debug Operator device is available |
 
 ## Phase 1: Lock the export contract and test matrix
 
