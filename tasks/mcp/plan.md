@@ -134,6 +134,9 @@ Deterministic:
   - `scroll_until`
 - selector objects map directly to `NodeMatcher`
 - `type` supports `submit` and `clear`
+- `click` accepts optional `clickType` as an enum of `"default"`, `"long_click"`, `"focus"`; defaults to `"default"` when omitted
+- `press` validates `key` as an enum of `"back"`, `"home"`, `"recents"` at the MCP boundary; do not pass it as a free string to the domain layer
+- `read` with `all` omitted or false returns the first matched text as a string; `read` with `all: true` returns all matches as an array of strings; both shapes are returned as structured JSON in the MCP content block
 - execution-backed tools support `deviceId`, `operatorPackage`, and `timeoutMs`
 - all execution-backed tools use one shared execution ID helper
 - envelope extraction rules are implemented once and reused
@@ -157,7 +160,7 @@ Judgment:
 | Packaging | ship from `apps/node/`, not a separate repo or package |
 | Entry command | `clawperator mcp serve` |
 | Dependency strategy | pin `@modelcontextprotocol/sdk` to `1.29.0` in `apps/node/package.json` |
-| Stdio safety rule | stdout belongs exclusively to the MCP transport. The `mcp serve` path must not write anything to stdout except protocol messages emitted by the MCP SDK |
+| Stdio safety rule | stdout belongs exclusively to the MCP transport. The `mcp serve` path must not write anything to stdout except protocol messages emitted by the MCP SDK. Detect `mcp serve` in `apps/node/src/cli/index.ts` before `getGlobalOpts` runs and before any `console.log` can fire, then route directly to the MCP bootstrap; all pre-bootstrap errors must go to stderr |
 
 ### PR-1 minimal tool surface
 
@@ -204,6 +207,19 @@ Do not infer app-vs-URI from one untyped `target` string in the MCP layer.
 
 Do not split this into separate MCP tools in this task pack. Use one `scroll_until` tool with `clickAfter?: boolean`.
 
+When `clickAfter` is false or omitted, use the `scroll_until` canonical action type. When `clickAfter` is true, use the `scroll_and_click` canonical action type. Both are in `apps/node/src/contracts/aliases.ts`. Verify the exact strings against `apps/node/src/domain/executions/validateExecution.ts` before wiring.
+
+### `execute` input shape
+
+| Input field | Required behavior |
+| --- | --- |
+| `actions` | required array of `ExecutionAction` objects matching `apps/node/src/contracts/execution.ts` |
+| `deviceId` | optional pass-through |
+| `operatorPackage` | optional pass-through |
+| `timeoutMs` | optional override |
+
+The MCP server generates `commandId`, `taskId`, `source`, and `expectedFormat`. Callers never provide these fields. `source` is fixed to `"mcp"`. `expectedFormat` is fixed to `"android-ui-automator"`.
+
 ### Selector mapping
 
 | MCP input field | NodeMatcher field |
@@ -242,6 +258,8 @@ Coordinates are absolute integer screen pixels:
 | MCP protocol misuse | return correct MCP protocol errors rather than faking tool results |
 
 The implementation phase must define one shared extraction helper that documents exactly which `ResultEnvelope.stepResults[].data` fields are used for convenience extraction. If snapshot text or screenshot path behavior is not stable enough, do not promise convenience fields beyond what the canonical envelope safely provides.
+
+Before writing this helper, read `apps/node/src/domain/executions/snapshotHelper.ts` and equivalent helpers in `apps/node/src/domain/` to find the actual field keys. These keys are not declared in the TypeScript contracts and must be confirmed from domain code before implementation.
 
 ### Execution IDs
 

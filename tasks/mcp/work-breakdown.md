@@ -49,22 +49,23 @@ Read these files IN THIS ORDER before writing anything.
 | --- | --- | --- |
 | 1 | `apps/node/src/domain/executions/runExecution.ts` | Canonical execution orchestration and post-processing |
 | 2 | `apps/node/src/domain/executions/validateExecution.ts` | Canonical execution validation and supported actions |
-| 3 | `apps/node/src/contracts/execution.ts` | Execution payload contract |
-| 4 | `apps/node/src/contracts/result.ts` | Result envelope contract |
-| 5 | `apps/node/src/contracts/errors.ts` | Stable error codes |
-| 6 | `apps/node/src/contracts/selectors.ts` | Canonical selector contract |
-| 7 | `apps/node/src/cli/index.ts` | Top-level CLI dispatch and stdout behavior |
-| 8 | `apps/node/src/cli/registry.ts` | Existing command surface and help conventions |
-| 9 | `apps/node/src/cli/commands/action.ts` | Current action behavior references |
-| 10 | `apps/node/src/cli/commands/observe.ts` | Current observe behavior references |
-| 11 | `apps/node/src/cli/commands/devices.ts` | Current device-listing behavior references |
-| 12 | `apps/node/src/cli/commands/packages.ts` | Current package-listing behavior references and current CLI-only seam |
-| 13 | `apps/node/src/cli/commands/serve.ts` | Current server transport behavior and duplication seams |
-| 14 | `apps/node/package.json` | Publish surface, scripts, engines, shipped README |
-| 15 | `apps/node/README.md` | Package-facing docs surface |
-| 16 | `tasks/mcp/plan.md` | Stable contract and scope boundaries after code-first review |
-| 17 | sibling repo `../clawperator-distribution/docs/decision-framework.md` | Distribution rationale |
-| 18 | sibling repo `../clawperator-distribution/videos/intro/v1/demo-flow-notes.md` | Demo proof constraints |
+| 3 | `apps/node/src/domain/executions/snapshotHelper.ts` (and peer helpers in `domain/executions/`) | `ResultEnvelope.stepResults[].data` field keys used for structured extraction; these are not in the TypeScript contracts |
+| 4 | `apps/node/src/contracts/execution.ts` | Execution payload contract |
+| 5 | `apps/node/src/contracts/result.ts` | Result envelope contract |
+| 6 | `apps/node/src/contracts/errors.ts` | Stable error codes |
+| 7 | `apps/node/src/contracts/selectors.ts` | Canonical selector contract |
+| 8 | `apps/node/src/cli/index.ts` | Top-level CLI dispatch and stdout behavior |
+| 9 | `apps/node/src/cli/registry.ts` | Existing command surface and help conventions |
+| 10 | `apps/node/src/cli/commands/action.ts` | Current action behavior references |
+| 11 | `apps/node/src/cli/commands/observe.ts` | Current observe behavior references |
+| 12 | `apps/node/src/cli/commands/devices.ts` | Current device-listing behavior references |
+| 13 | `apps/node/src/cli/commands/packages.ts` | Current package-listing behavior references and current CLI-only seam |
+| 14 | `apps/node/src/cli/commands/serve.ts` | Current server transport behavior and duplication seams |
+| 15 | `apps/node/package.json` | Publish surface, scripts, engines, shipped README |
+| 16 | `apps/node/README.md` | Package-facing docs surface |
+| 17 | `tasks/mcp/plan.md` | Stable contract and scope boundaries after code-first review |
+| 18 | sibling repo `../clawperator-distribution/docs/decision-framework.md` | Distribution rationale |
+| 19 | sibling repo `../clawperator-distribution/videos/intro/v1/demo-flow-notes.md` | Demo proof constraints |
 
 ## PR / Phase Plan
 
@@ -91,9 +92,7 @@ Extract the minimum shared typed services needed so MCP does not become a third 
 
 ### Steps
 
-1. Extract or introduce typed helpers for the seams that are currently transport-specific:
-   - operator-package resolution/defaulting
-   - any execution helper that both `serve` and MCP would otherwise duplicate
+1. Extract typed helpers for the seams that are currently transport-specific. The primary target is `resolveOperatorPackageForRequest` in `apps/node/src/cli/commands/serve.ts` - move it to a shared module under `apps/node/src/domain/` or equivalent so MCP does not reimplement it. Read `serve.ts` for any other execution helpers that both `serve` and MCP would otherwise duplicate and extract those if the evidence is clear.
 2. Keep the extraction minimal and evidence-based. Do not refactor unrelated command code.
 3. Add focused tests proving the extracted services match current behavior.
 4. Update `serve.ts` to use the extracted helpers where that reduces duplication cleanly.
@@ -139,7 +138,7 @@ Add the `mcp serve` command path, pin the SDK dependency, and prove protocol cor
 
 ### Steps
 
-1. Add `@modelcontextprotocol/sdk` version `1.29.0` to `apps/node/package.json`.
+1. Add `@modelcontextprotocol/sdk` version `1.29.0` to `apps/node/package.json`. Before pinning, verify that this version is ESM-compatible (check the SDK's own `package.json` for `"type": "module"` or dual-CJS/ESM exports) and runs on Node 24 as required by the `engines` field.
 2. Add a new top-level `mcp` CLI command with a `serve` subcommand.
 3. Implement stdio MCP server bootstrap under `apps/node/src/mcp/`.
 4. Add shared MCP helpers for:
@@ -147,8 +146,8 @@ Add the `mcp serve` command path, pin the SDK dependency, and prove protocol cor
    - selector mapping
    - envelope extraction
    - MCP error/result shaping
-5. Explicitly protect the `mcp serve` path from stray stdout writes.
-6. Add real protocol tests modeled on the repo’s existing long-running integration style, covering:
+5. Explicitly protect the `mcp serve` path from stray stdout writes. In `apps/node/src/cli/index.ts`, detect the `mcp serve` argv pattern before `getGlobalOpts` runs and before any `console.log` can fire. Route directly to the MCP bootstrap from that detection point. All pre-bootstrap errors must go to stderr. This prevents `maybeShowStarHint`, the `console.log(result)` dispatch path, and `UsageError` formatting from writing to stdout during server operation.
+6. Add real protocol tests at `apps/node/src/test/integration/mcp.test.ts`, modeled on the repo’s existing long-running integration style (see `apps/node/src/test/integration/serve.test.ts`), covering:
    - no unexpected stdout bytes before initialize
    - initialize handshake
    - listTools
@@ -195,7 +194,7 @@ Ship the smallest useful real MCP surface on top of the verified transport.
 
 1. Implement `devices` using the shared typed device-listing path.
 2. Implement `snapshot` using the canonical observe/execution path.
-3. Implement `execute` as a thin wrapper over the canonical validated execution contract.
+3. Implement `execute` as a thin wrapper over the canonical validated execution contract. Callers provide `actions` (required, matching `ExecutionAction[]` from `contracts/execution.ts`), `deviceId` (optional), `operatorPackage` (optional), and `timeoutMs` (optional). The server generates `commandId` and `taskId` via the shared helper, sets `source` to `"mcp"`, and sets `expectedFormat` to `"android-ui-automator"`. Do not expose `commandId`, `taskId`, `source`, or `expectedFormat` as caller inputs. Use a light MCP schema for `actions`: require each element to have `id: string` and `type: string` with `params` as an optional passthrough object. Do not mirror all of `ActionParams` into Zod - let `validateExecution` do the real enforcement.
 4. Support common execution-backed options where applicable:
    - `deviceId`
    - `operatorPackage`
@@ -255,11 +254,12 @@ Add ergonomic named tools only after the transport and canonical execute path ar
    - `scroll_until`
 2. Use explicit schemas:
    - `open`: exactly one of `appId` or `uri`
-   - `click`: `selector` xor `coordinate`
+   - `click`: `selector` xor `coordinate`, optional `clickType` as enum of `"default"`, `"long_click"`, `"focus"`, defaults to `"default"` when omitted
    - `type`: required `text`, required `selector`, optional `submit`, optional `clear`
-   - `read`: required `selector`, optional `all`, optional `container`
+   - `read`: required `selector`, optional `all`, optional `container`; when `all` is false or omitted return first matched text as a string, when `all: true` return all matches as an array of strings
+   - `press`: required `key` as enum of `"back"`, `"home"`, `"recents"`, validated at the MCP boundary
    - `wait`: required `selector`, optional `timeoutMs`
-   - `scroll_until`: required `selector`, optional `container`, optional `clickAfter?: boolean`
+   - `scroll_until`: required `selector`, optional `container`, optional `clickAfter?: boolean`; use `scroll_until` action type when `clickAfter` is false or omitted, `scroll_and_click` action type when `clickAfter` is true
 3. Add protocol-level tests for valid and invalid tool calls.
 4. Do not add `packages`, `back`, or `scroll` in this task pack.
 
@@ -311,7 +311,7 @@ Document the shipped MCP surface clearly and verify it against a real client plu
    - branch-local development command example
    - Claude Desktop configuration example
    - Node version requirement
-   - environment configuration for long-running MCP processes, including `CLAWPERATOR_OPERATOR_PACKAGE` and `ADB_PATH`
+   - environment configuration for long-running MCP processes, including `CLAWPERATOR_OPERATOR_PACKAGE` and `ADB_PATH`; note that Claude Desktop and similar MCP clients typically do not inherit the shell PATH, so `ADB_PATH` must be set explicitly in the client env block rather than relying on PATH resolution
    - the shipped MCP tool list
    - device-selection caveats
    - a short smoke-test flow
