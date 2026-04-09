@@ -708,6 +708,14 @@ describe("promoted flat commands - help and missing-arg errors", () => {
     assert.match(obj.message ?? "", /unrecognized flag '--goal'/);
   });
 
+  it("execute synonym also rejects --goal for normal payload execution", async () => {
+    const { stdout, code } = await runCli(["execute", "--goal", "wifi"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(obj.code, "USAGE");
+    assert.match(obj.message ?? "", /unrecognized flag '--goal'/);
+  });
+
   it("exec rejects typoed dash-prefixed flags before treating them as payloads", async () => {
     const { stdout, code } = await runCli(["exec", "--goa", "wifi"]);
     assert.strictEqual(code, 1, stdout);

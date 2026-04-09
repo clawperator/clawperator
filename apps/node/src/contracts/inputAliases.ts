@@ -84,6 +84,9 @@ function remapObjectKeys(
     if (isAliasKey && hadCanonicalInInput) {
       continue;
     }
+    if (value === undefined) {
+      continue;
+    }
     output[canonicalKey] = value;
   }
 
@@ -109,6 +112,9 @@ function normalizeActionParamsInput(input: unknown): unknown {
     }
     if (canonicalKey === "clickType" && value === true) {
       return "long_click";
+    }
+    if (canonicalKey === "clickType" && value === false) {
+      return undefined;
     }
     return value;
   });

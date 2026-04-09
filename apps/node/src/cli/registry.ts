@@ -1052,7 +1052,7 @@ COMMANDS["packages"] = {
   },
 };
 
-// exec (synonym: execute). Payload: positional <json-or-file>, --payload, or --execution (alias). Public CLI reference must stay aligned.
+// exec (synonym: execute). Payload: positional <json-or-file>, --payload, or payload aliases. Public CLI reference must stay aligned.
 COMMANDS["exec"] = {
   name: "exec",
   synonyms: ["execute"],
@@ -1075,7 +1075,9 @@ Payload (one of):
 
 Options:
   --payload <json-or-file>  Same as positional payload (primary named form)
-  --execution <json-or-file>  Alias for --payload (backward compatibility)
+  --execution <json-or-file> Alias for --payload (backward compatibility)
+  --input <json-or-file>     Alias for --payload
+  --file <json-or-file>      Alias for --payload
   --validate-only           Validate payload without executing
   --dry-run                 Print execution plan without running
 
@@ -1083,7 +1085,7 @@ Notes:
   - Leading '{' is always parsed as inline JSON. Leading '[' tries the string as a file path first; if the file is missing, it is parsed as an inline JSON array. Any other string is read as a file path.
   - Error precedence: unreadable file path -> invalid JSON content -> missing payload.
   - 'execute' is accepted as a synonym for 'exec'.
-  - '--execution' is accepted as an alias for '--payload'.
+  - '--execution', '--input', and '--file' are accepted aliases for '--payload'.
 `,
   topLevelBlock: `  exec <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>]
                                             Execute a validated command payload or print a dry-run plan

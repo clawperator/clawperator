@@ -300,7 +300,7 @@ async function main(): Promise<void> {
           if (arg === "--") {
             break;
           }
-          if (cmd === "exec" && rest[0] !== "best-effort" && arg === "--goal") {
+          if (def.name === "exec" && rest[0] !== "best-effort" && arg === "--goal") {
             firstUnknownFlag = arg;
             break;
           }

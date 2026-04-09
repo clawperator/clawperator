@@ -91,6 +91,27 @@ describe("validateExecution", () => {
     assert.strictEqual(ex.actions[0].type, "enter_text");
   });
 
+  it("normalizes longPress false by omitting clickType", () => {
+    const ex = validateExecution({
+      commandId: "cmd-longpress-false-1",
+      taskId: "task-longpress-false-1",
+      source: "test",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 5000,
+      actions: [
+        {
+          id: "click-1",
+          type: "click",
+          params: {
+            matcher: { textEquals: "Login" },
+            longPress: false,
+          },
+        },
+      ],
+    });
+    assert.strictEqual(ex.actions[0].params?.clickType, undefined);
+  });
+
   it("normalizes snake_case execution keys and common param aliases", () => {
     const ex = validateExecution({
       command_id: "cmd-snake-1",
