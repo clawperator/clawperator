@@ -18,12 +18,12 @@ updates authored public docs.
 
 | Item | Value |
 | --- | --- |
-| State | planning |
+| State | complete |
 | Total PRs | 1 |
 | Total phases | 5 |
-| Completed | 0 |
-| Remaining | 5 |
-| Current / Next | Phase 1 |
+| Completed | 5 |
+| Remaining | 0 |
+| Current / Next | complete |
 | Blockers | none |
 
 ## Goal

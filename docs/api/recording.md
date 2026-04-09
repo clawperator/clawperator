@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Document the current recording workflow, the raw NDJSON schema written by the Operator app, and the parsed step-log format produced by `clawperator record parse`.
+Document the current recording workflow, the raw NDJSON schema written by the Operator app, the parsed step-log format produced by `clawperator record parse`, and the agent-context export produced by `clawperator recording export`.
 
 ## Sources
 
@@ -10,6 +10,8 @@ Document the current recording workflow, the raw NDJSON schema written by the Op
 - Parser behavior: `apps/node/src/domain/recording/parseRecording.ts`
 - Pull behavior: `apps/node/src/domain/recording/pullRecording.ts`
 - CLI commands: `apps/node/src/cli/commands/record.ts`, `apps/node/src/cli/registry.ts`
+- Export builder: `apps/node/src/domain/recording/exportRecording.ts`
+- Shared validation: `apps/node/src/domain/recording/recordingValidation.ts`
 - Public error codes: `apps/node/src/contracts/errors.ts`
 
 ## Recording Lifecycle
@@ -21,6 +23,7 @@ The current flow is:
 3. `clawperator record stop [--session-id <id>]`
 4. `clawperator record pull [--session-id <id>] [--out <dir>]`
 5. `clawperator record parse --input <file> [--out <file>]`
+6. `clawperator recording export --input <file> [--out <file>] [--snapshots <omit|include>]`
 
 Notes:
 
@@ -29,6 +32,8 @@ Notes:
 - `parse` writes `<input without .ndjson>.steps.json` when the input ends with `.ndjson`, otherwise `<input>.steps.json`
 - `record start` builder timeout is `10000`
 - `record stop` builder timeout is `15000`
+- `recording export` defaults to `--snapshots omit`
+- `recording export` writes `<input without .ndjson>.export.json` when the input ends with `.ndjson`, otherwise `<input>.export.json`
 
 ## CLI Commands
 
@@ -224,6 +229,139 @@ Check:
 - `outputFile == "./recordings/demo-session.steps.json"`
 - `stepCount` matches the parsed `steps.length`
 - `stdout` contains the JSON result, while `stderr` also receives a human-readable step summary from `printStepSummary()`
+
+### Export
+
+```bash
+clawperator recording export --input <file> [--out <file>] [--snapshots <omit|include>] [--output <json|pretty>]
+clawperator record export --input <file> [--out <file>] [--snapshots <omit|include>] [--output <json|pretty>]
+```
+
+What the command does:
+
+- reads a local NDJSON recording file
+- validates it with the shared recording validator
+- preserves every supported raw event type in a richer JSON artifact
+- writes the export to disk
+- returns a compact success wrapper with the export path and summary counts
+- does not derive skills, selectors, parameters, or plans
+
+Snapshot mode:
+
+- `omit` is the default
+- `include` preserves the raw XML string in `snapshot.xml`
+- both modes always preserve `snapshot.present`
+
+Output-path rule:
+
+- if `--out` is omitted and the input ends with `.ndjson`, the output path is `<input without .ndjson>.export.json`
+- otherwise the output path is `<input>.export.json`
+- if `--out` is provided, that path is used as-is
+
+Success wrapper shape:
+
+```json
+{
+  "ok": true,
+  "outputFile": "./recordings/demo-session.export.json",
+  "sessionId": "demo-session",
+  "eventCount": 5,
+  "packageTransitionCount": 2,
+  "byType": {
+    "window_change": 1,
+    "click": 1,
+    "scroll": 1,
+    "press_key": 1,
+    "text_change": 1
+  }
+}
+```
+
+Verification:
+
+```bash
+clawperator recording export --input ./recordings/export-demo.ndjson --json
+```
+
+Check:
+
+- `ok == true`
+- `outputFile` ends with `.export.json`
+- `eventCount` matches `counts.totalEvents` inside the written file
+- `packageTransitionCount` matches the number of computed package transitions
+- `byType` matches the event-type counts inside the written file
+
+Export file contract:
+
+```json
+{
+  "exportVersion": 1,
+  "session": {
+    "sessionId": "demo-session",
+    "schemaVersion": 1,
+    "startedAt": 1710000000000,
+    "operatorPackage": "com.clawperator.operator.dev"
+  },
+  "snapshotMode": "omit",
+  "events": [
+    {
+      "seq": 0,
+      "ts": 1710000000000,
+      "deltaMsSincePrevious": null,
+      "type": "window_change",
+      "packageName": "com.android.settings",
+      "className": "com.android.settings.Settings",
+      "title": "Settings",
+      "snapshot": {
+        "present": true,
+        "xml": null
+      }
+    }
+  ],
+  "counts": {
+    "totalEvents": 1,
+    "byType": {
+      "window_change": 1
+    }
+  },
+  "packageTransitions": [],
+  "timeline": {
+    "firstEventTs": 1710000000000,
+    "lastEventTs": 1710000000000,
+    "durationMs": 0
+  }
+}
+```
+
+Exported event types:
+
+| Type | Preserved fields |
+| --- | --- |
+| `window_change` | `seq`, `ts`, `deltaMsSincePrevious`, `type`, `packageName`, `className`, `title`, `snapshot` |
+| `click` | `seq`, `ts`, `deltaMsSincePrevious`, `type`, `packageName`, `resourceId`, `text`, `contentDesc`, `bounds`, `snapshot` |
+| `scroll` | `seq`, `ts`, `deltaMsSincePrevious`, `type`, `packageName`, `resourceId`, `scrollX`, `scrollY`, `maxScrollX`, `maxScrollY`, `snapshot` |
+| `press_key` | `seq`, `ts`, `deltaMsSincePrevious`, `type`, `key`, `snapshot` |
+| `text_change` | `seq`, `ts`, `deltaMsSincePrevious`, `type`, `packageName`, `resourceId`, `text`, `snapshot` |
+
+Deterministic derived fields:
+
+- events are sorted by `seq` before export
+- `deltaMsSincePrevious` is `null` for the first event, then `current.ts - previous.ts`
+- package transitions are computed from adjacent package-bearing events only
+- `press_key` events are skipped for package-transition comparison
+- `timeline.durationMs` is `lastEventTs - firstEventTs`
+
+Failure modes:
+
+- malformed header or event data: `RECORDING_PARSE_FAILED`
+- unsupported schema version: `RECORDING_SCHEMA_VERSION_UNSUPPORTED`
+- output write failure: `RECORDING_EXPORT_FAILED`
+
+Recovery:
+
+- `RECORDING_EXPORT_FAILED`: fix the `--out` path, confirm the parent directory is writable, or choose a different host path
+
+The export is evidence for an external authoring agent or human. It is not an automatic skill generator.
 
 ## NDJSON Format
 
@@ -472,6 +610,7 @@ Only document codes that exist in `apps/node/src/contracts/errors.ts`.
 | `RECORDING_SESSION_NOT_FOUND` | `record pull` could not resolve a session id or the provided id was invalid |
 | `RECORDING_PULL_FAILED` | adb pull failed |
 | `RECORDING_PARSE_FAILED` | malformed file, invalid header, bad event fields, bad NDJSON, or unknown event type |
+| `RECORDING_EXPORT_FAILED` | output file or parent directory could not be written |
 | `RECORDING_SCHEMA_VERSION_UNSUPPORTED` | header schema version was not `1` |
 
 Related CLI usage error:
