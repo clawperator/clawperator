@@ -9,7 +9,7 @@ This follow-up should ship across 1 PR and 4 phases:
 - Phase 1: contract and schema convergence
 - Phase 2: runtime and error-surface hardening
 - Phase 3: transport and verification hardening
-- Phase 4: docs and operator-facing polish
+- Phase 4: agent ergonomics and docs polish
 
 ## Status
 
