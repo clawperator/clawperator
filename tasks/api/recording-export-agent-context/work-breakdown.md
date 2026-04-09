@@ -288,6 +288,7 @@ agent-context JSON artifact from a local NDJSON recording file.
    - `topLevelBlock` line for `recording export`
    - bare-command USAGE message updated to `recording start|stop|pull|parse|export ...`
    - help text that explains syntax, output-path rule, and `--snapshots <omit|include>`
+   - `--out` must be labeled and described as a file path, not a directory path
 12. Keep `recording parse` semantics unchanged.
 13. Add CLI and unit tests for:
    - valid `recording export --input <file>`
