@@ -34,6 +34,40 @@ export function getStringOpt(rest: string[], flag: string): string | undefined {
   return rest[i + 1];
 }
 
+export function getStringOptStrict(
+  rest: string[],
+  flag: string,
+  knownFlags: readonly string[] = [],
+): string | undefined {
+  const i = rest.indexOf(flag);
+  if (i < 0) {
+    return undefined;
+  }
+
+  const value = rest[i + 1];
+  if (!value) {
+    throw new UsageError(`${flag} requires a value`);
+  }
+
+  if (value === "--") {
+    const escapedValue = rest[i + 2];
+    if (!escapedValue) {
+      throw new UsageError(`${flag} requires a value`);
+    }
+    return escapedValue;
+  }
+
+  if (knownFlags.includes(value)) {
+    throw new UsageError(`${flag} requires a value`);
+  }
+
+  if (value.startsWith("--")) {
+    throw new UsageError(`${flag} requires a value. Use '${flag} -- <literal>' for a literal value that starts with --`);
+  }
+
+  return value;
+}
+
 export function getNumberOpt(rest: string[], flag: string): number | undefined {
   const i = rest.indexOf(flag);
   if (i < 0) {
@@ -229,14 +263,39 @@ Notes:
 const HELP_SKILLS_NEW = `clawperator skills new
 
 Usage:
-  clawperator skills new <skill_id> [--summary <text>] [--output <json|pretty>]
+  clawperator skills new <skill_id> [--summary <text>] [--recording-context <file>] [--output <json|pretty>]
 
 Notes:
   - Scaffolds a new local skill in the currently configured skills registry repo.
   - Derives applicationId and intent by splitting <skill_id> on the final dot.
   - Creates: SKILL.md, skill.json, scripts/run.js, and scripts/run.sh
   - --summary overrides the default TODO summary written to skill.json and SKILL.md.
+  - --recording-context copies a recording export JSON file into the new skill folder as reference evidence for an external authoring agent or human.
   - Updates the configured registry JSON so the new skill appears in skills list.
+`;
+
+const HELP_RECORDING = `clawperator recording
+
+Usage:
+  clawperator recording start|stop|pull|parse|export ... ('record' is an alias)
+`;
+
+const HELP_RECORDING_EXPORT = `clawperator recording export
+
+Usage:
+  clawperator recording export --input <file|directory> [--out <file>] [--snapshots <omit|include>] [--output <json|pretty>]
+  clawperator record export --input <file|directory> [--out <file>] [--snapshots <omit|include>] [--output <json|pretty>]
+
+Options:
+  --input <file|directory>       Local NDJSON recording file, or a directory resolved to the newest *.ndjson recording
+  --out <file>                   Output JSON file path
+  --snapshots <omit|include>     Snapshot XML mode (default: omit)
+
+Notes:
+  - Replaces a trailing .ndjson suffix with .export.json when --out is omitted.
+  - Otherwise appends .export.json to the input path when --out is omitted.
+  - Preserves raw recording evidence for agent or human review.
+  - Does not generate skill logic, selectors, or parameters.
 `;
 
 const HELP_SKILLS_VALIDATE = `clawperator skills validate
@@ -1875,7 +1934,7 @@ COMMANDS["skills"] = {
     const sub = rest[0];
     if (sub === "search") return ["--app", "--intent", "--keyword"];
     if (sub === "compile-artifact") return ["--skill-id", "--artifact", "--vars"];
-    if (sub === "new") return ["--summary"];
+    if (sub === "new") return ["--summary", "--recording-context"];
     if (sub === "validate") return ["--all", "--dry-run"];
     if (sub === "run") return ["--device", "--device-id", "--operator-package", "--receiver-package", "--timeout", "--timeout-ms", "--expect-contains", "--skip-validate"];
     if (sub === "sync" || sub === "update") return ["--ref"];
@@ -1890,7 +1949,7 @@ Usage:
   clawperator skills search --app <package_id> [--intent <intent>] [--keyword <text>]
   clawperator skills search <keyword>
   clawperator skills compile-artifact <skill_id> --artifact <name> [--vars <json>]
-  clawperator skills new <skill_id> [--summary <text>]
+  clawperator skills new <skill_id> [--summary <text>] [--recording-context <file>]
   clawperator skills validate <skill_id> [--dry-run]
   clawperator skills validate --all [--dry-run]
   clawperator skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--json] [--output <json|pretty>] [-- <extra_args>]
@@ -1916,7 +1975,7 @@ Usage:
   skills compile-artifact <skill_id> --artifact <name> [--vars <json>]
   skills compile-artifact --skill-id <id> --artifact <name> [--vars <json>]
                                             Compile from a skill artifact (skill: positional or --skill-id; artifact: climate-status or climate-status.recipe.json)
-  skills new <skill_id> [--summary <text>]
+  skills new <skill_id> [--summary <text>] [--recording-context <file>]
                                             Scaffold a new local skill folder and registry entry
   skills validate <skill_id> [--dry-run]
   skills validate --all [--dry-run]
@@ -1967,10 +2026,14 @@ Usage:
       }
     } else if (rest[0] === "new") {
       if (!rest[1]) {
-        return JSON.stringify({ code: "USAGE", message: "skills new <skill_id> [--summary <text>]" });
+        return JSON.stringify({ code: "USAGE", message: "skills new <skill_id> [--summary <text>] [--recording-context <file>]" });
       } else {
-        const summary = getOpt(rest, "--summary");
-        return (await import("./commands/skills.js")).cmdSkillsNew(rest[1], { ...out, summary });
+        const knownFlags = ["--summary", "--recording-context"];
+        return (await import("./commands/skills.js")).cmdSkillsNew(rest[1], {
+          ...out,
+          summary: getStringOptStrict(rest, "--summary", knownFlags),
+          recordingContextPath: getStringOptStrict(rest, "--recording-context", knownFlags),
+        });
       }
     } else if (rest[0] === "validate") {
       const dryRun = hasFlag(rest, "--dry-run");
@@ -2040,10 +2103,14 @@ COMMANDS["recording"] = {
     if (sub === "start" || sub === "stop") return ["--session-id"];
     if (sub === "pull") return ["--session-id", "--out"];
     if (sub === "parse") return ["--input", "--out"];
+    if (sub === "export") return ["--input", "--out", "--snapshots"];
     return [];
   },
   summary: "Manage recording sessions on the Operator app",
-  help: "clawperator recording\n\nUsage:\n  clawperator recording start|stop|pull|parse ... ('record' is an alias)\n",
+  help: HELP_RECORDING,
+  subtopics: {
+    export: HELP_RECORDING_EXPORT,
+  },
   topLevelBlock: `  recording start [--session-id <id>] [--device <serial>] [--operator-package <pkg>]
                                             Start a recording session on the Operator app ('record' is an alias)
   recording stop  [--session-id <id>] [--device <serial>] [--operator-package <pkg>]
@@ -2051,7 +2118,9 @@ COMMANDS["recording"] = {
   recording pull  [--session-id <id>] [--out <dir>] [--device <serial>]
                                             Pull the on-device NDJSON recording to host (default: ./recordings/, 'record' is an alias)
   recording parse --input <file> [--out <file>]
-                                            Parse a raw NDJSON recording into a step log JSON ('record' is an alias)`,
+                                            Parse a raw NDJSON recording into a step log JSON ('record' is an alias)
+  recording export --input <file|directory> [--out <file>] [--snapshots <omit|include>]
+                                            Export raw recording evidence into agent-context JSON ('record' is an alias)`,
   handler: async (ctx) => {
     const { rest, format, verbose, logger, deviceId, operatorPackage } = ctx;
     const out = { format, verbose, logger };
@@ -2063,38 +2132,53 @@ COMMANDS["recording"] = {
     if (sub === "start") {
       return (await import("./commands/record.js")).cmdRecordStart({
         ...out,
-        sessionId: getOpt(rest, "--session-id"),
+        sessionId: getStringOptStrict(rest, "--session-id", ["--session-id"]),
         ...runOpts,
       });
     } else if (sub === "stop") {
       return (await import("./commands/record.js")).cmdRecordStop({
         ...out,
-        sessionId: getOpt(rest, "--session-id"),
+        sessionId: getStringOptStrict(rest, "--session-id", ["--session-id"]),
         ...runOpts,
       });
     } else if (sub === "pull") {
-      const outputDirFlag = getStringOpt(rest, "--out");
+      const outputDirFlag = getStringOptStrict(rest, "--out", ["--session-id", "--out"]);
       const outputDir = outputDirFlag ?? "./recordings/";
       return (await import("./commands/record.js")).cmdRecordPull({
         ...out,
-        sessionId: getOpt(rest, "--session-id"),
+        sessionId: getStringOptStrict(rest, "--session-id", ["--session-id", "--out"]),
         outputDir,
         ...runOpts,
       });
     } else if (sub === "parse") {
-      const inputFile = getStringOpt(rest, "--input");
+      const inputFile = getStringOptStrict(rest, "--input", ["--input", "--out"]);
       if (!inputFile) {
         return JSON.stringify({ code: "USAGE", message: "recording parse --input <file> [--out <file>] ('record' is an alias)" });
       } else {
-        const outputFileFlag = getStringOpt(rest, "--out");
+        const outputFileFlag = getStringOptStrict(rest, "--out", ["--input", "--out"]);
         return (await import("./commands/record.js")).cmdRecordParse({
           ...out,
           inputFile,
           outputFile: outputFileFlag,
         });
       }
+    } else if (sub === "export") {
+      const inputFile = getStringOptStrict(rest, "--input", ["--input", "--out", "--snapshots"]);
+      if (!inputFile) {
+        return JSON.stringify({ code: "USAGE", message: "recording export --input <file|directory> [--out <file>] [--snapshots <omit|include>] ('record' is an alias)" });
+      }
+      const snapshotMode = getStringOptStrict(rest, "--snapshots", ["--input", "--out", "--snapshots"]);
+      if (snapshotMode !== undefined && snapshotMode !== "omit" && snapshotMode !== "include") {
+        throw new UsageError("recording export --snapshots must be one of: omit, include");
+      }
+      return (await import("./commands/record.js")).cmdRecordExport({
+        ...out,
+        inputFile,
+        outputFile: getStringOptStrict(rest, "--out", ["--input", "--out", "--snapshots"]),
+        snapshotMode,
+      });
     } else {
-      return JSON.stringify({ code: "USAGE", message: "recording start|stop|pull|parse ... ('record' is an alias)" });
+      return JSON.stringify({ code: "USAGE", message: "recording start|stop|pull|parse|export ... ('record' is an alias)" });
     }
   },
 };

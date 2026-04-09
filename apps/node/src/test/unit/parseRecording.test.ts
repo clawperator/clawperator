@@ -836,4 +836,48 @@ describe("parseRecording", () => {
       }
     );
   });
+
+  it("still prints the human-readable step summary to stderr", () => {
+    const ndjson = [
+      buildHeader(),
+      JSON.stringify({
+        ts: 1710000000000,
+        seq: 0,
+        type: "window_change",
+        packageName: "com.android.settings",
+        className: "com.android.settings.Settings",
+        title: "Settings",
+        snapshot: "<hierarchy><node /></hierarchy>",
+      }),
+      JSON.stringify({
+        ts: 1710000000100,
+        seq: 1,
+        type: "click",
+        packageName: "com.android.settings",
+        resourceId: "com.android.settings:id/dashboard_tile",
+        text: "Display",
+        contentDesc: "Display settings",
+        bounds: { left: 0, top: 400, right: 1080, bottom: 560 },
+        snapshot: "<hierarchy><node text='Display' /></hierarchy>",
+      }),
+    ].join("\n");
+
+    const writes: string[] = [];
+    const originalWrite = process.stderr.write.bind(process.stderr);
+    process.stderr.write = ((chunk: unknown) => {
+      writes.push(String(chunk));
+      return true;
+    }) as typeof process.stderr.write;
+
+    try {
+      parseRecording(ndjson);
+    } finally {
+      process.stderr.write = originalWrite;
+    }
+
+    assert.deepStrictEqual(writes, [
+      "[0] open_app   com.android.settings\n",
+      "[1] click      text=\"Display\" resourceId=com.android.settings:id/dashboard_tile contentDesc=\"Display settings\"\n",
+    ]);
+  });
 });

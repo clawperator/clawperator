@@ -1,8 +1,9 @@
 import { describe, it } from "node:test";
 import assert from "node:assert";
 import { spawn } from "node:child_process";
-import { rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "../../..");
@@ -242,6 +243,7 @@ describe("CLI help", () => {
     assert.match(stdout, /recording stop/);
     assert.match(stdout, /recording pull/);
     assert.match(stdout, /recording parse/);
+    assert.match(stdout, /recording export/);
     assert.match(stdout, /'record' is an alias/);
   });
 
@@ -250,7 +252,7 @@ describe("CLI help", () => {
     assert.strictEqual(code, 0);
     const obj = JSON.parse(stdout);
     assert.strictEqual(obj.code, "USAGE");
-    assert.match(obj.message, /recording start\|stop\|pull\|parse/);
+    assert.match(obj.message, /recording start\|stop\|pull\|parse\|export/);
     assert.match(obj.message, /'record' is an alias/);
   });
 
@@ -259,7 +261,7 @@ describe("CLI help", () => {
     assert.strictEqual(code, 0);
     const obj = JSON.parse(stdout);
     assert.strictEqual(obj.code, "USAGE");
-    assert.match(obj.message, /recording start\|stop\|pull\|parse/);
+    assert.match(obj.message, /recording start\|stop\|pull\|parse\|export/);
     assert.match(obj.message, /'record' is an alias/);
   });
 
@@ -269,6 +271,50 @@ describe("CLI help", () => {
     const obj = JSON.parse(stdout);
     assert.strictEqual(obj.code, "USAGE");
     assert.match(obj.message, /--input/);
+  });
+
+  it("returns USAGE for recording export without --input", async () => {
+    const { stdout, code } = await runCli(["recording", "export"]);
+    assert.strictEqual(code, 0);
+    const obj = JSON.parse(stdout);
+    assert.strictEqual(obj.code, "USAGE");
+    assert.match(obj.message, /recording export --input <file\|directory>/);
+  });
+
+  it("returns USAGE when --input is followed by another flag for recording export", async () => {
+    const { stdout, code } = await runCli(["recording", "export", "--input", "--out", "/tmp/demo.export.json"]);
+    assert.notStrictEqual(code, 0);
+    assert.match(stdout, /"code":"USAGE"/);
+    assert.match(stdout, /--input requires a value/);
+  });
+
+  it("returns USAGE when --input is followed by an unknown flag for recording export", async () => {
+    const { stdout, code } = await runCli(["recording", "export", "--input", "--bogus"]);
+    assert.notStrictEqual(code, 0);
+    assert.match(stdout, /"code":"USAGE"/);
+    assert.match(stdout, /Use '--input -- <literal>'/);
+  });
+
+  it("returns USAGE when --input is followed by another flag for recording parse", async () => {
+    const { stdout, code } = await runCli(["recording", "parse", "--input", "--out", "/tmp/demo.steps.json"]);
+    assert.notStrictEqual(code, 0);
+    assert.match(stdout, /"code":"USAGE"/);
+    assert.match(stdout, /--input requires a value/);
+  });
+
+  it("returns USAGE when --snapshots is missing a value for recording export", async () => {
+    const { stdout, code } = await runCli(["recording", "export", "--input", "/tmp/demo.ndjson", "--snapshots"]);
+    assert.notStrictEqual(code, 0);
+    assert.match(stdout, /"code":"USAGE"/);
+    assert.match(stdout, /--snapshots requires a value/);
+  });
+
+  it("returns USAGE when --snapshots has an invalid value for record export", async () => {
+    const { stdout, code } = await runCli(["record", "export", "--input", "/tmp/demo.ndjson", "--snapshots", "foo"]);
+    assert.notStrictEqual(code, 0);
+    const obj = JSON.parse(stdout);
+    assert.strictEqual(obj.code, "USAGE");
+    assert.match(obj.message, /omit, include/);
   });
 
   it("returns USAGE for record parse without --input", async () => {
@@ -284,6 +330,131 @@ describe("CLI help", () => {
     assert.notStrictEqual(code, 0);
     assert.match(stdout, /"code":"USAGE"/);
     assert.match(stdout, /--out requires a value/);
+  });
+
+  it("returns USAGE when --out is followed by another flag for recording pull", async () => {
+    const { stdout, code } = await runCli(["recording", "pull", "--out", "--session-id", "abc"]);
+    assert.notStrictEqual(code, 0);
+    assert.match(stdout, /"code":"USAGE"/);
+    assert.match(stdout, /--out requires a value/);
+  });
+
+  it("recording export accepts a dash-prefixed input path", async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-recording-dash-input-"));
+    const inputFile = join(tempRoot, "-context.ndjson");
+    await mkdir(tempRoot, { recursive: true });
+    await writeFile(
+      inputFile,
+      [
+        JSON.stringify({
+          type: "recording_header",
+          schemaVersion: 1,
+          sessionId: "dash-input",
+          startedAt: 1710000000000,
+          operatorPackage: "com.clawperator.operator.dev",
+        }),
+        JSON.stringify({
+          ts: 1710000000100,
+          seq: 0,
+          type: "window_change",
+          packageName: "com.example.a",
+          className: "MainActivity",
+          title: "Home",
+          snapshot: "<window />",
+        }),
+      ].join("\n"),
+      "utf8",
+    );
+
+    try {
+      const { stdout, code } = await runCli(["recording", "export", "--input", inputFile]);
+
+      assert.strictEqual(code, 0, stdout);
+      const output = join(tempRoot, "-context.export.json");
+      await stat(output);
+      const obj = JSON.parse(stdout) as { outputFile?: string };
+      assert.strictEqual(obj.outputFile, output);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("recording export accepts an escaped double-dash input path", async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-recording-double-dash-input-"));
+    const inputFile = join(tempRoot, "--context.ndjson");
+    await mkdir(tempRoot, { recursive: true });
+    await writeFile(
+      inputFile,
+      [
+        JSON.stringify({
+          type: "recording_header",
+          schemaVersion: 1,
+          sessionId: "double-dash-input",
+          startedAt: 1710000000000,
+          operatorPackage: "com.clawperator.operator.dev",
+        }),
+        JSON.stringify({
+          ts: 1710000000100,
+          seq: 0,
+          type: "window_change",
+          packageName: "com.example.a",
+          className: "MainActivity",
+          title: "Home",
+          snapshot: "<window />",
+        }),
+      ].join("\n"),
+      "utf8",
+    );
+
+    try {
+      const { stdout, code } = await runCli(["recording", "export", "--input", "--", inputFile]);
+
+      assert.strictEqual(code, 0, stdout);
+      const output = join(tempRoot, "--context.export.json");
+      await stat(output);
+      const obj = JSON.parse(stdout) as { outputFile?: string };
+      assert.strictEqual(obj.outputFile, output);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("still rejects unknown flags after an escaped double-dash input path", async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-recording-double-dash-input-unknown-"));
+    const inputFile = join(tempRoot, "--context.ndjson");
+    await mkdir(tempRoot, { recursive: true });
+    await writeFile(
+      inputFile,
+      [
+        JSON.stringify({
+          type: "recording_header",
+          schemaVersion: 1,
+          sessionId: "double-dash-input",
+          startedAt: 1710000000000,
+          operatorPackage: "com.clawperator.operator.dev",
+        }),
+        JSON.stringify({
+          ts: 1710000000100,
+          seq: 0,
+          type: "window_change",
+          packageName: "com.example.a",
+          className: "MainActivity",
+          title: "Home",
+          snapshot: "<window />",
+        }),
+      ].join("\n"),
+      "utf8",
+    );
+
+    try {
+      const { stdout, code } = await runCli(["recording", "export", "--input", "--", inputFile, "--bogus"]);
+
+      assert.notStrictEqual(code, 0);
+      assert.match(stdout, /"code":"USAGE"/);
+      assert.match(stdout, /unrecognized flag '--bogus'/);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
   });
 
   it("returns USAGE when --out flag has no value for record pull", async () => {

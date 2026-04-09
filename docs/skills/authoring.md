@@ -31,6 +31,12 @@ The scaffold writes exact relative paths:
 - `skills/<skill_id>/scripts/run.js`
 - `skills/<skill_id>/scripts/run.sh`
 
+When `--recording-context <file>` is provided, the scaffold also copies the source file to:
+
+- `skills/<skill_id>/recording-context.json`
+
+The success payload includes that copied path and the `files` array lists it.
+
 It also appends this exact registry shape:
 
 ```json
@@ -74,6 +80,75 @@ Exact failure shape:
   "message": "skill_id must contain at least one dot so applicationId and intent can be derived"
 }
 ```
+
+## Recording Context
+
+`clawperator skills new <skill_id> --recording-context <file>` copies the provided export file verbatim to `skills/<skill_id>/recording-context.json`.
+
+What that file is for:
+
+- it is reference evidence for an external human or agent authoring the skill
+- it is not an executable recipe
+- `scaffoldSkill()` does not infer selectors, parameters, or control flow from it
+- the source file must already match the recording export artifact schema
+- `skills validate` does not inspect `recording-context.json`; it still validates only the registry-linked skill files
+
+Recommended source:
+
+- use `clawperator recording export --snapshots omit` by default when the goal is agent or human authoring context
+- use `--snapshots include` only when the author genuinely needs the raw XML snapshots for manual inspection
+- the parsed `recording parse` output is not a substitute for `recording-context.json`
+- `recording parse` is a lossy step log, while `recording export` preserves the raw event timeline and package-transition evidence
+
+The scaffolded `SKILL.md` includes this section before the `Usage:` block:
+
+```markdown
+## Recording Context
+
+This skill was scaffolded with recording context at `recording-context.json`.
+Read that file to inspect the recorded interaction timeline and raw events.
+The recording context is reference evidence, not an executable skill recipe.
+An external agent or human author must write the reusable skill logic.
+```
+
+Success output with recording context adds the copied path:
+
+```json
+{
+  "created": true,
+  "skillId": "com.example.recording.export-demo",
+  "registryPath": "/abs/path/to/skills/skills-registry.json",
+  "skillPath": "/abs/path/to/skills/com.example.recording.export-demo",
+  "recordingContextPath": "/abs/path/to/skills/com.example.recording.export-demo/recording-context.json",
+  "files": [
+    "/abs/path/to/skills/com.example.recording.export-demo/SKILL.md",
+    "/abs/path/to/skills/com.example.recording.export-demo/skill.json",
+    "/abs/path/to/skills/com.example.recording.export-demo/scripts/run.js",
+    "/abs/path/to/skills/com.example.recording.export-demo/scripts/run.sh",
+    "/abs/path/to/skills/com.example.recording.export-demo/recording-context.json"
+  ],
+  "next": "Edit SKILL.md and scripts/run.js, then verify with: clawperator skills validate <skill_id>"
+}
+```
+
+Verification:
+
+```bash
+clawperator skills new com.example.recording.export-demo --recording-context ./recordings/export-demo.export.json --json
+```
+
+Check:
+
+- `recordingContextPath` points at the copied file inside the new skill folder
+- the copied file contents match the source export file byte-for-byte
+- `skill.json.artifacts` remains `[]`
+
+Failure modes:
+
+- blank `--recording-context` values: `SKILLS_SCAFFOLD_FAILED`
+- missing or unreadable source file: `SKILLS_SCAFFOLD_FAILED`
+- non-export JSON or malformed export artifacts: `SKILLS_SCAFFOLD_FAILED`
+- the scaffold does not derive skill logic from the recording context
 
 ## `SKILL.md` Format
 
