@@ -404,8 +404,7 @@ Options:
   --timeout <ms>         Max time to wait for snapshot (default: 30000ms)
   --json                 Output as JSON
 
-Also accepted as: --device-id, --file
-Also accepted as: --file for --path
+Also accepted as: --device-id
 
 Examples:
   clawperator snapshot
@@ -422,7 +421,7 @@ Options:
   --timeout <ms>         Max time to wait (default: 30000ms)
   --json                 Output as JSON
 
-Also accepted as: --device-id
+Also accepted as: --device-id, --file
 
 Examples:
   clawperator screenshot --path /tmp/screen.png

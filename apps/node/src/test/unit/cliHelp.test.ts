@@ -556,6 +556,7 @@ describe("promoted flat commands - help and missing-arg errors", () => {
     assert.strictEqual(code, 0);
     assert.match(stdout, /clawperator snapshot/);
     assert.match(stdout, /--timeout <ms>/);
+    assert.doesNotMatch(stdout, /--file/);
   });
 
   it("screenshot --help shows screenshot help", async () => {
@@ -563,6 +564,7 @@ describe("promoted flat commands - help and missing-arg errors", () => {
     assert.strictEqual(code, 0);
     assert.match(stdout, /clawperator screenshot/);
     assert.match(stdout, /--path <file>/);
+    assert.match(stdout, /Also accepted as: --device-id, --file/);
   });
 
   it("click --help shows click help", async () => {
