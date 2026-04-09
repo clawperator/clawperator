@@ -109,6 +109,20 @@ export function buildSuccessResult(payload: unknown): McpToolResult {
   return buildMcpSuccessResult(payload);
 }
 
+export function buildCommonExecutionSchema(properties: Record<string, unknown>, required: string[] = []): Record<string, unknown> {
+  return {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      deviceId: { type: "string", minLength: 1 },
+      operatorPackage: { type: "string", minLength: 1 },
+      timeoutMs: { type: "integer" },
+      ...properties,
+    },
+    ...(required.length > 0 ? { required } : {}),
+  };
+}
+
 export function buildValidationResult(message: string, path?: string): never {
   throw new McpError(
     ErrorCode.InvalidParams,

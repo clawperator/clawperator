@@ -2,13 +2,15 @@ import { z } from "zod";
 import type { NodeMatcher } from "../contracts/selectors.js";
 import { isNodeMatcherEmpty } from "../contracts/selectors.js";
 
+const optionalNonEmptyTrimmedSelectorString = z.string().trim().min(1).optional();
+
 export const mcpSelectorSchema = z.object({
-  id: z.string().optional(),
-  role: z.string().optional(),
-  text: z.string().optional(),
-  textContains: z.string().optional(),
-  desc: z.string().optional(),
-  descContains: z.string().optional(),
+  id: optionalNonEmptyTrimmedSelectorString,
+  role: optionalNonEmptyTrimmedSelectorString,
+  text: optionalNonEmptyTrimmedSelectorString,
+  textContains: optionalNonEmptyTrimmedSelectorString,
+  desc: optionalNonEmptyTrimmedSelectorString,
+  descContains: optionalNonEmptyTrimmedSelectorString,
 }).strict();
 
 export type McpSelectorInput = z.infer<typeof mcpSelectorSchema>;

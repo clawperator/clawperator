@@ -4,7 +4,7 @@ import type { ResultEnvelope } from "../../contracts/result.js";
 import { createMcpExecutionIds } from "../../mcp/executionIds.js";
 import { normalizeMcpError } from "../../mcp/errors.js";
 import { extractStepDataValue } from "../../mcp/results.js";
-import { mapSelectorToNodeMatcher } from "../../mcp/selectors.js";
+import { mapSelectorToNodeMatcher, mcpSelectorSchema } from "../../mcp/selectors.js";
 
 describe("createMcpExecutionIds", () => {
   it("generates distinct IDs with the expected prefix", () => {
@@ -44,6 +44,11 @@ describe("mapSelectorToNodeMatcher", () => {
       () => mapSelectorToNodeMatcher({}, "selector"),
       /selector must include at least one non-empty selector field/
     );
+  });
+
+  it("rejects whitespace-only selector fields at the MCP boundary", () => {
+    const parsed = mcpSelectorSchema.safeParse({ text: "   " });
+    assert.strictEqual(parsed.success, false);
   });
 });
 

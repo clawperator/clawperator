@@ -142,6 +142,18 @@ describe("CLI help", () => {
     assert.match(stderr || stdout, /mcp serve does not accept additional arguments/);
   });
 
+  it("routes --help before mcp serve through the MCP bootstrap guard", async () => {
+    const { stdout, stderr, code } = await runCli(["--help", "mcp", "serve"]);
+    assert.notStrictEqual(code, 0);
+    assert.match(stderr || stdout, /mcp serve does not accept additional arguments/);
+  });
+
+  it("routes --version before mcp serve through the MCP bootstrap guard", async () => {
+    const { stdout, stderr, code } = await runCli(["--version", "mcp", "serve"]);
+    assert.notStrictEqual(code, 0);
+    assert.match(stderr || stdout, /mcp serve does not accept additional arguments/);
+  });
+
   it("exec best-effort points at flat `snapshot`, not nested `observe snapshot` (exit 0)", async () => {
     const { stdout, code } = await runCli(["exec", "best-effort", "--goal", "test-goal"]);
     assert.strictEqual(code, 0, stdout);

@@ -8,14 +8,15 @@ import { buildReadExecution } from "../../domain/actions/read.js";
 import { buildPressKeyExecution } from "../../domain/actions/pressKey.js";
 import { buildWaitExecution } from "../../domain/actions/wait.js";
 import { buildScrollUntilExecution } from "../../domain/actions/scrollUntil.js";
+import { buildMcpErrorResult } from "../errors.js";
 import { extractStepDataValue } from "../results.js";
 import { mcpSelectorSchema } from "../selectors.js";
 import type { McpToolDefinition } from "./index.js";
 import {
   applyMcpExecutionMetadata,
+  buildCommonExecutionSchema,
   buildExecutionSuccessPayload,
   buildSuccessResult,
-  buildValidationResult,
   executionToolOptionsSchema,
   mapOptionalSelector,
   mapRequiredSelector,
@@ -108,20 +109,6 @@ const coordinateJsonSchema = {
   },
   required: ["x", "y"],
 };
-
-function buildCommonExecutionSchema(properties: Record<string, unknown>, required: string[] = []): Record<string, unknown> {
-  return {
-    type: "object",
-    additionalProperties: false,
-    properties: {
-      deviceId: { type: "string", minLength: 1 },
-      operatorPackage: { type: "string", minLength: 1 },
-      timeoutMs: { type: "integer" },
-      ...properties,
-    },
-    ...(required.length > 0 ? { required } : {}),
-  };
-}
 
 export function getNamedMcpTools(logger?: Logger): McpToolDefinition[] {
   return [
@@ -234,18 +221,36 @@ export function getNamedMcpTools(logger?: Logger): McpToolDefinition[] {
             errorKey: "error",
           });
           if (!extracted.ok) {
-            return buildValidationResult(extracted.message, "read");
+            return buildMcpErrorResult({
+              code: extracted.error,
+              message: extracted.message,
+              envelope: result.envelope,
+              deviceId: result.deviceId,
+              terminalSource: result.terminalSource,
+            });
           }
 
           if (parsed.all) {
             try {
               const values = JSON.parse(extracted.value) as unknown;
               if (!Array.isArray(values)) {
-                return buildValidationResult("read returned non-array data for all=true", "read");
+                return buildMcpErrorResult({
+                  code: "MCP_STEP_DATA_INVALID",
+                  message: "read returned non-array data for all=true",
+                  envelope: result.envelope,
+                  deviceId: result.deviceId,
+                  terminalSource: result.terminalSource,
+                });
               }
               return buildSuccessResult(values);
             } catch {
-              return buildValidationResult("read returned invalid JSON array data", "read");
+              return buildMcpErrorResult({
+                code: "MCP_STEP_DATA_INVALID",
+                message: "read returned invalid JSON array data",
+                envelope: result.envelope,
+                deviceId: result.deviceId,
+                terminalSource: result.terminalSource,
+              });
             }
           }
 

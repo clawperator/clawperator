@@ -9,6 +9,7 @@ import { extractStepDataValue } from "../results.js";
 import type { McpToolDefinition } from "./index.js";
 import {
   applyMcpExecutionMetadata,
+  buildCommonExecutionSchema,
   buildValidationResult,
   buildExecutionSuccessPayload,
   buildSuccessResult,
@@ -46,20 +47,6 @@ function hasCallerControlledScreenshotPath(action: z.infer<typeof executionActio
     return false;
   }
   return isRecord(normalizedAction.params) && Object.prototype.hasOwnProperty.call(normalizedAction.params, "path");
-}
-
-function buildCommonExecutionSchema(properties: Record<string, unknown>, required: string[] = []): Record<string, unknown> {
-  return {
-    type: "object",
-    additionalProperties: false,
-    properties: {
-      deviceId: { type: "string", minLength: 1 },
-      operatorPackage: { type: "string", minLength: 1 },
-      timeoutMs: { type: "integer" },
-      ...properties,
-    },
-    ...(required.length > 0 ? { required } : {}),
-  };
 }
 
 export function getCoreMcpTools(logger?: Logger): McpToolDefinition[] {
