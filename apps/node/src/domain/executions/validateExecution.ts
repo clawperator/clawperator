@@ -3,6 +3,7 @@ import { LIMITS } from "../../contracts/limits.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
 import { getCanonicalActionType } from "../../contracts/aliases.js";
 import type { Execution } from "../../contracts/execution.js";
+import { normalizeExecutionInput } from "../../contracts/inputAliases.js";
 
 const nodeMatcherSchema = z
   .object({
@@ -344,7 +345,8 @@ export interface ValidationFailure {
  * Call before any adb invocation.
  */
 export function validateExecution(input: unknown): Execution {
-  const parsed = executionSchema.safeParse(input);
+  const normalizedInput = normalizeExecutionInput(input);
+  const parsed = executionSchema.safeParse(normalizedInput);
   if (!parsed.success) {
     const first = parsed.error.errors[0];
     const details: NonNullable<ValidationFailure["details"]> = {

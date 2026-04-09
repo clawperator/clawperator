@@ -91,6 +91,96 @@ describe("validateExecution", () => {
     assert.strictEqual(ex.actions[0].type, "enter_text");
   });
 
+  it("normalizes snake_case execution keys and common param aliases", () => {
+    const ex = validateExecution({
+      command_id: "cmd-snake-1",
+      task_id: "task-snake-1",
+      source: "test",
+      expected_format: "android-ui-automator",
+      timeout_ms: 5000,
+      actions: [
+        {
+          id: "open-1",
+          type: "open_app",
+          params: {
+            package: "com.example.settings",
+          },
+        },
+      ],
+    });
+
+    assert.strictEqual(ex.commandId, "cmd-snake-1");
+    assert.strictEqual(ex.taskId, "task-snake-1");
+    assert.strictEqual(ex.expectedFormat, "android-ui-automator");
+    assert.strictEqual(ex.timeoutMs, 5000);
+    assert.strictEqual(ex.actions[0].params?.applicationId, "com.example.settings");
+  });
+
+  it("normalizes matcher aliases in params.matcher-like fields", () => {
+    const ex = validateExecution({
+      commandId: "cmd-match-1",
+      taskId: "task-match-1",
+      source: "test",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 5000,
+      actions: [
+        {
+          id: "click-1",
+          type: "click",
+          params: {
+            selector: {
+              id: "com.example:id/login",
+              accessibility_label: "Login",
+            },
+          },
+        },
+      ],
+    });
+
+    assert.deepStrictEqual(ex.actions[0].params?.matcher, {
+      resourceId: "com.example:id/login",
+      contentDescEquals: "Login",
+    });
+  });
+
+  it("normalizes url to uri for open_uri", () => {
+    const ex = validateExecution({
+      commandId: "cmd-url-1",
+      taskId: "task-url-1",
+      source: "test",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 5000,
+      actions: [{ id: "open-1", type: "open_uri", params: { url: "https://example.com" } }],
+    });
+
+    assert.strictEqual(ex.actions[0].params?.uri, "https://example.com");
+  });
+
+  it("normalizes expected_package and expected_node aliases for wait_for_navigation", () => {
+    const ex = validateExecution({
+      commandId: "cmd-nav-1",
+      taskId: "task-nav-1",
+      source: "test",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 10000,
+      actions: [
+        {
+          id: "wait-1",
+          type: "wait_for_navigation",
+          params: {
+            expected_package: "com.example.app",
+            expected_node: { text: "Done" },
+            timeout_ms: 5000,
+          },
+        },
+      ],
+    });
+
+    assert.strictEqual(ex.actions[0].params?.expectedPackage, "com.example.app");
+    assert.deepStrictEqual(ex.actions[0].params?.expectedNode, { textEquals: "Done" });
+    assert.strictEqual(ex.actions[0].params?.timeoutMs, 5000);
+  });
+
   it("accepts start_recording with sessionId", () => {
     const ex = validateExecution({
       commandId: "cmd-1",

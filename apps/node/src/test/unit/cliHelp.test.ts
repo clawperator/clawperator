@@ -203,7 +203,7 @@ describe("CLI help", () => {
     const { stdout, code } = await runCli(["inspect", "ui", "--timeout-ms"]);
     assert.notStrictEqual(code, 0);
     assert.match(stdout, /"code":"USAGE"/);
-    assert.match(stdout, /--timeout-ms requires a value/);
+    assert.match(stdout, /--timeout requires a value/);
   });
 
   it("accepts --format as an alias for --output", async () => {

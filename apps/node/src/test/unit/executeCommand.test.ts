@@ -226,6 +226,13 @@ describe("clawperator exec CLI", () => {
     assert.strictEqual(result.ok, true);
   });
 
+  it("accepts --input as an alias for --payload", async () => {
+    const { stdout, code } = await runCli(["exec", "--input", minimalInline, "--validate-only", "--json"]);
+    assert.strictEqual(code, 0);
+    const result = JSON.parse(stdout);
+    assert.strictEqual(result.ok, true);
+  });
+
   it("accepts positional file path with --validate-only", async () => {
     const fixturePath = join(packageRoot, "src", "test", "fixtures", "execution-sleep-minimal.json");
     const { stdout, code } = await runCli(["exec", fixturePath, "--validate-only", "--json"]);
@@ -261,6 +268,15 @@ describe("clawperator wait-for-nav CLI", () => {
     assert.strictEqual(action.type, "wait_for_navigation");
     assert.strictEqual(action.params.expectedPackage, "com.android.settings");
     assert.strictEqual(action.params.timeoutMs, 5000);
+  });
+
+  it("builds wait_for_navigation with --package alias and --timeout", async () => {
+    const { stdout, code } = await runCli(["wait-for-nav", "--package", "com.example.app", "--timeout", "5000", "--validate-only", "--json"]);
+    assert.strictEqual(code, 0, stdout);
+    const result = JSON.parse(stdout);
+    const action = result.execution.actions[0];
+    assert.strictEqual(action.type, "wait_for_navigation");
+    assert.strictEqual(action.params.expectedPackage, "com.example.app");
   });
 
   it("returns MISSING_ARGUMENT when --timeout is missing", async () => {

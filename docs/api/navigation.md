@@ -81,6 +81,12 @@ clawperator open com.android.settings
 
 The `open` command treats a non-URI target as an app package and dispatches to `open_app`.
 
+Accepted CLI aliases for the same intent:
+
+- `clawperator open-app com.android.settings`
+- `clawperator open_app com.android.settings`
+- `clawperator open --package com.android.settings`
+
 Exact classification rule from `isOpenCliUriTarget()`:
 
 - `open` routes to `open_uri` only when the target matches `[a-z][a-z0-9+\\-.]*://`
@@ -173,6 +179,11 @@ clawperator open https://clawperator.com
 
 The `open` command uses `isOpenCliUriTarget()` and routes to `open_uri` when the target matches a URI-with-scheme pattern.
 
+Accepted CLI aliases for the same intent:
+
+- `clawperator open --url https://clawperator.com`
+- `clawperator open --uri https://clawperator.com`
+
 Verification:
 
 ```bash
@@ -220,6 +231,11 @@ Error cases:
 ## `wait_for_navigation`
 
 `wait_for_navigation` is the navigation-specific confirmation step.
+
+CLI aliases accepted for agent-first ergonomics:
+
+- command alias: `wait_for_navigation`
+- target-package flags: `--package`, `--package-id`, `--application-id`
 
 Current public parameters:
 

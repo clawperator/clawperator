@@ -1968,7 +1968,7 @@ describe("runSkill", () => {
     assert.strictEqual(code, 1, stdout);
     const parsed = JSON.parse(stdout) as { code?: string; message?: string };
     assert.strictEqual(parsed.code, "USAGE");
-    assert.strictEqual(parsed.message, "--timeout-ms requires a value");
+    assert.strictEqual(parsed.message, "--timeout requires a value");
   });
 
   it("CLI skills run returns USAGE when --expect-contains is missing a value", async () => {

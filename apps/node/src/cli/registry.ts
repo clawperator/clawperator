@@ -10,7 +10,10 @@ import {
   makeMissingSelectorError,
   ELEMENT_SELECTOR_VALUE_FLAGS,
   CONTAINER_SELECTOR_VALUE_FLAGS,
+  ELEMENT_SELECTOR_FLAG_ALIASES,
+  CONTAINER_SELECTOR_FLAG_ALIASES,
 } from "./selectorFlags.js";
+import type { CliFlagAliasSpec } from "./flagAliases.js";
 
 // ---------------------------------------------------------------------------
 // Exported utilities (moved from index.ts so registry handlers can use them)
@@ -202,6 +205,7 @@ export interface CommandDef {
   topLevelBlock?: string;
   group: string;
   supportedFlags?: string[] | ((rest: string[]) => string[]);
+  flagAliases?: readonly CliFlagAliasSpec[] | ((rest: string[]) => readonly CliFlagAliasSpec[]);
   handler: (ctx: HandlerContext) => Promise<string | void>;
 }
 
@@ -400,7 +404,8 @@ Options:
   --timeout <ms>         Max time to wait for snapshot (default: 30000ms)
   --json                 Output as JSON
 
-Also accepted as: --device-id
+Also accepted as: --device-id, --file
+Also accepted as: --file for --path
 
 Examples:
   clawperator snapshot
@@ -445,7 +450,7 @@ Options:
   --long                 Perform a long press (clickType: long_click)
   --focus                Set input focus without clicking (clickType: focus)
 
-Also accepted as: --device-id, tap
+Also accepted as: --device-id, tap, --resource-id, --content-desc, --content-desc-contains
 
 Examples:
   clawperator click --text "Submit"
@@ -467,7 +472,7 @@ Options:
   --timeout <ms>         Max time to wait
   --json                 Output as JSON
 
-Also accepted as: --device-id, open-uri, open-url
+Also accepted as: --device-id, open-app, open_app, open-uri, open-url, open_uri, open_url, --package, --package-id, --application-id, --app-id, --url, --uri
 
 Examples:
   clawperator open com.android.settings
@@ -495,7 +500,7 @@ Options:
   --timeout <ms>         Max time to wait for element
   --json                 Output as JSON
 
-Also accepted as: --device-id, fill
+Also accepted as: --device-id, fill, enter-text, enter_text, --resource-id, --content-desc, --content-desc-contains
 
 Examples:
   clawperator type "hello world" --role textfield
@@ -518,7 +523,7 @@ Options:
   --timeout <ms>         Max time to wait
   --json                 Output as JSON
 
-Also accepted as: --device-id, read-kv
+Also accepted as: --device-id, read-kv, read-key-value-pair, read_key_value_pair, --text, --label-text, --id, --resource-id, --desc, --content-desc
 
 Examples:
   clawperator read-value --label "Battery" --json
@@ -552,7 +557,7 @@ Container selector flags (all optional):
   --container-role <role>           Container by element role
   --container-selector <json>       Container by raw NodeMatcher JSON
 
-Also accepted as: --device-id
+Also accepted as: --device-id, read-text, read_text, --resource-id, --content-desc, --content-desc-contains, --container-resource-id, --container-content-desc, --container-content-desc-contains
 
 Examples:
   clawperator read --id "com.example:id/battery_level"
@@ -585,6 +590,10 @@ Notes:
   - Default wait timeout is 30000ms (30 seconds) when --timeout is not specified.
   - Multiple simple flags combine with AND semantics.
 
+Also accepted as:
+  find, find-node, find_node, wait-for, wait_for, wait-for-node, wait_for_node
+  --resource-id, --content-desc, --content-desc-contains
+
 Examples:
   clawperator wait --text "Done"
   clawperator wait --id "com.example:id/progress" --timeout 10000
@@ -608,7 +617,7 @@ Options:
   --timeout <ms>         Required. Maximum time to wait (1-30000ms)
   --json                 Output as JSON
 
-Also accepted as: --device-id, wait-for-navigation
+Also accepted as: --device-id, wait-for-navigation, wait_for_navigation, --package, --package-id, --application-id, --app-id, --resource-id, --content-desc, --content-desc-contains
 
 Examples:
   clawperator wait-for-nav --app com.google.home --timeout 5000
@@ -630,7 +639,7 @@ Options:
   --timeout <ms>         Max time to wait
   --json                 Output as JSON
 
-Also accepted as: --device-id, press-key
+Also accepted as: --device-id, press-key, press_key, --button
 
 Examples:
   clawperator press home
@@ -663,12 +672,15 @@ Required:
   --app <package>       Alternative to positional argument
 
 Synonym:
-  close-app             Same as close
+  close-app, close_app  Same as close
 
 Notes:
   - Force-stops the specified application via adb.
   - The close_app action runs as a pre-flight in the Node layer before broadcast dispatch.
   - Requires the target app to be installed (does not need to be running).
+
+Also accepted as:
+  --package, --package-id, --application-id, --app-id
 
 Examples:
   clawperator close com.android.settings
@@ -715,7 +727,7 @@ Options:
   --timeout <ms>         Max time to wait (default: 30000ms)
   --json                 Output as JSON
 
-Also accepted as: --device-id
+Also accepted as: --device-id, --container-resource-id, --container-content-desc, --container-content-desc-contains
 
 Examples:
   clawperator scroll down
@@ -793,6 +805,53 @@ Notes:
 // ---------------------------------------------------------------------------
 
 export const COMMANDS: Record<string, CommandDef> = {};
+
+const OPEN_TARGET_FLAG_ALIASES: readonly CliFlagAliasSpec[] = [
+  { canonical: "--app", aliases: ["--package", "--package-id", "--application-id", "--app-id", "--uri", "--url"] },
+] as const;
+
+const CLOSE_TARGET_FLAG_ALIASES: readonly CliFlagAliasSpec[] = [
+  { canonical: "--app", aliases: ["--package", "--package-id", "--application-id", "--app-id"] },
+] as const;
+
+const EXEC_PAYLOAD_FLAG_ALIASES: readonly CliFlagAliasSpec[] = [
+  { canonical: "--payload", aliases: ["--execution", "--input", "--file"] },
+] as const;
+
+const SCREENSHOT_FLAG_ALIASES: readonly CliFlagAliasSpec[] = [
+  { canonical: "--path", aliases: ["--file"] },
+] as const;
+
+const PRESS_FLAG_ALIASES: readonly CliFlagAliasSpec[] = [
+  { canonical: "--key", aliases: ["--button"] },
+] as const;
+
+const WAIT_FOR_NAV_FLAG_ALIASES: readonly CliFlagAliasSpec[] = [
+  { canonical: "--app", aliases: ["--package", "--package-id", "--application-id", "--app-id"] },
+  ...ELEMENT_SELECTOR_FLAG_ALIASES,
+] as const;
+
+const READ_VALUE_FLAG_ALIASES: readonly CliFlagAliasSpec[] = [
+  { canonical: "--label", aliases: ["--text", "--label-text"] },
+  { canonical: "--label-id", aliases: ["--id", "--resource-id"] },
+  { canonical: "--label-desc", aliases: ["--desc", "--content-desc"] },
+] as const;
+
+const SKILLS_SEARCH_FLAG_ALIASES: readonly CliFlagAliasSpec[] = [
+  { canonical: "--app", aliases: ["--package", "--package-id", "--application-id"] },
+] as const;
+
+const SKILLS_COMPILE_ARTIFACT_FLAG_ALIASES: readonly CliFlagAliasSpec[] = [
+  { canonical: "--skill-id", aliases: ["--skill"] },
+] as const;
+
+const SKILLS_NEW_FLAG_ALIASES: readonly CliFlagAliasSpec[] = [
+  { canonical: "--summary", aliases: ["--description"] },
+] as const;
+
+const SERVE_FLAG_ALIASES: readonly CliFlagAliasSpec[] = [
+  { canonical: "--host", aliases: ["--bind"] },
+] as const;
 
 // operator
 COMMANDS["operator"] = {
@@ -999,10 +1058,11 @@ COMMANDS["exec"] = {
   name: "exec",
   synonyms: ["execute"],
   group: "Execution",
+  flagAliases: EXEC_PAYLOAD_FLAG_ALIASES,
   supportedFlags: (rest) =>
     rest[0] === "best-effort"
-      ? ["--payload", "--execution", "--validate-only", "--dry-run", "--goal"]
-      : ["--payload", "--execution", "--validate-only", "--dry-run"],
+      ? ["--payload", "--validate-only", "--dry-run", "--goal"]
+      : ["--payload", "--validate-only", "--dry-run"],
   summary: "Execute a validated command payload",
   help: `clawperator exec
 
@@ -1084,6 +1144,7 @@ Notes:
 
 COMMANDS["snapshot"] = {
   name: "snapshot",
+  synonyms: ["snapshot-ui", "snapshot_ui"],
   group: "Device Interaction",
   supportedFlags: [],
   summary: "Get current Android UI hierarchy as XML",
@@ -1105,7 +1166,9 @@ COMMANDS["snapshot"] = {
 
 COMMANDS["screenshot"] = {
   name: "screenshot",
+  synonyms: ["take-screenshot", "take_screenshot", "capture-screenshot"],
   group: "Device Interaction",
+  flagAliases: SCREENSHOT_FLAG_ALIASES,
   supportedFlags: ["--path"],
   summary: "Capture a screenshot from the device",
   help: HELP_SCREENSHOT,
@@ -1131,6 +1194,7 @@ COMMANDS["click"] = {
   name: "click",
   synonyms: ["tap"],
   group: "Device Interaction",
+  flagAliases: ELEMENT_SELECTOR_FLAG_ALIASES,
   supportedFlags: ["--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--coordinate", "--long", "--focus"],
   summary: "Tap the first matching UI element",
   help: HELP_CLICK,
@@ -1228,8 +1292,9 @@ COMMANDS["click"] = {
 
 COMMANDS["open"] = {
   name: "open",
-  synonyms: ["open-uri", "open-url"],
+  synonyms: ["open-app", "open_app", "open-uri", "open-url", "open_uri", "open_url"],
   group: "Device Interaction",
+  flagAliases: OPEN_TARGET_FLAG_ALIASES,
   supportedFlags: ["--app"],
   summary: "Open an app, URL, or URI on the device",
   help: HELP_OPEN,
@@ -1278,8 +1343,9 @@ COMMANDS["open"] = {
 
 COMMANDS["type"] = {
   name: "type",
-  synonyms: ["fill"],
+  synonyms: ["fill", "enter-text", "enter_text"],
   group: "Device Interaction",
+  flagAliases: ELEMENT_SELECTOR_FLAG_ALIASES,
   supportedFlags: ["--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--submit", "--clear"],
   summary: "Type text into the first matching UI element",
   help: HELP_TYPE,
@@ -1339,7 +1405,9 @@ COMMANDS["type"] = {
 
 COMMANDS["read"] = {
   name: "read",
+  synonyms: ["read-text", "read_text"],
   group: "Device Interaction",
+  flagAliases: [...ELEMENT_SELECTOR_FLAG_ALIASES, ...CONTAINER_SELECTOR_FLAG_ALIASES],
   supportedFlags: ["--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--all", "--container-text", "--container-text-contains", "--container-id", "--container-desc", "--container-desc-contains", "--container-role", "--container-selector"],
   summary: "Read text from the first matching UI element",
   help: HELP_READ,
@@ -1378,7 +1446,9 @@ COMMANDS["read"] = {
 
 COMMANDS["wait"] = {
   name: "wait",
+  synonyms: ["wait-for", "wait_for", "wait-for-node", "wait_for_node", "find", "find-node", "find_node"],
   group: "Device Interaction",
+  flagAliases: ELEMENT_SELECTOR_FLAG_ALIASES,
   supportedFlags: ["--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector"],
   summary: "Wait until a matching UI element appears",
   help: HELP_WAIT,
@@ -1418,8 +1488,9 @@ COMMANDS["wait"] = {
 
 COMMANDS["press"] = {
   name: "press",
-  synonyms: ["press-key"],
+  synonyms: ["press-key", "press_key"],
   group: "Device Interaction",
+  flagAliases: PRESS_FLAG_ALIASES,
   supportedFlags: ["--key"],
   summary: "Press a hardware key on the device",
   help: HELP_PRESS,
@@ -1512,8 +1583,9 @@ const closeHandler = async (ctx: HandlerContext): Promise<string | void> => {
 
 COMMANDS["close"] = {
   name: "close",
-  synonyms: ["close-app"],
+  synonyms: ["close-app", "close_app"],
   group: "Device Interaction",
+  flagAliases: CLOSE_TARGET_FLAG_ALIASES,
   supportedFlags: ["--app"],
   summary: "Force-stop an Android application",
   help: HELP_CLOSE,
@@ -1584,6 +1656,7 @@ COMMANDS["sleep"] = {
 COMMANDS["scroll"] = {
   name: "scroll",
   group: "Device Interaction",
+  flagAliases: CONTAINER_SELECTOR_FLAG_ALIASES,
   supportedFlags: ["--direction", "--container-text", "--container-text-contains", "--container-id", "--container-desc", "--container-desc-contains", "--container-role", "--container-selector"],
   summary: "Scroll the screen in a direction",
   help: HELP_SCROLL,
@@ -1711,7 +1784,9 @@ const scrollUntilHandler = async (ctx: HandlerContext, clickAfterDefault: boolea
 
 COMMANDS["scroll-until"] = {
   name: "scroll-until",
+  synonyms: ["scroll_until"],
   group: "Device Interaction",
+  flagAliases: [...ELEMENT_SELECTOR_FLAG_ALIASES, ...CONTAINER_SELECTOR_FLAG_ALIASES],
   supportedFlags: ["--click", "--direction", "--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--container-text", "--container-text-contains", "--container-id", "--container-desc", "--container-desc-contains", "--container-role", "--container-selector"],
   summary: "Scroll until a target element is visible",
   help: HELP_SCROLL_UNTIL,
@@ -1722,8 +1797,9 @@ COMMANDS["scroll-until"] = {
 
 COMMANDS["scroll-and-click"] = {
   name: "scroll-and-click",
-  synonyms: [],
+  synonyms: ["scroll_and_click"],
   group: "Device Interaction",
+  flagAliases: [...ELEMENT_SELECTOR_FLAG_ALIASES, ...CONTAINER_SELECTOR_FLAG_ALIASES],
   supportedFlags: ["--direction", "--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--container-text", "--container-text-contains", "--container-id", "--container-desc", "--container-desc-contains", "--container-role", "--container-selector"],
   summary: "Scroll until target is visible, then click it (alias for scroll-until --click)",
   help: HELP_SCROLL_UNTIL,
@@ -1735,8 +1811,9 @@ COMMANDS["scroll-and-click"] = {
 // wait-for-nav (synonym: wait-for-navigation)
 COMMANDS["wait-for-nav"] = {
   name: "wait-for-nav",
-  synonyms: ["wait-for-navigation"],
+  synonyms: ["wait-for-navigation", "wait_for_navigation"],
   group: "Device Interaction",
+  flagAliases: WAIT_FOR_NAV_FLAG_ALIASES,
   supportedFlags: ["--app", "--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--validate-only", "--dry-run"],
   summary: "Wait for app or screen navigation to complete",
   help: HELP_WAIT_FOR_NAV,
@@ -1838,8 +1915,9 @@ COMMANDS["wait-for-nav"] = {
 // read-value (synonym: read-kv)
 COMMANDS["read-value"] = {
   name: "read-value",
-  synonyms: ["read-kv"],
+  synonyms: ["read-kv", "read-key-value-pair", "read_key_value_pair"],
   group: "Device Interaction",
+  flagAliases: READ_VALUE_FLAG_ALIASES,
   supportedFlags: ["--label", "--label-id", "--label-desc", "--all", "--validate-only", "--dry-run"],
   summary: "Read the value associated with a labeled element",
   help: HELP_READ_VALUE,
@@ -1930,6 +2008,13 @@ COMMANDS["read-value"] = {
 COMMANDS["skills"] = {
   name: "skills",
   group: "Execution",
+  flagAliases: (rest) => {
+    const sub = rest[0];
+    if (sub === "search") return SKILLS_SEARCH_FLAG_ALIASES;
+    if (sub === "compile-artifact") return SKILLS_COMPILE_ARTIFACT_FLAG_ALIASES;
+    if (sub === "new") return SKILLS_NEW_FLAG_ALIASES;
+    return [];
+  },
   supportedFlags: (rest) => {
     const sub = rest[0];
     if (sub === "search") return ["--app", "--intent", "--keyword"];
@@ -2187,6 +2272,7 @@ COMMANDS["recording"] = {
 COMMANDS["serve"] = {
   name: "serve",
   group: "Execution",
+  flagAliases: SERVE_FLAG_ALIASES,
   supportedFlags: ["--port", "--host"],
   summary: "Start local HTTP/SSE server for remote control",
   help: "clawperator serve\n\nUsage:\n  clawperator serve [--port <number>] [--host <string>]\n\nNotes:\n  - Default host: 127.0.0.1\n",

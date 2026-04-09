@@ -46,6 +46,7 @@ Rules enforced by Node:
 - each matcher string value must be at most `512` characters (`LIMITS.MAX_MATCHER_VALUE_LENGTH`)
 - blank strings are rejected before or during validation depending on how the matcher was built
 - selector objects are strict in execution validation, so unknown keys are rejected
+- common input aliases are normalized before that strict validation runs, including `id`/`resource_id`, `text`, `text_contains`, `content_desc`, `description`, and `accessibility_label`
 - when the shared CLI parser sees no selector flags at all, it returns an empty matcher object and the command decides whether selectors are required for that command
 
 Concrete payload example:
@@ -94,6 +95,15 @@ For most commands, the CLI offers two equivalent ways to build a `NodeMatcher`:
 
 1. Shorthand flags such as `--text`, `--text-contains`, `--id`, `--desc`, `--desc-contains`, and `--role`
 2. Raw JSON via `--selector '<json>'`
+
+Agent-friendly CLI aliases accepted for shorthand selectors:
+
+- `--resource-id` -> `--id`
+- `--content-desc` -> `--desc`
+- `--content-desc-contains` -> `--desc-contains`
+- `--container-resource-id` -> `--container-id`
+- `--container-content-desc` -> `--container-desc`
+- `--container-content-desc-contains` -> `--container-desc-contains`
 
 Container selectors follow the same pattern:
 

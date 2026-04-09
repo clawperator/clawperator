@@ -18,6 +18,7 @@ Define the canonical `ExecutionAction.type` values, the exact parameters each ac
 | Rule | Meaning |
 | --- | --- |
 | Canonical action names only | Stored payloads should use canonical types such as `open_uri`, `wait_for_node`, and `take_screenshot`. Input aliases are normalized before validation. |
+| Canonical payload keys still win | Node accepts common input aliases such as snake_case top-level keys, `package` for `applicationId`, `url` for `uri`, `selector` for `matcher`, and `value` for `text`, but the normalized payload always uses the canonical field names. |
 | `params` is optional at the schema level | Action-specific validation then decides whether it is actually required. |
 | Selectors live on a separate page | `matcher`, `container`, `expectedNode`, and `labelMatcher` all use the [Selectors](selectors.md) `NodeMatcher` contract. |
 | `StepResult.data` is a string map | Node may attach known keys such as `text`, `path`, `warn`, `application_id`, `error`, or `message`, but most actions do not have a richer static success schema. |
@@ -90,6 +91,17 @@ Input aliases normalized by Node before validation:
 | `screenshot`, `capture_screenshot` | `take_screenshot` |
 | `type_text`, `text_entry`, `input_text` | `enter_text` |
 | `key_press` | `press_key` |
+
+Common payload-key aliases also accepted on input:
+
+- top-level execution keys: `command_id`, `task_id`, `expected_format`, `timeout_ms`
+- app/package fields: `package`, `package_id`, `application_id`, `app`, `app_id` -> `applicationId`
+- URI field: `url` -> `uri`
+- matcher fields: `selector`, `node`, `element` -> `matcher`
+- text-entry field: `value` -> `text`
+- screenshot path fields: `file`, `output_path` -> `path`
+- navigation fields: `expected_package`, `expected_node`, `timeout_ms`
+- label selector field: `label_matcher`
 
 ## Full Payload Example
 
