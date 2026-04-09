@@ -125,7 +125,9 @@ class McpSession {
 
   async close() {
     this.child.stdin.end();
-    const [code] = await once(this.child, "exit");
+    const code = this.child.exitCode ?? await new Promise((resolve) => {
+      this.child.once("exit", (exitCode) => resolve(exitCode));
+    });
     if (code !== 0) {
       throw new Error(`MCP server exited with code ${code}`);
     }

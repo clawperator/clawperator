@@ -227,7 +227,7 @@ function argvPrefixBeforeForwardSeparator(argv: string[]): string[] {
   return argv;
 }
 
-function isMcpServeArgv(argv: string[]): boolean {
+function resolveMcpServeArgs(argv: string[]): string[] | undefined {
   const prefix = argvPrefixBeforeForwardSeparator(argv);
   const globalFlagsWithValues = new Set(["--device", "--device-id", "--operator-package", "--receiver-package", "--output", "--format", "--timeout", "--timeout-ms", "--log-level"]);
   let index = 0;
@@ -248,16 +248,18 @@ function isMcpServeArgv(argv: string[]): boolean {
     break;
   }
 
-  return prefix[index] === "mcp" && prefix[index + 1] === "serve";
+  if (prefix[index] !== "mcp" || prefix[index + 1] !== "serve") {
+    return undefined;
+  }
+
+  return [...prefix.slice(0, index), ...prefix.slice(index + 2)];
 }
 
 async function main(): Promise<void> {
   const argv = process.argv.slice(2);
-  if (isMcpServeArgv(argv)) {
+  const mcpArgs = resolveMcpServeArgs(argv);
+  if (mcpArgs !== undefined) {
     try {
-      const prefix = argvPrefixBeforeForwardSeparator(argv);
-      const mcpIndex = prefix.findIndex((token) => token === "mcp");
-      const mcpArgs = [...prefix.slice(0, mcpIndex), ...prefix.slice(mcpIndex + 2)];
       await (await import("./commands/mcp.js")).cmdMcpServe(mcpArgs);
       return;
     } catch (error) {
