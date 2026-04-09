@@ -46,7 +46,7 @@ Read in this order before writing anything:
 | --- | --- | --- |
 | 1 | `tasks/mcp/ergonomics/plan.md` | Canonical decisions including payload shape and test placement rules |
 | 2 | `apps/node/src/mcp/tools/core.ts` | Current `snapshot` handler being extended in Phase 1 |
-| 3 | `apps/node/src/mcp/tools/common.ts` | `executionToolOptionsSchema`, `buildCommonExecutionSchema`, `nonEmptyOptionalStringSchema`, `applyMcpExecutionMetadata` |
+| 3 | `apps/node/src/mcp/tools/common.ts` | `executionToolOptionsSchema`, `buildCommonExecutionSchema`, `applyMcpExecutionMetadata` |
 | 4 | `apps/node/src/mcp/tools/index.ts` | `getMcpTools` factory - needs signature update in Phase 2 |
 | 5 | `apps/node/src/mcp/server.ts` | `createMcpServer` - where session state is created in Phase 2 |
 | 6 | `apps/node/src/mcp/tools/named.ts` | Named tool handlers - receive session defaults in Phase 2 |
@@ -399,11 +399,13 @@ Zod schema:
 
 ```ts
 const configureArgsSchema = z.object({
-  deviceId: nonEmptyOptionalStringSchema.optional(),
-  operatorPackage: nonEmptyOptionalStringSchema.optional(),
+  deviceId: z.string().trim().min(1).optional(),
+  operatorPackage: z.string().trim().min(1).optional(),
   timeoutMs: z.number().int().nonnegative().optional(),
 }).strict();
 ```
+
+This must match the existing `executionToolOptionsSchema` behavior for `deviceId` and `operatorPackage`: blank or whitespace-only values are rejected.
 
 JSON Schema for `inputSchema` (not `buildCommonExecutionSchema` - `configure` is not an execution tool):
 

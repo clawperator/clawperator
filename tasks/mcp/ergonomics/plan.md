@@ -123,7 +123,7 @@ Judgment:
 | --- | --- |
 | `configure` success payload | Always `{ session: { ...currentValues } }`. Omit unset fields. This shape is used in the handler, the unit tests, the integration tests, and the docs. |
 | `truncated` field | Include as `true` only when truncation was applied. Omit when the full snapshot fits within `maxChars`. |
-| `configure` validation | Use `nonEmptyOptionalStringSchema` (already in `common.ts`) for `deviceId` and `operatorPackage`. |
+| `configure` validation | Reuse the `executionToolOptionsSchema` validation behavior for `deviceId` and `operatorPackage`, so blank or whitespace-only values are rejected. |
 | Session state scope | One object per `createMcpServer()` call. Never a module-level global. |
 | Test location | Truncation and merge-precedence tests are unit tests. Integration tests cover protocol-level behavior (tool list includes `configure`, `configure` call succeeds and returns correct shape). |
 | Design note requirement | `configure` is the first MCP-only stateful surface. Add a sentence to `docs/internal/design/mcp-server.md` acknowledging that session-local state is an exception to the stateless posture, bounded to the `configure` tool only. |
