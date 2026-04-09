@@ -33,8 +33,12 @@ Notes:
 - `record start` builder timeout is `10000`
 - `record stop` builder timeout is `15000`
 - `recording export` defaults to `--snapshots omit`
-- `recording export` writes `<input without .ndjson>.export.json` when the input ends with `.ndjson`, otherwise `<input>.export.json`
-- if `--input` points at a directory, `recording export` picks the newest `*.ndjson` file in that directory and exports that file
+- if `recording export --input` points at a file and `--out` is omitted, the output path is `<input without .ndjson>.export.json` when the input ends with `.ndjson`, otherwise `<input>.export.json`
+- if `recording export --input` points at a directory, the command picks the newest `*.ndjson` file in that directory and derives the default export path from that resolved file
+- a common authoring workflow is:
+  1. `recording stop`
+  2. `recording pull --out <dir>`
+  3. `recording export --input <same dir>`
 
 ## CLI Commands
 
@@ -252,11 +256,14 @@ Snapshot mode:
 - `omit` is the default
 - `include` preserves the raw XML string in `snapshot.xml`
 - both modes always preserve `snapshot.present`
+- `omit` is usually the right authoring default because it preserves event evidence without embedding the raw XML snapshots
+- `include` is better when an external agent or human needs the full hierarchy snapshots for detailed manual review
 
 Output-path rule:
 
-- if `--out` is omitted and the input ends with `.ndjson`, the output path is `<input without .ndjson>.export.json`
-- otherwise the output path is `<input>.export.json`
+- if `--out` is omitted and the input is a file ending with `.ndjson`, the output path is `<input without .ndjson>.export.json`
+- if `--out` is omitted and the input is a file without a trailing `.ndjson`, the output path is `<input>.export.json`
+- if `--out` is omitted and the input is a directory, the command first resolves the newest `*.ndjson` file in that directory and then applies the same default-path rule to that resolved file
 - if `--out` is provided, that path is used as-is
 
 Success wrapper shape:
@@ -291,6 +298,14 @@ Check:
 - `eventCount` matches `counts.totalEvents` inside the written file
 - `packageTransitionCount` matches the number of computed package transitions
 - `byType` matches the event-type counts inside the written file
+
+Practical size tradeoff:
+
+- on a real small emulator capture, an export written with `--snapshots omit` was about `2 KB`
+- the same recording written with `--snapshots include` was about `165 KB`
+- the raw pulled NDJSON was about `164 KB`
+
+This is why `omit` is the default for agent-context export.
 
 Export file contract:
 
@@ -351,6 +366,13 @@ Deterministic derived fields:
 - package transitions are computed from adjacent package-bearing events only
 - `press_key` events are skipped for package-transition comparison
 - `timeline.durationMs` is `lastEventTs - firstEventTs`
+
+Observed-runtime caveat:
+
+- the export preserves every supported raw event type when those events are present in the NDJSON
+- recording still reflects what the runtime actually observed, not a one-to-one replay of CLI commands
+- in a real emulator run, a `back` CLI action produced downstream `window_change` events but no raw `press_key` event in the recording
+- do not assume every device action will always appear as a distinct raw event type
 
 Failure modes:
 
@@ -534,6 +556,12 @@ Important:
   ]
 }
 ```
+
+Important:
+
+- `parse` is intentionally lossy and step-oriented
+- `export` is intentionally evidence-preserving and event-oriented
+- the same recording can produce a small parsed step log while the export still contains multiple raw events such as `scroll`, `window_change`, or `text_change`
 
 Current parsed step types:
 

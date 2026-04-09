@@ -93,6 +93,13 @@ What that file is for:
 - the source file must already match the recording export artifact schema
 - `skills validate` does not inspect `recording-context.json`; it still validates only the registry-linked skill files
 
+Recommended source:
+
+- use `clawperator recording export --snapshots omit` by default when the goal is agent or human authoring context
+- use `--snapshots include` only when the author genuinely needs the raw XML snapshots for manual inspection
+- the parsed `recording parse` output is not a substitute for `recording-context.json`
+- `recording parse` is a lossy step log, while `recording export` preserves the raw event timeline and package-transition evidence
+
 The scaffolded `SKILL.md` includes this section before the `Usage:` block:
 
 ```markdown
