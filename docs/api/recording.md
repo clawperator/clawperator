@@ -653,15 +653,20 @@ Typical failure shape:
 ```json
 {
   "code": "RECORDING_ALREADY_IN_PROGRESS",
-  "message": "Recording is already in progress"
+  "message": "Recording is already in progress",
+  "sessionId": "record-123",
+  "filePath": "/storage/emulated/0/Android/data/com.clawperator.operator.dev/files/recordings/record-123.ndjson",
+  "hint": "Run 'clawperator recording stop --session-id record-123 --device <device_serial> --operator-package <package> --json' before starting a new recording."
 }
 ```
 
 Recovery:
 
-- run `clawperator record stop --device <device_serial> --json`
+- run `clawperator recording stop --session-id <active_session_id> --device <device_serial> --operator-package <package> --json`
 - then pull or parse the finished session before starting a new one
 - if your workflow uses explicit session ids, reuse the active session id instead of starting a second overlapping recording
+- use the `sessionId` and `filePath` fields in the error payload to target the exact session that is still active
+- the CLI also surfaces the same hint inside the failed `start_recording` step and the top-level envelope for easy copy/paste
 
 Verification pattern:
 

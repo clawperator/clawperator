@@ -16,22 +16,65 @@ import type { Logger } from "../../adapters/logger.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
 import type { RecordingExportSnapshotMode } from "../../domain/recording/recordingEventTypes.js";
 
+function buildRecordingAlreadyInProgressHint(options: {
+  sessionId?: string;
+  deviceId?: string;
+  operatorPackage?: string;
+}): string {
+  const deviceArg = options.deviceId ?? "<device_serial>";
+  const operatorPackageArg = options.operatorPackage ?? "<package>";
+  const sessionIdArg = options.sessionId ?? "<session_id>";
+  return `Run 'clawperator recording stop --session-id ${sessionIdArg} --device ${deviceArg} --operator-package ${operatorPackageArg} --json' before starting a new recording.`;
+}
+
+function addRecordingAlreadyInProgressHintToEnvelope(
+  envelope: {
+    stepResults?: Array<{
+      data?: Record<string, string>;
+    }>;
+    hint?: string;
+  },
+  options: {
+    sessionId?: string;
+    deviceId?: string;
+    operatorPackage?: string;
+  }
+): void {
+  const activeStep = envelope.stepResults?.find(step => step.data?.error === ERROR_CODES.RECORDING_ALREADY_IN_PROGRESS);
+  if (!activeStep?.data) {
+    return;
+  }
+  const hint = buildRecordingAlreadyInProgressHint({
+    sessionId: activeStep.data.sessionId,
+    deviceId: options.deviceId,
+    operatorPackage: options.operatorPackage,
+  });
+  activeStep.data.hint = hint;
+  envelope.hint = hint;
+}
+
 export async function cmdRecordStart(options: {
   format: OutputOptions["format"];
   sessionId?: string;
   deviceId?: string;
   operatorPackage?: string;
   logger?: Logger;
-}): Promise<string> {
+}, deps: {
+  runExecutionImpl?: typeof runExecution;
+} = {}): Promise<string> {
   try {
     const execution = buildStartRecordingExecution(options.sessionId);
-    const result = await runExecution(execution, {
+    const result = await (deps.runExecutionImpl ?? runExecution)(execution, {
       deviceId: options.deviceId,
       operatorPackage: options.operatorPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
       warn: message => process.stderr.write(message),
       logger: options.logger,
     });
     if (result.ok) {
+      addRecordingAlreadyInProgressHintToEnvelope(result.envelope, {
+        deviceId: result.deviceId ?? options.deviceId,
+        operatorPackage: options.operatorPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
+      });
       return formatSuccess(
         {
           envelope: result.envelope,
