@@ -12,6 +12,7 @@ import type { ClawperatorError } from "../contracts/errors.js";
 import type { OutputFormat } from "./output.js";
 import { formatError } from "./output.js";
 import type { CliFlagAliasSpec } from "./flagAliases.js";
+import { normalizeCliFlagAliases } from "./flagAliases.js";
 
 // ---------------------------------------------------------------------------
 // Flag name constants
@@ -80,16 +81,7 @@ function normalizeFlagAliases(
   rest: string[],
   aliasSpecs: readonly CliFlagAliasSpec[],
 ): string[] {
-  if (aliasSpecs.length === 0) {
-    return rest;
-  }
-  const aliasToCanonical = new Map<string, string>();
-  for (const spec of aliasSpecs) {
-    for (const alias of spec.aliases) {
-      aliasToCanonical.set(alias, spec.canonical);
-    }
-  }
-  return rest.map((token) => aliasToCanonical.get(token) ?? token);
+  return normalizeCliFlagAliases(rest, aliasSpecs);
 }
 
 function normalizeSelectorFlagAliases(rest: string[]): string[] {

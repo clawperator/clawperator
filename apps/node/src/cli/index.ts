@@ -140,7 +140,7 @@ function getGlobalOpts(argv: string[]): {
   verbose: boolean;
   rest: string[];
 } {
-  argv = normalizeCliFlagAliasesBeforeForwardSeparator(argv, GLOBAL_FLAG_ALIASES);
+  argv = normalizeCliFlagAliasesBeforeForwardSeparator(argv, GLOBAL_FLAG_ALIASES, FLAG_VALUE_ARITY);
   const rest: string[] = [];
   let deviceId: string | undefined;
   let operatorPackage: string | undefined;
@@ -286,7 +286,7 @@ async function main(): Promise<void> {
           "--verbose", "--help", "--version", "--disable-star-suggestions"
         ];
         const flagAliases = typeof def.flagAliases === "function" ? def.flagAliases(rest) : (def.flagAliases ?? []);
-        const normalizedRest = normalizeCliFlagAliasesBeforeForwardSeparator(rest, flagAliases);
+        const normalizedRest = normalizeCliFlagAliasesBeforeForwardSeparator(rest, flagAliases, FLAG_VALUE_ARITY);
         const localFlags = expandSupportedFlagsWithAliases(resolveSupportedFlagsFromRegistry(def, rest), flagAliases);
         const knownFlags = new Set([...localFlags, ...globalFlags]);
 

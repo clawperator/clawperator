@@ -37,4 +37,18 @@ describe("normalizeCliFlagAliasesBeforeForwardSeparator", () => {
     );
     assert.deepStrictEqual(normalized, ["--timeout", "5000"]);
   });
+
+  it("treats escaped -- after one-value flags as literal value marker", () => {
+    const flagValueArity = new Map<string, number>([
+      ["--summary", 1],
+      ["--format", 1],
+      ["--output", 1],
+    ]);
+    const normalized = normalizeCliFlagAliasesBeforeForwardSeparator(
+      ["--summary", "--", "literal", "--format", "json"],
+      TEST_ALIASES,
+      flagValueArity,
+    );
+    assert.deepStrictEqual(normalized, ["--summary", "--", "literal", "--output", "json"]);
+  });
 });

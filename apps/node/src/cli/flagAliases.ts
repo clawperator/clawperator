@@ -38,8 +38,27 @@ export function normalizeCliFlagAliases(
 export function normalizeCliFlagAliasesBeforeForwardSeparator(
   argv: string[],
   aliasSpecs: readonly CliFlagAliasSpec[],
+  flagValueArity: ReadonlyMap<string, number> = new Map<string, number>(),
 ): string[] {
-  const forwardIdx = argv.indexOf("--");
+  let forwardIdx = -1;
+  for (let i = 0; i < argv.length; i += 1) {
+    if (argv[i] !== "--") {
+      continue;
+    }
+    const previous = argv[i - 1];
+    if (
+      previous !== undefined
+      && flagValueArity.get(previous) === 1
+      && argv[i + 1] !== undefined
+    ) {
+      // `--` immediately after a one-value flag escapes a literal value token.
+      i += 1;
+      continue;
+    }
+    forwardIdx = i;
+    break;
+  }
+
   if (forwardIdx < 0) {
     return normalizeCliFlagAliases(argv, aliasSpecs);
   }
