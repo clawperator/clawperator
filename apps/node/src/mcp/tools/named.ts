@@ -83,6 +83,7 @@ const waitArgsSchema = executionToolOptionsSchema.extend({
 
 const scrollUntilArgsSchema = executionToolOptionsSchema.extend({
   selector: mcpSelectorSchema,
+  direction: z.enum(["down", "up", "left", "right"]),
   container: mcpSelectorSchema.optional(),
   clickAfter: z.boolean().optional(),
 }).strict();
@@ -302,12 +303,13 @@ export function getNamedMcpTools(logger?: Logger): McpToolDefinition[] {
     },
     {
       name: "scroll_until",
-      description: "Scroll downward until a matching node is visible, optionally clicking it afterward.",
+      description: "Scroll in the given direction until a matching node is visible, optionally clicking it afterward.",
       inputSchema: buildCommonExecutionSchema({
         selector: selectorJsonSchema,
+        direction: { type: "string", enum: ["down", "up", "left", "right"] },
         container: selectorJsonSchema,
         clickAfter: { type: "boolean" },
-      }, ["selector"]),
+      }, ["selector", "direction"]),
       handler: async (args) => {
         const parsed = parseToolArguments(scrollUntilArgsSchema, args);
 
@@ -316,7 +318,7 @@ export function getNamedMcpTools(logger?: Logger): McpToolDefinition[] {
         const container = mapOptionalSelector(parsed.container, "container");
 
         const execution = applyMcpExecutionMetadata(buildScrollUntilExecution(
-          "down",
+          parsed.direction,
           selector,
           container,
           parsed.clickAfter ?? false,

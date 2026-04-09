@@ -477,6 +477,7 @@ describe("mcp stdio integration", () => {
     const result = await client.callTool("scroll_until", {
       ...(await getPreferredExecutionArgs()),
       selector: { textContains: "Settings" },
+      direction: "down",
     });
 
     if (result.isError) {
@@ -495,6 +496,7 @@ describe("mcp stdio integration", () => {
     const result = await client.callTool("scroll_until", {
       ...(await getPreferredExecutionArgs()),
       selector: { textContains: "Settings" },
+      direction: "down",
       clickAfter: true,
     });
 

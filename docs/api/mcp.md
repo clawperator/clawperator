@@ -424,13 +424,14 @@ Example call:
 
 ### `scroll_until`
 
-Scroll downward until a matching node appears, optionally clicking it afterward.
+Scroll in the given direction until a matching node appears, optionally clicking it afterward.
 
 Parameters:
 
 | Field | Required | Notes |
 | --- | --- | --- |
 | `selector` | yes | Target selector |
+| `direction` | yes | Scroll direction: `"down"`, `"up"`, `"left"`, or `"right"` |
 | `container` | no | Optional container selector |
 | `clickAfter` | no | When `true`, the runtime uses action type `scroll_and_click` |
 | `deviceId` | no | Explicit target device |
@@ -444,6 +445,7 @@ Example scroll only:
   "selector": {
     "text": "About phone"
   },
+  "direction": "down",
   "deviceId": "<device_serial>"
 }
 ```
@@ -455,6 +457,7 @@ Example scroll then click:
   "selector": {
     "text": "About phone"
   },
+  "direction": "up",
   "clickAfter": true,
   "deviceId": "<device_serial>"
 }
