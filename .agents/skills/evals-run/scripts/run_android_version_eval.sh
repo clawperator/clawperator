@@ -51,7 +51,7 @@ setup_local_dev() {
 
 setup_published() {
   local published_version apk_url sha_url apk_path sha_path
-  published_version="$(clawperator version | python3 -c 'import json,sys; print(json.load(sys.stdin)["cliVersion"])')"
+  published_version="$(clawperator version --output json | python3 -c 'import json,sys; print(json.load(sys.stdin)["cliVersion"])')"
   apk_url="https://downloads.clawperator.com/operator/v${published_version}/operator-v${published_version}.apk"
   sha_url="${apk_url}.sha256"
   apk_path="${DOWNLOAD_DIR}/operator-v${published_version}.apk"

@@ -46,10 +46,8 @@ Runtime targets:
 
 The two runtime targets use different version sources that can diverge:
 
-| Runtime Target | CLI Version Source | APK Version | Package Name |
-|----------------|-------------------|-------------|--------------|
-| `local-dev` | `apps/node/package.json` (code version) | Local debug build | `com.clawperator.operator.dev` |
-| `published` | `npm install -g clawperator` (published version) | Downloaded release | `com.clawperator.operator` |
+- `local-dev`: CLI version comes from `apps/node/package.json` (code version), and the APK is the local debug build in `com.clawperator.operator.dev`.
+- `published`: CLI version comes from `npm install -g clawperator` (published version), and the APK is the downloaded release in `com.clawperator.operator`.
 
 The **code version** is typically ahead of the **published version** because
 it includes unreleased changes. This means you cannot mix runtime targets
