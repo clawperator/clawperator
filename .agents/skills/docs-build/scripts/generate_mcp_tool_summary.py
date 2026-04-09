@@ -2,30 +2,27 @@
 
 from __future__ import annotations
 
-import re
+import json
+import subprocess
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[4]
-TOOLS_DIR = ROOT / "apps/node/src/mcp/tools"
-TOOL_FILE_ORDER = ["core.ts", "named.ts"]
-PATTERN = re.compile(
-    r'name:\s*"(?P<name>[^"]+)"\s*,\s*description:\s*"(?P<description>[^"]+)"',
-    re.MULTILINE,
-)
+_LIST_SCRIPT = Path(__file__).resolve().parent / "list_mcp_tools.mjs"
 
 
 def iter_tools() -> list[tuple[str, str]]:
-    tools: list[tuple[str, str]] = []
-    for filename in TOOL_FILE_ORDER:
-        text = (TOOLS_DIR / filename).read_text(encoding="utf-8")
-        file_tools: list[tuple[str, str]] = []
-        for match in PATTERN.finditer(text):
-            file_tools.append((match.group("name"), match.group("description")))
-        if not file_tools:
-            raise ValueError(f"Failed to detect any MCP tools in {TOOLS_DIR / filename}")
-        tools.extend(file_tools)
-    return tools
+    result = subprocess.run(
+        ["node", str(_LIST_SCRIPT)],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    parsed = json.loads(result.stdout)
+    if not parsed:
+        raise ValueError("list_mcp_tools.mjs returned no tools - check that apps/node is built")
+    return [(name, description) for name, description in parsed]
 
 
 def main() -> int:
