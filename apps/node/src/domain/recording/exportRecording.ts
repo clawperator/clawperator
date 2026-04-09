@@ -420,5 +420,5 @@ function isNullableNumber(value: unknown): value is number | null {
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

@@ -185,10 +185,31 @@ function getGlobalOpts(argv: string[]): {
   return { deviceId, operatorPackage, timeoutMs, logLevel, output, explicitJsonOutput, verbose, rest };
 }
 
-/** Tokens after the first `--` are forwarded verbatim (e.g. to skill scripts); exclude them from global meta-flag detection. */
+/**
+ * Tokens after the first forwarding `--` are passed through verbatim (for example to skill scripts).
+ * A `--` that immediately follows a one-value flag is instead treated as the escape marker for a
+ * literal value that starts with `--`, so scanning must skip over both tokens in that case.
+ */
 function argvPrefixBeforeForwardSeparator(argv: string[]): string[] {
-  const sep = argv.indexOf("--");
-  return sep === -1 ? argv : argv.slice(0, sep);
+  for (let i = 0; i < argv.length; i += 1) {
+    if (argv[i] !== "--") {
+      continue;
+    }
+
+    const previous = argv[i - 1];
+    if (
+      previous !== undefined
+      && FLAG_VALUE_ARITY.get(previous) === 1
+      && argv[i + 1] !== undefined
+    ) {
+      i += 1;
+      continue;
+    }
+
+    return argv.slice(0, i);
+  }
+
+  return argv;
 }
 
 async function main(): Promise<void> {

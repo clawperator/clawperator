@@ -284,10 +284,10 @@ const HELP_RECORDING_EXPORT = `clawperator recording export
 
 Usage:
   clawperator recording export --input <file|directory> [--out <file>] [--snapshots <omit|include>] [--output <json|pretty>]
-  clawperator record export --input <file> [--out <file>] [--snapshots <omit|include>] [--output <json|pretty>]
+  clawperator record export --input <file|directory> [--out <file>] [--snapshots <omit|include>] [--output <json|pretty>]
 
 Options:
-  --input <file>                 Local NDJSON recording file to export
+  --input <file|directory>       Local NDJSON recording file, or a directory resolved to the newest *.ndjson recording
   --out <file>                   Output JSON file path
   --snapshots <omit|include>     Snapshot XML mode (default: omit)
 

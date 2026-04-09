@@ -419,6 +419,44 @@ describe("CLI help", () => {
     }
   });
 
+  it("still rejects unknown flags after an escaped double-dash input path", async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-recording-double-dash-input-unknown-"));
+    const inputFile = join(tempRoot, "--context.ndjson");
+    await mkdir(tempRoot, { recursive: true });
+    await writeFile(
+      inputFile,
+      [
+        JSON.stringify({
+          type: "recording_header",
+          schemaVersion: 1,
+          sessionId: "double-dash-input",
+          startedAt: 1710000000000,
+          operatorPackage: "com.clawperator.operator.dev",
+        }),
+        JSON.stringify({
+          ts: 1710000000100,
+          seq: 0,
+          type: "window_change",
+          packageName: "com.example.a",
+          className: "MainActivity",
+          title: "Home",
+          snapshot: "<window />",
+        }),
+      ].join("\n"),
+      "utf8",
+    );
+
+    try {
+      const { stdout, code } = await runCli(["recording", "export", "--input", "--", inputFile, "--bogus"]);
+
+      assert.notStrictEqual(code, 0);
+      assert.match(stdout, /"code":"USAGE"/);
+      assert.match(stdout, /unrecognized flag '--bogus'/);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
   it("returns USAGE when --out flag has no value for record pull", async () => {
     const { stdout, code } = await runCli(["record", "pull", "--out"]);
     assert.notStrictEqual(code, 0);

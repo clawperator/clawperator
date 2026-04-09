@@ -239,7 +239,7 @@ Check:
 
 ```bash
 clawperator recording export --input <file|directory> [--out <file>] [--snapshots <omit|include>] [--output <json|pretty>]
-clawperator record export --input <file> [--out <file>] [--snapshots <omit|include>] [--output <json|pretty>]
+clawperator record export --input <file|directory> [--out <file>] [--snapshots <omit|include>] [--output <json|pretty>]
 ```
 
 What the command does:
