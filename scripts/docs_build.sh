@@ -40,6 +40,10 @@ fi
 echo "Installing MkDocs dependencies..."
 pip install -r "$REQUIREMENTS_FILE"
 
+echo "Building Node package for docs generation..."
+npm --prefix "$REPO_ROOT/apps/node" ci
+npm --prefix "$REPO_ROOT/apps/node" run build
+
 echo "Assembling docs staging directory..."
 "$VENV_DIR/bin/python" "$REPO_ROOT/.agents/skills/docs-build/scripts/assemble.py"
 

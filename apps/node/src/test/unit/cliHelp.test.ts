@@ -136,6 +136,37 @@ describe("CLI help", () => {
     assert.match(stdout, /exec <json-or-file> \[--validate-only\]/);
   });
 
+  it("shows top-level help for help mcp serve", async () => {
+    const { stdout, code } = await runCli(["help", "mcp", "serve"]);
+    assert.strictEqual(code, 0);
+    assert.match(stdout, /Clawperator CLI/);
+    assert.match(stdout, /mcp serve/);
+  });
+
+  it("shows mcp help for --help mcp serve", async () => {
+    const { stdout, code } = await runCli(["--help", "mcp", "serve"]);
+    assert.strictEqual(code, 0);
+    assert.ok(stdout.length > 0);
+  });
+
+  it("prints the version for --version before mcp serve", async () => {
+    const { stdout, code } = await runCli(["--version", "mcp", "serve"]);
+    assert.strictEqual(code, 0);
+    assert.match(stdout.trim(), /^\d+\.\d+\.\d+/);
+  });
+
+  it("returns mcp serve usage for global flags before mcp serve", async () => {
+    const { stdout, code } = await runCli(["--operator-package", "com.clawperator.operator.dev", "mcp", "serve"]);
+    assert.strictEqual(code, 0);
+    assert.match(stdout, /mcp serve is a stdio transport/);
+  });
+
+  it("rejects forwarded extra args after mcp serve", async () => {
+    const { stdout, stderr, code } = await runCli(["mcp", "serve", "--", "extra"]);
+    assert.notStrictEqual(code, 0);
+    assert.match(stderr || stdout, /mcp serve does not accept additional arguments/);
+  });
+
   it("exec best-effort points at flat `snapshot`, not nested `observe snapshot` (exit 0)", async () => {
     const { stdout, code } = await runCli(["exec", "best-effort", "--goal", "test-goal"]);
     assert.strictEqual(code, 0, stdout);

@@ -2300,6 +2300,27 @@ COMMANDS["serve"] = {
   },
 };
 
+COMMANDS["mcp"] = {
+  name: "mcp",
+  group: "Execution",
+  supportedFlags: [],
+  summary: "Start the first-party MCP server",
+  help: "clawperator mcp\n\nUsage:\n  clawperator mcp serve\n\nNotes:\n  - Starts the stdio MCP server.\n  - Use 'node dist/cli/index.js mcp serve' for branch-local development.\n",
+  topLevelBlock: `  mcp serve
+                                            Start the first-party stdio MCP server`,
+  handler: async (ctx) => {
+    const { rest } = ctx;
+    if (rest[0] === "serve") {
+      return JSON.stringify({
+        code: "USAGE",
+        message: "mcp serve is a stdio transport and must be launched directly without CLI stdout formatting.",
+      });
+    }
+
+    return JSON.stringify({ code: "USAGE", message: "mcp serve" });
+  },
+};
+
 COMMANDS["logs"] = {
   name: "logs",
   group: "Utilities",

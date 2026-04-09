@@ -66,6 +66,7 @@ nav:
       - Timeouts: api/timeouts.md
       - Environment Variables: api/environment.md
       - Serve API: api/serve.md
+      - MCP Server: api/mcp.md
       - Navigation Patterns: api/navigation.md
       - Recording Format: api/recording.md
   - Skills:

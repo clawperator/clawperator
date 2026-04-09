@@ -1,4 +1,6 @@
 code_derived:
+  # api/mcp.md is authored in docs/ because it includes parameter-level guidance,
+  # client configuration, and verification flow that cannot be derived from code alone.
   - output: api/cli.md
     generator: scripts/generate_cli_reference.py
     sources:
@@ -16,3 +18,8 @@ markers:
     generator: scripts/generate_selector_table.py
     sources:
       - apps/node/src/cli/selectorFlags.ts
+  - page: api/mcp.md
+    marker: mcp-tool-summary
+    generator: scripts/generate_mcp_tool_summary.py
+    sources:
+      - apps/node/src/mcp/tools/

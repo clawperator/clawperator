@@ -227,8 +227,29 @@ function argvPrefixBeforeForwardSeparator(argv: string[]): string[] {
   return argv;
 }
 
+function resolveMcpServeArgs(argv: string[]): string[] | undefined {
+  if (argv[0] === "mcp" && argv[1] === "serve") {
+    return argv.slice(2);
+  }
+
+  return undefined;
+}
+
 async function main(): Promise<void> {
   const argv = process.argv.slice(2);
+  const mcpArgs = resolveMcpServeArgs(argv);
+  if (mcpArgs !== undefined) {
+    try {
+      await (await import("./commands/mcp.js")).cmdMcpServe(mcpArgs);
+      return;
+    } catch (error) {
+      if (error instanceof UsageError) {
+        process.stderr.write(`${JSON.stringify({ code: "USAGE", message: error.message })}\n`);
+        process.exit(1);
+      }
+      throw error;
+    }
+  }
   if (argv.length === 0 || argv[0] === "help") {
     console.log(generateTopLevelHelp(COMMANDS));
     process.exit(0);
