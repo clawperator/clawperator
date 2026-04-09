@@ -9,6 +9,7 @@ import {
   didYouMean,
   barePositionalTokens,
   isOpenCliUriTarget,
+  resolveSupportedFlagsFromRegistry,
 } from "../../cli/registry.js";
 
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "../../..");
@@ -246,6 +247,13 @@ describe("record synonym dispatches to recording handler", () => {
     const { stdout, code } = await runCli(["record", "--help"]);
     assert.strictEqual(code, 0);
     assert.match(stdout, /recording start/);
+  });
+
+  it("recording export exposes the expected supported flags", () => {
+    assert.deepStrictEqual(
+      resolveSupportedFlagsFromRegistry(COMMANDS.recording, ["export"]),
+      ["--input", "--out", "--snapshots"],
+    );
   });
 });
 

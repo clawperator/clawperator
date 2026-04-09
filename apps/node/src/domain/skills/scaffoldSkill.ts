@@ -1,4 +1,4 @@
-import { access, chmod, mkdir, writeFile } from "node:fs/promises";
+import { access, chmod, copyFile, mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import {
   loadRegistry,
@@ -20,6 +20,7 @@ export interface ScaffoldSkillSuccess {
   registryPath: string;
   skillPath: string;
   files: string[];
+  recordingContextPath?: string;
 }
 
 export interface ScaffoldSkillError {
@@ -31,6 +32,7 @@ export interface ScaffoldSkillError {
 export interface ScaffoldSkillOptions {
   registryPath?: string;
   summary?: string;
+  recordingContextPath?: string;
 }
 
 function deriveSkillMetadata(skillId: string): {
@@ -60,7 +62,23 @@ function indentYamlBlockScalar(value: string, indentSpaces: number): string {
     .join("\n");
 }
 
-function buildSkillMarkdown(skillId: string, summary: string, scriptPath: string): string {
+function buildSkillMarkdown(
+  skillId: string,
+  summary: string,
+  scriptPath: string,
+  includeRecordingContext: boolean,
+): string {
+  const recordingContextSection = includeRecordingContext
+    ? `## Recording Context
+
+This skill was scaffolded with recording context at \`recording-context.json\`.
+Read that file to inspect the recorded interaction timeline and raw events.
+The recording context is reference evidence, not an executable skill recipe.
+An external agent or human author must write the reusable skill logic.
+
+`
+    : "";
+
   return `---
 name: ${skillId}
 description: |-
@@ -76,7 +94,7 @@ Update this file with:
 3. expected outputs
 4. known caveats
 
-Usage:
+${recordingContextSection}Usage:
 
 \`\`\`bash
 node ${scriptPath} <device_id> [operator_package]
@@ -181,9 +199,21 @@ export async function scaffoldSkill(
 ): Promise<ScaffoldSkillSuccess | ScaffoldSkillError> {
   const normalizedOptions = typeof options === "string" ? { registryPath: options } : options;
   const rawSummary = (normalizedOptions as { summary?: unknown }).summary;
+  const rawRecordingContextPath = (normalizedOptions as { recordingContextPath?: unknown }).recordingContextPath;
   const summaryCandidate =
     typeof rawSummary === "string" ? rawSummary.trim() : undefined;
   const summary = summaryCandidate && summaryCandidate.length > 0 ? summaryCandidate : `TODO: describe ${skillId}`;
+  const recordingContextPath =
+    typeof rawRecordingContextPath === "string"
+      ? rawRecordingContextPath.trim()
+      : undefined;
+  if (recordingContextPath !== undefined && recordingContextPath.length === 0) {
+    return {
+      ok: false,
+      code: SKILLS_SCAFFOLD_FAILED,
+      message: "recordingContextPath must not be blank",
+    };
+  }
   const derived = deriveSkillMetadata(skillId);
   if (!derived) {
     return {
@@ -239,16 +269,30 @@ export async function scaffoldSkill(
 
   try {
     await mkdir(join(skillRoot, "scripts"), { recursive: true });
-    await writeFile(
-      join(skillRoot, "SKILL.md"),
-      buildSkillMarkdown(skillId, skillEntry.summary, scriptPathRelative),
-      "utf8"
+    const skillMarkdown = buildSkillMarkdown(
+      skillId,
+      skillEntry.summary,
+      scriptPathRelative,
+      recordingContextPath !== undefined,
     );
+    await writeFile(join(skillRoot, "SKILL.md"), skillMarkdown, "utf8");
     await writeFile(join(skillRoot, "skill.json"), `${JSON.stringify(skillEntry, null, 2)}\n`, "utf8");
     await writeFile(join(skillRoot, "scripts", "run.js"), buildScriptTemplate(skillId, derived.applicationId), "utf8");
     const runShPath = join(skillRoot, "scripts", "run.sh");
     await writeFile(runShPath, buildRunShTemplate(), "utf8");
     await chmod(runShPath, 0o755);
+
+    if (recordingContextPath !== undefined) {
+      try {
+        await copyFile(recordingContextPath, join(skillRoot, "recording-context.json"));
+      } catch (error) {
+        return {
+          ok: false,
+          code: SKILLS_SCAFFOLD_FAILED,
+          message: `Failed to copy recording context from ${recordingContextPath}: ${error instanceof Error ? error.message : String(error)}`,
+        };
+      }
+    }
 
     const updatedRegistry: SkillsRegistry = {
       ...loaded.registry,
@@ -269,11 +313,20 @@ export async function scaffoldSkill(
     skillId,
     registryPath: loaded.resolvedPath,
     skillPath: skillRoot,
-    files: [
-      join(skillRoot, "SKILL.md"),
-      join(skillRoot, "skill.json"),
-      join(skillRoot, "scripts", "run.js"),
-      join(skillRoot, "scripts", "run.sh"),
-    ],
+    ...(recordingContextPath !== undefined ? { recordingContextPath: join(skillRoot, "recording-context.json") } : {}),
+    files: recordingContextPath !== undefined
+      ? [
+          join(skillRoot, "SKILL.md"),
+          join(skillRoot, "skill.json"),
+          join(skillRoot, "scripts", "run.js"),
+          join(skillRoot, "scripts", "run.sh"),
+          join(skillRoot, "recording-context.json"),
+        ]
+      : [
+          join(skillRoot, "SKILL.md"),
+          join(skillRoot, "skill.json"),
+          join(skillRoot, "scripts", "run.js"),
+          join(skillRoot, "scripts", "run.sh"),
+        ],
   };
 }

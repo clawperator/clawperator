@@ -242,6 +242,7 @@ describe("CLI help", () => {
     assert.match(stdout, /recording stop/);
     assert.match(stdout, /recording pull/);
     assert.match(stdout, /recording parse/);
+    assert.match(stdout, /recording export/);
     assert.match(stdout, /'record' is an alias/);
   });
 
@@ -250,7 +251,7 @@ describe("CLI help", () => {
     assert.strictEqual(code, 0);
     const obj = JSON.parse(stdout);
     assert.strictEqual(obj.code, "USAGE");
-    assert.match(obj.message, /recording start\|stop\|pull\|parse/);
+    assert.match(obj.message, /recording start\|stop\|pull\|parse\|export/);
     assert.match(obj.message, /'record' is an alias/);
   });
 
@@ -259,7 +260,7 @@ describe("CLI help", () => {
     assert.strictEqual(code, 0);
     const obj = JSON.parse(stdout);
     assert.strictEqual(obj.code, "USAGE");
-    assert.match(obj.message, /recording start\|stop\|pull\|parse/);
+    assert.match(obj.message, /recording start\|stop\|pull\|parse\|export/);
     assert.match(obj.message, /'record' is an alias/);
   });
 
@@ -269,6 +270,29 @@ describe("CLI help", () => {
     const obj = JSON.parse(stdout);
     assert.strictEqual(obj.code, "USAGE");
     assert.match(obj.message, /--input/);
+  });
+
+  it("returns USAGE for recording export without --input", async () => {
+    const { stdout, code } = await runCli(["recording", "export"]);
+    assert.strictEqual(code, 0);
+    const obj = JSON.parse(stdout);
+    assert.strictEqual(obj.code, "USAGE");
+    assert.match(obj.message, /recording export --input <file>/);
+  });
+
+  it("returns USAGE when --snapshots is missing a value for recording export", async () => {
+    const { stdout, code } = await runCli(["recording", "export", "--input", "/tmp/demo.ndjson", "--snapshots"]);
+    assert.notStrictEqual(code, 0);
+    assert.match(stdout, /"code":"USAGE"/);
+    assert.match(stdout, /--snapshots requires a value/);
+  });
+
+  it("returns USAGE when --snapshots has an invalid value for record export", async () => {
+    const { stdout, code } = await runCli(["record", "export", "--input", "/tmp/demo.ndjson", "--snapshots", "foo"]);
+    assert.strictEqual(code, 0);
+    const obj = JSON.parse(stdout);
+    assert.strictEqual(obj.code, "USAGE");
+    assert.match(obj.message, /omit, include/);
   });
 
   it("returns USAGE for record parse without --input", async () => {
