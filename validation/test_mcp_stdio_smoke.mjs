@@ -6,7 +6,16 @@ import path from "node:path";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const cliEntrypoint = path.join(repoRoot, "apps/node/dist/cli/index.js");
-const operatorPackage = process.env.CLAWPERATOR_OPERATOR_PACKAGE ?? "com.clawperator.operator.dev";
+function resolveSmokeOperatorPackage(value) {
+  if (value === undefined) {
+    return "com.clawperator.operator.dev";
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : "com.clawperator.operator.dev";
+}
+
+const operatorPackage = resolveSmokeOperatorPackage(process.env.CLAWPERATOR_OPERATOR_PACKAGE);
 const preferredDevice = process.env.CLAWPERATOR_SMOKE_DEVICE;
 
 function delay(ms) {
