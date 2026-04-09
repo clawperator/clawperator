@@ -159,7 +159,7 @@ Judgment:
 | Runtime transport | stdio only in v1 |
 | Packaging | ship from `apps/node/`, not a separate repo or package |
 | Entry command | `clawperator mcp serve` |
-| Dependency strategy | pin `@modelcontextprotocol/sdk` to `1.29.0` in `apps/node/package.json` |
+| Dependency strategy | pin `@modelcontextprotocol/sdk` to `1.29.0` in `apps/node/package.json`. Before merging, verify this version installs cleanly on Node 24 (`npm install` with no `--legacy-peer-deps` required), that the SDK's own `package.json` has `"type": "module"` or a dual-CJS/ESM `exports` map, and that no peer-dep warning fires. |
 | Stdio safety rule | stdout belongs exclusively to the MCP transport. The `mcp serve` path must not write anything to stdout except protocol messages emitted by the MCP SDK. Detect `mcp serve` in `apps/node/src/cli/index.ts` before `getGlobalOpts` runs and before any `console.log` can fire, then route directly to the MCP bootstrap; all pre-bootstrap errors must go to stderr |
 
 ### PR-1 minimal tool surface
@@ -209,6 +209,8 @@ Do not split this into separate MCP tools in this task pack. Use one `scroll_unt
 
 When `clickAfter` is false or omitted, use the `scroll_until` canonical action type. When `clickAfter` is true, use the `scroll_and_click` canonical action type. Both are in `apps/node/src/contracts/aliases.ts`. Verify the exact strings against `apps/node/src/domain/executions/validateExecution.ts` before wiring.
 
+**Critical implementation note:** the action type STRING itself changes between these two cases. Using the `"scroll_until"` action type string with `clickAfter: true` in params is a mis-wiring - the param would be silently ignored or cause a validation error. When `clickAfter: true`, the action type must be `"scroll_and_click"`. Read `apps/node/src/domain/actions/scrollUntil.ts` to see how the existing action builder enforces this distinction before wiring the MCP tool.
+
 ### `execute` input shape
 
 | Input field | Required behavior |
@@ -247,7 +249,7 @@ Coordinates are absolute integer screen pixels:
 | Option | Rule |
 | --- | --- |
 | `deviceId` | optional pass-through to canonical execution paths |
-| `operatorPackage` | optional pass-through, otherwise env/default resolution |
+| `operatorPackage` | optional pass-through, otherwise env/default resolution. A blank string `""` is not a valid value - reject it at the MCP boundary with a validation error before it reaches `resolveOperatorPackageForRequest`. Omitting the field is valid; providing `""` is not. |
 | `timeoutMs` | supported for execution-backed tools where the canonical path already supports timeout behavior |
 
 ### Result and error shape
@@ -259,9 +261,22 @@ Coordinates are absolute integer screen pixels:
 | Tool fails before execution due to invalid MCP input | reject at the schema boundary with a precise validation message |
 | MCP protocol misuse | return correct MCP protocol errors rather than faking tool results |
 
+**MCP wire format distinction - required reading before implementation:**
+
+The MCP SDK distinguishes two fundamentally different error response types. Implementors must know which to use in each case:
+
+| Failure class | Wire format | When to use |
+| --- | --- | --- |
+| Clawperator runtime error (known error code) | `{ isError: true, content: [{ type: "text", text: JSON.stringify({ code, message }) }] }` | Tool executed, but device returned an error, e.g. `NO_DEVICES`, `EXECUTION_CONFLICT_IN_FLIGHT`, `EXECUTION_VALIDATION_FAILED` |
+| Unknown exception from `runExecution` | `{ isError: true, content: [{ type: "text", text: exceptionMessage }] }` | Uncaught throw from the domain layer; must not crash the server process |
+| Invalid tool input (Zod schema rejection) | MCP `InvalidParams` error response - returned automatically by the SDK when schema validation fails | Callers send wrong types or missing required fields |
+| Unknown MCP method or protocol violation | MCP protocol-level error - returned by the SDK itself | Malformed JSON-RPC; never handled by tool code |
+
+Every execution-backed tool handler must wrap `runExecution` in a try/catch. Any uncaught exception that escapes the domain layer must be caught and returned as `isError: true` in the tool response content. It must never crash the stdio server process.
+
 The implementation phase must define one shared extraction helper that documents exactly which `ResultEnvelope.stepResults[].data` fields are used for convenience extraction. If snapshot text or screenshot path behavior is not stable enough, do not promise convenience fields beyond what the canonical envelope safely provides.
 
-Before writing this helper, read `apps/node/src/domain/executions/snapshotHelper.ts` and equivalent helpers in `apps/node/src/domain/` to find the actual field keys. These keys are not declared in the TypeScript contracts and must be confirmed from domain code before implementation.
+Before writing this helper, read `apps/node/src/domain/executions/snapshotHelper.ts` to find snapshot-specific field keys. For `read_text` action result keys and other action data keys, the authoritative source is `apps/node/src/domain/executions/validateExecution.ts` and the domain action builder for `read_text`. These keys are not declared in the TypeScript contracts and must be confirmed from domain code before implementation. Do not assume `snapshotHelper.ts` covers non-snapshot data keys.
 
 ### Execution IDs
 
@@ -283,7 +298,7 @@ Long-running server configuration, such as `CLAWPERATOR_OPERATOR_PACKAGE`, `ADB_
 
 ## Failure Modes To Prevent
 
-- Producing any stray stdout output on the `mcp serve` path and corrupting the MCP stdio protocol stream
+- Producing any stray stdout output on the `mcp serve` path and corrupting the MCP stdio protocol stream. Specific threat sources: `maybeShowStarHint` (called at multiple points in `index.ts` including the `--version` path, the `doctor` path, and the post-dispatch upgrade check), `console.log(result)` at line 341, and `UsageError` formatting at line 213. MCP detection must occur before any of these can fire - before `main()` enters normal dispatch, not inside it.
 - Wrapping CLI string-returning helpers instead of reusing extracted typed services and canonical domain functions
 - Copying request validation or operator-package resolution into a third transport-specific implementation
 - Shipping a minimal MCP server without protocol-level initialize/listTools/callTool tests
@@ -292,6 +307,8 @@ Long-running server configuration, such as `CLAWPERATOR_OPERATOR_PACKAGE`, `ADB_
 - Letting MCP schemas drift from the actual selector and execution contracts
 - Declaring success without real stdio MCP smoke validation against a connected device or emulator
 - Treating `EXECUTION_CONFLICT_IN_FLIGHT` from concurrent tool calls as a bug to fix rather than expected behavior to document
+- Letting an uncaught exception from `runExecution` crash the stdio server process instead of returning an `isError: true` tool response
+- Accepting a blank string `""` as `operatorPackage` at the MCP tool boundary. Blank string must be rejected with a validation error, not passed through to `resolveOperatorPackageForRequest`. Per the repo's explicit contract (CLAUDE.md): reject blank strings at validation boundaries when they are not valid values.
 
 ## Output Contract
 
@@ -307,6 +324,7 @@ This task is complete when all of the following are true:
   - real-device or emulator verification
 - the `mcp serve` code path is verified to avoid stray stdout writes outside MCP protocol traffic
 - protocol tests prove initialize, listTools, callTool, invalid request handling, and clean shutdown
+- smoke validation uses a standalone Node script that speaks stdio MCP protocol directly; it does not depend on Claude Desktop or any external GUI client to pass
 
 ## Stability Expectations
 

@@ -40,6 +40,8 @@ Do not start PR-2 until PR-1 is merged. This task is intentionally transport-fir
 13. Pin one exact MCP SDK version in `apps/node/package.json`. Do not use an open-ended “or higher” range.
 14. PR-2 must not start until PR-1 is merged.
 15. Use the exact MCP tool name `scroll_until` everywhere in implementation, tests, and docs.
+16. Reject `operatorPackage: ""` (blank string) at the MCP tool boundary before it reaches `resolveOperatorPackageForRequest`. Omitting the field is valid; providing an empty string is not. This mirrors the existing blank-string rejection behavior in `serve.ts`.
+17. All test and verification commands that invoke the MCP server must use the branch-local build: `node apps/node/dist/cli/index.js mcp serve`. Do not use the global `clawperator` binary in tests - it may lag behind the checked-out branch and silently hide new or renamed commands (see CLAUDE.md).
 
 ## Required Reading
 
@@ -49,7 +51,8 @@ Read these files IN THIS ORDER before writing anything.
 | --- | --- | --- |
 | 1 | `apps/node/src/domain/executions/runExecution.ts` | Canonical execution orchestration and post-processing |
 | 2 | `apps/node/src/domain/executions/validateExecution.ts` | Canonical execution validation and supported actions |
-| 3 | `apps/node/src/domain/executions/snapshotHelper.ts` (and peer helpers in `domain/executions/`) | `ResultEnvelope.stepResults[].data` field keys used for structured extraction; these are not in the TypeScript contracts |
+| 3 | `apps/node/src/domain/executions/snapshotHelper.ts` | Snapshot-specific `ResultEnvelope.stepResults[].data` field keys (e.g. `"text"` for snapshot content, `"error"` when extraction fails). These keys are not in the TypeScript contracts. **Scope: snapshot data only.** For `read_text` and other action data keys, read entry 3a below. |
+| 3a | `apps/node/src/domain/executions/validateExecution.ts` and the `read_text` action domain builder | Data keys used by non-snapshot actions in `stepResults[].data`. Do not assume `snapshotHelper.ts` covers these. |
 | 4 | `apps/node/src/contracts/execution.ts` | Execution payload contract |
 | 5 | `apps/node/src/contracts/result.ts` | Result envelope contract |
 | 6 | `apps/node/src/contracts/errors.ts` | Stable error codes |
@@ -99,7 +102,7 @@ Extract the minimum shared typed services needed so MCP does not become a third 
 
 ### Steps
 
-1. Extract typed helpers for the seams that are currently transport-specific. The primary target is `resolveOperatorPackageForRequest` in `apps/node/src/cli/commands/serve.ts` - move it to a shared module under `apps/node/src/domain/` or equivalent so MCP does not reimplement it. Read `serve.ts` for any other execution helpers that both `serve` and MCP would otherwise duplicate and extract those if the evidence is clear.
+1. Extract `resolveOperatorPackageForRequest` from `apps/node/src/cli/commands/serve.ts` to a shared module under `apps/node/src/domain/` (e.g. `apps/node/src/domain/config/resolveOperatorPackage.ts`). This is the only required extraction for Phase 1. Do not extract further helpers from `serve.ts` without a concrete MCP usage site that would immediately use them - the file is ~695 lines and open-ended exploration will expand scope beyond this task.
 2. Keep the extraction minimal and evidence-based. Do not refactor unrelated command code.
 3. Add focused unit tests for each extracted helper. At minimum cover:
    - operator-package resolution with an explicit caller value, with an env-var fallback, and with the default fallback
@@ -147,7 +150,11 @@ Add the `mcp serve` command path, pin the SDK dependency, and prove protocol cor
 
 ### Steps
 
-1. Add `@modelcontextprotocol/sdk` version `1.29.0` to `apps/node/package.json`. Before pinning, verify that this version is ESM-compatible (check the SDK's own `package.json` for `"type": "module"` or dual-CJS/ESM exports) and runs on Node 24 as required by the `engines` field.
+1. Add `@modelcontextprotocol/sdk` version `1.29.0` to `apps/node/package.json`. Before pinning, perform all of the following verifications:
+   - Run `npm install` from `apps/node/` on Node 24 and confirm it completes without `--legacy-peer-deps` and without peer-dependency warnings for the SDK.
+   - Inspect the installed SDK's own `package.json`: confirm it has `"type": "module"` or a dual-CJS/ESM `exports` map with an `"import"` condition. If neither is present, this version is CJS-only and incompatible with the project's `"type": "module"` setup.
+   - Confirm `npm --prefix apps/node run build` still passes after the dependency is added.
+   If any of these checks fail, the SDK version must be changed before proceeding.
 2. Add a new top-level `mcp` CLI command with a `serve` subcommand.
 3. Implement stdio MCP server bootstrap under `apps/node/src/mcp/`.
 4. Add shared MCP helpers for:
@@ -159,14 +166,20 @@ Add the `mcp serve` command path, pin the SDK dependency, and prove protocol cor
    Add unit tests for each helper before moving on:
    - execution ID helper: generates distinct IDs with the `mcp-<tool>-` prefix pattern; two calls produce different values
    - selector mapping helper: each MCP input field maps to the correct `NodeMatcher` field; all-empty input triggers rejection, not a pass-through
-   - envelope extraction helper: correct field key is pulled from `stepResults[].data`; missing key returns a defined fallback or error, not `undefined` silently
-5. Explicitly protect the `mcp serve` path from stray stdout writes. In `apps/node/src/cli/index.ts`, detect the `mcp serve` argv pattern before `getGlobalOpts` runs and before any `console.log` can fire. Route directly to the MCP bootstrap from that detection point. All pre-bootstrap errors must go to stderr. This prevents `maybeShowStarHint`, the `console.log(result)` dispatch path, and `UsageError` formatting from writing to stdout during server operation.
+   - envelope extraction helper: correct field key is pulled from `stepResults[].data` per the required reading (entry 3 and 3a in the table above); snapshot steps use `"text"` for success and `"error"` for extraction failure; for other action types confirm the data key from `validateExecution.ts` before wiring; missing key returns a defined fallback or error, not `undefined` silently
+5. Explicitly protect the `mcp serve` path from stray stdout writes. In `apps/node/src/cli/index.ts`, detect the `mcp serve` argv pattern before `getGlobalOpts` runs - as the very first conditional inside `main()`, before any other branch can execute. Route directly to the MCP bootstrap from that detection point. All pre-bootstrap errors must go to stderr.
+
+   **Named threat sources that must be blocked:** `maybeShowStarHint` is called at four points in `main()` - the `--version` path (line ~204), the post-dispatch `doctor` trigger, the post-dispatch `skill` trigger, and the post-dispatch `upgrade` trigger. `console.log(result)` at line ~341 writes the command result. `UsageError` formatting at line ~213 writes to stdout via `console.log`. All of these must be unreachable on the `mcp serve` path. If the detection check fires first and exits the normal dispatch flow, none of them can run.
+
+   After implementing: run the Phase 2 protocol test that counts stdout bytes before the first JSON-RPC message to confirm no contamination has been introduced.
 6. Add real protocol tests at `apps/node/src/test/integration/mcp.test.ts`, modeled on the repo’s existing long-running integration style (see `apps/node/src/test/integration/serve.test.ts`), covering:
-   - no unexpected stdout bytes before initialize
+   - **zero non-protocol bytes before initialize**: spawn the binary and capture all stdout bytes before the first valid JSON-RPC newline-delimited message; assert that byte count is zero. This is the primary regression guard for the star-hint contamination risk.
    - initialize handshake
    - listTools
-   - one invalid request path
+   - one invalid request path (e.g. unknown method)
    - clean exit on stdin close
+
+   All tests must spawn `node apps/node/dist/cli/index.js mcp serve` as a subprocess (branch-local build). Do not use the global `clawperator` binary in tests.
 
 ### Acceptance Criteria
 
@@ -209,17 +222,21 @@ Ship the smallest useful real MCP surface on top of the verified transport.
 1. Implement `devices` using the shared typed device-listing path.
 2. Implement `snapshot` using the canonical observe/execution path.
 3. Implement `execute` as a thin wrapper over the canonical validated execution contract. Callers provide `actions` (required, matching `ExecutionAction[]` from `contracts/execution.ts`), `deviceId` (optional), `operatorPackage` (optional), and `timeoutMs` (optional). The server generates `commandId` and `taskId` via the shared helper, sets `source` to `"mcp"`, and sets `expectedFormat` to `"android-ui-automator"`. Do not expose `commandId`, `taskId`, `source`, or `expectedFormat` as caller inputs. Use a light MCP schema for `actions`: require each element to have `id: string` and `type: string` with `params` as an optional passthrough object. Do not mirror all of `ActionParams` into Zod - let `validateExecution` do the real enforcement.
+
+   **Error handling contract (required):** Wrap the `runExecution` call in a try/catch. If `runExecution` returns `{ ok: false, error }`, return an MCP tool response with `isError: true` and the Clawperator error code serialized as JSON in the content text. If `runExecution` throws an uncaught exception, catch it and also return `isError: true` with the exception message. Never let an exception from the domain layer crash the stdio server process. This same pattern applies to `snapshot` and all other execution-backed tools.
+
+   **Blank operatorPackage (required):** If the caller provides `operatorPackage: ""` (a blank string), reject it at the MCP tool boundary with a validation error before the value reaches `resolveOperatorPackageForRequest`. Omitting the field is valid; an empty string is not.
 4. Support common execution-backed options where applicable:
    - `deviceId`
    - `operatorPackage`
    - `timeoutMs`
 5. Add protocol-level tool-call tests for:
    - `devices`: valid call returns a list (may be empty if no device is connected in CI)
-   - `snapshot`: valid call returns an envelope; test does not require a connected device but must confirm the response shape
-   - `execute`: valid call with a minimal `actions` array (e.g., a single `sleep` action with `durationMs`); invalid call with missing `actions` field; invalid call with `actions` containing an element missing `type`
+   - `snapshot`: valid call returns a tool response. The test does not require a connected device. Accept either a success envelope (device connected) or an `isError: true` response with a Clawperator error code such as `NO_DEVICES` or `ADB_NOT_FOUND` (no device connected). Both are valid tool responses - do not treat a device-error response as a test failure.
+   - `execute`: valid call with a minimal `actions` array (e.g., a single `sleep` action with `durationMs`); invalid call with missing `actions` field; invalid call with `actions` containing an element missing `type`; invalid call with `operatorPackage: ""` (blank string) - must return a validation error, not pass through
    - invalid tool name: confirm MCP-level error response, not a crash
 
-   These tests must spawn the compiled binary as a subprocess and exchange real stdio MCP messages, not import handlers directly. Importing handlers bypasses the exact class of bug (stray writes, dispatch leaks) that the protocol tests exist to catch.
+   These tests must spawn `node apps/node/dist/cli/index.js mcp serve` as a subprocess and exchange real stdio MCP messages. Do not import handlers directly. Importing handlers bypasses the exact class of bug (stray writes, dispatch leaks) that the protocol tests exist to catch. Do not use the global `clawperator` binary.
 
 6. Stop after PR-1 and wait for merge.
 
@@ -276,7 +293,7 @@ Add ergonomic named tools only after the transport and canonical execute path ar
    - `read`: required `selector`, optional `all`, optional `container`; when `all` is false or omitted return first matched text as a string, when `all: true` return all matches as an array of strings
    - `press`: required `key` as enum of `"back"`, `"home"`, `"recents"`, validated at the MCP boundary
    - `wait`: required `selector`, optional `timeoutMs`
-   - `scroll_until`: required `selector`, optional `container`, optional `clickAfter?: boolean`; use `scroll_until` action type when `clickAfter` is false or omitted, `scroll_and_click` action type when `clickAfter` is true
+   - `scroll_until`: required `selector`, optional `container`, optional `clickAfter?: boolean`; when `clickAfter` is false or omitted use action type string `"scroll_until"`; when `clickAfter` is true use action type string `"scroll_and_click"`. **The action type string itself must change - it is not one type with a `clickAfter` param.** Using `"scroll_until"` type with `clickAfter: true` in params is a mis-wiring. Before implementing, read `apps/node/src/domain/actions/scrollUntil.ts` to see how the existing builder enforces this distinction.
 3. Add protocol-level tests for valid and invalid tool calls. Cover at minimum:
    - `open`: rejected when both `appId` and `uri` are provided; rejected when neither is provided; accepted with only `appId`; accepted with only `uri`
    - `click`: rejected when both `selector` and `coordinate` are provided; rejected when neither is provided
@@ -334,7 +351,7 @@ Document the shipped MCP surface clearly and verify it against a real client plu
    - branch-local development command example
    - Claude Desktop configuration example
    - Node version requirement
-   - environment configuration for long-running MCP processes, including `CLAWPERATOR_OPERATOR_PACKAGE` and `ADB_PATH`; note that Claude Desktop and similar MCP clients typically do not inherit the shell PATH, so `ADB_PATH` must be set explicitly in the client env block rather than relying on PATH resolution
+   - environment configuration for long-running MCP processes, including `CLAWPERATOR_OPERATOR_PACKAGE`, `ADB_PATH`, `CLAWPERATOR_LOG_DIR`, and `CLAWPERATOR_LOG_LEVEL`; note that Claude Desktop and similar MCP clients typically do not inherit the shell PATH, so `ADB_PATH` must be set explicitly in the client env block rather than relying on PATH resolution. `CLAWPERATOR_LOG_DIR` and `CLAWPERATOR_LOG_LEVEL` are the primary diagnostics path for MCP users - stderr is not visible in Claude Desktop, so users who need to debug errors must use the log file. Document this explicitly.
    - the shipped MCP tool list with parameter-level documentation for each tool: what each parameter accepts, which are required vs optional, and at least one example call shape
    - behavior when no device is connected at server start: the server starts successfully and returns errors on tool calls rather than failing to boot; document this so Claude Desktop users who launch the server before connecting a device know what to expect
    - device-selection caveats, including that concurrent tool calls may surface `EXECUTION_CONFLICT_IN_FLIGHT` if two execution-backed tools are called simultaneously; document this as expected behavior, not a bug
@@ -343,8 +360,10 @@ Document the shipped MCP surface clearly and verify it against a real client plu
 5. Run the docs build workflow instead of hand-editing generated outputs.
 6. If the implementation produced a reusable verification path, place it under `validation/`, not as a one-off script under `scripts/`.
 6a. Add a design note under `docs/internal/design/` covering the durable MCP-specific decisions that future contributors will need: why stdio-only in v1, why `execute` uses a light MCP schema and defers to `validateExecution` rather than mirroring `ActionParams`, and why named tools call action builders rather than the CLI formatter functions. This is required by the repo's docs discipline for internal design guidance that is not obvious from the code alone.
-7. Perform one real end-to-end MCP smoke test against a connected device or emulator. At minimum prove:
-   - `devices`
+7. Perform one real end-to-end MCP smoke test against a connected device or emulator. The smoke test must be implemented as a standalone Node script that speaks the stdio MCP protocol directly - spawning `node apps/node/dist/cli/index.js mcp serve` as a subprocess and exchanging JSON-RPC messages over its stdin/stdout. Do not require Claude Desktop or any GUI MCP client to execute the smoke test. The test must be reproducible from a terminal.
+
+   At minimum prove:
+   - `devices` returns the connected device
    - `snapshot` returns parseable XML with at least one extractable node element, not just `ok: true`
    - `open` or `execute`
    - one selector-driven interaction
@@ -354,7 +373,7 @@ Document the shipped MCP surface clearly and verify it against a real client plu
 
 - Package-facing and public docs both reflect the shipped MCP surface.
 - `./scripts/docs_build.sh` passes.
-- A real MCP client can start the server and successfully call the minimum smoke-test sequence.
+- A standalone Node MCP script can start the server via subprocess and successfully execute the minimum smoke-test sequence without Claude Desktop or any external GUI client.
 - The docs do not promise registry submission, hosted infrastructure, or tools not yet shipped.
 
 ### Validation
