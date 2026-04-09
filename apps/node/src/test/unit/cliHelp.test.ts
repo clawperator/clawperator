@@ -278,7 +278,7 @@ describe("CLI help", () => {
     assert.strictEqual(code, 0);
     const obj = JSON.parse(stdout);
     assert.strictEqual(obj.code, "USAGE");
-    assert.match(obj.message, /recording export --input <file>/);
+    assert.match(obj.message, /recording export --input <file\|directory>/);
   });
 
   it("returns USAGE when --input is followed by another flag for recording export", async () => {

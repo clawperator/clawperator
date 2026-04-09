@@ -1,6 +1,6 @@
 import { afterEach, describe, it } from "node:test";
 import assert from "node:assert";
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, utimes, writeFile } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -317,6 +317,49 @@ describe("exportRecording", () => {
     });
   });
 
+  it("exports a pulled session directory by choosing the newest NDJSON file", async () => {
+    const dir = await makeTempDir("clawperator-recording-export-dir-");
+    const pulledDir = join(dir, "pulled");
+    await mkdir(pulledDir, { recursive: true });
+
+    const olderFile = join(pulledDir, "older.ndjson");
+    const newerFile = join(pulledDir, "newer.ndjson");
+    await writeFile(olderFile, [
+      buildHeader({ sessionId: "older-session" }),
+      JSON.stringify({
+        ts: 1710000000000,
+        seq: 0,
+        type: "window_change",
+        packageName: "com.example.old",
+        className: "MainActivity",
+        title: "Old",
+      }),
+    ].join("\n"), "utf8");
+    await writeFile(newerFile, [
+      buildHeader({ sessionId: "newer-session" }),
+      JSON.stringify({
+        ts: 1710000001000,
+        seq: 0,
+        type: "window_change",
+        packageName: "com.example.new",
+        className: "MainActivity",
+        title: "New",
+      }),
+    ].join("\n"), "utf8");
+    await utimes(olderFile, 1710000000, 1710000000);
+    await utimes(newerFile, 1710000001, 1710000001);
+
+    const result = await exportRecordingFile(pulledDir);
+    const written = JSON.parse(await readFile(join(pulledDir, "newer.export.json"), "utf8"));
+
+    assert.strictEqual(result.outputFile, join(pulledDir, "newer.export.json"));
+    assert.strictEqual(written.session.sessionId, "newer-session");
+    assert.deepStrictEqual(written.counts, {
+      totalEvents: 1,
+      byType: { window_change: 1 },
+    });
+  });
+
   it("fails malformed headers, malformed events, and unsupported schema versions", async () => {
     const dir = await makeTempDir("clawperator-recording-export-errors-");
     const malformedHeader = join(dir, "bad-header.ndjson");
@@ -358,6 +401,8 @@ describe("recording export CLI", () => {
   it("supports both recording export and record export without parser stderr output", async () => {
     const dir = await makeTempDir("clawperator-recording-export-cli-");
     const inputFile = join(dir, "demo.ndjson");
+    const pulledDir = join(dir, "pulled");
+    await mkdir(pulledDir, { recursive: true });
     await writeFile(inputFile, [
       buildHeader({ sessionId: "cli-demo" }),
       JSON.stringify({
@@ -401,5 +446,25 @@ describe("recording export CLI", () => {
     const written = JSON.parse(await readFile(secondOutput, "utf8"));
     assert.strictEqual(written.snapshotMode, "include");
     assert.strictEqual(written.events[0].snapshot.xml, "<window />");
+
+    const directoryOutput = join(dir, "pulled.export.json");
+    await writeFile(join(pulledDir, "export-demo.ndjson"), [
+      buildHeader({ sessionId: "pulled-cli-demo" }),
+      JSON.stringify({
+        ts: 1710000001000,
+        seq: 0,
+        type: "window_change",
+        packageName: "com.example.dir",
+        className: "MainActivity",
+        title: "Dir",
+      }),
+    ].join("\n"), "utf8");
+
+    const third = await runCli(["recording", "export", "--input", pulledDir, "--out", directoryOutput, "--json"]);
+    assert.strictEqual(third.code, 0, third.stdout);
+    assert.strictEqual(third.stderr, "");
+    const thirdJson = JSON.parse(third.stdout) as { outputFile?: string; sessionId?: string };
+    assert.strictEqual(thirdJson.outputFile, directoryOutput);
+    assert.strictEqual(thirdJson.sessionId, "pulled-cli-demo");
   });
 });

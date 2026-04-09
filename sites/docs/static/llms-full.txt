@@ -1029,7 +1029,7 @@ This page is generated from the Node CLI registry and command sources.
 | `wait-for-nav` | `wait-for-nav --app <package> --timeout <ms> [--device <id>] [--operator-package <pkg>] [--json]` | wait-for-navigation | --app, --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --validate-only, --dry-run, --timeout, --device, --operator-package, --json | Wait for app or screen navigation to complete |
 | `read-value` | `read-value --label <text> [--json]` | read-kv | --label, --label-id, --label-desc, --all, --validate-only, --dry-run, --json | Read the value associated with a labeled element |
 | `skills` | `skills list`<br>`skills get <skill_id>`<br>`skills search --app <package_id> [--intent <intent>] [--keyword <text>]`<br>`skills search <keyword>`<br>`skills compile-artifact <skill_id> --artifact <name> [--vars <json>]`<br>`skills compile-artifact --skill-id <id> --artifact <name> [--vars <json>]`<br>`skills new <skill_id> [--summary <text>] [--recording-context <file>]`<br>`skills validate <skill_id> [--dry-run]`<br>`skills validate --all [--dry-run]`<br>`skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--json] [--output <json|pretty>] [-- <extra_args>]`<br>`skills install`<br>`skills update [--ref <git-ref>]`<br>`skills sync --ref <git-ref>` | - | --app, --intent, --keyword, --skill-id, --artifact, --vars, --summary, --recording-context, --all, --dry-run, --device, --device-id, --operator-package, --receiver-package, --timeout, --timeout-ms, --expect-contains, --skip-validate, --ref, --json, --output<br>Subcommands: install, sync, new, validate, compile-artifact, run | Manage and run automation skills |
-| `recording` | `recording start [--session-id <id>] [--device <serial>] [--operator-package <pkg>]`<br>`recording stop`<br>`recording pull`<br>`recording parse --input <file> [--out <file>]`<br>`recording export --input <file> [--out <file>] [--snapshots <omit|include>]` | record | --session-id, --out, --input, --snapshots, --device, --operator-package<br>Subcommands: export | Manage recording sessions on the Operator app |
+| `recording` | `recording start [--session-id <id>] [--device <serial>] [--operator-package <pkg>]`<br>`recording stop`<br>`recording pull`<br>`recording parse --input <file> [--out <file>]`<br>`recording export --input <file|directory> [--out <file>] [--snapshots <omit|include>]` | record | --session-id, --out, --input, --snapshots, --device, --operator-package<br>Subcommands: export | Manage recording sessions on the Operator app |
 | `serve` | `serve [--port <number>] [--host <string>]` | - | --port, --host | Start local HTTP/SSE server for remote control |
 | `logs` | `logs` | - | - | Tail the Clawperator log file |
 | `doctor` | `doctor [--json]`<br>`doctor --fix`<br>`doctor --full`<br>`doctor --check-only` | - | --fix, --full, --check-only, --json, --format, --output | Run environment and runtime checks |
@@ -1296,12 +1296,12 @@ This page is generated from the Node CLI registry and command sources.
 
 | Command | Syntax | Aliases | Flags | Summary |
 | --- | --- | --- | --- | --- |
-| `recording` | `recording start [--session-id <id>] [--device <serial>] [--operator-package <pkg>]`<br>`recording stop`<br>`recording pull`<br>`recording parse --input <file> [--out <file>]`<br>`recording export --input <file> [--out <file>] [--snapshots <omit|include>]` | record | --session-id, --out, --input, --snapshots, --device, --operator-package<br>Subcommands: export | Manage recording sessions on the Operator app |
+| `recording` | `recording start [--session-id <id>] [--device <serial>] [--operator-package <pkg>]`<br>`recording stop`<br>`recording pull`<br>`recording parse --input <file> [--out <file>]`<br>`recording export --input <file|directory> [--out <file>] [--snapshots <omit|include>]` | record | --session-id, --out, --input, --snapshots, --device, --operator-package<br>Subcommands: export | Manage recording sessions on the Operator app |
 
 ### `recording`
 
 - Summary: Manage recording sessions on the Operator app
-- Syntax: `recording start [--session-id <id>] [--device <serial>] [--operator-package <pkg>]`, `recording stop`, `recording pull`, `recording parse --input <file> [--out <file>]`, `recording export --input <file> [--out <file>] [--snapshots <omit|include>]`
+- Syntax: `recording start [--session-id <id>] [--device <serial>] [--operator-package <pkg>]`, `recording stop`, `recording pull`, `recording parse --input <file> [--out <file>]`, `recording export --input <file|directory> [--out <file>] [--snapshots <omit|include>]`
 - Aliases: `record`
 - Flags: `--session-id`, `--out`, `--input`, `--snapshots`, `--device`, `--operator-package`
 - Subcommands: `export`
@@ -6482,7 +6482,7 @@ The current flow is:
 3. `clawperator record stop [--session-id <id>]`
 4. `clawperator record pull [--session-id <id>] [--out <dir>]`
 5. `clawperator record parse --input <file> [--out <file>]`
-6. `clawperator recording export --input <file> [--out <file>] [--snapshots <omit|include>]`
+6. `clawperator recording export --input <file|directory> [--out <file>] [--snapshots <omit|include>]`
 
 Notes:
 
@@ -6493,6 +6493,7 @@ Notes:
 - `record stop` builder timeout is `15000`
 - `recording export` defaults to `--snapshots omit`
 - `recording export` writes `<input without .ndjson>.export.json` when the input ends with `.ndjson`, otherwise `<input>.export.json`
+- if `--input` points at a directory, `recording export` picks the newest `*.ndjson` file in that directory and exports that file
 
 ## CLI Commands
 
@@ -6692,7 +6693,7 @@ Check:
 ### Export
 
 ```bash
-clawperator recording export --input <file> [--out <file>] [--snapshots <omit|include>] [--output <json|pretty>]
+clawperator recording export --input <file|directory> [--out <file>] [--snapshots <omit|include>] [--output <json|pretty>]
 clawperator record export --input <file> [--out <file>] [--snapshots <omit|include>] [--output <json|pretty>]
 ```
 

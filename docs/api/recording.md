@@ -23,7 +23,7 @@ The current flow is:
 3. `clawperator record stop [--session-id <id>]`
 4. `clawperator record pull [--session-id <id>] [--out <dir>]`
 5. `clawperator record parse --input <file> [--out <file>]`
-6. `clawperator recording export --input <file> [--out <file>] [--snapshots <omit|include>]`
+6. `clawperator recording export --input <file|directory> [--out <file>] [--snapshots <omit|include>]`
 
 Notes:
 
@@ -34,6 +34,7 @@ Notes:
 - `record stop` builder timeout is `15000`
 - `recording export` defaults to `--snapshots omit`
 - `recording export` writes `<input without .ndjson>.export.json` when the input ends with `.ndjson`, otherwise `<input>.export.json`
+- if `--input` points at a directory, `recording export` picks the newest `*.ndjson` file in that directory and exports that file
 
 ## CLI Commands
 
@@ -233,7 +234,7 @@ Check:
 ### Export
 
 ```bash
-clawperator recording export --input <file> [--out <file>] [--snapshots <omit|include>] [--output <json|pretty>]
+clawperator recording export --input <file|directory> [--out <file>] [--snapshots <omit|include>] [--output <json|pretty>]
 clawperator record export --input <file> [--out <file>] [--snapshots <omit|include>] [--output <json|pretty>]
 ```
 

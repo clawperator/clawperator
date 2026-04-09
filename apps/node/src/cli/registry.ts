@@ -264,7 +264,7 @@ Usage:
 const HELP_RECORDING_EXPORT = `clawperator recording export
 
 Usage:
-  clawperator recording export --input <file> [--out <file>] [--snapshots <omit|include>] [--output <json|pretty>]
+  clawperator recording export --input <file|directory> [--out <file>] [--snapshots <omit|include>] [--output <json|pretty>]
   clawperator record export --input <file> [--out <file>] [--snapshots <omit|include>] [--output <json|pretty>]
 
 Options:
@@ -2100,7 +2100,7 @@ COMMANDS["recording"] = {
                                             Pull the on-device NDJSON recording to host (default: ./recordings/, 'record' is an alias)
   recording parse --input <file> [--out <file>]
                                             Parse a raw NDJSON recording into a step log JSON ('record' is an alias)
-  recording export --input <file> [--out <file>] [--snapshots <omit|include>]
+  recording export --input <file|directory> [--out <file>] [--snapshots <omit|include>]
                                             Export raw recording evidence into agent-context JSON ('record' is an alias)`,
   handler: async (ctx) => {
     const { rest, format, verbose, logger, deviceId, operatorPackage } = ctx;
@@ -2146,7 +2146,7 @@ COMMANDS["recording"] = {
     } else if (sub === "export") {
       const inputFile = getStringOptStrict(rest, "--input", ["--input", "--out", "--snapshots"]);
       if (!inputFile) {
-        return JSON.stringify({ code: "USAGE", message: "recording export --input <file> [--out <file>] [--snapshots <omit|include>] ('record' is an alias)" });
+        return JSON.stringify({ code: "USAGE", message: "recording export --input <file|directory> [--out <file>] [--snapshots <omit|include>] ('record' is an alias)" });
       }
       const snapshotMode = getStringOptStrict(rest, "--snapshots", ["--input", "--out", "--snapshots"]);
       if (snapshotMode !== undefined && snapshotMode !== "omit" && snapshotMode !== "include") {

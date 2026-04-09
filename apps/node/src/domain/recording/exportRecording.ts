@@ -1,4 +1,5 @@
 import * as fs from "node:fs/promises";
+import { join } from "node:path";
 import { ERROR_CODES } from "../../contracts/errors.js";
 import {
   RECORDING_EXPORT_VERSION,
@@ -18,9 +19,10 @@ export async function exportRecordingFile(
   outputFile?: string,
   snapshotMode: RecordingExportSnapshotMode = "omit",
 ): Promise<{ outputFile: string; exportData: RecordingExportArtifact }> {
-  const content = await fs.readFile(inputFile, "utf-8");
+  const resolvedInputFile = await resolveRecordingInputFile(inputFile);
+  const content = await fs.readFile(resolvedInputFile, "utf-8");
   const exportData = exportRecording(content, snapshotMode);
-  const resolvedOutputFile = outputFile ?? getDefaultRecordingExportPath(inputFile);
+  const resolvedOutputFile = outputFile ?? getDefaultRecordingExportPath(resolvedInputFile);
 
   try {
     await fs.writeFile(resolvedOutputFile, JSON.stringify(exportData, null, 2), "utf-8");
@@ -32,6 +34,44 @@ export async function exportRecordingFile(
   }
 
   return { outputFile: resolvedOutputFile, exportData };
+}
+
+async function resolveRecordingInputFile(inputFile: string): Promise<string> {
+  const stats = await fs.stat(inputFile);
+  if (!stats.isDirectory()) {
+    return inputFile;
+  }
+
+  const entries = await fs.readdir(inputFile, { withFileTypes: true });
+  const candidates = await Promise.all(
+    entries
+      .filter(entry => entry.isFile() && entry.name.endsWith(".ndjson"))
+      .map(async entry => {
+        const fullPath = join(inputFile, entry.name);
+        const entryStats = await fs.stat(fullPath);
+        return {
+          path: fullPath,
+          mtimeMs: entryStats.mtimeMs,
+          name: entry.name,
+        };
+      })
+  );
+
+  if (candidates.length === 0) {
+    throw {
+      code: ERROR_CODES.RECORDING_EXPORT_FAILED,
+      message: `No NDJSON recording files were found in directory ${inputFile}`,
+    };
+  }
+
+  candidates.sort((a, b) => {
+    if (a.mtimeMs !== b.mtimeMs) {
+      return b.mtimeMs - a.mtimeMs;
+    }
+    return a.name.localeCompare(b.name);
+  });
+
+  return candidates[0]!.path;
 }
 
 export function exportRecording(
