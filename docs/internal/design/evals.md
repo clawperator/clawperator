@@ -196,6 +196,8 @@ artifacts are skipped and do not block stdout or stderr answer extraction.
 
 ## Operational Guidance
 
+- For repo-local Codex work, prefer the [`evals-run`](../../../.agents/skills/evals-run/SKILL.md) skill.
+- Use the bundled helper script when you want one command to build the debug APK, install the matching APK for each runtime target, and run both paths on the same emulator.
 - Use `--mode full-repo` and `--skill-prompt prompt-skill.md` when you want to
   measure skill emission on the strongest available prompt surface.
 - Use `--replay <run_id>` to inspect a previous run's emitted skill.

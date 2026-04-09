@@ -58,6 +58,26 @@ def extract_answer_from_json_line(line: str) -> str | None:
         return None
     if not isinstance(payload, dict):
         return None
+
+    # Handle Kimi CLI format: {"role": "assistant", "content": [...]}
+    if payload.get("role") == "assistant":
+        content = payload.get("content")
+        if isinstance(content, list):
+            text_parts: list[str] = []
+            for item in content:
+                if isinstance(item, dict) and item.get("type") == "text":
+                    text = item.get("text")
+                    if isinstance(text, str):
+                        text_parts.append(text)
+            if text_parts:
+                match = extract_answer_from_line("".join(text_parts))
+                if match is not None:
+                    return match
+        elif isinstance(content, str):
+            match = extract_answer_from_line(content)
+            if match is not None:
+                return match
+
     payload_type = payload.get("type")
     if payload_type == "assistant":
         message = payload.get("message")
