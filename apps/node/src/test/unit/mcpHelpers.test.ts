@@ -5,6 +5,7 @@ import { createMcpExecutionIds } from "../../mcp/executionIds.js";
 import { normalizeMcpError } from "../../mcp/errors.js";
 import { extractStepDataValue } from "../../mcp/results.js";
 import { mapSelectorToNodeMatcher, mcpSelectorSchema } from "../../mcp/selectors.js";
+import { executionToolOptionsSchema } from "../../mcp/tools/common.js";
 
 describe("createMcpExecutionIds", () => {
   it("generates distinct IDs with the expected prefix", () => {
@@ -146,6 +147,28 @@ describe("extractStepDataValue", () => {
       message: "read_text step result did not include text.",
       step: envelope.stepResults[0],
     });
+  });
+});
+
+describe("executionToolOptionsSchema", () => {
+  it("trims deviceId and operatorPackage at the MCP boundary", () => {
+    const parsed = executionToolOptionsSchema.parse({
+      deviceId: " emulator-5554 ",
+      operatorPackage: " com.clawperator.operator.dev ",
+    });
+
+    assert.deepStrictEqual(parsed, {
+      deviceId: "emulator-5554",
+      operatorPackage: "com.clawperator.operator.dev",
+    });
+  });
+
+  it("rejects negative timeoutMs", () => {
+    const parsed = executionToolOptionsSchema.safeParse({
+      timeoutMs: -1,
+    });
+
+    assert.strictEqual(parsed.success, false);
   });
 });
 

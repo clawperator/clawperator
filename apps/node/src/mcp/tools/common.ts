@@ -11,15 +11,14 @@ import { createMcpExecutionIds } from "../executionIds.js";
 import type { McpSelectorInput } from "../selectors.js";
 import { mapSelectorToNodeMatcher } from "../selectors.js";
 
-const nonEmptyOptionalStringSchema = z.string().refine(
-  value => value.trim().length > 0,
-  { message: "must be a non-empty string when provided" }
-);
+const nonEmptyOptionalStringSchema = z.string().trim().min(1, {
+  message: "must be a non-empty string when provided",
+});
 
 export const executionToolOptionsSchema = z.object({
   deviceId: nonEmptyOptionalStringSchema.optional(),
   operatorPackage: nonEmptyOptionalStringSchema.optional(),
-  timeoutMs: z.number().int().optional(),
+  timeoutMs: z.number().int().nonnegative().optional(),
 }).strict();
 
 export type ExecutionToolOptions = z.infer<typeof executionToolOptionsSchema>;
@@ -116,7 +115,7 @@ export function buildCommonExecutionSchema(properties: Record<string, unknown>, 
     properties: {
       deviceId: { type: "string", minLength: 1 },
       operatorPackage: { type: "string", minLength: 1 },
-      timeoutMs: { type: "integer" },
+      timeoutMs: { type: "integer", minimum: 0 },
       ...properties,
     },
     ...(required.length > 0 ? { required } : {}),

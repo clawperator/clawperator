@@ -334,6 +334,13 @@ describe("mcp stdio integration", () => {
     assertInvalidParams(response);
   });
 
+  it("rejects open when appId is whitespace only", async () => {
+    await client.initialize();
+
+    const response = await client.requestTool("open", { appId: "   " });
+    assertInvalidParams(response);
+  });
+
   it("accepts open with only appId", async () => {
     await client.initialize();
 
@@ -525,6 +532,16 @@ describe("mcp stdio integration", () => {
 
     const response = await client.requestTool("execute", {
       deviceId: "",
+      actions: [{ id: "sleep-1", type: "sleep", params: { durationMs: 1 } }],
+    });
+    assertInvalidParams(response);
+  });
+
+  it("rejects execute when timeoutMs is negative", async () => {
+    await client.initialize();
+
+    const response = await client.requestTool("execute", {
+      timeoutMs: -1,
       actions: [{ id: "sleep-1", type: "sleep", params: { durationMs: 1 } }],
     });
     assertInvalidParams(response);

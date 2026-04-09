@@ -154,6 +154,12 @@ describe("CLI help", () => {
     assert.match(stderr || stdout, /mcp serve does not accept additional arguments/);
   });
 
+  it("rejects forwarded extra args after mcp serve", async () => {
+    const { stdout, stderr, code } = await runCli(["mcp", "serve", "--", "extra"]);
+    assert.notStrictEqual(code, 0);
+    assert.match(stderr || stdout, /mcp serve does not accept additional arguments/);
+  });
+
   it("exec best-effort points at flat `snapshot`, not nested `observe snapshot` (exit 0)", async () => {
     const { stdout, code } = await runCli(["exec", "best-effort", "--goal", "test-goal"]);
     assert.strictEqual(code, 0, stdout);

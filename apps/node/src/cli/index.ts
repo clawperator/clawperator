@@ -240,7 +240,7 @@ function resolveMcpServeArgs(argv: string[]): string[] | undefined {
       continue;
     }
     if (token === "mcp" && prefix[index + 1] === "serve") {
-      return [...prefix.slice(0, index), ...prefix.slice(index + 2)];
+      return [...argv.slice(0, index), ...argv.slice(index + 2)];
     }
     if (token === "--json" || token === "--verbose" || token === "--disable-star-suggestions" || token === "--help" || token === "--version") {
       continue;

@@ -30,8 +30,8 @@ const coordinateSchema = z.object({
 }).strict();
 
 const openArgsSchema = executionToolOptionsSchema.extend({
-  appId: z.string().min(1).optional(),
-  uri: z.string().min(1).optional(),
+  appId: z.string().trim().min(1).optional(),
+  uri: z.string().trim().min(1).optional(),
 }).strict().superRefine((value, ctx) => {
   const hasAppId = value.appId !== undefined;
   const hasUri = value.uri !== undefined;
