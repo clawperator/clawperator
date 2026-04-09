@@ -80,6 +80,29 @@ These are the specific classes of follow-up work this pack should address:
 9. Long-lived MCP sessions still lack an ergonomic way to set defaults for repeated execution-backed calls.
 10. Agents sometimes need a thin “where am I?” or readiness answer before deciding whether a full snapshot is worth the cost.
 
+## Tool Surface Audit
+
+A full audit of the named MCP tools against the underlying domain builders and `validateExecution.ts` was completed during the `add-mcp-server` PR review. The table below records each concern, its verdict, and where it was resolved.
+
+| Concern | Verdict | Resolution |
+| --- | --- | --- |
+| `scroll_until` direction hardcoded to `"down"` | Fixed | `direction` is now a required enum field (`"down"`, `"up"`, `"left"`, `"right"`) on the `scroll_until` tool. PR commit `98b4afb`. |
+| `read` missing `validator` / `validatorPattern` | Fixed | Both fields added to the `read` tool and `buildReadExecution`. `validator: "regex"` with `validatorPattern` required when set. PR commit `e3bd2dc`. |
+| `click` missing `focus` + coordinate constraint | Not a gap | The constraint (coordinate + `clickType: "focus"` = invalid) is caught by `validateExecution.ts`, the same path as CLI. No MCP-layer change needed. |
+| `open` and `press` hardcode timeouts in domain builders | Not a gap | `applyMcpExecutionMetadata` overrides `timeoutMs` from the caller when provided. The hardcoded builder defaults are only used when the caller omits the field. |
+| `wait_for_navigation` not a named tool | Deliberate deferral | Complex action requiring at least one of `expectedPackage` or `expectedNode`, plus its own sub-timeout constraint. Fully reachable via the `execute` tool. |
+| `sleep` not a named tool | Deliberate deferral | Reachable via `execute`. A named `sleep` tool adds little ergonomic value over `execute`. |
+| `close_app` not a named tool | Deliberate deferral | Reachable via `execute`. Paired with `open`; may be worth adding as a named tool in a future expansion pass if agent usage shows demand. |
+| `read_key_value_pair` not a named tool | Deliberate deferral | Reachable via `execute`. Narrow use case; not in v1 named-tool scope. |
+| `take_screenshot` not a named tool | Deliberate deferral | Reachable via `execute`. The `execute` tool blocks caller-controlled `path` for safety. A future named `screenshot` tool would need a clear path policy before shipping. |
+| `start_recording` / `stop_recording` not exposed | Deliberate deferral | Recording lifecycle is a multi-step flow. Reachable via `execute`. No named-tool wrapper planned for v1. |
+
+### Notes For Future Expansion
+
+- Before adding any new named tool, verify it is not already reachable with acceptable ergonomics via `execute`.
+- `close_app` and `take_screenshot` are the most likely candidates for future named-tool promotion if agent usage data shows they are commonly needed.
+- `wait_for_navigation` is the most complex deferred action. If promoted, its sub-timeout semantics and mutual-exclusion constraints need MCP-boundary validation on par with `wait`.
+
 ## PR Plan
 
 | PR | Purpose | Included phases | Agent tier | Merge gate |
