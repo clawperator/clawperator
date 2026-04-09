@@ -227,8 +227,45 @@ function argvPrefixBeforeForwardSeparator(argv: string[]): string[] {
   return argv;
 }
 
+function isMcpServeArgv(argv: string[]): boolean {
+  const prefix = argvPrefixBeforeForwardSeparator(argv);
+  const globalFlagsWithValues = new Set(["--device", "--device-id", "--operator-package", "--receiver-package", "--output", "--format", "--timeout", "--timeout-ms", "--log-level"]);
+  let index = 0;
+
+  while (index < prefix.length) {
+    const token = prefix[index];
+    if (token === undefined) {
+      break;
+    }
+    if (globalFlagsWithValues.has(token)) {
+      index += 2;
+      continue;
+    }
+    if (token === "--json" || token === "--verbose" || token === "--disable-star-suggestions") {
+      index += 1;
+      continue;
+    }
+    break;
+  }
+
+  return prefix[index] === "mcp" && prefix[index + 1] === "serve";
+}
+
 async function main(): Promise<void> {
   const argv = process.argv.slice(2);
+  if (isMcpServeArgv(argv)) {
+    try {
+      const mcpIndex = argv.findIndex((token) => token === "mcp");
+      await (await import("./commands/mcp.js")).cmdMcpServe(argv.slice(mcpIndex + 2));
+      return;
+    } catch (error) {
+      if (error instanceof UsageError) {
+        process.stderr.write(`${JSON.stringify({ code: "USAGE", message: error.message })}\n`);
+        process.exit(1);
+      }
+      throw error;
+    }
+  }
   if (argv.length === 0 || argv[0] === "help") {
     console.log(generateTopLevelHelp(COMMANDS));
     process.exit(0);
