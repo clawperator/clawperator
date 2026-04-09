@@ -1,4 +1,4 @@
-import { access, chmod, copyFile, mkdir, writeFile } from "node:fs/promises";
+import { access, chmod, copyFile, mkdir, mkdtemp, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import {
   loadRegistry,
@@ -267,25 +267,28 @@ export async function scaffoldSkill(
     artifacts: [],
   };
 
+  const stagingRoot = await mkdtemp(join(dirname(skillRoot), ".scaffold-"));
+  let movedIntoPlace = false;
   try {
-    await mkdir(join(skillRoot, "scripts"), { recursive: true });
+    await mkdir(join(stagingRoot, "scripts"), { recursive: true });
     const skillMarkdown = buildSkillMarkdown(
       skillId,
       skillEntry.summary,
       scriptPathRelative,
       recordingContextPath !== undefined,
     );
-    await writeFile(join(skillRoot, "SKILL.md"), skillMarkdown, "utf8");
-    await writeFile(join(skillRoot, "skill.json"), `${JSON.stringify(skillEntry, null, 2)}\n`, "utf8");
-    await writeFile(join(skillRoot, "scripts", "run.js"), buildScriptTemplate(skillId, derived.applicationId), "utf8");
-    const runShPath = join(skillRoot, "scripts", "run.sh");
+    await writeFile(join(stagingRoot, "SKILL.md"), skillMarkdown, "utf8");
+    await writeFile(join(stagingRoot, "skill.json"), `${JSON.stringify(skillEntry, null, 2)}\n`, "utf8");
+    await writeFile(join(stagingRoot, "scripts", "run.js"), buildScriptTemplate(skillId, derived.applicationId), "utf8");
+    const runShPath = join(stagingRoot, "scripts", "run.sh");
     await writeFile(runShPath, buildRunShTemplate(), "utf8");
     await chmod(runShPath, 0o755);
 
     if (recordingContextPath !== undefined) {
       try {
-        await copyFile(recordingContextPath, join(skillRoot, "recording-context.json"));
+        await copyFile(recordingContextPath, join(stagingRoot, "recording-context.json"));
       } catch (error) {
+        await rm(stagingRoot, { recursive: true, force: true });
         return {
           ok: false,
           code: SKILLS_SCAFFOLD_FAILED,
@@ -294,6 +297,8 @@ export async function scaffoldSkill(
       }
     }
 
+    await rename(stagingRoot, skillRoot);
+    movedIntoPlace = true;
     const updatedRegistry: SkillsRegistry = {
       ...loaded.registry,
       skills: [...loaded.registry.skills, skillEntry].sort((a, b) => a.id.localeCompare(b.id)),
@@ -301,6 +306,7 @@ export async function scaffoldSkill(
     await mkdir(dirname(loaded.resolvedPath), { recursive: true });
     await writeRegistry(loaded.resolvedPath, updatedRegistry);
   } catch (error) {
+    await rm(movedIntoPlace ? skillRoot : stagingRoot, { recursive: true, force: true });
     return {
       ok: false,
       code: SKILLS_SCAFFOLD_FAILED,
