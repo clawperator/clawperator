@@ -246,12 +246,13 @@ Parameters:
 | --- | --- | --- |
 | `deviceId` | no | Session default adb device serial |
 | `operatorPackage` | no | Session default operator package |
-| `timeoutMs` | no | Session default execution timeout |
+| `timeoutMs` | no | Session default execution timeout. Must be between `1000` and `120000`. |
 
 Rules:
 
 - all fields are optional
 - blank or whitespace-only `deviceId` and `operatorPackage` are rejected with `InvalidParams`
+- `timeoutMs` must stay within the normal execution timeout bounds before it is stored
 - the stored state is scoped to the current `createMcpServer()` instance only
 - the response shape is always `{ "session": { ...currentValues } }`
 - unset fields are omitted from `session`

@@ -345,6 +345,13 @@ describe("mcp stdio integration", () => {
     assertInvalidParams(response);
   });
 
+  it("rejects configure when timeoutMs is below the execution minimum", async () => {
+    await client.initialize();
+
+    const response = await client.requestTool("configure", { timeoutMs: 999 });
+    assertInvalidParams(response);
+  });
+
   it("rejects execute when actions is missing", async () => {
     await client.initialize();
 

@@ -2,6 +2,8 @@ import { z } from "zod";
 import type { Logger } from "../../adapters/logger.js";
 import type { ExecutionAction } from "../../contracts/execution.js";
 import { normalizeExecutionInput } from "../../contracts/inputAliases.js";
+import { LIMITS } from "../../contracts/limits.js";
+import type { ResultEnvelope, StepResult } from "../../contracts/result.js";
 import { listDevices } from "../../domain/devices/listDevices.js";
 import { buildSnapshotExecution } from "../../domain/observe/snapshot.js";
 import { buildMcpErrorResult } from "../errors.js";
@@ -37,7 +39,9 @@ const executeArgsSchema = executionToolOptionsSchema.extend({
   actions: z.array(executionActionSchema).min(1, { message: "actions is required" }),
 }).strict();
 
-const configureArgsSchema = executionToolOptionsSchema;
+const configureArgsSchema = executionToolOptionsSchema.extend({
+  timeoutMs: z.number().int().min(LIMITS.MIN_EXECUTION_TIMEOUT_MS).max(LIMITS.MAX_EXECUTION_TIMEOUT_MS).optional(),
+}).strict();
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -69,6 +73,44 @@ export function applySnapshotMaxChars(
   }
 
   return { snapshot: snapshot.slice(0, maxChars), truncated: true };
+}
+
+export interface SnapshotEnvelopeResult extends SnapshotMaxCharsResult {
+  envelope: ResultEnvelope;
+}
+
+export function applySnapshotMaxCharsToEnvelope(
+  envelope: ResultEnvelope,
+  snapshotStep: StepResult,
+  snapshot: string,
+  maxChars: number | undefined,
+): SnapshotEnvelopeResult {
+  const truncatedSnapshot = applySnapshotMaxChars(snapshot, maxChars);
+  if (!truncatedSnapshot.truncated) {
+    return {
+      ...truncatedSnapshot,
+      envelope,
+    };
+  }
+
+  return {
+    ...truncatedSnapshot,
+    envelope: {
+      ...envelope,
+      stepResults: envelope.stepResults.map((step) => {
+        if (step !== snapshotStep) {
+          return step;
+        }
+        return {
+          ...step,
+          data: {
+            ...step.data,
+            text: truncatedSnapshot.snapshot,
+          },
+        };
+      }),
+    },
+  };
 }
 
 function buildSessionStatePayload(session: SessionDefaults): { session: SessionDefaults } {
@@ -139,9 +181,17 @@ export function getCoreMcpTools(
             });
           }
 
-          const { snapshot, truncated } = applySnapshotMaxChars(extracted.value, parsed.maxChars);
+          const { snapshot, truncated, envelope } = applySnapshotMaxCharsToEnvelope(
+            result.envelope,
+            extracted.step,
+            extracted.value,
+            parsed.maxChars,
+          );
           return buildSuccessResult({
-            ...buildExecutionSuccessPayload(result),
+            ...buildExecutionSuccessPayload({
+              ...result,
+              envelope,
+            }),
             snapshot,
             ...(truncated ? { truncated } : {}),
           });
@@ -197,7 +247,11 @@ export function getCoreMcpTools(
         properties: {
           deviceId: { type: "string", minLength: 1, pattern: "\\S" },
           operatorPackage: { type: "string", minLength: 1, pattern: "\\S" },
-          timeoutMs: { type: "integer", minimum: 0 },
+          timeoutMs: {
+            type: "integer",
+            minimum: LIMITS.MIN_EXECUTION_TIMEOUT_MS,
+            maximum: LIMITS.MAX_EXECUTION_TIMEOUT_MS,
+          },
         },
       },
       handler: (args) => {

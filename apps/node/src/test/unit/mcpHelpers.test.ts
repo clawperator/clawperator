@@ -1,15 +1,15 @@
 import assert from "node:assert";
 import { describe, it } from "node:test";
 import { ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js";
+import { LIMITS } from "../../contracts/limits.js";
 import type { ResultEnvelope } from "../../contracts/result.js";
 import { createMcpExecutionIds } from "../../mcp/executionIds.js";
 import { buildMcpErrorResult, buildMcpSuccessResult, normalizeMcpError } from "../../mcp/errors.js";
 import { extractStepDataValue, parseReadAllResult } from "../../mcp/results.js";
 import { mapSelectorToNodeMatcher, mcpSelectorSchema } from "../../mcp/selectors.js";
 import { createSessionDefaults } from "../../mcp/session.js";
-import { getCoreMcpTools } from "../../mcp/tools/core.js";
+import { applySnapshotMaxChars, applySnapshotMaxCharsToEnvelope, getCoreMcpTools } from "../../mcp/tools/core.js";
 import { getNamedMcpTools } from "../../mcp/tools/named.js";
-import { applySnapshotMaxChars } from "../../mcp/tools/core.js";
 import { executionToolOptionsSchema, mergeWithSessionDefaults, type ExecutionToolOptions } from "../../mcp/tools/common.js";
 
 describe("createMcpExecutionIds", () => {
@@ -268,6 +268,77 @@ describe("applySnapshotMaxChars", () => {
   });
 });
 
+describe("applySnapshotMaxCharsToEnvelope", () => {
+  it("truncates the snapshot text inside the returned envelope copy", () => {
+    const envelope: ResultEnvelope = {
+      commandId: "cmd-1",
+      taskId: "task-1",
+      status: "success",
+      stepResults: [
+        {
+          id: "snap",
+          actionType: "snapshot_ui",
+          success: true,
+          data: {
+            text: "<hierarchy>abcdef</hierarchy>",
+            safe: "ok",
+          },
+        },
+      ],
+    };
+
+    const result = applySnapshotMaxCharsToEnvelope(
+      envelope,
+      envelope.stepResults[0],
+      envelope.stepResults[0].data.text,
+      10,
+    );
+
+    assert.strictEqual(result.snapshot, "<hierarchy");
+    assert.strictEqual(result.truncated, true);
+    assert.strictEqual(result.envelope.stepResults[0].data.text, "<hierarchy");
+    assert.strictEqual(result.envelope.stepResults[0].data.safe, "ok");
+    assert.strictEqual(envelope.stepResults[0].data.text, "<hierarchy>abcdef</hierarchy>");
+
+    const transport = buildMcpSuccessResult({
+      envelope: result.envelope,
+      snapshot: result.snapshot,
+      truncated: result.truncated,
+    });
+    assert.match(transport.content[0].text, /"snapshot":"<hierarchy"/);
+    assert.doesNotMatch(transport.content[0].text, /<hierarchy>abcdef<\/hierarchy>/);
+  });
+
+  it("returns the original envelope object when no truncation is needed", () => {
+    const envelope: ResultEnvelope = {
+      commandId: "cmd-1",
+      taskId: "task-1",
+      status: "success",
+      stepResults: [
+        {
+          id: "snap",
+          actionType: "snapshot_ui",
+          success: true,
+          data: {
+            text: "abc",
+          },
+        },
+      ],
+    };
+
+    const result = applySnapshotMaxCharsToEnvelope(
+      envelope,
+      envelope.stepResults[0],
+      "abc",
+      10,
+    );
+
+    assert.strictEqual(result.snapshot, "abc");
+    assert.strictEqual(result.truncated, undefined);
+    assert.strictEqual(result.envelope, envelope);
+  });
+});
+
 describe("mergeWithSessionDefaults", () => {
   it("uses session deviceId when per-call deviceId is absent", () => {
     const session = createSessionDefaults();
@@ -396,7 +467,7 @@ describe("MCP tool schemas", () => {
 
     assert.strictEqual(schema.properties?.deviceId?.pattern, "\\S");
     assert.strictEqual(schema.properties?.operatorPackage?.pattern, "\\S");
-    assert.strictEqual(schema.properties?.timeoutMs?.minimum, 0);
+    assert.strictEqual(schema.properties?.timeoutMs?.minimum, LIMITS.MIN_EXECUTION_TIMEOUT_MS);
   });
 
   it("rejects empty execute action ids and types before dispatch", async () => {
