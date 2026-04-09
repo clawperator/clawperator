@@ -288,7 +288,7 @@ Add ergonomic named tools only after the transport and canonical execute path ar
    - `scroll_until`
 2. Use explicit schemas:
    - `open`: exactly one of `appId` or `uri`; implement this as a Zod discriminated union or `superRefine` so the rejection is a schema-level error with a typed message, not a runtime `if/else` producing a generic throw
-   - `click`: `selector` xor `coordinate`, optional `clickType` as enum of `"default"`, `"long_click"`, `"focus"`, defaults to `"default"` when omitted
+   - `click`: `selector` xor `coordinate`, optional `clickType` as enum of `"default"`, `"long_click"`, `"focus"`, defaults to `"default"` when omitted. **This xor constraint is stricter than what the domain layer enforces** - `buildClickExecution` accepts both fields as independently optional and leaves mutual exclusion to downstream validation. Enforce it at the MCP schema boundary (Zod `superRefine` or discriminated union) so callers get a schema-level rejection, not a silent pass-through.
    - `type`: required `text`, required `selector`, optional `submit`, optional `clear`
    - `read`: required `selector`, optional `all`, optional `container`; when `all` is false or omitted return first matched text as a string, when `all: true` return all matches as an array of strings
    - `press`: required `key` as enum of `"back"`, `"home"`, `"recents"`, validated at the MCP boundary
@@ -359,7 +359,7 @@ Document the shipped MCP surface clearly and verify it against a real client plu
 4. Update docs-site navigation and source-map entries.
 5. Run the docs build workflow instead of hand-editing generated outputs.
 6. If the implementation produced a reusable verification path, place it under `validation/`, not as a one-off script under `scripts/`.
-6a. Add a design note under `docs/internal/design/` covering the durable MCP-specific decisions that future contributors will need: why stdio-only in v1, why `execute` uses a light MCP schema and defers to `validateExecution` rather than mirroring `ActionParams`, and why named tools call action builders rather than the CLI formatter functions. This is required by the repo's docs discipline for internal design guidance that is not obvious from the code alone.
+6a. Add a design note under `docs/internal/design/` covering the durable MCP-specific decisions that future contributors will need: why stdio-only in v1, why `execute` uses a light MCP schema and defers to `validateExecution` rather than mirroring `ActionParams`, why named tools call action builders rather than the CLI formatter functions, and that the `executionStore` in-flight lock is in-process memory only - it does not persist across server restarts, so a server restart after a crash or SIGTERM is always safe and will not produce a stale `EXECUTION_CONFLICT_IN_FLIGHT` on the next boot. This is required by the repo's docs discipline for internal design guidance that is not obvious from the code alone.
 7. Perform one real end-to-end MCP smoke test against a connected device or emulator. The smoke test must be implemented as a standalone Node script that speaks the stdio MCP protocol directly - spawning `node apps/node/dist/cli/index.js mcp serve` as a subprocess and exchanging JSON-RPC messages over its stdin/stdout. Do not require Claude Desktop or any GUI MCP client to execute the smoke test. The test must be reproducible from a terminal.
 
    At minimum prove:
