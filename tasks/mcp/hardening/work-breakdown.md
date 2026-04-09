@@ -169,7 +169,7 @@ Read `apps/node/src/test/integration/mcp.test.ts` in full. The following cases a
 ### Files or Surfaces To Change
 
 - `apps/node/src/test/integration/mcp.test.ts` - add cases a, b, c below
-- `apps/node/src/mcp/results.ts` or `apps/node/src/mcp/tools/named.ts` - extract `read(all=true)` parsing logic into a testable helper
+- `apps/node/src/mcp/results.ts` - extract `read(all=true)` parsing logic into a testable helper
 - `apps/node/src/test/unit/mcpHelpers.test.ts` - add unit cases d, e, f, g below
 
 ### Steps
@@ -216,7 +216,7 @@ The three `MCP_STEP_DATA_INVALID` branches in `named.ts:259-290` are:
 2. Parsed value is not an array → `"read returned non-array data for all=true"`
 3. Array contains a non-string element → `"read returned non-string items in array for all=true"`
 
-To make these testable without a live device, extract the parsing logic from `named.ts` into a pure helper function. The function takes the extracted string value and returns either a `string[]` or an error descriptor. The exact shape of the helper and its location (`results.ts` or a separate `readResult.ts`) are left to implementation judgment - pick whichever requires less restructuring. The contract is: the helper is exported and the unit test imports and calls it directly.
+To make these testable without a live device, extract the parsing logic from `named.ts` into a pure helper function in `apps/node/src/mcp/results.ts`. Name it `parseReadAllResult`. The function takes the extracted string value and returns either a `string[]` success payload or an error descriptor carrying `code: "MCP_STEP_DATA_INVALID"`. Export it and import it directly in the unit test. Do not leave this logic inline inside the tool handler after the phase is complete.
 
 After extracting:
 
@@ -267,6 +267,7 @@ Run `npm --prefix apps/node run build && npm --prefix apps/node run test`.
 Mechanical:
 - Cases a, b, c are present in `mcp.test.ts` and pass
 - Cases d, e, f, g are present in a unit test file and pass
+- `apps/node/src/mcp/results.ts` exports `parseReadAllResult`
 - `grep -n "MCP_STEP_DATA_INVALID" apps/node/src/test/unit/mcpHelpers.test.ts` returns at least three matches (one per branch)
 - `npm --prefix apps/node run build && npm --prefix apps/node run test` exits 0
 
@@ -436,7 +437,7 @@ Run `npm --prefix apps/node run build && npm --prefix apps/node run test`.
 ### Acceptance Criteria
 
 Mechanical:
-- Integration test suite contains a test that completes an `initialize` handshake (not just a 150 ms wait)
+- Integration test suite still contains the existing `emits zero stdout bytes before initialize` check and also contains a test that completes an `initialize` handshake
 - `named.ts` `wait` handler calls `applyMcpExecutionMetadata` with three arguments
 - `named.ts` `scroll_until` handler calls `applyMcpExecutionMetadata` with three arguments
 - `validation/test_mcp_stdio_smoke.mjs` contains `extractCandidateTexts` (plural) and iterates candidates

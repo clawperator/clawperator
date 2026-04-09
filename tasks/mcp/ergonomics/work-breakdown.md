@@ -81,7 +81,7 @@ Add `maxChars?: number` to the `snapshot` tool. Extract the truncation logic int
 
 #### Step 1: Extract a testable truncation helper
 
-Add and export `applySnapshotMaxChars` from `core.ts` (or `results.ts` if the function boundary is cleaner there):
+Add and export `applySnapshotMaxChars` from `core.ts`:
 
 ```ts
 export interface SnapshotMaxCharsResult {
@@ -324,7 +324,26 @@ it("mergeWithSessionDefaults uses session timeoutMs when per-call timeoutMs is a
 });
 ```
 
-**Case 5 - all fields absent remain undefined:**
+**Case 5 - mixed precedence across all three fields:**
+```ts
+it("mergeWithSessionDefaults applies precedence independently across all three fields", () => {
+  const session = createSessionDefaults();
+  session.deviceId = "session-device";
+  session.operatorPackage = "com.session.operator";
+  session.timeoutMs = 2000;
+
+  const result = mergeWithSessionDefaults({
+    deviceId: "call-device",
+    timeoutMs: 500,
+  }, session);
+
+  assert.strictEqual(result.deviceId, "call-device");
+  assert.strictEqual(result.operatorPackage, "com.session.operator");
+  assert.strictEqual(result.timeoutMs, 500);
+});
+```
+
+**Case 6 - all fields absent remain undefined:**
 ```ts
 it("mergeWithSessionDefaults leaves all fields undefined when both sources are absent", () => {
   const result = mergeWithSessionDefaults({}, createSessionDefaults());
@@ -334,7 +353,7 @@ it("mergeWithSessionDefaults leaves all fields undefined when both sources are a
 });
 ```
 
-**Case 6 - two sessions are independent:**
+**Case 7 - two sessions are independent:**
 ```ts
 it("two separate SessionDefaults objects do not share state", () => {
   const s1 = createSessionDefaults();
@@ -348,7 +367,7 @@ it("two separate SessionDefaults objects do not share state", () => {
 });
 ```
 
-You may combine cases if the assertions stay explicit, but the final unit coverage must still prove precedence or fallback for all three fields and independence of separate session objects.
+You may combine cases if the assertions stay explicit, but the final unit coverage must still prove precedence or fallback for all three fields and independence of separate session objects. After the phase is complete, a reviewer should be able to point to at least one explicit assertion for each of these facts: `deviceId` fallback, `deviceId` override, `operatorPackage` override or fallback, `timeoutMs` override or fallback, mixed-field precedence, and session isolation.
 
 #### Step 4: Update tool factory signatures
 
@@ -512,7 +531,7 @@ npm --prefix apps/node run build && npm --prefix apps/node run test
 
 Mechanical:
 - `apps/node/src/mcp/session.ts` exists and exports `SessionDefaults` and `createSessionDefaults`
-- Unit tests explicitly prove `mergeWithSessionDefaults` behavior for `deviceId`, `operatorPackage`, and `timeoutMs`, plus session isolation
+- Unit tests explicitly prove `mergeWithSessionDefaults` behavior for `deviceId`, `operatorPackage`, and `timeoutMs`, include at least one mixed-field precedence case, and prove session isolation
 - All 3 integration cases (A, B, C) pass
 - Tool-list integration test includes `"configure"` at position 4 (after `"execute"`)
 - `configure` with `deviceId: ""` returns `-32602`

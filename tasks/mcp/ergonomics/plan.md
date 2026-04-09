@@ -77,7 +77,7 @@ Both problems are reducible without adding new Android execution primitives.
 | Snapshot tool | `apps/node/src/mcp/tools/core.ts` | additive (new parameter + truncation helper) |
 | Configure tool | `apps/node/src/mcp/tools/core.ts` | new tool |
 | Session state | `apps/node/src/mcp/session.ts` (NEW) | new module |
-| Truncation helper | `apps/node/src/mcp/tools/core.ts` or `apps/node/src/mcp/results.ts` | new exported helper |
+| Truncation helper | `apps/node/src/mcp/tools/core.ts` | new exported helper |
 | Session merge helper | `apps/node/src/mcp/tools/common.ts` | new exported function |
 | Tool factory signatures | `apps/node/src/mcp/tools/index.ts`, `core.ts`, `named.ts` | targeted update |
 | MCP server bootstrap | `apps/node/src/mcp/server.ts` | targeted update |
@@ -144,7 +144,7 @@ This task produces:
 - `apps/node/src/mcp/session.ts` with `SessionDefaults` and `createSessionDefaults`
 - An exported truncation helper and updated `snapshot` tool with `maxChars` parameter
 - New `configure` tool with session state wiring through all execution tools
-- Unit tests covering: truncation (5 cases), `mergeWithSessionDefaults` across all three fields (at least 5 cases total), session isolation (1 case)
+- Unit tests covering: truncation (5 cases), `mergeWithSessionDefaults` across all three fields (at least 6 cases total, including one mixed-field case), session isolation (1 case)
 - Integration tests covering: `configure` in tool list, `configure` call shape, blank-value rejection
 - Updated `docs/api/mcp.md` with `maxChars` and `configure` documentation
 - A sentence in `docs/internal/design/mcp-server.md` acknowledging session-local state
