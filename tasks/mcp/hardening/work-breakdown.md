@@ -80,7 +80,7 @@ Extract the duplicated JSON Schema fragments from `named.ts` into a shared `apps
 
 1. Read `apps/node/src/mcp/tools/named.ts` lines 101-119 to confirm the two local definitions being extracted: `nonWhitespaceStringJsonSchema` and `selectorJsonSchema`.
 
-2. Create `apps/node/src/mcp/schemas.ts` with exactly these two exports. Content must be byte-identical to the current definitions in `named.ts`:
+2. Create `apps/node/src/mcp/schemas.ts` with exactly these two exports. The runtime JSON Schema object shape must be structurally identical to the current definitions in `named.ts`. TypeScript-only annotations such as `as const` are allowed if they do not change the emitted object structure:
 
    ```ts
    export const nonWhitespaceStringJsonSchema = {
@@ -125,7 +125,7 @@ Mechanical:
 - The integration test `lists tools over the stdio protocol` still passes (schema shapes unchanged)
 
 Human review:
-- The extracted schemas are byte-identical to the originals
+- The extracted schemas are structurally identical to the originals at runtime
 - No new file other than `schemas.ts` was created
 
 ### Validation
@@ -303,7 +303,7 @@ Do not change the `mcp serve` global-flag interception behavior.
 
 ### Files or Surfaces To Change
 
-- `apps/node/src/test/integration/mcp.test.ts` - keep the 150 ms silence test and add a handshake test beside it
+- `apps/node/src/test/integration/mcp.test.ts` - keep the 150 ms silence test and strengthen the existing initialize coverage so both the silence-window invariant and a working handshake are proved
 - `apps/node/src/mcp/tools/named.ts` - normalize `wait` and `scroll_until` timeout
 - `validation/test_mcp_stdio_smoke.mjs` - harden `read` step with fallback candidates
 - `docs/internal/design/mcp-server.md` - add a sentence about the transport invariant if not already present
@@ -314,7 +314,12 @@ Do not change the `mcp serve` global-flag interception behavior.
 
 The existing test `emits zero stdout bytes before initialize` waits 150 ms and checks byte count. Keep it. It proves that nothing leaks to stdout before the first client request is sent. On its own it is insufficient because it still passes if the subprocess exits early or never reaches a working state.
 
-Add a second test that successfully completes an `initialize` handshake:
+`apps/node/src/test/integration/mcp.test.ts` already contains initialize coverage. Do not add a duplicate handshake-only test if one is already present. Instead, strengthen the existing initialize coverage so the suite proves both:
+
+- pre-initialize silence
+- a successful `initialize` handshake over stdio that yields valid JSON-RPC
+
+One acceptable shape is to add a second test like this if no equivalent handshake proof already exists:
 
 ```ts
 it("completes initialize over stdio and returns valid JSON-RPC", async () => {
@@ -324,7 +329,7 @@ it("completes initialize over stdio and returns valid JSON-RPC", async () => {
 });
 ```
 
-Do not remove the existing silence-window test. The two tests cover different failure modes and both should remain.
+Do not remove the existing silence-window test. The silence-window proof and the handshake proof cover different failure modes and both should remain in the final suite, whether through two separate tests or by strengthening the existing initialize test plus keeping the silence test.
 
 Also add a dedicated test for the `initialize` response structure:
 

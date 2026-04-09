@@ -3,9 +3,11 @@ import { describe, it } from "node:test";
 import assert from "node:assert";
 import { buildSnapshotExecution } from "../../domain/observe/snapshot.js";
 import { buildScreenshotExecution } from "../../domain/observe/screenshot.js";
+import { buildWaitExecution } from "../../domain/actions/wait.js";
 import { attachSnapshotsToStepResults, runExecution } from "../../domain/executions/runExecution.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
 import { clawperatorEvents, CLAW_EVENT_TYPES } from "../../domain/observe/events.js";
+import { applyMcpExecutionMetadata } from "../../mcp/tools/common.js";
 
 describe("observe executions", () => {
   it("maps snapshots only onto successful snapshot_ui steps", () => {
@@ -34,6 +36,14 @@ describe("observe executions", () => {
   it("applies timeout override to screenshot execution", () => {
     const execution = buildScreenshotExecution({ timeoutMs: 7000 });
     assert.strictEqual(execution.timeoutMs, 7000);
+  });
+
+  it("preserves wait execution timeout padding when MCP metadata is applied", () => {
+    const execution = buildWaitExecution({ textEquals: "Settings" }, 12_000);
+    const stamped = applyMcpExecutionMetadata(execution, "wait");
+
+    assert.strictEqual(execution.timeoutMs, 30_000);
+    assert.strictEqual(stamped.timeoutMs, 30_000);
   });
 
   it("passes through explicit screenshot output path", () => {

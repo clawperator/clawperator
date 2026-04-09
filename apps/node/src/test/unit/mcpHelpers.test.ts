@@ -4,7 +4,7 @@ import { ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js";
 import type { ResultEnvelope } from "../../contracts/result.js";
 import { createMcpExecutionIds } from "../../mcp/executionIds.js";
 import { buildMcpErrorResult, buildMcpSuccessResult, normalizeMcpError } from "../../mcp/errors.js";
-import { extractStepDataValue } from "../../mcp/results.js";
+import { extractStepDataValue, parseReadAllResult } from "../../mcp/results.js";
 import { mapSelectorToNodeMatcher, mcpSelectorSchema } from "../../mcp/selectors.js";
 import { getCoreMcpTools } from "../../mcp/tools/core.js";
 import { getNamedMcpTools } from "../../mcp/tools/named.js";
@@ -156,6 +156,60 @@ describe("extractStepDataValue", () => {
       step: envelope.stepResults[0],
     });
   });
+
+  it("returns MCP_STEP_NOT_FOUND when no matching step exists", () => {
+    const envelope: ResultEnvelope = {
+      commandId: "c1",
+      taskId: "t1",
+      status: "success",
+      stepResults: [
+        { id: "press", actionType: "press_key", success: true, data: {} },
+      ],
+    };
+
+    const extracted = extractStepDataValue(envelope, {
+      actionType: "read_text",
+      dataKey: "text",
+      errorKey: "error",
+    });
+
+    assert.deepStrictEqual(extracted, {
+      ok: false,
+      error: "MCP_STEP_NOT_FOUND",
+      message: "No read_text step result was present in the envelope.",
+    });
+  });
+});
+
+describe("parseReadAllResult", () => {
+  it("returns MCP_STEP_DATA_INVALID when read all=true value is not valid JSON", () => {
+    const result = parseReadAllResult("not-json");
+    assert.strictEqual(result.ok, false);
+    assert.strictEqual(result.code, "MCP_STEP_DATA_INVALID");
+    assert.strictEqual(result.message, "read returned invalid JSON array data");
+  });
+
+  it("returns MCP_STEP_DATA_INVALID when read all=true value parses to a non-array", () => {
+    const result = parseReadAllResult("\"a string\"");
+    assert.strictEqual(result.ok, false);
+    assert.strictEqual(result.code, "MCP_STEP_DATA_INVALID");
+    assert.strictEqual(result.message, "read returned non-array data for all=true");
+  });
+
+  it("returns MCP_STEP_DATA_INVALID when read all=true array contains a non-string", () => {
+    const result = parseReadAllResult("[1,2,3]");
+    assert.strictEqual(result.ok, false);
+    assert.strictEqual(result.code, "MCP_STEP_DATA_INVALID");
+    assert.strictEqual(result.message, "read returned non-string items in array for all=true");
+  });
+
+  it("returns ok with string array when read all=true value is a valid string array", () => {
+    const result = parseReadAllResult("[\"a\",\"b\"]");
+    assert.strictEqual(result.ok, true);
+    if (result.ok) {
+      assert.deepStrictEqual(result.values, ["a", "b"]);
+    }
+  });
 });
 
 describe("executionToolOptionsSchema", () => {
@@ -219,7 +273,12 @@ describe("MCP tool schemas", () => {
           },
         ],
       }),
-      (error: unknown) => error instanceof McpError && error.code === ErrorCode.InvalidParams,
+      (error: unknown) => {
+        if (!(error instanceof McpError)) {
+          return false;
+        }
+        return error.code === ErrorCode.InvalidParams;
+      },
     );
   });
 });

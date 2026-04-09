@@ -176,11 +176,26 @@ describe("mcp stdio integration", () => {
     assert.strictEqual(client.stdoutBytes, 0, client.stderrText);
   });
 
-  it("completes initialize and returns server info", async () => {
+  it("completes initialize over stdio after the silence window", async () => {
+    await client.waitForSilence(150);
+    assert.strictEqual(client.stdoutBytes, 0, client.stderrText);
+
     const response = await client.initialize();
 
     assert.ok(response.result);
-    assert.strictEqual(typeof (response.result as { serverInfo?: { name?: string } }).serverInfo?.name, "string");
+    assert.ok(client.stdoutBytes > 0);
+  });
+
+  it("completes initialize and returns server info", async () => {
+    const response = await client.initialize();
+    const result = response.result as {
+      serverInfo?: { name?: string };
+      protocolVersion?: string;
+    };
+
+    assert.ok(response.result);
+    assert.strictEqual(result.serverInfo?.name, "clawperator");
+    assert.strictEqual(typeof result.protocolVersion, "string");
   });
 
   it("lists tools over the stdio protocol", async () => {
@@ -401,6 +416,22 @@ describe("mcp stdio integration", () => {
     assertInvalidParams(response);
   });
 
+  it("rejects type when selector is missing", async () => {
+    await client.initialize();
+
+    const response = await client.requestTool("type", { text: "hello" });
+    assertInvalidParams(response);
+  });
+
+  it("rejects type when text is missing", async () => {
+    await client.initialize();
+
+    const response = await client.requestTool("type", {
+      selector: { text: "Field" },
+    });
+    assertInvalidParams(response);
+  });
+
   it("rejects press when key is unsupported", async () => {
     await client.initialize();
 
@@ -508,6 +539,16 @@ describe("mcp stdio integration", () => {
     const payload = parseToolPayload(result) as { envelope?: { stepResults?: Array<{ actionType?: string }> } };
     const actionType = payload.envelope?.stepResults?.[0]?.actionType;
     assert.strictEqual(actionType, "scroll_and_click");
+  });
+
+  it("rejects scroll_until when direction is invalid", async () => {
+    await client.initialize();
+
+    const response = await client.requestTool("scroll_until", {
+      selector: { text: "Item" },
+      direction: "diagonal",
+    });
+    assertInvalidParams(response);
   });
 
   it("rejects execute when an action is missing type", async () => {
