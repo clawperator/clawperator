@@ -1,57 +1,70 @@
 :root {
   color-scheme: light;
 
-  --bg: #f5f1e7;
-  --surface: #fffaf3;
-  --surface-2: #f2e8da;
-  --border: #dbcbb8;
-  --border-strong: #c9b295;
+  --bg: #fcfdff;
+  --surface: #ffffff;
+  --surface-2: #f3f6fb;
+  --border: #d6dfec;
+  --border-strong: #bcc9dc;
 
-  --text: #1e2430;
-  --text-muted: #5c6370;
+  --text: #172033;
+  --text-muted: #53627a;
 
-  --accent: #ff6a3d;
-  --accent-hover: #ff835e;
+  --accent: #f15a32;
+  --accent-hover: #ff7a52;
+  --accent-rgb: 241, 90, 50;
   --accent-info: #2fc4d6;
+  --accent-cool-rgb: 102, 118, 255;
+  --accent-cool-soft-rgb: 122, 108, 243;
+  --hero-accent: #ff6a3d;
+  --hero-accent-shadow: 0 1px 0 rgba(255, 255, 255, 0.42);
+  --body-bg-glow:
+    radial-gradient(circle at 18% 0%, rgba(var(--accent-rgb), 0.022), transparent 18%),
+    radial-gradient(circle at 100% 0%, rgba(var(--accent-cool-rgb), 0.032), transparent 24%),
+    radial-gradient(circle at 78% 20%, rgba(var(--accent-cool-soft-rgb), 0.018), transparent 18%);
+  --hero-glow:
+    radial-gradient(circle at 24% 50%, rgba(var(--accent-rgb), 0.045), transparent 30%),
+    radial-gradient(circle at 78% 42%, rgba(var(--accent-cool-rgb), 0.07), transparent 36%),
+    radial-gradient(circle at 55% 72%, rgba(var(--accent-cool-soft-rgb), 0.04), transparent 26%);
 
-  --toolbar-bg: rgba(245, 241, 231, 0.92);
-  --toolbar-link-hover: rgba(30, 36, 48, 0.08);
+  --toolbar-bg: rgba(252, 253, 255, 0.9);
+  --toolbar-link-hover: rgba(23, 32, 51, 0.06);
   --toolbar-cta-hover-text: #7d2200;
-  --toolbar-cta-hover-bg: rgba(255, 106, 61, 0.12);
+  --toolbar-cta-hover-bg: rgba(var(--accent-rgb), 0.12);
 
-  --hero-problem: #6b7280;
-  --section-rule: rgba(30, 36, 48, 0.14);
+  --hero-problem: #617187;
+  --section-rule: rgba(23, 32, 51, 0.12);
 
-  --panel-bg: #fff9f2;
-  --panel-top-bg: #f2e7d8;
-  --panel-toggle-bg: #ece0cf;
-  --panel-border: rgba(124, 92, 55, 0.18);
-  --panel-shadow: 0 18px 40px rgba(100, 72, 37, 0.12);
+  --panel-bg: #ffffff;
+  --panel-top-bg: #f5f8fd;
+  --panel-toggle-bg: #edf2f8;
+  --panel-border: rgba(93, 117, 152, 0.2);
+  --panel-shadow: 0 18px 40px rgba(28, 49, 80, 0.1);
   --button-copied-text: #7d2200;
-  --button-copied-bg: rgba(255, 106, 61, 0.14);
+  --button-copied-bg: rgba(var(--accent-rgb), 0.14);
 
   --note-bg: rgba(47, 196, 214, 0.14);
 
-  --grid-line: rgba(30, 36, 48, 0.06);
-  --architecture-card-bg: rgba(255, 255, 255, 0.72);
-  --architecture-card-border: rgba(124, 92, 55, 0.15);
-  --architecture-card-edge-bg: rgba(255, 255, 255, 0.46);
-  --architecture-core-bg: rgba(255, 120, 80, 0.1);
-  --architecture-core-border: rgba(255, 120, 80, 0.26);
-  --architecture-core-shadow: 0 12px 28px rgba(255, 106, 61, 0.12);
-  --architecture-text: rgba(30, 36, 48, 0.82);
-  --architecture-pill-border: rgba(124, 92, 55, 0.16);
-  --architecture-pill-bg: rgba(255, 255, 255, 0.85);
+  --grid-line: rgba(23, 32, 51, 0.05);
+  --architecture-card-bg: rgba(255, 255, 255, 0.84);
+  --architecture-card-border: rgba(93, 117, 152, 0.16);
+  --architecture-card-edge-bg: rgba(244, 248, 255, 0.82);
+  --architecture-core-bg: rgba(var(--accent-rgb), 0.1);
+  --architecture-core-border: rgba(var(--accent-rgb), 0.26);
+  --architecture-core-shadow: 0 12px 28px rgba(var(--accent-rgb), 0.12);
+  --architecture-text: rgba(23, 32, 51, 0.82);
+  --architecture-pill-border: rgba(93, 117, 152, 0.16);
+  --architecture-pill-bg: rgba(255, 255, 255, 0.9);
 
-  --skill-example-bg: #fff9f2;
-  --workflow-card-border: rgba(255, 120, 60, 0.24);
-  --workflow-card-bg: rgba(255, 120, 60, 0.08);
-  --workflow-msg-border: rgba(124, 92, 55, 0.1);
-  --workflow-msg-bg: rgba(255, 255, 255, 0.58);
-  --workflow-role: rgba(30, 36, 48, 0.5);
-  --workflow-channel: rgba(30, 36, 48, 0.34);
-  --workflow-action: rgba(30, 36, 48, 0.68);
-  --bg-top-wash: linear-gradient(180deg, rgba(255, 255, 255, 0.28), transparent 42%);
+  --skill-example-bg: #fbfcff;
+  --workflow-card-border: rgba(var(--accent-rgb), 0.24);
+  --workflow-card-bg: rgba(var(--accent-rgb), 0.08);
+  --workflow-msg-border: rgba(93, 117, 152, 0.1);
+  --workflow-msg-bg: rgba(255, 255, 255, 0.74);
+  --workflow-role: rgba(23, 32, 51, 0.5);
+  --workflow-channel: rgba(23, 32, 51, 0.34);
+  --workflow-action: rgba(23, 32, 51, 0.68);
+  --bg-top-wash: linear-gradient(180deg, rgba(255, 255, 255, 0.38), rgba(255, 255, 255, 0) 44%);
 
   --toolbar-height: 80px;
   --section-gap: 3.4rem;
@@ -73,7 +86,17 @@
     --toolbar-bg: rgba(11, 15, 25, 0.92);
     --toolbar-link-hover: rgba(159, 176, 204, 0.12);
     --toolbar-cta-hover-text: #ffd9cc;
-    --toolbar-cta-hover-bg: rgba(255, 106, 61, 0.14);
+    --toolbar-cta-hover-bg: rgba(var(--accent-rgb), 0.14);
+    --hero-accent: #ff8b65;
+    --hero-accent-shadow: none;
+    --body-bg-glow:
+      radial-gradient(circle at 16% 0%, rgba(var(--accent-rgb), 0.04), transparent 22%),
+      radial-gradient(circle at 100% 0%, rgba(var(--accent-cool-rgb), 0.08), transparent 28%),
+      radial-gradient(circle at 76% 18%, rgba(var(--accent-cool-soft-rgb), 0.05), transparent 22%);
+    --hero-glow:
+      radial-gradient(circle at 24% 50%, rgba(var(--accent-rgb), 0.09), transparent 34%),
+      radial-gradient(circle at 78% 42%, rgba(var(--accent-cool-rgb), 0.14), transparent 40%),
+      radial-gradient(circle at 55% 72%, rgba(var(--accent-cool-soft-rgb), 0.08), transparent 30%);
 
     --hero-problem: #9ca3af;
     --section-rule: rgba(255, 255, 255, 0.12);
@@ -84,7 +107,7 @@
     --panel-border: rgba(255, 255, 255, 0.12);
     --panel-shadow: 0 18px 40px rgba(0, 0, 0, 0.24);
     --button-copied-text: #ffd1c1;
-    --button-copied-bg: rgba(255, 106, 61, 0.16);
+    --button-copied-bg: rgba(var(--accent-rgb), 0.16);
 
     --note-bg: rgba(47, 196, 214, 0.12);
 
@@ -92,16 +115,16 @@
     --architecture-card-bg: rgba(255, 255, 255, 0.03);
     --architecture-card-border: rgba(255, 255, 255, 0.08);
     --architecture-card-edge-bg: rgba(255, 255, 255, 0.025);
-    --architecture-core-bg: rgba(255, 120, 80, 0.06);
-    --architecture-core-border: rgba(255, 120, 80, 0.2);
-    --architecture-core-shadow: 0 12px 28px rgba(255, 106, 61, 0.08);
+    --architecture-core-bg: rgba(var(--accent-rgb), 0.06);
+    --architecture-core-border: rgba(var(--accent-rgb), 0.2);
+    --architecture-core-shadow: 0 12px 28px rgba(var(--accent-rgb), 0.08);
     --architecture-text: rgba(232, 238, 249, 0.86);
     --architecture-pill-border: rgba(255, 255, 255, 0.08);
     --architecture-pill-bg: rgba(11, 18, 33, 0.9);
 
     --skill-example-bg: #111c36;
-    --workflow-card-border: rgba(255, 120, 60, 0.22);
-    --workflow-card-bg: rgba(255, 120, 60, 0.06);
+    --workflow-card-border: rgba(var(--accent-rgb), 0.22);
+    --workflow-card-bg: rgba(var(--accent-rgb), 0.06);
     --workflow-msg-border: rgba(255, 255, 255, 0.05);
     --workflow-msg-bg: rgba(255, 255, 255, 0.02);
     --workflow-role: rgba(232, 238, 249, 0.45);
@@ -123,7 +146,7 @@ body {
   margin: 0;
   min-height: 100vh;
   background:
-    radial-gradient(circle at 50% -20%, rgba(255, 106, 61, 0.08), transparent 50%),
+    var(--body-bg-glow),
     var(--bg-top-wash),
     var(--bg);
   color: var(--text);
@@ -340,11 +363,12 @@ body {
 .hero-waterfall::before {
   content: "";
   position: absolute;
-  top: -1.5rem;
-  width: 340px;
-  height: 340px;
+  top: -2rem;
+  width: 520px;
+  height: 360px;
   border-radius: 999px;
-  background: radial-gradient(circle at center, rgba(255, 120, 80, 0.18), transparent 70%);
+  background: var(--hero-glow);
+  filter: blur(14px);
   z-index: -1;
   pointer-events: none;
 }
@@ -383,7 +407,8 @@ body {
   letter-spacing: 0.04em;
   text-transform: uppercase;
   font-weight: 800;
-  color: var(--accent);
+  color: var(--hero-accent);
+  text-shadow: var(--hero-accent-shadow);
   text-wrap: balance;
 }
 
@@ -451,14 +476,14 @@ body {
   align-content: center;
   text-align: center;
   gap: 0.95rem;
-  box-shadow: 0 18px 40px rgba(100, 72, 37, 0.08);
+  box-shadow: 0 18px 40px rgba(28, 49, 80, 0.1);
   transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
 }
 
 .resource-card:hover {
   transform: translateY(-2px);
   border-color: var(--border-strong);
-  box-shadow: 0 22px 44px rgba(100, 72, 37, 0.12);
+  box-shadow: 0 22px 44px rgba(28, 49, 80, 0.14);
 }
 
 .resource-card.disabled {
@@ -469,7 +494,7 @@ body {
 .resource-card.disabled:hover {
   transform: none;
   border-color: var(--border);
-  box-shadow: 0 18px 40px rgba(100, 72, 37, 0.08);
+  box-shadow: 0 18px 40px rgba(28, 49, 80, 0.1);
 }
 
 .resource-icon {
@@ -503,13 +528,15 @@ body {
 
 .hero-image-panel {
   margin-top: 2.2rem;
-  background-color: #efe3d2;
-  border: 1px solid rgba(124, 92, 55, 0.22);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.54)),
+    linear-gradient(135deg, rgba(239, 236, 255, 0.72), rgba(194, 202, 255, 0.52));
+  border: 1px solid rgba(124, 132, 234, 0.16);
   border-radius: 20px;
   padding: 1.3rem 0.7rem;
   width: 100%;
   max-width: 680px;
-  box-shadow: 0 16px 38px rgba(100, 72, 37, 0.1);
+  box-shadow: 0 18px 42px rgba(79, 91, 180, 0.11);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -522,14 +549,17 @@ body {
   font-weight: 800;
   letter-spacing: -0.02em;
   text-align: center;
-  color: var(--accent);
+  color: #000000;
+  text-shadow: none;
 }
 
 @media (prefers-color-scheme: dark) {
   .hero-image-panel {
-    background-color: #e8dcc8; /* Slightly darker but still light enough for black text */
-    border-color: rgba(255, 255, 255, 0.16);
-    box-shadow: 0 16px 38px rgba(0, 0, 0, 0.32);
+    background:
+      linear-gradient(135deg, rgba(229, 232, 248, 0.96), rgba(205, 213, 244, 0.92)),
+      linear-gradient(135deg, rgba(172, 181, 240, 0.26), rgba(145, 156, 230, 0.22));
+    border-color: rgba(152, 164, 235, 0.34);
+    box-shadow: 0 16px 38px rgba(0, 0, 0, 0.22);
   }
 }
 
@@ -553,8 +583,8 @@ body {
   line-height: 1.35;
   font-weight: 600;
   text-align: center;
-  color: var(--text-muted);
-  opacity: 0.8;
+  color: #000000;
+  opacity: 0.82;
 }
 
 .quickstart-intro {
