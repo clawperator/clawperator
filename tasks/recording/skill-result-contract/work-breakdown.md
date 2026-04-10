@@ -92,6 +92,17 @@ Decide the shape and emission mechanism for the skill-level result contract.
   `apps/node/src/contracts/` and is exported alongside `ResultEnvelope`.
 - A `Checkpoint` type defines at minimum `id: string`, `status: "ok" | "failed"
   | "skipped"`, and optional `observedAt`, `evidence`, and `note` fields.
+- `Checkpoint.evidence` is explicitly typed in v1. It must not default to a
+  free-form map. P1 must choose one of:
+  - a small typed union with `kind` plus payload
+  - a typed reference into `execEnvelopes`
+  - a hybrid of the two
+  and record the exact shape in code or a design note.
+- Runtime-state signaling for downstream compare is explicit. P1 must either:
+  - add a typed `diagnostics.runtimeState` or equivalent contract field with
+    values `healthy | poisoned | unavailable | unknown`, or
+  - state clearly that v1 compare downgrades those cases to
+    `upstream_failure`.
 - Emission channel is decided explicitly. The plan's recommendation is the
   `[Clawperator-Skill-Result]` framed single-line JSON; if P1 chooses
   differently it must record why.
@@ -155,6 +166,11 @@ Required cases:
   is structurally identical
 - `clawperator skills run --json` includes the parsed `skillResult` in the
   CLI output when present, and omits or nulls it for legacy skills
+- if `diagnostics.runtimeState` or equivalent exists, parser tests cover:
+  - known values accepted
+  - unknown value rejected or downgraded per the P1 decision
+- if P1 creates a typed checkpoint evidence union, parser tests cover at least
+  one representative of each allowed `kind`
 
 ### Validation
 
@@ -227,6 +243,9 @@ deterministically, drop it from the v1 list and document the reason in
 - The skill docs describe the new result behavior accurately, including the
   exact checkpoint identities listed above and the failure shape on
   verification mismatch.
+- Any checkpoint identities dropped as unstable are listed explicitly in
+  `SKILL.md` with the reason they were dropped so W4 fixtures do not silently
+  drift.
 
 ### Validation
 
@@ -268,6 +287,10 @@ new contract instead of inventing parallel mechanisms.
 
 - Downstream task packs no longer assume a separate trace mechanism.
 - Any unresolved follow-on is explicitly captured.
+- If P1 made contract decisions that are not self-evident from code alone
+  (frame marker policy, version compatibility, typed checkpoint evidence,
+  runtime-state semantics), a durable note is added under `docs/internal/design/`
+  or explicitly scheduled as the immediate next follow-on.
 
 ### Validation
 

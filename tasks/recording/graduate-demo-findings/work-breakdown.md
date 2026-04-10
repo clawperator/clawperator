@@ -65,6 +65,8 @@ docs. This wave is independent of the `SkillResult` contract wording.
 ### Files or Surfaces To Change
 
 - `docs/api/recording.md`
+- `docs/skills/authoring.md` for any wording that currently overstates how
+  directly recordings become skills
 - (optionally) `docs/setup.md` for any device-operations notes
 
 ### Steps
@@ -76,18 +78,24 @@ docs. This wave is independent of the `SkillResult` contract wording.
      and how compare consumes it
    - the sequential `pull` -> `parse` -> `export` workflow and why each step
      exists
-2. Land in `docs/setup.md` (or the relevant operations doc):
+2. Rewrite or remove any wording in `docs/api/recording.md` or
+   `docs/skills/authoring.md` that currently implies a recording becomes a
+   reusable skill with light cleanup. Do not merely append a caveat beneath
+   contradictory wording.
+3. Land in `docs/setup.md` (or the relevant operations doc):
    - operator force-stop invalidates the accessibility service and how to
      recover
    - container vs label clickability gotchas observed during recording
    - input persistence workaround for hybrid/WebView text fields
-3. Keep Samsung/Solax-specific coordinates out of these generalized docs.
+4. Keep Samsung/Solax-specific coordinates out of these generalized docs.
 
 ### Acceptance Criteria
 
 - Recording-as-evidence lessons live in `docs/api/recording.md`.
 - Device-operations lessons live in their proper authoring/setup home, not
   in `tasks/`.
+- No contradictory wording remains in authored docs claiming recordings become
+  reusable skills with only light cleanup.
 - No reference to the W2 `SkillResult` shape appears in wave A wording.
 
 ### Validation

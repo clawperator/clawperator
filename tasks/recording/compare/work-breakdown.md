@@ -81,8 +81,11 @@ Define checkpoint comparison and divergence classification on top of `SkillResul
    - `runtime_poisoned` (operator/accessibility/runtime evidence in
      `execEnvelopes` shows the runtime was in a stuck state)
    - `runtime_unavailable` (device disconnected, accessibility service down)
-3. Define the fixture plan for TDD using local sanitized fixtures only.
-4. Define how compare handles a baseline that contains UI snapshots
+3. Decide whether v1 gets explicit runtime-state signaling from W2. If not,
+   collapse `runtime_poisoned` and `runtime_unavailable` to
+   `upstream_failure` and record that limitation instead of guessing.
+4. Define the fixture plan for TDD using local sanitized fixtures only.
+5. Define how compare handles a baseline that contains UI snapshots
    (`snapshotMode: include`) versus one that does not. Baselines without
    snapshots must still be sufficient for checkpoint-identity compare.
 
@@ -91,6 +94,9 @@ Define checkpoint comparison and divergence classification on top of `SkillResul
 - Compare model is defined without inventing a parallel trace mechanism.
 - Divergence classes are explicit, named, and exhaustive enough for the brain
   to branch on them.
+- The plan explicitly states whether `runtime_poisoned` and
+  `runtime_unavailable` are first-class v1 classes or postponed behind
+  `upstream_failure`.
 - Fixture plan enumerates the specific files and the divergence each one
   forces (see P2 file list).
 - The CLI surface is finalized:
@@ -158,6 +164,10 @@ Required fixtures under `apps/node/src/test/fixtures/recording-compare/`:
   checkpoints match but whose `terminalVerification` is `null`
 - `solax-result-upstream-failure.skillresult.json` — `SkillResult` with
   `status: "failed"` and a partial checkpoint list
+- `solax-result-runtime-poisoned.skillresult.json` — only if W2 ships an
+  explicit runtime-state signal for `poisoned`
+- `solax-result-runtime-unavailable.skillresult.json` — only if W2 ships an
+  explicit runtime-state signal for `unavailable`
 
 Each fixture exists to force one specific divergence class. A test must
 pin every fixture to its expected divergence class so a regression in the
@@ -169,6 +179,9 @@ classification rules fails loudly.
 - Local fixtures listed above all exist and are exercised in tests.
 - Each divergence class enumerated in P1 is exercised by at least one
   fixture-driven test.
+- If runtime-state classes are postponed behind `upstream_failure`, no
+  poisoned/unavailable fixtures exist in v1 and the limitation is documented
+  in the compare docs and task status.
 - Baselines created with `snapshotMode: omit` are supported.
 - The CLI surface returns exit code `0` only on the success fixture; all
   divergence fixtures return non-zero.

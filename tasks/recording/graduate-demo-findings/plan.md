@@ -46,6 +46,9 @@ the authored docs, then retire the temporary demo task files.
 ## In Scope
 
 - move durable recording lessons into `docs/api/recording.md`
+- remove or rewrite any wording in `docs/api/recording.md` and
+  `docs/skills/authoring.md` that implies recordings become reusable skills
+  with light cleanup
 - move durable skill-authoring lessons into `docs/skills/authoring.md`
 - run docs build validation
 - delete superseded demo task files once their content is fully migrated
@@ -69,4 +72,3 @@ This task should produce:
 - updated durable docs
 - validated docs build
 - a reduced or deleted `tasks/recording/demo/` footprint
-

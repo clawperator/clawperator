@@ -92,6 +92,10 @@ reconstruction.
   - `terminalVerification` (or `null` if the skill does not declare one)
   - `execEnvelopes` (embedded `ResultEnvelope` records, in order)
   - `diagnostics` (optional structured hints, never required)
+- Checkpoint evidence must not be a free-form `Record<string,string>` as the
+  primary contract shape. P1 must choose a small typed union or another
+  explicitly versioned structure so downstream consumers are not forced back
+  into ad-hoc string parsing.
 - Solax is the first opt-in proving skill, not the template for every field.
 - `runSkill` returns `skillResult: SkillResult | null` on the success shape
   and on the error shape. Legacy skills set it to `null`.
@@ -123,6 +127,16 @@ implementation:
   backward compatibility in v1 but document that contract-driven
   verification is the preferred path. Plan its deprecation in a follow-up,
   not in this task.
+- Checkpoint evidence shape. Recommend a typed union with a `kind`
+  discriminant plus a small payload, and optional references into
+  `execEnvelopes` by index when the evidence comes from an underlying
+  `ResultEnvelope`. Do not leave this as an implementation detail in the
+  Solax retrofit.
+- Runtime-state signaling policy. P1 must decide whether `runtime_poisoned`
+  and `runtime_unavailable` are represented through a typed
+  `diagnostics.runtimeState` slot, another explicit contract field, or are
+  intentionally downgraded to `upstream_failure` in v1. Compare must not
+  guess these classes from raw stderr text.
 
 ## Failure Modes To Prevent
 
@@ -139,6 +153,8 @@ This task should produce:
 - `runSkill` support for parsing and returning it
 - test coverage using local fixtures only
 - a Solax skill that emits `SkillResult`
+- durable design notes in `docs/internal/design/` if the contract decisions
+  are not self-evident from the code alone
 
 ## Durable Follow-Up
 

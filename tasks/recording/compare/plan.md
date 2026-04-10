@@ -147,6 +147,10 @@ Judgment:
 - A `SkillResult` whose `status` is `indeterminate` (declared verification
   not proved) must be reported by compare as a distinct outcome class even
   if checkpoints otherwise match the baseline.
+- `runtime_poisoned` and `runtime_unavailable` are only valid compare classes
+  if W2 emits an explicit runtime-state signal. If W2 does not ship that
+  signal, compare must classify those cases as `upstream_failure` in v1 and
+  document the limitation.
 
 ## Failure Modes To Prevent
 
@@ -177,6 +181,8 @@ This task should produce:
     - baseline divergence
     - runtime poisoned state
     - runtime unavailable state
+- a conscious documented fallback to `upstream_failure` if runtime-state
+  signaling is not part of the shipped W2 contract
 - Solax validation showing the compare output is useful in practice
 - durable docs updates
 

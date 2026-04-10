@@ -93,6 +93,9 @@ silent regression and lets PR-1b focus on the Solax behavior.
 - Test fails if `runSkill` is changed to swallow non-zero exit when stdout
   is present.
 - Test does not depend on `../clawperator-skills/` or any live device.
+- If the existing CI path does not already run the new test through
+  `npm --prefix apps/node run test`, PR-1a must update CI in the same change
+  so the regression is enforced automatically.
 
 ### Validation
 

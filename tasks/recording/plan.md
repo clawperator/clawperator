@@ -65,6 +65,11 @@ After this work the brain can distinguish at least:
 These are not just better error strings. They are typed signals the brain can
 act on.
 
+For v1, `runtime_poisoned` and `runtime_unavailable` must be backed by an
+explicit runtime-state signal carried through the skill-layer contract. If W2
+cannot provide that signal cleanly, compare must downgrade those cases to
+`upstream_failure` rather than guessing from string matching.
+
 ### What kinds of skill claims become enforceable
 
 Today: `skill.json` is registry metadata. There is no machine-readable
@@ -123,6 +128,9 @@ The recording subtree is complete when **all** of the following are true:
   success (skill-checkpoints W1)
 - A regression test in `apps/node/src/test/` proves a stub skill that exits
   non-zero is reported by `runSkill` as `ok:false` (skill-checkpoints W1)
+- The non-zero-exit regression is exercised by the normal
+  `npm --prefix apps/node run test` path used in CI, or CI is updated in the
+  same PR so the regression is actually enforced (skill-checkpoints W1)
 - `SkillResult` is defined in `apps/node/src/contracts/`, parsed by
   `runSkill`, exposed on `SkillRunResult`, with backward compatibility for
   legacy skills (skill-result-contract W2)
@@ -143,6 +151,12 @@ The recording subtree is complete when **all** of the following are true:
 - `tasks/recording/demo/` is deleted; `brain-hand-contract/` is deleted once
   the contract docs land; this top-level plan is deleted when no active
   recording workstreams remain
+
+Durable design decisions for this program - including the `SkillResult` frame
+marker, version-compatibility policy, checkpoint evidence shape, runtime-state
+classification policy, and `indeterminate` semantics - must live in code and,
+if not self-evident there, in `docs/internal/design/`. They must not remain
+discoverable only through `tasks/`.
 
 ## Why This Exists
 
