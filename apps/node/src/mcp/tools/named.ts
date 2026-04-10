@@ -11,6 +11,7 @@ import { buildScrollUntilExecution } from "../../domain/actions/scrollUntil.js";
 import { buildMcpErrorResult } from "../errors.js";
 import { extractStepDataValue, parseReadAllResult } from "../results.js";
 import { nonWhitespaceStringJsonSchema, selectorJsonSchema } from "../schemas.js";
+import { createSessionDefaults, type SessionDefaults } from "../session.js";
 import { mcpSelectorSchema } from "../selectors.js";
 import type { McpToolDefinition } from "./index.js";
 import {
@@ -21,6 +22,7 @@ import {
   executionToolOptionsSchema,
   mapOptionalSelector,
   mapRequiredSelector,
+  mergeWithSessionDefaults,
   parseToolArguments,
   runExecutionTool,
 } from "./common.js";
@@ -109,7 +111,10 @@ const coordinateJsonSchema = {
   required: ["x", "y"],
 };
 
-export function getNamedMcpTools(logger?: Logger): McpToolDefinition[] {
+export function getNamedMcpTools(
+  logger?: Logger,
+  session: SessionDefaults = createSessionDefaults(),
+): McpToolDefinition[] {
   return [
     {
       name: "open",
@@ -126,12 +131,13 @@ export function getNamedMcpTools(logger?: Logger): McpToolDefinition[] {
       },
       handler: async (args) => {
         const parsed = parseToolArguments(openArgsSchema, args);
+        const opts = mergeWithSessionDefaults(parsed, session);
 
-        const execution = applyMcpExecutionMetadata(parsed.appId !== undefined
-          ? buildOpenAppExecution(parsed.appId)
-          : buildOpenUriExecution(parsed.uri!), "open", parsed.timeoutMs);
+        const execution = applyMcpExecutionMetadata(opts.appId !== undefined
+          ? buildOpenAppExecution(opts.appId)
+          : buildOpenUriExecution(opts.uri!), "open", opts.timeoutMs);
 
-        return await runExecutionTool(execution, parsed, logger, (result) => {
+        return await runExecutionTool(execution, opts, logger, (result) => {
           return buildSuccessResult(buildExecutionSuccessPayload(result));
         });
       },
@@ -152,16 +158,17 @@ export function getNamedMcpTools(logger?: Logger): McpToolDefinition[] {
       },
       handler: async (args) => {
         const parsed = parseToolArguments(clickArgsSchema, args);
+        const opts = mergeWithSessionDefaults(parsed, session);
 
-        const matcher = parsed.selector !== undefined ? mapRequiredSelector(parsed.selector, "selector") : undefined;
+        const matcher = opts.selector !== undefined ? mapRequiredSelector(opts.selector, "selector") : undefined;
 
         const execution = applyMcpExecutionMetadata(
-          buildClickExecution(matcher, parsed.clickType ?? "default", parsed.coordinate),
+          buildClickExecution(matcher, opts.clickType ?? "default", opts.coordinate),
           "click",
-          parsed.timeoutMs,
+          opts.timeoutMs,
         );
 
-        return await runExecutionTool(execution, parsed, logger, (result) => {
+        return await runExecutionTool(execution, opts, logger, (result) => {
           return buildSuccessResult(buildExecutionSuccessPayload(result));
         });
       },
@@ -177,17 +184,18 @@ export function getNamedMcpTools(logger?: Logger): McpToolDefinition[] {
       }, ["selector", "text"]),
       handler: async (args) => {
         const parsed = parseToolArguments(typeArgsSchema, args);
+        const opts = mergeWithSessionDefaults(parsed, session);
 
-        const selector = mapRequiredSelector(parsed.selector, "selector");
+        const selector = mapRequiredSelector(opts.selector, "selector");
 
         const execution = applyMcpExecutionMetadata(buildTypeTextExecution({
           selector,
-          text: parsed.text,
-          submit: parsed.submit,
-          clear: parsed.clear,
-        }), "type", parsed.timeoutMs);
+          text: opts.text,
+          submit: opts.submit,
+          clear: opts.clear,
+        }), "type", opts.timeoutMs);
 
-        return await runExecutionTool(execution, parsed, logger, (result) => {
+        return await runExecutionTool(execution, opts, logger, (result) => {
           return buildSuccessResult(buildExecutionSuccessPayload(result));
         });
       },
@@ -204,24 +212,25 @@ export function getNamedMcpTools(logger?: Logger): McpToolDefinition[] {
       }, ["selector"]),
       handler: async (args) => {
         const parsed = parseToolArguments(readArgsSchema, args);
+        const opts = mergeWithSessionDefaults(parsed, session);
 
-        const selector = mapRequiredSelector(parsed.selector, "selector");
+        const selector = mapRequiredSelector(opts.selector, "selector");
 
-        const container = mapOptionalSelector(parsed.container, "container");
+        const container = mapOptionalSelector(opts.container, "container");
 
         const execution = applyMcpExecutionMetadata(
           buildReadExecution({
             selector,
-            readAll: parsed.all,
+            readAll: opts.all,
             container,
-            validator: parsed.validator,
-            validatorPattern: parsed.validatorPattern,
+            validator: opts.validator,
+            validatorPattern: opts.validatorPattern,
           }),
           "read",
-          parsed.timeoutMs,
+          opts.timeoutMs,
         );
 
-        return await runExecutionTool(execution, parsed, logger, (result) => {
+        return await runExecutionTool(execution, opts, logger, (result) => {
           const extracted = extractStepDataValue(result.envelope, {
             actionType: "read_text",
             dataKey: "text",
@@ -237,7 +246,7 @@ export function getNamedMcpTools(logger?: Logger): McpToolDefinition[] {
             });
           }
 
-          if (parsed.all) {
+          if (opts.all) {
             const parsedReadAll = parseReadAllResult(extracted.value);
             if (!parsedReadAll.ok) {
               return buildMcpErrorResult({
@@ -263,14 +272,15 @@ export function getNamedMcpTools(logger?: Logger): McpToolDefinition[] {
       }, ["key"]),
       handler: async (args) => {
         const parsed = parseToolArguments(pressArgsSchema, args);
+        const opts = mergeWithSessionDefaults(parsed, session);
 
         const execution = applyMcpExecutionMetadata(
-          buildPressKeyExecution(parsed.key),
+          buildPressKeyExecution(opts.key),
           "press",
-          parsed.timeoutMs,
+          opts.timeoutMs,
         );
 
-        return await runExecutionTool(execution, parsed, logger, (result) => {
+        return await runExecutionTool(execution, opts, logger, (result) => {
           return buildSuccessResult(buildExecutionSuccessPayload(result));
         });
       },
@@ -283,15 +293,18 @@ export function getNamedMcpTools(logger?: Logger): McpToolDefinition[] {
       }, ["selector"]),
       handler: async (args) => {
         const parsed = parseToolArguments(waitArgsSchema, args);
+        const opts = mergeWithSessionDefaults(parsed, session);
 
-        const selector = mapRequiredSelector(parsed.selector, "selector");
+        const selector = mapRequiredSelector(opts.selector, "selector");
+        const waitExecution = buildWaitExecution(selector, opts.timeoutMs);
 
         const execution = applyMcpExecutionMetadata(
-          buildWaitExecution(selector, parsed.timeoutMs),
+          waitExecution,
           "wait",
+          waitExecution.timeoutMs,
         );
 
-        return await runExecutionTool(execution, parsed, logger, (result) => {
+        return await runExecutionTool(execution, opts, logger, (result) => {
           return buildSuccessResult(buildExecutionSuccessPayload(result));
         });
       },
@@ -307,20 +320,21 @@ export function getNamedMcpTools(logger?: Logger): McpToolDefinition[] {
       }, ["selector", "direction"]),
       handler: async (args) => {
         const parsed = parseToolArguments(scrollUntilArgsSchema, args);
+        const opts = mergeWithSessionDefaults(parsed, session);
 
-        const selector = mapRequiredSelector(parsed.selector, "selector");
+        const selector = mapRequiredSelector(opts.selector, "selector");
 
-        const container = mapOptionalSelector(parsed.container, "container");
+        const container = mapOptionalSelector(opts.container, "container");
 
         const execution = applyMcpExecutionMetadata(buildScrollUntilExecution(
-          parsed.direction,
+          opts.direction,
           selector,
           container,
-          parsed.clickAfter ?? false,
-          parsed.timeoutMs ?? 30_000,
-        ), "scroll_until", parsed.timeoutMs ?? 30_000);
+          opts.clickAfter ?? false,
+          opts.timeoutMs ?? 30_000,
+        ), "scroll_until", opts.timeoutMs ?? 30_000);
 
-        return await runExecutionTool(execution, parsed, logger, (result) => {
+        return await runExecutionTool(execution, opts, logger, (result) => {
           return buildSuccessResult(buildExecutionSuccessPayload(result));
         });
       },

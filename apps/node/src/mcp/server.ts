@@ -9,6 +9,7 @@ import {
   McpError,
   type CallToolResult,
 } from "@modelcontextprotocol/sdk/types.js";
+import { createSessionDefaults } from "./session.js";
 import { getMcpTools } from "./tools/index.js";
 
 const require = createRequire(import.meta.url);
@@ -25,7 +26,8 @@ export function createMcpServer(): Server {
   const logger = createClawperatorLogger({ outputFormat: "json" }).child({
     event: "mcp.server",
   });
-  const tools = getMcpTools(logger);
+  const session = createSessionDefaults();
+  const tools = getMcpTools(logger, session);
   const toolsByName = new Map(tools.map(tool => [tool.name, tool]));
   const server = new Server(createServerInfo(), {
     capabilities: {

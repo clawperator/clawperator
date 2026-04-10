@@ -207,7 +207,7 @@ describe("mcp stdio integration", () => {
     assert.ok(Array.isArray(tools));
     assert.deepStrictEqual(
       tools.map(tool => tool.name),
-      ["devices", "snapshot", "execute", "open", "click", "type", "read", "press", "wait", "scroll_until"],
+      ["devices", "snapshot", "execute", "configure", "open", "click", "type", "read", "press", "wait", "scroll_until"],
     );
 
     const execute = tools.find((tool) => tool.name === "execute");
@@ -316,6 +316,40 @@ describe("mcp stdio integration", () => {
     }
 
     assert.ok(payload.envelope);
+  });
+
+  it("configure with no args returns empty session state", async () => {
+    await client.initialize();
+
+    const result = await client.callTool("configure", {});
+    assert.strictEqual(result.isError, undefined);
+
+    const payload = parseToolPayload(result) as { session?: Record<string, unknown> };
+    assert.deepStrictEqual(payload.session, {});
+  });
+
+  it("configure stores deviceId and returns it in session state", async () => {
+    await client.initialize();
+
+    const result = await client.callTool("configure", { deviceId: "test-device-abc" });
+    assert.strictEqual(result.isError, undefined);
+
+    const payload = parseToolPayload(result) as { session?: Record<string, unknown> };
+    assert.deepStrictEqual(payload.session, { deviceId: "test-device-abc" });
+  });
+
+  it("rejects configure when deviceId is blank", async () => {
+    await client.initialize();
+
+    const response = await client.requestTool("configure", { deviceId: "" });
+    assertInvalidParams(response);
+  });
+
+  it("rejects configure when timeoutMs is below the execution minimum", async () => {
+    await client.initialize();
+
+    const response = await client.requestTool("configure", { timeoutMs: 999 });
+    assertInvalidParams(response);
   });
 
   it("rejects execute when actions is missing", async () => {
@@ -585,6 +619,16 @@ describe("mcp stdio integration", () => {
 
     const response = await client.requestTool("execute", {
       timeoutMs: -1,
+      actions: [{ id: "sleep-1", type: "sleep", params: { durationMs: 1 } }],
+    });
+    assertInvalidParams(response);
+  });
+
+  it("rejects execute when timeoutMs is below the execution minimum", async () => {
+    await client.initialize();
+
+    const response = await client.requestTool("execute", {
+      timeoutMs: 999,
       actions: [{ id: "sleep-1", type: "sleep", params: { durationMs: 1 } }],
     });
     assertInvalidParams(response);

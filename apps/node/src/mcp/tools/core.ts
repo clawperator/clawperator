@@ -2,10 +2,13 @@ import { z } from "zod";
 import type { Logger } from "../../adapters/logger.js";
 import type { ExecutionAction } from "../../contracts/execution.js";
 import { normalizeExecutionInput } from "../../contracts/inputAliases.js";
+import { LIMITS } from "../../contracts/limits.js";
+import type { ResultEnvelope, StepResult } from "../../contracts/result.js";
 import { listDevices } from "../../domain/devices/listDevices.js";
 import { buildSnapshotExecution } from "../../domain/observe/snapshot.js";
 import { buildMcpErrorResult } from "../errors.js";
 import { extractStepDataValue } from "../results.js";
+import { createSessionDefaults, type SessionDefaults } from "../session.js";
 import type { McpToolDefinition } from "./index.js";
 import {
   applyMcpExecutionMetadata,
@@ -15,13 +18,16 @@ import {
   buildSuccessResult,
   createRuntimeConfig,
   executionToolOptionsSchema,
+  mergeWithSessionDefaults,
   parseToolArguments,
   runExecutionTool,
 } from "./common.js";
 
 const emptyArgsSchema = z.object({}).strict();
 
-const snapshotArgsSchema = executionToolOptionsSchema;
+const snapshotArgsSchema = executionToolOptionsSchema.extend({
+  maxChars: z.number().int().positive().optional(),
+}).strict();
 
 const executionActionSchema = z.object({
   id: z.string().trim().min(1),
@@ -31,6 +37,12 @@ const executionActionSchema = z.object({
 
 const executeArgsSchema = executionToolOptionsSchema.extend({
   actions: z.array(executionActionSchema).min(1, { message: "actions is required" }),
+}).strict();
+
+const configureArgsSchema = z.object({
+  deviceId: z.string().trim().min(1).optional(),
+  operatorPackage: z.string().trim().min(1).optional(),
+  timeoutMs: z.number().int().min(LIMITS.MIN_EXECUTION_TIMEOUT_MS).max(LIMITS.MAX_EXECUTION_TIMEOUT_MS).optional(),
 }).strict();
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -49,7 +61,79 @@ function hasCallerControlledScreenshotPath(action: z.infer<typeof executionActio
   return isRecord(normalizedAction.params) && Object.prototype.hasOwnProperty.call(normalizedAction.params, "path");
 }
 
-export function getCoreMcpTools(logger?: Logger): McpToolDefinition[] {
+export interface SnapshotMaxCharsResult {
+  snapshot: string;
+  truncated?: true;
+}
+
+export function applySnapshotMaxChars(
+  snapshot: string,
+  maxChars: number | undefined,
+): SnapshotMaxCharsResult {
+  if (maxChars === undefined || snapshot.length <= maxChars) {
+    return { snapshot };
+  }
+
+  return { snapshot: snapshot.slice(0, maxChars), truncated: true };
+}
+
+export interface SnapshotEnvelopeResult extends SnapshotMaxCharsResult {
+  envelope: ResultEnvelope;
+}
+
+export function applySnapshotMaxCharsToEnvelope(
+  envelope: ResultEnvelope,
+  snapshotStep: StepResult,
+  snapshot: string,
+  maxChars: number | undefined,
+): SnapshotEnvelopeResult {
+  const truncatedSnapshot = applySnapshotMaxChars(snapshot, maxChars);
+  if (!truncatedSnapshot.truncated) {
+    return {
+      ...truncatedSnapshot,
+      envelope,
+    };
+  }
+
+  return {
+    ...truncatedSnapshot,
+    envelope: {
+      ...envelope,
+      stepResults: envelope.stepResults.map((step) => {
+        if (step !== snapshotStep) {
+          return step;
+        }
+        return {
+          ...step,
+          data: {
+            ...step.data,
+            text: truncatedSnapshot.snapshot,
+          },
+        };
+      }),
+    },
+  };
+}
+
+function buildSessionStatePayload(session: SessionDefaults): { session: SessionDefaults } {
+  const current: SessionDefaults = {};
+  if (session.deviceId !== undefined) {
+    current.deviceId = session.deviceId;
+  }
+  if (session.operatorPackage !== undefined) {
+    current.operatorPackage = session.operatorPackage;
+  }
+  if (session.timeoutMs !== undefined) {
+    current.timeoutMs = session.timeoutMs;
+  }
+
+  return { session: current };
+}
+
+export function getCoreMcpTools(
+  logger?: Logger,
+  session: SessionDefaults = createSessionDefaults(),
+): McpToolDefinition[] {
   return [
     {
       name: "devices",
@@ -69,17 +153,20 @@ export function getCoreMcpTools(logger?: Logger): McpToolDefinition[] {
     {
       name: "snapshot",
       description: "Capture the current Android UI hierarchy as XML.",
-      inputSchema: buildCommonExecutionSchema({}),
+      inputSchema: buildCommonExecutionSchema({
+        maxChars: { type: "integer", minimum: 1 },
+      }),
       handler: async (args) => {
         const parsed = parseToolArguments(snapshotArgsSchema, args);
+        const opts = mergeWithSessionDefaults(parsed, session);
 
         const execution = applyMcpExecutionMetadata(
-          buildSnapshotExecution({ timeoutMs: parsed.timeoutMs }),
+          buildSnapshotExecution({ timeoutMs: opts.timeoutMs }),
           "snapshot",
-          parsed.timeoutMs,
+          opts.timeoutMs,
         );
 
-        return await runExecutionTool(execution, parsed, logger, (result) => {
+        return await runExecutionTool(execution, opts, logger, (result) => {
           const extracted = extractStepDataValue(result.envelope, {
             actionType: "snapshot_ui",
             dataKey: "text",
@@ -96,9 +183,19 @@ export function getCoreMcpTools(logger?: Logger): McpToolDefinition[] {
             });
           }
 
+          const { snapshot, truncated, envelope } = applySnapshotMaxCharsToEnvelope(
+            result.envelope,
+            extracted.step,
+            extracted.value,
+            parsed.maxChars,
+          );
           return buildSuccessResult({
-            ...buildExecutionSuccessPayload(result),
-            snapshot: extracted.value,
+            ...buildExecutionSuccessPayload({
+              ...result,
+              envelope,
+            }),
+            snapshot,
+            ...(truncated ? { truncated } : {}),
           });
         });
       },
@@ -124,6 +221,7 @@ export function getCoreMcpTools(logger?: Logger): McpToolDefinition[] {
       }, ["actions"]),
       handler: async (args) => {
         const parsed = parseToolArguments(executeArgsSchema, args);
+        const opts = mergeWithSessionDefaults(parsed, session);
 
         if (parsed.actions.some((action) => hasCallerControlledScreenshotPath(action))) {
           return buildValidationResult("execute does not allow caller-controlled take_screenshot paths over MCP", "actions");
@@ -132,14 +230,46 @@ export function getCoreMcpTools(logger?: Logger): McpToolDefinition[] {
         const execution = {
           source: "mcp",
           expectedFormat: "android-ui-automator" as const,
-          timeoutMs: parsed.timeoutMs ?? 30_000,
+          timeoutMs: opts.timeoutMs ?? 30_000,
           actions: parsed.actions as ExecutionAction[],
         };
-        const stampedExecution = applyMcpExecutionMetadata(execution, "execute", parsed.timeoutMs ?? 30_000);
+        const stampedExecution = applyMcpExecutionMetadata(execution, "execute", opts.timeoutMs ?? 30_000);
 
-        return await runExecutionTool(stampedExecution, parsed, logger, (result) => {
+        return await runExecutionTool(stampedExecution, opts, logger, (result) => {
           return buildSuccessResult(buildExecutionSuccessPayload(result));
         });
+      },
+    },
+    {
+      name: "configure",
+      description: "Store per-session defaults for deviceId, operatorPackage, and timeoutMs.",
+      inputSchema: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          deviceId: { type: "string", minLength: 1, pattern: "\\S" },
+          operatorPackage: { type: "string", minLength: 1, pattern: "\\S" },
+          timeoutMs: {
+            type: "integer",
+            minimum: LIMITS.MIN_EXECUTION_TIMEOUT_MS,
+            maximum: LIMITS.MAX_EXECUTION_TIMEOUT_MS,
+          },
+        },
+      },
+      handler: (args) => {
+        const parsed = parseToolArguments(configureArgsSchema, args);
+
+        if (parsed.deviceId !== undefined) {
+          session.deviceId = parsed.deviceId;
+        }
+        if (parsed.operatorPackage !== undefined) {
+          session.operatorPackage = parsed.operatorPackage;
+        }
+        if (parsed.timeoutMs !== undefined) {
+          session.timeoutMs = parsed.timeoutMs;
+        }
+
+        return buildSuccessResult(buildSessionStatePayload(session));
       },
     },
   ];

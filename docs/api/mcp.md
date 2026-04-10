@@ -11,6 +11,7 @@ Describe the first-party stdio MCP server exposed by `clawperator mcp serve`: ho
 - Shared MCP tool helpers: `apps/node/src/mcp/tools/common.ts`, `apps/node/src/mcp/selectors.ts`
 - Core tools: `apps/node/src/mcp/tools/core.ts`
 - Named tools: `apps/node/src/mcp/tools/named.ts`
+- MCP session defaults: `apps/node/src/mcp/session.ts`
 - Execution contract: `apps/node/src/contracts/execution.ts`
 - Error codes: `apps/node/src/contracts/errors.ts`
 - Selector contract: `apps/node/src/contracts/selectors.ts`
@@ -47,7 +48,7 @@ Notes:
 
 - `mcp serve` is a long-running stdio transport. Do not wrap it in another CLI command that also writes to stdout.
 - The MCP path is detected before the normal CLI formatter runs, so stdout is reserved for MCP protocol messages only.
-- Global CLI flags such as `--device`, `--device-id`, and `--operator-package` are not accepted on the `mcp serve` argv line. Pass `deviceId` and `operatorPackage` per MCP tool call instead.
+- Global CLI flags such as `--device`, `--device-id`, and `--operator-package` are not accepted on the `mcp serve` argv line. Pass `deviceId` and `operatorPackage` per MCP tool call instead, or store them for the current MCP session with `configure`.
 - Node.js `24+` is required.
 
 ## Claude Desktop Example
@@ -133,7 +134,9 @@ All execution-backed tools accept these common options unless noted otherwise:
 | --- | --- | --- |
 | `deviceId` | no | Explicit adb device serial. Strongly recommended when multiple devices are connected. |
 | `operatorPackage` | no | Operator package override. Blank string is rejected. |
-| `timeoutMs` | no | Execution timeout override. For `wait`, this is the wait duration and the execution timeout is derived from it. |
+| `timeoutMs` | no | Execution timeout override. Values must stay within the normal execution timeout bounds or the MCP boundary rejects them with `InvalidParams`. For `wait`, this is the wait duration and the execution timeout is derived from it. |
+
+You can also store `deviceId`, `operatorPackage`, and `timeoutMs` once per MCP server process with `configure`. When both are present, per-call values win over session defaults for each field independently.
 
 ### `devices`
 
@@ -174,22 +177,27 @@ Parameters:
 | `deviceId` | no | Explicit target device |
 | `operatorPackage` | no | Explicit operator package |
 | `timeoutMs` | no | Execution timeout; defaults to `30000` |
+| `maxChars` | no | Truncate the returned XML to this many characters. Minimum `1`. |
 
 Example call:
 
 ```json
 {
   "deviceId": "<device_serial>",
-  "operatorPackage": "com.clawperator.operator.dev"
+  "operatorPackage": "com.clawperator.operator.dev",
+  "maxChars": 2000
 }
 ```
 
 Success payload includes:
 
 - `snapshot`: XML string from `snapshot_ui`
+- `truncated`: present as `true` only when `maxChars` shortened the XML
 - `deviceId`
 - `terminalSource`
 - `envelope`
+
+When `maxChars` is applied, the returned `envelope` is truncated consistently with the top-level `snapshot` field, so MCP clients do not receive a second full-copy XML payload through `content` or `structuredContent`.
 
 ### `execute`
 
@@ -229,6 +237,50 @@ Validation boundary:
 - MCP rejects caller-controlled `take_screenshot` `path` values so an MCP client cannot choose arbitrary host write locations
 
 Use [Actions](actions.md) for canonical action types and params.
+
+### `configure`
+
+Store per-session defaults for execution-backed MCP tools.
+
+Parameters:
+
+| Field | Required | Notes |
+| --- | --- | --- |
+| `deviceId` | no | Session default adb device serial |
+| `operatorPackage` | no | Session default operator package |
+| `timeoutMs` | no | Session default execution timeout. Must stay within the normal execution timeout bounds or `configure` rejects it with `InvalidParams`. |
+
+Rules:
+
+- all fields are optional
+- blank or whitespace-only `deviceId` and `operatorPackage` are rejected with `InvalidParams`
+- `timeoutMs` must stay within the normal execution timeout bounds before it is stored
+- the stored state is scoped to the current `createMcpServer()` instance only
+- the response shape is always `{ "session": { ...currentValues } }`
+- unset fields are omitted from `session`
+- per-call tool arguments override session defaults field-by-field
+
+Example call:
+
+```json
+{
+  "deviceId": "<device_serial>",
+  "operatorPackage": "com.clawperator.operator.dev",
+  "timeoutMs": 15000
+}
+```
+
+Example success payload:
+
+```json
+{
+  "session": {
+    "deviceId": "<device_serial>",
+    "operatorPackage": "com.clawperator.operator.dev",
+    "timeoutMs": 15000
+  }
+}
+```
 
 ### `open`
 
