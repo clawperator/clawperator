@@ -335,7 +335,8 @@ async function main(): Promise<void> {
             break;
           }
           const allowForwardedSkillRunFlag =
-            rest[0] === "run"
+            def.name === "skills"
+            && rest[0] === "run"
             && i >= 2;
           if (def.name === "exec" && rest[0] !== "best-effort" && arg === "--goal") {
             firstUnknownFlag = arg;

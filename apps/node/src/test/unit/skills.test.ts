@@ -3,7 +3,7 @@ import assert from "node:assert";
 import { spawn } from "node:child_process";
 import { chmod, mkdtemp, mkdir, copyFile, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join, normalize } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { tmpdir } from "node:os";
 import {
   CLAWPERATOR_BIN_ENV_VAR,
@@ -215,9 +215,11 @@ describe("loadRegistry", () => {
     const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-registry-unset-"));
 
     try {
-      const modulePath = join(packageRoot, "dist", "adapters", "skills-repo", "localSkillsRegistry.js");
+      const moduleUrl = pathToFileURL(
+        join(packageRoot, "dist", "adapters", "skills-repo", "localSkillsRegistry.js")
+      ).href;
       const script = `
-        import { loadRegistry } from ${JSON.stringify(modulePath)};
+        import { loadRegistry } from ${JSON.stringify(moduleUrl)};
         process.chdir(${JSON.stringify(tempRoot)});
         delete process.env.CLAWPERATOR_SKILLS_REGISTRY;
         try {
@@ -244,10 +246,12 @@ describe("loadRegistry", () => {
   });
 
   it("writes the configured path to stderr when CLAWPERATOR_SKILLS_REGISTRY points to a missing file", async () => {
-    const modulePath = join(packageRoot, "dist", "adapters", "skills-repo", "localSkillsRegistry.js");
+    const moduleUrl = pathToFileURL(
+      join(packageRoot, "dist", "adapters", "skills-repo", "localSkillsRegistry.js")
+    ).href;
     const missingPath = "/tmp/does-not-exist/skills-registry.json";
     const script = `
-      import { loadRegistry } from ${JSON.stringify(modulePath)};
+      import { loadRegistry } from ${JSON.stringify(moduleUrl)};
       process.env.CLAWPERATOR_SKILLS_REGISTRY = ${JSON.stringify(missingPath)};
       try {
         await loadRegistry();
@@ -283,9 +287,11 @@ describe("loadRegistry", () => {
     await copyFile(TEST_REGISTRY_PATH, fallbackPath);
 
     try {
-      const modulePath = join(packageRoot, "dist", "adapters", "skills-repo", "localSkillsRegistry.js");
+      const moduleUrl = pathToFileURL(
+        join(packageRoot, "dist", "adapters", "skills-repo", "localSkillsRegistry.js")
+      ).href;
       const script = `
-        import { loadRegistry, getRegistryPath } from ${JSON.stringify(modulePath)};
+        import { loadRegistry, getRegistryPath } from ${JSON.stringify(moduleUrl)};
         process.chdir(${JSON.stringify(appNodeDir)});
         delete process.env.CLAWPERATOR_SKILLS_REGISTRY;
         const result = await loadRegistry(getRegistryPath());
