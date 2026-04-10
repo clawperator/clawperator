@@ -215,8 +215,8 @@ This pack should produce:
   agent exits non-zero, agent emits malformed frame, agent emits
   indeterminate, agent takes a non-deterministic recovery path but
   reaches terminal verification
-- a reliability validation report under `tasks/recording/demo/` or
-  `docs/internal/design/` documenting the 10-run measurement
+- a reliability validation report under `docs/internal/design/reliability/`
+  documenting the 10-run measurement (must survive `tasks/recording/` deletion)
 - updates to `docs/skills/authoring.md` and `docs/skills/overview.md`
   describing the agent-driven orchestrated shape
 

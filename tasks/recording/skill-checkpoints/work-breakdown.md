@@ -43,8 +43,8 @@ Read these files IN THIS ORDER before writing anything.
 | --- | --- |
 | `tasks/recording/skill-checkpoints/plan.md` | Stable scope, ordering, and outputs |
 | `tasks/recording/demo/findings.md` | Ground truth from the Solax recording/debugging journey |
-| `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit/scripts/run.js` | Current implementation under repair |
-| `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit/SKILL.md` | Current durable skill notes and caveats |
+| `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit/scripts/run.js` | Current implementation under repair (P1 renames this to `...-replay`) |
+| `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit/SKILL.md` | Current durable skill notes and caveats (P1 renames this to `...-replay`) |
 | `docs/skills/authoring.md` | Durable destination for the generalized rule after proof |
 
 ## PR / Phase Plan

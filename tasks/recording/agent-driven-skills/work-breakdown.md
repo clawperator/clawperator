@@ -281,9 +281,12 @@ practice.
    last set to 100%").
 2. Run the Solax orchestrated skill 10 times with input `percent:
    40` and a clean baseline before each run.
-3. Capture the emitted `SkillResult` for each run into a directory
-   under `tasks/recording/demo/reliability/` (or
-   `docs/internal/design/` once the location is decided).
+3. Capture the emitted `SkillResult` for each run by saving the full
+   `clawperator skills run --json` output to
+   `docs/internal/design/reliability/` using the `tee` pattern below.
+   Use `docs/internal/design/` because `tasks/recording/` will be
+   deleted when the recording program closes; reliability evidence
+   must survive that cleanup.
 4. For each run, record:
    - final status (success / failed / indeterminate)
    - checkpoint identities reached and their statuses
@@ -312,24 +315,22 @@ practice.
   success`
 - zero `runtime_poisoned` states across all runs
 - at least one archived forced-failure run exists for Scene 11
-- a reliability report exists in the repo describing methodology,
-  results, and caveats
-- the report points to the raw run results in a location that will
-  survive task folder cleanup
+- a reliability report and raw run results exist under
+  `docs/internal/design/reliability/` and will survive deletion of
+  `tasks/recording/`
 
 ### Validation
 
 ```bash
+mkdir -p docs/internal/design/reliability
 for i in $(seq 1 10); do
   clawperator skills run com.solaxcloud.starter.set-discharge-to-limit-orchestrated \
     --device <device_serial> \
     --operator-package com.clawperator.operator.dev \
     --json -- 40 \
-    | tee tasks/recording/demo/reliability/run-$i.json
+    | tee docs/internal/design/reliability/run-$i.json
 done
 ```
-
-(The exact capture path is a P4 decision, not fixed here.)
 
 ### Expected Commit
 

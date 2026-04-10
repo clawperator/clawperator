@@ -133,15 +133,15 @@ Delete temporary demo notes whose durable content has now landed in docs.
 ### Steps
 
 1. Confirm wave A content exists in docs.
-2. Delete `tasks/recording/demo/meta-problem-summary.md` (already superseded
-   by `brain-hand-contract/problem-definition.md`).
-3. Trim `tasks/recording/demo/findings.md` to only the wave-B-specific
-   content; do not delete it yet.
+2. Trim `tasks/recording/demo/findings.md` to only the wave-B-specific
+   content; do not delete it yet. Wave A material is the recording lifecycle,
+   device operations, and operator package notes. Wave B material is
+   SkillResult shape, terminal verification, and orchestrated runtime notes.
 
 ### Acceptance Criteria
 
-- `meta-problem-summary.md` is gone.
 - `findings.md` no longer carries wave A material.
+- No stale recording-workflow facts remain uniquely in `tasks/`.
 
 ### Validation
 
@@ -173,7 +173,9 @@ stable.
 
 ### Steps
 
-1. Document the `SkillResult` shape, frame marker, and emission expectations.
+1. Document the `SkillResult` shape, frame marker, and emission expectations,
+   including the `source` field and the rule that `runSkill` injects it
+   (the skill or agent never emits `source` itself).
 2. Document the non-trivial skill rule: truthful exit, terminal verification,
    `SkillResult.terminalVerification` shape.
 3. Document the optional `contract` block, the `indeterminate` outcome

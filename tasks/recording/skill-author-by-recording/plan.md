@@ -148,15 +148,21 @@ are valid, maintained artifacts.
 
 ## Source Of Truth
 
-| Area | Source |
-| --- | --- |
-| Recording lifecycle | `docs/api/recording.md` |
-| Skill scaffolding and authoring | `docs/skills/authoring.md` |
-| Replay/orchestrated proving pattern | `tasks/recording/plan.md` |
-| Runtime-agent shape for orchestrated skills | `tasks/recording/agent-driven-skills/` |
-| Structured skill results | `tasks/recording/skill-result-contract/` |
-| Contract declaration | `tasks/recording/skill-contract-declaration/` |
-| Compare expectations | `tasks/recording/compare/` |
+W6 executes after W2b, W3, W4, and W5 have all landed. By that point the
+durable knowledge from each workstream will have graduated to docs. Prefer
+the docs paths below as the stable read; fall back to the task files only if
+the docs have not yet been updated.
+
+| Area | Stable source (post-graduation) | Task file (while active) |
+| --- | --- | --- |
+| Recording lifecycle | `docs/api/recording.md` | `tasks/recording/demo/` |
+| Skill scaffolding and authoring | `docs/skills/authoring.md` | `tasks/recording/graduate-demo-findings/` |
+| Replay/orchestrated proving pattern | `docs/skills/authoring.md` | `tasks/recording/plan.md` |
+| Runtime-agent shape for orchestrated skills | `docs/skills/authoring.md` | `tasks/recording/agent-driven-skills/` |
+| Structured skill results | `docs/skills/authoring.md`, `apps/node/src/contracts/` | `tasks/recording/skill-result-contract/` |
+| Contract declaration | `docs/skills/authoring.md` | `tasks/recording/skill-contract-declaration/` |
+| Compare workflow | `docs/api/recording.md` | `tasks/recording/compare/` |
+| Reliability report | `docs/internal/design/reliability/` | n/a (never in tasks/) |
 
 ## Output Contract
 

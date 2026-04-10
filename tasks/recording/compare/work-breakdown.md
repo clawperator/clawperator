@@ -170,35 +170,53 @@ Implement compare against recording export baselines using `SkillResult`.
 6. Ensure human-readable output names the first divergent checkpoint and its
    class.
 
+**Fixture format note:** Compare logic operates on a bare `SkillResult` object
+after the CLI layer extracts it from the `skills run --json` wrapper. Unit
+tests for compare logic therefore use bare `SkillResult` fixtures. CLI
+integration tests use full wrapper-format files (the saved output of
+`clawperator skills run --json`). Keep these two sets distinct in the
+fixture tree.
+
 Required fixtures under `apps/node/src/test/fixtures/recording-compare/`:
+
+Logic-layer fixtures (bare `SkillResult`, used by compare unit tests):
 
 - `solax-baseline-success.export.json` — Solax-shaped recording export with
   the raw export evidence for the canonical sequence
 - `solax-baseline-success.normalized.json` — expected normalized checkpoint
   baseline derived from the export fixture above
-- `solax-result-success.skillresult.json` — `SkillResult` whose checkpoints
-  match the baseline and whose `terminalVerification` proves the goal
-- `solax-result-success-path-differs.skillresult.json` — `SkillResult` whose
-  terminal verification proves the goal but whose checkpoint sequence differs
-  in a way that is valid for an agent-driven run
-- `solax-result-baseline-drift.skillresult.json` — `SkillResult` that
-  diverges at one named checkpoint (e.g.
-  `bottom_sheet_save_clicked` missing or replaced)
-- `solax-result-verification-failed.skillresult.json` — `SkillResult` whose
-  checkpoints match but whose `terminalVerification` shows the persisted
+- `solax-result-success.skillresult.json` — bare `SkillResult` whose
+  checkpoints match the baseline, `source: { kind: "agent", agentCli: "codex" }`,
+  and `terminalVerification` proves the goal
+- `solax-result-success-path-differs.skillresult.json` — bare `SkillResult`
+  with `source.kind: "agent"`, terminal verification proved, but checkpoint
+  sequence differs from baseline (valid for agent-driven run)
+- `solax-result-baseline-drift.skillresult.json` — bare `SkillResult` that
+  diverges at one named checkpoint (e.g. `device_discharging_card_opened`
+  missing or replaced)
+- `solax-result-verification-failed.skillresult.json` — bare `SkillResult`
+  whose checkpoints match but `terminalVerification` shows the persisted
   value did not equal the requested value
-- `solax-result-indeterminate.skillresult.json` — `SkillResult` whose
-  checkpoints match but whose `terminalVerification` is `null`
-- `solax-result-upstream-failure.skillresult.json` — `SkillResult` with
+- `solax-result-indeterminate.skillresult.json` — bare `SkillResult` whose
+  checkpoints match but `terminalVerification` is `null`
+- `solax-result-upstream-failure.skillresult.json` — bare `SkillResult` with
   `status: "failed"` and a partial checkpoint list
 - `solax-result-runtime-poisoned.skillresult.json` — only if W2 ships an
   explicit runtime-state signal for `poisoned`
 - `solax-result-runtime-unavailable.skillresult.json` — only if W2 ships an
   explicit runtime-state signal for `unavailable`
 
-Each fixture exists to force one specific divergence class. A test must
-pin every fixture to its expected divergence class so a regression in the
-classification rules fails loudly.
+CLI-layer fixtures (full `skills run --json` wrapper, used by CLI integration
+tests for the `--result` flag):
+
+- `solax-skills-run-success.json` — full saved `skills run --json` output
+  wrapping the success `SkillResult` above; used to confirm compare correctly
+  extracts `skillResult` from the wrapper
+- `solax-skills-run-malformed-wrapper.json` — a file that parses as JSON but
+  lacks the `skillResult` field; must produce a typed parse error from compare
+
+Each logic-layer fixture exists to force one specific divergence class. A test
+must pin every fixture to its expected class so a regression fails loudly.
 
 ### Acceptance Criteria
 
@@ -291,9 +309,19 @@ Show the compare output is useful on the real Solax orchestrated proving skill.
 ### Validation
 
 ```bash
+# Save a live run as the --result input (full skills run --json wrapper):
 CLAWPERATOR_SKILLS_REGISTRY=<clawperator_skills_root>/skills/skills-registry.json \
 CLAWPERATOR_OPERATOR_PACKAGE=com.clawperator.operator.dev \
-node <clawperator_root>/apps/node/dist/cli/index.js skills run com.solaxcloud.starter.set-discharge-to-limit-orchestrated --device <device_serial> --json -- 40
+node <clawperator_root>/apps/node/dist/cli/index.js skills run \
+  com.solaxcloud.starter.set-discharge-to-limit-orchestrated \
+  --device <device_serial> --json -- 40 \
+  > /tmp/solax-run.json
+
+# Run compare against the recording baseline:
+node <clawperator_root>/apps/node/dist/cli/index.js recording compare \
+  --baseline <recording_export>.export.json \
+  --result /tmp/solax-run.json \
+  --json
 ```
 
 ### Expected Commit

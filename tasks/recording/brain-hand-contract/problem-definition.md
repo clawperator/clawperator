@@ -186,7 +186,7 @@ Define a structured result that every non-trivial skill returns. Shape:
     "observed": { "textContains": "Discharge to 40%" },
     "status": "verified"
   },
-  "runtimeEnvelope": [ <exec ResultEnvelope per step>, ... ],
+  "execEnvelopes": [ <exec ResultEnvelope per step>, ... ],
   "diagnostics": { "first_failure": null, "hints": [] }
 }
 ```
@@ -427,26 +427,29 @@ brittle practice.
 - Do not keep durable lessons trapped in `tasks/`. Graduate them to docs as
   each stage lands.
 
-## Open Questions To Resolve In W2 Design
+## W2 Design Decisions (Resolved)
 
-- Exactly how does a skill emit its `SkillResult`? Last-line JSON, explicit
-  marker, file sidecar, or a dedicated stdout frame similar to
-  `[Clawperator-Result]`? A dedicated frame is the most robust and aligns with
-  the existing envelope idiom.
-- Does the contract version live in the skill result itself, in `skill.json`,
-  or both? Probably both, with the result carrying the runtime contract
-  version and `skill.json` carrying the authored version.
-- Where do `checkpoint.id` values come from? Free-form strings chosen by the
-  author are fine for v1. A registry of common checkpoint kinds can emerge
-  later.
-- What happens to legacy skills that emit only stdout text? `runSkill` should
-  remain backward compatible: absence of a structured result means
-  `SkillResult` is null and the caller falls back to the old fields. Only
-  non-trivial skills are expected to adopt the contract immediately.
-- Is `terminalVerification` required for all non-trivial skills, or only
-  declared? I recommend: required to be *emitted* if `skill.json` declares a
-  verification block; otherwise optional. This gives a gradient from trivial
-  to contract-bound.
+All open questions from the original W2 framing are now committed decisions.
+The authoritative source is `tasks/recording/skill-result-contract/plan.md`.
+Summary:
+
+- **Emission mechanism**: a dedicated stdout frame `[Clawperator-Skill-Result]`
+  followed by a single-line JSON document, mirroring `[Clawperator-Result]`.
+  `runSkill` scans stdout for this marker and parses the line that follows.
+- **`contractVersion`**: lives in `SkillResult` itself (runtime contract version).
+  `skill.json` carries the authored version separately.
+- **`source` field**: injected by `runSkill` after parsing the emitted frame, never
+  by the skill or agent. Shape: `{ kind: "agent", agentCli: string }` for
+  agent-driven skills, `{ kind: "script" }` for scripted replay. An emitted frame
+  that already contains `source` is rejected as malformed.
+- **`checkpoint.id` values**: free-form strings chosen by the author in v1. A
+  registry of common kinds can emerge later.
+- **Legacy skills (no structured result)**: `runSkill` remains backward compatible.
+  Absence of the frame means `skillResult: null`; callers fall back to old fields.
+  Only non-trivial skills are expected to adopt the contract immediately.
+- **`terminalVerification` requirement**: required to be emitted if `skill.json`
+  declares a verification block; otherwise optional. A skill that declares
+  verification but does not prove it returns `indeterminate`, not `success`.
 
 ## Appendix: Specifically Why Solax v0 Cannot Be "Good Enough" Without This
 

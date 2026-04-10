@@ -254,7 +254,9 @@ finer-grained orchestrated checkpoint list.
 
 - The retrofitted replay skill emits a parseable `SkillResult` using the
   shared frame marker and `contractVersion`, with the coarse-subset checkpoint
-  list defined above and a real terminal verification record.
+  list defined above and a real terminal verification record. The emitted frame
+  must NOT include a `source` field - `runSkill` injects `source: { kind: "script" }`
+  at parse time. An emitter that includes `source` will be rejected as malformed.
 - The emitted replay result is consumable by the Clawperator runtime tests via
   the copied fixture path used by W4 compare; round-tripping the live frame
   through `runSkill` parsing returns a structurally valid `SkillResult`.
