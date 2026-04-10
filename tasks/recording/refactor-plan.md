@@ -158,10 +158,17 @@ invoked, and reliably run, the program is not done.
 
 | Item | Value |
 | --- | --- |
-| State | planning — hardening in progress |
+| State | planning complete — ready for implementation |
 | Blockers | none |
-| Next | harden W2b scope, update W2/W3/W4/W6/top-level plans, rewrite video Scenes 2/3/7/8/10/12 |
-| Owner sign-off needed before | any file edits outside `tasks/recording/*` and before video scene rewrites |
+| Next | execute W1 (`skill-checkpoints/`), then W2, W2b, W3, W4, W5, W6 in sequence |
+| Owner sign-off needed before | implementation begins (first PR) |
+
+All planning work described in this file is done:
+- W2b plan and work-breakdown exist at `tasks/recording/agent-driven-skills/`
+- Video scenes 2, 3, 7, 8, 10, 12 are rewritten
+- All task packs (W1-W6) updated for agent-driven orchestrated shape
+- All open questions answered in task pack files (see "Open Questions" below)
+- All hard decisions committed in task packs or `brain-hand-contract/`
 
 ## The Disconnect We Discovered
 
@@ -691,223 +698,111 @@ production side of the video, so whoever records it plans for them:
 
 ## Additional Gaps And Hardening Items
 
-The items below are gaps the previous working session identified but
-did not fully close. Each one needs either an answer in this file, a
-phase in a task pack, or an explicit decision to defer. A future
-thread picking up this plan should walk this list and close each item.
+Status legend: [CLOSED] = owned by a task pack and answered; [OPEN] = not yet
+assigned to a task pack and must not disappear when this file is deleted.
 
-1. **Reliability validation phase.** W2b must run the orchestrated
-   Solax skill at least 10 times against a cleaned baseline and
-   record success rate, failure modes, and time to terminal state.
-   The video's "reliably run" claim rests on this measurement
-   existing. Currently referenced in the W2b scope above; make sure
-   the W2b work-breakdown file actually owns it when that file is
-   authored.
-2. **Observability story.** When an orchestrated run fails, what
-   does a developer read to debug it? Candidates: agent stderr
-   stream, `SkillResult.checkpoints`, `SkillResult.diagnostics`,
-   compare output, recording export. Pick the minimum set a
-   developer needs to diagnose a failed run and document it in
-   `docs/skills/` as part of W6 or a follow-on. Must be concrete
-   enough that the video can implicitly demo it in Scene 11.
-3. **Agent stderr contract.** Related to the above. W2b has to
-   decide whether the embedded agent is allowed to write
-   human-readable reasoning on stderr during the run, and whether
-   that stream is captured in the `SkillResult` or only surfaced
-   through `runSkill`'s existing stderr passthrough. Recommend:
-   stderr is free for agent reasoning logs in v1 and passes through
-   `runSkill`'s existing stdout/stderr capture without being
-   contract-versioned. If a future task wants to promote agent
-   reasoning to contract data, that is a new feature.
-4. **Cost and rate-limit story.** Every orchestrated skill run
-   spawns a codex process. That is paid API calls or bounded local
-   limits. The program is not blocked on solving this, but the
-   plans should name it so a future feature (shared agent session,
-   cached reasoning, etc.) has a place to land. Recommend: add a
-   "Cost notes" section to the W2b plan that says "in v1 every run
-   spawns a fresh codex process; batching, caching, and session
-   reuse are explicit follow-ups".
-5. **Recording export at runtime.** Does the runtime agent get the
-   recording export as evidence, or only SKILL.md? Recommend:
-   SKILL.md only at runtime. The export is authoring evidence and
-   should not be shipped into every run. This decision must land in
-   W2b or W6. If W6 decides the authoring-time agent needs a
-   different answer, it must say so explicitly.
-6. **SKILL.md shape sketch.** W2b must deliver at least one
-   concrete SKILL.md example, not just a schema. The executing
-   thread should sketch what the Solax orchestrated SKILL.md looks
-   like as part of W2b P1 so the authoring story and the runtime
-   story land against a real artifact. The sketch should include
-   declared inputs, the allowed primitives list, at least one
-   recovery branch, and the emission rule block.
-7. **Authoring-time agent prompt shape.** W6 has to produce a SKILL.md
-   from recording evidence. Required inputs:
-   - the recording export (must - it is the primary evidence the agent
-     reads to understand what the developer actually did on the device)
-   - an optional plain-language description from the user explaining
-     the intent and any nuance the recording alone does not capture
-     (e.g. "the second Save is for the outer page, not the dialog")
-   Optional / supplementary (pass if available, do not require):
-   - the existing replay skill as reference context if it exists
-   - a SKILL.md authoring template from W2b as a prompt scaffold
-   Document this decision in W6 P1. The authoring-time agent must
-   know what it can count on versus what it should ask for if missing.
-8. **Authoring self-test loop.** Listed in the W6 changes above.
-   Make sure the W6 work-breakdown actually owns a phase that runs
-   the freshly-authored skill at least once before declaring the
-   authoring done.
-9. **Non-determinism and compare.** Listed in the W4 changes above.
-   Make sure W4's work-breakdown owns both literal and semantic
-   comparison modes and names at least one agent-driven test case
-   for each.
-10. **Input validation.** `skill.json`'s declared inputs schema must
-    be enforced by `runSkill` before the agent is spawned, not by
-    the agent itself. Otherwise the agent sees garbage inputs and
-    makes poor decisions. W2b decision.
-11. **Agent CLI version pin.** `codex` is the default, but which
-    version? A codex CLI that changes its flags or prompt interface
-    between versions can break every orchestrated skill. Recommend:
-    `skill.json` carries an optional `agent.minVersion`, and W2b
-    defines what `runSkill` does when the installed version is
-    older. Defer to a follow-on if W2b does not have time.
-12. **Prompt injection / runtime agent trust.** The runtime agent
-    receives device screen content via `clawperator snapshot`. If
-    the device shows hostile content, the agent could be prompted
-    to misbehave. This is a real concern for any serious rollout.
-    For the proving case it is out of scope, but the program should
-    name it so a future security task pack has a hook. Add a
-    "Security follow-ups" note in `brain-hand-contract/` or W2b.
-13. **Runtime-state signalling from agent-driven skills.** W2 already
-    handles `runtime_poisoned` and `runtime_unavailable` as runtime
-    states. An agent-driven skill will likely hit these states more
-    often because it actually looks at the UI. Decide whether
-    agent-driven skills have a privileged way to report these
-    states (e.g. `SkillResult.diagnostics.runtimeState`) or just
-    use the existing mechanism. Recommend: same mechanism, no new
-    surface.
-14. **Per-turn checkpoint emission vs end-of-run.** Listed in open
-    questions below; default is end-of-run for v1.
-15. **What primitives does the agent actually need?** The plan
-    currently lists `exec`, `snapshot`, `checkpoint`. Verify against
-    the CLI registry (`apps/node/src/cli/registry.ts`) that these
-    are the right names and that no other primitives (e.g.
-    `recording snapshot --json`, `serve` endpoints) should be in
-    the allowed set. W2b decision.
-16. **Video forcing function.** Every time a task pack changes, walk
-    `video-draft.md` and confirm each scene still lines up with a
-    deliverable. If it does not, escalate to the owner. Never
-    quietly weaken the script to paper over a scope gap.
+1. [CLOSED] **Reliability validation phase.** Owned by W2b P4
+   (`tasks/recording/agent-driven-skills/work-breakdown.md`). 10 runs, 8/10
+   threshold, results saved to `docs/internal/design/reliability/`.
+2. [OPEN] **Observability story.** When an orchestrated run fails, what does a
+   developer read to debug it? The minimum set is: agent stderr stream
+   (captured by `runSkill`), `SkillResult.checkpoints`, compare output (when
+   available). This guidance must be added to `docs/skills/authoring.md` as
+   part of W6 P3 or a follow-on. The W6 work-breakdown P3 acceptance criteria
+   should name this explicitly.
+3. [CLOSED] **Agent stderr contract.** Resolved in W2b plan: stderr is free for
+   agent reasoning logs, forwarded by `runSkill`, not contract-versioned.
+4. [CLOSED] **Cost and rate-limit story.** Addressed in W2b plan "Cost Notes"
+   section: v1 spawns a fresh process per run; batching/caching are explicit
+   follow-ups.
+5. [CLOSED] **Recording export at runtime.** Resolved in W2b plan: SKILL.md
+   only at runtime. The recording export is authoring evidence only and is not
+   passed to the runtime agent.
+6. [CLOSED] **SKILL.md shape sketch.** Owned by W2b P3. Concrete SKILL.md
+   example is also shown in video Scene 8.
+7. [CLOSED] **Authoring-time agent prompt shape.** Resolved in W6
+   work-breakdown P2: recording export required; optional user plain-language
+   description; authoring-time agent should ask if recording is ambiguous.
+8. [CLOSED] **Authoring self-test loop.** Owned by W6 work-breakdown P1 and P2.
+9. [CLOSED] **Non-determinism and compare.** Owned by W4 work-breakdown. Both
+   literal and semantic modes exist; agent-driven Solax proving cases exist for
+   each.
+10. [CLOSED] **Input validation.** Owned by W2b: `runSkill` validates declared
+    inputs before spawning the agent.
+11. [CLOSED] **Agent CLI version pin.** Resolved: optional `agent.minVersion`
+    in `skill.json`; W2b P1 decides `runSkill` behavior on mismatch.
+12. [OPEN] **Prompt injection / runtime agent trust.** The runtime agent
+    receives device screen content via `clawperator snapshot`. A device
+    showing hostile content could prompt the agent to misbehave. This is
+    explicitly deferred for the proving case but must be tracked. A durable
+    "Security Follow-ups" section has been added to
+    `tasks/recording/agent-driven-skills/plan.md` (the Out of Scope block
+    already names it; the plan now has an explicit note). Any future security
+    task pack should start there.
+13. [CLOSED] **Runtime-state signalling.** Resolved: same existing mechanism,
+    no new surface for agent-driven skills in v1.
+14. [CLOSED] **Per-turn checkpoint emission.** Resolved: end-of-run only in v1.
+15. [CLOSED] **Primitive allowlist.** Owned by W2b P1: verified against
+    `apps/node/src/cli/registry.ts` before landing.
+16. [CLOSED] **Video forcing function.** Video scenes 2, 3, 7, 8, 10, 12
+    rewritten; all scenes now traceable to task pack deliverables.
 
-## Files That Will Change
+## Files Changed
 
-When this refactor is executed, these files will be touched. A future
-thread should keep this list in sync.
+All files below have been edited. This list is kept for audit purposes.
 
-- new: `tasks/recording/agent-driven-skills/plan.md`
-- new: `tasks/recording/agent-driven-skills/work-breakdown.md`
-- edit: `tasks/recording/skill-result-contract/plan.md`
-  - move orchestrated retrofit scope out
-  - clarify `SkillResult` is emitter-agnostic
-  - remove any "scripted orchestrated" wording
-- edit: `tasks/recording/skill-result-contract/work-breakdown.md`
-  - remove P3 orchestrated parts (keep replay retrofit)
-  - adjust PR grouping
-- edit: `tasks/recording/skill-contract-declaration/plan.md`
-  - update `indeterminate` semantics wording
-  - add W2b as a blocker
-  - update proving-case dependency
-- edit: `tasks/recording/skill-contract-declaration/work-breakdown.md`
-  - add an acceptance criterion for the forced-indeterminate case
-- edit: `tasks/recording/compare/plan.md`
-  - introduce literal vs semantic comparison modes
-  - add non-deterministic-path handling
-- edit: `tasks/recording/compare/work-breakdown.md`
-  - add Solax agent-driven proving cases for both modes
-- edit: `tasks/recording/skill-author-by-recording/plan.md`
-  - update output contract to "SKILL.md as agent program"
-  - add authoring self-test loop
-  - clarify recording export is authoring evidence only
-- edit: `tasks/recording/skill-author-by-recording/work-breakdown.md`
-  - update artifact list and acceptance criteria accordingly
-- edit: `tasks/recording/plan.md`
-  - add W2b to workstream table
-  - update Program Definition Of Done
-  - add Hard Rule for agent-driven orchestrated skills
-  - update PR grouping section
-  - update pack ownership section
-  - update blocker graph (W3 on W2b, etc.)
-- edit: `tasks/recording/video-draft.md`
-  - rewrite Scenes 2, 3, 7, 8, 10, 12 as described above
-  - light edits to Scene 9 narration
-  - light edits to Scene 11 narration (outcome-matches case)
-  - add video production notes block (or keep them only in this file)
-- sanity check, possibly small edits:
-  `tasks/recording/brain-hand-contract/problem-definition.md`
-- review, do not rewrite yet:
-  `tasks/recording/demo/findings.md` (W5 owns the graduation)
-- probably unchanged:
-  `tasks/recording/graduate-demo-findings/*` (W5) and
-  `tasks/recording/skill-checkpoints/*` (W1). Light cross-reference
-  pass to make sure nothing contradicts the refactor.
+- [DONE] new: `tasks/recording/agent-driven-skills/plan.md`
+- [DONE] new: `tasks/recording/agent-driven-skills/work-breakdown.md`
+- [DONE] edit: `tasks/recording/skill-result-contract/plan.md`
+- [DONE] edit: `tasks/recording/skill-result-contract/work-breakdown.md`
+- [DONE] edit: `tasks/recording/skill-contract-declaration/plan.md`
+- [DONE] edit: `tasks/recording/skill-contract-declaration/work-breakdown.md`
+- [DONE] edit: `tasks/recording/compare/plan.md`
+- [DONE] edit: `tasks/recording/compare/work-breakdown.md`
+- [DONE] edit: `tasks/recording/skill-author-by-recording/plan.md`
+- [DONE] edit: `tasks/recording/skill-author-by-recording/work-breakdown.md`
+- [DONE] edit: `tasks/recording/plan.md`
+- [DONE] edit: `tasks/recording/video-draft.md` (Scenes 2, 3, 7, 8, 10, 11, 12)
+- [DONE] edit: `tasks/recording/brain-hand-contract/problem-definition.md`
+- [DEFERRED] `tasks/recording/demo/findings.md` — W5 owns graduation
 
-## Open Questions For The Executing Thread
+## Open Questions — All Resolved
 
-These do not need to be resolved before W2b scoping, but they must be
-resolved before W2b implementation lands.
+These were open when this file was written. All are now answered in task packs.
+Authoritative answers live in `tasks/recording/agent-driven-skills/plan.md`
+unless noted otherwise.
 
-1. **Agent CLI discovery.** Does `runSkill` resolve `codex` from
-   `PATH` only, or from a configurable absolute path in
-   `skill.json`'s `agent` block, or both? Recommend: both, with
-   `skill.json` winning over PATH when present.
-2. **Timeout interaction.** `runSkill` today enforces a per-skill
-   timeout. Agent-driven skills are longer-running. Decide whether
-   orchestrated skills raise the default timeout, whether
-   `skill.json` carries its own timeout hint, and whether hitting
-   the outer timeout should kill the embedded agent cleanly.
-   Recommend: per-skill timeout hint in `skill.json`, sane default
-   (e.g. 300000ms for orchestrated skills), outer timeout is what
-   `runSkill` enforces.
-3. **Agent stdout discipline.** The embedded agent must emit exactly
-   one `[Clawperator-Skill-Result]` frame on stdout. Decide whether
-   the agent is allowed to write human-readable reasoning on stderr
-   during the run. Recommend: stderr is free for agent reasoning
-   logs in v1, with the caveat that it is not part of the contract
-   and should not be parsed by any downstream consumer.
-4. **Doctor check.** `clawperator doctor` should probably add a new
-   check: "agent CLI `codex` is on PATH". Decide whether this is a
-   W2b deliverable or a later follow-up. Recommend: W2b, so the
-   first orchestrated run on a new dev box has a clean failure path.
-5. **`SKILL_AGENT_CLI_UNAVAILABLE` error.** Add to
-   `apps/node/src/contracts/skills.ts`. Decide its exact code string
-   in W2b, not earlier.
-6. **Agent input shape.** Decide how inputs are passed to the codex
-   invocation. Recommend: as a JSON blob in an env var
-   (`CLAWPERATOR_SKILL_INPUTS`) plus the raw argv, so the SKILL.md
-   can reference either form.
-7. **Per-turn checkpoint emission vs end-of-run emission.** The
-   agent could either emit checkpoints progressively (one JSON line
-   per checkpoint) so `runSkill` sees progress, or buffer them all
-   and emit one `SkillResult` frame at the end. Recommend:
-   end-of-run emission in v1, because it preserves the existing
-   single-frame parser and avoids a streaming protocol. Progressive
-   emission is an explicit follow-up.
-8. **Compare modes.** Both literal and semantic. W4 owns this.
-   Recommend: literal is the default, semantic is an opt-in flag,
-   and the default case explicitly notes "outcome matches, path
-   differs" when literal fails but semantic passes.
-9. **Agent CLI version pinning.** See hardening item 11.
-10. **Primitive allowlist.** See hardening item 15.
-11. **Authoring self-test failure handling.** What does W6 do if the
-    freshly authored skill fails its self-test run? Candidates:
-    surface the failure and stop, auto-retry with agent feedback,
-    fall back to a scripted replay skeleton. Recommend: surface and
-    stop. The developer should see the failure and decide.
-12. **How many reliability runs is "enough"?** W2b says at least
-    10. Decide whether the real number is 10, 20, or
-    N-runs-until-3-consecutive-successes. Recommend: 10 runs, at
-    least 8 of which reach terminal verification, no
-    runtime_poisoned states. If those thresholds are not met, W2b
-    fails and the fix is scoped from the observed failure modes.
+1. **Agent CLI discovery.** Resolved: `skill.json.agent.cliPath` wins over
+   `PATH`; `PATH` wins if `cliPath` is null.
+2. **Timeout interaction.** Resolved: `skill.json.agent.timeoutMs` is the
+   per-skill default hint; `runSkill`'s outer timeout is authoritative.
+   Default 300000ms for orchestrated skills.
+3. **Agent stdout discipline.** Resolved: stderr is free for agent reasoning
+   logs, forwarded by `runSkill`, not part of `SkillResult` contract.
+4. **Doctor check.** Resolved: W2b deliverable — `clawperator doctor` gains an
+   agent CLI availability check.
+5. **`SKILL_AGENT_CLI_UNAVAILABLE` error.** Resolved: committed to this exact
+   string in `apps/node/src/contracts/skills.ts`.
+6. **Agent input shape.** Resolved: `CLAWPERATOR_SKILL_INPUTS` env var JSON
+   blob plus raw argv passthrough.
+7. **Per-turn checkpoint emission vs end-of-run.** Resolved: end-of-run
+   single-frame in v1. Progressive emission is an explicit follow-up.
+8. **Compare modes.** Resolved, but differently from this file's recommendation.
+   The compare plan (see `tasks/recording/compare/plan.md`) auto-detects mode
+   from `SkillResult.source.kind`: `kind === "agent"` uses semantic, `kind ===
+   "script"` uses literal. An opt-in flag was not adopted because source.kind
+   carries the same information without requiring the caller to know the skill's
+   emitter type.
+9. **Agent CLI version pinning.** Resolved: `skill.json.agent.minVersion` is
+   optional in v1; `runSkill` behavior on version mismatch is a W2b P1
+   decision. Explicit follow-up if W2b doesn't have time.
+10. **Primitive allowlist.** Resolved: verified against
+    `apps/node/src/cli/registry.ts` in W2b P1. Final list committed there.
+11. **Authoring self-test failure handling.** Resolved: surface and stop.
+    W6 work-breakdown P2 acceptance criteria owns this.
+12. **How many reliability runs is "enough"?** Resolved: 10 runs, at least 8
+    reach terminal verification with `status: success`, zero `runtime_poisoned`
+    states. Owned by W2b P4.
 
 ## Context For A Fresh Thread
 

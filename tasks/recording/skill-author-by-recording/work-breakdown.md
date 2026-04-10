@@ -138,4 +138,11 @@ experience is understandable from start to finish.
     `SkillResult`
 - The chosen decomposition still feels like one workflow to the user rather
   than a menu of competing authoring skills.
-- Any durable guidance discovered here is migrated into `docs/skills/authoring.md`.
+- `docs/skills/authoring.md` includes a concrete "debugging a failed
+  orchestrated run" section covering the minimum set a developer reads: agent
+  stderr stream (forwarded by `runSkill`), `SkillResult.checkpoints` (first
+  failed or skipped checkpoint), and compare output when a recording baseline
+  exists. This must be authored in this phase or explicitly scheduled as the
+  immediate follow-on before declaring W6 done.
+- Any other durable guidance discovered here is migrated into
+  `docs/skills/authoring.md`.

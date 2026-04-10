@@ -251,6 +251,30 @@ Batching, caching, session reuse, and cost/rate-limit optimization are explicit
 follow-ups, not hidden assumptions in this pack. The v1 bar is correctness,
 inspectability, and reliable outcome.
 
+## Security Follow-Ups
+
+These concerns are explicitly deferred from v1 but must not be lost when
+`tasks/recording/` is deleted. Any future security task pack should start here.
+
+- **Prompt injection via device screen content.** The runtime agent receives
+  device UI content via `clawperator snapshot`. A device showing adversarially
+  crafted text could prompt the agent to take unintended actions (navigate away
+  from the skill's declared scope, exfiltrate snapshot data, emit a misleading
+  `SkillResult`). Mitigations to explore: constraining the agent's permitted
+  Clawperator primitives at the harness level, sandboxing the agent process,
+  or requiring explicit human approval for agent actions outside the declared
+  checkpoint sequence.
+- **Agent CLI trust boundary.** The thin harness spawns a configurable binary.
+  A `skill.json` sourced from an untrusted skills registry could point
+  `agent.cliPath` at an arbitrary executable. `runSkill` should validate that
+  the resolved CLI path matches an allowlist or carries a signature before
+  spawning it.
+- **`SkillResult` frame spoofing.** If an agent can write arbitrary content to
+  stdout, it could emit a fabricated `SkillResult` claiming verification it
+  did not perform. The frame parser is the only defense today. Consider whether
+  a witness log (exec envelopes from actual `clawperator exec` calls) should
+  be cross-checked against declared checkpoints in a future hardening pass.
+
 ## Durable Follow-Up
 
 This work feeds:
