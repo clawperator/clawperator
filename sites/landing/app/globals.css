@@ -549,7 +549,7 @@ body {
   font-weight: 800;
   letter-spacing: -0.02em;
   text-align: center;
-  color: var(--text);
+  color: #000000;
   text-shadow: none;
 }
 
@@ -583,7 +583,7 @@ body {
   line-height: 1.35;
   font-weight: 600;
   text-align: center;
-  color: var(--text);
+  color: #000000;
   opacity: 0.82;
 }
 
