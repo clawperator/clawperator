@@ -1,3 +1,24 @@
+---
+title: Recording Promo Video Draft
+purpose: |
+  Draft script for a developer-facing promo/demo video that explains the
+  recording-to-replay-to-orchestrated-skill workflow being built in the
+  recording workstreams.
+audience:
+  - developers
+  - agents reading subtitles/transcripts
+status: draft
+working_backwards: |
+  This file is a "working backwards" artifact for the recording program. It
+  plays a similar role to an internal press release: it forces the team to
+  explain, in user-facing terms, what the finished workflow should feel like
+  when Clawperator, Codex, and OpenClaw are working together well.
+notes:
+  - Keep the spoken tone conversational rather than polished marketing copy.
+  - The script should describe the intended end-state clearly enough that it
+    can be used as a touchstone while the task packs are implemented.
+---
+
 # Video Draft
 
 Hi - today I'm going to demonstrate how to create a complex skill using Clawperator. In my case, I've got a battery in my home. I often find myself adjusting how much power I want to feed into the grid each night. The UI for doing this in the app has numerous steps, and we're going to use Clawperator to create a skill so we can automate this to the point that I can send a single message to my OpenClaw instance and the export limit will be changed. So let's get started.
