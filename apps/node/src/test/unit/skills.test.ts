@@ -1775,10 +1775,11 @@ describe("runSkill", () => {
     assert.strictEqual(result.output, "hello\n");
   });
 
-  it("returns SKILL_EXECUTION_FAILED for non-zero exit", async () => {
+  it("returns SKILL_EXECUTION_FAILED for non-zero exit even when stdout is present", async () => {
     const result = await runSkill("com.test.fail", []);
     assert.ok(!result.ok);
     assert.strictEqual(result.code, SKILL_EXECUTION_FAILED);
+    assert.ok(typeof result.exitCode === "number" && result.exitCode !== 0);
     assert.ok(result.stdout?.includes('"stage":"before-failure"'));
     assert.ok(result.stderr?.includes("FAIL_OUTPUT:intentional"));
   });

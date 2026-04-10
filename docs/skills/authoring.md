@@ -392,6 +392,37 @@ For the run result, verify:
 
 If the script exits non-zero, `skills run` returns `SKILL_EXECUTION_FAILED` and preserves `stdout`, `stderr`, and `exitCode`.
 
+### Non-Trivial Skill Rule
+
+For non-trivial skills, treat process success as a proof obligation, not just
+an implementation detail.
+
+Working definition:
+
+- a skill is `non-trivial` when successful script execution is not enough to
+  prove the claimed outcome
+- this usually means the skill changes app state, crosses multiple UI
+  transitions, or can fail silently while still appearing to have run
+- a read-only or capture-only skill is often trivial; a state-changing skill
+  should be assumed non-trivial unless proven otherwise
+
+Current authoring expectation:
+
+- if an underlying nested `clawperator exec` call fails, the skill script must
+  exit non-zero rather than translating the failure into a "successful" skill run
+- if the skill's purpose is to change app state, the skill should verify the
+  intended terminal state before reporting success
+
+Examples of terminal-state verification:
+
+- re-read the row or field the skill changed and confirm it matches the
+  requested value
+- re-open the relevant dialog or screen and confirm the persisted state is
+  present
+
+Do not assume that "the taps and text entry ran" is enough evidence for a
+non-trivial skill. If the skill changes state, prefer proving the state.
+
 ## Artifact Compilation
 
 Current compile command:
