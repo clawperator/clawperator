@@ -556,10 +556,10 @@ body {
 @media (prefers-color-scheme: dark) {
   .hero-image-panel {
     background:
-      linear-gradient(135deg, rgba(18, 24, 38, 0.92), rgba(18, 24, 38, 0.72)),
-      linear-gradient(135deg, rgba(74, 82, 181, 0.34), rgba(33, 41, 92, 0.46));
-    border-color: rgba(122, 132, 234, 0.24);
-    box-shadow: 0 16px 38px rgba(0, 0, 0, 0.32);
+      linear-gradient(135deg, rgba(229, 232, 248, 0.96), rgba(205, 213, 244, 0.92)),
+      linear-gradient(135deg, rgba(172, 181, 240, 0.26), rgba(145, 156, 230, 0.22));
+    border-color: rgba(152, 164, 235, 0.34);
+    box-shadow: 0 16px 38px rgba(0, 0, 0, 0.22);
   }
 }
 
