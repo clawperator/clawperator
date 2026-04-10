@@ -228,7 +228,7 @@ So this subtree now contains multiple linked workstreams rather than one task.
 | 4 | `compare/` | blocked on 2 | compare recording baseline against emitted `SkillResult` from the orchestrated skill |
 | 5a | `graduate-demo-findings/` (wave A) | active | graduate recording-as-evidence and operations facts that do not depend on `SkillResult` shape |
 | 5b | `graduate-demo-findings/` (wave B) | blocked on 2 | graduate skill-contract and authoring facts once W2 wording is stable |
-| 6 | future `.agents/skills/skill-author-by-recording/` | blocked on 5 | package the proven recording-to-replay-to-orchestrated workflow into a repo-local agent skill |
+| 6 | `skill-author-by-recording/` | blocked on 5 | package the proven recording-to-replay-to-orchestrated workflow into a repo-local agent skill |
 
 ## Required Sequence
 
