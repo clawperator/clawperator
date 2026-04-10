@@ -101,10 +101,16 @@ Once implemented, this task should inform:
 
 ## Relationship To The Recording Promo Video
 
-`tasks/recording/video-draft.md` describes the end-state of this workflow as
-if a developer can already invoke it in Codex. That framing is intentional:
-the video is a "working backwards" artifact that treats this task pack as the
-named owner of the guided authoring experience. The video must continue to
-be explicit that the workflow itself does not exist yet and only becomes real
-once this task pack lands on top of W1-W5. If the video ever implies the
-workflow exists today, fix the video, not the scope of this task.
+`tasks/recording/video-draft.md` is the script that will be read aloud once
+this task pack, and the W1-W5 work it depends on, have all landed. It is
+written in present tense and assumes the workflow exists, the `-replay` and
+`-orchestrated` Solax skills exist, `SkillResult` is parsed by `runSkill`,
+declared contracts with `indeterminate` status are shipped, and
+`clawperator recording compare` is shipped.
+
+That framing is intentional. Treat the video as a forcing function: the
+scope of this task is the gap between what the script describes and what
+currently exists. If the script describes something this pack cannot
+reasonably deliver, the fix is to escalate the scope of the task pack or
+re-negotiate the script with the recording-program owner. Do not silently
+weaken the script to hide a scope gap.

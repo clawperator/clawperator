@@ -1,9 +1,10 @@
 ---
 title: Recording Promo Video Draft
 purpose: |
-  Draft script for a developer-facing promo/demo video that explains the
-  recording-to-orchestrated-skill workflow being built in the recording
-  workstreams.
+  Script for a developer-facing promo/demo video that walks through the
+  recording-to-orchestrated-skill workflow end-to-end. The script is written
+  to be read aloud once the full recording program has shipped, so every
+  command, file, and API referenced here is assumed to exist and work.
 audience:
   - developers
   - OpenClaw tinkerers
@@ -11,39 +12,33 @@ audience:
   - agents reading subtitles or transcripts
 status: draft
 format: hybrid movie-script
-working_backwards: |
-  This file is a "working backwards" artifact for the recording program. It
-  plays a similar role to an internal press release: it forces the team to
-  explain, in user-facing terms, what the finished workflow should feel like
-  when Clawperator, Codex, and OpenClaw are working together well.
-honesty_rules:
-  - Every spoken claim must already be true in the repo or be explicitly owned
-    by a task pack under `tasks/recording/`.
-  - Pseudocode blocks must be labeled as "intended shape" when they describe a
-    surface that does not exist yet. The video must never imply that
-    `checkpoint(...)`, `emitSkillResult(...)`, or `skill-author-by-recording`
-    are callable today.
+reading_conditions: |
+  This script assumes the whole recording program in `tasks/recording/` has
+  landed. That means the `skill-author-by-recording` workflow exists, the
+  `-replay` and `-orchestrated` Solax skills both exist, the `SkillResult`
+  contract is shipped and parsed by `runSkill`, declared skill contracts
+  with the `indeterminate` status are shipped, and `clawperator recording
+  compare` exists. Do not add "not yet shipped" language to the spoken
+  content. If a scene describes something that is not true at recording
+  time, the fix is to land that task pack, not to caveat the script.
+clarity_rules:
   - The recording is evidence. The agent authors the orchestrated skill from
-    that evidence. At runtime, the skill runs to completion and hands back a
-    single structured result. The brain does not sit inside the skill on every
-    line and the agent does not sit inside `checkpoint(...)` at runtime.
-  - Any scene that would otherwise require an ephemeral `tasks/` file to be
-    visible on screen is a smell. The video must stand on code, docs, and
-    artifacts that will still exist after the recording program finishes.
-notes:
+    that evidence. At runtime, the skill runs to completion and emits a
+    single structured result. The brain does not sit inside the skill on
+    every line, and the agent is not running inside helper functions at
+    runtime. The agent's contribution is baked in at authoring time.
   - Keep the spoken tone conversational. Audience is developers, OpenClaw
-    tinkerers, and tech-savvy users - not a marketing panel.
-  - Use explicit "On screen" and "Show this code" directions when spoken words
-    alone would leave the mechanism unclear.
-  - Each "Show this code" block is pseudocode unless explicitly marked as
-    real. The goal is to make the shape of the end-state legible, not to
-    claim an API shipped today.
-owned_by_task_packs:
-  - workflow itself: tasks/recording/skill-author-by-recording/
-  - SkillResult contract and emission pattern: tasks/recording/skill-result-contract/
-  - indeterminate status and declared verification: tasks/recording/skill-contract-declaration/
-  - divergence diagnosis: tasks/recording/compare/
-  - replay baseline truthfulness: tasks/recording/skill-checkpoints/
+    tinkerers, and tech-savvy users, not a marketing panel.
+  - Use explicit "On screen" and "Show this code" directions whenever the
+    spoken words alone would leave the mechanism unclear.
+  - Do not reference `tasks/recording/*` files on screen. The viewer should
+    only ever see code, docs, CLI commands, and generated artifacts.
+authoring_provenance:
+  This script was written alongside the recording program task packs in
+  `tasks/recording/` and describes the end-state those packs are building
+  toward. It is kept in `tasks/` purely for authoring convenience. By the
+  time the video is recorded, those task packs are expected to be deleted
+  and the script read against the shipped system.
 ---
 
 # Video Draft
@@ -67,11 +62,11 @@ OpenClaw, set my battery export limit to 40% tonight.
 Hi. Today I'm going to show you how to take a messy multi-step mobile-app
 workflow, and turn it into something I can trigger with one sentence to my
 OpenClaw instance. The example is a real one. I've got a battery in my house
-and I constantly end up digging through the SolaX Cloud app to change how much
-energy I'm willing to push back to the grid. It's a bunch of taps, a modal, a
-text field, and two saves. I am going to replace all of that with a single
-message, and I am going to do it in a way that is actually verified, not just
-hopeful.
+and I constantly end up digging through the SolaX Cloud app to change how
+much energy I'm willing to push back to the grid. It's a bunch of taps, a
+modal, a text field, and two saves. I am going to replace all of that with a
+single message, and I am going to do it in a way that is actually verified,
+not just hopeful.
 
 ## Scene 2 - Why This Is Not Just Macro Replay
 
@@ -89,19 +84,21 @@ Macro replay            Clawperator + agent
 
 **Spoken**
 
-And before anyone says "this is a macro recorder" - it's not. I want to make
-that distinction early because it's the thing that makes this interesting.
+And before anyone says "this is a macro recorder" - it's not. I want to
+make that distinction early because it's the thing that makes this
+interesting.
 
 Clawperator is the deterministic "hand" that actually drives the Android
-device. My agent, OpenClaw, is the "brain" that reasons about what to do. What
-we are building is the thing in between: a skill that knows what it was
-trying to achieve, names the checkpoints it is hitting on the way, and reads
-the app state at the end to confirm it actually worked. If any of that goes
-sideways, the brain gets a structured result it can reason about, not a
-stdout blob.
+device. My agent, OpenClaw, is the "brain" that reasons about what to do.
+What we are building is the thing in between: a skill that knows what it
+was trying to achieve, names the checkpoints it is hitting on the way, and
+reads the app state at the end to confirm it actually worked. If any of
+that goes sideways, the brain gets a structured result it can reason about,
+not a stdout blob.
 
-That split is the whole point. Replay is "do these taps". Orchestrated is
-"achieve this outcome, checkpoint by checkpoint, and prove it".
+That split is the whole point. Replay is "try and do these taps in order".
+Orchestrated is "achieve this outcome, checkpoint by checkpoint, and prove
+it".
 
 ## Scene 3 - Invoke The Guided Authoring Workflow
 
@@ -116,33 +113,23 @@ com.solaxcloud.starter.set-discharge-to-limit-orchestrated skill.
 Guide me when I need to touch the phone.
 ```
 
-- Lower-third card:
-
-```text
-`skill-author-by-recording` is an intended repo-local workflow owned by
-tasks/recording/skill-author-by-recording/. It does not exist yet.
-This scene shows the end-state we are building toward.
-```
-
 **Spoken**
 
 Here is the important part. I am not going to hand-stitch any of this
 myself. I am going to ask Codex to use a repo-local workflow called
-`skill-author-by-recording`. That workflow, once it lands, is the thing that
-guides the entire process. It tells me when to go touch the phone. It runs
-the recording lifecycle commands for me. It pulls the artifacts back into the
+`skill-author-by-recording`. That workflow is the thing that guides the
+entire process. It tells me when to go touch the phone. It runs the
+recording lifecycle commands for me. It pulls the artifacts back into the
 repo. And then it helps the agent turn those artifacts into a real skill.
 
-And just to be explicit: this workflow doesn't exist yet. It is owned by one
-of the recording task packs in this repo, and it is the last thing that
-lands on top of everything else we are about to see. So this scene is showing
-the intended developer experience, not a feature you can run today.
+So from my point of view as a developer, I literally just type that prompt
+and then follow the instructions.
 
 ## Scene 4 - The Recording Lifecycle, Uncovered
 
 **On screen**
 
-- Terminal shows the commands the workflow would run under the hood:
+- Terminal shows the commands the workflow runs under the hood:
 
 ```bash
 clawperator record start --session-id <session_id> --device <device_serial> --operator-package com.clawperator.operator.dev --json
@@ -151,15 +138,13 @@ clawperator record pull --device <device_serial> --session-id <session_id> --out
 clawperator recording export --input ./recordings --snapshots omit --json
 ```
 
-- Highlight that `record`, `record stop`, `record pull`, and `recording
-  export` already exist as CLI commands today.
-
 **Spoken**
 
-Under the hood, this is not magic. These four commands are real, shipped
-Clawperator CLI commands. You can run them yourself right now. What the
+Under the hood, this is not magic. These four commands are real, first-class
+Clawperator CLI commands. You can run them yourself any time. What the
 workflow does is run them for me in the right order and hand me off to the
-phone at the right moment.
+phone at the right moment, so I never have to remember the lifecycle by
+heart.
 
 ## Scene 5 - Human Performs The Flow
 
@@ -177,9 +162,9 @@ phone at the right moment.
 
 OK, the workflow tells me recording is active, and I do the thing I want to
 automate. I open the app, I navigate down to the right control, I set the
-discharge limit to forty percent, and I save it. Then the workflow stops the
-recording, pulls the raw NDJSON off the device, and writes a clean export
-artifact into the repo.
+discharge limit to forty percent, and I save it. Then the workflow stops
+the recording, pulls the raw NDJSON off the device, and writes a clean
+export artifact into the repo.
 
 ## Scene 6 - The Export Is Evidence, Not A Skill
 
@@ -205,12 +190,12 @@ skill. It is evidence.
 
 It tells us, truthfully, the sequence of events that the Operator observed
 while I was driving the phone. It's got the click targets, the window
-transitions between apps, the rough timeline, and the package changes. That
-is genuinely useful to an agent that has to figure out what I did and why.
-But it is not a reusable automation. If I just blindly replay these events,
-the first time the app loads a little slower, or a popup shows up, or a
-layout shifts, that replay starts to drift. It is the raw material. The
-orchestrated skill still has to be written.
+transitions between apps, the rough timeline, and the package changes.
+That is genuinely useful to an agent that has to figure out what I did and
+why. But it is not a reusable automation. If I just blindly replay these
+events, the first time the app loads a little slower, or a popup shows up,
+or a layout shifts, that replay starts to drift. It is the raw material.
+The orchestrated skill still has to be written.
 
 ## Scene 7 - The Agent Authors The Skill
 
@@ -224,13 +209,14 @@ skills/com.solaxcloud.starter.set-discharge-to-limit-replay/
 skills/com.solaxcloud.starter.set-discharge-to-limit-orchestrated/
 ```
 
-- Draw arrows: export.json -> replay skill, export.json -> orchestrated skill.
+- Draw arrows: `export.json` -> replay skill, `export.json` -> orchestrated
+  skill.
 - Lower-third card:
 
 ```text
-replay baseline:     preserves the direct path (W1: skill-checkpoints)
-orchestrated sibling: adds named checkpoints, verification,
-                      and a structured SkillResult (W2: skill-result-contract)
+replay baseline       preserves the direct path through the UI
+orchestrated sibling  adds named checkpoints, terminal verification,
+                      a declared contract, and a SkillResult frame
 ```
 
 **Spoken**
@@ -238,33 +224,28 @@ orchestrated sibling: adds named checkpoints, verification,
 Here is where the brain/hand split becomes concrete.
 
 The workflow writes out two skills side by side. The first is a `replay`
-skill. That is the direct path, cleaned up, preserved as a durable baseline.
-It is what you use when the UI is stable and you just want to get from A to
-B the same way every time. We keep it around because it's cheap, it's
-inspectable, and sometimes it's all you need.
+skill. That is the direct path, cleaned up, preserved as a durable
+baseline. It is what you use when the UI is stable and you just want to
+get from A to B the same way every time. We keep it around because it's
+cheap, it's inspectable, and sometimes it's all you need.
 
-The second, and this is the exciting one, is the `orchestrated` sibling. It
-uses the same recording as its starting point, but it is a different kind of
-thing. It has a declared goal. It names every step on the way as a
+The second, and this is the exciting one, is the `orchestrated` sibling.
+It uses the same recording as its starting point, but it is a different
+kind of thing. It has a declared goal. It names every step on the way as a
 checkpoint. It verifies the persisted state at the end before it tells the
 brain it succeeded. And it emits a structured result the brain can read
 directly.
 
 And crucially, none of that is magic. The agent is writing this code from
 the recording evidence. The agent is not "inside" the skill at runtime. At
-runtime, the skill runs straight through. The agent's reasoning is baked in
-at authoring time.
+runtime, the skill runs straight through. The agent's reasoning is baked
+in at authoring time.
 
 ## Scene 8 - Replay Shape Versus Orchestrated Shape
 
 **On screen**
 
-- Side-by-side pseudocode. Add a header above each block:
-
-```text
-intended authoring shape (owned by W1 / W2)
-not a shipped API today
-```
+- Side-by-side code view of the two authored `run.js` files.
 
 **Show this code**
 
@@ -308,7 +289,10 @@ await reached("toolbar_save_clicked", saveOnToolbar);
 await reached("bottom_sheet_save_clicked", saveOnBottomSheet);
 
 const terminalVerification = await verifyDischargeToRow(40);
-checkpoints.push({ id: "terminal_state_verified", status: terminalVerification.ok ? "ok" : "failed" });
+checkpoints.push({
+  id: "terminal_state_verified",
+  status: terminalVerification.ok ? "ok" : "failed",
+});
 
 emitSkillResultFrame({
   contractVersion: "1.0.0",
@@ -328,29 +312,30 @@ operations. Do them in order. Done. On the right, the orchestrated version.
 It still does the same operations, in the same order, but it does three
 things the replay doesn't.
 
-First, it names every checkpoint. Those names are stable identifiers chosen
-at authoring time. They're how the brain later reasons about where the run
-actually got to.
+First, it names every checkpoint. Those names are stable identifiers
+chosen at authoring time. They're how the brain later reasons about where
+the run actually got to.
 
 Second, it verifies the terminal state. Before it tells anybody it
 succeeded, it reads the `Discharge to 40%` row back out of the app. If the
 row isn't there, it isn't success. The most important property of an
 orchestrated skill is that it is honest.
 
-And third, when it's done, it writes out a single structured result. That's
-the `SkillResult`. That's what the brain actually consumes.
+And third, when it's done, it writes out a single structured result.
+That's the `SkillResult`. That's what the brain actually consumes.
 
 One thing I want to be crystal clear about, because people get this part
-wrong. That `reached(...)` wrapper in the code is just ordinary skill code.
-It's not the agent. There is no agent sitting inside that function at
-runtime. The agent wrote this code. The code runs. The code emits a result.
-The agent reads the result later. That's the seam.
+wrong. That `reached(...)` wrapper in the code is just ordinary skill
+code. It's not the agent. There is no agent sitting inside that function
+at runtime. The agent wrote this code once, during authoring. The code
+runs. The code emits a result. The agent reads the result later. That's
+the seam.
 
 ## Scene 9 - The SkillResult Contract
 
 **On screen**
 
-- Show the intended `SkillResult` shape as a labeled JSON card:
+- Show the `SkillResult` shape as a labeled JSON card:
 
 ```json
 {
@@ -360,17 +345,17 @@ The agent reads the result later. That's the seam.
   "inputs": { "percent": 40 },
   "status": "success",
   "checkpoints": [
-    { "id": "app_opened",                 "status": "ok" },
-    { "id": "intelligence_tab_opened",    "status": "ok" },
-    { "id": "peak_export_card_opened",    "status": "ok" },
+    { "id": "app_opened",                     "status": "ok" },
+    { "id": "intelligence_tab_opened",        "status": "ok" },
+    { "id": "peak_export_card_opened",        "status": "ok" },
     { "id": "device_discharging_card_opened", "status": "ok" },
-    { "id": "discharge_to_row_focused",   "status": "ok" },
-    { "id": "dialog_input_focused",       "status": "ok" },
-    { "id": "target_text_entered",        "status": "ok" },
-    { "id": "dialog_confirm_clicked",     "status": "ok" },
-    { "id": "toolbar_save_clicked",       "status": "ok" },
-    { "id": "bottom_sheet_save_clicked",  "status": "ok" },
-    { "id": "terminal_state_verified",    "status": "ok" }
+    { "id": "discharge_to_row_focused",       "status": "ok" },
+    { "id": "dialog_input_focused",           "status": "ok" },
+    { "id": "target_text_entered",            "status": "ok" },
+    { "id": "dialog_confirm_clicked",         "status": "ok" },
+    { "id": "toolbar_save_clicked",           "status": "ok" },
+    { "id": "bottom_sheet_save_clicked",      "status": "ok" },
+    { "id": "terminal_state_verified",        "status": "ok" }
   ],
   "terminalVerification": {
     "expected": { "textContains": "Discharge to 40%" },
@@ -380,7 +365,7 @@ The agent reads the result later. That's the seam.
 }
 ```
 
-- Annotation labels:
+- Annotation labels beside the JSON:
   - "what I was trying to do"
   - "which checkpoints I hit"
   - "what proves it actually worked"
@@ -389,23 +374,22 @@ The agent reads the result later. That's the seam.
 
 ```text
 SkillResult frame is emitted on stdout inside [Clawperator-Skill-Result].
-Parsed by runSkill. Owned by tasks/recording/skill-result-contract/.
-Not shipped yet.
+runSkill parses it and hands it back to the caller as a typed object.
 ```
 
 **Spoken**
 
 And here is what the brain gets back. Not a stdout blob. A typed object.
-Goal, inputs, the full checkpoint list, terminal verification with expected
-and observed side by side, and a status that is one of `success`, `failed`,
-or `indeterminate`.
+Goal, inputs, the full checkpoint list, terminal verification with
+expected and observed side by side, and a status that is one of `success`,
+`failed`, or `indeterminate`.
 
 That `indeterminate` state is worth a beat. That's the state where the
-script ran fine, no exec call blew up, but the skill did not actually prove
-the thing it said it would prove. That is an honest signal. It means the
-brain knows the difference between "I verified it" and "I think it worked".
-That distinction is owned by a different task pack in this repo, and it's
-what stops a skill from lying by omission.
+script ran fine, no exec call blew up, but the skill did not actually
+prove the thing it said it would prove. That is an honest signal. It
+means the brain knows the difference between "I verified it" and "I think
+it worked". And that distinction is what stops a skill from lying by
+omission.
 
 ## Scene 10 - The Runtime Loop
 
@@ -438,29 +422,30 @@ OpenClaw intent
 
 **Spoken**
 
-Here's the actual runtime loop, because I think a lot of people picture this
-wrong. The brain does not micromanage the hand checkpoint by checkpoint. The
-brain forms intent. It picks the orchestrated skill. It invokes it with
-inputs. Clawperator then runs the skill straight through without asking the
-brain anything on the way. When the skill finishes, it emits one structured
-result. The brain reads that result, once, and decides what to do next.
+Here's the actual runtime loop, because I think a lot of people picture
+this wrong. The brain does not micromanage the hand checkpoint by
+checkpoint. The brain forms intent. It picks the orchestrated skill. It
+invokes it with inputs. Clawperator then runs the skill straight through
+without asking the brain anything on the way. When the skill finishes, it
+emits one structured result. The brain reads that result, once, and
+decides what to do next.
 
 That is what keeps the hand deterministic. The hand never has to guess. It
 executes. It observes. It reports. The brain only gets involved at
-boundaries - to choose the skill, to read the result, and to decide the next
-move if something wasn't quite right.
+boundaries - to choose the skill, to read the result, and to decide the
+next move if something wasn't quite right.
 
 And if things did go wrong, the brain actually has enough to reason about.
 It can see the last checkpoint that succeeded. It can see where the
-divergence started. It can see whether the terminal verification matched or
-not. It can decide to retry with different inputs, to try a different skill,
-or to tell me. That is the whole reason the `SkillResult` exists.
+divergence started. It can see whether the terminal verification matched
+or not. It can decide to retry with different inputs, to try a different
+skill, or to tell me. That is the whole reason the `SkillResult` exists.
 
 ## Scene 11 - When Replay And Orchestrated Disagree
 
 **On screen**
 
-- Split view. Left: the recording export from scene 6. Right: a
+- Split view. Left: the recording export from Scene 6. Right: a
   `SkillResult` from a failed run.
 - Terminal shows:
 
@@ -471,28 +456,16 @@ clawperator recording compare \
   --json
 ```
 
-- Lower-third card:
-
-```text
-`clawperator recording compare` is owned by tasks/recording/compare/.
-It consumes the SkillResult emitted in Scene 9.
-It does not exist yet.
-```
-
 **Spoken**
 
-And here's the bonus. Because the recording export is evidence, and because
-the orchestrated skill emits a structured result, you can compare them. You
-can point the compare command at the original recording baseline and at a
-specific skill run, and it will tell you the first checkpoint that diverged,
-classify what kind of divergence it was, and give the brain something
-concrete to act on. So when the Solax UI shifts in a future app update, the
-first run that drifts tells you exactly where it drifted. You don't have to
-go spelunking through screenshots.
-
-Again, that compare command is owned by one of the recording task packs. It
-is not shipped yet. But its input is the `SkillResult` you just saw, which
-keeps everything in this architecture pointed at the same shape.
+And here's the bonus. Because the recording export is evidence, and
+because the orchestrated skill emits a structured result, you can compare
+them. You point the compare command at the original recording baseline and
+at a specific skill run, and it tells you the first checkpoint that
+diverged, classifies what kind of divergence it was, and gives the brain
+something concrete to act on. So when the SolaX UI shifts in a future app
+update, the first run that drifts tells you exactly where it drifted. You
+don't have to go spelunking through screenshots.
 
 ## Scene 12 - Inspectability
 
@@ -515,14 +488,14 @@ recordings/<session>.export.json
 
 **Spoken**
 
-And I want to pause on this, because if you are a developer watching this,
-this is the part you should take away. None of this is "trust the AI". It
-is code. It is JSON. It is an NDJSON recording. It is two Git-tracked
-skills. It is a declared contract. You can open every one of these files
-and read them yourself. The agent's contribution is exactly visible: it
-wrote the orchestrated script, it named the checkpoints, it added the
-verification, it filled in the declared contract. That's the "how". There is
-no black box.
+And I want to pause on this, because if you are a developer watching
+this, this is the part you should take away. None of this is "trust the
+AI". It is code. It is JSON. It is an NDJSON recording. It is two
+Git-tracked skills. It is a declared contract. You can open every one of
+these files and read them yourself. The agent's contribution is exactly
+visible: it wrote the orchestrated script, it named the checkpoints, it
+added the verification, it filled in the declared contract. That's the
+"how". There is no black box.
 
 ## Scene 13 - Close: One Sentence, Verified Outcome
 
@@ -535,12 +508,13 @@ OpenClaw, set my battery export limit to 40% tonight.
 ```
 
 - Cut to the phone: the "Discharge to 40%" row is live.
-- Cut to the terminal: the `SkillResult.status == "success"` line highlighted.
+- Cut to the terminal: the `SkillResult.status == "success"` line
+  highlighted.
 
 **Spoken**
 
-So this is what we are building. I type one sentence into my OpenClaw
-instance. OpenClaw decides this is the
+So this is what I built. I type one sentence into my OpenClaw instance.
+OpenClaw decides this is the
 `com.solaxcloud.starter.set-discharge-to-limit-orchestrated` skill. It
 invokes it. Clawperator drives the app. The skill hits every checkpoint,
 reads the persisted row back, and emits a `SkillResult` with
@@ -548,10 +522,10 @@ reads the persisted row back, and emits a `SkillResult` with
 tells me it is done.
 
 And the reason I find this exciting, beyond the obvious "I didn't have to
-touch my phone" thing, is that this is a genuine brain-and-hand system. The
-hand stays deterministic and boring. The brain stays in the agent. The
-skill is the contract between them. The recording is the evidence the skill
-was written from. And every single piece of that is inspectable code,
-inspectable artifacts, or a shipped CLI command.
+touch my phone" thing, is that this is a genuine brain-and-hand system.
+The hand stays deterministic and boring. The brain stays in the agent.
+The skill is the contract between them. The recording is the evidence the
+skill was written from. And every single piece of that is inspectable
+code, inspectable artifacts, or a shipped CLI command.
 
-That's it. That's the workflow. Let's keep going.
+That's the workflow. Let's keep going.
