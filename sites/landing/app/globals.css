@@ -125,9 +125,9 @@ body {
   margin: 0;
   min-height: 100vh;
   background:
-    radial-gradient(circle at 18% 0%, rgba(255, 124, 87, 0.1), transparent 26%),
-    radial-gradient(circle at 100% 0%, rgba(102, 118, 255, 0.16), transparent 34%),
-    radial-gradient(circle at 78% 20%, rgba(122, 108, 243, 0.09), transparent 24%),
+    radial-gradient(circle at 18% 0%, rgba(255, 124, 87, 0.04), transparent 22%),
+    radial-gradient(circle at 100% 0%, rgba(102, 118, 255, 0.06), transparent 28%),
+    radial-gradient(circle at 78% 20%, rgba(122, 108, 243, 0.035), transparent 22%),
     var(--bg-top-wash),
     var(--bg);
   color: var(--text);
@@ -349,10 +349,10 @@ body {
   height: 360px;
   border-radius: 999px;
   background:
-    radial-gradient(circle at 24% 50%, rgba(255, 120, 80, 0.16), transparent 38%),
-    radial-gradient(circle at 78% 42%, rgba(102, 118, 255, 0.26), transparent 44%),
-    radial-gradient(circle at 55% 72%, rgba(122, 108, 243, 0.14), transparent 34%);
-  filter: blur(6px);
+    radial-gradient(circle at 24% 50%, rgba(255, 120, 80, 0.08), transparent 34%),
+    radial-gradient(circle at 78% 42%, rgba(102, 118, 255, 0.12), transparent 40%),
+    radial-gradient(circle at 55% 72%, rgba(122, 108, 243, 0.07), transparent 30%);
+  filter: blur(10px);
   z-index: -1;
   pointer-events: none;
 }
@@ -512,9 +512,9 @@ body {
 .hero-image-panel {
   margin-top: 2.2rem;
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.74), rgba(255, 255, 255, 0.48)),
-    linear-gradient(135deg, rgba(225, 218, 252, 0.95), rgba(110, 117, 255, 0.9));
-  border: 1px solid rgba(102, 118, 255, 0.22);
+    linear-gradient(135deg, rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0.28)),
+    linear-gradient(135deg, rgba(229, 224, 252, 0.82), rgba(132, 138, 248, 0.72));
+  border: 1px solid rgba(102, 118, 255, 0.18);
   border-radius: 20px;
   padding: 1.3rem 0.7rem;
   width: 100%;
@@ -532,8 +532,8 @@ body {
   font-weight: 800;
   letter-spacing: -0.02em;
   text-align: center;
-  color: #ffffff;
-  text-shadow: 0 1px 10px rgba(34, 39, 105, 0.22);
+  color: var(--text);
+  text-shadow: none;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -564,8 +564,8 @@ body {
   line-height: 1.35;
   font-weight: 600;
   text-align: center;
-  color: rgba(255, 255, 255, 0.9);
-  opacity: 1;
+  color: var(--text);
+  opacity: 0.82;
 }
 
 .quickstart-intro {
