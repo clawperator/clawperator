@@ -23,7 +23,6 @@ import { searchSkills } from "../../domain/skills/searchSkills.js";
 import { runSkill } from "../../domain/skills/runSkill.js";
 import { scaffoldSkill } from "../../domain/skills/scaffoldSkill.js";
 import { validateAllSkills, validateSkill } from "../../domain/skills/validateSkill.js";
-import { loadRegistry } from "../../adapters/skills-repo/localSkillsRegistry.js";
 import { validateExecution, validatePayloadSize } from "../../domain/executions/validateExecution.js";
 import { cmdSkillsRun } from "../../cli/commands/skills.js";
 import { createClawperatorLogger } from "../../adapters/logger.js";
@@ -214,45 +213,62 @@ describe("listSkills", () => {
 describe("loadRegistry", () => {
   it("warns to stderr when CLAWPERATOR_SKILLS_REGISTRY is unset and the default path is missing", async () => {
     const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-registry-unset-"));
-    const originalCwd = process.cwd();
-    delete process.env.CLAWPERATOR_SKILLS_REGISTRY;
-
-    const stderrOutput: string[] = [];
-    process.stderr.write = (chunk: unknown) => {
-      stderrOutput.push(String(chunk));
-      return true;
-    };
 
     try {
-      process.chdir(tempRoot);
-
-      await assert.rejects(() => loadRegistry(), /Registry not found at default path:/);
+      const modulePath = join(packageRoot, "dist", "adapters", "skills-repo", "localSkillsRegistry.js");
+      const script = `
+        import { loadRegistry } from ${JSON.stringify(modulePath)};
+        process.chdir(${JSON.stringify(tempRoot)});
+        delete process.env.CLAWPERATOR_SKILLS_REGISTRY;
+        try {
+          await loadRegistry();
+          console.log(JSON.stringify({ ok: true }));
+        } catch (error) {
+          console.log(JSON.stringify({ ok: false, message: error instanceof Error ? error.message : String(error) }));
+        }
+      `;
+      const child = await runNodeSnippet(script, {
+        env: { ...process.env },
+      });
+      assert.strictEqual(child.code, 0, child.stderr);
+      const parsed = JSON.parse(child.stdout) as { ok: boolean; message?: string };
+      assert.strictEqual(parsed.ok, false);
+      assert.match(parsed.message ?? "", /Registry not found at default path:/);
       assert.ok(
-        stderrOutput.some(line => line.includes("CLAWPERATOR_SKILLS_REGISTRY")),
-        `Expected stderr to mention CLAWPERATOR_SKILLS_REGISTRY, got: ${stderrOutput.join("")}`
+        child.stderr.includes("CLAWPERATOR_SKILLS_REGISTRY"),
+        `Expected stderr to mention CLAWPERATOR_SKILLS_REGISTRY, got: ${child.stderr}`
       );
     } finally {
-      process.chdir(originalCwd);
       await rm(tempRoot, { recursive: true, force: true });
     }
   });
 
   it("writes the configured path to stderr when CLAWPERATOR_SKILLS_REGISTRY points to a missing file", async () => {
-    process.env.CLAWPERATOR_SKILLS_REGISTRY = "/tmp/does-not-exist/skills-registry.json";
-
-    const stderrOutput: string[] = [];
-    process.stderr.write = (chunk: unknown) => {
-      stderrOutput.push(String(chunk));
-      return true;
-    };
-
-    await assert.rejects(
-      () => loadRegistry(),
+    const modulePath = join(packageRoot, "dist", "adapters", "skills-repo", "localSkillsRegistry.js");
+    const missingPath = "/tmp/does-not-exist/skills-registry.json";
+    const script = `
+      import { loadRegistry } from ${JSON.stringify(modulePath)};
+      process.env.CLAWPERATOR_SKILLS_REGISTRY = ${JSON.stringify(missingPath)};
+      try {
+        await loadRegistry();
+        console.log(JSON.stringify({ ok: true }));
+      } catch (error) {
+        console.log(JSON.stringify({ ok: false, message: error instanceof Error ? error.message : String(error) }));
+      }
+    `;
+    const child = await runNodeSnippet(script, {
+      env: { ...process.env },
+    });
+    assert.strictEqual(child.code, 0, child.stderr);
+    const parsed = JSON.parse(child.stdout) as { ok: boolean; message?: string };
+    assert.strictEqual(parsed.ok, false);
+    assert.match(
+      parsed.message ?? "",
       /Registry not found at configured path: \/tmp\/does-not-exist\/skills-registry\.json/
     );
     assert.ok(
-      stderrOutput.some(line => line.includes("/tmp/does-not-exist/skills-registry.json")),
-      `Expected stderr to include the missing path, got: ${stderrOutput.join("")}`
+      child.stderr.includes(missingPath),
+      `Expected stderr to include the missing path, got: ${child.stderr}`
     );
   });
 
@@ -1894,7 +1910,7 @@ describe("runSkill", () => {
     const { stdout, code } = await runCli([
       "skills",
       "run",
-      "com.test.echo",
+      "com.test.echo-all",
       "--output",
       "json",
       "--limit",
