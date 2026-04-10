@@ -54,7 +54,7 @@ authoring_provenance:
 
 **On screen**
 
-- Hold on a phone showing the SolaX Cloud app, buried several screens deep in
+- Hold on a phone showing the Solax Cloud app, buried several screens deep in
   the peak-export automation settings.
 - Cut to a terminal with a single prompt typed into a chat:
 
@@ -69,7 +69,7 @@ OpenClaw, set my battery export limit to 40% tonight.
 Today I want to show you something that, if you care about agent tools or
 mobile automation, should make you sit up a little.
 
-I have a real workflow in the SolaX Cloud app that is annoying enough that I
+I have a real workflow in the Solax Cloud app that is annoying enough that I
 never want to do it by hand again. It is a bunch of taps, a modal, a text
 field, and two saves. I am going to do that flow once, keep the evidence, turn
 it into an inspectable skill, and then trigger it with one sentence to
@@ -107,7 +107,7 @@ steps and hope the app still looks the same." This says, "achieve this
 outcome, prove the app really ended up there, and return a typed result the
 brain can reason about."
 
-And the nice part is that this is not a SolaX-only party trick. SolaX is just
+And the nice part is that this is not a Solax-only party trick. Solax is just
 the proving case I am using on camera. The same recording-driven workflow is
 meant to help you author your own weird, personal, app-specific skill too.
 
@@ -173,7 +173,7 @@ right moment so I do not have to keep the lifecycle in my head.
 **On screen**
 
 - Codex prints `Recording started on <device>. Please perform the flow now.`
-- Cut to the phone. Show the full SolaX navigation: open the app, go to the
+- Cut to the phone. Show the full Solax navigation: open the app, go to the
   Intelligence tab, open the peak-export card, open the device-discharging
   card, focus the `Discharge to` row, open the dialog, type `40`, confirm,
   save, and save again.
@@ -287,7 +287,7 @@ Panel 1: `SKILL.md`
 
 ```md
 # Goal
-Set the SolaX "Discharge to" value to `{percent}` and prove the persisted row
+Set the Solax "Discharge to" value to `{percent}` and prove the persisted row
 really shows that value before reporting success.
 
 # Allowed Clawperator primitives
@@ -402,6 +402,13 @@ contract.
     "status": "verified"
   }
 }
+```
+
+- Add a small caption under the card:
+
+```text
+Camera card omits optional v1 fields such as `execEnvelopes` and
+`diagnostics` for readability.
 ```
 
 - Lower-third card:
@@ -580,7 +587,7 @@ copy-paste or hand-built JSON in the loop.
 But if the run actually drifts in a meaningful way - say the app was not in
 the right starting state and the skill never reached its target checkpoint -
 compare tells me exactly where the first divergence happened. That means the
-next time the SolaX UI shifts, I do not have to spelunk through screenshots
+next time the Solax UI shifts, I do not have to spelunk through screenshots
 and terminal noise. I get a typed diagnosis I can act on.
 
 ## Scene 12 - Inspectability

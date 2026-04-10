@@ -21,7 +21,7 @@ The agent-driven orchestrated proving skill moved to W2b.
 | Completed | none |
 | Remaining | P1, P2, P3, P4 |
 | Current / Next | P1 |
-| Blockers | none |
+| Blockers | `tasks/recording/skill-checkpoints/` must land first |
 
 ## Goal
 
@@ -88,25 +88,29 @@ reconstruction.
 - Use an explicit framed skill result over "best effort parse last stdout
   line". Frames are unambiguous and align with the existing
   `[Clawperator-Result]` envelope idiom.
-- The contract must carry:
+- The contract defines these fields. The "Required vs optional fields" decision
+  below is authoritative for presence rules, and those rules apply separately
+  to the emitted frame and the parsed or injected `SkillResult` returned by
+  `runSkill`.
   - `contractVersion` (semver-shaped string)
   - `skillId`
-  - `source` (required - describes who emitted the result; see below)
-  - `goal`
-  - `inputs`
+  - `source` (required on the parsed or injected `SkillResult`; omitted from
+    the emitted frame and injected by `runSkill`; see below)
+  - `goal` (optional in v1; see "Required vs optional fields")
+  - `inputs` (optional in v1; see "Required vs optional fields")
   - `status` (`success` | `failed` | `indeterminate`)
   - `checkpoints` (ordered list of checkpoint records)
-  - `terminalVerification` (or `null` if the skill does not declare one)
-  - `execEnvelopes` (embedded `ResultEnvelope` records, in order)
+  - `terminalVerification` (optional in v1; may be `null` when present)
+  - `execEnvelopes` (optional embedded `ResultEnvelope` records, in order)
   - `diagnostics` (optional structured hints, never required)
 - `source` is a required field that carries the execution provenance of the
-  result. Shape: `{ kind: "agent"; agentCli: string } | { kind: "script" }`.
-  This field is **injected by `runSkill`** when it parses the emitted frame,
-  not by the skill or agent itself. For agent-driven skills, `runSkill` reads
-  the `agent.cli` value from `skill.json` and sets `source: { kind: "agent",
-  agentCli: <cli> }`. For scripted skills, it sets `source: { kind: "script"
-  }`. The skill-side emitter does not include `source` in the frame; `runSkill`
-  is the single authority for this field.
+  parsed or injected result. Shape: `{ kind: "agent"; agentCli: string } | {
+  kind: "script" }`. This field is **injected by `runSkill`** when it parses
+  the emitted frame, not by the skill or agent itself. For agent-driven
+  skills, `runSkill` reads the `agent.cli` value from `skill.json` and sets
+  `source: { kind: "agent", agentCli: <cli> }`. For scripted skills, it sets
+  `source: { kind: "script" }`. The skill-side emitter does not include
+  `source` in the frame; `runSkill` is the single authority for this field.
   Rationale: `source` is infrastructure metadata. The runtime agent knows what
   device actions to take, not which CLI binary it is running inside. Having
   `runSkill` inject `source` keeps SKILL.md emission rules clean and guarantees
