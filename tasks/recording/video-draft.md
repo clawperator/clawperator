@@ -165,7 +165,9 @@ right moment so I do not have to keep the lifecycle in my head.
   card, focus the `Discharge to` row, open the dialog, type `40`, confirm,
   save, and save again.
 - Cut back to the terminal. Codex prints `Recording stopped. Pulling
-  artifacts.` and then `Export written to ./recordings/<session>.export.json`.
+  artifacts.` and then `Export written to ./recordings/<session>.export.json`
+  followed by `Sanitized baseline retained at
+  ../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-orchestrated/references/compare-baseline.export.json`.
 
 **Spoken**
 
@@ -469,9 +471,9 @@ reliably proved before the skill is allowed to claim success.
 clawperator skills run com.solaxcloud.starter.set-discharge-to-limit-orchestrated \
   --json -- 40 > ./runs/solax-run-01.skill-result.json
 
-# Compare it against the original recording baseline:
+# Compare it against the retained sanitized recording baseline:
 clawperator recording compare \
-  --baseline ./recordings/<session>.export.json \
+  --baseline ../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-orchestrated/references/compare-baseline.export.json \
   --result ./runs/solax-run-01.skill-result.json \
   --json
 ```
@@ -492,7 +494,7 @@ clawperator recording compare \
 
 ```bash
 clawperator recording compare \
-  --baseline ./recordings/<session>.export.json \
+  --baseline ../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-orchestrated/references/compare-baseline.export.json \
   --result ./runs/solax-forced-failure.skill-result.json \
   --json
 ```
@@ -539,7 +541,7 @@ and terminal noise. I get a typed diagnosis I can act on.
 - Open Finder or file tree. Show:
 
 ```text
-recordings/<session>.export.json
+../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-orchestrated/references/compare-baseline.export.json
 ../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-orchestrated/SKILL.md
 ../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-orchestrated/scripts/run.js
 ../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-orchestrated/skill.json
@@ -559,9 +561,10 @@ This is the part I really want developers to take away.
 
 None of this is "trust the AI." It is evidence, code, JSON, and a typed result.
 You can open every artifact in this tree and inspect it. You can read the
-recording export. You can read the exact program the runtime agent was given.
-You can read the harness that starts it. You can read the declared contract.
-You can read the result from a real run.
+sanitized retained baseline export that future compare runs use. You can read
+the exact program the runtime agent was given. You can read the harness that
+starts it. You can read the declared contract. You can read the result from a
+real run.
 
 That is why this feels powerful instead of spooky. The brain is inspectable.
 The hand is inspectable. The contract is inspectable. The evidence is

@@ -69,6 +69,8 @@ Specify exactly what the skill-authoring workflow must do and show.
   - what is the runtime program the embedded agent will later read
 - The workflow names the specific artifacts it must surface, at minimum:
   - recording export
+  - retained sanitized compare baseline under the authored skill, e.g.
+    `references/compare-baseline.export.json`
   - orchestrated `SKILL.md`
   - orchestrated `skill.json`
   - orchestrated runtime script
@@ -103,6 +105,16 @@ defined workflow consistently.
   to author `SKILL.md`, `skill.json`, and the thin `run.js`. The authoring-time
   agent should ask for the user description if the recording export is not
   sufficient to infer the intent unambiguously.
+- It retains one canonical sanitized baseline export under the authored skill,
+  at a stable reference path such as
+  `references/compare-baseline.export.json`, for future compare and maintenance
+  work.
+- It sanitizes the retained baseline before commit by templating
+  environment-specific or personal values with angle-bracket placeholders such
+  as `<device_serial>`, `<person_name>`, `<place_name>`, and
+  `<account_email>`.
+- It does not list that retained baseline under `skill.json.artifacts`, and it
+  does not pass the retained baseline into the runtime agent prompt.
 - If helper skills are introduced, the top-level skill clearly delegates to
   them and preserves resumability across phase boundaries.
 - A developer following the workflow can understand the end-to-end path without

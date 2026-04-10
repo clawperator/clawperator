@@ -173,6 +173,10 @@ the following in a way a developer can follow:
 - shows the exact recording/export commands it is running under the hood, even
   if the workflow abstracts them
 - shows which recording artifacts were captured and where they live
+- retains one canonical sanitized recording-export baseline adjacent to the
+  authored skill, at a predictable reference path such as
+  `references/compare-baseline.export.json`, so future compare/debug work does
+  not depend on a temporary recordings directory
 - shows the authored orchestrated skill and its three load-bearing artifacts:
   `SKILL.md`, `skill.json`, and `scripts/run.js`
 - highlights the specific instructions, checkpoint identities, verification
@@ -182,6 +186,25 @@ the following in a way a developer can follow:
 - leaves behind enough inspectable commands, files, and code surfaces that the
   workflow can be demonstrated in a developer-facing video without relying on
   unstated operator knowledge
+
+The retained reference export is for authoring evidence, compare baselines, and
+future maintenance. It is not a runtime artifact and must not be listed under
+`skill.json.artifacts`. The runtime agent still reads only `SKILL.md`,
+`skill.json`, and the thin harness.
+
+Before the retained baseline is committed, the workflow must sanitize
+environment-specific or user-specific values into placeholders. The v1
+placeholder style should use angle-bracket tokens such as:
+
+- `<device_serial>`
+- `<person_name>`
+- `<place_name>`
+- `<account_email>`
+
+If a recording contains sensitive values that are relevant to understanding the
+flow, preserve the shape but template the value. Do not retain raw device
+serials, personal names, exact place names, email addresses, or similar
+identifiers in the committed reference export.
 
 The preferred implementation shape is:
 

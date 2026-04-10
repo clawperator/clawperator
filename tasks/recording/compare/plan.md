@@ -137,6 +137,12 @@ Judgment:
 - Raw recording export is input evidence, not a ready-made checkpoint
   baseline. W4 must define how export events and timeline facts normalize into
   the checkpoint baseline used for compare.
+- Compare must support sanitized retained baseline exports whose sensitive
+  values have been templated to placeholders such as `<device_serial>` or
+  `<person_name>`. Baseline normalization should rely on stable structural
+  facts and declared checkpoint identities, not on raw personal or
+  environment-specific strings where those strings are not essential to the
+  compare outcome.
 - Treat the first divergence as the primary diagnostic output.
 - Do not claim replay parity unless the final persisted app state is verified.
 - Generalize only after the Solax proving case works end to end.
@@ -207,6 +213,8 @@ This task should produce:
 - a compare command or equivalent compare-capable workflow
 - a normalization step or helper that derives a checkpoint baseline from raw
   recording export evidence
+- support for retained sanitized baseline exports kept adjacent to authored
+  skills for future compare/debug work
 - a fixture set derived from the Solax recording/run evidence that can anchor
   TDD-style regression coverage
 - an explicit compare mode or outcome field that distinguishes:
