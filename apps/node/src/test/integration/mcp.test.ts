@@ -624,6 +624,16 @@ describe("mcp stdio integration", () => {
     assertInvalidParams(response);
   });
 
+  it("rejects execute when timeoutMs is below the execution minimum", async () => {
+    await client.initialize();
+
+    const response = await client.requestTool("execute", {
+      timeoutMs: 999,
+      actions: [{ id: "sleep-1", type: "sleep", params: { durationMs: 1 } }],
+    });
+    assertInvalidParams(response);
+  });
+
   it("rejects execute when take_screenshot includes a caller path", async () => {
     await client.initialize();
 

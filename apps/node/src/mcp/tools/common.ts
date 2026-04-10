@@ -2,6 +2,7 @@ import { ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js";
 import { z, type ZodError, type ZodType } from "zod";
 import type { NodeMatcher } from "../../contracts/selectors.js";
 import type { Execution } from "../../contracts/execution.js";
+import { LIMITS } from "../../contracts/limits.js";
 import type { Logger } from "../../adapters/logger.js";
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 import { runExecution } from "../../domain/executions/runExecution.js";
@@ -19,7 +20,7 @@ const nonEmptyOptionalStringSchema = z.string().trim().min(1, {
 export const executionToolOptionsSchema = z.object({
   deviceId: nonEmptyOptionalStringSchema.optional(),
   operatorPackage: nonEmptyOptionalStringSchema.optional(),
-  timeoutMs: z.number().int().nonnegative().optional(),
+  timeoutMs: z.number().int().min(LIMITS.MIN_EXECUTION_TIMEOUT_MS).max(LIMITS.MAX_EXECUTION_TIMEOUT_MS).optional(),
 }).strict();
 
 export type ExecutionToolOptions = z.infer<typeof executionToolOptionsSchema>;
@@ -128,7 +129,11 @@ export function buildCommonExecutionSchema(properties: Record<string, unknown>, 
     properties: {
       deviceId: { type: "string", minLength: 1, pattern: "\\S" },
       operatorPackage: { type: "string", minLength: 1, pattern: "\\S" },
-      timeoutMs: { type: "integer", minimum: 0 },
+      timeoutMs: {
+        type: "integer",
+        minimum: LIMITS.MIN_EXECUTION_TIMEOUT_MS,
+        maximum: LIMITS.MAX_EXECUTION_TIMEOUT_MS,
+      },
       ...properties,
     },
     ...(required.length > 0 ? { required } : {}),

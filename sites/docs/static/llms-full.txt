@@ -6197,7 +6197,7 @@ All execution-backed tools accept these common options unless noted otherwise:
 | --- | --- | --- |
 | `deviceId` | no | Explicit adb device serial. Strongly recommended when multiple devices are connected. |
 | `operatorPackage` | no | Operator package override. Blank string is rejected. |
-| `timeoutMs` | no | Execution timeout override. For `wait`, this is the wait duration and the execution timeout is derived from it. |
+| `timeoutMs` | no | Execution timeout override. Values must stay within the normal execution timeout bounds or the MCP boundary rejects them with `InvalidParams`. For `wait`, this is the wait duration and the execution timeout is derived from it. |
 
 You can also store `deviceId`, `operatorPackage`, and `timeoutMs` once per MCP server process with `configure`. When both are present, per-call values win over session defaults for each field independently.
 
@@ -6318,7 +6318,6 @@ Rules:
 - all fields are optional
 - blank or whitespace-only `deviceId` and `operatorPackage` are rejected with `InvalidParams`
 - `timeoutMs` must stay within the normal execution timeout bounds before it is stored
-- per-call `timeoutMs` on execution-backed tools uses a looser minimum than `configure`; a value that works per-call may still be rejected when stored as a session default
 - the stored state is scoped to the current `createMcpServer()` instance only
 - the response shape is always `{ "session": { ...currentValues } }`
 - unset fields are omitted from `session`

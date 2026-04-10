@@ -234,6 +234,14 @@ describe("executionToolOptionsSchema", () => {
 
     assert.strictEqual(parsed.success, false);
   });
+
+  it("rejects timeoutMs below the execution minimum", () => {
+    const parsed = executionToolOptionsSchema.safeParse({
+      timeoutMs: LIMITS.MIN_EXECUTION_TIMEOUT_MS - 1,
+    });
+
+    assert.strictEqual(parsed.success, false);
+  });
 });
 
 describe("applySnapshotMaxChars", () => {
