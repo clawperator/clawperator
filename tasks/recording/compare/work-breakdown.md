@@ -6,6 +6,9 @@
   `../clawperator-skills` repo together.
 - Keep the Solax skill as the proving case throughout. Do not design compare
   support in the abstract and “apply it later”.
+- Use TDD for the compare implementation. Start from real fixtures captured from
+  the Solax recording and validated run traces, then build the compare behavior
+  against those fixtures.
 - Commit at natural checkpoints in each repo. Do not amend.
 - Validate with live device behavior, not only unit tests or JSON shape checks.
 
@@ -13,6 +16,9 @@
 
 - Do not compare skill runs to raw recording events one-to-one.
 - Do not depend on `record parse` as the only baseline artifact.
+- Do not rely on synthetic toy fixtures alone. At least one regression fixture
+  set must come from the Solax recording and the corresponding validated run
+  evidence from this task line.
 - Do not call the feature “replay validation” unless final persisted state is
   included in the proof path.
 - If the compare output cannot explain the first divergence for the Solax flow,
@@ -39,10 +45,12 @@
   - normalized checkpoint model
   - trace artifact proposal
   - divergence output proposal
+  - initial fixture plan for TDD
 - Required decisions:
   - what a checkpoint is
   - what evidence is baseline-only versus runtime-only
   - what counts as a meaningful mismatch
+  - which Solax snippets become stable test fixtures
 - Deliverable:
   - update this task pack if any stable decisions need to be clarified
   - optionally add a compact design note only if the model cannot fit cleanly in
@@ -56,10 +64,14 @@
   - tests under `apps/node/src/test/`
   - docs updates if the interface becomes user-visible in this phase
 - Requirements:
+  - add failing tests first using real compare fixtures
   - emit or assemble a run trace with enough information to explain divergence
   - compare against a recording export baseline
   - return machine-readable output and a clear human summary
   - cover valid, invalid, and missing-value CLI behavior if new flags are added
+  - add regression coverage for both:
+    - a matching path
+    - a first-divergence path
 
 ### P3. Prove the model with the Solax skill
 
@@ -72,6 +84,8 @@
     - a matching successful run
     - one intentionally or historically divergent run shape, if feasible
   - verify that the compare output identifies the first meaningful difference
+  - retain small, sanitized snippets from the proving run as durable fixtures if
+    they are needed to keep compare regressions trustworthy
 - Validation:
   - live device run
   - direct persisted-state verification in the Solax UI
@@ -94,7 +108,7 @@
 
 ## Findings File
 
-Create `tasks/recording-compare/findings.md` only when implementation starts.
+Create `tasks/recording/compare/findings.md` only when implementation starts.
 Do not prefill it with retrospective prose.
 
 When created, it must capture only:
@@ -110,6 +124,8 @@ When created, it must capture only:
 - For Clawperator changes:
   - `npm --prefix apps/node run build`
   - `npm --prefix apps/node run test`
+  - compare-focused tests must include real fixture coverage from this Solax
+    task line, not only synthetic examples
 - For any Android/runtime-sensitive change that affects live behavior:
   - real-device validation with the Samsung Galaxy used in this task line
 - For Solax skill proof:

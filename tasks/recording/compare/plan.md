@@ -45,6 +45,8 @@ ad-hoc UI dumps, and logs. That is slow, fragile, and difficult to generalize.
 - define the compare model for deterministic replay validation
 - emit or assemble a normalized run trace from skill execution
 - compare run trace checkpoints against a recording-export baseline
+- build the feature test-first using real fixtures from the Solax recording and
+  validated run traces
 - surface the first meaningful divergence in machine-readable and human-usable
   form
 - prove the model with the Solax discharge-limit skill
@@ -76,7 +78,7 @@ working notes. Durable guidance must migrate out of `tasks/`.
 | `apps/node/` | Clawperator repo | Trace emission, compare CLI/API, contracts |
 | `docs/` | Clawperator repo | Durable user/developer docs |
 | `../clawperator-skills/` | Skills repo | Proving skill, validation target, adoption feedback |
-| `tasks/recording-compare/` | Clawperator repo | Temporary execution contract for this work |
+| `tasks/recording/compare/` | Clawperator repo | Temporary execution contract for this work |
 
 ## Source Of Truth
 
@@ -87,6 +89,7 @@ working notes. Durable guidance must migrate out of `tasks/`.
 | Skill scaffolding behavior | `docs/skills/authoring.md` and `apps/node/src/domain/skills/scaffoldSkill.ts` |
 | Skill runtime contract | `apps/node/src/cli/registry.ts`, `apps/node/src/contracts/` |
 | Solax proving behavior | live device validation plus `../clawperator-skills` |
+| Test fixtures for compare behavior | snippets derived from the Solax recording export and validated run traces |
 
 ## Deterministic Versus Judgment
 
@@ -110,6 +113,8 @@ Judgment:
 - Treat the first divergence as the primary diagnostic output.
 - Do not claim replay parity unless the final persisted app state is verified.
 - Generalize only after the Solax proving case works end to end.
+- Treat tests as part of the product surface. The compare model is not accepted
+  until fixtures from the Solax case prove both matching and divergent paths.
 
 ## Failure Modes To Prevent
 
@@ -118,6 +123,8 @@ Judgment:
 - shipping a trace format that is too thin to explain divergence
 - overfitting compare logic to Solax-specific WebView behavior
 - leaving durable guidance trapped in `tasks/`
+- under-testing compare behavior with synthetic-only fixtures that do not
+  reflect real skill brittleness
 
 ## Output Contract
 
@@ -125,6 +132,8 @@ This task should produce:
 
 - a defined run-trace artifact shape
 - a compare command or equivalent compare-capable workflow
+- a fixture set derived from the Solax recording/run evidence that can anchor
+  TDD-style regression coverage
 - divergence output that identifies:
   - baseline checkpoint
   - actual checkpoint
@@ -147,4 +156,3 @@ Before deleting this task pack, move durable guidance into:
 - `docs/api/recording.md`
 - `docs/skills/authoring.md`
 - any repo-local skill guidance needed for `.agents/skills/skill-author-by-recording`
-
