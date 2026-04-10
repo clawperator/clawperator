@@ -53,6 +53,127 @@ So this subtree now contains multiple linked workstreams rather than one task.
 4. Start `compare/`
 5. Run `graduate-demo-findings/`
 
+## Preferred PR Grouping
+
+Group work into as few PRs as is reasonable, but do not hide repo boundaries or
+mix unrelated risk levels just to reduce count.
+
+### PR-1: W1 skill truthfulness
+
+Scope:
+
+- `tasks/recording/skill-checkpoints/` P1 and P2
+- Solax implementation changes in `../clawperator-skills`
+
+Why grouped:
+
+- this is one coherent behavior fix
+- Solax should become truthful in one reviewable step
+
+Keep separate from:
+
+- generalized docs changes in this repo, unless they remain very small and are
+  already proven by the Solax fix
+
+### PR-2: W1 durable authoring guidance
+
+Scope:
+
+- `tasks/recording/skill-checkpoints/` P3
+- small update to `docs/skills/authoring.md`
+
+Why separate by default:
+
+- different repo
+- much lower risk than the live Solax behavior change
+- can merge quickly once the Solax proof is stable
+
+Acceptable collapse:
+
+- if the docs wording is tiny and directly tied to the same validated Solax
+  change, folding this into the same overall review cycle is acceptable
+
+### PR-3: W2 skill result contract in Clawperator
+
+Scope:
+
+- `tasks/recording/skill-result-contract/` P1 and P2
+- contract definition
+- `runSkill` parsing
+- tests
+
+Why grouped:
+
+- contract shape and parser/tests should land together
+- splitting these creates churn without reducing much risk
+
+### PR-4: W2 Solax contract retrofit
+
+Scope:
+
+- `tasks/recording/skill-result-contract/` P3
+- Solax `SkillResult` emission in `../clawperator-skills`
+
+Why separate:
+
+- different repo
+- depends on PR-3 contract shape being real
+
+### PR-5: W2 downstream handoff updates
+
+Scope:
+
+- `tasks/recording/skill-result-contract/` P4
+- any task-pack alignment needed after the contract lands
+
+Why usually small:
+
+- planning/documentation follow-through only
+
+Acceptable collapse:
+
+- if PR-3 leaves the task packs obviously aligned already, this can be folded
+  into PR-3 instead of standing alone
+
+### PR-6: W3 contract declaration
+
+Scope:
+
+- `tasks/recording/skill-contract-declaration/` P1 and P2 in this repo
+- `tasks/recording/skill-contract-declaration/` P3 in `../clawperator-skills`
+
+Recommended split:
+
+- one Clawperator PR for scaffold/runtime support
+- one skills-repo PR for Solax declaration proof
+
+### PR-7: W4 compare
+
+Scope:
+
+- `tasks/recording/compare/` P1 through P4
+
+Recommended grouping:
+
+- one Clawperator PR for compare model, implementation, tests, and docs
+- one small skills-repo PR only if Solax proving support needs a runtime change
+
+Default preference:
+
+- do not split compare into many PRs unless the implementation grows more than
+  expected
+
+### PR-8: W5 graduate demo findings
+
+Scope:
+
+- `tasks/recording/graduate-demo-findings/` P1 and P2
+
+Why grouped:
+
+- this is cleanup and docs graduation
+- it should usually be a single small PR
+
 ## Hard Rules
 
 - Do not start compare implementation before `skill-result-contract/` lands.
@@ -60,6 +181,10 @@ So this subtree now contains multiple linked workstreams rather than one task.
 - Do not graduate temporary demo notes into docs until the durable wording is
   stable enough to survive the contract work.
 - Do not create `.agents/skills/skill-author-by-recording/` yet.
+- Prefer bundling closely related phases into one PR when they share the same
+  repo, risk level, and validation story.
+- Prefer separate PRs when the work crosses repos, changes runtime contracts, or
+  mixes live device behavior changes with lower-risk docs-only follow-up.
 
 ## What Each Pack Owns
 
