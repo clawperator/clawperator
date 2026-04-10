@@ -36,6 +36,8 @@ Secondary deliverable:
 - [x] Confirm the target device and operator package we will use for the live
       recording run.
 - [x] Define the Solax skill intent and target skill id before scaffolding.
+- [x] Confirm the Samsung device can use the debug operator variant for a live
+      recording run.
 - [ ] Run a real manual recording session for the Solax dialog flow on the
       Galaxy device.
 - [ ] Pull the raw NDJSON recording into `../clawperator-skills`.
