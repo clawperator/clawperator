@@ -1,50 +1,177 @@
-# Work Breakdown
+# Skill Contract Declaration Work Breakdown
 
-## Execution Summary
+Parent plan: `tasks/recording/skill-contract-declaration/plan.md`
 
-- This task starts only after `tasks/recording/skill-result-contract/` lands.
-- Keep the schema narrow: enough to declare intent and verification, not a full
-  policy language.
-- Use Solax as the proving case, but keep the declaration generic.
+## Executive Summary
+
+Total PRs: 2. Total phases: 3.
+
+- PR-1: declaration shape plus scaffold/runtime support
+- PR-2: Solax proving declaration
+
+Current state: blocked until `tasks/recording/skill-result-contract/` lands.
+
+## Status
+
+| Item | Value |
+| --- | --- |
+| State | blocked |
+| Total PRs | 2 |
+| Total phases | 3 |
+| Completed | none |
+| Remaining | P1, P2, P3 |
+| Current / Next | P1 after W2 |
+| Blockers | `tasks/recording/skill-result-contract/` must land first |
 
 ## Hard Rules
 
 - Do not require the new `contract` block for all existing skills.
-- Do not let the declaration drift away from what `SkillResult` can actually
-  prove.
+- Do not let the declaration drift away from what `SkillResult` can actually prove.
 - Do not fold compare logic into this task.
 
 ## Required Reading
 
-- `tasks/recording/brain-hand-contract/problem-definition.md`
-- `tasks/recording/skill-result-contract/plan.md`
-- `docs/skills/authoring.md`
+Read these files IN THIS ORDER before writing anything.
+
+| File | Why it matters |
+| --- | --- |
+| `tasks/recording/skill-contract-declaration/plan.md` | Stable scope and blockers |
+| `tasks/recording/brain-hand-contract/problem-definition.md` | Why declaration exists at all |
+| `tasks/recording/skill-result-contract/plan.md` | Upstream contract this declaration must align to |
+| `docs/skills/authoring.md` | Current public authoring contract |
+| `apps/node/src/domain/skills/scaffoldSkill.ts` | Scaffold behavior to extend |
+| `apps/node/src/domain/skills/runSkill.ts` | Runtime cross-check point |
+
+## PR / Phase Plan
+
+| PR | Purpose | Included phases | Agent tier | Merge gate |
+| --- | --- | --- | --- | --- |
+| PR-1 | Define and implement declaration support | P1, P2 | `thinking`, `default` | W2 landed |
+| PR-2 | Prove declaration with Solax | P3 | `default` | PR-1 merged locally and validated |
+
+## Phase P1: Define The Declaration Shape
+
+### Agent Tier
+
+`thinking`
+
+### Goal
+
+Define a narrow v1 `contract` block for `skill.json`.
+
+### Files or Surfaces To Change
+
+- `tasks/recording/skill-contract-declaration/`
+- optionally contract docs/comments in runtime surfaces
+
+### Steps
+
+1. Define `contract.inputs`.
+2. Define `contract.goal`.
+3. Define `contract.verification`.
+4. Keep the shape compatible with the existing registry model.
+
+### Acceptance Criteria
+
+- Declaration shape is explicit and narrow.
+- Shape is aligned with what `SkillResult` can actually prove.
+
+### Validation
+
+```bash
+git diff -- tasks/recording/skill-contract-declaration
+```
+
+### Expected Commit
+
+```text
+chore(tasks): define skill contract declaration shape
+```
+
+## Phase P2: Implement Scaffold And Runtime Support
+
+### Agent Tier
+
+`default`
+
+### Goal
+
+Add optional declaration support to the scaffold and runtime.
+
+### Files or Surfaces To Change
+
 - `apps/node/src/domain/skills/scaffoldSkill.ts`
 - `apps/node/src/domain/skills/runSkill.ts`
+- `apps/node/src/test/`
 
-## Phase Plan
+### Steps
 
-### P1. Define the declaration shape
+1. Add failing tests first.
+2. Update scaffold output to include an empty/starter `contract` block.
+3. Update runtime cross-checking of declared verification vs emitted `SkillResult`.
 
-- Tier: `thinking`
-- Requirements:
-  - define `contract.inputs`
-  - define `contract.goal`
-  - define `contract.verification`
-  - keep v1 compatible with the existing registry model
+Required cases:
 
-### P2. Implement scaffold and runtime support
+- declared verification present and matched
+- declared verification present and not proved
+- declaration omitted for legacy skill
 
-- Tier: `default`
-- Requirements:
-  - update scaffold output
-  - update runtime validation/cross-checking
-  - add test coverage for declared, missing, and mismatched verification
+### Acceptance Criteria
 
-### P3. Prove with Solax
+- Optional `contract` block is scaffolded correctly.
+- Runtime distinguishes declared-but-unproved verification from plain success.
+- Legacy skills remain valid without a `contract` block.
 
-- Tier: `default`
-- Requirements:
-  - declare the Solax contract in `skill.json`
-  - live-verify that the declaration and emitted `SkillResult` agree
+### Validation
 
+```bash
+npm --prefix apps/node run build
+```
+
+```bash
+npm --prefix apps/node run test
+```
+
+### Expected Commit
+
+```text
+feat(skills): add optional skill contract declaration
+```
+
+## Phase P3: Prove With Solax
+
+### Agent Tier
+
+`default`
+
+### Goal
+
+Declare the Solax contract and prove it agrees with emitted `SkillResult`.
+
+### Files or Surfaces To Change
+
+- `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit/skill.json`
+
+### Steps
+
+1. Declare the Solax contract in `skill.json`.
+2. Run the skill and confirm declared verification matches emitted verification.
+
+### Acceptance Criteria
+
+- Solax `skill.json` declares inputs, goal, and verification.
+- Live verification shows declaration and emitted `SkillResult` agree.
+
+### Validation
+
+```bash
+CLAWPERATOR_SKILLS_REGISTRY=<clawperator_skills_root>/skills/skills-registry.json \
+CLAWPERATOR_OPERATOR_PACKAGE=com.clawperator.operator.dev \
+node <clawperator_root>/apps/node/dist/cli/index.js skills run com.solaxcloud.starter.set-discharge-to-limit --device <device_serial> --json -- 40
+```
+
+### Expected Commit
+
+```text
+feat(solax): declare discharge limit contract
+```

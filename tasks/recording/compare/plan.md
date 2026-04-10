@@ -4,9 +4,9 @@
 
 Add a recording-versus-run comparison workflow that lets an agent identify the
 first meaningful divergence between a deterministic skill run and a recorded
-baseline. This is cross-repo work: Clawperator owns trace emission and compare
-behavior, while `../clawperator-skills` provides the proving skill and runtime
-validation target.
+baseline. This is cross-repo work: Clawperator owns `SkillResult` consumption,
+compare behavior, and fixture-driven tests, while `../clawperator-skills`
+provides the proving skill and runtime validation target.
 
 Start by proving the design against
 `com.solaxcloud.starter.set-discharge-to-limit`, then generalize only the parts
@@ -75,7 +75,7 @@ the mechanism that makes replay reliable.
 
 Edits are expected in:
 
-- `apps/node/` for run-trace and compare behavior
+- `apps/node/` for compare behavior that consumes `SkillResult`
 - `docs/api/` or `docs/skills/` for durable documentation
 - `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit`
   as the proving skill
@@ -87,7 +87,7 @@ working notes. Durable guidance must migrate out of `tasks/`.
 
 | Surface | Owner | Role |
 | --- | --- | --- |
-| `apps/node/` | Clawperator repo | Trace emission, compare CLI/API, contracts |
+| `apps/node/` | Clawperator repo | `SkillResult` consumption, compare CLI/API, contracts |
 | `docs/` | Clawperator repo | Durable user/developer docs |
 | `../clawperator-skills/` | Skills repo | Proving skill, validation target, adoption feedback |
 | `tasks/recording/compare/` | Clawperator repo | Temporary execution contract for this work |

@@ -1,69 +1,195 @@
-# Work Breakdown
+# Skill Checkpoints Work Breakdown
 
-## Execution Summary
+Parent plan: `tasks/recording/skill-checkpoints/plan.md`
 
-- This is the reliability sibling to `tasks/recording/compare/`.
-- Do this before treating Solax as the proving case for compare.
-- Keep the work focused and cheap. Fix the integrity gaps first before
-  inventing a generalized checkpoint framework.
+## Executive Summary
+
+Total PRs: 2. Total phases: 3.
+
+- PR-1: Solax integrity fixes plus live proof that failure propagates truthfully
+- PR-2: short durable authoring-doc update after the Solax proof is stable
+
+Current state: planning complete, ready for active execution.
+
+## Status
+
+| Item | Value |
+| --- | --- |
+| State | active |
+| Total PRs | 2 |
+| Total phases | 3 |
+| Completed | none |
+| Remaining | P1, P2, P3 |
+| Current / Next | P1 |
+| Blockers | none |
 
 ## Hard Rules
 
 - Do not return success if the underlying `clawperator exec` failed.
 - Do not return success unless the Solax UI shows the requested persisted value.
-- Do not broaden this task into compare or generic trace emission.
-- Do not claim a generalized selector solution unless it is actually proven on
-  the device.
+- Put any forced-failure proof in the same phase and commit as the silent-success fix. Do not defer it.
+- Do not broaden this task into compare, trace design, or skill contract work.
+- Keep Samsung/Solax-specific hacks in the skill docs, not in generalized authoring guidance.
 
 ## Required Reading
 
-- `tasks/recording/demo/findings.md`
-- `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit/SKILL.md`
+Read these files IN THIS ORDER before writing anything.
+
+| File | Why it matters |
+| --- | --- |
+| `tasks/recording/skill-checkpoints/plan.md` | Stable scope, ordering, and outputs |
+| `tasks/recording/demo/findings.md` | Ground truth from the Solax recording/debugging journey |
+| `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit/scripts/run.js` | Current implementation under repair |
+| `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit/SKILL.md` | Current durable skill notes and caveats |
+| `docs/skills/authoring.md` | Durable destination for the generalized rule after proof |
+
+## PR / Phase Plan
+
+| PR | Purpose | Included phases | Agent tier | Merge gate |
+| --- | --- | --- | --- | --- |
+| PR-1 | Make Solax truthful and verified | P1, P2 | `default` | none |
+| PR-2 | Graduate minimal durable guidance | P3 | `default` | PR-1 merged locally and validated |
+
+## Phase P1: Tighten Solax Integrity
+
+### Agent Tier
+
+`default`
+
+### Goal
+
+Remove silent-success behavior and make the save sequence truthful enough that a
+failed sub-exec reaches the caller as failure.
+
+### Files or Surfaces To Change
+
 - `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit/scripts/run.js`
+- optionally `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit/SKILL.md` if behavior notes change materially in the same phase
+
+### Steps
+
+1. Remove the current `stdout -> process.exit(0)` failure swallowing path.
+2. Make the second `Save` click safer:
+   - wait for the first `Save` target to disappear, or
+   - otherwise prove the UI advanced before the second click.
+3. Add a forced-failure proof path:
+   - preferred: a focused regression if a practical test harness exists
+   - fallback: a documented manual repro that proves `runSkill` returns failure
+4. Re-run the skill on-device after the fix.
+
+### Acceptance Criteria
+
+- `run.js` no longer exits `0` just because stdout exists after a failed exec.
+- A forced sub-exec failure reaches the caller as failure.
+- The save sequence no longer relies on two unscoped identical `Save` clicks with no advancement proof.
+
+### Validation
+
+```bash
+CLAWPERATOR_SKILLS_REGISTRY=<clawperator_skills_root>/skills/skills-registry.json \
+CLAWPERATOR_OPERATOR_PACKAGE=com.clawperator.operator.dev \
+node <clawperator_root>/apps/node/dist/cli/index.js skills validate com.solaxcloud.starter.set-discharge-to-limit --json
+```
+
+```bash
+CLAWPERATOR_SKILLS_REGISTRY=<clawperator_skills_root>/skills/skills-registry.json \
+CLAWPERATOR_OPERATOR_PACKAGE=com.clawperator.operator.dev \
+node <clawperator_root>/apps/node/dist/cli/index.js skills run com.solaxcloud.starter.set-discharge-to-limit --device <device_serial> --json -- 40
+```
+
+Required cases:
+
+- successful set to a new value returns success
+- forced sub-exec failure returns failure to the caller
+
+### Expected Commit
+
+```text
+fix(solax): make discharge limit failures truthful
+```
+
+## Phase P2: Add Terminal-State Verification
+
+### Agent Tier
+
+`default`
+
+### Goal
+
+Verify `Discharge to <target>%` before returning success.
+
+### Files or Surfaces To Change
+
+- `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit/scripts/run.js`
+- `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit/SKILL.md`
+
+### Steps
+
+1. Add the cheapest reliable read-back path for the Solax setting.
+2. Fail the skill if the persisted row does not match the requested value.
+3. Update the skill docs to reflect the verified behavior if the implementation changes.
+4. Validate on-device by setting to a new value and reading it back.
+
+### Acceptance Criteria
+
+- The skill does not report success unless `Discharge to <target>%` is observed.
+- The proof path is executed by the skill itself, not only by manual reviewer behavior.
+- The Solax skill docs accurately describe the verification behavior.
+
+### Validation
+
+```bash
+CLAWPERATOR_SKILLS_REGISTRY=<clawperator_skills_root>/skills/skills-registry.json \
+CLAWPERATOR_OPERATOR_PACKAGE=com.clawperator.operator.dev \
+node <clawperator_root>/apps/node/dist/cli/index.js skills run com.solaxcloud.starter.set-discharge-to-limit --device <device_serial> --json -- 39
+```
+
+Required cases:
+
+- set to `39` -> verified persisted row shows `39%`
+- set to `40` -> verified persisted row shows `40%`
+
+### Expected Commit
+
+```text
+fix(solax): verify persisted discharge limit
+```
+
+## Phase P3: Document Durable Guidance
+
+### Agent Tier
+
+`default`
+
+### Goal
+
+Add the minimum generalized authoring rule to the main docs.
+
+### Files or Surfaces To Change
+
 - `docs/skills/authoring.md`
 
-## Phase Plan
+### Steps
 
-### P1. Tighten the Solax skill integrity
+1. Add a short section stating that non-trivial skills:
+   - must exit non-zero on underlying exec failure
+   - must verify terminal state before reporting success
+2. Keep the guidance general and avoid Samsung/Solax-specific details.
+3. Validate docs build if the docs surface requires regeneration.
 
-- Tier: `default`
-- Requirements:
-  - remove silent-success handling on failed exec
-  - add a regression test or, if test coverage is not yet practical in the
-    skills repo, a documented manual repro that proves a forced sub-exec failure
-    reaches `runSkill` as `ok:false`
-  - make the second `Save` click safer:
-    - wait for first `Save` to disappear, or
-    - otherwise prove the UI advanced before the second click
-  - keep the implementation narrow and reviewable
+### Acceptance Criteria
 
-### P2. Add terminal-state verification
+- `docs/skills/authoring.md` contains the generalized non-trivial skill rule.
+- The wording is grounded in the proven Solax behavior but not overfit to Solax.
 
-- Tier: `default`
-- Requirements:
-  - verify `Discharge to <target>%` before returning success
-  - use the cheapest reliable proof path
-  - make failure legible to the caller if persistence did not occur
+### Validation
 
-### P3. Document the durable guidance
+```bash
+./scripts/docs_build.sh
+```
 
-- Tier: `default`
-- Requirements:
-  - update `docs/skills/authoring.md` with the generalized lesson:
-    non-trivial skills need checkpoints and terminal-state verification
-  - keep Solax-specific coordinate/input details in the skill docs
+### Expected Commit
 
-## Validation Expectations
-
-- live device validation on the Samsung Galaxy target
-- prove:
-  - successful set to a new value
-  - verified persisted row value
-  - failure propagation remains truthful if exec fails and reaches the caller as
-    failure
-
-## Findings File
-
-Create `tasks/recording/skill-checkpoints/findings.md` only if the work
-uncovers new reliability-specific lessons that do not fit cleanly in the
-existing demo findings file.
+```text
+docs(skills): require terminal verification for non-trivial skills
+```

@@ -1,162 +1,227 @@
-# Work Breakdown
+# Recording Compare Work Breakdown
 
-## Execution Summary
+Parent plan: `tasks/recording/compare/plan.md`
 
-- This is a cross-repo task. Work in the Clawperator repo and the sibling
-  `../clawperator-skills` repo together.
-- This task is downstream of `tasks/recording/skill-result-contract/`.
-- Keep the Solax skill as the proving case throughout. Do not design compare
-  support in the abstract and “apply it later”.
-- Use TDD for the compare implementation. Start from real fixtures captured from
-  the Solax recording and validated run traces, then build the compare behavior
-  against those fixtures.
-- Keep compare scoped to diagnosis. Do not turn this task into the general
-  "make skills reliable" workstream.
-- Commit at natural checkpoints in each repo. Do not amend.
-- Validate with live device behavior, not only unit tests or JSON shape checks.
+## Executive Summary
+
+Total PRs: 2. Total phases: 4.
+
+- PR-1: compare model, fixtures, implementation, tests
+- PR-2: Solax proving integration and docs cleanup
+
+Current state: blocked until `tasks/recording/skill-result-contract/` lands.
+
+## Status
+
+| Item | Value |
+| --- | --- |
+| State | blocked |
+| Total PRs | 2 |
+| Total phases | 4 |
+| Completed | none |
+| Remaining | P1, P2, P3, P4 |
+| Current / Next | P1 after W2 |
+| Blockers | `tasks/recording/skill-result-contract/` must land first |
 
 ## Hard Rules
 
 - Do not compare skill runs to raw recording events one-to-one.
 - Do not depend on `record parse` as the only baseline artifact.
-- Do not rely on synthetic toy fixtures alone. At least one regression fixture
-  set must come from the Solax recording and the corresponding validated run
-  evidence from this task line.
-- Do not let tests read from `../clawperator-skills/` at runtime. Copy any
-  required sanitized fixtures into the Clawperator test tree.
-- Do not require a live device to exercise compare tests. Live device runs are
-  proof inputs, not unit/regression dependencies.
-- Do not call the feature “replay validation” unless final persisted state is
-  included in the proof path.
-- If the compare output cannot explain the first divergence for the Solax flow,
-  the compare design is not done.
-- If durable learnings emerge, migrate them to real docs in the same phase that
-  proves them.
+- Do not let tests read from `../clawperator-skills/` at runtime.
+- Do not require a live device to exercise compare tests.
+- Do not call the feature “replay validation” unless final persisted state is included in the proof path.
+- If the compare output cannot explain the first divergence for the Solax flow, the compare design is not done.
 
 ## Required Reading
 
+Read these files IN THIS ORDER before writing anything.
+
+| File | Why it matters |
+| --- | --- |
+| `tasks/recording/compare/plan.md` | Stable compare scope and blockers |
+| `tasks/recording/brain-hand-contract/problem-definition.md` | Contract-first rationale for compare sequencing |
+| `tasks/recording/skill-result-contract/plan.md` | Upstream contract compare must consume |
+| `docs/api/recording.md` | Recording export behavior and limits |
+| `docs/skills/authoring.md` | Current authoring contract and durable docs destination |
+| `apps/node/src/domain/recording/exportRecording.ts` | Recording export schema source |
+| `tasks/recording/demo/findings.md` | Solax-specific divergence lessons and proof history |
+
+## PR / Phase Plan
+
+| PR | Purpose | Included phases | Agent tier | Merge gate |
+| --- | --- | --- | --- | --- |
+| PR-1 | Define and implement compare on top of `SkillResult` | P1, P2 | `thinking`, `default` | W2 landed |
+| PR-2 | Prove with Solax and finish docs | P3, P4 | `default` | PR-1 merged locally and validated |
+
+## Phase P1: Define The Compare Model
+
+### Agent Tier
+
+`thinking`
+
+### Goal
+
+Define checkpoint comparison and divergence classification on top of `SkillResult`.
+
+### Files or Surfaces To Change
+
+- `tasks/recording/compare/`
+- optionally a compact design note if the model cannot fit cleanly in implementation docs
+
+### Steps
+
+1. Define checkpoint comparison semantics.
+2. Define divergence classes:
+   - baseline divergence
+   - runtime poisoned state
+   - runtime unavailable state
+   - verification failed
+3. Define the fixture plan for TDD using local sanitized fixtures only.
+
+### Acceptance Criteria
+
+- Compare model is defined without inventing a parallel trace mechanism.
+- Divergence classes are explicit enough for the brain to act differently on each.
+- Fixture plan includes both a matching path and a forced divergent path.
+
+### Validation
+
+```bash
+git diff -- tasks/recording/compare
+```
+
+### Expected Commit
+
+```text
+chore(tasks): define recording compare model
+```
+
+## Phase P2: Implement Compare
+
+### Agent Tier
+
+`default`
+
+### Goal
+
+Implement compare against recording export baselines using `SkillResult`.
+
+### Files or Surfaces To Change
+
+- `apps/node/src/`
+- `apps/node/src/test/fixtures/recording-compare/`
+- `apps/node/src/test/`
+
+### Steps
+
+1. Add failing tests first using local fixtures.
+2. Implement compare against recording export baselines with `snapshotMode: omit`.
+3. Add CLI behavior and tests for:
+   - valid input
+   - invalid input
+   - missing value
+4. Ensure output is both machine-readable and human-usable.
+
+### Acceptance Criteria
+
+- Compare works without a live device.
+- Local fixtures cover:
+  - matching path
+  - first-divergence path
+- Baselines created with `snapshotMode: omit` are supported.
+
+### Validation
+
+```bash
+npm --prefix apps/node run build
+```
+
+```bash
+npm --prefix apps/node run test
+```
+
+### Expected Commit
+
+```text
+feat(recording): compare skill results to recording baselines
+```
+
+## Phase P3: Prove With Solax
+
+### Agent Tier
+
+`default`
+
+### Goal
+
+Show the compare output is useful on the real Solax proving skill.
+
+### Files or Surfaces To Change
+
+- `../clawperator-skills/`
+- local fixture copies in `apps/node/src/test/fixtures/recording-compare/`
+
+### Steps
+
+1. Run a matching Solax path and compare it.
+2. Produce a forced divergent path and compare it.
+3. Copy any required sanitized fixture snippets into the Clawperator repo.
+
+### Acceptance Criteria
+
+- One matching run is proven.
+- One forced divergent run is proven.
+- Compare identifies the first meaningful difference.
+
+### Validation
+
+```bash
+CLAWPERATOR_SKILLS_REGISTRY=<clawperator_skills_root>/skills/skills-registry.json \
+CLAWPERATOR_OPERATOR_PACKAGE=com.clawperator.operator.dev \
+node <clawperator_root>/apps/node/dist/cli/index.js skills run com.solaxcloud.starter.set-discharge-to-limit --device <device_serial> --json -- 40
+```
+
+### Expected Commit
+
+```text
+test(recording): prove compare with solax fixtures
+```
+
+## Phase P4: Finish Docs And Cleanup
+
+### Agent Tier
+
+`default`
+
+### Goal
+
+Capture durable compare guidance and close the task cleanly.
+
+### Files or Surfaces To Change
+
 - `docs/api/recording.md`
 - `docs/skills/authoring.md`
-- `apps/node/src/domain/recording/exportRecording.ts`
-- `apps/node/src/cli/registry.ts`
-- `tasks/recording/demo/findings.md`
-- `tasks/recording/demo/meta-problem-summary.md`
-- `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit/scripts/run.js`
+- `tasks/recording/compare/`
 
-## Phase Plan
+### Steps
 
-### P1. Define the compare model
+1. Move durable compare guidance into docs.
+2. Update task status and remaining follow-ons.
+3. Note whether repo-local authoring-skill work is now unblocked.
 
-- Tier: `thinking`
-- Output:
-  - normalized checkpoint model
-  - divergence output proposal
-  - initial fixture plan for TDD
-- Required decisions:
-  - what a checkpoint is
-  - what evidence is baseline-only versus runtime-only
-  - what counts as a meaningful mismatch
-  - which Solax snippets become stable test fixtures
-  - how compare distinguishes:
-    - skill divergence
-    - poisoned runtime state
-    - runtime unavailable state
-- Deliverable:
-  - update this task pack if any stable decisions need to be clarified
-  - optionally add a compact design note only if the model cannot fit cleanly in
-    implementation docs
+### Acceptance Criteria
 
-### P2. Implement trace and compare support in Clawperator
+- Durable compare guidance exists outside `tasks/`.
+- Task state is updated truthfully.
 
-- Tier: `default`
-- Likely surfaces:
-  - `apps/node/src/`
-  - tests under `apps/node/src/test/`
-  - docs updates if the interface becomes user-visible in this phase
-- Requirements:
-  - add failing tests first using real compare fixtures
-  - compare `SkillResult` against a recording export baseline
-  - return machine-readable output and a clear human summary
-  - cover valid, invalid, and missing-value CLI behavior if new flags are added
-  - add regression coverage for both:
-    - a matching path
-    - a first-divergence path
-  - ensure the implementation still works when the baseline recording export was
-    created with `snapshotMode: omit`
+### Validation
 
-### P3. Prove the model with the Solax skill
+```bash
+./scripts/docs_build.sh
+```
 
-- Tier: `default`
-- Repo:
-  - `../clawperator-skills`
-- Requirements:
-  - wire the Solax skill into the compare workflow as a real proving case
-  - demonstrate:
-    - a matching successful run
-    - a real intentionally or historically divergent run shape
-  - verify that the compare output identifies the first meaningful difference
-  - retain small, sanitized snippets from the proving run as durable fixtures if
-    they are needed to keep compare regressions trustworthy
-- Validation:
-  - live device run
-  - direct persisted-state verification in the Solax UI
+### Expected Commit
 
-### P4. Finish docs and cleanup
-
-- Tier: `default`
-- Requirements:
-  - migrate durable guidance into `docs/`
-  - leave task files only with temporary execution value
-  - note whether `.agents/skills/skill-author-by-recording` should consume the
-    new compare workflow immediately or in a follow-up
-
-## Sequencing
-
-1. Finish P1 before implementing command shape.
-2. Land `tasks/recording/skill-checkpoints/` before treating Solax as a
-   trustworthy compare proving case.
-3. Land `tasks/recording/skill-result-contract/` before implementing compare.
-4. Finish P2 enough to generate real compare output before broad docs work.
-5. Run P3 on-device before declaring the feature sound.
-6. Complete P4 in the same change series, not as a forgotten follow-up.
-
-## Findings File
-
-Create `tasks/recording/compare/findings.md` only when implementation starts.
-Do not prefill it with retrospective prose.
-
-When created, it must capture only:
-
-- compare artifact paths
-- runtime validation facts
-- first-divergence examples
-- false starts or discarded compare heuristics
-- durable lessons to migrate into docs or skills
-
-## Validation Expectations
-
-- For Clawperator changes:
-  - `npm --prefix apps/node run build`
-  - `npm --prefix apps/node run test`
-  - compare-focused tests must include real fixture coverage from this Solax
-    task line, not only synthetic examples
-- For any Android/runtime-sensitive change that affects live behavior:
-  - real-device validation with the Samsung Galaxy used in this task line
-- For Solax skill proof:
-  - run the skill
-  - run compare
-  - verify the persisted `Discharge to` value in the app UI
-
-## PR Shape
-
-- PR 1:
-  - compare model and Clawperator implementation
-  - tests
-  - core docs
-- PR 2:
-  - Solax proving integration
-  - follow-up docs refinements
-  - any repo-local skill guidance updates if warranted
-
-Keep the split only if it stays reviewable. If the implementation remains small
-and tightly coupled after P1, collapsing to one PR is acceptable.
+```text
+docs(recording): document compare workflow
+```
