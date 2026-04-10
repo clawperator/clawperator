@@ -4,6 +4,32 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project aims to follow Semantic Versioning.
 
+## [0.5.5] - 2026-04-10
+This release expands the MCP surface with a first-party server, session defaults, and snapshot truncation ergonomics, while also adding recording export and agent-friendly CLI aliases. Documentation was refreshed alongside the new runtime behavior and the already-published 0.5.4 release.
+
+### 🤖 Node API & CLI
+- **Added:** Added recording export for pulled NDJSON recordings, shared recording validation, and `skills new --recording-context` support for scaffolded skills.
+- **Added:** Added a first-party stdio MCP server and documented its tool surface.
+- **Added:** Added agent-friendly CLI and payload aliases to make command interactions more intuitive without changing canonical precedence.
+- **Changed:** Updated MCP session defaults and snapshot truncation behavior to make the server easier to use.
+- **Fixed:** Hardened MCP stdio parsing and added coverage for handshake, wait timeout padding, and source-aware selector retries.
+
+### 📚 Documentation & Website
+- **Added:** Documented recording export, skill recording-context workflows, the first-party MCP server, and alias/navigation references.
+- **Changed:** Updated release-facing docs to match the published 0.5.4 artifacts.
+- **Changed:** Refreshed MCP documentation and internal design notes for the new server behavior and ergonomics.
+
+Pull requests:
+- [fix(evals): harden evals](https://github.com/clawperator/clawperator/pull/155)
+- [chore: define canonical worktree location](https://github.com/clawperator/clawperator/pull/156)
+- [tasks/api: plan recording export agent-context workflow](https://github.com/clawperator/clawperator/pull/157)
+- [feat(node): add recording export and scaffolded recording context support](https://github.com/clawperator/clawperator/pull/159)
+- [docs: add transport-first MCP task pack](https://github.com/clawperator/clawperator/pull/158)
+- [feat(node): add agent-friendly CLI and payload aliases](https://github.com/clawperator/clawperator/pull/160)
+- [feat(node): add first-party MCP server](https://github.com/clawperator/clawperator/pull/161)
+- [docs(tasks): tighten MCP follow-up implementation handoff](https://github.com/clawperator/clawperator/pull/162)
+- [fix(node): harden MCP stdio parsing and coverage](https://github.com/clawperator/clawperator/pull/163)
+
 ## [0.5.4] - 2026-04-07
 This release pins the release and CI toolchain to Node 24, removes the flaky npm self-upgrade path, and aligns the public setup guidance with the new runtime floor.
 
