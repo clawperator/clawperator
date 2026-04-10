@@ -70,6 +70,25 @@ the agent finish the work or distill durable follow-up guidance.
   - the first reliable implementation used coordinate clicks for the two
     container-card taps and selector-driven actions for the remaining row,
     dialog, and save steps
+  - a later re-run showed the original `v0` skill was not actually reliable:
+    when asked to move from `40` to `39`, the UI still showed `Discharge to
+    40%` after the run
+  - root cause was the dialog input: the Solax `Discharge to` field lives in a
+    WebView-backed `android.widget.EditText` (`resourceId=van-field-1-input`),
+    and Clawperator `enter_text` reported success without producing the app-side
+    change Solax required for persistence
+  - the value only persisted when the skill used device key events:
+    `DEL`, `DEL`, `input text <value>`, then `KEYCODE_ENTER`, followed by
+    `Confirm`, top-page `Save`, and outer-page `Save`
+  - removing the final `snapshot_ui` from the skill avoided the recurring
+    terminal-envelope timeout at the end of otherwise successful runs
+  - after forcing `com.clawperator.operator.dev` to stop during debugging, the
+    accessibility service became unavailable and had to be re-enabled with adb
+    secure settings before Clawperator commands could handshake again
+  - verified end-to-end after the patch:
+    the skill successfully set the value to `40`, and then successfully set it
+    back to `39`; both were confirmed by reopening the Solax flow and reading
+    the persisted `Discharge to` row from the UI
 - Docs or workflow gaps:
   - `docs/api/recording.md` and `docs/skills/authoring.md` match the current
     flow we plan to use:
@@ -91,6 +110,12 @@ the agent finish the work or distill durable follow-up guidance.
   - when a recorded tap lands on blank space beside a label, do not assume the
     label text itself is the clickable node. Confirm with a live UI dump or
     screenshot, and use a container-aware strategy or coordinates when needed
+  - for hybrid or WebView-backed inputs, treat recording-derived text-entry
+    selectors as only a starting point. Validate that the host app actually
+    persists the changed value, not just that the field visually accepted text
+  - if a command times out and later commands log
+    `waiting_for_active_command=true`, clear the stuck operator state before
+    continuing or the next run may never actually start
 
 ## Open Questions
 
