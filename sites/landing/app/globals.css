@@ -16,7 +16,7 @@
   --accent-info: #2fc4d6;
   --accent-cool-rgb: 102, 118, 255;
   --accent-cool-soft-rgb: 122, 108, 243;
-  --hero-accent: #ec5b2f;
+  --hero-accent: #ff6a3d;
   --hero-accent-shadow: 0 1px 0 rgba(255, 255, 255, 0.42);
   --body-bg-glow:
     radial-gradient(circle at 18% 0%, rgba(var(--accent-rgb), 0.022), transparent 18%),
