@@ -73,7 +73,7 @@ This keeps the MCP layer transport-focused:
 - call `runExecution()`
 - shape the result into MCP content
 
-The one intentional exception is `configure`, which stores session-local defaults on the live `Server` instance only; this state is bounded to MCP transport ergonomics and does not change the shared execution engine contract.
+The one intentional exception is `configure`, which stores session-local defaults in the per-`createMcpServer()` session object passed into MCP tools; this state is bounded to MCP transport ergonomics and does not change the shared execution engine contract.
 
 ## Stdout Safety Is A Design Constraint
 
