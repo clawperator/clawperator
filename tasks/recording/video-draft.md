@@ -2,8 +2,8 @@
 title: Recording Promo Video Draft
 purpose: |
   Draft script for a developer-facing promo/demo video that explains the
-  recording-to-replay-to-orchestrated-skill workflow being built in the
-  recording workstreams.
+  recording-to-orchestrated-skill workflow being built in the recording
+  workstreams.
 audience:
   - developers
   - agents reading subtitles/transcripts
@@ -48,8 +48,7 @@ Hi - today I'm going to demonstrate how to create a complex skill using Clawpera
 
 ```text
 Use $skill-author-by-recording to create a Solax discharge-limit skill.
-I want a replay baseline and an orchestrated skill. Guide me when I need to
-touch the phone.
+Guide me when I need to touch the phone.
 ```
 
 **Spoken**
@@ -83,17 +82,13 @@ So in other words, yes, under the hood there are concrete commands involved here
 - Add a lower-third card:
 
 ```text
-This part of the demo is showing the intended workflow after
-tasks/recording/skill-author-by-recording/ lands.
+This part of the demo is showing the intended Clawperator workflow
+once skill-author-by-recording ships.
 ```
-
-- Briefly open:
-  - `tasks/recording/skill-author-by-recording/plan.md`
-  - `tasks/recording/skill-author-by-recording/work-breakdown.md`
 
 **Spoken**
 
-And just to be really explicit, this part is showing the workflow we are building toward. The recording plans now explicitly own this as a future repo-local workflow. So this isn't hand-wavy product language. This is meant to become a real skill in this repo, with a defined output contract.
+And just to be really explicit, this part is showing the workflow we are building toward. So this isn't hand-wavy product language. This is meant to become a real skill in this repo that Codex can use to guide a developer through the whole process.
 
 ## Scene 4 - Human Performs The Recorded Flow
 
@@ -121,7 +116,6 @@ Okay, that's done, and the workflow will now stop the recording and pull the cap
 recordings/solax-set-discharge-to-limit/<session>.ndjson
 recordings/solax-set-discharge-to-limit/<session>.steps.json
 recordings/solax-set-discharge-to-limit/<session>.export.json
-skills/com.solaxcloud.starter.set-discharge-to-limit-replay/recording-context.json
 ```
 
 - Open the export file and point at:
@@ -160,34 +154,42 @@ This is important. The export does not contain a magically completed skill. What
 
 **On screen**
 
-- Open the top-level recording plan:
-  - `tasks/recording/plan.md`
-- Highlight the two skill ids:
-  - `com.solaxcloud.starter.set-discharge-to-limit-replay`
-  - `com.solaxcloud.starter.set-discharge-to-limit-orchestrated`
+- Show a simple split card:
+
+```text
+Replay skill:
+- direct path
+- good for simple stable flows
+
+Orchestrated skill:
+- named checkpoints
+- terminal verification
+- structured result for the brain
+```
 
 **Spoken**
 
 So what we're going to do instead is use that recording as the source material for something better.
 
-We're going to create two different categories of skill in Clawperator. The first is a replay skill. A replay skill is useful because it gives us a deterministic baseline. It captures the direct path through the app and lets us prove that yes, there is a repeatable flow here. That's incredibly valuable. But the second category is where the magic really starts to happen, and that's the orchestrated skill.
+Clawperator has two categories of skill that matter here. A replay skill is the simpler kind. That's what you use when a direct path through the UI is stable enough that replaying that route is basically the whole job. But in this case, that's not enough. This Solax flow is multi-step, stateful, and high-consequence enough that what we actually want to end up with is an orchestrated skill.
 
 ## Scene 7 - The Missing "How"
 
 **On screen**
 
-- Open the future workflow task pack:
-  - `tasks/recording/skill-author-by-recording/plan.md`
-  - `tasks/recording/skill-author-by-recording/work-breakdown.md`
-- Highlight the specific workflow outputs:
-  - recording export
-  - replay skill
-  - orchestrated skill
-  - code inspection points
+- Show a simple artifact flow:
+
+```text
+record on phone
+  -> pull/export artifacts
+  -> scaffold code
+  -> Codex authors orchestrated skill
+  -> OpenClaw invokes it later
+```
 
 **Spoken**
 
-And this is the bit I really want to call out for developers and for agents reading this later. The orchestrated part is not magically produced by the recording itself. Clawperator does not pretend that a recording is already a robust skill. The recording gives us the evidence. Then Codex, using the `skill-author-by-recording` workflow, inspects that evidence, scaffolds the replay skill, and authors the orchestrated sibling from it.
+And this is the bit I really want to call out for developers and for agents reading this later. The orchestrated part is not magically produced by the recording itself. Clawperator does not pretend that a recording is already a robust skill. The recording gives us the evidence. Then Codex, using the `skill-author-by-recording` workflow, inspects that evidence, scaffolds the initial code, and authors the orchestrated skill from it.
 
 So there is a real "how" here.
 
@@ -195,62 +197,50 @@ The workflow captures the recording.
 
 It exports the recording artifact.
 
-It scaffolds the first replay skill from that recording context.
+It scaffolds the initial skill code from that recording context.
 
-And then the agent uses that evidence to write the orchestrated skill code.
+And then the agent uses that evidence to write the orchestrated skill code that will actually be invoked later by OpenClaw.
 
-## Scene 8 - Show The Replay Skill
+## Scene 8 - Show The Same Operation In Replay And Orchestrated Form
 
 **On screen**
 
-- Open:
-  - `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-replay/SKILL.md`
-  - `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-replay/scripts/run.js`
-- Highlight:
-  - the skill id
-  - the `clawperator-skill-type: replay` frontmatter
-  - the direct path through the UI
-  - any coordinate taps or direct input handling
+- Show one side-by-side code frame.
 
 **Spoken**
 
-So if we look at what gets generated, we'll have a replay skill that is basically the direct path through the UI.
-
-This is the recorded route, turned into a deterministic baseline. It's incredibly useful, because it proves the path is real. But it still isn't the full brain-and-hand story yet.
+So if we look at the actual code shape, the easiest way to understand this is to compare the same operation in replay mode and orchestrated mode.
 
 **Show this code**
 
 ```js
-// replay skill shape - direct path
-await openSolax();
-await openIntelligence();
-await openPeakExport();
-await openDeviceDischarging();
+// replay shape
 await openDischargeToDialog();
-await enterLimit(limit);
-await confirmAndSave();
-await verifyPersistedRow(limit);
+
+// orchestrated shape
+await checkpoint("dialog_opened", async () => {
+  await openDischargeToDialog();
+  return await assertDialogVisible("Discharge to");
+});
 ```
 
 **Spoken**
 
-So the replay skill is still code. It's not a raw tape recorder. But it's code that mainly preserves the direct route. That's why it remains a baseline. It shows us the path that really works on the device.
+This is the critical difference.
+
+In replay mode, we're basically saying: perform the operation.
+
+In orchestrated mode, we're saying: perform the operation, name the checkpoint, confirm the expected state was actually reached, and preserve that observation in the structured result.
+
+And just to be very precise here, `checkpoint(...)` is not the agent itself. It's helper code inside the skill. The agent wrote this code when authoring the skill, and later the brain reads the structured result that comes out of it. The agent is not sitting inside this function on every line. The helper is just what makes the skill's behavior observable and legible.
 
 ## Scene 9 - Show The Orchestrated Skill
 
 **On screen**
 
-- Open the future orchestrated skill surfaces that the current task packs are
-  defining:
-
-```text
-../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-orchestrated/SKILL.md
-../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-orchestrated/skill.json
-../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-orchestrated/scripts/run.js
-```
-
-- Highlight the parts the plans say will exist:
-  - declared goal
+- Show a simplified orchestrated skill snippet.
+- Highlight:
+  - goal
   - inputs
   - checkpoints
   - terminal verification
@@ -258,7 +248,7 @@ So the replay skill is still code. It's not a raw tape recorder. But it's code t
 
 **Spoken**
 
-And then we'll have an orchestrated skill that is much more deliberate about what it's doing.
+And the skill we end up with here is an orchestrated skill that is much more deliberate about what it's doing.
 
 The orchestrated skill code will have instructions and checkpoints that effectively say: open the app, make sure we're on the right tab, open the correct automation card, confirm that the discharge settings are visible, open the dialog, enter the requested value, save it, and then read the app state back to confirm the setting actually changed. And if any one of those checks fails, don't just pretend it worked. Report that failure back to the brain.
 
@@ -288,16 +278,13 @@ emitSkillResult({ goal, checkpoints, terminalVerification });
 
 **Spoken**
 
-And this is the key "how". The orchestrated skill is authored by the agent from the recording evidence and the replay baseline. The agent is not just copying taps. It's writing code that names the goal, names the checkpoints, verifies the end state, and emits a structured result the brain can reason about.
+And this is the key "how". The orchestrated skill is authored by the agent from the recording evidence. The agent is not just copying taps. It's writing code that names the goal, names the checkpoints, verifies the end state, and emits a structured result the brain can reason about.
 
 ## Scene 10 - Show The Contract And Result
 
 **On screen**
 
-- Open:
-  - `tasks/recording/skill-result-contract/plan.md`
-  - `tasks/recording/skill-contract-declaration/plan.md`
-- Highlight the intended `SkillResult` fields:
+- Show the intended `SkillResult` fields:
 
 ```json
 {
@@ -326,8 +313,8 @@ The brain, in my case OpenClaw, or it could be Codex, is responsible for the rea
 So if you want the simple version of the architecture here, it's this:
 
 - the recording gives the agent evidence
-- the replay skill preserves the route
-- the orchestrated skill turns that route into named checkpoints and verified outcomes
+- the agent authors an orchestrated skill from that evidence
+- that orchestrated skill turns the route into named checkpoints and verified outcomes
 - the `SkillResult` gives the brain something structured enough to reason over
 
 ## Scene 11 - Why This Needs Orchestration
@@ -335,8 +322,7 @@ So if you want the simple version of the architecture here, it's this:
 **On screen**
 
 - Show the app path again.
-- Optionally show snippets of the replay skill and then the planned
-  orchestrated checkpoints side by side.
+- Optionally show the side-by-side replay/orchestrated snippet again.
 
 **Spoken**
 
@@ -373,7 +359,7 @@ I'll tell OpenClaw, in natural language, to set my export limit to 40%.
 
 OpenClaw will then decide to invoke the orchestrated Solax skill.
 
-That orchestrated skill will use Clawperator to navigate the app in a reliable, observable way. It won't just say "tap tap tap done". It can stop at checkpoints. It can inspect the current UI. It can confirm it has opened the correct card. It can verify that it has reached the discharge dialog. It can enter the new limit. It can save. And then it can read the resulting UI state back and confirm that the row now says 40%.
+That orchestrated skill will use Clawperator to navigate the app in a reliable, observable way. It won't just say "tap tap tap done". The skill itself contains named checkpoints and verification logic. Clawperator executes those operations and returns what it observed. Then OpenClaw gets back a structured result it can reason about.
 
 If something goes wrong, that's also where the brain/hand split becomes so powerful.
 
@@ -395,18 +381,16 @@ In all of those cases, Clawperator still remains simple and deterministic. It ke
 
 ```text
 recordings/solax-set-discharge-to-limit/<session>.export.json
-../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-replay/scripts/run.js
 ../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-orchestrated/scripts/run.js
 ```
 
 - Draw boxes around:
   - evidence
-  - replay baseline
   - orchestrated logic
 
 **Spoken**
 
-And if you're a developer watching this, this is the part I'd pause on. These three things together are the whole story. The export shows the evidence. The replay code shows the preserved path. The orchestrated code shows what the agent added - checkpoints, verification, and a structured result. That's the exact "how" of the system.
+And if you're a developer watching this, this is the part I'd pause on. These two things together are the whole story. The export shows the evidence. The orchestrated code shows what the agent added - checkpoints, verification, and a structured result. That's the exact "how" of the system.
 
 ## Scene 13 - Developer Trust / Inspectability
 
@@ -417,16 +401,12 @@ And if you're a developer watching this, this is the part I'd pause on. These th
 
 ```text
 recordings/.../<session>.export.json
-skills/...-replay/...
 skills/...-orchestrated/...
 ```
 
-- Optionally show `tasks/recording/compare/plan.md` to reinforce future
-  compare/diagnostics.
-
 **Spoken**
 
-And I think this is the really important developer point. This isn't hand-wavy. It's not "trust the AI". It's inspectable. It's code. It's artifacts. It's a recording export. It's a replay skill. It's an orchestrated skill. And it's an agent using those pieces to drive Clawperator in a way that is much more powerful than replay alone.
+And I think this is the really important developer point. This isn't hand-wavy. It's not "trust the AI". It's inspectable. It's code. It's artifacts. It's a recording export. It's an orchestrated skill. And it's an agent using those pieces to drive Clawperator in a way that is much more powerful than blind replay alone.
 
 ## Scene 14 - Close
 
@@ -445,6 +425,6 @@ Then OpenClaw becomes the brain. Clawperator becomes the hand. The orchestrated 
 
 So that's what we're going to build.
 
-We're going to take this recording, turn it into a replay skill, evolve that into an orchestrated skill, and show how Clawperator plus an agent like OpenClaw or Codex lets you automate a real, messy, high-value mobile app workflow in a way that actually feels robust.
+We're going to take this recording, turn it into an orchestrated skill, and show how Clawperator plus an agent like OpenClaw or Codex lets you automate a real, messy, high-value mobile app workflow in a way that actually feels robust.
 
 Let's keep going.
