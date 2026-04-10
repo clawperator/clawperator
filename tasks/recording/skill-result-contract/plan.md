@@ -91,6 +91,7 @@ reconstruction.
 - The contract must carry:
   - `contractVersion` (semver-shaped string)
   - `skillId`
+  - `source` (required - describes who emitted the result; see below)
   - `goal`
   - `inputs`
   - `status` (`success` | `failed` | `indeterminate`)
@@ -98,6 +99,20 @@ reconstruction.
   - `terminalVerification` (or `null` if the skill does not declare one)
   - `execEnvelopes` (embedded `ResultEnvelope` records, in order)
   - `diagnostics` (optional structured hints, never required)
+- `source` is a required field that carries the execution provenance of the
+  result. Shape: `{ kind: "agent"; agentCli: string } | { kind: "script" }`.
+  This field is **injected by `runSkill`** when it parses the emitted frame,
+  not by the skill or agent itself. For agent-driven skills, `runSkill` reads
+  the `agent.cli` value from `skill.json` and sets `source: { kind: "agent",
+  agentCli: <cli> }`. For scripted skills, it sets `source: { kind: "script"
+  }`. The skill-side emitter does not include `source` in the frame; `runSkill`
+  is the single authority for this field.
+  Rationale: `source` is infrastructure metadata. The runtime agent knows what
+  device actions to take, not which CLI binary it is running inside. Having
+  `runSkill` inject `source` keeps SKILL.md emission rules clean and guarantees
+  accuracy. It also keeps `SkillResult` self-describing as a portable artifact:
+  any consumer reading a `.skill-result.json` file can determine the emitter
+  kind without needing the skills registry.
 - Checkpoint evidence must not be a free-form `Record<string,string>` as the
   primary contract shape. P1 must choose a small typed union or another
   explicitly versioned structure so downstream consumers are not forced back
@@ -150,9 +165,19 @@ implementation:
 - Behavior on a frame whose `contractVersion` major matches but minor is
   newer: accept, log unknown fields as a warning, do not reject. Behavior
   on unknown major: reject with a typed parse error.
-- Required vs optional fields. Recommend: `contractVersion`, `skillId`,
-  `status`, `checkpoints` are required. `goal`, `inputs`,
+- Required vs optional fields. Committed: `contractVersion`, `skillId`,
+  `source`, `status`, `checkpoints` are required. `goal`, `inputs`,
   `terminalVerification`, `execEnvelopes`, `diagnostics` are optional in v1.
+  `source` is required for all `SkillResult` documents because it is injected
+  by `runSkill` at parse time, not by the emitter - its presence is guaranteed
+  for any result `runSkill` returns.
+- `source` injection. Committed: `runSkill` is the single authority for the
+  `source` field. It injects `source: { kind: "agent", agentCli: <cli> }` for
+  agent-driven skills and `source: { kind: "script" }` for scripted skills
+  after parsing the emitted frame. If the emitted frame contains a `source`
+  field, `runSkill` must reject the result as malformed rather than silently
+  accepting a self-reported value that could differ from the known execution
+  context.
 - Status of the existing `expectContains` mechanism. Recommend: keep it for
   backward compatibility in v1 but document that contract-driven
   verification is the preferred path. Plan its deprecation in a follow-up,

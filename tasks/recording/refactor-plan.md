@@ -741,10 +741,17 @@ thread picking up this plan should walk this list and close each item.
    declared inputs, the allowed primitives list, at least one
    recovery branch, and the emission rule block.
 7. **Authoring-time agent prompt shape.** W6 has to produce a SKILL.md
-   from recording evidence. What prompt does the authoring-time
-   agent get? Candidates: the recording export, the user's stated
-   goal, the existing replay skill as a reference, the SKILL.md
-   template from W2b. Recommend: all four. Document this in W6.
+   from recording evidence. Required inputs:
+   - the recording export (must - it is the primary evidence the agent
+     reads to understand what the developer actually did on the device)
+   - an optional plain-language description from the user explaining
+     the intent and any nuance the recording alone does not capture
+     (e.g. "the second Save is for the outer page, not the dialog")
+   Optional / supplementary (pass if available, do not require):
+   - the existing replay skill as reference context if it exists
+   - a SKILL.md authoring template from W2b as a prompt scaffold
+   Document this decision in W6 P1. The authoring-time agent must
+   know what it can count on versus what it should ask for if missing.
 8. **Authoring self-test loop.** Listed in the W6 changes above.
    Make sure the W6 work-breakdown actually owns a phase that runs
    the freshly-authored skill at least once before declaring the

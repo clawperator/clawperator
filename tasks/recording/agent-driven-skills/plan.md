@@ -127,6 +127,11 @@ the gap between that promise and the current plans.
 - The recording export is authoring evidence only. It is not passed
   to the runtime agent. SKILL.md is the only program the runtime
   agent reads.
+- The runtime agent must not include a `source` field in the emitted
+  `[Clawperator-Skill-Result]` frame. `source` is injected by `runSkill`
+  from the known `skill.json` `agent` block after parsing the frame. SKILL.md
+  emission rules must explicitly omit `source`. If a frame arrives with
+  `source` already set, `runSkill` rejects it as malformed.
 - The authoring-time agent (W6) and the runtime agent (this pack)
   are the same binary (`codex`) with different prompts. Plans that
   split them across different CLIs need owner approval.
@@ -214,6 +219,26 @@ This pack should produce:
   `docs/internal/design/` documenting the 10-run measurement
 - updates to `docs/skills/authoring.md` and `docs/skills/overview.md`
   describing the agent-driven orchestrated shape
+
+## SkillResult File Persistence
+
+The `clawperator skills run --json` output includes the full `SkillResult` in
+its JSON payload. Saving this to a file is the mechanism that feeds the
+`clawperator recording compare --result <file>` workflow shown in the video.
+
+W2b does not own a new `--save-result` flag. The v1 pattern is:
+
+```bash
+clawperator skills run <id> --json -- <inputs> > ./runs/<id>-<ts>.skill-result.json
+```
+
+W4 (`compare/`) owns the `--result` file input contract. W2b owns ensuring the
+`--json` output from `clawperator skills run` contains the full `SkillResult`
+document in a form that `compare` can consume directly.
+
+The reliability validation phase (P4) must save all 10 run results and the
+forced-failure run using this pattern, so they are available as real inputs
+for the compare demo in Scene 11 of the video.
 
 ## Cost Notes
 

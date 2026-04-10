@@ -170,6 +170,7 @@ Define a structured result that every non-trivial skill returns. Shape:
 ```
 {
   "skillId": "com.solaxcloud.starter.set-discharge-to-limit",
+  "source": { "kind": "agent", "agentCli": "codex" },
   "goal": { "kind": "set", "target": { "discharge_limit_percent": 40 } },
   "status": "success" | "failed" | "indeterminate",
   "checkpoints": [
@@ -365,14 +366,20 @@ stages 1-4. Before then it would codify the current brittleness as convention.
 
 | Workstream | Owner | Status |
 | --- | --- | --- |
+| W0. Brain/hand architectural framing | `brain-hand-contract/` (this file) | active reference |
 | W1. Skill integrity retrofit (Solax) | `skill-checkpoints/` | created |
 | W2. Skill result contract | `skill-result-contract/` | created |
 | W2b. Agent-driven orchestrated runtime | `agent-driven-skills/` | created |
 | W3. Skill goal/verification declaration | `skill-contract-declaration/` | created |
 | W4. Recording compare diagnostic | `compare/` | created |
 | W5. Skill authoring guidance graduation | `graduate-demo-findings/` | created |
-| W6. Observation primitives in the runtime | future, after W2-W5 | deferred |
-| W7. Repo-local skill-author-by-recording | `skill-author-by-recording/` | planned, blocked on W2b/W3/W4/W5 |
+| W6. Repo-local skill-author-by-recording | `skill-author-by-recording/` | planned, blocked on W2b/W3/W4/W5 |
+
+Note: "Observation primitives in the runtime" (originally listed as W6/W7 in
+earlier drafts) is explicitly deferred. It has no task pack yet and will only
+be scheduled after W2-W5 have revealed which observation primitives are
+genuinely missing. See `tasks/recording/plan.md` for the current authoritative
+workstream sequence.
 
 ## What Should Happen First
 

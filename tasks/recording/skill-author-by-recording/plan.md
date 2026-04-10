@@ -75,6 +75,65 @@ pattern if needed, but keep a single front door for the user.
   - surfacing the key files and generated code for inspection
 - explicit visual/file-level outputs that a human can inspect during the flow
 
+## Replay vs Orchestrated: When To Use Each
+
+This workflow produces an orchestrated skill by default. That is not always
+the right choice. The authoring-time agent must apply the following guidance
+when deciding what to produce, and must surface the choice to the developer
+before authoring begins.
+
+### Use a replay skill when
+
+- The UI flow is short (roughly five interactions or fewer) and stable for
+  the known target layout.
+- Every step follows a predictable deterministic path with no branching based
+  on current UI state.
+- No recovery from app-state surprises is expected - the app is assumed to be
+  in the right starting state before every run.
+- Coordinate-based or exact-node-match clicking is acceptable because the
+  layout is controlled.
+- The skill is intended as a baseline reference for compare or as a first
+  sanity check, not as a primary production automation.
+
+A replay skill can be authored directly from the recording export without
+running an agent CLI at runtime. It still emits `SkillResult` per the W2
+contract, but its `run.js` is the full execution logic rather than a thin
+harness delegating to an agent.
+
+### Use an orchestrated skill when
+
+- The flow involves multiple steps where the right action depends on what the
+  current UI state actually shows.
+- Recovery from unexpected app state (wrong screen, stale UI, prior run left
+  the app mid-flow) is important for reliability.
+- The skill's goal requires verifying that an action had the intended
+  persisted effect before reporting success.
+- The inputs change the flow in ways a fixed script cannot safely anticipate.
+- The flow is complex enough that describing it as a plain-English agent
+  program (SKILL.md) is clearer than encoding it as imperative script logic.
+
+An orchestrated skill spawns an embedded runtime agent that reads SKILL.md
+and reasons turn by turn. It does not bypass Clawperator - the agent calls
+Clawperator primitives for every device action. What changes is that an agent
+is doing the reasoning, not a fixed script.
+
+### Both can coexist
+
+The Solax discharge-limit proving case has both a replay sibling
+(`-replay`) and an orchestrated sibling (`-orchestrated`). The replay
+baseline exists as a deterministic reference. The orchestrated skill exists
+as the production-grade, agent-driven, contract-verified automation.
+
+Some larger orchestrated skills may internally follow deterministic sequences
+for parts of their flow. That is fine. What makes a skill orchestrated is that
+an agent decides the sequence and holds itself to a declared contract, not that
+every step is non-deterministic.
+
+If the recording evidence suggests the flow is simple enough for replay, tell
+the developer before authoring and let them choose. Do not default to
+orchestrated just because it sounds more sophisticated. Simple replay skills
+are valid, maintained artifacts.
+
 ## Out Of Scope
 
 - runtime support changes that belong in the main recording workstreams

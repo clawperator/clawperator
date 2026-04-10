@@ -97,8 +97,12 @@ defined workflow consistently.
 - The skill exists in `.agents/skills/`.
 - It guides the operator rather than assuming silent background work.
 - It points developers at the exact files that explain what was generated.
-- It uses the recording export, the user's stated goal, and the W2b/W3 contract
-  shape to author `SKILL.md`, `skill.json`, and the thin `run.js`.
+- It uses the recording export (required) and an optional plain-language
+  description from the user explaining intent or device-specific nuance that
+  the recording alone may not capture, along with the W2b/W3 contract shape,
+  to author `SKILL.md`, `skill.json`, and the thin `run.js`. The authoring-time
+  agent should ask for the user description if the recording export is not
+  sufficient to infer the intent unambiguously.
 - If helper skills are introduced, the top-level skill clearly delegates to
   them and preserves resumability across phase boundaries.
 - A developer following the workflow can understand the end-to-end path without

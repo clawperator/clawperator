@@ -157,7 +157,12 @@ Make `runSkill` parse and return `SkillResult` without breaking legacy skills.
 
 Required cases:
 
-- well-formed frame -> parsed `skillResult` returned on `SkillRunResult`
+- well-formed frame from scripted skill -> `source: { kind: "script" }` injected
+  by `runSkill`, not by the emitter; `skillResult` returned on `SkillRunResult`
+- well-formed frame from agent-driven skill -> `source: { kind: "agent",
+  agentCli: <cli from skill.json> }` injected by `runSkill`
+- frame that contains a `source` field -> rejected as malformed (the emitter
+  must not self-report `source`)
 - well-formed frame on a script that exits non-zero -> `skillResult` is still
   surfaced on the error shape so the brain can read structured failure
 - malformed JSON inside a frame -> typed parse error, not silent legacy fallback
@@ -166,7 +171,7 @@ Required cases:
 - newer minor `contractVersion` -> accept, log unknown fields
 - newer major `contractVersion` -> reject with typed parse error
 - round-trip: a `SkillResult` value serialized into a frame and parsed back
-  is structurally identical
+  is structurally identical (including injected `source`)
 - `clawperator skills run --json` includes the parsed `skillResult` in the
   CLI output when present, and omits or nulls it for legacy skills
 - if `diagnostics.runtimeState` or equivalent exists, parser tests cover:

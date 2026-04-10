@@ -153,8 +153,19 @@ Judgment:
   - `literal` for path-sensitive replay comparison
   - `semantic` for agent-driven runs where terminal outcome can still match
     even when intermediate checkpoints differ
+- Compare determines the mode automatically from `SkillResult.source.kind`.
+  If `source.kind === "agent"`, compare uses `semantic` mode. If
+  `source.kind === "script"`, compare uses `literal` mode. The `--mode` flag
+  can override the auto-detected choice. This field is guaranteed to be
+  present in any `SkillResult` produced by `runSkill` (it is injected at
+  parse time, not emitted by the skill). Compare does not need the skills
+  registry to determine the mode - the result is self-describing.
 - For agent-driven runs, "outcome matches, path differs" is a successful
   compare result, not a divergence failure.
+- For agent-driven runs that fail (terminal verification not proved), compare
+  still uses `semantic` mode and reports the first checkpoint divergence
+  within that frame. The `compareMode` field in the output always reflects
+  the mode compare used, regardless of whether the run succeeded or failed.
 - CLI surface for v1 is
   `clawperator recording compare --baseline <export.json> --result <skill-result.json> [--json]`.
   Both inputs are local files. Compare reads them, does not run anything,

@@ -122,13 +122,17 @@ Here is the part that should feel kind of wild. I am not going to manually
 stitch this together file by file. I am going to ask Codex to use a repo-local
 workflow called `skill-author-by-recording`.
 
-That workflow is the authoring-time guide. It tells me when to touch the
-phone. It runs the recording lifecycle for me. It pulls the artifacts back
-into the repo. Then it hands those artifacts to an authoring-time agent that
-writes the actual skill.
+That workflow is the authoring-time guide. It starts the recording for me, tells
+me when to touch the phone, pulls the artifacts back into the repo when I am
+done, and then hands those artifacts to an authoring-time agent that reads the
+recording evidence and writes the actual skill.
 
-So from my point of view as the developer, I type that one prompt and then I
-follow along.
+From my point of view as the developer: I type that one prompt, I pick up the
+phone when the workflow asks me to, I do the thing I want to automate - once -
+and I put the phone down. That is my entire manual contribution. The authoring
+agent does the rest: recording lifecycle, artifact export, SKILL.md, skill.json,
+run.js, and an initial self-test run to confirm the skill works before it calls
+itself done.
 
 ## Scene 4 - The Recording Lifecycle, Uncovered
 
@@ -344,6 +348,7 @@ contract.
 {
   "contractVersion": "1.0.0",
   "skillId": "com.solaxcloud.starter.set-discharge-to-limit-orchestrated",
+  "source": { "kind": "agent", "agentCli": "codex" },
   "goal": { "kind": "set_discharge_limit", "percent": 40 },
   "inputs": { "percent": 40 },
   "status": "success",
@@ -367,7 +372,8 @@ contract.
 - Lower-third card:
 
 ```text
-`runSkill` parses the `[Clawperator-Skill-Result]` frame
+`runSkill` parses the `[Clawperator-Skill-Result]` frame,
+injects `source` from the known skill configuration,
 and hands this back as a typed object.
 ```
 
@@ -421,8 +427,10 @@ OpenClaw intent
     failed -> inspect checkpoints and reason
 ```
 
-- Keep the runtime agent's stderr reasoning visible in the terminal while the
-  diagram animates.
+- Ideally, show the runtime agent's stderr reasoning streaming in a terminal
+  panel while the diagram animates. This depends on Codex producing readable
+  output during the run. If it does not, fall back to showing the final
+  `SkillResult` JSON appearing after the diagram completes.
 
 **Spoken**
 
@@ -451,30 +459,46 @@ reliably proved before the skill is allowed to claim success.
 
 - Split view. Left: the recording export from Scene 6. Right: a saved
   `SkillResult` from a later run.
-- Terminal shows:
+- Terminal shows two compare invocations: one for a successful run where the
+  agent took a different path, and one for a forced-failure run where the app
+  was put in a bad starting state.
+
+```bash
+# Successful run saved earlier:
+clawperator skills run com.solaxcloud.starter.set-discharge-to-limit-orchestrated \
+  --json -- 40 > ./runs/solax-run-01.skill-result.json
+
+# Compare it against the original recording baseline:
+clawperator recording compare \
+  --baseline ./recordings/<session>.export.json \
+  --result ./runs/solax-run-01.skill-result.json \
+  --json
+```
+
+- First show a successful compare result (agent took a different path,
+  terminal verification still matched):
+
+```json
+{
+  "compareMode": "semantic",
+  "outcome": "outcome_matches_path_differs",
+  "summary": "terminal verification matched even though the runtime path differed from the recording baseline"
+}
+```
+
+- Then cut to a forced-failure compare result (app was put in a wrong
+  starting state before this run):
 
 ```bash
 clawperator recording compare \
   --baseline ./recordings/<session>.export.json \
-  --result ./runs/<run>.skill-result.json \
+  --result ./runs/solax-forced-failure.skill-result.json \
   --json
 ```
 
-- First show a successful semantic compare result:
-
 ```json
 {
-  "mode": "semantic",
-  "outcome": "outcome_matches_path_differs",
-  "summary": "terminal verification matched even though the runtime path differed"
-}
-```
-
-- Then cut to a forced-failure compare result:
-
-```json
-{
-  "mode": "literal",
+  "compareMode": "semantic",
   "outcome": "baseline_drift",
   "firstDivergence": {
     "baselineCheckpoint": "device_discharging_card_opened",
@@ -489,14 +513,18 @@ This is the other half of why the workflow matters. Because the recording is
 evidence, and because the orchestrated skill emits a structured result, I can
 compare them.
 
-And compare is smart about what kind of run it is looking at. If the runtime
-agent took a slightly different path but still proved the final state, compare
-does not scream failure. It says, basically, outcome matches, path differs.
+Compare reads the SkillResult and sees that it came from an agent-driven
+skill, so it uses semantic matching: it cares whether the terminal outcome
+was reached, not whether every intermediate step matched the recording
+exactly. If the runtime agent took a slightly different path but still
+proved the final state, compare reports that as "outcome matches, path
+differs" - not a failure.
 
-But if the run actually drifts in a meaningful way, compare tells me where the
-first divergence happened. That means the next time the SolaX UI shifts, I do
-not have to spelunk through screenshots and terminal noise. I get a typed
-diagnosis I can act on.
+But if the run actually drifts in a meaningful way - say the app was not in
+the right starting state and the skill never reached its target checkpoint -
+compare tells me exactly where the first divergence happened. That means the
+next time the SolaX UI shifts, I do not have to spelunk through screenshots
+and terminal noise. I get a typed diagnosis I can act on.
 
 ## Scene 12 - Inspectability
 
