@@ -1,6 +1,5 @@
 plugins {
     id("com.android.library")
-    id("org.jetbrains.kotlin.android")
     alias(libs.plugins.kotlin.serialization)
 }
 
@@ -17,9 +16,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     
-    kotlinOptions {
-        jvmTarget = "17"
-    }
 
     buildFeatures {
         resValues = true

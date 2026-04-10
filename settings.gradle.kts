@@ -30,14 +30,23 @@ project(":apps:android").projectDir = file("apps/android")
 include(":apps:android:app-conformance")
 project(":apps:android:app-conformance").projectDir = file("apps/android/app-conformance")
 
+include(":shared")
+project(":shared").projectDir = file("apps/android/shared")
+
 include(":app")
 project(":app").projectDir = file("apps/android/app")
 
 include(":shared:app:app-adapter")
 project(":shared:app:app-adapter").projectDir = file("apps/android/shared/app/app-adapter")
 
+include(":shared:app")
+project(":shared:app").projectDir = file("apps/android/shared/app")
+
 include(":shared:core:common")
 project(":shared:core:common").projectDir = file("apps/android/shared/core/common")
+
+include(":shared:core")
+project(":shared:core").projectDir = file("apps/android/shared/core")
 
 include(":shared:core:devicepackage")
 project(":shared:core:devicepackage").projectDir = file("apps/android/shared/core/devicepackage")
@@ -50,6 +59,9 @@ project(":shared:data:content").projectDir = file("apps/android/shared/data/cont
 
 include(":shared:data:content-model")
 project(":shared:data:content-model").projectDir = file("apps/android/shared/data/content-model")
+
+include(":shared:data")
+project(":shared:data").projectDir = file("apps/android/shared/data")
 
 include(":shared:data:operator")
 project(":shared:data:operator").projectDir = file("apps/android/shared/data/operator")

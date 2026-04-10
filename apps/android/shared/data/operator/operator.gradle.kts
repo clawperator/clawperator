@@ -1,7 +1,6 @@
 plugins {
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.android.library")
-    id("org.jetbrains.kotlin.android")
     alias(libs.plugins.kotlin.serialization)
 }
 
@@ -19,9 +18,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     
-    kotlinOptions {
-        jvmTarget = "17"
-    }
 
     buildFeatures {
         compose = true
@@ -77,6 +73,7 @@ dependencies {
     testImplementation(libs.androidx.arch.core.testing)
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.test.core)
+    testImplementation(libs.kotlin.test.junit)
     
     androidTestImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.androidx.test.espresso.core)
@@ -85,4 +82,5 @@ dependencies {
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.rules)
     androidTestImplementation(libs.androidx.arch.core.testing)
+    androidTestImplementation(libs.kotlin.test.junit)
 }

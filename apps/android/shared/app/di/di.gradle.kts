@@ -1,6 +1,5 @@
 plugins {
     id("com.android.library")
-    id("org.jetbrains.kotlin.android")
     alias(libs.plugins.kotlin.serialization)
 }
 
@@ -17,9 +16,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     
-    kotlinOptions {
-        jvmTarget = "17"
-    }
 
     buildFeatures {
         buildConfig = true
@@ -58,9 +54,11 @@ dependencies {
     implementation(libs.okhttp3.okhttp)
     
     testImplementation(libs.androidx.test.core)
+    testImplementation("junit:junit:4.13.2")
     testImplementation(libs.koin.test)
     testImplementation(libs.robolectric)
     testImplementation(libs.kotlin.test)
+    testImplementation(libs.kotlin.test.junit)
 }
 
 // Disable quality checks for this module

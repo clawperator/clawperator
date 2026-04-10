@@ -16,7 +16,7 @@ import org.junit.Assert
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
-import org.junit.Test
+import kotlin.test.Test
 
 class PackageRepositoryDefaultTest {
     private lateinit var packageRepository: PackageRepositoryDefault

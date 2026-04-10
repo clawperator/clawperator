@@ -1,7 +1,5 @@
 plugins {
     id("com.android.application")
-    id("kotlin-android")
-    alias(libs.plugins.kotlin.serialization)
 }
 
 fun env(name: String, legacyName: String? = null): String? =
@@ -62,6 +60,8 @@ fun readNodePackageVersion(): String {
     return versionLine
 }
 
+val baseApplicationId = "com.clawperator.operator"
+
 android {
     namespace = "com.clawperator.operator"
 
@@ -69,7 +69,7 @@ android {
     val resolvedVersion = parseVersionName(resolvedVersionName)
 
     defaultConfig {
-        applicationId = "com.clawperator.operator"
+        applicationId = baseApplicationId
         versionCode = System.getenv("CLAWPERATOR_VERSION_CODE")?.toInt() ?: computeVersionCode(resolvedVersion)
         versionName = resolvedVersion.name
     }
@@ -158,6 +158,7 @@ dependencies {
     testImplementation(libs.robolectric)
     testImplementation(libs.kotlin.reflect)
     testImplementation(libs.kotlin.test)
+    testImplementation(libs.kotlin.test.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.androidx.test.espresso.core)
     androidTestImplementation(libs.androidx.test.espresso.contrib)
@@ -166,31 +167,38 @@ dependencies {
     androidTestImplementation(libs.androidx.test.rules)
     androidTestImplementation(libs.androidx.arch.core.testing)
     androidTestImplementation(libs.kotlin.test)
+    androidTestImplementation(libs.kotlin.test.junit)
 }
 
-project.afterEvaluate {
-    android.applicationVariants.forEach { variant ->
-        val variantCap = variant.name.replaceFirstChar { it.titlecase() }
-        val pkg = variant.applicationId
+tasks.register("runDebug") {
+    dependsOn("installDebug")
+    group = "run"
 
-        if (variant.buildType.name == "debug") {
-            tasks.register<Exec>("run$variantCap") {
-                dependsOn("install$variantCap")
-                group = "run"
-                commandLine("adb", "shell", "am", "start", "-n", "${variant.applicationId}/clawperator.activity.MainActivity")
-                doLast {
-                    println("Launching ${variant.applicationId}/clawperator.activity.MainActivity")
+    doLast {
+        val debugApplicationId = "$baseApplicationId.dev"
 
-                    println("⏱️  Waiting 2 seconds for installation to complete...")
-                    Thread.sleep(2000)
+        println("Launching $debugApplicationId/clawperator.activity.MainActivity")
+        val launchResult =
+            ProcessBuilder("adb", "shell", "am", "start", "-n", "$debugApplicationId/clawperator.activity.MainActivity")
+                .inheritIO()
+                .start()
+                .waitFor()
+        check(launchResult == 0) { "adb launch command failed with exit code $launchResult" }
 
-                    println("🔧 Granting permissions for $pkg...")
-                    exec {
-                        commandLine("${project.rootDir}/../../scripts/clawperator_grant_android_permissions.sh", "--package", pkg)
-                    }
-                }
-            }
-        }
+        println("⏱️  Waiting 2 seconds for installation to complete...")
+        Thread.sleep(2000)
+
+        println("🔧 Granting permissions for $debugApplicationId...")
+        val grantResult =
+            ProcessBuilder(
+                rootProject.file("scripts/clawperator_grant_android_permissions.sh").absolutePath,
+                "--package",
+                debugApplicationId,
+            )
+                .inheritIO()
+                .start()
+                .waitFor()
+        check(grantResult == 0) { "permission grant command failed with exit code $grantResult" }
     }
 }
 

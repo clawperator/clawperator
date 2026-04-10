@@ -1,7 +1,9 @@
 // import org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask
-import com.android.build.gradle.BaseExtension
+import com.android.build.api.dsl.ApplicationExtension
+import com.android.build.api.dsl.LibraryExtension
 import java.io.FileInputStream
 import java.util.Properties
+import org.gradle.api.tasks.testing.Test
 
 // Load local.properties
 val localProperties =
@@ -20,7 +22,6 @@ extra.apply {
 
 buildscript {
     extra.apply {
-        set("buildToolsVersion", libs.versions.buildTools.get())
         set("compileSdkVersion", 35)
         set("minSdkVersion", 21)
         set("targetSdkVersion", 35)
@@ -93,10 +94,6 @@ subprojects {
         val project = this@afterEvaluate
         if (project.plugins.hasPlugin("com.android.application") || project.plugins.hasPlugin("com.android.library")) {
             addCommonConfigurationForAndroidModules(project)
-        }
-
-        if (project.plugins.hasPlugin("com.android.library")) {
-            addCommonConfigurationForAndroidLibraries(project)
         }
 
         // Configure code quality for each subproject
@@ -178,55 +175,71 @@ fun addCommonConfigurationForAndroidModules(project: Project) {
         }
     }
 
-    project.extensions.configure<BaseExtension> {
-        compileOptions {
-            sourceCompatibility = JavaVersion.VERSION_17
-            targetCompatibility = JavaVersion.VERSION_17
-        }
+    if (project.plugins.hasPlugin("com.android.application")) {
+        project.extensions.configure<ApplicationExtension> {
+            compileOptions {
+                sourceCompatibility = JavaVersion.VERSION_17
+                targetCompatibility = JavaVersion.VERSION_17
+            }
 
-//        (this as ExtensionAware).extensions.configure<KotlinJvmOptions> {
-//            jvmTarget = "17"
-//        }
+            compileSdk = project.rootProject.extra["compileSdkVersion"] as Int
+            defaultConfig {
+                minSdk = project.rootProject.extra["minSdkVersion"] as Int
+                targetSdk = project.rootProject.extra["targetSdkVersion"] as Int
+                vectorDrawables.useSupportLibrary = true
+                testApplicationId = "com.actionlauncher.test"
+                testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+                testInstrumentationRunnerArguments["clearPackageData"] = "true"
+            }
 
-        compileSdkVersion(project.rootProject.extra["compileSdkVersion"] as Int)
-        buildToolsVersion(project.rootProject.extra["buildToolsVersion"] as String)
-
-        defaultConfig {
-            minSdk = project.rootProject.extra["minSdkVersion"] as Int
-            targetSdk = project.rootProject.extra["targetSdkVersion"] as Int
-            vectorDrawables.useSupportLibrary = true
-            testApplicationId = "com.actionlauncher.test"
-            testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-            testInstrumentationRunnerArguments["clearPackageData"] = "true"
-        }
-
-        packagingOptions {
-            resources {
-                excludes.apply {
-                    add("META-INF/LICENSE.txt")
-                    add("META-INF/NOTICE.txt")
-                    add("META-INF/LICENSE")
-                    add("META-INF/NOTICE")
-                    add("META-INF/AL2.0")
-                    add("META-INF/LGPL2.1")
-                    add("META-INF/versions/9/previous-compilation-data.bin")
-                    add(".readme")
-                    add("README.txt")
+            packaging {
+                resources {
+                    excludes.apply {
+                        add("META-INF/LICENSE.txt")
+                        add("META-INF/NOTICE.txt")
+                        add("META-INF/LICENSE")
+                        add("META-INF/NOTICE")
+                        add("META-INF/AL2.0")
+                        add("META-INF/LGPL2.1")
+                        add("META-INF/versions/9/previous-compilation-data.bin")
+                        add(".readme")
+                        add("README.txt")
+                    }
                 }
             }
         }
     }
-}
 
-fun addCommonConfigurationForAndroidLibraries(project: Project) {
-    project.extensions.configure<BaseExtension> {
-        signingConfigs {
-//            create("debug") {
-//                storeFile = project.file(".android/debug.keystore")
-//                storePassword = "android"
-//                keyAlias = "androiddebugkey"
-//                keyPassword = "android"
-//            }
+    if (project.plugins.hasPlugin("com.android.library")) {
+        project.extensions.configure<LibraryExtension> {
+            compileOptions {
+                sourceCompatibility = JavaVersion.VERSION_17
+                targetCompatibility = JavaVersion.VERSION_17
+            }
+
+            compileSdk = project.rootProject.extra["compileSdkVersion"] as Int
+            defaultConfig {
+                minSdk = project.rootProject.extra["minSdkVersion"] as Int
+                vectorDrawables.useSupportLibrary = true
+                testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+                testInstrumentationRunnerArguments["clearPackageData"] = "true"
+            }
+
+            packaging {
+                resources {
+                    excludes.apply {
+                        add("META-INF/LICENSE.txt")
+                        add("META-INF/NOTICE.txt")
+                        add("META-INF/LICENSE")
+                        add("META-INF/NOTICE")
+                        add("META-INF/AL2.0")
+                        add("META-INF/LGPL2.1")
+                        add("META-INF/versions/9/previous-compilation-data.bin")
+                        add(".readme")
+                        add("README.txt")
+                    }
+                }
+            }
         }
     }
 }
@@ -294,6 +307,9 @@ tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
 }
 tasks.withType<io.gitlab.arturbosch.detekt.DetektCreateBaselineTask>().configureEach {
     jvmTarget = "17"
+}
+tasks.withType<Test>().configureEach {
+    failOnNoDiscoveredTests = false
 }
 
 ktlint {
