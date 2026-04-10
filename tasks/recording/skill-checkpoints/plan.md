@@ -17,11 +17,11 @@ skill authoring guidance.
 | Item | Value |
 | --- | --- |
 | State | active |
-| Total PRs | 2 |
-| Total phases | 3 |
+| Total PRs | 3 |
+| Total phases | 4 |
 | Completed | none |
-| Remaining | P1, P2, P3 |
-| Current / Next | P1 |
+| Remaining | P0, P1, P2, P3 |
+| Current / Next | P0 |
 | Blockers | none |
 
 ## Goal

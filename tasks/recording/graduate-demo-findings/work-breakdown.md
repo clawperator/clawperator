@@ -39,8 +39,7 @@ Read these files IN THIS ORDER before writing anything.
 | File | Why it matters |
 | --- | --- |
 | `tasks/recording/graduate-demo-findings/plan.md` | Stable scope and cleanup intent |
-| `tasks/recording/demo/findings.md` | Source material for durable lessons |
-| `tasks/recording/demo/meta-problem-summary.md` | Candidate for deletion or supersession |
+| `tasks/recording/demo/findings.md` | Source material for durable lessons from the demo task |
 | `docs/api/recording.md` | Durable destination for recording workflow lessons |
 | `docs/skills/authoring.md` | Durable destination for skill-authoring lessons |
 

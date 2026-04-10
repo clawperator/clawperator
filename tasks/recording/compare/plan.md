@@ -29,7 +29,7 @@ consume `SkillResult`, not invent an overlapping trace mechanism first.
 | Total phases | 4 |
 | Completed | none |
 | Remaining | P1, P2, P3, P4 |
-| Current / Next | W1 then W2 |
+| Current / Next | P1 after W2 |
 | Blockers | `tasks/recording/skill-result-contract/` must define `SkillResult` first |
 
 ## Goal
