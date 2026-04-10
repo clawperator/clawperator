@@ -2,13 +2,13 @@
 
 Hi - today I'm going demonstrate how to create a complex skill using Clawperator. In my case, I've got a battery in my home. I often find myself adjusting how much power I want to feed into the grid each night. The UI for doing this in the app has numerous steps, and we're going to use Clawperator to create a skill so we can automate this to the point that I can send a single message to my OpenClaw instance and the export limit will be changed. So let's get started.
 
-First thing, we're going to run the <command> to start recording, then, I'm going to navigate through the various pages in the app, and I'm going to set the desired % i want to stop feeding my power back into the grid. I'm going to set it to stop at 40%.
+First thing, we're going to run the <command> to start recording, then, I'm going to navigate through the various pages in the app, and I'm going to set the desired percentrage i want to stop feeding my power back into the grid. I'm going to set it to stop at 40%.
 
-Okay, that's done, so I'll now run the <command> to cease recording. So those operations have all been capctured.
+Okay, that's done, so I'll now run the <command> to cease recording. So those operations have all been capttured.
 
 Now we're going to create a repeatable skill from this recording. If you're new to Clawperator, you should now that Clawperator works best in conjunction with an agent - the system has been architceted so that Clawperator itself is your "hand" - it will reliably execute operations on your Android device on your behalf. And this hand works in conjunction with the "brain" that is your agent, in my case, my OpenClaw instance.
 
-Now, UI automation can be fickle at times. There can be unpredicable load times, intermittent UI pops displaying randomly and similar. So we're going to create an "orchestrator skill" out of this operation, where my agent will control Clawperator to reliably set my max battery export level.
+Now, UI automation can be fickle at times. There can be unpredicable load times, intermittent UI pop-ups displaying randomly and similar. So we're going to create an "orchestrated skill" out of this operation, where my agent will control Clawperator to reliably set my max battery export level.
 
 And this is where the really interesting part starts.
 
