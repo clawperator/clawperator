@@ -180,6 +180,12 @@ The recording subtree is complete when **all** of the following are true:
   `com.solaxcloud.starter.set-discharge-to-limit-orchestrated` and emits a
   parseable `SkillResult` with enumerated checkpoints and terminal
   verification (skill-result-contract W2)
+- The preserved replay sibling
+  `com.solaxcloud.starter.set-discharge-to-limit-replay` is retrofitted in
+  the same workstream to also emit a parseable `SkillResult`, using the
+  coarse-subset checkpoint list defined by W2, so the recording program
+  does not ship a first-class replay skill that still speaks opaque
+  stdout (skill-result-contract W2)
 - `skill.json` supports an optional `contract` block, scaffold writes a
   starter, and `runSkill` returns a distinct `indeterminate` state when a
   declared verification is not proved (skill-contract-declaration W3)
@@ -319,15 +325,19 @@ Why grouped:
 Scope:
 
 - `tasks/recording/skill-result-contract/` P3
-- create/retrofit
+- create
   `com.solaxcloud.starter.set-discharge-to-limit-orchestrated`
+- retrofit the preserved
+  `com.solaxcloud.starter.set-discharge-to-limit-replay` sibling to emit
+  `SkillResult` as well
 - Solax `SkillResult` emission in `../clawperator-skills`
 
 Why separate:
 
 - different repo
 - depends on PR-3 contract shape being real
-- should not destabilize the preserved `-replay` baseline
+- both Solax skills land on the contract in the same PR so compare does not
+  see a half-migrated pair
 
 ### PR-5: W2 downstream handoff updates
 
@@ -458,7 +468,9 @@ Owns:
 
 - skill-level `SkillResult`
 - `runSkill` parsing/support
-- Solax retrofit to emit structured results
+- creation of the orchestrated Solax proving skill
+- retrofit of the preserved replay Solax skill so both Solax skills emit
+  `SkillResult`
 
 Does not own:
 

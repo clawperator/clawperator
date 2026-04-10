@@ -191,7 +191,7 @@ npm --prefix apps/node run test
 feat(skills): parse structured skill results
 ```
 
-## Phase P3: Retrofit Solax To Emit `SkillResult`
+## Phase P3: Retrofit Both Solax Skills To Emit `SkillResult`
 
 ### Agent Tier
 
@@ -199,29 +199,49 @@ feat(skills): parse structured skill results
 
 ### Goal
 
-Make a new Solax `-orchestrated` skill the first opt-in proving skill for the
-new contract, while leaving the `-replay` baseline intact.
+Make the new Solax `-orchestrated` skill the first proving skill for the
+contract, and retrofit the `-replay` sibling to emit `SkillResult` in the
+same workstream. Both Solax skills end up speaking the contract. The
+recording program does not ship a first-class replay skill that still
+talks to the brain through opaque stdout.
 
 ### Files or Surfaces To Change
 
 - `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-orchestrated/`
-- optionally read from the sibling `...-replay/` skill as the starting point
-  for selectors, device caveats, and validation expectations
+- `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-replay/`
 
 ### Steps
 
 1. Create or retrofit
    `com.solaxcloud.starter.set-discharge-to-limit-orchestrated` as a sibling
-   to the preserved replay skill.
-2. Emit a minimal `SkillResult` from the orchestrated skill.
-3. Include:
+   to the existing replay skill.
+2. Emit a `SkillResult` from the orchestrated skill, including:
    - declared goal (`set discharge limit to <n>%`)
    - input percent
-   - checkpoint list (see required identities below)
+   - the full checkpoint list (see required identities below)
    - terminal verification record
    - relevant embedded exec evidence (the `ResultEnvelope` from each
      `clawperator exec` step in execution order)
-4. Validate live on the Samsung target.
+3. Retrofit
+   `com.solaxcloud.starter.set-discharge-to-limit-replay` to also emit a
+   `SkillResult` in the same PR. The replay emitter should:
+   - reuse the same frame marker and contract version as the orchestrated
+     skill
+   - declare the same `goal` kind and `inputs` shape
+   - emit the same terminal verification record
+   - enumerate at least a coarser subset of the orchestrated checkpoint
+     identities so a replay run and an orchestrated run for the same
+     request remain comparable (see coarse-subset policy below)
+4. Validate both skills live on the Samsung target.
+
+Replay checkpoint coarse-subset policy: the replay skill must emit, at
+minimum, `app_opened`, `discharge_to_row_focused`, `target_text_entered`,
+`save_completed`, and `terminal_state_verified`. Intermediate navigation
+checkpoints are optional for the replay skill because replay treats the
+full path as one cleaned-up traversal. `save_completed` is a replay-only
+identifier that collapses the `toolbar_save_clicked` and
+`bottom_sheet_save_clicked` pair into a single successful-save checkpoint,
+so compare can still align a replay run to an orchestrated baseline.
 
 Required Solax checkpoint identities for v1 (stable strings, in order):
 
@@ -248,17 +268,26 @@ silently.
 
 - `com.solaxcloud.starter.set-discharge-to-limit-orchestrated` exists as a
   distinct skill id beside the preserved `-replay` baseline.
-- The orchestrated skill emits a parseable `SkillResult`.
-- The emitted result matches the actual runtime behavior.
-- The emitted result is consumable by the Clawperator runtime tests via the
-  copied fixture path used by W4 compare; round-tripping the live frame
-  through `runSkill` parsing returns a structurally valid `SkillResult`.
-- The skill docs describe the new result behavior accurately, including the
-  exact checkpoint identities listed above and the failure shape on
-  verification mismatch.
-- Any checkpoint identities dropped as unstable are listed explicitly in
-  `SKILL.md` with the reason they were dropped so W4 fixtures do not silently
-  drift.
+- The orchestrated skill emits a parseable `SkillResult` that matches the
+  actual runtime behavior.
+- The retrofitted replay skill also emits a parseable `SkillResult` using
+  the same frame marker and `contractVersion`, with the coarse-subset
+  checkpoint list defined above and the same terminal verification record.
+- Both emitted results are consumable by the Clawperator runtime tests via
+  the copied fixture path used by W4 compare; round-tripping the live frame
+  through `runSkill` parsing returns a structurally valid `SkillResult` for
+  each skill.
+- A replay run and an orchestrated run for the same input (`40`) produce
+  `SkillResult` documents whose coarse-subset checkpoint identities align,
+  so W4 compare has a baseline to walk.
+- Both skills' docs describe the new result behavior accurately, including
+  the exact checkpoint identities each skill emits and the failure shape on
+  verification mismatch. The replay skill's `SKILL.md` explicitly names its
+  coarse-subset checkpoints, including the `save_completed` collapse, so a
+  reader does not have to derive them from the orchestrated sibling.
+- Any checkpoint identities dropped as unstable are listed explicitly in the
+  affected skill's `SKILL.md` with the reason they were dropped so W4
+  fixtures do not silently drift.
 
 ### Validation
 
@@ -268,11 +297,26 @@ CLAWPERATOR_OPERATOR_PACKAGE=com.clawperator.operator.dev \
 node <clawperator_root>/apps/node/dist/cli/index.js skills run com.solaxcloud.starter.set-discharge-to-limit-orchestrated --device <device_serial> --json -- 40
 ```
 
+```bash
+CLAWPERATOR_SKILLS_REGISTRY=<clawperator_skills_root>/skills/skills-registry.json \
+CLAWPERATOR_OPERATOR_PACKAGE=com.clawperator.operator.dev \
+node <clawperator_root>/apps/node/dist/cli/index.js skills run com.solaxcloud.starter.set-discharge-to-limit-replay --device <device_serial> --json -- 40
+```
+
+Confirm that both invocations return `skillResult` on the CLI JSON envelope
+and that the round-tripped `SkillResult` values parse cleanly through
+`runSkill`.
+
 ### Expected Commit
 
 ```text
-feat(solax): add discharge limit orchestrated skill
+feat(solax): emit skill result from discharge limit skills
 ```
+
+Both the new orchestrated skill and the retrofitted replay skill land in
+the same commit so the Solax pair speaks `SkillResult` atomically. Split
+the commit only if live validation forces a fix into the replay skill
+after the orchestrated skill is already in.
 
 ## Phase P4: Prepare Downstream Handoff
 

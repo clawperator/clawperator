@@ -197,12 +197,13 @@ events, the first time the app loads a little slower, or a popup shows up,
 or a layout shifts, that replay starts to drift. It is the raw material.
 The orchestrated skill still has to be written.
 
-## Scene 7 - The Agent Authors The Skill
+## Scene 7 - The Agent Authors Two Skills
 
 **On screen**
 
 - Codex begins streaming code into the editor. On the left, the export JSON.
-  On the right, two new files being authored in `../clawperator-skills`:
+  On the right, two new skill folders being authored in
+  `../clawperator-skills`:
 
 ```text
 skills/com.solaxcloud.starter.set-discharge-to-limit-replay/
@@ -214,79 +215,102 @@ skills/com.solaxcloud.starter.set-discharge-to-limit-orchestrated/
 - Lower-third card:
 
 ```text
-replay baseline       preserves the direct path through the UI
-orchestrated sibling  adds named checkpoints, terminal verification,
-                      a declared contract, and a SkillResult frame
+Both skills emit a SkillResult.
+Replay:       path-centric. Walk the captured route and verify the outcome.
+Orchestrated: goal-centric. Declare the goal and verification up front;
+              the runtime cross-checks them and can return "indeterminate".
 ```
 
 **Spoken**
 
 Here is where the brain/hand split becomes concrete.
 
-The workflow writes out two skills side by side. The first is a `replay`
-skill. That is the direct path, cleaned up, preserved as a durable
-baseline. It is what you use when the UI is stable and you just want to
-get from A to B the same way every time. We keep it around because it's
-cheap, it's inspectable, and sometimes it's all you need.
+The workflow writes out two skills side by side. Same recording as the
+starting point. Same Android app. Same end result in the UI. Two different
+authoring shapes.
 
-The second, and this is the exciting one, is the `orchestrated` sibling.
-It uses the same recording as its starting point, but it is a different
-kind of thing. It has a declared goal. It names every step on the way as a
-checkpoint. It verifies the persisted state at the end before it tells the
-brain it succeeded. And it emits a structured result the brain can read
-directly.
+The first is a `replay` skill. That is the direct path, cleaned up,
+preserved as a durable baseline. It is what you use when the UI is stable
+and you just want to get from A to B the same way every time. It is
+cheap, it is inspectable, and a lot of the time it's all you actually
+need.
 
-And crucially, none of that is magic. The agent is writing this code from
-the recording evidence. The agent is not "inside" the skill at runtime. At
-runtime, the skill runs straight through. The agent's reasoning is baked
-in at authoring time.
+The second is the `orchestrated` sibling. Same path, but it also declares
+its goal and its verification up front, inside `skill.json`. That
+declaration is what lets Clawperator cross-check what the skill *claimed*
+it would prove against what it *actually* proved, and give you back a
+third outcome beyond success and failed: `indeterminate`, the case where
+the script ran cleanly but did not satisfy its own contract.
+
+But here is the part I want to be really explicit about, because I know
+how people are going to hear this otherwise: **both of these skills emit
+a `SkillResult`**. Every modern skill does. That is not a property of
+`orchestrated`. That is the universal contract any skill under Clawperator
+uses to talk back to the brain. The agent authors the result emission
+into both skills, from the same recording evidence. The difference
+between replay and orchestrated is *what the skill declares* and *how
+much reasoning lives in the script*, not whether the brain gets
+structured output.
 
 ## Scene 8 - Replay Shape Versus Orchestrated Shape
 
 **On screen**
 
-- Side-by-side code view of the two authored `run.js` files.
+- Side-by-side code view of the two authored `run.js` files. Above each
+  block, a header card:
+  - left: `set-discharge-to-limit-replay / scripts/run.js`
+  - right: `set-discharge-to-limit-orchestrated / scripts/run.js`
 
 **Show this code**
 
 ```js
-// replay shape
-await openApp();
-await openIntelligenceTab();
-await openPeakExportCard();
-await openDeviceDischargingCard();
-await focusDischargeToRow();
-await enterLimit(40);
-await confirmDialog();
-await saveOnToolbar();
-await saveOnBottomSheet();
+// replay: path-centric, still emits a SkillResult
+const checkpoints = [];
+async function step(id, fn) {
+  try { await fn(); checkpoints.push({ id, status: "ok" }); }
+  catch (err) { checkpoints.push({ id, status: "failed", note: String(err) }); throw err; }
+}
+
+await step("app_opened",                  openApp);
+await step("discharge_to_row_focused",    navigateToDischargeToRow);
+await step("target_text_entered",         () => enterLimit(40));
+await step("save_completed",              completeSave);
+
+const terminalVerification = await verifyDischargeToRow(40);
+checkpoints.push({
+  id: "terminal_state_verified",
+  status: terminalVerification.ok ? "ok" : "failed",
+});
+
+emitSkillResultFrame({
+  contractVersion: "1.0.0",
+  skillId: "com.solaxcloud.starter.set-discharge-to-limit-replay",
+  goal:   { kind: "set_discharge_limit", percent: 40 },
+  inputs: { percent: 40 },
+  status: terminalVerification.ok ? "success" : "failed",
+  checkpoints,
+  terminalVerification,
+});
 ```
 
 ```js
-// orchestrated shape
+// orchestrated: goal-centric, declared contract, richer checkpoints
 const checkpoints = [];
-const goal = { kind: "set_discharge_limit", percent: 40 };
-
 async function reached(id, fn) {
-  try {
-    await fn();
-    checkpoints.push({ id, status: "ok" });
-  } catch (err) {
-    checkpoints.push({ id, status: "failed", note: String(err) });
-    throw err;
-  }
+  try { await fn(); checkpoints.push({ id, status: "ok" }); }
+  catch (err) { checkpoints.push({ id, status: "failed", note: String(err) }); throw err; }
 }
 
-await reached("app_opened", openApp);
-await reached("intelligence_tab_opened", openIntelligenceTab);
-await reached("peak_export_card_opened", openPeakExportCard);
+await reached("app_opened",                    openApp);
+await reached("intelligence_tab_opened",       openIntelligenceTab);
+await reached("peak_export_card_opened",       openPeakExportCard);
 await reached("device_discharging_card_opened", openDeviceDischargingCard);
-await reached("discharge_to_row_focused", focusDischargeToRow);
-await reached("dialog_input_focused", focusDialogInput);
-await reached("target_text_entered", () => enterLimit(40));
-await reached("dialog_confirm_clicked", confirmDialog);
-await reached("toolbar_save_clicked", saveOnToolbar);
-await reached("bottom_sheet_save_clicked", saveOnBottomSheet);
+await reached("discharge_to_row_focused",      focusDischargeToRow);
+await reached("dialog_input_focused",          focusDialogInput);
+await reached("target_text_entered",           () => enterLimit(40));
+await reached("dialog_confirm_clicked",        confirmDialog);
+await reached("toolbar_save_clicked",          saveOnToolbar);
+await reached("bottom_sheet_save_clicked",     saveOnBottomSheet);
 
 const terminalVerification = await verifyDischargeToRow(40);
 checkpoints.push({
@@ -297,7 +321,7 @@ checkpoints.push({
 emitSkillResultFrame({
   contractVersion: "1.0.0",
   skillId: "com.solaxcloud.starter.set-discharge-to-limit-orchestrated",
-  goal,
+  goal:   { kind: "set_discharge_limit", percent: 40 },
   inputs: { percent: 40 },
   status: terminalVerification.ok ? "success" : "failed",
   checkpoints,
@@ -305,37 +329,67 @@ emitSkillResultFrame({
 });
 ```
 
+- Cut to the orchestrated skill's `skill.json` and highlight the `contract`
+  block:
+
+```json
+{
+  "id": "com.solaxcloud.starter.set-discharge-to-limit-orchestrated",
+  "contract": {
+    "inputs": { "percent": "integer[0,100]" },
+    "goal":   { "kind": "set_discharge_limit" },
+    "verification": {
+      "kind": "node_text_matches",
+      "matcher": "Discharge to {percent}%"
+    }
+  }
+}
+```
+
 **Spoken**
 
-OK look at the difference. On the left, replay. It's basically a list of
-operations. Do them in order. Done. On the right, the orchestrated version.
-It still does the same operations, in the same order, but it does three
-things the replay doesn't.
+OK look at these two side by side.
 
-First, it names every checkpoint. Those names are stable identifiers
-chosen at authoring time. They're how the brain later reasons about where
-the run actually got to.
+The replay version on the left is short and linear. It names a handful of
+coarse-grained checkpoints - opened the app, focused the right row,
+entered the value, saved - and then reads the "Discharge to 40%" row back
+out of the UI as its terminal verification. And then, crucially, it does
+the same thing the orchestrated version does: it emits a `SkillResult`
+frame. Goal, inputs, checkpoints, terminal verification, status. The full
+contract. Replay is not excused from talking back to the brain in a
+structured way.
 
-Second, it verifies the terminal state. Before it tells anybody it
-succeeded, it reads the `Discharge to 40%` row back out of the app. If the
-row isn't there, it isn't success. The most important property of an
-orchestrated skill is that it is honest.
+The orchestrated version on the right does more. It enumerates every
+intermediate step as its own named checkpoint, so if the UI shifts and
+the flow breaks somewhere in the middle, the brain can see exactly how
+far the run got and where it diverged. And then here, over in
+`skill.json`, it declares its contract: its inputs schema, its goal
+shape, and its verification rule. That declaration is what Clawperator
+cross-checks at the end. If the declared verification isn't satisfied,
+the runtime gives the brain back `indeterminate`, not `success`. That is
+what stops a skill from lying by omission, and it is the superpower the
+orchestrated shape adds.
 
-And third, when it's done, it writes out a single structured result.
-That's the `SkillResult`. That's what the brain actually consumes.
+So the simple mental model is this. Both skills emit `SkillResult`. Both
+verify the final state of the app. The replay skill trusts the path. The
+orchestrated skill declares the goal and lets the runtime hold the skill
+to it.
 
 One thing I want to be crystal clear about, because people get this part
-wrong. That `reached(...)` wrapper in the code is just ordinary skill
-code. It's not the agent. There is no agent sitting inside that function
-at runtime. The agent wrote this code once, during authoring. The code
-runs. The code emits a result. The agent reads the result later. That's
-the seam.
+wrong. Those `step(...)` and `reached(...)` wrappers in the code are
+ordinary skill code. They are not the agent. There is no agent sitting
+inside those functions at runtime. The agent wrote this code once,
+during authoring. The code runs. The code emits a result. The agent
+reads the result later. That is the seam.
 
-## Scene 9 - The SkillResult Contract
+## Scene 9 - The SkillResult Contract, Up Close
 
 **On screen**
 
-- Show the `SkillResult` shape as a labeled JSON card:
+- Show the `SkillResult` shape as a labeled JSON card. This is the
+  orchestrated Solax skill's result, picked because it has the fullest
+  checkpoint list to point at; the replay skill emits a structurally
+  identical document, just with fewer checkpoint entries:
 
 ```json
 {
@@ -379,17 +433,19 @@ runSkill parses it and hands it back to the caller as a typed object.
 
 **Spoken**
 
-And here is what the brain gets back. Not a stdout blob. A typed object.
-Goal, inputs, the full checkpoint list, terminal verification with
-expected and observed side by side, and a status that is one of `success`,
-`failed`, or `indeterminate`.
+And here is what the brain gets back from any modern Clawperator skill.
+Not a stdout blob. A typed object. Goal, inputs, the full checkpoint
+list, terminal verification with expected and observed side by side, and
+a status that is one of `success`, `failed`, or `indeterminate`.
 
-That `indeterminate` state is worth a beat. That's the state where the
+That `indeterminate` state is worth a beat. That is the state where the
 script ran fine, no exec call blew up, but the skill did not actually
-prove the thing it said it would prove. That is an honest signal. It
-means the brain knows the difference between "I verified it" and "I think
-it worked". And that distinction is what stops a skill from lying by
-omission.
+prove the thing it said it would prove. The runtime only hands that
+status back when a skill has a declared contract in its `skill.json` to
+compare against, which is why I called that out on the orchestrated skill
+a moment ago. It means the brain knows the difference between "I
+verified it" and "I think it worked", and it's what stops any skill with
+a declared contract from lying by omission.
 
 ## Scene 10 - The Runtime Loop
 
@@ -402,7 +458,11 @@ OpenClaw intent
   "set discharge limit to 40%"
        |
        v
-  invoke orchestrated skill with inputs
+  pick a skill
+  (orchestrated preferred; replay sibling available as fallback)
+       |
+       v
+  invoke the skill with inputs
        |
        v
   Clawperator hand runs the whole skill straight through
@@ -416,7 +476,7 @@ OpenClaw intent
        v
   OpenClaw brain reads the SkillResult
   - status == success? done
-  - status == indeterminate? decide whether to retry differently
+  - status == indeterminate? retry differently, or escalate
   - status == failed? inspect the last ok checkpoint and reason
 ```
 

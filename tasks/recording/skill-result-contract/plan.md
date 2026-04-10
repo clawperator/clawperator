@@ -50,11 +50,15 @@ reconstruction.
 - create or retrofit
   `com.solaxcloud.starter.set-discharge-to-limit-orchestrated` to emit the
   new shape
+- retrofit `com.solaxcloud.starter.set-discharge-to-limit-replay` to emit
+  `SkillResult` as well, so the recording program does not ship a
+  first-class replay skill that still speaks stdout
 - create test fixtures and tests in the Clawperator repo
 
 ## Out of Scope
 
-- broad retrofit of all existing skills
+- broad retrofit of every unrelated legacy skill in one pass (those are on
+  a separate migration path and are upgraded as they are touched)
 - compare implementation itself
 - new observation primitives unless the contract work proves they are necessary
 - authoring a repo-local `skill-author-by-recording` skill
@@ -100,14 +104,31 @@ reconstruction.
   explicitly versioned structure so downstream consumers are not forced back
   into ad-hoc string parsing.
 - `com.solaxcloud.starter.set-discharge-to-limit-orchestrated` is the first
-  opt-in proving skill, not the template for every field.
-- `runSkill` returns `skillResult: SkillResult | null` on the success shape
-  and on the error shape. Legacy skills set it to `null`.
+  proving skill for the contract, not the template for every field.
+- Emitting `SkillResult` is the expected default for every skill authored
+  after W2 ships, regardless of whether the skill is a `-replay` or
+  `-orchestrated` variant. The contract is the common return channel all
+  new skills use to talk to the brain. It is not a property reserved for
+  orchestrated skills.
+- `runSkill` returns `skillResult: SkillResult | null` on both the success
+  and error shape. `null` is reserved for legacy skills that predate the
+  contract, not for replay skills as a class.
 - The `clawperator skills run --json` CLI surface must include
   `skillResult` in its JSON output when present.
-- Backward compatibility hard rule: existing skills that emit no frame must
-  continue to return `ok: true` based on exit code, exactly as today, with
-  `skillResult: null`. No legacy skill is required to opt in.
+- Backward compatibility hard rule (legacy only): existing skills that
+  predate this contract and emit no frame must continue to return
+  `ok: true` based on exit code, exactly as today, with
+  `skillResult: null`. Those skills are on an explicit migration path and
+  should be upgraded to emit `SkillResult` as they are touched. This
+  compatibility lane exists for legacy skills; it is not a category of
+  skill any new authoring work should use.
+- Required Solax retrofit scope: in this workstream, both
+  `com.solaxcloud.starter.set-discharge-to-limit-replay` and
+  `com.solaxcloud.starter.set-discharge-to-limit-orchestrated` end up
+  emitting `SkillResult`. The orchestrated skill is the first emitter and
+  proves the contract; the replay sibling is retrofitted in the same
+  workstream so the recording program does not ship a first-class replay
+  skill that still speaks stdout.
 - W2 must not introduce a `SkillRunResult` shape that W3 will immediately
   need to break. If W2 adds new run-result discriminants or status fields,
   they must be designed to extend to W3's `indeterminate` outcome without
