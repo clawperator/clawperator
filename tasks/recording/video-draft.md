@@ -6,7 +6,9 @@ purpose: |
   workstreams.
 audience:
   - developers
-  - agents reading subtitles/transcripts
+  - OpenClaw tinkerers
+  - tech-savvy users
+  - agents reading subtitles or transcripts
 status: draft
 format: hybrid movie-script
 working_backwards: |
@@ -14,417 +16,542 @@ working_backwards: |
   plays a similar role to an internal press release: it forces the team to
   explain, in user-facing terms, what the finished workflow should feel like
   when Clawperator, Codex, and OpenClaw are working together well.
+honesty_rules:
+  - Every spoken claim must already be true in the repo or be explicitly owned
+    by a task pack under `tasks/recording/`.
+  - Pseudocode blocks must be labeled as "intended shape" when they describe a
+    surface that does not exist yet. The video must never imply that
+    `checkpoint(...)`, `emitSkillResult(...)`, or `skill-author-by-recording`
+    are callable today.
+  - The recording is evidence. The agent authors the orchestrated skill from
+    that evidence. At runtime, the skill runs to completion and hands back a
+    single structured result. The brain does not sit inside the skill on every
+    line and the agent does not sit inside `checkpoint(...)` at runtime.
+  - Any scene that would otherwise require an ephemeral `tasks/` file to be
+    visible on screen is a smell. The video must stand on code, docs, and
+    artifacts that will still exist after the recording program finishes.
 notes:
-  - Keep the spoken tone conversational rather than polished marketing copy.
-  - The script should make the "how" visible through scenes, commands, files,
-    and code callouts, not just through spoken claims.
-  - Use explicit "On screen" and "Show this code" directions whenever the
-    spoken words alone would leave the mechanism unclear.
+  - Keep the spoken tone conversational. Audience is developers, OpenClaw
+    tinkerers, and tech-savvy users - not a marketing panel.
+  - Use explicit "On screen" and "Show this code" directions when spoken words
+    alone would leave the mechanism unclear.
+  - Each "Show this code" block is pseudocode unless explicitly marked as
+    real. The goal is to make the shape of the end-state legible, not to
+    claim an API shipped today.
+owned_by_task_packs:
+  - workflow itself: tasks/recording/skill-author-by-recording/
+  - SkillResult contract and emission pattern: tasks/recording/skill-result-contract/
+  - indeterminate status and declared verification: tasks/recording/skill-contract-declaration/
+  - divergence diagnosis: tasks/recording/compare/
+  - replay baseline truthfulness: tasks/recording/skill-checkpoints/
 ---
 
 # Video Draft
 
-## Scene 1 - Setup / What We Are Solving
+## Scene 1 - The Hook
 
 **On screen**
 
-- Open the Solax app on the phone and briefly show the UI path that has to be
-  navigated manually.
-- Cut back to terminal and editor.
+- Hold on a phone showing the SolaX Cloud app, buried several screens deep in
+  the peak-export automation settings.
+- Cut to a terminal with a single prompt typed into a chat:
+
+```text
+OpenClaw, set my battery export limit to 40% tonight.
+```
+
+- Cut back to the phone, now showing the new "Discharge to 40%" row.
 
 **Spoken**
 
-Hi - today I'm going to demonstrate how to create a complex skill using Clawperator. In my case, I've got a battery in my home. I often find myself adjusting how much power I want to feed into the grid each night. The UI for doing this in the app has numerous steps, and we're going to use Clawperator to create a skill so we can automate this to the point that I can send a single message to my OpenClaw instance and the export limit will be changed. So let's get started.
+Hi. Today I'm going to show you how to take a messy multi-step mobile-app
+workflow, and turn it into something I can trigger with one sentence to my
+OpenClaw instance. The example is a real one. I've got a battery in my house
+and I constantly end up digging through the SolaX Cloud app to change how much
+energy I'm willing to push back to the grid. It's a bunch of taps, a modal, a
+text field, and two saves. I am going to replace all of that with a single
+message, and I am going to do it in a way that is actually verified, not just
+hopeful.
 
-## Scene 2 - Invoke The Guided Workflow
+## Scene 2 - Why This Is Not Just Macro Replay
+
+**On screen**
+
+- Split card:
+
+```text
+Macro replay            Clawperator + agent
+  tap tap tap done        brain forms intent
+  hope it worked          hand executes named checkpoints
+                          hand verifies the final app state
+                          brain reads a structured result
+```
+
+**Spoken**
+
+And before anyone says "this is a macro recorder" - it's not. I want to make
+that distinction early because it's the thing that makes this interesting.
+
+Clawperator is the deterministic "hand" that actually drives the Android
+device. My agent, OpenClaw, is the "brain" that reasons about what to do. What
+we are building is the thing in between: a skill that knows what it was
+trying to achieve, names the checkpoints it is hitting on the way, and reads
+the app state at the end to confirm it actually worked. If any of that goes
+sideways, the brain gets a structured result it can reason about, not a
+stdout blob.
+
+That split is the whole point. Replay is "do these taps". Orchestrated is
+"achieve this outcome, checkpoint by checkpoint, and prove it".
+
+## Scene 3 - Invoke The Guided Authoring Workflow
 
 **On screen**
 
 - Open Codex in the Clawperator repo.
-- Open the future repo-local workflow file:
-  - `.agents/skills/skill-author-by-recording/SKILL.md`
-- Highlight that this is the workflow being used.
-- Show the exact prompt being sent to Codex, something like:
+- Show the exact prompt being sent to Codex:
 
 ```text
-Use $skill-author-by-recording to create a Solax discharge-limit skill.
+Use $skill-author-by-recording to create a
+com.solaxcloud.starter.set-discharge-to-limit-orchestrated skill.
 Guide me when I need to touch the phone.
+```
+
+- Lower-third card:
+
+```text
+`skill-author-by-recording` is an intended repo-local workflow owned by
+tasks/recording/skill-author-by-recording/. It does not exist yet.
+This scene shows the end-state we are building toward.
 ```
 
 **Spoken**
 
-Now, the first important thing to understand is that I'm not going to manually stitch all of this together myself. I'm going to ask Codex to use Clawperator's `skill-author-by-recording` workflow. That workflow is the thing that is going to guide the process. It will tell me when to perform the flow on the phone, it will manage the recording lifecycle, it will pull the artifacts back into the repo, and then it will help turn that captured flow into real skill code.
+Here is the important part. I am not going to hand-stitch any of this
+myself. I am going to ask Codex to use a repo-local workflow called
+`skill-author-by-recording`. That workflow, once it lands, is the thing that
+guides the entire process. It tells me when to go touch the phone. It runs
+the recording lifecycle commands for me. It pulls the artifacts back into the
+repo. And then it helps the agent turn those artifacts into a real skill.
 
-## Scene 3 - Show The Underlying Recording Commands
+And just to be explicit: this workflow doesn't exist yet. It is owned by one
+of the recording task packs in this repo, and it is the last thing that
+lands on top of everything else we are about to see. So this scene is showing
+the intended developer experience, not a feature you can run today.
+
+## Scene 4 - The Recording Lifecycle, Uncovered
 
 **On screen**
 
-- In the terminal, show the exact commands that the guided workflow is driving
-  under the hood:
+- Terminal shows the commands the workflow would run under the hood:
 
 ```bash
 clawperator record start --session-id <session_id> --device <device_serial> --operator-package com.clawperator.operator.dev --json
 clawperator record stop --device <device_serial> --operator-package com.clawperator.operator.dev --json
-clawperator record pull --device <device_serial> --session-id <session_id> --out <recordings_dir> --json
-clawperator recording export --input <recordings_dir> --out <export_file> --snapshots omit --json
+clawperator record pull --device <device_serial> --session-id <session_id> --out ./recordings --json
+clawperator recording export --input ./recordings --snapshots omit --json
 ```
 
-- Then visually step back and make it clear the workflow is abstracting this.
+- Highlight that `record`, `record stop`, `record pull`, and `recording
+  export` already exist as CLI commands today.
 
 **Spoken**
 
-So in other words, yes, under the hood there are concrete commands involved here like `clawperator record start`, `clawperator record stop`, `clawperator record pull`, and `clawperator recording export`. But for the developer experience we're aiming for, I shouldn't need to manually remember and orchestrate those commands every time. The agent should do that with me.
+Under the hood, this is not magic. These four commands are real, shipped
+Clawperator CLI commands. You can run them yourself right now. What the
+workflow does is run them for me in the right order and hand me off to the
+phone at the right moment.
 
-## Scene 3A - Make The Future-State Explicit
+## Scene 5 - Human Performs The Flow
 
 **On screen**
 
-- Add a lower-third card:
+- Codex prints "Recording started on <device>. Please perform the flow now."
+- Cut to the phone. Show the full SolaX navigation: open the app, go to the
+  Intelligence tab, open the peak-export card, open the device-discharging
+  card, focus the "Discharge to" row, open the dialog, type 40, confirm,
+  save, and save again.
+- Cut back to the terminal. Codex prints "Recording stopped. Pulling
+  artifacts." and then "Export written to ./recordings/<session>.export.json".
+
+**Spoken**
+
+OK, the workflow tells me recording is active, and I do the thing I want to
+automate. I open the app, I navigate down to the right control, I set the
+discharge limit to forty percent, and I save it. Then the workflow stops the
+recording, pulls the raw NDJSON off the device, and writes a clean export
+artifact into the repo.
+
+## Scene 6 - The Export Is Evidence, Not A Skill
+
+**On screen**
+
+- Open `./recordings/<session>.export.json`.
+- Highlight these top-level fields visually:
+  - `events`
+  - `packageTransitions`
+  - `counts`
+  - `timeline`
+- Annotation card:
 
 ```text
-This part of the demo is showing the intended Clawperator workflow
-once skill-author-by-recording ships.
+Recording export = evidence.
+Not a finished skill. Not a replayable plan.
 ```
 
 **Spoken**
 
-And just to be really explicit, this part is showing the workflow we are building toward. So this isn't hand-wavy product language. This is meant to become a real skill in this repo that Codex can use to guide a developer through the whole process.
+Now this is the part I see people get wrong most often. This file is not a
+skill. It is evidence.
 
-## Scene 4 - Human Performs The Recorded Flow
+It tells us, truthfully, the sequence of events that the Operator observed
+while I was driving the phone. It's got the click targets, the window
+transitions between apps, the rough timeline, and the package changes. That
+is genuinely useful to an agent that has to figure out what I did and why.
+But it is not a reusable automation. If I just blindly replay these events,
+the first time the app loads a little slower, or a popup shows up, or a
+layout shifts, that replay starts to drift. It is the raw material. The
+orchestrated skill still has to be written.
 
-**On screen**
-
-- Codex says recording is active.
-- Cut to the phone.
-- Show the founder navigating the Solax flow and setting the value to 40%.
-
-**Spoken**
-
-So now Codex is going to tell me that the recording is active, and at that point I'm going to navigate through the various pages in the app, and I'm going to set the desired percentage I want to stop feeding my power back into the grid. I'm going to set it to stop at 40%.
-
-Okay, that's done, and the workflow will now stop the recording and pull the captured artifacts into the project. So those operations have all been captured.
-
-## Scene 5 - Show The Captured Artifacts
+## Scene 7 - The Agent Authors The Skill
 
 **On screen**
 
-- Open Finder or the editor file tree.
-- Show the recording artifacts produced by the workflow.
-- Highlight these files:
+- Codex begins streaming code into the editor. On the left, the export JSON.
+  On the right, two new files being authored in `../clawperator-skills`:
 
 ```text
-recordings/solax-set-discharge-to-limit/<session>.ndjson
-recordings/solax-set-discharge-to-limit/<session>.steps.json
-recordings/solax-set-discharge-to-limit/<session>.export.json
+skills/com.solaxcloud.starter.set-discharge-to-limit-replay/
+skills/com.solaxcloud.starter.set-discharge-to-limit-orchestrated/
 ```
 
-- Open the export file and point at:
-  - events
-  - package transitions
-  - timeline
-
-**Spoken**
-
-Now we're going to create a repeatable skill from this recording. If you're new to Clawperator, you should know that Clawperator works best in conjunction with an agent - the system has been architected so that Clawperator itself is your "hand" - it will reliably execute operations on your Android device on your behalf. And this hand works in conjunction with the "brain" that is your agent, in my case, my OpenClaw instance.
-
-And this is where the really interesting part starts.
-
-The recording we just created is incredibly useful, but it's not the finished thing. The recording is evidence. It shows us the path I took through the app. It shows the clicks, the screens, the timing, the rough shape of the flow. But it doesn't yet give us a truly reliable automation. If we just blindly replayed every tap, we might get lucky a lot of the time, but the moment a screen loads a little slower, or a modal appears, or a UI element shifts, that replay starts to get brittle.
-
-## Scene 5A - Show Exactly What The Export Gives Us
-
-**On screen**
-
-- Open the export JSON and visually highlight:
-  - event list
-  - package transitions
-  - event counts
-  - timeline
-- Add an annotation card:
+- Draw arrows: export.json -> replay skill, export.json -> orchestrated skill.
+- Lower-third card:
 
 ```text
-Recording export is evidence, not a finished skill.
+replay baseline:     preserves the direct path (W1: skill-checkpoints)
+orchestrated sibling: adds named checkpoints, verification,
+                      and a structured SkillResult (W2: skill-result-contract)
 ```
 
 **Spoken**
 
-This is important. The export does not contain a magically completed skill. What it gives us is evidence the agent can inspect. It can see the raw event timeline, package changes, and the broad structure of the path I took through the app. That's enough to scaffold and reason from. It's not enough to pretend the job is done.
+Here is where the brain/hand split becomes concrete.
 
-## Scene 6 - Explain Replay Vs Orchestrated
+The workflow writes out two skills side by side. The first is a `replay`
+skill. That is the direct path, cleaned up, preserved as a durable baseline.
+It is what you use when the UI is stable and you just want to get from A to
+B the same way every time. We keep it around because it's cheap, it's
+inspectable, and sometimes it's all you need.
+
+The second, and this is the exciting one, is the `orchestrated` sibling. It
+uses the same recording as its starting point, but it is a different kind of
+thing. It has a declared goal. It names every step on the way as a
+checkpoint. It verifies the persisted state at the end before it tells the
+brain it succeeded. And it emits a structured result the brain can read
+directly.
+
+And crucially, none of that is magic. The agent is writing this code from
+the recording evidence. The agent is not "inside" the skill at runtime. At
+runtime, the skill runs straight through. The agent's reasoning is baked in
+at authoring time.
+
+## Scene 8 - Replay Shape Versus Orchestrated Shape
 
 **On screen**
 
-- Show a simple split card:
+- Side-by-side pseudocode. Add a header above each block:
 
 ```text
-Replay skill:
-- direct path
-- good for simple stable flows
-
-Orchestrated skill:
-- named checkpoints
-- terminal verification
-- structured result for the brain
+intended authoring shape (owned by W1 / W2)
+not a shipped API today
 ```
-
-**Spoken**
-
-So what we're going to do instead is use that recording as the source material for something better.
-
-Clawperator has two categories of skill that matter here. A replay skill is the simpler kind. That's what you use when a direct path through the UI is stable enough that replaying that route is basically the whole job. But in this case, that's not enough. This Solax flow is multi-step, stateful, and high-consequence enough that what we actually want to end up with is an orchestrated skill.
-
-## Scene 7 - The Missing "How"
-
-**On screen**
-
-- Show a simple artifact flow:
-
-```text
-record on phone
-  -> pull/export artifacts
-  -> scaffold code
-  -> Codex authors orchestrated skill
-  -> OpenClaw invokes it later
-```
-
-**Spoken**
-
-And this is the bit I really want to call out for developers and for agents reading this later. The orchestrated part is not magically produced by the recording itself. Clawperator does not pretend that a recording is already a robust skill. The recording gives us the evidence. Then Codex, using the `skill-author-by-recording` workflow, inspects that evidence, scaffolds the initial code, and authors the orchestrated skill from it.
-
-So there is a real "how" here.
-
-The workflow captures the recording.
-
-It exports the recording artifact.
-
-It scaffolds the initial skill code from that recording context.
-
-And then the agent uses that evidence to write the orchestrated skill code that will actually be invoked later by OpenClaw.
-
-## Scene 8 - Show The Same Operation In Replay And Orchestrated Form
-
-**On screen**
-
-- Show one side-by-side code frame.
-
-**Spoken**
-
-So if we look at the actual code shape, the easiest way to understand this is to compare the same operation in replay mode and orchestrated mode.
 
 **Show this code**
 
 ```js
 // replay shape
-await openDischargeToDialog();
+await openApp();
+await openIntelligenceTab();
+await openPeakExportCard();
+await openDeviceDischargingCard();
+await focusDischargeToRow();
+await enterLimit(40);
+await confirmDialog();
+await saveOnToolbar();
+await saveOnBottomSheet();
+```
 
+```js
 // orchestrated shape
-await checkpoint("dialog_opened", async () => {
-  await openDischargeToDialog();
-  return await assertDialogVisible("Discharge to");
+const checkpoints = [];
+const goal = { kind: "set_discharge_limit", percent: 40 };
+
+async function reached(id, fn) {
+  try {
+    await fn();
+    checkpoints.push({ id, status: "ok" });
+  } catch (err) {
+    checkpoints.push({ id, status: "failed", note: String(err) });
+    throw err;
+  }
+}
+
+await reached("app_opened", openApp);
+await reached("intelligence_tab_opened", openIntelligenceTab);
+await reached("peak_export_card_opened", openPeakExportCard);
+await reached("device_discharging_card_opened", openDeviceDischargingCard);
+await reached("discharge_to_row_focused", focusDischargeToRow);
+await reached("dialog_input_focused", focusDialogInput);
+await reached("target_text_entered", () => enterLimit(40));
+await reached("dialog_confirm_clicked", confirmDialog);
+await reached("toolbar_save_clicked", saveOnToolbar);
+await reached("bottom_sheet_save_clicked", saveOnBottomSheet);
+
+const terminalVerification = await verifyDischargeToRow(40);
+checkpoints.push({ id: "terminal_state_verified", status: terminalVerification.ok ? "ok" : "failed" });
+
+emitSkillResultFrame({
+  contractVersion: "1.0.0",
+  skillId: "com.solaxcloud.starter.set-discharge-to-limit-orchestrated",
+  goal,
+  inputs: { percent: 40 },
+  status: terminalVerification.ok ? "success" : "failed",
+  checkpoints,
+  terminalVerification,
 });
 ```
 
 **Spoken**
 
-This is the critical difference.
+OK look at the difference. On the left, replay. It's basically a list of
+operations. Do them in order. Done. On the right, the orchestrated version.
+It still does the same operations, in the same order, but it does three
+things the replay doesn't.
 
-In replay mode, we're basically saying: perform the operation.
+First, it names every checkpoint. Those names are stable identifiers chosen
+at authoring time. They're how the brain later reasons about where the run
+actually got to.
 
-In orchestrated mode, we're saying: perform the operation, name the checkpoint, confirm the expected state was actually reached, and preserve that observation in the structured result.
+Second, it verifies the terminal state. Before it tells anybody it
+succeeded, it reads the `Discharge to 40%` row back out of the app. If the
+row isn't there, it isn't success. The most important property of an
+orchestrated skill is that it is honest.
 
-And just to be very precise here, `checkpoint(...)` is not the agent itself. It's helper code inside the skill. The agent wrote this code when authoring the skill, and later the brain reads the structured result that comes out of it. The agent is not sitting inside this function on every line. The helper is just what makes the skill's behavior observable and legible.
+And third, when it's done, it writes out a single structured result. That's
+the `SkillResult`. That's what the brain actually consumes.
 
-## Scene 9 - Show The Orchestrated Skill
+One thing I want to be crystal clear about, because people get this part
+wrong. That `reached(...)` wrapper in the code is just ordinary skill code.
+It's not the agent. There is no agent sitting inside that function at
+runtime. The agent wrote this code. The code runs. The code emits a result.
+The agent reads the result later. That's the seam.
 
-**On screen**
-
-- Show a simplified orchestrated skill snippet.
-- Highlight:
-  - goal
-  - inputs
-  - checkpoints
-  - terminal verification
-  - emitted `SkillResult`
-
-**Spoken**
-
-And the skill we end up with here is an orchestrated skill that is much more deliberate about what it's doing.
-
-The orchestrated skill code will have instructions and checkpoints that effectively say: open the app, make sure we're on the right tab, open the correct automation card, confirm that the discharge settings are visible, open the dialog, enter the requested value, save it, and then read the app state back to confirm the setting actually changed. And if any one of those checks fails, don't just pretend it worked. Report that failure back to the brain.
-
-That is the key difference.
-
-Replay gives us the route.
-
-Orchestration gives us the observable, verifiable outcome.
-
-**Show this code**
-
-```js
-// orchestrated skill shape - goal plus checkpoints
-const goal = { kind: "set_discharge_limit", limit };
-
-await checkpoint("app_opened", () => openSolax());
-await checkpoint("intelligence_tab_opened", () => ensureIntelligenceTab());
-await checkpoint("peak_export_card_opened", () => openPeakExportCard());
-await checkpoint("device_discharging_opened", () => openDeviceDischarging());
-await checkpoint("dialog_opened", () => openDischargeToDialog());
-await checkpoint("limit_entered", () => enterLimit(limit));
-await checkpoint("save_completed", () => confirmAndSave());
-
-const terminalVerification = await verifyPersistedRow(limit);
-emitSkillResult({ goal, checkpoints, terminalVerification });
-```
-
-**Spoken**
-
-And this is the key "how". The orchestrated skill is authored by the agent from the recording evidence. The agent is not just copying taps. It's writing code that names the goal, names the checkpoints, verifies the end state, and emits a structured result the brain can reason about.
-
-## Scene 10 - Show The Contract And Result
+## Scene 9 - The SkillResult Contract
 
 **On screen**
 
-- Show the intended `SkillResult` fields:
+- Show the intended `SkillResult` shape as a labeled JSON card:
 
 ```json
 {
-  "goal": "...",
-  "inputs": "...",
-  "status": "success | failed | indeterminate",
-  "checkpoints": [],
-  "terminalVerification": {},
-  "execEnvelopes": []
+  "contractVersion": "1.0.0",
+  "skillId": "com.solaxcloud.starter.set-discharge-to-limit-orchestrated",
+  "goal":   { "kind": "set_discharge_limit", "percent": 40 },
+  "inputs": { "percent": 40 },
+  "status": "success",
+  "checkpoints": [
+    { "id": "app_opened",                 "status": "ok" },
+    { "id": "intelligence_tab_opened",    "status": "ok" },
+    { "id": "peak_export_card_opened",    "status": "ok" },
+    { "id": "device_discharging_card_opened", "status": "ok" },
+    { "id": "discharge_to_row_focused",   "status": "ok" },
+    { "id": "dialog_input_focused",       "status": "ok" },
+    { "id": "target_text_entered",        "status": "ok" },
+    { "id": "dialog_confirm_clicked",     "status": "ok" },
+    { "id": "toolbar_save_clicked",       "status": "ok" },
+    { "id": "bottom_sheet_save_clicked",  "status": "ok" },
+    { "id": "terminal_state_verified",    "status": "ok" }
+  ],
+  "terminalVerification": {
+    "expected": { "textContains": "Discharge to 40%" },
+    "observed": { "textContains": "Discharge to 40%" },
+    "status":   "verified"
+  }
 }
 ```
 
-- Add labels beside the JSON:
+- Annotation labels:
   - "what I was trying to do"
-  - "what I observed on the way"
-  - "what proves it really worked"
+  - "which checkpoints I hit"
+  - "what proves it actually worked"
+
+- Lower-third card:
+
+```text
+SkillResult frame is emitted on stdout inside [Clawperator-Skill-Result].
+Parsed by runSkill. Owned by tasks/recording/skill-result-contract/.
+Not shipped yet.
+```
 
 **Spoken**
 
-That's the thing I find exciting here. We're not building a dumb macro recorder. We're building a system where the hand can act with precision, and the brain can guide it with judgement.
+And here is what the brain gets back. Not a stdout blob. A typed object.
+Goal, inputs, the full checkpoint list, terminal verification with expected
+and observed side by side, and a status that is one of `success`, `failed`,
+or `indeterminate`.
 
-The hand, Clawperator, is responsible for doing concrete things well. Open the app. Wait for this node. Click this element. Type this text. Read this value back from the UI. Take a snapshot. Return structured output. It's the precise, deterministic layer.
+That `indeterminate` state is worth a beat. That's the state where the
+script ran fine, no exec call blew up, but the skill did not actually prove
+the thing it said it would prove. That is an honest signal. It means the
+brain knows the difference between "I verified it" and "I think it worked".
+That distinction is owned by a different task pack in this repo, and it's
+what stops a skill from lying by omission.
 
-The brain, in my case OpenClaw, or it could be Codex, is responsible for the reasoning. It can inspect what Clawperator observed. It can decide whether the app is actually on the right screen. It can notice that a popup appeared. It can choose whether to retry, whether to take a slightly different path, whether to verify a value, whether to fail safely, or whether to continue.
-
-So if you want the simple version of the architecture here, it's this:
-
-- the recording gives the agent evidence
-- the agent authors an orchestrated skill from that evidence
-- that orchestrated skill turns the route into named checkpoints and verified outcomes
-- the `SkillResult` gives the brain something structured enough to reason over
-
-## Scene 11 - Why This Needs Orchestration
-
-**On screen**
-
-- Show the app path again.
-- Optionally show the side-by-side replay/orchestrated snippet again.
-
-**Spoken**
-
-So in this battery-export example, that matters a lot.
-
-This is not a one-click skill. We have to open the app, move to the right tab, open the correct automation, get down into the right discharge settings, open a dialog, enter a new percentage, confirm it, save it, and then make sure the new value actually persisted. That is a very different thing from just tapping a single button.
-
-And importantly, success here is not "the script ran". Success is "the export limit in the app is now actually changed to the value I asked for."
-
-That distinction is massive.
-
-Because if I ask my OpenClaw instance to set the export limit to 40%, I don't want a best effort. I don't want a tool that says "well, I clicked some things, hope for the best." I want the brain to drive the hand all the way to a verified outcome. I want it to know what it was trying to do, observe the current state, issue the right actions, and only report success once the app itself shows that the value has actually been updated.
-
-## Scene 12 - Show The Runtime Loop
+## Scene 10 - The Runtime Loop
 
 **On screen**
 
-- Show a simple terminal or diagram loop:
+- Diagram:
 
 ```text
 OpenClaw intent
-  -> invoke orchestrated skill
-  -> Clawperator executes checkpoint step
-  -> Clawperator returns observation
-  -> OpenClaw decides next action
-  -> Clawperator verifies final state
+  "set discharge limit to 40%"
+       |
+       v
+  invoke orchestrated skill with inputs
+       |
+       v
+  Clawperator hand runs the whole skill straight through
+  - executes each exec step
+  - records every checkpoint as it is reached
+  - reads back the discharge-to row
+       |
+       v
+  skill emits one SkillResult frame on stdout
+       |
+       v
+  OpenClaw brain reads the SkillResult
+  - status == success? done
+  - status == indeterminate? decide whether to retry differently
+  - status == failed? inspect the last ok checkpoint and reason
 ```
 
 **Spoken**
 
-So the way this will look in practice is something like this:
+Here's the actual runtime loop, because I think a lot of people picture this
+wrong. The brain does not micromanage the hand checkpoint by checkpoint. The
+brain forms intent. It picks the orchestrated skill. It invokes it with
+inputs. Clawperator then runs the skill straight through without asking the
+brain anything on the way. When the skill finishes, it emits one structured
+result. The brain reads that result, once, and decides what to do next.
 
-I'll tell OpenClaw, in natural language, to set my export limit to 40%.
+That is what keeps the hand deterministic. The hand never has to guess. It
+executes. It observes. It reports. The brain only gets involved at
+boundaries - to choose the skill, to read the result, and to decide the next
+move if something wasn't quite right.
 
-OpenClaw will then decide to invoke the orchestrated Solax skill.
+And if things did go wrong, the brain actually has enough to reason about.
+It can see the last checkpoint that succeeded. It can see where the
+divergence started. It can see whether the terminal verification matched or
+not. It can decide to retry with different inputs, to try a different skill,
+or to tell me. That is the whole reason the `SkillResult` exists.
 
-That orchestrated skill will use Clawperator to navigate the app in a reliable, observable way. It won't just say "tap tap tap done". The skill itself contains named checkpoints and verification logic. Clawperator executes those operations and returns what it observed. Then OpenClaw gets back a structured result it can reason about.
-
-If something goes wrong, that's also where the brain/hand split becomes so powerful.
-
-Maybe the app loads slowly.
-
-Maybe a random popup appears.
-
-Maybe the app opens on a different tab than expected.
-
-Maybe the save didn't actually persist.
-
-In all of those cases, Clawperator still remains simple and deterministic. It keeps being the hand. It keeps doing the exact operations it is asked to do, and it keeps reporting exactly what it observed. And the brain can use that information to decide what to do next.
-
-## Scene 12A - Make The Demo Inspectable
+## Scene 11 - When Replay And Orchestrated Disagree
 
 **On screen**
 
-- Open these files side by side:
+- Split view. Left: the recording export from scene 6. Right: a
+  `SkillResult` from a failed run.
+- Terminal shows:
+
+```bash
+clawperator recording compare \
+  --baseline ./recordings/<session>.export.json \
+  --result ./runs/<run>.skill-result.json \
+  --json
+```
+
+- Lower-third card:
 
 ```text
-recordings/solax-set-discharge-to-limit/<session>.export.json
+`clawperator recording compare` is owned by tasks/recording/compare/.
+It consumes the SkillResult emitted in Scene 9.
+It does not exist yet.
+```
+
+**Spoken**
+
+And here's the bonus. Because the recording export is evidence, and because
+the orchestrated skill emits a structured result, you can compare them. You
+can point the compare command at the original recording baseline and at a
+specific skill run, and it will tell you the first checkpoint that diverged,
+classify what kind of divergence it was, and give the brain something
+concrete to act on. So when the Solax UI shifts in a future app update, the
+first run that drifts tells you exactly where it drifted. You don't have to
+go spelunking through screenshots.
+
+Again, that compare command is owned by one of the recording task packs. It
+is not shipped yet. But its input is the `SkillResult` you just saw, which
+keeps everything in this architecture pointed at the same shape.
+
+## Scene 12 - Inspectability
+
+**On screen**
+
+- Open Finder or file tree. Show, side by side:
+
+```text
+recordings/<session>.export.json
+../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-replay/scripts/run.js
 ../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-orchestrated/scripts/run.js
+../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-orchestrated/skill.json
 ```
 
-- Draw boxes around:
+- Draw boxes:
   - evidence
+  - replay path
   - orchestrated logic
+  - declared contract
 
 **Spoken**
 
-And if you're a developer watching this, this is the part I'd pause on. These two things together are the whole story. The export shows the evidence. The orchestrated code shows what the agent added - checkpoints, verification, and a structured result. That's the exact "how" of the system.
+And I want to pause on this, because if you are a developer watching this,
+this is the part you should take away. None of this is "trust the AI". It
+is code. It is JSON. It is an NDJSON recording. It is two Git-tracked
+skills. It is a declared contract. You can open every one of these files
+and read them yourself. The agent's contribution is exactly visible: it
+wrote the orchestrated script, it named the checkpoints, it added the
+verification, it filled in the declared contract. That's the "how". There is
+no black box.
 
-## Scene 13 - Developer Trust / Inspectability
+## Scene 13 - Close: One Sentence, Verified Outcome
 
 **On screen**
 
-- Open the file tree and show that the workflow leaves behind inspectable
-  artifacts:
+- Return to the original chat prompt:
 
 ```text
-recordings/.../<session>.export.json
-skills/...-orchestrated/...
+OpenClaw, set my battery export limit to 40% tonight.
 ```
 
-**Spoken**
-
-And I think this is the really important developer point. This isn't hand-wavy. It's not "trust the AI". It's inspectable. It's code. It's artifacts. It's a recording export. It's an orchestrated skill. And it's an agent using those pieces to drive Clawperator in a way that is much more powerful than blind replay alone.
-
-## Scene 14 - Close
-
-**On screen**
-
-- Return to terminal and show a natural-language request to OpenClaw.
-- End on the verified result in the app.
+- Cut to the phone: the "Discharge to 40%" row is live.
+- Cut to the terminal: the `SkillResult.status == "success"` line highlighted.
 
 **Spoken**
 
-And once that's in place, the user experience becomes kind of magical.
+So this is what we are building. I type one sentence into my OpenClaw
+instance. OpenClaw decides this is the
+`com.solaxcloud.starter.set-discharge-to-limit-orchestrated` skill. It
+invokes it. Clawperator drives the app. The skill hits every checkpoint,
+reads the persisted row back, and emits a `SkillResult` with
+`status: success` and `terminalVerification.status: verified`. OpenClaw
+tells me it is done.
 
-Instead of me opening the Solax app, navigating through multiple screens, editing a dialog, saving it, and double-checking it worked, I can just send a single message to my OpenClaw instance. Something like "set my export limit to 40% tonight."
+And the reason I find this exciting, beyond the obvious "I didn't have to
+touch my phone" thing, is that this is a genuine brain-and-hand system. The
+hand stays deterministic and boring. The brain stays in the agent. The
+skill is the contract between them. The recording is the evidence the skill
+was written from. And every single piece of that is inspectable code,
+inspectable artifacts, or a shipped CLI command.
 
-Then OpenClaw becomes the brain. Clawperator becomes the hand. The orchestrated skill becomes the bridge between them. And together they can take that intent, drive the Android UI, and come back with a result that isn't just plausible, but verified.
-
-So that's what we're going to build.
-
-We're going to take this recording, turn it into an orchestrated skill, and show how Clawperator plus an agent like OpenClaw or Codex lets you automate a real, messy, high-value mobile app workflow in a way that actually feels robust.
-
-Let's keep going.
+That's it. That's the workflow. Let's keep going.

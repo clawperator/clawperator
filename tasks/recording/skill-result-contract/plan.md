@@ -112,6 +112,19 @@ reconstruction.
   need to break. If W2 adds new run-result discriminants or status fields,
   they must be designed to extend to W3's `indeterminate` outcome without
   another breaking reshape.
+- W2 does not ship a shared skill-side authoring helper (there is no
+  `checkpoint(...)` library or framework published by this task pack). The
+  orchestrated Solax `run.js` emits the `SkillResult` frame with ordinary
+  per-skill code: it keeps an in-script list of checkpoint records, appends
+  to it as each step completes or fails, runs its terminal verification
+  read-back, and writes one `[Clawperator-Skill-Result]` frame on stdout at
+  the end of the run. Whether a skill uses a tiny local helper inside its
+  own `scripts/` directory is a per-skill stylistic choice and is not a
+  public contract. Any future cross-skill helper library is explicitly out
+  of scope for W2 and must be proposed as a separate task pack if it is
+  wanted later. This keeps the "agent authors the skill" story honest: the
+  agent is writing the emission code itself from the recording evidence,
+  not calling a magic framework that does it for them.
 
 ## Required Decisions In P1
 

@@ -98,3 +98,13 @@ Once implemented, this task should inform:
 - `.agents/skills/skill-author-by-recording/`
 - `docs/skills/authoring.md`
 - any developer-facing demos or videos of the recording workflow
+
+## Relationship To The Recording Promo Video
+
+`tasks/recording/video-draft.md` describes the end-state of this workflow as
+if a developer can already invoke it in Codex. That framing is intentional:
+the video is a "working backwards" artifact that treats this task pack as the
+named owner of the guided authoring experience. The video must continue to
+be explicit that the workflow itself does not exist yet and only becomes real
+once this task pack lands on top of W1-W5. If the video ever implies the
+workflow exists today, fix the video, not the scope of this task.
