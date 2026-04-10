@@ -296,10 +296,12 @@ export function getNamedMcpTools(
         const opts = mergeWithSessionDefaults(parsed, session);
 
         const selector = mapRequiredSelector(opts.selector, "selector");
+        const waitExecution = buildWaitExecution(selector, opts.timeoutMs);
 
         const execution = applyMcpExecutionMetadata(
-          buildWaitExecution(selector, opts.timeoutMs),
+          waitExecution,
           "wait",
+          waitExecution.timeoutMs,
         );
 
         return await runExecutionTool(execution, opts, logger, (result) => {

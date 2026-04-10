@@ -40,7 +40,7 @@ describe("observe executions", () => {
 
   it("preserves wait execution timeout padding when MCP metadata is applied", () => {
     const execution = buildWaitExecution({ textEquals: "Settings" }, 12_000);
-    const stamped = applyMcpExecutionMetadata(execution, "wait");
+    const stamped = applyMcpExecutionMetadata(execution, "wait", execution.timeoutMs);
 
     assert.strictEqual(execution.timeoutMs, 30_000);
     assert.strictEqual(stamped.timeoutMs, 30_000);

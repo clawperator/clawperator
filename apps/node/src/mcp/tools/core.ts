@@ -39,7 +39,9 @@ const executeArgsSchema = executionToolOptionsSchema.extend({
   actions: z.array(executionActionSchema).min(1, { message: "actions is required" }),
 }).strict();
 
-const configureArgsSchema = executionToolOptionsSchema.extend({
+const configureArgsSchema = z.object({
+  deviceId: z.string().trim().min(1).optional(),
+  operatorPackage: z.string().trim().min(1).optional(),
   timeoutMs: z.number().int().min(LIMITS.MIN_EXECUTION_TIMEOUT_MS).max(LIMITS.MAX_EXECUTION_TIMEOUT_MS).optional(),
 }).strict();
 
