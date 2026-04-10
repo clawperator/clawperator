@@ -5,6 +5,12 @@
 Package the proven recording-to-orchestrated workflow into a repo-local agent
 skill at `.agents/skills/skill-author-by-recording/`.
 
+This skill is the **single developer-facing entrypoint** for skill authorship
+from a recording. If implementation complexity requires decomposition, it may
+delegate to narrower helper skills internally. We should not add a separate
+top-level `skill-author-orchestrator` skill because that would be redundant and
+too easy to confuse with `...-orchestrated`.
+
 This task exists because the current recording plans already define the replay
 baseline, the agent-driven orchestrated runtime, and the compare/contract
 story. Until this workflow is explicitly owned, the developer-facing "how"
@@ -32,7 +38,8 @@ durable docs are all in place.
 
 Create a repo-local agent workflow that can guide a human and an authoring-time
 agent through the full path from recorded UI flow to an **agent-driven
-orchestrated skill**, without pretending the recording alone is sufficient.
+orchestrated skill**, without pretending the recording alone is sufficient, and
+without forcing the human to choose among multiple top-level authoring skills.
 
 ## Why This Is A Separate Task
 
@@ -48,9 +55,15 @@ What is still missing is the guided developer experience that turns those
 pieces into one understandable workflow. That workflow should be explicit and
 inspectable, not tribal knowledge.
 
+The release skill family is the closest local precedent: one orchestrator skill
+coordinates several narrower release skills. W6 should copy that decomposition
+pattern if needed, but keep a single front door for the user.
+
 ## In Scope
 
 - a repo-local skill at `.agents/skills/skill-author-by-recording/`
+- explicit phase boundaries for the internal authoring workflow
+- optional helper-skill decomposition behind the single top-level entrypoint
 - instructions that guide the operator through:
   - starting recording
   - performing the recorded UI flow when prompted
@@ -69,6 +82,8 @@ inspectable, not tribal knowledge.
 - inventing new contracts or result shapes in this task
 - proving the replay baseline again unless the authoring-time agent wants to
   read it as optional reference material
+- adding a second developer-facing top-level skill such as
+  `skill-author-orchestrator`
 
 ## Source Of Truth
 
@@ -100,6 +115,25 @@ the following in a way a developer can follow:
 - leaves behind enough inspectable commands, files, and code surfaces that the
   workflow can be demonstrated in a developer-facing video without relying on
   unstated operator knowledge
+
+The preferred implementation shape is:
+
+- top-level entrypoint:
+  - `.agents/skills/skill-author-by-recording/`
+- helper skills behind that entrypoint, if decomposition is needed:
+  - `.agents/skills/recording-capture-export/`
+  - `.agents/skills/skill-author-orchestrated-from-recording/`
+  - `.agents/skills/skill-validate-authored-skill/`
+
+These helper names are descriptive and non-overlapping. Avoid names such as
+`skill-author-orchestrator` because they are too easy to confuse with
+`skill-author-orchestrated` or with the product concept of an orchestrated
+skill.
+
+Replay-specific helper authorship is intentionally **not** required in the
+first user-facing workflow. The replay baseline remains an important proving
+artifact in W1/W2, but the front-door authorship experience in W6 is centered
+on producing the orchestrated skill that the video demonstrates.
 
 ## Durable Follow-Up
 

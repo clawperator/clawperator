@@ -452,6 +452,11 @@ it was designed around.
   the orchestrated sibling, with the thin run.js harness as a
   near-boilerplate follow-on and the skill.json contract block as
   the third artifact.
+- W6 should use the release-skill family as the decomposition precedent:
+  one top-level `skill-author-by-recording` entrypoint, with optional helper
+  skills behind it if the implementation gets large. Do **not** add a second
+  top-level `skill-author-orchestrator` skill; that name is too easy to
+  confuse with `skill-author-orchestrated`.
 - The workflow must know how to prompt the human when to touch the
   phone, run the recording lifecycle, and then hand the recording
   evidence to an authoring-time agent that produces the
@@ -472,6 +477,11 @@ it was designed around.
   evidence only. SKILL.md is the runtime program. This is the
   cleanest story and avoids shipping huge evidence blobs into every
   run of the skill.
+- Default helper decomposition for W6, if needed:
+  - `recording-capture-export`
+  - `skill-author-orchestrated-from-recording`
+  - `skill-validate-authored-skill`
+  Replay-specific helper authoring is not part of the first front-door flow.
 
 ### Changed: `tasks/recording/plan.md` (top-level)
 

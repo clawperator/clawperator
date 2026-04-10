@@ -23,6 +23,11 @@ Current state: blocked until the earlier recording workstreams have landed.
   workflow exists to make the "how" understandable.
 - Do not declare authoring done until the newly written skill has been invoked
   once and its emitted `SkillResult` is inspectable.
+- Keep one human-facing entrypoint: `skill-author-by-recording`.
+- If helper skills are introduced, they sit behind that entrypoint. Do not
+  make the user choose among multiple top-level authoring skills for this flow.
+- Do not introduce a top-level skill named `skill-author-orchestrator`.
+  That name is too easy to confuse with `skill-author-orchestrated`.
 
 ## Required Reading
 
@@ -69,6 +74,16 @@ Specify exactly what the skill-authoring workflow must do and show.
   - orchestrated runtime script
   - first-run `SkillResult`
   - any compare or verification artifact added by the earlier workstreams
+- The workflow explicitly defines whether implementation is:
+  - monolithic inside `skill-author-by-recording`, or
+  - decomposed behind it into helper skills
+- If helper skills are used, the default recommended decomposition is:
+  - `recording-capture-export`
+  - `skill-author-orchestrated-from-recording`
+  - `skill-validate-authored-skill`
+- Replay-skill authoring is not required as part of the first front-door flow.
+  If we later want replay authoring as a first-class workflow, it should be a
+  deliberate follow-up task rather than an implicit requirement in W6.
 
 ## Phase P2: Implement The Repo-Local Skill
 
@@ -84,6 +99,8 @@ defined workflow consistently.
 - It points developers at the exact files that explain what was generated.
 - It uses the recording export, the user's stated goal, and the W2b/W3 contract
   shape to author `SKILL.md`, `skill.json`, and the thin `run.js`.
+- If helper skills are introduced, the top-level skill clearly delegates to
+  them and preserves resumability across phase boundaries.
 - A developer following the workflow can understand the end-to-end path without
   extra narration from the original author.
 
@@ -103,4 +120,6 @@ experience is understandable from start to finish.
     the thin `run.js`
   - how the brain/hand model is embodied in code and in the first-run
     `SkillResult`
+- The chosen decomposition still feels like one workflow to the user rather
+  than a menu of competing authoring skills.
 - Any durable guidance discovered here is migrated into `docs/skills/authoring.md`.

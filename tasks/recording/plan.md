@@ -155,11 +155,15 @@ skill, and then hand-author the reliable parts.
 After this work:
 
 - it is safe to build a repo-local `.agents/skills/skill-author-by-recording/`
-  workflow that guides an agent through the full process
+  workflow that guides an agent through the full process as the single
+  developer-facing entrypoint
 - that workflow can tell the human exactly when to perform the recorded UI
   flow, manage `record start` / `record stop` / `record pull` / `recording
   export`, hand the captured evidence to an authoring-time agent, and then
   help author the orchestrated skill from that evidence
+- if the workflow becomes large, it is explicitly allowed to orchestrate
+  narrower helper skills behind the scenes, similar to `release-orchestrator`,
+  but the human-facing entrypoint remains `skill-author-by-recording`
 - the resulting artifacts are inspectable by both developers and agents:
   recording export, orchestrated `SKILL.md`, thin `run.js`, declared contract,
   first-run `SkillResult`, and compare output
