@@ -28,7 +28,10 @@ the agent finish the work or distill durable follow-up guidance.
 
 - Target skill id: `com.solaxcloud.starter.set-discharge-to-limit`
 - Skill path:
+  `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit`
 - Validation status:
+  - `skills validate` passes
+  - `skills run ... -- 40` succeeded on-device
 
 ## Findings
 
@@ -62,6 +65,11 @@ the agent finish the work or distill durable follow-up guidance.
     doctor --operator-package com.clawperator.operator.dev` passed including a
     successful handshake
   - `record parse` emitted six warnings that scroll events were dropped in v1
+  - final successful runtime path on the Samsung device was:
+    `Intelligence -> Peak Export card -> Device Discharging action card -> Discharge to row -> dialog input -> Confirm -> Save`
+  - the first reliable implementation used coordinate clicks for the two
+    container-card taps and selector-driven actions for the remaining row,
+    dialog, and save steps
 - Docs or workflow gaps:
   - `docs/api/recording.md` and `docs/skills/authoring.md` match the current
     flow we plan to use:
@@ -70,12 +78,19 @@ the agent finish the work or distill durable follow-up guidance.
   - pull, export, and parse should be treated as sequential steps in practice;
     running export or parse before pull completes can create false failure
     noise
+  - the recording parse output was useful, but not sufficient by itself to
+    derive the working skill flow. Live screenshots and UI dumps were needed to
+    identify the real clickable containers and the extra `Device Discharging`
+    step between `Peak Export` and `Discharge to`
 - Durable guidance to migrate into `skill-author-by-recording`:
   - Prefer proving the app-specific skill first, then distilling the reusable
     workflow from the real implementation rather than guessing abstractions up
     front.
   - Do not parallelize dependent artifact steps after recording stop. Pull
     first, then export, then parse or inspect.
+  - when a recorded tap lands on blank space beside a label, do not assume the
+    label text itself is the clickable node. Confirm with a live UI dump or
+    screenshot, and use a container-aware strategy or coordinates when needed
 
 ## Open Questions
 

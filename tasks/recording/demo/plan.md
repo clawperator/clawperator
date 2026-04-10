@@ -42,11 +42,11 @@ Secondary deliverable:
       Galaxy device.
 - [x] Pull the raw NDJSON recording into `../clawperator-skills`.
 - [x] Export the recording context artifact for authoring.
-- [ ] Scaffold the new Solax skill into `../clawperator-skills` using
+- [x] Scaffold the new Solax skill into `../clawperator-skills` using
       `--recording-context`.
 - [ ] Inspect the recording artifacts and turn the captured flow into reusable
       skill logic rather than a one-off replay.
-- [ ] Validate the Solax skill on-device and note any reliability gaps.
+- [x] Validate the Solax skill on-device and note any reliability gaps.
 - [ ] Update `tasks/recording/demo/findings.md` throughout the work with:
       commands used, artifact paths, observed gaps, and decisions.
 - [ ] Distill the stable parts of the workflow into
