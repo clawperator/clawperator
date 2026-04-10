@@ -252,7 +252,7 @@ in the video.
 W2b does not own a new `--save-result` flag. The v1 pattern is:
 
 ```bash
-clawperator skills run <id> --json -- <inputs> > ./runs/<id>-<ts>.skill-result.json
+clawperator skills run <id> --json -- <inputs> > ./runs/<id>-<ts>.skills-run.json
 ```
 
 W4 (`compare/`) owns the `--result` file input contract. The intended v1

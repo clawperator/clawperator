@@ -533,12 +533,12 @@ back to the outer brain.
 ```bash
 # Successful run saved earlier:
 clawperator skills run com.solaxcloud.starter.set-discharge-to-limit-orchestrated \
-  --json -- 40 > ./runs/solax-run-01.skill-result.json
+  --json -- 40 > ./runs/solax-run-01.skills-run.json
 
 # Compare it against the retained sanitized recording baseline:
 clawperator recording compare \
   --baseline ../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-orchestrated/references/compare-baseline.export.json \
-  --result ./runs/solax-run-01.skill-result.json \
+  --result ./runs/solax-run-01.skills-run.json \
   --json
 ```
 
@@ -559,7 +559,7 @@ clawperator recording compare \
 ```bash
 clawperator recording compare \
   --baseline ../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-orchestrated/references/compare-baseline.export.json \
-  --result ./runs/solax-forced-failure.skill-result.json \
+  --result ./runs/solax-forced-failure.skills-run.json \
   --json
 ```
 
@@ -609,7 +609,7 @@ and terminal noise. I get a typed diagnosis I can act on.
 ../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-orchestrated/SKILL.md
 ../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-orchestrated/scripts/run.js
 ../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-orchestrated/skill.json
-./runs/<run>.skill-result.json
+./runs/<run>.skills-run.json
 ```
 
 - Draw boxes:

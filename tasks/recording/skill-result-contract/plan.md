@@ -117,9 +117,10 @@ reconstruction.
   Rationale: `source` is infrastructure metadata. The runtime agent knows what
   device actions to take, not which CLI binary it is running inside. Having
   `runSkill` inject `source` keeps SKILL.md emission rules clean and guarantees
-  accuracy. It also keeps `SkillResult` self-describing as a portable artifact:
-  any consumer reading a `.skill-result.json` file can determine the emitter
-  kind without needing the skills registry.
+  accuracy. It also keeps the persisted `clawperator skills run --json`
+  wrapper self-describing as a portable artifact: any consumer reading a
+  `.skills-run.json` file can inspect `skillResult.source` to determine the
+  emitter kind without needing the skills registry.
 - Checkpoint evidence must not be a free-form `Record<string,string>` as the
   primary contract shape. P1 must choose a small typed union or another
   explicitly versioned structure so downstream consumers are not forced back
