@@ -41,7 +41,7 @@ success.
 - define `inputs`, `goal`, and `verification` structure for v1
 - update scaffolding to emit an empty/starter `contract` block
 - cross-check declared verification against emitted `SkillResult`
-- declare the contract for the Solax skill as the proving case
+- declare the contract for the Solax `-orchestrated` skill as the proving case
 
 ## Out of Scope
 
@@ -56,7 +56,7 @@ success.
 | --- | --- | --- |
 | `apps/node/src/domain/skills/` | Clawperator repo | scaffold + runtime enforcement |
 | `apps/node/src/test/` | Clawperator repo | contract declaration tests |
-| `../clawperator-skills/` | Skills repo | Solax declaration proving case |
+| `../clawperator-skills/` | Skills repo | Solax orchestrated declaration proving case |
 | `tasks/recording/skill-contract-declaration/` | Clawperator repo | temporary execution contract |
 
 ## Decision Rules
@@ -90,5 +90,4 @@ This task should produce:
 - an optional `contract` block shape in `skill.json`
 - scaffold support for the block
 - runtime cross-checking of declared verification against emitted `SkillResult`
-- Solax `skill.json` updated to declare its contract
-
+- Solax `-orchestrated` `skill.json` updated to declare its contract

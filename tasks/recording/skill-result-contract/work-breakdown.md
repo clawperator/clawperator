@@ -42,7 +42,7 @@ Read these files IN THIS ORDER before writing anything.
 | `apps/node/src/contracts/result.ts` | Existing exec-level envelope that must remain separate |
 | `apps/node/src/domain/skills/runSkill.ts` | Current skill runtime contract to retrofit |
 | `docs/skills/authoring.md` | Current public authoring contract |
-| `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit/scripts/run.js` | First proving skill |
+| `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-replay/scripts/run.js` | Current replay baseline to preserve while designing the orchestrated sibling |
 
 ## PR / Phase Plan
 
@@ -196,24 +196,29 @@ feat(skills): parse structured skill results
 
 ### Goal
 
-Make the Solax skill the first opt-in proving skill for the new contract.
+Make a new Solax `-orchestrated` skill the first opt-in proving skill for the
+new contract, while leaving the `-replay` baseline intact.
 
 ### Files or Surfaces To Change
 
-- `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit/scripts/run.js`
-- `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit/SKILL.md`
+- `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-orchestrated/`
+- optionally read from the sibling `...-replay/` skill as the starting point
+  for selectors, device caveats, and validation expectations
 
 ### Steps
 
-1. Emit a minimal `SkillResult` from the Solax skill.
-2. Include:
+1. Create or retrofit
+   `com.solaxcloud.starter.set-discharge-to-limit-orchestrated` as a sibling
+   to the preserved replay skill.
+2. Emit a minimal `SkillResult` from the orchestrated skill.
+3. Include:
    - declared goal (`set discharge limit to <n>%`)
    - input percent
    - checkpoint list (see required identities below)
    - terminal verification record
    - relevant embedded exec evidence (the `ResultEnvelope` from each
      `clawperator exec` step in execution order)
-3. Validate live on the Samsung target.
+4. Validate live on the Samsung target.
 
 Required Solax checkpoint identities for v1 (stable strings, in order):
 
@@ -235,7 +240,9 @@ deterministically, drop it from the v1 list and document the reason in
 
 ### Acceptance Criteria
 
-- Solax emits a parseable `SkillResult`.
+- `com.solaxcloud.starter.set-discharge-to-limit-orchestrated` exists as a
+  distinct skill id beside the preserved `-replay` baseline.
+- The orchestrated skill emits a parseable `SkillResult`.
 - The emitted result matches the actual runtime behavior.
 - The emitted result is consumable by the Clawperator runtime tests via the
   copied fixture path used by W4 compare; round-tripping the live frame
@@ -252,13 +259,13 @@ deterministically, drop it from the v1 list and document the reason in
 ```bash
 CLAWPERATOR_SKILLS_REGISTRY=<clawperator_skills_root>/skills/skills-registry.json \
 CLAWPERATOR_OPERATOR_PACKAGE=com.clawperator.operator.dev \
-node <clawperator_root>/apps/node/dist/cli/index.js skills run com.solaxcloud.starter.set-discharge-to-limit --device <device_serial> --json -- 40
+node <clawperator_root>/apps/node/dist/cli/index.js skills run com.solaxcloud.starter.set-discharge-to-limit-orchestrated --device <device_serial> --json -- 40
 ```
 
 ### Expected Commit
 
 ```text
-feat(solax): emit structured skill result
+feat(solax): add discharge limit orchestrated skill
 ```
 
 ## Phase P4: Prepare Downstream Handoff

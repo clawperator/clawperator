@@ -122,36 +122,44 @@ test(skills): regression for non-zero exit propagation
 ### Goal
 
 Remove silent-success behavior and make the save sequence truthful enough that a
-failed sub-exec reaches the caller as failure.
+failed sub-exec reaches the caller as failure, while preserving the current
+skill as the explicit replay baseline.
 
 ### Files or Surfaces To Change
 
-- `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit/scripts/run.js`
-- optionally `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit/SKILL.md` if behavior notes change materially in the same phase
+- `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-replay/`
+- any registry/index surface in `../clawperator-skills` needed to preserve the
+  renamed skill id cleanly
 
 ### Steps
 
 1. Remove the current `stdout -> process.exit(0)` failure swallowing path in
    `run.js`. On any thrown exec error, exit non-zero (preserving the failed
    exec stdout to stderr or to a structured error so the brain still sees it).
-2. Make the second `Save` click safer using one of these concrete approaches:
+2. Preserve the existing Solax skill under the explicit id
+   `com.solaxcloud.starter.set-discharge-to-limit-replay`. Update any local
+   references needed so W2 can build `-orchestrated` separately instead of
+   mutating the replay baseline in place.
+3. Make the second `Save` click safer using one of these concrete approaches:
    - add a `wait_for_node` with `present:false` semantics (or equivalent)
      for the first `Save` node before the second click, with a finite
      timeout. If the first `Save` does not disappear, fail the skill.
    - otherwise scope the second `Save` to a different container/resource id
      observed in the bottom-sheet phase, so the matcher cannot collide with
      the first.
-3. Provide a documented manual repro for forced sub-exec failure on the live
+4. Provide a documented manual repro for forced sub-exec failure on the live
    device, complementing the P0 regression. Capture the exact `skills run`
    command and the resulting `SKILL_EXECUTION_FAILED` JSON. Add this to the
    skill's `SKILL.md` "validation" section so it remains discoverable.
-4. Re-run the skill on-device after the fix for both success and failure
+5. Re-run the skill on-device after the fix for both success and failure
    paths.
 
 ### Acceptance Criteria
 
 - `run.js` no longer exits `0` after a failed exec under any stdout
   condition.
+- The replay baseline exists under the explicit skill id
+  `com.solaxcloud.starter.set-discharge-to-limit-replay`.
 - The save sequence either waits for the first `Save` to disappear, or
   scopes the second match to a distinct node with documented evidence.
 - The documented forced-failure repro produces a non-zero exit and a
@@ -163,13 +171,13 @@ failed sub-exec reaches the caller as failure.
 ```bash
 CLAWPERATOR_SKILLS_REGISTRY=<clawperator_skills_root>/skills/skills-registry.json \
 CLAWPERATOR_OPERATOR_PACKAGE=com.clawperator.operator.dev \
-node <clawperator_root>/apps/node/dist/cli/index.js skills validate com.solaxcloud.starter.set-discharge-to-limit --json
+node <clawperator_root>/apps/node/dist/cli/index.js skills validate com.solaxcloud.starter.set-discharge-to-limit-replay --json
 ```
 
 ```bash
 CLAWPERATOR_SKILLS_REGISTRY=<clawperator_skills_root>/skills/skills-registry.json \
 CLAWPERATOR_OPERATOR_PACKAGE=com.clawperator.operator.dev \
-node <clawperator_root>/apps/node/dist/cli/index.js skills run com.solaxcloud.starter.set-discharge-to-limit --device <device_serial> --json -- 40
+node <clawperator_root>/apps/node/dist/cli/index.js skills run com.solaxcloud.starter.set-discharge-to-limit-replay --device <device_serial> --json -- 40
 ```
 
 Required cases:
@@ -180,7 +188,7 @@ Required cases:
 ### Expected Commit
 
 ```text
-fix(solax): make discharge limit failures truthful
+fix(solax): preserve truthful discharge limit replay skill
 ```
 
 ## Phase P2: Add Terminal-State Verification
@@ -195,8 +203,8 @@ Verify `Discharge to <target>%` before returning success.
 
 ### Files or Surfaces To Change
 
-- `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit/scripts/run.js`
-- `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit/SKILL.md`
+- `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-replay/scripts/run.js`
+- `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-replay/SKILL.md`
 
 ### Steps
 
@@ -234,7 +242,7 @@ Verify `Discharge to <target>%` before returning success.
 ```bash
 CLAWPERATOR_SKILLS_REGISTRY=<clawperator_skills_root>/skills/skills-registry.json \
 CLAWPERATOR_OPERATOR_PACKAGE=com.clawperator.operator.dev \
-node <clawperator_root>/apps/node/dist/cli/index.js skills run com.solaxcloud.starter.set-discharge-to-limit --device <device_serial> --json -- 39
+node <clawperator_root>/apps/node/dist/cli/index.js skills run com.solaxcloud.starter.set-discharge-to-limit-replay --device <device_serial> --json -- 39
 ```
 
 Required cases:
@@ -245,7 +253,7 @@ Required cases:
 ### Expected Commit
 
 ```text
-fix(solax): verify persisted discharge limit
+fix(solax): verify persisted discharge limit replay
 ```
 
 ## Phase P3: Document Durable Guidance

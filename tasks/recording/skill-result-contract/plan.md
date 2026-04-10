@@ -7,7 +7,8 @@ as more than an opaque stdout blob. This is the load-bearing interface change
 that turns checkpoints, terminal verification, and compare output into
 structured, consumable data instead of private script conventions.
 
-Use the Solax skill as the first proving case, but keep the contract generic.
+Use a new Solax orchestrated skill as the first proving case, while preserving
+the replay baseline separately.
 
 ## Status
 
@@ -23,9 +24,9 @@ Use the Solax skill as the first proving case, but keep the contract generic.
 
 ## Goal
 
-Introduce a skill-level `SkillResult` contract and retrofit the Solax skill to
-emit it, so the brain can read goals, checkpoints, terminal verification, and
-embedded exec outcomes directly.
+Introduce a skill-level `SkillResult` contract and create a new Solax
+`-orchestrated` skill that emits it, so the brain can read goals,
+checkpoints, terminal verification, and embedded exec outcomes directly.
 
 ## Why Now
 
@@ -46,7 +47,9 @@ reconstruction.
 - decide how a skill emits it robustly
 - make `runSkill` parse and return it compatibly with legacy skills
 - embed exec-level evidence inside the skill-level result
-- retrofit the Solax skill to emit the new shape
+- create or retrofit
+  `com.solaxcloud.starter.set-discharge-to-limit-orchestrated` to emit the
+  new shape
 - create test fixtures and tests in the Clawperator repo
 
 ## Out of Scope
@@ -63,7 +66,7 @@ reconstruction.
 | `apps/node/src/contracts/` | Clawperator repo | `SkillResult` contract |
 | `apps/node/src/domain/skills/` | Clawperator repo | parsing, runtime, compatibility |
 | `apps/node/src/test/` | Clawperator repo | fixtures and regression tests |
-| `../clawperator-skills/` | Skills repo | Solax retrofit proving case |
+| `../clawperator-skills/` | Skills repo | Solax orchestrated proving case |
 | `tasks/recording/skill-result-contract/` | Clawperator repo | temporary execution contract |
 
 ## Source Of Truth
@@ -96,7 +99,8 @@ reconstruction.
   primary contract shape. P1 must choose a small typed union or another
   explicitly versioned structure so downstream consumers are not forced back
   into ad-hoc string parsing.
-- Solax is the first opt-in proving skill, not the template for every field.
+- `com.solaxcloud.starter.set-discharge-to-limit-orchestrated` is the first
+  opt-in proving skill, not the template for every field.
 - `runSkill` returns `skillResult: SkillResult | null` on the success shape
   and on the error shape. Legacy skills set it to `null`.
 - The `clawperator skills run --json` CLI surface must include
@@ -152,7 +156,7 @@ This task should produce:
 - a defined `SkillResult` contract
 - `runSkill` support for parsing and returning it
 - test coverage using local fixtures only
-- a Solax skill that emits `SkillResult`
+- a new Solax `-orchestrated` skill that emits `SkillResult`
 - durable design notes in `docs/internal/design/` if the contract decisions
   are not self-evident from the code alone
 

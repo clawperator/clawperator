@@ -167,20 +167,21 @@ feat(skills): add optional skill contract declaration
 
 ### Goal
 
-Declare the Solax contract and prove it agrees with emitted `SkillResult`.
+Declare the Solax orchestrated-skill contract and prove it agrees with emitted
+`SkillResult`.
 
 ### Files or Surfaces To Change
 
-- `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit/skill.json`
+- `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-orchestrated/skill.json`
 
 ### Steps
 
-1. Declare the Solax contract in `skill.json`.
+1. Declare the Solax orchestrated-skill contract in `skill.json`.
 2. Run the skill and confirm declared verification matches emitted verification.
 
 ### Acceptance Criteria
 
-- Solax `skill.json` declares inputs, goal, and verification.
+- Solax orchestrated `skill.json` declares inputs, goal, and verification.
 - Live verification shows declaration and emitted `SkillResult` agree.
 
 ### Validation
@@ -188,11 +189,11 @@ Declare the Solax contract and prove it agrees with emitted `SkillResult`.
 ```bash
 CLAWPERATOR_SKILLS_REGISTRY=<clawperator_skills_root>/skills/skills-registry.json \
 CLAWPERATOR_OPERATOR_PACKAGE=com.clawperator.operator.dev \
-node <clawperator_root>/apps/node/dist/cli/index.js skills run com.solaxcloud.starter.set-discharge-to-limit --device <device_serial> --json -- 40
+node <clawperator_root>/apps/node/dist/cli/index.js skills run com.solaxcloud.starter.set-discharge-to-limit-orchestrated --device <device_serial> --json -- 40
 ```
 
 ### Expected Commit
 
 ```text
-feat(solax): declare discharge limit contract
+feat(solax): declare discharge limit orchestrated contract
 ```

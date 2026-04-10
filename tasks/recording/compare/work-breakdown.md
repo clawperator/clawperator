@@ -210,7 +210,7 @@ feat(recording): compare skill results to recording baselines
 
 ### Goal
 
-Show the compare output is useful on the real Solax proving skill.
+Show the compare output is useful on the real Solax orchestrated proving skill.
 
 ### Files or Surfaces To Change
 
@@ -219,8 +219,9 @@ Show the compare output is useful on the real Solax proving skill.
 
 ### Steps
 
-1. Run a matching Solax path on-device and capture both the recording export
-   and the emitted `SkillResult`. Compare them; expect no divergence.
+1. Run a matching orchestrated Solax path on-device and capture both the
+   recording export and the emitted `SkillResult`. Compare them; expect no
+   divergence.
 2. Force a `baseline_drift` divergence on-device (e.g. by changing the
    skill's checkpoint sequence in a sanitized branch) and compare; expect
    the first divergent checkpoint to be reported by identity.
@@ -246,7 +247,7 @@ Show the compare output is useful on the real Solax proving skill.
 ```bash
 CLAWPERATOR_SKILLS_REGISTRY=<clawperator_skills_root>/skills/skills-registry.json \
 CLAWPERATOR_OPERATOR_PACKAGE=com.clawperator.operator.dev \
-node <clawperator_root>/apps/node/dist/cli/index.js skills run com.solaxcloud.starter.set-discharge-to-limit --device <device_serial> --json -- 40
+node <clawperator_root>/apps/node/dist/cli/index.js skills run com.solaxcloud.starter.set-discharge-to-limit-orchestrated --device <device_serial> --json -- 40
 ```
 
 ### Expected Commit

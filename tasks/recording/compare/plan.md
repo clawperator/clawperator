@@ -9,8 +9,8 @@ compare behavior, and fixture-driven tests, while `../clawperator-skills`
 provides the proving skill and runtime validation target.
 
 Start by proving the design against
-`com.solaxcloud.starter.set-discharge-to-limit`, then generalize only the parts
-that survive that live exercise.
+`com.solaxcloud.starter.set-discharge-to-limit-orchestrated`, then generalize
+only the parts that survive that live exercise.
 
 This task is strictly about diagnosis. It does not own the separate work of
 making skills more reliable via in-skill checkpoints, terminal-state
@@ -77,7 +77,9 @@ Edits are expected in:
 
 - `apps/node/` for compare behavior that consumes `SkillResult`
 - `docs/api/` or `docs/skills/` for durable documentation
-- `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit`
+- `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-replay`
+  as the historical replay baseline and
+  `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-orchestrated`
   as the proving skill
 
 The existing recording demo task files remain in scope only as temporary
@@ -89,7 +91,7 @@ working notes. Durable guidance must migrate out of `tasks/`.
 | --- | --- | --- |
 | `apps/node/` | Clawperator repo | `SkillResult` consumption, compare CLI/API, contracts |
 | `docs/` | Clawperator repo | Durable user/developer docs |
-| `../clawperator-skills/` | Skills repo | Proving skill, validation target, adoption feedback |
+| `../clawperator-skills/` | Skills repo | Orchestrated proving skill, replay baseline, validation target, adoption feedback |
 | `tasks/recording/compare/` | Clawperator repo | Temporary execution contract for this work |
 
 ## Source Of Truth
@@ -101,7 +103,7 @@ working notes. Durable guidance must migrate out of `tasks/`.
 | Skill scaffolding behavior | `docs/skills/authoring.md` and `apps/node/src/domain/skills/scaffoldSkill.ts` |
 | Skill runtime contract | `apps/node/src/cli/registry.ts`, `apps/node/src/contracts/` |
 | Skill-level result contract | `tasks/recording/brain-hand-contract/problem-definition.md` and the future `tasks/recording/skill-result-contract/` task pack |
-| Solax proving behavior | live device validation plus `../clawperator-skills` |
+| Solax proving behavior | live device validation plus the orchestrated and replay skills in `../clawperator-skills` |
 | Test fixtures for compare behavior | sanitized snippets copied into the Clawperator test tree from Solax recording/run evidence |
 
 ## Deterministic Versus Judgment

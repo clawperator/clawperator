@@ -2,14 +2,15 @@
 
 ## Executive Summary
 
-Retrofit the Solax proving skill with explicit integrity guarantees and define a
-small, durable pattern for non-trivial skills: do not report success unless the
-skill verifies the intended terminal app state. This is separate from recording
-compare. Compare is diagnostic; this task is about reliability.
+Retrofit the current Solax proving skill with explicit integrity guarantees and
+preserve it as the durable `-replay` baseline. Define a small, durable pattern
+for non-trivial replay skills: do not report success unless the skill verifies
+the intended terminal app state. This is separate from recording compare.
+Compare is diagnostic; this task is about reliability.
 
-Use `com.solaxcloud.starter.set-discharge-to-limit` as the first retrofit and
-capture the minimal conventions that should later inform broader skill authoring
-guidance.
+Use `com.solaxcloud.starter.set-discharge-to-limit-replay` as the replay
+baseline and capture the minimal conventions that should later inform broader
+skill authoring guidance.
 
 ## Status
 
@@ -25,8 +26,9 @@ guidance.
 
 ## Goal
 
-Make the Solax skill truthful and checkpointed enough to serve as a trustworthy
-proving case for later compare work.
+Make the Solax replay skill truthful and checkpointed enough to serve as a
+trustworthy baseline and proving case for later compare and orchestrated-skill
+work.
 
 ## Why Now
 
@@ -43,6 +45,8 @@ Solax as a proof target.
 ## In Scope
 
 - fix silent-success behavior in the Solax skill
+- preserve/rename the current Solax skill as
+  `com.solaxcloud.starter.set-discharge-to-limit-replay`
 - prove that a forced sub-exec failure reaches `runSkill` as failure instead of
   being flattened into success
 - add terminal-state verification for `Discharge to <target>%`
@@ -62,7 +66,7 @@ Solax as a proof target.
 
 Primary work is expected in:
 
-- `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit/`
+- `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-replay/`
 - `docs/skills/authoring.md`
 - potentially `tasks/recording/demo/findings.md` until durable docs are updated
 
@@ -78,7 +82,7 @@ Primary work is expected in:
 
 | Area | Source |
 | --- | --- |
-| Solax skill behavior | `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit/` |
+| Solax replay skill behavior | `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-replay/` |
 | Current recording learnings | `tasks/recording/demo/findings.md` |
 | Skill authoring expectations | `docs/skills/authoring.md` |
 
@@ -105,6 +109,8 @@ Primary work is expected in:
 This task should produce:
 
 - a Solax skill that exits truthfully
+- the current replay-style Solax behavior preserved under the explicit
+  `-replay` name
 - proof that forced sub-exec failure propagates to the caller as failure
 - explicit terminal-state verification for the requested discharge value
 - a documented checkpoint/reliability pattern suitable for future skill
