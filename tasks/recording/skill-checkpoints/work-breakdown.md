@@ -4,10 +4,14 @@ Parent plan: `tasks/recording/skill-checkpoints/plan.md`
 
 ## Executive Summary
 
-Total PRs: 2. Total phases: 3.
+Total PRs: 3. Total phases: 4.
 
-- PR-1: Solax integrity fixes plus live proof that failure propagates truthfully
-- PR-2: short durable authoring-doc update after the Solax proof is stable
+- PR-1a: Clawperator-side regression test in `apps/node/src/test/` proving
+  that a stub skill which exits non-zero surfaces as `ok:false` from
+  `runSkill`. This protects the propagation path itself from regression.
+- PR-1b: Solax integrity fixes plus live proof that failure propagates
+  truthfully and that the persisted row is verified before success.
+- PR-2: short durable authoring-doc update after the Solax proof is stable.
 
 Current state: planning complete, ready for active execution.
 
@@ -16,11 +20,11 @@ Current state: planning complete, ready for active execution.
 | Item | Value |
 | --- | --- |
 | State | active |
-| Total PRs | 2 |
-| Total phases | 3 |
+| Total PRs | 3 |
+| Total phases | 4 |
 | Completed | none |
-| Remaining | P1, P2, P3 |
-| Current / Next | P1 |
+| Remaining | P0, P1, P2, P3 |
+| Current / Next | P0 |
 | Blockers | none |
 
 ## Hard Rules
@@ -47,8 +51,64 @@ Read these files IN THIS ORDER before writing anything.
 
 | PR | Purpose | Included phases | Agent tier | Merge gate |
 | --- | --- | --- | --- | --- |
-| PR-1 | Make Solax truthful and verified | P1, P2 | `default` | none |
-| PR-2 | Graduate minimal durable guidance | P3 | `default` | PR-1 merged locally and validated |
+| PR-1a | Regression test for `runSkill` failure propagation | P0 | `default` | none |
+| PR-1b | Make Solax truthful and verified | P1, P2 | `default` | PR-1a landed |
+| PR-2 | Graduate minimal durable guidance | P3 | `default` | PR-1b merged locally and validated |
+
+## Phase P0: Regression Test For Failure Propagation
+
+### Agent Tier
+
+`default`
+
+### Goal
+
+Prove inside the Clawperator test surface that a skill script which exits
+non-zero is reported by `runSkill` as `ok:false` with
+`code: SKILL_EXECUTION_FAILED`. This protects the propagation path from
+silent regression and lets PR-1b focus on the Solax behavior.
+
+### Files Or Surfaces To Change
+
+- `apps/node/src/test/` (new test file)
+- a small stub skill fixture under the test tree (in-test inline registry, or
+  a fixture directory similar to other skills tests)
+
+### Steps
+
+1. Create a stub skill registry and a stub script that always exits non-zero
+   with both stdout content and stderr content. The stdout content matters:
+   it must be present so the test proves the legacy `exit(0) on any stdout`
+   behavior cannot be reintroduced upstream of `runSkill`.
+2. Invoke `runSkill` against the stub.
+3. Assert:
+   - `result.ok === false`
+   - `result.code === "SKILL_EXECUTION_FAILED"`
+   - `result.exitCode` is non-zero
+   - `result.stdout` and `result.stderr` are preserved on the error
+
+### Acceptance Criteria
+
+- Test exists in `apps/node/src/test/` and lives in CI.
+- Test fails if `runSkill` is changed to swallow non-zero exit when stdout
+  is present.
+- Test does not depend on `../clawperator-skills/` or any live device.
+
+### Validation
+
+```bash
+npm --prefix apps/node run build
+```
+
+```bash
+npm --prefix apps/node run test
+```
+
+### Expected Commit
+
+```text
+test(skills): regression for non-zero exit propagation
+```
 
 ## Phase P1: Tighten Solax Integrity
 
@@ -68,20 +128,32 @@ failed sub-exec reaches the caller as failure.
 
 ### Steps
 
-1. Remove the current `stdout -> process.exit(0)` failure swallowing path.
-2. Make the second `Save` click safer:
-   - wait for the first `Save` target to disappear, or
-   - otherwise prove the UI advanced before the second click.
-3. Add a forced-failure proof path:
-   - preferred: a focused regression if a practical test harness exists
-   - fallback: a documented manual repro that proves `runSkill` returns failure
-4. Re-run the skill on-device after the fix.
+1. Remove the current `stdout -> process.exit(0)` failure swallowing path in
+   `run.js`. On any thrown exec error, exit non-zero (preserving the failed
+   exec stdout to stderr or to a structured error so the brain still sees it).
+2. Make the second `Save` click safer using one of these concrete approaches:
+   - add a `wait_for_node` with `present:false` semantics (or equivalent)
+     for the first `Save` node before the second click, with a finite
+     timeout. If the first `Save` does not disappear, fail the skill.
+   - otherwise scope the second `Save` to a different container/resource id
+     observed in the bottom-sheet phase, so the matcher cannot collide with
+     the first.
+3. Provide a documented manual repro for forced sub-exec failure on the live
+   device, complementing the P0 regression. Capture the exact `skills run`
+   command and the resulting `SKILL_EXECUTION_FAILED` JSON. Add this to the
+   skill's `SKILL.md` "validation" section so it remains discoverable.
+4. Re-run the skill on-device after the fix for both success and failure
+   paths.
 
 ### Acceptance Criteria
 
-- `run.js` no longer exits `0` just because stdout exists after a failed exec.
-- A forced sub-exec failure reaches the caller as failure.
-- The save sequence no longer relies on two unscoped identical `Save` clicks with no advancement proof.
+- `run.js` no longer exits `0` after a failed exec under any stdout
+  condition.
+- The save sequence either waits for the first `Save` to disappear, or
+  scopes the second match to a distinct node with documented evidence.
+- The documented forced-failure repro produces a non-zero exit and a
+  `SKILL_EXECUTION_FAILED` envelope from `clawperator skills run --json`.
+- P0 regression in `apps/node/src/test/` still passes.
 
 ### Validation
 
@@ -125,16 +197,34 @@ Verify `Discharge to <target>%` before returning success.
 
 ### Steps
 
-1. Add the cheapest reliable read-back path for the Solax setting.
-2. Fail the skill if the persisted row does not match the requested value.
-3. Update the skill docs to reflect the verified behavior if the implementation changes.
-4. Validate on-device by setting to a new value and reading it back.
+1. After the save sequence, re-navigate to (or remain on) the
+   `Discharge to ...` row and read its current text using a Clawperator
+   selector or `snapshot_ui`-derived match.
+2. Compare the observed numeric value against the *requested* `targetText`,
+   not just any `Discharge to <n>%` string. The check must fail if the
+   observed value does not equal the requested value.
+3. Strongly preferred: also confirm the observed value differs from the
+   value present *before* the change, to defend against the false positive
+   where the row already happened to display the requested value. If this
+   adds significant complexity, document the residual risk in `SKILL.md`
+   instead of skipping the check.
+4. Fail the skill (non-zero exit) if the persisted value does not equal the
+   requested value.
+5. Update `SKILL.md` to describe the verification behavior, including the
+   exact failure shape the brain will see if verification fails.
+6. Validate on-device with both `40` and `39` and confirm verification
+   passes for the matching value.
 
 ### Acceptance Criteria
 
-- The skill does not report success unless `Discharge to <target>%` is observed.
-- The proof path is executed by the skill itself, not only by manual reviewer behavior.
-- The Solax skill docs accurately describe the verification behavior.
+- The skill does not report success unless the persisted row equals the
+  *requested* value, not merely any `Discharge to <n>%` value.
+- The proof path is executed by the skill itself, not only by manual
+  reviewer behavior.
+- A residual false-positive risk (if any) is documented explicitly in
+  `SKILL.md`.
+- The Solax skill docs accurately describe the verification behavior and
+  the failure shape.
 
 ### Validation
 

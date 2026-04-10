@@ -79,15 +79,50 @@ reconstruction.
 
 - Introduce a new skill-level contract instead of overloading `ResultEnvelope`.
 - Keep `runSkill` backward compatible for legacy skills that emit plain stdout.
-- Prefer an explicit framed skill result over “best effort parse last stdout
-  line” if the implementation cost is reasonable.
+- Use an explicit framed skill result over "best effort parse last stdout
+  line". Frames are unambiguous and align with the existing
+  `[Clawperator-Result]` envelope idiom.
 - The contract must carry:
-  - goal
-  - status
-  - checkpoints
-  - terminal verification
-  - embedded exec evidence
+  - `contractVersion` (semver-shaped string)
+  - `skillId`
+  - `goal`
+  - `inputs`
+  - `status` (`success` | `failed` | `indeterminate`)
+  - `checkpoints` (ordered list of checkpoint records)
+  - `terminalVerification` (or `null` if the skill does not declare one)
+  - `execEnvelopes` (embedded `ResultEnvelope` records, in order)
+  - `diagnostics` (optional structured hints, never required)
 - Solax is the first opt-in proving skill, not the template for every field.
+- `runSkill` returns `skillResult: SkillResult | null` on the success shape
+  and on the error shape. Legacy skills set it to `null`.
+- The `clawperator skills run --json` CLI surface must include
+  `skillResult` in its JSON output when present.
+- Backward compatibility hard rule: existing skills that emit no frame must
+  continue to return `ok: true` based on exit code, exactly as today, with
+  `skillResult: null`. No legacy skill is required to opt in.
+
+## Required Decisions In P1
+
+P1 must commit to all of these. None of them may be deferred to
+implementation:
+
+- Frame marker string. Recommend `[Clawperator-Skill-Result]` to mirror
+  `[Clawperator-Result]`.
+- Frame placement: single contiguous JSON document immediately after the
+  marker on its own line, terminated by end-of-stream or a closing marker
+  line. Recommend single-line JSON for the v1 frame to keep the parser
+  trivial.
+- Behavior on multiple frames in one stdout stream: reject as malformed.
+- Behavior on a frame whose `contractVersion` major matches but minor is
+  newer: accept, log unknown fields as a warning, do not reject. Behavior
+  on unknown major: reject with a typed parse error.
+- Required vs optional fields. Recommend: `contractVersion`, `skillId`,
+  `status`, `checkpoints` are required. `goal`, `inputs`,
+  `terminalVerification`, `execEnvelopes`, `diagnostics` are optional in v1.
+- Status of the existing `expectContains` mechanism. Recommend: keep it for
+  backward compatibility in v1 but document that contract-driven
+  verification is the preferred path. Plan its deprecation in a follow-up,
+  not in this task.
 
 ## Failure Modes To Prevent
 

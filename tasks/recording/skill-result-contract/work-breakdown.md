@@ -79,13 +79,26 @@ Decide the shape and emission mechanism for the skill-level result contract.
 ### Acceptance Criteria
 
 - `SkillResult` has a concrete shape for:
-  - goal
-  - status
-  - checkpoints
-  - terminal verification
-  - embedded exec evidence
-- Emission channel is decided explicitly.
+  - `contractVersion`
+  - `skillId`
+  - `goal`
+  - `inputs`
+  - `status` (`success` | `failed` | `indeterminate`)
+  - `checkpoints` (ordered list with stable identity, status, and optional evidence)
+  - `terminalVerification` (typed record or `null`)
+  - `execEnvelopes` (embedded `ResultEnvelope[]` in order)
+  - `diagnostics` (optional)
+- A concrete TypeScript interface for `SkillResult` exists in
+  `apps/node/src/contracts/` and is exported alongside `ResultEnvelope`.
+- A `Checkpoint` type defines at minimum `id: string`, `status: "ok" | "failed"
+  | "skipped"`, and optional `observedAt`, `evidence`, and `note` fields.
+- Emission channel is decided explicitly. The plan's recommendation is the
+  `[Clawperator-Skill-Result]` framed single-line JSON; if P1 chooses
+  differently it must record why.
 - Legacy behavior for skills that emit plain stdout is defined explicitly.
+- All P1 decisions enumerated under "Required Decisions In P1" in
+  `tasks/recording/skill-result-contract/plan.md` are committed in code or
+  in-repo design notes.
 
 ### Validation
 
@@ -130,11 +143,18 @@ Make `runSkill` parse and return `SkillResult` without breaking legacy skills.
 
 Required cases:
 
-- well-formed frame -> parsed `skillResult`
-- malformed JSON -> failure
-- missing frame -> legacy path still works
-- multiple frames -> reject
-- version mismatch -> reject or classify explicitly
+- well-formed frame -> parsed `skillResult` returned on `SkillRunResult`
+- well-formed frame on a script that exits non-zero -> `skillResult` is still
+  surfaced on the error shape so the brain can read structured failure
+- malformed JSON inside a frame -> typed parse error, not silent legacy fallback
+- missing frame -> legacy path still works, `skillResult: null`
+- multiple frames -> reject as malformed
+- newer minor `contractVersion` -> accept, log unknown fields
+- newer major `contractVersion` -> reject with typed parse error
+- round-trip: a `SkillResult` value serialized into a frame and parsed back
+  is structurally identical
+- `clawperator skills run --json` includes the parsed `skillResult` in the
+  CLI output when present, and omits or nulls it for legacy skills
 
 ### Validation
 
@@ -171,18 +191,42 @@ Make the Solax skill the first opt-in proving skill for the new contract.
 
 1. Emit a minimal `SkillResult` from the Solax skill.
 2. Include:
-   - declared goal
+   - declared goal (`set discharge limit to <n>%`)
    - input percent
-   - checkpoint list
-   - terminal verification
-   - relevant embedded exec evidence
+   - checkpoint list (see required identities below)
+   - terminal verification record
+   - relevant embedded exec evidence (the `ResultEnvelope` from each
+     `clawperator exec` step in execution order)
 3. Validate live on the Samsung target.
+
+Required Solax checkpoint identities for v1 (stable strings, in order):
+
+- `app_opened`
+- `intelligence_tab_opened`
+- `peak_export_card_opened`
+- `device_discharging_card_opened`
+- `discharge_to_row_focused`
+- `dialog_input_focused`
+- `target_text_entered`
+- `dialog_confirm_clicked`
+- `toolbar_save_clicked`
+- `bottom_sheet_save_clicked`
+- `terminal_state_verified`
+
+If the live retrofit shows one of these checkpoints cannot be observed
+deterministically, drop it from the v1 list and document the reason in
+`SKILL.md`. Do not invent new checkpoint identities silently.
 
 ### Acceptance Criteria
 
 - Solax emits a parseable `SkillResult`.
 - The emitted result matches the actual runtime behavior.
-- The skill docs describe the new result behavior accurately.
+- The emitted result is consumable by the Clawperator runtime tests via the
+  copied fixture path used by W4 compare; round-tripping the live frame
+  through `runSkill` parsing returns a structurally valid `SkillResult`.
+- The skill docs describe the new result behavior accurately, including the
+  exact checkpoint identities listed above and the failure shape on
+  verification mismatch.
 
 ### Validation
 

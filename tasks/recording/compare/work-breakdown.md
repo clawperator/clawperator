@@ -70,19 +70,31 @@ Define checkpoint comparison and divergence classification on top of `SkillResul
 
 ### Steps
 
-1. Define checkpoint comparison semantics.
+1. Define checkpoint comparison semantics. Checkpoints are matched by
+   identity (the stable string) and order, not by index alone.
 2. Define divergence classes:
-   - baseline divergence
-   - runtime poisoned state
-   - runtime unavailable state
-   - verification failed
+   - `baseline_drift` (skill diverged from baseline at a named checkpoint)
+   - `verification_failed` (terminal verification did not match)
+   - `verification_indeterminate` (declared verification not proved at all)
+   - `upstream_failure` (the skill exited non-zero or `SkillResult.status`
+     was `failed`; compare reports the upstream cause and stops walking)
+   - `runtime_poisoned` (operator/accessibility/runtime evidence in
+     `execEnvelopes` shows the runtime was in a stuck state)
+   - `runtime_unavailable` (device disconnected, accessibility service down)
 3. Define the fixture plan for TDD using local sanitized fixtures only.
+4. Define how compare handles a baseline that contains UI snapshots
+   (`snapshotMode: include`) versus one that does not. Baselines without
+   snapshots must still be sufficient for checkpoint-identity compare.
 
 ### Acceptance Criteria
 
 - Compare model is defined without inventing a parallel trace mechanism.
-- Divergence classes are explicit enough for the brain to act differently on each.
-- Fixture plan includes both a matching path and a forced divergent path.
+- Divergence classes are explicit, named, and exhaustive enough for the brain
+  to branch on them.
+- Fixture plan enumerates the specific files and the divergence each one
+  forces (see P2 file list).
+- The CLI surface is finalized:
+  `clawperator recording compare --baseline <file> --result <file> [--json]`.
 
 ### Validation
 
@@ -115,20 +127,51 @@ Implement compare against recording export baselines using `SkillResult`.
 ### Steps
 
 1. Add failing tests first using local fixtures.
-2. Implement compare against recording export baselines with `snapshotMode: omit`.
-3. Add CLI behavior and tests for:
-   - valid input
-   - invalid input
-   - missing value
-4. Ensure output is both machine-readable and human-usable.
+2. Implement compare against recording export baselines with
+   `snapshotMode: omit`.
+3. Add CLI behavior and tests for the
+   `clawperator recording compare --baseline <file> --result <file> [--json]`
+   surface, covering:
+   - both files present and well-formed
+   - missing `--baseline` value
+   - missing `--result` value
+   - file not found
+   - malformed JSON in either file
+4. Ensure `--json` output carries the typed divergence report and exit code
+   matches plan Decision Rules.
+5. Ensure human-readable output names the first divergent checkpoint and its
+   class.
+
+Required fixtures under `apps/node/src/test/fixtures/recording-compare/`:
+
+- `solax-baseline-success.export.json` — Solax-shaped recording export with
+  the canonical checkpoint sequence
+- `solax-result-success.skillresult.json` — `SkillResult` whose checkpoints
+  match the baseline and whose `terminalVerification` proves the goal
+- `solax-result-baseline-drift.skillresult.json` — `SkillResult` that
+  diverges at one named checkpoint (e.g.
+  `bottom_sheet_save_clicked` missing or replaced)
+- `solax-result-verification-failed.skillresult.json` — `SkillResult` whose
+  checkpoints match but whose `terminalVerification` shows the persisted
+  value did not equal the requested value
+- `solax-result-indeterminate.skillresult.json` — `SkillResult` whose
+  checkpoints match but whose `terminalVerification` is `null`
+- `solax-result-upstream-failure.skillresult.json` — `SkillResult` with
+  `status: "failed"` and a partial checkpoint list
+
+Each fixture exists to force one specific divergence class. A test must
+pin every fixture to its expected divergence class so a regression in the
+classification rules fails loudly.
 
 ### Acceptance Criteria
 
 - Compare works without a live device.
-- Local fixtures cover:
-  - matching path
-  - first-divergence path
+- Local fixtures listed above all exist and are exercised in tests.
+- Each divergence class enumerated in P1 is exercised by at least one
+  fixture-driven test.
 - Baselines created with `snapshotMode: omit` are supported.
+- The CLI surface returns exit code `0` only on the success fixture; all
+  divergence fixtures return non-zero.
 
 ### Validation
 
@@ -163,15 +206,27 @@ Show the compare output is useful on the real Solax proving skill.
 
 ### Steps
 
-1. Run a matching Solax path and compare it.
-2. Produce a forced divergent path and compare it.
-3. Copy any required sanitized fixture snippets into the Clawperator repo.
+1. Run a matching Solax path on-device and capture both the recording export
+   and the emitted `SkillResult`. Compare them; expect no divergence.
+2. Force a `baseline_drift` divergence on-device (e.g. by changing the
+   skill's checkpoint sequence in a sanitized branch) and compare; expect
+   the first divergent checkpoint to be reported by identity.
+3. Force a `verification_failed` divergence on-device (e.g. by requesting a
+   value the skill records as set but the persisted row does not actually
+   show) and compare; expect the verification class.
+4. Sanitize and copy the captured artifacts into
+   `apps/node/src/test/fixtures/recording-compare/` so the P2 tests are
+   anchored to evidence from real runs, not hand-written shapes.
 
 ### Acceptance Criteria
 
-- One matching run is proven.
-- One forced divergent run is proven.
-- Compare identifies the first meaningful difference.
+- One matching live run is proven.
+- A `baseline_drift` divergence is proven against a live forced run.
+- A `verification_failed` divergence is proven against a live forced run.
+- The fixtures listed in P2 are derived from these live runs (where
+  practical) rather than hand-authored from scratch.
+- Compare identifies the first meaningful difference and classifies it
+  using the P1 divergence classes.
 
 ### Validation
 

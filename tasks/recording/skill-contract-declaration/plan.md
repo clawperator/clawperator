@@ -63,9 +63,25 @@ success.
 
 - `contract` is optional for legacy skills in v1.
 - If `contract.verification` exists, missing or failed proof in `SkillResult`
-  must not be treated as plain success.
+  must not be treated as plain success. The runtime must surface this case as
+  a distinct `indeterminate` status on `SkillRunResult`, not as `ok: true`
+  and not as `ok: false` with `SKILL_EXECUTION_FAILED`.
+- `indeterminate` semantics: the script exited zero, no exec step failed, the
+  emitted `SkillResult.status` was `success`, but the declared verification
+  was either absent from `SkillResult.terminalVerification` or did not match.
+  The brain treats this as "the skill ran but did not prove its goal" and
+  must not assume the requested state was reached.
+- The validator (`apps/node/src/domain/skills/validateSkill.ts` and the
+  `clawperator skills validate` surface) must accept a missing `contract`
+  block, accept a well-formed `contract` block, and reject a malformed one
+  with a typed error. Existing legacy skills without a `contract` must
+  continue to validate.
 - Keep the first version narrow and boring. Solax is the proving case, not the
   schema for every future skill type.
+- Scaffold output: a newly scaffolded skill ships with a present-but-empty
+  `contract` block (with `inputs: []`, `goal: ""`, and `verification: null`)
+  so authors see the shape immediately. Document this so authors know an
+  empty block is intentional and not a stub to be deleted.
 
 ## Output Contract
 

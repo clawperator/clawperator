@@ -20,6 +20,130 @@ Turn the Solax recording effort into a truthful proving case, then use that
 proving case to build the missing skill-layer contract and only then implement
 recording-versus-run compare.
 
+## Service Improvement Outcome
+
+When this program of work is complete, Clawperator the runtime is meaningfully
+stronger than it is today in the following concrete ways. This section is the
+yardstick for whether the subtree is finished.
+
+### What the brain can know after a skill run that it cannot know today
+
+Today: a skill returns `{ ok, output: string, exitCode }`. The brain reads a
+stdout blob it must hand-parse, and must trust that the script wrote the
+truth.
+
+After this work:
+
+- the brain reads a typed `SkillResult` with declared goal, inputs,
+  enumerated checkpoints, terminal verification evidence, embedded exec
+  envelopes, and a top-level run state of `success`, `failed`, or
+  `indeterminate`
+- "indeterminate" is a real state distinct from success: it means the skill
+  ran without exec failure but did not prove its declared verification
+- the brain can branch on checkpoint identity, not on substring matches
+- the brain can tell which checkpoint was the *first* divergence from a
+  recording baseline, classified by category, without re-running the skill
+
+### What kinds of failures become diagnosable
+
+Today: failures present as "exit non-zero plus a stdout blob" or worse,
+"exit zero with a stdout blob that looks like success".
+
+After this work the brain can distinguish at least:
+
+- exec failure inside the skill (a `clawperator exec` step returned non-zero)
+- declared verification not proved (skill produced output but did not satisfy
+  its own contract)
+- baseline divergence (skill diverged from the recording-export path at a
+  specific named checkpoint)
+- runtime poisoned state (the operator was in a stuck or invalid state when
+  the skill tried to run)
+- runtime unavailable state (accessibility service down, device disconnected)
+- terminal verification false (skill reached the end, but the persisted app
+  state did not match the requested goal)
+
+These are not just better error strings. They are typed signals the brain can
+act on.
+
+### What kinds of skill claims become enforceable
+
+Today: `skill.json` is registry metadata. There is no machine-readable
+declaration of what a skill is *for*. `SKILL.md` is prose. `runSkill` only
+checks exit code and an optional substring.
+
+After this work:
+
+- a skill can declare `inputs`, `goal`, and `verification` in `skill.json`
+- the runtime cross-checks declared verification against emitted
+  `SkillResult.terminalVerification`
+- a skill that says it sets a value but never proves the value was set
+  cannot return `success` to the brain
+- legacy skills with no declaration keep working unchanged
+
+### What "deterministic replay for deterministic UI" means in stronger practical terms
+
+Today: "deterministic replay" effectively means "the script worked once on
+this device when I last ran it". There is no re-checkable evidence that the
+intended state was reached.
+
+After this work, deterministic replay has a precise practical definition:
+
+- the skill emits a `SkillResult` whose checkpoint sequence matches the
+  recording baseline at all enumerated checkpoints
+- the skill's `terminalVerification` proves the requested final state is
+  actually present in the app
+- compare can confirm both of those facts in CI-style conditions, against
+  fixtures, without a live device, on every change
+
+### What the docs and authoring reality become truer about
+
+Today: `docs/skills/authoring.md` describes the scaffold and validation
+mechanics, and is silent on terminal verification, checkpoint shape, and
+result emission. `docs/api/recording.md` correctly says recording is evidence,
+but the workflow that consumes it implies recordings can become skills with
+just light cleanup.
+
+After this work:
+
+- `docs/skills/authoring.md` describes the structured `SkillResult` shape
+  and the required pattern for non-trivial skills (truthful exit, terminal
+  verification, optional declared contract)
+- `docs/api/recording.md` describes recordings as evidence and points to the
+  compare workflow as the way to validate replay against a baseline
+- the durable Solax learnings (input persistence workaround, accessibility
+  service restart, container vs label clickability) live in the right docs
+  instead of in `tasks/`
+
+## Program Definition Of Done
+
+The recording subtree is complete when **all** of the following are true:
+
+- Solax `v0` exits truthfully on forced failure (skill-checkpoints W1)
+- Solax verifies the persisted `Discharge to <n>%` row before reporting
+  success (skill-checkpoints W1)
+- A regression test in `apps/node/src/test/` proves a stub skill that exits
+  non-zero is reported by `runSkill` as `ok:false` (skill-checkpoints W1)
+- `SkillResult` is defined in `apps/node/src/contracts/`, parsed by
+  `runSkill`, exposed on `SkillRunResult`, with backward compatibility for
+  legacy skills (skill-result-contract W2)
+- The Solax skill emits a parseable `SkillResult` with enumerated
+  checkpoints and terminal verification (skill-result-contract W2)
+- `skill.json` supports an optional `contract` block, scaffold writes a
+  starter, and `runSkill` returns a distinct `indeterminate` state when a
+  declared verification is not proved (skill-contract-declaration W3)
+- Solax `skill.json` declares its contract (skill-contract-declaration W3)
+- `clawperator recording compare` consumes a `SkillResult` and a recording
+  export, identifies the first divergence with a typed category, runs
+  test-first against local fixtures with no live device dependency, and is
+  proven against both a baseline-drift and a verification-failure divergence
+  on the Solax case (compare W4)
+- Durable recording and authoring learnings live in `docs/api/recording.md`
+  and `docs/skills/authoring.md`, regenerated by `./scripts/docs_build.sh`
+  (graduate-demo-findings W5)
+- `tasks/recording/demo/` is deleted; `brain-hand-contract/` is deleted once
+  the contract docs land; this top-level plan is deleted when no active
+  recording workstreams remain
+
 ## Why This Exists
 
 The original task was to create one Solax skill from a recording.
@@ -43,7 +167,8 @@ So this subtree now contains multiple linked workstreams rather than one task.
 | 2 | `skill-result-contract/` | ready after 1 | define `SkillResult` and make skills legible to the brain |
 | 3 | `skill-contract-declaration/` | blocked on 2 | declare inputs, goal, and verification in `skill.json` |
 | 4 | `compare/` | blocked on 2 | compare recording baseline against emitted `SkillResult` |
-| 5 | `graduate-demo-findings/` | blocked on 1/2 shape settling | move durable lessons into docs and retire temp files |
+| 5a | `graduate-demo-findings/` (wave A) | active | graduate recording-as-evidence and operations facts that do not depend on `SkillResult` shape |
+| 5b | `graduate-demo-findings/` (wave B) | blocked on 2 | graduate skill-contract and authoring facts once W2 wording is stable |
 
 ## Required Sequence
 
@@ -53,12 +178,31 @@ So this subtree now contains multiple linked workstreams rather than one task.
 4. Start `compare/`
 5. Run `graduate-demo-findings/`
 
+`graduate-demo-findings/` wave A may run in parallel with `skill-checkpoints/`
+because its content does not depend on the contract shape. Wave B still waits
+for W2 wording to stabilize.
+
 ## Preferred PR Grouping
 
 Group work into as few PRs as is reasonable, but do not hide repo boundaries or
 mix unrelated risk levels just to reduce count.
 
-### PR-1: W1 skill truthfulness
+### PR-1a: W1 Clawperator-side regression for `runSkill` failure propagation
+
+Scope:
+
+- a stub skill fixture under `apps/node/src/test/` that exits non-zero
+- a focused regression test asserting `runSkill` returns `ok:false` with
+  `code: SKILL_EXECUTION_FAILED`
+- no Solax changes in this PR
+
+Why separated from PR-1b:
+
+- this lives in the Clawperator repo and protects the propagation path itself
+  from regression
+- it can land before the Solax-side fix and unblock review of PR-1b
+
+### PR-1b: W1 Solax skill truthfulness
 
 Scope:
 
@@ -163,16 +307,35 @@ Default preference:
 - do not split compare into many PRs unless the implementation grows more than
   expected
 
-### PR-8: W5 graduate demo findings
+### PR-8a: W5 wave A — graduate recording and operations facts
 
 Scope:
 
-- `tasks/recording/graduate-demo-findings/` P1 and P2
+- `tasks/recording/graduate-demo-findings/` P1A and P2A
+- `docs/api/recording.md` and `docs/setup.md` updates
+- delete `tasks/recording/demo/meta-problem-summary.md` (already done as
+  part of the EM-level review) and trim wave A material out of
+  `findings.md`
 
-Why grouped:
+Why separated from PR-8b:
 
-- this is cleanup and docs graduation
-- it should usually be a single small PR
+- wave A content is stable now and does not depend on W2 wording
+- it can ship in parallel with the W1/W2 work and unblocks doc readers
+  earlier
+
+### PR-8b: W5 wave B — graduate skill contract authoring guidance
+
+Scope:
+
+- `tasks/recording/graduate-demo-findings/` P1B and P2B
+- `docs/skills/authoring.md` updates
+- final retirement of `tasks/recording/demo/` and
+  `tasks/recording/brain-hand-contract/`
+
+Why separate:
+
+- depends on W2 contract wording being stable
+- ends the recording subtree cleanup
 
 ## Hard Rules
 
@@ -273,3 +436,17 @@ When the durable docs and contract work are landed:
   docs and task history
 - this top-level `plan.md` can be deleted once no active recording workstreams
   remain
+
+`brain-hand-contract/problem-definition.md` can be deleted as soon as **all**
+of these are true:
+
+- `docs/skills/authoring.md` describes the `SkillResult` shape and the
+  declared-contract pattern
+- `docs/api/recording.md` describes recording as evidence and points to
+  `clawperator recording compare`
+- the program definition of done above is satisfied
+
+`tasks/recording/demo/meta-problem-summary.md` was deleted during the
+EM-level review because it was already fully superseded by
+`brain-hand-contract/problem-definition.md`. Its observations live more
+rigorously in the brain-hand-contract document.

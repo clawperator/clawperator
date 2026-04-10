@@ -134,6 +134,19 @@ Judgment:
 - Compare must not require a live device to exercise tests. Live device proof is
   for proving the contract against Solax, not for routine compare regression
   coverage.
+- CLI surface for v1 is
+  `clawperator recording compare --baseline <export.json> --result <skill-result.json> [--json]`.
+  Both inputs are local files. Compare reads them, does not run anything,
+  and emits a typed report. Exit code is `0` for "no meaningful divergence",
+  non-zero for "divergence" or input/parse errors. The `--json` flag is the
+  brain-facing surface and must include the typed divergence report.
+- A `SkillResult` whose `status` is `failed` is *not* a compare divergence on
+  its own. Compare reports the upstream failure verbatim and only walks
+  checkpoints up to the failure point. Compare does not invent divergence
+  for steps that never ran.
+- A `SkillResult` whose `status` is `indeterminate` (declared verification
+  not proved) must be reported by compare as a distinct outcome class even
+  if checkpoints otherwise match the baseline.
 
 ## Failure Modes To Prevent
 
