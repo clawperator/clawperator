@@ -109,7 +109,7 @@ This task should produce:
 
 This work should later feed:
 
+- `tasks/recording/skill-contract-declaration/`
 - `tasks/recording/compare/`
 - `docs/skills/authoring.md`
 - future `skill.json` goal/verification declaration work
-
