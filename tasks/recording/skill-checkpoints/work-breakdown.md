@@ -29,6 +29,9 @@
 - Tier: `default`
 - Requirements:
   - remove silent-success handling on failed exec
+  - add a regression test or, if test coverage is not yet practical in the
+    skills repo, a documented manual repro that proves a forced sub-exec failure
+    reaches `runSkill` as `ok:false`
   - make the second `Save` click safer:
     - wait for first `Save` to disappear, or
     - otherwise prove the UI advanced before the second click
@@ -56,7 +59,8 @@
 - prove:
   - successful set to a new value
   - verified persisted row value
-  - failure propagation remains truthful if exec fails
+  - failure propagation remains truthful if exec fails and reaches the caller as
+    failure
 
 ## Findings File
 

@@ -4,6 +4,7 @@
 
 - This is a cross-repo task. Work in the Clawperator repo and the sibling
   `../clawperator-skills` repo together.
+- This task is downstream of `tasks/recording/skill-result-contract/`.
 - Keep the Solax skill as the proving case throughout. Do not design compare
   support in the abstract and “apply it later”.
 - Use TDD for the compare implementation. Start from real fixtures captured from
@@ -23,6 +24,8 @@
   evidence from this task line.
 - Do not let tests read from `../clawperator-skills/` at runtime. Copy any
   required sanitized fixtures into the Clawperator test tree.
+- Do not require a live device to exercise compare tests. Live device runs are
+  proof inputs, not unit/regression dependencies.
 - Do not call the feature “replay validation” unless final persisted state is
   included in the proof path.
 - If the compare output cannot explain the first divergence for the Solax flow,
@@ -47,14 +50,9 @@
 - Tier: `thinking`
 - Output:
   - normalized checkpoint model
-  - trace artifact proposal
   - divergence output proposal
   - initial fixture plan for TDD
 - Required decisions:
-  - how the run trace is produced:
-    - exec-native trace emission
-    - helper-wrapped skill trace accumulation
-    - post-hoc reconstruction
   - what a checkpoint is
   - what evidence is baseline-only versus runtime-only
   - what counts as a meaningful mismatch
@@ -77,8 +75,7 @@
   - docs updates if the interface becomes user-visible in this phase
 - Requirements:
   - add failing tests first using real compare fixtures
-  - emit or assemble a run trace with enough information to explain divergence
-  - compare against a recording export baseline
+  - compare `SkillResult` against a recording export baseline
   - return machine-readable output and a clear human summary
   - cover valid, invalid, and missing-value CLI behavior if new flags are added
   - add regression coverage for both:
@@ -116,11 +113,12 @@
 ## Sequencing
 
 1. Finish P1 before implementing command shape.
-2. Land the Solax integrity/reliability task separately before treating Solax as
-   a trustworthy compare proving case.
-3. Finish P2 enough to generate real compare output before broad docs work.
-4. Run P3 on-device before declaring the feature sound.
-5. Complete P4 in the same change series, not as a forgotten follow-up.
+2. Land `tasks/recording/skill-checkpoints/` before treating Solax as a
+   trustworthy compare proving case.
+3. Land `tasks/recording/skill-result-contract/` before implementing compare.
+4. Finish P2 enough to generate real compare output before broad docs work.
+5. Run P3 on-device before declaring the feature sound.
+6. Complete P4 in the same change series, not as a forgotten follow-up.
 
 ## Findings File
 

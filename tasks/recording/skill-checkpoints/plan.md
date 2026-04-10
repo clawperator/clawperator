@@ -43,6 +43,8 @@ Solax as a proof target.
 ## In Scope
 
 - fix silent-success behavior in the Solax skill
+- prove that a forced sub-exec failure reaches `runSkill` as failure instead of
+  being flattened into success
 - add terminal-state verification for `Discharge to <target>%`
 - tighten the double-`Save` behavior so the second click cannot accidentally hit
   the same node without evidence the UI advanced
@@ -93,6 +95,7 @@ Primary work is expected in:
 ## Failure Modes To Prevent
 
 - false success when exec failed
+- sub-exec failure that reaches the brain as `ok:true`
 - success without persisted-state verification
 - mistaken second `Save` click against the same node
 - documenting Solax-specific hacks as if they were generic authoring guidance
@@ -102,6 +105,7 @@ Primary work is expected in:
 This task should produce:
 
 - a Solax skill that exits truthfully
+- proof that forced sub-exec failure propagates to the caller as failure
 - explicit terminal-state verification for the requested discharge value
 - a documented checkpoint/reliability pattern suitable for future skill
   authoring guidance
@@ -110,4 +114,3 @@ This task should produce:
 
 Graduate the generalizable parts of this work into `docs/skills/authoring.md`.
 Keep Samsung/Solax-specific details in the skill docs.
-

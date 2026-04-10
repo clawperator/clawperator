@@ -17,17 +17,20 @@ making skills more reliable via in-skill checkpoints, terminal-state
 verification, or better selector strategies. That work belongs in a sibling
 task pack.
 
+This task is also downstream of the skill-level result contract. Compare should
+consume `SkillResult`, not invent an overlapping trace mechanism first.
+
 ## Status
 
 | Item | Value |
 | --- | --- |
-| State | active |
+| State | blocked |
 | Total PRs | 2 |
 | Total phases | 4 |
 | Completed | none |
 | Remaining | P1, P2, P3, P4 |
-| Current / Next | P1 |
-| Blockers | none |
+| Current / Next | W1 then W2 |
+| Blockers | `tasks/recording/skill-result-contract/` must define `SkillResult` first |
 
 ## Goal
 
@@ -51,8 +54,7 @@ the mechanism that makes replay reliable.
 ## In Scope
 
 - define the compare model for deterministic replay validation
-- emit or assemble a normalized run trace from skill execution
-- compare run trace checkpoints against a recording-export baseline
+- compare `SkillResult` checkpoints against a recording-export baseline
 - build the feature test-first using real fixtures from the Solax recording and
   validated run traces
 - surface the first meaningful divergence in machine-readable and human-usable
@@ -98,6 +100,7 @@ working notes. Durable guidance must migrate out of `tasks/`.
 | Current recording workflow | `docs/api/recording.md` |
 | Skill scaffolding behavior | `docs/skills/authoring.md` and `apps/node/src/domain/skills/scaffoldSkill.ts` |
 | Skill runtime contract | `apps/node/src/cli/registry.ts`, `apps/node/src/contracts/` |
+| Skill-level result contract | `tasks/recording/brain-hand-contract/problem-definition.md` and the future `tasks/recording/skill-result-contract/` task pack |
 | Solax proving behavior | live device validation plus `../clawperator-skills` |
 | Test fixtures for compare behavior | sanitized snippets copied into the Clawperator test tree from Solax recording/run evidence |
 
@@ -105,7 +108,6 @@ working notes. Durable guidance must migrate out of `tasks/`.
 
 Deterministic:
 
-- trace capture shape
 - normalized checkpoint extraction
 - compare output schema
 - divergence ordering rules
@@ -125,12 +127,13 @@ Judgment:
 - Generalize only after the Solax proving case works end to end.
 - Treat tests as part of the product surface. The compare model is not accepted
   until fixtures from the Solax case prove both matching and divergent paths.
-- Force an explicit P1 decision on how run traces are produced. Do not defer
-  this until implementation.
 - Design for recording baselines created with `snapshotMode: omit`; compare must
   still be useful without baseline UI dumps.
 - Keep fixtures inside the Clawperator repo. Tests must not depend on the
   sibling skills repo being present at runtime.
+- Compare must not require a live device to exercise tests. Live device proof is
+  for proving the contract against Solax, not for routine compare regression
+  coverage.
 
 ## Failure Modes To Prevent
 
@@ -148,7 +151,6 @@ Judgment:
 
 This task should produce:
 
-- a defined run-trace artifact shape
 - a compare command or equivalent compare-capable workflow
 - a fixture set derived from the Solax recording/run evidence that can anchor
   TDD-style regression coverage
@@ -167,7 +169,7 @@ This task should produce:
 
 ## Idempotency
 
-Trace and compare outputs may vary in timestamps and incidental metadata.
+`SkillResult`-derived compare outputs may vary in timestamps and incidental metadata.
 Checkpoint identities, divergence ordering, and final-state conclusions should
 remain stable across reruns of the same deterministic flow.
 
