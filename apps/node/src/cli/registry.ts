@@ -2159,7 +2159,19 @@ Usage:
             if (i + 1 >= rest.length) {
               throw new UsageError("--expect-contains requires a value");
             }
-            expectContains = rest[i + 1];
+            const nextToken = rest[i + 1];
+            if (nextToken === "--") {
+              if (i + 2 >= rest.length) {
+                throw new UsageError("--expect-contains requires a value");
+              }
+              expectContains = rest[i + 2];
+              i += 2;
+              continue;
+            }
+            if (nextToken.startsWith("--")) {
+              throw new UsageError("--expect-contains requires a value");
+            }
+            expectContains = nextToken;
             i += 1;
             continue;
           }

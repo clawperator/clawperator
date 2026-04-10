@@ -2031,6 +2031,26 @@ describe("runSkill", () => {
     assert.strictEqual(parsed.message, "--expect-contains requires a value");
   });
 
+  it("CLI skills run returns USAGE when --expect-contains is followed by another flag", async () => {
+    const { stdout, code } = await runCli([
+      "skills", "run", "com.test.echo", "--expect-contains", "--timeout", "5000",
+    ]);
+    assert.strictEqual(code, 1, stdout);
+    const parsed = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(parsed.code, "USAGE");
+    assert.strictEqual(parsed.message, "--expect-contains requires a value");
+  });
+
+  it("CLI skills run accepts an escaped double-dash literal for --expect-contains", async () => {
+    const { stdout, code } = await runCli([
+      "skills", "run", "com.test.echo", "--output", "json", "--expect-contains", "--", "TEST_OUTPUT:--help", "--", "--help",
+    ]);
+    assert.strictEqual(code, 0, stdout);
+    const parsed = JSON.parse(stdout) as { expectedSubstring?: string; output?: string };
+    assert.strictEqual(parsed.expectedSubstring, "TEST_OUTPUT:--help");
+    assert.ok(parsed.output?.includes("TEST_OUTPUT:--help"));
+  });
+
   it("CLI skills run returns usage when skill_id is missing even with --timeout", async () => {
     const { stdout } = await runCli(["skills", "run", "--timeout", "5000", "--output", "json"]);
     const parsed = JSON.parse(stdout) as { code?: string; message?: string };
