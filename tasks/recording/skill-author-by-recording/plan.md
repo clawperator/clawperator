@@ -77,15 +77,17 @@ pattern if needed, but keep a single front door for the user.
 
 ## Replay vs Orchestrated: When To Use Each
 
-This workflow produces an orchestrated skill by default. That is not always
-the right choice. The authoring-time agent must apply the following guidance
-when deciding what to produce, and must surface the choice to the developer
-before authoring begins.
+This workflow is centered on the orchestrated authoring path because that is
+the primary proving case for the recording program and the promo video. That
+does not make orchestrated the right answer for every flow. The authoring-time
+agent must apply the following guidance when deciding what to produce, and must
+surface the choice to the developer before authoring begins.
 
 ### Use a replay skill when
 
-- The UI flow is short (roughly five interactions or fewer) and stable for
-  the known target layout.
+- The UI flow is short and stable for the known target layout. A small number
+  of interactions can be a signal here, but it is not a hard threshold or
+  product rule.
 - Every step follows a predictable deterministic path with no branching based
   on current UI state.
 - No recovery from app-state surprises is expected - the app is assumed to be

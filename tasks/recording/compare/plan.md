@@ -167,8 +167,10 @@ Judgment:
   within that frame. The `compareMode` field in the output always reflects
   the mode compare used, regardless of whether the run succeeded or failed.
 - CLI surface for v1 is
-  `clawperator recording compare --baseline <export.json> --result <skill-result.json> [--json]`.
-  Both inputs are local files. Compare reads them, does not run anything,
+  `clawperator recording compare --baseline <export.json> --result <skills-run-json.json> [--json]`.
+  Both inputs are local files. For v1, `--result` accepts the full saved JSON
+  output of `clawperator skills run --json`, not a bare extracted
+  `SkillResult` document. Compare reads that wrapper, extracts `skillResult`,
   and emits a typed report. Exit code is `0` for "no meaningful divergence",
   non-zero for "divergence" or input/parse errors. The `--json` flag is the
   brain-facing surface and must include the typed divergence report.

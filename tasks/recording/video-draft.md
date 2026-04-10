@@ -127,12 +127,13 @@ me when to touch the phone, pulls the artifacts back into the repo when I am
 done, and then hands those artifacts to an authoring-time agent that reads the
 recording evidence and writes the actual skill.
 
-From my point of view as the developer: I type that one prompt, I pick up the
-phone when the workflow asks me to, I do the thing I want to automate - once -
-and I put the phone down. That is my entire manual contribution. The authoring
-agent does the rest: recording lifecycle, artifact export, SKILL.md, skill.json,
-run.js, and an initial self-test run to confirm the skill works before it calls
-itself done.
+In the happy path I am showing here, my job as the developer is very small: I
+type that one prompt, I pick up the phone when the workflow asks me to, I do
+the thing I want to automate once, and I put the phone down. If the recording
+is ambiguous, the authoring workflow may ask me one clarifying question about
+intent. Then the authoring agent does the rest: recording lifecycle, artifact
+export, SKILL.md, skill.json, run.js, and an initial self-test run to confirm
+the skill works before it calls itself done.
 
 ## Scene 4 - The Recording Lifecycle, Uncovered
 
@@ -458,7 +459,7 @@ reliably proved before the skill is allowed to claim success.
 **On screen**
 
 - Split view. Left: the recording export from Scene 6. Right: a saved
-  `SkillResult` from a later run.
+  `clawperator skills run --json` result file from a later run.
 - Terminal shows two compare invocations: one for a successful run where the
   agent took a different path, and one for a forced-failure run where the app
   was put in a bad starting state.
@@ -519,6 +520,11 @@ was reached, not whether every intermediate step matched the recording
 exactly. If the runtime agent took a slightly different path but still
 proved the final state, compare reports that as "outcome matches, path
 differs" - not a failure.
+
+And to make that workflow concrete: compare is reading the saved
+`skills run --json` file from the earlier invocation, extracting the
+`skillResult`, and using that as the runtime artifact. There is no manual
+copy-paste or hand-built JSON in the loop.
 
 But if the run actually drifts in a meaningful way - say the app was not in
 the right starting state and the skill never reached its target checkpoint -

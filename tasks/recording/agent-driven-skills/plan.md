@@ -223,8 +223,9 @@ This pack should produce:
 ## SkillResult File Persistence
 
 The `clawperator skills run --json` output includes the full `SkillResult` in
-its JSON payload. Saving this to a file is the mechanism that feeds the
-`clawperator recording compare --result <file>` workflow shown in the video.
+its JSON payload. Saving that full CLI JSON output to a file is the mechanism
+that feeds the `clawperator recording compare --result <file>` workflow shown
+in the video.
 
 W2b does not own a new `--save-result` flag. The v1 pattern is:
 
@@ -232,9 +233,12 @@ W2b does not own a new `--save-result` flag. The v1 pattern is:
 clawperator skills run <id> --json -- <inputs> > ./runs/<id>-<ts>.skill-result.json
 ```
 
-W4 (`compare/`) owns the `--result` file input contract. W2b owns ensuring the
-`--json` output from `clawperator skills run` contains the full `SkillResult`
-document in a form that `compare` can consume directly.
+W4 (`compare/`) owns the `--result` file input contract. The intended v1
+contract is that compare accepts this saved `skills run --json` wrapper
+directly, extracts `skillResult`, and does not require a separate transform
+step. W2b owns ensuring the `--json` output from `clawperator skills run`
+contains the full `SkillResult` document in a form that `compare` can consume
+directly from that wrapper.
 
 The reliability validation phase (P4) must save all 10 run results and the
 forced-failure run using this pattern, so they are available as real inputs
