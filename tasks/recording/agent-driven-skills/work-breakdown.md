@@ -126,7 +126,7 @@ chore(tasks): commit agent-driven skill runtime contract decisions
 ### Goal
 
 Extend `runSkill` and the skills contract so a skill with an `agent`
-block in its `skill.json` runs via the configured agent CLI, with
+block in its `skill.json` runs via its `scripts/run.js` harness, with
 typed failure paths and doctor coverage.
 
 ### Steps
@@ -141,12 +141,15 @@ typed failure paths and doctor coverage.
    - resolve the agent CLI per the resolution order decided in P1
    - if the CLI is missing, return `SKILL_AGENT_CLI_UNAVAILABLE`
      without spawning anything
-   - spawn the agent with SKILL.md as the program argument and
+   - execute the skill's `scripts/run.js` harness instead of spawning
+     the agent directly
+   - pass through the resolved agent configuration and skill inputs so
+     the harness can spawn the agent with SKILL.md as the program and
      inputs as an env var blob plus argv
    - forward stdout and stderr
    - parse the emitted `[Clawperator-Skill-Result]` frame via the
      existing W2 parser
-   - enforce the outer timeout; if it hits, kill the agent cleanly
+   - enforce the outer timeout; if it hits, kill the harness cleanly
      and return a typed error
 4. Add a `clawperator doctor` check under
    `apps/node/src/domain/doctor/checks/` that verifies the
@@ -162,7 +165,7 @@ typed failure paths and doctor coverage.
      parse error
    - agent emits `status: indeterminate` returns that status intact
    - agent emits `status: success` returns the full typed object
-   - outer timeout kills the agent cleanly
+  - outer timeout kills the harness cleanly
    - an agent-driven run that takes a non-deterministic recovery
      path but still reaches terminal verification is reported as
      `success` with the actually-reached checkpoints
@@ -179,6 +182,9 @@ typed failure paths and doctor coverage.
   is green, including the new regression tests
 - `clawperator doctor` reports agent CLI availability
 - docs describe the agent-driven orchestrated shape accurately
+- the implementation has one clear spawn boundary: `runSkill`
+  executes `scripts/run.js`, and `scripts/run.js` spawns the
+  configured agent CLI
 
 ### Validation
 

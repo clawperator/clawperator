@@ -62,7 +62,8 @@ the gap between that promise and the current plans.
   inputs, allowed primitives, required checkpoint identities,
   recovery branches, emission rules)
 - thin-harness pattern for `run.js` (small, boilerplate, reusable)
-- `runSkill` changes required to spawn an agent CLI safely
+- `runSkill` changes required to execute orchestrated skills via
+  `scripts/run.js` safely
 - a new typed error `SKILL_AGENT_CLI_UNAVAILABLE`
 - an advisory `clawperator doctor` host check for the default agent CLI
   (`codex`) plus any explicit env override used for orchestrated skills
@@ -89,7 +90,7 @@ the gap between that promise and the current plans.
 | Surface | Owner | Role |
 | --- | --- | --- |
 | `apps/node/src/contracts/skills.ts` | Clawperator repo | `agent` block, `SKILL_AGENT_CLI_UNAVAILABLE` |
-| `apps/node/src/domain/skills/runSkill.ts` | Clawperator repo | detection and spawning of agent-driven skills |
+| `apps/node/src/domain/skills/runSkill.ts` | Clawperator repo | detection of agent-driven skills, execution of `scripts/run.js`, timeout handling, result parsing |
 | `apps/node/src/domain/doctor/checks/` | Clawperator repo | advisory host check for the default orchestrated-skill agent CLI |
 | `apps/node/src/test/` | Clawperator repo | fixtures and regression tests |
 | `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-orchestrated/` | Skills repo | Solax proving case (SKILL.md, run.js, skill.json) |
@@ -118,6 +119,12 @@ the gap between that promise and the current plans.
   contain skill logic. If a harness starts growing skill-specific
   code, that code belongs in SKILL.md as an instruction for the
   agent, not in the harness.
+- Responsibility boundary: `runSkill` does not spawn the agent CLI
+  directly for orchestrated skills. It validates the configured agent
+  settings, executes the skill's `scripts/run.js` harness, forwards
+  stdout and stderr, enforces the outer timeout, and parses the emitted
+  `SkillResult`. The harness is the layer that resolves and spawns the
+  configured agent CLI on `SKILL.md`.
 - The embedded agent is not allowed to invent checkpoint identities
   outside the list declared in SKILL.md. If the run took a path
   SKILL.md did not cover, the missing identities are reported as
@@ -210,9 +217,9 @@ implementation:
 This pack should produce:
 
 - the extended `skill.json` contract with an `agent` block
-- `runSkill` changes to detect agent-driven skills,
-  spawn the agent CLI, forward stdout/stderr, and return the parsed
-  `SkillResult`
+- `runSkill` changes to detect agent-driven skills, execute the skill's
+  `scripts/run.js` harness, forward stdout and stderr, and return the
+  parsed `SkillResult`
 - `SKILL_AGENT_CLI_UNAVAILABLE` typed error in
   `apps/node/src/contracts/skills.ts`
 - a `clawperator doctor` advisory check for the default orchestrated-skill
