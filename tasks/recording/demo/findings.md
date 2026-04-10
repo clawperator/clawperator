@@ -22,7 +22,7 @@ the agent finish the work or distill durable follow-up guidance.
 
 ## Skill Scaffolding
 
-- Target skill id:
+- Target skill id: `com.solaxcloud.starter.set-discharge-to-limit`
 - Skill path:
 - Validation status:
 
@@ -45,7 +45,7 @@ the agent finish the work or distill durable follow-up guidance.
 ## Open Questions
 
 - Exact Solax intent name:
-  - existing namespace confirmed:
-    `com.solaxcloud.starter.get-battery`
+  - chosen: `set-discharge-to-limit`
+  - full skill id: `com.solaxcloud.starter.set-discharge-to-limit`
 - Is snapshot omission sufficient:
 - Any app-specific constraints that should not be generalized:
