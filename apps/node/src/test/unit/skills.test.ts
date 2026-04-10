@@ -23,7 +23,6 @@ import { searchSkills } from "../../domain/skills/searchSkills.js";
 import { runSkill } from "../../domain/skills/runSkill.js";
 import { scaffoldSkill } from "../../domain/skills/scaffoldSkill.js";
 import { validateAllSkills, validateSkill } from "../../domain/skills/validateSkill.js";
-import { loadRegistry } from "../../adapters/skills-repo/localSkillsRegistry.js";
 import { validateExecution, validatePayloadSize } from "../../domain/executions/validateExecution.js";
 import { cmdSkillsRun } from "../../cli/commands/skills.js";
 import { createClawperatorLogger } from "../../adapters/logger.js";
@@ -214,45 +213,62 @@ describe("listSkills", () => {
 describe("loadRegistry", () => {
   it("warns to stderr when CLAWPERATOR_SKILLS_REGISTRY is unset and the default path is missing", async () => {
     const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-registry-unset-"));
-    const originalCwd = process.cwd();
-    delete process.env.CLAWPERATOR_SKILLS_REGISTRY;
-
-    const stderrOutput: string[] = [];
-    process.stderr.write = (chunk: unknown) => {
-      stderrOutput.push(String(chunk));
-      return true;
-    };
 
     try {
-      process.chdir(tempRoot);
-
-      await assert.rejects(() => loadRegistry(), /Registry not found at default path:/);
+      const modulePath = join(packageRoot, "dist", "adapters", "skills-repo", "localSkillsRegistry.js");
+      const script = `
+        import { loadRegistry } from ${JSON.stringify(modulePath)};
+        process.chdir(${JSON.stringify(tempRoot)});
+        delete process.env.CLAWPERATOR_SKILLS_REGISTRY;
+        try {
+          await loadRegistry();
+          console.log(JSON.stringify({ ok: true }));
+        } catch (error) {
+          console.log(JSON.stringify({ ok: false, message: error instanceof Error ? error.message : String(error) }));
+        }
+      `;
+      const child = await runNodeSnippet(script, {
+        env: { ...process.env },
+      });
+      assert.strictEqual(child.code, 0, child.stderr);
+      const parsed = JSON.parse(child.stdout) as { ok: boolean; message?: string };
+      assert.strictEqual(parsed.ok, false);
+      assert.match(parsed.message ?? "", /Registry not found at default path:/);
       assert.ok(
-        stderrOutput.some(line => line.includes("CLAWPERATOR_SKILLS_REGISTRY")),
-        `Expected stderr to mention CLAWPERATOR_SKILLS_REGISTRY, got: ${stderrOutput.join("")}`
+        child.stderr.includes("CLAWPERATOR_SKILLS_REGISTRY"),
+        `Expected stderr to mention CLAWPERATOR_SKILLS_REGISTRY, got: ${child.stderr}`
       );
     } finally {
-      process.chdir(originalCwd);
       await rm(tempRoot, { recursive: true, force: true });
     }
   });
 
   it("writes the configured path to stderr when CLAWPERATOR_SKILLS_REGISTRY points to a missing file", async () => {
-    process.env.CLAWPERATOR_SKILLS_REGISTRY = "/tmp/does-not-exist/skills-registry.json";
-
-    const stderrOutput: string[] = [];
-    process.stderr.write = (chunk: unknown) => {
-      stderrOutput.push(String(chunk));
-      return true;
-    };
-
-    await assert.rejects(
-      () => loadRegistry(),
+    const modulePath = join(packageRoot, "dist", "adapters", "skills-repo", "localSkillsRegistry.js");
+    const missingPath = "/tmp/does-not-exist/skills-registry.json";
+    const script = `
+      import { loadRegistry } from ${JSON.stringify(modulePath)};
+      process.env.CLAWPERATOR_SKILLS_REGISTRY = ${JSON.stringify(missingPath)};
+      try {
+        await loadRegistry();
+        console.log(JSON.stringify({ ok: true }));
+      } catch (error) {
+        console.log(JSON.stringify({ ok: false, message: error instanceof Error ? error.message : String(error) }));
+      }
+    `;
+    const child = await runNodeSnippet(script, {
+      env: { ...process.env },
+    });
+    assert.strictEqual(child.code, 0, child.stderr);
+    const parsed = JSON.parse(child.stdout) as { ok: boolean; message?: string };
+    assert.strictEqual(parsed.ok, false);
+    assert.match(
+      parsed.message ?? "",
       /Registry not found at configured path: \/tmp\/does-not-exist\/skills-registry\.json/
     );
     assert.ok(
-      stderrOutput.some(line => line.includes("/tmp/does-not-exist/skills-registry.json")),
-      `Expected stderr to include the missing path, got: ${stderrOutput.join("")}`
+      child.stderr.includes(missingPath),
+      `Expected stderr to include the missing path, got: ${child.stderr}`
     );
   });
 
@@ -1775,10 +1791,11 @@ describe("runSkill", () => {
     assert.strictEqual(result.output, "hello\n");
   });
 
-  it("returns SKILL_EXECUTION_FAILED for non-zero exit", async () => {
+  it("returns SKILL_EXECUTION_FAILED for non-zero exit even when stdout is present", async () => {
     const result = await runSkill("com.test.fail", []);
     assert.ok(!result.ok);
     assert.strictEqual(result.code, SKILL_EXECUTION_FAILED);
+    assert.ok(typeof result.exitCode === "number" && result.exitCode !== 0);
     assert.ok(result.stdout?.includes('"stage":"before-failure"'));
     assert.ok(result.stderr?.includes("FAIL_OUTPUT:intentional"));
   });
@@ -1889,6 +1906,50 @@ describe("runSkill", () => {
     assert.strictEqual(parsed.timeoutMs, undefined);
   });
 
+  it("CLI skills run forwards unknown named flags without requiring --", async () => {
+    const { stdout, code } = await runCli([
+      "skills",
+      "run",
+      "com.test.echo-all",
+      "--output",
+      "json",
+      "--limit",
+      "40",
+    ]);
+    assert.strictEqual(code, 0, stdout);
+    const parsed = JSON.parse(stdout) as { output?: string; timeoutMs?: number | undefined };
+    assert.ok(parsed.output?.includes("TEST_OUTPUT:--limit"));
+    assert.ok(parsed.output?.includes("TEST_OUTPUT:40"));
+    assert.strictEqual(parsed.timeoutMs, undefined);
+  });
+
+  it("CLI skills run rejects a typo in a known wrapper flag after the skill id", async () => {
+    const { stdout, code } = await runCli([
+      "skills",
+      "run",
+      "com.test.echo-all",
+      "--skip-validtae",
+    ]);
+    assert.strictEqual(code, 1, stdout);
+    const parsed = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(parsed.code, "USAGE");
+    assert.strictEqual(parsed.message, "unrecognized flag '--skip-validtae'. Did you mean '--skip-validate'?");
+  });
+
+  it("CLI skills run rejects a typo in a known value-taking wrapper flag after the skill id", async () => {
+    const { stdout, code } = await runCli([
+      "skills",
+      "run",
+      "com.test.echo-all",
+      "--expect-contians",
+      "needle",
+    ]);
+    assert.strictEqual(code, 1, stdout);
+    const parsed = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(parsed.code, "USAGE");
+    assert.strictEqual(parsed.message, "unrecognized flag '--expect-contians'. Did you mean '--expect-contains'?");
+  });
+
   it("CLI skills run preserves alias-like tokens after -- without rewriting", async () => {
     const { stdout, code } = await runCli([
       "skills",
@@ -1995,6 +2056,26 @@ describe("runSkill", () => {
     const parsed = JSON.parse(stdout) as { code?: string; message?: string };
     assert.strictEqual(parsed.code, "USAGE");
     assert.strictEqual(parsed.message, "--expect-contains requires a value");
+  });
+
+  it("CLI skills run returns USAGE when --expect-contains is followed by another flag", async () => {
+    const { stdout, code } = await runCli([
+      "skills", "run", "com.test.echo", "--expect-contains", "--timeout", "5000",
+    ]);
+    assert.strictEqual(code, 1, stdout);
+    const parsed = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(parsed.code, "USAGE");
+    assert.strictEqual(parsed.message, "--expect-contains requires a value");
+  });
+
+  it("CLI skills run accepts an escaped double-dash literal for --expect-contains", async () => {
+    const { stdout, code } = await runCli([
+      "skills", "run", "com.test.echo", "--output", "json", "--expect-contains", "--", "TEST_OUTPUT:--help", "--", "--help",
+    ]);
+    assert.strictEqual(code, 0, stdout);
+    const parsed = JSON.parse(stdout) as { expectedSubstring?: string; output?: string };
+    assert.strictEqual(parsed.expectedSubstring, "TEST_OUTPUT:--help");
+    assert.ok(parsed.output?.includes("TEST_OUTPUT:--help"));
   });
 
   it("CLI skills run returns usage when skill_id is missing even with --timeout", async () => {

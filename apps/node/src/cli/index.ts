@@ -47,6 +47,19 @@ function similarityRatio(s1: string, s2: string): number {
   return 1 - (dist / maxLen);
 }
 
+function findClosestFlagMatch(flag: string, candidates: Iterable<string>): { match?: string; score: number } {
+  let match: string | undefined;
+  let score = 0;
+  for (const candidate of candidates) {
+    const candidateScore = similarityRatio(flag, candidate);
+    if (candidateScore > score) {
+      score = candidateScore;
+      match = candidate;
+    }
+  }
+  return { match, score };
+}
+
 const FLAG_VALUE_ARITY = new Map<string, number>([
   ["--device", 1],
   ["--device-id", 1],
@@ -321,6 +334,9 @@ async function main(): Promise<void> {
           if (arg === "--") {
             break;
           }
+          const allowForwardedSkillRunFlag =
+            rest[0] === "run"
+            && i >= 2;
           if (def.name === "exec" && rest[0] !== "best-effort" && arg === "--goal") {
             firstUnknownFlag = arg;
             break;
@@ -339,6 +355,17 @@ async function main(): Promise<void> {
             continue;
           }
           if (arg.startsWith("--")) {
+            if (!knownFlags.has(arg) && allowForwardedSkillRunFlag) {
+              const { match, score } = findClosestFlagMatch(arg, knownFlags);
+              if (match && score > 0.75) {
+                firstUnknownFlag = arg;
+                break;
+              }
+              if (restBeforeForward[i + 1] !== undefined && !restBeforeForward[i + 1].startsWith("--")) {
+                i += 1;
+              }
+              continue;
+            }
             if (!knownFlags.has(arg) && allowsLeadingPositional && !consumedPositional) {
               const nextArg = restBeforeForward[i + 1];
               if (nextArg !== undefined && !nextArg.startsWith("--")) {
@@ -358,15 +385,7 @@ async function main(): Promise<void> {
         }
 
         if (firstUnknownFlag) {
-          let bestMatch: string | undefined;
-          let bestScore = 0;
-          for (const flag of knownFlags) {
-            const score = similarityRatio(firstUnknownFlag, flag);
-            if (score > bestScore) {
-              bestScore = score;
-              bestMatch = flag;
-            }
-          }
+          const { match: bestMatch, score: bestScore } = findClosestFlagMatch(firstUnknownFlag, knownFlags);
           if (bestMatch && bestScore > 0.75) {
             result = JSON.stringify({ code: "USAGE", message: `unrecognized flag '${firstUnknownFlag}'. Did you mean '${bestMatch}'?` });
             usageParseError = true;

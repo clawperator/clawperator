@@ -25,6 +25,24 @@ Current role split:
 
 Skills are registry-driven. They are not discovered by folder scanning alone. `clawperator skills list`, `clawperator skills search`, `clawperator skills get`, `clawperator skills validate`, and `clawperator skills run` all read the registry through `loadRegistry()` in `apps/node/src/adapters/skills-repo/localSkillsRegistry.ts`.
 
+## Skill Categories
+
+Current authoring practice recognizes two categories of skills:
+
+- `-replay` skills:
+  - recording-derived or replay-oriented wrappers
+  - optimized for deterministic path execution on a known UI flow
+  - may rely on tighter device or layout assumptions
+- `-orchestrated` skills:
+  - agent-controlled skills intended to better match the Clawperator brain/hand model
+  - expected to expose structured checkpoints, terminal verification, and clearer result semantics as that contract work lands
+
+Important current caveats:
+
+- this category split is a documented naming and authoring convention, not yet a machine-enforced runtime field
+- some legacy skills predate the suffix convention and may still have unsuffixed ids
+- unsuffixed legacy ids should not be read as proof that a skill is already orchestrated
+
 ## Skill Structure
 
 The registry contract for one skill is:
@@ -288,7 +306,7 @@ Top-level usage and lookup failures are exact:
 Current execution command:
 
 ```bash
-clawperator skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--timeout-ms <ms>] [--expect-contains <text>] [--skip-validate] [--json] [-- <extra_args>]
+clawperator skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--timeout-ms <ms>] [--expect-contains <text>] [--skip-validate] [--json] [skill_args...]
 ```
 
 What the wrapper does:
@@ -305,7 +323,8 @@ What the wrapper does:
 Argument passing rules:
 
 - if `--device` was provided, the wrapper prepends that device id as the first script argument
-- arguments after `--` are forwarded to the script unchanged
+- unknown trailing tokens such as `--limit 40` are forwarded to the script unchanged
+- use `--` when you need to force literal passthrough for tokens that would otherwise be parsed as wrapper flags
 - `CLAWPERATOR_BIN` and `CLAWPERATOR_OPERATOR_PACKAGE` are injected into the script environment
 - in JSON mode, the wrapper suppresses the pretty banner so stdout stays parseable JSON
 

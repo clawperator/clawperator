@@ -1064,7 +1064,7 @@ This page is generated from the Node CLI registry and command sources.
 | `scroll-and-click` | `scroll-and-click [<direction>] --text <text> [--device <id>] [--operator-package <pkg>] [--json]` | scroll_and_click | --direction, --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --container-text, --container-text-contains, --container-id, --container-desc, --container-desc-contains, --container-role, --container-selector, --click, --device, --operator-package, --json | Scroll until target is visible, then click it (alias for scroll-until --click) |
 | `wait-for-nav` | `wait-for-nav --app <package> --timeout <ms> [--device <id>] [--operator-package <pkg>] [--json]` | wait-for-navigation, wait_for_navigation | --app, --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --validate-only, --dry-run, --timeout, --device, --operator-package, --json | Wait for app or screen navigation to complete |
 | `read-value` | `read-value --label <text> [--json]` | read-kv, read-key-value-pair, read_key_value_pair | --label, --label-id, --label-desc, --all, --validate-only, --dry-run, --json | Read the value associated with a labeled element |
-| `skills` | `skills list`<br>`skills get <skill_id>`<br>`skills search --app <package_id> [--intent <intent>] [--keyword <text>]`<br>`skills search <keyword>`<br>`skills compile-artifact <skill_id> --artifact <name> [--vars <json>]`<br>`skills compile-artifact --skill-id <id> --artifact <name> [--vars <json>]`<br>`skills new <skill_id> [--summary <text>] [--recording-context <file>]`<br>`skills validate <skill_id> [--dry-run]`<br>`skills validate --all [--dry-run]`<br>`skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--json] [--output <json|pretty>] [-- <extra_args>]`<br>`skills install`<br>`skills update [--ref <git-ref>]`<br>`skills sync --ref <git-ref>` | - | --app, --intent, --keyword, --skill-id, --artifact, --vars, --summary, --recording-context, --all, --dry-run, --device, --device-id, --operator-package, --receiver-package, --timeout, --timeout-ms, --expect-contains, --skip-validate, --ref, --json, --output<br>Subcommands: install, sync, new, validate, compile-artifact, run | Manage and run automation skills |
+| `skills` | `skills list`<br>`skills get <skill_id>`<br>`skills search --app <package_id> [--intent <intent>] [--keyword <text>]`<br>`skills search <keyword>`<br>`skills compile-artifact <skill_id> --artifact <name> [--vars <json>]`<br>`skills compile-artifact --skill-id <id> --artifact <name> [--vars <json>]`<br>`skills new <skill_id> [--summary <text>] [--recording-context <file>]`<br>`skills validate <skill_id> [--dry-run]`<br>`skills validate --all [--dry-run]`<br>`skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--json] [--output <json|pretty>] [skill_args...]`<br>`skills install`<br>`skills update [--ref <git-ref>]`<br>`skills sync --ref <git-ref>` | - | --app, --intent, --keyword, --skill-id, --artifact, --vars, --summary, --recording-context, --all, --dry-run, --device, --device-id, --operator-package, --receiver-package, --timeout, --timeout-ms, --expect-contains, --skip-validate, --ref, --json, --output<br>Subcommands: install, sync, new, validate, compile-artifact, run | Manage and run automation skills |
 | `recording` | `recording start [--session-id <id>] [--device <serial>] [--operator-package <pkg>]`<br>`recording stop`<br>`recording pull`<br>`recording parse --input <file> [--out <file>]`<br>`recording export --input <file|directory> [--out <file>] [--snapshots <omit|include>]` | record | --session-id, --out, --input, --snapshots, --device, --operator-package<br>Subcommands: export | Manage recording sessions on the Operator app |
 | `serve` | `serve [--port <number>] [--host <string>]` | - | --port, --host | Start local HTTP/SSE server for remote control |
 | `mcp` | `mcp serve` | - | - | Start the first-party MCP server |
@@ -1171,7 +1171,7 @@ This page is generated from the Node CLI registry and command sources.
 | Command | Syntax | Aliases | Flags | Summary |
 | --- | --- | --- | --- | --- |
 | `exec` | `exec <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>]`<br>`exec best-effort --goal <text> [--device <id>] [--operator-package <package>]` | execute | --payload, --validate-only, --dry-run, --goal, --device, --operator-package, --execution, --input, --file | Execute a validated command payload |
-| `skills` | `skills list`<br>`skills get <skill_id>`<br>`skills search --app <package_id> [--intent <intent>] [--keyword <text>]`<br>`skills search <keyword>`<br>`skills compile-artifact <skill_id> --artifact <name> [--vars <json>]`<br>`skills compile-artifact --skill-id <id> --artifact <name> [--vars <json>]`<br>`skills new <skill_id> [--summary <text>] [--recording-context <file>]`<br>`skills validate <skill_id> [--dry-run]`<br>`skills validate --all [--dry-run]`<br>`skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--json] [--output <json|pretty>] [-- <extra_args>]`<br>`skills install`<br>`skills update [--ref <git-ref>]`<br>`skills sync --ref <git-ref>` | - | --app, --intent, --keyword, --skill-id, --artifact, --vars, --summary, --recording-context, --all, --dry-run, --device, --device-id, --operator-package, --receiver-package, --timeout, --timeout-ms, --expect-contains, --skip-validate, --ref, --json, --output<br>Subcommands: install, sync, new, validate, compile-artifact, run | Manage and run automation skills |
+| `skills` | `skills list`<br>`skills get <skill_id>`<br>`skills search --app <package_id> [--intent <intent>] [--keyword <text>]`<br>`skills search <keyword>`<br>`skills compile-artifact <skill_id> --artifact <name> [--vars <json>]`<br>`skills compile-artifact --skill-id <id> --artifact <name> [--vars <json>]`<br>`skills new <skill_id> [--summary <text>] [--recording-context <file>]`<br>`skills validate <skill_id> [--dry-run]`<br>`skills validate --all [--dry-run]`<br>`skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--json] [--output <json|pretty>] [skill_args...]`<br>`skills install`<br>`skills update [--ref <git-ref>]`<br>`skills sync --ref <git-ref>` | - | --app, --intent, --keyword, --skill-id, --artifact, --vars, --summary, --recording-context, --all, --dry-run, --device, --device-id, --operator-package, --receiver-package, --timeout, --timeout-ms, --expect-contains, --skip-validate, --ref, --json, --output<br>Subcommands: install, sync, new, validate, compile-artifact, run | Manage and run automation skills |
 | `serve` | `serve [--port <number>] [--host <string>]` | - | --port, --host | Start local HTTP/SSE server for remote control |
 | `mcp` | `mcp serve` | - | - | Start the first-party MCP server |
 
@@ -1185,7 +1185,7 @@ This page is generated from the Node CLI registry and command sources.
 ### `skills`
 
 - Summary: Manage and run automation skills
-- Syntax: `skills list`, `skills get <skill_id>`, `skills search --app <package_id> [--intent <intent>] [--keyword <text>]`, `skills search <keyword>`, `skills compile-artifact <skill_id> --artifact <name> [--vars <json>]`, `skills compile-artifact --skill-id <id> --artifact <name> [--vars <json>]`, `skills new <skill_id> [--summary <text>] [--recording-context <file>]`, `skills validate <skill_id> [--dry-run]`, `skills validate --all [--dry-run]`, `skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--json] [--output <json|pretty>] [-- <extra_args>]`, `skills install`, `skills update [--ref <git-ref>]`, `skills sync --ref <git-ref>`
+- Syntax: `skills list`, `skills get <skill_id>`, `skills search --app <package_id> [--intent <intent>] [--keyword <text>]`, `skills search <keyword>`, `skills compile-artifact <skill_id> --artifact <name> [--vars <json>]`, `skills compile-artifact --skill-id <id> --artifact <name> [--vars <json>]`, `skills new <skill_id> [--summary <text>] [--recording-context <file>]`, `skills validate <skill_id> [--dry-run]`, `skills validate --all [--dry-run]`, `skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--json] [--output <json|pretty>] [skill_args...]`, `skills install`, `skills update [--ref <git-ref>]`, `skills sync --ref <git-ref>`
 - Aliases: -
 - Flags: `--app`, `--intent`, `--keyword`, `--skill-id`, `--artifact`, `--vars`, `--summary`, `--recording-context`, `--all`, `--dry-run`, `--device`, `--device-id`, `--operator-package`, `--receiver-package`, `--timeout`, `--timeout-ms`, `--expect-contains`, `--skip-validate`, `--ref`, `--json`, `--output`
 - Subcommands: `install`, `sync`, `new`, `validate`, `compile-artifact`, `run`
@@ -8050,6 +8050,24 @@ Current role split:
 
 Skills are registry-driven. They are not discovered by folder scanning alone. `clawperator skills list`, `clawperator skills search`, `clawperator skills get`, `clawperator skills validate`, and `clawperator skills run` all read the registry through `loadRegistry()` in `apps/node/src/adapters/skills-repo/localSkillsRegistry.ts`.
 
+## Skill Categories
+
+Current authoring practice recognizes two categories of skills:
+
+- `-replay` skills:
+  - recording-derived or replay-oriented wrappers
+  - optimized for deterministic path execution on a known UI flow
+  - may rely on tighter device or layout assumptions
+- `-orchestrated` skills:
+  - agent-controlled skills intended to better match the Clawperator brain/hand model
+  - expected to expose structured checkpoints, terminal verification, and clearer result semantics as that contract work lands
+
+Important current caveats:
+
+- this category split is a documented naming and authoring convention, not yet a machine-enforced runtime field
+- some legacy skills predate the suffix convention and may still have unsuffixed ids
+- unsuffixed legacy ids should not be read as proof that a skill is already orchestrated
+
 ## Skill Structure
 
 The registry contract for one skill is:
@@ -8313,7 +8331,7 @@ Top-level usage and lookup failures are exact:
 Current execution command:
 
 ```bash
-clawperator skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--timeout-ms <ms>] [--expect-contains <text>] [--skip-validate] [--json] [-- <extra_args>]
+clawperator skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--timeout-ms <ms>] [--expect-contains <text>] [--skip-validate] [--json] [skill_args...]
 ```
 
 What the wrapper does:
@@ -8330,7 +8348,8 @@ What the wrapper does:
 Argument passing rules:
 
 - if `--device` was provided, the wrapper prepends that device id as the first script argument
-- arguments after `--` are forwarded to the script unchanged
+- unknown trailing tokens such as `--limit 40` are forwarded to the script unchanged
+- use `--` when you need to force literal passthrough for tokens that would otherwise be parsed as wrapper flags
 - `CLAWPERATOR_BIN` and `CLAWPERATOR_OPERATOR_PACKAGE` are injected into the script environment
 - in JSON mode, the wrapper suppresses the pretty banner so stdout stays parseable JSON
 
@@ -8753,6 +8772,19 @@ Current reality:
 - the validator does not currently parse the internals of `SKILL.md`
 - validation only checks that the file exists at the path referenced by the registry
 
+Current skill-type convention:
+
+- `clawperator-skill-type` may be added to `SKILL.md` frontmatter as author-facing metadata
+- current expected values are `replay` and `orchestrated`
+- this field is documentation only today; the runtime and validator do not enforce or consume it yet
+- some legacy skills predate this convention and may not include the field or a suffix in the id
+
+Recommended current practice:
+
+- use a `-replay` id suffix for replay-oriented baseline skills
+- use a `-orchestrated` id suffix for agent-controlled skills as that contract work lands
+- when a skill follows one of those conventions, keep the frontmatter `clawperator-skill-type` value aligned with the id suffix
+
 So the minimum current contract is:
 
 - `SKILL.md` exists
@@ -8961,6 +8993,37 @@ For the run result, verify:
 - `exitCode` is `0`
 
 If the script exits non-zero, `skills run` returns `SKILL_EXECUTION_FAILED` and preserves `stdout`, `stderr`, and `exitCode`.
+
+### Non-Trivial Skill Rule
+
+For non-trivial skills, treat process success as a proof obligation, not just
+an implementation detail.
+
+Working definition:
+
+- a skill is `non-trivial` when successful script execution is not enough to
+  prove the claimed outcome
+- this usually means the skill changes app state, crosses multiple UI
+  transitions, or can fail silently while still appearing to have run
+- a read-only or capture-only skill is often trivial; a state-changing skill
+  should be assumed non-trivial unless proven otherwise
+
+Current authoring expectation:
+
+- if an underlying nested `clawperator exec` call fails, the skill script must
+  exit non-zero rather than translating the failure into a "successful" skill run
+- if the skill's purpose is to change app state, the skill should verify the
+  intended terminal state before reporting success
+
+Examples of terminal-state verification:
+
+- re-read the row or field the skill changed and confirm it matches the
+  requested value
+- re-open the relevant dialog or screen and confirm the persisted state is
+  present
+
+Do not assume that "the taps and text entry ran" is enough evidence for a
+non-trivial skill. If the skill changes state, prefer proving the state.
 
 ## Artifact Compilation
 
