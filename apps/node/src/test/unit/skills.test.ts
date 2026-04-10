@@ -1890,6 +1890,23 @@ describe("runSkill", () => {
     assert.strictEqual(parsed.timeoutMs, undefined);
   });
 
+  it("CLI skills run forwards unknown named flags without requiring --", async () => {
+    const { stdout, code } = await runCli([
+      "skills",
+      "run",
+      "com.test.echo",
+      "--output",
+      "json",
+      "--limit",
+      "40",
+    ]);
+    assert.strictEqual(code, 0, stdout);
+    const parsed = JSON.parse(stdout) as { output?: string; timeoutMs?: number | undefined };
+    assert.ok(parsed.output?.includes("TEST_OUTPUT:--limit"));
+    assert.ok(parsed.output?.includes("TEST_OUTPUT:40"));
+    assert.strictEqual(parsed.timeoutMs, undefined);
+  });
+
   it("CLI skills run preserves alias-like tokens after -- without rewriting", async () => {
     const { stdout, code } = await runCli([
       "skills",

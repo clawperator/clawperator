@@ -288,7 +288,7 @@ Top-level usage and lookup failures are exact:
 Current execution command:
 
 ```bash
-clawperator skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--timeout-ms <ms>] [--expect-contains <text>] [--skip-validate] [--json] [-- <extra_args>]
+clawperator skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--timeout-ms <ms>] [--expect-contains <text>] [--skip-validate] [--json] [skill_args...]
 ```
 
 What the wrapper does:
@@ -305,7 +305,8 @@ What the wrapper does:
 Argument passing rules:
 
 - if `--device` was provided, the wrapper prepends that device id as the first script argument
-- arguments after `--` are forwarded to the script unchanged
+- unknown trailing tokens such as `--limit 40` are forwarded to the script unchanged
+- use `--` when you need to force literal passthrough for tokens that would otherwise be parsed as wrapper flags
 - `CLAWPERATOR_BIN` and `CLAWPERATOR_OPERATOR_PACKAGE` are injected into the script environment
 - in JSON mode, the wrapper suppresses the pretty banner so stdout stays parseable JSON
 

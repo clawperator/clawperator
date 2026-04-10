@@ -336,7 +336,7 @@ Notes:
 const HELP_SKILLS_RUN = `clawperator skills run
 
 Usage:
-  clawperator skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--json] [--output <json|pretty>] [-- <extra_args>]
+  clawperator skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--json] [--output <json|pretty>] [skill_args...]
 
 Notes:
   - Runs the selected skill script through the local skill wrapper.
@@ -349,7 +349,8 @@ Notes:
   - If the assertion text is missing, the wrapper fails with SKILL_OUTPUT_ASSERTION_FAILED.
   - By default, the wrapper performs a pre-run dry-run validation gate before starting the skill script.
   - --skip-validate bypasses that gate for CI or development escape hatches only.
-  - Arguments after -- are forwarded to the underlying skill script unchanged.
+  - Unknown trailing tokens such as --limit 40 are forwarded to the underlying skill script unchanged.
+  - Use -- when you need to force literal passthrough for tokens that would otherwise be parsed as wrapper flags.
   - Environment variables CLAWPERATOR_BIN and CLAWPERATOR_OPERATOR_PACKAGE are injected into the skill script.
   - This wrapper does not replace live validation of screenshots, artifacts, or app state.
 `;
@@ -2038,7 +2039,7 @@ Usage:
   clawperator skills new <skill_id> [--summary <text>] [--recording-context <file>]
   clawperator skills validate <skill_id> [--dry-run]
   clawperator skills validate --all [--dry-run]
-  clawperator skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--json] [--output <json|pretty>] [-- <extra_args>]
+  clawperator skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--json] [--output <json|pretty>] [skill_args...]
   clawperator skills install
   clawperator skills update [--ref <git-ref>]
   clawperator skills sync --ref <git-ref>
@@ -2066,7 +2067,7 @@ Usage:
   skills validate <skill_id> [--dry-run]
   skills validate --all [--dry-run]
                                             Validate one local skill or the entire configured registry
-  skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--json] [--output <json|pretty>] [-- <extra_args>]
+  skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--json] [--output <json|pretty>] [skill_args...]
                                             Invoke a skill script (convenience wrapper)
   skills install
                                             Clone skills repository to ~/.clawperator/skills/
@@ -2136,23 +2137,50 @@ Usage:
         return JSON.stringify({
           code: "USAGE",
           message:
-            "skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--json] [--output <json|pretty>] [-- <extra_args>]",
+            "skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--json] [--output <json|pretty>] [skill_args...]",
         });
       } else {
-        const dashDash = rest.indexOf("--");
-        const optSegment = dashDash >= 0 ? rest.slice(0, dashDash) : rest;
         const scriptArgs: string[] = [];
-        const localTimeoutMs = getNumberOpt(optSegment, "--timeout-ms") ?? getNumberOpt(optSegment, "--timeout");
+        if (deviceId) scriptArgs.push(deviceId);
+        let localTimeoutMs: number | undefined;
+        let expectContains: string | undefined;
+        let skipValidate = false;
+        for (let i = 2; i < rest.length; i += 1) {
+          const token = rest[i];
+          if (token === "--") {
+            scriptArgs.push(...rest.slice(i + 1));
+            break;
+          }
+          if (token === "--skip-validate") {
+            skipValidate = true;
+            continue;
+          }
+          if (token === "--expect-contains") {
+            if (i + 1 >= rest.length) {
+              throw new UsageError("--expect-contains requires a value");
+            }
+            expectContains = rest[i + 1];
+            i += 1;
+            continue;
+          }
+          if (token === "--timeout" || token === "--timeout-ms") {
+            if (i + 1 >= rest.length) {
+              throw new UsageError(`${token} requires a value`);
+            }
+            const value = Number(rest[i + 1]);
+            if (!Number.isFinite(value)) {
+              throw new UsageError(`${token} requires a numeric value`);
+            }
+            localTimeoutMs = value;
+            i += 1;
+            continue;
+          }
+          scriptArgs.push(token);
+        }
         const effectiveTimeoutMs = localTimeoutMs ?? timeoutMs;
         const invalidTimeoutResult = getInvalidTimeoutResult(effectiveTimeoutMs, { format });
         if (invalidTimeoutResult) {
           return invalidTimeoutResult;
-        }
-        const expectContains = getStringOpt(optSegment, "--expect-contains");
-        const skipValidate = hasFlag(optSegment, "--skip-validate");
-        if (deviceId) scriptArgs.push(deviceId);
-        if (dashDash >= 0) {
-          scriptArgs.push(...rest.slice(dashDash + 1));
         }
         return (await import("./commands/skills.js")).cmdSkillsRun(
           skillId,

@@ -321,6 +321,9 @@ async function main(): Promise<void> {
           if (arg === "--") {
             break;
           }
+          const allowForwardedSkillRunFlag =
+            rest[0] === "run"
+            && i >= 2;
           if (def.name === "exec" && rest[0] !== "best-effort" && arg === "--goal") {
             firstUnknownFlag = arg;
             break;
@@ -339,6 +342,12 @@ async function main(): Promise<void> {
             continue;
           }
           if (arg.startsWith("--")) {
+            if (!knownFlags.has(arg) && allowForwardedSkillRunFlag) {
+              if (restBeforeForward[i + 1] !== undefined && !restBeforeForward[i + 1].startsWith("--")) {
+                i += 1;
+              }
+              continue;
+            }
             if (!knownFlags.has(arg) && allowsLeadingPositional && !consumedPositional) {
               const nextArg = restBeforeForward[i + 1];
               if (nextArg !== undefined && !nextArg.startsWith("--")) {
