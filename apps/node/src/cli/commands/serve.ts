@@ -6,7 +6,7 @@ import { listSkills } from "../../domain/skills/listSkills.js";
 import { getSkill } from "../../domain/skills/getSkill.js";
 import { searchSkills } from "../../domain/skills/searchSkills.js";
 import { runSkill } from "../../domain/skills/runSkill.js";
-import { clawperatorEvents, CLAW_EVENT_TYPES } from "../../domain/observe/events.js";
+import { clawperatorEvents, CLAWPERATOR_EVENT_TYPES } from "../../domain/observe/events.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
 import { SKILL_NOT_FOUND, SKILL_OUTPUT_ASSERTION_FAILED } from "../../contracts/skills.js";
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
@@ -533,14 +533,14 @@ export async function startServer(options: ServeOptions): Promise<Server> {
     });
 
     const cleanup = () => {
-      clawperatorEvents.off(CLAW_EVENT_TYPES.RESULT, onResult);
-      clawperatorEvents.off(CLAW_EVENT_TYPES.EXECUTION, onExecution);
+      clawperatorEvents.off(CLAWPERATOR_EVENT_TYPES.RESULT, onResult);
+      clawperatorEvents.off(CLAWPERATOR_EVENT_TYPES.EXECUTION, onExecution);
     };
 
     const onResult = (data: { deviceId: string; envelope: any }) => {
       try {
         if (!res.writableEnded) {
-          res.write(`event: ${CLAW_EVENT_TYPES.RESULT}\n`);
+          res.write(`event: ${CLAWPERATOR_EVENT_TYPES.RESULT}\n`);
           res.write(`data: ${JSON.stringify(data)}\n\n`);
         }
       } catch (err) {
@@ -557,7 +557,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
     const onExecution = (data: { deviceId: string; input: unknown; result: any }) => {
       try {
         if (!res.writableEnded) {
-          res.write(`event: ${CLAW_EVENT_TYPES.EXECUTION}\n`);
+          res.write(`event: ${CLAWPERATOR_EVENT_TYPES.EXECUTION}\n`);
           res.write(`data: ${JSON.stringify(data)}\n\n`);
         }
       } catch (err) {
@@ -571,8 +571,8 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       }
     };
 
-    clawperatorEvents.on(CLAW_EVENT_TYPES.RESULT, onResult);
-    clawperatorEvents.on(CLAW_EVENT_TYPES.EXECUTION, onExecution);
+    clawperatorEvents.on(CLAWPERATOR_EVENT_TYPES.RESULT, onResult);
+    clawperatorEvents.on(CLAWPERATOR_EVENT_TYPES.EXECUTION, onExecution);
 
     req.on("close", () => {
       options.logger?.emit({

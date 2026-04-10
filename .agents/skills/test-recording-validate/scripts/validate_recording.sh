@@ -15,7 +15,7 @@ RUN_DIR="$RUNS_DIR/$TIMESTAMP"
 
 # Use local CLI build from repo root (supports 'recording' canonical command)
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
-CLAW="$REPO_ROOT/apps/node/dist/cli/index.js"
+CLAWPERATOR_CLI="$REPO_ROOT/apps/node/dist/cli/index.js"
 
 # Receiver package - use env var or default to dev package for testing
 OPERATOR_PKG="${CLAWPERATOR_OPERATOR_PACKAGE:-com.clawperator.operator.dev}"
@@ -24,7 +24,7 @@ OPERATOR_PKG="${CLAWPERATOR_OPERATOR_PACKAGE:-com.clawperator.operator.dev}"
 DEVICE_ID="${1:-}"
 if [[ -z "$DEVICE_ID" ]]; then
     echo "[INFO] No device serial provided, checking connected devices..."
-    DEVICES=$(node "$CLAW" devices --output json 2>/dev/null | grep -o '"serial":"[^"]*"' | cut -d'"' -f4 || true)
+    DEVICES=$(node "$CLAWPERATOR_CLI" devices --output json 2>/dev/null | grep -o '"serial":"[^"]*"' | cut -d'"' -f4 || true)
     if [[ -z "$DEVICES" ]]; then
         DEVICE_COUNT=0
     else
@@ -72,10 +72,10 @@ update_report() {
 
 # Step 1: Start recording
 echo "[INFO] Clearing any stale recording session before starting..."
-node "$CLAW" recording stop --device "$DEVICE_ID" --operator-package "$OPERATOR_PKG" --json >/dev/null 2>&1 || true
+node "$CLAWPERATOR_CLI" recording stop --device "$DEVICE_ID" --operator-package "$OPERATOR_PKG" --json >/dev/null 2>&1 || true
 
 echo "[STEP 1] Starting recording session..."
-START_OUTPUT=$(node "$CLAW" recording start --device "$DEVICE_ID" --operator-package "$OPERATOR_PKG" --json 2>&1) || {
+START_OUTPUT=$(node "$CLAWPERATOR_CLI" recording start --device "$DEVICE_ID" --operator-package "$OPERATOR_PKG" --json 2>&1) || {
     echo "[ERROR] Recording start failed: $START_OUTPUT"
     update_report "steps.start" '{"success": false, "error": "command failed"}'
     exit 2
@@ -112,7 +112,7 @@ update_report "steps.skill" '{"success": true}'
 
 # Step 3: Stop recording
 echo "[STEP 3] Stopping recording session..."
-STOP_OUTPUT=$(node "$CLAW" recording stop --device "$DEVICE_ID" --operator-package "$OPERATOR_PKG" --json 2>&1) || {
+STOP_OUTPUT=$(node "$CLAWPERATOR_CLI" recording stop --device "$DEVICE_ID" --operator-package "$OPERATOR_PKG" --json 2>&1) || {
     echo "[ERROR] Recording stop failed: $STOP_OUTPUT"
     update_report "steps.stop" '{"success": false, "error": "command failed"}'
     exit 4
@@ -125,7 +125,7 @@ update_report "steps.stop" "{\"success\": true, \"eventCount\": $EVENT_COUNT}"
 
 # Step 4: Pull recording
 echo "[STEP 4] Pulling recording to host..."
-PULL_OUTPUT=$(node "$CLAW" recording pull --device "$DEVICE_ID" --operator-package "$OPERATOR_PKG" --session-id "$SESSION_ID" --out "$RUN_DIR" --json 2>&1) || {
+PULL_OUTPUT=$(node "$CLAWPERATOR_CLI" recording pull --device "$DEVICE_ID" --operator-package "$OPERATOR_PKG" --session-id "$SESSION_ID" --out "$RUN_DIR" --json 2>&1) || {
     echo "[ERROR] Recording pull failed: $PULL_OUTPUT"
     update_report "steps.pull" '{"success": false, "error": "command failed"}'
     exit 5
@@ -148,7 +148,7 @@ PARSE_OUTPUT_FILE="$RUN_DIR/parse_output.json"
 PARSE_SUMMARY_FILE="$RUN_DIR/parse_summary.txt"
 
 # Capture both stdout and stderr separately
-PARSE_STDOUT=$(node "$CLAW" recording parse --input "$NDJSON_FILE" --output json 2>"$PARSE_SUMMARY_FILE") || {
+PARSE_STDOUT=$(node "$CLAWPERATOR_CLI" recording parse --input "$NDJSON_FILE" --output json 2>"$PARSE_SUMMARY_FILE") || {
     echo "[ERROR] Recording parse failed"
     cat "$PARSE_SUMMARY_FILE" >&2
     update_report "steps.parse" '{"success": false, "error": "command failed"}'

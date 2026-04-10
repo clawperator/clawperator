@@ -21,7 +21,7 @@ import type { ResultEnvelope, StepResult } from "../../contracts/result.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 import { createClawperatorLogger } from "../../adapters/logger.js";
-import { clawperatorEvents, CLAW_EVENT_TYPES } from "../../domain/observe/events.js";
+import { clawperatorEvents, CLAWPERATOR_EVENT_TYPES } from "../../domain/observe/events.js";
 import { isAbsolute, join } from "node:path";
 import { tmpdir } from "node:os";
 import { FakeProcessRunner } from "./fakes/FakeProcessRunner.js";
@@ -747,7 +747,7 @@ describe("buildTimeoutError", () => {
     runner.queueResult({ code: 0, stdout: "", stderr: "" });
     runner.queueResult({ code: 0, stdout: "", stderr: "" });
 
-    const resultEvent = once(clawperatorEvents, CLAW_EVENT_TYPES.RESULT);
+    const resultEvent = once(clawperatorEvents, CLAWPERATOR_EVENT_TYPES.RESULT);
     const result = await runExecution(
       {
         commandId: "cmd-timeout-5",
@@ -812,7 +812,7 @@ describe("buildTimeoutError", () => {
       runner.queueResult({ code: 0, stdout: "", stderr: "" }); // logcat -c
       runner.queueResult({ code: 0, stdout: "", stderr: "" }); // broadcast
 
-      const resultEvent = once(clawperatorEvents, CLAW_EVENT_TYPES.RESULT);
+      const resultEvent = once(clawperatorEvents, CLAWPERATOR_EVENT_TYPES.RESULT);
       const result = await runExecution(
         {
           commandId: "cmd-timeout-6",
