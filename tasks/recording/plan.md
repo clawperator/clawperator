@@ -138,6 +138,26 @@ After this work:
   service restart, container vs label clickability) live in the right docs
   instead of in `tasks/`
 
+### What the developer-facing authoring workflow becomes
+
+Today: creating a serious skill from a recording still requires an expert to
+manually manage recording lifecycle commands, inspect the export, scaffold the
+skill, and then hand-author the reliable parts.
+
+After this work:
+
+- it is safe to build a repo-local `.agents/skills/skill-author-by-recording/`
+  workflow that guides an agent through the full process
+- that workflow can tell the human exactly when to perform the recorded UI
+  flow, manage `record start` / `record stop` / `record pull` / `recording
+  export`, scaffold the replay skill, and then help author the orchestrated
+  sibling from the captured evidence
+- the resulting artifacts are inspectable by both developers and agents:
+  recording export, replay skill, orchestrated skill, declared contract, and
+  compare output
+- the workflow remains honest that recordings are evidence, while still making
+  end-to-end skill creation feel guided rather than manual
+
 ## Program Definition Of Done
 
 The recording subtree is complete when **all** of the following are true:
@@ -208,6 +228,7 @@ So this subtree now contains multiple linked workstreams rather than one task.
 | 4 | `compare/` | blocked on 2 | compare recording baseline against emitted `SkillResult` from the orchestrated skill |
 | 5a | `graduate-demo-findings/` (wave A) | active | graduate recording-as-evidence and operations facts that do not depend on `SkillResult` shape |
 | 5b | `graduate-demo-findings/` (wave B) | blocked on 2 | graduate skill-contract and authoring facts once W2 wording is stable |
+| 6 | future `.agents/skills/skill-author-by-recording/` | blocked on 5 | package the proven recording-to-replay-to-orchestrated workflow into a repo-local agent skill |
 
 ## Required Sequence
 
