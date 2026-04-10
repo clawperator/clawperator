@@ -58,6 +58,9 @@ the agent finish the work or distill durable follow-up guidance.
     `Discharge to 41%`
   - parsed text-entry selector included:
     `resourceId=van-field-1-input`
+  - the recording alone did not reveal the real clickable containers for the
+    two higher-level navigation cards; the human had tapped blank space beside
+    visible headings, so text labels were not enough to reconstruct the path
 - Validation notes:
   - `clawperator doctor` passed overall device readiness but warned on the
     operator package variant mismatch
@@ -70,6 +73,9 @@ the agent finish the work or distill durable follow-up guidance.
   - the first reliable implementation used coordinate clicks for the two
     container-card taps and selector-driven actions for the remaining row,
     dialog, and save steps
+  - those coordinate clicks are implemented through Clawperator `click` actions
+    with `coordinate` params inside `clawperator exec`, not as raw adb taps
+    inside the skill
   - a later re-run showed the original `v0` skill was not actually reliable:
     when asked to move from `40` to `39`, the UI still showed `Discharge to
     40%` after the run
@@ -80,6 +86,12 @@ the agent finish the work or distill durable follow-up guidance.
   - the value only persisted when the skill used device key events:
     `DEL`, `DEL`, `input text <value>`, then `KEYCODE_ENTER`, followed by
     `Confirm`, top-page `Save`, and outer-page `Save`
+  - the evidence for the coordinate targets came from combining:
+    recording knowledge of where the human tapped, screenshots to understand the
+    visible spatial layout, and UI dumps to understand which nodes actually
+    existed and were clickable
+  - screenshot inspection by itself was not sufficient; the UI dump was needed
+    to confirm that the visible text nodes were not the full clickable targets
   - removing the final `snapshot_ui` from the skill avoided the recurring
     terminal-envelope timeout at the end of otherwise successful runs
   - after forcing `com.clawperator.operator.dev` to stop during debugging, the
@@ -89,6 +101,14 @@ the agent finish the work or distill durable follow-up guidance.
     the skill successfully set the value to `40`, and then successfully set it
     back to `39`; both were confirmed by reopening the Solax flow and reading
     the persisted `Discharge to` row from the UI
+  - verified again later by rerunning the same `v0` skill to set the value back
+    to `40`, then reopening the Solax path and confirming the row showed
+    `Discharge to 40%`
+  - the currently working `v0` shape is:
+    `Clawperator open/selector navigation -> Clawperator coordinate tap for Peak Export -> Clawperator coordinate tap for Device Discharging -> Clawperator row click for Discharge to -> adb key events for text entry -> Clawperator Confirm/Save/Save`
+  - on the target Samsung device and current Solax layout, this `v0` is now
+    deterministic enough to pass repeated live reruns, but it is still layout-
+    dependent because of the container-card coordinates
 - Docs or workflow gaps:
   - `docs/api/recording.md` and `docs/skills/authoring.md` match the current
     flow we plan to use:
@@ -101,6 +121,9 @@ the agent finish the work or distill durable follow-up guidance.
     derive the working skill flow. Live screenshots and UI dumps were needed to
     identify the real clickable containers and the extra `Device Discharging`
     step between `Peak Export` and `Discharge to`
+  - skill documentation in the skills repo needs to explicitly state when a
+    skill relies on coordinate taps, when it uses adb-side input workarounds,
+    and what live validation was actually performed
 - Durable guidance to migrate into `skill-author-by-recording`:
   - Prefer proving the app-specific skill first, then distilling the reusable
     workflow from the real implementation rather than guessing abstractions up
@@ -110,12 +133,17 @@ the agent finish the work or distill durable follow-up guidance.
   - when a recorded tap lands on blank space beside a label, do not assume the
     label text itself is the clickable node. Confirm with a live UI dump or
     screenshot, and use a container-aware strategy or coordinates when needed
+  - for deterministic replay work, capture enough real fixtures and validation
+    evidence that later compare tooling can reason about where a run diverged
+    from the recording baseline
   - for hybrid or WebView-backed inputs, treat recording-derived text-entry
     selectors as only a starting point. Validate that the host app actually
     persists the changed value, not just that the field visually accepted text
   - if a command times out and later commands log
     `waiting_for_active_command=true`, clear the stuck operator state before
     continuing or the next run may never actually start
+  - if force-stopping the debug operator is part of debugging, expect to
+    re-establish accessibility-service readiness before trusting the next run
 
 ## Open Questions
 
@@ -123,4 +151,9 @@ the agent finish the work or distill durable follow-up guidance.
   - chosen: `set-discharge-to-limit`
   - full skill id: `com.solaxcloud.starter.set-discharge-to-limit`
 - Is snapshot omission sufficient:
+  - sufficient for authoring context here, but not sufficient by itself to
+    reconstruct the final reliable skill path without extra live inspection
 - Any app-specific constraints that should not be generalized:
+  - yes: the exact Samsung card coordinates and the specific Solax input
+    persistence workaround should be treated as app/layout-specific until proven
+    broader
