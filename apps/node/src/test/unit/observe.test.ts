@@ -6,7 +6,7 @@ import { buildScreenshotExecution } from "../../domain/observe/screenshot.js";
 import { buildWaitExecution } from "../../domain/actions/wait.js";
 import { attachSnapshotsToStepResults, runExecution } from "../../domain/executions/runExecution.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
-import { clawperatorEvents, CLAW_EVENT_TYPES } from "../../domain/observe/events.js";
+import { clawperatorEvents, CLAWPERATOR_EVENT_TYPES } from "../../domain/observe/events.js";
 import { applyMcpExecutionMetadata } from "../../mcp/tools/common.js";
 
 describe("observe executions", () => {
@@ -80,7 +80,7 @@ describe("observe executions", () => {
       },
     }));
 
-    const executionEvent = once(clawperatorEvents, CLAW_EVENT_TYPES.EXECUTION);
+    const executionEvent = once(clawperatorEvents, CLAWPERATOR_EVENT_TYPES.EXECUTION);
     const result = await runExecution(largeExecution, { deviceId: "test-device", timeoutMs: 12_345 });
     assert.ok(!result.ok);
     assert.strictEqual(result.error.code, ERROR_CODES.PAYLOAD_TOO_LARGE);

@@ -16,16 +16,16 @@ import type { RunExecutionResult } from "../executions/runExecution.js";
 export const clawperatorEvents = new EventEmitter();
 clawperatorEvents.setMaxListeners(100); // support many SSE clients, but keep a limit to detect leaks
 
-export const CLAW_EVENT_TYPES = {
+export const CLAWPERATOR_EVENT_TYPES = {
   RESULT: "clawperator:result", // specific canonical terminal envelope (legacy/v0.1)
   EXECUTION: "clawperator:execution", // full outcome of any runExecution call (success or failure)
   EVENT: "clawperator:event", // placeholder for future real-time events
 } as const;
 
 export function emitResult(deviceId: string, envelope: ResultEnvelope): void {
-  clawperatorEvents.emit(CLAW_EVENT_TYPES.RESULT, { deviceId, envelope });
+  clawperatorEvents.emit(CLAWPERATOR_EVENT_TYPES.RESULT, { deviceId, envelope });
 }
 
 export function emitExecution(deviceId: string, input: unknown, result: RunExecutionResult): void {
-  clawperatorEvents.emit(CLAW_EVENT_TYPES.EXECUTION, { deviceId, input, result });
+  clawperatorEvents.emit(CLAWPERATOR_EVENT_TYPES.EXECUTION, { deviceId, input, result });
 }
