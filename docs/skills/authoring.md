@@ -183,6 +183,19 @@ Current reality:
 - the validator does not currently parse the internals of `SKILL.md`
 - validation only checks that the file exists at the path referenced by the registry
 
+Current skill-type convention:
+
+- `clawperator-skill-type` may be added to `SKILL.md` frontmatter as author-facing metadata
+- current expected values are `replay` and `orchestrated`
+- this field is documentation only today; the runtime and validator do not enforce or consume it yet
+- some legacy skills predate this convention and may not include the field or a suffix in the id
+
+Recommended current practice:
+
+- use a `-replay` id suffix for replay-oriented baseline skills
+- use a `-orchestrated` id suffix for agent-controlled skills as that contract work lands
+- when a skill follows one of those conventions, keep the frontmatter `clawperator-skill-type` value aligned with the id suffix
+
 So the minimum current contract is:
 
 - `SKILL.md` exists
