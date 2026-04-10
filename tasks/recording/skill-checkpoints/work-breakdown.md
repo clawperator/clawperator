@@ -140,9 +140,13 @@ skill as the explicit replay baseline.
    `com.solaxcloud.starter.set-discharge-to-limit-replay`. Update any local
    references needed so W2 can build `-orchestrated` separately instead of
    mutating the replay baseline in place.
-   Explicitly retire the old unsuffixed id
-   `com.solaxcloud.starter.set-discharge-to-limit` in the same PR. Do not
-   leave both ids pointing at the replay implementation.
+   Also implement the explicit compatibility decision for the old unsuffixed
+   id `com.solaxcloud.starter.set-discharge-to-limit`:
+   - keep it temporarily as a deprecated shim entry that delegates to or
+     mirrors `...-replay`, or
+   - retire it with a migration note only if the skills repo has no supported
+     callers that rely on it
+   The PR must choose one path and document it. Do not leave this ambiguous.
 3. Make the second `Save` click safer using one of these concrete approaches:
    - add a `wait_for_node` with `present:false` semantics (or equivalent)
      for the first `Save` node before the second click, with a finite
@@ -163,9 +167,10 @@ skill as the explicit replay baseline.
   condition.
 - The replay baseline exists under the explicit skill id
   `com.solaxcloud.starter.set-discharge-to-limit-replay`.
-- The old unsuffixed id `com.solaxcloud.starter.set-discharge-to-limit` is
-  retired, and any repo-local docs or references that named it are updated in
-  the same PR.
+- The old unsuffixed id `com.solaxcloud.starter.set-discharge-to-limit` has a
+  documented compatibility outcome:
+  - either a deprecated shim exists temporarily, or
+  - the id is retired with migration notes and reference cleanup in the same PR
 - The save sequence either waits for the first `Save` to disappear, or
   scopes the second match to a distinct node with documented evidence.
 - The documented forced-failure repro produces a non-zero exit and a

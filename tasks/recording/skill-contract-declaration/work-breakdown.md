@@ -111,6 +111,8 @@ Add optional declaration support to the scaffold and runtime.
 - `apps/node/src/domain/skills/scaffoldSkill.ts`
 - `apps/node/src/domain/skills/validateSkill.ts`
 - `apps/node/src/domain/skills/runSkill.ts`
+- `apps/node/src/cli/commands/skills.ts`
+- `apps/node/src/cli/commands/serve.ts`
 - `apps/node/src/contracts/` (extend `SkillRunResult` for the new
   `indeterminate` status)
 - `apps/node/src/test/`
@@ -128,6 +130,8 @@ Add optional declaration support to the scaffold and runtime.
 6. Update runtime cross-checking of declared verification vs emitted
    `SkillResult` and route the result to the correct `SkillRunResult`
    discriminant.
+7. Update CLI/serve response shaping so `indeterminate`, `skillResult`, and
+   the declared-contract outcome reach existing consumers consistently.
 
 Required cases:
 
@@ -141,6 +145,8 @@ Required cases:
   decision and is covered by tests
 - malformed `contract` block -> validator rejects with a typed error
 - scaffolded skill with present-but-empty `contract` validates and runs
+- `skills run --json` exposes the new outcome consistently
+- serve/API JSON exposes the new outcome consistently
 
 ### Acceptance Criteria
 
@@ -152,6 +158,8 @@ Required cases:
   success and reports it as `indeterminate`.
 - The CLI surface `clawperator skills run --json` exposes the
   `indeterminate` state in its JSON output.
+- The serve/API surface exposes the same outcome semantics without forcing a
+  separate consumer-specific interpretation.
 - `SkillEntry`, registry loading, and any relevant schema surfaces accept the
   new optional `contract` field without breaking legacy skills.
 - Legacy skills remain valid without a `contract` block.

@@ -54,7 +54,9 @@ the mechanism that makes replay reliable.
 ## In Scope
 
 - define the compare model for deterministic replay validation
-- compare `SkillResult` checkpoints against a recording-export baseline
+- define and implement normalization from raw recording export into a
+  compareable checkpoint baseline
+- compare `SkillResult` checkpoints against that derived baseline
 - build the feature test-first using real fixtures from the Solax recording and
   validated run traces
 - surface the first meaningful divergence in machine-readable and human-usable
@@ -124,6 +126,9 @@ Judgment:
 
 - Compare normalized checkpoints, not raw event streams.
 - Prefer recording export as baseline evidence over parsed step log alone.
+- Raw recording export is input evidence, not a ready-made checkpoint
+  baseline. W4 must define how export events and timeline facts normalize into
+  the checkpoint baseline used for compare.
 - Treat the first divergence as the primary diagnostic output.
 - Do not claim replay parity unless the final persisted app state is verified.
 - Generalize only after the Solax proving case works end to end.
@@ -171,6 +176,8 @@ Judgment:
 This task should produce:
 
 - a compare command or equivalent compare-capable workflow
+- a normalization step or helper that derives a checkpoint baseline from raw
+  recording export evidence
 - a fixture set derived from the Solax recording/run evidence that can anchor
   TDD-style regression coverage
 - divergence output that identifies:

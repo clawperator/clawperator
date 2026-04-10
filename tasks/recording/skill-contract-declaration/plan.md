@@ -57,6 +57,8 @@ success.
 | `apps/node/src/contracts/skills.ts` | Clawperator repo | `SkillEntry` shape must grow an optional `contract` |
 | `apps/node/src/domain/skills/` | Clawperator repo | scaffold + runtime enforcement |
 | `apps/node/src/adapters/skills-repo/` | Clawperator repo | registry loading/projection if needed |
+| `apps/node/src/cli/commands/skills.ts` | Clawperator repo | `skills run --json` must expose the new state cleanly |
+| `apps/node/src/cli/commands/serve.ts` | Clawperator repo | serve/API consumers must expose the new state cleanly |
 | `apps/node/src/test/` | Clawperator repo | contract declaration tests |
 | `../clawperator-skills/` | Skills repo | Solax orchestrated declaration proving case |
 | `tasks/recording/skill-contract-declaration/` | Clawperator repo | temporary execution contract |
@@ -99,4 +101,5 @@ This task should produce:
 - an optional `contract` block shape in `skill.json`
 - scaffold support for the block
 - runtime cross-checking of declared verification against emitted `SkillResult`
+- CLI and serve surfaces that expose the new runtime outcome consistently
 - Solax `-orchestrated` `skill.json` updated to declare its contract

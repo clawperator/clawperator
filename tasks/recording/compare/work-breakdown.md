@@ -72,7 +72,13 @@ Define checkpoint comparison and divergence classification on top of `SkillResul
 
 1. Define checkpoint comparison semantics. Checkpoints are matched by
    identity (the stable string) and order, not by index alone.
-2. Define divergence classes:
+2. Define how raw recording export normalizes into the checkpoint baseline.
+   This includes:
+   - which export events become checkpoint identities
+   - which events remain supporting evidence only
+   - how package transitions and timeline facts contribute
+   - how missing snapshots affect normalization
+3. Define divergence classes:
    - `baseline_drift` (skill diverged from baseline at a named checkpoint)
    - `verification_failed` (terminal verification did not match)
    - `verification_indeterminate` (declared verification not proved at all)
@@ -81,17 +87,19 @@ Define checkpoint comparison and divergence classification on top of `SkillResul
    - `runtime_poisoned` (operator/accessibility/runtime evidence in
      `execEnvelopes` shows the runtime was in a stuck state)
    - `runtime_unavailable` (device disconnected, accessibility service down)
-3. Decide whether v1 gets explicit runtime-state signaling from W2. If not,
+4. Decide whether v1 gets explicit runtime-state signaling from W2. If not,
    collapse `runtime_poisoned` and `runtime_unavailable` to
    `upstream_failure` and record that limitation instead of guessing.
-4. Define the fixture plan for TDD using local sanitized fixtures only.
-5. Define how compare handles a baseline that contains UI snapshots
+5. Define the fixture plan for TDD using local sanitized fixtures only.
+6. Define how compare handles a baseline that contains UI snapshots
    (`snapshotMode: include`) versus one that does not. Baselines without
    snapshots must still be sufficient for checkpoint-identity compare.
 
 ### Acceptance Criteria
 
 - Compare model is defined without inventing a parallel trace mechanism.
+- The plan defines a concrete export-to-checkpoint normalization step instead
+  of assuming raw export already contains canonical checkpoints.
 - Divergence classes are explicit, named, and exhaustive enough for the brain
   to branch on them.
 - The plan explicitly states whether `runtime_poisoned` and
@@ -133,9 +141,11 @@ Implement compare against recording export baselines using `SkillResult`.
 ### Steps
 
 1. Add failing tests first using local fixtures.
-2. Implement compare against recording export baselines with
-   `snapshotMode: omit`.
-3. Add CLI behavior and tests for the
+2. Implement export-to-checkpoint normalization for recording baselines,
+   including `snapshotMode: omit`.
+3. Implement compare against the derived checkpoint baseline using
+   `SkillResult`.
+4. Add CLI behavior and tests for the
    `clawperator recording compare --baseline <file> --result <file> [--json]`
    surface, covering:
    - both files present and well-formed
@@ -143,15 +153,17 @@ Implement compare against recording export baselines using `SkillResult`.
    - missing `--result` value
    - file not found
    - malformed JSON in either file
-4. Ensure `--json` output carries the typed divergence report and exit code
+5. Ensure `--json` output carries the typed divergence report and exit code
    matches plan Decision Rules.
-5. Ensure human-readable output names the first divergent checkpoint and its
+6. Ensure human-readable output names the first divergent checkpoint and its
    class.
 
 Required fixtures under `apps/node/src/test/fixtures/recording-compare/`:
 
 - `solax-baseline-success.export.json` — Solax-shaped recording export with
-  the canonical checkpoint sequence
+  the raw export evidence for the canonical sequence
+- `solax-baseline-success.normalized.json` — expected normalized checkpoint
+  baseline derived from the export fixture above
 - `solax-result-success.skillresult.json` — `SkillResult` whose checkpoints
   match the baseline and whose `terminalVerification` proves the goal
 - `solax-result-baseline-drift.skillresult.json` — `SkillResult` that
@@ -177,6 +189,8 @@ classification rules fails loudly.
 
 - Compare works without a live device.
 - Local fixtures listed above all exist and are exercised in tests.
+- Normalization from raw export to checkpoint baseline is covered by tests and
+  does not rely on implicit assumptions.
 - Each divergence class enumerated in P1 is exercised by at least one
   fixture-driven test.
 - New tests added under `apps/node/src/test/` run under the default
@@ -224,7 +238,8 @@ Show the compare output is useful on the real Solax orchestrated proving skill.
 
 1. Run a matching orchestrated Solax path on-device and capture both the
    recording export and the emitted `SkillResult`. Compare them; expect no
-   divergence.
+   divergence. Preserve the normalized checkpoint baseline derived from the
+   export as part of the evidence set.
 2. Force a `baseline_drift` divergence on-device (e.g. by changing the
    skill's checkpoint sequence in a sanitized branch) and compare; expect
    the first divergent checkpoint to be reported by identity.
@@ -245,6 +260,8 @@ Show the compare output is useful on the real Solax orchestrated proving skill.
 - A `verification_failed` divergence is proven against a live forced run.
 - The fixtures listed in P2 are derived from these live runs (where
   practical) rather than hand-authored from scratch.
+- The normalization fixture is derived from the captured export, not invented
+  independently of it.
 - The forced-divergence implementation used for evidence capture is not
   merged into either repo; only the sanitized fixtures persist.
 - Compare identifies the first meaningful difference and classifies it

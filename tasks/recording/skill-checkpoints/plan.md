@@ -47,6 +47,9 @@ Solax as a proof target.
 - fix silent-success behavior in the Solax skill
 - preserve/rename the current Solax skill as
   `com.solaxcloud.starter.set-discharge-to-limit-replay`
+- provide an explicit compatibility path for callers that still use the
+  unsuffixed `com.solaxcloud.starter.set-discharge-to-limit` id during the
+  transition
 - prove that a forced sub-exec failure reaches `runSkill` as failure instead of
   being flattened into success
 - add terminal-state verification for `Discharge to <target>%`
@@ -111,6 +114,8 @@ This task should produce:
 - a Solax skill that exits truthfully
 - the current replay-style Solax behavior preserved under the explicit
   `-replay` name
+- a documented migration or compatibility decision for the old unsuffixed
+  Solax skill id
 - proof that forced sub-exec failure propagates to the caller as failure
 - explicit terminal-state verification for the requested discharge value
 - a documented checkpoint/reliability pattern suitable for future skill

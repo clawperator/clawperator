@@ -73,11 +73,12 @@ docs. This wave is independent of the `SkillResult` contract wording.
 
 1. Land in `docs/api/recording.md`:
    - recordings are evidence, not executable skills
-   - `record parse` is lossy and must not be the only baseline artifact
-   - `recording export` is the canonical baseline; default `snapshotMode`
-     and how compare consumes it
-   - the sequential `pull` -> `parse` -> `export` workflow and why each step
-     exists
+   - `recording export` is the canonical retained artifact for authoring and
+     later validation work
+   - `record parse` is lossy inspection and must not be the only baseline
+     artifact
+   - the practical workflow today is `pull` -> `export`, with `parse`
+     available afterward for human inspection when useful
 2. Rewrite or remove any wording in `docs/api/recording.md` or
    `docs/skills/authoring.md` that currently implies a recording becomes a
    reusable skill with light cleanup. Do not merely append a caveat beneath
@@ -85,9 +86,10 @@ docs. This wave is independent of the `SkillResult` contract wording.
 3. Land in `docs/setup.md` (or the relevant operations doc):
    - operator force-stop invalidates the accessibility service and how to
      recover
-   - container vs label clickability gotchas observed during recording
-   - input persistence workaround for hybrid/WebView text fields
-4. Keep Samsung/Solax-specific coordinates out of these generalized docs.
+4. Keep Samsung/Solax-specific coordinates, click-target quirks, and input
+   persistence workarounds out of wave A generalized docs. Leave them in
+   skill-local docs or later authoring guidance unless and until they are
+   proven broader than this Solax case.
 
 ### Acceptance Criteria
 
@@ -99,6 +101,8 @@ docs. This wave is independent of the `SkillResult` contract wording.
 - No reference to the W2 `SkillResult` shape appears in wave A wording.
 - No reference to a shipped compare CLI or compare workflow appears in wave A
   wording until W4 has actually landed.
+- Solax-specific clickability and input-workaround caveats are not promoted to
+  generalized docs without explicit evidence they are broader than this case.
 
 ### Validation
 
