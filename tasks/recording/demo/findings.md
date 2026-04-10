@@ -29,9 +29,18 @@ the agent finish the work or distill durable follow-up guidance.
 ## Findings
 
 - Recording:
+- Recording:
+  - live prerequisite check found an operator variant mismatch on the Samsung
+    device:
+    expected `com.clawperator.operator.dev`, installed
+    `com.clawperator.operator`
+  - Solax app package is installed on the device:
+    `com.solaxcloud.starter`
 - Export artifact:
 - Selector or control-flow notes:
 - Validation notes:
+  - `clawperator doctor` passed overall device readiness but warned on the
+    operator package variant mismatch
 - Docs or workflow gaps:
   - `docs/api/recording.md` and `docs/skills/authoring.md` match the current
     flow we plan to use:
