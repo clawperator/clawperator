@@ -18,17 +18,17 @@ the agent finish the work or distill durable follow-up guidance.
 ## Recording Run
 
 - Date: 2026-04-10
-- Device: Samsung Galaxy physical device (`SM_S901E`)
+- Device: Samsung Galaxy physical device (`<device_model>`)
 - Operator package: `com.clawperator.operator.dev`
-- Session id: `solax-set-discharge-to-limit-20260410-135211`
+- Session id: `<session_id>`
 - Recording directory:
-  `../clawperator-skills/recordings/solax-set-discharge-to-limit`
+  `<recording_dir>`
 - NDJSON path:
-  `../clawperator-skills/recordings/solax-set-discharge-to-limit/solax-set-discharge-to-limit-20260410-135211.ndjson`
+  `<recording_dir>/<recording_name>.ndjson`
 - Export path:
-  `../clawperator-skills/recordings/solax-set-discharge-to-limit/solax-set-discharge-to-limit-20260410-135211.export.json`
+  `<recording_dir>/<recording_name>.export.json`
 - Steps path:
-  `../clawperator-skills/recordings/solax-set-discharge-to-limit/solax-set-discharge-to-limit-20260410-135211.steps.json`
+  `<recording_dir>/<recording_name>.steps.json`
 
 ## Skill Scaffolding
 

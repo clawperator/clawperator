@@ -178,7 +178,8 @@ right moment so I do not have to keep the lifecycle in my head.
   card, focus the `Discharge to` row, open the dialog, type `40`, confirm,
   save, and save again.
 - Cut back to the terminal. Codex prints `Recording stopped. Pulling
-  artifacts.` and then `Export written to ./recordings/<session>.export.json`
+  artifacts.` and then `Export written to
+  ./recordings/<session_id>/<session_id>.export.json`
   followed by `Sanitized baseline retained at
   ../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-orchestrated/references/compare-baseline.export.json`.
 - Add a small note card beside the retained baseline path:
@@ -200,7 +201,7 @@ device, and writes an export artifact into the repo.
 
 **On screen**
 
-- Open `./recordings/<session>.export.json`.
+- Open `./recordings/<session_id>/<session_id>.export.json`.
 - Highlight these top-level fields visually:
   - `events`
   - `packageTransitions`
@@ -311,7 +312,7 @@ really shows that value before reporting success.
 Emit exactly one `[Clawperator-Skill-Result]` frame at the end of the run.
 ```
 
-Panel 2: `scripts/run.js`
+Panel 2: simplified `scripts/run.js` harness sketch
 
 ```js
 const program = readFileSync(new URL("../SKILL.md", import.meta.url), "utf8");
@@ -327,6 +328,13 @@ const child = spawn(resolveAgentCli(skill.agent, process.env), buildAgentArgs(pr
 child.stdout.pipe(process.stdout);
 child.stderr.pipe(process.stderr);
 child.on("exit", (code) => process.exit(code ?? 1));
+```
+
+- Add a small caption under Panel 2:
+
+```text
+Illustrative harness sketch for camera readability.
+The real file also includes imports and helper implementations.
 ```
 
 Panel 3: `skill.json`

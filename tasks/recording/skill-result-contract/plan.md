@@ -34,8 +34,11 @@ while leaving the agent-driven orchestrated proving skill to W2b.
 
 Current code verified in the repo shows:
 
-- `runSkill` returns `{ ok, output: string, exitCode }`
-- skill stdout is the skill-to-brain channel
+- `runSkill` returns a `SkillRunResult` on success with `ok`, `skillId`,
+  `output`, `exitCode`, and `durationMs`
+- failure results carry `ok: false`, a typed `code` and `message`, and
+  optional raw `stdout` and `stderr`
+- skill stdout is still the primary skill-to-brain channel
 - `ResultEnvelope` is exec-level only
 - skill scaffolding has no declared goal or verification contract
 

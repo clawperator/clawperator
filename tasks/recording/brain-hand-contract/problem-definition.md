@@ -28,8 +28,10 @@ Concretely, this is what is missing today:
 - A skill has no structured way to report what it did, what it observed, which
   checkpoints it reached, or what the terminal state was. Its return channel to
   the brain is literally the stdout string of `scripts/run.js`, as wrapped by
-  `runSkill` which only surfaces `stdout`, `stderr`, `exitCode`, and an
-  optional `expectContains` substring check.
+  `runSkill`, which today returns transport/runtime fields such as `skillId`,
+  `output`, `exitCode`, `durationMs`, and on failures optional raw `stdout`
+  and `stderr`. That is useful execution metadata, but it is still not a typed
+  skill result.
 - The exec-level `ResultEnvelope` in `apps/node/src/contracts/result.ts` is
   rich, but it only describes one `clawperator exec` invocation. A skill that
   makes several exec calls collapses them into opaque stdout. Everything the
@@ -101,10 +103,13 @@ what the skill should observe on success, or what counts as a failure.
 
 ### 2. Skills have no structured result channel
 
-`runSkill` returns a `SkillRunResult { ok: true, output: string, exitCode }` on
-success. The `output` is whatever the script wrote to stdout. There is no
-typed result schema, no checkpoint list, no evidence block, no terminal-state
-assertion. Everything interesting the skill did is either lost or ad-hoc.
+`runSkill` currently returns transport/runtime fields such as `ok`, `skillId`,
+`output`, `exitCode`, and `durationMs` on success, and an error shape with
+`ok: false`, a typed `code` and `message`, and optional `stdout` / `stderr` on
+failure. That is useful execution metadata, but it is still not a typed skill
+result schema. There is no checkpoint list, no evidence block, no
+domain-specific post-condition payload, and no terminal-state assertion.
+Everything interesting the skill did is either lost or ad-hoc.
 
 This is the single most load-bearing gap. Compare cannot work well without it.
 Authoring guidance cannot improve much without it. Reliability work cannot
