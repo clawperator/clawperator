@@ -1,8 +1,6 @@
 plugins {
     id("com.android.application")
-    id("kotlin-android")
     id("org.jetbrains.kotlin.plugin.compose")
-    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -50,9 +48,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-    }
 
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.3"
@@ -81,5 +76,6 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 
     testImplementation(libs.kotlin.test)
+    testImplementation(libs.kotlin.test.junit)
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
 }

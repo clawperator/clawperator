@@ -8,7 +8,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
-import org.junit.Test
+import kotlin.test.Test
 
 class PackageManagerExtensionsKtTest {
     private val context: Context by lazy { InstrumentationRegistry.getInstrumentation().targetContext }

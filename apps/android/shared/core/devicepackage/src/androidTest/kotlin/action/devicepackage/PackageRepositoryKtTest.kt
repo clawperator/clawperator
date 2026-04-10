@@ -9,7 +9,7 @@ import android.content.Context
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
-import org.junit.Test
+import kotlin.test.Test
 
 class PackageRepositoryKtTest {
     private val context: Context by lazy { InstrumentationRegistry.getInstrumentation().targetContext }

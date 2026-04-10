@@ -6,7 +6,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
-import org.junit.Test
+import kotlin.test.Test
 
 class PackageInfoRepositorySystemTest {
     private val context: Context by lazy {

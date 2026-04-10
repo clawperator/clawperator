@@ -11,7 +11,7 @@ import android.content.pm.PackageManager
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
-import org.junit.Test
+import kotlin.test.Test
 
 class PackageRepositorySystemTest {
     private val context: Context by lazy {

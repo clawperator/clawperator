@@ -2,7 +2,7 @@ package action.graphics
 
 import androidx.compose.ui.graphics.Color
 import kotlin.test.assertEquals
-import org.junit.Test
+import kotlin.test.Test
 
 class ColorExtensionsKtTest {
     @Test
