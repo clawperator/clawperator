@@ -151,6 +151,9 @@ Make `runSkill` parse and return `SkillResult` without breaking legacy skills.
 - Well-formed `SkillResult` is parsed and surfaced.
 - Missing `SkillResult` keeps legacy skills working.
 - Malformed or ambiguous framing is rejected clearly.
+- New tests added under `apps/node/src/test/` run under the default
+  `npm --prefix apps/node run test` path; if not, the PR updates CI in the
+  same change.
 
 Required cases:
 
@@ -234,9 +237,12 @@ Required Solax checkpoint identities for v1 (stable strings, in order):
 - `bottom_sheet_save_clicked`
 - `terminal_state_verified`
 
-If the live retrofit shows one of these checkpoints cannot be observed
-deterministically, drop it from the v1 list and document the reason in
-`SKILL.md`. Do not invent new checkpoint identities silently.
+These checkpoint names are tentative until validated against the shipped W1
+save sequencing and the real orchestrated implementation. If the live retrofit
+shows one of these checkpoints cannot be observed deterministically, or W1
+changes make a listed identity misleading, drop or rename it deliberately and
+document the reason in `SKILL.md`. Do not invent new checkpoint identities
+silently.
 
 ### Acceptance Criteria
 

@@ -131,8 +131,9 @@ After this work:
 - `docs/skills/authoring.md` describes the structured `SkillResult` shape
   and the required pattern for non-trivial skills (truthful exit, terminal
   verification, optional declared contract)
-- `docs/api/recording.md` describes recordings as evidence and points to the
-  compare workflow as the way to validate replay against a baseline
+- `docs/api/recording.md` describes recordings as evidence. After W4 ships,
+  it also points to the compare workflow as the way to validate replay
+  against a baseline
 - the durable Solax learnings (input persistence workaround, accessibility
   service restart, container vs label clickability) live in the right docs
   instead of in `tasks/`
@@ -411,6 +412,9 @@ Does not own:
 Owns:
 
 - Solax `v0` integrity fixes
+- retiring the unsuffixed
+  `com.solaxcloud.starter.set-discharge-to-limit` id in favor of
+  `...-replay`, with any doc/reference sweep needed in the same PR
 - failure propagation truthfulness
 - terminal-state verification
 - safer save sequencing
@@ -419,6 +423,13 @@ Does not own:
 
 - compare
 - generalized skill runtime contracts
+
+Caller preference while both Solax skills exist:
+
+- prefer `com.solaxcloud.starter.set-discharge-to-limit-replay` until W3
+  lands and the orchestrated skill has both `SkillResult` and declared
+  contract support
+- treat `...-orchestrated` as the experimental proving sibling during W2/W3
 
 ### `skill-result-contract/`
 
@@ -487,7 +498,7 @@ of these are true:
 - `docs/skills/authoring.md` describes the `SkillResult` shape and the
   declared-contract pattern
 - `docs/api/recording.md` describes recording as evidence and points to
-  `clawperator recording compare`
+  `clawperator recording compare` after that command has shipped
 - the program definition of done above is satisfied
 
 `tasks/recording/demo/meta-problem-summary.md` was deleted during the

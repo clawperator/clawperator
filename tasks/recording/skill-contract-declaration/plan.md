@@ -54,7 +54,9 @@ success.
 
 | Surface | Owner | Role |
 | --- | --- | --- |
+| `apps/node/src/contracts/skills.ts` | Clawperator repo | `SkillEntry` shape must grow an optional `contract` |
 | `apps/node/src/domain/skills/` | Clawperator repo | scaffold + runtime enforcement |
+| `apps/node/src/adapters/skills-repo/` | Clawperator repo | registry loading/projection if needed |
 | `apps/node/src/test/` | Clawperator repo | contract declaration tests |
 | `../clawperator-skills/` | Skills repo | Solax orchestrated declaration proving case |
 | `tasks/recording/skill-contract-declaration/` | Clawperator repo | temporary execution contract |
@@ -82,6 +84,13 @@ success.
   `contract` block (with `inputs: []`, `goal: ""`, and `verification: null`)
   so authors see the shape immediately. Document this so authors know an
   empty block is intentional and not a stub to be deleted.
+- P1 must decide the semantics of a present-but-empty `contract` block versus
+  a missing one. Recommended v1 rule:
+  - missing `contract` means legacy skill, no declaration enforcement
+  - present-but-empty `contract` is allowed by scaffold and validator, but is
+    treated as semantically equivalent to missing for runtime enforcement
+    until the author fills at least one meaningful field
+  Do not leave this implicit.
 
 ## Output Contract
 

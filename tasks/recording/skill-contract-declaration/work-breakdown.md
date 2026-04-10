@@ -70,12 +70,17 @@ Define a narrow v1 `contract` block for `skill.json`.
 1. Define `contract.inputs`.
 2. Define `contract.goal`.
 3. Define `contract.verification`.
-4. Keep the shape compatible with the existing registry model.
+4. Define the semantics of a present-but-empty `contract` block versus a
+   missing one.
+5. Keep the shape compatible with the existing registry model.
 
 ### Acceptance Criteria
 
 - Declaration shape is explicit and narrow.
 - Shape is aligned with what `SkillResult` can actually prove.
+- The semantic difference between a missing `contract` block and a
+  present-but-empty one is explicit and consistent across scaffold,
+  validator, and runtime.
 
 ### Validation
 
@@ -101,6 +106,8 @@ Add optional declaration support to the scaffold and runtime.
 
 ### Files or Surfaces To Change
 
+- `apps/node/src/contracts/skills.ts`
+- `apps/node/src/adapters/skills-repo/`
 - `apps/node/src/domain/skills/scaffoldSkill.ts`
 - `apps/node/src/domain/skills/validateSkill.ts`
 - `apps/node/src/domain/skills/runSkill.ts`
@@ -116,7 +123,9 @@ Add optional declaration support to the scaffold and runtime.
 3. Update validator to accept/reject the optional `contract` block.
 4. Update scaffold output to include a present-but-empty `contract` block per
    plan Decision Rules.
-5. Update runtime cross-checking of declared verification vs emitted
+5. Extend `SkillEntry` and any registry-loading or schema surfaces needed so
+   the optional `contract` block can round-trip cleanly from the skills repo.
+6. Update runtime cross-checking of declared verification vs emitted
    `SkillResult` and route the result to the correct `SkillRunResult`
    discriminant.
 
@@ -128,6 +137,8 @@ Required cases:
   -> `ok: false`
 - declaration omitted for legacy skill -> existing behavior, no
   `indeterminate` is ever produced
+- present-but-empty `contract` block -> behavior matches the explicit P1
+  decision and is covered by tests
 - malformed `contract` block -> validator rejects with a typed error
 - scaffolded skill with present-but-empty `contract` validates and runs
 
@@ -141,7 +152,12 @@ Required cases:
   success and reports it as `indeterminate`.
 - The CLI surface `clawperator skills run --json` exposes the
   `indeterminate` state in its JSON output.
+- `SkillEntry`, registry loading, and any relevant schema surfaces accept the
+  new optional `contract` field without breaking legacy skills.
 - Legacy skills remain valid without a `contract` block.
+- New tests added under `apps/node/src/test/` run under the default
+  `npm --prefix apps/node run test` path; if not, the PR updates CI in the
+  same change.
 
 ### Validation
 

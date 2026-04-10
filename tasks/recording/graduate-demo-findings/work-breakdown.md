@@ -97,6 +97,8 @@ docs. This wave is independent of the `SkillResult` contract wording.
 - No contradictory wording remains in authored docs claiming recordings become
   reusable skills with only light cleanup.
 - No reference to the W2 `SkillResult` shape appears in wave A wording.
+- No reference to a shipped compare CLI or compare workflow appears in wave A
+  wording until W4 has actually landed.
 
 ### Validation
 

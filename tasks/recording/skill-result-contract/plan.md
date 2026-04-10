@@ -108,6 +108,10 @@ reconstruction.
 - Backward compatibility hard rule: existing skills that emit no frame must
   continue to return `ok: true` based on exit code, exactly as today, with
   `skillResult: null`. No legacy skill is required to opt in.
+- W2 must not introduce a `SkillRunResult` shape that W3 will immediately
+  need to break. If W2 adds new run-result discriminants or status fields,
+  they must be designed to extend to W3's `indeterminate` outcome without
+  another breaking reshape.
 
 ## Required Decisions In P1
 

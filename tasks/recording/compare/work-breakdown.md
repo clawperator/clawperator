@@ -179,6 +179,9 @@ classification rules fails loudly.
 - Local fixtures listed above all exist and are exercised in tests.
 - Each divergence class enumerated in P1 is exercised by at least one
   fixture-driven test.
+- New tests added under `apps/node/src/test/` run under the default
+  `npm --prefix apps/node run test` path; if not, the PR updates CI in the
+  same change.
 - If runtime-state classes are postponed behind `upstream_failure`, no
   poisoned/unavailable fixtures exist in v1 and the limitation is documented
   in the compare docs and task status.
@@ -231,6 +234,9 @@ Show the compare output is useful on the real Solax orchestrated proving skill.
 4. Sanitize and copy the captured artifacts into
    `apps/node/src/test/fixtures/recording-compare/` so the P2 tests are
    anchored to evidence from real runs, not hand-written shapes.
+5. Capture forced-divergence artifacts from a throwaway local branch or local
+   uncommitted patch in `../clawperator-skills` that is discarded after
+   evidence capture. Do not merge the forced-divergence implementation.
 
 ### Acceptance Criteria
 
@@ -239,6 +245,8 @@ Show the compare output is useful on the real Solax orchestrated proving skill.
 - A `verification_failed` divergence is proven against a live forced run.
 - The fixtures listed in P2 are derived from these live runs (where
   practical) rather than hand-authored from scratch.
+- The forced-divergence implementation used for evidence capture is not
+  merged into either repo; only the sanitized fixtures persist.
 - Compare identifies the first meaningful difference and classifies it
   using the P1 divergence classes.
 

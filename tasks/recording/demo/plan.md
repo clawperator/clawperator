@@ -18,6 +18,13 @@ Secondary deliverable:
 - a persistent repo-local Codex skill at
   `.agents/skills/skill-author-by-recording/`
 
+Status note:
+
+- This plan is historical context only. The active workstreams now live under
+  sibling folders in `tasks/recording/`.
+- The repo-local authoring skill is deferred and must not be revived from this
+  checklist until the top-level recording plan explicitly unblocks it.
+
 ## Constraints
 
 - Use the branch-local Node CLI build from `apps/node/`.
@@ -51,7 +58,8 @@ Secondary deliverable:
       commands used, artifact paths, observed gaps, and decisions.
 - [ ] Distill the stable parts of the workflow into
       `.agents/skills/skill-author-by-recording/`.
-- [ ] Decide whether durable docs in `docs/skills/` also need an update based
+      Deferred. Superseded by `tasks/recording/plan.md`.
+- [x] Decide whether durable docs in `docs/skills/` also need an update based
       on what we learned.
 - [ ] Remove this task folder once the durable knowledge has been migrated and
       the Solax work is complete.
