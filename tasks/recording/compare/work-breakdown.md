@@ -9,6 +9,8 @@
 - Use TDD for the compare implementation. Start from real fixtures captured from
   the Solax recording and validated run traces, then build the compare behavior
   against those fixtures.
+- Keep compare scoped to diagnosis. Do not turn this task into the general
+  "make skills reliable" workstream.
 - Commit at natural checkpoints in each repo. Do not amend.
 - Validate with live device behavior, not only unit tests or JSON shape checks.
 
@@ -19,6 +21,8 @@
 - Do not rely on synthetic toy fixtures alone. At least one regression fixture
   set must come from the Solax recording and the corresponding validated run
   evidence from this task line.
+- Do not let tests read from `../clawperator-skills/` at runtime. Copy any
+  required sanitized fixtures into the Clawperator test tree.
 - Do not call the feature “replay validation” unless final persisted state is
   included in the proof path.
 - If the compare output cannot explain the first divergence for the Solax flow,
@@ -47,10 +51,18 @@
   - divergence output proposal
   - initial fixture plan for TDD
 - Required decisions:
+  - how the run trace is produced:
+    - exec-native trace emission
+    - helper-wrapped skill trace accumulation
+    - post-hoc reconstruction
   - what a checkpoint is
   - what evidence is baseline-only versus runtime-only
   - what counts as a meaningful mismatch
   - which Solax snippets become stable test fixtures
+  - how compare distinguishes:
+    - skill divergence
+    - poisoned runtime state
+    - runtime unavailable state
 - Deliverable:
   - update this task pack if any stable decisions need to be clarified
   - optionally add a compact design note only if the model cannot fit cleanly in
@@ -72,6 +84,8 @@
   - add regression coverage for both:
     - a matching path
     - a first-divergence path
+  - ensure the implementation still works when the baseline recording export was
+    created with `snapshotMode: omit`
 
 ### P3. Prove the model with the Solax skill
 
@@ -80,9 +94,9 @@
   - `../clawperator-skills`
 - Requirements:
   - wire the Solax skill into the compare workflow as a real proving case
-  - demonstrate at least:
+  - demonstrate:
     - a matching successful run
-    - one intentionally or historically divergent run shape, if feasible
+    - a real intentionally or historically divergent run shape
   - verify that the compare output identifies the first meaningful difference
   - retain small, sanitized snippets from the proving run as durable fixtures if
     they are needed to keep compare regressions trustworthy
@@ -102,9 +116,11 @@
 ## Sequencing
 
 1. Finish P1 before implementing command shape.
-2. Finish P2 enough to generate real compare output before broad docs work.
-3. Run P3 on-device before declaring the feature sound.
-4. Complete P4 in the same change series, not as a forgotten follow-up.
+2. Land the Solax integrity/reliability task separately before treating Solax as
+   a trustworthy compare proving case.
+3. Finish P2 enough to generate real compare output before broad docs work.
+4. Run P3 on-device before declaring the feature sound.
+5. Complete P4 in the same change series, not as a forgotten follow-up.
 
 ## Findings File
 

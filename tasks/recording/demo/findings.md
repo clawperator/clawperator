@@ -79,10 +79,11 @@ the agent finish the work or distill durable follow-up guidance.
   - a later re-run showed the original `v0` skill was not actually reliable:
     when asked to move from `40` to `39`, the UI still showed `Discharge to
     40%` after the run
-  - root cause was the dialog input: the Solax `Discharge to` field lives in a
-    WebView-backed `android.widget.EditText` (`resourceId=van-field-1-input`),
-    and Clawperator `enter_text` reported success without producing the app-side
-    change Solax required for persistence
+  - plain Clawperator `enter_text` was not sufficient for persistence in the
+    Solax `Discharge to` input path. The exact root cause remains unverified.
+    One hypothesis from live inspection was that this part of the UI may be
+    WebView-backed, but the reliable fact is narrower: text could appear
+    accepted without the saved value changing
   - the value only persisted when the skill used device key events:
     `DEL`, `DEL`, `input text <value>`, then `KEYCODE_ENTER`, followed by
     `Confirm`, top-page `Save`, and outer-page `Save`
@@ -136,7 +137,7 @@ the agent finish the work or distill durable follow-up guidance.
   - for deterministic replay work, capture enough real fixtures and validation
     evidence that later compare tooling can reason about where a run diverged
     from the recording baseline
-  - for hybrid or WebView-backed inputs, treat recording-derived text-entry
+  - for hybrid or otherwise tricky inputs, treat recording-derived text-entry
     selectors as only a starting point. Validate that the host app actually
     persists the changed value, not just that the field visually accepted text
   - if a command times out and later commands log

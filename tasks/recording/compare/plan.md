@@ -12,6 +12,11 @@ Start by proving the design against
 `com.solaxcloud.starter.set-discharge-to-limit`, then generalize only the parts
 that survive that live exercise.
 
+This task is strictly about diagnosis. It does not own the separate work of
+making skills more reliable via in-skill checkpoints, terminal-state
+verification, or better selector strategies. That work belongs in a sibling
+task pack.
+
 ## Status
 
 | Item | Value |
@@ -40,6 +45,9 @@ The Solax `v0` work showed two truths at once:
 Without comparison support, agents must infer divergence from screenshots,
 ad-hoc UI dumps, and logs. That is slow, fragile, and difficult to generalize.
 
+Comparison support is needed because diagnosis is weak today. It is not itself
+the mechanism that makes replay reliable.
+
 ## In Scope
 
 - define the compare model for deterministic replay validation
@@ -58,6 +66,8 @@ ad-hoc UI dumps, and logs. That is slow, fragile, and difficult to generalize.
 - generic “brain” architecture changes beyond what compare support requires
 - strict raw-event replay matching
 - retrofitting every existing skill in one pass
+- in-skill checkpoint conventions, terminal-state verification, or reliability
+  retrofits beyond what compare proofing minimally needs
 
 ## Existing Artifact Scope
 
@@ -89,7 +99,7 @@ working notes. Durable guidance must migrate out of `tasks/`.
 | Skill scaffolding behavior | `docs/skills/authoring.md` and `apps/node/src/domain/skills/scaffoldSkill.ts` |
 | Skill runtime contract | `apps/node/src/cli/registry.ts`, `apps/node/src/contracts/` |
 | Solax proving behavior | live device validation plus `../clawperator-skills` |
-| Test fixtures for compare behavior | snippets derived from the Solax recording export and validated run traces |
+| Test fixtures for compare behavior | sanitized snippets copied into the Clawperator test tree from Solax recording/run evidence |
 
 ## Deterministic Versus Judgment
 
@@ -115,16 +125,24 @@ Judgment:
 - Generalize only after the Solax proving case works end to end.
 - Treat tests as part of the product surface. The compare model is not accepted
   until fixtures from the Solax case prove both matching and divergent paths.
+- Force an explicit P1 decision on how run traces are produced. Do not defer
+  this until implementation.
+- Design for recording baselines created with `snapshotMode: omit`; compare must
+  still be useful without baseline UI dumps.
+- Keep fixtures inside the Clawperator repo. Tests must not depend on the
+  sibling skills repo being present at runtime.
 
 ## Failure Modes To Prevent
 
 - building a compare system that depends on lossy `record parse` output alone
 - comparing timestamps or raw event counts that are not stable enough to matter
 - shipping a trace format that is too thin to explain divergence
-- overfitting compare logic to Solax-specific WebView behavior
+- overfitting compare logic to Solax-specific implementation details
 - leaving durable guidance trapped in `tasks/`
 - under-testing compare behavior with synthetic-only fixtures that do not
   reflect real skill brittleness
+- blurring "skill diverged from baseline" with "runtime was poisoned or
+  unavailable"
 
 ## Output Contract
 
@@ -140,6 +158,10 @@ This task should produce:
   - first divergence point
   - evidence summary
   - likely class of mismatch
+  - whether the failure is:
+    - baseline divergence
+    - runtime poisoned state
+    - runtime unavailable state
 - Solax validation showing the compare output is useful in practice
 - durable docs updates
 
