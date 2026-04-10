@@ -61,7 +61,7 @@ the mechanism that makes replay reliable.
 - define the compare model for replay-style literal comparison and
   agent-driven semantic comparison
 - define and implement normalization from raw recording export into a
-  compareable checkpoint baseline
+  comparable checkpoint baseline
 - compare `SkillResult` checkpoints against that derived baseline
 - build the feature test-first using real fixtures from the Solax recording and
   validated run traces

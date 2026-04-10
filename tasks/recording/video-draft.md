@@ -155,10 +155,10 @@ that evidence into a runnable, inspectable skill.
 - Terminal shows the commands the workflow runs under the hood:
 
 ```bash
-clawperator record start --session-id <session_id> --device <device_serial> --operator-package com.clawperator.operator.dev --json
-clawperator record stop --device <device_serial> --operator-package com.clawperator.operator.dev --json
-clawperator record pull --device <device_serial> --session-id <session_id> --out ./recordings --json
-clawperator recording export --input ./recordings --snapshots omit --json
+clawperator recording start --session-id <session_id> --device <device_serial> --operator-package com.clawperator.operator.dev --json
+clawperator recording stop --device <device_serial> --operator-package com.clawperator.operator.dev --json
+clawperator recording pull --device <device_serial> --session-id <session_id> --out ./recordings/<session_id> --json
+clawperator recording export --input ./recordings/<session_id> --snapshots omit --json
 ```
 
 **Spoken**
