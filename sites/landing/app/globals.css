@@ -12,14 +12,18 @@
 
   --accent: #f15a32;
   --accent-hover: #ff7a52;
+  --accent-rgb: 241, 90, 50;
+  --accent-hover-rgb: 255, 122, 82;
   --accent-info: #2fc4d6;
   --accent-cool: #6676ff;
   --accent-cool-soft: #7a6cf3;
+  --hero-accent: #ec5b2f;
+  --hero-accent-shadow: 0 1px 0 rgba(255, 255, 255, 0.42);
 
   --toolbar-bg: rgba(252, 253, 255, 0.9);
   --toolbar-link-hover: rgba(23, 32, 51, 0.06);
   --toolbar-cta-hover-text: #7d2200;
-  --toolbar-cta-hover-bg: rgba(255, 106, 61, 0.12);
+  --toolbar-cta-hover-bg: rgba(var(--accent-rgb), 0.12);
 
   --hero-problem: #617187;
   --section-rule: rgba(23, 32, 51, 0.12);
@@ -30,7 +34,7 @@
   --panel-border: rgba(93, 117, 152, 0.2);
   --panel-shadow: 0 18px 40px rgba(28, 49, 80, 0.1);
   --button-copied-text: #7d2200;
-  --button-copied-bg: rgba(255, 106, 61, 0.14);
+  --button-copied-bg: rgba(var(--accent-rgb), 0.14);
 
   --note-bg: rgba(47, 196, 214, 0.14);
 
@@ -38,16 +42,16 @@
   --architecture-card-bg: rgba(255, 255, 255, 0.84);
   --architecture-card-border: rgba(93, 117, 152, 0.16);
   --architecture-card-edge-bg: rgba(244, 248, 255, 0.82);
-  --architecture-core-bg: rgba(255, 120, 80, 0.1);
-  --architecture-core-border: rgba(255, 120, 80, 0.26);
-  --architecture-core-shadow: 0 12px 28px rgba(255, 106, 61, 0.12);
+  --architecture-core-bg: rgba(var(--accent-rgb), 0.1);
+  --architecture-core-border: rgba(var(--accent-rgb), 0.26);
+  --architecture-core-shadow: 0 12px 28px rgba(var(--accent-rgb), 0.12);
   --architecture-text: rgba(23, 32, 51, 0.82);
   --architecture-pill-border: rgba(93, 117, 152, 0.16);
   --architecture-pill-bg: rgba(255, 255, 255, 0.9);
 
   --skill-example-bg: #fbfcff;
-  --workflow-card-border: rgba(255, 120, 60, 0.24);
-  --workflow-card-bg: rgba(255, 120, 60, 0.08);
+  --workflow-card-border: rgba(var(--accent-rgb), 0.24);
+  --workflow-card-bg: rgba(var(--accent-rgb), 0.08);
   --workflow-msg-border: rgba(93, 117, 152, 0.1);
   --workflow-msg-bg: rgba(255, 255, 255, 0.74);
   --workflow-role: rgba(23, 32, 51, 0.5);
@@ -75,7 +79,9 @@
     --toolbar-bg: rgba(11, 15, 25, 0.92);
     --toolbar-link-hover: rgba(159, 176, 204, 0.12);
     --toolbar-cta-hover-text: #ffd9cc;
-    --toolbar-cta-hover-bg: rgba(255, 106, 61, 0.14);
+    --toolbar-cta-hover-bg: rgba(var(--accent-rgb), 0.14);
+    --hero-accent: #ff8b65;
+    --hero-accent-shadow: none;
 
     --hero-problem: #9ca3af;
     --section-rule: rgba(255, 255, 255, 0.12);
@@ -86,7 +92,7 @@
     --panel-border: rgba(255, 255, 255, 0.12);
     --panel-shadow: 0 18px 40px rgba(0, 0, 0, 0.24);
     --button-copied-text: #ffd1c1;
-    --button-copied-bg: rgba(255, 106, 61, 0.16);
+    --button-copied-bg: rgba(var(--accent-rgb), 0.16);
 
     --note-bg: rgba(47, 196, 214, 0.12);
 
@@ -94,16 +100,16 @@
     --architecture-card-bg: rgba(255, 255, 255, 0.03);
     --architecture-card-border: rgba(255, 255, 255, 0.08);
     --architecture-card-edge-bg: rgba(255, 255, 255, 0.025);
-    --architecture-core-bg: rgba(255, 120, 80, 0.06);
-    --architecture-core-border: rgba(255, 120, 80, 0.2);
-    --architecture-core-shadow: 0 12px 28px rgba(255, 106, 61, 0.08);
+    --architecture-core-bg: rgba(var(--accent-rgb), 0.06);
+    --architecture-core-border: rgba(var(--accent-rgb), 0.2);
+    --architecture-core-shadow: 0 12px 28px rgba(var(--accent-rgb), 0.08);
     --architecture-text: rgba(232, 238, 249, 0.86);
     --architecture-pill-border: rgba(255, 255, 255, 0.08);
     --architecture-pill-bg: rgba(11, 18, 33, 0.9);
 
     --skill-example-bg: #111c36;
-    --workflow-card-border: rgba(255, 120, 60, 0.22);
-    --workflow-card-bg: rgba(255, 120, 60, 0.06);
+    --workflow-card-border: rgba(var(--accent-rgb), 0.22);
+    --workflow-card-bg: rgba(var(--accent-rgb), 0.06);
     --workflow-msg-border: rgba(255, 255, 255, 0.05);
     --workflow-msg-bg: rgba(255, 255, 255, 0.02);
     --workflow-role: rgba(232, 238, 249, 0.45);
@@ -391,8 +397,8 @@ body {
   letter-spacing: 0.04em;
   text-transform: uppercase;
   font-weight: 800;
-  color: #ec5b2f;
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.42);
+  color: var(--hero-accent);
+  text-shadow: var(--hero-accent-shadow);
   text-wrap: balance;
 }
 
@@ -539,8 +545,10 @@ body {
 
 @media (prefers-color-scheme: dark) {
   .hero-image-panel {
-    background-color: #e8dcc8; /* Slightly darker but still light enough for black text */
-    border-color: rgba(255, 255, 255, 0.16);
+    background:
+      linear-gradient(135deg, rgba(18, 24, 38, 0.92), rgba(18, 24, 38, 0.72)),
+      linear-gradient(135deg, rgba(74, 82, 181, 0.34), rgba(33, 41, 92, 0.46));
+    border-color: rgba(122, 132, 234, 0.24);
     box-shadow: 0 16px 38px rgba(0, 0, 0, 0.32);
   }
 }
