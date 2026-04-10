@@ -2,6 +2,12 @@
 
 Deterministic Node.js CLI and API for Android automation, designed for AI agents.
 
+This npm package ships the built Node API and CLI entrypoint for installation and runtime use.
+The full source tree, including the Android operator app, docs, and build tooling, lives in the public GitHub repository:
+[github.com/clawperator/clawperator](https://github.com/clawperator/clawperator).
+Project skills are maintained separately in the public skills repository:
+[github.com/clawperator/clawperator-skills](https://github.com/clawperator/clawperator-skills).
+
 ## Install
 
 ```bash
