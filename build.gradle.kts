@@ -4,6 +4,8 @@ import com.android.build.api.dsl.LibraryExtension
 import java.io.FileInputStream
 import java.util.Properties
 import org.gradle.api.tasks.testing.Test
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
 
 // Load local.properties
 val localProperties =
@@ -85,6 +87,12 @@ allprojects {
 // The clean task is already provided by Gradle
 
 subprojects {
+    tasks.withType<KotlinJvmCompile>().configureEach {
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_17)
+        }
+    }
+
     // Apply code quality plugins to all subprojects
     apply(plugin = "org.jlleitschuh.gradle.ktlint")
     apply(plugin = "io.gitlab.arturbosch.detekt")
