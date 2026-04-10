@@ -74,10 +74,11 @@ depend on, because the plans are only honest if they match current code:
   structured checkpoints, terminal verification, and clearer result
   semantics as that contract work lands". That wording should stay
   until the contract work actually ships; updating it is a W2 deliverable.
-- `.agents/skills/docs-build/`, `.agents/skills/docs-author/`,
-  `.agents/skills/skill-author-by-recording/` — internal examples of
-  the SKILL.md-as-program pattern. These are the closest precedents
-  for what the new user-facing orchestrated skills should look like.
+- `.agents/skills/docs-build/` and `.agents/skills/docs-author/` —
+  internal examples of the markdown-as-program pattern that already
+  exist in this checkout. There is not yet a
+  `.agents/skills/skill-author-by-recording/` skill; W6 creates that
+  later.
 - `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-replay/`
   — the existing replay skill. Read it to understand the current Solax
   automation, and to inform the SKILL.md-as-program that W2b will

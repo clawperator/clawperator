@@ -101,7 +101,7 @@ the gap between that promise and the current plans.
 | Current skill runtime | `apps/node/src/domain/skills/runSkill.ts` |
 | Current doctor checks | `apps/node/src/domain/doctor/checks/` |
 | Current replay skill | `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-replay/` |
-| Internal SKILL.md-as-program precedents | `.agents/skills/docs-build/`, `.agents/skills/docs-author/`, `.agents/skills/skill-author-by-recording/` |
+| Internal SKILL.md-as-program precedents | `.agents/skills/docs-build/`, `.agents/skills/docs-author/` |
 | Architectural framing | `tasks/recording/brain-hand-contract/problem-definition.md` |
 | Refactor rationale | `tasks/recording/refactor-plan.md` |
 
@@ -214,6 +214,13 @@ This pack should produce:
   `docs/internal/design/` documenting the 10-run measurement
 - updates to `docs/skills/authoring.md` and `docs/skills/overview.md`
   describing the agent-driven orchestrated shape
+
+## Cost Notes
+
+In v1, every orchestrated skill invocation spawns a fresh `codex` process.
+Batching, caching, session reuse, and cost/rate-limit optimization are explicit
+follow-ups, not hidden assumptions in this pack. The v1 bar is correctness,
+inspectability, and reliable outcome.
 
 ## Durable Follow-Up
 

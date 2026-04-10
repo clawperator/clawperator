@@ -18,7 +18,7 @@ relevant guidance has a stable long-term home in `docs/`.
 | Completed | none |
 | Remaining | P1A, P2A, P1B, P2B |
 | Current / Next | P1A — recording-as-evidence facts can graduate now |
-| Blockers | wave B blocked on W2 (`skill-result-contract`) wording stabilizing |
+| Blockers | wave B blocked on W2 (`skill-result-contract`) and W2b (`agent-driven-skills`) wording stabilizing |
 
 ## Two-Wave Structure
 
@@ -31,9 +31,10 @@ The durable findings split cleanly into two groups:
   Wave A can graduate as soon as W1 (`skill-checkpoints`) is in flight,
   because the wording does not depend on later contract decisions.
 - **Wave B — skill contract and authoring facts.** These describe the
-  `SkillResult` shape, terminal verification expectations, and declared
-  contract behavior. Wave B is blocked on W2 because the wording must match
-  the shipped contract.
+  `SkillResult` shape, terminal verification expectations, declared
+  contract behavior, and the runtime-agent shape for orchestrated skills.
+  Wave B is blocked on W2 and W2b because the wording must match the shipped
+  contract and the shipped runtime model.
 
 Splitting the wave lets durable recording knowledge land sooner without
 trapping wave B behind a wording change later.

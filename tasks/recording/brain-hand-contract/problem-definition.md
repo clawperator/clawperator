@@ -9,6 +9,10 @@ Capture the deeper architectural problem that the Solax
 a concrete path forward. This file is a problem definition, not a task pack.
 Task packs should be derived from it only after the framing is agreed.
 
+Status note: sibling task packs now exist under `tasks/recording/`, and W2b
+adds the runtime-agent shape for orchestrated skills. Keep this file as the
+"why", not the latest source of sequencing details.
+
 ## Crisp Problem Statement
 
 The Clawperator `brain / hand` model is documented as an architectural
@@ -335,7 +339,8 @@ verification failed), and emit a structured diagnosis the brain can act on.
 Update `docs/skills/authoring.md` to describe:
 
 - the contract shape
-- how to author a non-trivial skill as a checkpointed orchestration
+- how to author a non-trivial skill as a checkpointed orchestration or
+  agent-driven `SKILL.md` program, depending on the skill shape
 - what recordings contribute and what they do not
 - how to declare goal and verification
 
@@ -360,35 +365,39 @@ stages 1-4. Before then it would codify the current brittleness as convention.
 
 | Workstream | Owner | Status |
 | --- | --- | --- |
-| W1. Skill integrity retrofit (Solax) | skill-checkpoints task | active |
-| W2. Skill result contract | new task pack | not yet created |
-| W3. Skill goal/verification declaration | new task pack | not yet created |
-| W4. Recording compare diagnostic | compare task, re-scoped after W2 | active, adjust |
-| W5. Skill authoring guidance graduation | docs work, after W2 and W3 | not yet created |
+| W1. Skill integrity retrofit (Solax) | `skill-checkpoints/` | created |
+| W2. Skill result contract | `skill-result-contract/` | created |
+| W2b. Agent-driven orchestrated runtime | `agent-driven-skills/` | created |
+| W3. Skill goal/verification declaration | `skill-contract-declaration/` | created |
+| W4. Recording compare diagnostic | `compare/` | created |
+| W5. Skill authoring guidance graduation | `graduate-demo-findings/` | created |
 | W6. Observation primitives in the runtime | future, after W2-W5 | deferred |
-| W7. Repo-local skill-author-by-recording | future, after W5 | blocked on W5 |
+| W7. Repo-local skill-author-by-recording | `skill-author-by-recording/` | planned, blocked on W2b/W3/W4/W5 |
 
 ## What Should Happen First
 
 1. Finish W1 as planned. Small, cheap, unblocks trust in the Solax proving
    case. Within one or two focused commits in the skills repo.
-2. Create a W2 task pack for the skill result contract. Design the type,
-   decide how `runSkill` parses it, retrofit Solax to emit it. This is the
-   central change. Build it test-first with real Solax evidence.
-3. Create a W3 task pack for the declarative goal/verification block in
-   `skill.json`. Small surface, high leverage, validates W2 contract in
-   practice.
-4. Adjust the compare task pack: replace the P1 "how is a run trace produced"
+2. Finish W2: design the type, decide how `runSkill` parses it, and retrofit
+   the replay baseline to emit it. This is the central change. Build it
+   test-first with real Solax evidence.
+3. Finish W2b: define the agent-driven orchestrated runtime shape so the
+   Solax `-orchestrated` skill is an embedded runtime agent, not a labeled
+   script.
+4. Finish W3: add the declarative goal/verification block in `skill.json`.
+   Small surface, high leverage, validates W2/W2b in practice.
+5. Adjust the compare task pack: replace the P1 "how is a run trace produced"
    decision with "compare consumes `SkillResult`" and tighten the fixtures
    accordingly.
-5. Execute compare on top of the new contract. It becomes a smaller, clearer
+6. Execute compare on top of the new contract. It becomes a smaller, clearer
    feature.
-6. Graduate durable recording-demo findings into `docs/skills/authoring.md`
+7. Graduate durable recording-demo findings into `docs/skills/authoring.md`
    and `docs/api/recording.md` as part of W5.
 
 Ordering matters because doing W4 before W2 forces compare to invent a trace
-shape that W2 will then replace. Doing W6 before W2 invents runtime primitives
-without a contract to anchor them. Doing W7 before W5 codifies brittle practice.
+shape that W2 will then replace. Doing W6 before W2/W2b invents runtime
+primitives without a contract to anchor them. Doing W7 before W5 codifies
+brittle practice.
 
 ## What Should Explicitly Not Happen Yet
 

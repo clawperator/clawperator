@@ -9,7 +9,8 @@ Total PRs: 2. Total phases: 3.
 - PR-1: declaration shape plus scaffold/runtime support
 - PR-2: Solax proving declaration
 
-Current state: blocked until `tasks/recording/skill-result-contract/` lands.
+Current state: blocked until `tasks/recording/skill-result-contract/` lands,
+with the Solax proving phase additionally blocked on W2b.
 
 ## Status
 
@@ -21,7 +22,7 @@ Current state: blocked until `tasks/recording/skill-result-contract/` lands.
 | Completed | none |
 | Remaining | P1, P2, P3 |
 | Current / Next | P1 after W2 |
-| Blockers | `tasks/recording/skill-result-contract/` must land first |
+| Blockers | `tasks/recording/skill-result-contract/` must land first; P3 also waits on `tasks/recording/agent-driven-skills/` |
 
 ## Hard Rules
 
@@ -38,6 +39,7 @@ Read these files IN THIS ORDER before writing anything.
 | `tasks/recording/skill-contract-declaration/plan.md` | Stable scope and blockers |
 | `tasks/recording/brain-hand-contract/problem-definition.md` | Why declaration exists at all |
 | `tasks/recording/skill-result-contract/plan.md` | Upstream contract this declaration must align to |
+| `tasks/recording/agent-driven-skills/plan.md` | The runtime-agent shape the Solax proving declaration must match |
 | `docs/skills/authoring.md` | Current public authoring contract |
 | `apps/node/src/domain/skills/scaffoldSkill.ts` | Scaffold behavior to extend |
 | `apps/node/src/domain/skills/validateSkill.ts` | Validator surface for the new optional `contract` field |
@@ -191,8 +193,8 @@ feat(skills): add optional skill contract declaration
 
 ### Goal
 
-Declare the Solax orchestrated-skill contract and prove it agrees with emitted
-`SkillResult`.
+Declare the Solax orchestrated-skill contract and prove it agrees with the
+emitted `SkillResult` from the agent-driven runtime path.
 
 ### Files or Surfaces To Change
 
@@ -201,12 +203,19 @@ Declare the Solax orchestrated-skill contract and prove it agrees with emitted
 ### Steps
 
 1. Declare the Solax orchestrated-skill contract in `skill.json`.
-2. Run the skill and confirm declared verification matches emitted verification.
+2. Run the skill and confirm declared verification matches emitted
+   verification.
+3. Force a run in which the skill reaches the end of its runtime path but
+   cannot satisfy the declared verification, and confirm the runtime surfaces
+   `indeterminate` rather than `success`.
 
 ### Acceptance Criteria
 
 - Solax orchestrated `skill.json` declares inputs, goal, and verification.
-- Live verification shows declaration and emitted `SkillResult` agree.
+- Live verification shows declaration and emitted `SkillResult` agree on the
+  success path.
+- A forced non-proving run from the agent-driven Solax skill returns
+  `status: indeterminate` and that state reaches `skills run --json`.
 
 ### Validation
 

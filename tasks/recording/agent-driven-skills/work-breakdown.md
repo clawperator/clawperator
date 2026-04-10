@@ -51,8 +51,8 @@ Before starting P1, read:
 - `apps/node/src/domain/doctor/checks/` (to pattern-match the new
   agent CLI check against existing checks)
 - `.agents/skills/docs-author/SKILL.md` and
-  `.agents/skills/skill-author-by-recording/SKILL.md` (repo-local
-  precedents for SKILL.md-as-program)
+  `.agents/skills/docs-build/SKILL.md` (repo-local precedents for
+  markdown-as-program workflows that already exist in this checkout)
 - `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-replay/`
   (the current scripted Solax baseline)
 

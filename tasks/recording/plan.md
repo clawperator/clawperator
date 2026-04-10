@@ -16,9 +16,17 @@ This file is the entrypoint. The sub-task packs hold the executable detail.
 
 ## Current Goal
 
-Turn the Solax recording effort into a truthful proving case, then use that
-proving case to build the missing skill-layer contract and only then implement
-recording-versus-run compare.
+Turn the Solax recording effort into a truthful proving case for two distinct
+skill layers:
+
+- a preserved `-replay` baseline that is deterministic, verified, and useful as
+  baseline evidence
+- an `-orchestrated` proving skill that is **agent-driven at runtime** through
+  `SKILL.md` plus a thin harness, emits `SkillResult`, declares its contract,
+  and is reliable enough to anchor the recording promo video
+
+Then build compare and guided authoring around that corrected split instead of
+around the older "scripted orchestrated skill" assumption.
 
 ## Service Improvement Outcome
 
@@ -150,11 +158,11 @@ After this work:
   workflow that guides an agent through the full process
 - that workflow can tell the human exactly when to perform the recorded UI
   flow, manage `record start` / `record stop` / `record pull` / `recording
-  export`, scaffold the replay skill, and then help author the orchestrated
-  sibling from the captured evidence
+  export`, hand the captured evidence to an authoring-time agent, and then
+  help author the orchestrated skill from that evidence
 - the resulting artifacts are inspectable by both developers and agents:
-  recording export, replay skill, orchestrated skill, declared contract, and
-  compare output
+  recording export, orchestrated `SKILL.md`, thin `run.js`, declared contract,
+  first-run `SkillResult`, and compare output
 - the workflow remains honest that recordings are evidence, while still making
   end-to-end skill creation feel guided rather than manual
 
@@ -176,16 +184,21 @@ The recording subtree is complete when **all** of the following are true:
 - `SkillResult` is defined in `apps/node/src/contracts/`, parsed by
   `runSkill`, exposed on `SkillRunResult`, with backward compatibility for
   legacy skills (skill-result-contract W2)
-- A new Solax brain/hand proving skill exists at
-  `com.solaxcloud.starter.set-discharge-to-limit-orchestrated` and emits a
-  parseable `SkillResult` with enumerated checkpoints and terminal
-  verification (skill-result-contract W2)
 - The preserved replay sibling
   `com.solaxcloud.starter.set-discharge-to-limit-replay` is retrofitted in
   the same workstream to also emit a parseable `SkillResult`, using the
   coarse-subset checkpoint list defined by W2, so the recording program
   does not ship a first-class replay skill that still speaks opaque
   stdout (skill-result-contract W2)
+- A new Solax brain/hand proving skill exists at
+  `com.solaxcloud.starter.set-discharge-to-limit-orchestrated`, and that
+  proving skill is agent-driven at runtime:
+  - `SKILL.md` is the runtime agent's program
+  - `scripts/run.js` is a thin harness that spawns the configured agent CLI
+  - the embedded runtime agent emits a parseable `SkillResult` with declared
+    checkpoint identities and terminal verification
+  - the reliability validation phase has been run against a live Samsung
+    target and recorded a passing outcome rate (agent-driven-skills W2b)
 - `skill.json` supports an optional `contract` block, scaffold writes a
   starter, and `runSkill` returns a distinct `indeterminate` state when a
   declared verification is not proved (skill-contract-declaration W3)
@@ -229,24 +242,28 @@ So this subtree now contains multiple linked workstreams rather than one task.
 | --- | --- | --- | --- |
 | 0 | `brain-hand-contract/` | active reference | problem definition and architectural framing |
 | 1 | `skill-checkpoints/` | next | preserve the current Solax path as the truthful `-replay` baseline |
-| 2 | `skill-result-contract/` | ready after 1 | define `SkillResult` and create the new Solax `-orchestrated` proving skill |
-| 3 | `skill-contract-declaration/` | blocked on 2 | declare inputs, goal, and verification in the orchestrated `skill.json` |
-| 4 | `compare/` | blocked on 2 | compare recording baseline against emitted `SkillResult` from the orchestrated skill |
+| 2 | `skill-result-contract/` | ready after 1 | define `SkillResult`, parse it in `runSkill`, and retrofit the replay baseline to emit it |
+| 2b | `agent-driven-skills/` | ready after 2 | define the runtime agent shape for orchestrated skills and prove it on the Solax `-orchestrated` skill |
+| 3 | `skill-contract-declaration/` | blocked on 2 and 2b | declare inputs, goal, and verification in the agent-driven orchestrated `skill.json` |
+| 4 | `compare/` | blocked on 2 for implementation and 2b for proving | compare recording baseline against emitted `SkillResult`, including agent-driven runs that may take a different path |
 | 5a | `graduate-demo-findings/` (wave A) | active | graduate recording-as-evidence and operations facts that do not depend on `SkillResult` shape |
 | 5b | `graduate-demo-findings/` (wave B) | blocked on 2 | graduate skill-contract and authoring facts once W2 wording is stable |
-| 6 | `skill-author-by-recording/` | blocked on 5 | package the proven recording-to-replay-to-orchestrated workflow into a repo-local agent skill |
+| 6 | `skill-author-by-recording/` | blocked on 2b, 3, 4, and 5 | package the proven recording-to-orchestrated workflow into a repo-local agent skill |
 
 ## Required Sequence
 
 1. Finish `skill-checkpoints/`
 2. Finish `skill-result-contract/`
-3. Start `skill-contract-declaration/`
-4. Start `compare/`
-5. Run `graduate-demo-findings/`
+3. Finish `agent-driven-skills/`
+4. Start `skill-contract-declaration/`
+5. Start `compare/`
+6. Run `graduate-demo-findings/`
 
 `graduate-demo-findings/` wave A may run in parallel with `skill-checkpoints/`
 because its content does not depend on the contract shape. Wave B still waits
-for W2 wording to stabilize.
+for W2 wording to stabilize. W6 waits until the runtime agent shape, declared
+contract semantics, compare model, and durable docs are all stable enough to
+teach honestly.
 
 ## Preferred PR Grouping
 
@@ -320,26 +337,54 @@ Why grouped:
 - contract shape and parser/tests should land together
 - splitting these creates churn without reducing much risk
 
-### PR-4: W2 Solax contract retrofit
+### PR-4: W2 replay contract retrofit
 
 Scope:
 
 - `tasks/recording/skill-result-contract/` P3
-- create
-  `com.solaxcloud.starter.set-discharge-to-limit-orchestrated`
 - retrofit the preserved
   `com.solaxcloud.starter.set-discharge-to-limit-replay` sibling to emit
-  `SkillResult` as well
-- Solax `SkillResult` emission in `../clawperator-skills`
+  `SkillResult`
+- replay-skill `SkillResult` emission in `../clawperator-skills`
 
 Why separate:
 
 - different repo
 - depends on PR-3 contract shape being real
-- both Solax skills land on the contract in the same PR so compare does not
-  see a half-migrated pair
+- keeps W2 emitter-agnostic and leaves the orchestrated runtime shape to W2b
 
-### PR-5: W2 downstream handoff updates
+### PR-5a: W2b runtime agent support
+
+Scope:
+
+- `tasks/recording/agent-driven-skills/` P1 and P2
+- `apps/node` runtime support for agent-driven skills
+- doctor coverage and regression tests
+
+Why separate:
+
+- new runtime contract surface
+- different risk profile from the skills-repo Solax proving case
+- keeps the universal `SkillResult` work distinct from the runtime-agent path
+
+### PR-5b: W2b Solax proving case and reliability validation
+
+Scope:
+
+- `tasks/recording/agent-driven-skills/` P3, P4, and P5
+- create
+  `com.solaxcloud.starter.set-discharge-to-limit-orchestrated`
+- reliability validation and forced-failure capture for the video
+- downstream plan/docs handoff
+
+Why separate:
+
+- different repo
+- depends on PR-5a runtime support existing
+- the video's "reliably run" claim must be backed by this proof, not by
+  architecture notes alone
+
+### PR-6: W2 downstream handoff updates
 
 Scope:
 
@@ -355,7 +400,7 @@ Acceptable collapse:
 - if PR-3 leaves the task packs obviously aligned already, this can be folded
   into PR-3 instead of standing alone
 
-### PR-6: W3 contract declaration
+### PR-7: W3 contract declaration
 
 Scope:
 
@@ -367,7 +412,7 @@ Recommended split:
 - one Clawperator PR for scaffold/runtime support
 - one skills-repo PR for Solax declaration proof
 
-### PR-7: W4 compare
+### PR-8: W4 compare
 
 Scope:
 
@@ -383,7 +428,7 @@ Default preference:
 - do not split compare into many PRs unless the implementation grows more than
   expected
 
-### PR-8a: W5 wave A — graduate recording and operations facts
+### PR-9a: W5 wave A — graduate recording and operations facts
 
 Scope:
 
@@ -393,13 +438,13 @@ Scope:
   part of the EM-level review) and trim wave A material out of
   `findings.md`
 
-Why separated from PR-8b:
+Why separated from PR-9b:
 
 - wave A content is stable now and does not depend on W2 wording
 - it can ship in parallel with the W1/W2 work and unblocks doc readers
   earlier
 
-### PR-8b: W5 wave B — graduate skill contract authoring guidance
+### PR-9b: W5 wave B — graduate skill contract authoring guidance
 
 Scope:
 
@@ -420,6 +465,9 @@ Why separate:
 - Do not graduate temporary demo notes into docs until the durable wording is
   stable enough to survive the contract work.
 - Do not create `.agents/skills/skill-author-by-recording/` yet.
+- Orchestrated skills created from W2b onward are agent-driven by definition.
+  A `run.js` that contains the skill logic itself instead of spawning an agent
+  CLI is, by definition, a replay-shaped skill regardless of its id suffix.
 - Prefer bundling closely related phases into one PR when they share the same
   repo, risk level, and validation story.
 - Prefer separate PRs when the work crosses repos, changes runtime contracts, or
@@ -458,9 +506,9 @@ Does not own:
 Caller preference while both Solax skills exist:
 
 - prefer `com.solaxcloud.starter.set-discharge-to-limit-replay` until W3
-  lands and the orchestrated skill has both `SkillResult` and declared
+  lands and the orchestrated skill has both runtime-agent support and declared
   contract support
-- treat `...-orchestrated` as the experimental proving sibling during W2/W3
+- treat `...-orchestrated` as the experimental proving sibling during W2b/W3
 
 ### `skill-result-contract/`
 
@@ -468,13 +516,29 @@ Owns:
 
 - skill-level `SkillResult`
 - `runSkill` parsing/support
-- creation of the orchestrated Solax proving skill
-- retrofit of the preserved replay Solax skill so both Solax skills emit
-  `SkillResult`
+- retrofit of the preserved replay Solax skill so the replay baseline also
+  emits `SkillResult`
 
 Does not own:
 
+- agent-driven orchestrated skill runtime
 - declarative `skill.json` goal/verification block
+- compare implementation
+
+### `agent-driven-skills/`
+
+Owns:
+
+- the runtime-agent shape for orchestrated skills
+- the `agent` block in `skill.json`
+- agent CLI resolution, validation, and doctor coverage
+- the Solax `...-orchestrated` proving skill
+- reliability validation for the orchestrated proving case
+
+Does not own:
+
+- the universal `SkillResult` contract itself
+- replay-skill behavior beyond what W2 already owns
 - compare implementation
 
 ### `skill-contract-declaration/`
@@ -483,6 +547,7 @@ Owns:
 
 - optional `contract` block in `skill.json`
 - scaffold/runtime follow-up for declaration
+- cross-checking the declared contract against the emitted `SkillResult`
 
 ### `compare/`
 
@@ -510,6 +575,12 @@ execute, start with:
 
 - `tasks/recording/skill-checkpoints/plan.md`
 - `tasks/recording/skill-checkpoints/work-breakdown.md`
+
+If an agent is picking up the architectural correction that unlocks the video
+and the future authoring workflow, start with:
+
+- `tasks/recording/refactor-plan.md`
+- `tasks/recording/agent-driven-skills/plan.md`
 
 If an agent is trying to understand the bigger "why", start with:
 

@@ -9,7 +9,8 @@ Total PRs: 2. Total phases: 4.
 - PR-1 (wave A): graduate recording-as-evidence and operations facts that do
   not depend on the `SkillResult` shape. Can ship as soon as W1 is in flight.
 - PR-2 (wave B): graduate skill-contract and authoring facts that depend on
-  W2 (`skill-result-contract`) wording being stable.
+  W2 (`skill-result-contract`) and W2b (`agent-driven-skills`) wording being
+  stable.
 
 Current state: wave A is active. Wave B is blocked on W2.
 
@@ -23,7 +24,7 @@ Current state: wave A is active. Wave B is blocked on W2.
 | Completed | none |
 | Remaining | P1A, P2A, P1B, P2B |
 | Current / Next | P1A |
-| Blockers | wave B waits for W2 contract wording to stabilize |
+| Blockers | wave B waits for W2 contract wording and W2b runtime-agent wording to stabilize |
 
 ## Hard Rules
 
@@ -48,7 +49,7 @@ Read these files IN THIS ORDER before writing anything.
 | PR | Purpose | Included phases | Agent tier | Merge gate |
 | --- | --- | --- | --- | --- |
 | PR-1 | Wave A: graduate recording/operations facts | P1A, P2A | `default` | none (W2 not required) |
-| PR-2 | Wave B: graduate skill-contract/authoring facts | P1B, P2B | `default` | W2 contract wording stable |
+| PR-2 | Wave B: graduate skill-contract/authoring facts | P1B, P2B | `default` | W2 contract wording and W2b runtime-agent wording stable |
 
 ## Phase P1A: Graduate Recording And Operations Facts
 
@@ -163,7 +164,8 @@ chore(tasks): retire wave A recording demo notes
 ### Goal
 
 Move durable skill-contract and authoring knowledge into the authored docs
-once W2 (`skill-result-contract`) wording is stable.
+once W2 (`skill-result-contract`) and W2b (`agent-driven-skills`) wording are
+stable.
 
 ### Files or Surfaces To Change
 
@@ -174,8 +176,9 @@ once W2 (`skill-result-contract`) wording is stable.
 1. Document the `SkillResult` shape, frame marker, and emission expectations.
 2. Document the non-trivial skill rule: truthful exit, terminal verification,
    `SkillResult.terminalVerification` shape.
-3. Document the optional `contract` block and the `indeterminate` outcome
-   class.
+3. Document the optional `contract` block, the `indeterminate` outcome
+   class, and the agent-driven orchestrated runtime shape (`SKILL.md` plus
+   thin harness plus `agent` block).
 4. Keep Samsung/Solax-specific coordinates and hacks out of generalized
    guidance.
 

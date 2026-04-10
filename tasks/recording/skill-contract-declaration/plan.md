@@ -7,8 +7,10 @@ inputs, goal, and verification are machine-readable before runtime. This builds
 on the skill result contract and lets the runtime cross-check what a skill
 claimed it would verify against what it actually verified.
 
-This is downstream of `tasks/recording/skill-result-contract/` and should not
-start until the runtime can parse `SkillResult`.
+This is downstream of `tasks/recording/skill-result-contract/` and
+`tasks/recording/agent-driven-skills/`. It should not start until the runtime
+can parse `SkillResult` and the Solax orchestrated proving skill has an
+agent-driven runtime shape to declare against.
 
 ## Status
 
@@ -19,8 +21,8 @@ start until the runtime can parse `SkillResult`.
 | Total phases | 3 |
 | Completed | none |
 | Remaining | P1, P2, P3 |
-| Current / Next | blocked on W2 |
-| Blockers | `tasks/recording/skill-result-contract/` must land first |
+| Current / Next | blocked on W2 and W2b |
+| Blockers | `tasks/recording/skill-result-contract/` must land first; `tasks/recording/agent-driven-skills/` must land before the Solax proving phase |
 
 ## Goal
 
@@ -70,9 +72,11 @@ success.
   must not be treated as plain success. The runtime must surface this case as
   a distinct `indeterminate` status on `SkillRunResult`, not as `ok: true`
   and not as `ok: false` with `SKILL_EXECUTION_FAILED`.
-- `indeterminate` semantics: the script exited zero, no exec step failed, the
-  emitted `SkillResult.status` was `success`, but the declared verification
-  was either absent from `SkillResult.terminalVerification` or did not match.
+- `indeterminate` semantics are emitter-agnostic but must be written
+  explicitly for the agent-driven path: the skill-runner (script or embedded
+  runtime agent) exited without an upstream exec/runtime failure, but the
+  declared verification in `skill.json` was either absent from
+  `SkillResult.terminalVerification` or did not match the observed proof.
   The brain treats this as "the skill ran but did not prove its goal" and
   must not assume the requested state was reached.
 - The validator (`apps/node/src/domain/skills/validateSkill.ts` and the
@@ -102,4 +106,5 @@ This task should produce:
 - scaffold support for the block
 - runtime cross-checking of declared verification against emitted `SkillResult`
 - CLI and serve surfaces that expose the new runtime outcome consistently
-- Solax `-orchestrated` `skill.json` updated to declare its contract
+- Solax `-orchestrated` `skill.json` updated to declare its contract against
+  the shipped agent-driven runtime shape from W2b

@@ -6,6 +6,12 @@ Capture concrete findings while creating a real Solax skill from a live manual
 recording. This file is temporary. Durable workflow guidance should move into
 `.agents/skills/skill-author-by-recording/` or the main docs once proven.
 
+Scope note: these findings are durable for recording lifecycle, device
+behavior, Solax UI quirks, and replay-baseline reliability work. They predate
+the W2b correction that makes orchestrated skills agent-driven at runtime, so
+do not treat this file as the source of truth for orchestrated implementation
+shape.
+
 Populate this file as execution progresses. Keep only information that helps
 the agent finish the work or distill durable follow-up guidance.
 

@@ -7,8 +7,9 @@ as more than an opaque stdout blob. This is the load-bearing interface change
 that turns checkpoints, terminal verification, and compare output into
 structured, consumable data instead of private script conventions.
 
-Use a new Solax orchestrated skill as the first proving case, while preserving
-the replay baseline separately.
+W2 is intentionally emitter-agnostic. It defines the contract, teaches
+`runSkill` to parse it, and retrofits the preserved replay baseline to emit it.
+The agent-driven orchestrated proving skill moved to W2b.
 
 ## Status
 
@@ -24,9 +25,10 @@ the replay baseline separately.
 
 ## Goal
 
-Introduce a skill-level `SkillResult` contract and create a new Solax
-`-orchestrated` skill that emits it, so the brain can read goals,
-checkpoints, terminal verification, and embedded exec outcomes directly.
+Introduce a skill-level `SkillResult` contract and make `runSkill` parse it so
+the brain can read goals, checkpoints, terminal verification, and embedded exec
+outcomes directly. Prove the contract on the preserved Solax replay baseline,
+while leaving the agent-driven orchestrated proving skill to W2b.
 
 ## Why Now
 
@@ -47,9 +49,6 @@ reconstruction.
 - decide how a skill emits it robustly
 - make `runSkill` parse and return it compatibly with legacy skills
 - embed exec-level evidence inside the skill-level result
-- create or retrofit
-  `com.solaxcloud.starter.set-discharge-to-limit-orchestrated` to emit the
-  new shape
 - retrofit `com.solaxcloud.starter.set-discharge-to-limit-replay` to emit
   `SkillResult` as well, so the recording program does not ship a
   first-class replay skill that still speaks stdout
@@ -70,7 +69,7 @@ reconstruction.
 | `apps/node/src/contracts/` | Clawperator repo | `SkillResult` contract |
 | `apps/node/src/domain/skills/` | Clawperator repo | parsing, runtime, compatibility |
 | `apps/node/src/test/` | Clawperator repo | fixtures and regression tests |
-| `../clawperator-skills/` | Skills repo | Solax orchestrated proving case |
+| `../clawperator-skills/` | Skills repo | Solax replay proving case for contract emission |
 | `tasks/recording/skill-result-contract/` | Clawperator repo | temporary execution contract |
 
 ## Source Of Truth
@@ -103,8 +102,6 @@ reconstruction.
   primary contract shape. P1 must choose a small typed union or another
   explicitly versioned structure so downstream consumers are not forced back
   into ad-hoc string parsing.
-- `com.solaxcloud.starter.set-discharge-to-limit-orchestrated` is the first
-  proving skill for the contract, not the template for every field.
 - Emitting `SkillResult` is the expected default for every skill authored
   after W2 ships, regardless of whether the skill is a `-replay` or
   `-orchestrated` variant. The contract is the common return channel all
@@ -122,30 +119,21 @@ reconstruction.
   should be upgraded to emit `SkillResult` as they are touched. This
   compatibility lane exists for legacy skills; it is not a category of
   skill any new authoring work should use.
-- Required Solax retrofit scope: in this workstream, both
-  `com.solaxcloud.starter.set-discharge-to-limit-replay` and
-  `com.solaxcloud.starter.set-discharge-to-limit-orchestrated` end up
-  emitting `SkillResult`. The orchestrated skill is the first emitter and
-  proves the contract; the replay sibling is retrofitted in the same
-  workstream so the recording program does not ship a first-class replay
-  skill that still speaks stdout.
+- Required Solax retrofit scope: in this workstream,
+  `com.solaxcloud.starter.set-discharge-to-limit-replay` ends up emitting
+  `SkillResult`. W2b separately creates the agent-driven
+  `...-orchestrated` sibling and makes it emit the same contract. Keeping that
+  split explicit is how W2 stays emitter-agnostic.
 - W2 must not introduce a `SkillRunResult` shape that W3 will immediately
   need to break. If W2 adds new run-result discriminants or status fields,
   they must be designed to extend to W3's `indeterminate` outcome without
   another breaking reshape.
-- W2 does not ship a shared skill-side authoring helper (there is no
-  `checkpoint(...)` library or framework published by this task pack). The
-  orchestrated Solax `run.js` emits the `SkillResult` frame with ordinary
-  per-skill code: it keeps an in-script list of checkpoint records, appends
-  to it as each step completes or fails, runs its terminal verification
-  read-back, and writes one `[Clawperator-Skill-Result]` frame on stdout at
-  the end of the run. Whether a skill uses a tiny local helper inside its
-  own `scripts/` directory is a per-skill stylistic choice and is not a
-  public contract. Any future cross-skill helper library is explicitly out
-  of scope for W2 and must be proposed as a separate task pack if it is
-  wanted later. This keeps the "agent authors the skill" story honest: the
-  agent is writing the emission code itself from the recording evidence,
-  not calling a magic framework that does it for them.
+- W2 does not ship a shared skill-side authoring helper. Replay skills may
+  emit the `SkillResult` frame with ordinary per-skill code, and W2b may
+  later decide how agent-driven orchestrated skills emit the same frame via
+  their SKILL.md program. Any future cross-skill helper library is explicitly
+  out of scope for W2 and must be proposed as a separate task pack if it is
+  wanted later.
 
 ## Required Decisions In P1
 
@@ -194,7 +182,7 @@ This task should produce:
 - a defined `SkillResult` contract
 - `runSkill` support for parsing and returning it
 - test coverage using local fixtures only
-- a new Solax `-orchestrated` skill that emits `SkillResult`
+- the preserved Solax replay baseline emitting `SkillResult`
 - durable design notes in `docs/internal/design/` if the contract decisions
   are not self-evident from the code alone
 
@@ -202,6 +190,7 @@ This task should produce:
 
 This work should later feed:
 
+- `tasks/recording/agent-driven-skills/`
 - `tasks/recording/skill-contract-declaration/`
 - `tasks/recording/compare/`
 - `docs/skills/authoring.md`

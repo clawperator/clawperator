@@ -3,14 +3,19 @@
 ## Executive Summary
 
 Add a recording-versus-run comparison workflow that lets an agent identify the
-first meaningful divergence between a deterministic skill run and a recorded
-baseline. This is cross-repo work: Clawperator owns `SkillResult` consumption,
-compare behavior, and fixture-driven tests, while `../clawperator-skills`
-provides the proving skill and runtime validation target.
+first meaningful divergence between a recorded baseline and a later skill run.
+This is cross-repo work: Clawperator owns `SkillResult` consumption, compare
+behavior, and fixture-driven tests, while `../clawperator-skills` provides the
+proving skills and runtime validation target.
 
-Start by proving the design against
-`com.solaxcloud.starter.set-discharge-to-limit-orchestrated`, then generalize
-only the parts that survive that live exercise.
+Compare now has to support two realities:
+
+- replay runs whose path is expected to match the recording closely
+- agent-driven orchestrated runs whose path may differ while still reaching the
+  same terminal outcome
+
+Start by proving the design against the Solax replay and orchestrated pair,
+then generalize only the parts that survive that live exercise.
 
 This task is strictly about diagnosis. It does not own the separate work of
 making skills more reliable via in-skill checkpoints, terminal-state
@@ -30,7 +35,7 @@ consume `SkillResult`, not invent an overlapping trace mechanism first.
 | Completed | none |
 | Remaining | P1, P2, P3, P4 |
 | Current / Next | P1 after W2 |
-| Blockers | `tasks/recording/skill-result-contract/` must define `SkillResult` first |
+| Blockers | `tasks/recording/skill-result-contract/` must define `SkillResult` first; live proving also waits on `tasks/recording/agent-driven-skills/` |
 
 ## Goal
 
@@ -53,7 +58,8 @@ the mechanism that makes replay reliable.
 
 ## In Scope
 
-- define the compare model for deterministic replay validation
+- define the compare model for replay-style literal comparison and
+  agent-driven semantic comparison
 - define and implement normalization from raw recording export into a
   compareable checkpoint baseline
 - compare `SkillResult` checkpoints against that derived baseline
@@ -115,6 +121,8 @@ Deterministic:
 - normalized checkpoint extraction
 - compare output schema
 - divergence ordering rules
+- the rules for when compare uses literal path matching versus semantic
+  terminal-outcome matching
 
 Judgment:
 
@@ -141,6 +149,12 @@ Judgment:
 - Compare must not require a live device to exercise tests. Live device proof is
   for proving the contract against Solax, not for routine compare regression
   coverage.
+- Compare has two first-class modes:
+  - `literal` for path-sensitive replay comparison
+  - `semantic` for agent-driven runs where terminal outcome can still match
+    even when intermediate checkpoints differ
+- For agent-driven runs, "outcome matches, path differs" is a successful
+  compare result, not a divergence failure.
 - CLI surface for v1 is
   `clawperator recording compare --baseline <export.json> --result <skill-result.json> [--json]`.
   Both inputs are local files. Compare reads them, does not run anything,
@@ -164,6 +178,8 @@ Judgment:
 - building a compare system that depends on lossy `record parse` output alone
 - comparing timestamps or raw event counts that are not stable enough to matter
 - shipping a trace format that is too thin to explain divergence
+- treating a successful agent-driven run as a failure just because it took a
+  different route than the recording baseline
 - overfitting compare logic to Solax-specific implementation details
 - leaving durable guidance trapped in `tasks/`
 - under-testing compare behavior with synthetic-only fixtures that do not
@@ -180,6 +196,10 @@ This task should produce:
   recording export evidence
 - a fixture set derived from the Solax recording/run evidence that can anchor
   TDD-style regression coverage
+- an explicit compare mode or outcome field that distinguishes:
+  - "literal match"
+  - "outcome matches, path differs"
+  - true divergence
 - divergence output that identifies:
   - baseline checkpoint
   - actual checkpoint
@@ -197,9 +217,11 @@ This task should produce:
 
 ## Idempotency
 
-`SkillResult`-derived compare outputs may vary in timestamps and incidental metadata.
-Checkpoint identities, divergence ordering, and final-state conclusions should
-remain stable across reruns of the same deterministic flow.
+`SkillResult`-derived compare outputs may vary in timestamps, incidental
+metadata, and the exact path an agent-driven run took. Checkpoint identities,
+declared compare mode, divergence ordering, and final-state conclusions should
+remain stable across reruns of the same deterministic replay flow and across
+meaningfully equivalent agent-driven runs.
 
 ## Durable Follow-Up
 

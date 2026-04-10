@@ -22,6 +22,9 @@ Status note:
 
 - This plan is historical context only. The active workstreams now live under
   sibling folders in `tasks/recording/`.
+- It predates the W2b correction that makes orchestrated skills agent-driven
+  at runtime. Do not use this file as guidance for the orchestrated runtime
+  shape.
 - The repo-local authoring skill is deferred and must not be revived from this
   checklist until the top-level recording plan explicitly unblocks it.
 
@@ -52,7 +55,7 @@ Status note:
 - [x] Scaffold the new Solax skill into `../clawperator-skills` using
       `--recording-context`.
 - [ ] Inspect the recording artifacts and turn the captured flow into reusable
-      skill logic rather than a one-off replay.
+      authoring evidence rather than treating it as a one-off replay.
 - [x] Validate the Solax skill on-device and note any reliability gaps.
 - [ ] Update `tasks/recording/demo/findings.md` throughout the work with:
       commands used, artifact paths, observed gaps, and decisions.
@@ -74,3 +77,6 @@ Status note:
   discovered while doing the work.
 - The reusable repo-local authoring skill exists with instructions that reflect
   the real Solax implementation experience.
+
+Historical note: the actual end-state for the orchestrated runtime skill now
+lives in W2b and W6, not in this file.

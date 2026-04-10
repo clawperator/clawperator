@@ -10,6 +10,8 @@ Total PRs: 2. Total phases: 4.
 - PR-2: Solax proving integration and docs cleanup
 
 Current state: blocked until `tasks/recording/skill-result-contract/` lands.
+Live proving also depends on W2b because the semantic compare cases need the
+agent-driven orchestrated Solax skill.
 
 ## Status
 
@@ -21,7 +23,7 @@ Current state: blocked until `tasks/recording/skill-result-contract/` lands.
 | Completed | none |
 | Remaining | P1, P2, P3, P4 |
 | Current / Next | P1 after W2 |
-| Blockers | `tasks/recording/skill-result-contract/` must land first |
+| Blockers | `tasks/recording/skill-result-contract/` must land first; P3 also waits on `tasks/recording/agent-driven-skills/` |
 
 ## Hard Rules
 
@@ -41,6 +43,7 @@ Read these files IN THIS ORDER before writing anything.
 | `tasks/recording/compare/plan.md` | Stable compare scope and blockers |
 | `tasks/recording/brain-hand-contract/problem-definition.md` | Contract-first rationale for compare sequencing |
 | `tasks/recording/skill-result-contract/plan.md` | Upstream contract compare must consume |
+| `tasks/recording/agent-driven-skills/plan.md` | Why semantic compare is required for agent-driven runs |
 | `docs/api/recording.md` | Recording export behavior and limits |
 | `docs/skills/authoring.md` | Current authoring contract and durable docs destination |
 | `apps/node/src/domain/recording/exportRecording.ts` | Recording export schema source |
@@ -61,7 +64,9 @@ Read these files IN THIS ORDER before writing anything.
 
 ### Goal
 
-Define checkpoint comparison and divergence classification on top of `SkillResult`.
+Define checkpoint comparison and divergence classification on top of
+`SkillResult`, including the rules for when compare is path-literal versus
+terminal-outcome-semantic.
 
 ### Files or Surfaces To Change
 
@@ -70,8 +75,11 @@ Define checkpoint comparison and divergence classification on top of `SkillResul
 
 ### Steps
 
-1. Define checkpoint comparison semantics. Checkpoints are matched by
-   identity (the stable string) and order, not by index alone.
+1. Define checkpoint comparison semantics for both supported modes:
+   - `literal`: checkpoints are matched by identity and order
+   - `semantic`: terminal outcome is authoritative; checkpoint drift is
+     described but not treated as failure when the declared verification still
+     holds
 2. Define how raw recording export normalizes into the checkpoint baseline.
    This includes:
    - which export events become checkpoint identities
@@ -80,6 +88,8 @@ Define checkpoint comparison and divergence classification on top of `SkillResul
    - how missing snapshots affect normalization
 3. Define divergence classes:
    - `baseline_drift` (skill diverged from baseline at a named checkpoint)
+   - `outcome_matches_path_differs` (agent-driven run reached the goal through
+     a different valid route)
    - `verification_failed` (terminal verification did not match)
    - `verification_indeterminate` (declared verification not proved at all)
    - `upstream_failure` (the skill exited non-zero or `SkillResult.status`
@@ -109,6 +119,8 @@ Define checkpoint comparison and divergence classification on top of `SkillResul
   forces (see P2 file list).
 - The CLI surface is finalized:
   `clawperator recording compare --baseline <file> --result <file> [--json]`.
+- The plan explicitly defines when compare returns
+  `outcome_matches_path_differs` instead of `baseline_drift`.
 
 ### Validation
 
@@ -144,7 +156,7 @@ Implement compare against recording export baselines using `SkillResult`.
 2. Implement export-to-checkpoint normalization for recording baselines,
    including `snapshotMode: omit`.
 3. Implement compare against the derived checkpoint baseline using
-   `SkillResult`.
+   `SkillResult`, with both literal and semantic handling.
 4. Add CLI behavior and tests for the
    `clawperator recording compare --baseline <file> --result <file> [--json]`
    surface, covering:
@@ -166,6 +178,9 @@ Required fixtures under `apps/node/src/test/fixtures/recording-compare/`:
   baseline derived from the export fixture above
 - `solax-result-success.skillresult.json` — `SkillResult` whose checkpoints
   match the baseline and whose `terminalVerification` proves the goal
+- `solax-result-success-path-differs.skillresult.json` — `SkillResult` whose
+  terminal verification proves the goal but whose checkpoint sequence differs
+  in a way that is valid for an agent-driven run
 - `solax-result-baseline-drift.skillresult.json` — `SkillResult` that
   diverges at one named checkpoint (e.g.
   `bottom_sheet_save_clicked` missing or replaced)
@@ -193,6 +208,8 @@ classification rules fails loudly.
   does not rely on implicit assumptions.
 - Each divergence class enumerated in P1 is exercised by at least one
   fixture-driven test.
+- The `outcome_matches_path_differs` case is exercised by at least one
+  fixture-driven test and returns a non-error compare outcome.
 - New tests added under `apps/node/src/test/` run under the default
   `npm --prefix apps/node run test` path; if not, the PR updates CI in the
   same change.
@@ -236,26 +253,30 @@ Show the compare output is useful on the real Solax orchestrated proving skill.
 
 ### Steps
 
-1. Run a matching orchestrated Solax path on-device and capture both the
-   recording export and the emitted `SkillResult`. Compare them; expect no
-   divergence. Preserve the normalized checkpoint baseline derived from the
-   export as part of the evidence set.
-2. Force a `baseline_drift` divergence on-device (e.g. by changing the
+1. Run a matching replay or happy-path orchestrated Solax path on-device and
+   capture both the recording export and the emitted `SkillResult`. Compare
+   them; expect literal success.
+2. Capture an agent-driven orchestrated run that takes a different valid path
+   than the recording baseline but still reaches terminal verification.
+   Compare it; expect `outcome_matches_path_differs`, not failure.
+3. Force a `baseline_drift` divergence on-device (e.g. by changing the
    skill's checkpoint sequence in a sanitized branch) and compare; expect
    the first divergent checkpoint to be reported by identity.
-3. Force a `verification_failed` divergence on-device (e.g. by requesting a
+4. Force a `verification_failed` divergence on-device (e.g. by requesting a
    value the skill records as set but the persisted row does not actually
    show) and compare; expect the verification class.
-4. Sanitize and copy the captured artifacts into
+5. Sanitize and copy the captured artifacts into
    `apps/node/src/test/fixtures/recording-compare/` so the P2 tests are
    anchored to evidence from real runs, not hand-written shapes.
-5. Capture forced-divergence artifacts from a throwaway local branch or local
+6. Capture forced-divergence artifacts from a throwaway local branch or local
    uncommitted patch in `../clawperator-skills` that is discarded after
    evidence capture. Do not merge the forced-divergence implementation.
 
 ### Acceptance Criteria
 
-- One matching live run is proven.
+- One literal matching live run is proven.
+- One valid agent-driven path-different run is proven and classified as
+  `outcome_matches_path_differs`.
 - A `baseline_drift` divergence is proven against a live forced run.
 - A `verification_failed` divergence is proven against a live forced run.
 - The fixtures listed in P2 are derived from these live runs (where

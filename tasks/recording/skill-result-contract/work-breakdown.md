@@ -42,7 +42,7 @@ Read these files IN THIS ORDER before writing anything.
 | `apps/node/src/contracts/result.ts` | Existing exec-level envelope that must remain separate |
 | `apps/node/src/domain/skills/runSkill.ts` | Current skill runtime contract to retrofit |
 | `docs/skills/authoring.md` | Current public authoring contract |
-| `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-replay/scripts/run.js` | Current replay baseline to preserve while designing the orchestrated sibling |
+| `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-replay/scripts/run.js` | Current replay baseline to preserve while retrofitting the contract |
 
 ## PR / Phase Plan
 
@@ -191,7 +191,7 @@ npm --prefix apps/node run test
 feat(skills): parse structured skill results
 ```
 
-## Phase P3: Retrofit Both Solax Skills To Emit `SkillResult`
+## Phase P3: Retrofit The Replay Solax Skill To Emit `SkillResult`
 
 ### Agent Tier
 
@@ -199,40 +199,28 @@ feat(skills): parse structured skill results
 
 ### Goal
 
-Make the new Solax `-orchestrated` skill the first proving skill for the
-contract, and retrofit the `-replay` sibling to emit `SkillResult` in the
-same workstream. Both Solax skills end up speaking the contract. The
-recording program does not ship a first-class replay skill that still
-talks to the brain through opaque stdout.
+Retrofit the preserved Solax `-replay` baseline to emit `SkillResult` so the
+recording program does not ship a first-class replay skill that still talks to
+the brain through opaque stdout. The agent-driven `-orchestrated` proving skill
+now lives in W2b.
 
 ### Files or Surfaces To Change
 
-- `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-orchestrated/`
 - `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-replay/`
 
 ### Steps
 
-1. Create or retrofit
-   `com.solaxcloud.starter.set-discharge-to-limit-orchestrated` as a sibling
-   to the existing replay skill.
-2. Emit a `SkillResult` from the orchestrated skill, including:
-   - declared goal (`set discharge limit to <n>%`)
-   - input percent
-   - the full checkpoint list (see required identities below)
-   - terminal verification record
-   - relevant embedded exec evidence (the `ResultEnvelope` from each
-     `clawperator exec` step in execution order)
-3. Retrofit
-   `com.solaxcloud.starter.set-discharge-to-limit-replay` to also emit a
-   `SkillResult` in the same PR. The replay emitter should:
-   - reuse the same frame marker and contract version as the orchestrated
-     skill
-   - declare the same `goal` kind and `inputs` shape
-   - emit the same terminal verification record
-   - enumerate at least a coarser subset of the orchestrated checkpoint
-     identities so a replay run and an orchestrated run for the same
-     request remain comparable (see coarse-subset policy below)
-4. Validate both skills live on the Samsung target.
+1. Retrofit
+   `com.solaxcloud.starter.set-discharge-to-limit-replay` to emit a
+   `SkillResult`. The replay emitter should:
+   - use the same frame marker and contract version W2 defines for every skill
+   - declare the same `goal` kind and `inputs` shape W2b will later reuse for
+     the orchestrated sibling
+   - emit a terminal verification record
+   - enumerate a stable coarse checkpoint subset that W2b can later align the
+     orchestrated skill to (see coarse-subset policy below)
+2. Validate the replay skill live on the Samsung target.
+3. Record any checkpoint-name or evidence-shape decisions W2b must mirror.
 
 Replay checkpoint coarse-subset policy: the replay skill must emit, at
 minimum, `app_opened`, `discharge_to_row_focused`, `target_text_entered`,
@@ -240,62 +228,41 @@ minimum, `app_opened`, `discharge_to_row_focused`, `target_text_entered`,
 checkpoints are optional for the replay skill because replay treats the
 full path as one cleaned-up traversal. `save_completed` is a replay-only
 identifier that collapses the `toolbar_save_clicked` and
-`bottom_sheet_save_clicked` pair into a single successful-save checkpoint,
-so compare can still align a replay run to an orchestrated baseline.
+`bottom_sheet_save_clicked` pair into a single successful-save checkpoint.
+W2b will later define how the orchestrated checkpoint set maps onto this
+coarse replay subset for compare purposes.
 
-Required Solax checkpoint identities for v1 (stable strings, in order):
+Required replay checkpoint identities for v1 (stable strings, in order):
 
 - `app_opened`
-- `intelligence_tab_opened`
-- `peak_export_card_opened`
-- `device_discharging_card_opened`
 - `discharge_to_row_focused`
-- `dialog_input_focused`
 - `target_text_entered`
-- `dialog_confirm_clicked`
-- `toolbar_save_clicked`
-- `bottom_sheet_save_clicked`
+- `save_completed`
 - `terminal_state_verified`
 
-These checkpoint names are tentative until validated against the shipped W1
-save sequencing and the real orchestrated implementation. If the live retrofit
-shows one of these checkpoints cannot be observed deterministically, or W1
-changes make a listed identity misleading, drop or rename it deliberately and
-document the reason in `SKILL.md`. Do not invent new checkpoint identities
-silently.
+If the live replay retrofit shows one of these checkpoints cannot be observed
+deterministically, drop or rename it deliberately and document the reason in
+`SKILL.md`. Do not invent new checkpoint identities silently. W2b will own the
+finer-grained orchestrated checkpoint list.
 
 ### Acceptance Criteria
 
-- `com.solaxcloud.starter.set-discharge-to-limit-orchestrated` exists as a
-  distinct skill id beside the preserved `-replay` baseline.
-- The orchestrated skill emits a parseable `SkillResult` that matches the
-  actual runtime behavior.
-- The retrofitted replay skill also emits a parseable `SkillResult` using
-  the same frame marker and `contractVersion`, with the coarse-subset
-  checkpoint list defined above and the same terminal verification record.
-- Both emitted results are consumable by the Clawperator runtime tests via
+- The retrofitted replay skill emits a parseable `SkillResult` using the
+  shared frame marker and `contractVersion`, with the coarse-subset checkpoint
+  list defined above and a real terminal verification record.
+- The emitted replay result is consumable by the Clawperator runtime tests via
   the copied fixture path used by W4 compare; round-tripping the live frame
-  through `runSkill` parsing returns a structurally valid `SkillResult` for
-  each skill.
-- A replay run and an orchestrated run for the same input (`40`) produce
-  `SkillResult` documents whose coarse-subset checkpoint identities align,
-  so W4 compare has a baseline to walk.
-- Both skills' docs describe the new result behavior accurately, including
-  the exact checkpoint identities each skill emits and the failure shape on
-  verification mismatch. The replay skill's `SKILL.md` explicitly names its
-  coarse-subset checkpoints, including the `save_completed` collapse, so a
-  reader does not have to derive them from the orchestrated sibling.
+  through `runSkill` parsing returns a structurally valid `SkillResult`.
+- The replay skill's docs describe the new result behavior accurately,
+  including the exact checkpoint identities it emits and the failure shape on
+  verification mismatch.
 - Any checkpoint identities dropped as unstable are listed explicitly in the
-  affected skill's `SKILL.md` with the reason they were dropped so W4
-  fixtures do not silently drift.
+  replay skill's `SKILL.md` with the reason they were dropped so W4 fixtures
+  do not silently drift.
+- Any follow-on alignment W2b must honor is recorded explicitly in P4 rather
+  than assumed.
 
 ### Validation
-
-```bash
-CLAWPERATOR_SKILLS_REGISTRY=<clawperator_skills_root>/skills/skills-registry.json \
-CLAWPERATOR_OPERATOR_PACKAGE=com.clawperator.operator.dev \
-node <clawperator_root>/apps/node/dist/cli/index.js skills run com.solaxcloud.starter.set-discharge-to-limit-orchestrated --device <device_serial> --json -- 40
-```
 
 ```bash
 CLAWPERATOR_SKILLS_REGISTRY=<clawperator_skills_root>/skills/skills-registry.json \
@@ -303,20 +270,14 @@ CLAWPERATOR_OPERATOR_PACKAGE=com.clawperator.operator.dev \
 node <clawperator_root>/apps/node/dist/cli/index.js skills run com.solaxcloud.starter.set-discharge-to-limit-replay --device <device_serial> --json -- 40
 ```
 
-Confirm that both invocations return `skillResult` on the CLI JSON envelope
-and that the round-tripped `SkillResult` values parse cleanly through
-`runSkill`.
+Confirm that the invocation returns `skillResult` on the CLI JSON envelope and
+that the round-tripped `SkillResult` value parses cleanly through `runSkill`.
 
 ### Expected Commit
 
 ```text
-feat(solax): emit skill result from discharge limit skills
+feat(solax): emit skill result from discharge limit replay skill
 ```
-
-Both the new orchestrated skill and the retrofitted replay skill land in
-the same commit so the Solax pair speaks `SkillResult` atomically. Split
-the commit only if live validation forces a fix into the replay skill
-after the orchestrated skill is already in.
 
 ## Phase P4: Prepare Downstream Handoff
 
@@ -326,23 +287,27 @@ after the orchestrated skill is already in.
 
 ### Goal
 
-Update the downstream task packs so compare and declaration work consume the
-new contract instead of inventing parallel mechanisms.
+Update the downstream task packs so compare, W2b, and declaration work consume
+the new contract instead of inventing parallel mechanisms.
 
 ### Files or Surfaces To Change
 
+- `tasks/recording/agent-driven-skills/`
 - `tasks/recording/compare/`
 - `tasks/recording/skill-contract-declaration/`
 
 ### Steps
 
-1. Confirm compare consumes `SkillResult`.
-2. Confirm declaration work now targets the actual runtime contract.
-3. Record any follow-on work discovered during implementation.
+1. Confirm W2b consumes the emitted contract without redefining it.
+2. Confirm compare consumes `SkillResult`.
+3. Confirm declaration work now targets the actual runtime contract.
+4. Record any follow-on work discovered during implementation.
 
 ### Acceptance Criteria
 
 - Downstream task packs no longer assume a separate trace mechanism.
+- W2b explicitly owns the agent-driven orchestrated proving skill and does not
+  drift back into "scripted orchestrated" wording.
 - Any unresolved follow-on is explicitly captured.
 - If P1 made contract decisions that are not self-evident from code alone
   (frame marker policy, version compatibility, typed checkpoint evidence,
@@ -352,7 +317,7 @@ new contract instead of inventing parallel mechanisms.
 ### Validation
 
 ```bash
-git diff -- tasks/recording/compare tasks/recording/skill-contract-declaration
+git diff -- tasks/recording/agent-driven-skills tasks/recording/compare tasks/recording/skill-contract-declaration
 ```
 
 ### Expected Commit
