@@ -34,6 +34,7 @@ lifecycleExtensions = "2.2.0"
 material3Compose = "1.3.1"
 okhttp = "4.12.0"
 okio = "3.9.1"
+orgJson = "20240303"
 processPhoenix = "2.1.2"
 robolectric="4.10"
 testRunner = "1.5.2"
@@ -100,6 +101,7 @@ ktor_serialization_kotlinx_json = { module = "io.ktor:ktor-serialization-kotlinx
 okhttp3_logging_interceptor = { module = "com.squareup.okhttp3:logging-interceptor", version.ref = "okhttp" }
 okhttp3_okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
 okio = { module = "com.squareup.okio:okio", version.ref = "okio" }
+org_json = { module = "org.json:json", version.ref = "orgJson" }
 process_phoenix = { module = "com.jakewharton:process-phoenix", version.ref = "processPhoenix" }
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
 timber = { module = "com.jakewharton.timber:timber", version.ref = "timber" }
