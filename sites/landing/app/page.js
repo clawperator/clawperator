@@ -653,28 +653,21 @@ scroll_and_click(<device_labeled_"Living room">)
 snapshot_ui()
 {
   "envelope": {
-    "commandId": "cmd-123",
-    "taskId": "cmd-123",
     "status": "success",
     "stepResults": [
       {
-        "id": "snapshot-1",
-        "actionType": "snapshot_ui",
         "success": true,
         "data": {
           "text": "Off"
         }
       }
     ],
-    "error": null
+    ...
   },
-  "deviceId": "device-123",
-  "terminalSource": "clawperator_result",
-  "isCanonicalTerminal": true
+  ...
 }
 
-# agent reads envelope.status === "success" and envelope.stepResults[0].success === true,
-# then checks envelope.stepResults[0].data.text === "Off":
+# agent reads "Off", decides to act:
 if <hvac_state> == "Off":
   click(<turn_on>)`}</code>
             </pre>
