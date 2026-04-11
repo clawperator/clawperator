@@ -113,11 +113,29 @@ async function resolveSkillResultSource(
         message: `Unable to read trusted skill result source metadata from ${skillJsonPath}: skill.json must contain a JSON object`,
       };
     }
-    const parsed = parsedUnknown as SkillManifestLike;
-    if (typeof parsed.agent?.cli === "string" && parsed.agent.cli.trim().length > 0) {
-      return { ok: true, source: { kind: "agent", agentCli: parsed.agent.cli.trim() } };
+
+    const parsedRecord = parsedUnknown as Record<string, unknown>;
+    if (!Object.prototype.hasOwnProperty.call(parsedRecord, "agent")) {
+      return { ok: true, source: { kind: "script" } };
     }
-    return { ok: true, source: { kind: "script" } };
+
+    const agent = parsedRecord.agent;
+    if (typeof agent !== "object" || agent === null || Array.isArray(agent)) {
+      return {
+        ok: false,
+        message: `Unable to read trusted skill result source metadata from ${skillJsonPath}: skill.json agent must be an object when present`,
+      };
+    }
+
+    const parsed = parsedUnknown as SkillManifestLike;
+    if (typeof parsed.agent?.cli !== "string" || parsed.agent.cli.trim().length === 0) {
+      return {
+        ok: false,
+        message: `Unable to read trusted skill result source metadata from ${skillJsonPath}: skill.json agent.cli must be a non-empty string when agent is present`,
+      };
+    }
+
+    return { ok: true, source: { kind: "agent", agentCli: parsed.agent.cli.trim() } };
   } catch (error) {
     return {
       ok: false,

@@ -2043,6 +2043,42 @@ describe("runSkill", () => {
     }
   });
 
+  it("rejects framed SkillResults when skill.json has a malformed agent block", async () => {
+    const fixtureScript = join(
+      packageRoot,
+      "src",
+      "test",
+      "fixtures",
+      "skills",
+      "com.test.skill-result",
+      "scripts",
+      "emit_skill_result.js"
+    );
+    const temp = await createTempRegistryWithSkill({
+      skillId: "com.test.invalid-agent-source-skill",
+      scriptSourcePath: fixtureScript,
+      skillJsonContents: JSON.stringify({
+        agent: {
+          cli: "",
+        },
+      }),
+    });
+
+    try {
+      const framedResult = await runSkill("com.test.invalid-agent-source-skill", ["valid"], temp.registryPath);
+      assert.ok(!framedResult.ok);
+      assert.strictEqual(framedResult.code, SKILL_RESULT_PARSE_FAILED);
+      assert.match(framedResult.message, /agent\.cli must be a non-empty string/i);
+
+      const legacyResult = await runSkill("com.test.invalid-agent-source-skill", ["legacy"], temp.registryPath);
+      assert.ok(legacyResult.ok, `Expected legacy path to stay permissive: ${"message" in legacyResult ? legacyResult.message : ""}`);
+      assert.strictEqual(legacyResult.skillResult, null);
+      assert.strictEqual(legacyResult.output, "legacy-output-only\n");
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
   it("rejects unsupported SkillResult contract major versions", async () => {
     const result = await runSkill(TEST_SKILL_RESULT, ["unsupported-major"]);
 
