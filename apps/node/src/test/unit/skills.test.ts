@@ -3177,6 +3177,7 @@ describe("CLI skills run streaming", () => {
     assert.strictEqual(code, 0, `stderr: ${stderr}`);
     assert.ok(stderr.startsWith("[Clawperator]"), stderr);
     assert.ok(stdout.includes("progress:before-frame"), stdout);
+    assert.ok(stdout.indexOf("progress:before-frame") < stdout.indexOf("\"skillResult\""), stdout);
     assert.ok(stdout.includes("\"skillResult\""), stdout);
     assert.ok(!stdout.includes("[Clawperator-Skill-Result]"), stdout);
   });

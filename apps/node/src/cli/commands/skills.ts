@@ -102,14 +102,23 @@ function stripTrailingSkillResultFrame(stdout: string): string {
 function createPrettyStdoutForwarder(writer: (chunk: string) => void) {
   let incomplete = "";
   let bufferedLines: string[] = [];
-
-  const bufferedNonEmptyLineCount = () =>
-    bufferedLines.reduce((count, line) => count + (lineWithoutTrailingNewline(line).trim().length > 0 ? 1 : 0), 0);
+  let bufferedNonEmptyIndexes: number[] = [];
 
   const flushSafeLines = () => {
-    while (bufferedLines.length > 0 && bufferedNonEmptyLineCount() > 2) {
-      writer(bufferedLines.shift() ?? "");
+    if (bufferedNonEmptyIndexes.length <= 2) {
+      return;
     }
+
+    const firstProtectedIndex = bufferedNonEmptyIndexes[bufferedNonEmptyIndexes.length - 2];
+    if (firstProtectedIndex <= 0) {
+      return;
+    }
+
+    writer(bufferedLines.slice(0, firstProtectedIndex).join(""));
+    bufferedLines = bufferedLines.slice(firstProtectedIndex);
+    bufferedNonEmptyIndexes = bufferedNonEmptyIndexes
+      .filter((index) => index >= firstProtectedIndex)
+      .map((index) => index - firstProtectedIndex);
   };
 
   return {
@@ -120,19 +129,28 @@ function createPrettyStdoutForwarder(writer: (chunk: string) => void) {
       const trailingIsComplete = trailingLine === undefined || trailingLine.endsWith("\n");
       const readyLines = trailingIsComplete ? completeLines : completeLines.slice(0, -1);
 
-      bufferedLines.push(...readyLines);
+      for (const line of readyLines) {
+        bufferedLines.push(line);
+        if (lineWithoutTrailingNewline(line).trim().length > 0) {
+          bufferedNonEmptyIndexes.push(bufferedLines.length - 1);
+        }
+      }
       incomplete = trailingIsComplete ? "" : trailingLine ?? "";
       flushSafeLines();
     },
     finish(options: { stripTerminalFrame: boolean }) {
       if (incomplete.length > 0) {
         bufferedLines.push(incomplete);
+        if (lineWithoutTrailingNewline(incomplete).trim().length > 0) {
+          bufferedNonEmptyIndexes.push(bufferedLines.length - 1);
+        }
         incomplete = "";
       }
 
       const tail = bufferedLines.join("");
       writer(options.stripTerminalFrame ? stripTrailingSkillResultFrame(tail) : tail);
       bufferedLines = [];
+      bufferedNonEmptyIndexes = [];
     },
   };
 }
