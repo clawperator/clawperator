@@ -32,9 +32,11 @@ the agent finish the work or distill durable follow-up guidance.
 
 ## Skill Scaffolding
 
-- Target skill id: `com.solaxcloud.starter.set-discharge-to-limit`
-- Skill path:
+- Target skill id at scaffold time: `com.solaxcloud.starter.set-discharge-to-limit`
+- Original scaffold path:
   `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit`
+- Current preserved replay baseline:
+  `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-replay`
 - Validation status:
   - `skills validate` passes
   - `skills run ... -- 40` succeeded on-device
@@ -156,7 +158,9 @@ the agent finish the work or distill durable follow-up guidance.
 
 - Exact Solax intent name:
   - chosen: `set-discharge-to-limit`
-  - full skill id: `com.solaxcloud.starter.set-discharge-to-limit`
+  - original scaffolded full skill id: `com.solaxcloud.starter.set-discharge-to-limit`
+  - current replay baseline full skill id:
+    `com.solaxcloud.starter.set-discharge-to-limit-replay`
 - Is snapshot omission sufficient:
   - sufficient for authoring context here, but not sufficient by itself to
     reconstruct the final reliable skill path without extra live inspection

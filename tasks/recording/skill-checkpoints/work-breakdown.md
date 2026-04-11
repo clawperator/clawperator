@@ -13,18 +13,18 @@ Total PRs: 3. Total phases: 4.
   truthfully and that the persisted row is verified before success.
 - PR-2: short durable authoring-doc update after the Solax proof is stable.
 
-Current state: planning complete, ready for active execution.
+Current state: P0 through P3 are complete. The `skill-checkpoints` pack is done.
 
 ## Status
 
 | Item | Value |
 | --- | --- |
-| State | active |
+| State | complete |
 | Total PRs | 3 |
 | Total phases | 4 |
-| Completed | none |
-| Remaining | P0, P1, P2, P3 |
-| Current / Next | P0 |
+| Completed | P0, P1, P2, P3 |
+| Remaining | none |
+| Current / Next | complete |
 | Blockers | none |
 
 ## Hard Rules
@@ -43,8 +43,8 @@ Read these files IN THIS ORDER before writing anything.
 | --- | --- |
 | `tasks/recording/skill-checkpoints/plan.md` | Stable scope, ordering, and outputs |
 | `tasks/recording/demo/findings.md` | Ground truth from the Solax recording/debugging journey |
-| `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit/scripts/run.js` | Current implementation under repair (P1 renames this to `...-replay`) |
-| `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit/SKILL.md` | Current durable skill notes and caveats (P1 renames this to `...-replay`) |
+| `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-replay/scripts/run.js` | Current replay baseline implementation |
+| `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-replay/SKILL.md` | Current durable replay skill notes and caveats |
 | `docs/skills/authoring.md` | Durable destination for the generalized rule after proof |
 
 ## PR / Phase Plan
@@ -55,7 +55,7 @@ Read these files IN THIS ORDER before writing anything.
 | PR-1b | Make Solax truthful and verified | P1, P2 | `default` | PR-1a landed |
 | PR-2 | Graduate minimal durable guidance | P3 | `default` | PR-1b merged locally and validated |
 
-## Phase P0: Regression Test For Failure Propagation
+## Phase P0 [DONE]: Regression Test For Failure Propagation
 
 ### Agent Tier
 
@@ -113,7 +113,7 @@ npm --prefix apps/node run test
 test(skills): regression for non-zero exit propagation
 ```
 
-## Phase P1: Tighten Solax Integrity
+## Phase P1 [DONE]: Tighten Solax Integrity
 
 ### Agent Tier
 
@@ -202,7 +202,7 @@ Required cases:
 fix(solax): preserve truthful discharge limit replay skill
 ```
 
-## Phase P2: Add Terminal-State Verification
+## Phase P2 [DONE]: Add Terminal-State Verification
 
 ### Agent Tier
 
@@ -267,7 +267,7 @@ Required cases:
 fix(solax): verify persisted discharge limit replay
 ```
 
-## Phase P3: Document Durable Guidance
+## Phase P3 [DONE]: Document Durable Guidance
 
 ### Agent Tier
 

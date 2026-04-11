@@ -55,9 +55,11 @@ yardstick for whether the subtree is finished.
 
 ### What the brain can know after a skill run that it cannot know today
 
-Today: a skill returns `{ ok, output: string, exitCode }`. The brain reads a
-stdout blob it must hand-parse, and must trust that the script wrote the
-truth.
+Today: a skill returns transport/runtime fields such as `ok`, `skillId`,
+`output`, `exitCode`, and `durationMs` on success, and typed `code`/`message`
+plus optional `exitCode`/`stdout`/`stderr` on failure when a subprocess
+actually ran. The brain still reads a stdout blob it must hand-parse, and must
+trust that the script wrote the truth.
 
 After this work:
 
@@ -270,7 +272,7 @@ So this subtree now contains multiple linked workstreams rather than one task.
 | Order | Task Pack | State | Purpose |
 | --- | --- | --- | --- |
 | 0 | `brain-hand-contract/` | active reference | problem definition and architectural framing |
-| 1 | `skill-checkpoints/` | next | preserve the current Solax path as the truthful `-replay` baseline |
+| 1 | `skill-checkpoints/` | complete | preserve the current Solax path as the truthful `-replay` baseline |
 | 2 | `skill-result-contract/` | ready after 1 | define `SkillResult`, parse it in `runSkill`, and retrofit the replay baseline to emit it |
 | 2b | `agent-driven-skills/` | ready after 2 | define the runtime agent shape for orchestrated skills and prove it on the Solax `-orchestrated` skill |
 | 3 | `skill-contract-declaration/` | blocked on 2 and 2b | declare inputs, goal, and verification in the agent-driven orchestrated `skill.json` |
@@ -281,18 +283,18 @@ So this subtree now contains multiple linked workstreams rather than one task.
 
 ## Required Sequence
 
-1. Finish `skill-checkpoints/`
+1. `skill-checkpoints/` is complete
 2. Finish `skill-result-contract/`
 3. Finish `agent-driven-skills/`
 4. Start `skill-contract-declaration/`
 5. Start `compare/`
 6. Run `graduate-demo-findings/`
 
-`graduate-demo-findings/` wave A may run in parallel with `skill-checkpoints/`
-because its content does not depend on the contract shape. Wave B still waits
-for W2 wording to stabilize. W6 waits until the runtime agent shape, declared
-contract semantics, compare model, and durable docs are all stable enough to
-teach honestly.
+`graduate-demo-findings/` wave A was allowed to run in parallel with
+`skill-checkpoints/` because its content did not depend on the contract shape.
+Wave B still waits for W2 wording to stabilize. W6 waits until the runtime
+agent shape, declared contract semantics, compare model, and durable docs are
+all stable enough to teach honestly.
 
 ## Preferred PR Grouping
 

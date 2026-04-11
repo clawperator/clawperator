@@ -51,9 +51,11 @@ reliability problem.
 
 ## Why The Solax Work Exposed It
 
-`com.solaxcloud.starter.set-discharge-to-limit` is the first non-trivial skill
-we authored from a recording. It is modest in goal ("set a numeric field") but
-it required, in order to produce a truthful `v0`:
+The Solax discharge-limit skill, originally scaffolded as
+`com.solaxcloud.starter.set-discharge-to-limit` and now preserved as the replay
+baseline `com.solaxcloud.starter.set-discharge-to-limit-replay`, is the first
+non-trivial skill we authored from a recording. It is modest in goal ("set a
+numeric field") but it required, in order to produce a truthful `v0`:
 
 - two device-specific coordinate taps for container cards whose visible text
   was not the clickable node
@@ -174,7 +176,7 @@ Define a structured result that every non-trivial skill returns. Shape:
 
 ```
 {
-  "skillId": "com.solaxcloud.starter.set-discharge-to-limit",
+  "skillId": "com.solaxcloud.starter.set-discharge-to-limit-replay",
   "source": { "kind": "agent", "agentCli": "codex" },
   "goal": { "kind": "set", "target": { "discharge_limit_percent": 40 } },
   "status": "success" | "failed" | "indeterminate",
