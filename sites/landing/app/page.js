@@ -618,6 +618,9 @@ export default function Home() {
             <a href="https://docs.clawperator.com/reference/api-overview/" target="_blank" rel="noreferrer">
               API overview
             </a>
+            <a href="https://docs.clawperator.com/api/mcp/" target="_blank" rel="noreferrer">
+              MCP server
+            </a>
           </div>
         </div>
       </section>
@@ -728,7 +731,7 @@ if <hvac_state> == "Off":
           </article>
           <div className="architecture-connector">
             <span className="architecture-line" />
-            <span className="architecture-text">Node API / CLI / Skills</span>
+            <span className="architecture-text">Node API / CLI / MCP / Skills</span>
           </div>
           <article className="architecture-card architecture-card-core">
             <div className="architecture-card-stack">
