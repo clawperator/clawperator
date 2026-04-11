@@ -274,7 +274,7 @@ So this subtree now contains multiple linked workstreams rather than one task.
 | 0 | `brain-hand-contract/` | active reference | problem definition and architectural framing |
 | 1 | `skill-checkpoints/` | complete | preserve the current Solax path as the truthful `-replay` baseline |
 | 2 | `skill-result-contract/` | complete | define `SkillResult`, parse it in `runSkill`, and retrofit the replay baseline to emit it |
-| 2b | `agent-driven-skills/` | next active work | define the runtime agent shape for orchestrated skills and prove it on the Solax `-orchestrated` skill |
+| 2b | `agent-driven-skills/` | active, P1-P3 complete | define the runtime agent shape for orchestrated skills and prove it on the Solax `-orchestrated` skill |
 | 3 | `skill-contract-declaration/` | blocked on 2 and 2b | declare inputs, goal, and verification in the agent-driven orchestrated `skill.json` |
 | 4 | `compare/` | blocked on 2 for implementation and 2b for proving | compare recording baseline against emitted `SkillResult`, including agent-driven runs that may take a different path |
 | 5a | `graduate-demo-findings/` (wave A) | active | graduate recording-as-evidence and operations facts that do not depend on `SkillResult` shape |
@@ -285,7 +285,7 @@ So this subtree now contains multiple linked workstreams rather than one task.
 
 1. `skill-checkpoints/` is complete
 2. `skill-result-contract/` is complete
-3. Finish `agent-driven-skills/`
+3. Finish `agent-driven-skills/` reliability and handoff phases
 4. Start `skill-contract-declaration/`
 5. Start `compare/`
 6. Run `graduate-demo-findings/`

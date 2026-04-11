@@ -22,13 +22,27 @@ runtime shape of orchestrated skills.
 
 | Item | Value |
 | --- | --- |
-| State | planning |
+| State | active |
 | Total PRs | 2 |
 | Total phases | 5 |
-| Completed | none |
-| Remaining | P1, P2, P3, P4, P5 |
-| Current / Next | P1 after W2 lands |
-| Blockers | `skill-result-contract/` must land first (W2 contract + parser) |
+| Completed | P1, P2, P3 |
+| Remaining | P4, P5 |
+| Current / Next | P4 reliability validation |
+| Blockers | none |
+
+## Current Reality
+
+The W2b runtime shape now exists in code and in the Solax proving skill:
+
+- Clawperator `runSkill` detects agent-driven skills via `skill.json.agent`
+- orchestrated skills execute through `scripts/run.js` rather than direct agent
+  spawn in `runSkill`
+- missing agent CLI returns `SKILL_AGENT_CLI_UNAVAILABLE`
+- the Solax orchestrated proving skill exists in `../clawperator-skills`
+- one branch-local live proving run has succeeded on the physical Samsung target
+
+What remains is repeated-run reliability validation and the durable handoff/docs
+phase. W2b should no longer be described as blocked on W2.
 
 ## Goal
 
@@ -167,7 +181,8 @@ the gap between that promise and the current plans.
   target with a cleaned starting state and record success rate,
   failure modes, and time-to-terminal-state. At least 8 of 10 runs
   must reach terminal verification with `status: success`, with no
-  `runtime_poisoned` states, or the pack does not ship.
+  `runtime_poisoned` states, or the pack does not ship. One successful
+  proving run exists already; it is not sufficient to close P4.
 - Replay remains first-class. This pack defines the orchestrated runtime shape,
   but it must not weaken the preserved replay baseline or imply replay is now a
   deprecated category.
