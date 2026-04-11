@@ -1894,6 +1894,15 @@ describe("runSkill", () => {
     assert.strictEqual(result.skillResult, null);
   });
 
+  it("rejects framed SkillResults whose skillId does not match the invoked skill", async () => {
+    const result = await runSkill(TEST_SKILL_RESULT, ["mismatch-skill-id"]);
+
+    assert.ok(!result.ok);
+    assert.strictEqual(result.code, SKILL_RESULT_PARSE_FAILED);
+    assert.match(result.message, /did not match invoked skill/i);
+    assert.strictEqual(result.skillResult, null);
+  });
+
   it("rejects unsupported SkillResult contract major versions", async () => {
     const result = await runSkill(TEST_SKILL_RESULT, ["unsupported-major"]);
 
@@ -1974,6 +1983,15 @@ describe("runSkill", () => {
     assert.ok(!result.ok);
     assert.strictEqual(result.code, SKILL_EXECUTION_TIMEOUT);
     assert.ok(result.stdout?.includes('"stage":"before-timeout"'));
+  });
+
+  it("reports timeout instead of parse failure when a framed result is cut off by timeout", async () => {
+    const result = await runSkill(TEST_SKILL_RESULT, ["partial-frame-timeout"], undefined, 150);
+
+    assert.ok(!result.ok);
+    assert.strictEqual(result.code, SKILL_EXECUTION_TIMEOUT);
+    assert.ok(result.stdout?.includes("[Clawperator-Skill-Result]"));
+    assert.strictEqual(result.skillResult, null);
   });
 
   it("CLI skills run includes partial stdout on failure", async () => {

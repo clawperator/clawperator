@@ -112,6 +112,7 @@ async function resolveSkillResultSource(
 
 function parseSkillResultFrame(
   stdout: string,
+  expectedSkillId: string,
   source: SkillResultSource,
   logger?: Logger
 ): SkillFrameParseSuccess | SkillFrameParseFailure {
@@ -184,6 +185,13 @@ function parseSkillResultFrame(
       event: "skills.run.skill_result_minor_version_ahead",
       message: `SkillResult contractVersion ${schemaResult.data.contractVersion} is newer than supported minor ${SKILL_RESULT_CONTRACT_MINOR_VERSION}; unknown fields will be ignored`,
     });
+  }
+
+  if (schemaResult.data.skillId !== expectedSkillId) {
+    return {
+      ok: false,
+      message: `SkillResult skillId ${schemaResult.data.skillId} did not match invoked skill ${expectedSkillId}`,
+    };
   }
 
   return {
@@ -337,7 +345,20 @@ export async function runSkill(
 
     child.on("close", (code) => {
       const durationMs = Date.now() - start;
-      const parsedSkillResult = parseSkillResultFrame(stdout, source, skillLogger);
+      if (timedOut) {
+        finish({
+          ok: false,
+          code: SKILL_EXECUTION_TIMEOUT,
+          message: `Skill ${skillId} timed out after ${timeout}ms`,
+          skillId,
+          stdout: stdout || undefined,
+          stderr: stderr || undefined,
+          skillResult: null,
+        });
+        return;
+      }
+
+      const parsedSkillResult = parseSkillResultFrame(stdout, skillId, source, skillLogger);
       if (!parsedSkillResult.ok) {
         finish({
           ok: false,
@@ -348,19 +369,6 @@ export async function runSkill(
           stdout: stdout || undefined,
           stderr: stderr || undefined,
           skillResult: null,
-        });
-        return;
-      }
-
-      if (timedOut) {
-        finish({
-          ok: false,
-          code: SKILL_EXECUTION_TIMEOUT,
-          message: `Skill ${skillId} timed out after ${timeout}ms`,
-          skillId,
-          stdout: stdout || undefined,
-          stderr: stderr || undefined,
-          skillResult: parsedSkillResult.skillResult,
         });
         return;
       }

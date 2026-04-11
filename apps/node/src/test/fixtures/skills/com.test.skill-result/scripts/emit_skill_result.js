@@ -122,6 +122,20 @@ switch (mode) {
       },
     });
     break;
+  case "mismatch-skill-id":
+    emitFrame({
+      ...basePayload,
+      skillId: "com.test.other-skill",
+    });
+    break;
+  case "partial-frame-timeout":
+    console.log("progress:before-frame");
+    console.log(prefix);
+    process.stdout.write("{\"contractVersion\":\"1.0.0\"");
+    setTimeout(() => {
+      process.exit(0);
+    }, 1000);
+    break;
   case "fail":
     emitFrame({
       ...basePayload,
