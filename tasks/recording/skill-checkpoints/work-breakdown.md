@@ -13,7 +13,7 @@ Total PRs: 3. Total phases: 4.
   truthfully and that the persisted row is verified before success.
 - PR-2: short durable authoring-doc update after the Solax proof is stable.
 
-Current state: planning complete, ready for active execution.
+Current state: P0 complete. PR-1a landed locally and PR-1b is next.
 
 ## Status
 
@@ -22,9 +22,9 @@ Current state: planning complete, ready for active execution.
 | State | active |
 | Total PRs | 3 |
 | Total phases | 4 |
-| Completed | none |
-| Remaining | P0, P1, P2, P3 |
-| Current / Next | P0 |
+| Completed | P0 |
+| Remaining | P1, P2, P3 |
+| Current / Next | P1 |
 | Blockers | none |
 
 ## Hard Rules
@@ -55,7 +55,7 @@ Read these files IN THIS ORDER before writing anything.
 | PR-1b | Make Solax truthful and verified | P1, P2 | `default` | PR-1a landed |
 | PR-2 | Graduate minimal durable guidance | P3 | `default` | PR-1b merged locally and validated |
 
-## Phase P0: Regression Test For Failure Propagation
+## Phase P0 [DONE]: Regression Test For Failure Propagation
 
 ### Agent Tier
 

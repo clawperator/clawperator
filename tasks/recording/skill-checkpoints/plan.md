@@ -19,9 +19,9 @@ skill authoring guidance.
 | State | active |
 | Total PRs | 3 |
 | Total phases | 4 |
-| Completed | none |
-| Remaining | P0, P1, P2, P3 |
-| Current / Next | P0 |
+| Completed | P0 |
+| Remaining | P1, P2, P3 |
+| Current / Next | P1 |
 | Blockers | none |
 
 ## Goal
