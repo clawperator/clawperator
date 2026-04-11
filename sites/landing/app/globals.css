@@ -696,6 +696,13 @@ body {
   font-size: 0.88rem;
 }
 
+.agent-entry-links a + a::before {
+  content: "·";
+  margin-right: 0.9rem;
+  opacity: 0.45;
+  pointer-events: none;
+}
+
 .quickstart-top {
   padding: 1rem 1.1rem;
   display: flex;
@@ -1676,6 +1683,10 @@ body {
   .agent-entry-links {
     flex-direction: column;
     gap: 0.5rem;
+  }
+
+  .agent-entry-links a + a::before {
+    display: none;
   }
 
   .loop-step {
