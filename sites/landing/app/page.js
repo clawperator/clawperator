@@ -638,21 +638,28 @@ export default function Home() {
           </div>
           <div className="loop-example">
             <p className="loop-example-label">
-              Example agent loop (pseudocode - see{" "}
+              Example agent loop (see{" "}
               <a href="https://docs.clawperator.com" target="_blank" rel="noreferrer">
                 docs.clawperator.com
               </a>{" "}
               for the full API)
             </p>
             <pre>
-              <code>{`open_app(<google_home_app_id>)
-snapshot_ui()
-click(<climate_tab>)
-snapshot_ui()
-scroll_and_click(<device_labeled_"Living room">)
-snapshot_ui()
-if <hvac_state> == "Off":
-  click(<turn_on>)`}</code>
+              <code>{`clawperator open --app com.google.android.apps.chromecast.app
+clawperator click --text "Climate"
+clawperator scroll-and-click --text-contains "Living room"
+
+clawperator read --text-contains "Heating" --json
+# {
+#   "ok": true,
+#   "envelope": {
+#     "status": "success",
+#     "stepResults": [{ "data": { "text": "Off" } }]
+#   }
+# }
+
+# agent reads "Off", decides to act:
+clawperator click --text "Turn On"`}</code>
             </pre>
           </div>
         </div>
