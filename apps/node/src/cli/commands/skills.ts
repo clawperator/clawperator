@@ -101,25 +101,8 @@ function stripTrailingSkillResultFrame(stdout: string): string {
 
 function createPrettyStdoutForwarder(writer: (chunk: string) => void) {
   let incomplete = "";
-  let bufferedLines: string[] = [];
-  let bufferedNonEmptyIndexes: number[] = [];
-
-  const flushSafeLines = () => {
-    if (bufferedNonEmptyIndexes.length <= 2) {
-      return;
-    }
-
-    const firstProtectedIndex = bufferedNonEmptyIndexes[bufferedNonEmptyIndexes.length - 2];
-    if (firstProtectedIndex <= 0) {
-      return;
-    }
-
-    writer(bufferedLines.slice(0, firstProtectedIndex).join(""));
-    bufferedLines = bufferedLines.slice(firstProtectedIndex);
-    bufferedNonEmptyIndexes = bufferedNonEmptyIndexes
-      .filter((index) => index >= firstProtectedIndex)
-      .map((index) => index - firstProtectedIndex);
-  };
+  let protectedTail = "";
+  let protectingFrameTail = false;
 
   return {
     onChunk(chunk: string) {
@@ -130,27 +113,35 @@ function createPrettyStdoutForwarder(writer: (chunk: string) => void) {
       const readyLines = trailingIsComplete ? completeLines : completeLines.slice(0, -1);
 
       for (const line of readyLines) {
-        bufferedLines.push(line);
-        if (lineWithoutTrailingNewline(line).trim().length > 0) {
-          bufferedNonEmptyIndexes.push(bufferedLines.length - 1);
+        if (!protectingFrameTail && lineWithoutTrailingNewline(line) === SKILL_RESULT_FRAME_PREFIX) {
+          protectingFrameTail = true;
+        }
+
+        if (protectingFrameTail) {
+          protectedTail += line;
+        } else {
+          writer(line);
         }
       }
+
       incomplete = trailingIsComplete ? "" : trailingLine ?? "";
-      flushSafeLines();
     },
     finish(options: { stripTerminalFrame: boolean }) {
       if (incomplete.length > 0) {
-        bufferedLines.push(incomplete);
-        if (lineWithoutTrailingNewline(incomplete).trim().length > 0) {
-          bufferedNonEmptyIndexes.push(bufferedLines.length - 1);
+        if (!protectingFrameTail && lineWithoutTrailingNewline(incomplete) === SKILL_RESULT_FRAME_PREFIX) {
+          protectingFrameTail = true;
+        }
+        if (protectingFrameTail) {
+          protectedTail += incomplete;
+        } else {
+          writer(incomplete);
         }
         incomplete = "";
       }
 
-      const tail = bufferedLines.join("");
-      writer(options.stripTerminalFrame ? stripTrailingSkillResultFrame(tail) : tail);
-      bufferedLines = [];
-      bufferedNonEmptyIndexes = [];
+      writer(options.stripTerminalFrame ? stripTrailingSkillResultFrame(protectedTail) : protectedTail);
+      protectedTail = "";
+      protectingFrameTail = false;
     },
   };
 }

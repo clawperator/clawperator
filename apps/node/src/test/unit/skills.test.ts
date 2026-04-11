@@ -3129,7 +3129,9 @@ describe("CLI skills run streaming", () => {
     assert.ok(stderrChunks[0]?.startsWith("[Clawperator]"), stderrChunks[0]);
     assert.ok(
       stdoutChunks.some((chunk, index) =>
-        chunk.includes("chunk1") && stdoutChunks.slice(index + 1).some((later) => later.includes("chunk2"))
+        chunk.includes("chunk1")
+        && !chunk.includes("chunk2")
+        && stdoutChunks.slice(index + 1).some((later) => later.includes("chunk2"))
       ),
       stdoutChunks.join("")
     );
