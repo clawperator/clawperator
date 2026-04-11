@@ -12,6 +12,12 @@ This is downstream of `tasks/recording/skill-result-contract/` and
 can parse `SkillResult` and the Solax orchestrated proving skill has an
 agent-driven runtime shape to declare against.
 
+Shipped W2 code in `apps/node/src/contracts/skillResult.ts`,
+`apps/node/src/domain/skills/runSkill.ts`, and the corresponding tests is the
+authoritative source of truth for `SkillResult` framing, parsing, provenance,
+and JSON surfacing. If older task text conflicts with shipped code, W3 must
+follow the shipped code.
+
 ## Status
 
 | Item | Value |
@@ -68,6 +74,20 @@ success.
 ## Decision Rules
 
 - `contract` is optional for legacy skills in v1.
+- W3 must consume the shipped W2 `SkillResult` contract exactly as implemented:
+  - frame marker is exactly `[Clawperator-Skill-Result]`
+  - the frame is marker line + one JSON line + end-of-stream
+  - `runSkill` accepts at most one frame and rejects malformed framing with
+    `SKILL_RESULT_PARSE_FAILED`
+  - newer minor versions on the same major are accepted; unsupported major
+    versions are rejected
+  - emitted frames must not include `source`
+  - framed `skillId` must match the invoked skill id
+  - trusted provenance is authoritative for framed results: if `runSkill`
+    cannot read source metadata from `skill.json`, it must reject the framed
+    result rather than best-effort guessing
+  - timeout takes precedence over frame parsing; W3 must not assume a timeout
+    can coexist with a parsed partial frame
 - v1 declaration shape is narrow and explicit:
   - `contract.inputs` is an object mapping input names to simple schema strings
     such as `{ "percent": "integer[0,100]" }`
@@ -79,6 +99,10 @@ success.
   must not be treated as plain success. The runtime must surface this case as
   a distinct `indeterminate` status on `SkillRunResult`, not as `ok: true`
   and not as `ok: false` with `SKILL_EXECUTION_FAILED`.
+- W3 must not invent a second trace or result mechanism. Declaration
+  enforcement consumes the already-parsed `skillResult` returned by
+  `runSkill` and the already-shipped CLI/serve JSON surfaces, rather than
+  reparsing stdout or defining a parallel trace shape.
 - `indeterminate` semantics are emitter-agnostic but must be written
   explicitly for the agent-driven path: the skill-runner (script or embedded
   runtime agent) exited without an upstream exec/runtime failure, but the

@@ -29,6 +29,9 @@ with the Solax proving phase additionally blocked on W2b.
 - Do not require the new `contract` block for all existing skills.
 - Do not let the declaration drift away from what `SkillResult` can actually prove.
 - Do not fold compare logic into this task.
+- Do not redefine W2 framing, provenance, or parse behavior inside W3.
+  Declaration enforcement must consume the shipped `runSkill` result rather
+  than reparsing stdout or inventing a second trace channel.
 
 ## Required Reading
 
@@ -129,8 +132,9 @@ Add optional declaration support to the scaffold and runtime.
 ### Steps
 
 1. Add failing tests first.
-2. Extend `SkillRunResult` with an `indeterminate` discriminant whose shape is
-   defined by W3 plan Decision Rules.
+2. Extend `SkillRunResult` with any new W3 outcome shape only on top of the
+   shipped W2 contract. Do not reshape `skillResult`, change framing, permit
+   emitted `source`, or weaken W2's authoritative provenance rules.
 3. Update validator to accept/reject the optional `contract` block.
 4. Update scaffold output to include a present-but-empty `contract` block per
    plan Decision Rules.
@@ -138,9 +142,12 @@ Add optional declaration support to the scaffold and runtime.
    the optional `contract` block can round-trip cleanly from the skills repo.
 6. Update runtime cross-checking of declared verification vs emitted
    `SkillResult` and route the result to the correct `SkillRunResult`
-   discriminant.
+   discriminant. This cross-check must consume the parsed `skillResult`
+   returned by `runSkill`; it must not reparse raw stdout.
 7. Update CLI/serve response shaping so `indeterminate`, `skillResult`, and
-   the declared-contract outcome reach existing consumers consistently.
+   the declared-contract outcome reach existing consumers consistently, while
+   preserving the already-shipped W2 `skillResult` field and parse-failure
+   behavior.
 
 Required cases:
 
@@ -148,6 +155,9 @@ Required cases:
 - declared verification present and not proved -> `indeterminate`
 - declared verification present but emitted `SkillResult.status === "failed"`
   -> `ok: false`
+- timeout during a framed run -> timeout outcome wins; no parsed partial frame
+- framed output with unreadable trusted source metadata -> parse failure, not
+  best-effort declaration enforcement
 - declaration omitted for legacy skill -> existing behavior, no
   `indeterminate` is ever produced
 - present-but-empty `contract` block -> behavior matches the explicit P1
@@ -166,7 +176,8 @@ Required cases:
 - Runtime distinguishes declared-but-unproved verification from plain
   success and reports it as `indeterminate`.
 - The CLI surface `clawperator skills run --json` exposes the
-  `indeterminate` state in its JSON output.
+  `indeterminate` state in its JSON output without redefining the shipped W2
+  `skillResult` field.
 - The serve/API surface exposes the same outcome semantics without forcing a
   separate consumer-specific interpretation.
 - `SkillEntry`, registry loading, and any relevant schema surfaces accept the
