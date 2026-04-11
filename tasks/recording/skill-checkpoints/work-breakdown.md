@@ -13,7 +13,7 @@ Total PRs: 3. Total phases: 4.
   truthfully and that the persisted row is verified before success.
 - PR-2: short durable authoring-doc update after the Solax proof is stable.
 
-Current state: P0 complete. PR-1a landed locally and PR-1b is next.
+Current state: P0, P1, and P2 are complete. PR-2 is next.
 
 ## Status
 
@@ -22,9 +22,9 @@ Current state: P0 complete. PR-1a landed locally and PR-1b is next.
 | State | active |
 | Total PRs | 3 |
 | Total phases | 4 |
-| Completed | P0 |
-| Remaining | P1, P2, P3 |
-| Current / Next | P1 |
+| Completed | P0, P1, P2 |
+| Remaining | P3 |
+| Current / Next | P3 |
 | Blockers | none |
 
 ## Hard Rules
@@ -113,7 +113,7 @@ npm --prefix apps/node run test
 test(skills): regression for non-zero exit propagation
 ```
 
-## Phase P1: Tighten Solax Integrity
+## Phase P1 [DONE]: Tighten Solax Integrity
 
 ### Agent Tier
 
@@ -202,7 +202,7 @@ Required cases:
 fix(solax): preserve truthful discharge limit replay skill
 ```
 
-## Phase P2: Add Terminal-State Verification
+## Phase P2 [DONE]: Add Terminal-State Verification
 
 ### Agent Tier
 
