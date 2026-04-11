@@ -645,7 +645,7 @@ export default function Home() {
               for the full API)
             </p>
             <pre>
-              <code>{`clawperator open --app com.google.android.apps.chromecast.app
+              <code>{`clawperator open --app com.google.android.apps.chromecast.app  # Google Home
 clawperator click --text "Climate"
 clawperator scroll-and-click --text-contains "Living room"
 
