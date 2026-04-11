@@ -134,10 +134,10 @@ function parseSkillResultFrame(
 ): SkillFrameParseSuccess | SkillFrameParseFailure {
   const lines = stdout.split(/\r?\n/);
   const nonEmptyLines = lines
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
+    .map((line) => ({ raw: line, trimmed: line.trim() }))
+    .filter((line) => line.trimmed.length > 0);
   const markerIndexes = nonEmptyLines
-    .map((line, index) => (line === SKILL_RESULT_FRAME_PREFIX ? index : -1))
+    .map((line, index) => (line.raw === SKILL_RESULT_FRAME_PREFIX ? index : -1))
     .filter((index) => index >= 0);
 
   if (nonEmptyLines.length === 0) {
@@ -152,8 +152,8 @@ function parseSkillResultFrame(
     return { ok: false, message: "SkillResult frame marker was not followed by a JSON line" };
   }
 
-  const jsonLine = nonEmptyLines[nonEmptyLines.length - 1];
-  const markerLine = nonEmptyLines[nonEmptyLines.length - 2];
+  const jsonLine = nonEmptyLines[nonEmptyLines.length - 1].trimmed;
+  const markerLine = nonEmptyLines[nonEmptyLines.length - 2].raw;
 
   if (markerLine !== SKILL_RESULT_FRAME_PREFIX) {
     return { ok: false, message: "SkillResult frame must be the terminal non-empty stdout suffix" };

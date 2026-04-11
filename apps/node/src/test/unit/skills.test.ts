@@ -1957,6 +1957,14 @@ describe("runSkill", () => {
     assert.strictEqual(result.skillResult, null);
   });
 
+  it("treats whitespace-padded marker lines as legacy stdout instead of a framed SkillResult", async () => {
+    const result = await runSkill(TEST_SKILL_RESULT, ["whitespace-padded-frame-marker"]);
+
+    assert.ok(result.ok, `Expected whitespace-padded marker output to stay legacy: ${"message" in result ? result.message : ""}`);
+    assert.ok(result.output.includes(` ${"[Clawperator-Skill-Result]"} `));
+    assert.strictEqual(result.skillResult, null);
+  });
+
   it("rejects framed SkillResults that try to self-report source", async () => {
     const result = await runSkill(TEST_SKILL_RESULT, ["with-source"]);
 

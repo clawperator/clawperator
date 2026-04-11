@@ -107,6 +107,11 @@ switch (mode) {
     emitFrame(basePayload);
     console.log("trailing-output-after-frame");
     break;
+  case "whitespace-padded-frame-marker":
+    console.log("progress:before-frame");
+    console.log(` ${prefix} `);
+    console.log(JSON.stringify(basePayload));
+    break;
   case "malformed-json":
     console.log(prefix);
     console.log("{not-json");
