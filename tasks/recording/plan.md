@@ -57,8 +57,9 @@ yardstick for whether the subtree is finished.
 
 Today: a skill returns transport/runtime fields such as `ok`, `skillId`,
 `output`, `exitCode`, and `durationMs` on success, and typed `code`/`message`
-plus optional `stdout`/`stderr` on failure. The brain still reads a stdout blob
-it must hand-parse, and must trust that the script wrote the truth.
+plus optional `exitCode`/`stdout`/`stderr` on failure when a subprocess
+actually ran. The brain still reads a stdout blob it must hand-parse, and must
+trust that the script wrote the truth.
 
 After this work:
 
