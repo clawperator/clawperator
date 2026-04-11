@@ -34,6 +34,7 @@ import {
   SKILL_EXECUTION_FAILED,
   SKILL_EXECUTION_TIMEOUT,
   SKILL_OUTPUT_ASSERTION_FAILED,
+  SKILL_RESULT_PARSE_FAILED,
   SKILL_ALREADY_EXISTS,
   SKILL_ID_INVALID,
   REGISTRY_READ_FAILED,
@@ -47,6 +48,8 @@ const TEST_SKILL_INVALID_ARTIFACT = "test-skill-invalid-artifact";
 const TEST_SKILL_SCRIPT_ONLY = "test-skill-script-only";
 const TEST_SKILL_EMPTY_ARTIFACTS = "test-skill-empty-artifacts";
 const TEST_SKILL_PROGRESS = "com.test.progress";
+const TEST_SKILL_RESULT = "com.test.skill-result";
+const TEST_AGENT_SKILL_RESULT = "com.test.agent-skill-result";
 const TEST_FIXTURE_CHUNKED_OUTPUT = "test-fixture-chunked-output";
 const TEST_FIXTURE_MIXED_STREAMS = "test-fixture-mixed-streams";
 const TEST_FIXTURE_SPLIT_WORD = "test-fixture-split-word";
@@ -1676,6 +1679,7 @@ describe("runSkill", () => {
     const result = await runSkill(TEST_FIXTURE_CHUNKED_OUTPUT, []);
     assert.ok(result.ok, `Expected runSkill to succeed: ${"message" in result ? result.message : ""}`);
     assert.strictEqual(result.output, "chunk1\nchunk2\n");
+    assert.strictEqual(result.skillResult, null);
   });
 
   it("streams each stdout chunk to onOutput before resolution", async () => {
@@ -1744,12 +1748,45 @@ describe("runSkill", () => {
     assert.strictEqual(result.exitCode, 0);
     assert.ok(result.output.includes("TEST_OUTPUT:hello"));
     assert.ok(typeof result.durationMs === "number" && result.durationMs >= 0);
+    assert.strictEqual(result.skillResult, null);
   });
 
   it("runs script with no args", async () => {
     const result = await runSkill("com.test.echo", []);
     assert.ok(result.ok);
     assert.ok(result.output.includes("TEST_OUTPUT:no-args"));
+    assert.strictEqual(result.skillResult, null);
+  });
+
+  it("parses a valid framed SkillResult for scripted skills", async () => {
+    const result = await runSkill(TEST_SKILL_RESULT, ["valid"]);
+    assert.ok(result.ok, `Expected framed SkillResult to succeed: ${"message" in result ? result.message : ""}`);
+    assert.ok(result.output.includes("progress:before-frame"));
+    assert.ok(result.skillResult);
+    assert.strictEqual(result.skillResult.source.kind, "script");
+    assert.strictEqual(result.skillResult.skillId, TEST_SKILL_RESULT);
+    assert.strictEqual(result.skillResult.status, "success");
+    assert.strictEqual(result.skillResult.checkpoints.length, 3);
+    assert.deepStrictEqual(result.skillResult.checkpoints.map((checkpoint) => checkpoint.evidence?.kind), [
+      "text",
+      "json",
+      "result_envelope_ref",
+    ]);
+    assert.strictEqual(result.skillResult.diagnostics?.runtimeState, "healthy");
+  });
+
+  it("parses a valid framed SkillResult for agent-driven skills and injects agent source metadata", async () => {
+    const result = await runSkill(TEST_AGENT_SKILL_RESULT, ["valid"], undefined, undefined, {
+      TEST_SKILL_ID: TEST_AGENT_SKILL_RESULT,
+    });
+
+    assert.ok(result.ok, `Expected agent SkillResult to succeed: ${"message" in result ? result.message : ""}`);
+    assert.ok(result.skillResult);
+    assert.deepStrictEqual(result.skillResult.source, {
+      kind: "agent",
+      agentCli: "codex",
+    });
+    assert.strictEqual(result.skillResult.skillId, TEST_AGENT_SKILL_RESULT);
   });
 
   it("returns SKILL_OUTPUT_ASSERTION_FAILED when expectContains is missing from output", async () => {
@@ -1766,6 +1803,7 @@ describe("runSkill", () => {
     assert.strictEqual(result.code, SKILL_OUTPUT_ASSERTION_FAILED);
     assert.strictEqual(result.expectedSubstring, "missing-value");
     assert.ok(result.output?.includes("TEST_OUTPUT:hello"));
+    assert.strictEqual(result.skillResult, null);
   });
 
   it("succeeds when output includes expectContains", async () => {
@@ -1805,6 +1843,72 @@ describe("runSkill", () => {
     assert.strictEqual(result.exitCode, 2);
     assert.strictEqual(result.stdout, "{\"partial\":true,\"stage\":\"before-failure\"}\n");
     assert.strictEqual(result.stderr, "FAIL_OUTPUT:intentional\n");
+    assert.strictEqual(result.skillResult, null);
+  });
+
+  it("surfaces a parsed SkillResult on the error path when a framed skill exits non-zero", async () => {
+    const result = await runSkill(TEST_SKILL_RESULT, ["fail"]);
+
+    assert.ok(!result.ok);
+    assert.strictEqual(result.code, SKILL_EXECUTION_FAILED);
+    assert.strictEqual(result.exitCode, 9);
+    assert.ok(result.stdout?.includes("[Clawperator-Skill-Result]"));
+    assert.ok(result.skillResult);
+    assert.strictEqual(result.skillResult.status, "failed");
+    assert.strictEqual(result.skillResult.source.kind, "script");
+    assert.strictEqual(result.skillResult.diagnostics?.runtimeState, "poisoned");
+  });
+
+  it("keeps legacy stdout behavior when no SkillResult frame is present", async () => {
+    const result = await runSkill(TEST_SKILL_RESULT, ["legacy"]);
+
+    assert.ok(result.ok, `Expected legacy mode to succeed: ${"message" in result ? result.message : ""}`);
+    assert.strictEqual(result.output, "legacy-output-only\n");
+    assert.strictEqual(result.skillResult, null);
+  });
+
+  it("rejects malformed SkillResult JSON instead of silently falling back to legacy parsing", async () => {
+    const result = await runSkill(TEST_SKILL_RESULT, ["malformed-json"]);
+
+    assert.ok(!result.ok);
+    assert.strictEqual(result.code, SKILL_RESULT_PARSE_FAILED);
+    assert.match(result.message, /invalid JSON/i);
+    assert.strictEqual(result.skillResult, null);
+  });
+
+  it("rejects multiple SkillResult frames", async () => {
+    const result = await runSkill(TEST_SKILL_RESULT, ["multiple"]);
+
+    assert.ok(!result.ok);
+    assert.strictEqual(result.code, SKILL_RESULT_PARSE_FAILED);
+    assert.match(result.message, /multiple SkillResult frames/i);
+    assert.strictEqual(result.skillResult, null);
+  });
+
+  it("rejects framed SkillResults that try to self-report source", async () => {
+    const result = await runSkill(TEST_SKILL_RESULT, ["with-source"]);
+
+    assert.ok(!result.ok);
+    assert.strictEqual(result.code, SKILL_RESULT_PARSE_FAILED);
+    assert.match(result.message, /must not include source/i);
+    assert.strictEqual(result.skillResult, null);
+  });
+
+  it("rejects unsupported SkillResult contract major versions", async () => {
+    const result = await runSkill(TEST_SKILL_RESULT, ["unsupported-major"]);
+
+    assert.ok(!result.ok);
+    assert.strictEqual(result.code, SKILL_RESULT_PARSE_FAILED);
+    assert.match(result.message, /Unsupported SkillResult contract major version 2/);
+    assert.strictEqual(result.skillResult, null);
+  });
+
+  it("accepts newer SkillResult minor versions on the same major", async () => {
+    const result = await runSkill(TEST_SKILL_RESULT, ["newer-minor"]);
+
+    assert.ok(result.ok, `Expected newer minor version to succeed: ${"message" in result ? result.message : ""}`);
+    assert.ok(result.skillResult);
+    assert.strictEqual(result.skillResult.contractVersion, "1.2.0");
   });
 
   it("keeps progress lines before the result line in result.output", async () => {
@@ -1840,6 +1944,29 @@ describe("runSkill", () => {
     const resultLines = outputLines.filter((line) => line.startsWith("✅"));
     assert.strictEqual(resultLines.length, 1, "expected exactly one canonical result line");
     assert.ok(resultLines[0].includes("Progress fixture complete"));
+  });
+
+  it("CLI skills run includes skillResult in JSON output when present", async () => {
+    const { stdout, code } = await runCli([
+      "skills",
+      "run",
+      TEST_SKILL_RESULT,
+      "--output",
+      "json",
+      "--",
+      "valid",
+    ]);
+
+    assert.strictEqual(code, 0, stdout);
+    const parsed = JSON.parse(stdout) as {
+      skillResult?: {
+        skillId?: string;
+        source?: { kind?: string };
+      } | null;
+    };
+
+    assert.strictEqual(parsed.skillResult?.skillId, TEST_SKILL_RESULT);
+    assert.strictEqual(parsed.skillResult?.source?.kind, "script");
   });
 
   it("returns partial stdout when a skill times out", async () => {
@@ -2326,6 +2453,7 @@ describe("cmdSkillsRun preflight gate", () => {
         output: "should-not-run",
         exitCode: 0,
         durationMs: 1,
+        skillResult: null,
       } as const;
     };
 
@@ -2353,6 +2481,7 @@ describe("cmdSkillsRun preflight gate", () => {
         output: "RUN_OK",
         exitCode: 0,
         durationMs: 1,
+        skillResult: null,
       } as const;
     };
 
@@ -2380,6 +2509,7 @@ describe("cmdSkillsRun preflight gate", () => {
         output: "RUN_OK",
         exitCode: 0,
         durationMs: 1,
+        skillResult: null,
       } as const;
     };
 
@@ -2429,6 +2559,7 @@ describe("cmdSkillsRun preflight gate", () => {
             output: "RUN_OK",
             exitCode: 0,
             durationMs: 1,
+            skillResult: null,
           }),
         }
       );
@@ -2488,6 +2619,7 @@ describe("cmdSkillsRun preflight gate", () => {
               output: "chunk1\\nchunk2\\n",
               exitCode: 0,
               durationMs: 1,
+              skillResult: null,
             };
           }
         }
@@ -2521,6 +2653,7 @@ describe("cmdSkillsRun preflight gate", () => {
         output: "RUN_OK",
         exitCode: 0,
         durationMs: 1,
+        skillResult: null,
       } as const;
     };
 

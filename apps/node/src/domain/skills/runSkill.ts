@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { access } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import { join, extname } from "node:path";
 import { loadRegistry, findSkillById, getRepoRoot } from "../../adapters/skills-repo/localSkillsRegistry.js";
 import type { Logger } from "../../adapters/logger.js";
@@ -10,7 +10,16 @@ import {
   SKILL_EXECUTION_FAILED,
   SKILL_EXECUTION_TIMEOUT,
   SKILL_OUTPUT_ASSERTION_FAILED,
+  SKILL_RESULT_PARSE_FAILED,
 } from "../../contracts/skills.js";
+import {
+  emittedSkillResultSchema,
+  SKILL_RESULT_CONTRACT_MAJOR_VERSION,
+  SKILL_RESULT_CONTRACT_MINOR_VERSION,
+  SKILL_RESULT_FRAME_PREFIX,
+  type SkillResult,
+  type SkillResultSource,
+} from "../../contracts/skillResult.js";
 
 const DEFAULT_TIMEOUT_MS = 120_000;
 
@@ -20,6 +29,7 @@ export interface SkillRunResult {
   output: string;
   exitCode: number;
   durationMs: number;
+  skillResult: SkillResult | null;
 }
 
 export interface SkillRunError {
@@ -33,6 +43,7 @@ export interface SkillRunError {
   /** Present when code is SKILL_OUTPUT_ASSERTION_FAILED */
   output?: string;
   expectedSubstring?: string;
+  skillResult: SkillResult | null;
 }
 
 export interface SkillRunEnv {
@@ -48,6 +59,142 @@ export interface SkillRunCallbacks {
   logger?: Logger;
 }
 
+interface SkillManifestLike {
+  agent?: {
+    cli?: string;
+  };
+}
+
+interface SkillFrameParseSuccess {
+  ok: true;
+  skillResult: SkillResult | null;
+}
+
+interface SkillFrameParseFailure {
+  ok: false;
+  message: string;
+}
+
+function parseSemver(version: string): { major: number; minor: number; patch: number } | null {
+  const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(version.trim());
+  if (!match) {
+    return null;
+  }
+  return {
+    major: Number.parseInt(match[1], 10),
+    minor: Number.parseInt(match[2], 10),
+    patch: Number.parseInt(match[3], 10),
+  };
+}
+
+async function resolveSkillResultSource(
+  repoRoot: string,
+  skillPath: string,
+  logger?: Logger
+): Promise<SkillResultSource> {
+  try {
+    const raw = await readFile(join(repoRoot, skillPath, "skill.json"), "utf-8");
+    const parsed = JSON.parse(raw) as SkillManifestLike;
+    if (typeof parsed.agent?.cli === "string" && parsed.agent.cli.trim().length > 0) {
+      return { kind: "agent", agentCli: parsed.agent.cli.trim() };
+    }
+  } catch (error) {
+    logger?.emit({
+      ts: new Date().toISOString(),
+      level: "warn",
+      event: "skills.run.skill_result_source_fallback",
+      message: `Falling back to scripted skill source inference: ${error instanceof Error ? error.message : String(error)}`,
+    });
+  }
+
+  return { kind: "script" };
+}
+
+function parseSkillResultFrame(
+  stdout: string,
+  source: SkillResultSource,
+  logger?: Logger
+): SkillFrameParseSuccess | SkillFrameParseFailure {
+  const lines = stdout.split(/\r?\n/);
+  const frameIndexes = lines
+    .map((line, index) => (line.trim() === SKILL_RESULT_FRAME_PREFIX ? index : -1))
+    .filter((index) => index >= 0);
+
+  if (frameIndexes.length === 0) {
+    return { ok: true, skillResult: null };
+  }
+
+  if (frameIndexes.length > 1) {
+    return { ok: false, message: "Skill emitted multiple SkillResult frames" };
+  }
+
+  const markerIndex = frameIndexes[0];
+  const jsonLine = lines[markerIndex + 1]?.trim();
+  if (!jsonLine) {
+    return { ok: false, message: "SkillResult frame marker was not followed by a JSON line" };
+  }
+
+  const trailingNonWhitespace = lines.slice(markerIndex + 2).some((line) => line.trim().length > 0);
+  if (trailingNonWhitespace) {
+    return { ok: false, message: "SkillResult frame must terminate at end-of-stream in v1" };
+  }
+
+  let parsedJson: unknown;
+  try {
+    parsedJson = JSON.parse(jsonLine);
+  } catch (error) {
+    return {
+      ok: false,
+      message: `SkillResult frame contained invalid JSON: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+
+  if (typeof parsedJson !== "object" || parsedJson === null || Array.isArray(parsedJson)) {
+    return { ok: false, message: "SkillResult frame must be a JSON object" };
+  }
+
+  if ("source" in parsedJson) {
+    return { ok: false, message: "SkillResult frame must not include source; runSkill injects it" };
+  }
+
+  const schemaResult = emittedSkillResultSchema.safeParse(parsedJson);
+  if (!schemaResult.success) {
+    return {
+      ok: false,
+      message: `SkillResult frame failed validation: ${schemaResult.error.issues.map((issue) => `${issue.path.join(".") || "<root>"}: ${issue.message}`).join("; ")}`,
+    };
+  }
+
+  const semver = parseSemver(schemaResult.data.contractVersion);
+  if (semver === null) {
+    return { ok: false, message: `SkillResult contractVersion must be semver-shaped, got ${schemaResult.data.contractVersion}` };
+  }
+
+  if (semver.major !== SKILL_RESULT_CONTRACT_MAJOR_VERSION) {
+    return {
+      ok: false,
+      message: `Unsupported SkillResult contract major version ${semver.major}; expected ${SKILL_RESULT_CONTRACT_MAJOR_VERSION}`,
+    };
+  }
+
+  if (semver.minor > SKILL_RESULT_CONTRACT_MINOR_VERSION) {
+    logger?.emit({
+      ts: new Date().toISOString(),
+      level: "warn",
+      event: "skills.run.skill_result_minor_version_ahead",
+      message: `SkillResult contractVersion ${schemaResult.data.contractVersion} is newer than supported minor ${SKILL_RESULT_CONTRACT_MINOR_VERSION}; unknown fields will be ignored`,
+    });
+  }
+
+  return {
+    ok: true,
+    skillResult: {
+      ...schemaResult.data,
+      source,
+    },
+  };
+}
+
 export async function runSkill(
   skillId: string,
   args: string[],
@@ -58,11 +205,12 @@ export async function runSkill(
   expectContains?: string
 ): Promise<SkillRunResult | SkillRunError> {
   let resolvedPath: string;
+  let source: SkillResultSource = { kind: "script" };
   try {
     const loaded = await loadRegistry(registryPath);
     const skill = findSkillById(loaded.registry, skillId);
     if (!skill) {
-      return { ok: false, code: SKILL_NOT_FOUND, message: `Skill not found: ${skillId}`, skillId };
+      return { ok: false, code: SKILL_NOT_FOUND, message: `Skill not found: ${skillId}`, skillId, skillResult: null };
     }
 
     if (!skill.scripts || skill.scripts.length === 0) {
@@ -71,6 +219,7 @@ export async function runSkill(
         code: SKILL_SCRIPT_NOT_FOUND,
         message: `Skill ${skillId} has no scripts defined`,
         skillId,
+        skillResult: null,
       };
     }
 
@@ -82,9 +231,10 @@ export async function runSkill(
       skill.scripts[0];
 
     resolvedPath = join(repoRoot, scriptRelative);
+    source = await resolveSkillResultSource(repoRoot, skill.path, callbacks?.logger?.child({ skillId }));
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    return { ok: false, code: REGISTRY_READ_FAILED, message };
+    return { ok: false, code: REGISTRY_READ_FAILED, message, skillResult: null };
   }
 
   try {
@@ -95,6 +245,7 @@ export async function runSkill(
       code: SKILL_SCRIPT_NOT_FOUND,
       message: `Script not found: ${resolvedPath}`,
       skillId,
+      skillResult: null,
     };
   }
 
@@ -180,11 +331,27 @@ export async function runSkill(
         skillId,
         stdout: stdout || undefined,
         stderr: stderr || undefined,
+        skillResult: null,
       });
     });
 
     child.on("close", (code) => {
       const durationMs = Date.now() - start;
+      const parsedSkillResult = parseSkillResultFrame(stdout, source, skillLogger);
+      if (!parsedSkillResult.ok) {
+        finish({
+          ok: false,
+          code: SKILL_RESULT_PARSE_FAILED,
+          message: parsedSkillResult.message,
+          skillId,
+          exitCode: code ?? undefined,
+          stdout: stdout || undefined,
+          stderr: stderr || undefined,
+          skillResult: null,
+        });
+        return;
+      }
+
       if (timedOut) {
         finish({
           ok: false,
@@ -193,6 +360,7 @@ export async function runSkill(
           skillId,
           stdout: stdout || undefined,
           stderr: stderr || undefined,
+          skillResult: parsedSkillResult.skillResult,
         });
         return;
       }
@@ -222,6 +390,7 @@ export async function runSkill(
           exitCode,
           stdout: stdout || undefined,
           stderr: stderr || undefined,
+          skillResult: parsedSkillResult.skillResult,
         });
         return;
       }
@@ -242,6 +411,7 @@ export async function runSkill(
           skillId,
           output: stdout,
           expectedSubstring: expectContains,
+          skillResult: parsedSkillResult.skillResult,
         });
         return;
       }
@@ -251,6 +421,7 @@ export async function runSkill(
         output: stdout,
         exitCode: 0,
         durationMs,
+        skillResult: parsedSkillResult.skillResult,
       });
     });
 

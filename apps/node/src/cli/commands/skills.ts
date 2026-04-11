@@ -263,6 +263,7 @@ export async function cmdSkillsRun(
       output: result.output,
       exitCode: result.exitCode,
       durationMs: result.durationMs,
+      skillResult: result.skillResult,
       timeoutMs: timeoutMs ?? undefined,
       expectedSubstring: expectContains ?? undefined,
     }, options);
@@ -273,6 +274,7 @@ export async function cmdSkillsRun(
       message: result.message,
       skillId: result.skillId,
       output: result.output,
+      skillResult: result.skillResult,
       expectedSubstring: result.expectedSubstring,
       timeoutMs: timeoutMs ?? undefined,
     }, options);
@@ -284,6 +286,7 @@ export async function cmdSkillsRun(
     exitCode: result.exitCode,
     stdout: result.stdout,
     stderr: result.stderr,
+    skillResult: result.skillResult,
     timeoutMs: timeoutMs ?? undefined,
     expectedSubstring: expectContains ?? undefined,
   }, options);
