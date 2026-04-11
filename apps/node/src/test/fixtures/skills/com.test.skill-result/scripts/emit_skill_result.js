@@ -92,6 +92,17 @@ switch (mode) {
   case "legacy":
     console.log("legacy-output-only");
     break;
+  case "marker-progress-only":
+    console.log("progress:before-marker");
+    console.log(prefix);
+    console.log("progress:after-marker");
+    break;
+  case "marker-progress-before-valid-frame":
+    console.log("progress:before-marker");
+    console.log(prefix);
+    console.log("progress:after-marker");
+    emitFrame(basePayload);
+    break;
   case "malformed-json":
     console.log(prefix);
     console.log("{not-json");

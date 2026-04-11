@@ -1912,6 +1912,23 @@ describe("runSkill", () => {
     assert.strictEqual(result.skillResult, null);
   });
 
+  it("ignores earlier marker mentions when they are not part of the trailing frame suffix", async () => {
+    const result = await runSkill(TEST_SKILL_RESULT, ["marker-progress-only"]);
+
+    assert.ok(result.ok, `Expected progress marker output to stay legacy: ${"message" in result ? result.message : ""}`);
+    assert.ok(result.output.includes("[Clawperator-Skill-Result]"));
+    assert.strictEqual(result.skillResult, null);
+  });
+
+  it("parses only the trailing SkillResult frame suffix when earlier marker lines appear in progress output", async () => {
+    const result = await runSkill(TEST_SKILL_RESULT, ["marker-progress-before-valid-frame"]);
+
+    assert.ok(result.ok, `Expected trailing frame to parse successfully: ${"message" in result ? result.message : ""}`);
+    assert.ok(result.skillResult);
+    assert.strictEqual(result.skillResult.skillId, TEST_SKILL_RESULT);
+    assert.strictEqual(result.skillResult.source.kind, "script");
+  });
+
   it("rejects malformed SkillResult JSON instead of silently falling back to legacy parsing", async () => {
     const result = await runSkill(TEST_SKILL_RESULT, ["malformed-json"]);
 
@@ -1995,6 +2012,7 @@ describe("runSkill", () => {
     assert.ok(result.ok, `Expected newer minor version to succeed: ${"message" in result ? result.message : ""}`);
     assert.ok(result.skillResult);
     assert.strictEqual(result.skillResult.contractVersion, "1.2.0");
+    assert.ok(!("extraField" in result.skillResult));
   });
 
   it("keeps progress lines before the result line in result.output", async () => {

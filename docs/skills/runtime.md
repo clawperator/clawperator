@@ -246,6 +246,7 @@ The unified logger captures skill output as `skills.run.output` events, enabling
 {
   "skillId": "com.android.settings.capture-overview",
   "output": "RESULT|status=success|snapshot=/tmp/settings.xml\n",
+  "skillResult": null,
   "exitCode": 0,
   "durationMs": 15321
 }
@@ -259,7 +260,8 @@ The unified logger captures skill output as `skills.run.output` events, enabling
   "message": "Skill com.android.settings.capture-overview timed out after 120000ms",
   "skillId": "com.android.settings.capture-overview",
   "stdout": "RESULT|status=partial\n",
-  "stderr": "still waiting for target node\n"
+  "stderr": "still waiting for target node\n",
+  "skillResult": null
 }
 ```
 
@@ -295,6 +297,7 @@ Recovery patterns:
 - `SKILL_SCRIPT_NOT_FOUND`: repair the registry entry or restore the script file on disk
 - `SKILL_EXECUTION_FAILED`: inspect `exitCode`, `stdout`, and `stderr`
 - `SKILL_EXECUTION_TIMEOUT`: inspect partial `stdout` and only then consider increasing `--timeout`
+- `SKILL_RESULT_PARSE_FAILED`: fix malformed framed output or unreadable trusted source metadata in `skill.json`
 
 ## Practical Runtime Rules
 

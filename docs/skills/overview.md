@@ -361,6 +361,7 @@ Check these exact fields:
 
 - `skillId` matches the requested registry id
 - `output` is the raw stdout stream captured from the skill script
+- `skillResult` is either a parsed structured result or `null` for a legacy skill
 - `exitCode` is `0` on success
 - `durationMs` is the measured wrapper runtime
 - `timeoutMs` is present only when a timeout override was passed on the CLI
@@ -389,6 +390,7 @@ If the expected text is present, the success payload echoes the assertion:
 {
   "skillId": "com.android.settings.capture-overview",
   "output": "RESULT|status=success|snapshot=/tmp/settings.xml\n",
+  "skillResult": null,
   "exitCode": 0,
   "durationMs": 15842
 }
@@ -397,7 +399,7 @@ If the expected text is present, the success payload echoes the assertion:
 Important:
 
 - `output` is raw stdout from the script
-- the wrapper does not impose a structured stdout format on the skill itself
+- the wrapper parses a trailing framed `SkillResult` when present and returns it as `skillResult`
 - progress lines written by the skill to stdout remain inside `output` in JSON mode
 - pretty mode writes a banner before streaming live skill output, so use `--json` when another agent needs machine-readable output
 - in JSON mode, the wrapper returns one JSON object and does not stream live child stdout separately
@@ -413,7 +415,8 @@ Important:
   "skillId": "com.android.settings.capture-overview",
   "exitCode": 2,
   "stdout": "RESULT|status=partial|snapshot=/tmp/settings.xml\n",
-  "stderr": "Timed out waiting for expected node\n"
+  "stderr": "Timed out waiting for expected node\n",
+  "skillResult": null
 }
 ```
 
@@ -434,7 +437,18 @@ Other wrapper failures are distinct and worth handling separately:
   "message": "Skill com.android.settings.capture-overview output did not include expected text",
   "skillId": "com.android.settings.capture-overview",
   "output": "RESULT|status=success|snapshot=/tmp/settings.xml\n",
+  "skillResult": null,
   "expectedSubstring": "missing-value"
+}
+```
+
+```json
+{
+  "code": "SKILL_RESULT_PARSE_FAILED",
+  "message": "SkillResult frame contained invalid JSON: ...",
+  "skillId": "com.android.settings.capture-overview",
+  "stdout": "[Clawperator-Skill-Result]\n{not-json\n",
+  "skillResult": null
 }
 ```
 
@@ -513,6 +527,7 @@ Recovery depends on the error code:
 - `SKILL_EXECUTION_FAILED`: inspect `stdout`, `stderr`, and the skill script's exit code
 - `SKILL_EXECUTION_TIMEOUT`: raise `--timeout` only after confirming the skill is still making progress
 - `SKILL_OUTPUT_ASSERTION_FAILED`: verify the expected substring against the raw `output`
+- `SKILL_RESULT_PARSE_FAILED`: fix malformed framed output or trusted-provenance metadata before rerunning
 
 ## Serve API Context
 
@@ -544,6 +559,7 @@ Common ones:
 | `SKILL_EXECUTION_FAILED` | subprocess exited non-zero or failed to spawn |
 | `SKILL_EXECUTION_TIMEOUT` | wrapper timeout elapsed |
 | `SKILL_OUTPUT_ASSERTION_FAILED` | `--expect-contains` was set and the output did not contain the text |
+| `SKILL_RESULT_PARSE_FAILED` | a framed `SkillResult` was malformed or could not be trusted |
 
 ## Practical Model
 

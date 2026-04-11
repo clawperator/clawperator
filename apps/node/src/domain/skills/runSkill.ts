@@ -126,16 +126,29 @@ function parseSkillResultFrame(
   logger?: Logger
 ): SkillFrameParseSuccess | SkillFrameParseFailure {
   const lines = stdout.split(/\r?\n/);
-  const frameIndexes = lines
-    .map((line, index) => (line.trim() === SKILL_RESULT_FRAME_PREFIX ? index : -1))
-    .filter((index) => index >= 0);
+  const nonEmptyLines = lines
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
 
-  if (frameIndexes.length === 0) {
+  if (nonEmptyLines.length === 0) {
     return { ok: true, skillResult: null };
   }
 
-  if (frameIndexes.length > 1) {
-    return { ok: false, message: "Skill emitted multiple SkillResult frames" };
+  if (nonEmptyLines.length === 1) {
+    return nonEmptyLines[0] === SKILL_RESULT_FRAME_PREFIX
+      ? { ok: false, message: "SkillResult frame marker was not followed by a JSON line" }
+      : { ok: true, skillResult: null };
+  }
+
+  const jsonLine = nonEmptyLines[nonEmptyLines.length - 1];
+  const markerLine = nonEmptyLines[nonEmptyLines.length - 2];
+
+  if (markerLine !== SKILL_RESULT_FRAME_PREFIX) {
+    return { ok: true, skillResult: null };
+  }
+
+  if (!jsonLine.startsWith("{")) {
+    return { ok: true, skillResult: null };
   }
 
   if (!sourceResolution.ok) {
@@ -145,15 +158,23 @@ function parseSkillResultFrame(
     };
   }
 
-  const markerIndex = frameIndexes[0];
-  const jsonLine = lines[markerIndex + 1]?.trim();
   if (!jsonLine) {
     return { ok: false, message: "SkillResult frame marker was not followed by a JSON line" };
   }
 
-  const trailingNonWhitespace = lines.slice(markerIndex + 2).some((line) => line.trim().length > 0);
-  if (trailingNonWhitespace) {
-    return { ok: false, message: "SkillResult frame must terminate at end-of-stream in v1" };
+  for (let index = 0; index < nonEmptyLines.length - 2; index += 1) {
+    if (nonEmptyLines[index] !== SKILL_RESULT_FRAME_PREFIX) {
+      continue;
+    }
+    const nextLine = nonEmptyLines[index + 1];
+    try {
+      const candidate = JSON.parse(nextLine);
+      if (typeof candidate === "object" && candidate !== null && !Array.isArray(candidate)) {
+        return { ok: false, message: "Skill emitted multiple SkillResult frames" };
+      }
+    } catch {
+      // Earlier marker mentions that are not followed by a JSON object are inert progress output.
+    }
   }
 
   let parsedJson: unknown;

@@ -126,6 +126,6 @@ export const emittedSkillResultSchema = z.object({
   terminalVerification: skillTerminalVerificationSchema.nullable().optional(),
   execEnvelopes: z.array(resultEnvelopeSchema).optional(),
   diagnostics: skillDiagnosticsSchema.optional(),
-}).passthrough();
+});
 
 export type EmittedSkillResult = z.infer<typeof emittedSkillResultSchema>;
