@@ -12,6 +12,7 @@ import {
   SKILL_VALIDATION_FAILED,
 } from "../../contracts/skills.js";
 import { validateExecution, type ValidationFailure } from "../executions/validateExecution.js";
+import { parseSkillManifestMetadata } from "./skillManifest.js";
 
 const SKILL_DRY_RUN_SKIP_REASON =
   "skill has no pre-compiled artifacts; payload is generated at runtime by the skill script";
@@ -168,6 +169,19 @@ async function validateLoadedSkill(
       details: {
         skillJsonPath,
         mismatchFields,
+      },
+    };
+  }
+
+  const manifestResult = parseSkillManifestMetadata(skillJsonPath, parsed);
+  if (!manifestResult.ok) {
+    return {
+      ok: false,
+      code: SKILL_VALIDATION_FAILED,
+      message: `Skill ${skill.id} has an invalid agent manifest`,
+      details: {
+        skillJsonPath,
+        reason: manifestResult.message,
       },
     };
   }

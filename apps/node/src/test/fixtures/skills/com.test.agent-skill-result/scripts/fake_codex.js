@@ -1,0 +1,92 @@
+#!/usr/bin/env node
+
+const args = process.argv.slice(2);
+const skillProgramPath = args[0];
+const mode = args[1] || "valid";
+const skillId = process.env.CLAWPERATOR_SKILL_ID || "com.test.agent-skill-result";
+const prefix = "[Clawperator-Skill-Result]";
+
+if (!skillProgramPath) {
+  console.error("missing skill program");
+  process.exit(3);
+}
+
+if (
+  process.env.CLAWPERATOR_SKILL_INPUTS !== undefined &&
+  process.env.CLAWPERATOR_SKILL_INPUTS !== JSON.stringify(args.slice(1))
+) {
+  console.error("unexpected forwarded skill inputs");
+  process.exit(4);
+}
+
+const basePayload = {
+  contractVersion: "1.0.0",
+  skillId,
+  goal: {
+    kind: "set_discharge_limit",
+    percent: 40,
+  },
+  inputs: {
+    percent: 40,
+  },
+  status: "success",
+  checkpoints: [
+    { id: "app_opened", status: "ok" },
+    { id: "discharge_to_row_focused", status: "ok" },
+    { id: "target_text_entered", status: "ok" },
+    { id: "save_completed", status: "ok" },
+    { id: "terminal_state_verified", status: "ok" },
+  ],
+  terminalVerification: {
+    status: "verified",
+    expected: {
+      kind: "text",
+      text: "Discharge to 40%",
+    },
+    observed: {
+      kind: "text",
+      text: "Discharge to 40%",
+    },
+  },
+  diagnostics: {
+    runtimeState: "healthy",
+  },
+};
+
+switch (mode) {
+  case "valid":
+    process.stderr.write(`agent-reading:${skillProgramPath}\n`);
+    console.log(prefix);
+    console.log(JSON.stringify(basePayload));
+    process.exit(0);
+    break;
+  case "agent-fail":
+    process.stderr.write("agent failed intentionally\n");
+    process.exit(17);
+    break;
+  case "malformed-json":
+    console.log(prefix);
+    console.log("{not-json");
+    process.exit(0);
+    break;
+  case "indeterminate":
+    console.log(prefix);
+    console.log(JSON.stringify({
+      ...basePayload,
+      status: "indeterminate",
+      checkpoints: basePayload.checkpoints.map((checkpoint, index) => (
+        index === basePayload.checkpoints.length - 1
+          ? { ...checkpoint, status: "skipped", note: "recovery path preserved terminal verification uncertainty" }
+          : checkpoint
+      )),
+      terminalVerification: {
+        status: "not_run",
+        note: "agent stopped before terminal verification",
+      },
+    }));
+    process.exit(0);
+    break;
+  default:
+    console.error(`unknown mode:${mode}`);
+    process.exit(5);
+}

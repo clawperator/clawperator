@@ -1,6 +1,8 @@
 import { spawn } from "node:child_process";
-import { access, readFile } from "node:fs/promises";
-import { join, extname } from "node:path";
+import { access } from "node:fs/promises";
+import { constants as fsConstants } from "node:fs";
+import { delimiter } from "node:path";
+import { join, extname, isAbsolute, resolve } from "node:path";
 import { loadRegistry, findSkillById, getRepoRoot } from "../../adapters/skills-repo/localSkillsRegistry.js";
 import type { Logger } from "../../adapters/logger.js";
 import {
@@ -11,6 +13,8 @@ import {
   SKILL_EXECUTION_TIMEOUT,
   SKILL_OUTPUT_ASSERTION_FAILED,
   SKILL_RESULT_PARSE_FAILED,
+  SKILL_AGENT_CLI_UNAVAILABLE,
+  type SkillAgentConfig,
 } from "../../contracts/skills.js";
 import {
   emittedSkillResultSchema,
@@ -20,8 +24,15 @@ import {
   type SkillResult,
   type SkillResultSource,
 } from "../../contracts/skillResult.js";
+import { readSkillManifestMetadata, type SkillManifestReadResult } from "./skillManifest.js";
 
 const DEFAULT_TIMEOUT_MS = 120_000;
+const SKILL_AGENT_CLI_ENV_VAR = "CLAWPERATOR_SKILL_AGENT_CLI";
+const SKILL_AGENT_CLI_PATH_ENV_VAR = "CLAWPERATOR_SKILL_AGENT_CLI_PATH";
+const SKILL_AGENT_TIMEOUT_MS_ENV_VAR = "CLAWPERATOR_SKILL_AGENT_TIMEOUT_MS";
+const SKILL_INPUTS_ENV_VAR = "CLAWPERATOR_SKILL_INPUTS";
+const SKILL_PROGRAM_ENV_VAR = "CLAWPERATOR_SKILL_PROGRAM";
+const SKILL_ID_ENV_VAR = "CLAWPERATOR_SKILL_ID";
 
 export interface SkillRunResult {
   ok: true;
@@ -59,11 +70,17 @@ export interface SkillRunCallbacks {
   logger?: Logger;
 }
 
-interface SkillManifestLike {
-  agent?: {
-    cli?: string;
-  };
+interface AgentCliResolutionSuccess {
+  ok: true;
+  executablePath: string;
 }
+
+interface AgentCliResolutionFailure {
+  ok: false;
+  message: string;
+}
+
+type AgentCliResolution = AgentCliResolutionSuccess | AgentCliResolutionFailure;
 
 interface SkillSourceResolutionSuccess {
   ok: true;
@@ -100,48 +117,63 @@ function parseSemver(version: string): { major: number; minor: number; patch: nu
 }
 
 async function resolveSkillResultSource(
-  repoRoot: string,
-  skillPath: string
+  manifestResult: SkillManifestReadResult
 ): Promise<SkillSourceResolution> {
-  const skillJsonPath = join(repoRoot, skillPath, "skill.json");
-  try {
-    const raw = await readFile(skillJsonPath, "utf-8");
-    const parsedUnknown = JSON.parse(raw) as unknown;
-    if (typeof parsedUnknown !== "object" || parsedUnknown === null || Array.isArray(parsedUnknown)) {
-      return {
-        ok: false,
-        message: `Unable to read trusted skill result source metadata from ${skillJsonPath}: skill.json must contain a JSON object`,
-      };
-    }
-
-    const parsedRecord = parsedUnknown as Record<string, unknown>;
-    if (!Object.prototype.hasOwnProperty.call(parsedRecord, "agent")) {
-      return { ok: true, source: { kind: "script" } };
-    }
-
-    const agent = parsedRecord.agent;
-    if (typeof agent !== "object" || agent === null || Array.isArray(agent)) {
-      return {
-        ok: false,
-        message: `Unable to read trusted skill result source metadata from ${skillJsonPath}: skill.json agent must be an object when present`,
-      };
-    }
-
-    const parsed = parsedUnknown as SkillManifestLike;
-    if (typeof parsed.agent?.cli !== "string" || parsed.agent.cli.trim().length === 0) {
-      return {
-        ok: false,
-        message: `Unable to read trusted skill result source metadata from ${skillJsonPath}: skill.json agent.cli must be a non-empty string when agent is present`,
-      };
-    }
-
-    return { ok: true, source: { kind: "agent", agentCli: parsed.agent.cli.trim() } };
-  } catch (error) {
+  if (!manifestResult.ok) {
     return {
       ok: false,
-      message: `Unable to read trusted skill result source metadata from ${skillJsonPath}: ${error instanceof Error ? error.message : String(error)}`,
+      message: manifestResult.message,
     };
   }
+
+  if (!manifestResult.metadata.agent) {
+    return { ok: true, source: { kind: "script" } };
+  }
+
+  return { ok: true, source: { kind: "agent", agentCli: manifestResult.metadata.agent.cli } };
+}
+
+async function canExecute(path: string): Promise<boolean> {
+  try {
+    await access(path, fsConstants.X_OK);
+    return true;
+  } catch {
+    try {
+      await access(path, fsConstants.F_OK);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}
+
+async function resolveAgentCliExecutable(
+  agent: SkillAgentConfig,
+  skillDir: string
+): Promise<AgentCliResolution> {
+  if (agent.cliPath && agent.cliPath.length > 0) {
+    const resolvedCliPath = isAbsolute(agent.cliPath) ? agent.cliPath : resolve(skillDir, agent.cliPath);
+    if (await canExecute(resolvedCliPath)) {
+      return { ok: true, executablePath: resolvedCliPath };
+    }
+    return {
+      ok: false,
+      message: `Configured agent CLI was not found or is not executable at ${resolvedCliPath}`,
+    };
+  }
+
+  const pathEntries = (process.env.PATH ?? "").split(delimiter).filter((entry) => entry.length > 0);
+  for (const entry of pathEntries) {
+    const candidate = join(entry, agent.cli);
+    if (await canExecute(candidate)) {
+      return { ok: true, executablePath: candidate };
+    }
+  }
+
+  return {
+    ok: false,
+    message: `Configured agent CLI '${agent.cli}' was not found on PATH`,
+  };
 }
 
 function parseSkillResultFrame(
@@ -266,6 +298,10 @@ export async function runSkill(
 ): Promise<SkillRunResult | SkillRunError> {
   let resolvedPath: string;
   let sourceResolution: SkillSourceResolution = { ok: true, source: { kind: "script" } };
+  let resolvedAgentConfig: SkillAgentConfig | null = null;
+  let resolvedAgentExecutablePath: string | null = null;
+  let skillProgramPath: string | null = null;
+  let effectiveTimeoutMs = timeoutMs ?? DEFAULT_TIMEOUT_MS;
   try {
     const loaded = await loadRegistry(registryPath);
     const skill = findSkillById(loaded.registry, skillId);
@@ -284,6 +320,7 @@ export async function runSkill(
     }
 
     const repoRoot = getRepoRoot(loaded.resolvedPath);
+    skillProgramPath = join(repoRoot, skill.path, "SKILL.md");
     // Prefer .js script over .sh for direct node invocation
     const scriptRelative =
       skill.scripts.find((s) => extname(s) === ".js") ??
@@ -291,7 +328,27 @@ export async function runSkill(
       skill.scripts[0];
 
     resolvedPath = join(repoRoot, scriptRelative);
-    sourceResolution = await resolveSkillResultSource(repoRoot, skill.path);
+    const manifestResult = await readSkillManifestMetadata(repoRoot, skill.path);
+    sourceResolution = await resolveSkillResultSource(manifestResult);
+
+    if (manifestResult.ok && manifestResult.metadata.agent) {
+      resolvedAgentConfig = manifestResult.metadata.agent;
+      effectiveTimeoutMs = timeoutMs ?? resolvedAgentConfig.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+      const agentResolution = await resolveAgentCliExecutable(
+        resolvedAgentConfig,
+        join(repoRoot, skill.path)
+      );
+      if (!agentResolution.ok) {
+        return {
+          ok: false,
+          code: SKILL_AGENT_CLI_UNAVAILABLE,
+          message: `Skill ${skillId} requires agent CLI '${resolvedAgentConfig.cli}', but it is unavailable. ${agentResolution.message}`,
+          skillId,
+          skillResult: null,
+        };
+      }
+      resolvedAgentExecutablePath = agentResolution.executablePath;
+    }
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     return { ok: false, code: REGISTRY_READ_FAILED, message, skillResult: null };
@@ -312,7 +369,7 @@ export async function runSkill(
   const ext = extname(resolvedPath);
   const cmd = ext === ".js" ? process.execPath : resolvedPath;
   const cmdArgs = ext === ".js" ? [resolvedPath, ...args] : args;
-  const timeout = timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const timeout = effectiveTimeoutMs;
   const skillLogger = callbacks?.logger?.child({ skillId });
 
   // Merge provided env with process.env, with provided env taking precedence
@@ -320,6 +377,14 @@ export async function runSkill(
     ...process.env,
     ...env,
   };
+  if (resolvedAgentConfig && resolvedAgentExecutablePath && skillProgramPath) {
+    childEnv[SKILL_AGENT_CLI_ENV_VAR] = resolvedAgentConfig.cli;
+    childEnv[SKILL_AGENT_CLI_PATH_ENV_VAR] = resolvedAgentExecutablePath;
+    childEnv[SKILL_AGENT_TIMEOUT_MS_ENV_VAR] = String(resolvedAgentConfig.timeoutMs ?? timeout);
+    childEnv[SKILL_INPUTS_ENV_VAR] = JSON.stringify(args);
+    childEnv[SKILL_PROGRAM_ENV_VAR] = skillProgramPath;
+    childEnv[SKILL_ID_ENV_VAR] = skillId;
+  }
 
   const start = Date.now();
   return new Promise((resolve) => {

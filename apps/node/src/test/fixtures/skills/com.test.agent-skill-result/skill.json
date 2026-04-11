@@ -6,10 +6,12 @@
   "path": "skills/com.test.agent-skill-result",
   "skillFile": "skills/com.test.agent-skill-result/SKILL.md",
   "scripts": [
-    "skills/com.test.skill-result/scripts/emit_skill_result.js"
+    "skills/com.test.agent-skill-result/scripts/run.js"
   ],
   "artifacts": [],
   "agent": {
-    "cli": "codex"
+    "cli": "codex",
+    "cliPath": "scripts/fake_codex.js",
+    "timeoutMs": 30000
   }
 }

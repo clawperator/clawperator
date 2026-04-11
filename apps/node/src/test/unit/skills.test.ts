@@ -22,6 +22,7 @@ import { compileArtifact } from "../../domain/skills/compileArtifact.js";
 import { searchSkills } from "../../domain/skills/searchSkills.js";
 import { runSkill } from "../../domain/skills/runSkill.js";
 import { scaffoldSkill } from "../../domain/skills/scaffoldSkill.js";
+import { parseSkillManifestMetadata } from "../../domain/skills/skillManifest.js";
 import { validateAllSkills, validateSkill } from "../../domain/skills/validateSkill.js";
 import { validateExecution, validatePayloadSize } from "../../domain/executions/validateExecution.js";
 import { cmdSkillsRun } from "../../cli/commands/skills.js";
@@ -35,6 +36,7 @@ import {
   SKILL_EXECUTION_TIMEOUT,
   SKILL_OUTPUT_ASSERTION_FAILED,
   SKILL_RESULT_PARSE_FAILED,
+  SKILL_AGENT_CLI_UNAVAILABLE,
   SKILL_ALREADY_EXISTS,
   SKILL_ID_INVALID,
   REGISTRY_READ_FAILED,
@@ -1821,7 +1823,7 @@ describe("runSkill", () => {
   });
 
   it("parses a valid framed SkillResult for agent-driven skills and injects agent source metadata", async () => {
-    const result = await runSkill(TEST_AGENT_SKILL_RESULT, ["valid", "--skill-id", TEST_AGENT_SKILL_RESULT]);
+    const result = await runSkill(TEST_AGENT_SKILL_RESULT, ["valid"]);
 
     assert.ok(result.ok, `Expected agent SkillResult to succeed: ${"message" in result ? result.message : ""}`);
     assert.ok(result.skillResult);
@@ -1830,6 +1832,75 @@ describe("runSkill", () => {
       agentCli: "codex",
     });
     assert.strictEqual(result.skillResult.skillId, TEST_AGENT_SKILL_RESULT);
+    assert.ok(result.output.includes("[Clawperator-Skill-Result]"));
+  });
+
+  it("fails before spawn when an orchestrated skill's configured agent CLI is unavailable", async () => {
+    const temp = await createTempRegistryWithSkill({
+      skillId: "com.test.missing-agent-cli",
+      scriptSourcePath: join(
+        packageRoot,
+        "src",
+        "test",
+        "fixtures",
+        "skills",
+        "com.test.agent-skill-result",
+        "scripts",
+        "run.js"
+      ),
+      skillJsonContents: JSON.stringify({
+        id: "com.test.missing-agent-cli",
+        applicationId: "com.test",
+        intent: "missing-agent-cli",
+        summary: "Temporary test skill",
+        path: "skills/com.test.missing-agent-cli",
+        skillFile: "skills/com.test.missing-agent-cli/SKILL.md",
+        scripts: ["skills/com.test.missing-agent-cli/scripts/run.js"],
+        artifacts: [],
+        agent: {
+          cli: "missing-agent-cli-for-tests",
+        },
+      }),
+    });
+
+    try {
+      const result = await runSkill("com.test.missing-agent-cli", ["valid"], temp.registryPath);
+      assert.ok(!result.ok);
+      assert.strictEqual(result.code, SKILL_AGENT_CLI_UNAVAILABLE);
+      assert.match(result.message, /missing-agent-cli-for-tests/);
+      assert.strictEqual(result.skillResult, null);
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
+  it("returns a typed execution failure when the orchestrated harness forwards a non-zero agent exit", async () => {
+    const result = await runSkill(TEST_AGENT_SKILL_RESULT, ["agent-fail"]);
+
+    assert.ok(!result.ok);
+    assert.strictEqual(result.code, SKILL_EXECUTION_FAILED);
+    assert.strictEqual(result.exitCode, 17);
+    assert.match(result.stderr ?? "", /agent failed intentionally/);
+    assert.strictEqual(result.skillResult, null);
+  });
+
+  it("rejects malformed framed SkillResult output from an orchestrated harness", async () => {
+    const result = await runSkill(TEST_AGENT_SKILL_RESULT, ["malformed-json"]);
+
+    assert.ok(!result.ok);
+    assert.strictEqual(result.code, SKILL_RESULT_PARSE_FAILED);
+    assert.match(result.message, /invalid JSON/i);
+    assert.strictEqual(result.skillResult, null);
+  });
+
+  it("preserves indeterminate SkillResult status for orchestrated skills", async () => {
+    const result = await runSkill(TEST_AGENT_SKILL_RESULT, ["indeterminate"]);
+
+    assert.ok(result.ok, `Expected orchestrated indeterminate result to parse: ${"message" in result ? result.message : ""}`);
+    assert.ok(result.skillResult);
+    assert.strictEqual(result.skillResult.source.kind, "agent");
+    assert.strictEqual(result.skillResult.status, "indeterminate");
+    assert.strictEqual(result.skillResult.terminalVerification?.status, "not_run");
   });
 
   it("returns SKILL_OUTPUT_ASSERTION_FAILED when expectContains is missing from output", async () => {
@@ -2075,6 +2146,17 @@ describe("runSkill", () => {
     } finally {
       await temp.cleanup();
     }
+  });
+
+  it("rejects malformed agent blocks when parsing skill manifest metadata", () => {
+    const result = parseSkillManifestMetadata("/tmp/test-skill.json", {
+      agent: {
+        cli: "",
+      },
+    });
+
+    assert.ok(!result.ok);
+    assert.match(result.message, /agent\.cli must be a non-empty string/i);
   });
 
   it("rejects unsupported SkillResult contract major versions", async () => {
