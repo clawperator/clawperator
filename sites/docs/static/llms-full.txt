@@ -8897,6 +8897,23 @@ Invocation rules:
 - stdout and stderr are captured separately
 - success requires subprocess exit code `0`
 
+## Non-Trivial Skill Success Rules
+
+For non-trivial skills, reaching the end of the script is not enough to claim
+success.
+
+Required current rule:
+
+- if an underlying `clawperator exec` call fails, the skill must exit non-zero
+- a non-trivial skill must verify the intended terminal app state before it
+  reports success
+- success should mean "the requested state was actually observed", not merely
+  "the script finished running"
+
+This guidance is intentionally general. The exact verification step depends on
+the app and workflow, but the rule does not: success should reflect verified
+state, and execution failure should remain visible to the caller.
+
 The scaffolded `run.js` contract is:
 
 ```text
