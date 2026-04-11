@@ -188,10 +188,6 @@ function parseSkillResultFrame(
     };
   }
 
-  if (!jsonLine) {
-    return { ok: false, message: "SkillResult frame marker was not followed by a JSON line" };
-  }
-
   if (markerIndexes.length > 1 || markerIndexes[0] !== nonEmptyLines.length - 2) {
     return { ok: false, message: "Skill emitted multiple SkillResult frames or a non-terminal SkillResult marker" };
   }

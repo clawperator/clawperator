@@ -101,8 +101,42 @@ function stripTrailingSkillResultFrame(stdout: string): string {
 
 function createPrettyStdoutForwarder(writer: (chunk: string) => void) {
   let incomplete = "";
-  let protectedTail = "";
+  let protectedLines: string[] = [];
+  let protectedNonEmptyIndexes: number[] = [];
   let protectingFrameTail = false;
+
+  const flushProtectedPrefix = () => {
+    while (protectingFrameTail && protectedNonEmptyIndexes.length > 2) {
+      const firstProtectedIndex = protectedNonEmptyIndexes[protectedNonEmptyIndexes.length - 2];
+      if (firstProtectedIndex <= 0) {
+        break;
+      }
+
+      writer(protectedLines.slice(0, firstProtectedIndex).join(""));
+      protectedLines = protectedLines.slice(firstProtectedIndex);
+      protectedNonEmptyIndexes = protectedNonEmptyIndexes
+        .filter((index) => index >= firstProtectedIndex)
+        .map((index) => index - firstProtectedIndex);
+    }
+
+    if (
+      protectingFrameTail
+      && !protectedLines.some((line) => lineWithoutTrailingNewline(line) === SKILL_RESULT_FRAME_PREFIX)
+    ) {
+      writer(protectedLines.join(""));
+      protectedLines = [];
+      protectedNonEmptyIndexes = [];
+      protectingFrameTail = false;
+    }
+  };
+
+  const bufferProtectedLine = (line: string) => {
+    protectedLines.push(line);
+    if (lineWithoutTrailingNewline(line).trim().length > 0) {
+      protectedNonEmptyIndexes.push(protectedLines.length - 1);
+    }
+    flushProtectedPrefix();
+  };
 
   return {
     onChunk(chunk: string) {
@@ -118,7 +152,7 @@ function createPrettyStdoutForwarder(writer: (chunk: string) => void) {
         }
 
         if (protectingFrameTail) {
-          protectedTail += line;
+          bufferProtectedLine(line);
         } else {
           writer(line);
         }
@@ -132,15 +166,17 @@ function createPrettyStdoutForwarder(writer: (chunk: string) => void) {
           protectingFrameTail = true;
         }
         if (protectingFrameTail) {
-          protectedTail += incomplete;
+          bufferProtectedLine(incomplete);
         } else {
           writer(incomplete);
         }
         incomplete = "";
       }
 
+      const protectedTail = protectedLines.join("");
       writer(options.stripTerminalFrame ? stripTrailingSkillResultFrame(protectedTail) : protectedTail);
-      protectedTail = "";
+      protectedLines = [];
+      protectedNonEmptyIndexes = [];
       protectingFrameTail = false;
     },
   };
