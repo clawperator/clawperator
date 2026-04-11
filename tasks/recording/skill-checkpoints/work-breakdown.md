@@ -13,7 +13,7 @@ Total PRs: 3. Total phases: 4.
   truthfully and that the persisted row is verified before success.
 - PR-2: short durable authoring-doc update after the Solax proof is stable.
 
-Current state: P0, P1, and P2 are complete. PR-2 is next.
+Current state: P0 through P3 are complete. The `skill-checkpoints` pack is done.
 
 ## Status
 
@@ -22,9 +22,9 @@ Current state: P0, P1, and P2 are complete. PR-2 is next.
 | State | active |
 | Total PRs | 3 |
 | Total phases | 4 |
-| Completed | P0, P1, P2 |
-| Remaining | P3 |
-| Current / Next | P3 |
+| Completed | P0, P1, P2, P3 |
+| Remaining | none |
+| Current / Next | complete |
 | Blockers | none |
 
 ## Hard Rules
@@ -267,7 +267,7 @@ Required cases:
 fix(solax): verify persisted discharge limit replay
 ```
 
-## Phase P3: Document Durable Guidance
+## Phase P3 [DONE]: Document Durable Guidance
 
 ### Agent Tier
 
