@@ -3134,6 +3134,52 @@ describe("CLI skills run streaming", () => {
       stdoutChunks.join("")
     );
   });
+
+  it("hides terminal SkillResult frames from pretty-mode stdout while keeping human output", async () => {
+    const fakeAdbDir = await createFakeAdb({
+      installed: true,
+      operatorPackage: "com.clawperator.operator.dev",
+    });
+    const cliPath = join(packageRoot, "dist", "cli", "index.js");
+    let stdout = "";
+    let stderr = "";
+
+    const proc = spawn(process.execPath, [
+      cliPath,
+      "skills",
+      "run",
+      TEST_SKILL_RESULT,
+      "--operator-package",
+      "com.clawperator.operator.dev",
+      "--output",
+      "pretty",
+    ], {
+      cwd: packageRoot,
+      env: {
+        ...process.env,
+        PATH: `${fakeAdbDir}${process.env.PATH ? `:${process.env.PATH}` : ""}`,
+        CLAWPERATOR_SKILLS_REGISTRY: TEST_REGISTRY_PATH,
+      },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    proc.stdout.on("data", (chunk) => {
+      stdout += chunk.toString();
+    });
+    proc.stderr.on("data", (chunk) => {
+      stderr += chunk.toString();
+    });
+
+    const code = await new Promise<number>((resolve) => {
+      proc.on("close", (exitCode) => resolve(exitCode ?? -1));
+    });
+
+    assert.strictEqual(code, 0, `stderr: ${stderr}`);
+    assert.ok(stderr.startsWith("[Clawperator]"), stderr);
+    assert.ok(stdout.includes("progress:before-frame"), stdout);
+    assert.ok(stdout.includes("\"skillResult\""), stdout);
+    assert.ok(!stdout.includes("[Clawperator-Skill-Result]"), stdout);
+  });
 });
 
 describe("runSkill logging", () => {

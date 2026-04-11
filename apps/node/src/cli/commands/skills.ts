@@ -9,6 +9,7 @@ import { searchSkills } from "../../domain/skills/searchSkills.js";
 import { runSkill, type SkillRunEnv } from "../../domain/skills/runSkill.js";
 import { scaffoldSkill } from "../../domain/skills/scaffoldSkill.js";
 import { validateAllSkills, validateSkill } from "../../domain/skills/validateSkill.js";
+import { SKILL_RESULT_FRAME_PREFIX } from "../../contracts/skillResult.js";
 import { SKILL_OUTPUT_ASSERTION_FAILED } from "../../contracts/skills.js";
 import type { OutputOptions } from "../output.js";
 import { formatSuccess, formatError } from "../output.js";
@@ -52,6 +53,95 @@ function emitCliEvent(logger: Logger | undefined, event: Omit<LogEvent, "ts">): 
     ts: new Date().toISOString(),
     ...event,
   });
+}
+
+function splitTextIntoLinesPreservingEndings(text: string): string[] {
+  const matches = text.match(/[^\r\n]*(?:\r?\n|$)/g) ?? [];
+  return matches.filter((line) => line.length > 0);
+}
+
+function lineWithoutTrailingNewline(line: string): string {
+  return line.replace(/\r?\n$/, "");
+}
+
+function stripTrailingSkillResultFrame(stdout: string): string {
+  const lines = splitTextIntoLinesPreservingEndings(stdout);
+  if (lines.length === 0) {
+    return stdout;
+  }
+
+  let jsonLineIndex = -1;
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    if (lineWithoutTrailingNewline(lines[index]).trim().length > 0) {
+      jsonLineIndex = index;
+      break;
+    }
+  }
+  if (jsonLineIndex < 0) {
+    return stdout;
+  }
+
+  let markerLineIndex = -1;
+  for (let index = jsonLineIndex - 1; index >= 0; index -= 1) {
+    if (lineWithoutTrailingNewline(lines[index]).trim().length > 0) {
+      markerLineIndex = index;
+      break;
+    }
+  }
+  if (markerLineIndex < 0) {
+    return stdout;
+  }
+
+  if (lineWithoutTrailingNewline(lines[markerLineIndex]) !== SKILL_RESULT_FRAME_PREFIX) {
+    return stdout;
+  }
+
+  return lines.slice(0, markerLineIndex).join("");
+}
+
+function createPrettyStdoutForwarder(writer: (chunk: string) => void) {
+  let incomplete = "";
+  let bufferedLines: string[] = [];
+
+  const bufferedNonEmptyLineCount = () =>
+    bufferedLines.reduce((count, line) => count + (lineWithoutTrailingNewline(line).trim().length > 0 ? 1 : 0), 0);
+
+  const flushSafeLines = () => {
+    while (bufferedLines.length > 0 && bufferedNonEmptyLineCount() > 2) {
+      writer(bufferedLines.shift() ?? "");
+    }
+  };
+
+  return {
+    onChunk(chunk: string) {
+      incomplete += chunk;
+      const completeLines = splitTextIntoLinesPreservingEndings(incomplete);
+      const trailingLine = completeLines.at(-1);
+      const trailingIsComplete = trailingLine === undefined || trailingLine.endsWith("\n");
+      const readyLines = trailingIsComplete ? completeLines : completeLines.slice(0, -1);
+
+      bufferedLines.push(...readyLines);
+      incomplete = trailingIsComplete ? "" : trailingLine ?? "";
+      flushSafeLines();
+    },
+    finish(options: { stripTerminalFrame: boolean }) {
+      if (incomplete.length > 0) {
+        bufferedLines.push(incomplete);
+        incomplete = "";
+      }
+
+      const tail = bufferedLines.join("");
+      writer(options.stripTerminalFrame ? stripTrailingSkillResultFrame(tail) : tail);
+      bufferedLines = [];
+    },
+  };
+}
+
+function sanitizePrettySkillStdout(stdout: string | undefined, skillResultPresent: boolean): string | undefined {
+  if (stdout === undefined || !skillResultPresent) {
+    return stdout;
+  }
+  return stripTrailingSkillResultFrame(stdout);
 }
 
 export async function cmdSkillsList(options: { format: OutputOptions["format"] }): Promise<string> {
@@ -234,12 +324,21 @@ export async function cmdSkillsRun(
     ? await (async () => {
         const removeStdoutErrorListener = suppressStreamPipeErrors(process.stdout);
         const removeStderrErrorListener = suppressStreamPipeErrors(process.stderr);
+        const stdoutForwarder = createPrettyStdoutForwarder((chunk) => {
+          try {
+            process.stdout.write(chunk);
+          } catch (error) {
+            if (!isIgnorablePipeError(error)) {
+              throw error;
+            }
+          }
+        });
         try {
-          return await runSkillImpl(skillId, args, undefined, timeoutMs, env, {
+          const runResult = await runSkillImpl(skillId, args, undefined, timeoutMs, env, {
             onOutput: (chunk, stream) => {
               try {
                 if (stream === "stdout") {
-                  process.stdout.write(chunk);
+                  stdoutForwarder.onChunk(chunk);
                 } else {
                   process.stderr.write(chunk);
                 }
@@ -251,6 +350,10 @@ export async function cmdSkillsRun(
             },
             logger: cliLogger,
           }, expectContains);
+          stdoutForwarder.finish({
+            stripTerminalFrame: runResult.skillResult !== null,
+          });
+          return runResult;
         } finally {
           removeStdoutErrorListener();
           removeStderrErrorListener();
@@ -260,7 +363,9 @@ export async function cmdSkillsRun(
   if (result.ok) {
     return formatSuccess({
       skillId: result.skillId,
-      output: result.output,
+      output: options.format === "pretty"
+        ? sanitizePrettySkillStdout(result.output, result.skillResult !== null)
+        : result.output,
       exitCode: result.exitCode,
       durationMs: result.durationMs,
       skillResult: result.skillResult,
@@ -273,7 +378,9 @@ export async function cmdSkillsRun(
       code: SKILL_OUTPUT_ASSERTION_FAILED,
       message: result.message,
       skillId: result.skillId,
-      output: result.output,
+      output: options.format === "pretty"
+        ? sanitizePrettySkillStdout(result.output, result.skillResult !== null)
+        : result.output,
       skillResult: result.skillResult,
       expectedSubstring: result.expectedSubstring,
       timeoutMs: timeoutMs ?? undefined,
@@ -284,7 +391,9 @@ export async function cmdSkillsRun(
     message: result.message,
     skillId: result.skillId,
     exitCode: result.exitCode,
-    stdout: result.stdout,
+    stdout: options.format === "pretty"
+      ? sanitizePrettySkillStdout(result.stdout, result.skillResult !== null)
+      : result.stdout,
     stderr: result.stderr,
     skillResult: result.skillResult,
     timeoutMs: timeoutMs ?? undefined,
