@@ -1912,21 +1912,22 @@ describe("runSkill", () => {
     assert.strictEqual(result.skillResult, null);
   });
 
-  it("ignores earlier marker mentions when they are not part of the trailing frame suffix", async () => {
+  it("rejects earlier marker mentions when they are not part of the trailing frame suffix", async () => {
     const result = await runSkill(TEST_SKILL_RESULT, ["marker-progress-only"]);
 
-    assert.ok(result.ok, `Expected progress marker output to stay legacy: ${"message" in result ? result.message : ""}`);
-    assert.ok(result.output.includes("[Clawperator-Skill-Result]"));
+    assert.ok(!result.ok);
+    assert.strictEqual(result.code, SKILL_RESULT_PARSE_FAILED);
+    assert.match(result.message, /terminal non-empty stdout suffix|followed by a JSON object line/i);
     assert.strictEqual(result.skillResult, null);
   });
 
-  it("parses only the trailing SkillResult frame suffix when earlier marker lines appear in progress output", async () => {
+  it("rejects earlier marker mentions even when a later trailing frame looks valid", async () => {
     const result = await runSkill(TEST_SKILL_RESULT, ["marker-progress-before-valid-frame"]);
 
-    assert.ok(result.ok, `Expected trailing frame to parse successfully: ${"message" in result ? result.message : ""}`);
-    assert.ok(result.skillResult);
-    assert.strictEqual(result.skillResult.skillId, TEST_SKILL_RESULT);
-    assert.strictEqual(result.skillResult.source.kind, "script");
+    assert.ok(!result.ok);
+    assert.strictEqual(result.code, SKILL_RESULT_PARSE_FAILED);
+    assert.match(result.message, /multiple SkillResult frames|non-terminal SkillResult marker/i);
+    assert.strictEqual(result.skillResult, null);
   });
 
   it("rejects malformed SkillResult JSON instead of silently falling back to legacy parsing", async () => {
@@ -1943,7 +1944,16 @@ describe("runSkill", () => {
 
     assert.ok(!result.ok);
     assert.strictEqual(result.code, SKILL_RESULT_PARSE_FAILED);
-    assert.match(result.message, /multiple SkillResult frames/i);
+    assert.match(result.message, /multiple SkillResult frames|non-terminal SkillResult marker/i);
+    assert.strictEqual(result.skillResult, null);
+  });
+
+  it("rejects framed output when any non-whitespace stdout appears after the frame", async () => {
+    const result = await runSkill(TEST_SKILL_RESULT, ["frame-with-trailing-output"]);
+
+    assert.ok(!result.ok);
+    assert.strictEqual(result.code, SKILL_RESULT_PARSE_FAILED);
+    assert.match(result.message, /terminal non-empty stdout suffix/i);
     assert.strictEqual(result.skillResult, null);
   });
 
@@ -1992,6 +2002,34 @@ describe("runSkill", () => {
       assert.ok(legacyResult.ok, `Expected legacy path to stay permissive: ${"message" in legacyResult ? legacyResult.message : ""}`);
       assert.strictEqual(legacyResult.skillResult, null);
       assert.strictEqual(legacyResult.output, "legacy-output-only\n");
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
+  it("rejects framed SkillResults when skill.json is valid JSON but not an object", async () => {
+    const fixtureScript = join(
+      packageRoot,
+      "src",
+      "test",
+      "fixtures",
+      "skills",
+      "com.test.skill-result",
+      "scripts",
+      "emit_skill_result.js"
+    );
+    const temp = await createTempRegistryWithSkill({
+      skillId: "com.test.non-object-source-skill",
+      scriptSourcePath: fixtureScript,
+      skillJsonContents: JSON.stringify(true),
+    });
+
+    try {
+      const result = await runSkill("com.test.non-object-source-skill", ["valid"], temp.registryPath);
+      assert.ok(!result.ok);
+      assert.strictEqual(result.code, SKILL_RESULT_PARSE_FAILED);
+      assert.match(result.message, /skill\.json must contain a JSON object/i);
+      assert.strictEqual(result.skillResult, null);
     } finally {
       await temp.cleanup();
     }

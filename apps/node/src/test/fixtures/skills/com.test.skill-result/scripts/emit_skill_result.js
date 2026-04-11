@@ -103,6 +103,10 @@ switch (mode) {
     console.log("progress:after-marker");
     emitFrame(basePayload);
     break;
+  case "frame-with-trailing-output":
+    emitFrame(basePayload);
+    console.log("trailing-output-after-frame");
+    break;
   case "malformed-json":
     console.log(prefix);
     console.log("{not-json");

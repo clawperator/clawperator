@@ -106,7 +106,14 @@ async function resolveSkillResultSource(
   const skillJsonPath = join(repoRoot, skillPath, "skill.json");
   try {
     const raw = await readFile(skillJsonPath, "utf-8");
-    const parsed = JSON.parse(raw) as SkillManifestLike;
+    const parsedUnknown = JSON.parse(raw) as unknown;
+    if (typeof parsedUnknown !== "object" || parsedUnknown === null || Array.isArray(parsedUnknown)) {
+      return {
+        ok: false,
+        message: `Unable to read trusted skill result source metadata from ${skillJsonPath}: skill.json must contain a JSON object`,
+      };
+    }
+    const parsed = parsedUnknown as SkillManifestLike;
     if (typeof parsed.agent?.cli === "string" && parsed.agent.cli.trim().length > 0) {
       return { ok: true, source: { kind: "agent", agentCli: parsed.agent.cli.trim() } };
     }
@@ -129,26 +136,31 @@ function parseSkillResultFrame(
   const nonEmptyLines = lines
     .map((line) => line.trim())
     .filter((line) => line.length > 0);
+  const markerIndexes = nonEmptyLines
+    .map((line, index) => (line === SKILL_RESULT_FRAME_PREFIX ? index : -1))
+    .filter((index) => index >= 0);
 
   if (nonEmptyLines.length === 0) {
     return { ok: true, skillResult: null };
   }
 
+  if (markerIndexes.length === 0) {
+    return { ok: true, skillResult: null };
+  }
+
   if (nonEmptyLines.length === 1) {
-    return nonEmptyLines[0] === SKILL_RESULT_FRAME_PREFIX
-      ? { ok: false, message: "SkillResult frame marker was not followed by a JSON line" }
-      : { ok: true, skillResult: null };
+    return { ok: false, message: "SkillResult frame marker was not followed by a JSON line" };
   }
 
   const jsonLine = nonEmptyLines[nonEmptyLines.length - 1];
   const markerLine = nonEmptyLines[nonEmptyLines.length - 2];
 
   if (markerLine !== SKILL_RESULT_FRAME_PREFIX) {
-    return { ok: true, skillResult: null };
+    return { ok: false, message: "SkillResult frame must be the terminal non-empty stdout suffix" };
   }
 
   if (!jsonLine.startsWith("{")) {
-    return { ok: true, skillResult: null };
+    return { ok: false, message: "SkillResult frame marker must be followed by a JSON object line" };
   }
 
   if (!sourceResolution.ok) {
@@ -162,19 +174,8 @@ function parseSkillResultFrame(
     return { ok: false, message: "SkillResult frame marker was not followed by a JSON line" };
   }
 
-  for (let index = 0; index < nonEmptyLines.length - 2; index += 1) {
-    if (nonEmptyLines[index] !== SKILL_RESULT_FRAME_PREFIX) {
-      continue;
-    }
-    const nextLine = nonEmptyLines[index + 1];
-    try {
-      const candidate = JSON.parse(nextLine);
-      if (typeof candidate === "object" && candidate !== null && !Array.isArray(candidate)) {
-        return { ok: false, message: "Skill emitted multiple SkillResult frames" };
-      }
-    } catch {
-      // Earlier marker mentions that are not followed by a JSON object are inert progress output.
-    }
+  if (markerIndexes.length > 1 || markerIndexes[0] !== nonEmptyLines.length - 2) {
+    return { ok: false, message: "Skill emitted multiple SkillResult frames or a non-terminal SkillResult marker" };
   }
 
   let parsedJson: unknown;
