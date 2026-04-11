@@ -290,6 +290,28 @@ describe("serve API integration", () => {
     assert.ok(body.error.stdout?.includes("[Clawperator-Skill-Result]"));
   });
 
+  test("POST /skills/:skillId/run reports timeout instead of parse failure for a partial framed result", async () => {
+    const res = await fetch(`http://localhost:${port}/skills/com.test.skill-result/run`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ args: ["partial-frame-timeout"], timeoutMs: 150 }),
+    });
+
+    assert.strictEqual(res.status, 400);
+    const body = await res.json() as {
+      ok: boolean;
+      error: {
+        code: string;
+        skillResult?: unknown;
+        stdout?: string;
+      };
+    };
+    assert.strictEqual(body.ok, false);
+    assert.strictEqual(body.error.code, "SKILL_EXECUTION_TIMEOUT");
+    assert.strictEqual(body.error.skillResult, null);
+    assert.ok(body.error.stdout?.includes("[Clawperator-Skill-Result]"));
+  });
+
   test("POST /skills/:skillId/run accepts timeoutMs override", async () => {
     const res = await fetch(`http://localhost:${port}/skills/com.test.echo/run`, {
       method: "POST",
