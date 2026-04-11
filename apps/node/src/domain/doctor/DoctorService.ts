@@ -4,7 +4,8 @@ import { resolveDevice } from "../devices/resolveDevice.js";
 import {
   checkNodeVersion,
   checkAdbPresence,
-  checkAdbServer
+  checkAdbServer,
+  checkOrchestratedSkillAgentCli,
 } from "./checks/hostChecks.js";
 import {
   checkDeviceDiscovery,
@@ -51,6 +52,9 @@ export class DoctorService {
     const adbServer = await checkAdbServer(config);
     checks.push(adbServer);
     if (this.shouldHaltOnFailure(adbServer)) return this.finalize(checks, config, options.fix);
+
+    const orchestratedSkillAgentCli = await checkOrchestratedSkillAgentCli(config);
+    checks.push(orchestratedSkillAgentCli);
 
     if (full) {
       const javaVersion = await checkJavaVersion(config);

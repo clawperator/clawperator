@@ -1903,6 +1903,20 @@ describe("runSkill", () => {
     assert.strictEqual(result.skillResult.terminalVerification?.status, "not_run");
   });
 
+  it("reports success for orchestrated skills that take a recovery path but still reach terminal verification", async () => {
+    const result = await runSkill(TEST_AGENT_SKILL_RESULT, ["recovery-success"]);
+
+    assert.ok(result.ok, `Expected orchestrated recovery-path success to parse: ${"message" in result ? result.message : ""}`);
+    assert.ok(result.skillResult);
+    assert.strictEqual(result.skillResult.status, "success");
+    assert.deepStrictEqual(
+      result.skillResult.checkpoints.map((checkpoint) => checkpoint.status),
+      ["ok", "ok", "ok", "ok", "ok"]
+    );
+    assert.match(result.skillResult.checkpoints[0].note ?? "", /reopened once/i);
+    assert.match(result.skillResult.terminalVerification?.note ?? "", /recovery branch/i);
+  });
+
   it("returns SKILL_OUTPUT_ASSERTION_FAILED when expectContains is missing from output", async () => {
     const result = await runSkill(
       "com.test.echo",
@@ -2256,6 +2270,15 @@ describe("runSkill", () => {
     assert.ok(!result.ok);
     assert.strictEqual(result.code, SKILL_EXECUTION_TIMEOUT);
     assert.ok(result.stdout?.includes('"stage":"before-timeout"'));
+  });
+
+  it("returns timeout for orchestrated skills and preserves timeout precedence over any later frame", async () => {
+    const result = await runSkill(TEST_AGENT_SKILL_RESULT, ["timeout"], undefined, 150);
+
+    assert.ok(!result.ok);
+    assert.strictEqual(result.code, SKILL_EXECUTION_TIMEOUT);
+    assert.ok(result.stdout?.includes('"stage":"before-timeout"'));
+    assert.strictEqual(result.skillResult, null);
   });
 
   it("reports timeout instead of parse failure when a framed result is cut off by timeout", async () => {
@@ -2824,6 +2847,40 @@ describe("cmdSkillsRun preflight gate", () => {
     assert.strictEqual(runCalls, 0);
     assert.strictEqual(parsed.code, SKILL_VALIDATION_FAILED);
     assert.match(parsed.message ?? "", /Skill not found/);
+  });
+
+  it("prepends the selected device id to forwarded skill args in cmdSkillsRun", async () => {
+    let observedArgs: string[] | null = null;
+    const fakeRunSkill = async (_skillId: string, args: string[]) => {
+      observedArgs = args;
+      return {
+        ok: true,
+        skillId: TEST_SKILL_VALID_ARTIFACT,
+        output: "RUN_OK",
+        exitCode: 0,
+        durationMs: 1,
+        skillResult: null,
+      } as const;
+    };
+
+    const stdout = await cmdSkillsRun(
+      TEST_SKILL_VALID_ARTIFACT,
+      ["--limit", "40"],
+      undefined,
+      undefined,
+      undefined,
+      {
+        format: "json",
+        skipValidate: true,
+        deviceId: "device-123",
+        runSkillImpl: fakeRunSkill as typeof runSkill,
+      }
+    );
+
+    const parsed = JSON.parse(stdout) as { skillId?: string; output?: string };
+    assert.strictEqual(parsed.skillId, TEST_SKILL_VALID_ARTIFACT);
+    assert.strictEqual(parsed.output, "RUN_OK");
+    assert.deepStrictEqual(observedArgs, ["device-123", "--limit", "40"]);
   });
 
   it("keeps cmdSkillsRun silent in JSON mode without a logger", async () => {

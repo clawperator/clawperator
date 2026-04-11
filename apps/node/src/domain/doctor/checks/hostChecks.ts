@@ -4,6 +4,9 @@ import { type DoctorCheckResult } from "../../../contracts/doctor.js";
 import { ERROR_CODES } from "../../../contracts/errors.js";
 import { DOCTOR_DOCS_URLS } from "../docsUrls.js";
 
+const DEFAULT_ORCHESTRATED_SKILL_AGENT_CLI = "codex";
+const ORCHESTRATED_SKILL_AGENT_CLI_ENV_VAR = "CLAWPERATOR_SKILL_AGENT_CLI";
+
 export async function checkNodeVersion(): Promise<DoctorCheckResult> {
   const version = process.version;
   const major = parseInt(version.slice(1).split(".")[0], 10);
@@ -91,5 +94,43 @@ export async function checkAdbServer(config: RuntimeConfig): Promise<DoctorCheck
     id: "host.adb.server",
     status: "pass",
     summary: "adb server is healthy.",
+  };
+}
+
+export async function checkOrchestratedSkillAgentCli(config: RuntimeConfig): Promise<DoctorCheckResult> {
+  const configuredCli = process.env[ORCHESTRATED_SKILL_AGENT_CLI_ENV_VAR]?.trim() || DEFAULT_ORCHESTRATED_SKILL_AGENT_CLI;
+  const shellCommand = `command -v ${configuredCli}`;
+  const result = await config.runner.runShell(shellCommand);
+
+  if (result.code !== 0 || !result.stdout.trim()) {
+    return {
+      id: "host.skill-agent-cli.presence",
+      status: "warn",
+      code: ERROR_CODES.HOST_DEPENDENCY_MISSING,
+      summary: `Default orchestrated-skill agent CLI '${configuredCli}' was not found on PATH.`,
+      detail: "Agent-driven skills can still be validated, but `skills run` for orchestrated skills will fail until the configured agent CLI is installed or overridden.",
+      fix: {
+        title: "Install or configure the orchestrated skill agent CLI",
+        platform: "any",
+        steps: [
+          { kind: "manual", value: "Install the configured agent CLI so it is available on PATH." },
+          { kind: "manual", value: `Or set ${ORCHESTRATED_SKILL_AGENT_CLI_ENV_VAR} to a different executable name before running doctor or orchestrated skills.` },
+        ],
+        docsUrl: DOCTOR_DOCS_URLS.setup,
+      },
+      evidence: {
+        configuredCli,
+      },
+    };
+  }
+
+  return {
+    id: "host.skill-agent-cli.presence",
+    status: "pass",
+    summary: `Default orchestrated-skill agent CLI '${configuredCli}' is available.`,
+    evidence: {
+      configuredCli,
+      resolvedPath: result.stdout.trim(),
+    },
   };
 }

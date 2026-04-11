@@ -86,6 +86,40 @@ switch (mode) {
     }));
     process.exit(0);
     break;
+  case "recovery-success":
+    console.log(prefix);
+    console.log(JSON.stringify({
+      ...basePayload,
+      checkpoints: [
+        { id: "app_opened", status: "ok", note: "app reopened once before proceeding" },
+        { id: "discharge_to_row_focused", status: "ok" },
+        { id: "target_text_entered", status: "ok", note: "recovery branch still reached target input" },
+        { id: "save_completed", status: "ok" },
+        { id: "terminal_state_verified", status: "ok" },
+      ],
+      terminalVerification: {
+        status: "verified",
+        expected: {
+          kind: "text",
+          text: "Discharge to 40%",
+        },
+        observed: {
+          kind: "text",
+          text: "Discharge to 40%",
+        },
+        note: "recovery branch preserved terminal verification",
+      },
+    }));
+    process.exit(0);
+    break;
+  case "timeout":
+    process.stdout.write('{"stage":"before-timeout"}\n');
+    setTimeout(() => {
+      console.log(prefix);
+      console.log(JSON.stringify(basePayload));
+      process.exit(0);
+    }, 1000);
+    break;
   default:
     console.error(`unknown mode:${mode}`);
     process.exit(5);

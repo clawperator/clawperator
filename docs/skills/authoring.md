@@ -193,7 +193,7 @@ Current skill-type convention:
 Recommended current practice:
 
 - use a `-replay` id suffix for replay-oriented baseline skills
-- use a `-orchestrated` id suffix for agent-controlled skills as that contract work lands
+- use a `-orchestrated` id suffix for agent-controlled skills
 - when a skill follows one of those conventions, keep the frontmatter `clawperator-skill-type` value aligned with the id suffix
 
 So the minimum current contract is:
@@ -202,6 +202,14 @@ So the minimum current contract is:
 - the registry entry points to it correctly
 
 The scaffold's usage section is a starting point, not a machine-enforced schema.
+
+For agent-driven orchestrated skills, `SKILL.md` is also the runtime agent
+program. In that shape:
+
+- `scripts/run.js` should stay a thin harness
+- the harness spawns the configured agent CLI from `skill.json.agent`
+- the runtime agent uses Clawperator as the hand
+- the runtime agent emits exactly one terminal `[Clawperator-Skill-Result]` frame
 
 ## `skill.json` Contract
 
@@ -220,6 +228,17 @@ Important current rule:
   - `artifacts`
 - other `skill.json` fields are allowed, but the current validator does not
   compare or enforce them
+
+Current orchestrated-skill extension:
+
+- `skill.json.agent` is an optional runtime block for agent-driven skills
+- current supported fields are:
+  - `cli` required string
+  - `cliPath` optional string or null
+  - `timeoutMs` optional positive integer
+- if `agent` is present, `runSkill()` resolves the configured CLI before spawn
+- if the CLI is unavailable, `runSkill()` returns `SKILL_AGENT_CLI_UNAVAILABLE`
+- the harness still owns the direct agent spawn; `runSkill()` executes `scripts/run.js`
 
 If any of those differ, validation fails with `SKILL_VALIDATION_FAILED`.
 
@@ -277,6 +296,24 @@ Success response:
   }
 }
 ```
+
+## Authoring Agent-Driven Orchestrated Skills
+
+When a skill is agent-driven at runtime, the authoring split is:
+
+- `SKILL.md` contains the runtime program for the agent
+- `skill.json` carries the trusted `agent` metadata
+- `scripts/run.js` is a thin harness that:
+  - receives the forwarded script args from `clawperator skills run`
+  - reads `CLAWPERATOR_SKILL_PROGRAM`
+  - reads `CLAWPERATOR_SKILL_INPUTS`
+  - reads the resolved agent CLI path from `CLAWPERATOR_SKILL_AGENT_CLI_PATH`
+  - spawns the configured agent CLI on `SKILL.md`
+  - forwards stdout and stderr
+
+The harness should not absorb skill logic that belongs in `SKILL.md`. If the
+wrapper starts containing the real navigation or verification policy, the skill
+has drifted away from the W2b runtime shape.
 
 If `skill.json` drifts from the registry, validation fails with `SKILL_VALIDATION_FAILED` and names the mismatched fields:
 

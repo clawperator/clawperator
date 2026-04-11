@@ -35,11 +35,14 @@ Current authoring practice recognizes two categories of skills:
   - may rely on tighter device or layout assumptions
 - `-orchestrated` skills:
   - agent-controlled skills intended to better match the Clawperator brain/hand model
-  - expected to expose structured checkpoints, terminal verification, and clearer result semantics as that contract work lands
+  - may declare an `agent` block in `skill.json`
+  - run through their `scripts/run.js` harness, which spawns the configured agent CLI
+  - can emit structured `SkillResult` frames with checkpoints and terminal verification that `runSkill` parses and returns
 
 Important current caveats:
 
-- this category split is a documented naming and authoring convention, not yet a machine-enforced runtime field
+- the `-replay` / `-orchestrated` suffix split is still primarily a naming and authoring convention, not a dedicated registry enum
+- runtime behavior for orchestrated skills is currently driven by the presence of `skill.json.agent`, not by suffix inspection alone
 - some legacy skills predate the suffix convention and may still have unsuffixed ids
 - unsuffixed legacy ids should not be read as proof that a skill is already orchestrated
 
@@ -77,6 +80,25 @@ Meaning of the fields:
 | `skillFile` | `SKILL.md` path |
 | `scripts` | runnable script paths |
 | `artifacts` | deterministic recipe payload files |
+
+Orchestrated skills may also include an `agent` block in `skill.json`:
+
+```json
+{
+  "agent": {
+    "cli": "codex",
+    "timeoutMs": 300000
+  }
+}
+```
+
+Current behavior:
+
+- `runSkill()` detects agent-driven orchestrated skills from `skill.json.agent`
+- `runSkill()` validates agent CLI availability before spawn and returns `SKILL_AGENT_CLI_UNAVAILABLE` when it is missing
+- `runSkill()` executes the skill's `scripts/run.js` harness
+- the harness is responsible for spawning the configured agent CLI on `SKILL.md`
+- framed `SkillResult` output must omit `source`; `runSkill()` injects trusted source metadata from `skill.json.agent`
 
 ## Registry
 

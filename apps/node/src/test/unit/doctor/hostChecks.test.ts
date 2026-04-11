@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert";
-import { checkAdbPresence, checkAdbServer, checkNodeVersion } from "../../../domain/doctor/checks/hostChecks.js";
+import { checkAdbPresence, checkAdbServer, checkNodeVersion, checkOrchestratedSkillAgentCli } from "../../../domain/doctor/checks/hostChecks.js";
 import { ERROR_CODES } from "../../../contracts/errors.js";
 import { getDefaultRuntimeConfig } from "../../../adapters/android-bridge/runtimeConfig.js";
 import { FakeProcessRunner } from "../fakes/FakeProcessRunner.js";
@@ -107,6 +107,51 @@ describe("Doctor: hostChecks", () => {
             const result = await checkAdbServer(config);
 
             assert.strictEqual(result.status, "pass");
+        });
+    });
+
+    describe("checkOrchestratedSkillAgentCli", () => {
+        it("returns a warning when the default orchestrated skill agent CLI is missing", async () => {
+            const runner = new FakeProcessRunner();
+            const config = getDefaultRuntimeConfig({ runner });
+
+            runner.queueResult({ code: 1, stdout: "", stderr: "" });
+
+            const result = await checkOrchestratedSkillAgentCli(config);
+
+            assert.strictEqual(result.status, "warn");
+            assert.strictEqual(result.code, ERROR_CODES.HOST_DEPENDENCY_MISSING);
+            assert.match(result.summary, /codex/);
+            assert.deepStrictEqual(result.evidence, { configuredCli: "codex" });
+        });
+
+        it("respects CLAWPERATOR_SKILL_AGENT_CLI when set", async () => {
+            const runner = new FakeProcessRunner();
+            const config = getDefaultRuntimeConfig({ runner });
+            const original = process.env.CLAWPERATOR_SKILL_AGENT_CLI;
+            process.env.CLAWPERATOR_SKILL_AGENT_CLI = "my-agent";
+            runner.queueResult({ code: 0, stdout: "/usr/local/bin/my-agent\n", stderr: "" });
+
+            try {
+                const result = await checkOrchestratedSkillAgentCli(config);
+
+                assert.strictEqual(result.status, "pass");
+                assert.match(result.summary, /my-agent/);
+                assert.deepStrictEqual(result.evidence, {
+                    configuredCli: "my-agent",
+                    resolvedPath: "/usr/local/bin/my-agent",
+                });
+                assert.deepStrictEqual(runner.calls[0], {
+                    command: "bash",
+                    args: ["-lc", "command -v my-agent"],
+                });
+            } finally {
+                if (original === undefined) {
+                    delete process.env.CLAWPERATOR_SKILL_AGENT_CLI;
+                } else {
+                    process.env.CLAWPERATOR_SKILL_AGENT_CLI = original;
+                }
+            }
         });
     });
 });

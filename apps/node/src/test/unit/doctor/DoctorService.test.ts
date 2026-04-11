@@ -22,6 +22,7 @@ describe("DoctorService", () => {
     runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
     runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
     runner.queueResult({ code: 0, stdout: "", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "/opt/homebrew/bin/codex\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "33\n", stderr: "" });
@@ -57,6 +58,7 @@ describe("DoctorService", () => {
     runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
     runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
     runner.queueResult({ code: 0, stdout: "", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "/opt/homebrew/bin/codex\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "33\n", stderr: "" });
@@ -91,6 +93,7 @@ describe("DoctorService", () => {
     runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
     runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
     runner.queueResult({ code: 0, stdout: "", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "/opt/homebrew/bin/codex\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "33\n", stderr: "" });
@@ -128,6 +131,8 @@ describe("DoctorService", () => {
     runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
     // checkAdbServer: adb start-server
     runner.queueResult({ code: 0, stdout: "", stderr: "" });
+    // checkOrchestratedSkillAgentCli: command -v codex
+    runner.queueResult({ code: 0, stdout: "/opt/homebrew/bin/codex\n", stderr: "" });
     // checkDeviceDiscovery: adb devices (two devices → warn)
     runner.queueResult({ code: 0, stdout: "List of devices attached\nserial1\tdevice\nserial2\tdevice\n", stderr: "" });
     // resolveDevice: adb devices (two devices → throws → caught → early finalize)
@@ -161,6 +166,7 @@ describe("DoctorService", () => {
     runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
     runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
     runner.queueResult({ code: 0, stdout: "", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "/opt/homebrew/bin/codex\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "33\n", stderr: "" });
@@ -189,6 +195,7 @@ describe("DoctorService", () => {
     runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
     runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
     runner.queueResult({ code: 0, stdout: "", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "/opt/homebrew/bin/codex\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "33\n", stderr: "" });
@@ -217,6 +224,7 @@ describe("DoctorService", () => {
     runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
     runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
     runner.queueResult({ code: 0, stdout: "", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "/opt/homebrew/bin/codex\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "33\n", stderr: "" });
@@ -258,6 +266,7 @@ describe("DoctorService logging", () => {
     runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
     runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
     runner.queueResult({ code: 0, stdout: "", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "/opt/homebrew/bin/codex\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "33\n", stderr: "" });
