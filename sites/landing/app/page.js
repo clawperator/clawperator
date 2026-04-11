@@ -611,13 +611,17 @@ export default function Home() {
           </p>
           <div className="agent-entry-links">
             <a href="/agents">/agents</a>
+            <span className="agent-entry-sep">·</span>
             <a href="/index.md">/index.md</a>
+            <span className="agent-entry-sep">·</span>
             <a href="https://docs.clawperator.com/reference/cli-reference/" target="_blank" rel="noreferrer">
               CLI reference
             </a>
+            <span className="agent-entry-sep">·</span>
             <a href="https://docs.clawperator.com/reference/api-overview/" target="_blank" rel="noreferrer">
               API overview
             </a>
+            <span className="agent-entry-sep">·</span>
             <a href="https://docs.clawperator.com/api/mcp/" target="_blank" rel="noreferrer">
               MCP server
             </a>

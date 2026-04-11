@@ -696,11 +696,9 @@ body {
   font-size: 0.88rem;
 }
 
-.agent-entry-links a + a::before {
-  content: "·";
-  margin-right: 0.9rem;
-  opacity: 0.45;
-  pointer-events: none;
+.agent-entry-sep {
+  opacity: 0.4;
+  user-select: none;
 }
 
 .quickstart-top {
@@ -1685,7 +1683,7 @@ body {
     gap: 0.5rem;
   }
 
-  .agent-entry-links a + a::before {
+  .agent-entry-sep {
     display: none;
   }
 
