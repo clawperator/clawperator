@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { ResultEnvelope } from "./result.js";
+import type { ResultEnvelope, StepResult } from "./result.js";
 
 export const SKILL_RESULT_FRAME_PREFIX = "[Clawperator-Skill-Result]";
 export const SKILL_RESULT_CONTRACT_VERSION = "1.0.0";
@@ -64,16 +64,30 @@ const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
   z.union([z.string(), z.number(), z.boolean(), z.null(), z.array(jsonValueSchema), z.record(jsonValueSchema)])
 );
 
-const resultEnvelopeSchema: z.ZodType<ResultEnvelope> = z.object({
+function normalizeEnvelopeStepResultData(raw: unknown): Record<string, string> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return {};
+  }
+
+  const normalized: Record<string, string> = {};
+  for (const [key, value] of Object.entries(raw)) {
+    normalized[key] = typeof value === "string" ? value : String(value);
+  }
+  return normalized;
+}
+
+const resultEnvelopeStepSchema: z.ZodType<StepResult, z.ZodTypeDef, unknown> = z.object({
+  id: z.string(),
+  actionType: z.string(),
+  success: z.boolean(),
+  data: z.unknown().transform((raw) => normalizeEnvelopeStepResultData(raw)),
+});
+
+const resultEnvelopeSchema: z.ZodType<ResultEnvelope, z.ZodTypeDef, unknown> = z.object({
   commandId: z.string(),
   taskId: z.string(),
   status: z.enum(["success", "failed"]),
-  stepResults: z.array(z.object({
-    id: z.string(),
-    actionType: z.string(),
-    success: z.boolean(),
-    data: z.record(z.string()),
-  })),
+  stepResults: z.array(resultEnvelopeStepSchema),
   error: z.string().nullable().optional(),
   errorCode: z.string().nullable().optional(),
   hint: z.string().optional(),

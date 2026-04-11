@@ -2053,6 +2053,22 @@ describe("runSkill", () => {
     assert.ok(!("extraField" in result.skillResult));
   });
 
+  it("accepts raw ResultEnvelope data values in execEnvelopes and normalizes them to strings", async () => {
+    const result = await runSkill(TEST_SKILL_RESULT, ["raw-envelope-data"]);
+
+    assert.ok(result.ok, `Expected raw execEnvelopes to parse successfully: ${"message" in result ? result.message : ""}`);
+    assert.ok(result.skillResult);
+    assert.ok(result.skillResult.execEnvelopes);
+    assert.strictEqual(result.skillResult.execEnvelopes.length, 1);
+    assert.strictEqual(result.skillResult.execEnvelopes[0].stepResults.length, 1);
+    assert.deepStrictEqual(result.skillResult.execEnvelopes[0].stepResults[0].data, {
+      duration_ms: "1000",
+      ok: "true",
+      retries: "0",
+      note: "kept",
+    });
+  });
+
   it("keeps progress lines before the result line in result.output", async () => {
     const result = await runSkill(TEST_SKILL_PROGRESS, []);
     assert.ok(result.ok, `Expected progress fixture to succeed: ${"message" in result ? result.message : ""}`);

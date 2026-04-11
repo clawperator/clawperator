@@ -129,6 +129,32 @@ switch (mode) {
       extraField: "future",
     });
     break;
+  case "raw-envelope-data":
+    emitFrame({
+      ...basePayload,
+      execEnvelopes: [
+        {
+          commandId: "cmd-raw",
+          taskId: "task-raw",
+          status: "success",
+          stepResults: [
+            {
+              id: "step-raw",
+              actionType: "wait",
+              success: true,
+              data: {
+                duration_ms: 1000,
+                ok: true,
+                retries: 0,
+                note: "kept",
+              },
+            },
+          ],
+          error: null,
+        },
+      ],
+    });
+    break;
   case "with-source":
     emitFrame({
       ...basePayload,
