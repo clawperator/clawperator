@@ -1821,9 +1821,7 @@ describe("runSkill", () => {
   });
 
   it("parses a valid framed SkillResult for agent-driven skills and injects agent source metadata", async () => {
-    const result = await runSkill(TEST_AGENT_SKILL_RESULT, ["valid"], undefined, undefined, {
-      TEST_SKILL_ID: TEST_AGENT_SKILL_RESULT,
-    });
+    const result = await runSkill(TEST_AGENT_SKILL_RESULT, ["valid", "--skill-id", TEST_AGENT_SKILL_RESULT]);
 
     assert.ok(result.ok, `Expected agent SkillResult to succeed: ${"message" in result ? result.message : ""}`);
     assert.ok(result.skillResult);

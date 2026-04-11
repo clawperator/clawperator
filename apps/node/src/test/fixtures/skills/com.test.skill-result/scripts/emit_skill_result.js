@@ -1,7 +1,29 @@
 #!/usr/bin/env node
 
-const mode = process.argv[2] || "valid";
-const skillId = process.env.TEST_SKILL_ID || "com.test.skill-result";
+const args = process.argv.slice(2);
+let mode = "valid";
+let cliSkillId;
+
+for (let index = 0; index < args.length; index += 1) {
+  const arg = args[index];
+
+  if (arg === "--skill-id") {
+    cliSkillId = args[index + 1];
+    index += 1;
+    continue;
+  }
+
+  if (arg.startsWith("--skill-id=")) {
+    cliSkillId = arg.slice("--skill-id=".length);
+    continue;
+  }
+
+  if (!arg.startsWith("--") && mode === "valid") {
+    mode = arg || "valid";
+  }
+}
+
+const skillId = cliSkillId || process.env.TEST_SKILL_ID || "com.test.skill-result";
 const prefix = "[Clawperator-Skill-Result]";
 
 const basePayload = {
