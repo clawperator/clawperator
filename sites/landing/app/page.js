@@ -648,29 +648,6 @@ click(<climate_tab>)
 snapshot_ui()
 scroll_and_click(<device_labeled_"Living room">)
 snapshot_ui()
-{
-  "envelope": {
-    "commandId": "cmd-123",
-    "taskId": "cmd-123",
-    "status": "success",
-    "stepResults": [
-      {
-        "id": "snapshot-1",
-        "actionType": "snapshot_ui",
-        "success": true,
-        "data": {
-          "text": "Off"
-        }
-      }
-    ],
-    "error": null
-  },
-  "deviceId": "device-123",
-  "terminalSource": "clawperator_result",
-  "isCanonicalTerminal": true
-}
-
-# agent reads envelope.stepResults[0].data.text === "Off", decides to act:
 if <hvac_state> == "Off":
   click(<turn_on>)`}</code>
             </pre>
@@ -751,7 +728,7 @@ if <hvac_state> == "Off":
           </article>
           <div className="architecture-connector">
             <span className="architecture-line" />
-            <span className="architecture-text">Node API / CLI / MCP / Skills</span>
+            <span className="architecture-text">Node API / CLI / Skills</span>
           </div>
           <article className="architecture-card architecture-card-core">
             <div className="architecture-card-stack">
