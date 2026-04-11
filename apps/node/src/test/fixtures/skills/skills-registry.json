@@ -53,6 +53,30 @@
       "artifacts": []
     },
     {
+      "id": "com.test.skill-result",
+      "applicationId": "com.test",
+      "intent": "skill-result",
+      "summary": "Test skill that emits framed SkillResult payloads.",
+      "path": "skills/com.test.skill-result",
+      "skillFile": "skills/com.test.skill-result/SKILL.md",
+      "scripts": [
+        "skills/com.test.skill-result/scripts/emit_skill_result.js"
+      ],
+      "artifacts": []
+    },
+    {
+      "id": "com.test.agent-skill-result",
+      "applicationId": "com.test",
+      "intent": "agent-skill-result",
+      "summary": "Test skill that emits framed SkillResult payloads with agent metadata.",
+      "path": "skills/com.test.agent-skill-result",
+      "skillFile": "skills/com.test.agent-skill-result/SKILL.md",
+      "scripts": [
+        "skills/com.test.skill-result/scripts/emit_skill_result.js"
+      ],
+      "artifacts": []
+    },
+    {
       "id": "com.test.fail",
       "applicationId": "com.test",
       "intent": "fail",

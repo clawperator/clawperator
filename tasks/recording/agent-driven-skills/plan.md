@@ -130,6 +130,16 @@ the gap between that promise and the current plans.
   SKILL.md did not cover, the missing identities are reported as
   `skipped` and the final status is `indeterminate` unless terminal
   verification still holds.
+- For the Solax proving case, W2b must mirror the replay contract
+  choices made in W2 P3 unless a later task pack intentionally
+  revises them. Reuse `goal: { "kind": "set_discharge_limit",
+  "percent": <n> }`, reuse `inputs: { "percent": <n> }`, and include
+  the same coarse replay checkpoint subset in the same order:
+  `app_opened`, `discharge_to_row_focused`, `target_text_entered`,
+  `save_completed`, `terminal_state_verified`. Do not silently drop
+  or rename any of those coarse identities; if one later proves
+  unstable, record the reason explicitly in the task pack and skill
+  docs.
 - The recording export is authoring evidence only. It is not passed
   to the runtime agent. SKILL.md is the only program the runtime
   agent reads.
@@ -142,6 +152,13 @@ the gap between that promise and the current plans.
   from the known `skill.json` `agent` block after parsing the frame. SKILL.md
   emission rules must explicitly omit `source`. If a frame arrives with
   `source` already set, `runSkill` rejects it as malformed.
+- Framed provenance is authoritative, not best-effort. W2b must ensure the
+  orchestrated skill's `skill.json` always carries readable trusted source
+  metadata (`agent.cli`) because shipped W2 behavior rejects framed results if
+  `runSkill` cannot read source metadata from `skill.json`.
+- Timeout precedence is fixed by shipped W2 behavior: if the outer `runSkill`
+  timeout fires, W2b must consume the timeout outcome and must not assume a
+  partially written frame can still be parsed into `skillResult`.
 - The authoring-time agent (W6) and the runtime agent (this pack)
   are the same binary (`codex`) with different prompts. Plans that
   split them across different CLIs need owner approval.

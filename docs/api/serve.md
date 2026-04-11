@@ -463,6 +463,7 @@ Argument mapping:
   "ok": true,
   "skillId": "com.test.echo",
   "output": "TEST_OUTPUT:hello\nTEST_OUTPUT:api\n",
+  "skillResult": null,
   "exitCode": 0,
   "durationMs": 18,
   "timeoutMs": 4321,
@@ -477,6 +478,8 @@ Behavior:
 - if the skill ID does not exist, the route returns HTTP `404`
 - if skill registry loading fails, the route returns HTTP `500` with `REGISTRY_READ_FAILED`
 - other `runSkill()` failures, including non-zero exit and timeout, return HTTP `400`
+- when a skill emits a framed `SkillResult`, successful and error responses include `skillResult`
+- malformed framed output returns `SKILL_RESULT_PARSE_FAILED`
 - successful responses always include `exitCode: 0`
 
 Failure examples:
@@ -509,7 +512,23 @@ Non-zero skill exit:
     "exitCode": 2,
     "stdout": "partial output\n",
     "stderr": "fatal error\n",
+    "skillResult": null,
     "timeoutMs": 4321
+  }
+}
+```
+
+Malformed framed result:
+
+```json
+{
+  "ok": false,
+  "error": {
+    "code": "SKILL_RESULT_PARSE_FAILED",
+    "message": "SkillResult frame contained invalid JSON: ...",
+    "skillId": "com.test.echo",
+    "stdout": "[Clawperator-Skill-Result]\n{not-json\n",
+    "skillResult": null
   }
 }
 ```

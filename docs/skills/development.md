@@ -407,6 +407,7 @@ Verification pattern:
   "ok": true,
   "skillId": "com.example.app.do-thing",
   "output": "RESULT|status=success\n",
+  "skillResult": null,
   "exitCode": 0,
   "durationMs": 8421,
   "timeoutMs": 90000,
@@ -425,7 +426,8 @@ Verification pattern:
     "skillId": "com.example.app.do-thing",
     "exitCode": 1,
     "stdout": "RESULT|status=partial\n",
-    "stderr": "Expected node not found\n"
+    "stderr": "Expected node not found\n",
+    "skillResult": null
   }
 }
 ```
@@ -433,7 +435,7 @@ Verification pattern:
 - unlike CLI `skills run`, this route calls `runSkill()` directly
 - it does not run the CLI pre-validation gate from `cmdSkillsRun()`
 - it does not inject the CLI wrapper banner
-- handle `error.code` values such as `SKILL_OUTPUT_ASSERTION_FAILED`, `SKILL_EXECUTION_FAILED`, and `SKILL_EXECUTION_TIMEOUT` through the nested `error` object, not as the top-level response object
+- handle `error.code` values such as `SKILL_OUTPUT_ASSERTION_FAILED`, `SKILL_EXECUTION_FAILED`, `SKILL_EXECUTION_TIMEOUT`, and `SKILL_RESULT_PARSE_FAILED` through the nested `error` object, not as the top-level response object
 
 ## Skill Sync
 

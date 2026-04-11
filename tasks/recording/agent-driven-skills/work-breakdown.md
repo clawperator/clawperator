@@ -149,8 +149,9 @@ typed failure paths and doctor coverage.
    - forward stdout and stderr
    - parse the emitted `[Clawperator-Skill-Result]` frame via the
      existing W2 parser
-   - enforce the outer timeout; if it hits, kill the harness cleanly
-     and return a typed error
+   - enforce the outer timeout; if it hits, kill the harness cleanly,
+     return a typed error, and preserve shipped W2 precedence where
+     timeout wins over parsing any partial frame content
 4. Add a `clawperator doctor` check under
    `apps/node/src/domain/doctor/checks/` that verifies the
    default orchestrated-skill agent CLI is available on PATH (or at
@@ -163,9 +164,13 @@ typed failure paths and doctor coverage.
      with agent stderr captured
    - agent emits a malformed `SkillResult` frame returns a typed
      parse error
+   - agent emits a frame but trusted source metadata cannot be read
+     from `skill.json` returns a parse failure, not best-effort
+     provenance
    - agent emits `status: indeterminate` returns that status intact
    - agent emits `status: success` returns the full typed object
-  - outer timeout kills the harness cleanly
+   - outer timeout kills the harness cleanly and wins over any
+     partial frame parsing
    - an agent-driven run that takes a non-deterministic recovery
      path but still reaches terminal verification is reported as
      `success` with the actually-reached checkpoints
@@ -230,9 +235,19 @@ skill. Prove the runtime contract from P2 against a live device.
 4. Author `SKILL.md` as an agent program. It must:
    - declare the runtime inputs in plain language (`percent` in the
      range 0-100)
-   - declare the goal (`set_discharge_limit`)
-   - enumerate the required checkpoint identities (aligned with the
-     W2 replay coarse subset and the W2 orchestrated full list)
+   - declare the goal (`set_discharge_limit`) using the same emitted
+     shape W2 P3 chose for replay:
+     `goal: { "kind": "set_discharge_limit", "percent": <n> }`
+   - emit `inputs: { "percent": <n> }` so the orchestrated sibling
+     matches the replay skill's runtime shape
+   - enumerate the required checkpoint identities, including the
+     exact W2 replay coarse subset in the same order:
+     `app_opened`, `discharge_to_row_focused`,
+     `target_text_entered`, `save_completed`,
+     `terminal_state_verified`
+   - if W2b adds finer-grained orchestrated-only checkpoints, keep
+     the replay coarse identities stable rather than renaming or
+     dropping them silently
    - describe the allowed primitives the agent may call
    - describe at least one recovery branch (e.g. "if the
      Intelligence tab is not visible after opening the app, close

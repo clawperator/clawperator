@@ -218,6 +218,8 @@ Important current rule:
   - `skillFile`
   - `scripts`
   - `artifacts`
+- other `skill.json` fields are allowed, but the current validator does not
+  compare or enforce them
 
 If any of those differ, validation fails with `SKILL_VALIDATION_FAILED`.
 
@@ -403,7 +405,81 @@ Current scaffold behavior on nested `clawperator exec` failure is also worth kno
 - if `execFileSync("clawperator", ...)` throws but produced stdout, the scaffolded script writes that stdout and exits `0`
 - only failures with no stdout fall through to `stderr` plus `exit 1`
 
-There are no special stdout markers enforced by `runSkill.ts`. Any stdout contract beyond "raw output string" is skill-defined.
+## Structured Skill Result Contract
+
+Current runtime behavior from `apps/node/src/contracts/skillResult.ts` and
+`apps/node/src/domain/skills/runSkill.ts`:
+
+- `runSkill()` recognizes a skill-level framed result marker:
+  `[Clawperator-Skill-Result]`
+- the v1 frame is two lines at the end of stdout:
+  - line 1: the marker exactly
+  - line 2: one JSON object line
+- any non-whitespace stdout after the JSON line makes the frame malformed in v1
+- multiple frames are rejected
+- malformed framed output is rejected with `SKILL_RESULT_PARSE_FAILED`
+- legacy skills that emit no frame still succeed or fail based on process exit
+  code and return `skillResult: null`
+
+The emitted frame must not contain `source`. `runSkill()` injects it after
+parsing:
+
+- scripted skills get `source: { "kind": "script" }`
+- skills whose `skill.json` contains `agent.cli` get
+  `source: { "kind": "agent", "agentCli": "<cli>" }`
+- framed `SkillResult` output requires readable trusted metadata from the
+  skill's `skill.json`; if that metadata cannot be read or parsed, the runtime
+  rejects the frame with `SKILL_RESULT_PARSE_FAILED` instead of guessing
+  provenance
+
+Current v1 `SkillResult` fields:
+
+- required:
+  - `contractVersion`
+  - `skillId`
+  - `status`
+  - `checkpoints`
+- injected by `runSkill()`:
+  - `source`
+- optional:
+  - `goal`
+  - `inputs`
+  - `terminalVerification`
+  - `execEnvelopes`
+  - `diagnostics`
+
+Current status enums:
+
+- top-level `status`: `success`, `failed`, `indeterminate`
+- checkpoint `status`: `ok`, `failed`, `skipped`
+- `diagnostics.runtimeState`: `healthy`, `poisoned`, `unavailable`, `unknown`
+
+Current typed checkpoint evidence kinds:
+
+- `text`
+- `json`
+- `result_envelope_ref`
+
+Minimal framed example:
+
+```text
+[Clawperator-Skill-Result]
+{"contractVersion":"1.0.0","skillId":"com.example.demo.capture-state","status":"success","checkpoints":[{"id":"terminal_state_verified","status":"ok","evidence":{"kind":"text","text":"Discharge to 40%"}}],"terminalVerification":{"status":"verified","expected":{"kind":"text","text":"Discharge to 40%"},"observed":{"kind":"text","text":"Discharge to 40%"}}}
+```
+
+Current authoring rule for new non-trivial skills:
+
+- emit a framed `SkillResult`
+- keep process exit truthful
+- use `terminalVerification` when the skill claims a persisted app-state
+  change
+- use `skillResult: null` only for legacy skills that have not yet been
+  upgraded
+
+Version handling:
+
+- same major version with a newer minor version is accepted
+- a different major version is rejected with `SKILL_RESULT_PARSE_FAILED`
 
 ### Run Script Verification
 
@@ -417,10 +493,15 @@ clawperator skills run com.example.demo.capture-state --device <device_serial> -
 For the run result, verify:
 
 - `skillId` matches the registry id
-- `output` contains the raw JSON emitted by the scaffolded `clawperator exec --json` call
+- `output` contains the full stdout, including the framed result when emitted
 - `exitCode` is `0`
+- `skillResult` is either a parsed object or `null` for a legacy skill
 
-If the script exits non-zero, `skills run` returns `SKILL_EXECUTION_FAILED` and preserves `stdout`, `stderr`, and `exitCode`.
+If the script exits non-zero, `skills run` returns `SKILL_EXECUTION_FAILED` and
+preserves `stdout`, `stderr`, `exitCode`, and any parsed `skillResult`.
+
+If the script emits a malformed frame, `skills run` returns
+`SKILL_RESULT_PARSE_FAILED` instead of falling back to legacy stdout parsing.
 
 ### Non-Trivial Skill Rule
 

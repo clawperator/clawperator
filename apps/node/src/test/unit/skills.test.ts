@@ -34,6 +34,7 @@ import {
   SKILL_EXECUTION_FAILED,
   SKILL_EXECUTION_TIMEOUT,
   SKILL_OUTPUT_ASSERTION_FAILED,
+  SKILL_RESULT_PARSE_FAILED,
   SKILL_ALREADY_EXISTS,
   SKILL_ID_INVALID,
   REGISTRY_READ_FAILED,
@@ -47,6 +48,8 @@ const TEST_SKILL_INVALID_ARTIFACT = "test-skill-invalid-artifact";
 const TEST_SKILL_SCRIPT_ONLY = "test-skill-script-only";
 const TEST_SKILL_EMPTY_ARTIFACTS = "test-skill-empty-artifacts";
 const TEST_SKILL_PROGRESS = "com.test.progress";
+const TEST_SKILL_RESULT = "com.test.skill-result";
+const TEST_AGENT_SKILL_RESULT = "com.test.agent-skill-result";
 const TEST_FIXTURE_CHUNKED_OUTPUT = "test-fixture-chunked-output";
 const TEST_FIXTURE_MIXED_STREAMS = "test-fixture-mixed-streams";
 const TEST_FIXTURE_SPLIT_WORD = "test-fixture-split-word";
@@ -140,6 +143,51 @@ async function getPackageVersion(): Promise<string> {
   const pkg = await readFile(join(packageRoot, "package.json"), "utf8");
   const parsed = JSON.parse(pkg) as { version?: string };
   return parsed.version ?? "0.0.0";
+}
+
+async function createTempRegistryWithSkill(options: {
+  skillId: string;
+  scriptSourcePath: string;
+  skillJsonContents: string;
+}): Promise<{ registryPath: string; cleanup: () => Promise<void> }> {
+  const root = await mkdtemp(join(tmpdir(), "clawperator-skill-result-source-"));
+  const skillDir = join(root, "skills", options.skillId);
+  const scriptsDir = join(skillDir, "scripts");
+  await mkdir(scriptsDir, { recursive: true });
+
+  const scriptDest = join(scriptsDir, "run.js");
+  await copyFile(options.scriptSourcePath, scriptDest);
+  await writeFile(join(skillDir, "SKILL.md"), `# ${options.skillId}\n`);
+  await writeFile(join(skillDir, "skill.json"), options.skillJsonContents);
+
+  const registryPath = join(root, "skills", "skills-registry.json");
+  await writeFile(
+    registryPath,
+    JSON.stringify({
+      schemaVersion: "1.0",
+      generatedAt: "2026-04-11T00:00:00Z",
+      skills: [
+        {
+          id: options.skillId,
+          applicationId: "com.test",
+          intent: "temp",
+          summary: "Temporary test skill",
+          path: `skills/${options.skillId}`,
+          skillFile: `skills/${options.skillId}/SKILL.md`,
+          scripts: [`skills/${options.skillId}/scripts/run.js`],
+          artifacts: [],
+        },
+      ],
+    }),
+    "utf8"
+  );
+
+  return {
+    registryPath,
+    cleanup: async () => {
+      await rm(root, { recursive: true, force: true });
+    },
+  };
 }
 
 function getLogPathForDir(logDir: string): string {
@@ -1676,6 +1724,7 @@ describe("runSkill", () => {
     const result = await runSkill(TEST_FIXTURE_CHUNKED_OUTPUT, []);
     assert.ok(result.ok, `Expected runSkill to succeed: ${"message" in result ? result.message : ""}`);
     assert.strictEqual(result.output, "chunk1\nchunk2\n");
+    assert.strictEqual(result.skillResult, null);
   });
 
   it("streams each stdout chunk to onOutput before resolution", async () => {
@@ -1744,12 +1793,43 @@ describe("runSkill", () => {
     assert.strictEqual(result.exitCode, 0);
     assert.ok(result.output.includes("TEST_OUTPUT:hello"));
     assert.ok(typeof result.durationMs === "number" && result.durationMs >= 0);
+    assert.strictEqual(result.skillResult, null);
   });
 
   it("runs script with no args", async () => {
     const result = await runSkill("com.test.echo", []);
     assert.ok(result.ok);
     assert.ok(result.output.includes("TEST_OUTPUT:no-args"));
+    assert.strictEqual(result.skillResult, null);
+  });
+
+  it("parses a valid framed SkillResult for scripted skills", async () => {
+    const result = await runSkill(TEST_SKILL_RESULT, ["valid"]);
+    assert.ok(result.ok, `Expected framed SkillResult to succeed: ${"message" in result ? result.message : ""}`);
+    assert.ok(result.output.includes("progress:before-frame"));
+    assert.ok(result.skillResult);
+    assert.strictEqual(result.skillResult.source.kind, "script");
+    assert.strictEqual(result.skillResult.skillId, TEST_SKILL_RESULT);
+    assert.strictEqual(result.skillResult.status, "success");
+    assert.strictEqual(result.skillResult.checkpoints.length, 3);
+    assert.deepStrictEqual(result.skillResult.checkpoints.map((checkpoint) => checkpoint.evidence?.kind), [
+      "text",
+      "json",
+      "result_envelope_ref",
+    ]);
+    assert.strictEqual(result.skillResult.diagnostics?.runtimeState, "healthy");
+  });
+
+  it("parses a valid framed SkillResult for agent-driven skills and injects agent source metadata", async () => {
+    const result = await runSkill(TEST_AGENT_SKILL_RESULT, ["valid", "--skill-id", TEST_AGENT_SKILL_RESULT]);
+
+    assert.ok(result.ok, `Expected agent SkillResult to succeed: ${"message" in result ? result.message : ""}`);
+    assert.ok(result.skillResult);
+    assert.deepStrictEqual(result.skillResult.source, {
+      kind: "agent",
+      agentCli: "codex",
+    });
+    assert.strictEqual(result.skillResult.skillId, TEST_AGENT_SKILL_RESULT);
   });
 
   it("returns SKILL_OUTPUT_ASSERTION_FAILED when expectContains is missing from output", async () => {
@@ -1766,6 +1846,7 @@ describe("runSkill", () => {
     assert.strictEqual(result.code, SKILL_OUTPUT_ASSERTION_FAILED);
     assert.strictEqual(result.expectedSubstring, "missing-value");
     assert.ok(result.output?.includes("TEST_OUTPUT:hello"));
+    assert.strictEqual(result.skillResult, null);
   });
 
   it("succeeds when output includes expectContains", async () => {
@@ -1805,6 +1886,229 @@ describe("runSkill", () => {
     assert.strictEqual(result.exitCode, 2);
     assert.strictEqual(result.stdout, "{\"partial\":true,\"stage\":\"before-failure\"}\n");
     assert.strictEqual(result.stderr, "FAIL_OUTPUT:intentional\n");
+    assert.strictEqual(result.skillResult, null);
+  });
+
+  it("surfaces a parsed SkillResult on the error path when a framed skill exits non-zero", async () => {
+    const result = await runSkill(TEST_SKILL_RESULT, ["fail"]);
+
+    assert.ok(!result.ok);
+    assert.strictEqual(result.code, SKILL_EXECUTION_FAILED);
+    assert.strictEqual(result.exitCode, 9);
+    assert.ok(result.stdout?.includes("[Clawperator-Skill-Result]"));
+    assert.ok(result.skillResult);
+    assert.strictEqual(result.skillResult.status, "failed");
+    assert.strictEqual(result.skillResult.source.kind, "script");
+    assert.strictEqual(result.skillResult.diagnostics?.runtimeState, "poisoned");
+  });
+
+  it("keeps legacy stdout behavior when no SkillResult frame is present", async () => {
+    const result = await runSkill(TEST_SKILL_RESULT, ["legacy"]);
+
+    assert.ok(result.ok, `Expected legacy mode to succeed: ${"message" in result ? result.message : ""}`);
+    assert.strictEqual(result.output, "legacy-output-only\n");
+    assert.strictEqual(result.skillResult, null);
+  });
+
+  it("rejects earlier marker mentions when they are not part of the trailing frame suffix", async () => {
+    const result = await runSkill(TEST_SKILL_RESULT, ["marker-progress-only"]);
+
+    assert.ok(!result.ok);
+    assert.strictEqual(result.code, SKILL_RESULT_PARSE_FAILED);
+    assert.match(result.message, /terminal non-empty stdout suffix|followed by a JSON object line/i);
+    assert.strictEqual(result.skillResult, null);
+  });
+
+  it("rejects earlier marker mentions even when a later trailing frame looks valid", async () => {
+    const result = await runSkill(TEST_SKILL_RESULT, ["marker-progress-before-valid-frame"]);
+
+    assert.ok(!result.ok);
+    assert.strictEqual(result.code, SKILL_RESULT_PARSE_FAILED);
+    assert.match(result.message, /multiple SkillResult frames|non-terminal SkillResult marker/i);
+    assert.strictEqual(result.skillResult, null);
+  });
+
+  it("rejects malformed SkillResult JSON instead of silently falling back to legacy parsing", async () => {
+    const result = await runSkill(TEST_SKILL_RESULT, ["malformed-json"]);
+
+    assert.ok(!result.ok);
+    assert.strictEqual(result.code, SKILL_RESULT_PARSE_FAILED);
+    assert.match(result.message, /invalid JSON/i);
+    assert.strictEqual(result.skillResult, null);
+  });
+
+  it("rejects multiple SkillResult frames", async () => {
+    const result = await runSkill(TEST_SKILL_RESULT, ["multiple"]);
+
+    assert.ok(!result.ok);
+    assert.strictEqual(result.code, SKILL_RESULT_PARSE_FAILED);
+    assert.match(result.message, /multiple SkillResult frames|non-terminal SkillResult marker/i);
+    assert.strictEqual(result.skillResult, null);
+  });
+
+  it("rejects framed output when any non-whitespace stdout appears after the frame", async () => {
+    const result = await runSkill(TEST_SKILL_RESULT, ["frame-with-trailing-output"]);
+
+    assert.ok(!result.ok);
+    assert.strictEqual(result.code, SKILL_RESULT_PARSE_FAILED);
+    assert.match(result.message, /terminal non-empty stdout suffix/i);
+    assert.strictEqual(result.skillResult, null);
+  });
+
+  it("treats whitespace-padded marker lines as legacy stdout instead of a framed SkillResult", async () => {
+    const result = await runSkill(TEST_SKILL_RESULT, ["whitespace-padded-frame-marker"]);
+
+    assert.ok(result.ok, `Expected whitespace-padded marker output to stay legacy: ${"message" in result ? result.message : ""}`);
+    assert.ok(result.output.includes(` ${"[Clawperator-Skill-Result]"} `));
+    assert.strictEqual(result.skillResult, null);
+  });
+
+  it("rejects framed SkillResults that try to self-report source", async () => {
+    const result = await runSkill(TEST_SKILL_RESULT, ["with-source"]);
+
+    assert.ok(!result.ok);
+    assert.strictEqual(result.code, SKILL_RESULT_PARSE_FAILED);
+    assert.match(result.message, /must not include source/i);
+    assert.strictEqual(result.skillResult, null);
+  });
+
+  it("rejects framed SkillResults whose skillId does not match the invoked skill", async () => {
+    const result = await runSkill(TEST_SKILL_RESULT, ["mismatch-skill-id"]);
+
+    assert.ok(!result.ok);
+    assert.strictEqual(result.code, SKILL_RESULT_PARSE_FAILED);
+    assert.match(result.message, /did not match invoked skill/i);
+    assert.strictEqual(result.skillResult, null);
+  });
+
+  it("rejects framed SkillResults when trusted source metadata cannot be read", async () => {
+    const fixtureScript = join(
+      packageRoot,
+      "src",
+      "test",
+      "fixtures",
+      "skills",
+      "com.test.skill-result",
+      "scripts",
+      "emit_skill_result.js"
+    );
+    const temp = await createTempRegistryWithSkill({
+      skillId: "com.test.invalid-source-skill",
+      scriptSourcePath: fixtureScript,
+      skillJsonContents: "{invalid-json",
+    });
+
+    try {
+      const framedResult = await runSkill("com.test.invalid-source-skill", ["valid"], temp.registryPath);
+      assert.ok(!framedResult.ok);
+      assert.strictEqual(framedResult.code, SKILL_RESULT_PARSE_FAILED);
+      assert.match(framedResult.message, /trusted skill result source metadata/i);
+
+      const legacyResult = await runSkill("com.test.invalid-source-skill", ["legacy"], temp.registryPath);
+      assert.ok(legacyResult.ok, `Expected legacy path to stay permissive: ${"message" in legacyResult ? legacyResult.message : ""}`);
+      assert.strictEqual(legacyResult.skillResult, null);
+      assert.strictEqual(legacyResult.output, "legacy-output-only\n");
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
+  it("rejects framed SkillResults when skill.json is valid JSON but not an object", async () => {
+    const fixtureScript = join(
+      packageRoot,
+      "src",
+      "test",
+      "fixtures",
+      "skills",
+      "com.test.skill-result",
+      "scripts",
+      "emit_skill_result.js"
+    );
+    const temp = await createTempRegistryWithSkill({
+      skillId: "com.test.non-object-source-skill",
+      scriptSourcePath: fixtureScript,
+      skillJsonContents: JSON.stringify(true),
+    });
+
+    try {
+      const result = await runSkill("com.test.non-object-source-skill", ["valid"], temp.registryPath);
+      assert.ok(!result.ok);
+      assert.strictEqual(result.code, SKILL_RESULT_PARSE_FAILED);
+      assert.match(result.message, /skill\.json must contain a JSON object/i);
+      assert.strictEqual(result.skillResult, null);
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
+  it("rejects framed SkillResults when skill.json has a malformed agent block", async () => {
+    const fixtureScript = join(
+      packageRoot,
+      "src",
+      "test",
+      "fixtures",
+      "skills",
+      "com.test.skill-result",
+      "scripts",
+      "emit_skill_result.js"
+    );
+    const temp = await createTempRegistryWithSkill({
+      skillId: "com.test.invalid-agent-source-skill",
+      scriptSourcePath: fixtureScript,
+      skillJsonContents: JSON.stringify({
+        agent: {
+          cli: "",
+        },
+      }),
+    });
+
+    try {
+      const framedResult = await runSkill("com.test.invalid-agent-source-skill", ["valid"], temp.registryPath);
+      assert.ok(!framedResult.ok);
+      assert.strictEqual(framedResult.code, SKILL_RESULT_PARSE_FAILED);
+      assert.match(framedResult.message, /agent\.cli must be a non-empty string/i);
+
+      const legacyResult = await runSkill("com.test.invalid-agent-source-skill", ["legacy"], temp.registryPath);
+      assert.ok(legacyResult.ok, `Expected legacy path to stay permissive: ${"message" in legacyResult ? legacyResult.message : ""}`);
+      assert.strictEqual(legacyResult.skillResult, null);
+      assert.strictEqual(legacyResult.output, "legacy-output-only\n");
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
+  it("rejects unsupported SkillResult contract major versions", async () => {
+    const result = await runSkill(TEST_SKILL_RESULT, ["unsupported-major"]);
+
+    assert.ok(!result.ok);
+    assert.strictEqual(result.code, SKILL_RESULT_PARSE_FAILED);
+    assert.match(result.message, /Unsupported SkillResult contract major version 2/);
+    assert.strictEqual(result.skillResult, null);
+  });
+
+  it("accepts newer SkillResult minor versions on the same major", async () => {
+    const result = await runSkill(TEST_SKILL_RESULT, ["newer-minor"]);
+
+    assert.ok(result.ok, `Expected newer minor version to succeed: ${"message" in result ? result.message : ""}`);
+    assert.ok(result.skillResult);
+    assert.strictEqual(result.skillResult.contractVersion, "1.2.0");
+    assert.ok(!("extraField" in result.skillResult));
+  });
+
+  it("accepts raw ResultEnvelope data values in execEnvelopes and normalizes them to strings", async () => {
+    const result = await runSkill(TEST_SKILL_RESULT, ["raw-envelope-data"]);
+
+    assert.ok(result.ok, `Expected raw execEnvelopes to parse successfully: ${"message" in result ? result.message : ""}`);
+    assert.ok(result.skillResult);
+    assert.ok(result.skillResult.execEnvelopes);
+    assert.strictEqual(result.skillResult.execEnvelopes.length, 1);
+    assert.strictEqual(result.skillResult.execEnvelopes[0].stepResults.length, 1);
+    assert.deepStrictEqual(result.skillResult.execEnvelopes[0].stepResults[0].data, {
+      duration_ms: "1000",
+      ok: "true",
+      retries: "0",
+      note: "kept",
+    });
   });
 
   it("keeps progress lines before the result line in result.output", async () => {
@@ -1842,11 +2146,43 @@ describe("runSkill", () => {
     assert.ok(resultLines[0].includes("Progress fixture complete"));
   });
 
+  it("CLI skills run includes skillResult in JSON output when present", async () => {
+    const { stdout, code } = await runCli([
+      "skills",
+      "run",
+      TEST_SKILL_RESULT,
+      "--output",
+      "json",
+      "--",
+      "valid",
+    ]);
+
+    assert.strictEqual(code, 0, stdout);
+    const parsed = JSON.parse(stdout) as {
+      skillResult?: {
+        skillId?: string;
+        source?: { kind?: string };
+      } | null;
+    };
+
+    assert.strictEqual(parsed.skillResult?.skillId, TEST_SKILL_RESULT);
+    assert.strictEqual(parsed.skillResult?.source?.kind, "script");
+  });
+
   it("returns partial stdout when a skill times out", async () => {
     const result = await runSkill("com.test.partial-timeout", [], undefined, 150);
     assert.ok(!result.ok);
     assert.strictEqual(result.code, SKILL_EXECUTION_TIMEOUT);
     assert.ok(result.stdout?.includes('"stage":"before-timeout"'));
+  });
+
+  it("reports timeout instead of parse failure when a framed result is cut off by timeout", async () => {
+    const result = await runSkill(TEST_SKILL_RESULT, ["partial-frame-timeout"], undefined, 150);
+
+    assert.ok(!result.ok);
+    assert.strictEqual(result.code, SKILL_EXECUTION_TIMEOUT);
+    assert.ok(result.stdout?.includes("[Clawperator-Skill-Result]"));
+    assert.strictEqual(result.skillResult, null);
   });
 
   it("CLI skills run includes partial stdout on failure", async () => {
@@ -2326,6 +2662,7 @@ describe("cmdSkillsRun preflight gate", () => {
         output: "should-not-run",
         exitCode: 0,
         durationMs: 1,
+        skillResult: null,
       } as const;
     };
 
@@ -2353,6 +2690,7 @@ describe("cmdSkillsRun preflight gate", () => {
         output: "RUN_OK",
         exitCode: 0,
         durationMs: 1,
+        skillResult: null,
       } as const;
     };
 
@@ -2380,6 +2718,7 @@ describe("cmdSkillsRun preflight gate", () => {
         output: "RUN_OK",
         exitCode: 0,
         durationMs: 1,
+        skillResult: null,
       } as const;
     };
 
@@ -2429,6 +2768,7 @@ describe("cmdSkillsRun preflight gate", () => {
             output: "RUN_OK",
             exitCode: 0,
             durationMs: 1,
+            skillResult: null,
           }),
         }
       );
@@ -2488,6 +2828,7 @@ describe("cmdSkillsRun preflight gate", () => {
               output: "chunk1\\nchunk2\\n",
               exitCode: 0,
               durationMs: 1,
+              skillResult: null,
             };
           }
         }
@@ -2521,6 +2862,7 @@ describe("cmdSkillsRun preflight gate", () => {
         output: "RUN_OK",
         exitCode: 0,
         durationMs: 1,
+        skillResult: null,
       } as const;
     };
 
@@ -2785,10 +3127,59 @@ describe("CLI skills run streaming", () => {
     assert.ok(stderrChunks[0]?.startsWith("[Clawperator]"), stderrChunks[0]);
     assert.ok(
       stdoutChunks.some((chunk, index) =>
-        chunk.includes("chunk1") && stdoutChunks.slice(index + 1).some((later) => later.includes("chunk2"))
+        chunk.includes("chunk1")
+        && !chunk.includes("chunk2")
+        && stdoutChunks.slice(index + 1).some((later) => later.includes("chunk2"))
       ),
       stdoutChunks.join("")
     );
+  });
+
+  it("hides terminal SkillResult frames from pretty-mode stdout while keeping human output", async () => {
+    const fakeAdbDir = await createFakeAdb({
+      installed: true,
+      operatorPackage: "com.clawperator.operator.dev",
+    });
+    const cliPath = join(packageRoot, "dist", "cli", "index.js");
+    let stdout = "";
+    let stderr = "";
+
+    const proc = spawn(process.execPath, [
+      cliPath,
+      "skills",
+      "run",
+      TEST_SKILL_RESULT,
+      "--operator-package",
+      "com.clawperator.operator.dev",
+      "--output",
+      "pretty",
+    ], {
+      cwd: packageRoot,
+      env: {
+        ...process.env,
+        PATH: `${fakeAdbDir}${process.env.PATH ? `:${process.env.PATH}` : ""}`,
+        CLAWPERATOR_SKILLS_REGISTRY: TEST_REGISTRY_PATH,
+      },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    proc.stdout.on("data", (chunk) => {
+      stdout += chunk.toString();
+    });
+    proc.stderr.on("data", (chunk) => {
+      stderr += chunk.toString();
+    });
+
+    const code = await new Promise<number>((resolve) => {
+      proc.on("close", (exitCode) => resolve(exitCode ?? -1));
+    });
+
+    assert.strictEqual(code, 0, `stderr: ${stderr}`);
+    assert.ok(stderr.startsWith("[Clawperator]"), stderr);
+    assert.ok(stdout.includes("progress:before-frame"), stdout);
+    assert.ok(stdout.indexOf("progress:before-frame") < stdout.indexOf("\"skillResult\""), stdout);
+    assert.ok(stdout.includes("\"skillResult\""), stdout);
+    assert.ok(!stdout.includes("[Clawperator-Skill-Result]"), stdout);
   });
 });
 

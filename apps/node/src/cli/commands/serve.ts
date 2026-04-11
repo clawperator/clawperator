@@ -477,6 +477,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
           output: result.output,
           exitCode: result.exitCode,
           durationMs: result.durationMs,
+          skillResult: result.skillResult,
           timeoutMs: typeof timeoutMs === "number" ? timeoutMs : undefined,
           expectedSubstring: typeof expectContains === "string" ? expectContains : undefined,
         });
@@ -488,6 +489,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
             message: result.message,
             skillId: result.skillId,
             output: result.output,
+            skillResult: result.skillResult,
             expectedSubstring: result.expectedSubstring,
             timeoutMs: typeof timeoutMs === "number" ? timeoutMs : undefined,
           },
@@ -505,6 +507,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
             exitCode: result.exitCode,
             stdout: result.stdout,
             stderr: result.stderr,
+            skillResult: result.skillResult,
             timeoutMs: typeof timeoutMs === "number" ? timeoutMs : undefined,
             expectedSubstring: typeof expectContains === "string" ? expectContains : undefined,
           },

@@ -218,6 +218,100 @@ describe("serve API integration", () => {
     assert.ok(body.error.stderr?.includes("FAIL_OUTPUT:intentional"));
   });
 
+  test("POST /skills/:skillId/run returns skillResult on framed success", async () => {
+    const res = await fetch(`http://localhost:${port}/skills/com.test.skill-result/run`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ args: ["valid"] }),
+    });
+
+    assert.strictEqual(res.status, 200);
+    const body = await res.json() as {
+      ok: boolean;
+      skillId?: string;
+      skillResult?: {
+        skillId?: string;
+        status?: string;
+        source?: { kind?: string };
+      } | null;
+    };
+    assert.strictEqual(body.ok, true);
+    assert.strictEqual(body.skillId, "com.test.skill-result");
+    assert.strictEqual(body.skillResult?.skillId, "com.test.skill-result");
+    assert.strictEqual(body.skillResult?.status, "success");
+    assert.strictEqual(body.skillResult?.source?.kind, "script");
+  });
+
+  test("POST /skills/:skillId/run returns skillResult on framed non-zero failure", async () => {
+    const res = await fetch(`http://localhost:${port}/skills/com.test.skill-result/run`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ args: ["fail"] }),
+    });
+
+    assert.strictEqual(res.status, 400);
+    const body = await res.json() as {
+      ok: boolean;
+      error: {
+        code: string;
+        skillResult?: {
+          skillId?: string;
+          status?: string;
+          source?: { kind?: string };
+        } | null;
+      };
+    };
+    assert.strictEqual(body.ok, false);
+    assert.strictEqual(body.error.code, "SKILL_EXECUTION_FAILED");
+    assert.strictEqual(body.error.skillResult?.skillId, "com.test.skill-result");
+    assert.strictEqual(body.error.skillResult?.status, "failed");
+    assert.strictEqual(body.error.skillResult?.source?.kind, "script");
+  });
+
+  test("POST /skills/:skillId/run returns parse failure for malformed framed output", async () => {
+    const res = await fetch(`http://localhost:${port}/skills/com.test.skill-result/run`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ args: ["malformed-json"] }),
+    });
+
+    assert.strictEqual(res.status, 400);
+    const body = await res.json() as {
+      ok: boolean;
+      error: {
+        code: string;
+        skillResult?: unknown;
+        stdout?: string;
+      };
+    };
+    assert.strictEqual(body.ok, false);
+    assert.strictEqual(body.error.code, "SKILL_RESULT_PARSE_FAILED");
+    assert.strictEqual(body.error.skillResult, null);
+    assert.ok(body.error.stdout?.includes("[Clawperator-Skill-Result]"));
+  });
+
+  test("POST /skills/:skillId/run reports timeout instead of parse failure for a partial framed result", async () => {
+    const res = await fetch(`http://localhost:${port}/skills/com.test.skill-result/run`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ args: ["partial-frame-timeout"], timeoutMs: 150 }),
+    });
+
+    assert.strictEqual(res.status, 400);
+    const body = await res.json() as {
+      ok: boolean;
+      error: {
+        code: string;
+        skillResult?: unknown;
+        stdout?: string;
+      };
+    };
+    assert.strictEqual(body.ok, false);
+    assert.strictEqual(body.error.code, "SKILL_EXECUTION_TIMEOUT");
+    assert.strictEqual(body.error.skillResult, null);
+    assert.ok(body.error.stdout?.includes("[Clawperator-Skill-Result]"));
+  });
+
   test("POST /skills/:skillId/run accepts timeoutMs override", async () => {
     const res = await fetch(`http://localhost:${port}/skills/com.test.echo/run`, {
       method: "POST",
