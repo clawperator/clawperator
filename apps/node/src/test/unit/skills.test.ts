@@ -145,6 +145,51 @@ async function getPackageVersion(): Promise<string> {
   return parsed.version ?? "0.0.0";
 }
 
+async function createTempRegistryWithSkill(options: {
+  skillId: string;
+  scriptSourcePath: string;
+  skillJsonContents: string;
+}): Promise<{ registryPath: string; cleanup: () => Promise<void> }> {
+  const root = await mkdtemp(join(tmpdir(), "clawperator-skill-result-source-"));
+  const skillDir = join(root, "skills", options.skillId);
+  const scriptsDir = join(skillDir, "scripts");
+  await mkdir(scriptsDir, { recursive: true });
+
+  const scriptDest = join(scriptsDir, "run.js");
+  await copyFile(options.scriptSourcePath, scriptDest);
+  await writeFile(join(skillDir, "SKILL.md"), `# ${options.skillId}\n`);
+  await writeFile(join(skillDir, "skill.json"), options.skillJsonContents);
+
+  const registryPath = join(root, "skills", "skills-registry.json");
+  await writeFile(
+    registryPath,
+    JSON.stringify({
+      schemaVersion: "1.0",
+      generatedAt: "2026-04-11T00:00:00Z",
+      skills: [
+        {
+          id: options.skillId,
+          applicationId: "com.test",
+          intent: "temp",
+          summary: "Temporary test skill",
+          path: `skills/${options.skillId}`,
+          skillFile: `skills/${options.skillId}/SKILL.md`,
+          scripts: [`skills/${options.skillId}/scripts/run.js`],
+          artifacts: [],
+        },
+      ],
+    }),
+    "utf8"
+  );
+
+  return {
+    registryPath,
+    cleanup: async () => {
+      await rm(root, { recursive: true, force: true });
+    },
+  };
+}
+
 function getLogPathForDir(logDir: string): string {
   const now = new Date();
   const yyyy = String(now.getFullYear());
@@ -1901,6 +1946,38 @@ describe("runSkill", () => {
     assert.strictEqual(result.code, SKILL_RESULT_PARSE_FAILED);
     assert.match(result.message, /did not match invoked skill/i);
     assert.strictEqual(result.skillResult, null);
+  });
+
+  it("rejects framed SkillResults when trusted source metadata cannot be read", async () => {
+    const fixtureScript = join(
+      packageRoot,
+      "src",
+      "test",
+      "fixtures",
+      "skills",
+      "com.test.skill-result",
+      "scripts",
+      "emit_skill_result.js"
+    );
+    const temp = await createTempRegistryWithSkill({
+      skillId: "com.test.invalid-source-skill",
+      scriptSourcePath: fixtureScript,
+      skillJsonContents: "{invalid-json",
+    });
+
+    try {
+      const framedResult = await runSkill("com.test.invalid-source-skill", ["valid"], temp.registryPath);
+      assert.ok(!framedResult.ok);
+      assert.strictEqual(framedResult.code, SKILL_RESULT_PARSE_FAILED);
+      assert.match(framedResult.message, /trusted skill result source metadata/i);
+
+      const legacyResult = await runSkill("com.test.invalid-source-skill", ["legacy"], temp.registryPath);
+      assert.ok(legacyResult.ok, `Expected legacy path to stay permissive: ${"message" in legacyResult ? legacyResult.message : ""}`);
+      assert.strictEqual(legacyResult.skillResult, null);
+      assert.strictEqual(legacyResult.output, "legacy-output-only\n");
+    } finally {
+      await temp.cleanup();
+    }
   });
 
   it("rejects unsupported SkillResult contract major versions", async () => {

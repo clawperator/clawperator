@@ -9016,6 +9016,10 @@ parsing:
 - scripted skills get `source: { "kind": "script" }`
 - skills whose `skill.json` contains `agent.cli` get
   `source: { "kind": "agent", "agentCli": "<cli>" }`
+- framed `SkillResult` output requires readable trusted metadata from the
+  skill's `skill.json`; if that metadata cannot be read or parsed, the runtime
+  rejects the frame with `SKILL_RESULT_PARSE_FAILED` instead of guessing
+  provenance
 
 Current v1 `SkillResult` fields:
 

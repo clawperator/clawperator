@@ -65,6 +65,18 @@ interface SkillManifestLike {
   };
 }
 
+interface SkillSourceResolutionSuccess {
+  ok: true;
+  source: SkillResultSource;
+}
+
+interface SkillSourceResolutionFailure {
+  ok: false;
+  message: string;
+}
+
+type SkillSourceResolution = SkillSourceResolutionSuccess | SkillSourceResolutionFailure;
+
 interface SkillFrameParseSuccess {
   ok: true;
   skillResult: SkillResult | null;
@@ -89,31 +101,28 @@ function parseSemver(version: string): { major: number; minor: number; patch: nu
 
 async function resolveSkillResultSource(
   repoRoot: string,
-  skillPath: string,
-  logger?: Logger
-): Promise<SkillResultSource> {
+  skillPath: string
+): Promise<SkillSourceResolution> {
+  const skillJsonPath = join(repoRoot, skillPath, "skill.json");
   try {
-    const raw = await readFile(join(repoRoot, skillPath, "skill.json"), "utf-8");
+    const raw = await readFile(skillJsonPath, "utf-8");
     const parsed = JSON.parse(raw) as SkillManifestLike;
     if (typeof parsed.agent?.cli === "string" && parsed.agent.cli.trim().length > 0) {
-      return { kind: "agent", agentCli: parsed.agent.cli.trim() };
+      return { ok: true, source: { kind: "agent", agentCli: parsed.agent.cli.trim() } };
     }
+    return { ok: true, source: { kind: "script" } };
   } catch (error) {
-    logger?.emit({
-      ts: new Date().toISOString(),
-      level: "warn",
-      event: "skills.run.skill_result_source_fallback",
-      message: `Falling back to scripted skill source inference: ${error instanceof Error ? error.message : String(error)}`,
-    });
+    return {
+      ok: false,
+      message: `Unable to read trusted skill result source metadata from ${skillJsonPath}: ${error instanceof Error ? error.message : String(error)}`,
+    };
   }
-
-  return { kind: "script" };
 }
 
 function parseSkillResultFrame(
   stdout: string,
   expectedSkillId: string,
-  source: SkillResultSource,
+  sourceResolution: SkillSourceResolution,
   logger?: Logger
 ): SkillFrameParseSuccess | SkillFrameParseFailure {
   const lines = stdout.split(/\r?\n/);
@@ -127,6 +136,13 @@ function parseSkillResultFrame(
 
   if (frameIndexes.length > 1) {
     return { ok: false, message: "Skill emitted multiple SkillResult frames" };
+  }
+
+  if (!sourceResolution.ok) {
+    return {
+      ok: false,
+      message: `${sourceResolution.message}. Framed SkillResult output requires authoritative source metadata.`,
+    };
   }
 
   const markerIndex = frameIndexes[0];
@@ -198,7 +214,7 @@ function parseSkillResultFrame(
     ok: true,
     skillResult: {
       ...schemaResult.data,
-      source,
+      source: sourceResolution.source,
     },
   };
 }
@@ -213,7 +229,7 @@ export async function runSkill(
   expectContains?: string
 ): Promise<SkillRunResult | SkillRunError> {
   let resolvedPath: string;
-  let source: SkillResultSource = { kind: "script" };
+  let sourceResolution: SkillSourceResolution = { ok: true, source: { kind: "script" } };
   try {
     const loaded = await loadRegistry(registryPath);
     const skill = findSkillById(loaded.registry, skillId);
@@ -239,7 +255,7 @@ export async function runSkill(
       skill.scripts[0];
 
     resolvedPath = join(repoRoot, scriptRelative);
-    source = await resolveSkillResultSource(repoRoot, skill.path, callbacks?.logger?.child({ skillId }));
+    sourceResolution = await resolveSkillResultSource(repoRoot, skill.path);
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     return { ok: false, code: REGISTRY_READ_FAILED, message, skillResult: null };
@@ -358,7 +374,7 @@ export async function runSkill(
         return;
       }
 
-      const parsedSkillResult = parseSkillResultFrame(stdout, skillId, source, skillLogger);
+      const parsedSkillResult = parseSkillResultFrame(stdout, skillId, sourceResolution, skillLogger);
       if (!parsedSkillResult.ok) {
         finish({
           ok: false,
