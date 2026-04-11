@@ -34,7 +34,7 @@ Clawperator is most effective when the primary interface for a service exists on
 Clawperator operates as a coordinated stack from the reasoning layer down to the hardware:
 
 1. **AI Agent / LLM**: The "brain" that reasons about state and decides which actions to take.
-2. **Node API / CLI (agent integration surface)**: The canonical interface for agents to send commands and receive results.
+2. **Node API / CLI / MCP (agent integration surface)**: The canonical interface for agents to send commands and receive results. Supports direct CLI use, the Node API, and a first-party stdio MCP server (`clawperator mcp serve`) for MCP clients such as Claude Desktop.
 3. **Skills**: Reusable app workflows that sit above the core runtime to package reliable UI paths.
 4. **Clawperator runtime (host-side execution engine)**: The host-side engine that translates API requests into device actions.
 5. **ADB (Android Debug Bridge)**: The transport layer used to communicate with the target device.
@@ -42,7 +42,7 @@ Clawperator operates as a coordinated stack from the reasoning layer down to the
 7. **Android device**: The target environment (preferred: physical Android device; alternative: Android emulator).
 
 **System Hierarchy**: 
-Agent → Node API / CLI → Skills → Clawperator runtime → ADB → Android device → User-installed Android apps
+Agent → Node API / CLI / MCP → Skills → Clawperator runtime → ADB → Android device → User-installed Android apps
 
 ## Execution model
 
@@ -85,6 +85,7 @@ For many services, the mobile app effectively **is the API**. Clawperator allows
 - **Operator Automation Playbook**: https://docs.clawperator.com/design/operator-llm-playbook/
 - **API Overview**: https://docs.clawperator.com/reference/api-overview/
 - **CLI Reference**: https://docs.clawperator.com/reference/cli-reference/
+- **MCP Server**: https://docs.clawperator.com/api/mcp/
 - **Crash Recovery (Permissions)**: https://docs.clawperator.com/reference/cli-reference/#grant-device-permissions
 - **First-Time Setup**: https://docs.clawperator.com/getting-started/first-time-setup/
 - **Full Compiled Docs**: https://clawperator.com/llms-full.txt
