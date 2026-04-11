@@ -16,7 +16,7 @@ skill authoring guidance.
 
 | Item | Value |
 | --- | --- |
-| State | active |
+| State | complete |
 | Total PRs | 3 |
 | Total phases | 4 |
 | Completed | P0, P1, P2, P3 |

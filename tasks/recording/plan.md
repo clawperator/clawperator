@@ -55,9 +55,10 @@ yardstick for whether the subtree is finished.
 
 ### What the brain can know after a skill run that it cannot know today
 
-Today: a skill returns `{ ok, output: string, exitCode }`. The brain reads a
-stdout blob it must hand-parse, and must trust that the script wrote the
-truth.
+Today: a skill returns transport/runtime fields such as `ok`, `skillId`,
+`output`, `exitCode`, and `durationMs` on success, and typed `code`/`message`
+plus optional `stdout`/`stderr` on failure. The brain still reads a stdout blob
+it must hand-parse, and must trust that the script wrote the truth.
 
 After this work:
 

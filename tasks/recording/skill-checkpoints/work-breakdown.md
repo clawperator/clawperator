@@ -19,7 +19,7 @@ Current state: P0 through P3 are complete. The `skill-checkpoints` pack is done.
 
 | Item | Value |
 | --- | --- |
-| State | active |
+| State | complete |
 | Total PRs | 3 |
 | Total phases | 4 |
 | Completed | P0, P1, P2, P3 |
