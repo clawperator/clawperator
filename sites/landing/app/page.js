@@ -645,31 +645,15 @@ export default function Home() {
               for the full API)
             </p>
             <pre>
-              <code>{`open_app(<google_home_app_id>)
-snapshot_ui()
-click(<climate_tab>)
-snapshot_ui()
-scroll_and_click(<device_labeled_"Living room">)
-snapshot_ui()
-{
-  "envelope": {
-    "status": "success",
-    "stepResults": [
-      {
-        "success": true,
-        "data": {
-          "text": "Off"
-        }
-      }
-    ],
-    ...
-  },
-  ...
-}
+              <code>{`clawperator open --app com.google.android.apps.chromecast.app
+clawperator click --text "Climate"
+clawperator scroll-and-click --text-contains "Living room"
 
-# agent reads "Off", decides to act:
-if <hvac_state> == "Off":
-  click(<turn_on>)`}</code>
+clawperator read --text-contains "Heating" --json
+# { "text": "Off" }
+
+# agent reads "Off", turns it on:
+clawperator click --text "Turn On"`}</code>
             </pre>
           </div>
         </div>
