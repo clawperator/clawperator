@@ -1,4 +1,0 @@
-interface:
-  display_name: "Orchestrated Skill Author"
-  short_description: "Author orchestrated skills against the durable runtime contract"
-  default_prompt: "Use $orchestrated-skill-author to author or refactor an orchestrated skill. Read the governing docs first, keep skill authority in `SKILL.md`, keep `skill.json.agent` limited to trusted runtime metadata, and keep `scripts/run.js` as a thin harness."

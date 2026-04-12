@@ -28,6 +28,9 @@ Current state: blocked until the earlier recording workstreams have landed.
 - Keep one human-facing entrypoint: `skill-author-by-recording`.
 - If helper skills are introduced, they sit behind that entrypoint. Do not
   make the user choose among multiple top-level authoring skills for this flow.
+- Reuse the named orchestrated runtime contract from
+  `docs/skills/overview.md#orchestrated-runtime-contract`. Do not create a
+  second competing definition inside the authoring skill.
 - Do not introduce a top-level skill named `skill-author-orchestrator`.
   That name is too easy to confuse with `skill-author-orchestrated`.
 
@@ -85,6 +88,10 @@ Specify exactly what the skill-authoring workflow must do and show.
 - The workflow explicitly defines whether implementation is:
   - monolithic inside `skill-author-by-recording`, or
   - decomposed behind it into helper skills
+- The workflow explicitly points at the durable contract source for authored
+  orchestrated skills:
+  - `docs/skills/overview.md#orchestrated-runtime-contract`
+  - `docs/skills/authoring.md#authoring-agent-driven-orchestrated-skills`
 - If helper skills are used, the default recommended decomposition is:
   - `recording-capture-export`
   - `skill-author-orchestrated-from-recording`
@@ -106,6 +113,9 @@ defined workflow consistently.
 - The skill exists in `.agents/skills/`.
 - It guides the operator rather than assuming silent background work.
 - It points developers at the exact files that explain what was generated.
+- It reuses the durable orchestrated runtime contract wording from
+  `docs/skills/overview.md#orchestrated-runtime-contract` rather than
+  restating a drift-prone parallel version.
 - It uses the recording export (required) and an optional plain-language
   description from the user explaining intent or device-specific nuance that
   the recording alone may not capture, along with the W2b/W3 contract shape,
