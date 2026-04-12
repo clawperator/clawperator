@@ -27,6 +27,7 @@ SOLAX_APP_ID = "com.solaxcloud.starter"
 SOLAX_SKILL_ID = "com.solaxcloud.starter.set-discharge-to-limit-orchestrated"
 DEFAULT_TARGET_VALUES = (35, 40, 45)
 DEFAULT_SKILLS_REGISTRY = REPO_ROOT.parent / "clawperator-skills" / "skills" / "skills-registry.json"
+SKILL_RUN_TIMEOUT_S = 180
 
 
 @dataclass
@@ -34,6 +35,7 @@ class CommandCapture:
     name: str
     command: list[str]
     returncode: int
+    timed_out: bool
     stdout_path: str
     stderr_path: str
     parsed_json_path: str | None
@@ -85,24 +87,38 @@ def _run_and_capture(
     parse_json: bool,
     replacements: list[tuple[str, str]],
     cwd: Path | None = None,
+    timeout_s: int | None = None,
 ) -> tuple[CommandCapture, dict[str, Any] | None, str, str]:
     commands_dir = run_dir / "commands"
     commands_dir.mkdir(parents=True, exist_ok=True)
     started_at = format_timestamp()
-    result = subprocess.run(
-        command,
-        check=False,
-        capture_output=True,
-        text=True,
-        env=env,
-        cwd=str(cwd) if cwd is not None else None,
-    )
+    timed_out = False
+    try:
+        result = subprocess.run(
+            command,
+            check=False,
+            capture_output=True,
+            text=True,
+            env=env,
+            cwd=str(cwd) if cwd is not None else None,
+            timeout=timeout_s,
+        )
+        stdout = result.stdout
+        stderr = result.stderr
+        returncode = result.returncode
+    except subprocess.TimeoutExpired as exc:
+        timed_out = True
+        stdout = exc.stdout if isinstance(exc.stdout, str) else (exc.stdout.decode("utf-8", errors="replace") if exc.stdout else "")
+        stderr = exc.stderr if isinstance(exc.stderr, str) else (exc.stderr.decode("utf-8", errors="replace") if exc.stderr else "")
+        timeout_note = f"\n[live-skill-eval] command timed out after {timeout_s}s\n"
+        stderr = f"{stderr}{timeout_note}" if stderr else timeout_note.lstrip("\n")
+        returncode = 124
     finished_at = format_timestamp()
     stdout_path = commands_dir / f"{name}.stdout.txt"
     stderr_path = commands_dir / f"{name}.stderr.txt"
-    _write_text(stdout_path, result.stdout, replacements)
-    _write_text(stderr_path, result.stderr, replacements)
-    parsed_payload = _parse_json(result.stdout) if parse_json else None
+    _write_text(stdout_path, stdout, replacements)
+    _write_text(stderr_path, stderr, replacements)
+    parsed_payload = _parse_json(stdout) if parse_json else None
     parsed_json_path: Path | None = None
     if parsed_payload is not None:
         parsed_json_path = commands_dir / f"{name}.json"
@@ -110,23 +126,33 @@ def _run_and_capture(
     capture = CommandCapture(
         name=name,
         command=command,
-        returncode=result.returncode,
+        returncode=returncode,
+        timed_out=timed_out,
         stdout_path=str(stdout_path.relative_to(run_dir)),
         stderr_path=str(stderr_path.relative_to(run_dir)),
         parsed_json_path=str(parsed_json_path.relative_to(run_dir)) if parsed_json_path is not None else None,
         started_at=started_at,
         finished_at=finished_at,
     )
-    return capture, parsed_payload, result.stdout, result.stderr
+    return capture, parsed_payload, stdout, stderr
 
 
 def _clawperator_env() -> dict[str, str]:
-    return {
+    env = {
         "PATH": os.environ["PATH"],
         "HOME": os.environ["HOME"],
         "LANG": os.environ.get("LANG", "C.UTF-8"),
         "LC_ALL": os.environ.get("LC_ALL", "C.UTF-8"),
     }
+    for key in [
+        "CLAWPERATOR_SKILL_RETAIN_LOGS",
+        "CLAWPERATOR_SKILL_LOG_DIR",
+        "CLAWPERATOR_SKILL_DEBUG",
+        "CLAWPERATOR_SKILL_AGENT_TIMEOUT_MS",
+    ]:
+        if key in os.environ:
+            env[key] = os.environ[key]
+    return env
 
 
 def _foreground_package(device_serial: str) -> tuple[str | None, str | None, str]:
@@ -299,11 +325,13 @@ def _normalization_sequence(
     }
     _write_json(foreground_path.with_suffix(".json"), foreground_summary, replacements)
     outside_app_proven = foreground_package is not None and foreground_package != SOLAX_APP_ID
+    app_restart_proven = bool(records) and all(record["ok"] for record in records)
     return {
         "records": records,
         "foreground_package": foreground_package,
         "foreground_path": str(foreground_path.with_suffix(".json").relative_to(run_dir)),
         "outside_app_proven": outside_app_proven,
+        "app_restart_proven": app_restart_proven,
     }
 
 
@@ -390,10 +418,12 @@ def _extract_skill_result(payload: dict[str, Any] | None) -> dict[str, Any] | No
 
 def _classify_run(
     *,
+    normalization_before_probe: dict[str, Any],
     normalization_before_skill: dict[str, Any],
     observed_percent: int | None,
     target_percent: int | None,
     result_payload: dict[str, Any] | None,
+    skill_capture: CommandCapture | None,
 ) -> dict[str, Any]:
     skill_result = _extract_skill_result(result_payload)
     skill_status = skill_result.get("status") if isinstance(skill_result, dict) else None
@@ -409,6 +439,7 @@ def _classify_run(
         and terminal_verification.get("status") == "verified"
         and _extract_percent(observed_terminal_text) == target_percent
     )
+    run_start_restarted = bool(normalization_before_probe.get("app_restart_proven"))
     outside_app_proven = bool(normalization_before_skill.get("outside_app_proven"))
     target_difference_proven = observed_percent is not None and target_percent is not None and observed_percent != target_percent
     if not outside_app_proven and skill_status == "success" and terminal_verified:
@@ -422,6 +453,9 @@ def _classify_run(
         proof_mode = "unproven"
     elif target_percent is None:
         classification = "target_selection_failed"
+        proof_mode = "unproven"
+    elif skill_capture is not None and skill_capture.timed_out:
+        classification = "skill_timed_out"
         proof_mode = "unproven"
     elif result_payload is None:
         classification = "result_parse_failed"
@@ -446,6 +480,7 @@ def _classify_run(
         "classification": classification,
         "proof_mode": proof_mode,
         "passed": classification == "cold_start_verified",
+        "run_start_restarted": run_start_restarted,
         "outside_app_proven": outside_app_proven,
         "target_difference_proven": target_difference_proven,
         "terminal_verification_proven": terminal_verified,
@@ -477,6 +512,7 @@ def _render_summary_markdown(summary: dict[str, Any]) -> str:
         f"- Continuation-only successes: `{summary['counts']['continuation_success_only']}`",
         f"- Outside-app proof failures: `{summary['counts']['outside_app_not_proven']}`",
         f"- Target-selection failures: `{summary['counts']['target_selection_failed']}`",
+        f"- Skill timeouts: `{summary['counts']['skill_timed_out']}`",
         f"- Verification mismatches: `{summary['counts']['verification_mismatch']}`",
         "",
         "## Runs",
@@ -522,6 +558,7 @@ def _initial_summary(*, batch_id: str, device_serial: str, operator_package: str
             "outside_app_not_proven": 0,
             "observed_value_unavailable": 0,
             "target_selection_failed": 0,
+            "skill_timed_out": 0,
             "verification_mismatch": 0,
             "skill_failed": 0,
             "skill_indeterminate": 0,
@@ -653,13 +690,16 @@ def run_solax_orchestrated_cold_start_eval(
                 parse_json=True,
                 replacements=replacements,
                 cwd=REPO_ROOT,
+                timeout_s=SKILL_RUN_TIMEOUT_S,
             )
 
         classification = _classify_run(
+            normalization_before_probe=normalization_before_probe,
             normalization_before_skill=normalization_before_skill,
             observed_percent=probe["observed_percent"],
             target_percent=target_percent,
             result_payload=result_payload,
+            skill_capture=skill_capture,
         )
 
         run_metadata = {

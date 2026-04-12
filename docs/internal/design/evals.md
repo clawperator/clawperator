@@ -239,6 +239,21 @@ Artifact boundary:
 - retained live batches are copied into the private `clawperator-artifacts`
   repo rather than committed in the main product repo
 
+Run-start normalization:
+
+- each live proving run force-stops the target app before probe so the observed
+  persisted value comes from a restarted app process, not leftover in-app state
+  from a previous attempt
+- the harness force-stops the target app again before `skills run` so the skill
+  itself starts from a fresh outer-app state as well
+
+Hang handling:
+
+- the live orchestrated-skill harness must bound `skills run` with an explicit
+  timeout and classify a hung skill as `skill_timed_out`
+- a hung skill is evidence of an unproven run, not a reason to leave the batch
+  without summary output
+
 That split is intentional. The benchmark harness measures an agent solving a
 task. The cold-start skill eval measures whether a pre-authored skill proves
 its claimed behavior repeatedly from a normalized device state.

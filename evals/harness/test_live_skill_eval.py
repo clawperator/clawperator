@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import subprocess
+from pathlib import Path
 
 from evals.harness import live_skill_eval
 
@@ -31,10 +33,12 @@ def test_classify_run_accepts_only_cold_start_verified_success():
     }
 
     classified = live_skill_eval._classify_run(
+        normalization_before_probe={"app_restart_proven": True},
         normalization_before_skill={"outside_app_proven": True},
         observed_percent=40,
         target_percent=45,
         result_payload=result_payload,
+        skill_capture=None,
     )
 
     assert classified["classification"] == "cold_start_verified"
@@ -54,15 +58,42 @@ def test_classify_run_distinguishes_continuation_only_success():
     }
 
     classified = live_skill_eval._classify_run(
+        normalization_before_probe={"app_restart_proven": True},
         normalization_before_skill={"outside_app_proven": False},
         observed_percent=40,
         target_percent=35,
         result_payload=result_payload,
+        skill_capture=None,
     )
 
     assert classified["classification"] == "continuation_success_only"
     assert classified["proof_mode"] == "continuation-only"
     assert classified["passed"] is False
+
+
+def test_classify_run_marks_skill_timeout():
+    classified = live_skill_eval._classify_run(
+        normalization_before_probe={"app_restart_proven": True},
+        normalization_before_skill={"outside_app_proven": True},
+        observed_percent=40,
+        target_percent=35,
+        result_payload=None,
+        skill_capture=live_skill_eval.CommandCapture(
+            name="skill-run",
+            command=["clawperator", "skills", "run"],
+            returncode=124,
+            timed_out=True,
+            stdout_path="run-01/commands/skill-run.stdout.txt",
+            stderr_path="run-01/commands/skill-run.stderr.txt",
+            parsed_json_path=None,
+            started_at="2026-04-13T09:23:08+10:00",
+            finished_at="2026-04-13T09:26:08+10:00",
+        ),
+    )
+
+    assert classified["classification"] == "skill_timed_out"
+    assert classified["proof_mode"] == "unproven"
+    assert classified["run_start_restarted"] is True
 
 
 def test_render_summary_markdown_lists_runs():
@@ -79,6 +110,7 @@ def test_render_summary_markdown_lists_runs():
             "continuation_success_only": 1,
             "outside_app_not_proven": 0,
             "target_selection_failed": 0,
+            "skill_timed_out": 0,
             "verification_mismatch": 0,
         },
         "runs": [
@@ -123,6 +155,51 @@ def test_sanitize_json_value_redacts_device_and_repo_paths(tmp_path):
     assert sanitized["device"] == "<device_serial>"
     assert sanitized["registry"] == "/<local_user>/src/clawperator-skills/skills/skills-registry.json"
     assert sanitized["repo"] == "/<local_user>/src/clawperator"
+
+
+def test_clawperator_env_forwards_skill_debugging_overrides(monkeypatch):
+    monkeypatch.setenv("PATH", "/usr/bin")
+    monkeypatch.setenv("HOME", "/tmp/home")
+    monkeypatch.setenv("CLAWPERATOR_SKILL_RETAIN_LOGS", "1")
+    monkeypatch.setenv("CLAWPERATOR_SKILL_LOG_DIR", "/tmp/skill-logs")
+    monkeypatch.setenv("CLAWPERATOR_SKILL_AGENT_TIMEOUT_MS", "120000")
+
+    env = live_skill_eval._clawperator_env()
+
+    assert env["CLAWPERATOR_SKILL_RETAIN_LOGS"] == "1"
+    assert env["CLAWPERATOR_SKILL_LOG_DIR"] == "/tmp/skill-logs"
+    assert env["CLAWPERATOR_SKILL_AGENT_TIMEOUT_MS"] == "120000"
+
+
+def test_run_and_capture_records_timeout(tmp_path, monkeypatch):
+    def fake_run(*args, **kwargs):
+        exc = subprocess.TimeoutExpired(
+            cmd=["clawperator", "skills", "run"],
+            timeout=kwargs["timeout"],
+            output='{"partial":true}\n',
+            stderr="still waiting",
+        )
+        exc.stdout = exc.output
+        raise exc
+
+    monkeypatch.setattr(live_skill_eval.subprocess, "run", fake_run)
+
+    capture, payload, stdout, stderr = live_skill_eval._run_and_capture(
+        command=["clawperator", "skills", "run"],
+        run_dir=tmp_path,
+        name="skill-run",
+        env={"PATH": "/usr/bin", "HOME": "/tmp"},
+        parse_json=True,
+        replacements=[],
+        cwd=Path("/tmp"),
+        timeout_s=180,
+    )
+
+    assert capture.returncode == 124
+    assert capture.timed_out is True
+    assert payload == {"partial": True}
+    assert stdout == '{"partial":true}\n'
+    assert "timed out after 180s" in stderr
 
 
 def test_run_eval_dispatches_solax_eval(monkeypatch, tmp_path):

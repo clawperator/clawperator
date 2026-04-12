@@ -57,14 +57,14 @@ Retention boundary:
 
 This eval encodes the cold-start proving policy in code. For every run it:
 
-1. closes `com.solaxcloud.starter`
+1. force-stops `com.solaxcloud.starter` so the run starts from a restarted app process
 2. presses Home
 3. proves the app is not foregrounded
 4. opens SolaX and probes the current persisted discharge row
-5. closes SolaX again and re-proves outside-app state before the skill run
+5. force-stops SolaX again and re-proves outside-app state before the skill run
 6. chooses a configured target percent that differs from the observed value
 7. runs `clawperator skills run ... --output json`
-8. classifies the run as cold-start proof, continuation-only success, or a
+8. classifies the run as cold-start proof, continuation-only success, skill timeout, or a
    specific failure mode
 
 Artifacts land under `evals/artifacts/<batch_id>/`:
@@ -91,6 +91,9 @@ Truth boundary:
 - `continuation_success_only` means the skill reached the requested final
   value, but the eval did not prove the run started from normalized outside-app
   state
+- `skill_timed_out` means the orchestrated `skills run` process did not finish
+  within the eval timeout window, so the batch records the partial evidence and
+  fails the run truthfully
 - any other classification is a failed cold-start proof batch member, even if
   the skill emitted a structured `SkillResult`
 
