@@ -333,7 +333,9 @@ export async function runSkill(
       };
     }
 
-    resolvedPath = resolveRepoRelativeSkillPath(repoRoot, scriptRelative);
+    const harnessScriptRelative = skill.scripts.find((scriptPath) => isOrchestratedHarnessScriptPath(scriptPath));
+    const trustedManifestScriptRelative = harnessScriptRelative ?? scriptRelative;
+    resolvedPath = resolveRepoRelativeSkillPath(repoRoot, trustedManifestScriptRelative);
     const manifestResult = await readSkillManifestMetadata(repoRoot, skill.path);
     const requiresTrustedManifest = await scriptRequiresTrustedManifestMetadata(resolvedPath);
     if (!manifestResult.ok && requiresTrustedManifest) {
@@ -358,7 +360,7 @@ export async function runSkill(
     const manifestAgent = manifestResult.ok ? manifestResult.metadata.agent : undefined;
     const isAgentDriven = manifestAgent !== null && manifestAgent !== undefined;
     const runnableScriptRelative = isAgentDriven
-      ? skill.scripts.find((scriptPath) => isOrchestratedHarnessScriptPath(scriptPath))
+      ? harnessScriptRelative
       : scriptRelative;
 
     if (!runnableScriptRelative) {

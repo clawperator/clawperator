@@ -1,9 +1,13 @@
 import { describe, it } from "node:test";
 import assert from "node:assert";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { resolveAgentCliExecutable, resolveExecutableOnPathForPlatform } from "../../domain/skills/agentCli.js";
+import {
+  resolveAgentCliExecutable,
+  resolveConfiguredAgentCli,
+  resolveExecutableOnPathForPlatform,
+} from "../../domain/skills/agentCli.js";
 
 describe("resolveExecutableOnPathForPlatform", () => {
   it("resolves Windows launcher extensions via PATHEXT", async () => {
@@ -61,5 +65,44 @@ describe("resolveAgentCliExecutable", () => {
     } finally {
       await rm(tempDir, { recursive: true, force: true });
     }
+  });
+
+  it("rejects cliPath symlinks that resolve outside the skill directory", async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), "clawperator-agent-cli-symlink-"));
+    const skillDir = join(tempDir, "skill");
+    const externalDir = join(tempDir, "external");
+
+    try {
+      await mkdir(join(skillDir, "scripts"), { recursive: true });
+      await mkdir(externalDir, { recursive: true });
+      await writeFile(join(externalDir, "outside-agent"), "#!/bin/sh\nexit 0\n", "utf8");
+      await chmod(join(externalDir, "outside-agent"), 0o755);
+      await symlink(join(externalDir, "outside-agent"), join(skillDir, "scripts", "agent-link"));
+
+      const result = await resolveAgentCliExecutable(
+        { cli: "codex", cliPath: "scripts/agent-link" },
+        skillDir,
+        process.env
+      );
+      assert.ok(!result.ok);
+      assert.match(result.message, /must resolve within the skill directory/i);
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("resolveConfiguredAgentCli", () => {
+  it("does not override a manifest-pinned cliPath with CLAWPERATOR_SKILL_AGENT_CLI", () => {
+    const result = resolveConfiguredAgentCli(
+      { cli: "codex", cliPath: "scripts/fake-agent" },
+      { ...process.env, CLAWPERATOR_SKILL_AGENT_CLI: "override-agent" }
+    );
+
+    assert.ok(result.ok);
+    assert.deepStrictEqual(result.agent, {
+      cli: "codex",
+      cliPath: "scripts/fake-agent",
+    });
   });
 });

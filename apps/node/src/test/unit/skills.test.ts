@@ -2958,6 +2958,50 @@ describe("runSkill", () => {
     }
   });
 
+  it("fails closed for malformed orchestrated manifests using the runnable harness script", async () => {
+    const temp = await createTempRegistryWithSkill({
+      skillId: "com.test.malformed-agent-manifest",
+      scriptSourcePath: join(
+        packageRoot,
+        "src",
+        "test",
+        "fixtures",
+        "skills",
+        TEST_SKILL_SCRIPT_ONLY,
+        "scripts",
+        "run.js"
+      ),
+      skillJsonContents: "{not-json",
+      extraScriptSourcePaths: [
+        join(
+          packageRoot,
+          "src",
+          "test",
+          "fixtures",
+          "skills",
+          "com.test.agent-skill-result",
+          "scripts",
+          "fake_codex.js"
+        ),
+      ],
+    });
+
+    const root = dirname(dirname(temp.registryPath));
+    const skillDir = join(root, "skills", "com.test.malformed-agent-manifest");
+    const harnessPath = join(skillDir, "scripts", "run.js");
+
+    try {
+      await writeFile(harnessPath, "#!/usr/bin/env node\nprocess.env.CLAWPERATOR_SKILL_AGENT_CLI_PATH ??= 'missing';\nconsole.log('legacy-looking harness');\n", "utf8");
+
+      const result = await runSkill("com.test.malformed-agent-manifest", [], temp.registryPath);
+      assert.ok(!result.ok);
+      assert.strictEqual(result.code, SKILL_VALIDATION_FAILED);
+      assert.match(result.message, /trusted skill result source metadata/i);
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
   it("rejects malformed agent blocks when parsing skill manifest metadata", () => {
     const result = parseSkillManifestMetadata("/tmp/test-skill.json", {
       agent: {

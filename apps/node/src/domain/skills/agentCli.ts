@@ -1,5 +1,5 @@
 import { constants as fsConstants } from "node:fs";
-import { access } from "node:fs/promises";
+import { access, realpath } from "node:fs/promises";
 import { delimiter, extname, join, resolve, relative, isAbsolute } from "node:path";
 import type { SkillAgentConfig } from "../../contracts/skills.js";
 
@@ -43,6 +43,9 @@ export function resolveConfiguredAgentCli(
   agent: SkillAgentConfig,
   resolvedEnv: NodeJS.ProcessEnv
 ): EffectiveAgentConfigResolution {
+  if (agent.cliPath && agent.cliPath.trim().length > 0) {
+    return { ok: true, agent };
+  }
   const overriddenCli = resolvedEnv[SKILL_AGENT_CLI_ENV_VAR]?.trim();
   if (!overriddenCli) {
     return { ok: true, agent };
@@ -132,6 +135,22 @@ export async function resolveAgentCliExecutable(
       };
     }
     if (await canResolveAgentTarget(resolvedCliPath)) {
+      try {
+        const canonicalSkillDir = await realpath(skillDir);
+        const canonicalCliPath = await realpath(resolvedCliPath);
+        const canonicalRelativePath = relative(canonicalSkillDir, canonicalCliPath);
+        if (canonicalRelativePath.startsWith("..") || isAbsolute(canonicalRelativePath)) {
+          return {
+            ok: false,
+            message: "Configured agent cliPath must resolve within the skill directory",
+          };
+        }
+      } catch {
+        return {
+          ok: false,
+          message: `Configured agent CLI was not found or is not executable at ${resolvedCliPath}`,
+        };
+      }
       return { ok: true, executablePath: resolvedCliPath };
     }
     return {
