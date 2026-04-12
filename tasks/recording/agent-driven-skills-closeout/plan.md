@@ -114,10 +114,15 @@ This pack keeps the remaining work narrow:
    `apps/node/dist/cli/index.js` must be removed. `CLAWPERATOR_BIN` supplied by
    the parent process is the single source of truth for the Clawperator CLI
    path; the harness must not synthesise its own fallback.
-5. `CLAWPERATOR_SKILL_AGENT_ALLOW_BYPASS` must be removed. If codex sandbox or
-   approval-bypass behavior is genuinely required to run the skill, that must
-   be promoted into a declared field on `skill.json.agent` and documented; no
-   private env toggles.
+5. `CLAWPERATOR_SKILL_AGENT_ALLOW_BYPASS` must be removed. Before that removal,
+   a bypass-dependency probe (C2.0 in the work breakdown) must run against the
+   physical Samsung target *with the bypass unset*, and the outcome must be
+   committed under
+   `docs/internal/design/reliability/solax-discharge-to-limit-orchestrated/probe-no-bypass/`.
+   If the probe succeeds, delete the toggle in C2. If the probe fails citing
+   codex sandbox or approval policy, the bypass must be promoted into a
+   declared field on `skill.json.agent` and documented; it must not be
+   preserved as a hidden env var.
 6. The orchestrated skill (and, if needed, `docs/skills/authoring.md` and
    `docs/skills/overview.md`) must explicitly state that W2b v1 orchestrated
    skills are currently codex-only at runtime. The limitation must be visible,
@@ -131,6 +136,10 @@ This pack keeps the remaining work narrow:
 - Clawperator code/doc fixes for the remaining runtime and public-doc gaps,
   including tightened malformed-agent rejection, the error-code table update,
   and the orchestrated env-var contract documentation
+- committed C2.0 probe evidence under
+  `docs/internal/design/reliability/solax-discharge-to-limit-orchestrated/probe-no-bypass/`
+  recording whether the current skill reaches terminal verification on the
+  physical Samsung target with `CLAWPERATOR_SKILL_AGENT_ALLOW_BYPASS` unset
 - a materially thinner Solax orchestrated `scripts/run.js` with no duplicate
   contract parser, no sibling-repo assumption, no hidden bypass toggle, and no
   Solax-specific prompt construction beyond the minimum needed to hand
@@ -206,9 +215,14 @@ This closeout pack is done only when all of the following are true:
 - `SKILL_AGENT_CLI_UNAVAILABLE` appears in the public error-code reference
 - the orchestrated runtime env-var contract is documented on a public docs
   surface
+- the C2.0 bypass-dependency probe has been executed on the physical Samsung
+  target with `CLAWPERATOR_SKILL_AGENT_ALLOW_BYPASS` unset, and the outcome is
+  committed as evidence for the delete-vs-promote decision
 - the Solax orchestrated harness is thin enough to serve as a truthful W2b v1
   codex reference, with no sibling-repo coupling, no duplicated SkillResult
-  parser, and no hidden bypass toggle
+  parser, and no hidden bypass toggle (or, if the probe forced a contract
+  promotion, the new `skill.json.agent` field is declared and documented
+  instead of the env var)
 - the codex-only W2b v1 limitation is documented honestly in the skill and in
   the public skill docs
 - the 10-run P4 reliability protocol has been executed on a physical Samsung

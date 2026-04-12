@@ -11,9 +11,9 @@ W2b runtime work. This pack should be used for implementation. The older
 | Item | Value |
 | --- | --- |
 | Total PRs | 2 |
-| Total phases | 3 |
+| Total phases | 4 |
 | Completed | none |
-| Remaining | C1, C2, C3 |
+| Remaining | C1, C2.0, C2, C3 |
 | Current / Next | C1 |
 
 ## Hard Rules
@@ -26,7 +26,10 @@ W2b runtime work. This pack should be used for implementation. The older
   runtime" or equivalent.
 - Do not preserve hidden runtime toggles as private operator knowledge. If a
   knob is needed, promote it into the public `skill.json.agent` contract or
-  delete it.
+  delete it. The delete-vs-promote decision for
+  `CLAWPERATOR_SKILL_AGENT_ALLOW_BYPASS` must be backed by the C2.0 probe
+  evidence, not by recollection.
+- Do not begin C2 edits to `scripts/run.js` before C2.0 is committed.
 - Do not broaden this pack into W3 or W4.
 - Do not touch the replay sibling
   (`com.solaxcloud.starter.set-discharge-to-limit-replay`) as part of this
@@ -108,6 +111,106 @@ honestly PR-ready.
 - `apps/node` build + unit tests pass
 - `./scripts/docs_build.sh` succeeds
 
+## Phase C2.0: Bypass Dependency Probe (gate for C2)
+
+### Goal
+
+Produce committed evidence for the `CLAWPERATOR_SKILL_AGENT_ALLOW_BYPASS`
+delete-vs-promote fork *before* any edit to `scripts/run.js`. The caveat this
+closes: nobody currently knows whether the one successful proving run
+depended on `--dangerously-bypass-approvals-and-sandbox`. An implementation
+agent must not silently re-smuggle the flag, and must not delete it blindly.
+
+This phase is a hard gate. C2 cannot begin until C2.0 is complete and its
+evidence is committed.
+
+### Current Reality To Verify Before Probing
+
+- `skills/com.solaxcloud.starter.set-discharge-to-limit-orchestrated/scripts/run.js:12`
+  reads `CLAWPERATOR_SKILL_AGENT_ALLOW_BYPASS` and, when set to `1`, splices
+  `--dangerously-bypass-approvals-and-sandbox` into the codex argv.
+- The flag is not documented in `SKILL.md`, `skill.json`, `docs/skills/`, or
+  the task pack. It exists only in `run.js`.
+- The skills pack currently has exactly one recorded live proving success.
+  No artifact exists that confirms whether that run was produced with the
+  bypass flag set or unset.
+
+### Steps
+
+1. Git-archaeology, no device needed. Search for any written trace of the
+   successful proving run command and environment:
+   ```
+   git -C ../clawperator-skills log --all -p -- skills/com.solaxcloud.starter.set-discharge-to-limit-orchestrated/scripts/run.js | head -400
+   git -C ../clawperator log --all --grep "proving\|orchestrated\|W2b\|Solax" --oneline
+   git -C ../clawperator log --all -p -- tasks/recording/agent-driven-skills/ | head -400
+   ```
+   If the historical run is provably bypass-free (e.g. the commit message or
+   a task-pack note says so), record that in the probe artifact anyway; it
+   does not replace the live probe, but it weakens the "might be load-bearing"
+   concern.
+2. Capture the codex baseline on the proving host:
+   ```
+   codex --version
+   codex exec --help 2>&1 | grep -iE "sandbox|approval|ask|dangerously"
+   ```
+   Save the output into the probe directory. This is how the probe outcome
+   will be interpretable six months from now when codex defaults have moved.
+3. Establish the same clean baseline starting state C3 will use (see C3
+   Step 1 for the fields that must match). Record device serial, Android
+   version, SolaX Cloud app version, operator package
+   (`com.clawperator.operator.dev`), pre-run app state, and the initial
+   discharge-to-limit slider value.
+4. Run the current, unchanged orchestrated skill once against the physical
+   Samsung target with the bypass explicitly unset and the Clawperator
+   branch-local build:
+   ```
+   unset CLAWPERATOR_SKILL_AGENT_ALLOW_BYPASS
+   CLAWPERATOR_SKILLS_REGISTRY=../clawperator-skills/skills/skills-registry.json \
+   node apps/node/dist/cli/index.js skills run \
+     com.solaxcloud.starter.set-discharge-to-limit-orchestrated \
+     --device <device_serial> \
+     --operator-package com.clawperator.operator.dev \
+     --output json -- 40 \
+     2> probe.stderr > probe.json
+   ```
+   Capture `probe.json`, `probe.stderr`, the exact shell command used,
+   start time, and end time.
+5. Classify the outcome into exactly one of the three predetermined buckets.
+   Do not invent a fourth.
+
+   | Bucket | Observation | Action |
+   | --- | --- | --- |
+   | A: bypass-independent success | `probe.json` contains a `status: "success"` SkillResult and `terminalVerification.status: "verified"` | Delete `CLAWPERATOR_SKILL_AGENT_ALLOW_BYPASS` from `scripts/run.js` in C2 Step 4 with no promotion. The probe run itself may count as `run-00` for C3. |
+   | B: sandbox/approval-cited failure | `probe.stderr` cites codex sandbox, approval, "denied", "read-only", "cannot write", subprocess-blocked, or codex refuses to spawn the Clawperator child | Stop. Do not delete the flag. Open the declared-contract conversation: propose a field on `skill.json.agent` (e.g. `approvalMode: "bypass"` or `sandboxMode: "workspace-write"`), add runtime support in `apps/node/src/domain/skills/skillManifest.ts` and `runSkill.ts`, document it in `docs/skills/authoring.md`, and only then continue C2. The probe stderr is the PR justification for the contract change. |
+   | C: inconclusive failure | Failure is real but unrelated to sandbox/approval policy (flake, timeout, app state, layout drift). Stderr contains no sandbox/approval signal. | Retry the probe up to 2 more times from the same clean baseline. If all three attempts fail without citing sandbox/approval, treat this as bypass-independent unreliability: proceed with C2 Step 4 deletion *and* flag the instability as a risk for C3. All three probe attempts must be committed. |
+6. Commit the probe artifacts and the classification decision in a single
+   commit before touching `run.js`:
+   ```
+   docs(reliability): probe codex sandbox dependency for Solax orchestrated skill
+   ```
+   Required artifacts under
+   `docs/internal/design/reliability/solax-discharge-to-limit-orchestrated/probe-no-bypass/`:
+   - `README.md` (bucket, classification reasoning, codex version, baseline
+     fields, exact command used, decision for C2)
+   - `probe.json` (or `probe-attempt-1.json`, `probe-attempt-2.json`,
+     `probe-attempt-3.json` for bucket C)
+   - `probe.stderr` (same pattern)
+   - `codex-version.txt`
+   - `codex-sandbox-flags.txt`
+7. If bucket B was hit, open a small sibling task (or extend C2 Step 4) for
+   the `skill.json.agent` contract extension work. Do not start C2 Step 1-3
+   until the contract shape is decided.
+
+### Acceptance Criteria
+
+- the probe directory exists and contains the required artifacts
+- the probe `README.md` names exactly one of buckets A, B, or C
+- the decision path for C2 Step 4 is pinned in writing (delete, promote, or
+  delete-with-reliability-risk-flag)
+- if bucket B was hit, a declared-contract design note exists before C2
+  Step 1 begins
+- no edit to `scripts/run.js` has been made yet at the end of this phase
+
 ## Phase C2: Thin The Solax Orchestrated Harness
 
 ### Goal
@@ -178,12 +281,25 @@ not.
    - do not pass `--add-dir <clawperatorRepoRoot>` to codex; if codex needs
      filesystem visibility at all, limit it to the skills repo directory that
      the harness already knows about
-4. Remove the hidden sandbox/approval bypass knob:
-   - delete `CLAWPERATOR_SKILL_AGENT_ALLOW_BYPASS` and the conditional
-     `--dangerously-bypass-approvals-and-sandbox` insertion
-   - if the skill genuinely cannot run without that bypass on the proving
-     host, stop and surface the question before continuing: this becomes a
-     `skill.json.agent` contract question, not a harness question
+4. Remove the hidden sandbox/approval bypass knob, using the C2.0 probe
+   result as the single source of truth for which path to take:
+   - if C2.0 hit bucket A (bypass-independent success) or bucket C
+     (inconclusive failure, no sandbox/approval signal), delete
+     `CLAWPERATOR_SKILL_AGENT_ALLOW_BYPASS` and the conditional
+     `--dangerously-bypass-approvals-and-sandbox` insertion from
+     `scripts/run.js`
+   - if C2.0 hit bucket B (sandbox/approval-cited failure), do not delete
+     the behavior. Instead, the bypass must be promoted into the public
+     `skill.json.agent` contract as a declared field, added to
+     `apps/node/src/contracts/skills.ts`, parsed in
+     `apps/node/src/domain/skills/skillManifest.ts`, threaded through
+     `runSkill.ts` into the harness env as a new public env var, and
+     documented in `docs/skills/authoring.md` and
+     `docs/skills/overview.md`. Only after that contract work is merged
+     may `CLAWPERATOR_SKILL_AGENT_ALLOW_BYPASS` be removed from
+     `scripts/run.js` and replaced with a read of the new declared field.
+   - under no circumstances may the bypass path continue to exist as a
+     private, undocumented env var in `scripts/run.js`
 5. Update the skill and public docs so the codex-only W2b v1 limitation is
    explicit:
    - add a short note at the top of
@@ -289,14 +405,32 @@ independently reviewable.
 1. `docs(tasks): add W2b closeout follow-up pack`
 2. `fix(skills): reject malformed orchestrated agent metadata`
 3. `docs(skills): list SKILL_AGENT_CLI_UNAVAILABLE and orchestrated env vars`
-4. `refactor(solax): thin orchestrated codex harness`
-5. `docs(solax): document codex-only W2b v1 limitation`
-6. `docs(reliability): record Solax orchestrated 10-run validation`
-7. `docs(tasks): update W2b closeout and agent-driven-skills status`
+4. `docs(reliability): probe codex sandbox dependency for Solax orchestrated skill`
+5. (only if C2.0 hit bucket B) `feat(skills): declare agent approval-mode field on skill.json.agent`
+6. `refactor(solax): thin orchestrated codex harness`
+7. `docs(solax): document codex-only W2b v1 limitation`
+8. `docs(reliability): record Solax orchestrated 10-run validation`
+9. `docs(tasks): update W2b closeout and agent-driven-skills status`
 
 Commits 1-3 belong to the Clawperator repo PR.
-Commits 4-6 belong to the skills repo PR.
-Commit 7 may span both repos as small status-file edits.
+Commit 4 also belongs to the Clawperator repo PR: probe evidence lives
+under `docs/internal/design/reliability/solax-discharge-to-limit-orchestrated/probe-no-bypass/`
+in the Clawperator repo (the reliability evidence surface is Clawperator-side
+by existing convention), not in the skills pack.
+Commit 5 is conditional and, if present, spans both repos: the contract
+shape lands in Clawperator (`apps/node/src/contracts/skills.ts`,
+`skillManifest.ts`, `runSkill.ts`, docs) and the consuming `skill.json.agent`
+edit lands in the skills repo.
+Commits 6-7 belong to the skills repo PR.
+Commit 8 belongs to the Clawperator repo PR (reliability evidence lives in
+the Clawperator reliability dir for the same reason as commit 4).
+Commit 9 may span both repos as small status-file edits.
+
+Because the reliability artifacts live in Clawperator but the skills repo PR
+depends on the reliability threshold being met, the skills repo PR is
+practically gated on merging the Clawperator PR (or at least on the
+reliability commits landing in the Clawperator branch) before it is marked
+ready. This ordering is expected and should not be worked around.
 
 The Clawperator repo PR may be considered ready as soon as C1 is complete and
 its validation is green. The skills repo PR is not ready until C2 and C3 are
