@@ -12,6 +12,7 @@ import {
   SKILL_OUTPUT_ASSERTION_FAILED,
   SKILL_RESULT_PARSE_FAILED,
   SKILL_AGENT_CLI_UNAVAILABLE,
+  SKILL_VALIDATION_FAILED,
   type SkillAgentConfig,
 } from "../../contracts/skills.js";
 import {
@@ -278,10 +279,20 @@ export async function runSkill(
 
     const repoRoot = getRepoRoot(loaded.resolvedPath);
     const manifestResult = await readSkillManifestMetadata(repoRoot, skill.path);
+    if (!manifestResult.ok) {
+      return {
+        ok: false,
+        code: SKILL_VALIDATION_FAILED,
+        message: manifestResult.message,
+        skillId,
+        skillResult: null,
+      };
+    }
+
     sourceResolution = await resolveSkillResultSource(manifestResult);
     skillProgramPath = join(repoRoot, skill.skillFile);
 
-    const manifestAgent = manifestResult.ok ? manifestResult.metadata.agent : undefined;
+    const manifestAgent = manifestResult.metadata.agent;
     const isAgentDriven = manifestAgent !== null && manifestAgent !== undefined;
     const scriptRelative = isAgentDriven
       ? skill.scripts.find((scriptPath) => scriptPath.endsWith("/scripts/run.js"))

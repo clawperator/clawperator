@@ -1795,10 +1795,11 @@ describe("runSkill", () => {
   });
 
   it("returns SKILL_SCRIPT_NOT_FOUND when script file missing", async () => {
-    // The fixture registry has a script path that doesn't exist on disk
+    // The fixture registry entry points at a skill folder that is not present on disk.
     const result = await runSkill("com.android.settings.capture-overview", []);
     assert.ok(!result.ok);
-    assert.strictEqual(result.code, SKILL_SCRIPT_NOT_FOUND);
+    assert.strictEqual(result.code, SKILL_VALIDATION_FAILED);
+    assert.match(result.message, /Unable to read trusted skill result source metadata/i);
   });
 
   it("runs script and captures output on success", async () => {
@@ -2597,13 +2598,15 @@ describe("runSkill", () => {
     try {
       const framedResult = await runSkill("com.test.invalid-source-skill", ["valid"], temp.registryPath);
       assert.ok(!framedResult.ok);
-      assert.strictEqual(framedResult.code, SKILL_RESULT_PARSE_FAILED);
+      assert.strictEqual(framedResult.code, SKILL_VALIDATION_FAILED);
       assert.match(framedResult.message, /trusted skill result source metadata/i);
+      assert.strictEqual(framedResult.skillResult, null);
 
       const legacyResult = await runSkill("com.test.invalid-source-skill", ["legacy"], temp.registryPath);
-      assert.ok(legacyResult.ok, `Expected legacy path to stay permissive: ${"message" in legacyResult ? legacyResult.message : ""}`);
+      assert.ok(!legacyResult.ok);
+      assert.strictEqual(legacyResult.code, SKILL_VALIDATION_FAILED);
+      assert.match(legacyResult.message, /trusted skill result source metadata/i);
       assert.strictEqual(legacyResult.skillResult, null);
-      assert.strictEqual(legacyResult.output, "legacy-output-only\n");
     } finally {
       await temp.cleanup();
     }
@@ -2629,7 +2632,7 @@ describe("runSkill", () => {
     try {
       const result = await runSkill("com.test.non-object-source-skill", ["valid"], temp.registryPath);
       assert.ok(!result.ok);
-      assert.strictEqual(result.code, SKILL_RESULT_PARSE_FAILED);
+      assert.strictEqual(result.code, SKILL_VALIDATION_FAILED);
       assert.match(result.message, /skill\.json must contain a JSON object/i);
       assert.strictEqual(result.skillResult, null);
     } finally {
@@ -2661,10 +2664,39 @@ describe("runSkill", () => {
     try {
       const framedResult = await runSkill("com.test.invalid-agent-source-skill", ["valid"], temp.registryPath);
       assert.ok(!framedResult.ok);
-      assert.strictEqual(framedResult.code, SKILL_RESULT_PARSE_FAILED);
+      assert.strictEqual(framedResult.code, SKILL_VALIDATION_FAILED);
       assert.match(framedResult.message, /agent\.cli must be a non-empty string/i);
+      assert.strictEqual(framedResult.skillResult, null);
 
       const legacyResult = await runSkill("com.test.invalid-agent-source-skill", ["legacy"], temp.registryPath);
+      assert.ok(!legacyResult.ok);
+      assert.strictEqual(legacyResult.code, SKILL_VALIDATION_FAILED);
+      assert.match(legacyResult.message, /agent\.cli must be a non-empty string/i);
+      assert.strictEqual(legacyResult.skillResult, null);
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
+  it("keeps the legacy path permissive when skill.json has no agent block", async () => {
+    const fixtureScript = join(
+      packageRoot,
+      "src",
+      "test",
+      "fixtures",
+      "skills",
+      "com.test.skill-result",
+      "scripts",
+      "emit_skill_result.js"
+    );
+    const temp = await createTempRegistryWithSkill({
+      skillId: "com.test.absent-agent-source-skill",
+      scriptSourcePath: fixtureScript,
+      skillJsonContents: JSON.stringify({}),
+    });
+
+    try {
+      const legacyResult = await runSkill("com.test.absent-agent-source-skill", ["legacy"], temp.registryPath);
       assert.ok(legacyResult.ok, `Expected legacy path to stay permissive: ${"message" in legacyResult ? legacyResult.message : ""}`);
       assert.strictEqual(legacyResult.skillResult, null);
       assert.strictEqual(legacyResult.output, "legacy-output-only\n");
